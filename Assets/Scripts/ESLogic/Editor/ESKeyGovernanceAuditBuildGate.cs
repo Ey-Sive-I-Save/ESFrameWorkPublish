@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -19,6 +21,7 @@ namespace ES
         public void OnPreprocessBuild(BuildReport report)
         {
             ESKeyGovernanceAudit.RunAndThrowIfErrors("Player build");
+            ESMonoScriptIdentityAudit.RunAndThrowIfErrors("Player build");
             ESCharacterTemplateReleaseGate.RunAndThrowIfErrors("Player build");
             ESAudioContentAudit.RunAndThrowIfErrors("Player build", true);
         }
@@ -27,19 +30,202 @@ namespace ES
     /// <summary>
     /// Keeps the resource pipeline extensible: ES_Editor exposes the hook and project governance owns the policy.
     /// </summary>
-    [InitializeOnLoad]
-    internal static class ESKeyGovernanceAuditResourceBuildGate
+    /// <summary>资源烘焙前的 Key 审计订阅由 AssemblyStream 显式安装。</summary>
+    internal sealed class ESKeyGovernanceAuditResourceBuildGate : EditorInvoker_Level0
     {
-        static ESKeyGovernanceAuditResourceBuildGate()
+        public override void InitInvoke()
         {
+            ESAssetBundleBuilder.BeforeBuildValidation -= AuditBeforeResourceBake;
             ESAssetBundleBuilder.BeforeBuildValidation += AuditBeforeResourceBake;
         }
 
         private static void AuditBeforeResourceBake()
         {
             ESKeyGovernanceAudit.RunAndThrowIfErrors("Resource bake");
+            ESMonoScriptIdentityAudit.RunAndThrowIfErrors("Resource bake");
             ESCharacterTemplateReleaseGate.RunAndThrowIfErrors("Resource bake");
             ESAudioContentAudit.RunAndThrowIfErrors("Resource bake", false);
+        }
+    }
+
+    /// <summary>
+    /// 迁移脚本的硬门禁：Unity 的资产引用依赖 .meta GUID，而可挂载脚本还要求
+    /// 文件名、Mono 类型名和编译后的 MonoScript 三者一致。该审计只覆盖已登记的
+    /// 高风险类型迁移，不对历史实验代码做未经授权的全盘重命名。
+    /// </summary>
+    internal static class ESMonoScriptIdentityAudit
+    {
+        private readonly struct MigrationContract
+        {
+            public readonly string assetPath;
+            public readonly string expectedGuid;
+            public readonly Type expectedType;
+            public readonly string oldTypeName;
+
+            public MigrationContract(string assetPath, string expectedGuid, Type expectedType, string oldTypeName)
+            {
+                this.assetPath = assetPath;
+                this.expectedGuid = expectedGuid;
+                this.expectedType = expectedType;
+                this.oldTypeName = oldTypeName;
+            }
+        }
+
+        private readonly struct AssetContract
+        {
+            public readonly string assetPath;
+            public readonly string expectedGuid;
+            public readonly string expectedScriptGuid;
+
+            public AssetContract(string assetPath, string expectedGuid, string expectedScriptGuid)
+            {
+                this.assetPath = assetPath;
+                this.expectedGuid = expectedGuid;
+                this.expectedScriptGuid = expectedScriptGuid;
+            }
+        }
+
+        private readonly struct GuidContract
+        {
+            public readonly string assetPath;
+            public readonly string expectedGuid;
+
+            public GuidContract(string assetPath, string expectedGuid)
+            {
+                this.assetPath = assetPath;
+                this.expectedGuid = expectedGuid;
+            }
+        }
+
+        private static readonly MigrationContract[] Contracts =
+        {
+            new MigrationContract(
+                "Assets/Scripts/ESLogic/Runtime/Camera/Content/ESCameraViewDefinition.cs",
+                "2ec636e27c6c4859a44b7fa352b4b91d",
+                typeof(ESCameraViewDefinition),
+                "ESCameraProfile"),
+            new MigrationContract(
+                "Assets/Scripts/ESLogic/Runtime/Camera/Content/ESCameraViewDefinitionCatalog.cs",
+                "9ee80928fa684cddb3b4933b80c7b974",
+                typeof(ESCameraViewDefinitionCatalog),
+                "ESCameraProfileCatalog"),
+            new MigrationContract(
+                "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Utilities/EntityCharacterIdentity.cs",
+                "8c00f6a7e06e4b7ca48b68f6b52ba0cb",
+                typeof(EntityCharacterIdentity),
+                "EntityCharacterProfile"),
+            new MigrationContract(
+                "Assets/Scripts/ESLogic/Runtime/State/Parameter/System/StateDefaultNumericParameterConfig.cs",
+                "b733ce200c4cfae449d38052fbd29000",
+                typeof(StateDefaultNumericParameterConfig),
+                "StateDefaultNumericParameterProfile")
+        };
+
+        private static readonly AssetContract[] AssetContracts =
+        {
+            new AssetContract(
+                "Assets/ESNormalAssets/Camera/ESCameraViewDefinitionCatalog.asset",
+                "38bda9db880d3ea4a83af046c5168196",
+                "9ee80928fa684cddb3b4933b80c7b974"),
+            new AssetContract(
+                "Assets/ESNormalAssets/Camera/ViewDefinitions/PlayerThirdPerson.asset",
+                "3d32a95d6d34fd44db1788e400d88c5d",
+                "2ec636e27c6c4859a44b7fa352b4b91d"),
+            new AssetContract(
+                "Assets/ESNormalAssets/Camera/ViewDefinitions/VehicleChase.asset",
+                "abf9fc5bfa606cd48a28755e5498c7a4",
+                "2ec636e27c6c4859a44b7fa352b4b91d")
+        };
+
+        private static readonly GuidContract[] GuidContracts =
+        {
+            new GuidContract(
+                "Assets/ESNormalAssets/Camera/ViewDefinitions",
+                "992a331a462668449953985468822d17")
+        };
+
+        [MenuItem("【ES】/开发与维护/审计/Mono脚本名称与GUID")]
+        private static void RunAndLog()
+        {
+            List<string> errors = new List<string>(Contracts.Length * 2);
+            Validate(errors);
+            if (errors.Count == 0)
+            {
+                Debug.Log("[ES Mono脚本审计] 通过：迁移脚本的文件名、Mono 类型名、GUID 均一致。");
+                return;
+            }
+
+            Debug.LogError(BuildReport("手动审计", errors));
+        }
+
+        internal static void RunAndThrowIfErrors(string stage)
+        {
+            List<string> errors = new List<string>(Contracts.Length * 2);
+            Validate(errors);
+            if (errors.Count > 0)
+                throw new BuildFailedException(BuildReport(stage, errors));
+        }
+
+        private static void Validate(List<string> errors)
+        {
+            for (int i = 0; i < Contracts.Length; i++)
+            {
+                MigrationContract contract = Contracts[i];
+                MonoScript script = AssetDatabase.LoadAssetAtPath<MonoScript>(contract.assetPath);
+                if (script == null)
+                {
+                    errors.Add(contract.assetPath + "：找不到 MonoScript；旧类型 " + contract.oldTypeName + " 的迁移入口已断裂。");
+                    continue;
+                }
+
+                string fileName = Path.GetFileNameWithoutExtension(contract.assetPath);
+                if (!string.Equals(fileName, contract.expectedType.Name, StringComparison.Ordinal))
+                    errors.Add(contract.assetPath + "：脚本文件名 " + fileName + " 与主类型 " + contract.expectedType.Name + " 不一致。");
+
+                Type actualType = script.GetClass();
+                if (actualType != contract.expectedType)
+                    errors.Add(contract.assetPath + "：MonoScript.GetClass() 为 "
+                               + (actualType == null ? "<null>" : actualType.FullName)
+                               + "，期望 " + contract.expectedType.FullName + "。");
+
+                string guid = AssetDatabase.AssetPathToGUID(contract.assetPath);
+                if (!string.Equals(guid, contract.expectedGuid, StringComparison.Ordinal))
+                    errors.Add(contract.assetPath + "：GUID=" + guid + "，期望保留旧 GUID=" + contract.expectedGuid + "。");
+            }
+
+            for (int i = 0; i < AssetContracts.Length; i++)
+            {
+                AssetContract contract = AssetContracts[i];
+                string absoluteAssetPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", contract.assetPath));
+                if (!File.Exists(absoluteAssetPath))
+                {
+                    errors.Add(contract.assetPath + "：迁移后的资产不存在。");
+                    continue;
+                }
+
+                string guid = AssetDatabase.AssetPathToGUID(contract.assetPath);
+                if (!string.Equals(guid, contract.expectedGuid, StringComparison.Ordinal))
+                    errors.Add(contract.assetPath + "：资产 GUID=" + guid + "，期望保留旧 GUID=" + contract.expectedGuid + "。");
+
+                string yaml = File.ReadAllText(absoluteAssetPath, Encoding.UTF8);
+                string expectedScript = "m_Script: {fileID: 11500000, guid: " + contract.expectedScriptGuid + ", type: 3}";
+                if (yaml.IndexOf(expectedScript, StringComparison.Ordinal) < 0)
+                    errors.Add(contract.assetPath + "：m_Script 未指向期望脚本 GUID=" + contract.expectedScriptGuid + "。");
+            }
+
+            for (int i = 0; i < GuidContracts.Length; i++)
+            {
+                GuidContract contract = GuidContracts[i];
+                string guid = AssetDatabase.AssetPathToGUID(contract.assetPath);
+                if (!string.Equals(guid, contract.expectedGuid, StringComparison.Ordinal))
+                    errors.Add(contract.assetPath + "：目录 GUID=" + guid + "，期望保留旧 GUID=" + contract.expectedGuid + "。");
+            }
+        }
+
+        private static string BuildReport(string stage, List<string> errors)
+        {
+            return "[ES Mono脚本审计] " + stage + " 已阻止：发现 " + errors.Count + " 个错误。\n- "
+                   + string.Join("\n- ", errors);
         }
     }
 
@@ -52,7 +238,7 @@ namespace ES
     {
         private static readonly string[] AssetSearchRoots = { "Assets" };
 
-        [MenuItem("【ES】/审计/音频内容与对象池")]
+        [MenuItem("【ES】/开发与维护/审计/音频内容与对象池")]
         private static void RunAndLog()
         {
             var errors = new List<string>(32);

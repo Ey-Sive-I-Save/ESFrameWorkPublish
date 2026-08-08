@@ -1222,7 +1222,8 @@ namespace ES
 
             try
             {
-                using (var writer = new StreamWriter(reportPath, false, Encoding.UTF8))
+                var reportBuilder = new StringBuilder(16 * 1024);
+                using (var writer = new StringWriter(reportBuilder))
                 {
                     writer.WriteLine("=== 资产引用分析报告 ===");
                     writer.WriteLine($"生成时间: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
@@ -1290,6 +1291,7 @@ namespace ES
                     }
                 }
 
+                ESManagedFileIO.WriteTextAtUserSelectedPath(reportPath, reportBuilder.ToString(), Encoding.UTF8);
                 EditorUtility.RevealInFinder(reportPath);
                 ShowCompletionDialog("导出完成", $"分析报告已导出到：\n{reportPath}");
             }
@@ -1881,8 +1883,9 @@ namespace ES
                     lines.AddRange(failedMessages);
                 }
 
-                File.WriteAllLines(fullPath, lines, Encoding.UTF8);
+                ESManagedFileIO.WriteTextAtomic(fullPath, string.Join(Environment.NewLine, lines), Encoding.UTF8, Application.dataPath);
                 AssetDatabase.ImportAsset(manifestAssetPath);
+                EditorUtility.RevealInFinder(fullPath);
             }
             catch (Exception ex)
             {

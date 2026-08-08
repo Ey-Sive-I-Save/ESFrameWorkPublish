@@ -663,7 +663,104 @@ namespace ES
                         }
                     }
                 }
+                EditorGUILayout.Space(4);
+                DrawExportStateBanner(width);
             }
+        }
+
+        private void DrawExportStateBanner(float width)
+        {
+            ESAssetPackageExportSession session = GetLastExportSession();
+            string attemptState = string.IsNullOrWhiteSpace(bake.lastExportAttemptState) ? "Idle" : bake.lastExportAttemptState;
+            if (string.Equals(attemptState, "Running", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(attemptState, "Failed", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(attemptState, "AwaitingInput", StringComparison.OrdinalIgnoreCase))
+            {
+                string title = string.Equals(attemptState, "Running", StringComparison.OrdinalIgnoreCase)
+                    ? "上一次导出可能在 Unity 重载或异常中断"
+                    : string.Equals(attemptState, "AwaitingInput", StringComparison.OrdinalIgnoreCase)
+                        ? "导出计划等待用户确认"
+                        : "上一次导出事务失败，未确认全部目标已提交";
+                string attemptDetails = title
+                    + "\n会话 " + SafeText(bake.lastExportAttemptSessionId)
+                    + "｜时间 " + SafeText(bake.lastExportAttemptTime)
+                    + "\n" + SafeText(bake.lastExportAttemptMessage);
+                EditorGUILayout.HelpBox(attemptDetails, MessageType.Warning);
+                DrawExportLocationActions(null);
+                if (session != null)
+                    EditorGUILayout.LabelField("最近成功会话仍保留：" + SafeText(session.sessionId), EditorStyles.miniLabel);
+                return;
+            }
+
+            if (string.Equals(attemptState, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            {
+                EditorGUILayout.HelpBox(SafeText(bake.lastExportAttemptMessage), MessageType.Info);
+                DrawExportLocationActions(session);
+                return;
+            }
+
+            if (session == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "尚未提交过导出事务。下一步：先重新烘焙并在分类页勾选资产，再执行‘复制勾选资产’。",
+                    MessageType.Info);
+                return;
+            }
+
+            bool warning = !string.IsNullOrWhiteSpace(session.transactionWarning) || session.errorCount > 0;
+            string status = warning ? "已提交，但存在需要复核的警告" : "导出事务已提交";
+            string details = $"{status}｜会话 {SafeText(session.sessionId)}｜目标 {session.totalAssetCount}｜新增 {session.createdCount}｜更新 {session.updatedCount}";
+            if (warning && !string.IsNullOrWhiteSpace(session.transactionWarning))
+                details += "\n" + session.transactionWarning;
+
+            EditorGUILayout.HelpBox(details, warning ? MessageType.Warning : MessageType.Info);
+            DrawExportLocationActions(session);
+        }
+
+        private void DrawExportLocationActions(ESAssetPackageExportSession session)
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(bake.exportRootPath)))
+                {
+                    if (GUILayout.Button("定位导出目录", EditorStyles.toolbarButton, GUILayout.Width(96)))
+                        RevealExportRoot();
+                    if (GUILayout.Button("复制完整路径", EditorStyles.toolbarButton, GUILayout.Width(96)))
+                        CopyExportRootPath();
+                }
+                GUILayout.FlexibleSpace();
+                if (session != null)
+                {
+                    string transactionState = string.IsNullOrWhiteSpace(session.transactionState) ? "历史会话" : session.transactionState;
+                    EditorGUILayout.LabelField("事务状态：" + transactionState, EditorStyles.miniLabel, GUILayout.Width(180));
+                }
+            }
+        }
+
+        private ESAssetPackageExportSession GetLastExportSession()
+        {
+            return bake != null && bake.exportSessions != null && bake.exportSessions.Count > 0
+                ? bake.exportSessions[bake.exportSessions.Count - 1]
+                : null;
+        }
+
+        private void RevealExportRoot()
+        {
+            string fullPath = AssetPathToFullPath(bake.exportRootPath);
+            if (Directory.Exists(fullPath))
+            {
+                EditorUtility.RevealInFinder(fullPath);
+                return;
+            }
+
+            EditorUtility.DisplayDialog("导出目录不可用", "当前导出目录不存在：\n" + bake.exportRootPath, "确定");
+        }
+
+        private void CopyExportRootPath()
+        {
+            string fullPath = AssetPathToFullPath(bake.exportRootPath);
+            EditorGUIUtility.systemCopyBuffer = fullPath;
+            ESAssetPackageBakeWindow.UsingWindow?.ShowNotification(new GUIContent("已复制完整导出路径"));
         }
 
         private void DrawPathConfig(float width)
@@ -698,6 +795,18 @@ namespace ES
                 bake.exportDependencies = EditorGUILayout.ToggleLeft("导出依赖资源", bake.exportDependencies);
                 bake.remapExportedGuids = EditorGUILayout.ToggleLeft("重映射导出内部 GUID", bake.remapExportedGuids);
                 bake.overwriteExistingExport = EditorGUILayout.ToggleLeft("重复导出时覆盖旧目标", bake.overwriteExistingExport);
+                if (bake.overwriteExistingExport)
+                {
+                    EditorGUILayout.HelpBox(
+                        "覆盖模式会先备份已有目标，暂存全部新资产并在提交阶段替换；失败时会尝试恢复。Unity 刷新或用户外部修改仍可能留下需复核的事务现场。",
+                        MessageType.Warning);
+                }
+                else
+                {
+                    EditorGUILayout.HelpBox(
+                        "默认不覆盖已有链路目标；冲突会生成唯一目标或列入跳过清单。",
+                        MessageType.Info);
+                }
 
                 DrawCategoryFolderConfig();
 
@@ -707,6 +816,10 @@ namespace ES
                     {
                         if (GUILayout.Button("Ping 导出目录", GUILayout.Width(96)))
                             PingFolder(bake.exportRootPath);
+                        if (GUILayout.Button("打开目录", GUILayout.Width(78)))
+                            RevealExportRoot();
+                        if (GUILayout.Button("复制路径", GUILayout.Width(78)))
+                            CopyExportRootPath();
                     }
                     GUILayout.FlexibleSpace();
                 }
@@ -750,6 +863,13 @@ namespace ES
                 {
                     ESAssetPackageExportSession last = bake.exportSessions[bake.exportSessions.Count - 1];
                     EditorGUILayout.LabelField("最近会话", $"{last.sessionId} | 新增 {last.createdCount} | 更新 {last.updatedCount} | 失败 {last.errorCount}");
+                    EditorGUILayout.LabelField("事务状态", string.IsNullOrWhiteSpace(last.transactionState) ? "历史会话" : last.transactionState);
+                    if (!string.IsNullOrWhiteSpace(last.transactionWarning))
+                        EditorGUILayout.HelpBox(last.transactionWarning, MessageType.Warning);
+                }
+                else
+                {
+                    EditorGUILayout.HelpBox("暂无导出会话。导出完成后，这里会显示事务状态、目标数量和恢复入口。", MessageType.Info);
                 }
             }
         }
@@ -2167,7 +2287,10 @@ namespace ES
                     DrawAnimationDetail(asset, targetRecord);
                     break;
                 case ESAssetPackageCategory.Shader:
-                    ESAssetPackagePreviewUtility.DrawShaderDetail(asset as Shader, bake);
+                    if (asset is Shader shader)
+                        ESAssetPackagePreviewUtility.DrawShaderDetail(shader, bake);
+                    else
+                        ESAssetPackagePreviewUtility.DrawObjectPreviewDetail(asset, targetRecord.assetPath);
                     break;
                 case ESAssetPackageCategory.Font:
                     ESAssetPackagePreviewUtility.DrawFontDetail(asset);
@@ -2972,6 +3095,26 @@ namespace ES
         public static void DrawObjectPreviewDetail(UnityEngine.Object asset, string path)
         {
             DrawLargePreview(asset, 220);
+            EditorGUILayout.LabelField("类型", asset != null ? asset.GetType().Name : "资源缺失");
+            EditorGUILayout.LabelField("路径", string.IsNullOrWhiteSpace(path) ? "无" : path);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("复制路径"))
+                    EditorGUIUtility.systemCopyBuffer = path ?? string.Empty;
+                using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(path)))
+                {
+                    if (GUILayout.Button("打开所在目录"))
+                    {
+                        string projectRoot = Directory.GetParent(Application.dataPath)?.FullName;
+                        string fullPath = string.IsNullOrEmpty(projectRoot) || string.IsNullOrWhiteSpace(path)
+                            ? string.Empty
+                            : Path.Combine(projectRoot, path.Replace('/', Path.DirectorySeparatorChar));
+                        string directory = string.IsNullOrEmpty(fullPath) ? string.Empty : Path.GetDirectoryName(fullPath);
+                        if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
+                            EditorUtility.RevealInFinder(directory);
+                    }
+                }
+            }
             string[] deps = string.IsNullOrEmpty(path) ? Array.Empty<string>() : AssetDatabase.GetDependencies(path, false);
             EditorGUILayout.LabelField("直接依赖", deps.Length.ToString());
             for (int i = 0; i < Mathf.Min(8, deps.Length); i++)
@@ -3115,7 +3258,7 @@ namespace ES
             if (texture != null)
                 GUI.DrawTexture(rect, texture, ScaleMode.ScaleToFit);
             else
-                GUI.Label(rect, "无预览", EditorStyles.centeredGreyMiniLabel);
+                GUI.Label(rect, "预览不可用（资源类型、导入状态或当前 Unity 环境不支持）", EditorStyles.centeredGreyMiniLabel);
         }
 
         private static void PlayAudioClip(AudioClip clip)
@@ -3981,7 +4124,7 @@ namespace ES
                 {
                     string name = Path.GetFileName(viewDirectories[i]);
                     if (!string.IsNullOrEmpty(name) && name.EndsWith(yawSuffix, StringComparison.Ordinal))
-                        Directory.Delete(viewDirectories[i], true);
+                        ESManagedFileIO.DeleteDirectory(viewDirectories[i], GetPersistentRoot());
                 }
             }
             catch (Exception ex)
@@ -4548,7 +4691,8 @@ namespace ES
                 try
                 {
                     if (Directory.Exists(persistentDirectory))
-                        Directory.Delete(persistentDirectory, true);
+                        ESManagedFileIO.DeleteDirectory(persistentDirectory, GetPersistentRoot());
+                    ESManagedFileIO.EnsurePath(persistentDirectory, false, GetPersistentRoot());
                     Directory.CreateDirectory(persistentDirectory);
                     preparedPersistentWrite = true;
                 }
@@ -4578,7 +4722,7 @@ namespace ES
                     {
                         byte[] png = frames[frameIndex].EncodeToPNG();
                         if (png != null && png.Length > 0)
-                            File.WriteAllBytes(GetFramePath(persistentDirectory, frameIndex), png);
+                            ESManagedFileIO.WriteBytesAtomic(GetFramePath(persistentDirectory, frameIndex), png, GetPersistentRoot());
                     }
                     catch (Exception ex)
                     {
@@ -4596,8 +4740,7 @@ namespace ES
 
                 try
                 {
-                    Directory.CreateDirectory(persistentDirectory);
-                    File.WriteAllText(GetManifestPath(persistentDirectory), manifestContent, Encoding.UTF8);
+                    ESManagedFileIO.WriteTextAtomic(GetManifestPath(persistentDirectory), manifestContent, Encoding.UTF8, GetPersistentRoot());
                 }
                 catch (Exception ex)
                 {

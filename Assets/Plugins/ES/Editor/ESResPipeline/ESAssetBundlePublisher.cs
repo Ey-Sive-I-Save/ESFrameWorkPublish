@@ -25,6 +25,11 @@ namespace ES
         private static void PublishCore()
         {
             ESAssetPipelineIO.EnsureAssetBundleReleaseMode();
+            var sourceLibraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>()
+                .Where(item => item != null && item.ContainsBuild)
+                .OrderBy(item => item.LibFolderName, StringComparer.Ordinal)
+                .ToList();
+            ESAssetReferenceBaker.ValidateSourceStateForBuild(sourceLibraries);
             string platform = ESAssetPipelineIO.PlatformName;
             string stagingRoot = ESAssetPipelineIO.StagingRoot(platform);
             if (!Directory.Exists(stagingRoot)) throw new DirectoryNotFoundException("资源包暂存目录不存在，请先执行“构建资源包”：" + stagingRoot);
@@ -81,7 +86,7 @@ namespace ES
                     ? CombineUrl(ESGlobalResSetting.Instance.Path_Net, relativeBase + ESAssetPipelineIO.BundleManifestFileName)
                     : string.Empty;
                 if (includeInitialPackage && hasEmbeddedCopy)
-                    CopyStage(stageFolder, ESAssetPipelineIO.EmbeddedLibraryFolder(initialRoot, platform, libraryFolder), manifest, identity);
+                    CopyStage(stageFolder, ESAssetPipelineIO.EmbeddedLibraryFolder(initialRoot, platform, libraryFolder), manifest, identity, true);
                 string localTestLibraryFolder = ESAssetPipelineIO.ReleaseLibraryFolder(localTestRoot, string.Empty, releaseVersion, libraryFolder);
                 CopyStage(stageFolder, localTestLibraryFolder, manifest, identity);
                 if (hasRemoteCopy)
@@ -136,9 +141,9 @@ namespace ES
             string localBundleIndexPath = Path.Combine(localTestRoot, releaseVersion, ESAssetPipelineIO.ReleaseBundleIndexFileName);
             string cdnBundleIndexPath = Path.Combine(cdnRoot, releaseVersion, ESAssetPipelineIO.ReleaseBundleIndexFileName);
             if (includeInitialPackage)
-                ESAssetPipelineIO.WriteJson(initialBundleIndexPath, bundleIndex, true);
-            ESAssetPipelineIO.WriteJson(localBundleIndexPath, bundleIndex, true);
-            ESAssetPipelineIO.WriteJson(cdnBundleIndexPath, bundleIndex, true);
+                ESAssetPipelineIO.WriteJsonCreateNew(initialBundleIndexPath, bundleIndex);
+            ESAssetPipelineIO.WriteJsonCreateNew(localBundleIndexPath, bundleIndex);
+            ESAssetPipelineIO.WriteJsonCreateNew(cdnBundleIndexPath, bundleIndex);
             release.bundleIndexUrl = CombineUrl(ESGlobalResSetting.Instance.Path_Net, bundleIndexRelativePath);
             release.bundleIndexSha256 = ESResManifestIntegrity.ComputeFileSha256(cdnBundleIndexPath);
             SetPublishProgress("校验全局 Bundle 索引与依赖闭包", 0.72f);
@@ -233,7 +238,7 @@ namespace ES
                 if (!string.IsNullOrEmpty(identity.catalogSha256) && !ESResManifestIntegrity.VerifyFileSha256(catalogPath, identity.catalogSha256)) throw new InvalidDataException("Catalog Hash 不匹配：" + catalogPath);
                 foreach (var assetBundle in manifest.assetBundles)
                 {
-                    string file = Path.Combine(folder, assetBundle.localRelativePath.Replace('/', Path.DirectorySeparatorChar));
+                    string file = ESAssetPipelineIO.ResolveGeneratedRelativePath(folder, assetBundle.localRelativePath);
                     if (!File.Exists(file) || new FileInfo(file).Length != assetBundle.size || !ESResManifestIntegrity.VerifyFileSha256(file, assetBundle.sha256)) throw new InvalidDataException("AB 文件完整性失败：" + file);
                     if (packages.ContainsKey(assetBundle.assetBundleKey)) throw new InvalidDataException("重复 AssetBundleKey：" + assetBundle.assetBundleKey);
                     packages.Add(assetBundle.assetBundleKey, assetBundle);
@@ -250,6 +255,9 @@ namespace ES
             if (!Directory.Exists(releaseFolder) || !File.Exists(rootManifestPath))
                 throw new InvalidOperationException("无法生成手动上传计划：发布目录不完整。");
 
+            string validatedCdnRoot = Path.GetFullPath(cdnRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (ContainsExistingReparsePoint(validatedCdnRoot, validatedCdnRoot))
+                throw new UnauthorizedAccessException("上传计划源根不能穿过 junction/symlink：" + cdnRoot);
             var plan = new ESAssetReleaseUploadPlan
             {
                 platform = platform,
@@ -259,16 +267,20 @@ namespace ES
                 generatedUtc = DateTime.UtcNow.ToString("O")
             };
             int order = 0;
-            foreach (string sourcePath in Directory.GetFiles(releaseFolder, "*", SearchOption.AllDirectories).OrderBy(item => item, StringComparer.Ordinal))
+            foreach (string sourcePath in ESManagedFileIO.EnumerateFilesSafely(releaseFolder, "*").OrderBy(item => item, StringComparer.Ordinal))
             {
+                if (ContainsExistingReparsePoint(validatedCdnRoot, sourcePath))
+                    throw new UnauthorizedAccessException("上传计划不能收集 junction/symlink 文件：" + sourcePath);
                 string relativePath = releaseVersion + "/" + sourcePath.Substring(releaseFolder.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Replace('\\', '/');
                 plan.files.Add(CreateUploadPlanFile(sourcePath, relativePath, ++order, false));
             }
+            if (ContainsExistingReparsePoint(validatedCdnRoot, rootManifestPath))
+                throw new UnauthorizedAccessException("上传计划根清单不能指向重解析文件：" + rootManifestPath);
             plan.files.Add(CreateUploadPlanFile(rootManifestPath, ESAssetPipelineIO.ReleaseManifestFileName, ++order, true));
 
             string planFolder = ESAssetPipelineIO.ManualUploadPlansRoot(platform);
             string planPath = Path.Combine(planFolder, releaseVersion + ".json");
-            ESAssetPipelineIO.WriteJson(planPath, plan, true);
+            ESAssetPipelineIO.WriteJsonCreateNew(planPath, plan);
             return planPath;
         }
 
@@ -289,20 +301,41 @@ namespace ES
             };
         }
 
-        private static void CopyStage(string sourceFolder, string destinationFolder, ESAssetBundleManifest manifest, ESAssetLibraryIdentity identity)
+        private static void CopyStage(string sourceFolder, string destinationFolder, ESAssetBundleManifest manifest, ESAssetLibraryIdentity identity,
+            bool replaceManagedDestination = false)
         {
-            RecreateGeneratedDirectory(destinationFolder);
-            var relativePaths = manifest.assetBundles.Select(item => item.localRelativePath)
-                .Concat(new[] { ESAssetPipelineIO.BundleManifestFileName, ESAssetPipelineIO.CatalogFileName })
-                .Distinct(StringComparer.Ordinal);
-            foreach (string relativePath in relativePaths)
+            string destination = Path.GetFullPath(destinationFolder ?? string.Empty);
+            string destinationParent = Path.GetDirectoryName(destination);
+            if (string.IsNullOrWhiteSpace(destinationParent))
+                throw new InvalidDataException("发布 Library 目标目录无效：" + destinationFolder);
+
+            EnsurePublishDirectory(destinationParent);
+            string staging = destination + ".staging-" + Guid.NewGuid().ToString("N");
+            try
             {
-                string sourcePath = Path.Combine(sourceFolder, relativePath.Replace('/', Path.DirectorySeparatorChar));
-                string destinationPath = Path.Combine(destinationFolder, relativePath.Replace('/', Path.DirectorySeparatorChar));
-                Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
-                File.Copy(sourcePath, destinationPath, true);
+                EnsurePublishDirectory(staging);
+                var relativePaths = manifest.assetBundles.Select(item => item.localRelativePath)
+                    .Concat(new[] { ESAssetPipelineIO.BundleManifestFileName, ESAssetPipelineIO.CatalogFileName })
+                    .Distinct(StringComparer.Ordinal);
+                foreach (string relativePath in relativePaths)
+                {
+                    string sourcePath = ESAssetPipelineIO.ResolveGeneratedRelativePath(sourceFolder, relativePath);
+                    string stagingPath = ESAssetPipelineIO.ResolveGeneratedRelativePath(staging, relativePath);
+                    EnsurePublishDirectory(Path.GetDirectoryName(stagingPath));
+                    CopyFile(sourcePath, stagingPath);
+                }
+
+                ESAssetPipelineIO.WriteJsonCreateNew(Path.Combine(staging, ESAssetPipelineIO.LibraryIdentityFileName), identity);
+                VerifyPublishedLibrary(staging, manifest, identity);
+                CommitStagedLibraryDirectory(staging, destination, replaceManagedDestination, manifest, identity);
+                staging = null;
+                VerifyPublishedLibrary(destination, manifest, identity);
             }
-            ESAssetPipelineIO.WriteJson(Path.Combine(destinationFolder, ESAssetPipelineIO.LibraryIdentityFileName), identity);
+            finally
+            {
+                if (!string.IsNullOrEmpty(staging) && Directory.Exists(staging))
+                    DeletePublishDirectory(staging);
+            }
         }
 
         private static void ValidateExistingEmbeddedLibrary(string embeddedFolder, ESAssetBundleManifest manifest, string expectedIdentitySha256)
@@ -315,17 +348,10 @@ namespace ES
                 throw new InvalidOperationException("随包 Library 与当前构建不一致，不能仅发布热更新；请切换 LocalBuild 重新生成应用首包：" + embeddedFolder);
             foreach (ESAssetBundleRecord bundle in manifest.assetBundles ?? new List<ESAssetBundleRecord>())
             {
-                string path = Path.Combine(embeddedFolder, bundle.localRelativePath.Replace('/', Path.DirectorySeparatorChar));
+                string path = ESAssetPipelineIO.ResolveGeneratedRelativePath(embeddedFolder, bundle.localRelativePath);
                 if (!File.Exists(path) || new FileInfo(path).Length != bundle.size || !ESResManifestIntegrity.VerifyFileSha256(path, bundle.sha256))
                     throw new InvalidOperationException("随包 Library 的 Bundle 已变化，不能仅发布热更新；请重新生成应用首包：" + bundle.assetBundleKey);
             }
-        }
-
-        private static void RecreateGeneratedDirectory(string path)
-        {
-            if (Directory.Exists(path))
-                Directory.Delete(path, true);
-            Directory.CreateDirectory(path);
         }
 
         private static ESAssetConsumerReference PublishConsumer(ESAssetLibraryConsumer consumer, List<ESAssetLibraryConsumer> allConsumers, Dictionary<string, PublishedLibrary> libraries,
@@ -367,9 +393,9 @@ namespace ES
                 string localPath = Path.Combine(localTestRoot, releaseVersion, "Consumers", consumer.ConsumerId + ".json");
                 string cdnPath = Path.Combine(cdnRoot, releaseVersion, "Consumers", consumer.ConsumerId + ".json");
                 if (!string.IsNullOrEmpty(initialRoot))
-                    ESAssetPipelineIO.WriteJson(initialPath, manifest, true);
-                ESAssetPipelineIO.WriteJson(localPath, manifest, true);
-                ESAssetPipelineIO.WriteJson(cdnPath, manifest, true);
+                    ESAssetPipelineIO.WriteJsonCreateNew(initialPath, manifest);
+                ESAssetPipelineIO.WriteJsonCreateNew(localPath, manifest);
+                ESAssetPipelineIO.WriteJsonCreateNew(cdnPath, manifest);
                 var result = new ESAssetConsumerReference { consumerId = consumer.ConsumerId, consumerUrl = CombineUrl(ESGlobalResSetting.Instance.Path_Net, relativePath), consumerSha256 = ESResManifestIntegrity.ComputeFileSha256(cdnPath) };
                 publications.Add(consumer.ConsumerId, result);
                 return result;
@@ -586,14 +612,16 @@ namespace ES
                     throw new InvalidDataException("发布 Bundle 索引路径无效：" + bundle.assetBundleKey);
                 if (requiresRemote)
                 {
-                    string filePath = Path.Combine(ESAssetPipelineIO.ReleaseLibraryFolder(cdnRoot, string.Empty, releaseVersion, bundle.libraryFolder), bundle.localRelativePath);
+                    string filePath = ESAssetPipelineIO.ResolveGeneratedRelativePath(
+                        ESAssetPipelineIO.ReleaseLibraryFolder(cdnRoot, string.Empty, releaseVersion, bundle.libraryFolder),
+                        bundle.localRelativePath);
                     if (!File.Exists(filePath) || new FileInfo(filePath).Length != bundle.size || !ESResManifestIntegrity.VerifyFileSha256(filePath, bundle.sha256))
                         throw new InvalidDataException("发布 Bundle 远端文件校验失败：" + bundle.assetBundleKey);
                 }
                 if (bundle.deliveryMode == ESAssetDeliveryMode.BuiltIn
                     || (includeInitialPackage && bundle.deliveryMode == ESAssetDeliveryMode.Updateable))
                 {
-                    string embeddedPath = Path.Combine(streamingReleaseRoot, bundle.embeddedRelativePath.Replace('/', Path.DirectorySeparatorChar));
+                    string embeddedPath = ESAssetPipelineIO.ResolveGeneratedRelativePath(streamingReleaseRoot, bundle.embeddedRelativePath);
                     if (!File.Exists(embeddedPath) || new FileInfo(embeddedPath).Length != bundle.size || !ESResManifestIntegrity.VerifyFileSha256(embeddedPath, bundle.sha256))
                         throw new InvalidDataException("发布 Bundle 随包文件校验失败：" + bundle.assetBundleKey);
                 }
@@ -681,15 +709,269 @@ namespace ES
         {
             if (string.IsNullOrWhiteSpace(sourcePath))
                 return string.Empty;
-            return Path.IsPathRooted(sourcePath)
+            string resolved = Path.IsPathRooted(sourcePath)
                 ? Path.GetFullPath(sourcePath)
                 : Path.GetFullPath(Path.Combine(ESAssetPipelineIO.ProjectRoot, sourcePath));
+
+            string projectRoot = Path.GetFullPath(ESAssetPipelineIO.ProjectRoot)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!string.Equals(resolved, projectRoot, StringComparison.OrdinalIgnoreCase)
+                && !resolved.StartsWith(projectRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Consumer 代码包源文件必须位于当前工程根目录内：" + sourcePath);
+
+            if (ContainsExistingReparsePoint(projectRoot, resolved))
+                throw new UnauthorizedAccessException("Consumer 代码包源文件不能穿过 junction/symlink：" + sourcePath);
+            return resolved;
+        }
+
+        private static bool ContainsExistingReparsePoint(string root, string candidate)
+        {
+            string rootFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if ((Directory.Exists(rootFull) || File.Exists(rootFull))
+                && (File.GetAttributes(rootFull) & FileAttributes.ReparsePoint) != 0)
+                return true;
+            string current = rootFull;
+            string relative = candidate.Substring(rootFull.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            foreach (string segment in relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            {
+                if (string.IsNullOrEmpty(segment)) continue;
+                current = Path.Combine(current, segment);
+                if (!Directory.Exists(current) && !File.Exists(current)) break;
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 发布目录先在同一输出根内完成暂存与完整性验证，再以目录移动提交。
+        /// 新版本目录拒绝覆盖；只有 StreamingAssets 的既有受管 Embedded Library 可以进入可恢复替换。
+        /// </summary>
+        private static void CommitStagedLibraryDirectory(
+            string stagingPath,
+            string destinationPath,
+            bool replaceManagedDestination,
+            ESAssetBundleManifest expectedManifest,
+            ESAssetLibraryIdentity expectedIdentity)
+        {
+            string staging = Path.GetFullPath(stagingPath ?? string.Empty);
+            string destination = Path.GetFullPath(destinationPath ?? string.Empty);
+            string outputRoot = GetPublishOutputRoot(destination);
+            if (outputRoot == null || !Directory.Exists(staging))
+                throw new InvalidOperationException("发布暂存目录不在受管输出根内或已经丢失：" + stagingPath);
+            if (ContainsExistingReparsePoint(outputRoot, staging)
+                || ContainsExistingReparsePoint(outputRoot, destination))
+                throw new UnauthorizedAccessException("发布目录提交不能穿过 junction/symlink。");
+
+            if (!Directory.Exists(destination))
+            {
+                Directory.Move(staging, destination);
+                VerifyPublishedLibrary(destination, expectedManifest, expectedIdentity);
+                return;
+            }
+
+            if (!replaceManagedDestination)
+                throw new IOException("发布版本目录已存在，拒绝覆盖。请使用新的发布版本：" + destination);
+
+            ManagedLibraryFingerprint oldFingerprint = CaptureManagedLibraryFingerprint(destination);
+            string backup = destination + ".backup-" + Guid.NewGuid().ToString("N");
+            Directory.Move(destination, backup);
+            EnsureManagedLibraryFingerprint(backup, oldFingerprint, "旧 Embedded Library 备份后身份不一致");
+            bool committed = false;
+            try
+            {
+                Directory.Move(staging, destination);
+                if (!Directory.Exists(destination) || ContainsExistingReparsePoint(outputRoot, destination))
+                    throw new IOException("发布目录提交后不可用：" + destination);
+                VerifyPublishedLibrary(destination, expectedManifest, expectedIdentity);
+                committed = true;
+            }
+            catch (Exception commitException)
+            {
+                try
+                {
+                    if (Directory.Exists(destination))
+                        throw new IOException("提交失败后目标目录已被保留，拒绝删除可能的外部修改：" + destination);
+                    if (!Directory.Exists(backup))
+                        throw new DirectoryNotFoundException("提交失败后旧 Embedded Library 备份丢失：" + backup);
+                    EnsureManagedLibraryFingerprint(backup, oldFingerprint, "恢复前旧 Embedded Library 备份已被修改");
+                    Directory.Move(backup, destination);
+                    EnsureManagedLibraryFingerprint(destination, oldFingerprint, "恢复后的旧 Embedded Library 身份不一致");
+                }
+                catch (Exception restoreException)
+                {
+                    throw new AggregateException("发布目录提交失败且旧目录恢复失败。", commitException, restoreException);
+                }
+
+                throw;
+            }
+            finally
+            {
+                if (committed && Directory.Exists(backup))
+                {
+                    try
+                    {
+                        DeletePublishDirectory(backup);
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        throw new IOException("新 Embedded Library 已提交，但旧目录备份清理失败；已保留现场：" + backup, cleanupException);
+                    }
+                }
+            }
+        }
+
+        private static ManagedLibraryFingerprint CaptureManagedLibraryFingerprint(string destination)
+        {
+            string identityPath = Path.Combine(destination, ESAssetPipelineIO.LibraryIdentityFileName);
+            string manifestPath = Path.Combine(destination, ESAssetPipelineIO.BundleManifestFileName);
+            if (!File.Exists(identityPath) || !File.Exists(manifestPath))
+                throw new UnauthorizedAccessException("拒绝替换缺少 ES 发布标识的既有目录：" + destination);
+            ESAssetLibraryIdentity identity = ESAssetPipelineIO.ReadJson<ESAssetLibraryIdentity>(identityPath);
+            ESAssetBundleManifest manifest = ESAssetPipelineIO.ReadJson<ESAssetBundleManifest>(manifestPath);
+            if (identity == null || manifest == null)
+                throw new InvalidDataException("拒绝替换无法解析的既有 ES 发布目录：" + destination);
+            VerifyPublishedLibrary(destination, manifest, identity);
+            return new ManagedLibraryFingerprint
+            {
+                identitySha256 = ESResManifestIntegrity.ComputeFileSha256(identityPath),
+                manifestSha256 = ESResManifestIntegrity.ComputeFileSha256(manifestPath)
+            };
+        }
+
+        private static void EnsureManagedLibraryFingerprint(string destination, ManagedLibraryFingerprint expected, string context)
+        {
+            if (expected == null)
+                throw new ArgumentNullException(nameof(expected));
+            ManagedLibraryFingerprint actual = CaptureManagedLibraryFingerprint(destination);
+            if (!string.Equals(actual.identitySha256, expected.identitySha256, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(actual.manifestSha256, expected.manifestSha256, StringComparison.OrdinalIgnoreCase))
+                throw new IOException(context + "：" + destination);
+        }
+
+        private static void VerifyPublishedLibrary(string folder, ESAssetBundleManifest manifest, ESAssetLibraryIdentity expectedIdentity)
+        {
+            if (manifest == null || expectedIdentity == null)
+                throw new ArgumentNullException(manifest == null ? nameof(manifest) : nameof(expectedIdentity));
+
+            string outputRoot = GetPublishOutputRoot(folder);
+            if (outputRoot == null || ContainsExistingReparsePoint(outputRoot, folder))
+                throw new UnauthorizedAccessException("发布 Library 校验目录不在受管输出根内或穿过 junction/symlink：" + folder);
+            ESManagedFileIO.EnsureNoNestedReparsePoints(folder);
+
+            string catalogPath = Path.Combine(folder, ESAssetPipelineIO.CatalogFileName);
+            string manifestPath = Path.Combine(folder, ESAssetPipelineIO.BundleManifestFileName);
+            string identityPath = Path.Combine(folder, ESAssetPipelineIO.LibraryIdentityFileName);
+            if (string.IsNullOrWhiteSpace(expectedIdentity.catalogSha256)
+                || !ESResManifestIntegrity.VerifyFileSha256(catalogPath, expectedIdentity.catalogSha256))
+                throw new InvalidDataException("发布 Library Catalog Hash 校验失败：" + catalogPath);
+            if (string.IsNullOrWhiteSpace(expectedIdentity.assetBundleManifestSha256)
+                || !ESResManifestIntegrity.VerifyFileSha256(manifestPath, expectedIdentity.assetBundleManifestSha256))
+                throw new InvalidDataException("发布 Library Manifest Hash 校验失败：" + manifestPath);
+
+            ESAssetLibraryIdentity actualIdentity = ESAssetPipelineIO.ReadJson<ESAssetLibraryIdentity>(identityPath);
+            if (actualIdentity == null
+                || !string.Equals(actualIdentity.libraryName, expectedIdentity.libraryName, StringComparison.Ordinal)
+                || !string.Equals(actualIdentity.libraryFolder, expectedIdentity.libraryFolder, StringComparison.Ordinal)
+                || !string.Equals(actualIdentity.catalogSha256, expectedIdentity.catalogSha256, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(actualIdentity.assetBundleManifestSha256, expectedIdentity.assetBundleManifestSha256, StringComparison.OrdinalIgnoreCase)
+                || actualIdentity.deliveryMode != expectedIdentity.deliveryMode
+                || !string.Equals(actualIdentity.version, expectedIdentity.version, StringComparison.Ordinal)
+                || !string.Equals(actualIdentity.channel, expectedIdentity.channel, StringComparison.Ordinal)
+                || !string.Equals(actualIdentity.catalogUrl, expectedIdentity.catalogUrl, StringComparison.Ordinal)
+                || !string.Equals(actualIdentity.assetBundleManifestUrl, expectedIdentity.assetBundleManifestUrl, StringComparison.Ordinal))
+                throw new InvalidDataException("发布 Library Identity 与暂存验证结果不一致：" + identityPath);
+
+            foreach (ESAssetBundleRecord bundle in manifest.assetBundles ?? Enumerable.Empty<ESAssetBundleRecord>())
+            {
+                string bundlePath = ESAssetPipelineIO.ResolveGeneratedRelativePath(folder, bundle.localRelativePath);
+                if (!File.Exists(bundlePath)
+                    || new FileInfo(bundlePath).Length != bundle.size
+                    || !ESResManifestIntegrity.VerifyFileSha256(bundlePath, bundle.sha256))
+                    throw new InvalidDataException("发布 Bundle 完整性校验失败：" + bundle.assetBundleKey);
+            }
         }
 
         private static void CopyFile(string sourcePath, string destinationPath)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
-            File.Copy(sourcePath, destinationPath, true);
+            string source = Path.GetFullPath(sourcePath ?? string.Empty);
+            string destination = Path.GetFullPath(destinationPath ?? string.Empty);
+            string sourceRoot = Path.GetFullPath(ESAssetPipelineIO.ProjectRoot);
+            if (!File.Exists(source) || ContainsExistingReparsePoint(sourceRoot, source))
+                throw new UnauthorizedAccessException("发布源文件不存在或位于 junction/symlink：" + sourcePath);
+            EnsurePublishDirectory(Path.GetDirectoryName(destination));
+            string destinationRoot = GetPublishOutputRoot(destination);
+            if (destinationRoot == null || ContainsExistingReparsePoint(destinationRoot, destination)
+                || (File.Exists(destination) && (File.GetAttributes(destination) & FileAttributes.ReparsePoint) != 0))
+                throw new UnauthorizedAccessException("发布目标文件不在受管输出目录或位于 junction/symlink：" + destinationPath);
+            if (File.Exists(destination))
+                throw new IOException("发布产物已存在，拒绝覆盖。请使用新的发布版本：" + destination);
+
+            long expectedSize = new FileInfo(source).Length;
+            string expectedSha256 = ESResManifestIntegrity.ComputeFileSha256(source);
+            string temporaryPath = Path.Combine(Path.GetDirectoryName(destination), "." + Path.GetFileName(destination) + ".stage-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                File.Copy(source, temporaryPath, false);
+                if (new FileInfo(temporaryPath).Length != expectedSize
+                    || !ESResManifestIntegrity.VerifyFileSha256(temporaryPath, expectedSha256))
+                    throw new InvalidDataException("发布暂存文件与源文件 Hash 不一致：" + sourcePath);
+                if (new FileInfo(source).Length != expectedSize
+                    || !ESResManifestIntegrity.VerifyFileSha256(source, expectedSha256))
+                    throw new IOException("发布源文件在复制期间发生变化，拒绝提交：" + sourcePath);
+                if (File.Exists(destination) || ContainsExistingReparsePoint(destinationRoot, destination))
+                    throw new IOException("发布目标在提交前已存在或路径发生变化，拒绝覆盖：" + destinationPath);
+
+                File.Move(temporaryPath, destination);
+                if (!File.Exists(destination)
+                    || new FileInfo(destination).Length != expectedSize
+                    || !ESResManifestIntegrity.VerifyFileSha256(destination, expectedSha256))
+                    throw new InvalidDataException("发布提交后文件完整性校验失败：" + destinationPath);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+            }
+        }
+
+        private static void DeletePublishDirectory(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+                return;
+            string candidate = Path.GetFullPath(path);
+            string outputRoot = GetPublishOutputRoot(candidate);
+            if (outputRoot == null || string.Equals(candidate, outputRoot, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("发布目录清理目标越出受管输出根：" + path);
+            ESManagedFileIO.DeleteDirectory(candidate, outputRoot);
+        }
+
+        private static void EnsurePublishDirectory(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                throw new InvalidDataException("发布输出目录不能为空。");
+            string candidate = Path.GetFullPath(path);
+            string root = GetPublishOutputRoot(candidate);
+            if (root == null || string.Equals(candidate, root, StringComparison.OrdinalIgnoreCase)
+                || ContainsExistingReparsePoint(root, candidate))
+                throw new UnauthorizedAccessException("发布输出目录不在受管范围或位于 junction/symlink：" + path);
+            Directory.CreateDirectory(candidate);
+        }
+
+        private static string GetPublishOutputRoot(string path)
+        {
+            string candidate = Path.GetFullPath(path);
+            string[] roots =
+            {
+                Path.GetFullPath(ESAssetPipelineIO.PipelineRoot),
+                Path.GetFullPath(Path.Combine(Application.streamingAssetsPath, ESGlobalResSetting.ResParentFolderName)),
+                ToAbsolutePath(ESGlobalResSetting.Instance.Path_LocalBuildOnEditorPath_),
+                ToAbsolutePath(ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath)
+            };
+            return roots.Where(root => !string.IsNullOrWhiteSpace(root))
+                .Select(Path.GetFullPath)
+                .Where(root => string.Equals(candidate, root, StringComparison.OrdinalIgnoreCase)
+                    || candidate.StartsWith(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(root => root.Length)
+                .FirstOrDefault();
         }
 
         /// <summary>
@@ -703,6 +985,8 @@ namespace ES
             string validatedRoot = resRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
             if (!platformRoot.StartsWith(validatedRoot, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("StreamingAssets 清理目标越界：" + platformRoot);
+            if (ContainsExistingReparsePoint(resRoot, platformRoot))
+                throw new UnauthorizedAccessException("StreamingAssets 清理目标不能穿过 junction/symlink：" + platformRoot);
             if (!Directory.Exists(platformRoot)) return;
 
             int removed = 0;
@@ -715,9 +999,11 @@ namespace ES
                 string validatedPlatformRoot = platformRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
                 if (!target.StartsWith(validatedPlatformRoot, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("StreamingAssets 清理目标越界：" + target);
-                Directory.Delete(target, true);
+                if (ContainsExistingReparsePoint(platformRoot, target))
+                    throw new UnauthorizedAccessException("StreamingAssets 清理目标不能穿过 junction/symlink：" + target);
+                ESAssetPipelineIO.DeleteGeneratedDirectory(target);
                 string metaPath = target + ".meta";
-                if (File.Exists(metaPath)) File.Delete(metaPath);
+                if (File.Exists(metaPath)) ESAssetPipelineIO.DeleteGeneratedFile(metaPath);
                 removed++;
             }
             foreach (string file in Directory.EnumerateFiles(platformRoot).ToArray())
@@ -725,7 +1011,9 @@ namespace ES
                 string fileName = Path.GetFileName(file);
                 if (string.Equals(fileName, embeddedFolderName + ".meta", StringComparison.OrdinalIgnoreCase))
                     continue;
-                File.Delete(file);
+                if (ContainsExistingReparsePoint(platformRoot, file))
+                    throw new UnauthorizedAccessException("StreamingAssets 清理文件不能穿过 junction/symlink：" + file);
+                ESAssetPipelineIO.DeleteGeneratedFile(file);
                 removed++;
             }
             if (removed == 0) return;
@@ -737,6 +1025,8 @@ namespace ES
         {
             if (string.IsNullOrWhiteSpace(generatedRoot) || !Directory.Exists(generatedRoot)) return;
             string root = Path.GetFullPath(generatedRoot);
+            if (ContainsExistingReparsePoint(root, root))
+                throw new UnauthorizedAccessException("本地发布版本根目录不能穿过 junction/symlink：" + generatedRoot);
             int removed = 0;
             foreach (string folder in Directory.EnumerateDirectories(root).ToArray())
             {
@@ -752,7 +1042,9 @@ namespace ES
                 string validatedRoot = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
                 if (!target.StartsWith(validatedRoot, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("本地发布版本清理目标越界：" + target);
-                Directory.Delete(target, true);
+                if (ContainsExistingReparsePoint(root, target))
+                    throw new UnauthorizedAccessException("本地发布版本清理目标不能穿过 junction/symlink：" + target);
+                ESAssetPipelineIO.DeleteGeneratedDirectory(target);
                 removed++;
             }
             if (removed > 0)
@@ -762,11 +1054,18 @@ namespace ES
         private static void PruneManualUploadPlans(string planFolder, int keepCount)
         {
             if (string.IsNullOrWhiteSpace(planFolder) || !Directory.Exists(planFolder)) return;
+            if (ContainsExistingReparsePoint(ESAssetPipelineIO.PipelineRoot, planFolder))
+                throw new UnauthorizedAccessException("手工上传计划目录不能穿过 junction/symlink：" + planFolder);
             string[] obsolete = Directory.EnumerateFiles(planFolder, "*.json", SearchOption.TopDirectoryOnly)
                 .OrderByDescending(path => File.GetLastWriteTimeUtc(path))
                 .Skip(Math.Max(1, keepCount))
                 .ToArray();
-            foreach (string path in obsolete) File.Delete(path);
+            foreach (string path in obsolete)
+            {
+                if (ContainsExistingReparsePoint(planFolder, path))
+                    throw new UnauthorizedAccessException("手工上传计划清理目标不能穿过 junction/symlink：" + path);
+                ESAssetPipelineIO.DeleteGeneratedFile(path);
+            }
             if (obsolete.Length > 0)
                 Debug.Log($"[ESRes][Cleanup] 手工上传计划已删除 {obsolete.Length} 份旧记录，保留最新 {Math.Max(1, keepCount)} 份。");
         }
@@ -778,6 +1077,12 @@ namespace ES
             public string identityUrl;
             public string embeddedIdentityRelativePath;
             public string identitySha256;
+        }
+
+        private sealed class ManagedLibraryFingerprint
+        {
+            public string identitySha256;
+            public string manifestSha256;
         }
 
         private static string ToAbsolutePath(string path) => Path.IsPathRooted(path) ? path : Path.Combine(ESAssetPipelineIO.ProjectRoot, path);

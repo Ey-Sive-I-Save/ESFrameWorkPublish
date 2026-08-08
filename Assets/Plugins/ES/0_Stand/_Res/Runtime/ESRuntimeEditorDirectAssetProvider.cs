@@ -34,9 +34,27 @@ namespace ES
             if (string.IsNullOrEmpty(assetPath)) throw new InvalidOperationException("GUID does not resolve to an editor scene: " + id.Guid);
             AsyncOperation operation = SceneManager.LoadSceneAsync(assetPath, mode);
             if (operation == null) throw new InvalidOperationException("Editor scene could not be loaded: " + assetPath);
-            await operation.ToUniTask(cancellationToken: cancellationToken);
+            // Unity cannot stop an AsyncOperation once it has been created. Cancellation
+            // only cancels the caller's wait; additive loads can be compensated after finish,
+            // while Single loads must report that they cannot be rolled back.
+            await operation.ToUniTask();
             Scene scene = SceneManager.GetSceneByPath(assetPath);
             if (!scene.IsValid()) throw new InvalidOperationException("Editor scene is invalid after loading: " + assetPath);
+            if (cancellationToken.IsCancellationRequested)
+            {
+                if (mode == LoadSceneMode.Additive && scene.isLoaded)
+                {
+                    AsyncOperation unload = SceneManager.UnloadSceneAsync(scene);
+                    if (unload == null)
+                        throw new InvalidOperationException("EditorDirect 取消后的 Additive 场景补偿卸载无法启动，场景仍保持加载：" + assetPath);
+                    await unload.ToUniTask();
+                }
+                else if (mode == LoadSceneMode.Single)
+                {
+                    Debug.LogWarning("[ESRes][Scene] EditorDirect 取消发生在 Single 场景加载完成后；Unity 无法回滚当前场景。Scene=" + assetPath);
+                }
+                throw new OperationCanceledException(cancellationToken);
+            }
             return scene;
         }
     }

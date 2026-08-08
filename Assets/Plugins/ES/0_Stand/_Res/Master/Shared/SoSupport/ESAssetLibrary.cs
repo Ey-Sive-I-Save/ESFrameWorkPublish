@@ -185,7 +185,7 @@ namespace ES
         public bool ContainsBuild = true;
 
         [LabelText("AB 短码")]
-        [Tooltip("2~12 位小写字母、数字或下划线；首次烘焙自动生成并持久化。修改后会生成一套新的 BundleKey。")]
+        [Tooltip("2~12 位小写字母、数字或下划线；必须在正式烘焙前显式生成或填写。修改后会生成一套新的 BundleKey。")]
         public string AssetBundleCode = string.Empty;
 
         [HideInInspector]

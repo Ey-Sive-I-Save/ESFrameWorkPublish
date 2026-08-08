@@ -45,4 +45,59 @@ namespace ES
             Requirement = requirement;
         }
     }
+
+    public enum ESCollectionDrawMode
+    {
+        ProjectDefault,
+        StandardCard,
+        FeelCard,
+        /// <summary>
+        /// Uses the compact Feel presentation and lets ES own the complete collection container,
+        /// including add, remove and deterministic reordering actions.
+        /// </summary>
+        FeelList,
+        /// <summary>
+        /// Uses the ESEditorSection presentation surface while adding collection ownership,
+        /// including add, remove and deterministic reordering actions.
+        /// </summary>
+        SectionList,
+        DefaultDrawer
+    }
+
+    /// <summary>
+    /// Overrides the project-level editor presentation for one serialized collection. This is
+    /// type metadata only: it is never serialized into an object instance and has no Player
+    /// runtime state or per-instance memory cost.
+    /// </summary>
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [AttributeUsage(
+        AttributeTargets.Field | AttributeTargets.Property,
+        AllowMultiple = false,
+        Inherited = true)]
+    public sealed class ESCollectionDrawStyleAttribute : Attribute
+    {
+        public readonly ESCollectionDrawMode Mode;
+
+        /// <summary>
+        /// Optional serialized bool member shown as the integrated FeelList enable toggle.
+        /// </summary>
+        public string EnabledMemberName { get; set; } = "enabled";
+
+        /// <summary>
+        /// Controls whether FeelList exposes duplication. Disable this for collections whose
+        /// stable identity contract forbids duplicate element types or keys.
+        /// </summary>
+        public bool AllowDuplicateItems { get; set; } = true;
+
+        /// <summary>
+        /// Keeps manual moves inside the nondecreasing IESCollectionDefaultOrder contract and
+        /// exposes single-item and whole-list restore operations.
+        /// </summary>
+        public bool EnforceDefaultOrder { get; set; }
+
+        public ESCollectionDrawStyleAttribute(ESCollectionDrawMode mode)
+        {
+            Mode = mode;
+        }
+    }
 }

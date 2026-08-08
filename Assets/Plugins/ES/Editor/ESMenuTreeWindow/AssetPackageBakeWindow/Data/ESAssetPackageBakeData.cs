@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using UnityEngine;
 
 #if UNITY_EDITOR
@@ -234,11 +235,20 @@ namespace ES
         [LabelText("失败数"), ReadOnly]
         public int errorCount;
 
+        [LabelText("事务状态"), ReadOnly]
+        public string transactionState;
+
+        [LabelText("事务警告"), ReadOnly]
+        public string transactionWarning;
+
         [LabelText("重复跳过数"), ReadOnly]
         public int duplicateSkippedCount;
 
         [LabelText("导出目标路径"), ReadOnly]
         public List<string> targetAssetPaths = new List<string>();
+
+        [LabelText("导出目标GUID"), ReadOnly]
+        public List<string> targetAssetGuids = new List<string>();
 
         [LabelText("依赖源路径"), ReadOnly]
         public List<string> dependencyAssetPaths = new List<string>();
@@ -331,6 +341,18 @@ namespace ES
 
         [FoldoutGroup("导出链路"), LabelText("最后导出依赖数"), ReadOnly]
         public int lastExportDependencyCount;
+
+        [LabelText("最近导出尝试状态"), ReadOnly]
+        public string lastExportAttemptState = "Idle";
+
+        [LabelText("最近导出尝试会话"), ReadOnly]
+        public string lastExportAttemptSessionId;
+
+        [LabelText("最近导出尝试时间"), ReadOnly]
+        public string lastExportAttemptTime;
+
+        [LabelText("最近导出尝试说明"), ReadOnly]
+        public string lastExportAttemptMessage;
 
         [FoldoutGroup("导出链路"), LabelText("导出链路")]
         [ListDrawerSettings(ShowIndexLabels = true, NumberOfItemsPerPage = 12)]
@@ -503,6 +525,15 @@ public static class ESAssetPackageBakeUtility
             public bool rootSelected;
             public bool dependency;
             public bool overwrite;
+        }
+
+        private sealed class ExportTransactionItem
+        {
+            public ExportPlanItem plan;
+            public string stagedPath;
+            public string backupPath;
+            public bool hadExistingTarget;
+            public bool committed;
         }
 
         public static void Bake(ESAssetPackageBakeData data)
@@ -695,8 +726,20 @@ public static class ESAssetPackageBakeUtility
                 return;
             }
 
+            data.lastExportAttemptState = "AwaitingInput";
+            data.lastExportAttemptSessionId = sessionId;
+            data.lastExportAttemptTime = exportTime;
+            data.lastExportAttemptMessage = "导出计划已生成，等待用户确认。";
+            EditorUtility.SetDirty(data);
+            AssetDatabase.SaveAssets();
             if (!DisplayExportPreflight(data, exportRoot, plan, rootPaths, dependencyPaths, duplicateSkipped))
+            {
+                data.lastExportAttemptState = "Cancelled";
+                data.lastExportAttemptMessage = "用户取消了本次导出，未修改目标资产。";
+                EditorUtility.SetDirty(data);
+                AssetDatabase.SaveAssets();
                 return;
+            }
 
 
 
@@ -704,46 +747,31 @@ public static class ESAssetPackageBakeUtility
             foreach (string folder in categoryFolders.OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
                 EnsureAssetFolder(folder);
 
-            AssetDatabase.StartAssetEditing();
-            try
+            string transactionRoot = NormalizeAssetPath($"{exportRoot}/.ESBakeTransactions/{sessionId}");
+            data.lastExportAttemptState = "Running";
+            data.lastExportAttemptSessionId = sessionId;
+            data.lastExportAttemptTime = exportTime;
+            data.lastExportAttemptMessage = "事务正在准备暂存、备份和提交。若 Unity 中途重载，下次打开窗口时请优先检查事务状态。";
+            EditorUtility.SetDirty(data);
+            AssetDatabase.SaveAssets();
+            if (!TryCommitExportTransaction(
+                    transactionRoot,
+                    plan,
+                    out copiedPathMap,
+                    out created,
+                    out updated,
+                    out string transactionError))
             {
-                foreach (ExportPlanItem item in plan)
-                {
-                    string sourcePath = item.sourcePath;
-                    string targetPath = item.targetPath;
-                    bool existedBefore = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(targetPath) != null;
-
-                    if (existedBefore && !item.overwrite)
-                    {
-                        errors.Add(sourcePath + " -> 目标已存在，未覆盖: " + targetPath);
-                        continue;
-                    }
-
-                    if (existedBefore && item.overwrite && !AssetDatabase.DeleteAsset(targetPath))
-                    {
-                        errors.Add(sourcePath);
-                        continue;
-                    }
-
-                    if (AssetDatabase.CopyAsset(sourcePath, targetPath))
-                    {
-                        if (existedBefore)
-                            updated++;
-                        else
-                            created++;
-
-                        copiedPathMap[sourcePath] = targetPath;
-                    }
-                    else
-                    {
-                        errors.Add(sourcePath);
-                    }
-                }
-            }
-            finally
-            {
-                AssetDatabase.StopAssetEditing();
-                AssetDatabase.Refresh();
+                errors.Add("事务导出失败：" + transactionError);
+                data.lastExportAttemptState = "Failed";
+                data.lastExportAttemptMessage = transactionError;
+                EditorUtility.SetDirty(data);
+                AssetDatabase.SaveAssets();
+                EditorUtility.DisplayDialog(
+                    "资源包导出失败",
+                    "导出事务未提交，已尝试恢复原有目标。\n\n" + transactionError,
+                    "确定");
+                return;
             }
 
             int remapped = data.remapExportedGuids ? RemapCopiedAssetGuids(copiedPathMap) : 0;
@@ -766,8 +794,14 @@ public static class ESAssetPackageBakeUtility
                 updatedCount = updated,
                 remappedFileCount = remapped,
                 errorCount = errors.Count,
+                transactionState = "Committed",
+                transactionWarning = transactionError,
                 duplicateSkippedCount = duplicateSkipped.Count,
                 targetAssetPaths = copiedPathMap.Values.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList(),
+                targetAssetGuids = copiedPathMap.Values
+                    .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                    .Select(AssetDatabase.AssetPathToGUID)
+                    .ToList(),
                 dependencyAssetPaths = dependencyPaths.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList(),
                 duplicateSkippedSourcePaths = duplicateSkipped.ToList(),
                 errorAssetPaths = errors.ToList()
@@ -779,6 +813,10 @@ public static class ESAssetPackageBakeUtility
             data.lastExportRootPath = exportRoot;
             data.lastExportAssetCount = copiedPathMap.Count;
             data.lastExportDependencyCount = session.dependencyAssetCount;
+            data.lastExportAttemptState = string.IsNullOrEmpty(transactionError) ? "Committed" : "CommittedWithWarning";
+            data.lastExportAttemptMessage = string.IsNullOrEmpty(transactionError)
+                ? "导出事务已提交，目标和会话记录已刷新。"
+                : transactionError;
             data.RebuildStats();
             EditorUtility.SetDirty(data);
             AssetDatabase.SaveAssets();
@@ -788,11 +826,184 @@ public static class ESAssetPackageBakeUtility
                 message += "\n\n重复/冲突项:\n" + string.Join("\n", duplicateSkipped.Take(8));
             if (errors.Count > 0)
                 message += "\n\n失败项:\n" + string.Join("\n", errors.Take(8));
+            if (!string.IsNullOrEmpty(transactionError))
+                message += "\n\n事务警告:\n" + transactionError;
 
             EditorUtility.DisplayDialog("资源包导出", message, "确定");
             UnityEngine.Object folderAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(exportRoot);
             if (folderAsset != null)
                 EditorGUIUtility.PingObject(folderAsset);
+        }
+
+        private static bool TryCommitExportTransaction(
+            string transactionRoot,
+            List<ExportPlanItem> plan,
+            out Dictionary<string, string> copiedPathMap,
+            out int created,
+            out int updated,
+            out string transactionError)
+        {
+            copiedPathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            created = 0;
+            updated = 0;
+            transactionError = string.Empty;
+            var items = new List<ExportTransactionItem>(plan?.Count ?? 0);
+            bool editing = false;
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(transactionRoot) || !transactionRoot.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("事务目录必须位于 Assets 下。");
+                if (AssetDatabase.IsValidFolder(transactionRoot))
+                    throw new IOException("事务目录已存在，拒绝复用旧事务：" + transactionRoot);
+
+                string stagedRoot = NormalizeAssetPath(transactionRoot + "/Staged");
+                string backupRoot = NormalizeAssetPath(transactionRoot + "/Backup");
+                EnsureAssetFolder(stagedRoot);
+                EnsureAssetFolder(backupRoot);
+
+                AssetDatabase.StartAssetEditing();
+                editing = true;
+                for (int index = 0; index < plan.Count; index++)
+                {
+                    ExportPlanItem exportPlan = plan[index];
+                    if (exportPlan == null || string.IsNullOrEmpty(exportPlan.sourcePath) || string.IsNullOrEmpty(exportPlan.targetPath))
+                        throw new InvalidDataException("导出事务包含空的源或目标路径。");
+                    if (AssetDatabase.LoadMainAssetAtPath(exportPlan.sourcePath) == null)
+                        throw new FileNotFoundException("导出源资产不存在：" + exportPlan.sourcePath);
+
+                    bool existedBefore = AssetDatabase.LoadMainAssetAtPath(exportPlan.targetPath) != null;
+                    if (existedBefore && !exportPlan.overwrite)
+                        throw new IOException("目标在事务阶段已存在且不允许覆盖：" + exportPlan.targetPath);
+
+                    var item = new ExportTransactionItem
+                    {
+                        plan = exportPlan,
+                        hadExistingTarget = existedBefore,
+                        stagedPath = BuildTransactionAssetPath(stagedRoot, index, exportPlan.targetPath),
+                        backupPath = existedBefore ? BuildTransactionAssetPath(backupRoot, index, exportPlan.targetPath) : string.Empty
+                    };
+
+                    if (existedBefore && !AssetDatabase.CopyAsset(exportPlan.targetPath, item.backupPath))
+                        throw new IOException("无法备份已有目标，事务已中止：" + exportPlan.targetPath);
+                    if (!AssetDatabase.CopyAsset(exportPlan.sourcePath, item.stagedPath))
+                        throw new IOException("无法生成暂存资产，事务已中止：" + exportPlan.sourcePath);
+                    items.Add(item);
+                }
+
+                AssetDatabase.StopAssetEditing();
+                editing = false;
+                AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+                VerifyTransactionAssets(items);
+
+                AssetDatabase.StartAssetEditing();
+                editing = true;
+                for (int index = 0; index < items.Count; index++)
+                {
+                    ExportTransactionItem item = items[index];
+                    bool targetExistsNow = AssetDatabase.LoadMainAssetAtPath(item.plan.targetPath) != null;
+                    if (targetExistsNow && !item.plan.overwrite)
+                        throw new IOException("提交阶段发现新的目标冲突：" + item.plan.targetPath);
+                    if (targetExistsNow && !AssetDatabase.DeleteAsset(item.plan.targetPath))
+                        throw new IOException("无法删除待替换目标，事务已中止：" + item.plan.targetPath);
+
+                    string moveError = AssetDatabase.MoveAsset(item.stagedPath, item.plan.targetPath);
+                    if (!string.IsNullOrEmpty(moveError))
+                        throw new IOException("暂存资产提交失败：" + item.plan.targetPath + "，" + moveError);
+
+                    item.committed = true;
+                    copiedPathMap[item.plan.sourcePath] = item.plan.targetPath;
+                    if (item.hadExistingTarget) updated++;
+                    else created++;
+                }
+
+                AssetDatabase.StopAssetEditing();
+                editing = false;
+                AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+                if (!AssetDatabase.DeleteAsset(transactionRoot))
+                    transactionError = "导出已提交，但事务目录清理失败，已保留供恢复：" + transactionRoot;
+                else
+                    RemoveEmptyFolders(NormalizeAssetPath(transactionRoot.Substring(0, transactionRoot.LastIndexOf('/'))));
+                return true;
+            }
+            catch (Exception exception)
+            {
+                if (editing)
+                {
+                    AssetDatabase.StopAssetEditing();
+                    editing = false;
+                }
+
+                AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+                string rollbackError = RollbackExportTransaction(items, transactionRoot);
+                transactionError = exception.Message + (string.IsNullOrEmpty(rollbackError) ? string.Empty : "\n回滚异常：" + rollbackError);
+                return false;
+            }
+            finally
+            {
+                if (editing)
+                    AssetDatabase.StopAssetEditing();
+            }
+        }
+
+        private static void VerifyTransactionAssets(List<ExportTransactionItem> items)
+        {
+            for (int index = 0; index < items.Count; index++)
+            {
+                ExportTransactionItem item = items[index];
+                if (AssetDatabase.LoadMainAssetAtPath(item.stagedPath) == null)
+                    throw new IOException("暂存资产刷新后不可见：" + item.stagedPath);
+                if (item.hadExistingTarget && AssetDatabase.LoadMainAssetAtPath(item.backupPath) == null)
+                    throw new IOException("已有目标备份刷新后不可见：" + item.backupPath);
+            }
+        }
+
+        private static string RollbackExportTransaction(List<ExportTransactionItem> items, string transactionRoot)
+        {
+            var rollbackErrors = new List<string>();
+            bool editing = false;
+            try
+            {
+                AssetDatabase.StartAssetEditing();
+                editing = true;
+                for (int index = items.Count - 1; index >= 0; index--)
+                {
+                    ExportTransactionItem item = items[index];
+                    if (item.committed && AssetDatabase.LoadMainAssetAtPath(item.plan.targetPath) != null
+                        && !AssetDatabase.DeleteAsset(item.plan.targetPath))
+                        rollbackErrors.Add("无法删除已提交目标：" + item.plan.targetPath);
+
+                    if (item.hadExistingTarget && AssetDatabase.LoadMainAssetAtPath(item.backupPath) != null)
+                    {
+                        string moveError = AssetDatabase.MoveAsset(item.backupPath, item.plan.targetPath);
+                        if (!string.IsNullOrEmpty(moveError))
+                            rollbackErrors.Add("无法恢复原目标：" + item.plan.targetPath + "，" + moveError);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                rollbackErrors.Add(exception.Message);
+            }
+            finally
+            {
+                if (editing)
+                    AssetDatabase.StopAssetEditing();
+                AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+            }
+
+            if (rollbackErrors.Count == 0 && AssetDatabase.IsValidFolder(transactionRoot))
+                AssetDatabase.DeleteAsset(transactionRoot);
+            return string.Join("；", rollbackErrors);
+        }
+
+        private static string BuildTransactionAssetPath(string root, int index, string targetPath)
+        {
+            string name = Path.GetFileNameWithoutExtension(targetPath);
+            string extension = Path.GetExtension(targetPath);
+            string safeName = SanitizeFileNamePrefix(name).TrimEnd('_');
+            if (string.IsNullOrEmpty(safeName)) safeName = "Asset";
+            return NormalizeAssetPath($"{root}/item_{index:D5}_{safeName}{extension}");
         }
 
         private static void ExportSelectedAssetsByCategory_Legacy(ESAssetPackageBakeData data)
@@ -861,50 +1072,50 @@ public static class ESAssetPackageBakeUtility
             int created = 0;
             int updated = 0;
 
-            AssetDatabase.StartAssetEditing();
-            try
+            var plan = new List<ExportPlanItem>();
+            foreach (string sourcePath in exportPaths)
             {
-                foreach (string sourcePath in exportPaths)
+                Type type = AssetDatabase.GetMainAssetTypeAtPath(sourcePath);
+                ESAssetPackageCategory category = DetermineCategory(sourcePath, type);
+                string categoryFolder = $"{exportRoot}/{data.GetConfiguredExportSubFolder(category)}";
+                EnsureAssetFolder(categoryFolder);
+
+                string targetPath = ResolveExportTargetPath(sourcePath, categoryFolder, previousLinks, usedTargetPaths);
+                bool overwrite = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(targetPath) != null;
+                if (overwrite && !data.overwriteExistingExport)
                 {
-                    Type type = AssetDatabase.GetMainAssetTypeAtPath(sourcePath);
-                    ESAssetPackageCategory category = DetermineCategory(sourcePath, type);
-                    string categoryFolder = $"{exportRoot}/{data.GetConfiguredExportSubFolder(category)}";
-                    EnsureAssetFolder(categoryFolder);
-
-                    string targetPath = ResolveExportTargetPath(sourcePath, categoryFolder, previousLinks, usedTargetPaths);
-                    bool existedBefore = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(targetPath) != null;
-                    if (existedBefore && !data.overwriteExistingExport)
-                    {
-                        targetPath = AssetDatabase.GenerateUniqueAssetPath(targetPath);
-                        usedTargetPaths.Add(targetPath);
-                        existedBefore = false;
-                    }
-
-                    if (existedBefore && data.overwriteExistingExport && !AssetDatabase.DeleteAsset(targetPath))
-                    {
-                        errors.Add(sourcePath);
-                        continue;
-                    }
-
-                    if (AssetDatabase.CopyAsset(sourcePath, targetPath))
-                    {
-                        if (existedBefore)
-                            updated++;
-                        else
-                            created++;
-
-                        copiedPathMap[sourcePath] = targetPath;
-                    }
-                    else
-                    {
-                        errors.Add(sourcePath);
-                    }
+                    targetPath = AssetDatabase.GenerateUniqueAssetPath(targetPath);
+                    usedTargetPaths.Add(targetPath);
+                    overwrite = false;
                 }
+
+                plan.Add(new ExportPlanItem
+                {
+                    sourcePath = sourcePath,
+                    targetPath = targetPath,
+                    category = category,
+                    rootSelected = rootPaths.Contains(sourcePath),
+                    dependency = !rootPaths.Contains(sourcePath),
+                    overwrite = overwrite
+                });
             }
-            finally
+
+            string transactionRoot = NormalizeAssetPath($"{exportRoot}/.ESBakeTransactions/{sessionId}");
+            data.lastExportAttemptState = "Running";
+            data.lastExportAttemptSessionId = sessionId;
+            data.lastExportAttemptTime = exportTime;
+            data.lastExportAttemptMessage = "事务正在准备暂存、备份和提交。";
+            EditorUtility.SetDirty(data);
+            AssetDatabase.SaveAssets();
+            if (!TryCommitExportTransaction(transactionRoot, plan, out copiedPathMap, out created, out updated, out string transactionError))
             {
-                AssetDatabase.StopAssetEditing();
-                AssetDatabase.Refresh();
+                errors.Add(transactionError);
+                data.lastExportAttemptState = "Failed";
+                data.lastExportAttemptMessage = transactionError;
+                EditorUtility.SetDirty(data);
+                AssetDatabase.SaveAssets();
+                EditorUtility.DisplayDialog("资源包导出失败", "导出事务未提交，已尝试恢复原有目标。\n\n" + transactionError, "确定");
+                return;
             }
 
             int remapped = data.remapExportedGuids ? RemapCopiedAssetGuids(copiedPathMap) : 0;
@@ -924,7 +1135,13 @@ public static class ESAssetPackageBakeUtility
                 updatedCount = updated,
                 remappedFileCount = remapped,
                 errorCount = errors.Count,
+                transactionState = "Committed",
+                transactionWarning = transactionError,
                 targetAssetPaths = copiedPathMap.Values.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList(),
+                targetAssetGuids = copiedPathMap.Values
+                    .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                    .Select(AssetDatabase.AssetPathToGUID)
+                    .ToList(),
                 errorAssetPaths = errors.ToList()
             };
             data.exportSessions.Add(session);
@@ -934,6 +1151,10 @@ public static class ESAssetPackageBakeUtility
             data.lastExportRootPath = exportRoot;
             data.lastExportAssetCount = copiedPathMap.Count;
             data.lastExportDependencyCount = session.dependencyAssetCount;
+            data.lastExportAttemptState = string.IsNullOrEmpty(transactionError) ? "Committed" : "CommittedWithWarning";
+            data.lastExportAttemptMessage = string.IsNullOrEmpty(transactionError)
+                ? "导出事务已提交，目标和会话记录已刷新。"
+                : transactionError;
             EditorUtility.SetDirty(data);
             AssetDatabase.SaveAssets();
 
@@ -972,9 +1193,17 @@ public static class ESAssetPackageBakeUtility
 
             int deleted = 0;
             int missing = 0;
-            List<string> targets = session.targetAssetPaths != null
-                ? session.targetAssetPaths.OrderByDescending(p => p.Length).ToList()
+            int changed = 0;
+            List<string> recordedTargetPaths = session.targetAssetPaths != null
+                ? session.targetAssetPaths.Select(NormalizeAssetPath).ToList()
                 : new List<string>();
+            var recordedGuids = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (session.targetAssetGuids != null)
+            {
+                for (int index = 0; index < recordedTargetPaths.Count && index < session.targetAssetGuids.Count; index++)
+                    recordedGuids[recordedTargetPaths[index]] = session.targetAssetGuids[index];
+            }
+            List<string> targets = recordedTargetPaths.OrderByDescending(p => p.Length).ToList();
 
             AssetDatabase.StartAssetEditing();
             try
@@ -988,6 +1217,14 @@ public static class ESAssetPackageBakeUtility
                     if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(targetPath) == null)
                     {
                         missing++;
+                        continue;
+                    }
+
+                    if (recordedGuids.TryGetValue(targetPath, out string expectedGuid)
+                        && !string.IsNullOrEmpty(expectedGuid)
+                        && !string.Equals(AssetDatabase.AssetPathToGUID(targetPath), expectedGuid, StringComparison.OrdinalIgnoreCase))
+                    {
+                        changed++;
                         continue;
                     }
 
@@ -1023,7 +1260,7 @@ public static class ESAssetPackageBakeUtility
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            EditorUtility.DisplayDialog("资产包导出回退", $"回退完成。\n删除: {deleted}\n已不存在: {missing}", "确定");
+            EditorUtility.DisplayDialog("资产包导出回退", $"回退完成。\n删除: {deleted}\n已不存在: {missing}\n已被修改而跳过: {changed}", "确定");
         }
 
         private static bool AddExportPath(string path, string exportRoot, HashSet<string> exportPaths)
@@ -1192,6 +1429,8 @@ public static class ESAssetPackageBakeUtility
                 $"计划复制依赖: {dependencyCount}\n" +
                 $"计划覆盖: {overwriteCount}\n" +
                 $"重复/冲突跳过: {duplicateSkipped.Count}\n\n";
+
+            message += "事务策略: 先暂存全部源资产并备份已有目标，全部校验通过后才提交；任一阶段失败将尝试自动回滚。\n\n";
 
             if (dependencyPaths.Count > 0)
                 message += "依赖文件预览:\n" + string.Join("\n", dependencyPaths.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).Take(18)) + "\n\n";
@@ -1367,7 +1606,7 @@ public static class ESAssetPackageBakeUtility
             if (!Directory.Exists(fullRoot))
                 return;
 
-            foreach (string directory in Directory.GetDirectories(fullRoot, "*", SearchOption.AllDirectories)
+            foreach (string directory in ESManagedFileIO.EnumerateDirectoriesSafely(fullRoot)
                          .OrderByDescending(d => d.Length))
             {
                 if (Directory.EnumerateFileSystemEntries(directory).Any())
@@ -1433,7 +1672,7 @@ public static class ESAssetPackageBakeUtility
                 if (newText == text)
                     continue;
 
-                File.WriteAllText(fullPath, newText);
+                ESManagedFileIO.WriteTextAtomic(fullPath, newText, new UTF8Encoding(false), Application.dataPath);
                 changedFiles++;
             }
 

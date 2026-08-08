@@ -25,7 +25,7 @@ namespace ES
 
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
-                FileName = "powershell",
+                FileName = Path.Combine(System.Environment.SystemDirectory, "powershell.exe"),
                 Arguments = "-ExecutionPolicy Bypass -File \"" + scriptPath + "\"",
                 WorkingDirectory = projectRoot,
                 UseShellExecute = false,
@@ -34,20 +34,36 @@ namespace ES
                 CreateNoWindow = true
             };
 
-            using (Process process = Process.Start(startInfo))
+            try
             {
-                string output = process.StandardOutput.ReadToEnd();
-                string error = process.StandardError.ReadToEnd();
-                process.WaitForExit();
-
-                if (!string.IsNullOrEmpty(output))
-                    UnityEngine.Debug.Log(output);
-
-                if (process.ExitCode != 0)
+                using (ESManagedEditorProcess execution = ESManagedEditorProcessRunner.StartPowerShell(
+                    startInfo, projectRoot, 120))
                 {
-                    UnityEngine.Debug.LogError(error);
-                    return;
+                    if (!execution.WaitForExit(120000))
+                    {
+                        execution.Terminate();
+                        UnityEngine.Debug.LogError("Luban 配置生成超时，受管 PowerShell 进程树已终止。\n脚本：" + scriptPath);
+                        return;
+                    }
+
+                    string output = execution.ReadStandardOutputToEnd();
+                    string error = execution.ReadStandardErrorToEnd();
+                    execution.TryGetExitCode(out int exitCode);
+
+                    if (!string.IsNullOrEmpty(output))
+                        UnityEngine.Debug.Log(output);
+
+                    if (exitCode != 0)
+                    {
+                        UnityEngine.Debug.LogError(error);
+                        return;
+                    }
                 }
+            }
+            catch (System.Exception exception)
+            {
+                UnityEngine.Debug.LogError("Luban 配置生成失败：" + exception.Message);
+                return;
             }
 
             AssetDatabase.Refresh();

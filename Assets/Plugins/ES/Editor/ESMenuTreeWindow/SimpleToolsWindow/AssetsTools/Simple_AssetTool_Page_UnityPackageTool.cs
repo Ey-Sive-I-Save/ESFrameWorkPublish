@@ -718,7 +718,7 @@ namespace ES
                     EditorUtility.SetDirty(ESGlobalEditorDefaultConfi.Instance);
 #endif
             }
- 
+
             // 确保当前配置索引有效
             if (currentConfigIndex != -1 && (currentConfigIndex < 0 || currentConfigIndex >= globalConfigs.Count))
             {
@@ -975,7 +975,15 @@ namespace ES
                 return;
             }
 
-            var finalOutputPath = Path.Combine(outputPath, SanitizeFileName(packageName) + ".unitypackage");
+            string managedOutputDirectory;
+            string outputPathError;
+            if (!TryResolveManagedPackageOutputDirectory(outputPath, true, out managedOutputDirectory, out outputPathError))
+            {
+                EditorUtility.DisplayDialog("输出路径不受管", outputPathError, "确定");
+                return;
+            }
+
+            var finalOutputPath = Path.Combine(managedOutputDirectory, SanitizeFileName(packageName) + ".unitypackage");
 
             string exportPreview = SimpleToolsSafetyUtility.JoinPreview(assetPaths, 12);
             if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
@@ -987,11 +995,11 @@ namespace ES
 
             try
             {
-                // 确保导出目录存在
-                Directory.CreateDirectory(outputPath);
-
-                AssetDatabase.ExportPackage(assetPaths, finalOutputPath,
+                string stagedOutputPath = BuildUniqueStagingPackagePath(managedOutputDirectory, finalOutputPath);
+                AssetDatabase.ExportPackage(assetPaths, stagedOutputPath,
                     includeDependencies ? ExportPackageOptions.IncludeDependencies : ExportPackageOptions.Default);
+
+                PromoteExportedPackage(stagedOutputPath, finalOutputPath, managedOutputDirectory);
 
                 lastResultSummary = $"打包完成: {assetPaths.Length} 个资源 | 配置 {configName} | 依赖 {GetDependencyInclusionText(includeDependencies)}";
                 lastResultDetail = $"输出文件:\n{finalOutputPath}\n\n资源预览:\n" + SimpleToolsSafetyUtility.JoinPreview(assetPaths, 12);
@@ -1061,7 +1069,15 @@ namespace ES
                 packageName = "ESPackage";
             }
             var timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var outputPath = Path.Combine(outputDir, $"{SanitizeFileName(packageName)}_{timestamp}.unitypackage");
+            string managedOutputDirectory;
+            string outputPathError;
+            if (!TryResolveManagedPackageOutputDirectory(outputDir, true, out managedOutputDirectory, out outputPathError))
+            {
+                EditorUtility.DisplayDialog("输出路径不受管", outputPathError, "确定");
+                return;
+            }
+
+            var outputPath = Path.Combine(managedOutputDirectory, $"{SanitizeFileName(packageName)}_{timestamp}.unitypackage");
 
             string publishPreview = SimpleToolsSafetyUtility.JoinPreview(assetPaths, 12);
             if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
@@ -1073,11 +1089,10 @@ namespace ES
 
             try
             {
-                // 确保输出目录存在
-                Directory.CreateDirectory(outputDir);
-
                 // 不包含依赖的发布打包
-                AssetDatabase.ExportPackage(assetPaths.ToArray(), outputPath, ExportPackageOptions.Default);
+                string stagedOutputPath = BuildUniqueStagingPackagePath(managedOutputDirectory, outputPath);
+                AssetDatabase.ExportPackage(assetPaths.ToArray(), stagedOutputPath, ExportPackageOptions.Default);
+                PromoteExportedPackage(stagedOutputPath, outputPath, managedOutputDirectory);
 
                 lastResultSummary = $"发布打包完成: {assetPaths.Count} 个资源 | 发布路径 {publishPath}";
                 lastResultDetail = $"输出文件:\n{outputPath}\n\n资源预览:\n" + SimpleToolsSafetyUtility.JoinPreview(assetPaths, 12);
@@ -1102,6 +1117,127 @@ namespace ES
 
             fileName = fileName.Trim();
             return string.IsNullOrEmpty(fileName) ? "ESPackage" : fileName;
+        }
+
+        private static string ProjectRootPath
+        {
+            get { return Directory.GetParent(Application.dataPath).FullName; }
+        }
+
+        private static string[] ManagedPackageOutputRoots
+        {
+            get
+            {
+                string projectRoot = ProjectRootPath;
+                return new[]
+                {
+                    Path.Combine(projectRoot, "ES", "Output", "UnityPackages"),
+                    Path.Combine(projectRoot, "Assets", "Plugins", "ES", "Editor", "Installer", "Downloads", "Main")
+                };
+            }
+        }
+
+        private static bool TryResolveManagedPackageOutputDirectory(string configuredPath, bool createDirectory, out string normalizedDirectory, out string error)
+        {
+            normalizedDirectory = null;
+            error = null;
+            try
+            {
+                if (string.IsNullOrWhiteSpace(configuredPath))
+                {
+                    error = "输出目录不能为空。";
+                    return false;
+                }
+
+                string raw = configuredPath.Trim().Replace("\\", "/");
+                string candidate = Path.IsPathRooted(raw)
+                    ? raw
+                    : Path.Combine(ProjectRootPath, raw);
+                candidate = ESManagedFileIO.NormalizeFullPath(candidate);
+
+                string matchedRoot = null;
+                foreach (string root in ManagedPackageOutputRoots)
+                {
+                    string normalizedRoot = ESManagedFileIO.NormalizeFullPath(root);
+                    if (ESManagedFileIO.IsWithinRoot(candidate, normalizedRoot))
+                    {
+                        matchedRoot = normalizedRoot;
+                        break;
+                    }
+                }
+
+                if (matchedRoot == null)
+                {
+                    error = "UnityPackage 只能写入 ES/Output/UnityPackages 或 ES Installer Downloads/Main 受管目录。";
+                    return false;
+                }
+
+                if (ESManagedFileIO.ContainsExistingReparsePoint(candidate))
+                {
+                    error = "输出目录不能穿过 junction/symlink/reparse point。";
+                    return false;
+                }
+
+                if (createDirectory)
+                    Directory.CreateDirectory(candidate);
+
+                if (ESManagedFileIO.ContainsExistingReparsePoint(candidate))
+                {
+                    error = "输出目录创建后变成了重解析路径，已拒绝写入。";
+                    return false;
+                }
+
+                normalizedDirectory = candidate;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = "输出目录无效：" + exception.Message;
+                return false;
+            }
+        }
+
+        private static string BuildUniqueStagingPackagePath(string outputDirectory, string finalPath)
+        {
+            string stagingPath;
+            do
+            {
+                string baseName = Path.GetFileNameWithoutExtension(finalPath);
+                stagingPath = Path.Combine(outputDirectory, "." + baseName + ".staging-" + Guid.NewGuid().ToString("N") + ".unitypackage");
+            }
+            while (File.Exists(stagingPath));
+            return stagingPath;
+        }
+
+        private static void PromoteExportedPackage(string stagingPath, string finalPath, string allowedRoot)
+        {
+            try
+            {
+                ESManagedFileIO.EnsurePath(stagingPath, true, allowedRoot);
+                if (!File.Exists(stagingPath) || new FileInfo(stagingPath).Length <= 0)
+                    throw new InvalidDataException("UnityPackage 暂存产物为空或不存在。");
+
+                ESManagedFileIO.EnsurePath(finalPath, false, allowedRoot);
+                if (File.Exists(finalPath))
+                    throw new IOException("目标 UnityPackage 已存在，拒绝覆盖：" + finalPath);
+
+                File.Move(stagingPath, finalPath);
+                ESManagedFileIO.EnsurePath(finalPath, true, allowedRoot);
+                if (!File.Exists(finalPath) || new FileInfo(finalPath).Length <= 0)
+                    throw new InvalidDataException("UnityPackage 提升后校验失败。");
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(stagingPath))
+                        File.Delete(stagingPath);
+                }
+                catch
+                {
+                    // 保留原始异常；残留暂存文件会在下一次受管门禁中被发现。
+                }
+            }
         }
 
         private static string GetDependencyInclusionText(bool includeDependencies)

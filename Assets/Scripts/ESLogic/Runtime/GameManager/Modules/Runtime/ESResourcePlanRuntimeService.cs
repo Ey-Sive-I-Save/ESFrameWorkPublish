@@ -94,7 +94,12 @@ namespace ES
             private CancellationTokenSource releaseCancellation;
             private bool disposed;
 
-            public bool CanRevive => !disposed && releaseRequested && allLoadsCompletion.Task.Status.IsCompleted();
+            // Only a fully usable Ready context may be reclaimed during the release cooldown.
+            // Failed/Canceled/partially-loading contexts must create a fresh transaction so a
+            // re-entry really retries the resource work instead of reviving a stale failure.
+            public bool CanRevive => !disposed && releaseRequested
+                && stateBeforeRelease == ESResourcePlanState.Ready
+                && allLoadsCompletion.Task.Status.IsCompleted();
             public bool IsDisposed => disposed;
 
             public void BeginRelease()

@@ -35,7 +35,7 @@ namespace ES
             // 固定保留 Unity 原始 Manifest 与 AB 输出，供下一次构建复用。
             // 它不属于 Staging，因而不会上传、下载或混入发布目录。
             string buildRoot = ESAssetPipelineIO.BuildCacheRoot(platform);
-            Directory.CreateDirectory(buildRoot);
+            ESAssetPipelineIO.EnsureGeneratedDirectory(buildRoot);
             var builds = plan.assignments.GroupBy(item => item.assetBundleKey, StringComparer.Ordinal).Select(group => new AssetBundleBuild
             {
                 assetBundleName = group.Key,
@@ -153,7 +153,7 @@ namespace ES
             string stageFolder = ESAssetPipelineIO.StagingLibraryFolder(platform, owner);
             RecreateGeneratedDirectory(stageFolder);
             string assetBundlesFolder = Path.Combine(stageFolder, ESAssetPipelineIO.AssetBundlesFolderName);
-            Directory.CreateDirectory(assetBundlesFolder);
+            ESAssetPipelineIO.EnsureGeneratedDirectory(assetBundlesFolder);
             var manifest = new ESAssetBundleManifest { platform = platform, libraryName = owner };
             foreach (string key in bundleKeys.OrderBy(item => item, StringComparer.Ordinal))
             {
@@ -167,7 +167,7 @@ namespace ES
                 if (!BuildPipeline.GetCRCForAssetBundle(source, out uint crc))
                     throw new InvalidDataException("[ESRes][Build] 无法读取 Unity 原始 AssetBundle CRC：" + source);
                 // 发布候选从 BuildCache 复制；缓存必须保留其原始 Manifest 与 AB。
-                File.Copy(source, destination, true);
+                ESAssetPipelineIO.CopyGeneratedFileAtomic(source, destination);
                 manifest.assetBundles.Add(new ESAssetBundleRecord { assetBundleKey = key, fileName = fileName, unityHash = unityManifest.GetAssetBundleHash(key).ToString(), sha256 = ESResManifestIntegrity.ComputeFileSha256(destination),
                     crc = crc, size = new FileInfo(destination).Length, localRelativePath = localRelativePath, dependencies = unityManifest.GetDirectDependencies(key).OrderBy(item => item, StringComparer.Ordinal).ToList() });
             }
@@ -179,7 +179,7 @@ namespace ES
             string catalogSource = Path.Combine(ESAssetPipelineIO.LibraryBakeFolder(owner), ESAssetPipelineIO.CatalogFileName);
             string catalogDestination = Path.Combine(stageFolder, ESAssetPipelineIO.CatalogFileName);
             ESAssetLibraryCatalog catalog;
-            if (File.Exists(catalogSource)) { File.Copy(catalogSource, catalogDestination, true); catalog = ESAssetPipelineIO.ReadJson<ESAssetLibraryCatalog>(catalogSource); }
+            if (File.Exists(catalogSource)) { ESAssetPipelineIO.CopyGeneratedFileAtomic(catalogSource, catalogDestination); catalog = ESAssetPipelineIO.ReadJson<ESAssetLibraryCatalog>(catalogSource); }
             else { catalog = new ESAssetLibraryCatalog { libraryName = owner, libraryFolder = owner,
                 libraryBundleCode = ESAssetBundleUtility.NormalizeLibraryCode(owner), libraryAssetGuid = ESAssetBundleUtility.StableHash(owner, 32) };
                 ESAssetPipelineIO.WriteJson(catalogDestination, catalog); }
@@ -224,12 +224,13 @@ namespace ES
             string librariesRoot = ESAssetPipelineIO.StagingLibrariesRoot(platform);
             if (!Directory.Exists(librariesRoot))
                 return;
+            ESAssetPipelineIO.EnsureGeneratedDirectory(librariesRoot);
 
             var active = new HashSet<string>(owners.Select(ESAssetPipelineIO.SafeSegment), StringComparer.OrdinalIgnoreCase);
             foreach (string folder in Directory.EnumerateDirectories(librariesRoot))
             {
                 if (!active.Contains(Path.GetFileName(folder)))
-                    Directory.Delete(folder, true);
+                    ESAssetPipelineIO.DeleteGeneratedDirectory(folder);
             }
         }
 
@@ -237,21 +238,23 @@ namespace ES
         {
             if (!Directory.Exists(stagingRoot))
                 return;
+            ESAssetPipelineIO.EnsureGeneratedDirectory(stagingRoot);
 
             foreach (string folder in Directory.EnumerateDirectories(stagingRoot))
             {
                 if (!string.Equals(Path.GetFileName(folder), ESAssetPipelineIO.LibrariesFolderName, StringComparison.OrdinalIgnoreCase))
-                    Directory.Delete(folder, true);
+                    ESAssetPipelineIO.DeleteGeneratedDirectory(folder);
             }
 
             // BuildSet 只在全部 Library 成功构建后写入；旧指针不可保留。
             foreach (string file in Directory.EnumerateFiles(stagingRoot, "*", SearchOption.TopDirectoryOnly))
-                File.Delete(file);
+                ESAssetPipelineIO.DeleteGeneratedFile(file);
         }
 
         private static void PruneBuildCache(string buildRoot, IEnumerable<string> activeBundleKeys)
         {
             if (!Directory.Exists(buildRoot)) return;
+            ESAssetPipelineIO.EnsureGeneratedDirectory(buildRoot);
             string rootManifestName = Path.GetFileName(buildRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             var retainedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -268,13 +271,13 @@ namespace ES
             foreach (string file in Directory.EnumerateFiles(buildRoot, "*", SearchOption.TopDirectoryOnly))
             {
                 if (retainedFiles.Contains(Path.GetFileName(file))) continue;
-                File.Delete(file);
+                ESAssetPipelineIO.DeleteGeneratedFile(file);
                 removed++;
             }
             // 新命名规范禁止斜杠，当前有效 Bundle 不会占用子目录；这里清除旧路径式命名产物。
             foreach (string folder in Directory.EnumerateDirectories(buildRoot))
             {
-                Directory.Delete(folder, true);
+                ESAssetPipelineIO.DeleteGeneratedDirectory(folder);
                 removed++;
             }
             if (removed > 0)
@@ -284,8 +287,8 @@ namespace ES
         private static void RecreateGeneratedDirectory(string path)
         {
             if (Directory.Exists(path))
-                Directory.Delete(path, true);
-            Directory.CreateDirectory(path);
+                ESAssetPipelineIO.DeleteGeneratedDirectory(path);
+            ESAssetPipelineIO.EnsureGeneratedDirectory(path);
         }
     }
 }

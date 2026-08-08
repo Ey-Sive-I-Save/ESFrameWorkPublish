@@ -82,7 +82,8 @@ namespace ES
             if (!Directory.Exists(directory))
                 Directory.CreateDirectory(directory);
 
-            File.WriteAllText(absolutePath, report, new UTF8Encoding(false));
+            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
+            ESManagedFileIO.WriteTextAtomic(absolutePath, report, new UTF8Encoding(false), projectRoot);
             if (refreshAssetDatabase)
                 AssetDatabase.Refresh();
             return new ESKeyGovernanceAuditResult(absolutePath, warnings, errors);
@@ -488,9 +489,9 @@ namespace ES
         private static Dictionary<string, SourceUsage> ScanSourceUsage()
         {
             Dictionary<string, SourceUsage> result = new Dictionary<string, SourceUsage>(StringComparer.Ordinal);
-            string[] files = Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories);
-            Array.Sort(files, StringComparer.Ordinal);
-            for (int fileIndex = 0; fileIndex < files.Length; fileIndex++)
+            List<string> files = new List<string>(ESManagedFileIO.EnumerateFilesSafely(Application.dataPath, "*.cs"));
+            files.Sort(StringComparer.Ordinal);
+            for (int fileIndex = 0; fileIndex < files.Count; fileIndex++)
             {
                 string fullPath = files[fileIndex];
                 string normalizedPath = fullPath.Replace('\\', '/');
@@ -536,9 +537,9 @@ namespace ES
         private static List<StringContainerUsage> ScanStringKeyContainers()
         {
             List<StringContainerUsage> result = new List<StringContainerUsage>();
-            string[] files = Directory.GetFiles(Application.dataPath, "*.cs", SearchOption.AllDirectories);
-            Array.Sort(files, StringComparer.Ordinal);
-            for (int fileIndex = 0; fileIndex < files.Length; fileIndex++)
+            List<string> files = new List<string>(ESManagedFileIO.EnumerateFilesSafely(Application.dataPath, "*.cs"));
+            files.Sort(StringComparer.Ordinal);
+            for (int fileIndex = 0; fileIndex < files.Count; fileIndex++)
             {
                 string fullPath = files[fileIndex];
                 string normalizedPath = fullPath.Replace('\\', '/');

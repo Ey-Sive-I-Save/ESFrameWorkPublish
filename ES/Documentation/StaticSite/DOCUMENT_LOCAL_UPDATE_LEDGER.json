@@ -999,6 +999,63 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260808-003",
+                        "status":  "documented",
+                        "summary":  "提交资源运行时、受管文件 IO、构建发布、安装器、资源计划与相关测试和资产治理强化。",
+                        "sourcePaths":  [
+                                            "Assets/ESNormalAssets/Data/AssetLibrary",
+                                            "Assets/ESNormalAssets/Data/GlobalData/AssetSettings",
+                                            "Assets/ESNormalAssets/ESValidation/LevelAssetFlow",
+                                            "Assets/Plugins/ES/0_Stand",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESArtifactTrustAndManagedFileIOTests.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESArtifactTrustAndManagedFileIOTests.cs.meta",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESAssetScopePoolingTests.cs",
+                                            "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow",
+                                            "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools",
+                                            "Assets/Plugins/ES/Editor/ESResPipeline",
+                                            "Assets/Plugins/ES/Editor/Installer",
+                                            "Assets/Plugins/ES/Obsolete/ResourceV1",
+                                            "Assets/Scripts/ESLogic/Editor/ESKeyGovernanceAudit.cs",
+                                            "Assets/Scripts/ESLogic/Editor/ESKeyGovernanceAuditBuildGate.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/ESResourcePlanRuntimeService.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/ESRuntimeAssetCatalog.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/ESRuntimeDataAssetLoadingService.cs",
+                                            "Documentation/ES_INSTALLER_SIGNED_UNITYPACKAGE_STANDARD.md",
+                                            "Documentation/ES_RESOURCE_SYSTEM_PRODUCT_BRIEF_DRAFT.md",
+                                            "ES/ResourcePipeline"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/0_Stand/Stand_Tools/IO/ESManagedFileIO.cs",
+                                              "Assets/Plugins/ES/0_Stand/Stand_Tools/IO/ESArtifactTrustVerifier.cs",
+                                              "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetBundlePublisher.cs",
+                                              "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                                              "Assets/Plugins/ES/1_Design/Tests/ESArtifactTrustAndManagedFileIOTests.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "资源加载、落盘、发布、安装和资源计划共享受管路径、暂存、哈希和回滚边界。将它们与相应测试、受管资源资产和旧版归档同批提交，可避免发布链在中间提交出现未受保护的旁路。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "批次包含受管 IO 与信任边界的定向 EditMode 测试入口",
+                                                            "提交前由 staged-only 门禁核对完整路径清单和补丁指纹"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "生产公钥、真实签名包和完整供应链轮换验收仍需环境配置",
+                                                             "Unity 导入和故障注入证据不因源码提交自动扩大"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1011,13 +1068,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-08T18:55:31+08:00",
-                       "head":  "eac62fcfc45cd002e57638472aa3b4007c1038e4",
-                       "stagedSourcePatchSha256":  "85987733b6e023b70d16a4b9697f64d910b305929b3da48a11d16380fa33afdd",
-                       "stagedSourceManifestSha256":  "c5e49a461314efabdaac64dfc802782bf66cf1af520249c54700040eae28ad26",
-                       "stagedSourceFileCount":  98,
+                       "preparedAt":  "2026-08-08T18:57:16+08:00",
+                       "head":  "69a27307739105ea2c9e437f0c6134c76d288703",
+                       "stagedSourcePatchSha256":  "7f2eff16a2b69d127e7d8abc6147c1e02ffef8fa52c378087572a1f5b50127c9",
+                       "stagedSourceManifestSha256":  "961ab641d2de931a0dff2a341e143965555d06a0cbf2d446817afe468f8f68aa",
+                       "stagedSourceFileCount":  87,
                        "entryIds":  [
-                                        "LOCAL-20260808-002"
+                                        "LOCAL-20260808-003"
                                     ]
                    }
 }

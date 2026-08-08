@@ -77,6 +77,8 @@ namespace ES
                 case ESRuntimeReleaseTransferState.Verifying: status = "正在校验资源完整性"; break;
                 case ESRuntimeReleaseTransferState.Initializing: status = "正在初始化运行时资源"; break;
                 case ESRuntimeReleaseTransferState.Completed: status = "资源传输完成"; break;
+                case ESRuntimeReleaseTransferState.Failed: status = "资源传输失败"; break;
+                case ESRuntimeReleaseTransferState.Cancelled: status = "资源传输已取消"; break;
                 default: status = "正在下载资源"; break;
             }
             string detail = snapshot.TotalFileCount == 0
@@ -84,6 +86,8 @@ namespace ES
                 : "文件 " + snapshot.CompletedFileCount + " / " + snapshot.TotalFileCount
                   + "  " + FormatBytes(snapshot.CompletedBytes) + " / " + FormatBytes(snapshot.TotalBytes)
                   + (string.IsNullOrWhiteSpace(snapshot.Subject) ? string.Empty : "  " + snapshot.Subject);
+            if (snapshot.State == ESRuntimeReleaseTransferState.Failed || snapshot.State == ESRuntimeReleaseTransferState.Cancelled)
+                detail = (string.IsNullOrWhiteSpace(snapshot.TerminalMessage) ? detail : snapshot.TerminalMessage + "  ") + "请查看诊断并重试。";
             if (snapshot.RetryAttempt > 1) detail += "  重试 " + snapshot.RetryAttempt + "/3";
             else if (snapshot.SpeedBytesPerSecond > 0f)
                 detail += "  " + FormatBytes((long)snapshot.SpeedBytesPerSecond) + "/s"

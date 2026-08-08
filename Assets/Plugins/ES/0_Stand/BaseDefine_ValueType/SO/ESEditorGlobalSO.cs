@@ -172,6 +172,12 @@ namespace ES
         {
             if (_instance != null) return _instance;
 
+#if UNITY_EDITOR
+            // 普通全局 SO 不进入编辑器常驻预加载集合；首次访问时通过统一索引按类型加载。
+            ESEditorSO.EnsureTypeLoaded<This>();
+            if (_instance != null) return _instance;
+#endif
+
             // 先从缓存中查找已确认或任意可用实例
             if (AllCaches.Count > 0)
             {

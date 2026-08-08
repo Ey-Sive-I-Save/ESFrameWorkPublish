@@ -232,6 +232,14 @@ MonoBehaviour:
     ColorTag: 0
     Desc: ESAssetReferTerrainData
     pages: []
+  DefaultRawBook:
+    Name: Default Raw Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 22
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferRaw
+    pages: []
   ContainsBuild: 1
   AssetBundleCode: 
   IsNet: 1

@@ -110,7 +110,95 @@ namespace ES
         public string Path_Sub_DownloadRelative_ = ResParentFolderName;
 
         [HideInInspector]
-        public string Path_RuntimeDownloadCache => Path.Combine(Application.persistentDataPath, Path_Sub_DownloadRelative_ ?? string.Empty);
+        public string Path_RuntimeDownloadCache =>
+            TryGetRuntimeDownloadCachePath(out string path, out _) ? path : string.Empty;
+
+        /// <summary>
+        /// Resolves the runtime download cache only when the configured value is a
+        /// relative, normalized path below Application.persistentDataPath.
+        /// Invalid serialized/configured values fail closed instead of escaping the cache root.
+        /// </summary>
+        public bool TryGetRuntimeDownloadCachePath(out string fullPath, out string error)
+        {
+            fullPath = string.Empty;
+            error = string.Empty;
+
+            if (!TryNormalizeDownloadRelativePath(Path_Sub_DownloadRelative_, out string normalized, out error))
+                return false;
+
+            string persistentRoot = Path.GetFullPath(Application.persistentDataPath)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string candidate = Path.GetFullPath(Path.Combine(
+                persistentRoot,
+                normalized.Replace('/', Path.DirectorySeparatorChar)));
+            string requiredPrefix = persistentRoot + Path.DirectorySeparatorChar;
+            if (!candidate.StartsWith(requiredPrefix, System.StringComparison.OrdinalIgnoreCase))
+            {
+                error = "规范化后的下载缓存路径不在 persistentDataPath 子目录内。";
+                return false;
+            }
+
+            if (ContainsExistingReparsePoint(persistentRoot, candidate))
+            {
+                error = "下载缓存路径不能穿过 junction/symlink。";
+                return false;
+            }
+
+            fullPath = candidate;
+            return true;
+        }
+
+        public static bool TryNormalizeDownloadRelativePath(string value, out string normalized, out string error)
+        {
+            normalized = string.Empty;
+            error = string.Empty;
+            string candidate = (value ?? string.Empty).Trim().Replace('\\', '/');
+            if (string.IsNullOrEmpty(candidate))
+            {
+                error = "下载缓存相对路径不能为空。";
+                return false;
+            }
+
+            if (Path.IsPathRooted(candidate)
+                || (candidate.Length >= 2 && char.IsLetter(candidate[0]) && candidate[1] == ':')
+                || candidate.StartsWith("/", System.StringComparison.Ordinal))
+            {
+                error = "下载缓存路径必须是相对路径，不能是绝对路径。";
+                return false;
+            }
+
+            string[] segments = candidate.Split('/');
+            for (int i = 0; i < segments.Length; i++)
+            {
+                string segment = segments[i].Trim();
+                if (string.IsNullOrEmpty(segment) || segment == "." || segment == ".."
+                    || segment.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                {
+                    error = "下载缓存路径包含非法、空或目录逃逸片段：" + value;
+                    return false;
+                }
+
+                segments[i] = segment;
+            }
+
+            normalized = string.Join("/", segments);
+            return true;
+        }
+
+        private static bool ContainsExistingReparsePoint(string root, string candidate)
+        {
+            string rootFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string current = rootFull;
+            string relative = candidate.Substring(rootFull.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            foreach (string segment in relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            {
+                if (string.IsNullOrEmpty(segment)) continue;
+                current = Path.Combine(current, segment);
+                if (!Directory.Exists(current) && !File.Exists(current)) break;
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return true;
+            }
+            return false;
+        }
 
         [VerticalGroup("Main/FolderPath")]
         [OnInspectorGUI]
@@ -138,6 +226,12 @@ namespace ES
 #if UNITY_EDITOR
         private static void DrawFolderShortcut(string label, string path, bool important = false)
         {
+            if (string.IsNullOrEmpty(path))
+            {
+                EditorGUILayout.HelpBox(label + "路径无效，请修正下载持久相对路径。", MessageType.Error);
+                return;
+            }
+
             string fullPath = Path.GetFullPath(path);
             string displayPath = GetCompactDisplayPath(fullPath);
             using (new EditorGUILayout.HorizontalScope())
@@ -255,24 +349,48 @@ namespace ES
             {
                 ESLocalReleasePointer pointer = JsonUtility.FromJson<ESLocalReleasePointer>(File.ReadAllText(rootManifestPath));
                 string releaseVersion = pointer != null ? pointer.releaseVersion : null;
-                if (!string.IsNullOrEmpty(releaseVersion) && string.Equals(Path.GetFileName(releaseVersion), releaseVersion, System.StringComparison.Ordinal))
+                if (IsSafeReleaseFolderName(releaseVersion))
                 {
                     string releaseFolder = Path.GetFullPath(Path.Combine(platformRoot, releaseVersion));
                     string validatedRoot = Path.GetFullPath(platformRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
                     if (releaseFolder.StartsWith(validatedRoot, System.StringComparison.OrdinalIgnoreCase) && Directory.Exists(releaseFolder))
-                        Directory.Delete(releaseFolder, true);
+                        ESManagedFileIO.DeleteDirectory(releaseFolder, platformRoot);
                 }
 
-                File.Delete(rootManifestPath);
+                ESManagedFileIO.DeleteFile(rootManifestPath, platformRoot);
                 string bundleIndexPath = Path.Combine(platformRoot, "ESAssetReleaseBundleIndex.json");
                 if (File.Exists(bundleIndexPath))
-                    File.Delete(bundleIndexPath);
+                    ESManagedFileIO.DeleteFile(bundleIndexPath, platformRoot);
                 AssetDatabase.Refresh();
             }
             catch (System.Exception exception)
             {
                 Debug.LogError("[ESGlobalResSetting] 清理本地发布资源失败：" + exception.Message);
             }
+        }
+
+        private static bool IsSafeReleaseFolderName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            string candidate = value.Trim();
+            if (candidate == "." || candidate == ".."
+                || Path.IsPathRooted(candidate)
+                || candidate.IndexOf('/') >= 0
+                || candidate.IndexOf('\\') >= 0
+                || candidate.IndexOf(':') >= 0
+                || !string.Equals(Path.GetFileName(candidate), candidate, System.StringComparison.Ordinal))
+                return false;
+
+            char[] invalid = Path.GetInvalidFileNameChars();
+            for (int i = 0; i < invalid.Length; i++)
+            {
+                if (candidate.IndexOf(invalid[i]) >= 0)
+                    return false;
+            }
+
+            return true;
         }
 
         [System.Serializable]
@@ -291,7 +409,13 @@ namespace ES
 
         private void OpenPersist()
         {
-            OpenGeneratedFolder(Path_RuntimeDownloadCache);
+            if (!TryGetRuntimeDownloadCachePath(out string path, out string error))
+            {
+                Debug.LogError("[ESGlobalResSetting] 无法打开运行时下载缓存：" + error);
+                return;
+            }
+
+            OpenGeneratedFolder(path);
         }
 
         private void Ping_(string path)

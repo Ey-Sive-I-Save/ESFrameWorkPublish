@@ -98,7 +98,7 @@ MonoBehaviour:
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 11500000, guid: ef7c98344bad5a74bb6ea31e423bac35, type: 3}
-      Kind: 18
+      Kind: 19
       EnumKey: 0
       StringKey: SingletonSeriMono
       AssetGuid: ef7c98344bad5a74bb6ea31e423bac35
@@ -426,7 +426,7 @@ MonoBehaviour:
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 11500000, guid: e4815b677e9fb2d4fb96a0343968a27a, type: 3}
-      Kind: 18
+      Kind: 19
       EnumKey: 0
       StringKey: CircleDenpendceSamples
       AssetGuid: e4815b677e9fb2d4fb96a0343968a27a
@@ -439,7 +439,7 @@ MonoBehaviour:
       ColorTag: 0
       namedOption: 0
       OB: {fileID: 11500000, guid: a43b0f8f0c53eba4e8fb65148bafdd7a, type: 3}
-      Kind: 18
+      Kind: 19
       EnumKey: 0
       StringKey: CircleDependenceSamplePrefabRef
       AssetGuid: a43b0f8f0c53eba4e8fb65148bafdd7a
@@ -511,6 +511,14 @@ MonoBehaviour:
     CustomIcon: {fileID: 0}
     ColorTag: 0
     Desc: ESAssetReferTerrainData
+    pages: []
+  DefaultRawBook:
+    Name: Default Raw Book
+    WritableDefaultMessageOnEditor: 0
+    PreferredAssetCategory: 22
+    CustomIcon: {fileID: 0}
+    ColorTag: 0
+    Desc: ESAssetReferRaw
     pages: []
   ContainsBuild: 1
   AssetBundleCode: 

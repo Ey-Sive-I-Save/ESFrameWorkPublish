@@ -11,6 +11,25 @@ namespace ES
     /// <summary>唯一启动场景入口。模式完全由 ESAssetRunMode 决定，不另设本地/远端开关。</summary>
     public sealed partial class ESResManager : MonoBehaviour
     {
+        private sealed class BootstrapRun
+        {
+            public readonly int Generation;
+            public readonly CancellationTokenSource Cancellation = new CancellationTokenSource();
+            public readonly UniTaskCompletionSource Completion = new UniTaskCompletionSource();
+            public ESRuntimeReleaseDownloader Downloader;
+
+            public BootstrapRun(int generation)
+            {
+                Generation = generation;
+            }
+
+            public void Cancel()
+            {
+                if (!Cancellation.IsCancellationRequested)
+                    Cancellation.Cancel();
+            }
+        }
+
         public static ESResManager Instance { get; private set; }
         public ESResBootstrapState State { get; private set; } = ESResBootstrapState.Created;
         public event Action<ESResBootstrapState> StateChanged;
@@ -20,8 +39,10 @@ namespace ES
         [SerializeField] private ESResBootstrapTheme bootstrapTheme;
 
         private ESResBootstrapView bootstrapView;
-        private CancellationTokenSource bootstrapCancellation;
-        private ESRuntimeReleaseDownloader releaseDownloader;
+        private BootstrapRun bootstrapRun;
+        private int bootstrapGeneration;
+        private bool restartPending;
+        private bool destroyed;
 
         private void Awake()
         {
@@ -35,7 +56,7 @@ namespace ES
         private void Start()
         {
             // 唯一运行时启动入口：发布模式默认走新版 Release Bootstrap。
-            RestartBootstrapFlow();
+            StartBootstrapRun();
         }
         private void OnDisable()
         {
@@ -59,8 +80,8 @@ namespace ES
         }
         private void OnDestroy()
         {
-            bootstrapCancellation?.Cancel();
-            bootstrapCancellation?.Dispose();
+            destroyed = true;
+            bootstrapRun?.Cancel();
             if (Instance == this) Instance = null;
         }
 
@@ -73,19 +94,45 @@ namespace ES
 
         public void RestartBootstrapFlow()
         {
-            bootstrapCancellation?.Cancel();
-            bootstrapCancellation?.Dispose();
-            bootstrapCancellation = new CancellationTokenSource();
+            if (destroyed) return;
+            if (bootstrapRun == null)
+            {
+                StartBootstrapRun();
+                return;
+            }
+
+            restartPending = true;
+            bootstrapRun.Cancel();
+            WaitForBootstrapRunThenRestartAsync(bootstrapRun).Forget();
+        }
+
+        private void StartBootstrapRun()
+        {
+            if (destroyed || bootstrapRun != null) return;
+
+            var run = new BootstrapRun(++bootstrapGeneration);
+            bootstrapRun = run;
             lastBootstrapError = string.Empty;
             SetState(ESResBootstrapState.Created);
             bootstrapView.SetVisible(true);
             bootstrapView.SetProgress(0f, "正在准备资源启动", string.Empty);
             bootstrapView.SetAction(null, null);
-            RunBootstrapFlowAsync(bootstrapCancellation.Token).Forget();
+            RunBootstrapFlowAsync(run).Forget();
         }
 
-        private async UniTaskVoid RunBootstrapFlowAsync(CancellationToken cancellationToken)
+        private async UniTaskVoid WaitForBootstrapRunThenRestartAsync(BootstrapRun run)
         {
+            try { await run.Completion.Task; }
+            catch (Exception exception) { Debug.LogException(exception, this); }
+
+            if (destroyed || !restartPending) return;
+            restartPending = false;
+            StartBootstrapRun();
+        }
+
+        private async UniTask RunBootstrapFlowAsync(BootstrapRun run)
+        {
+            CancellationToken cancellationToken = run.Cancellation.Token;
             try
             {
                 if (globalResSetting == null)
@@ -93,7 +140,7 @@ namespace ES
 
                 ESAssetRunMode runMode = ESAssetRunModeSession.Lock(globalResSetting);
                 if (runMode != ESAssetRunMode.LocalBuild && runMode != ESAssetRunMode.HotUpdate)
-                    throw new InvalidOperationException("Bootstrap 只支持 LocalBuild 或 HotUpdate。Player 中 Editor 模式会自动升级为 LocalBuild；编辑器测试请切换到 LocalBuild 或 HotUpdate。");
+                    throw new InvalidOperationException("Bootstrap 只支持 LocalBuild 或 HotUpdate。Player 不会自动切换或改写 Editor 模式；请在构建前明确配置正式发布模式。");
 
                 SetState(runMode == ESAssetRunMode.HotUpdate
                     ? ESResBootstrapState.CheckingRemotePolicy
@@ -102,12 +149,12 @@ namespace ES
                     runMode == ESAssetRunMode.HotUpdate ? "正在检查远端资源版本" : "正在验证本地资源包",
                     runMode == ESAssetRunMode.HotUpdate ? "读取发布根清单" : "读取初始包发布清单");
 
-                releaseDownloader = new ESRuntimeReleaseDownloader(globalResSetting, runMode);
-                lastReleaseDownloader = releaseDownloader;
-                releaseDownloader.ProgressChanged += OnReleaseDownloadProgress;
-                releaseDownloader.DownloadSnapshotChanged += OnReleaseDownloadSnapshot;
+                run.Downloader = new ESRuntimeReleaseDownloader(globalResSetting, runMode);
+                lastReleaseDownloader = run.Downloader;
+                run.Downloader.ProgressChanged += OnReleaseDownloadProgress;
+                run.Downloader.DownloadSnapshotChanged += OnReleaseDownloadSnapshot;
                 SetState(ESResBootstrapState.DownloadingRequiredResources);
-                ESRuntimeReleaseDownloadResult result = await ESRuntimeReleaseBootstrap.InitializeAsync(globalResSetting, releaseDownloader, cancellationToken);
+                ESRuntimeReleaseDownloadResult result = await ESRuntimeReleaseBootstrap.InitializeAsync(globalResSetting, run.Downloader, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 bootstrapView.SetStatus("正在初始化游戏资源", "注入 Catalog、资源加载器并预热 GameCore");
@@ -121,6 +168,7 @@ namespace ES
             catch (OperationCanceledException) { }
             catch (Exception exception)
             {
+                if (destroyed) return;
                 lastBootstrapError = exception.ToString();
                 SetState(ESResBootstrapState.Blocked);
                 bootstrapView.SetProgress(0f, "资源启动失败", exception.Message);
@@ -129,12 +177,15 @@ namespace ES
             }
             finally
             {
-                if (releaseDownloader != null)
+                if (run.Downloader != null)
                 {
-                    releaseDownloader.ProgressChanged -= OnReleaseDownloadProgress;
-                    releaseDownloader.DownloadSnapshotChanged -= OnReleaseDownloadSnapshot;
+                    run.Downloader.ProgressChanged -= OnReleaseDownloadProgress;
+                    run.Downloader.DownloadSnapshotChanged -= OnReleaseDownloadSnapshot;
                 }
-                releaseDownloader = null;
+                if (ReferenceEquals(bootstrapRun, run))
+                    bootstrapRun = null;
+                run.Cancellation.Dispose();
+                run.Completion.TrySetResult();
             }
         }
 
@@ -174,13 +225,29 @@ namespace ES
             if (!Application.CanStreamedLevelBeLoaded(initialGameplayScene))
                 throw new InvalidOperationException("[ESRes][Bootstrap][Scene] 初始游戏场景未进入 Player 构建或名称无效：" + initialGameplayScene);
 
+            cancellationToken.ThrowIfCancellationRequested();
             Debug.Log("[ESRes][Bootstrap][Scene] 开始进入初始游戏场景：" + initialGameplayScene, this);
             AsyncOperation operation = SceneManager.LoadSceneAsync(initialGameplayScene, LoadSceneMode.Single);
             if (operation == null)
                 throw new InvalidOperationException("[ESRes][Bootstrap][Scene] Unity 未能创建场景加载任务：" + initialGameplayScene);
 
-            await operation.ToUniTask(cancellationToken: cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
+            // Unity's Single scene operation cannot be stopped or rolled back once created.
+            // Bootstrap cancellation only cancels the caller's wait; the operation must finish
+            // before the run can be considered quiescent and a retry can begin.
+            await operation.ToUniTask();
+            if (cancellationToken.IsCancellationRequested)
+            {
+                if (!destroyed)
+                {
+                    SetState(ESResBootstrapState.Blocked);
+                    bootstrapView.SetProgress(0f, "场景已进入，但启动等待已取消",
+                        "Unity 无法回滚 Single 场景加载；请确认当前场景后再点击“重试”。");
+                    bootstrapView.SetAction(RestartBootstrapFlow, "重试");
+                    Debug.LogWarning("[ESRes][Bootstrap][Scene] Bootstrap 等待已取消，但 Single 场景加载已完成。" +
+                        "Unity 无法回滚当前场景，未将其伪装为已取消。Scene=" + initialGameplayScene, this);
+                }
+                return;
+            }
             bootstrapView.SetVisible(false);
             Debug.Log("[ESRes][Bootstrap][Scene] 初始游戏场景加载完成：" + SceneManager.GetActiveScene().name, this);
         }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -11,6 +12,12 @@ namespace ES.EditorInternal
     /// </summary>
     internal static class ESResourcePlanConfigKeySynchronizer
     {
+        private static readonly string[] ManagedAssetRoots =
+        {
+            "Assets/ESNormalAssets",
+            "Assets/Plugins/ES"
+        };
+
         private readonly struct PendingSync
         {
             public readonly string PropertyPath;
@@ -27,39 +34,96 @@ namespace ES.EditorInternal
         private static void SynchronizeAllMenu()
             => SynchronizeAll();
 
+        [MenuItem(MenuItemPathDefine.RESOURCE_DELIVERY_PATH + "ConfigKey/预览全部过期绑定 Key")]
+        private static void PreviewAllMenu()
+        {
+            ESAssetCatalogKeyPicker.RefreshForValidation();
+            int ownerCount;
+            var changes = new List<string>();
+            int pending = CollectPendingChanges(true, changes, out ownerCount);
+            string detail = changes.Count == 0
+                ? "当前受管 ES 资产没有发现需要同步的绑定 Key。"
+                : "受管范围：Assets/ESNormalAssets、Assets/Plugins/ES\n\n" + string.Join("\n", changes.Take(80));
+            if (changes.Count > 80)
+                detail += "\n...（其余 " + (changes.Count - 80) + " 项未展开）";
+            EditorUtility.DisplayDialog("ConfigKey 同步预览", "对象：" + ownerCount + "，待同步：" + pending + "\n\n" + detail, "确定");
+        }
+
         public static int SynchronizeAll()
         {
             ESAssetCatalogKeyPicker.RefreshForValidation();
-            int ownerCount = 0;
+            int ownerCount;
+            var preview = new List<string>();
+            int pending = CollectPendingChanges(true, preview, out ownerCount);
+            if (pending == 0)
+            {
+                Debug.Log("[ESRes][ConfigKey] managed owner scan=" + ownerCount + ", synchronized=0.");
+                return 0;
+            }
+
+            string previewText = string.Join("\n", preview.Take(40));
+            if (preview.Count > 40)
+                previewText += "\n...（其余 " + (preview.Count - 40) + " 项未展开）";
+            if (!EditorUtility.DisplayDialog(
+                "确认同步受管 ConfigKey",
+                "只会修改以下 ES 受管目录中的已绑定源快照：\nAssets/ESNormalAssets\nAssets/Plugins/ES\n\n待同步：" + pending + " 项\n\n" + previewText + "\n\n操作支持 Undo，手填 Key 不会被修改。",
+                "同步",
+                "取消"))
+                return 0;
+
+            int syncCount = CollectPendingChanges(false, null, out ownerCount);
+            if (syncCount > 0)
+                AssetDatabase.SaveAssets();
+            Debug.Log("[ESRes][ConfigKey] managed owner scan=" + ownerCount + ", synchronized=" + syncCount + ".");
+            return syncCount;
+        }
+
+        private static int CollectPendingChanges(bool dryRun, List<string> changes, out int ownerCount)
+        {
+            ownerCount = 0;
             int syncCount = 0;
-            foreach (string guid in AssetDatabase.FindAssets("t:ScriptableObject"))
+            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string guid in FindManagedGuids("t:ScriptableObject"))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (string.IsNullOrEmpty(path) || !seenPaths.Add(path))
+                    continue;
                 foreach (UnityEngine.Object owner in AssetDatabase.LoadAllAssetsAtPath(path))
                 {
                     if (!(owner is ScriptableObject))
                         continue;
                     ownerCount++;
-                    syncCount += Synchronize(owner);
+                    syncCount += Synchronize(owner, dryRun, changes);
                 }
             }
-
-            if (syncCount > 0)
-                AssetDatabase.SaveAssets();
-            Debug.Log("[ESRes][ConfigKey] owner scan=" + ownerCount + ", synchronized=" + syncCount + ".");
             return syncCount;
         }
 
+        private static IEnumerable<string> FindManagedGuids(string filter)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string root in ManagedAssetRoots)
+            {
+                if (!AssetDatabase.IsValidFolder(root))
+                    continue;
+                foreach (string guid in AssetDatabase.FindAssets(filter, new[] { root }))
+                {
+                    if (seen.Add(guid))
+                        yield return guid;
+                }
+            }
+        }
+
         /// <summary>
-        /// 所有烘焙入口共用的强一致校验：先把已绑定源资产的最新 Key 写回引用，
-        /// 再验证每个绑定仍能定位同一源。手填的高级 Key 不在这里被改写。
+        /// 所有烘焙入口共用的只读强一致校验：验证已绑定源资产的 Key 快照
+        /// 仍能定位同一源。同步动作必须由用户通过上面的显式菜单主动触发；
+        /// 这里绝不能为了继续烘焙而修改任意 ScriptableObject。
         /// </summary>
         public static void ValidateAllForBake()
         {
-            SynchronizeAll();
             ESAssetCatalogKeyPicker.RefreshForValidation();
             var errors = new List<string>();
-            foreach (string guid in AssetDatabase.FindAssets("t:ESResourcePlanInfo"))
+            foreach (string guid in FindManagedGuids("t:ESResourcePlanInfo"))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 ESResourcePlanInfo plan = AssetDatabase.LoadAssetAtPath<ESResourcePlanInfo>(path);
@@ -97,9 +161,9 @@ namespace ES.EditorInternal
         }
 
         public static int Synchronize(ESResourcePlanInfo plan)
-            => Synchronize((UnityEngine.Object)plan);
+            => Synchronize((UnityEngine.Object)plan, false, null);
 
-        private static int Synchronize(UnityEngine.Object owner)
+        private static int Synchronize(UnityEngine.Object owner, bool dryRun, List<string> changes)
         {
             if (owner == null)
                 return 0;
@@ -133,13 +197,18 @@ namespace ES.EditorInternal
                 if (!ESAssetCatalogKeyPicker.IsStale(key, candidate))
                     continue;
 
+                synchronized++;
+                if (changes != null)
+                    changes.Add(owner.name + " :: " + pending[i].PropertyPath + " (" + pending[i].Kind + ")");
+                if (dryRun)
+                    continue;
+
                 if (!undoRecorded)
                 {
                     Undo.RecordObject(owner, "Synchronize ConfigKey Snapshots");
                     undoRecorded = true;
                 }
                 ESAssetCatalogKeyPicker.ApplyCandidate(key, candidate, recordUndo: false);
-                synchronized++;
             }
             return synchronized;
         }

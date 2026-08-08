@@ -6,6 +6,18 @@ using UnityEngine;
 
 namespace ES
 {
+    /// <summary>框架预定义的资源生命周期域；业务多实例使用 StringKey 创建独立域。</summary>
+    public enum ESAssetDomain
+    {
+        GameInternal,
+        ApplicationSession,
+        GameSession,
+        Presentation,
+        Scene,
+        UI,
+        Feature
+    }
+
     /// <summary>
     /// 一个逻辑 Owner 的资源域。同一 Scope 内同一身份最多持有一次，技能反复引用不会重复计数。
     /// Scope Dispose 只结束 Owner 记录，不会在游戏中卸载资源；AB 仅由安全点统一卸载。
@@ -65,6 +77,8 @@ namespace ES
         public UniTask<T> LoadAsync<T>(ESAssetRefer<T> refer, CancellationToken cancellationToken = default) where T : UnityEngine.Object
         {
             if (disposed) return UniTask.FromException<T>(new ObjectDisposedException(nameof(ESAssetScope)));
+            if (!ESAssets.CanAcceptNewRequests(provider))
+                return UniTask.FromException<T>(new InvalidOperationException("ESRuntimeDataAssetLoadingService 正在切换 Provider，旧 Scope 禁止发起新请求。"));
             if (refer == null) return UniTask.FromException<T>(new ArgumentNullException(nameof(refer)));
             ESAssetIdentity id = refer.AssetIdentity;
             if (entries.TryGetValue(id, out Entry entry))
@@ -90,6 +104,8 @@ namespace ES
         public UniTask<T> LoadResolvedAsync<T>(ESAssetIdentity id, CancellationToken cancellationToken = default) where T : UnityEngine.Object
         {
             if (disposed) return UniTask.FromException<T>(new ObjectDisposedException(nameof(ESAssetScope)));
+            if (!ESAssets.CanAcceptNewRequests(provider))
+                return UniTask.FromException<T>(new InvalidOperationException("ESRuntimeDataAssetLoadingService 正在切换 Provider，旧 Scope 禁止发起新请求。"));
             if (!id.IsValid) return UniTask.FromException<T>(new ArgumentException("AssetTable 解析出的资产身份无效。", nameof(id)));
             if (entries.TryGetValue(id, out Entry entry))
             {
@@ -241,6 +257,7 @@ namespace ES
         }
 
         internal bool HasPendingOperations => pooledState != null && pending.Count > 0;
+        internal bool CanAcceptNewRequests => !disposed && ESAssets.CanAcceptNewRequests(provider);
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public bool IsDisposed => disposed;
 
@@ -321,6 +338,8 @@ namespace ES
         {
             if (disposed)
                 return UniTask.FromException<T>(new ObjectDisposedException(nameof(ESAssetTemporaryScope)));
+            if (!scope.CanAcceptNewRequests)
+                return UniTask.FromException<T>(new InvalidOperationException("ESRuntimeDataAssetLoadingService 正在切换 Provider，旧 TemporaryScope 禁止发起新请求。"));
             if (refer == null)
                 return UniTask.FromException<T>(new ArgumentNullException(nameof(refer)));
             if (!refer.IsValid)
@@ -368,6 +387,8 @@ namespace ES
         {
             if (disposed)
                 return UniTask.FromException<T>(new ObjectDisposedException(nameof(ESAssetTemporaryScope)));
+            if (!scope.CanAcceptNewRequests)
+                return UniTask.FromException<T>(new InvalidOperationException("ESRuntimeDataAssetLoadingService 正在切换 Provider，旧 TemporaryScope 禁止发起新请求。"));
             if (refer == null)
                 return UniTask.FromException<T>(new ArgumentNullException(nameof(refer)));
             if (!refer.IsValid)
@@ -505,9 +526,15 @@ namespace ES
 
         internal void InvalidateAtSafePoint()
         {
+            // The temporary domain keeps one real ESAssetScope underneath its logical
+            // ReferenceCount/LeaseCount table. A full safe point must invalidate both layers;
+            // clearing only the logical states would leave stale entries in the inner Scope,
+            // allowing a post-unload request to return an object whose Provider cache was
+            // already unloaded.
             generation = generation == int.MaxValue ? 1 : generation + 1;
             leases.Clear();
             states.Clear();
+            scope.InvalidateAtSafePoint();
         }
 
         public void Dispose()
@@ -598,6 +625,56 @@ namespace ES
     /// <summary>业务层入口：默认 Owner 自动释放；Scope 仅用于批量/非 Unity Owner 的高级场景。</summary>
     public static partial class ESAssets
     {
+        private readonly struct ScopeRegistryKey : IEquatable<ScopeRegistryKey>
+        {
+            public readonly ESAssetDomain Domain;
+            public readonly string StringKey;
+            public readonly bool IsString;
+
+            public ScopeRegistryKey(ESAssetDomain domain)
+            {
+                Domain = domain;
+                StringKey = null;
+                IsString = false;
+            }
+
+            public ScopeRegistryKey(string key)
+            {
+                Domain = default;
+                StringKey = NormalizeScopeKey(key);
+                IsString = true;
+            }
+
+            public bool Equals(ScopeRegistryKey other) => IsString == other.IsString
+                && (IsString ? string.Equals(StringKey, other.StringKey, StringComparison.Ordinal) : Domain == other.Domain);
+            public override bool Equals(object obj) => obj is ScopeRegistryKey other && Equals(other);
+            public override int GetHashCode() => IsString
+                ? StringComparer.Ordinal.GetHashCode(StringKey)
+                : (int)Domain;
+            public override string ToString() => IsString ? StringKey : "@domain:" + Domain;
+        }
+
+        private sealed class ScopeRegistration
+        {
+            public ScopeRegistryState State;
+            public ESAssetScope Scope;
+            public ScopeRegistryKey? Parent;
+            public HashSet<ScopeRegistryKey> Children;
+            public long Generation;
+            public float CreatedRealtime;
+            public bool ImplicitlyCreated;
+        }
+
+        private enum ScopeRegistryState : byte
+        {
+            Creating,
+            Active,
+            Closing
+        }
+
+        private static readonly Dictionary<ScopeRegistryKey, ScopeRegistration> registeredScopes = new Dictionary<ScopeRegistryKey, ScopeRegistration>();
+        private const int ScopeRegistryWarningCount = 64;
+        private static long nextRegisteredScopeGeneration;
         private static readonly HashSet<ESAssetScope> liveScopes = new HashSet<ESAssetScope>();
         // Active ResourcePlans publish the assets their internal Scope already owns here.
         // Gameplay reads this index without becoming another owner; the Plan remains the
@@ -653,6 +730,8 @@ namespace ES
         }
         /// <summary>框架内部的当前运行时加载后端；业务代码只使用 ESAssets/ResourcePlan。</summary>
         internal static IESAssetRuntimeProvider RuntimeBackend => runtimeProvider;
+        internal static bool CanAcceptNewRequests(IESAssetRuntimeProvider provider)
+            => !providerTransitioning && provider != null && ReferenceEquals(runtimeProvider, provider);
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static void AttachRuntimeBackend(IESAssetRuntimeProvider provider)
         {
@@ -707,6 +786,7 @@ namespace ES
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static void ResetScopesForProviderTransition()
         {
+            ReportUnreleasedRegisteredScopes("ProviderTransition");
             temporaryScope?.Dispose();
             temporaryScope = null;
             var scopes = new List<ESAssetScope>(liveScopes);
@@ -719,6 +799,7 @@ namespace ES
                 scope.Dispose();
             }
             liveScopes.Clear();
+            registeredScopes.Clear();
             residentScope = null;
         }
 
@@ -765,17 +846,213 @@ namespace ES
             }
         }
 
-        /// <summary>
-        /// 默认、无显式持有业务入口：调用者不创建计数、不持有 Scope、也不需要 Release。
-        /// 框架在内部常驻域按资产身份去重持有，直到显式安全点卸载；这不是取消
-        /// RuntimeBackend 的保护计数，而是把计数责任完全收敛到底层。
-        /// 角色技能、UI 与普通业务均可直接使用。
-        /// </summary>
+        /// <summary>默认业务入口使用 GameSession 域；首次加载会自动创建该域。</summary>
         public static UniTask<T> LoadAsync<T>(ESAssetRefer<T> refer, CancellationToken cancellationToken = default) where T : UnityEngine.Object
         {
-            if (refer != null && TryGetActivePlanAsset(refer.AssetIdentity, out T planned))
-                return UniTask.FromResult(planned);
-            return GetResidentScope().LoadAsync(refer, cancellationToken);
+            return LoadAsync(refer, ESAssetDomain.GameSession, cancellationToken);
+        }
+
+        public static UniTask<T> LoadAsync<T>(ESAssetRefer<T> refer, ESAssetDomain domain, CancellationToken cancellationToken = default) where T : UnityEngine.Object
+        {
+            EnsurePublicDomainAccess(domain);
+            return GetOrCreateRegisteredScope(new ScopeRegistryKey(domain)).LoadAsync(refer, cancellationToken);
+        }
+
+        public static UniTask<T> LoadAsync<T>(ESAssetRefer<T> refer, string scopeKey, CancellationToken cancellationToken = default) where T : UnityEngine.Object
+            => GetOrCreateRegisteredScope(new ScopeRegistryKey(scopeKey)).LoadAsync(refer, cancellationToken);
+
+        /// <summary>框架会话基础资源专用；普通业务应使用已建立的 Domain/StringKey Scope。</summary>
+        public static UniTask<T> LoadResidentAsync<T>(ESAssetRefer<T> refer, CancellationToken cancellationToken = default) where T : UnityEngine.Object
+            => GetResidentScope().LoadAsync(refer, cancellationToken);
+
+        /// <summary>共享 TemporaryScope 中的一次独立、幂等释放租期。</summary>
+        public static UniTask<ESAssetTemporaryLease<T>> LoadTemporaryAsync<T>(ESAssetRefer<T> refer, CancellationToken cancellationToken = default) where T : UnityEngine.Object
+            => TemporaryScope.LoadAsyncLease(refer, cancellationToken);
+
+        public static void CreateScope(ESAssetDomain domain)
+        {
+            EnsurePublicDomainAccess(domain);
+            CreateRegisteredScope(new ScopeRegistryKey(domain), null, false);
+        }
+        public static void CreateScope(string scopeKey) => CreateRegisteredScope(new ScopeRegistryKey(scopeKey), null, false);
+        public static void CreateScope(string scopeKey, ESAssetDomain parent)
+        {
+            EnsurePublicDomainAccess(parent);
+            CreateRegisteredScope(new ScopeRegistryKey(scopeKey), new ScopeRegistryKey(parent), false);
+        }
+        public static void CreateScope(string scopeKey, string parentScopeKey)
+            => CreateRegisteredScope(new ScopeRegistryKey(scopeKey), new ScopeRegistryKey(parentScopeKey), false);
+        public static void CreateScope(ESAssetDomain domain, ESAssetDomain parent)
+        {
+            EnsurePublicDomainAccess(domain);
+            EnsurePublicDomainAccess(parent);
+            CreateRegisteredScope(new ScopeRegistryKey(domain), new ScopeRegistryKey(parent), false);
+        }
+        public static void CreateScope(ESAssetDomain domain, string parentScopeKey)
+        {
+            EnsurePublicDomainAccess(domain);
+            CreateRegisteredScope(new ScopeRegistryKey(domain), new ScopeRegistryKey(parentScopeKey), false);
+        }
+
+        /// <summary>逻辑关闭并释放域持有；底层已发出的共享请求可能仍在后台完成并自动归还迟到 Handle。</summary>
+        public static bool ReleaseScope(ESAssetDomain domain)
+        {
+            EnsurePublicDomainAccess(domain);
+            return ReleaseRegisteredScope(new ScopeRegistryKey(domain));
+        }
+        /// <summary>逻辑关闭并释放域持有；底层已发出的共享请求可能仍在后台完成并自动归还迟到 Handle。</summary>
+        public static bool ReleaseScope(string scopeKey) => ReleaseRegisteredScope(new ScopeRegistryKey(scopeKey));
+
+        private static void EnsurePublicDomainAccess(ESAssetDomain domain)
+        {
+            if (domain == ESAssetDomain.GameInternal)
+                throw new InvalidOperationException("[ESRes][ScopeRegistry] GameInternal 仅允许框架内部资源会话使用，普通业务不得加载、创建或释放。");
+        }
+
+        private static string NormalizeScopeKey(string key)
+        {
+            string normalized = key?.Trim();
+            if (string.IsNullOrEmpty(normalized))
+                throw new ArgumentException("资源 Scope StringKey 不能为空。", nameof(key));
+            if (normalized.StartsWith("@domain:", StringComparison.OrdinalIgnoreCase)
+                || Enum.TryParse(normalized, true, out ESAssetDomain _))
+                throw new ArgumentException("资源 Scope StringKey 使用了框架保留域名称；请使用业务前缀，例如 scene:world_01 或 ui:inventory。", nameof(key));
+            if (normalized.Length > 128)
+                throw new ArgumentException("资源 Scope StringKey 不能超过 128 个字符。", nameof(key));
+            int separator = normalized.IndexOf(':');
+            if (separator <= 0 || separator == normalized.Length - 1)
+                throw new ArgumentException("资源 Scope StringKey 必须使用稳定业务前缀，例如 scene:world_01、ui:inventory 或 presentation:intro。", nameof(key));
+            for (int i = 0; i < separator; i++)
+            {
+                char c = normalized[i];
+                if ((c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-' && c != '_')
+                    throw new ArgumentException("资源 Scope StringKey 前缀只能包含小写字母、数字、'-' 或 '_'。", nameof(key));
+            }
+            return normalized;
+        }
+
+        private static ESAssetScope CreateRegisteredScope(ScopeRegistryKey key, ScopeRegistryKey? parent, bool implicitlyCreated)
+        {
+            if (!IsReady || runtimeProvider == null)
+                throw new InvalidOperationException("ESRuntimeDataAssetLoadingService 尚未初始化或正在切换 Provider。");
+            if (registeredScopes.ContainsKey(key))
+                throw new InvalidOperationException("资源 Scope 已经存在：" + key);
+
+            ScopeRegistration parentRegistration = null;
+            if (parent.HasValue)
+            {
+                if (parent.Value.Equals(key))
+                    throw new InvalidOperationException("资源 Scope 不能绑定自身为父级：" + key);
+                if (!registeredScopes.TryGetValue(parent.Value, out parentRegistration)
+                    || parentRegistration.State != ScopeRegistryState.Active)
+                    throw new InvalidOperationException("父资源 Scope 尚未建立或正在关闭：" + parent.Value);
+            }
+
+            var registration = new ScopeRegistration
+            {
+                State = ScopeRegistryState.Creating,
+                Parent = parent,
+                Generation = ++nextRegisteredScopeGeneration,
+                CreatedRealtime = Time.realtimeSinceStartup,
+                ImplicitlyCreated = implicitlyCreated
+            };
+            registeredScopes.Add(key, registration);
+            try
+            {
+                registration.Scope = new ESAssetScope(runtimeProvider);
+                registration.State = ScopeRegistryState.Active;
+                if (parentRegistration != null)
+                {
+                    parentRegistration.Children ??= new HashSet<ScopeRegistryKey>();
+                    parentRegistration.Children.Add(key);
+                }
+                ReportScopeCreated(key, registration);
+                return registration.Scope;
+            }
+            catch
+            {
+                if (parentRegistration != null)
+                    parentRegistration.Children?.Remove(key);
+                registeredScopes.Remove(key);
+                registration.Scope?.Dispose();
+                throw;
+            }
+        }
+
+        private static ESAssetScope GetOrCreateRegisteredScope(ScopeRegistryKey key)
+        {
+            if (!IsReady || runtimeProvider == null)
+                throw new InvalidOperationException("ESRuntimeDataAssetLoadingService 尚未初始化或正在切换 Provider。");
+            if (!registeredScopes.TryGetValue(key, out ScopeRegistration registration))
+                return CreateRegisteredScope(key, null, true);
+            if (registration.State == ScopeRegistryState.Creating)
+                throw new InvalidOperationException("资源 Scope 正在创建，检测到同 Key 重入：" + key);
+            if (registration.State == ScopeRegistryState.Closing)
+                throw new InvalidOperationException("资源 Scope 正在关闭，不能接受新请求：" + key);
+            if (registration.Scope == null || registration.Scope.IsDisposed)
+                throw new InvalidOperationException("资源 Scope Registry 状态损坏：" + key + ", Generation=" + registration.Generation);
+            return registration.Scope;
+        }
+
+        private static bool ReleaseRegisteredScope(ScopeRegistryKey key)
+        {
+            if (!registeredScopes.TryGetValue(key, out ScopeRegistration registration)
+                || registration.State == ScopeRegistryState.Closing)
+                return false;
+
+            registration.State = ScopeRegistryState.Closing;
+            if (registration.Children != null && registration.Children.Count > 0)
+            {
+                var children = new ScopeRegistryKey[registration.Children.Count];
+                registration.Children.CopyTo(children);
+                for (int i = 0; i < children.Length; i++)
+                    ReleaseRegisteredScope(children[i]);
+            }
+
+            if (registration.Parent.HasValue
+                && registeredScopes.TryGetValue(registration.Parent.Value, out ScopeRegistration parent))
+                parent.Children?.Remove(key);
+            try
+            {
+                // Keep the Closing registration visible while Dispose raises ownership-ending
+                // notifications. A synchronous callback that re-enters with the same key must be
+                // rejected instead of silently creating a new generation before the old one ends.
+                registration.Scope?.Dispose();
+                return true;
+            }
+            finally
+            {
+                registeredScopes.Remove(key);
+            }
+        }
+
+        private static void ReportScopeCreated(ScopeRegistryKey key, ScopeRegistration registration)
+        {
+            if (!Debug.isDebugBuild && !Application.isEditor)
+                return;
+            if (registration.ImplicitlyCreated)
+                Debug.Log("[ESRes][ScopeRegistry] 首次加载自动创建资源域：" + key + ", Generation=" + registration.Generation);
+            if (registeredScopes.Count > ScopeRegistryWarningCount)
+                Debug.LogWarning("[ESRes][ScopeRegistry] 当前活动资源域数量过高：" + registeredScopes.Count
+                    + "。请检查动态 StringKey、拼写错误或未调用 ReleaseScope 的流程。");
+        }
+
+        private static void ReportUnreleasedRegisteredScopes(string reason)
+        {
+            if ((!Debug.isDebugBuild && !Application.isEditor) || registeredScopes.Count == 0)
+                return;
+            float now = Time.realtimeSinceStartup;
+            foreach (KeyValuePair<ScopeRegistryKey, ScopeRegistration> pair in registeredScopes)
+            {
+                ScopeRegistration registration = pair.Value;
+                if (!registration.ImplicitlyCreated || registration.State == ScopeRegistryState.Closing)
+                    continue;
+                float lifetime = now - registration.CreatedRealtime;
+                if (lifetime >= 300f)
+                    Debug.LogWarning("[ESRes][ScopeRegistry] 自动创建的资源域在 " + reason
+                        + " 时仍未显式释放：" + pair.Key + ", Generation=" + registration.Generation
+                        + ", LifetimeSeconds=" + lifetime.ToString("F1"));
+            }
         }
 
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]

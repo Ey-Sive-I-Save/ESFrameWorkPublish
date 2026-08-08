@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
@@ -48,7 +49,7 @@ namespace ES
         public int enumKey;
         public bool isBusinessAsset;
     }
-    [Serializable] public sealed class ESRuntimeCatalog { public int formatVersion; public string libraryName, libraryFolder, libraryBundleCode, libraryAssetGuid; public List<ESRuntimeCatalogEntry> assets = new List<ESRuntimeCatalogEntry>(); }
+    [Serializable] public sealed class ESRuntimeCatalog { public int formatVersion; public string libraryName, libraryFolder, libraryBundleCode, libraryAssetGuid, generatedUtc; public List<ESRuntimeCatalogEntry> assets = new List<ESRuntimeCatalogEntry>(); }
     [Serializable] public sealed class ESRuntimeBundleRecord { public string assetBundleKey, fileName, unityHash, sha256, localRelativePath; public uint crc; public long size; public List<string> dependencies = new List<string>(); }
     [Serializable] public sealed class ESRuntimeReleaseMainAssetRecord { public string guid, assetBundleKey, internalName, typeName; }
     [Serializable] public sealed class ESRuntimeReleaseSubAssetRecord { public string guid, assetBundleKey, internalName, subAssetName, typeName; public long localFileId; }
@@ -66,7 +67,7 @@ namespace ES
     [Serializable] internal sealed class ESRuntimeVerifiedFileIndex { public string releaseVersion; public List<ESRuntimeVerifiedFile> files = new List<ESRuntimeVerifiedFile>(); }
 
     public enum ESRuntimeReleaseDownloadStage { ReadingRelease, ReadingConsumer, ReadingLibraryIdentity, ReadingCatalog, ReadingAssetBundleManifest, PreparingTransfer, DownloadingFile, VerifyingAssetBundle, InitializingRuntime, Completed }
-    public enum ESRuntimeReleaseTransferState { Discovering, Downloading, Verifying, Initializing, Completed }
+    public enum ESRuntimeReleaseTransferState { Discovering, Downloading, Verifying, Initializing, Completed, Failed, Cancelled }
     public readonly struct ESRuntimeReleaseDownloadProgress
     {
         public readonly ESRuntimeReleaseDownloadStage Stage;
@@ -93,10 +94,11 @@ namespace ES
         public readonly int RetryAttempt;
         public readonly float SpeedBytesPerSecond;
         public readonly int EstimatedRemainingSeconds;
+        public readonly string TerminalMessage;
 
         public ESRuntimeReleaseDownloadSnapshot(ESRuntimeReleaseTransferState state, string subject, long totalBytes, long completedBytes,
             long currentFileBytes, long currentFileSize, int completedFileCount, int totalFileCount, int retryAttempt,
-            float speedBytesPerSecond, int estimatedRemainingSeconds)
+            float speedBytesPerSecond, int estimatedRemainingSeconds, string terminalMessage = null)
         {
             State = state;
             Subject = subject ?? string.Empty;
@@ -109,6 +111,7 @@ namespace ES
             RetryAttempt = Math.Max(0, retryAttempt);
             SpeedBytesPerSecond = Math.Max(0f, speedBytesPerSecond);
             EstimatedRemainingSeconds = Math.Max(0, estimatedRemainingSeconds);
+            TerminalMessage = terminalMessage ?? string.Empty;
         }
 
         public float Progress01 => TotalBytes <= 0 ? (State == ESRuntimeReleaseTransferState.Completed ? 1f : 0f) : Mathf.Clamp01((float)CompletedBytes / TotalBytes);
@@ -211,6 +214,12 @@ namespace ES
     /// <summary>新版 Root → Consumer → Library → Manifest → AB 下载链；与旧 GameIdentity 管线完全独立。</summary>
     public sealed partial class ESRuntimeReleaseDownloader
     {
+        private sealed class ReleaseTransportException : IOException
+        {
+            public ReleaseTransportException(string url, string detail, Exception inner = null)
+                : base("远端资源传输失败：" + url + (string.IsNullOrWhiteSpace(detail) ? string.Empty : "，" + detail), inner) { }
+        }
+
         private sealed class TransferPlanFile
         {
             public string RelativePath;
@@ -254,6 +263,7 @@ namespace ES
         private long transferSampleBytes;
         private float transferSpeedBytesPerSecond;
         private float transferLastSnapshotTime;
+        private string transferTerminalMessage = string.Empty;
         private string verifiedReleaseVersion;
         // Root is intentionally stable so it can be revalidated. Everything it points at is
         // release-versioned locally as well; an interrupted new release therefore cannot
@@ -297,7 +307,9 @@ namespace ES
 
             runMode = lockedRunMode;
             platform = ESAssetBundleUtility.GetRuntimeResourcePlatformName(settings.applyPlatform);
-            cacheRoot = Path.Combine(Application.persistentDataPath, settings.Path_Sub_DownloadRelative_, "ReleaseV2", platform);
+            if (!settings.TryGetRuntimeDownloadCachePath(out string downloadCacheRoot, out string pathError))
+                throw new InvalidDataException("运行时下载缓存路径无效：" + pathError);
+            cacheRoot = Path.Combine(downloadCacheRoot, "ReleaseV2", platform);
             useLocalReleaseSource = runMode == ESAssetRunMode.LocalBuild;
             localReleaseRoot = Application.streamingAssetsPath.TrimEnd('/', '\\') + "/" + ESGlobalResSetting.ResParentFolderName;
         }
@@ -315,7 +327,13 @@ namespace ES
             try
             {
                 string platform = ESAssetBundleUtility.GetRuntimeResourcePlatformName(settings.applyPlatform);
-                string root = Path.Combine(Application.persistentDataPath, settings.Path_Sub_DownloadRelative_, "ReleaseV2", platform);
+                if (!settings.TryGetRuntimeDownloadCachePath(out string downloadCacheRoot, out string pathError))
+                {
+                    error = "运行时下载缓存路径无效：" + pathError;
+                    return false;
+                }
+
+                string root = Path.Combine(downloadCacheRoot, "ReleaseV2", platform);
                 string source = Path.Combine(root, "ESAssetReleaseManifest.json");
                 var manifest = JsonConvert.DeserializeObject<ESRuntimeReleaseManifest>(File.ReadAllText(source));
                 if (manifest == null || manifest.formatVersion != ReleaseProtocolFormatVersion
@@ -341,7 +359,7 @@ namespace ES
         /// EditorSimulateBuild 专用入口：只读取并校验正式发布清单，不下载代码包或 AssetBundle。
         /// 返回的 RuntimeMap 仅用于身份/依赖预检，物理加载由 EditorDirect Provider 完成。
         /// </summary>
-        internal UniTask<ESRuntimeReleaseDownloadResult> DownloadEditorSimulationMetadataAsync(CancellationToken cancellationToken = default)
+        public UniTask<ESRuntimeReleaseDownloadResult> DownloadEditorSimulationMetadataAsync(CancellationToken cancellationToken = default)
         {
             return ExecuteReleaseOperationAsync(() => DownloadEditorSimulationMetadataCoreAsync(cancellationToken), cancellationToken);
         }
@@ -554,7 +572,7 @@ namespace ES
                 return await DownloadJsonAsync<ESRuntimeReleaseManifest>(rootUrl, Path.Combine(cacheRoot, "ESAssetReleaseManifest.json"), null, token);
             }
             catch (OperationCanceledException) { throw; }
-            catch (Exception remoteException) when (!useLocalReleaseSource)
+            catch (ReleaseTransportException remoteException) when (!useLocalReleaseSource)
             {
                 string fallbackPath = Path.Combine(cacheRoot, "LastKnownGood", "ESAssetReleaseManifest.json");
                 if (!File.Exists(fallbackPath))
@@ -1086,6 +1104,7 @@ namespace ES
             transferCompletedFileCount = 0;
             transferRetryAttempt = 0;
             transferCurrentSubject = string.Empty;
+            transferTerminalMessage = string.Empty;
             transferState = ESRuntimeReleaseTransferState.Discovering;
 
             foreach (CollectedCodePackage collected in codePackages ?? Array.Empty<CollectedCodePackage>())
@@ -1124,6 +1143,25 @@ namespace ES
             transferSpeedBytesPerSecond = 0f;
             Report(ESRuntimeReleaseDownloadStage.PreparingTransfer, "TransferPlan", transferCompletedFileCount, transferPlanFiles.Count);
             PublishTransferSnapshot(true);
+        }
+
+        private void ResetTransferStateForOperation()
+        {
+            transferPlanFiles.Clear();
+            transferTotalBytes = 0;
+            transferCompletedBytes = 0;
+            transferCurrentFileBytes = 0;
+            transferCurrentFileSize = 0;
+            transferCurrentInitialBytes = 0;
+            transferCompletedFileCount = 0;
+            transferRetryAttempt = 0;
+            transferCurrentSubject = string.Empty;
+            transferTerminalMessage = string.Empty;
+            transferState = ESRuntimeReleaseTransferState.Discovering;
+            transferSampleTime = Time.realtimeSinceStartup;
+            transferSampleBytes = 0;
+            transferSpeedBytesPerSecond = 0f;
+            transferLastSnapshotTime = 0f;
         }
 
         private void AddTransferPlanFile(string relativePath, string localPath, long size, string hash)
@@ -1222,7 +1260,7 @@ namespace ES
                 : 0;
             var snapshot = new ESRuntimeReleaseDownloadSnapshot(transferState, transferCurrentSubject, transferTotalBytes,
                 visibleBytes, transferCurrentFileBytes, transferCurrentFileSize, transferCompletedFileCount, transferPlanFiles.Count,
-                transferRetryAttempt, transferSpeedBytesPerSecond, eta);
+                transferRetryAttempt, transferSpeedBytesPerSecond, eta, transferTerminalMessage);
             RecordDiagnosticSnapshot(snapshot);
             transferLastSnapshotTime = now;
             DownloadSnapshotChanged?.Invoke(snapshot);
@@ -1240,12 +1278,22 @@ namespace ES
         private void CompleteTransferPlan()
         {
             transferState = ESRuntimeReleaseTransferState.Completed;
+            transferTerminalMessage = string.Empty;
             transferCurrentSubject = string.Empty;
             transferCurrentFileBytes = 0;
             transferCurrentFileSize = 0;
             transferCurrentInitialBytes = 0;
             transferRetryAttempt = 0;
             Report(ESRuntimeReleaseDownloadStage.Completed, "TransferComplete", transferCompletedFileCount, transferPlanFiles.Count);
+            PublishTransferSnapshot(true);
+        }
+
+        private void PublishTerminalState(ESRuntimeReleaseTransferState state, Exception exception)
+        {
+            transferState = state;
+            transferTerminalMessage = exception == null || string.IsNullOrWhiteSpace(exception.Message)
+                ? (state == ESRuntimeReleaseTransferState.Cancelled ? "资源下载已取消。" : "资源下载失败。")
+                : exception.Message;
             PublishTransferSnapshot(true);
         }
 
@@ -1364,7 +1412,9 @@ namespace ES
                 {
                     if (!File.Exists(sourcePath) || new FileInfo(sourcePath).Length != expectedSize || !ESResManifestIntegrity.VerifyFileSha256(sourcePath, expectedHash))
                         throw new InvalidDataException("Initial AssetBundle is invalid: " + sourcePath);
-                    File.Copy(sourcePath, localPath, true);
+                    // StreamingAssets is a shipped source and must remain intact; only the
+                    // cache destination is promoted.
+                    PromoteFile(sourcePath, localPath, deleteSource: false);
                 }
                 else
                 {
@@ -1381,8 +1431,7 @@ namespace ES
                         if (File.Exists(localSourcePartPath)) File.Delete(localSourcePartPath);
                         throw new InvalidDataException("Initial AssetBundle is invalid: " + sourcePath);
                     }
-                    if (File.Exists(localPath)) File.Delete(localPath);
-                    File.Move(localSourcePartPath, localPath);
+                    PromoteFile(localSourcePartPath, localPath);
                 }
                 verified[relativePath] = new ESRuntimeVerifiedFile { relativePath = relativePath, size = expectedSize, sha256 = expectedHash };
                 CompleteTransferFile(relativePath);
@@ -1457,8 +1506,7 @@ namespace ES
             if (!ESResManifestIntegrity.VerifyFileSha256(partPath, expectedHash))
                 return false;
 
-            DeleteFileIfExists(localPath);
-            File.Move(partPath, localPath);
+            PromoteFile(partPath, localPath);
             verified[relativePath] = new ESRuntimeVerifiedFile { relativePath = relativePath, size = expectedSize, sha256 = expectedHash };
             CompleteTransferFile(relativePath);
             VerboseLog("资源校验完成 | " + relativePath + " | " + expectedSize + " bytes");
@@ -1476,6 +1524,37 @@ namespace ES
         {
             if (File.Exists(path))
                 File.Delete(path);
+        }
+
+        private static void PromoteFile(string sourcePath, string destinationPath, bool deleteSource = true)
+        {
+            if (!File.Exists(sourcePath))
+                throw new FileNotFoundException("待提升文件不存在。", sourcePath);
+            string sourceRoot = Path.GetDirectoryName(Path.GetFullPath(sourcePath));
+            string destinationRoot = Path.GetDirectoryName(Path.GetFullPath(destinationPath));
+            if (string.IsNullOrEmpty(sourceRoot) || string.IsNullOrEmpty(destinationRoot))
+                throw new InvalidDataException("资源提升路径无效。");
+            EnsureSafeCachePath(sourcePath, sourceRoot);
+            EnsureSafeCachePath(destinationPath, destinationRoot);
+            string temporary = destinationPath + ".tmp-" + Guid.NewGuid().ToString("N");
+            try
+            {
+                File.Copy(sourcePath, temporary, true);
+                if (File.Exists(destinationPath))
+                {
+                    try { File.Replace(temporary, destinationPath, null); }
+                    catch (PlatformNotSupportedException) { File.Copy(temporary, destinationPath, true); File.Delete(temporary); }
+                    catch (IOException) { File.Copy(temporary, destinationPath, true); File.Delete(temporary); }
+                    catch (UnauthorizedAccessException) { File.Copy(temporary, destinationPath, true); File.Delete(temporary); }
+                }
+                else File.Move(temporary, destinationPath);
+            }
+            finally
+            {
+                DeleteFileIfExists(temporary);
+            }
+            if (deleteSource)
+                DeleteFileIfExists(sourcePath);
         }
 
         private static DownloadHandler CreateFileDownloadHandler(string path, bool append)
@@ -1496,7 +1575,11 @@ namespace ES
             if (bytes == null)
                 throw new IOException("WebGL download returned no file data: " + request.url);
 
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            string directory = Path.GetDirectoryName(path);
+            if (string.IsNullOrEmpty(directory))
+                throw new InvalidDataException("缓存写入目录无效。");
+            Directory.CreateDirectory(directory);
+            EnsureSafeCachePath(path, directory);
             using (var stream = new FileStream(path, append ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None))
                 stream.Write(bytes, 0, bytes.Length);
 #endif
@@ -1504,14 +1587,30 @@ namespace ES
 
         private async UniTask<T> ExecuteReleaseOperationAsync<T>(Func<UniTask<T>> operation, CancellationToken token)
         {
-            await releaseOperationGate.WaitAsync(token);
+            bool entered = false;
             try
             {
+                await releaseOperationGate.WaitAsync(token);
+                entered = true;
+                ResetTransferStateForOperation();
                 return await operation();
+            }
+            catch (OperationCanceledException exception)
+            {
+                if (entered)
+                    PublishTerminalState(ESRuntimeReleaseTransferState.Cancelled, exception);
+                throw;
+            }
+            catch (Exception exception)
+            {
+                if (entered)
+                    PublishTerminalState(ESRuntimeReleaseTransferState.Failed, exception);
+                throw;
             }
             finally
             {
-                releaseOperationGate.Release();
+                if (entered)
+                    releaseOperationGate.Release();
             }
         }
 
@@ -1623,7 +1722,9 @@ namespace ES
                 }
                 await request.SendWebRequest().ToUniTask(cancellationToken: token);
                 if (request.result == UnityWebRequest.Result.Success) return request.downloadHandler.text;
-                if (attempt == MaxAttempts) throw new IOException("清单下载失败：" + url + "，" + request.error);
+                if (request.result != UnityWebRequest.Result.ConnectionError)
+                    throw new InvalidDataException("远端清单请求被拒绝或响应无效：HTTP=" + request.responseCode + "，" + url + "，" + request.error);
+                if (attempt == MaxAttempts) throw new ReleaseTransportException(url, request.error);
                 await UniTask.Delay(TimeSpan.FromSeconds(attempt), cancellationToken: token);
             }
             throw new InvalidOperationException();
@@ -1669,34 +1770,133 @@ namespace ES
         private void SaveVerifiedIndex() => WriteTextAtomically(ReleaseCachePath("ESVerifiedFileIndex.json"), JsonConvert.SerializeObject(new ESRuntimeVerifiedFileIndex { releaseVersion = verifiedReleaseVersion, files = verified.Values.OrderBy(item => item.relativePath, StringComparer.Ordinal).ToList() }, Formatting.Indented));
         private static void WriteTextAtomically(string path, string text)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
-            string temp = path + ".tmp";
-            File.WriteAllText(temp, text);
-#if UNITY_WEBGL && !UNITY_EDITOR
-            // WebGL's virtual filesystem does not provide a durable File.Replace contract.
-            // The verified index is an optimization only: a crash here falls back to SHA-256.
-            DeleteFileIfExists(path);
-            File.Move(temp, path);
-#else
-            if (File.Exists(path)) File.Replace(temp, path, null);
-            else File.Move(temp, path);
-#endif
+            string directory = Path.GetDirectoryName(path);
+            if (string.IsNullOrEmpty(directory))
+                throw new InvalidDataException("缓存写入目录无效。");
+            Directory.CreateDirectory(directory);
+            EnsureSafeCachePath(path, directory);
+            string temp = path + ".tmp-" + Guid.NewGuid().ToString("N");
+            try
+            {
+                File.WriteAllText(temp, text ?? string.Empty, new UTF8Encoding(false));
+                if (File.Exists(path))
+                {
+                    try { File.Replace(temp, path, null); }
+                    catch (PlatformNotSupportedException) { File.Copy(temp, path, true); File.Delete(temp); }
+                    catch (IOException) { File.Copy(temp, path, true); File.Delete(temp); }
+                    catch (UnauthorizedAccessException) { File.Copy(temp, path, true); File.Delete(temp); }
+                }
+                else File.Move(temp, path);
+            }
+            finally
+            {
+                DeleteFileIfExists(temp);
+            }
+        }
+
+        private static void EnsureSafeCachePath(string path, string allowedRoot)
+        {
+            string candidate = Path.GetFullPath(path);
+            string root = Path.GetFullPath(allowedRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!IsPathWithinRoot(root, candidate))
+                throw new UnauthorizedAccessException("运行时缓存路径越出受管目录：" + path);
+            string current = root;
+            string relative = candidate.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            foreach (string segment in relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            {
+                if (string.IsNullOrEmpty(segment)) continue;
+                current = Path.Combine(current, segment);
+                if (!Directory.Exists(current) && !File.Exists(current)) break;
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    throw new UnauthorizedAccessException("运行时缓存路径不能穿过 junction/symlink：" + path);
+            }
         }
         private string ResolveLocalReleasePath(string url)
         {
-            if (!string.IsNullOrEmpty(url) && url.StartsWith(localReleaseRoot, StringComparison.OrdinalIgnoreCase))
-                return url;
-            if (Path.IsPathRooted(url)) return url;
+            if (string.IsNullOrWhiteSpace(url))
+                throw new InvalidDataException("本地发布资源路径不能为空。");
+
+            string input = url.Trim();
+            if (input.StartsWith(localReleaseRoot, StringComparison.OrdinalIgnoreCase))
+                return ValidateLocalReleasePath(input);
+            if (Path.IsPathRooted(input))
+                return ValidateLocalReleasePath(input);
+
             string remoteRoot = (settings.Path_Net ?? string.Empty).TrimEnd('/', '\\');
-            string relative = url ?? string.Empty;
+            string relative = input;
             if (!string.IsNullOrEmpty(remoteRoot) && relative.StartsWith(remoteRoot, StringComparison.OrdinalIgnoreCase))
                 relative = relative.Substring(remoteRoot.Length).TrimStart('/', '\\');
             return CombineLocalReleasePath(relative);
         }
         private string CombineLocalReleasePath(string relativePath)
         {
-            if (!IsFilePath(localReleaseRoot)) return localReleaseRoot.TrimEnd('/') + "/" + (relativePath ?? string.Empty).TrimStart('/', '\\').Replace('\\', '/');
-            return Path.Combine(localReleaseRoot, (relativePath ?? string.Empty).Replace('/', Path.DirectorySeparatorChar));
+            string normalized = NormalizeLocalReleaseRelativePath(relativePath);
+            if (!IsFilePath(localReleaseRoot))
+                return localReleaseRoot.TrimEnd('/') + "/" + normalized;
+
+            string root = Path.GetFullPath(localReleaseRoot);
+            string candidate = Path.GetFullPath(Path.Combine(root, normalized.Replace('/', Path.DirectorySeparatorChar)));
+            if (!IsPathWithinRoot(root, candidate))
+                throw new InvalidDataException("本地发布资源路径越过了 StreamingAssets 发布根目录：" + relativePath);
+            return candidate;
+        }
+        private string ValidateLocalReleasePath(string path)
+        {
+            if (!IsFilePath(localReleaseRoot))
+            {
+                string normalizedRoot = localReleaseRoot.TrimEnd('/');
+                if (string.Equals(path, normalizedRoot, StringComparison.OrdinalIgnoreCase))
+                    return normalizedRoot;
+                if (!path.StartsWith(normalizedRoot + "/", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(path, normalizedRoot, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("本地发布资源路径不在 StreamingAssets 发布根目录内：" + path);
+                return normalizedRoot + "/" + NormalizeLocalReleaseRelativePath(path.Substring(normalizedRoot.Length));
+            }
+
+            string root = Path.GetFullPath(localReleaseRoot);
+            string candidate = Path.GetFullPath(path);
+            if (!IsPathWithinRoot(root, candidate))
+                throw new InvalidDataException("本地发布资源路径不在 StreamingAssets 发布根目录内：" + path);
+            return candidate;
+        }
+        private static bool IsPathWithinRoot(string root, string candidate)
+        {
+            string normalizedRoot = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            string normalizedCandidate = candidate.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            return normalizedCandidate.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    candidate.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    StringComparison.OrdinalIgnoreCase);
+        }
+        private static string NormalizeLocalReleaseRelativePath(string relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(relativePath))
+                throw new InvalidDataException("本地发布资源相对路径不能为空。");
+
+            string normalized = relativePath.Replace('\\', '/').Trim();
+            if (normalized.StartsWith("/", StringComparison.Ordinal)
+                || normalized.StartsWith("\\", StringComparison.Ordinal)
+                || Path.IsPathRooted(normalized))
+                throw new InvalidDataException("本地发布资源相对路径不能是绝对路径：" + relativePath);
+
+            string[] segments = normalized.Split('/');
+            var safeSegments = new List<string>(segments.Length);
+            foreach (string segment in segments)
+            {
+                if (string.IsNullOrEmpty(segment) || string.Equals(segment, ".", StringComparison.Ordinal))
+                    continue;
+                if (string.Equals(segment, "..", StringComparison.Ordinal)
+                    || segment.IndexOf(':') >= 0)
+                    throw new InvalidDataException("本地发布资源相对路径包含非法片段：" + relativePath);
+                safeSegments.Add(segment);
+            }
+
+            if (safeSegments.Count == 0)
+                throw new InvalidDataException("本地发布资源相对路径没有有效片段：" + relativePath);
+            return string.Join("/", safeSegments);
         }
         private static bool IsFilePath(string path) => !path.Contains("://") && !path.StartsWith("jar:", StringComparison.OrdinalIgnoreCase);
         private static void ValidateFormat(int? formatVersion, string manifestName)

@@ -45,7 +45,7 @@ namespace ES
         public List<ESAssetLibraryConsumer> RequiredConsumers = new List<ESAssetLibraryConsumer>();
 
         [HideInInspector]
-        [Tooltip("由资产烘焙自动维护。仅收集本 Consumer 必需 Library 中实现 IGameCoreSO 的 ScriptableObject。")]
+        [Tooltip("由用户显式执行‘同步并检查’维护；正式烘焙只校验此快照，不会自动改写。仅收集本 Consumer 必需 Library 中实现 IGameCoreSO 的 ScriptableObject。")]
         [SerializeReference]
         public List<ESAssetReferBase> GameCoreAssets = new List<ESAssetReferBase>();
 

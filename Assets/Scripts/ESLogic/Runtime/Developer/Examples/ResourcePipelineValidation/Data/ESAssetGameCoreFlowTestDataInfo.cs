@@ -64,6 +64,7 @@ namespace ES
     public sealed class ESAssetGameCoreFlowTestDataInfo : SoDataInfo, IGameCoreSO
     {
         [NonSerialized] private ESAssetScope testScope;
+        [NonSerialized] private ESRuntimeSceneHandle testSceneHandle;
 
         [TitleGroup("Test Root")]
         [HideLabel, InlineProperty]
@@ -196,13 +197,17 @@ namespace ES
         {
             testScope?.Dispose();
             testScope = null;
-            scene.Release();
-            Debug.Log("[ESFlowTest][Release] Dedicated test Scope disposed; all test-held asset references were returned.", this);
+            // ESRuntimeSceneHandle owns the scene lease; Dispose is the current resource-runtime release contract.
+            testSceneHandle.Dispose();
+            testSceneHandle = default;
+            Debug.Log("[ESFlowTest][Release] Dedicated test Scope and Scene Handle disposed; all test-held asset references were returned.", this);
         }
 
         public async UniTask<string> RunAssetLoadTestAsync(CancellationToken token = default)
         {
             testScope?.Dispose();
+            testSceneHandle.Dispose();
+            testSceneHandle = default;
             testScope = ESAssets.CreateScope();
             var report = new StringBuilder(3072);
             report.AppendLine("[ESFlowTest][Load] Full asset loading report");
@@ -233,6 +238,7 @@ namespace ES
                     try
                     {
                         ESRuntimeSceneHandle handle = await scene.LoadAsync(LoadSceneMode.Single, token);
+                        testSceneHandle = handle;
                         report.Append("[PASS] Scene: ").Append(handle.Scene.path).AppendLine();
                     }
                     catch (Exception exception) { AppendFailure(report, "Scene", exception); }

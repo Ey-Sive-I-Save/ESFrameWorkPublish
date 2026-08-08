@@ -93,6 +93,11 @@ namespace ES
                 AddEvent(report + " Scene=" + activeScene.Scene.name + ", Valid=" + activeScene.Scene.IsValid()
                     + ", AssetId=" + activeLevel.scene.AssetIdentity);
             }
+            catch (OperationCanceledException)
+            {
+                report = "[CANCELED] 进入关卡等待已取消。";
+                AddEvent(report);
+            }
             catch (Exception exception)
             {
                 report = "[FAIL] 进入关卡失败：" + exception.Message;
@@ -107,23 +112,43 @@ namespace ES
             if (activeLevel == null) return;
             string leavingLevelName = activeLevel.levelName;
             AddEvent("开始离开关卡：" + leavingLevelName + "。");
+            // SceneManager cannot cancel an unload AsyncOperation once it has been created.
+            // Teardown therefore always runs to quiescence with CancellationToken.None;
+            // the caller's token is checked only after the scene lease, Plan and safe point
+            // have been settled. Releasing any of those earlier would race the Unity unload.
             if (hasActiveScene && activeScene.Scene.IsValid() && activeScene.Scene.isLoaded)
-                await SceneManager.UnloadSceneAsync(activeScene.Scene).ToUniTask(cancellationToken: token);
-            if (hasActiveScene) activeScene.Dispose();
-            hasActiveScene = false;
-            await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate, token);
+            {
+                AsyncOperation unload = SceneManager.UnloadSceneAsync(activeScene.Scene);
+                if (unload == null)
+                    throw new InvalidOperationException("Unity 未能创建验收场景卸载任务：" + activeScene.Scene.name);
+                await unload.ToUniTask();
+            }
+            if (hasActiveScene)
+            {
+                activeScene.Dispose();
+                hasActiveScene = false;
+            }
+            await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate);
             if (activeLevel.resourcePlan != null && ESGameManager.ResourcePlans != null)
             {
-                lastPlanReport = await activeLevel.resourcePlan.ReleaseAsync(token);
+                lastPlanReport = await activeLevel.resourcePlan.ReleaseAsync(CancellationToken.None);
                 AddPlanEvent("资源计划释放完成", lastPlanReport);
+                if (lastPlanReport.State == ESResourcePlanState.Failed)
+                    throw new InvalidOperationException("资源计划释放失败：" + leavingLevelName);
             }
-            ESRuntimeUnusedAssetBundleUnloadResult result = await ESAssets.UnloadReleasedAssetBundlesAtSafePointAsync(token);
+            ESRuntimeUnusedAssetBundleUnloadResult result = await ESAssets.UnloadReleasedAssetBundlesAtSafePointAsync(CancellationToken.None);
             lastUnloadResult = result;
             hasUnloadResult = true;
-            report = "[PASS] 离开 " + activeLevel.levelName + "：卸载 AB=" + result.UnloadedAssetBundleCount
+            report = "[PASS] 离开 " + leavingLevelName + "：卸载 AB=" + result.UnloadedAssetBundleCount
                 + "，清除对象缓存=" + result.EvictedCachedAssetCount + "。";
             AddEvent(report);
             activeLevel = null;
+            if (token.IsCancellationRequested)
+            {
+                report = "[CANCELED] 已完成离开 " + leavingLevelName + " 的实际清理，但调用方等待已取消。";
+                AddEvent(report);
+                throw new OperationCanceledException(token);
+            }
         }
 
         private void OnGUI()
@@ -177,6 +202,11 @@ namespace ES
             if (busy || activeLevel == null) return;
             busy = true;
             try { await LeaveActiveLevelAsync(this.GetCancellationTokenOnDestroy()); }
+            catch (OperationCanceledException)
+            {
+                report = "[CANCELED] 离开关卡等待已取消。";
+                AddEvent(report);
+            }
             catch (Exception exception) { report = "[FAIL] 离开关卡失败：" + exception.Message; AddEvent(report); Debug.LogException(exception, this); }
             finally { busy = false; }
         }

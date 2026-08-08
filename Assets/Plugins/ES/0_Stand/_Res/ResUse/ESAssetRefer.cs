@@ -636,11 +636,11 @@ namespace ES
         /// 返回的 Lease 会捕获本次实际 Scope，Provider 切换后仍能安全地完成旧租期释放。
         /// </summary>
         public UniTask<ESAssetTemporaryLease<T>> LoadAsyncLease(CancellationToken cancellationToken = default)
-            => ESAssets.TemporaryScope.LoadAsyncLease(this, cancellationToken);
+            => ESAssets.LoadTemporaryAsync(this, cancellationToken);
 
         public override async UniTask PreloadAsync(CancellationToken cancellationToken = default)
         {
-            await LoadAsync(cancellationToken);
+            await ESAssets.LoadResidentAsync(this, cancellationToken);
         }
 
         /// <summary>
@@ -666,9 +666,17 @@ namespace ES
         public bool TryLoad(Component owner, out T asset)
             => ESAssets.TryGetOwned(this, owner, out asset);
 
-        /// <summary>默认无显式持有入口：全局驻留至显式资源安全点，调用者不需要 Owner、Scope 或 Release。</summary>
+        /// <summary>默认业务入口：加载到 GameSession 域；首次使用会自动创建。</summary>
         public UniTask<T> LoadAsync(CancellationToken cancellationToken = default)
             => ESAssets.LoadAsync(this, cancellationToken);
+
+        /// <summary>加载到预定义资源域；首次使用会自动创建并由对应流程负责 ReleaseScope。</summary>
+        public UniTask<T> LoadAsync(ESAssetDomain domain, CancellationToken cancellationToken = default)
+            => ESAssets.LoadAsync(this, domain, cancellationToken);
+
+        /// <summary>加载到合法业务前缀的 StringKey 资源域；首次使用会自动创建。</summary>
+        public UniTask<T> LoadAsync(string scopeKey, CancellationToken cancellationToken = default)
+            => ESAssets.LoadAsync(this, scopeKey, cancellationToken);
 
         #endregion
 
@@ -1037,8 +1045,8 @@ namespace ES
         public UniTask<ESRuntimeSceneHandle> LoadAsync(LoadSceneMode mode = LoadSceneMode.Single, CancellationToken cancellationToken = default)
         {
             IESAssetRuntimeProvider provider = ESAssets.RuntimeBackend;
-            if (provider == null)
-                return UniTask.FromException<ESRuntimeSceneHandle>(new InvalidOperationException("ESAssetReferScene 尚未接入 ESRuntimeDataAssetLoadingService。"));
+            if (!ESAssets.IsReady || provider == null)
+                return UniTask.FromException<ESRuntimeSceneHandle>(new InvalidOperationException("ESAssetReferScene 尚未接入资源会话或正在切换 Provider。"));
             return LoadWithProviderAsync(provider, mode, cancellationToken);
         }
 

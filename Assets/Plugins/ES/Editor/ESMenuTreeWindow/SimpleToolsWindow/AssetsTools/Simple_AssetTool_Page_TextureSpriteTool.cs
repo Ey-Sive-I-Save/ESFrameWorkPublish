@@ -470,7 +470,10 @@ namespace ES
                                 assetPath = SimpleToolsSafetyUtility.GetUniqueAssetPath(assetPath);
                             }
 
-                            File.WriteAllBytes(SimpleToolsSafetyUtility.AssetPathToFullPath(assetPath), bytes);
+                            ESManagedFileIO.WriteBytesAtomic(
+                                SimpleToolsSafetyUtility.AssetPathToFullPath(assetPath),
+                                bytes,
+                                Application.dataPath);
                             AssetDatabase.ImportAsset(assetPath);
 
                             var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;

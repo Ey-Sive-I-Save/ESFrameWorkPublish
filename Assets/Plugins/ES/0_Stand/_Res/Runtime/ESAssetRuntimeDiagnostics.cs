@@ -15,6 +15,12 @@ namespace ES
         public readonly int PendingAssetCount;
         public readonly int PooledScopeStateCount;
         public readonly bool HasResidentScope;
+        public readonly int RegisteredScopeCount;
+        public readonly int ImplicitRegisteredScopeCount;
+        public readonly int ClosingRegisteredScopeCount;
+        public readonly bool HasUnloadFailure;
+        public readonly int UnloadFailureCount;
+        public readonly string LastUnloadError;
 
         public ESAssetRuntimeDiagnostics(
             bool isReady,
@@ -26,7 +32,13 @@ namespace ES
             int loadedAssetCount,
             int pendingAssetCount,
             int pooledScopeStateCount,
-            bool hasResidentScope)
+            bool hasResidentScope,
+            int registeredScopeCount,
+            int implicitRegisteredScopeCount,
+            int closingRegisteredScopeCount,
+            bool hasUnloadFailure,
+            int unloadFailureCount,
+            string lastUnloadError)
         {
             IsReady = isReady;
             IsProviderTransitioning = isProviderTransitioning;
@@ -38,6 +50,12 @@ namespace ES
             PendingAssetCount = pendingAssetCount;
             PooledScopeStateCount = pooledScopeStateCount;
             HasResidentScope = hasResidentScope;
+            RegisteredScopeCount = registeredScopeCount;
+            ImplicitRegisteredScopeCount = implicitRegisteredScopeCount;
+            ClosingRegisteredScopeCount = closingRegisteredScopeCount;
+            HasUnloadFailure = hasUnloadFailure;
+            UnloadFailureCount = unloadFailureCount;
+            LastUnloadError = lastUnloadError ?? string.Empty;
         }
     }
 
@@ -54,9 +72,12 @@ namespace ES
         {
             IESAssetRuntimeProvider provider = ESAssets.RuntimeBackend;
             bool providerPending = provider is IESRuntimeAssetOperationTracker tracker && tracker.HasPendingOperations;
+            var unloadDiagnostics = provider as IESRuntimeAssetUnloadDiagnostics;
             int pendingScopes = 0;
             int loadedAssets = 0;
             int pendingAssets = 0;
+            int implicitRegisteredScopes = 0;
+            int closingRegisteredScopes = 0;
 
             foreach (ESAssetScope scope in liveScopes)
             {
@@ -66,6 +87,14 @@ namespace ES
                 pendingAssets += scope.DiagnosticPendingAssetCount;
                 if (scope.HasPendingOperations)
                     pendingScopes++;
+            }
+
+            foreach (ScopeRegistration registration in registeredScopes.Values)
+            {
+                if (registration.ImplicitlyCreated)
+                    implicitRegisteredScopes++;
+                if (registration.State == ScopeRegistryState.Closing)
+                    closingRegisteredScopes++;
             }
 
             return new ESAssetRuntimeDiagnostics(
@@ -78,7 +107,13 @@ namespace ES
                 loadedAssets,
                 pendingAssets,
                 ESAssetScope.PooledStateCount,
-                residentScope != null && !residentScope.IsDisposed);
+                residentScope != null && !residentScope.IsDisposed,
+                registeredScopes.Count,
+                implicitRegisteredScopes,
+                closingRegisteredScopes,
+                unloadDiagnostics != null && unloadDiagnostics.HasUnloadFailure,
+                unloadDiagnostics?.UnloadFailureCount ?? 0,
+                unloadDiagnostics?.LastUnloadError ?? string.Empty);
         }
     }
 }

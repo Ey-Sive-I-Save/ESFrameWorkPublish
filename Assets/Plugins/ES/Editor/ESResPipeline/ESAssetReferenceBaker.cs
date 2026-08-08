@@ -10,110 +10,51 @@ namespace ES
 {
     public static class ESAssetReferenceBaker
     {
-        public static void SyncConsumerGameCoreAssets(ESAssetLibraryConsumer consumer)
-        {
-            if (consumer == null) throw new ArgumentNullException(nameof(consumer));
-            List<ESAssetLibrary> libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>()
-                ?.Where(item => item != null).ToList() ?? new List<ESAssetLibrary>();
-            List<string> errors = SyncConsumerGameCoreCatalog(consumer, libraries);
-            AssetDatabase.SaveAssets();
-            if (errors.Count > 0) throw new InvalidOperationException(string.Join("\n", errors));
-        }
-
-        public static bool TryAddManualGameCoreAsset(ESAssetLibraryConsumer consumer, UnityEngine.Object asset)
-        {
-            if (consumer == null || !(asset is ScriptableObject scriptableObject)
-                || ESScriptableObjectClassification.GetClass(scriptableObject) != ESScriptableObjectClass.GameCore)
-                return false;
-            ESPipelineAssetIdentity identity = ESAssetPipelineIO.GetIdentity(asset);
-            if (!identity.IsValid) return false;
-            consumer.ManualGameCoreAssets ??= new List<ESAssetReferBase>();
-            if (consumer.ManualGameCoreAssets.Any(item => item != null && item.AssetIdentity.Equals(new ESAssetIdentity(identity.guid, identity.localFileId))))
-                return true;
-            var refer = new ESAssetReferScriptableObject();
-            refer.InitializeGeneratedReference(identity.guid, identity.localFileId, ESAssetReferKind.ScriptableObject, 0, string.Empty);
-            consumer.ManualGameCoreAssets.Add(refer);
-            EditorUtility.SetDirty(consumer);
-            return true;
-        }
-
-        public static bool TryAddResidentAsset(ESAssetLibraryConsumer consumer, UnityEngine.Object asset, out string error)
-        {
-            error = string.Empty;
-            if (consumer == null || asset == null)
-            {
-                error = "Consumer 或资产为空。";
-                return false;
-            }
-
-            string path = AssetDatabase.GetAssetPath(asset);
-            if (string.IsNullOrWhiteSpace(path) || ESAssetPipelineIO.IsEditorOnly(path, asset))
-            {
-                error = "脚本、EditorOnly 或无效资产不能作为启动常驻资产。";
-                return false;
-            }
-            if (asset is SceneAsset)
-            {
-                error = "Scene 不能作为常驻对象加载，请使用场景加载流程。";
-                return false;
-            }
-            if (asset is ScriptableObject scriptableObject
-                && ESScriptableObjectClassification.GetClass(scriptableObject) == ESScriptableObjectClass.GameCore)
-            {
-                error = "IGameCoreSO 应放入 GameCoreAssets，不能重复放入 ResidentAssets。";
-                return false;
-            }
-
-            ESPipelineAssetIdentity identity = ESAssetPipelineIO.GetIdentity(asset);
-            if (!identity.IsValid)
-            {
-                error = "资产缺少有效 GUID/LocalFileId。";
-                return false;
-            }
-
-            ESAssetPage page = null;
-            foreach (ESAssetReferKind kind in Enum.GetValues(typeof(ESAssetReferKind)))
-                if (kind != ESAssetReferKind.None
-                    && ESAssetRegistry.TryGetByAssetIdentity(kind, identity.guid, identity.localFileId, out page))
-                    break;
-            if (page == null)
-            {
-                error = "资产尚未注册到 AssetLibrary，请先完成资源注册。";
-                return false;
-            }
-
-            consumer.ResidentAssets ??= new List<ESAssetReferBase>();
-            if (consumer.ResidentAssets.Any(item => item != null && item.AssetIdentity.Equals(new ESAssetIdentity(identity.guid, identity.localFileId))))
-                return true;
-
-            var refer = new ESAssetReferUnityObject();
-            refer.InitializeGeneratedReference(identity.guid, identity.localFileId, page.Kind, page.EnumKey, page.EffectiveStringKey);
-            consumer.ResidentAssets.Add(refer);
-            EditorUtility.SetDirty(consumer);
-            return true;
-        }
-
         /// <summary>
-        /// 烘焙入口改为编辑器长任务。每帧只推进一个 Library、Consumer 或输出文件；
+        /// 烘焙入口改为编辑器长任务。每帧只推进一个 Library 或输出文件；
         /// AssetDatabase 的原子调用仍保持在主线程，避免额外线程同步和 GC 压力。
         /// </summary>
-        public static ESEditorLongTask Bake()
+        public static ESEditorLongTask Bake(Action<ESEditorLongTask> onFinished = null)
         {
-            ESAssetPipelineIO.EnsureAssetBundleReleaseMode();
-            ESAssetPipelineIO.PurgeLegacyGeneratedArtifactsBeforeBake();
-            // 不依赖任意窗口的前置检查。菜单、脚本和 CI 都必须获得同一份
-            // ConfigKey 源头权威校验，避免把过期快照写进新的 Catalog。
-            ESResourcePlanGameCoreExpansion.BakeAll();
-            ESResourcePlanConfigKeySynchronizer.ValidateAllForBake();
             var libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>()
                 .Where(item => item != null && item.ContainsBuild)
                 .OrderBy(item => item.LibFolderName, StringComparer.Ordinal)
                 .ToList();
-            EnsureLibraryBundleCodes(libraries);
-            return ESEditorHandle.EnqueueLongTask(new ESAssetReferenceBakeLongTask(libraries));
+            // EditorDirect 只生成编辑器 Catalog/ReferenceGraph。正式 AB 命名、Consumer
+            // 快照和发布 ConfigKey 门禁由 Planner/Publisher 的独立入口执行。
+            ESResourcePlanConfigKeySynchronizer.ValidateAllForBake();
+            return ESEditorHandle.EnqueueLongTask(new ESAssetReferenceBakeLongTask(
+                libraries, ESAssetPipelineIO.BakeRoot, null, false, onFinished));
         }
 
-        private static void EnsureLibraryBundleCodes(IReadOnlyCollection<ESAssetLibrary> libraries)
+        internal static ESEditorLongTask BakeForCatalogRecovery(
+            string transactionId, Action<ESEditorLongTask> onFinished = null)
+        {
+            if (string.IsNullOrWhiteSpace(transactionId))
+                throw new ArgumentException("Catalog 恢复事务 ID 不能为空。", nameof(transactionId));
+
+            var libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>()
+                .Where(item => item != null && item.ContainsBuild)
+                .OrderBy(item => item.LibFolderName, StringComparer.Ordinal)
+                .ToList();
+            // EditorDirect 恢复只负责 Catalog/ReferenceGraph，不提前引入正式
+            // LocalBuild/HotUpdate 的 AB 短码门禁；正式发布门禁仍由独立阶段负责。
+            ESResourcePlanConfigKeySynchronizer.ValidateAllForBake();
+            string outputRoot = ESAssetPipelineIO.RecoveryBakeRoot(transactionId);
+            return ESEditorHandle.EnqueueLongTask(new ESAssetReferenceBakeLongTask(
+                libraries, outputRoot, transactionId, true, onFinished));
+        }
+
+        internal static void ValidateSourceStateForBuild(IReadOnlyCollection<ESAssetLibrary> libraries)
+        {
+            // 不依赖任意窗口的前置检查。菜单、脚本和 CI 都必须获得同一份
+            // 只读 ConfigKey、Consumer 与 Library 命名校验；源资产修复必须是显式动作。
+            ESResourcePlanConfigKeySynchronizer.ValidateAllForBake();
+            ValidateLibraryBundleCodes(libraries);
+            ValidateConsumerGameCoreAssetsForBuild(libraries);
+        }
+
+        private static void ValidateLibraryBundleCodes(IReadOnlyCollection<ESAssetLibrary> libraries)
         {
             var owners = new Dictionary<string, ESAssetLibrary>(StringComparer.Ordinal);
             foreach (ESAssetLibrary library in libraries ?? Array.Empty<ESAssetLibrary>())
@@ -125,39 +66,47 @@ namespace ES
 
                 string code = library.AssetBundleCode?.Trim().ToLowerInvariant() ?? string.Empty;
                 if (string.IsNullOrEmpty(code))
-                {
-                    code = ESAssetBundleUtility.CreateAutomaticLibraryCode(library.Name, libraryGuid);
-                    Undo.RecordObject(library, "Generate AssetBundle Code");
-                    library.AssetBundleCode = code;
-                    EditorUtility.SetDirty(library);
-                    Debug.Log($"[ESRes][Bake][Naming] 已为 Library [{library.Name}] 固化 AB 短码：{code}", library);
-                }
+                    throw new InvalidOperationException($"[ESRes][Bake] Library [{library.Name}] 未配置 AB 短码，请在 Library Inspector 中显式生成或填写后重试。");
                 if (!ESAssetBundleUtility.IsValidLibraryCode(code))
                     throw new InvalidOperationException($"[ESRes][Bake] Library [{library.Name}] 的 AB 短码无效：{library.AssetBundleCode}。仅允许 2~12 位 a-z、0-9、_。");
                 if (owners.TryGetValue(code, out ESAssetLibrary existing))
                     throw new InvalidOperationException($"[ESRes][Bake] Library AB 短码全局冲突：{code}，Library=[{existing.Name}] 与 [{library.Name}]。");
                 owners.Add(code, library);
             }
-            AssetDatabase.SaveAssets();
         }
 
         private sealed class ESAssetReferenceBakeLongTask : ESEditorLongTask
         {
-            private enum Phase { Catalogs, Graphs, ValidateKeys, GameCore, WriteOutputs, Finish }
+            private enum Phase { Catalogs, Graphs, ValidateKeys, WriteOutputs, Finish }
             private readonly List<ESAssetLibrary> libraries;
             private readonly Dictionary<ESAssetLibrary, ESAssetLibraryCatalog> catalogs = new Dictionary<ESAssetLibrary, ESAssetLibraryCatalog>();
             private readonly Dictionary<ESAssetLibrary, ESAssetReferenceGraph> graphs = new Dictionary<ESAssetLibrary, ESAssetReferenceGraph>();
-            private readonly List<ESAssetLibraryConsumer> consumers;
-            private readonly List<string> gameCoreErrors = new List<string>();
+            private readonly Action<ESEditorLongTask> onFinished;
+            private readonly string outputRoot;
+            private readonly string transactionId;
+            private readonly bool writeCommitMarker;
+            private readonly string bakeGenerationUtc = DateTime.UtcNow.ToString("O");
             private Phase phase;
             private int index;
 
-            public ESAssetReferenceBakeLongTask(List<ESAssetLibrary> libraries)
+            public ESAssetReferenceBakeLongTask(
+                List<ESAssetLibrary> libraries,
+                string outputRoot,
+                string transactionId,
+                bool writeCommitMarker,
+                Action<ESEditorLongTask> onFinished)
                 : base("烘焙资产引用", "ES.ResourcePipeline", 10)
             {
                 this.libraries = libraries ?? new List<ESAssetLibrary>();
-                consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
-                    ?.Where(item => item != null).OrderBy(item => item.ConsumerId, StringComparer.Ordinal).ToList() ?? new List<ESAssetLibraryConsumer>();
+                this.outputRoot = outputRoot ?? throw new ArgumentNullException(nameof(outputRoot));
+                this.transactionId = transactionId;
+                this.writeCommitMarker = writeCommitMarker;
+                this.onFinished = onFinished;
+            }
+
+            protected override void OnFinish()
+            {
+                onFinished?.Invoke(this);
             }
 
             public override ESEditorLongTaskStepResult ProcessStep(ESEditorLongTaskContext context)
@@ -169,7 +118,7 @@ namespace ES
                         {
                             ESAssetLibrary library = libraries[index];
                             SetProgress(index, TotalSteps, "分析资源库：" + library.Name);
-                            catalogs.Add(library, CreateCatalog(library));
+                            catalogs.Add(library, CreateCatalog(library, bakeGenerationUtc));
                             index++;
                             return ESEditorLongTaskStepResult.Continue;
                         }
@@ -191,19 +140,6 @@ namespace ES
                     case Phase.ValidateKeys:
                         SetProgress(libraries.Count * 2, TotalSteps, "校验业务资源键");
                         ValidateBusinessKeys(catalogs.Values);
-                        phase = Phase.GameCore;
-                        return ESEditorLongTaskStepResult.Continue;
-                    case Phase.GameCore:
-                        if (index < consumers.Count)
-                        {
-                            ESAssetLibraryConsumer consumer = consumers[index];
-                            SetProgress(libraries.Count * 2 + 1 + index, TotalSteps, "同步游戏核心：" + consumer.Name);
-                            gameCoreErrors.AddRange(SyncConsumerGameCoreCatalog(consumer, libraries));
-                            index++;
-                            return ESEditorLongTaskStepResult.Continue;
-                        }
-                        AssetDatabase.SaveAssets();
-                        index = 0;
                         phase = Phase.WriteOutputs;
                         return ESEditorLongTaskStepResult.Continue;
                     case Phase.WriteOutputs:
@@ -212,8 +148,8 @@ namespace ES
                             ESAssetLibrary library = libraries[index];
                             ESAssetLibraryCatalog catalog = catalogs[library];
                             ESAssetReferenceGraph graph = graphs[library];
-                            SetProgress(libraries.Count * 2 + consumers.Count + 1 + index, TotalSteps, "写入资源目录与引用图：" + catalog.libraryName);
-                            string outputFolder = ESAssetPipelineIO.LibraryBakeFolder(catalog.libraryFolder);
+                            SetProgress(libraries.Count * 2 + 1 + index, TotalSteps, "写入资源目录与引用图：" + catalog.libraryName);
+                            string outputFolder = Path.Combine(outputRoot, ESAssetPipelineIO.SafeSegment(catalog.libraryFolder));
                             ESAssetPipelineIO.WriteJson(Path.Combine(outputFolder, ESAssetPipelineIO.CatalogFileName), catalog, true);
                             ESAssetPipelineIO.WriteJson(Path.Combine(outputFolder, ESAssetPipelineIO.ReferenceGraphFileName), graph, true);
                             index++;
@@ -223,9 +159,9 @@ namespace ES
                         return ESEditorLongTaskStepResult.Continue;
                     default:
                         AssetDatabase.Refresh();
-                        int errors = catalogs.Values.Sum(item => item.errors.Count) + graphs.Values.Sum(item => item.errors.Count) + gameCoreErrors.Count;
+                        int errors = catalogs.Values.Sum(item => item.errors.Count) + graphs.Values.Sum(item => item.errors.Count);
                         int warnings = catalogs.Values.Sum(item => item.warnings.Count) + graphs.Values.Sum(item => item.warnings.Count);
-                        Debug.Log($"[ESRes][Bake] 完成 {catalogs.Count} 个资源库与引用图，错误 {errors}，警告 {warnings}。输出：{ESAssetPipelineIO.BakeRoot}");
+                        Debug.Log($"[ESRes][Bake] 完成 {catalogs.Count} 个资源库与引用图，错误 {errors}，警告 {warnings}。输出：{outputRoot}");
                         foreach (string warning in catalogs.Values.SelectMany(item => item.warnings)
                             .Concat(graphs.Values.SelectMany(item => item.warnings))
                             .Distinct(StringComparer.Ordinal))
@@ -234,24 +170,89 @@ namespace ES
                         {
                             foreach (string error in catalogs.Values.SelectMany(item => item.errors)
                                 .Concat(graphs.Values.SelectMany(item => item.errors))
-                                .Concat(gameCoreErrors)
                                 .Distinct(StringComparer.Ordinal))
                                 Debug.LogError("[ESRes][Bake][Error] " + error);
                             SetFailure(new InvalidOperationException("[ESRes][Bake] 资产引用烘焙存在错误，请检查资源目录后再规划资源包。"));
                             return ESEditorLongTaskStepResult.Fail;
+                        }
+                        if (writeCommitMarker)
+                        {
+                            if (libraries.Count == 0)
+                            {
+                                SetFailure(new InvalidOperationException(
+                                    "[ESRes][CatalogRecovery] 本次恢复烘焙没有 ContainsBuild 的资源库，不生成恢复提交标记。"));
+                                return ESEditorLongTaskStepResult.Fail;
+                            }
+
+                            WriteCommitMarker();
                         }
                         SetProgress(TotalSteps, TotalSteps, "烘焙完成");
                         return ESEditorLongTaskStepResult.Complete;
                 }
             }
 
-            private int TotalSteps => libraries.Count * 3 + consumers.Count + 2;
+            private void WriteCommitMarker()
+            {
+                var commit = new ESAssetCatalogBakeCommit
+                {
+                    transactionId = transactionId,
+                    generatedUtc = DateTime.UtcNow.ToString("O"),
+                    commitGeneration = DateTime.UtcNow.Ticks
+                };
+
+                foreach (ESAssetLibrary library in libraries)
+                {
+                    ESAssetLibraryCatalog catalog = catalogs[library];
+                    string folder = Path.Combine(outputRoot, ESAssetPipelineIO.SafeSegment(catalog.libraryFolder));
+                    AddCommitOutput(commit, catalog, folder, ESAssetPipelineIO.CatalogFileName, true);
+                    AddCommitOutput(commit, catalog, folder, ESAssetPipelineIO.ReferenceGraphFileName, false);
+                }
+
+                string commitPath = Path.Combine(outputRoot, ESAssetPipelineIO.CatalogBakeCommitFileName);
+                if (File.Exists(commitPath))
+                    throw new InvalidOperationException(
+                        "[ESRes][CatalogRecovery] 恢复提交标记已存在，拒绝覆盖同一 transaction 的既有提交。");
+                ESAssetPipelineIO.WriteJsonCreateNew(commitPath, commit);
+            }
+
+            private void AddCommitOutput(
+                ESAssetCatalogBakeCommit commit,
+                ESAssetLibraryCatalog catalog,
+                string folder,
+                string fileName,
+                bool isCatalog)
+            {
+                string path = Path.Combine(folder, fileName);
+                if (!File.Exists(path))
+                    throw new FileNotFoundException("Catalog 烘焙输出缺失，无法提交本次恢复事务。", path);
+
+                string normalizedRoot = outputRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                commit.outputs.Add(new ESAssetCatalogBakeOutput
+                {
+                    relativePath = path.Substring(normalizedRoot.Length + 1)
+                        .Replace(Path.DirectorySeparatorChar, '/'),
+                    libraryName = catalog.libraryName,
+                    libraryFolder = catalog.libraryFolder,
+                    outputKind = isCatalog
+                        ? ESAssetPipelineIO.CatalogOutputKind
+                        : ESAssetPipelineIO.ReferenceGraphOutputKind,
+                    protocolVersion = isCatalog
+                        ? ESAssetPipelineIO.CatalogFormatVersion
+                        : ESAssetPipelineIO.ReferenceGraphFormatVersion,
+                    commitGeneration = commit.commitGeneration,
+                    size = new FileInfo(path).Length,
+                    sha256 = ESResManifestIntegrity.ComputeFileSha256(path),
+                    isCatalog = isCatalog
+                });
+            }
+
+            private int TotalSteps => libraries.Count * 3 + 2;
         }
-        private static ESAssetLibraryCatalog CreateCatalog(ESAssetLibrary library)
+        private static ESAssetLibraryCatalog CreateCatalog(ESAssetLibrary library, string generatedUtc)
         {
             string libraryAssetGuid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(library));
             var catalog = new ESAssetLibraryCatalog { libraryName = library.Name, libraryFolder = library.LibFolderName,
-                libraryBundleCode = library.AssetBundleCode, libraryAssetGuid = libraryAssetGuid };
+                libraryBundleCode = library.AssetBundleCode, libraryAssetGuid = libraryAssetGuid, generatedUtc = generatedUtc };
             foreach (var book in library.GetAllUseableBooks().Where(item => item != null))
             {
                 if (book.pages == null) continue;
@@ -303,7 +304,7 @@ namespace ES
             {
                 libraryName = catalog.libraryName,
                 libraryFolder = catalog.libraryFolder,
-                generatedUtc = DateTime.UtcNow.ToString("O")
+                generatedUtc = catalog.generatedUtc
             };
             var ownersByPath = (allCatalogs ?? Enumerable.Empty<ESAssetLibraryCatalog>())
                 .SelectMany(item => (item.assets ?? new List<ESAssetCatalogEntry>())
@@ -499,25 +500,59 @@ namespace ES
             catalog.warnings.Add(warning);
         }
 
-        private static List<string> SyncConsumerGameCoreCatalogs(IReadOnlyCollection<ESAssetLibrary> libraries)
+        internal static void ValidateConsumerGameCoreAssetsForBuild(IReadOnlyCollection<ESAssetLibrary> libraries)
         {
-            var allErrors = new List<string>();
-            var consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
-                ?.Where(item => item != null).ToList() ?? new List<ESAssetLibraryConsumer>();
-            foreach (ESAssetLibraryConsumer consumer in consumers)
-            {
-                allErrors.AddRange(SyncConsumerGameCoreCatalog(consumer, libraries));
-            }
-            AssetDatabase.SaveAssets();
-            return allErrors;
+            var errors = new List<string>();
+            foreach (ESAssetLibraryConsumer consumer in ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
+                ?.Where(item => item != null).ToList() ?? new List<ESAssetLibraryConsumer>())
+                errors.AddRange(ValidateConsumerGameCoreCatalog(consumer, libraries));
+            if (errors.Count > 0)
+                throw new InvalidOperationException("[ESRes][Build] Consumer GameCore 快照校验失败；请执行 Consumer 的‘同步并检查’后重试：\n"
+                    + string.Join("\n", errors.Distinct(StringComparer.Ordinal)));
         }
 
-        private static List<string> SyncConsumerGameCoreCatalog(ESAssetLibraryConsumer consumer, IReadOnlyCollection<ESAssetLibrary> libraries)
+        private static List<string> ValidateConsumerGameCoreCatalog(ESAssetLibraryConsumer consumer, IReadOnlyCollection<ESAssetLibrary> libraries)
         {
-            consumer.EnsureStableIdentity();
-            var generated = new List<ESAssetReferBase>();
+            var errors = new List<string>();
+            if (string.IsNullOrWhiteSpace(consumer.ConsumerId))
+                errors.Add("Consumer [" + consumer.Name + "] 缺少稳定 ID，请先保存 Consumer 或显式补全 ID。");
+
+            List<string> computedErrors = BuildConsumerGameCoreSnapshot(consumer, libraries, out List<ESAssetReferBase> generated);
+            errors.AddRange(computedErrors);
+
+            var expected = generated
+                .Where(item => item != null && item.IsValid)
+                .Select(GetReferenceIdentityKey)
+                .OrderBy(item => item, StringComparer.Ordinal)
+                .ToList();
+            var actual = new List<string>();
+            foreach (ESAssetReferBase refer in consumer.GameCoreAssets ?? new List<ESAssetReferBase>())
+            {
+                if (refer == null || !refer.IsValid)
+                {
+                    errors.Add("Consumer [" + consumer.Name + "] 的 GameCoreAssets 包含空或无效引用。");
+                    continue;
+                }
+                actual.Add(GetReferenceIdentityKey(refer));
+            }
+            actual.Sort(StringComparer.Ordinal);
+            if (!expected.SequenceEqual(actual, StringComparer.Ordinal))
+                errors.Add("Consumer [" + consumer.Name + "] 的 GameCoreAssets 快照已过期；请执行‘同步并检查’，Bake 不会自动改写 Consumer。");
+
+            return errors.Distinct(StringComparer.Ordinal).ToList();
+        }
+
+        internal static List<string> BuildConsumerGameCoreSnapshot(
+            ESAssetLibraryConsumer consumer,
+            IReadOnlyCollection<ESAssetLibrary> libraries,
+            out List<ESAssetReferBase> generated)
+        {
+            if (consumer == null) throw new ArgumentNullException(nameof(consumer));
+            libraries ??= Array.Empty<ESAssetLibrary>();
+            generated = new List<ESAssetReferBase>();
             var paths = new HashSet<string>(StringComparer.Ordinal);
             var identities = new HashSet<string>(StringComparer.Ordinal);
+            var errors = new List<string>();
             foreach (ESAssetLibrary library in (consumer.ConsumerLibFolders ?? new List<ESAssetLibrary>()).Where(library => library != null && libraries.Contains(library)))
             foreach (ESAssetBook book in library.GetAllUseableBooks().Where(book => book?.pages != null))
             foreach (ESAssetPage page in book.pages.Where(page => page?.OB != null))
@@ -530,18 +565,31 @@ namespace ES
                     AddGameCoreAsset(page.OB as ScriptableObject, generated, identities, paths);
             }
             foreach (ESAssetReferBase refer in consumer.ManualGameCoreAssets ?? new List<ESAssetReferBase>())
-                if (refer != null && refer.IsValid)
-                    AddGameCoreAsset(ResolveExactScriptableObject(refer.GUID, refer.LocalFileId), generated, identities, paths);
+            {
+                if (refer == null || !refer.IsValid)
+                {
+                    errors.Add("Consumer [" + consumer.Name + "] 的 ManualGameCoreAssets 包含空或无效引用。");
+                    continue;
+                }
+                ScriptableObject manualAsset = ResolveExactScriptableObject(refer.GUID, refer.LocalFileId);
+                if (manualAsset == null)
+                {
+                    errors.Add("Consumer [" + consumer.Name + "] 的 ManualGameCoreAssets 引用已丢失："
+                        + refer.GUID + "#" + refer.LocalFileId + "。");
+                    continue;
+                }
+                AddGameCoreAsset(manualAsset, generated, identities, paths);
+            }
             var closureErrors = new List<string>();
             ExpandGameCoreConfigKeyClosure(generated, identities, paths, closureErrors);
-            consumer.GameCoreAssets = generated.GroupBy(item => item.AssetIdentity).Select(group => group.First()).ToList();
-            var validationErrors = ValidateGameCoreDependencies(consumer, paths);
-            validationErrors.AddRange(closureErrors);
-            validationErrors.AddRange(ValidateCollectedItemGameCoreDefinitions(generated));
-            consumer.GameCoreValidationErrors = validationErrors.Distinct(StringComparer.Ordinal).ToList();
-            EditorUtility.SetDirty(consumer);
-            return consumer.GameCoreValidationErrors;
+            errors.AddRange(ValidateGameCoreDependencies(consumer, paths));
+            errors.AddRange(closureErrors);
+            errors.AddRange(ValidateCollectedItemGameCoreDefinitions(generated));
+            return errors.Distinct(StringComparer.Ordinal).ToList();
         }
+
+        private static string GetReferenceIdentityKey(ESAssetReferBase refer)
+            => (refer?.GUID ?? string.Empty) + "#" + (refer?.LocalFileId ?? 0);
 
         private static void AddGameCoreAssetsAtPath(string path, List<ESAssetReferBase> destination, HashSet<string> identities, HashSet<string> paths)
         {

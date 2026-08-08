@@ -1,7 +1,9 @@
 {
-  "formatVersion": 2,
+  "formatVersion": 3,
   "libraryName": "测试库",
   "libraryFolder": "ceshiku",
+  "libraryBundleCode": "",
+  "libraryAssetGuid": "4718578158784d34ba816e7be20ffed1",
   "assets": [
     {
       "identity": {
@@ -17,9 +19,14 @@
       "stringKey": "GameObject (3)",
       "libraryName": "测试库",
       "libraryFolder": "ceshiku",
+      "libraryBundleCode": "",
       "pageName": "GameObject (3)",
       "namedOption": "UseFilePath",
       "subAssetName": "",
+      "parentFolderPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res",
+      "parentFolderGuid": "9c152950070239147ba580034a5d9b79",
+      "topLevelFolderPath": "Assets/Plugins",
+      "topLevelFolderGuid": "e281160275b6e6f43bffb849e2c973e3",
       "enumKey": 0,
       "isBusinessAsset": true
     },
@@ -37,9 +44,14 @@
       "stringKey": "GameObject (3)",
       "libraryName": "测试库",
       "libraryFolder": "ceshiku",
+      "libraryBundleCode": "",
       "pageName": "GameObject (3)",
       "namedOption": "UseFilePath",
       "subAssetName": "",
+      "parentFolderPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res",
+      "parentFolderGuid": "9c152950070239147ba580034a5d9b79",
+      "topLevelFolderPath": "Assets/Plugins",
+      "topLevelFolderGuid": "e281160275b6e6f43bffb849e2c973e3",
       "enumKey": 0,
       "isBusinessAsset": true
     },
@@ -57,9 +69,14 @@
       "stringKey": "es_asset_gamecore_flow_hotupdate_test",
       "libraryName": "测试库",
       "libraryFolder": "ceshiku",
+      "libraryBundleCode": "",
       "pageName": "ESAssetGameCoreFlowHotUpdateTest",
       "namedOption": "UseFilePath",
       "subAssetName": "",
+      "parentFolderPath": "Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate",
+      "parentFolderGuid": "b9a796a708004977a6970891626e353f",
+      "topLevelFolderPath": "Assets/Plugins",
+      "topLevelFolderGuid": "e281160275b6e6f43bffb849e2c973e3",
       "enumKey": 0,
       "isBusinessAsset": true
     }

@@ -3,7 +3,6 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 #if UNITY_EDITOR
-using UnityEditor;
 using System.IO;
 #endif
 
@@ -24,6 +23,28 @@ namespace ES
         public static bool IsLocked
         {
             get { lock (SyncRoot) return isLocked; }
+        }
+
+        /// <summary>
+        /// 只读诊断当前配置模式与本次会话实际锁定模式。
+        /// 返回 false 表示尚未创建资源会话；不允许调用方据此改写模式。
+        /// </summary>
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static bool TryGetLockedModes(out ESAssetRunMode configuredMode, out ESAssetRunMode effectiveMode)
+        {
+            lock (SyncRoot)
+            {
+                if (!isLocked)
+                {
+                    configuredMode = default;
+                    effectiveMode = default;
+                    return false;
+                }
+
+                configuredMode = lockedConfiguredMode;
+                effectiveMode = lockedMode;
+                return true;
+            }
         }
 
         public static ESAssetRunMode Lock(ESGlobalResSetting settings)
@@ -68,20 +89,19 @@ namespace ES
             {
                 if (!HasBasicLocalEditorReleaseEntry(settings))
                 {
-                    const string message = "当前资源方案需要本地构建内容，但未找到基础本地发布入口文件（Root Manifest / Bundle Index）。";
+                    const string message = "当前资源方案配置为 LocalBuild，但未找到基础本地发布入口文件（Root Manifest / Bundle Index）。";
                     Debug.LogError("[ESRes][RunMode] " + message);
-                    if (Application.isBatchMode)
-                        throw new InvalidOperationException(message + " 批处理模式禁止回退到 EditorDirect，以避免 CI 假通过。");
-                    EditorUtility.DisplayDialog("ES 资源方案回退", message + "\n\n编辑器本次会话将临时回退到 EditorDirect；配置资产不会被修改。需要验证构建链时请先完成 LocalBuild。", "确定");
-                    return ESAssetRunMode.EditorDirect;
+                    throw new InvalidOperationException(message
+                        + " 当前会话不会自动回退到 EditorDirect 或 EditorSimulateBuild。"
+                        + "请显式执行 LocalBuild 发布链，或将运行模式明确改为 EditorDirect 后重新启动会话。");
                 }
             }
 #endif
 #if !UNITY_EDITOR
             if (settings.AssetRunMode == ESAssetRunMode.EditorDirect || settings.AssetRunMode == ESAssetRunMode.EditorSimulateBuild)
             {
-                Debug.LogWarning("[ESRes] Player 不支持 " + settings.AssetRunMode + "，已自动升级为 LocalBuild。");
-                settings.AssetRunMode = ESAssetRunMode.LocalBuild;
+                throw new InvalidOperationException("[ESRes][RunMode] Player 不支持 " + settings.AssetRunMode
+                    + "。请在构建前将运行模式明确配置为 LocalBuild 或 HotUpdate；运行时不会自动改写设置或切换模式。");
             }
 #endif
             return settings.AssetRunMode;
@@ -105,7 +125,7 @@ namespace ES
 #endif
     }
 
-    internal abstract class ESRuntimeAssetProviderBase : IESAssetRuntimeProvider, IESRuntimeAssetOperationTracker
+    internal abstract class ESRuntimeAssetProviderBase : IESAssetRuntimeProvider, IESRuntimeAssetOperationTracker, IESRuntimeAssetUnloadDiagnostics
     {
         private readonly ESRuntimeAssetLoader loader;
 
@@ -130,6 +150,9 @@ namespace ES
         public void UnloadAllAtSafePoint() => loader.UnloadAllAtSafePoint();
         public void Dispose() => loader.Dispose();
         public bool HasPendingOperations => loader.HasPendingOperations;
+        public bool HasUnloadFailure => loader.HasUnloadFailure;
+        public int UnloadFailureCount => loader.UnloadFailureCount;
+        public string LastUnloadError => loader.LastUnloadError;
         public UniTask WaitForPendingOperationsAsync(System.Threading.CancellationToken cancellationToken = default)
             => loader.WaitForPendingOperationsAsync(cancellationToken);
     }

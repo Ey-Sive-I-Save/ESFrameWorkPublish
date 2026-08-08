@@ -105,10 +105,56 @@ namespace ES
         UniTask WaitForPendingOperationsAsync(CancellationToken cancellationToken = default);
     }
 
+    internal interface IESRuntimeAssetUnloadDiagnostics
+    {
+        bool HasUnloadFailure { get; }
+        int UnloadFailureCount { get; }
+        string LastUnloadError { get; }
+    }
+
     /// <summary>GUID/GUID+LocalFileId 到物理加载位置的运行时加载器。RuntimeKey 不参与全局寻址。</summary>
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    public sealed class ESRuntimeAssetLoader : IESAssetRuntimeProvider, IESRuntimeAssetOperationTracker
+    public sealed class ESRuntimeAssetLoader : IESAssetRuntimeProvider, IESRuntimeAssetOperationTracker, IESRuntimeAssetUnloadDiagnostics
     {
+        private sealed class SceneLoadCommit
+        {
+            private readonly object sync = new object();
+            private bool waiterCanceled;
+            private byte ownershipState;
+
+            public bool WaiterCanceled
+            {
+                get { lock (sync) return waiterCanceled; }
+            }
+
+            public void CancelWaiter()
+            {
+                lock (sync) waiterCanceled = true;
+            }
+
+            public bool TryCommitOwnership()
+            {
+                lock (sync)
+                {
+                    if (waiterCanceled || ownershipState != 0)
+                        return false;
+                    ownershipState = 1;
+                    return true;
+                }
+            }
+
+            public bool TryReleaseOwnership()
+            {
+                lock (sync)
+                {
+                    if (ownershipState != 1)
+                        return false;
+                    ownershipState = 2;
+                    return true;
+                }
+            }
+        }
+
         private sealed class AssetBundleLease
         {
             public AssetBundle Bundle;
@@ -126,15 +172,24 @@ namespace ES
         private readonly Dictionary<ESAssetIdentity, int> objectRefCounts = new Dictionary<ESAssetIdentity, int>();
         private readonly Dictionary<ESAssetIdentity, UniTaskCompletionSource<UnityEngine.Object>> loadingObjects = new Dictionary<ESAssetIdentity, UniTaskCompletionSource<UnityEngine.Object>>();
         private readonly Dictionary<ESAssetIdentity, ESRuntimeAssetLoadStatus> statusById = new Dictionary<ESAssetIdentity, ESRuntimeAssetLoadStatus>();
+        private int pendingSceneOperations;
         private bool disposed;
+        private bool disposeWhenIdle;
+        private int unloadFailureCount;
+        private string lastUnloadError = string.Empty;
 
         public event Action<ESRuntimeAssetLoadStatus> StatusChanged;
+
+        public bool HasUnloadFailure => unloadFailureCount > 0;
+        public int UnloadFailureCount => unloadFailureCount;
+        public string LastUnloadError => lastUnloadError ?? string.Empty;
 
         public bool HasPendingOperations
         {
             get
             {
                 if (loadingObjects.Count > 0) return true;
+                if (pendingSceneOperations > 0) return true;
                 foreach (AssetBundleLease lease in assetBundles.Values)
                     if (lease.InFlight != null) return true;
                 return false;
@@ -223,26 +278,190 @@ namespace ES
             {
                 if (requireRuntimeMapIdentity && !runtimeMap.TryGetMainAsset(id.Guid, out _))
                     throw new KeyNotFoundException($"[ESRes][SimulateBuild] 场景 GUID 未登记：GUID={id.Guid}");
-                Scene directScene = await directAssetProvider.LoadSceneAsync(id, mode, cancellationToken);
+                // Unity's AsyncOperation cannot be stopped once created. The core request
+                // therefore continues with CancellationToken.None while the caller may cancel
+                // only its wait. Keeping this request tracked prevents a Provider transition
+                // from disposing the old runtime while Unity is still entering the scene.
+                cancellationToken.ThrowIfCancellationRequested();
+                pendingSceneOperations++;
+                var completion = new UniTaskCompletionSource<Scene>();
+                var commit = new SceneLoadCommit();
+                LoadDirectSceneCoreAsync(id, mode, cancellationToken, directAssetProvider, completion, commit).Forget();
+                Scene directScene;
+                try
+                {
+                    directScene = await completion.Task.AttachExternalCancellation(cancellationToken);
+                }
+                catch
+                {
+                    commit.CancelWaiter();
+                    if (commit.TryReleaseOwnership())
+                        ReleaseLoaded(id, string.Empty);
+                    throw;
+                }
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    commit.CancelWaiter();
+                    if (commit.TryReleaseOwnership())
+                        ReleaseLoaded(id, string.Empty);
+                    throw new OperationCanceledException(cancellationToken);
+                }
                 return new ESRuntimeSceneHandle(this, id, string.Empty, directScene);
             }
             if (!runtimeMap.TryGetMainAsset(id.Guid, out ESRuntimeAssetRecord record)) throw new KeyNotFoundException($"[ESRes][Load] Scene GUID 未登记：GUID={id.Guid}");
-            await AcquireAssetBundleTreeAsync(record.AssetBundleKey, id, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            pendingSceneOperations++;
+            var sceneCompletion = new UniTaskCompletionSource<Scene>();
+            var sceneCommit = new SceneLoadCommit();
+            LoadBundleSceneCoreAsync(id, record, mode, cancellationToken, sceneCompletion, sceneCommit).Forget();
+            Scene loadedScene;
             try
             {
+                loadedScene = await sceneCompletion.Task.AttachExternalCancellation(cancellationToken);
+            }
+            catch
+            {
+                sceneCommit.CancelWaiter();
+                if (sceneCommit.TryReleaseOwnership())
+                    ReleaseLoaded(id, record.AssetBundleKey);
+                throw;
+            }
+            if (cancellationToken.IsCancellationRequested)
+            {
+                sceneCommit.CancelWaiter();
+                if (sceneCommit.TryReleaseOwnership())
+                    ReleaseLoaded(id, record.AssetBundleKey);
+                throw new OperationCanceledException(cancellationToken);
+            }
+            return new ESRuntimeSceneHandle(this, id, record.AssetBundleKey, loadedScene);
+        }
+
+        private async UniTask LoadDirectSceneCoreAsync(
+            ESAssetIdentity id,
+            LoadSceneMode mode,
+            CancellationToken requestCancellation,
+            IESRuntimeDirectAssetProvider provider,
+            UniTaskCompletionSource<Scene> completion,
+            SceneLoadCommit commit)
+        {
+            try
+            {
+                Scene scene = await provider.LoadSceneAsync(id, mode, CancellationToken.None);
+                if (requestCancellation.IsCancellationRequested || commit.WaiterCanceled)
+                {
+                    if (mode == LoadSceneMode.Additive && scene.isLoaded)
+                    {
+                        AsyncOperation unload = SceneManager.UnloadSceneAsync(scene);
+                        if (unload == null)
+                            throw new InvalidOperationException("[ESRes][Scene] 取消后的 Additive 场景补偿卸载无法启动，场景仍保持加载：GUID=" + id.Guid);
+                        await unload.ToUniTask();
+                    }
+                    else if (mode == LoadSceneMode.Single)
+                    {
+                        Debug.LogWarning("[ESRes][Scene] 取消请求发生在 Single 场景已开始加载之后；Unity 无法回滚已进入的场景。" +
+                            "调用方等待已取消，但当前场景仍由场景生命周期管理。GUID=" + id.Guid);
+                    }
+                    completion.TrySetException(new OperationCanceledException(requestCancellation));
+                    return;
+                }
+                RetainObject(id);
+                if (!commit.TryCommitOwnership())
+                {
+                    ReleaseLoaded(id, string.Empty);
+                    completion.TrySetException(new OperationCanceledException(requestCancellation));
+                    return;
+                }
+                completion.TrySetResult(scene);
+            }
+            catch (Exception exception)
+            {
+                completion.TrySetException(exception);
+            }
+            finally
+            {
+                pendingSceneOperations--;
+                TryFinalizeDeferredDispose();
+            }
+        }
+
+        private async UniTask LoadBundleSceneCoreAsync(
+            ESAssetIdentity id,
+            ESRuntimeAssetRecord record,
+            LoadSceneMode mode,
+            CancellationToken requestCancellation,
+            UniTaskCompletionSource<Scene> completion,
+            SceneLoadCommit commit)
+        {
+            bool bundleTreeAcquired = false;
+            try
+            {
+                await AcquireAssetBundleTreeAsync(record.AssetBundleKey, id, CancellationToken.None);
+                bundleTreeAcquired = true;
+                if (requestCancellation.IsCancellationRequested || commit.WaiterCanceled)
+                {
+                    ReleaseAssetBundleTree(record.AssetBundleKey);
+                    completion.TrySetException(new OperationCanceledException(requestCancellation));
+                    return;
+                }
+
                 if (!assetBundles.TryGetValue(record.AssetBundleKey, out AssetBundleLease lease) || lease.Bundle == null)
                     throw new InvalidOperationException($"[ESRes][Load] Scene 所属 AssetBundle 未加载：BundleKey={record.AssetBundleKey}, GUID={id.Guid}");
                 Report(id, ESRuntimeAssetLoadState.LoadingAsset, .9f, 0, record.InternalName);
                 // AssetBundle 只负责将场景数据载入内存；真正触发场景切换的是 SceneManager。
+                // The Unity operation itself is intentionally awaited without the caller token.
+                // Cancellation can stop the wait, never the Unity operation.
                 AsyncOperation operation = SceneManager.LoadSceneAsync(record.InternalName, mode);
                 if (operation == null) throw new InvalidOperationException($"[ESRes][Load] AssetBundle 中未找到 Scene：GUID={id.Guid}, BundleKey={record.AssetBundleKey}, InternalName={record.InternalName}");
-                await operation.ToUniTask(cancellationToken: cancellationToken);
+                await operation.ToUniTask();
                 Scene scene = SceneManager.GetSceneByPath(record.InternalName);
                 if (!scene.IsValid()) throw new InvalidOperationException($"[ESRes][Load] 已加载 Scene 无效：GUID={id.Guid}, BundleKey={record.AssetBundleKey}, InternalName={record.InternalName}");
+
+                if (requestCancellation.IsCancellationRequested || commit.WaiterCanceled)
+                {
+                    // Additive scenes can be compensated after Unity finishes. A Single load
+                    // has already replaced the active scene and cannot be rolled back safely;
+                    // report that fact explicitly instead of pretending the load was canceled.
+                    if (mode == LoadSceneMode.Additive && scene.isLoaded)
+                    {
+                        AsyncOperation unload = SceneManager.UnloadSceneAsync(scene);
+                        if (unload == null)
+                            throw new InvalidOperationException("[ESRes][Scene] 取消后的 Additive 场景补偿卸载无法启动，场景仍保持加载：GUID=" + id.Guid);
+                        await unload.ToUniTask();
+                    }
+                    else if (mode == LoadSceneMode.Single)
+                    {
+                        Debug.LogWarning("[ESRes][Scene] 取消请求发生在 Single 场景已开始加载之后；Unity 无法回滚已进入的场景。" +
+                            "调用方等待已取消，但当前场景仍由场景生命周期管理。GUID=" + id.Guid);
+                    }
+                    ReleaseAssetBundleTree(record.AssetBundleKey);
+                    bundleTreeAcquired = false;
+                    completion.TrySetException(new OperationCanceledException(requestCancellation));
+                    return;
+                }
+
                 Report(id, ESRuntimeAssetLoadState.Ready, 1f, 0, null);
-                return new ESRuntimeSceneHandle(this, id, record.AssetBundleKey, scene);
+                RetainObject(id);
+                if (!commit.TryCommitOwnership())
+                {
+                    ReleaseLoaded(id, record.AssetBundleKey);
+                    bundleTreeAcquired = false;
+                    completion.TrySetException(new OperationCanceledException(requestCancellation));
+                    return;
+                }
+                completion.TrySetResult(scene);
+                bundleTreeAcquired = false; // ownership transfers to ESRuntimeSceneHandle
             }
-            catch { ReleaseAssetBundleTree(record.AssetBundleKey); throw; }
+            catch (Exception exception)
+            {
+                completion.TrySetException(exception);
+            }
+            finally
+            {
+                if (bundleTreeAcquired)
+                    ReleaseAssetBundleTree(record.AssetBundleKey);
+                pendingSceneOperations--;
+                TryFinalizeDeferredDispose();
+            }
         }
 
         public void Release(ESAssetIdentity id)
@@ -268,8 +487,28 @@ namespace ES
             foreach (AssetBundleLease lease in assetBundles.Values)
             {
                 if (lease.InFlight != null) throw new InvalidOperationException("[ESRes][Load] 仍有 AssetBundle 请求进行中，不能执行资源安全点卸载。");
-                if (lease.Bundle != null) lease.Bundle.Unload(false);
             }
+
+            var failures = new List<Exception>();
+            var unloadedKeys = new List<string>();
+            foreach (var pair in assetBundles)
+                if (TryUnloadAssetBundle(pair.Key, pair.Value.Bundle, failures))
+                    unloadedKeys.Add(pair.Key);
+
+            for (int i = 0; i < unloadedKeys.Count; i++)
+                assetBundles.Remove(unloadedKeys[i]);
+            if (failures.Count > 0)
+            {
+                // A partial safe-point unload is not a usable Provider state. Keep the
+                // failed leases for diagnosis, but block future loads instead of silently
+                // exposing a cache whose Bundle ownership is no longer trustworthy.
+                disposed = true;
+                cachedObjects.Clear();
+                objectRefCounts.Clear();
+                loadingObjects.Clear();
+                ThrowUnloadFailures("全量资源安全点卸载", failures);
+            }
+
             assetBundles.Clear();
             cachedObjects.Clear();
             objectRefCounts.Clear();
@@ -360,6 +599,7 @@ namespace ES
             }
 
             int unloaded = 0;
+            var failures = new List<Exception>();
             List<string> unusedBundles = null;
             foreach (var pair in assetBundles)
             {
@@ -371,13 +611,21 @@ namespace ES
                 for (int i = 0; i < unusedBundles.Count; i++)
                 {
                     AssetBundleLease lease = assetBundles[unusedBundles[i]];
-                    if (lease.Bundle != null) lease.Bundle.Unload(false);
+                    if (!TryUnloadAssetBundle(unusedBundles[i], lease.Bundle, failures))
+                        continue;
                     assetBundles.Remove(unusedBundles[i]);
                     unloaded++;
                 }
 
             if (evicted > 0 || unloaded > 0)
                 await Resources.UnloadUnusedAssets().ToUniTask(cancellationToken: cancellationToken);
+            if (failures.Count > 0)
+            {
+                disposed = true;
+                cachedObjects.Clear();
+                objectRefCounts.Clear();
+                ThrowUnloadFailures("增量资源安全点卸载", failures);
+            }
             return new ESRuntimeUnusedAssetBundleUnloadResult(unloaded, evicted);
         }
 
@@ -409,7 +657,11 @@ namespace ES
                 return asset;
             }
             catch (Exception e) { completion.TrySetException(e); Report(id, ESRuntimeAssetLoadState.Failed, 0f, 0, e.Message); throw; }
-            finally { loadingObjects.Remove(id); }
+            finally
+            {
+                loadingObjects.Remove(id);
+                TryFinalizeDeferredDispose();
+            }
         }
 
         private async UniTask<T> GetOrLoadSubAssetAsync<T>(ESAssetIdentity id, string assetBundleKey, string internalName, string selector, string expectedTypeName, CancellationToken token) where T : UnityEngine.Object
@@ -457,7 +709,11 @@ namespace ES
                 return selected;
             }
             catch (Exception e) { completion.TrySetException(e); Report(id, ESRuntimeAssetLoadState.Failed, 0f, 0, e.Message); throw; }
-            finally { loadingObjects.Remove(id); }
+            finally
+            {
+                loadingObjects.Remove(id);
+                TryFinalizeDeferredDispose();
+            }
         }
 
         private void RetainObject(ESAssetIdentity id) { objectRefCounts.TryGetValue(id, out var count); objectRefCounts[id] = count + 1; }
@@ -503,6 +759,7 @@ namespace ES
             finally
             {
                 loadingObjects.Remove(id);
+                TryFinalizeDeferredDispose();
             }
         }
 
@@ -579,9 +836,16 @@ namespace ES
                 lease.InFlight = null;
                 if (lease.RefCount == 0)
                 {
-                    if (lease.Bundle != null) lease.Bundle.Unload(false);
-                    assetBundles.Remove(record.AssetBundleKey);
+                    var failures = new List<Exception>();
+                    if (TryUnloadAssetBundle(record.AssetBundleKey, lease.Bundle, failures))
+                        assetBundles.Remove(record.AssetBundleKey);
+                    else
+                    {
+                        disposed = true;
+                        Debug.LogError(new AggregateException("[ESRes][Unload] 取消后的 AssetBundle 收尾失败；Provider 已阻断后续加载。", failures));
+                    }
                 }
+                TryFinalizeDeferredDispose();
             }
         }
 
@@ -631,14 +895,80 @@ namespace ES
             statusById[id] = status; StatusChanged?.Invoke(status);
         }
 
+        private bool TryUnloadAssetBundle(string assetBundleKey, AssetBundle bundle, List<Exception> failures)
+        {
+            if (bundle == null) return true;
+            try
+            {
+                bundle.Unload(false);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                var failure = new InvalidOperationException(
+                    "[ESRes][Unload] AssetBundle 卸载失败：BundleKey=" + assetBundleKey,
+                    exception);
+                unloadFailureCount++;
+                lastUnloadError = failure.ToString();
+                failures?.Add(failure);
+                return false;
+            }
+        }
+
+        private void ThrowUnloadFailures(string operation, List<Exception> failures)
+        {
+            if (failures == null || failures.Count == 0) return;
+            var aggregate = new AggregateException(
+                "[ESRes][Unload] " + operation + "未能完整完成；Provider 已阻断后续加载。",
+                failures);
+            Debug.LogError(aggregate);
+            throw aggregate;
+        }
+
         private void ThrowIfDisposed() { if (disposed) throw new ObjectDisposedException(nameof(ESRuntimeAssetLoader)); }
 
         public void Dispose()
         {
             if (disposed) return;
             disposed = true;
-            foreach (var pair in assetBundles) if (pair.Value.Bundle != null) pair.Value.Bundle.Unload(false);
-            assetBundles.Clear(); cachedObjects.Clear(); objectRefCounts.Clear(); loadingObjects.Clear(); statusById.Clear();
+            if (HasPendingOperations)
+            {
+                // A synchronous Provider disposal may be requested while Unity still owns an
+                // AsyncOperation. Mark the loader unavailable to new callers, but defer bundle
+                // unload and dictionary clearing until every old request has reached its own
+                // completion path. This keeps the old generation self-contained during a
+                // Provider transition.
+                disposeWhenIdle = true;
+                return;
+            }
+            FinalizeDispose();
+        }
+
+        private void TryFinalizeDeferredDispose()
+        {
+            if (disposeWhenIdle && !HasPendingOperations)
+            {
+                disposeWhenIdle = false;
+                FinalizeDispose();
+            }
+        }
+
+        private void FinalizeDispose()
+        {
+            var failures = new List<Exception>();
+            var unloadedKeys = new List<string>();
+            foreach (var pair in assetBundles)
+                if (TryUnloadAssetBundle(pair.Key, pair.Value.Bundle, failures))
+                    unloadedKeys.Add(pair.Key);
+
+            for (int i = 0; i < unloadedKeys.Count; i++)
+                assetBundles.Remove(unloadedKeys[i]);
+            cachedObjects.Clear();
+            objectRefCounts.Clear();
+            loadingObjects.Clear();
+            statusById.Clear();
+            if (failures.Count > 0)
+                Debug.LogError(new AggregateException("[ESRes][Unload] Provider Dispose 未能完整卸载全部 AssetBundle。", failures));
         }
     }
 

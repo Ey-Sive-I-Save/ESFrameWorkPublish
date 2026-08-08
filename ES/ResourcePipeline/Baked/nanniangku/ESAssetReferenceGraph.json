@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "libraryName": "男娘库",
   "libraryFolder": "nanniangku",
-  "generatedUtc": "2026-07-26T15:35:43.5717549Z",
+  "generatedUtc": "2026-08-07T19:03:26.5852243Z",
   "roots": [
     {
       "identity": {
@@ -111,7 +111,7 @@
       },
       "assetPath": "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ActorDataInfo.cs",
       "assetTypeName": "UnityEditor.MonoScript",
-      "dependencyHash": "b0aed68f7d534084b68c73139b4fba35",
+      "dependencyHash": "88ee244c8a962ae06cfaf2890d9af7e8",
       "editorOnly": true,
       "markable": false,
       "ownerLibraryFolders": [],

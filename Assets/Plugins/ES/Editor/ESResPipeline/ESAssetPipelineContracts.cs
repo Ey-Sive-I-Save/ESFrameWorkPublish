@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using Newtonsoft.Json;
 using UnityEditor;
 using UnityEngine;
@@ -31,10 +32,27 @@ namespace ES
     [Serializable] public sealed class ESAssetLibraryCatalog
     {
         public int formatVersion = 3;
-        public string libraryName = string.Empty, libraryFolder = string.Empty, libraryBundleCode = string.Empty, libraryAssetGuid = string.Empty;
+        public string libraryName = string.Empty, libraryFolder = string.Empty, libraryBundleCode = string.Empty, libraryAssetGuid = string.Empty, generatedUtc = string.Empty;
         public List<ESAssetCatalogEntry> assets = new List<ESAssetCatalogEntry>();
         public List<string> excludedEditorOnlyPaths = new List<string>();
         public List<string> errors = new List<string>(), warnings = new List<string>();
+    }
+    [Serializable] public sealed class ESAssetCatalogBakeOutput
+    {
+        public string relativePath = string.Empty;
+        public string libraryName = string.Empty, libraryFolder = string.Empty, outputKind = string.Empty;
+        public int protocolVersion;
+        public long commitGeneration;
+        public long size;
+        public string sha256 = string.Empty;
+        public bool isCatalog;
+    }
+    [Serializable] public sealed class ESAssetCatalogBakeCommit
+    {
+        public int formatVersion = 2;
+        public string transactionId = string.Empty, generatedUtc = string.Empty;
+        public long commitGeneration;
+        public List<ESAssetCatalogBakeOutput> outputs = new List<ESAssetCatalogBakeOutput>();
     }
     [Serializable] public sealed class ESAssetReferenceRoot
     {
@@ -216,8 +234,11 @@ namespace ES
     internal static class ESAssetPipelineIO
     {
         public const int ReferenceGraphFormatVersion = 1;
+        public const int CatalogFormatVersion = 3;
         public const int RuntimeProtocolFormatVersion = 5;
-        public const string CatalogFileName = "ESAssetLibraryCatalog.json", ReferenceGraphFileName = "ESAssetReferenceGraph.json", PlanFileName = "ESAssetBundleBuildPlan.json", AssetListFileName = "ESAssetBundleAssetList.json";
+        public const int CatalogBakeCommitFormatVersion = 2;
+        public const string CatalogOutputKind = "Catalog", ReferenceGraphOutputKind = "ReferenceGraph";
+        public const string CatalogFileName = "ESAssetLibraryCatalog.json", ReferenceGraphFileName = "ESAssetReferenceGraph.json", CatalogBakeCommitFileName = "ESAssetCatalogBakeCommit.json", PlanFileName = "ESAssetBundleBuildPlan.json", AssetListFileName = "ESAssetBundleAssetList.json";
         public const string BundleManifestFileName = "ESAssetBundleManifest.json", LibraryIdentityFileName = "ESAssetLibraryIdentity.json", BuildSetFileName = "ESAssetBuildSet.json", ReleaseManifestFileName = "ESAssetReleaseManifest.json", ConsumerManifestFileName = "ESAssetConsumerManifest.json", ReleaseBundleIndexFileName = "ESAssetReleaseBundleIndex.json";
         public static string ProjectRoot => Directory.GetParent(Application.dataPath).FullName;
         public static string PipelineRoot => Path.Combine(ProjectRoot, "ES", "ResourcePipeline");
@@ -238,13 +259,17 @@ namespace ES
         public static string StagingLibraryFolder(string platform, string libraryFolder) => Path.Combine(StagingLibrariesRoot(platform), SafeSegment(libraryFolder));
         public static string AssetBundleRelativePath(string fileName) => AssetBundlesFolderName + "/" + ESAssetBundleUtility.ToSafeAssetBundleFileName(fileName);
         public static string ReleaseLibraryFolder(string releaseRoot, string platform, string releaseVersion, string libraryFolder)
-            => string.IsNullOrEmpty(platform)
-                ? Path.Combine(releaseRoot, releaseVersion, LibrariesFolderName, SafeSegment(libraryFolder))
-                : Path.Combine(releaseRoot, platform, releaseVersion, LibrariesFolderName, SafeSegment(libraryFolder));
+        {
+            string safeReleaseVersion = RequirePathSegment(releaseVersion, "releaseVersion");
+            string safePlatform = string.IsNullOrEmpty(platform) ? string.Empty : RequirePathSegment(platform, "platform");
+            return string.IsNullOrEmpty(safePlatform)
+                ? Path.Combine(releaseRoot, safeReleaseVersion, LibrariesFolderName, SafeSegment(libraryFolder))
+                : Path.Combine(releaseRoot, safePlatform, safeReleaseVersion, LibrariesFolderName, SafeSegment(libraryFolder));
+        }
         public static string ReleaseLibraryRelativeBase(string platform, string releaseVersion, string libraryFolder)
-            => platform + "/" + releaseVersion + "/" + LibrariesFolderName + "/" + SafeSegment(libraryFolder) + "/";
+            => RequirePathSegment(platform, "platform") + "/" + RequirePathSegment(releaseVersion, "releaseVersion") + "/" + LibrariesFolderName + "/" + SafeSegment(libraryFolder) + "/";
         public static string EmbeddedLibraryRelativeBase(string platform, string libraryFolder)
-            => platform + "/Embedded/" + LibrariesFolderName + "/" + SafeSegment(libraryFolder) + "/";
+            => RequirePathSegment(platform, "platform") + "/Embedded/" + LibrariesFolderName + "/" + SafeSegment(libraryFolder) + "/";
         public static string EmbeddedLibraryFolder(string releaseRoot, string platform, string libraryFolder)
             => Path.Combine(releaseRoot, EmbeddedLibraryRelativeBase(platform, libraryFolder).Replace('/', Path.DirectorySeparatorChar));
 
@@ -255,12 +280,35 @@ namespace ES
                 throw new InvalidOperationException($"AB 构建/发布只支持 LocalBuild 或 HotUpdate，当前模式为 {mode}。");
         }
 
+        [MenuItem(MenuItemPathDefine.RESOURCE_DELIVERY_PATH + "资源管理/清理旧协议生成物", false, 30)]
+        private static void PurgeLegacyGeneratedArtifactsMenu()
+        {
+            if (ESGlobalResSetting.Instance == null)
+                throw new InvalidOperationException("未找到 ESGlobalResSetting，无法确定旧协议产物的平台目录。");
+
+            string platform = PlatformName;
+            if (!HasLegacyGeneratedArtifacts(platform))
+            {
+                EditorUtility.DisplayDialog("ES 资源管线", "当前平台没有检测到旧协议生成物。", "确定");
+                return;
+            }
+
+            bool confirmed = EditorUtility.DisplayDialog(
+                "清理旧协议生成物",
+                "将清理当前平台的旧协议生成目录，包括 Baked、Planned、BuildCache、BuildStaging、Published、Releases，以及 StreamingAssets 中的 ES 生成资源。\n\n不会删除 Assets 中的业务源资产。确认继续吗？",
+                "清理",
+                "取消");
+            if (confirmed)
+                PurgeLegacyGeneratedArtifactsExplicitly();
+        }
+
         /// <summary>
         /// One-time destructive boundary for the v5 release protocol. Generated v1/v3 files
         /// cannot participate in the new pipeline, so keeping them is both misleading and a
-        /// source of accidental manual publication. This runs before Bake, never mid-pipeline.
+        /// source of accidental manual publication. This is an explicit cleanup action and
+        /// must not be coupled to EditorDirect catalog baking.
         /// </summary>
-        public static void PurgeLegacyGeneratedArtifactsBeforeBake()
+        public static void PurgeLegacyGeneratedArtifactsExplicitly()
         {
             string platform = PlatformName;
             if (!HasLegacyGeneratedArtifacts(platform))
@@ -305,17 +353,150 @@ namespace ES
             catch { return true; }
         }
 
-        private static void DeleteGeneratedDirectory(string path)
+        internal static void DeleteGeneratedDirectory(string path)
         {
-            if (Directory.Exists(path))
-                Directory.Delete(path, true);
+            if (string.IsNullOrWhiteSpace(path))
+                throw new InvalidDataException("生成物清理路径不能为空。");
+
+            string candidate = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string pipelineRoot = Path.GetFullPath(PipelineRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string streamingRoot = Path.GetFullPath(Path.Combine(Application.streamingAssetsPath, ESGlobalResSetting.ResParentFolderName))
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!IsWithinRoot(candidate, pipelineRoot) && !IsWithinRoot(candidate, streamingRoot))
+                throw new UnauthorizedAccessException("生成物清理路径越出 ES 发布根目录：" + path);
+            if (ContainsExistingReparsePoint(candidate))
+                throw new UnauthorizedAccessException("生成物清理路径不能穿过 junction/symlink：" + path);
+
+            if (string.Equals(candidate, pipelineRoot, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(candidate, streamingRoot, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("禁止删除 ES 资源管线根目录：" + path);
+            if (Directory.Exists(candidate))
+            {
+                string managedRoot = IsWithinRoot(candidate, pipelineRoot) ? pipelineRoot : streamingRoot;
+                ESManagedFileIO.DeleteDirectory(candidate, managedRoot);
+            }
+        }
+
+        private static bool IsWithinRoot(string candidate, string root)
+        {
+            return string.Equals(candidate, root, StringComparison.OrdinalIgnoreCase)
+                || candidate.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static void DeleteGeneratedFile(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                throw new InvalidDataException("生成物文件清理路径不能为空。");
+            string candidate = Path.GetFullPath(path);
+            string pipelineRoot = Path.GetFullPath(PipelineRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string streamingRoot = Path.GetFullPath(Path.Combine(Application.streamingAssetsPath, ESGlobalResSetting.ResParentFolderName))
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!IsWithinRoot(candidate, pipelineRoot) && !IsWithinRoot(candidate, streamingRoot))
+                throw new UnauthorizedAccessException("生成物文件清理路径越出 ES 受管目录：" + path);
+            if (ContainsExistingReparsePoint(candidate))
+                throw new UnauthorizedAccessException("生成物文件不能穿过 junction/symlink：" + path);
+            if (File.Exists(candidate)) File.Delete(candidate);
+        }
+
+        internal static void EnsureGeneratedDirectory(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                throw new InvalidDataException("生成物目录路径不能为空。");
+            string candidate = Path.GetFullPath(path);
+            string pipelineRoot = Path.GetFullPath(PipelineRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string streamingRoot = Path.GetFullPath(Path.Combine(Application.streamingAssetsPath, ESGlobalResSetting.ResParentFolderName))
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!IsWithinRoot(candidate, pipelineRoot) && !IsWithinRoot(candidate, streamingRoot))
+                throw new UnauthorizedAccessException("生成物目录不在 ES 受管目录内：" + path);
+            if (ContainsExistingReparsePoint(candidate))
+                throw new UnauthorizedAccessException("生成物目录不能穿过 junction/symlink：" + path);
+            Directory.CreateDirectory(candidate);
+        }
+
+        internal static void CopyGeneratedFileAtomic(string sourcePath, string destinationPath)
+        {
+            string source = Path.GetFullPath(sourcePath ?? string.Empty);
+            string destination = Path.GetFullPath(destinationPath ?? string.Empty);
+            string pipelineRoot = Path.GetFullPath(PipelineRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string streamingRoot = Path.GetFullPath(Path.Combine(Application.streamingAssetsPath, ESGlobalResSetting.ResParentFolderName))
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!File.Exists(source)) throw new FileNotFoundException("资源管线源文件不存在。", source);
+            if (!IsWithinRoot(source, pipelineRoot) && !IsWithinRoot(source, streamingRoot))
+                throw new UnauthorizedAccessException("资源管线源文件不在受管目录内：" + sourcePath);
+            if (!IsWithinRoot(destination, pipelineRoot) && !IsWithinRoot(destination, streamingRoot))
+                throw new UnauthorizedAccessException("资源管线目标文件不在受管目录内：" + destinationPath);
+            if (ContainsExistingReparsePoint(source) || ContainsExistingReparsePoint(Path.GetDirectoryName(destination) ?? destination)
+                || (File.Exists(destination) && ContainsExistingReparsePoint(destination)))
+                throw new UnauthorizedAccessException("资源管线复制不能穿过 junction/symlink。");
+            string directory = Path.GetDirectoryName(destination);
+            if (string.IsNullOrEmpty(directory)) throw new InvalidDataException("资源管线目标目录无效：" + destinationPath);
+            Directory.CreateDirectory(directory);
+            ESManagedFileIO.CopyFileAtomic(source, destination, pipelineRoot, streamingRoot);
+        }
+
+        private static bool ContainsExistingReparsePoint(string path)
+        {
+            string root = Path.GetPathRoot(path);
+            if (string.IsNullOrEmpty(root)) return false;
+            string current = root;
+            string relative = path.Substring(root.Length);
+            foreach (string segment in relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            {
+                if (string.IsNullOrEmpty(segment)) continue;
+                current = Path.Combine(current, segment);
+                if (!Directory.Exists(current) && !File.Exists(current)) break;
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return true;
+            }
+            return false;
+        }
+
+        private static void EnsureNoNestedReparsePoints(string directory)
+        {
+            ESManagedFileIO.EnsureNoNestedReparsePoints(directory);
         }
         public static string PlatformName => ESAssetBundleBuildTargetUtility.GetBuildTarget(ESGlobalResSetting.Instance.applyPlatform).ToString();
         public static string LibraryBakeFolder(string folder) => Path.Combine(BakeRoot, SafeSegment(folder));
+        public static string RecoveryBakeRoot(string transactionId)
+            => Path.Combine(BakeRoot, ".Recovery", RequirePathSegment(transactionId, "transactionId"));
+        public static string RecoveryBakeCommitPath(string transactionId)
+            => Path.Combine(RecoveryBakeRoot(transactionId), CatalogBakeCommitFileName);
         // LibraryFolder 本身就是物理目录和运行时清单共同使用的权威值，禁止先生成
         // "__gamecore_x" 再由 SafeSegment 隐式改成 "gamecore_x"，否则构建与发布查找不一致。
         public static string GameCoreLibraryFolder(string consumerId) => SafeSegment("gamecore_" + SafeSegment(consumerId));
         public static string SafeSegment(string value) => string.IsNullOrWhiteSpace(value) ? "DefaultLibrary" : ESAssetBundleUtility.ToSafeAssetBundleKey(value).Replace('/', '_').Replace('\\', '_');
+
+        public static string ResolveGeneratedRelativePath(string root, string relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(relativePath))
+                throw new InvalidDataException("生成物相对路径不能为空。");
+
+            string normalized = relativePath.Trim().Replace('\\', '/');
+            if (Path.IsPathRooted(normalized) || normalized.StartsWith("/", StringComparison.Ordinal))
+                throw new InvalidDataException("生成物相对路径不能是绝对路径：" + relativePath);
+            foreach (string segment in normalized.Split('/'))
+            {
+                if (string.IsNullOrEmpty(segment) || segment == "." || segment == ".." || segment.IndexOf(':') >= 0)
+                    throw new InvalidDataException("生成物相对路径包含非法片段：" + relativePath);
+            }
+
+            string normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string candidate = Path.GetFullPath(Path.Combine(normalizedRoot, normalized.Replace('/', Path.DirectorySeparatorChar)));
+            if (!IsWithinRoot(candidate, normalizedRoot))
+                throw new UnauthorizedAccessException("生成物相对路径越出根目录：" + relativePath);
+            return candidate;
+        }
+
+        private static string RequirePathSegment(string value, string fieldName)
+        {
+            string segment = (value ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(segment)
+                || segment == "."
+                || segment == ".."
+                || !string.Equals(Path.GetFileName(segment), segment, StringComparison.Ordinal)
+                || segment.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                throw new InvalidDataException(fieldName + " 不是合法路径片段：" + value);
+            return segment;
+        }
         public static ESPipelineAssetIdentity GetIdentity(UnityEngine.Object asset)
         {
             var result = new ESPipelineAssetIdentity();
@@ -344,14 +525,43 @@ namespace ES
                 && typeof(ScriptableObject).IsAssignableFrom(assetType)
                 && Attribute.IsDefined(assetType, typeof(ESOnlyEditorSOAttribute), true);
         }
-        public static void WriteJson<T>(string path, T value, bool atomic = false)
+        public static void WriteJson<T>(string path, T value, bool atomic = true)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            WriteJsonCore(path, value, false);
+        }
+
+        public static void WriteJsonCreateNew<T>(string path, T value)
+        {
+            WriteJsonCore(path, value, true);
+        }
+
+        private static void WriteJsonCore<T>(string path, T value, bool createNew)
+        {
+            string normalizedPath = Path.GetFullPath(path);
+            string pipelineRoot = Path.GetFullPath(PipelineRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string streamingRoot = Path.GetFullPath(Path.Combine(Application.streamingAssetsPath, ESGlobalResSetting.ResParentFolderName))
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!IsWithinRoot(normalizedPath, pipelineRoot) && !IsWithinRoot(normalizedPath, streamingRoot))
+                throw new UnauthorizedAccessException("资源管线 JSON 只能写入 ES/ResourcePipeline 或 StreamingAssets/Res：" + path);
+            if (ContainsExistingReparsePoint(normalizedPath))
+                throw new UnauthorizedAccessException("资源管线 JSON 路径不能穿过 junction/symlink：" + path);
+
             string json = JsonConvert.SerializeObject(value, Formatting.Indented);
-            if (!atomic) { File.WriteAllText(path, json); return; }
-            string temporaryPath = path + ".tmp";
-            File.WriteAllText(temporaryPath, json);
-            if (File.Exists(path)) File.Replace(temporaryPath, path, null); else File.Move(temporaryPath, path);
+            // 发布清单、目录、计划和索引统一原子提升；保留 atomic 参数仅兼容旧调用方。
+            if (createNew)
+                ESManagedFileIO.WriteTextAtomicCreateNew(
+                    normalizedPath,
+                    json,
+                    new UTF8Encoding(false),
+                    pipelineRoot,
+                    streamingRoot);
+            else
+                ESManagedFileIO.WriteTextAtomic(
+                    normalizedPath,
+                    json,
+                    new UTF8Encoding(false),
+                    pipelineRoot,
+                    streamingRoot);
         }
         public static T ReadJson<T>(string path)
         {

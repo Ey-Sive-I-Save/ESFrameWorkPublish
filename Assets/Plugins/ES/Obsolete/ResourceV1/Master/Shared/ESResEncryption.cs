@@ -56,8 +56,10 @@ namespace ES
     {
         private readonly byte[] _xorKey;
 
-        public ESXOREncryptor(string key = "ESFramework2026")
+        public ESXOREncryptor(string key)
         {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("XOR 加密器必须显式提供密钥。", nameof(key));
             _xorKey = System.Text.Encoding.UTF8.GetBytes(key);
         }
 
@@ -92,9 +94,9 @@ namespace ES
 
         public byte[] ComputeHash(byte[] data)
         {
-            using (var md5 = System.Security.Cryptography.MD5.Create())
+            using (var sha256 = System.Security.Cryptography.SHA256.Create())
             {
-                return md5.ComputeHash(data);
+                return sha256.ComputeHash(data ?? Array.Empty<byte>());
             }
         }
     }
@@ -107,8 +109,12 @@ namespace ES
         private readonly byte[] _key;
         private readonly byte[] _iv;
 
-        public ESAESEncryptor(string key = "ESFramework2026!", string iv = "ESInit1234567890")
+        public ESAESEncryptor(string key, string iv)
         {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("AES 加密器必须显式提供密钥。", nameof(key));
+            if (string.IsNullOrWhiteSpace(iv))
+                throw new ArgumentException("AES 加密器必须显式提供 IV。", nameof(iv));
             _key = System.Text.Encoding.UTF8.GetBytes(key.PadRight(16).Substring(0, 16));
             _iv = System.Text.Encoding.UTF8.GetBytes(iv.PadRight(16).Substring(0, 16));
         }
@@ -194,12 +200,20 @@ namespace ES
 
         public bool VerifyIntegrity(byte[] data, string expectedHash)
         {
-            return true; // 不验证
+            if (string.IsNullOrWhiteSpace(expectedHash))
+                return false;
+
+            var hash = ComputeHash(data);
+            var hashString = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+            return hashString.Equals(expectedHash.Replace("-", string.Empty).Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
         public byte[] ComputeHash(byte[] data)
         {
-            return new byte[0];
+            using (var sha256 = System.Security.Cryptography.SHA256.Create())
+            {
+                return sha256.ComputeHash(data ?? Array.Empty<byte>());
+            }
         }
     }
 
@@ -226,7 +240,7 @@ namespace ES
         {
             if (_currentEncryptor == null)
             {
-                _currentEncryptor = new ESNoEncryptor(); // 默认不加密
+                throw new InvalidOperationException("ESResEncryptionHelper 尚未配置加密器；禁止静默回退为不加密。请显式 SetEncryptor。" );
             }
             return _currentEncryptor;
         }

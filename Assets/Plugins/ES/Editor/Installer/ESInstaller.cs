@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEditor.PackageManager;
@@ -150,6 +151,11 @@ namespace ES.EditorInternal.Installer
 
         private static async Task<bool> CheckGitPackageInstalledAsync(GitPackageDependency dependency)
         {
+            if (dependency == null)
+                return false;
+            if (!TryValidatePinnedGitUrl(dependency.gitUrl, out string pinnedGitUrl, out _, out _))
+                return false;
+
             // 首先检查类是否存在（同步操作）
             if (!string.IsNullOrEmpty(dependency.checkClass))
             {
@@ -170,7 +176,7 @@ namespace ES.EditorInternal.Installer
 
                 if (request.Status == StatusCode.Success)
                 {
-                    return request.Result.Any(p => p.packageId == dependency.gitUrl || p.name == dependency.gitUrl);
+                    return request.Result.Any(p => p.packageId == pinnedGitUrl || p.name == pinnedGitUrl);
                 }
                 return false;
             }
@@ -765,6 +771,11 @@ namespace ES.EditorInternal.Installer
         private bool isConfigModified = false;
         private string configFilePath;
 
+        private const string UnityPackageTrustManifestFileName = "es-unitypackage.manifest.json";
+        private readonly Queue<VerifiedUnityPackage> verifiedImportQueue = new Queue<VerifiedUnityPackage>();
+        private VerifiedUnityPackage activeVerifiedImport;
+        private string lastImportReceiptPath;
+
         #endregion
 
         #region 菜单项
@@ -824,6 +835,13 @@ namespace ES.EditorInternal.Installer
             ScanAndLoadAllPackages(); // 扫描并加载所有包
             _ = CheckAllPackagesInstallStateAsync(); // 异步检查所有包的安装状态
 
+            AssetDatabase.importPackageCompleted -= OnTrustedImportCompleted;
+            AssetDatabase.importPackageCompleted += OnTrustedImportCompleted;
+            AssetDatabase.importPackageCancelled -= OnTrustedImportCancelled;
+            AssetDatabase.importPackageCancelled += OnTrustedImportCancelled;
+            AssetDatabase.importPackageFailed -= OnTrustedImportFailed;
+            AssetDatabase.importPackageFailed += OnTrustedImportFailed;
+
         }
 
         private void InitializePaths()
@@ -839,9 +857,806 @@ namespace ES.EditorInternal.Installer
             configFilePath = Path.Combine(downloadsFolderPath, "Main", "package.json");
 
             // 确保下载文件夹存在
+            ESManagedFileIO.EnsurePath(downloadsFolderPath, false, Application.dataPath);
             if (!Directory.Exists(downloadsFolderPath))
             {
                 Directory.CreateDirectory(downloadsFolderPath);
+            }
+        }
+
+        [Serializable]
+        private sealed class UnityPackageTrustManifest
+        {
+            public int schemaVersion;
+            public string keyId = string.Empty;
+            public string packageId = string.Empty;
+            public string packageVersion = string.Empty;
+            public string source = string.Empty;
+            public List<UnityPackageTrustArtifact> artifacts = new List<UnityPackageTrustArtifact>();
+            public string signature = string.Empty;
+        }
+
+        [Serializable]
+        private sealed class UnityPackageTrustArtifact
+        {
+            public string relativePath = string.Empty;
+            public long size;
+            public string sha256 = string.Empty;
+        }
+
+        private sealed class VerifiedUnityPackage
+        {
+            public string packageId;
+            public string packageVersion;
+            public string source;
+            public string keyId;
+            public string signature;
+            public string originalPath;
+            public string stagedPath;
+            public string stagingDirectory;
+            public string receiptId;
+            public string receiptPath;
+            public long size;
+            public string sha256;
+        }
+
+        [Serializable]
+        private sealed class UnityPackageImportReceipt
+        {
+            public int schemaVersion = 1;
+            public string receiptId;
+            public string recordedAtUtc;
+            public string result;
+            public string unityPackageName;
+            public string packageId;
+            public string packageVersion;
+            public string source;
+            public string keyId;
+            public string originalPath;
+            public long expectedSize;
+            public string expectedSha256;
+            public long actualSize;
+            public string actualSha256;
+            public string detail;
+        }
+
+        private static class ESInstallerTrustedKeys
+        {
+            private static readonly Dictionary<string, string> TrustedRsaPublicKeys =
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    // 只能由发布责任人通过代码审查提交 RSA 公钥；包目录和 package.json 不能注册 key。
+                };
+
+            public static bool TryGetRsaPublicKey(string keyId, out string publicKeyXml)
+            {
+                publicKeyXml = null;
+                return !string.IsNullOrWhiteSpace(keyId)
+                    && TrustedRsaPublicKeys.TryGetValue(keyId, out publicKeyXml)
+                    && !string.IsNullOrWhiteSpace(publicKeyXml);
+            }
+        }
+
+        /// <summary>
+        /// 将配置文件中的 packageFolderPath/folderName 收口到 Installer 自己的 Downloads 根目录。
+        /// 安装器会读取外部 JSON，不能把这些字段直接交给 Path.Combine 和 AssetDatabase.ImportPackage，
+        /// 否则一个绝对路径或 .. 片段就能让安装器读取/导入工程外的 unitypackage。
+        /// </summary>
+        private string GetSafePackageFolderPath(ESPackageBase package)
+        {
+            if (package == null || string.IsNullOrWhiteSpace(downloadsFolderPath))
+                return null;
+
+            try
+            {
+                string downloadsRoot = Path.GetFullPath(downloadsFolderPath)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string fullPath;
+                if (string.IsNullOrWhiteSpace(package.packageFolderPath))
+                {
+                    string folderName = (package.folderName ?? string.Empty).Trim().Replace('\\', '/');
+                    if (string.IsNullOrWhiteSpace(folderName)
+                        || Path.IsPathRooted(folderName)
+                        || folderName.IndexOf('/') >= 0
+                        || folderName.IndexOf(':') >= 0
+                        || folderName == "."
+                        || folderName == "..")
+                        return null;
+
+                    fullPath = Path.GetFullPath(Path.Combine(downloadsRoot, folderName));
+                }
+                else
+                {
+                    fullPath = Path.GetFullPath(package.packageFolderPath);
+                }
+
+                string requiredPrefix = downloadsRoot + Path.DirectorySeparatorChar;
+                if (!fullPath.StartsWith(requiredPrefix, StringComparison.OrdinalIgnoreCase))
+                    return null;
+                return ContainsExistingReparsePoint(downloadsRoot, fullPath) ? null : fullPath;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        private static bool ContainsExistingReparsePoint(string root, string candidate)
+        {
+            string rootFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string current = rootFull;
+            string relative = candidate.Substring(rootFull.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            foreach (string segment in relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            {
+                if (string.IsNullOrEmpty(segment)) continue;
+                current = Path.Combine(current, segment);
+                if (!Directory.Exists(current) && !File.Exists(current)) break;
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// .unitypackage 必须由受信发布公钥签名的清单逐一声明。清单与包同目录可以被替换，
+        /// 所以它不是信任根；只接受编译进安装器的受信 keyId 对应公钥。
+        /// </summary>
+        private bool TryPrepareTrustedUnityPackages(
+            ESPackageBase package,
+            out List<VerifiedUnityPackage> verifiedPackages,
+            out string error)
+        {
+            verifiedPackages = new List<VerifiedUnityPackage>();
+            error = string.Empty;
+            string stagingDirectory = null;
+            try
+            {
+                if (package == null || string.IsNullOrWhiteSpace(package.packageId) || string.IsNullOrWhiteSpace(package.version))
+                    throw new InvalidDataException("安装包必须声明 packageId 和 version，才能建立可追溯供应链身份。");
+
+                string packageDirectory = GetSafePackageFolderPath(package);
+                if (string.IsNullOrWhiteSpace(packageDirectory) || !Directory.Exists(packageDirectory))
+                    throw new DirectoryNotFoundException("安装包目录不存在或越出 Downloads 受管根目录。");
+
+                ESManagedFileIO.EnsurePath(packageDirectory, false, downloadsFolderPath);
+                ESManagedFileIO.EnsureNoNestedReparsePoints(packageDirectory);
+
+                string manifestPath = Path.Combine(packageDirectory, UnityPackageTrustManifestFileName);
+                ESManagedFileIO.EnsurePath(manifestPath, true, packageDirectory);
+                if (!File.Exists(manifestPath))
+                    throw new FileNotFoundException("缺少已签名 .unitypackage 清单：" + UnityPackageTrustManifestFileName, manifestPath);
+
+                UnityPackageTrustManifest manifest = JsonUtility.FromJson<UnityPackageTrustManifest>(File.ReadAllText(manifestPath, Encoding.UTF8));
+                if (!TryValidateUnityPackageManifest(package, packageDirectory, manifest, out List<UnityPackageTrustArtifact> artifacts, out string validationError))
+                    throw new InvalidDataException(validationError);
+
+                string stagingRoot = GetTrustedImportStagingRoot();
+                EnsureInstallerLibraryDirectory(stagingRoot);
+                stagingDirectory = Path.Combine(stagingRoot, "batch-" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(stagingDirectory);
+                ESManagedFileIO.EnsurePath(stagingDirectory, false, stagingRoot);
+                ESManagedFileIO.EnsureNoNestedReparsePoints(stagingDirectory);
+
+                foreach (UnityPackageTrustArtifact artifact in artifacts)
+                {
+                    if (!TryResolveManifestArtifactPath(packageDirectory, artifact.relativePath, out string sourcePath, out string pathError))
+                        throw new InvalidDataException(pathError);
+                    ESManagedFileIO.EnsurePath(sourcePath, true, packageDirectory);
+                    if ((File.GetAttributes(sourcePath) & FileAttributes.ReparsePoint) != 0)
+                        throw new UnauthorizedAccessException("安装包文件不能是 junction/symlink：" + sourcePath);
+
+                    if (!ESArtifactTrustVerifier.TryCaptureStableFileIdentity(sourcePath, out long sourceSize, out string sourceHash, out string identityError))
+                        throw new IOException("无法建立安装包文件身份：" + identityError);
+                    if (sourceSize != artifact.size || !string.Equals(sourceHash, artifact.sha256, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("安装包 Hash 或 Size 与已签名清单不一致：" + artifact.relativePath);
+
+                    string stagedPath = Path.Combine(stagingDirectory, Path.GetFileName(sourcePath));
+                    ESManagedFileIO.CopyFileAtomic(sourcePath, stagedPath, packageDirectory, stagingDirectory);
+                    if (!ESArtifactTrustVerifier.TryCaptureStableFileIdentity(stagedPath, out long stagedSize, out string stagedHash, out identityError)
+                        || stagedSize != artifact.size
+                        || !string.Equals(stagedHash, artifact.sha256, StringComparison.OrdinalIgnoreCase))
+                        throw new IOException("受信暂存文件 Hash 或 Size 不一致：" + artifact.relativePath + "；" + identityError);
+
+                    verifiedPackages.Add(new VerifiedUnityPackage
+                    {
+                        packageId = manifest.packageId,
+                        packageVersion = manifest.packageVersion,
+                        source = manifest.source,
+                        keyId = manifest.keyId,
+                        signature = manifest.signature,
+                        originalPath = sourcePath,
+                        stagedPath = stagedPath,
+                        stagingDirectory = stagingDirectory,
+                        size = artifact.size,
+                        sha256 = artifact.sha256.ToLowerInvariant(),
+                    });
+                }
+
+                return true;
+            }
+            catch (Exception exception)
+            {
+                if (!string.IsNullOrWhiteSpace(stagingDirectory) && Directory.Exists(stagingDirectory))
+                {
+                    try
+                    {
+                        ESManagedFileIO.DeleteDirectory(stagingDirectory, GetTrustedImportStagingRoot());
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        error = "受信安装预检失败：" + exception.Message + "；暂存现场保留：" + stagingDirectory + "；清理失败：" + cleanupException.Message;
+                        return false;
+                    }
+                }
+
+                error = "受信安装预检失败：" + exception.Message;
+                return false;
+            }
+        }
+
+        private static bool TryValidateUnityPackageManifest(
+            ESPackageBase package,
+            string packageDirectory,
+            UnityPackageTrustManifest manifest,
+            out List<UnityPackageTrustArtifact> artifacts,
+            out string error)
+        {
+            artifacts = new List<UnityPackageTrustArtifact>();
+            error = string.Empty;
+            if (manifest == null || manifest.schemaVersion != 1)
+            {
+                error = "仅支持 schemaVersion=1 的已签名 .unitypackage 清单。";
+                return false;
+            }
+
+            if (!string.Equals(manifest.packageId, package.packageId, StringComparison.Ordinal)
+                || !string.Equals(manifest.packageVersion, package.version, StringComparison.Ordinal))
+            {
+                error = "已签名清单的 packageId/version 与当前安装配置不一致。";
+                return false;
+            }
+
+            if (!IsSafeManifestValue(manifest.keyId, false)
+                || !IsSafeManifestValue(manifest.packageId, false)
+                || !IsSafeManifestValue(manifest.packageVersion, false)
+                || !IsSafeManifestValue(manifest.source, false)
+                || !IsSafeTrustKeyId(manifest.keyId))
+            {
+                error = "已签名清单包含无效 keyId、packageId、version 或 source。";
+                return false;
+            }
+
+            if (!ESInstallerTrustedKeys.TryGetRsaPublicKey(manifest.keyId, out string publicKeyXml))
+            {
+                error = "未配置 keyId“" + manifest.keyId + "”的受信发布公钥；安装器按 fail-closed 拒绝导入。";
+                return false;
+            }
+
+            string[] packageFiles = Directory.GetFiles(packageDirectory, "*.unitypackage", SearchOption.TopDirectoryOnly);
+            if (packageFiles.Length == 0)
+            {
+                error = "安装包目录中没有 .unitypackage 文件。";
+                return false;
+            }
+
+            var filesByName = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (string packageFile in packageFiles)
+            {
+                string fileName = Path.GetFileName(packageFile);
+                if (string.IsNullOrWhiteSpace(fileName) || filesByName.ContainsKey(fileName))
+                {
+                    error = "安装包目录存在名称冲突的 .unitypackage 文件。";
+                    return false;
+                }
+                filesByName.Add(fileName, packageFile);
+            }
+
+            if (manifest.artifacts == null || manifest.artifacts.Count == 0 || manifest.artifacts.Count != filesByName.Count)
+            {
+                error = "已签名清单必须逐一且仅一次声明目录内所有 .unitypackage 文件。";
+                return false;
+            }
+
+            var manifestNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (UnityPackageTrustArtifact artifact in manifest.artifacts)
+            {
+                if (artifact == null)
+                {
+                    error = "已签名清单包含无效 artifact。";
+                    return false;
+                }
+
+                string resolvedPath;
+                string artifactPathError;
+                if (!TryResolveManifestArtifactPath(packageDirectory, artifact.relativePath, out resolvedPath, out artifactPathError)
+                    || !IsSafeManifestValue(artifact.relativePath, false)
+                    || artifact.size <= 0
+                    || !ESArtifactTrustVerifier.IsSha256(artifact.sha256))
+                {
+                    error = "已签名清单包含无效 artifact：" + artifactPathError;
+                    return false;
+                }
+
+                string fileName = Path.GetFileName(resolvedPath);
+                if (!manifestNames.Add(fileName) || !filesByName.ContainsKey(fileName))
+                {
+                    error = "已签名清单存在重复、未知或未声明的 .unitypackage 文件。";
+                    return false;
+                }
+
+                artifacts.Add(new UnityPackageTrustArtifact
+                {
+                    relativePath = artifact.relativePath,
+                    size = artifact.size,
+                    sha256 = artifact.sha256.ToLowerInvariant(),
+                });
+            }
+
+            if (manifestNames.Count != filesByName.Count)
+            {
+                error = "目录内存在未被已签名清单声明的 .unitypackage 文件。";
+                return false;
+            }
+
+            byte[] canonicalPayload = Encoding.UTF8.GetBytes(BuildCanonicalManifestPayload(manifest, artifacts));
+            if (!ESArtifactTrustVerifier.TryVerifyRsaSha256(publicKeyXml, canonicalPayload, manifest.signature, out string signatureError))
+            {
+                error = "已签名清单验证失败：" + signatureError;
+                return false;
+            }
+
+            artifacts.Sort((left, right) => StringComparer.Ordinal.Compare(left.relativePath, right.relativePath));
+            return true;
+        }
+
+        private static string BuildCanonicalManifestPayload(
+            UnityPackageTrustManifest manifest,
+            List<UnityPackageTrustArtifact> artifacts)
+        {
+            var ordered = new List<UnityPackageTrustArtifact>(artifacts);
+            ordered.Sort((left, right) => StringComparer.Ordinal.Compare(left.relativePath, right.relativePath));
+            var builder = new StringBuilder();
+            builder.Append("ESInstaller.UnityPackageManifest\n");
+            builder.Append("schemaVersion=").Append(manifest.schemaVersion).Append('\n');
+            AppendCanonicalManifestField(builder, "keyId", manifest.keyId);
+            AppendCanonicalManifestField(builder, "packageId", manifest.packageId);
+            AppendCanonicalManifestField(builder, "packageVersion", manifest.packageVersion);
+            AppendCanonicalManifestField(builder, "source", manifest.source);
+            builder.Append("artifactCount=").Append(ordered.Count).Append('\n');
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                UnityPackageTrustArtifact artifact = ordered[i];
+                builder.Append("artifact[").Append(i).Append("]\n");
+                AppendCanonicalManifestField(builder, "relativePath", artifact.relativePath);
+                builder.Append("size=").Append(artifact.size).Append('\n');
+                AppendCanonicalManifestField(builder, "sha256", artifact.sha256.ToLowerInvariant());
+            }
+
+            return builder.ToString();
+        }
+
+        private static void AppendCanonicalManifestField(StringBuilder builder, string fieldName, string value)
+        {
+            builder.Append(fieldName).Append('=').Append(value).Append('\n');
+        }
+
+        private static bool TryResolveManifestArtifactPath(string packageDirectory, string relativePath, out string fullPath, out string error)
+        {
+            fullPath = null;
+            error = string.Empty;
+            string normalized = (relativePath ?? string.Empty).Trim().Replace('\\', '/');
+            if (string.IsNullOrEmpty(normalized)
+                || Path.IsPathRooted(normalized)
+                || normalized.Contains("..")
+                || normalized.IndexOf('/') >= 0
+                || normalized.IndexOf(':') >= 0
+                || !normalized.EndsWith(".unitypackage", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "artifact.relativePath 必须是包目录内的单个 .unitypackage 文件名。";
+                return false;
+            }
+
+            try
+            {
+                string candidate = Path.GetFullPath(Path.Combine(packageDirectory, normalized));
+                if (!ESManagedFileIO.IsWithinRoot(candidate, packageDirectory)
+                    || !string.Equals(Path.GetFileName(candidate), normalized, StringComparison.Ordinal))
+                {
+                    error = "artifact.relativePath 越出包目录。";
+                    return false;
+                }
+
+                fullPath = candidate;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = "artifact.relativePath 无效：" + exception.Message;
+                return false;
+            }
+        }
+
+        private static bool IsSafeTrustKeyId(string value)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length > 64) return false;
+            foreach (char character in value)
+            {
+                bool permitted = character >= 'a' && character <= 'z'
+                    || character >= 'A' && character <= 'Z'
+                    || character >= '0' && character <= '9'
+                    || character == '.' || character == '_' || character == '-';
+                if (!permitted) return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsSafeManifestValue(string value, bool allowEmpty)
+        {
+            if (string.IsNullOrEmpty(value)) return allowEmpty;
+            if (!string.Equals(value, value.Trim(), StringComparison.Ordinal) || value.Length > 2048) return false;
+            foreach (char character in value)
+            {
+                if (char.IsControl(character)) return false;
+            }
+
+            return true;
+        }
+
+        private string GetTrustedImportStagingRoot()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
+            return Path.Combine(projectRoot, "Library", "ESInstaller", "VerifiedImports");
+        }
+
+        private string GetTrustedImportReceiptRoot()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
+            return Path.Combine(projectRoot, "Library", "ESInstaller", "ImportReceipts");
+        }
+
+        private static void EnsureInstallerLibraryDirectory(string directory)
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
+            string libraryRoot = Path.Combine(projectRoot, "Library");
+            Directory.CreateDirectory(directory);
+            ESManagedFileIO.EnsurePath(directory, false, libraryRoot);
+            ESManagedFileIO.EnsureNoNestedReparsePoints(directory);
+        }
+
+        private bool TryQueueTrustedImports(List<VerifiedUnityPackage> verifiedPackages, string operationName, out string error)
+        {
+            error = string.Empty;
+            if (verifiedPackages == null || verifiedPackages.Count == 0)
+            {
+                error = "没有通过签名与 Hash 校验的 .unitypackage 可导入。";
+                return false;
+            }
+
+            if (activeVerifiedImport != null || verifiedImportQueue.Count > 0)
+            {
+                error = "已有受信安装任务正在等待 Unity 导入结果；请先完成、取消或关闭当前导入面板。";
+                return false;
+            }
+
+            foreach (VerifiedUnityPackage package in verifiedPackages)
+                verifiedImportQueue.Enqueue(package);
+
+            ShowStatus(operationName + "：已完成签名、Size、SHA-256 与受信暂存校验，准备导入 " + verifiedPackages.Count + " 个包。", MessageType.Info);
+            StartNextTrustedImport();
+            return true;
+        }
+
+        private void StartNextTrustedImport()
+        {
+            if (activeVerifiedImport != null) return;
+            if (verifiedImportQueue.Count == 0)
+            {
+                ShowStatus("所有受信 .unitypackage 导入请求均已处理；可通过“定位上次导入收据”查看结果。", MessageType.Info);
+                return;
+            }
+
+            activeVerifiedImport = verifiedImportQueue.Dequeue();
+            try
+            {
+                if (!ESArtifactTrustVerifier.TryCaptureStableFileIdentity(
+                        activeVerifiedImport.stagedPath,
+                        out long actualSize,
+                        out string actualHash,
+                        out string identityError)
+                    || actualSize != activeVerifiedImport.size
+                    || !string.Equals(actualHash, activeVerifiedImport.sha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException("导入前受信暂存文件身份不一致：" + identityError);
+                }
+
+                activeVerifiedImport.receiptId = Guid.NewGuid().ToString("N");
+                string receiptRoot = GetTrustedImportReceiptRoot();
+                EnsureInstallerLibraryDirectory(receiptRoot);
+                activeVerifiedImport.receiptPath = Path.Combine(receiptRoot, activeVerifiedImport.receiptId + ".json");
+                WriteTrustedImportReceipt(activeVerifiedImport, "ImportRequested", string.Empty, string.Empty, true);
+                lastImportReceiptPath = activeVerifiedImport.receiptPath;
+                ShowStatus("正在导入已验证包：" + Path.GetFileName(activeVerifiedImport.originalPath) + "。Unity 导入面板关闭后将写入最终收据。", MessageType.Info);
+                AssetDatabase.ImportPackage(activeVerifiedImport.stagedPath, true);
+            }
+            catch (Exception exception)
+            {
+                CompleteActiveTrustedImport("ImportFailed", string.Empty, exception.Message);
+            }
+        }
+
+        private void OnTrustedImportCompleted(string packageName)
+        {
+            if (activeVerifiedImport == null) return;
+            CompleteActiveTrustedImport("ImportCompleted", packageName, string.Empty);
+        }
+
+        private void OnTrustedImportCancelled(string packageName)
+        {
+            if (activeVerifiedImport == null) return;
+            CompleteActiveTrustedImport("ImportCancelled", packageName, "用户取消了 Unity 导入面板。");
+        }
+
+        private void OnTrustedImportFailed(string packageName, string message)
+        {
+            if (activeVerifiedImport == null) return;
+            CompleteActiveTrustedImport("ImportFailed", packageName, message ?? string.Empty);
+        }
+
+        private void CompleteActiveTrustedImport(string result, string unityPackageName, string detail)
+        {
+            VerifiedUnityPackage completed = activeVerifiedImport;
+            activeVerifiedImport = null;
+            bool integrityPreserved = ESArtifactTrustVerifier.TryCaptureStableFileIdentity(
+                completed.stagedPath,
+                out long actualSize,
+                out string actualHash,
+                out string identityError)
+                && actualSize == completed.size
+                && string.Equals(actualHash, completed.sha256, StringComparison.OrdinalIgnoreCase);
+            if (!integrityPreserved)
+            {
+                result = "ImportFailed";
+                detail = string.IsNullOrWhiteSpace(detail)
+                    ? "导入完成信号后无法复核受信暂存文件身份：" + identityError
+                    : detail + "；导入完成信号后无法复核受信暂存文件身份：" + identityError;
+            }
+
+            try
+            {
+                WriteTrustedImportReceipt(completed, result, unityPackageName, detail, false);
+                lastImportReceiptPath = completed.receiptPath;
+            }
+            catch (Exception receiptException)
+            {
+                result = "ImportFailed";
+                detail = "导入状态收据写入失败：" + receiptException.Message;
+            }
+
+            if (!string.Equals(result, "ImportCompleted", StringComparison.Ordinal))
+            {
+                CancelQueuedTrustedImports("前一个受信安装未完成，剩余包未导入：" + detail);
+                CleanupTrustedStagingDirectory(completed.stagingDirectory);
+                ShowStatus("受信安装失败或已取消：" + detail + "。已停止后续导入；收据：" + completed.receiptPath, MessageType.Error);
+                return;
+            }
+
+            CleanupTrustedStagingDirectoryIfUnused(completed.stagingDirectory);
+            ShowStatus("已记录导入完成：" + Path.GetFileName(completed.originalPath) + "；收据：" + completed.receiptPath, MessageType.Info);
+            StartNextTrustedImport();
+        }
+
+        private void CancelQueuedTrustedImports(string detail)
+        {
+            while (verifiedImportQueue.Count > 0)
+            {
+                VerifiedUnityPackage queued = verifiedImportQueue.Dequeue();
+                queued.receiptId = Guid.NewGuid().ToString("N");
+                string receiptRoot = GetTrustedImportReceiptRoot();
+                try
+                {
+                    EnsureInstallerLibraryDirectory(receiptRoot);
+                    queued.receiptPath = Path.Combine(receiptRoot, queued.receiptId + ".json");
+                    WriteTrustedImportReceipt(queued, "NotImported", string.Empty, detail, true);
+                    lastImportReceiptPath = queued.receiptPath;
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError("[ESInstaller] 无法写入未导入包的受信收据：" + exception);
+                }
+                CleanupTrustedStagingDirectoryIfUnused(queued.stagingDirectory);
+            }
+        }
+
+        private void WriteTrustedImportReceipt(
+            VerifiedUnityPackage package,
+            string result,
+            string unityPackageName,
+            string detail,
+            bool createNew)
+        {
+            if (package == null || string.IsNullOrWhiteSpace(package.receiptPath))
+                throw new InvalidOperationException("受信安装收据路径尚未分配。");
+
+            long actualSize = 0;
+            string actualHash = string.Empty;
+            string identityError = string.Empty;
+            ESArtifactTrustVerifier.TryCaptureStableFileIdentity(package.stagedPath, out actualSize, out actualHash, out identityError);
+            var receipt = new UnityPackageImportReceipt
+            {
+                receiptId = package.receiptId,
+                recordedAtUtc = DateTime.UtcNow.ToString("O"),
+                result = result ?? string.Empty,
+                unityPackageName = unityPackageName ?? string.Empty,
+                packageId = package.packageId,
+                packageVersion = package.packageVersion,
+                source = package.source,
+                keyId = package.keyId,
+                originalPath = package.originalPath,
+                expectedSize = package.size,
+                expectedSha256 = package.sha256,
+                actualSize = actualSize,
+                actualSha256 = actualHash,
+                detail = string.IsNullOrWhiteSpace(identityError) ? detail ?? string.Empty : (detail ?? string.Empty) + "；身份复核：" + identityError,
+            };
+
+            string json = JsonUtility.ToJson(receipt, true);
+            if (createNew)
+                ESManagedFileIO.WriteTextAtomicCreateNew(package.receiptPath, json, new UTF8Encoding(false), GetTrustedImportReceiptRoot());
+            else
+                ESManagedFileIO.WriteTextAtomic(package.receiptPath, json, new UTF8Encoding(false), GetTrustedImportReceiptRoot());
+        }
+
+        private void CleanupTrustedStagingDirectoryIfUnused(string stagingDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(stagingDirectory)) return;
+            if (activeVerifiedImport != null && string.Equals(activeVerifiedImport.stagingDirectory, stagingDirectory, StringComparison.OrdinalIgnoreCase)) return;
+            foreach (VerifiedUnityPackage queued in verifiedImportQueue)
+            {
+                if (string.Equals(queued.stagingDirectory, stagingDirectory, StringComparison.OrdinalIgnoreCase)) return;
+            }
+            CleanupTrustedStagingDirectory(stagingDirectory);
+        }
+
+        private void CleanupTrustedStagingDirectory(string stagingDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(stagingDirectory) || !Directory.Exists(stagingDirectory)) return;
+            try
+            {
+                ESManagedFileIO.DeleteDirectory(stagingDirectory, GetTrustedImportStagingRoot());
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("[ESInstaller] 受信安装暂存目录清理失败，已保留现场：" + stagingDirectory + "；" + exception);
+            }
+        }
+
+        /// <summary>
+        /// Git URL 只能引用不可变完整 commit。branch、tag 和短 SHA 都会移动或产生歧义，
+        /// 不能作为安装器的供应链身份。UPM 仍使用原始 URL 安装，但所有入口都必须先经过本门禁。
+        /// </summary>
+        private static bool TryValidatePinnedGitUrl(string gitUrl, out string normalizedUrl, out string commit, out string error)
+        {
+            normalizedUrl = (gitUrl ?? string.Empty).Trim();
+            commit = string.Empty;
+            error = string.Empty;
+            if (string.IsNullOrEmpty(normalizedUrl))
+            {
+                error = "Git URL 为空。";
+                return false;
+            }
+
+            int markerIndex = normalizedUrl.LastIndexOf('#');
+            if (markerIndex <= 0 || markerIndex == normalizedUrl.Length - 1)
+            {
+                error = "Git URL 必须以 # 加完整 commit SHA（40 或 64 位十六进制）结尾。";
+                return false;
+            }
+
+            string source = normalizedUrl.Substring(0, markerIndex);
+            commit = normalizedUrl.Substring(markerIndex + 1);
+            if (!IsSupportedGitSource(source))
+            {
+                error = "Git URL 仅支持 git+https、https、ssh 或 git@ 远端来源。";
+                return false;
+            }
+            if ((commit.Length != 40 && commit.Length != 64) || !commit.All(Uri.IsHexDigit))
+            {
+                error = "Git URL 只能使用完整 40 或 64 位十六进制 commit SHA，不能使用 branch、tag 或短 SHA。";
+                return false;
+            }
+
+            commit = commit.ToLowerInvariant();
+            normalizedUrl = source + "#" + commit;
+            return true;
+        }
+
+        private static bool IsSupportedGitSource(string source)
+        {
+            return source.StartsWith("git+https://", StringComparison.OrdinalIgnoreCase)
+                || source.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                || source.StartsWith("ssh://", StringComparison.OrdinalIgnoreCase)
+                || source.StartsWith("git@", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool TryValidatePackageGitDependencies(ESPackageBase package, out string error)
+        {
+            error = string.Empty;
+            if (package == null)
+            {
+                error = "安装包配置为空。";
+                return false;
+            }
+
+            foreach (GitPackageDependency dependency in package.gitDependencies ?? new List<GitPackageDependency>())
+            {
+                if (dependency == null)
+                {
+                    error = "Git 依赖为空。";
+                    return false;
+                }
+                if (!TryValidatePinnedGitUrl(dependency.gitUrl, out _, out _, out string pinError))
+                {
+                    error = "Git 依赖“" + dependency.name + "”不满足固定 commit 要求：" + pinError;
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static void DrawGitSupplyChainStatus(GitPackageDependency dependency)
+        {
+            if (dependency == null)
+            {
+                EditorGUILayout.HelpBox("已阻断安装：Git 依赖为空。", MessageType.Error);
+                return;
+            }
+
+            if (TryValidatePinnedGitUrl(dependency.gitUrl, out _, out string commit, out string error))
+            {
+                EditorGUILayout.LabelField("供应链固定 Commit", commit, EditorStyles.miniLabel);
+                return;
+            }
+
+            EditorGUILayout.HelpBox("已阻断安装：" + error, MessageType.Error);
+        }
+
+        private static bool TryResolveProjectAssetPath(string assetPath, out string fullPath)
+        {
+            fullPath = null;
+            string normalized = (assetPath ?? string.Empty).Trim().Replace('\\', '/');
+            if (normalized.Length == 0
+                || normalized.Contains("://", StringComparison.Ordinal)
+                || normalized.StartsWith("jar:", StringComparison.OrdinalIgnoreCase)
+                || Path.IsPathRooted(normalized)
+                || (!normalized.Equals("Assets", StringComparison.OrdinalIgnoreCase)
+                    && !normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            string[] segments = normalized.Split('/');
+            for (int i = 0; i < segments.Length; i++)
+            {
+                if (segments[i] == ".." || segments[i].IndexOf(':') >= 0)
+                    return false;
+            }
+
+            try
+            {
+                string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
+                string candidate = Path.GetFullPath(Path.Combine(projectRoot, normalized));
+                string assetsRoot = Path.GetFullPath(Application.dataPath)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string requiredPrefix = assetsRoot + Path.DirectorySeparatorChar;
+                if (!candidate.StartsWith(requiredPrefix, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(candidate, assetsRoot, StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                fullPath = candidate;
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
             }
         }
 
@@ -888,11 +1703,9 @@ namespace ES.EditorInternal.Installer
             await Task.Run(() =>
           {
               // 检查文件夹是否存在
-              string packagePath = string.IsNullOrEmpty(package.packageFolderPath)
-                  ? Path.Combine(downloadsFolderPath, package.folderName)
-                  : package.packageFolderPath;
+              string packagePath = GetSafePackageFolderPath(package);
 
-              if (!Directory.Exists(packagePath))
+              if (string.IsNullOrEmpty(packagePath) || !Directory.Exists(packagePath))
               {
                   package.installState = PackageInstallState.NotInstalled;
                   return;
@@ -923,17 +1736,10 @@ namespace ES.EditorInternal.Installer
               // 如果有assetPath，检查资产路径是否存在
               else if (!string.IsNullOrEmpty(package.assetPath))
               {
-                  string fullPath;
-                  if (package.assetPath.Contains("StreamingAssets"))
+                  if (!TryResolveProjectAssetPath(package.assetPath, out string fullPath))
                   {
-                      // 对于 StreamingAssets，使用专用路径，避免替换
-                      string relativePath = package.assetPath.Replace("Assets/StreamingAssets/", "").Replace("Assets/StreamingAssets", "");
-                      fullPath = Path.Combine(Application.streamingAssetsPath, relativePath);
-                  }
-                  else
-                  {
-                      // 对于其他路径，保持原逻辑
-                      fullPath = Path.Combine(Application.dataPath, package.assetPath.Replace("Assets/", ""));
+                      package.installState = PackageInstallState.NotInstalled;
+                      return;
                   }
                   // Debug.Log("Checking asset path: " + fullPath);
                   if (File.Exists(fullPath) || Directory.Exists(fullPath))
@@ -1036,8 +1842,8 @@ namespace ES.EditorInternal.Installer
             }
 
             // 检查文件是否存在
-            string fullPath = Path.Combine(Application.dataPath, dependency.assetPath.Replace("Assets/", ""));
-            return File.Exists(fullPath) || Directory.Exists(fullPath);
+            return TryResolveProjectAssetPath(dependency.assetPath, out string fullPath)
+                && (File.Exists(fullPath) || Directory.Exists(fullPath));
         }
 
         /// <summary>
@@ -1406,7 +2212,7 @@ namespace ES.EditorInternal.Installer
             }
 
             // 如果没有类检查，则检查文件夹和文件是否存在
-            string mainPackagePath = Path.Combine(downloadsFolderPath, currentProfile.mainPackage.folderName);
+            string mainPackagePath = GetSafePackageFolderPath(currentProfile.mainPackage);
 
             // 检查主包文件夹是否存在
             if (!Directory.Exists(mainPackagePath))
@@ -1514,6 +2320,10 @@ namespace ES.EditorInternal.Installer
 
         private void OnDisable()
         {
+            AssetDatabase.importPackageCompleted -= OnTrustedImportCompleted;
+            AssetDatabase.importPackageCancelled -= OnTrustedImportCancelled;
+            AssetDatabase.importPackageFailed -= OnTrustedImportFailed;
+
             // 只有在有未保存的更改时才询问用户是否保存
             if (isConfigModified)
             {
@@ -2169,6 +2979,7 @@ namespace ES.EditorInternal.Installer
             EditorGUILayout.LabelField($"版本: {dependency.version}");
             EditorGUILayout.LabelField($"描述: {dependency.description}");
             EditorGUILayout.LabelField($"Git URL: {dependency.gitUrl}");
+            DrawGitSupplyChainStatus(dependency);
             if (!string.IsNullOrEmpty(dependency.checkClass))
                 EditorGUILayout.LabelField($"检查类名: {dependency.checkClass}");
 
@@ -2370,6 +3181,7 @@ namespace ES.EditorInternal.Installer
             EditorGUILayout.LabelField($"版本: {dependency.version}");
             EditorGUILayout.LabelField($"描述: {dependency.description}");
             EditorGUILayout.LabelField($"Git URL: {dependency.gitUrl}");
+            DrawGitSupplyChainStatus(dependency);
             EditorGUILayout.LabelField($"检查类名: {dependency.checkClass}");
 
             EditorGUILayout.BeginHorizontal();
@@ -2491,7 +3303,7 @@ namespace ES.EditorInternal.Installer
                 {
                     // 主包信息
                     EditorGUILayout.LabelField("主包 (必需)", EditorStyles.boldLabel);
-                    string mainPackagePath = Path.Combine(downloadsFolderPath, currentProfile.mainPackage.folderName);
+                    string mainPackagePath = GetSafePackageFolderPath(currentProfile.mainPackage);
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.LabelField($"路径: {mainPackagePath}", GUILayout.ExpandWidth(true));
                     EditorGUI.BeginDisabledGroup(true);
@@ -2564,7 +3376,7 @@ namespace ES.EditorInternal.Installer
                             }
 
                             // 包位置信息
-                            string packagePath = Path.Combine("Assets/Plugins/ES/Editor/Installer/Downloads", extPackage.folderName);
+                            string packagePath = GetSafePackageFolderPath(extPackage);
                             EditorGUILayout.LabelField($"位置: {packagePath}", EditorStyles.miniLabel);
 
                             // 检查包文件状态
@@ -2622,7 +3434,7 @@ namespace ES.EditorInternal.Installer
 
                     // 主包信息
                     EditorGUILayout.LabelField("主包 (必需)", EditorStyles.miniBoldLabel);
-                    string mainPackagePath = Path.Combine(downloadsFolderPath, currentProfile.mainPackage.folderName);
+                    string mainPackagePath = GetSafePackageFolderPath(currentProfile.mainPackage);
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.LabelField($"路径: {mainPackagePath}", EditorStyles.miniLabel, GUILayout.ExpandWidth(true));
                     EditorGUILayout.EndHorizontal();
@@ -2660,7 +3472,7 @@ namespace ES.EditorInternal.Installer
                             EditorGUILayout.BeginHorizontal();
                             EditorGUILayout.LabelField($"• {extPackage.displayName}", EditorStyles.miniLabel, GUILayout.ExpandWidth(true));
 
-                            string extFolderPath = Path.Combine("Assets/Plugins/ES/Editor/Installer/Downloads", extPackage.folderName);
+                            string extFolderPath = GetSafePackageFolderPath(extPackage);
                             if (Directory.Exists(extFolderPath))
                             {
                                 string[] extPackages = Directory.GetFiles(extFolderPath, "*.unitypackage");
@@ -2737,9 +3549,7 @@ namespace ES.EditorInternal.Installer
             EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
             EditorGUILayout.Space(5);
 
-            string packagePath = string.IsNullOrEmpty(package.packageFolderPath)
-                ? Path.Combine(downloadsFolderPath, package.folderName)
-                : package.packageFolderPath;
+            string packagePath = GetSafePackageFolderPath(package);
 
             // 显示包路径
             EditorGUILayout.LabelField($"路径: {packagePath}", EditorStyles.miniLabel);
@@ -2994,6 +3804,19 @@ namespace ES.EditorInternal.Installer
             }
 
             EditorGUILayout.EndHorizontal();
+
+            if (!string.IsNullOrWhiteSpace(lastImportReceiptPath))
+            {
+                EditorGUILayout.Space(4);
+                EditorGUILayout.BeginHorizontal(EditorStyles.helpBox);
+                EditorGUILayout.LabelField("最近受信导入收据", EditorStyles.miniBoldLabel, GUILayout.Width(110));
+                EditorGUILayout.SelectableLabel(lastImportReceiptPath, EditorStyles.miniLabel, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                if (GUILayout.Button("定位", GUILayout.Width(48)))
+                    EditorUtility.RevealInFinder(lastImportReceiptPath);
+                if (GUILayout.Button("复制路径", GUILayout.Width(70)))
+                    EditorGUIUtility.systemCopyBuffer = lastImportReceiptPath;
+                EditorGUILayout.EndHorizontal();
+            }
         }
 
         #endregion
@@ -3008,6 +3831,12 @@ namespace ES.EditorInternal.Installer
         /// </summary>
         private void InstallPackage(ESPackageBase package, bool forceInstall = false)
         {
+            if (!TryValidatePackageGitDependencies(package, out string gitPinError))
+            {
+                ShowStatus("安装被供应链门禁拒绝：" + gitPinError, MessageType.Error);
+                return;
+            }
+
             // 检查是否已安装，如果是则弹出提示（除非是强制安装）
             if (package.installState == PackageInstallState.Installed && !forceInstall)
             {
@@ -3025,22 +3854,11 @@ namespace ES.EditorInternal.Installer
                 }
             }
 
-            string packagePath = string.IsNullOrEmpty(package.packageFolderPath)
-                ? Path.Combine(downloadsFolderPath, package.folderName)
-                : package.packageFolderPath;
+            string packagePath = GetSafePackageFolderPath(package);
 
             if (!Directory.Exists(packagePath))
             {
                 ShowStatus("包文件夹不存在", MessageType.Error);
-                return;
-            }
-
-            // 扫描文件夹中的所有Unity Package文件
-            string[] scannedFiles = Directory.GetFiles(packagePath, "*.unitypackage");
-
-            if (scannedFiles.Length == 0)
-            {
-                ShowStatus("没有找到要安装的包文件", MessageType.Error);
                 return;
             }
 
@@ -3052,15 +3870,19 @@ namespace ES.EditorInternal.Installer
             }
 
             string installMode = forceInstall ? "强制安装" : "安装";
-            ShowStatus($"开始{installMode} {package.displayName}，共 {scannedFiles.Length} 个文件...", MessageType.Info);
-
-            foreach (string packageFile in scannedFiles)
+            if (!TryPrepareTrustedUnityPackages(package, out List<VerifiedUnityPackage> verifiedPackages, out string trustError))
             {
-                // 使用interactive模式显示Unity标准导入面板
-                AssetDatabase.ImportPackage(packageFile, true);
+                ShowStatus("安装被 .unitypackage 供应链门禁拒绝：" + trustError, MessageType.Error);
+                return;
             }
 
-            ShowStatus($"{package.displayName} {installMode}已启动，请在弹出的导入面板中选择要导入的资源", MessageType.Info);
+            if (!TryQueueTrustedImports(verifiedPackages, package.displayName + " " + installMode, out string queueError))
+            {
+                foreach (VerifiedUnityPackage verified in verifiedPackages)
+                    CleanupTrustedStagingDirectoryIfUnused(verified.stagingDirectory);
+                ShowStatus("安装未启动：" + queueError, MessageType.Error);
+                return;
+            }
 
             // 延迟检查安装状态
             EditorApplication.delayCall += () =>
@@ -3094,7 +3916,8 @@ namespace ES.EditorInternal.Installer
             {
                 foreach (var dep in package.gitDependencies)
                 {
-                    if (dep.isRequired && !dep.isInstalled)
+                    if (!TryValidatePinnedGitUrl(dep?.gitUrl, out _, out _, out _)
+                        || (dep.isRequired && !dep.isInstalled))
                     {
                         allValid = false;
                         break;
@@ -3133,9 +3956,9 @@ namespace ES.EditorInternal.Installer
         {
             try
             {
-                string json = JsonUtility.ToJson(currentProfile, true);
-                File.WriteAllText(configFilePath, json);
                 currentProfile.lastModified = DateTime.Now;
+                string json = JsonUtility.ToJson(currentProfile, true);
+                ESManagedFileIO.WriteTextAtomic(configFilePath, json, Encoding.UTF8, Application.dataPath);
                 isConfigModified = false; // 重置未保存更改标志
                 AssetDatabase.Refresh();
             }
@@ -3306,10 +4129,15 @@ namespace ES.EditorInternal.Installer
 
         private async Task CheckGitPackageDependency(GitPackageDependency dependency)
         {
-            if (string.IsNullOrEmpty(dependency.gitUrl))
+            if (dependency == null)
+            {
+                ShowStatus("Git包依赖为空，无法进行供应链校验。", MessageType.Error);
+                return;
+            }
+            if (!TryValidatePinnedGitUrl(dependency.gitUrl, out string pinnedGitUrl, out _, out string pinError))
             {
                 dependency.isInstalled = false;
-                ShowStatus($"Git包 {dependency.name} 缺少Git URL", MessageType.Warning);
+                ShowStatus($"Git包 {dependency.name} 被供应链门禁拒绝：{pinError}", MessageType.Error);
                 return;
             }
 
@@ -3334,7 +4162,7 @@ namespace ES.EditorInternal.Installer
 
                 if (request.Status == StatusCode.Success)
                 {
-                    dependency.isInstalled = request.Result.Any(p => p.packageId == dependency.gitUrl || p.name == dependency.gitUrl);
+                    dependency.isInstalled = request.Result.Any(p => p.packageId == pinnedGitUrl || p.name == pinnedGitUrl);
                     if (dependency.isInstalled)
                     {
                         ShowStatus($"Git包 {dependency.name} 已安装 (通过UPM验证)", MessageType.Info);
@@ -3361,9 +4189,15 @@ namespace ES.EditorInternal.Installer
 
         private async Task InstallGitPackageDependency(GitPackageDependency dependency)
         {
-            if (string.IsNullOrEmpty(dependency.gitUrl))
+            if (dependency == null)
             {
-                ShowStatus($"Git包 {dependency.name} 缺少Git URL", MessageType.Error);
+                ShowStatus("Git包依赖为空，无法安装。", MessageType.Error);
+                return;
+            }
+            if (!TryValidatePinnedGitUrl(dependency.gitUrl, out string pinnedGitUrl, out string commit, out string pinError))
+            {
+                dependency.isInstalled = false;
+                ShowStatus($"Git包 {dependency.name} 被供应链门禁拒绝：{pinError}", MessageType.Error);
                 return;
             }
 
@@ -3371,8 +4205,8 @@ namespace ES.EditorInternal.Installer
             try
             {
                 // 在主线程同步发起请求（这不会阻塞）
-                request = Client.Add(dependency.gitUrl);
-                ShowStatus($"正在安装Git包 {dependency.name}...", MessageType.Info);
+                request = Client.Add(pinnedGitUrl);
+                ShowStatus($"正在安装Git包 {dependency.name}（固定 commit {commit.Substring(0, 12)}…）...", MessageType.Info);
             }
             catch (Exception e)
             {
@@ -3498,14 +4332,16 @@ namespace ES.EditorInternal.Installer
             }
 
             bool unityPackagesValid = currentProfile.mainPackage.unityDependencies.All(d => !d.isRequired || d.isInstalled);
-            bool gitPackagesValid = currentProfile.mainPackage.gitDependencies.All(d => !d.isRequired || d.isInstalled);
+            bool gitPackagesValid = currentProfile.mainPackage.gitDependencies.All(d => d != null
+                && TryValidatePinnedGitUrl(d.gitUrl, out _, out _, out _)
+                && (!d.isRequired || d.isInstalled));
             bool userPackagesValid = currentProfile.mainPackage.userDependencies.All(d => !d.isRequired || d.isInstalled);
 
             // 检查ES包系统：主包必需，选中的扩展包也必需
             bool esPackagesValid = true;
 
             // 检查主包
-            string mainPackagePath = Path.Combine(downloadsFolderPath, currentProfile.mainPackage.folderName);
+            string mainPackagePath = GetSafePackageFolderPath(currentProfile.mainPackage);
             if (!Directory.Exists(mainPackagePath))
             {
                 esPackagesValid = false;
@@ -3524,7 +4360,7 @@ namespace ES.EditorInternal.Installer
             {
                 foreach (var extPackage in currentProfile.extensionPackages.Where(e => e.isSelectedForInstall))
                 {
-                    string extFolderPath = Path.Combine("Assets/Plugins/ES/Editor/Installer/Downloads", extPackage.folderName);
+                    string extFolderPath = GetSafePackageFolderPath(extPackage);
                     if (!Directory.Exists(extFolderPath))
                     {
                         esPackagesValid = false;
@@ -3544,72 +4380,43 @@ namespace ES.EditorInternal.Installer
 
         private void StartInstallation()
         {
-            // 检查主包
-            string mainPackagePath = Path.Combine(downloadsFolderPath, currentProfile.mainPackage.folderName);
-            if (!Directory.Exists(mainPackagePath))
+            if (!TryValidatePackageGitDependencies(currentProfile?.mainPackage, out string mainGitPinError))
             {
-                ShowStatus($"主包文件夹不存在: {mainPackagePath}", MessageType.Error);
+                ShowStatus("主包安装被供应链门禁拒绝：" + mainGitPinError, MessageType.Error);
                 return;
             }
 
-            // 扫描主包文件
-            string[] mainPackageFiles = Directory.GetFiles(mainPackagePath, "*.unitypackage");
-
-            if (mainPackageFiles.Length == 0)
+            var packagesToInstall = new List<ESPackageBase> { currentProfile.mainPackage };
+            foreach (ESExtensionPackage extension in currentProfile.extensionPackages ?? new List<ESExtensionPackage>())
             {
-                ShowStatus("在主包文件夹中未找到任何 .unitypackage 文件", MessageType.Error);
-                return;
-            }
-
-            // 收集所有需要安装的包
-            List<string> allPackageFiles = new List<string>(mainPackageFiles);
-
-            // 检查选中的扩展包
-            List<ESExtensionPackage> selectedExtensions = currentProfile.extensionPackages
-                .Where(ext => ext.isSelectedForInstall)
-                .ToList();
-
-            foreach (var extPackage in selectedExtensions)
-            {
-                string extFolderPath = Path.Combine(downloadsFolderPath, extPackage.folderName);
-                if (Directory.Exists(extFolderPath))
+                if (!extension.isSelectedForInstall) continue;
+                if (!TryValidatePackageGitDependencies(extension, out string extensionGitPinError))
                 {
-                    string[] extPackageFiles = Directory.GetFiles(extFolderPath, "*.unitypackage");
-                    if (extPackageFiles.Length > 0)
-                    {
-                        allPackageFiles.AddRange(extPackageFiles);
-                        ShowStatus($"扩展包 {extPackage.displayName} 已添加到安装列表", MessageType.Info);
-                    }
-                    else
-                    {
-                        ShowStatus($"警告: 扩展包 {extPackage.displayName} 文件夹中未找到Unity Package文件", MessageType.Warning);
-                    }
+                    ShowStatus("扩展包“" + extension.displayName + "”被供应链门禁拒绝：" + extensionGitPinError, MessageType.Error);
+                    return;
                 }
-                else
+                packagesToInstall.Add(extension);
+            }
+
+            var verifiedPackages = new List<VerifiedUnityPackage>();
+            foreach (ESPackageBase package in packagesToInstall)
+            {
+                if (!TryPrepareTrustedUnityPackages(package, out List<VerifiedUnityPackage> prepared, out string trustError))
                 {
-                    ShowStatus($"警告: 扩展包 {extPackage.displayName} 文件夹不存在", MessageType.Warning);
+                    foreach (VerifiedUnityPackage verified in verifiedPackages)
+                        CleanupTrustedStagingDirectoryIfUnused(verified.stagingDirectory);
+                    ShowStatus("批量安装被 .unitypackage 供应链门禁拒绝（" + package.displayName + "）：" + trustError, MessageType.Error);
+                    return;
                 }
+                verifiedPackages.AddRange(prepared);
             }
 
-            if (allPackageFiles.Count == 0)
+            if (!TryQueueTrustedImports(verifiedPackages, "ES 框架批量安装", out string queueError))
             {
-                ShowStatus("没有找到任何可安装的Unity Package文件", MessageType.Error);
-                return;
+                foreach (VerifiedUnityPackage verified in verifiedPackages)
+                    CleanupTrustedStagingDirectoryIfUnused(verified.stagingDirectory);
+                ShowStatus("批量安装未启动：" + queueError, MessageType.Error);
             }
-
-            // 开始导入所有找到的Unity Package文件
-            ShowStatus($"开始导入 {allPackageFiles.Count} 个Unity Package文件 (主包: {mainPackageFiles.Length}, 扩展包: {allPackageFiles.Count - mainPackageFiles.Length})...", MessageType.Info);
-
-            foreach (string packagePath in allPackageFiles)
-            {
-                string fileName = Path.GetFileName(packagePath);
-                ShowStatus($"正在导入: {fileName}", MessageType.Info);
-
-                // 导入Unity Package，显示导入面板 (interactive = true)
-                AssetDatabase.ImportPackage(packagePath, true);
-            }
-
-            ShowStatus($"ES框架安装已开始，共导入 {allPackageFiles.Count} 个Unity Package文件，请在弹出的面板中选择要导入的资源", MessageType.Info);
         }
 
         private async void RefreshAllStatuses()
@@ -3672,7 +4479,7 @@ namespace ES.EditorInternal.Installer
             }
 
             report += $"\n主包: {currentProfile.mainPackage.displayName} v{currentProfile.mainPackage.version}\n";
-            string mainPackagePath = Path.Combine(downloadsFolderPath, currentProfile.mainPackage.folderName);
+            string mainPackagePath = GetSafePackageFolderPath(currentProfile.mainPackage);
             report += $"主包文件夹: {mainPackagePath}\n";
 
             // 统计主包文件
@@ -3697,7 +4504,7 @@ namespace ES.EditorInternal.Installer
                 foreach (var extPackage in currentProfile.extensionPackages)
                 {
                     string status = extPackage.isSelectedForInstall ? "已选择" : "未选择";
-                    string folderPath = Path.Combine(downloadsFolderPath, extPackage.folderName);
+                    string folderPath = GetSafePackageFolderPath(extPackage);
                     report += $"  • {extPackage.displayName} v{extPackage.version} ({status})\n";
                     report += $"    文件夹: {folderPath}\n";
 
@@ -3722,10 +4529,12 @@ namespace ES.EditorInternal.Installer
             // 保存报告到当前文件夹
             string reportFileName = $"ES_Installation_Report_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
             string reportPath = Path.Combine(downloadsFolderPath, reportFileName);
-            File.WriteAllText(reportPath, report);
+            ESManagedFileIO.WriteTextAtomic(reportPath, report, new UTF8Encoding(false), downloadsFolderPath);
             AssetDatabase.Refresh();
 
             ShowStatus($"安装报告已生成: {reportPath}", MessageType.Info);
+            if (EditorUtility.DisplayDialog("安装报告已生成", reportPath, "打开所在文件夹", "关闭"))
+                EditorUtility.RevealInFinder(reportPath);
         }
 
         private void ShowHelp()

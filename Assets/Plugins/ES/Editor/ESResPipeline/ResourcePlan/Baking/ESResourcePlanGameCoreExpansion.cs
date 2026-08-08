@@ -12,6 +12,21 @@ namespace ES.EditorInternal
     /// </summary>
     internal static class ESResourcePlanGameCoreExpansion
     {
+        [MenuItem(MenuItemPathDefine.RESOURCE_DELIVERY_PATH + "ResourcePlan/显式展开并写入 GameCore 快照", false, 35)]
+        private static void BakeAllMenu()
+        {
+            try
+            {
+                int changed = BakeAll();
+                EditorUtility.DisplayDialog("ES ResourcePlan", "已显式展开并写入 " + changed + " 个 ResourcePlan。", "确定");
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                EditorUtility.DisplayDialog("ES ResourcePlan", "展开失败：" + exception.Message, "确定");
+            }
+        }
+
         public static int BakeAll()
         {
             ESAssetCatalogKeyPicker.RefreshForValidation();

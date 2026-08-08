@@ -30,6 +30,21 @@ namespace ES
         [LabelText("启用自定义色板")]
         public bool useCustomPalette = true;
 
+        [Title("全局 Editor 外观")]
+        [LabelText("启用 ES 全局外观")]
+        [Tooltip("为 Unity 公开 Editor 回调和 ES 窗口启用统一视觉；进入 PlayMode 时会自动停用，返回编辑模式后恢复。")]
+        public bool enableGlobalEditorShell = true;
+
+        [Title("交互反馈与动效")]
+        [LabelText("启用编辑器动效")]
+        [Tooltip("控制选中呼吸、状态闪光和轻量扫光。关闭后所有界面仍保持完整信息和颜色语义。")]
+        public bool enableMotion = true;
+
+        [Range(0f, 1f)]
+        [LabelText("动效强度")]
+        [Tooltip("建议保持 0.65～0.85。数值越低越克制，不影响编辑数据。")]
+        public float motionIntensity = 0.78f;
+
         [Title("深色皮肤色板")]
         [ColorUsage(false)]
         [LabelText("层级强调起始色")]
@@ -72,6 +87,9 @@ namespace ES
             density = 1f;
             showSectionSubtitle = true;
             useCustomPalette = true;
+            enableGlobalEditorShell = true;
+            enableMotion = true;
+            motionIntensity = 0.78f;
 
             darkAccentStart = new Color(0.48f, 0.78f, 1f, 0.92f);
             darkAccentEnd = new Color(0.13f, 0.42f, 0.72f, 0.96f);

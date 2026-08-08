@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEngine;
 
@@ -189,6 +190,7 @@ namespace ES
                 for (int i = 0; i < ordered.Count; i++)
                 {
                     ESAssetReleaseUploadPlanFile file = ordered[i];
+                    ValidateUploadSourcePath(request.Plan, file);
                     if (string.IsNullOrWhiteSpace(file.sourcePath) || !System.IO.File.Exists(file.sourcePath))
                         throw new InvalidOperationException("上传源文件不存在：" + file.relativePath);
                     if (new System.IO.FileInfo(file.sourcePath).Length != file.size)
@@ -210,6 +212,45 @@ namespace ES
                 result.Message = exception.Message;
             }
             return result;
+        }
+
+        internal static void ValidateUploadSourcePath(ESAssetReleaseUploadPlan plan, ESAssetReleaseUploadPlanFile file)
+        {
+            if (plan == null || file == null)
+                throw new InvalidOperationException("上传计划条目不能为空。");
+            if (string.IsNullOrWhiteSpace(plan.sourceRoot))
+                throw new InvalidOperationException("上传计划缺少受管 sourceRoot。");
+
+            string root = Path.GetFullPath(plan.sourceRoot)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string source = Path.GetFullPath(file.sourcePath ?? string.Empty);
+            if (!string.Equals(source, root, StringComparison.OrdinalIgnoreCase)
+                && !source.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("上传源文件必须位于计划 sourceRoot 内：" + file.sourcePath);
+
+            string normalizedRelative = (file.relativePath ?? string.Empty).Replace('\\', '/');
+            if (string.IsNullOrWhiteSpace(normalizedRelative)
+                || Path.IsPathRooted(normalizedRelative)
+                || normalizedRelative.Split('/').Any(segment => string.IsNullOrEmpty(segment) || segment == "." || segment == ".." || segment.IndexOf(':') >= 0))
+                throw new InvalidDataException("上传计划 relativePath 包含非法片段：" + file.relativePath);
+
+            if (ContainsExistingReparsePoint(root, source))
+                throw new UnauthorizedAccessException("上传源文件不能穿过 junction/symlink：" + file.sourcePath);
+        }
+
+        private static bool ContainsExistingReparsePoint(string root, string candidate)
+        {
+            string rootFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string current = rootFull;
+            string relative = candidate.Substring(rootFull.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            foreach (string segment in relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            {
+                if (string.IsNullOrEmpty(segment)) continue;
+                current = Path.Combine(current, segment);
+                if (!Directory.Exists(current) && !File.Exists(current)) break;
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return true;
+            }
+            return false;
         }
 
         private static void ValidateTargetPublicRoot(ESAssetReleaseUploadTarget target, ESAssetReleaseUploadPlan plan)
@@ -374,6 +415,15 @@ namespace ES
             if (index >= orderedFiles.Count) return ESEditorLongTaskStepResult.Complete;
             ESAssetReleaseUploadPlanFile file = orderedFiles[index];
             SetProgress(index, orderedFiles.Count, "上传 " + (index + 1) + "/" + orderedFiles.Count + "：" + file.relativePath);
+            try
+            {
+                ESAssetReleaseUploadCoordinator.ValidateUploadSourcePath(request.Plan, file);
+            }
+            catch (Exception exception)
+            {
+                SetFailure(exception);
+                return ESEditorLongTaskStepResult.Fail;
+            }
             if (string.IsNullOrWhiteSpace(file.sourcePath) || string.IsNullOrWhiteSpace(file.relativePath) || !System.IO.File.Exists(file.sourcePath)
                 || new System.IO.FileInfo(file.sourcePath).Length != file.size)
             {

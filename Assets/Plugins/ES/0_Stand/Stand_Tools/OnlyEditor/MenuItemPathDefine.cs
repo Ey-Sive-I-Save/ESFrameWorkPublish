@@ -12,6 +12,7 @@ namespace ES
         public const string SCENE_OBJECTS = "场景与对象";
         public const string RUNTIME_DIAGNOSTICS = "运行时诊断";
         public const string PROJECT_SETTINGS = "项目设置";
+        public const string AUTOMATION = "自动化";
         public const string DEVELOPMENT_MAINTENANCE = "开发与维护";
         public const string INSTALL_INTEGRATION = "安装与集成";
         public const string SAMPLES_TESTS = "示例与测试";
@@ -39,9 +40,11 @@ namespace ES
         public const string PROJECT_ASSETS_PATH = DEVELOPMENT_MAINTENANCE_PATH + "项目资产职责/";
         public const string RESOURCE_WINDOW_PATH = RESOURCE_DELIVERY_PATH + "资源管理/资源管理窗口";
         public const string ASSET_CREATION_PATH = PROJECT_SETTINGS_PATH + "创建数据资产/";
+        public const string ASSET_CREATE_CONTEXT_PATH = "Assets/Create/" + ROOT_PATH;
         public const string INSTALL_DEPENDENCY_PATH = INSTALL_INTEGRATION_PATH + "依赖管理/";
         public const string TEST_TOOLS_PATH = SAMPLES_TESTS_PATH + "编辑器案例/";
         public const string DEBUG_PATH = DEVELOPMENT_MAINTENANCE_PATH + "自检与调试/";
+        public const string AUTOMATION_PATH = ROOT_PATH + AUTOMATION + "/";
         public const string INTERACTION_RUNTIME_PANEL_PATH = RUNTIME_DIAGNOSTICS_PATH + "交互系统/运行时面板";
         public const string STAT_RUNTIME_PANEL_PATH = RUNTIME_DIAGNOSTICS_PATH + "属性系统/运行时面板";
 

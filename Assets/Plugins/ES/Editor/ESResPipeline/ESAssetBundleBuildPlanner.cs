@@ -11,11 +11,13 @@ namespace ES
     {
         public static void PlanAndMark()
         {
+            ESAssetPipelineIO.EnsureAssetBundleReleaseMode();
             string platform = ESAssetPipelineIO.PlatformName;
             string outputFolder = ESAssetPipelineIO.PlanRoot(platform);
             string previousPlanPath = Path.Combine(outputFolder, ESAssetPipelineIO.PlanFileName);
             ESAssetBundleBuildPlan previousPlan = File.Exists(previousPlanPath) ? ESAssetPipelineIO.ReadJson<ESAssetBundleBuildPlan>(previousPlanPath) : null;
             var libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>().Where(item => item != null && item.ContainsBuild).OrderBy(item => item.LibFolderName, StringComparer.Ordinal).ToList();
+            ESAssetReferenceBaker.ValidateSourceStateForBuild(libraries);
             var catalogs = new List<ESAssetLibraryCatalog>();
             var graphNodes = new Dictionary<string, Dictionary<string, ESAssetReferenceNode>>(StringComparer.Ordinal);
             var bakeWarnings = new List<string>();

@@ -48,19 +48,12 @@ namespace ES
         }
 
         private static bool TryResolveAssetIdentity<TData, TAsset>(
-            ESAssetConfigKeyTable<TData, TAsset> table, int enumKey, string stringKey, out ESAssetIdentity identity)
+            ESAssetConfigTableReader<TData, TAsset> table, int enumKey, string stringKey, out ESAssetIdentity identity)
             where TData : ESAssetReferConfigDataBase<TAsset>
             where TAsset : UnityEngine.Object
         {
             identity = default;
-            if (table == null || !table.TryGetRuntimeKey(enumKey, stringKey, out int tableKey))
-                return false;
-
-            if (!table.TryGet(tableKey, out TData configData) || configData == null)
-                return false;
-
-            identity = new ESAssetIdentity(configData.AssetGuid, configData.AssetLocalFileId);
-            return identity.IsValid;
+            return table != null && table.TryResolveAssetIdentity(enumKey, stringKey, out identity);
         }
     }
 }

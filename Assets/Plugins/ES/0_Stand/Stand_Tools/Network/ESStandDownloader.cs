@@ -56,8 +56,17 @@ namespace ES
         public Dictionary<string, string> Headers;
 
         [NonSerialized] private ESDownloadRuntimeStatus runtimeStatus;
+        [NonSerialized] private string temporaryPath;
 
-        public string TemporaryPath => DestinationPath + ".download";
+        public string TemporaryPath
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(temporaryPath))
+                    temporaryPath = DestinationPath + ".download-" + Guid.NewGuid().ToString("N");
+                return temporaryPath;
+            }
+        }
         public ESDownloadRuntimeStatus RuntimeStatus => runtimeStatus ?? (runtimeStatus = new ESDownloadRuntimeStatus());
 
         public static ESDownloadRequest AssetBundle(string url, string destinationPath, string sha256 = null, long size = 0L)
@@ -365,9 +374,9 @@ namespace ES
             CancellationToken cancellationToken = default)
         {
             ValidateRequest(request);
-            string destination = Path.GetFullPath(request.DestinationPath);
-            string temporary = Path.GetFullPath(request.TemporaryPath);
-            Directory.CreateDirectory(Path.GetDirectoryName(destination));
+            string allowedRoot;
+            string destination = ValidateManagedDestination(request.DestinationPath, out allowedRoot);
+            string temporary = ValidateManagedDestination(request.TemporaryPath, out _);
 
             int maxAttempts = Math.Max(1, request.MaxRetryCount);
             ESDownloadRuntimeStatus runtimeStatus = request.RuntimeStatus;
@@ -401,14 +410,14 @@ namespace ES
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (forceRestart && File.Exists(temporary)) File.Delete(temporary);
+                    if (forceRestart) DeleteManagedFileIfExists(temporary, allowedRoot);
                     if (request.EnableResume) forceRestart = false;
 
                     long existingBytes = request.EnableResume && File.Exists(temporary) ? new FileInfo(temporary).Length : 0L;
                     resumedFromBytes = existingBytes;
                     if (knownTotal > 0 && existingBytes > knownTotal)
                     {
-                        File.Delete(temporary);
+                        DeleteManagedFileIfExists(temporary, allowedRoot);
                         existingBytes = 0L;
                     }
 
@@ -463,7 +472,7 @@ namespace ES
                         if (requestedRange && webRequest.responseCode != 206)
                         {
                             ESDownloadTrafficMonitor.AddRequest(attemptNetworkBytes);
-                            if (File.Exists(temporary)) File.Delete(temporary);
+                            DeleteManagedFileIfExists(temporary, allowedRoot);
                             forceRestart = true;
                             attempt--;
                             continue;
@@ -479,18 +488,18 @@ namespace ES
                     if (knownTotal > 0 && actualSize != knownTotal)
                         throw new InvalidDataException($"下载未完成，期望 {knownTotal}，实际 {actualSize}");
 
-                    string sha256 = null;
-                    if (!string.IsNullOrWhiteSpace(request.ExpectedSha256))
-                    {
-                        sha256 = await ComputeSha256Async(temporary, cancellationToken);
-                        if (!string.Equals(sha256, NormalizeHash(request.ExpectedSha256), StringComparison.OrdinalIgnoreCase))
-                            throw new InvalidDataException("SHA-256 校验失败");
-                    }
+                    string sha256 = await ComputeSha256Async(temporary, cancellationToken);
+                    if (!string.IsNullOrWhiteSpace(request.ExpectedSha256)
+                        && !string.Equals(sha256, NormalizeHash(request.ExpectedSha256), StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("SHA-256 校验失败");
 
-                    CommitFile(temporary, destination);
+                    CommitFile(temporary, destination, allowedRoot);
+                    string committedSha256 = await ComputeSha256Async(destination, cancellationToken);
+                    if (!string.Equals(sha256, committedSha256, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("下载提交后 SHA-256 校验失败");
                     result.State = ESDownloadState.Completed;
                     result.FileSize = FileLength(destination);
-                    result.Sha256 = sha256;
+                    result.Sha256 = committedSha256;
                     ESDownloadTrafficMonitor.AddRequest(attemptNetworkBytes);
                     ESDownloadTrafficMonitor.AddCommitted(attemptNetworkBytes);
                     RecordAttempt(result, attempt, ESDownloadState.Completed, responseCode, attemptNetworkBytes, resumedFromBytes, attemptWatch.Elapsed.TotalSeconds, 0d, null);
@@ -512,7 +521,7 @@ namespace ES
                     ESDownloadTrafficMonitor.AddRequest(attemptNetworkBytes);
                     if (ex is InvalidDataException)
                     {
-                        if (File.Exists(temporary)) File.Delete(temporary);
+                        DeleteManagedFileIfExists(temporary, allowedRoot);
                         forceRestart = true;
                     }
                     double retryDelay = attempt < maxAttempts ? Math.Max(0d, request.RetryDelaySeconds) * attempt : 0d;
@@ -787,8 +796,9 @@ namespace ES
         public static void DeleteTemporaryFile(ESDownloadRequest request)
         {
             if (request == null || string.IsNullOrWhiteSpace(request.DestinationPath)) return;
-            string path = Path.GetFullPath(request.TemporaryPath);
-            if (File.Exists(path)) File.Delete(path);
+            string allowedRoot;
+            string path = ValidateManagedDestination(request.TemporaryPath, out allowedRoot);
+            DeleteManagedFileIfExists(path, allowedRoot);
         }
 
         private static async UniTask<long> TryGetRemoteSizeAsync(ESDownloadRequest request, CancellationToken cancellationToken)
@@ -847,11 +857,74 @@ namespace ES
             }
         }
 
-        private static void CommitFile(string temporary, string destination)
+        private static void CommitFile(string temporary, string destination, string allowedRoot)
         {
+            ESManagedFileIO.EnsurePath(temporary, true, allowedRoot);
             if (!File.Exists(temporary)) throw new FileNotFoundException("下载临时文件不存在", temporary);
-            if (File.Exists(destination)) File.Delete(destination);
-            File.Move(temporary, destination);
+            ESManagedFileIO.EnsurePath(destination, false, allowedRoot);
+            if (!File.Exists(destination))
+            {
+                File.Move(temporary, destination);
+            }
+            else
+            {
+                // 优先使用原子替换；平台不支持或文件系统拒绝替换时，保留旧文件并走可恢复的移动提交。
+                try
+                {
+                    File.Replace(temporary, destination, null);
+                }
+                catch (PlatformNotSupportedException)
+                {
+                    PromoteWithBackup(temporary, destination, allowedRoot);
+                }
+                catch (IOException)
+                {
+                    PromoteWithBackup(temporary, destination, allowedRoot);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    PromoteWithBackup(temporary, destination, allowedRoot);
+                }
+            }
+
+            ESManagedFileIO.EnsurePath(destination, true, allowedRoot);
+            if (!File.Exists(destination))
+                throw new IOException("下载提交后目标文件不存在：" + destination);
+        }
+
+        private static void PromoteWithBackup(string temporary, string destination, string allowedRoot)
+        {
+            string backup = destination + ".backup-" + Guid.NewGuid().ToString("N");
+            ESManagedFileIO.EnsurePath(backup, false, allowedRoot);
+            File.Move(destination, backup);
+            bool promoted = false;
+            try
+            {
+                File.Move(temporary, destination);
+                ESManagedFileIO.EnsurePath(destination, true, allowedRoot);
+                promoted = true;
+            }
+            catch (Exception commitException)
+            {
+                try
+                {
+                    if (!File.Exists(destination) && File.Exists(backup))
+                        File.Move(backup, destination);
+                }
+                catch (Exception restoreException)
+                {
+                    throw new AggregateException("下载提交失败且旧文件恢复失败。", commitException, restoreException);
+                }
+                throw;
+            }
+            finally
+            {
+                if (promoted && File.Exists(backup))
+                {
+                    try { File.Delete(backup); }
+                    catch { /* 保留备份现场，不覆盖已成功提交结果。 */ }
+                }
+            }
         }
 
         private static void ApplyHeaders(UnityWebRequest request, Dictionary<string, string> headers)
@@ -911,6 +984,50 @@ namespace ES
             if (request == null) throw new ArgumentNullException(nameof(request));
             if (string.IsNullOrWhiteSpace(request.Url)) throw new ArgumentException("下载 URL 不能为空", nameof(request));
             if (string.IsNullOrWhiteSpace(request.DestinationPath)) throw new ArgumentException("目标文件路径不能为空", nameof(request));
+        }
+
+        private static string ValidateManagedDestination(string path, out string allowedRoot)
+        {
+            allowedRoot = null;
+            if (string.IsNullOrWhiteSpace(path))
+                throw new ArgumentException("下载目标路径不能为空。", nameof(path));
+            if (ContainsParentTraversal(path))
+                throw new UnauthorizedAccessException("下载目标路径不得包含 .. 段：" + path);
+
+            string candidate = ESManagedFileIO.NormalizeFullPath(path);
+            string[] roots = { UnityEngine.Application.persistentDataPath, UnityEngine.Application.temporaryCachePath };
+            foreach (string root in roots)
+            {
+                if (string.IsNullOrWhiteSpace(root))
+                    continue;
+                string normalizedRoot = ESManagedFileIO.NormalizeFullPath(root);
+                if (!ESManagedFileIO.IsWithinRoot(candidate, normalizedRoot)
+                    || string.Equals(candidate, normalizedRoot, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string directory = Path.GetDirectoryName(candidate);
+                if (string.IsNullOrEmpty(directory))
+                    throw new InvalidDataException("下载目标目录无效：" + path);
+                Directory.CreateDirectory(directory);
+                ESManagedFileIO.EnsurePath(candidate, false, normalizedRoot);
+                allowedRoot = normalizedRoot;
+                return candidate;
+            }
+
+            throw new UnauthorizedAccessException("下载目标必须位于 persistentDataPath 或 temporaryCachePath：" + path);
+        }
+
+        private static void DeleteManagedFileIfExists(string path, string allowedRoot)
+        {
+            if (File.Exists(path))
+                ESManagedFileIO.DeleteFile(path, allowedRoot);
+        }
+
+        private static bool ContainsParentTraversal(string path)
+        {
+            foreach (string segment in path.Replace('\\', '/').Split('/'))
+                if (segment == "..") return true;
+            return false;
         }
 
         private static string NormalizeHash(string hash) => hash.Replace("-", string.Empty).Trim().ToLowerInvariant();

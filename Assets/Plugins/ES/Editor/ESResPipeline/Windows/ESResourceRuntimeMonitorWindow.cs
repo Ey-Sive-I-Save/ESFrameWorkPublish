@@ -84,6 +84,17 @@ namespace ES
             DrawSectionTitle("Bootstrap / 下载");
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
+                ESGlobalResSetting settings = ESGlobalResSetting.Instance;
+                EditorGUILayout.LabelField("配置运行模式", settings != null ? settings.AssetRunMode.ToString() : "未配置");
+                if (ESAssetRunModeSession.TryGetLockedModes(out ESAssetRunMode configuredMode, out ESAssetRunMode effectiveMode))
+                {
+                    EditorGUILayout.LabelField("会话有效模式", effectiveMode.ToString());
+                    if (configuredMode != effectiveMode)
+                        EditorGUILayout.HelpBox("配置模式与会话有效模式不一致；资源系统禁止静默切换，需立即检查初始化路径。", MessageType.Error);
+                }
+                else
+                    EditorGUILayout.LabelField("会话有效模式", "尚未锁定");
+
                 ESResManager manager = ESResManager.Instance;
                 EditorGUILayout.LabelField("Manager", manager != null ? "存在" : "未创建");
                 EditorGUILayout.LabelField("Bootstrap 状态", manager != null ? manager.State.ToString() : "不可用");
@@ -118,6 +129,10 @@ namespace ES
                         EditorGUILayout.LabelField("当前传输", EmptyAsDash(snapshot.Subject));
                         EditorGUILayout.LabelField("速度 / ETA", FormatBytes((long)snapshot.SpeedBytesPerSecond) + "/s / " + snapshot.EstimatedRemainingSeconds + "s");
                         EditorGUILayout.LabelField("重试", snapshot.RetryAttempt.ToString());
+                        if (snapshot.State == ESRuntimeReleaseTransferState.Failed || snapshot.State == ESRuntimeReleaseTransferState.Cancelled)
+                            EditorGUILayout.HelpBox(
+                                string.IsNullOrWhiteSpace(snapshot.TerminalMessage) ? "资源传输已结束，但没有提供终态原因。" : snapshot.TerminalMessage,
+                                snapshot.State == ESRuntimeReleaseTransferState.Failed ? MessageType.Error : MessageType.Warning);
                     }
                 }
                 else
@@ -144,11 +159,29 @@ namespace ES
                 EditorGUILayout.LabelField("Provider 切换中", BoolText(diagnostics.IsProviderTransitioning));
                 EditorGUILayout.LabelField("Provider", EmptyAsDash(diagnostics.ProviderType));
                 EditorGUILayout.LabelField("Provider 在途请求", BoolText(diagnostics.ProviderHasPendingOperations));
+                if (ESEditorResourceSessionBootstrap.IsEditorDirectCatalogDegraded)
+                {
+                    EditorGUILayout.HelpBox(
+                        "EditorDirect 已进入降级模式：直接 ESAssetRefer 可用，但 ConfigKey / ConfigData 未完成注入。",
+                        MessageType.Error);
+                    EditorGUILayout.SelectableLabel(
+                        ESEditorResourceSessionBootstrap.EditorDirectCatalogDiagnostic,
+                        EditorStyles.textArea,
+                        GUILayout.MinHeight(50f));
+                }
                 EditorGUILayout.LabelField("活跃 Scope", diagnostics.LiveScopeCount.ToString());
                 EditorGUILayout.LabelField("有请求的 Scope", diagnostics.PendingScopeCount.ToString());
+                EditorGUILayout.LabelField("Registry Scope", diagnostics.RegisteredScopeCount.ToString());
+                EditorGUILayout.LabelField("隐式创建 Registry", diagnostics.ImplicitRegisteredScopeCount.ToString());
+                EditorGUILayout.LabelField("正在关闭 Registry", diagnostics.ClosingRegisteredScopeCount.ToString());
                 EditorGUILayout.LabelField("Scope 已持有资产", diagnostics.LoadedAssetCount.ToString());
                 EditorGUILayout.LabelField("Scope 在途资产", diagnostics.PendingAssetCount.ToString());
                 EditorGUILayout.LabelField("Resident Scope", diagnostics.HasResidentScope ? "已创建" : "未创建");
+                if (diagnostics.HasUnloadFailure)
+                {
+                    EditorGUILayout.HelpBox("AssetBundle 卸载出现异常，Provider 已进入阻断状态；失败次数：" + diagnostics.UnloadFailureCount, MessageType.Error);
+                    EditorGUILayout.SelectableLabel(diagnostics.LastUnloadError, EditorStyles.textArea, GUILayout.MinHeight(50f));
+                }
 
                 ESRuntimeDataAssetLoadingService loadingService = ESGameManager.RuntimeData != null
                     ? ESGameManager.RuntimeData.ExistingAssetLoadingService
@@ -602,6 +635,20 @@ namespace ES
             builder.AppendLine("Time=" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"));
             builder.AppendLine("PlayMode=" + EditorApplication.isPlaying);
             builder.AppendLine("PersistentDataPath=" + Application.persistentDataPath);
+            ESGlobalResSetting settings = ESGlobalResSetting.Instance;
+            builder.AppendLine("RunMode.Configured=" + (settings != null ? settings.AssetRunMode.ToString() : "Unavailable"));
+            if (ESAssetRunModeSession.TryGetLockedModes(out ESAssetRunMode configuredMode, out ESAssetRunMode effectiveMode))
+            {
+                builder.AppendLine("RunMode.SessionConfigured=" + configuredMode);
+                builder.AppendLine("RunMode.Effective=" + effectiveMode);
+                builder.AppendLine("RunMode.Mismatch=" + (configuredMode != effectiveMode));
+            }
+            else
+            {
+                builder.AppendLine("RunMode.SessionConfigured=Unlocked");
+                builder.AppendLine("RunMode.Effective=Unavailable");
+                builder.AppendLine("RunMode.Mismatch=false");
+            }
 
             ESResManager manager = ESResManager.Instance;
             builder.AppendLine("Bootstrap.Manager=" + (manager != null));
@@ -631,6 +678,7 @@ namespace ES
                     builder.AppendLine("Release.TransferSpeed=" + snapshot.SpeedBytesPerSecond);
                     builder.AppendLine("Release.TransferETA=" + snapshot.EstimatedRemainingSeconds);
                     builder.AppendLine("Release.TransferRetry=" + snapshot.RetryAttempt);
+                    builder.AppendLine("Release.TransferTerminalMessage=" + (snapshot.TerminalMessage ?? string.Empty));
                 }
             }
             if (manager != null && !string.IsNullOrWhiteSpace(manager.LastBootstrapError))
@@ -641,11 +689,19 @@ namespace ES
             builder.AppendLine("Assets.ProviderTransitioning=" + assets.IsProviderTransitioning);
             builder.AppendLine("Assets.Provider=" + assets.ProviderType);
             builder.AppendLine("Assets.ProviderPending=" + assets.ProviderHasPendingOperations);
+            builder.AppendLine("EditorDirect.CatalogDegraded=" + ESEditorResourceSessionBootstrap.IsEditorDirectCatalogDegraded);
+            builder.AppendLine("EditorDirect.CatalogDiagnostic=" + (ESEditorResourceSessionBootstrap.EditorDirectCatalogDiagnostic ?? string.Empty).Replace('\r', ' ').Replace('\n', ' '));
             builder.AppendLine("Assets.LiveScopes=" + assets.LiveScopeCount);
             builder.AppendLine("Assets.PendingScopes=" + assets.PendingScopeCount);
+            builder.AppendLine("Assets.RegisteredScopes=" + assets.RegisteredScopeCount);
+            builder.AppendLine("Assets.ImplicitRegisteredScopes=" + assets.ImplicitRegisteredScopeCount);
+            builder.AppendLine("Assets.ClosingRegisteredScopes=" + assets.ClosingRegisteredScopeCount);
             builder.AppendLine("Assets.LoadedInScopes=" + assets.LoadedAssetCount);
             builder.AppendLine("Assets.PendingInScopes=" + assets.PendingAssetCount);
             builder.AppendLine("Assets.ResidentScope=" + assets.HasResidentScope);
+            builder.AppendLine("Assets.HasUnloadFailure=" + assets.HasUnloadFailure);
+            builder.AppendLine("Assets.UnloadFailureCount=" + assets.UnloadFailureCount);
+            builder.AppendLine("Assets.LastUnloadError=" + (assets.LastUnloadError ?? string.Empty).Replace('\r', ' ').Replace('\n', ' '));
 
             ESResourcePlanRuntimeService planService = ESGameManager.ResourcePlans;
             if (planService == null)

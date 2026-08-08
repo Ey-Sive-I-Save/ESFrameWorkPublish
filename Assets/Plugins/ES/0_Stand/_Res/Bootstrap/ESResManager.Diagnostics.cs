@@ -5,7 +5,7 @@ namespace ES
         private ESRuntimeReleaseDownloader lastReleaseDownloader;
         private string lastBootstrapError = string.Empty;
 
-        public ESRuntimeReleaseDownloader DiagnosticReleaseDownloader => releaseDownloader ?? lastReleaseDownloader;
+        public ESRuntimeReleaseDownloader DiagnosticReleaseDownloader => bootstrapRun?.Downloader ?? lastReleaseDownloader;
         public string LastBootstrapError => lastBootstrapError ?? string.Empty;
     }
 }

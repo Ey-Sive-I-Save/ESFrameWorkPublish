@@ -633,7 +633,6 @@ namespace ES
                 {
                     return paths;
                 }
-
                 foreach (string file in allFiles)
                 {
                     string relativePath = "Assets" + file.Replace(Application.dataPath, "").Replace('\\', '/');

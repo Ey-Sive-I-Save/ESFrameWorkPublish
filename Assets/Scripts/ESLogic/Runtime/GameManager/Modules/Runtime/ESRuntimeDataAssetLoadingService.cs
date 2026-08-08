@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
-using UnityEngine;
 
 namespace ES
 {
@@ -38,15 +38,25 @@ namespace ES
             try
             {
                 QuiesceScopesAndPlans(runtimeProvider != null);
+                ESRuntimeDataAsset.InvalidateAssetConfigTableBinding();
+                if (ESRuntimeDataAsset.ActiveAssetConfigReaderCount != 0)
+                    throw new InvalidOperationException("[ESRes][Provider] 仍有 Asset ConfigTable Payload Lease，不能同步切换 Provider。");
                 DisposeCurrentProviderCore();
                 AttachProvider(provider);
             }
-            catch
+            catch (Exception exception)
             {
-                if (ReferenceEquals(provider, runtimeProvider))
-                    DisposeCurrentProviderCore();
-                else
-                    provider.Dispose();
+                try
+                {
+                    if (ReferenceEquals(provider, runtimeProvider))
+                        DisposeCurrentProviderCore();
+                    else
+                        provider.Dispose();
+                }
+                catch (Exception cleanupException)
+                {
+                    throw new AggregateException("[ESRes][Provider] 初始化失败后的 Provider 清理也失败。", exception, cleanupException);
+                }
                 throw;
             }
             finally
@@ -72,18 +82,38 @@ namespace ES
             try
             {
                 QuiesceScopesAndPlans(runtimeProvider != null);
+                ESRuntimeDataAsset.InvalidateAssetConfigTableBinding();
                 if (runtimeProvider != null)
+                {
                     await ESAssets.WaitForPendingOperationsAsync(cancellationToken);
+                    await ESRuntimeDataAsset.WaitForAssetConfigReadersAsync(cancellationToken);
+                }
                 DisposeCurrentProviderCore();
-                rebuildTablesBeforeAttach?.Invoke();
+                if (rebuildTablesBeforeAttach != null)
+                {
+                    ESRuntimeDataAsset.BeginProviderCandidateBuild();
+                    try { rebuildTablesBeforeAttach(); }
+                    catch
+                    {
+                        ESRuntimeDataAsset.CancelProviderCandidateBuild();
+                        throw;
+                    }
+                }
                 AttachProvider(provider);
             }
-            catch
+            catch (Exception exception)
             {
-                if (ReferenceEquals(provider, runtimeProvider))
-                    DisposeCurrentProviderCore();
-                else
-                    provider.Dispose();
+                try
+                {
+                    if (ReferenceEquals(provider, runtimeProvider))
+                        DisposeCurrentProviderCore();
+                    else
+                        provider.Dispose();
+                }
+                catch (Exception cleanupException)
+                {
+                    throw new AggregateException("[ESRes][Provider] 异步初始化失败后的 Provider 清理也失败。", exception, cleanupException);
+                }
                 throw;
             }
             finally
@@ -101,6 +131,9 @@ namespace ES
             try
             {
                 QuiesceScopesAndPlans(false);
+                ESRuntimeDataAsset.InvalidateAssetConfigTableBinding();
+                if (ESRuntimeDataAsset.ActiveAssetConfigReaderCount != 0)
+                    throw new InvalidOperationException("[ESRes][Provider] 仍有 Asset ConfigTable Payload Lease，不能同步销毁 Provider。");
                 DisposeCurrentProviderCore();
             }
             finally
@@ -117,19 +150,19 @@ namespace ES
             if (ESAssets.HasPendingOperations)
                 throw new InvalidOperationException("[ESRes][SafePoint] 当前仍有资源请求，请使用 UnloadAllAssetsAtSafePointAsync。");
 
-            bool loadersReset = false;
             ESAssets.BeginProviderTransition();
             try
             {
                 QuiesceScopesAndPlans(false);
-                ESRuntimeDataAsset.ResetAllAssetLoaders();
-                loadersReset = true;
+                if (ESRuntimeDataAsset.ActiveAssetConfigReaderCount != 0)
+                    throw new InvalidOperationException("[ESRes][SafePoint] 仍有 Asset ConfigTable Payload Lease，请使用异步安全点并等待调用方释放。");
+                ESRuntimeDataAsset.RotateGenerationAtSafePoint(runtimeProvider, ESAssets.RuntimeBackendGeneration);
+                if (ESRuntimeDataAsset.ActiveAssetConfigReaderCount != 0)
+                    throw new InvalidOperationException("[ESRes][SafePoint] 代际交换期间出现新的 Asset ConfigTable 读者，拒绝提前卸载 Provider。");
                 ESAssets.UnloadAllAtSafePoint();
             }
             finally
             {
-                if (loadersReset && runtimeProvider != null)
-                    BindAllTables(runtimeProvider);
                 ESAssets.EndProviderTransition();
             }
         }
@@ -140,20 +173,18 @@ namespace ES
             if (!initialized || runtimeProvider == null)
                 return;
 
-            bool loadersReset = false;
             ESAssets.BeginProviderTransition();
             try
             {
                 QuiesceScopesAndPlans(false);
                 await ESAssets.WaitForPendingOperationsAsync(cancellationToken);
-                ESRuntimeDataAsset.ResetAllAssetLoaders();
-                loadersReset = true;
+                await ESRuntimeDataAsset.WaitForAssetConfigReadersAsync(cancellationToken);
+                ESRuntimeDataAsset.RotateGenerationAtSafePoint(runtimeProvider, ESAssets.RuntimeBackendGeneration);
+                await ESRuntimeDataAsset.WaitForAssetConfigReadersAsync(cancellationToken);
                 await ESAssets.UnloadAllAtSafePointAsync(cancellationToken);
             }
             finally
             {
-                if (loadersReset && runtimeProvider != null)
-                    BindAllTables(runtimeProvider);
                 ESAssets.EndProviderTransition();
             }
         }
@@ -182,45 +213,41 @@ namespace ES
 
         private void DisposeCurrentProviderCore()
         {
-            ESRuntimeDataAsset.ResetAllAssetLoaders();
-            ESRuntimeAssetCatalog.Deactivate(assetCatalog);
-            assetCatalog = null;
-            ESAssets.DetachRuntimeBackend(runtimeProvider);
-            runtimeProvider?.Dispose();
+            IESAssetRuntimeProvider provider = runtimeProvider;
+            ESRuntimeAssetCatalog catalog = assetCatalog;
+
+            // Invalidate the service before invoking cleanup callbacks. If any cleanup
+            // callback throws, callers must observe a non-ready service instead of a stale
+            // RuntimeBackend that looks usable after a failed transition.
             runtimeProvider = null;
+            assetCatalog = null;
             initialized = false;
+            var failures = new List<Exception>(2);
+            try { ESRuntimeDataAsset.DetachRuntimeProvider(provider); }
+            catch (Exception exception) { failures.Add(exception); }
+            try { ESRuntimeAssetCatalog.Deactivate(catalog); }
+            catch (Exception exception) { failures.Add(exception); }
+            try { ESAssets.DetachRuntimeBackend(provider); }
+            catch (Exception exception) { failures.Add(exception); }
+            try { provider?.Dispose(); }
+            catch (Exception exception) { failures.Add(exception); }
+
+            if (failures.Count == 1)
+                throw failures[0];
+            if (failures.Count > 1)
+                throw new AggregateException("[ESRes][Provider] Provider 清理过程中发生多个异常。", failures);
         }
 
         private void AttachProvider(IESAssetRuntimeProvider provider)
         {
             runtimeProvider = provider;
-            BindAllTables(runtimeProvider);
+            ESAssets.AttachRuntimeBackend(runtimeProvider);
+            ESRuntimeDataAsset.AttachRuntimeProvider(
+                runtimeProvider,
+                ESAssets.RuntimeBackendGeneration == int.MaxValue ? 1 : ESAssets.RuntimeBackendGeneration + 1);
             assetCatalog = new ESRuntimeAssetCatalog();
             ESRuntimeAssetCatalog.Activate(assetCatalog);
-            ESAssets.AttachRuntimeBackend(runtimeProvider);
             initialized = true;
-        }
-
-        private static void BindAllTables(IESAssetRuntimeProvider provider)
-        {
-            ESRuntimeDataAsset.Prefabs.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferPrefabConfigData, GameObject>(provider));
-            ESRuntimeDataAsset.Sprites.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferSpriteConfigData, Sprite>(provider));
-            ESRuntimeDataAsset.AudioClips.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferAudioClipConfigData, AudioClip>(provider));
-            ESRuntimeDataAsset.AnimationClips.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferAnimationClipConfigData, AnimationClip>(provider));
-            ESRuntimeDataAsset.AnimatorControllers.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferAnimatorControllerConfigData, RuntimeAnimatorController>(provider));
-            ESRuntimeDataAsset.Materials.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferMaterialConfigData, Material>(provider));
-            ESRuntimeDataAsset.Meshes.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferMeshConfigData, Mesh>(provider));
-            ESRuntimeDataAsset.Scenes.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferSceneConfigData, UnityEngine.Object>(provider));
-            ESRuntimeDataAsset.Textures.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferTextureConfigData, Texture>(provider));
-            ESRuntimeDataAsset.Texture2Ds.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferTexture2DConfigData, Texture2D>(provider));
-            ESRuntimeDataAsset.SpriteAtlases.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferSpriteAtlasConfigData, UnityEngine.U2D.SpriteAtlas>(provider));
-            ESRuntimeDataAsset.Avatars.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferAvatarConfigData, Avatar>(provider));
-            ESRuntimeDataAsset.PlayableAssets.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferPlayableAssetConfigData, UnityEngine.Playables.PlayableAsset>(provider));
-            ESRuntimeDataAsset.ScriptableObjects.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferScriptableObjectConfigData, ScriptableObject>(provider));
-            ESRuntimeDataAsset.TimelineAssets.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferTimelineAssetConfigData, UnityEngine.Object>(provider));
-            ESRuntimeDataAsset.VideoClips.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferVideoClipConfigData, UnityEngine.Video.VideoClip>(provider));
-            ESRuntimeDataAsset.TerrainDatas.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferTerrainDataConfigData, TerrainData>(provider));
-            ESRuntimeDataAsset.RawAssets.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferRawConfigData, TextAsset>(provider));
         }
     }
 }

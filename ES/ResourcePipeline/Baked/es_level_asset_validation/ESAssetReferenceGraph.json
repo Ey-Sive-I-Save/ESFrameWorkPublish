@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "libraryName": "关卡资源卸载验收库",
   "libraryFolder": "es_level_asset_validation",
-  "generatedUtc": "2026-07-26T15:35:43.3077996Z",
+  "generatedUtc": "2026-08-07T19:03:26.5529582Z",
   "roots": [
     {
       "identity": {
@@ -416,7 +416,7 @@
       },
       "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Data/ESLevelAssetValidationGameCore.asset",
       "assetTypeName": "ES.ESLevelAssetValidationGameCore",
-      "dependencyHash": "28e4db790f02d1f295e37757ba324e31",
+      "dependencyHash": "2f6b33b617bd558e943faebda5c78dfc",
       "editorOnly": false,
       "markable": true,
       "ownerLibraryFolders": [
@@ -426,7 +426,7 @@
         "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Data/Level01_Blocks_ResourcePlan.asset",
         "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Data/Level02_Spheres_ResourcePlan.asset",
         "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Data/Level03_Cylinders_ResourcePlan.asset",
-        "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESLevelAssetValidationGameCore.cs"
+        "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Data/ESLevelAssetValidationGameCore.cs"
       ]
     },
     {
@@ -439,7 +439,7 @@
       },
       "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Data/Level01_Blocks_ResourcePlan.asset",
       "assetTypeName": "ES.ESResourcePlanInfo",
-      "dependencyHash": "5005fbe88a843ea687e87bf2064d4ea7",
+      "dependencyHash": "cfff6304829acca98cf9dbf8184e410e",
       "editorOnly": false,
       "markable": true,
       "ownerLibraryFolders": [],
@@ -457,7 +457,7 @@
       },
       "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Data/Level02_Spheres_ResourcePlan.asset",
       "assetTypeName": "ES.ESResourcePlanInfo",
-      "dependencyHash": "4932c99eff3684e293f3e3a09e49fbb6",
+      "dependencyHash": "24bca1900bbd6b12982c3c358578eb4d",
       "editorOnly": false,
       "markable": true,
       "ownerLibraryFolders": [],
@@ -475,7 +475,7 @@
       },
       "assetPath": "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Data/Level03_Cylinders_ResourcePlan.asset",
       "assetTypeName": "ES.ESResourcePlanInfo",
-      "dependencyHash": "302875177e1489fa0d8cc865c204fbcb",
+      "dependencyHash": "5665fd559ed988083c270c910d1aff13",
       "editorOnly": false,
       "markable": true,
       "ownerLibraryFolders": [],
@@ -879,7 +879,7 @@
       ],
       "directDependencies": [
         "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Blue.mat",
-        "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveDepth.cs"
+        "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Components/ESHotUpdateLoopMoveDepth.cs"
       ]
     },
     {
@@ -900,7 +900,7 @@
       ],
       "directDependencies": [
         "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Cyan.mat",
-        "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveDepth.cs"
+        "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Components/ESHotUpdateLoopMoveDepth.cs"
       ]
     },
     {
@@ -921,7 +921,7 @@
       ],
       "directDependencies": [
         "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Green.mat",
-        "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveVertical.cs"
+        "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Components/ESHotUpdateLoopMoveVertical.cs"
       ]
     },
     {
@@ -942,7 +942,7 @@
       ],
       "directDependencies": [
         "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Magenta.mat",
-        "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveVertical.cs"
+        "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Components/ESHotUpdateLoopMoveVertical.cs"
       ]
     },
     {
@@ -963,7 +963,7 @@
       ],
       "directDependencies": [
         "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Red.mat",
-        "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveHorizontal.cs"
+        "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Components/ESHotUpdateLoopMoveHorizontal.cs"
       ]
     },
     {
@@ -984,7 +984,7 @@
       ],
       "directDependencies": [
         "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials/Level01_Blocks/Level01_Blocks_Yellow.mat",
-        "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveHorizontal.cs"
+        "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Components/ESHotUpdateLoopMoveHorizontal.cs"
       ]
     },
     {
@@ -1305,13 +1305,29 @@
     },
     {
       "identity": {
+        "guid": "47d54198f048049438a590333b39677e",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "47d54198f048049438a590333b39677e"
+      },
+      "assetPath": "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESResourcePlanInfo.cs",
+      "assetTypeName": "UnityEditor.MonoScript",
+      "dependencyHash": "dd1690a5fe68d3ed92151cc3c819ffa7",
+      "editorOnly": true,
+      "markable": false,
+      "ownerLibraryFolders": [],
+      "directDependencies": []
+    },
+    {
+      "identity": {
         "guid": "d8c760a084355f03b60e5d6984203003",
         "localFileId": 0,
         "IsValid": true,
         "IsSubAsset": false,
         "Key": "d8c760a084355f03b60e5d6984203003"
       },
-      "assetPath": "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveDepth.cs",
+      "assetPath": "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Components/ESHotUpdateLoopMoveDepth.cs",
       "assetTypeName": "UnityEditor.MonoScript",
       "dependencyHash": "c212ddd0ac3aca677c3ace18dffaf49f",
       "editorOnly": true,
@@ -1327,7 +1343,7 @@
         "IsSubAsset": false,
         "Key": "b6a54f8e62134de1b4ec3b47620f1001"
       },
-      "assetPath": "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveHorizontal.cs",
+      "assetPath": "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Components/ESHotUpdateLoopMoveHorizontal.cs",
       "assetTypeName": "UnityEditor.MonoScript",
       "dependencyHash": "b3d58763fbe2d05e45dec00d8a209f70",
       "editorOnly": true,
@@ -1343,7 +1359,7 @@
         "IsSubAsset": false,
         "Key": "c7b65f9f73244ef2a5fd4c5873102002"
       },
-      "assetPath": "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveVertical.cs",
+      "assetPath": "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Components/ESHotUpdateLoopMoveVertical.cs",
       "assetTypeName": "UnityEditor.MonoScript",
       "dependencyHash": "0b2471d1595cb9dd02b3845e3a25d1e8",
       "editorOnly": true,
@@ -1359,25 +1375,9 @@
         "IsSubAsset": false,
         "Key": "e727a53253e67dd4f8d71dd69501093b"
       },
-      "assetPath": "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESLevelAssetValidationGameCore.cs",
+      "assetPath": "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Data/ESLevelAssetValidationGameCore.cs",
       "assetTypeName": "UnityEditor.MonoScript",
-      "dependencyHash": "037d7d7a7f6efcc668c58d9d3390d875",
-      "editorOnly": true,
-      "markable": false,
-      "ownerLibraryFolders": [],
-      "directDependencies": []
-    },
-    {
-      "identity": {
-        "guid": "47d54198f048049438a590333b39677e",
-        "localFileId": 0,
-        "IsValid": true,
-        "IsSubAsset": false,
-        "Key": "47d54198f048049438a590333b39677e"
-      },
-      "assetPath": "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESResourcePlanInfo.cs",
-      "assetTypeName": "UnityEditor.MonoScript",
-      "dependencyHash": "86ae5ee7631204f5912640814bdf4cad",
+      "dependencyHash": "403288a623517dd565b765df6e091a92",
       "editorOnly": true,
       "markable": false,
       "ownerLibraryFolders": [],
@@ -1425,7 +1425,7 @@
       },
       "assetPath": "Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader",
       "assetTypeName": "UnityEngine.Shader",
-      "dependencyHash": "f0a1ea784e8d8eb98e10c50c30c0b7f8",
+      "dependencyHash": "d1a0ab12d74301f1d679cdaf457957a8",
       "editorOnly": false,
       "markable": false,
       "ownerLibraryFolders": [],
@@ -1435,11 +1435,11 @@
   "errors": [],
   "warnings": [
     "引用图已标记 EditorOnly 依赖：Packages/com.unity.render-pipelines.universal/Editor/AssetVersion.cs",
-    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveDepth.cs",
-    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveVertical.cs",
-    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESHotUpdateLoopMoveHorizontal.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Components/ESHotUpdateLoopMoveDepth.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Components/ESHotUpdateLoopMoveVertical.cs",
+    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Components/ESHotUpdateLoopMoveHorizontal.cs",
     "引用图已标记 EditorOnly 依赖：Packages/com.unity.render-pipelines.universal/Runtime/UniversalAdditionalLightData.cs",
     "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESResourcePlanInfo.cs",
-    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESLevelAssetValidationGameCore.cs"
+    "引用图已标记 EditorOnly 依赖：Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Data/ESLevelAssetValidationGameCore.cs"
   ]
 }

@@ -61,11 +61,11 @@ namespace ES.Tests
                 Assert.That(cue.TryValidate(out _), Is.False);
 
                 cue.variants[0].weight = 1f;
-                cue.spatialProfile.enableDoppler = true;
-                cue.spatialProfile.dopplerLevel = float.NaN;
+                cue.spatialSettings.enableDoppler = true;
+                cue.spatialSettings.dopplerLevel = float.NaN;
                 Assert.That(cue.TryValidate(out _), Is.False);
 
-                cue.spatialProfile.dopplerLevel = 1f;
+                cue.spatialSettings.dopplerLevel = 1f;
                 cue.playbackStartSeconds = float.NaN;
                 Assert.That(cue.TryValidate(out _), Is.False);
 
@@ -227,7 +227,7 @@ namespace ES.Tests
                 Assert.That(voices.Count, Is.EqualTo(2));
                 Assert.That(voices, Does.Contain(otherCueVoice));
                 Assert.That(voices, Does.Contain(directVoice));
-                Assert.That(module.TryGetVoiceStatus(CreateVoiceHandle(1, 1), out ESAudioVoiceStatus status), Is.True);
+                Assert.That(module.TryGetVoiceStatus((ESAudioVoiceHandle)CreateVoiceHandle(1, 1), out ESAudioVoiceStatus status), Is.True);
                 Assert.That(status.State, Is.EqualTo(ESAudioVoiceState.Ended));
                 Assert.That(status.EndReason, Is.EqualTo(ESAudioVoiceEndReason.ResourceOwnerReleased));
             }

@@ -53,7 +53,7 @@ MonoBehaviour:
     - key: 256
       relatedKeys: 08001000200004000200
     - key: 512
-      relatedKeys: 080010002000040002000001
+      relatedKeys: 08001000200004000200
     - key: 1024
       relatedKeys: 08001000200004000200000100028000
     editorSymmetricMode: 0

@@ -15,13 +15,6 @@ namespace ES
         [LabelText("自动确保RuntimeWatch验证模块"), Tooltip("开启后：运行时如果基础域没有添加 RuntimeWatch 验证模块，会自动创建并加入。建议仅在调试/验证链路时开启。")]
         public bool autoEnsureRuntimeWatchModule = false;
 
-        [Title("默认地面参数")]
-        [LabelText("启用默认地面参数")]
-        public bool applyGroundDefaults = true;
-
-        [HideLabel]
-        public GroundedDefaults groundedDefaults = GroundedDefaults.Default;
-
         public override void _AwakeRegisterAllModules()
         {
             if (autoEnsureFootPlacementModule)
@@ -35,7 +28,6 @@ namespace ES
             }
 
             base._AwakeRegisterAllModules();
-            ApplyGroundDefaults();
         }
 
         [Button("确保脚贴合模块存在"), PropertyOrder(-10)]
@@ -206,39 +198,5 @@ namespace ES
             return null;
         }
 
-        [Button("应用默认地面参数")]
-        public void ApplyGroundDefaults()
-        {
-            if (!applyGroundDefaults || MyCore == null) return;
-            var kcc = MyCore.kcc;
-            kcc.maxStableMoveSpeed = groundedDefaults.maxStableMoveSpeed;
-            kcc.stableMovementSharpness = groundedDefaults.stableMovementSharpness;
-            kcc.jumpSpeed = groundedDefaults.jumpSpeed;
-            kcc.orientationSharpness = groundedDefaults.orientationSharpness;
-        }
-    }
-
-    [Serializable]
-    public struct GroundedDefaults
-    {
-        [LabelText("最大地面速度")]
-        public float maxStableMoveSpeed;
-
-        [LabelText("地面响应")]
-        public float stableMovementSharpness;
-
-        [LabelText("跳跃速度")]
-        public float jumpSpeed;
-
-        [LabelText("转向锐度")]
-        public float orientationSharpness;
-
-        public static GroundedDefaults Default => new GroundedDefaults
-        {
-            maxStableMoveSpeed = 8f,
-            stableMovementSharpness = 15f,
-            jumpSpeed = 8f,
-            orientationSharpness = 10f
-        };
     }
 }

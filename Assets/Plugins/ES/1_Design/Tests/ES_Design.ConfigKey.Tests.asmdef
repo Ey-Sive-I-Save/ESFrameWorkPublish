@@ -5,6 +5,8 @@
         "ES_Design",
         "ES_Stand",
         "ES_Logic",
+        "ES_Editor",
+        "UniTask",
         "KCC"
     ],
     "includePlatforms": [
@@ -14,6 +16,7 @@
     "allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [
+        "Sirenix.OdinInspector.Attributes.dll",
         "Sirenix.Serialization.dll"
     ],
     "autoReferenced": false,

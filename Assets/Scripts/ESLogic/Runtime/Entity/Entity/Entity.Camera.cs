@@ -25,7 +25,7 @@ namespace ES
         {
             ReleaseDefaultCameraRequest();
 
-            EntityCharacterProfile profile = GetComponent<EntityCharacterProfile>();
+            EntityCharacterIdentity profile = GetComponent<EntityCharacterIdentity>();
             ESCameraModule camera = ESGameManager.Camera;
             if (profile == null
                 || camera == null

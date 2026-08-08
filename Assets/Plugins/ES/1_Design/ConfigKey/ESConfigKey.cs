@@ -5,11 +5,19 @@ using Sirenix.OdinInspector;
 
 namespace ES
 {
-    internal static class ESConfigKeyDiagnostics
+    /// <summary>
+    /// ConfigKey 运行时缺失诊断的只读订阅入口。
+    /// Editor 集成必须能够订阅缺失事件，但只有本程序集可以上报诊断。
+    /// </summary>
+    public static class ESConfigKeyDiagnostics
     {
-        internal static event Action<string, string> MissingKey;
+        public static event Action<string, string> MissingKey;
 
-        internal static void ReportMissing(string scope, string description)
+        /// <summary>
+        /// 供 ConfigKey 运行时表及其直接适配层上报缺失诊断。
+        /// 普通业务只应订阅 <see cref="MissingKey"/>，不得把它作为通用事件总线。
+        /// </summary>
+        public static void ReportMissing(string scope, string description)
         {
             try { MissingKey?.Invoke(scope, description); }
             catch (Exception exception) { UnityEngine.Debug.LogException(exception); }
@@ -503,7 +511,7 @@ namespace ES
                 return 0;
 
             // 补充别名时可能复用既有槽位，其真实 RuntimeKey 不一定等于本次 Bake 值。
-            return TryGetRuntimeKey(enumKey, stringKey, out int committedRuntimeKey)
+            return TryGetRuntimeKeyCore(enumKey, stringKey, out int committedRuntimeKey)
                 ? committedRuntimeKey
                 : 0;
         }
@@ -628,7 +636,7 @@ namespace ES
             if (!RegisterInternal(runtimeKey, enumKey, effectiveStringKey, data, debugName))
                 return 0;
 
-            return TryGetRuntimeKey(enumKey, effectiveStringKey, out int committedRuntimeKey)
+            return TryGetRuntimeKeyCore(enumKey, effectiveStringKey, out int committedRuntimeKey)
                 ? committedRuntimeKey
                 : 0;
         }
@@ -642,17 +650,25 @@ namespace ES
             return UpsertInternal(runtimeKey, enumKey, stringKey, data, stringKey);
         }
 
-        public bool TryGet(int runtimeKey, out TData data)
+        public virtual bool TryGet(int runtimeKey, out TData data)
         {
-            if (slotByRuntimeKey.TryGetValue(runtimeKey, out int slot))
-                return TryGetBySlot(slot, out data);
+            if (TryGetCore(runtimeKey, out data))
+                return true;
 
-            data = null;
             ESConfigKeyDiagnostics.ReportMissing(keyScope, "RuntimeKey=" + runtimeKey);
             return false;
         }
 
-        public bool TryGet<TEnumKey>(ESGameCoreConfigKey<TEnumKey> key, out TData data)
+        protected bool TryGetCore(int runtimeKey, out TData data)
+        {
+            if (slotByRuntimeKey.TryGetValue(runtimeKey, out int slot))
+                return TryGetBySlotCore(slot, out data);
+
+            data = null;
+            return false;
+        }
+
+        public virtual bool TryGet<TEnumKey>(ESGameCoreConfigKey<TEnumKey> key, out TData data)
             where TEnumKey : struct, Enum
         {
             if (key == null)
@@ -669,7 +685,7 @@ namespace ES
             return false;
         }
 
-        public bool TryGet<TEnumKey>(ESAssetConfigKey<TEnumKey> key, out TData data)
+        public virtual bool TryGet<TEnumKey>(ESAssetConfigKey<TEnumKey> key, out TData data)
             where TEnumKey : struct, Enum
         {
             if (key == null)
@@ -686,21 +702,29 @@ namespace ES
             return false;
         }
 
-        public TData Get(int runtimeKey)
+        public virtual TData Get(int runtimeKey)
         {
             return TryGet(runtimeKey, out TData data) ? data : null;
         }
 
-        public bool TryGetRuntimeKey(string stringKey, out int runtimeKey)
+        public virtual bool TryGetRuntimeKey(string stringKey, out int runtimeKey)
         {
-            if (TryGetSlotByStringKey(stringKey, out int slot))
+            if (TryGetRuntimeKeyCore(stringKey, out runtimeKey))
+                return true;
+
+            ESConfigKeyDiagnostics.ReportMissing(keyScope, "StringKey=" + stringKey);
+            return false;
+        }
+
+        protected bool TryGetRuntimeKeyCore(string stringKey, out int runtimeKey)
+        {
+            if (TryGetSlotByStringKeyCore(stringKey, out int slot))
             {
                 runtimeKey = slots[slot].runtimeKey;
                 return runtimeKey != 0;
             }
 
             runtimeKey = 0;
-            ESConfigKeyDiagnostics.ReportMissing(keyScope, "StringKey=" + stringKey);
             return false;
         }
 
@@ -709,7 +733,12 @@ namespace ES
         /// the same entry; a mismatched EnumKey/StringKey pair is rejected instead of silently
         /// preferring the enum.
         /// </summary>
-        public bool TryGetRuntimeKey(int enumKey, string stringKey, out int runtimeKey)
+        public virtual bool TryGetRuntimeKey(int enumKey, string stringKey, out int runtimeKey)
+        {
+            return TryGetRuntimeKeyCore(enumKey, stringKey, out runtimeKey);
+        }
+
+        protected bool TryGetRuntimeKeyCore(int enumKey, string stringKey, out int runtimeKey)
         {
             int enumRuntimeKey = 0;
             int stringRuntimeKey = 0;
@@ -717,7 +746,7 @@ namespace ES
             bool requestedString = !string.IsNullOrEmpty(stringKey);
             bool hasEnum = enumKey != 0 && slotByEnumKey.TryGetValue(enumKey, out int enumSlot)
                            && (enumRuntimeKey = slots[enumSlot].runtimeKey) != 0;
-            bool hasString = !string.IsNullOrEmpty(stringKey) && TryGetRuntimeKey(stringKey, out stringRuntimeKey);
+            bool hasString = !string.IsNullOrEmpty(stringKey) && TryGetRuntimeKeyCore(stringKey, out stringRuntimeKey);
 
             if ((requestedEnum && !hasEnum) || (requestedString && !hasString))
             {
@@ -740,7 +769,12 @@ namespace ES
         /// 只读当前表，不触发注册、分配或任何持久化行为。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetRuntimeKey(IESConfigKey key, out int runtimeKey)
+        public virtual bool TryGetRuntimeKey(IESConfigKey key, out int runtimeKey)
+        {
+            return TryGetRuntimeKeyCore(key, out runtimeKey);
+        }
+
+        protected bool TryGetRuntimeKeyCore(IESConfigKey key, out int runtimeKey)
         {
             if (key == null)
             {
@@ -758,7 +792,7 @@ namespace ES
                     if (!string.IsNullOrEmpty(key.StringKey)
                         && ((!string.IsNullOrEmpty(entry.stringKey)
                              && !string.Equals(entry.stringKey, key.StringKey, StringComparison.Ordinal))
-                            || (TryGetRuntimeKey(key.StringKey, out int stringRuntimeKey)
+                            || (TryGetRuntimeKeyCore(key.StringKey, out int stringRuntimeKey)
                                 && stringRuntimeKey != runtimeKey)))
                     {
                         runtimeKey = 0;
@@ -774,7 +808,7 @@ namespace ES
                 return false;
             }
 
-            return TryGetRuntimeKey(key.StringKey, out runtimeKey);
+            return TryGetRuntimeKeyCore(key.StringKey, out runtimeKey);
         }
 
         /// <summary>
@@ -782,7 +816,7 @@ namespace ES
         /// 未注入时抛出异常，适合初始化完成后一次获取并缓存到热路径。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int GetRuntimeKey(IESConfigKey key)
+        public virtual int GetRuntimeKey(IESConfigKey key)
         {
             if (TryGetRuntimeKey(key, out int runtimeKey))
                 return runtimeKey;
@@ -793,22 +827,28 @@ namespace ES
             throw new KeyNotFoundException("[ESConfigKeyTable] ConfigKey 尚未注入当前强类型表：" + keyDescription);
         }
 
-        public bool TryGetByStringKey(string stringKey, out TData data)
+        public virtual bool TryGetByStringKey(string stringKey, out TData data)
         {
-            if (TryGetSlotByStringKey(stringKey, out int slot))
-                return TryGetBySlot(slot, out data);
+            if (TryGetSlotByStringKeyCore(stringKey, out int slot)
+                && TryGetBySlotCore(slot, out data))
+                return true;
 
             data = null;
             ESConfigKeyDiagnostics.ReportMissing(keyScope, "StringKey=" + stringKey);
             return false;
         }
 
-        public bool TryGetSlot(int runtimeKey, out int slot)
+        public virtual bool TryGetSlot(int runtimeKey, out int slot)
         {
             return slotByRuntimeKey.TryGetValue(runtimeKey, out slot);
         }
 
-        public bool TryGetSlotByEnumKey(int enumKey, out int slot)
+        public virtual bool TryGetSlotByEnumKey(int enumKey, out int slot)
+        {
+            return TryGetSlotByEnumKeyCore(enumKey, out slot);
+        }
+
+        protected bool TryGetSlotByEnumKeyCore(int enumKey, out int slot)
         {
             if (enumKey == 0)
             {
@@ -819,7 +859,12 @@ namespace ES
             return slotByEnumKey.TryGetValue(enumKey, out slot);
         }
 
-        public bool TryGetSlotByStringKey(string stringKey, out int slot)
+        public virtual bool TryGetSlotByStringKey(string stringKey, out int slot)
+        {
+            return TryGetSlotByStringKeyCore(stringKey, out slot);
+        }
+
+        protected bool TryGetSlotByStringKeyCore(string stringKey, out int slot)
         {
             if (string.IsNullOrEmpty(stringKey))
             {
@@ -830,7 +875,12 @@ namespace ES
             return slotByStringKey.TryGetValue(stringKey, out slot);
         }
 
-        public bool TryGetBySlot(int slot, out TData data)
+        public virtual bool TryGetBySlot(int slot, out TData data)
+        {
+            return TryGetBySlotCore(slot, out data);
+        }
+
+        protected bool TryGetBySlotCore(int slot, out TData data)
         {
             if ((uint)slot < (uint)slots.Count)
             {
@@ -846,7 +896,7 @@ namespace ES
             return false;
         }
 
-        public bool TryGetRuntimeKeyBySlot(int slot, out int runtimeKey)
+        public virtual bool TryGetRuntimeKeyBySlot(int slot, out int runtimeKey)
         {
             if ((uint)slot < (uint)slots.Count && slots[slot].valid)
             {
@@ -920,7 +970,7 @@ namespace ES
         public int BakeRaw(int enumKey, string stringKey)
         {
             EnsureCanBuild();
-            if (TryGetRuntimeKey(enumKey, stringKey, out int existingRuntimeKey))
+            if (TryGetRuntimeKeyCore(enumKey, stringKey, out int existingRuntimeKey))
                 return existingRuntimeKey;
             if (enumKey != 0)
                 return enumKey;
@@ -1143,7 +1193,7 @@ namespace ES
             if (string.IsNullOrEmpty(stringKey))
                 return 0;
 
-            if (TryGetRuntimeKey(stringKey, out int runtimeKey))
+            if (TryGetRuntimeKeyCore(stringKey, out int runtimeKey))
                 return runtimeKey;
 
             if (reservedRuntimeKeyByString.TryGetValue(stringKey, out runtimeKey))

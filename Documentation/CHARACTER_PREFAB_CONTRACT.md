@@ -8,16 +8,16 @@
 
 ## 核心结论
 
-`Entity` 是角色的运行时核心和唯一 DataInfo 绑定执行者；`EntityCharacterProfile` 是同根、唯一的静态身份声明。Profile 声明 Prefab 身份、阵营、正式 Variant 的唯一 DataInfo，及可选的默认 `Camera ProfileKey`；它不能接管 AI、Buff、战斗、装备、Cinemachine 或相机运行时控制权。
+`Entity` 是角色的运行时核心和唯一 DataInfo 绑定执行者；`EntityCharacterIdentity` 是同根、唯一的静态身份声明。身份声明负责 Prefab 身份、阵营、正式 Variant 的唯一 DataInfo，及可选的默认 `Camera DefinitionKey`；它不能接管 AI、Buff、战斗、装备、Cinemachine 或相机运行时控制权。
 
 ```text
 Entity 生命周期
-  -> 同根 EntityCharacterProfile
+  -> 同根 EntityCharacterIdentity
   -> Entity.BindDefinition(唯一 Actor / Monster / Npc DataInfo)
-  -> 若 Profile 配置 Camera ProfileKey：Entity.Push(Base CameraRequest)
+  -> 若 Profile 配置 Camera DefinitionKey：Entity.Push(Base CameraRequest)
 ```
 
-`EntityCharacterProfile` 不是“大脚本管理全部内容”，它是一个很小的 Prefab 元数据入口。默认 Camera ProfileKey 只是内容身份键；`Entity` 产生纯 Request，场景 `ESCameraDirector` 仲裁并由 CM2 Adapter 执行。四个 Domain 和各自 Module 仍负责运行能力。
+`EntityCharacterIdentity` 不是“大脚本管理全部内容”，它是一个很小的 Prefab 元数据入口。默认 Camera DefinitionKey 只是内容身份键；`Entity` 产生纯 Request，场景 `ESCameraDirector` 仲裁并由 CM2 Adapter 执行。四个 Domain 和各自 Module 仍负责运行能力。
 
 ## 三种 Prefab 身份
 
@@ -35,7 +35,7 @@ Entity 生命周期
 
 | 层次 | 固定/按需组件 | 职责 |
 | --- | --- | --- |
-| 根角色底盘 | `Entity`、`KinematicCharacterMotor`、`CapsuleCollider`、`EntityCharacterProfile`、`EntityTransformMapping` | 运行入口、KCC 身体、Prefab 身份和稳定挂点缓存；每个根各一份 |
+| 根角色底盘 | `Entity`、`KinematicCharacterMotor`、`CapsuleCollider`、`EntityCharacterIdentity`、`EntityTransformMapping` | 运行入口、KCC 身体、Prefab 身份和稳定挂点缓存；每个根各一份 |
 | 模型表现 | `Animator` | 模型动画承载；由根 `Entity.animator` 指向，运行时 Controller 仍由 StateMachine/Playable 链路处理 |
 | IK 表现桥 | `StateFinalIKDriver` | 模板可保留唯一 Driver 作为无 Solver 基线；正式 Variant 只在所需 Solver 齐全时显式启用能力 |
 | 武器内容 | 每个实际 `weaponRoot` 按需挂 `EntityWeaponBinding` | 武器手持、收纳、枪口、瞄准、副手握点、状态覆盖和武器 Tag；无武器角色不挂空组件 |
@@ -50,10 +50,11 @@ Pool 生命周期组件由运行时补充和调用；它不属于角色内容组
 
 ```text
 EntityBasicMoveRotateModule
-EntityAIInputDispatchModule
 ```
 
-`autoEnsurePlayerInputModules` 必须关闭；不能依赖 AI 域在运行时悄悄补模块。这样移动的最终执行与输入意图的唯一消费入口在 Prefab 制作期就是可见、可审计的。
+输入执行器不再是独立 Module：`EntityAIDomain` 自身持有输入执行配置，并在域更新阶段统一消费 `inputState`，再驱动 Basic/战斗/技能/交互模块。`inputState` 是 Awake 时创建的纯运行态，不进入 Prefab 或 Scene 序列化。
+
+运行时自动补玩家输入模块的入口已经删除。玩家 Writer 必须由正式 Player Variant 在 Prefab 制作期显式保存，使输入意图的写入与唯一消费入口始终可见、可审计。
 
 `EntityPlayerInputWriteModule` 不属于通用底盘：`BuildInput`、`RuntimePoolTemplate`、以及非玩家阵营的正式 Variant 必须为零；阵营为 `Player` 的正式 Variant 必须显式配置唯一一份。
 
@@ -63,7 +64,8 @@ EntityAIInputDispatchModule
 
 - DataInfo 是角色定义和固有 Tag 的唯一权威；Prefab 不复制第二份 Tag 或定义字段。
 - `Entity` 直接读取同根 Profile 并调用自身 `BindDefinition`；禁止增加 `EntityCharacterDefinitionBinding`、`EntityCharacterComposition` 或等价中转组件。
-- Player Variant 的可选 `defaultCameraProfileKey/defaultCameraViewKey/defaultCameraPriority` 仅表达默认镜头内容意图；不保存 VCam、Brain、Rig Prefab 或运行时 Lease。没有该键的正式 NPC/怪物不会申请本地相机。
+- DataInfo 的运动共享参数在 `Entity.BindDefinition` 时写入 KCC 作者默认值；`ClearDefinition`/回池恢复 Prefab 基线，Character Attribute/ValueChange 可在运行时覆盖。未被 KCC 实际消费的作者字段不得被当作已接通的运行参数。
+- Player Variant 的可选 `defaultCameraDefinitionKey/defaultCameraViewKey/defaultCameraPriority` 仅表达默认镜头内容意图；不保存 VCam、Brain、Rig Prefab 或运行时 Lease。没有该键的正式 NPC/怪物不会申请本地相机。
 - BuildInput 必须保持空定义；RuntimePoolTemplate 绝不能在激活时覆盖租出方已经绑定的定义；CharacterVariant 必须只有一个匹配的 DataInfo。
 - 编辑器构建工具只负责创建、剥离和验证模板资产；它不是角色出生时的业务“生成器”。
 
@@ -92,11 +94,11 @@ EntityAIInputDispatchModule
 
 P0 发布门禁必须阻止 `ES基础角色模板.prefab`、全局预览模型和其依赖闭包进入正式场景内容、池预热或发布资源。模板验证通过不等于正式角色验收通过。
 
-`【ES】/内容制作/角色模板/审计项目角色基础模块` 会扫描项目内所有带 `EntityCharacterProfile` 的 Prefab；发布门禁则会对实际进入场景或 AssetBundle 依赖闭包的正式 Variant 重复执行同一基础 Module 契约。两者都不新增运行时组件。
+`【ES】/内容制作/角色模板/审计项目角色基础模块` 会扫描项目内所有带 `EntityCharacterIdentity` 的 Prefab；发布门禁则会对实际进入场景或 AssetBundle 依赖闭包的正式 Variant 重复执行同一基础 Module 契约。两者都不新增运行时组件。
 
-基础模板验收：根组件唯一性、唯一移动/输入调度 Module、无玩家输入写入、无定义 Profile、无武器 Binding、Solver-free Driver、全量 Mapping、层级与运行时容器、EditorOnly 剥离和禁止直接发布。
+基础模板验收：根组件唯一性、唯一移动 Module、AI 域输入执行器、无玩家输入写入、无定义 Profile、无武器 Binding、Solver-free Driver、全量 Mapping、层级与运行时容器、EditorOnly 剥离和禁止直接发布。
 
-正式角色验收：唯一 DataInfo、阵营、唯一移动/输入调度 Module、玩家阵营唯一输入写入/骑乘/攀爬 Module 与其状态契约、模型/Animator、所启用 IK 的 Solver、Layer、主 Collider、HurtBox/HitBox、InteractionProbe、实际装备与武器 Binding。至少执行一次 PlayMode 烟雾测试：移动、攀爬、上/下车、状态切换、对象池复用、武器挂载、命中检测和已启用 IK。
+正式角色验收：唯一 DataInfo、阵营、唯一移动 Module、AI 域输入执行器、玩家阵营唯一输入写入/骑乘/攀爬 Module 与其状态契约、模型/Animator、所启用 IK 的 Solver、Layer、主 Collider、HurtBox/HitBox、InteractionProbe、实际装备与武器 Binding。至少执行一次 PlayMode 烟雾测试：移动、攀爬、上/下车、状态切换、对象池复用、武器挂载、命中检测和已启用 IK。
 
 当前 `ESBasicCharacterTemplateBuilder` 的静态验证和预览场景自检只能证明模板结构；不能替代正式角色的 PlayMode 验收或发布门禁证据。
 
@@ -169,4 +171,4 @@ Assets/Scenes/Tests/ESPlayerControllerTest.unity
 Assets/Scenes/Tests/ESPlayerControllerTest.unity
 ```
 
-场景包含独立的 `ESGameManager`（默认 ES 输入服务）、场景拥有的 `ESCameraSceneBinding + Camera + CinemachineBrain + Director Owned RigRoot`、Ground、攀爬墙、可翻越矮墙，以及汽车/自行车/直升机。相机内容由 `ProfileCatalog/RigCatalog` 资产提供；角色 Prefab 只保留 Mapping 与 Camera ProfileKey，不进入 Main Camera、Brain 或 VCam。环境和载具使用 `Ground`、`Wall`、`WorldDynamic`、`Interaction` 的既有 Layer 职责。
+场景包含独立的 `ESGameManager`（默认 ES 输入服务）、场景拥有的 `ESCameraSceneBinding + Camera + CinemachineBrain + Director Owned RigRoot`、Ground、攀爬墙、可翻越矮墙，以及汽车/自行车/直升机。相机内容由 `DefinitionCatalog/RigCatalog` 资产提供；角色 Prefab 只保留 Mapping 与 Camera DefinitionKey，不进入 Main Camera、Brain 或 VCam。环境和载具使用 `Ground`、`Wall`、`WorldDynamic`、`Interaction` 的既有 Layer 职责。

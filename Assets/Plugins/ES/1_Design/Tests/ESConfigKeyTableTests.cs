@@ -213,37 +213,29 @@ namespace ES.Tests
         {
             const string stringKey = "tests.raw.payload";
             const string guid = "1234567890abcdef1234567890abcdef";
-            ESAssetConfigKeyTable<ESAssetReferRawConfigData, TextAsset> table = ESRuntimeDataAsset.RawAssets;
-            var key = new ESAssetReferRawConfigKey { stringKey = stringKey };
-            var data = new ESAssetReferRawConfigData
+            var catalogData = new ESRuntimeCatalog();
+            catalogData.assets.Add(new ESRuntimeCatalogEntry
             {
-                key = key,
-                keyName = stringKey,
-                displayName = "Raw Test Payload"
-            };
-            data.SetAssetIdentity(guid, 0);
-
-            table.BeginBuild(clear: true);
-            try
-            {
-                Assert.That(ESRuntimeDataAsset.RegisterRaw(data), Is.True);
-            }
-            finally
-            {
-                table.EndBuild();
-            }
+                identity = new ESRuntimeCatalogIdentity { guid = guid },
+                assetTypeName = typeof(TextAsset).FullName,
+                kind = ESAssetReferKind.Raw.ToString(),
+                stringKey = stringKey,
+                isBusinessAsset = true
+            });
 
             try
             {
+                long previousGeneration = ESRuntimeDataAsset.AssetConfigTableGeneration;
+                Assert.That(ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(new[] { catalogData }), Is.EqualTo(1));
                 var catalog = new ESRuntimeAssetCatalog();
                 Assert.That(catalog.TryResolveAssetIdentity(ESAssetReferKind.Raw, 0, stringKey, out ESAssetIdentity identity), Is.True);
                 Assert.That(identity.Guid, Is.EqualTo(guid));
                 Assert.That(identity.LocalFileId, Is.Zero);
+                Assert.That(ESRuntimeDataAsset.AssetConfigTableGeneration, Is.GreaterThan(previousGeneration));
             }
             finally
             {
-                table.BeginBuild(clear: true);
-                table.EndBuild();
+                ESRuntimeDataAsset.ClearAssetConfigTables();
             }
         }
 
@@ -303,71 +295,63 @@ namespace ES.Tests
         }
 
         [Test]
-        public void AssetCatalog_RebuildRefreshesCompleteDataAndRejectsDuplicateWithoutMutation()
+        public void AssetCatalog_GenerationSwap_PinsOldReaderAndPublishesNewDataAtomically()
         {
-            const string businessKey = "characters.catalog-duplicate";
+            const string businessKey = "characters.generation-swap";
             var seedCatalog = new ESRuntimeCatalog();
             seedCatalog.assets.Add(CreatePrefabCatalogEntry(
                 businessKey,
-                "guid-seed",
-                "Seed",
-                "seed-library"));
+                "guid-generation-v1",
+                "Generation V1",
+                "generation-v1-library"));
+            ESAssetConfigDataReadLease<ESAssetReferPrefabConfigData, GameObject> oldLease = null;
 
             try
             {
                 Assert.That(ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(
                     new[] { seedCatalog }), Is.EqualTo(1));
-                Assert.That(ESRuntimeDataAsset.Prefabs.TryGetByStringKey(
-                    businessKey,
-                    out ESAssetReferPrefabConfigData seedData), Is.True);
-                seedData.version = "stale-version-must-not-survive";
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryAcquireConfigData(businessKey, out oldLease), Is.True);
+                long oldGeneration = oldLease.Generation;
+                ESAssetReferPrefabConfigData oldData = oldLease.Data;
 
                 var rebuiltCatalog = new ESRuntimeCatalog();
                 rebuiltCatalog.assets.Add(CreatePrefabCatalogEntry(
                     businessKey,
-                    "guid-first",
-                    "First Authoritative Entry",
-                    "first-library"));
-                rebuiltCatalog.assets.Add(CreatePrefabCatalogEntry(
-                    businessKey,
-                    "guid-duplicate-must-not-win",
-                    "Duplicate Entry",
-                    "duplicate-library"));
+                    "guid-generation-v2",
+                    "Generation V2",
+                    "generation-v2-library"));
+                Assert.That(ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(
+                    new[] { rebuiltCatalog }), Is.EqualTo(1));
 
-                int injected = ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(
-                    new[] { rebuiltCatalog });
-
-                Assert.That(injected, Is.EqualTo(1));
-                Assert.That(ESRuntimeDataAsset.GetAssetConflictCount(), Is.EqualTo(1));
-                Assert.That(ESRuntimeDataAsset.GetAssetConflictReport(), Does.Contain("Duplicate Asset Catalog business key"));
-                Assert.That(ESRuntimeDataAsset.Prefabs.TryGetByStringKey(
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryAcquireConfigData(
                     businessKey,
-                    out ESAssetReferPrefabConfigData rebuiltData), Is.True);
-                Assert.That(rebuiltData, Is.SameAs(seedData));
-                Assert.That(rebuiltData.keyName, Is.EqualTo(businessKey));
-                Assert.That(rebuiltData.displayName, Is.EqualTo("First Authoritative Entry"));
-                Assert.That(rebuiltData.sourcePackage, Is.EqualTo("first-library"));
-                Assert.That(rebuiltData.version, Is.Empty);
-                Assert.That(rebuiltData.AssetGuid, Is.EqualTo("guid-first"));
-                Assert.That(rebuiltData.AssetLocalFileId, Is.Zero);
-                Assert.That(rebuiltData.key, Is.Not.Null);
-                Assert.That(rebuiltData.key.StringKey, Is.EqualTo(businessKey));
-                Assert.That(rebuiltData.key.guid, Is.EqualTo("guid-first"));
-                Assert.That(rebuiltData.key.localFileId, Is.Zero);
-                Assert.That(rebuiltData.key.assetTypeName, Is.EqualTo(typeof(GameObject).FullName));
-                Assert.That(rebuiltData.runtimeKey, Is.EqualTo(
-                    ESRuntimeDataAsset.Prefabs.GetRuntimeKey(rebuiltData.key)));
-                Assert.That(rebuiltData.LoadedAssetReady, Is.False);
+                    out ESAssetConfigDataReadLease<ESAssetReferPrefabConfigData, GameObject> newLease), Is.True);
+                using (newLease)
+                {
+                    Assert.That(newLease.Generation, Is.GreaterThan(oldGeneration));
+                    Assert.That(newLease.Data, Is.Not.SameAs(oldData));
+                    Assert.That(newLease.Data.AssetGuid, Is.EqualTo("guid-generation-v2"));
+                    Assert.That(newLease.Data.displayName, Is.EqualTo("Generation V2"));
+                }
+
+                Assert.That(oldData.AssetGuid, Is.EqualTo("guid-generation-v1"));
+                Assert.That(oldData.displayName, Is.EqualTo("Generation V1"));
+                Assert.That(ESRuntimeDataAsset.RetiredAssetConfigGenerationCount, Is.GreaterThanOrEqualTo(1));
+                int retiredBeforeRelease = ESRuntimeDataAsset.RetiredAssetConfigGenerationCount;
+                oldLease.Dispose();
+                oldLease.Dispose();
+                oldLease = null;
+                Assert.That(ESRuntimeDataAsset.RetiredAssetConfigGenerationCount, Is.LessThan(retiredBeforeRelease));
             }
             finally
             {
-                ESRuntimeDataAsset.BeginBuild(true);
-                ESRuntimeDataAsset.EndBuild();
+                oldLease?.Dispose();
+                ESRuntimeDataAsset.ClearAssetConfigTables();
             }
         }
 
         [Test]
-        public void AssetCatalog_PreflightFailure_PreservesPreviousMappingsAndReadyPayload()
+        public void AssetCatalog_CandidateFailure_PreservesCurrentGenerationAndMappings()
         {
             const string retainedKey = "characters.atomic-catalog-retained";
             const string stagedKey = "characters.atomic-catalog-staged";
@@ -377,17 +361,12 @@ namespace ES.Tests
                 "guid-atomic-catalog-old",
                 "Atomic Catalog Old",
                 "atomic-old-library"));
-            var readyAsset = new GameObject("AtomicCatalogReadyAsset");
 
             try
             {
                 Assert.That(ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(
                     new[] { seedCatalog }), Is.EqualTo(1));
-                Assert.That(ESRuntimeDataAsset.Prefabs.TryGetByStringKey(
-                    retainedKey,
-                    out ESAssetReferPrefabConfigData oldData), Is.True);
-                int oldRuntimeKey = oldData.runtimeKey;
-                oldData.SetLoadedAsset(readyAsset);
+                long committedGeneration = ESRuntimeDataAsset.AssetConfigTableGeneration;
 
                 var invalidCatalog = new ESRuntimeCatalog();
                 invalidCatalog.assets.Add(CreatePrefabCatalogEntry(
@@ -404,31 +383,163 @@ namespace ES.Tests
                 Assert.Throws<System.InvalidOperationException>(() =>
                     ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(new[] { invalidCatalog }));
 
-                Assert.That(ESRuntimeDataAsset.Prefabs.TryGetByStringKey(
+                Assert.That(ESRuntimeDataAsset.AssetConfigTableGeneration, Is.EqualTo(committedGeneration));
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryResolveAssetIdentity(
+                    0,
                     retainedKey,
-                    out ESAssetReferPrefabConfigData retainedData), Is.True);
-                Assert.That(retainedData, Is.SameAs(oldData));
-                Assert.That(retainedData.runtimeKey, Is.EqualTo(oldRuntimeKey));
-                Assert.That(retainedData.LoadedAssetReady, Is.True);
-                Assert.That(retainedData.LoadedAsset, Is.SameAs(readyAsset));
-                Assert.That(ESRuntimeDataAsset.Prefabs.TryGet(
-                    oldRuntimeKey,
-                    out ESAssetReferPrefabConfigData retainedByRuntimeKey), Is.True);
-                Assert.That(retainedByRuntimeKey, Is.SameAs(oldData));
-                Assert.That(ESRuntimeDataAsset.Prefabs.TryGetByStringKey(
-                    stagedKey,
-                    out ESAssetReferPrefabConfigData _), Is.False);
+                    out ESAssetIdentity retainedIdentity), Is.True);
+                Assert.That(retainedIdentity.Guid, Is.EqualTo("guid-atomic-catalog-old"));
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryResolveAssetIdentity(0, stagedKey, out _), Is.False);
             }
             finally
             {
-                ESRuntimeDataAsset.BeginBuild(true);
-                ESRuntimeDataAsset.EndBuild();
-                Object.DestroyImmediate(readyAsset);
+                ESRuntimeDataAsset.ClearAssetConfigTables();
             }
         }
 
         [Test]
-        public void AssetPage_PreflightFailure_PreservesPreviousMappingsAndReadyPayload()
+        public void AssetCatalog_DuplicateCandidate_IsRejectedWithoutChangingAuthority()
+        {
+            const string businessKey = "characters.duplicate-candidate";
+            var seedCatalog = new ESRuntimeCatalog();
+            seedCatalog.assets.Add(CreatePrefabCatalogEntry(
+                businessKey,
+                "guid-duplicate-authority",
+                "Committed Authority",
+                "authority-library"));
+
+            try
+            {
+                Assert.That(ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(
+                    new[] { seedCatalog }), Is.EqualTo(1));
+                long committedGeneration = ESRuntimeDataAsset.AssetConfigTableGeneration;
+
+                var duplicateCatalog = new ESRuntimeCatalog();
+                duplicateCatalog.assets.Add(CreatePrefabCatalogEntry(
+                    businessKey,
+                    "guid-duplicate-first",
+                    "Duplicate First",
+                    "duplicate-first-library"));
+                duplicateCatalog.assets.Add(CreatePrefabCatalogEntry(
+                    businessKey,
+                    "guid-duplicate-second",
+                    "Duplicate Second",
+                    "duplicate-second-library"));
+
+                Assert.That(ESRuntimeDataAsset.TryValidateAssetConfigTablesFromCatalogs(
+                    new[] { duplicateCatalog },
+                    out ESAssetCatalogBuildValidation validation,
+                    out string validationError), Is.False);
+                Assert.That(validation.conflictCount, Is.EqualTo(1));
+                Assert.That(validationError, Does.Contain("冲突"));
+                Assert.Throws<System.InvalidOperationException>(() =>
+                    ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(new[] { duplicateCatalog }));
+
+                Assert.That(ESRuntimeDataAsset.AssetConfigTableGeneration, Is.EqualTo(committedGeneration));
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryResolveAssetIdentity(
+                    0,
+                    businessKey,
+                    out ESAssetIdentity identity), Is.True);
+                Assert.That(identity.Guid, Is.EqualTo("guid-duplicate-authority"));
+            }
+            finally
+            {
+                ESRuntimeDataAsset.ClearAssetConfigTables();
+            }
+        }
+
+        [Test]
+        public void AssetCatalog_StaleCandidate_CannotOverwriteNewerGeneration()
+        {
+            const string staleKey = "characters.stale-candidate";
+            var staleRecord = new ESAssetConfigRecord(
+                0,
+                staleKey,
+                "guid-stale-candidate",
+                0,
+                typeof(GameObject).FullName,
+                null,
+                "Stale Candidate",
+                "stale-library");
+            var records = new[]
+            {
+                new ESAssetConfigGenerationRecord(ESAssetReferKind.Prefab, in staleRecord)
+            };
+            ESAssetConfigTableGenerationState staleCandidate =
+                ESRuntimeDataAsset.BuildCandidateFromGenerationRecords(records, out ESAssetCatalogBuildValidation validation);
+            Assert.That(validation.candidateEntries, Is.EqualTo(1));
+
+            var newerCatalog = new ESRuntimeCatalog();
+            newerCatalog.assets.Add(CreatePrefabCatalogEntry(
+                "characters.newer-authority",
+                "guid-newer-authority",
+                "Newer Authority",
+                "newer-library"));
+
+            try
+            {
+                Assert.That(ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(
+                    new[] { newerCatalog }), Is.EqualTo(1));
+                long newerGeneration = ESRuntimeDataAsset.AssetConfigTableGeneration;
+
+                Assert.Throws<System.InvalidOperationException>(() =>
+                    ESRuntimeDataAsset.CommitOrStageCandidate(staleCandidate, string.Empty));
+                staleCandidate = null;
+
+                Assert.That(ESRuntimeDataAsset.AssetConfigTableGeneration, Is.EqualTo(newerGeneration));
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryResolveAssetIdentity(
+                    0,
+                    "characters.newer-authority",
+                    out ESAssetIdentity identity), Is.True);
+                Assert.That(identity.Guid, Is.EqualTo("guid-newer-authority"));
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryResolveAssetIdentity(0, staleKey, out _), Is.False);
+            }
+            finally
+            {
+                staleCandidate?.Retire();
+                ESRuntimeDataAsset.ClearAssetConfigTables();
+            }
+        }
+
+        [Test]
+        public void AssetCatalog_Invalidation_RejectsNewReadersButLetsExistingLeaseExit()
+        {
+            const string businessKey = "characters.invalidated-provider-binding";
+            var catalog = new ESRuntimeCatalog();
+            catalog.assets.Add(CreatePrefabCatalogEntry(
+                businessKey,
+                "guid-invalidated-provider-binding",
+                "Invalidated Provider Binding",
+                "binding-test-library"));
+            ESAssetConfigDataReadLease<ESAssetReferPrefabConfigData, GameObject> existingLease = null;
+
+            try
+            {
+                Assert.That(ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(
+                    new[] { catalog }), Is.EqualTo(1));
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryAcquireConfigData(
+                    businessKey,
+                    out existingLease), Is.True);
+
+                ESRuntimeDataAsset.InvalidateAssetConfigTableBinding();
+
+                Assert.That(ESRuntimeDataAsset.AssetConfigTablesAvailable, Is.False);
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryResolveAssetIdentity(0, businessKey, out _), Is.False);
+                Assert.That(existingLease.Data.AssetGuid, Is.EqualTo("guid-invalidated-provider-binding"));
+                Assert.That(ESRuntimeDataAsset.RetiredAssetConfigGenerationCount, Is.GreaterThanOrEqualTo(1));
+                existingLease.Dispose();
+                existingLease.Dispose();
+                existingLease = null;
+            }
+            finally
+            {
+                existingLease?.Dispose();
+                ESRuntimeDataAsset.ClearAssetConfigTables();
+            }
+        }
+
+        [Test]
+        public void AssetPage_CandidateFailure_PreservesCurrentGeneration()
         {
             const string retainedKey = "characters.atomic-page-retained";
             const string stagedKey = "characters.atomic-page-staged";
@@ -438,17 +549,12 @@ namespace ES.Tests
                 "guid-atomic-page-old",
                 "Atomic Page Old",
                 "atomic-page-old-library"));
-            var readyAsset = new GameObject("AtomicPageReadyAsset");
 
             try
             {
                 Assert.That(ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(
                     new[] { seedCatalog }), Is.EqualTo(1));
-                Assert.That(ESRuntimeDataAsset.Prefabs.TryGetByStringKey(
-                    retainedKey,
-                    out ESAssetReferPrefabConfigData oldData), Is.True);
-                int oldRuntimeKey = oldData.runtimeKey;
-                oldData.SetLoadedAsset(readyAsset);
+                long committedGeneration = ESRuntimeDataAsset.AssetConfigTableGeneration;
 
                 var validPage = new ESAssetPage
                 {
@@ -470,26 +576,17 @@ namespace ES.Tests
                 Assert.Throws<System.ArgumentOutOfRangeException>(() =>
                     ESRuntimeDataAsset.RebuildAssetConfigTablesFromPages(new[] { validPage, invalidPage }));
 
-                Assert.That(ESRuntimeDataAsset.Prefabs.TryGetByStringKey(
+                Assert.That(ESRuntimeDataAsset.AssetConfigTableGeneration, Is.EqualTo(committedGeneration));
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryResolveAssetIdentity(
+                    0,
                     retainedKey,
-                    out ESAssetReferPrefabConfigData retainedData), Is.True);
-                Assert.That(retainedData, Is.SameAs(oldData));
-                Assert.That(retainedData.runtimeKey, Is.EqualTo(oldRuntimeKey));
-                Assert.That(retainedData.LoadedAssetReady, Is.True);
-                Assert.That(retainedData.LoadedAsset, Is.SameAs(readyAsset));
-                Assert.That(ESRuntimeDataAsset.Prefabs.TryGet(
-                    oldRuntimeKey,
-                    out ESAssetReferPrefabConfigData retainedByRuntimeKey), Is.True);
-                Assert.That(retainedByRuntimeKey, Is.SameAs(oldData));
-                Assert.That(ESRuntimeDataAsset.Prefabs.TryGetByStringKey(
-                    stagedKey,
-                    out ESAssetReferPrefabConfigData _), Is.False);
+                    out ESAssetIdentity retainedIdentity), Is.True);
+                Assert.That(retainedIdentity.Guid, Is.EqualTo("guid-atomic-page-old"));
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryResolveAssetIdentity(0, stagedKey, out _), Is.False);
             }
             finally
             {
-                ESRuntimeDataAsset.BeginBuild(true);
-                ESRuntimeDataAsset.EndBuild();
-                Object.DestroyImmediate(readyAsset);
+                ESRuntimeDataAsset.ClearAssetConfigTables();
             }
         }
 

@@ -2361,12 +2361,6 @@ MonoBehaviour:
           MayHasAddingElement: 1
         autoEnsureFootPlacementModule: 0
         autoEnsureRuntimeWatchModule: 0
-        applyGroundDefaults: 1
-        groundedDefaults:
-          maxStableMoveSpeed: 8
-          stableMovementSharpness: 15
-          jumpSpeed: 8
-          orientationSharpness: 10
     - rid: 23628927934398466
       type: {class: EntityBasicRuntimeWatchModule, ns: ES, asm: ES_Logic}
       data:
@@ -2392,41 +2386,6 @@ MonoBehaviour:
         MyModules:
           ValuesNow: []
           MayHasAddingElement: 1
-        inputState:
-          enableInput: 1
-          motion:
-            frameIndex: 0
-            move: {x: 0, y: 0}
-            look: {x: 0, y: 0}
-            flyVertical: 0
-            eyeHold: 0
-            peekLeftHold: 0
-            peekRightHold: 0
-          action:
-            frameIndex: 0
-            attack: 0
-            heavyAttack: 0
-            block: 0
-            slide: 0
-            switchWeapon: 0
-            equipWeapon: 0
-            holsterWeapon: 0
-            weaponSlot1: 0
-            weaponSlot2: 0
-            weaponSlot3: 0
-            weaponSlot4: 0
-            weaponSlot5: 0
-            aim: 0
-            skill1: 0
-            skill2: 0
-            skill3: 0
-            jump: 0
-            crouchToggle: 0
-            flyToggle: 0
-            mountToggle: 0
-            climbToggle: 0
-            interact: 0
-        autoEnsurePlayerInputModules: 0
     - rid: 23628974699577354
       type: {class: EntityBuffDomain, ns: ES, asm: ES_Logic}
       data:
@@ -3886,7 +3845,7 @@ MonoBehaviour:
   summary: "\u628A\u73A9\u5BB6\u8F93\u5165\u3001AI\u3001\u5267\u60C5\u3001\u7F51\u7EDC\u3001\u8F7D\u5177\u3001\u72B6\u6001\u9650\u5236\u6574\u7406\u6210\u672C\u5E27\u63A7\u5236\u8BF7\u6C42\uFF0C\u518D\u4EA4\u7ED9
     Entity/Basic/State \u6267\u884C\u3002"
   readMe: "\u804C\u8D23\uFF1A\u8FD9\u91CC\u4E0D\u662F\u5916\u58F3\u5927\u8111\uFF0C\u800C\u662F
-    EntityAIDomain \u65B9\u5411\u7684\u63A7\u5236\u6765\u6E90\u5165\u53E3\u3002\u5B83\u6536\u96C6\u73A9\u5BB6\u8F93\u5165\u3001AI\u51B3\u7B56\u3001\u5267\u60C5\u63A5\u7BA1\u3001\u7F51\u7EDC\u540C\u6B65\u3001\u8F7D\u5177\u63A7\u5236\u548C\u72B6\u6001\u9650\u5236\uFF0C\u6574\u7406\u6210\u79FB\u52A8\u3001\u671D\u5411\u3001\u8DF3\u8DC3\u3001\u6280\u80FD\u3001\u4EA4\u4E92\u7B49\u672C\u5E27\u8BF7\u6C42\u3002\n\u9700\u8981\u811A\u672C\uFF1AEntityPlayerInputWriteModule\u3001EntityAIInputDispatchModule\uFF0C\u672A\u6765\u53EF\u6269\u5C55\u63A7\u5236\u6765\u6E90\u6A21\u5757/\u63A7\u5236\u8BF7\u6C42\u6A21\u5757\u3002\n\u5173\u952E\u8BBE\u7F6E\uFF1A\u8F93\u5165\u53EA\u8D1F\u8D23\u91C7\u6837\uFF0CAI\u57DF\u8D1F\u8D23\u6574\u7406\u6765\u6E90\u548C\u8BF7\u6C42\uFF0CBasic\u57DF\u6267\u884C\u8EAB\u4F53\u8FD0\u52A8\uFF0CState\u57DF\u6267\u884C\u72B6\u6001\u4E0E\u8868\u73B0\u3002\n\u7981\u6B62\u4E8B\u9879\uFF1A\u4E0D\u8981\u8BA9\u591A\u4E2A\u6A21\u5757\u76F4\u63A5\u62A2\u5199
+    EntityAIDomain \u65B9\u5411\u7684\u63A7\u5236\u6765\u6E90\u5165\u53E3\u3002\u5B83\u6536\u96C6\u73A9\u5BB6\u8F93\u5165\u3001AI\u51B3\u7B56\u3001\u5267\u60C5\u63A5\u7BA1\u3001\u7F51\u7EDC\u540C\u6B65\u3001\u8F7D\u5177\u63A7\u5236\u548C\u72B6\u6001\u9650\u5236\uFF0C\u6574\u7406\u6210\u79FB\u52A8\u3001\u671D\u5411\u3001\u8DF3\u8DC3\u3001\u6280\u80FD\u3001\u4EA4\u4E92\u7B49\u672C\u5E27\u8BF7\u6C42\u3002\n\u9700\u8981\u811A\u672C\uFF1AEntityPlayerInputWriteModule\uFF0C\u5B9E\u4F53\u8F93\u5165\u6267\u884C\u7531 EntityAIDomain \u6536\u53E3\uFF0C\u672A\u6765\u53EF\u6269\u5C55\u63A7\u5236\u6765\u6E90\u6A21\u5757/\u63A7\u5236\u8BF7\u6C42\u6A21\u5757\u3002\n\u5173\u952E\u8BBE\u7F6E\uFF1A\u8F93\u5165\u53EA\u8D1F\u8D23\u91C7\u6837\uFF0CAI\u57DF\u8D1F\u8D23\u6574\u7406\u6765\u6E90\u548C\u8BF7\u6C42\uFF0CBasic\u57DF\u6267\u884C\u8EAB\u4F53\u8FD0\u52A8\uFF0CState\u57DF\u6267\u884C\u72B6\u6001\u4E0E\u8868\u73B0\u3002\n\u7981\u6B62\u4E8B\u9879\uFF1A\u4E0D\u8981\u8BA9\u591A\u4E2A\u6A21\u5757\u76F4\u63A5\u62A2\u5199
     Entity/KCC/Transform\uFF1B\u4E0D\u8981\u628A\u63A7\u5236\u6743\u505A\u6210\u8131\u79BB
     Domain/Module \u7684\u5916\u90E8\u5927\u7CFB\u7EDF\u3002"
   requiredItems:

@@ -1,5 +1,6 @@
 using Sirenix.OdinInspector;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ES
 {
@@ -9,7 +10,9 @@ namespace ES
     /// 骨骼/Socket 映射和碰撞体分别由 EntityTransformMapping 和标准 Collider 节点负责。
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class EntityCharacterProfile : MonoBehaviour
+    [UnityEngine.Scripting.APIUpdating.MovedFrom(true, sourceNamespace: "ES", sourceAssembly: "ES_Logic", sourceClassName: "EntityCharacterProfile")]
+    [AddComponentMenu("【ES】/场景与对象/角色身份")]
+    public sealed class EntityCharacterIdentity : MonoBehaviour
     {
         [Title("角色身份")]
         [LabelText("角色类型")]
@@ -32,9 +35,12 @@ namespace ES
         public NpcDataInfo npcDefinition;
 
         [Title("默认相机意图")]
-        [ShowIf(nameof(IsFormalCharacter)), LabelText("相机 ProfileKey")]
-        [Tooltip("为空表示该角色不主动占用本地相机。玩家 Variant 应填写稳定 ProfileKey，而不是 VCam 引用。")]
-        public string defaultCameraProfileKey;
+        [ShowIf(nameof(IsFormalCharacter)), LabelText("相机 Definition")]
+        [Tooltip("未配置表示该角色不主动占用本地相机。玩家 Variant 只能填写稳定 Definition 引用，而不是 VCam 引用。")]
+        public ESCameraDefinitionReference defaultCameraDefinition;
+
+        [SerializeField, HideInInspector, FormerlySerializedAs("defaultCameraProfileKey"), FormerlySerializedAs("defaultCameraDefinitionKey")]
+        private string legacyDefaultCameraDefinitionKey;
 
         [ShowIf(nameof(IsFormalCharacter)), LabelText("相机 ViewKey")]
         public string defaultCameraViewKey = "MainView";
@@ -50,7 +56,7 @@ namespace ES
         /// <summary>
         /// 由同根 Entity 在自身生命周期中调用的唯一 Prefab 定义入口。
         /// BuildInput 保证无定义；RuntimePoolTemplate 保留给租户调用 Entity.BindDefinition；
-        /// CharacterVariant 则使用本 Profile 的唯一 DataInfo。
+        /// CharacterVariant 则使用本身份声明的唯一 DataInfo。
         /// </summary>
         public bool ApplyPrefabDefinition(Entity entity, out string error)
         {
@@ -85,7 +91,7 @@ namespace ES
         {
             if (!IsFormalCharacter)
             {
-                error = "只有“正式角色”可以从角色档案自动绑定角色数据。";
+                error = "只有“正式角色”可以从角色身份声明自动绑定角色数据。";
                 return false;
             }
             if (entity == null)
@@ -115,7 +121,7 @@ namespace ES
         }
 
         /// <summary>
-        /// 角色只有通过 Profile 提供默认镜头意图。它只生成纯 CameraRequest，绝不引用
+        /// 角色只有通过身份声明提供默认镜头意图。它只生成纯 CameraRequest，绝不引用
         /// Cinemachine 或场景 Rig；不存在相机配置的正式 NPC/怪物会自然返回 false。
         /// </summary>
         public bool TryCreateDefaultCameraRequest(
@@ -127,7 +133,7 @@ namespace ES
             if (!IsFormalCharacter
                 || entity == null
                 || mapping == null
-                || string.IsNullOrWhiteSpace(defaultCameraProfileKey))
+                || !defaultCameraDefinition.IsConfigured)
             {
                 return false;
             }
@@ -140,7 +146,7 @@ namespace ES
 
             request = ESCameraRequest.CreateBase(
                 new ESCameraViewId(defaultCameraViewKey),
-                defaultCameraProfileKey,
+                defaultCameraDefinition,
                 defaultCameraPriority,
                 entity,
                 follow,
@@ -192,7 +198,7 @@ namespace ES
         {
             if (prefabRole != EntityCharacterPrefabRole.CharacterVariant)
             {
-                error = "正式角色必须使用“正式角色”类型的角色档案。";
+                error = "正式角色必须使用“正式角色”类型的角色身份声明。";
                 return false;
             }
 

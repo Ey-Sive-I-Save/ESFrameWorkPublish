@@ -1076,8 +1076,11 @@ namespace ES
         private static List<PickerEntry> pickerEntries;
         private static bool dirty = true;
 
-        [UnityEditor.InitializeOnLoadMethod]
-        private static void Initialize()
+        /// <summary>
+        /// Registers the editor invalidation callback through ES AssemblyStream.
+        /// The cache itself remains in the Design assembly because editor drawers consume it.
+        /// </summary>
+        public static void InitializeEditorEvents()
         {
             UnityEditor.EditorApplication.projectChanged -= Invalidate;
             UnityEditor.EditorApplication.projectChanged += Invalidate;

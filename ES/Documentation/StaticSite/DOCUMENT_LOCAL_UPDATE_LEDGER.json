@@ -1216,6 +1216,64 @@
                                                      "#editor-overview"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260808-007",
+                        "status":  "documented",
+                        "summary":  "提交角色、载具、音频、状态、标签与 GameCore 的运行时能力、编辑器建模入口、测试场景和配套序列化资产。",
+                        "sourcePaths":  [
+                                            "Assets/ESNormalAssets/CharacterTemplates",
+                                            "Assets/ESNormalAssets/CharacterVariants",
+                                            "Assets/ESNormalAssets/Data/CharacterVariants",
+                                            "Assets/ESNormalAssets/Data/GlobalData/StateMachineConfig",
+                                            "Assets/ESNormalAssets/Data/Group",
+                                            "Assets/ESNormalAssets/EditorTools/大黑塔.prefab",
+                                            "Assets/ESNormalAssets/VehiclePrototypes",
+                                            "Assets/Plugins/ES/1_Design/ConfigKey",
+                                            "Assets/Plugins/ES/1_Design/Tag",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESAudioCueRuntimeTests.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESConfigKeyTableTests.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ES_Design.ConfigKey.Tests.asmdef",
+                                            "Assets/Plugins/ES/3_Examples/1_Runtime/Example_SimpleTools/New Scene 1.unity",
+                                            "Assets/Plugins/Easy Save 3/Resources/ES3/ES3Defaults.asset",
+                                            "Assets/Scenes/Tests/ESPlayerControllerTest.unity",
+                                            "Assets/Scripts/ESLogic/Data/AssetConfigKey",
+                                            "Assets/Scripts/ESLogic/Editor/CharacterTemplates",
+                                            "Assets/Scripts/ESLogic/Editor/SkillSequenceRuntimeCacheEditorLifecycle.cs",
+                                            "Assets/Scripts/ESLogic/ES_Logic.asmdef",
+                                            "Assets/Scripts/ESLogic/Runtime",
+                                            "Documentation/CHARACTER_PREFAB_CONTRACT.md",
+                                            "Documentation/VEHICLE_RUNTIME_CONTRACT.md"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs",
+                                              "Assets/Scripts/ESLogic/Runtime/Vehicle/VehicleController.cs",
+                                              "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESAudioModule.cs",
+                                              "Assets/Plugins/ES/1_Design/Tests/ESAudioCueRuntimeTests.cs",
+                                              "Assets/Scenes/Tests/ESPlayerControllerTest.unity"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "角色身份、实体领域、玩家模板、载具、音频、状态和 GameCore 数据经由序列化资产与运行时模块相互依赖。将模型代码、生成入口、测试场景和资产同批提交，可避免缺失类型或预制体绑定中断。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "批次携带领域测试、运行时契约和测试场景作为 Unity 验收入口",
+                                                            "提交前由 staged-only 门禁核对路径清单和补丁指纹"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "完整角色切换、载具、音频和存档流程仍需 Unity PlayMode/Player 实测",
+                                                             "序列化资产变更仍需在目标项目完整导入后复核"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1228,13 +1286,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-08T19:03:08+08:00",
-                       "head":  "cb3986913f987ff6253d38a44619764fe34d6726",
-                       "stagedSourcePatchSha256":  "051a84875cfb1fd678214d392cfe09353a8a47aaecfe0a27e8aba6e1d1cd4945",
-                       "stagedSourceManifestSha256":  "63440e9b95def85dac900f4a2f7064a8221a856f47ac3585f5f618bb7c00b2ec",
-                       "stagedSourceFileCount":  121,
+                       "preparedAt":  "2026-08-08T19:05:19+08:00",
+                       "head":  "cfcf65fe7a2cb9f57e85626405d01fea8ee90900",
+                       "stagedSourcePatchSha256":  "6129b1a48f8dd195b5abe2560d5c77b18eed691955ac858d41d3e42cd8dba253",
+                       "stagedSourceManifestSha256":  "2f95a202377527ba026d7b076a2fd55a74f6be841e9fcd80584750bd01c35da7",
+                       "stagedSourceFileCount":  59,
                        "entryIds":  [
-                                        "LOCAL-20260808-006"
+                                        "LOCAL-20260808-007"
                                     ]
                    }
 }

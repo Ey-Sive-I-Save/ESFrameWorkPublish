@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.Audio;
+using UnityEngine.Serialization;
 
 namespace ES
 {
@@ -252,8 +253,9 @@ namespace ES
         [LabelText("最大距离"), MinValue(0f)]
         public float maxDistance = 30f;
 
-        [LabelText("可选 Spatial Profile"), InlineProperty]
-        public ESAudioSpatialProfile spatialProfile = new ESAudioSpatialProfile();
+        [LabelText("可选 空间设置"), InlineProperty]
+        [FormerlySerializedAs("spatialProfile")]
+        public ESAudioSpatialSettings spatialSettings = new ESAudioSpatialSettings();
 
         public bool TryValidate(out string error)
         {
@@ -273,7 +275,7 @@ namespace ES
                 error = "AudioClip 播放配置包含无效的优先级、音量、音高或距离。";
                 return false;
             }
-            if (spatialProfile != null && !spatialProfile.TryValidate(out error))
+            if (spatialSettings != null && !spatialSettings.TryValidate(out error))
                 return false;
 
             error = null;
@@ -1519,7 +1521,7 @@ namespace ES
             voice.spatialMode = cueData.source.spatialMode;
             voice.minDistance = cueData.source.minDistance;
             voice.maxDistance = cueData.source.maxDistance;
-            voice.spatialProfile = cueData.source.spatialProfile;
+            voice.spatialSettings = cueData.source.spatialSettings;
             voice.baseVolume = ResolveBaseVolume(cueData.source, request);
             voice.pitch = ResolvePitch(cueData.source, request);
             voice.createdAt = now;
@@ -1613,7 +1615,7 @@ namespace ES
             float pitch = config != null ? config.pitch : 1f;
             float minDistance = config != null ? config.minDistance : 1f;
             float maxDistance = config != null ? config.maxDistance : 30f;
-            ESAudioSpatialProfile spatialProfile = config != null ? config.spatialProfile : null;
+            ESAudioSpatialSettings spatialSettings = config != null ? config.spatialSettings : null;
             bool loop = forceLoop ?? (config != null && config.loop);
             long requestedPriority = (long)(config != null ? config.priority : 128) + request.priorityOffset;
             int priority = requestedPriority < 0L ? 0 : requestedPriority > 256L ? 256 : (int)requestedPriority;
@@ -1636,7 +1638,7 @@ namespace ES
             voice.spatialMode = spatialMode;
             voice.minDistance = minDistance;
             voice.maxDistance = maxDistance;
-            voice.spatialProfile = spatialProfile;
+            voice.spatialSettings = spatialSettings;
             voice.baseVolume = ResolveBaseVolume(volume, request);
             voice.pitch = ResolvePitch(pitch, request);
             voice.createdAt = now;
@@ -1743,7 +1745,7 @@ namespace ES
             source.maxDistance = Mathf.Max(source.minDistance, voice.maxDistance);
             ResetOptionalSpatialSettings(source);
             if (voice.spatialMode == ESAudioSpatialMode.ThreeD)
-                ApplySpatialProfile(source, voice.spatialProfile);
+                ApplySpatialSettings(source, voice.spatialSettings);
             source.outputAudioMixerGroup = ResolveCategoryMixerGroup(voice.category);
             if (!voice.usesBoundEmitter)
                 source.transform.position = voice.position;
@@ -2510,26 +2512,26 @@ namespace ES
             source.spatializePostEffects = false;
         }
 
-        private static void ApplySpatialProfile(AudioSource source, ESAudioSpatialProfile profile)
+        private static void ApplySpatialSettings(AudioSource source, ESAudioSpatialSettings settings)
         {
-            if (profile == null)
+            if (settings == null)
                 return;
 
-            if (profile.useCustomRolloff)
+            if (settings.useCustomRolloff)
             {
                 source.rolloffMode = AudioRolloffMode.Custom;
-                source.SetCustomCurve(AudioSourceCurveType.CustomRolloff, profile.customRolloffCurve);
+                source.SetCustomCurve(AudioSourceCurveType.CustomRolloff, settings.customRolloffCurve);
             }
-            if (profile.enableDoppler)
-                source.dopplerLevel = profile.dopplerLevel;
-            if (profile.enableSpread)
-                source.spread = profile.spread;
-            if (profile.enableReverbZoneMix)
-                source.reverbZoneMix = profile.reverbZoneMix;
-            if (profile.enableSpatializer)
+            if (settings.enableDoppler)
+                source.dopplerLevel = settings.dopplerLevel;
+            if (settings.enableSpread)
+                source.spread = settings.spread;
+            if (settings.enableReverbZoneMix)
+                source.reverbZoneMix = settings.reverbZoneMix;
+            if (settings.enableSpatializer)
             {
                 source.spatialize = true;
-                source.spatializePostEffects = profile.spatializePostEffects;
+                source.spatializePostEffects = settings.spatializePostEffects;
             }
         }
 
@@ -3167,7 +3169,7 @@ namespace ES
             public ESAudioSpatialMode spatialMode;
             public float minDistance;
             public float maxDistance;
-            public ESAudioSpatialProfile spatialProfile;
+            public ESAudioSpatialSettings spatialSettings;
             public float baseVolume;
             public float pitch;
             public float createdAt;
@@ -3207,7 +3209,7 @@ namespace ES
                 spatialMode = default;
                 minDistance = 0f;
                 maxDistance = 0f;
-                spatialProfile = null;
+                spatialSettings = null;
                 baseVolume = 0f;
                 pitch = 0f;
                 createdAt = 0f;

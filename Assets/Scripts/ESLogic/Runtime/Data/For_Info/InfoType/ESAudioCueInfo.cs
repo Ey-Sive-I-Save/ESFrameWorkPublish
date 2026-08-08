@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ES
 {
@@ -33,7 +34,7 @@ namespace ES
     /// Cues retain the lightweight 2D/3D distance path and perform no extra per-frame work.
     /// </summary>
     [Serializable]
-    public sealed class ESAudioSpatialProfile
+    public sealed class ESAudioSpatialSettings
     {
         [LabelText("自定义衰减曲线")]
         public bool useCustomRolloff;
@@ -184,8 +185,9 @@ namespace ES
 
         [TitleGroup("三维/高级")]
         [ShowIf(nameof(IsThreeDimensional))]
-        [LabelText("可选 Spatial Profile"), InlineProperty]
-        public ESAudioSpatialProfile spatialProfile = new ESAudioSpatialProfile();
+        [LabelText("可选 空间设置"), InlineProperty]
+        [FormerlySerializedAs("spatialProfile")]
+        public ESAudioSpatialSettings spatialSettings = new ESAudioSpatialSettings();
 
         [TitleGroup("播放窗口")]
         [LabelText("启用播放窗口")]
@@ -386,8 +388,8 @@ namespace ES
             }
 
             if (spatialMode == ESAudioSpatialMode.ThreeD
-                && spatialProfile != null
-                && !spatialProfile.TryValidate(out error))
+                && spatialSettings != null
+                && !spatialSettings.TryValidate(out error))
                 return false;
 
             for (int i = 0; i < variants.Count; i++)

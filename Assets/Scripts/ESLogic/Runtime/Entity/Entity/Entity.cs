@@ -49,7 +49,7 @@ namespace ES
         /// </summary>
         private void ApplyPrefabProfileDefinition()
         {
-            EntityCharacterProfile profile = GetComponent<EntityCharacterProfile>();
+            EntityCharacterIdentity profile = GetComponent<EntityCharacterIdentity>();
             if (profile == null)
                 return;
 
@@ -92,6 +92,15 @@ namespace ES
         [NonSerialized] private bool waitsForTagCatalog;
         [NonSerialized] private ESTagDefinitionState intrinsicTagState;
         [NonSerialized] private bool waitsForAttributeCatalog;
+        [NonSerialized] private bool authoringMotionBaselineCaptured;
+        [NonSerialized] private float authoringMaxStableMoveSpeed;
+        [NonSerialized] private float authoringStableMovementSharpness;
+        [NonSerialized] private float authoringMaxAirMoveSpeed;
+        [NonSerialized] private float authoringAirAccelerationSpeed;
+        [NonSerialized] private float authoringJumpSpeed;
+        [NonSerialized] private float authoringOrientationSharpness;
+        [NonSerialized] private float authoringSpeedMultiplier;
+        [NonSerialized] private float authoringSpeedLimit;
 
         /// <summary>Entity is one Tag host. The container itself has no Entity-specific behavior.</summary>
         public ESTagCollection Tags => tags ??= CreateTagCollection();
@@ -133,6 +142,7 @@ namespace ES
         protected override void OnBeforeAwakeRegister()
         {
             EnsureEntityStructure();
+            CaptureAuthoringMotionBaseline();
             EnsureEntityOpSupport();
             Tags.Warmup();
             EnsureTransformMapping();
@@ -177,6 +187,7 @@ namespace ES
         public void OnPoolDespawned()
         {
             ReleaseDefaultCameraRequest();
+            aiDomain?.ResetControlArbitrationForLifecycle();
             UnsubscribeFromTagCatalog();
             UnsubscribeFromAttributeCatalog();
             buffDomain?.ClearAllBuffs();
@@ -189,6 +200,7 @@ namespace ES
         public void OnPoolSpawned()
         {
             EnsureEntityStructure();
+            CaptureAuthoringMotionBaseline();
             EnsureEntityOpSupport();
             Tags.Warmup();
             EnsureTransformMapping();
@@ -260,31 +272,51 @@ namespace ES
         /// <summary>Binds the sole Actor definition that owns this Entity's birth Tags.</summary>
         public bool BindDefinition(ActorDataInfo definition)
         {
-            return BindIntrinsicTags(definition, definition != null ? definition.tags : null);
+            bool applied = BindIntrinsicTags(definition, definition != null ? definition.tags : null);
+            ApplyDefinitionMotion(
+                definition != null ? definition.motionShared : null,
+                definition != null ? definition.motionVariable : default);
+            return applied;
         }
 
         /// <summary>Binds the sole Monster definition that owns this Entity's birth Tags.</summary>
         public bool BindDefinition(MonsterDataInfo definition)
         {
-            return BindIntrinsicTags(definition, definition != null ? definition.tags : null);
+            bool applied = BindIntrinsicTags(definition, definition != null ? definition.tags : null);
+            ApplyDefinitionMotion(
+                definition != null ? definition.motionShared : null,
+                definition != null ? definition.motionVariable : default);
+            return applied;
         }
 
         /// <summary>Binds the sole NPC definition that owns this Entity's birth Tags.</summary>
         public bool BindDefinition(NpcDataInfo definition)
         {
-            return BindIntrinsicTags(definition, definition != null ? definition.tags : null);
+            bool applied = BindIntrinsicTags(definition, definition != null ? definition.tags : null);
+            ApplyDefinitionMotion(
+                definition != null ? definition.motionShared : null,
+                definition != null ? definition.motionVariable : default);
+            return applied;
         }
 
         /// <summary>RuntimeData keeps only a reference to its originating Monster definition's direct Tag list.</summary>
         public bool BindDefinition(ESMonsterRuntimeData definition)
         {
-            return BindIntrinsicTags(definition != null ? definition.soSource : null, definition != null ? definition.tags : null);
+            bool applied = BindIntrinsicTags(definition != null ? definition.soSource : null, definition != null ? definition.tags : null);
+            ApplyDefinitionMotion(
+                definition != null ? definition.sharedData : null,
+                definition != null ? definition.defaultVariableData : default);
+            return applied;
         }
 
         /// <summary>RuntimeData keeps only a reference to its originating NPC definition's direct Tag list.</summary>
         public bool BindDefinition(ESNpcRuntimeData definition)
         {
-            return BindIntrinsicTags(definition != null ? definition.soSource : null, definition != null ? definition.tags : null);
+            bool applied = BindIntrinsicTags(definition != null ? definition.soSource : null, definition != null ? definition.tags : null);
+            ApplyDefinitionMotion(
+                definition != null ? definition.sharedData : null,
+                definition != null ? definition.defaultVariableData : default);
+            return applied;
         }
 
         /// <summary>
@@ -365,6 +397,65 @@ namespace ES
             intrinsicTagDefinition = null;
             intrinsicTagError = null;
             intrinsicTagState = ESTagDefinitionState.Empty;
+            RestoreAuthoringMotionBaseline();
+        }
+
+        private void CaptureAuthoringMotionBaseline()
+        {
+            if (authoringMotionBaselineCaptured || kcc == null)
+                return;
+
+            authoringMaxStableMoveSpeed = kcc.maxStableMoveSpeed;
+            authoringStableMovementSharpness = kcc.stableMovementSharpness;
+            authoringMaxAirMoveSpeed = kcc.maxAirMoveSpeed;
+            authoringAirAccelerationSpeed = kcc.airAccelerationSpeed;
+            authoringJumpSpeed = kcc.jumpSpeed;
+            authoringOrientationSharpness = kcc.orientationSharpness;
+            authoringSpeedMultiplier = kcc.speedMultiplier;
+            authoringSpeedLimit = kcc.speedLimit;
+            authoringMotionBaselineCaptured = true;
+        }
+
+        private void ApplyDefinitionMotion(
+            EntityMotionSharedData sharedData,
+            EntityMotionVariableData variableData)
+        {
+            CaptureAuthoringMotionBaseline();
+            if (kcc == null || sharedData == null)
+            {
+                RestoreAuthoringMotionBaseline();
+                return;
+            }
+
+            kcc.maxStableMoveSpeed = sharedData.maxStableMoveSpeed;
+            kcc.stableMovementSharpness = sharedData.stableMovementSharpness;
+            kcc.maxAirMoveSpeed = sharedData.maxAirMoveSpeed;
+            kcc.airAccelerationSpeed = sharedData.airAccelerationSpeed;
+            kcc.jumpSpeed = sharedData.jumpSpeed;
+            kcc.orientationSharpness = sharedData.orientationSharpness > 0f
+                ? sharedData.orientationSharpness
+                : authoringOrientationSharpness;
+            // Zero is the CLR default for old serialized variable data, not a useful spawn speed.
+            // A deliberate stop must use the Entity Move Permit, so it cannot silently brick input.
+            kcc.speedMultiplier = variableData.speedMultiplier > 0f
+                ? variableData.speedMultiplier
+                : 1f;
+            kcc.speedLimit = variableData.speedLimit;
+        }
+
+        private void RestoreAuthoringMotionBaseline()
+        {
+            if (!authoringMotionBaselineCaptured || kcc == null)
+                return;
+
+            kcc.maxStableMoveSpeed = authoringMaxStableMoveSpeed;
+            kcc.stableMovementSharpness = authoringStableMovementSharpness;
+            kcc.maxAirMoveSpeed = authoringMaxAirMoveSpeed;
+            kcc.airAccelerationSpeed = authoringAirAccelerationSpeed;
+            kcc.jumpSpeed = authoringJumpSpeed;
+            kcc.orientationSharpness = authoringOrientationSharpness;
+            kcc.speedMultiplier = authoringSpeedMultiplier;
+            kcc.speedLimit = authoringSpeedLimit;
         }
 
         private bool BindIntrinsicTags(UnityEngine.Object definition, IReadOnlyList<ESTagStableReference> definitionTags)

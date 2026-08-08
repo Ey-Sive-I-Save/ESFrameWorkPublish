@@ -178,15 +178,15 @@ namespace ES
                 StateSupportFlags.Crouched
             });
 
-            // SpecialInteraction：禁止切换到游泳/飞行/骑乘/趴伏/下蹲/攀爬
+            // SpecialInteraction：禁止切换到游泳/飞行/骑乘/趴伏/下蹲；
+            // 梯子、交互点等特殊交互可以把角色交给攀爬域。
             AddRelations(StateSupportFlags.SpecialInteraction, new[]
             {
                 StateSupportFlags.Swimming,
                 StateSupportFlags.Flying,
                 StateSupportFlags.Mounted,
                 StateSupportFlags.Prone,
-                StateSupportFlags.Crouched,
-                StateSupportFlags.Climbing
+                StateSupportFlags.Crouched
             });
 
             // Observer：禁止切换到游泳/飞行/骑乘/趴伏/下蹲/攀爬/特殊交互/过场

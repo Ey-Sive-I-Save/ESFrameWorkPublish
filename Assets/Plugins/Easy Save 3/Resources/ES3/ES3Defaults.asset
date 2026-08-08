@@ -43,7 +43,9 @@ MonoBehaviour:
     - EasySave3
     - ES_Design
     - ES_Logic
+    - ES_Logic.DynamicAtlas.PlayMode.Tests
     - ES_Stand
+    - ESFramework.AITest
     - ESPlayer
     - Gaskellgames
     - Gaskellgames.FolderSystem

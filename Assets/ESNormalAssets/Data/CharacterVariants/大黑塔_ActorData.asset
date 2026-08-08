@@ -35,7 +35,8 @@ MonoBehaviour:
     enableMount: 1
     enableGrappleMotion: 0
     maxStableMoveSpeed: 8
-    stableMovementSharpness: 15
+    stableMovementSharpness: 20
+    orientationSharpness: 18
     maxAirMoveSpeed: 8
     airAccelerationSpeed: 5
     jumpSpeed: 8

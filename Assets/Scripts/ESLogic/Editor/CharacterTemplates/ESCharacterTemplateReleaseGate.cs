@@ -31,7 +31,7 @@ namespace ES
         }
 
         /// <summary>
-        /// 扫描项目内所有声明了 EntityCharacterProfile 的 Prefab。
+        /// 扫描项目内所有声明了 EntityCharacterIdentity 的 Prefab。
         /// 这是制作期审计入口；发布期仍由依赖闭包检查只验证实际会进入内容的 Prefab。
         /// </summary>
         internal static bool ValidateAllCharacterPrefabModuleContracts(out string report)
@@ -48,10 +48,10 @@ namespace ES
                 if (prefab == null)
                     continue;
 
-                EntityCharacterProfile[] profiles = prefab.GetComponentsInChildren<EntityCharacterProfile>(true);
+                EntityCharacterIdentity[] profiles = prefab.GetComponentsInChildren<EntityCharacterIdentity>(true);
                 for (int j = 0; j < profiles.Length; j++)
                 {
-                    EntityCharacterProfile profile = profiles[j];
+                    EntityCharacterIdentity profile = profiles[j];
                     profileCount++;
                     Entity entity = profile != null ? profile.GetComponent<Entity>() : null;
                     if (!ValidateCharacterPrefabModuleContract(profile, entity, out string error))
@@ -65,7 +65,7 @@ namespace ES
 
             report = errors.Count == 0
                 ? "[角色基础模块审计] 通过：已检查 " + profileCount
-                  + " 个 EntityCharacterProfile。移动、输入调度和玩家输入写入契约完整。"
+                  + " 个 EntityCharacterIdentity。移动、输入调度和玩家输入写入契约完整。"
                 : "[角色基础模块审计] 未通过：\n- " + string.Join("\n- ", errors);
             return errors.Count == 0;
         }
@@ -188,10 +188,10 @@ namespace ES
                 if (!ValidateClimbingStateContract(entity, out string climbError))
                     errors.Add(context + "中的攀爬状态配置不合格：" + prefabPath + " | " + climbError);
 
-                EntityCharacterProfile profile = entity != null ? entity.GetComponent<EntityCharacterProfile>() : null;
+                EntityCharacterIdentity profile = entity != null ? entity.GetComponent<EntityCharacterIdentity>() : null;
                 if (profile == null)
                 {
-                    errors.Add(context + "中的 Entity 缺少根 EntityCharacterProfile：" + prefabPath);
+                    errors.Add(context + "中的 Entity 缺少根 EntityCharacterIdentity：" + prefabPath);
                     continue;
                 }
 
@@ -232,13 +232,13 @@ namespace ES
         /// BuildInput 和 RuntimePoolTemplate 不携带本地玩家输入；只有 Player 阵营的正式角色可携带它。
         /// </summary>
         private static bool ValidateCharacterPrefabModuleContract(
-            EntityCharacterProfile profile,
+            EntityCharacterIdentity profile,
             Entity entity,
             out string error)
         {
             if (profile == null || entity == null || profile.gameObject != entity.gameObject)
             {
-                error = "EntityCharacterProfile 必须与 Entity 同挂在角色根节点。";
+                error = "EntityCharacterIdentity 必须与 Entity 同挂在角色根节点。";
                 return false;
             }
 
@@ -249,18 +249,11 @@ namespace ES
             }
 
             int moveCount = CountBasicModule<EntityBasicMoveRotateModule>(entity);
-            int dispatchCount = CountAiModule<EntityAIInputDispatchModule>(entity);
             int playerWriterCount = CountAiModule<EntityPlayerInputWriteModule>(entity);
-            if (moveCount != 1 || dispatchCount != 1)
+            if (moveCount != 1 || entity.aiDomain == null)
             {
-                error = "必须各有唯一的 EntityBasicMoveRotateModule 与 EntityAIInputDispatchModule"
-                        + "（当前 Move=" + moveCount + "，Dispatch=" + dispatchCount + "）。";
-                return false;
-            }
-
-            if (entity.aiDomain.autoEnsurePlayerInputModules)
-            {
-                error = "不得启用 autoEnsurePlayerInputModules；基础模块必须由 Prefab 显式配置。";
+                error = "必须有唯一的 EntityBasicMoveRotateModule，且 EntityAIDomain 必须提供输入执行器"
+                        + "（当前 Move=" + moveCount + "，AIDomain=" + (entity.aiDomain != null ? "有效" : "缺失") + "）。";
                 return false;
             }
 
@@ -278,10 +271,10 @@ namespace ES
 
             if (requiresPlayerWriter)
             {
-                if (string.IsNullOrWhiteSpace(profile.defaultCameraProfileKey)
+                if (!profile.defaultCameraDefinition.IsConfigured
                     || !string.Equals(profile.defaultCameraViewKey, ESCameraViewId.Main.Key, StringComparison.Ordinal))
                 {
-                    error = "玩家正式角色必须配置 MainView 的默认 Camera ProfileKey；相机只由 SceneBinding → Director 驱动。";
+                    error = "玩家正式角色必须配置 MainView 的默认 Camera Definition；相机只由 SceneBinding → Director 驱动。";
                     return false;
                 }
 

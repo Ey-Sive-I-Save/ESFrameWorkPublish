@@ -41,9 +41,9 @@
   -> 驾驶权释放 / Controller 禁用 / 销毁：Release Lease
 ```
 
-- `driverCameraProfileKey` 为空时，载具不申请镜头；它是对静态骑乘点、AI 车辆和无镜头载具的正常配置，不需要空组件。
+- `driverCameraDefinitionKey` 为空时，载具不申请镜头；它是对静态骑乘点、AI 车辆和无镜头载具的正常配置，不需要空组件。
 - 请求 Owner 必须是当前 `driver`，而不是 Controller。这样不增加输入转发 if，现有 `Entity.SubmitCameraLook` 仅在该请求获胜时自然被 Director 接受。
-- 驾驶镜头的 `Follow` 默认是载具根；正式载具可显式配置专用相机锚点。它只保存 Transform 与 ProfileKey，不保存 Brain、VCam 或 Rig。
+- 驾驶镜头的 `Follow` 默认是载具根；正式载具可显式配置专用相机锚点。它只保存 Transform 与 DefinitionKey，不保存 Brain、VCam 或 Rig。
 - 默认内容工具生成 `vehicle.chase` Profile/Rig。方块汽车、自行车与直升机在“升级方块载具骑乘探针”时会显式写入该 Profile；项目内容可以替换为专属稳定 Key。
 
 ## 运动调度

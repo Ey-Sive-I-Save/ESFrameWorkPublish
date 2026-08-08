@@ -13,10 +13,6 @@ namespace ES
     [Serializable]
     public sealed class EntityInputState
     {
-        [Title("开关")]
-        [LabelText("是否启用输入")]
-        public bool enableInput = true;
-
         [Title("输出状态")]
         [ShowInInspector, ReadOnly]
         public EntityMotionInputState motion;
@@ -24,85 +20,10 @@ namespace ES
         [ShowInInspector, ReadOnly]
         public EntityActionInputPulse action;
 
-        public Vector2 Move => motion.move;
-        public Vector2 Look => motion.look;
-
-        public bool ConsumeAttack() => action.ConsumeAttack();
-        public bool ConsumeHeavyAttack() => action.ConsumeHeavyAttack();
-        public bool ConsumeBlock() => action.ConsumeBlock();
-        public bool ConsumeSlide() => action.ConsumeSlide();
-        public bool ConsumeSwitchWeapon() => action.ConsumeSwitchWeapon();
-        public bool ConsumeEquipWeapon() => action.ConsumeEquipWeapon();
-        public bool ConsumeHolsterWeapon() => action.ConsumeHolsterWeapon();
-        public bool ConsumeWeaponSlot1() => action.ConsumeWeaponSlot1();
-        public bool ConsumeWeaponSlot2() => action.ConsumeWeaponSlot2();
-        public bool ConsumeWeaponSlot3() => action.ConsumeWeaponSlot3();
-        public bool ConsumeWeaponSlot4() => action.ConsumeWeaponSlot4();
-        public bool ConsumeWeaponSlot5() => action.ConsumeWeaponSlot5();
-        public bool ConsumeAim() => action.ConsumeAim();
-        public bool ConsumeSkill1() => action.ConsumeSkill1();
-        public bool ConsumeSkill2() => action.ConsumeSkill2();
-        public bool ConsumeSkill3() => action.ConsumeSkill3();
-        public bool ConsumeJump() => action.ConsumeJump();
-        public bool ConsumeCrouchToggle() => action.ConsumeCrouchToggle();
-        public bool ConsumeFlyToggle() => action.ConsumeFlyToggle();
-        public bool ConsumeMountToggle() => action.ConsumeMountToggle();
-        public bool ConsumeClimbToggle() => action.ConsumeClimbToggle();
-        public bool ConsumeInteract() => action.ConsumeInteract();
-        public void ClearOneShot() => action.Clear();
-        public bool EyeHold => motion.eyeHold;
-        public bool PeekLeftHold => motion.peekLeftHold;
-        public bool PeekRightHold => motion.peekRightHold;
-        public bool BlockHeld => motion.blockHold;
-        public float AimPeek => motion.AimPeek;
-        public float FlyVertical => motion.flyVertical;
-
         public void ClearAll()
         {
             motion.Clear();
             action.Clear();
-        }
-
-        public void SetMotion(Vector2 move, Vector2 look, float flyVertical = 0f)
-        {
-            motion.move = move;
-            motion.look = look;
-            motion.flyVertical = flyVertical;
-            motion.frameIndex = Time.frameCount;
-        }
-
-        public void SetMotionHold(bool eyeHold, bool peekLeftHold, bool peekRightHold)
-        {
-            motion.eyeHold = eyeHold;
-            motion.peekLeftHold = peekLeftHold;
-            motion.peekRightHold = peekRightHold;
-            motion.frameIndex = Time.frameCount;
-        }
-
-        public void PulseAttack()
-        {
-            action.PulseAttack(Time.frameCount);
-        }
-
-        public void PulseInteract()
-        {
-            action.PulseInteract(Time.frameCount);
-        }
-
-        public void PulseSkill(int slot)
-        {
-            switch (slot)
-            {
-                case 1:
-                    action.PulseSkill1(Time.frameCount);
-                    break;
-                case 2:
-                    action.PulseSkill2(Time.frameCount);
-                    break;
-                case 3:
-                    action.PulseSkill3(Time.frameCount);
-                    break;
-            }
         }
     }
 
@@ -124,12 +45,10 @@ namespace ES
         protected override void Update()
         {
             EntityInputState state = MyDomain.inputState;
-            if (state == null)
-                return;
 
             // This writer owns the local player's previous frame. Clear it when it is
             // disabled so the dispatcher cannot keep driving the entity from stale intent.
-            if (!enablePlayerInput || !state.enableInput)
+            if (!enablePlayerInput)
             {
                 state.ClearAll();
                 return;
@@ -165,13 +84,12 @@ namespace ES
 
             // claimLocalControl only controls whether this prefab declares control ownership during
             // initialization. It never grants permission to read the global input stream.
-            if (!localControl.IsLocallyControlled(MyCore))
+            if (!MyDomain.CanPlayerWriteInput())
             {
                 state.ClearAll();
                 return;
             }
 
-            state.motion.frameIndex = Time.frameCount;
             state.motion.move = input.ReadVector2(ESInputActionId.Move);
             state.motion.look = input.ReadVector2(ESInputActionId.Look);
             state.motion.flyVertical = input.ReadAxis(ESInputActionId.FlyVertical);
@@ -179,31 +97,30 @@ namespace ES
             state.motion.peekLeftHold = input.IsHeld(ESInputActionId.PeekLeft);
             state.motion.peekRightHold = input.IsHeld(ESInputActionId.PeekRight);
 
-            int frame = Time.frameCount;
-            if (input.ConsumePressed(ESInputActionId.Attack)) state.action.PulseAttack(frame);
-            if (input.ConsumePressed(ESInputActionId.HeavyAttack)) state.action.PulseHeavyAttack(frame);
+            if (input.ConsumePressed(ESInputActionId.Attack)) state.action.PulseAttack();
+            if (input.ConsumePressed(ESInputActionId.HeavyAttack)) state.action.PulseHeavyAttack();
             // Block is a hold, not a one-frame toggle. Consume the press so it remains
             // exclusively owned by the local player writer; the dispatcher reads blockHold.
             input.ConsumePressed(ESInputActionId.Block);
-            if (input.ConsumePressed(ESInputActionId.Slide)) state.action.PulseSlide(frame);
-            if (input.ConsumePressed(ESInputActionId.SwitchWeapon)) state.action.PulseSwitchWeapon(frame);
-            if (input.ConsumePressed(ESInputActionId.EquipWeapon)) state.action.PulseEquipWeapon(frame);
-            if (input.ConsumePressed(ESInputActionId.HolsterWeapon)) state.action.PulseHolsterWeapon(frame);
-            if (input.ConsumePressed(ESInputActionId.WeaponSlot1)) state.action.PulseWeaponSlot1(frame);
-            if (input.ConsumePressed(ESInputActionId.WeaponSlot2)) state.action.PulseWeaponSlot2(frame);
-            if (input.ConsumePressed(ESInputActionId.WeaponSlot3)) state.action.PulseWeaponSlot3(frame);
-            if (input.ConsumePressed(ESInputActionId.WeaponSlot4)) state.action.PulseWeaponSlot4(frame);
-            if (input.ConsumePressed(ESInputActionId.WeaponSlot5)) state.action.PulseWeaponSlot5(frame);
-            if (input.ConsumePressed(ESInputActionId.Aim)) state.action.PulseAim(frame);
-            if (input.ConsumePressed(ESInputActionId.Skill1)) state.action.PulseSkill1(frame);
-            if (input.ConsumePressed(ESInputActionId.Skill2)) state.action.PulseSkill2(frame);
-            if (input.ConsumePressed(ESInputActionId.Skill3)) state.action.PulseSkill3(frame);
-            if (input.ConsumePressed(ESInputActionId.Jump)) state.action.PulseJump(frame);
-            if (input.ConsumePressed(ESInputActionId.Crouch)) state.action.PulseCrouchToggle(frame);
-            if (input.ConsumePressed(ESInputActionId.Fly)) state.action.PulseFlyToggle(frame);
-            if (input.ConsumePressed(ESInputActionId.Mount)) state.action.PulseMountToggle(frame);
-            if (input.ConsumePressed(ESInputActionId.Climb)) state.action.PulseClimbToggle(frame);
-            if (input.ConsumePressed(ESInputActionId.Interact)) state.action.PulseInteract(frame);
+            if (input.ConsumePressed(ESInputActionId.Slide)) state.action.PulseSlide();
+            if (input.ConsumePressed(ESInputActionId.SwitchWeapon)) state.action.PulseSwitchWeapon();
+            if (input.ConsumePressed(ESInputActionId.EquipWeapon)) state.action.PulseEquipWeapon();
+            if (input.ConsumePressed(ESInputActionId.HolsterWeapon)) state.action.PulseHolsterWeapon();
+            if (input.ConsumePressed(ESInputActionId.WeaponSlot1)) state.action.PulseWeaponSlot1();
+            if (input.ConsumePressed(ESInputActionId.WeaponSlot2)) state.action.PulseWeaponSlot2();
+            if (input.ConsumePressed(ESInputActionId.WeaponSlot3)) state.action.PulseWeaponSlot3();
+            if (input.ConsumePressed(ESInputActionId.WeaponSlot4)) state.action.PulseWeaponSlot4();
+            if (input.ConsumePressed(ESInputActionId.WeaponSlot5)) state.action.PulseWeaponSlot5();
+            if (input.ConsumePressed(ESInputActionId.Aim)) state.action.PulseAim();
+            if (input.ConsumePressed(ESInputActionId.Skill1)) state.action.PulseSkill1();
+            if (input.ConsumePressed(ESInputActionId.Skill2)) state.action.PulseSkill2();
+            if (input.ConsumePressed(ESInputActionId.Skill3)) state.action.PulseSkill3();
+            if (input.ConsumePressed(ESInputActionId.Jump)) state.action.PulseJump();
+            if (input.ConsumePressed(ESInputActionId.Crouch)) state.action.PulseCrouchToggle();
+            if (input.ConsumePressed(ESInputActionId.Fly)) state.action.PulseFlyToggle();
+            if (input.ConsumePressed(ESInputActionId.Mount)) state.action.PulseMountToggle();
+            if (input.ConsumePressed(ESInputActionId.Climb)) state.action.PulseClimbToggle();
+            if (input.ConsumePressed(ESInputActionId.Interact)) state.action.PulseInteract();
         }
 
         protected override void OnDisable()
@@ -216,102 +133,13 @@ namespace ES
     }
 
     // =================================================================================================
-    // 输入调度模块（AI 域）
+    // AI 域输入执行器
     // - 读取 Entity 输入状态
     // - 驱动 Basic 域的“实际生效模块”
     // =================================================================================================
-    [Serializable, TypeRegistryItem("AI输入调度模块")]
-    public class EntityAIInputDispatchModule : EntityAIModuleBase
+    public partial class EntityAIDomain
     {
-        [LabelText("移动缩放")]
-        public float moveScale = 1f;
-
-        [Title("Tag Gate")]
-        [LabelText("输入调度 Tag 条件")]
-        [Tooltip("为空时不限制。条件不匹配时当前帧输入不会驱动移动、战斗、技能或交互。")]
-        public ESTagConditionConfig dispatchTagCondition = new ESTagConditionConfig();
-
-        [Title("转身模式")]
-        public TurnMode turnMode = TurnMode.FreeLook;
-
-        [LabelText("转身速率")]
-        public float turnSpeed = 12f;
-
-        [LabelText("视角平滑")]
-        public float lookSmooth = 10f;
-
-        [Title("移动平滑")]
-        [LabelText("移动平滑")]
-        public float moveSmooth = 12f;
-
-        [LabelText("无输入时立即停下")]
-        public bool stopMoveWhenNoInput = true;
-
-        [LabelText("移动死区")]
-        public float moveDeadZone = 0.05f;
-
-        [LabelText("攀爬时禁用移动平滑")]
-        public bool disableMoveSmoothWhileClimbing = true;
-
-        [Title("相机控制")]
-        [LabelText("启用相机上下视角")]
-        public bool enableCameraLook = true;
-
-        [LabelText("AIM(可选)")]
-        public Transform aimTransform;
-
-        [Title("瞄准驱动")]
-        [LabelText("驱动 AimIK")]
-        public bool driveAimIK = true;
-
-        [LabelText("AimIK 权重"), Range(0f, 1f)]
-        public float aimIKWeight = 0f;
-
-        [LabelText("瞄准目标距离")]
-        public float aimTargetDistance = 30f;
-
-        [LabelText("无相机时瞄准高度")]
-        public float fallbackAimHeight = 1.5f;
-
-        [LabelText("相机Yaw速率")]
-        public float cameraYawSpeed = 220f;
-
-        [LabelText("相机Pitch速率")]
-        public float cameraPitchSpeed = 90f;
-
-        [LabelText("水平旋转倍率")]
-        public float yawMultiplier = 1f;
-
-        [LabelText("竖直旋转倍率")]
-        public float pitchMultiplier = 1f;
-
-        [LabelText("相机Pitch限制")]
-        public Vector2 cameraPitchLimit = new Vector2(-80f, 80f);
-
-        [LabelText("Pitch软限制范围")]
-        public float cameraPitchSoftZone = 12f;
-
-        [LabelText("Pitch越界矫正速率")]
-        public float cameraPitchCorrectionSpeed = 12f;
-
-        [LabelText("相机旋转平滑")]
-        public float cameraLookSmooth = 12f;
-
-        [Title("小眼睛")]
-        [LabelText("小眼睛视角倍率")]
-        public float eyeLookScale = 1f;
-
-        [LabelText("小眼睛回正速率")]
-        public float eyeReturnSpeed = 10f;
-
-        [LabelText("相机调试")]
-        public bool debugCamera;
-
-        [LabelText("骑乘调试")]
-        public bool debugMount;
-
         private Vector3 _lastLookWorld = Vector3.forward;
-        private Vector3 _smoothedMoveWorld;
         private float _freeLookYaw;
         private bool _freeLookInited;
         // Driver is stable for the lifetime of a bound Animator. Cache the positive
@@ -325,43 +153,16 @@ namespace ES
         private float _aimPitchCurrent;
         private bool _aimAnglesInited;
 
-        private float _eyeYawOffset;
-        private float _eyePitchOffset;
-
-        private float _eyePitchVel;
-
         private bool _wasClimbing;
 
-        private const int SpeedSampleCapacity = 256;
-        private float _totalMoveTime;
-        private float _last1sSpeedSum;
-        [NonSerialized] private SpeedSample[] _speedSamples;
-        [NonSerialized] private int _speedSampleHead;
-        [NonSerialized] private int _speedSampleCount;
         private Transform _runtimeAimTarget;
 
-        [ShowInInspector, ReadOnly, LabelText("总运动时长")]
-        public float totalMoveTime;
-
-        [ShowInInspector, ReadOnly, LabelText("最近1秒平均速率")]
-        public float avgSpeedLast1s;
-
-        [ShowInInspector, ReadOnly, LabelText("最近跳跃输入帧")]
-        public int lastJumpInputFrame;
-
-        public override void Start()
+        private void UpdateInputDispatch()
         {
-            base.Start();
-            EnsureSpeedSampleBuffer();
-        }
+            if (MyCore == null) return;
 
-        protected override void Update()
-        {
-            if (MyCore == null || MyDomain == null) return;
-
-            var input = MyDomain.inputState;
-            if (input == null) return;
-            if (!input.enableInput)
+            var input = inputState;
+            if (IsControlBlocked)
             {
                 input.ClearAll();
                 ResetCharacterMotionInput();
@@ -369,7 +170,6 @@ namespace ES
                 ClearCombatInputLatches();
                 return;
             }
-
             if (dispatchTagCondition != null
                 && !dispatchTagCondition.IsEmpty
                 && !MyCore.Tags.Matches(dispatchTagCondition))
@@ -387,11 +187,8 @@ namespace ES
             bool isClimbing = hasClimbModule && climbModule.subState != ClimbSubState.None;
 
             bool hasMountModule = TryGetModule(out global::ES.EntityBasicMountModule mountModule);
-            if (hasMountModule && input.ConsumeMountToggle())
+            if (hasMountModule && input.action.ConsumeMountToggle())
             {
-                if (debugMount)
-                    Debug.Log($"[EntityAIInputDispatch] MountToggle consumed | module={mountModule.GetType().Name}");
-
                 mountModule.ToggleMount();
             }
 
@@ -403,20 +200,19 @@ namespace ES
             if (hasMountModule && mountModule.IsMounted)
             {
                 DispatchMountedControl(input, cam, mountModule);
-                input.ClearOneShot();
+                input.action.Clear();
                 _wasClimbing = false;
                 return;
             }
 
-            DispatchGroundMove(input, cam, isClimbing);
+            DispatchGroundMove(input, cam);
             DispatchFly(input);
-            UpdateMoveStats(_smoothedMoveWorld);
             DispatchClimb(input, climbModule, hasClimbModule);
             DispatchInteraction(input);
             DispatchCombat(input, cam);
             DispatchSkill(input);
 
-            input.ClearOneShot();
+            input.action.Clear();
             _wasClimbing = isClimbing;
         }
 
@@ -427,13 +223,11 @@ namespace ES
             if (!isClimbing || _wasClimbing)
                 return;
 
-            _smoothedMoveWorld = Vector3.zero;
             MyCore.SetMoveInput(Vector3.zero);
         }
 
         private void ResetCharacterMotionInput()
         {
-            _smoothedMoveWorld = Vector3.zero;
             MyCore?.ResetKCCInputs();
         }
 
@@ -457,35 +251,33 @@ namespace ES
             if (!enableCameraLook)
                 return;
 
-            float scale = input.EyeHold ? eyeLookScale : 1f;
             // 只有当前本地控制实体可以把 Look 交给 Camera 模块。普通 AI 仍可保留
             // 自己的瞄准/骨骼意图，但绝不能参与 MainView 的输入或仲裁。
             if (MyCore != null
                 && ESGameManager.LocalControl != null
                 && ESGameManager.LocalControl.IsLocallyControlled(MyCore))
             {
-                MyCore.SubmitCameraLook(input.Look * scale);
+                MyCore.SubmitCameraLook(input.motion.look);
             }
 
             // Aim 是角色骨骼/IK 意图，保留在角色域；它不拥有或驱动相机实例。
             if (aimTransform != null)
-                ApplyAimLook(input.Look, scale, input.EyeHold);
+                ApplyAimLook(input.motion.look);
         }
 
-        private void DispatchGroundMove(EntityInputState input, Transform cam, bool isClimbing)
+        private void DispatchGroundMove(EntityInputState input, Transform cam)
         {
             if (!TryGetModule(out EntityBasicMoveRotateModule moveModule))
                 return;
 
-            ApplyMoveAndLook(input, cam, isClimbing);
+            ApplyMoveAndLook(input, cam);
 
-            if (input.ConsumeJump())
+            if (input.action.ConsumeJump())
             {
-                lastJumpInputFrame = Time.frameCount;
                 moveModule.RequestJump();
             }
 
-            if (input.ConsumeCrouchToggle())
+            if (input.action.ConsumeCrouchToggle())
                 moveModule.ToggleCrouch();
 
         }
@@ -495,18 +287,18 @@ namespace ES
             if (!TryGetModule(out EntityBasicFlyModule flyModule))
                 return;
 
-            if (input.ConsumeFlyToggle())
+            if (input.action.ConsumeFlyToggle())
                 flyModule.ToggleFly();
 
-            flyModule.SetVerticalInput(input.FlyVertical);
+            flyModule.SetVerticalInput(input.motion.flyVertical);
         }
 
         private void DispatchMountedControl(EntityInputState input, Transform cam, global::ES.EntityBasicMountModule mountModule)
         {
             // Keep using the same camera-relative conversion as foot movement, but route
             // the resolved intent only to the current driver seat.
-            ApplyMoveAndLook(input, cam, false);
-            MyCore.SetVerticalInput(input.FlyVertical);
+            ApplyMoveAndLook(input, cam);
+            MyCore.SetVerticalInput(input.motion.flyVertical);
 
             EntityMountable mountable = mountModule.currentMount;
             if (mountable != null)
@@ -523,13 +315,13 @@ namespace ES
 
         private void DispatchClimb(EntityInputState input, EntityBasicClimbModule climbModule, bool hasClimbModule)
         {
-            if (hasClimbModule && input.ConsumeClimbToggle())
+            if (hasClimbModule && input.action.ConsumeClimbToggle())
                 climbModule.ToggleClimb();
         }
 
         private void DispatchInteraction(EntityInputState input)
         {
-            if (TryGetModule(out EntityBasicInteractionModule interactionModule) && input.ConsumeInteract())
+            if (TryGetModule(out EntityBasicInteractionModule interactionModule) && input.action.ConsumeInteract())
                 interactionModule.RequestInteract();
         }
 
@@ -538,16 +330,16 @@ namespace ES
             if (!TryGetModule(out EntityBasicCombatModule combatModule))
                 return;
 
-            if (input.ConsumeAttack()) combatModule.TriggerAttack();
-            if (input.ConsumeHeavyAttack()) combatModule.TriggerHeavyAttack();
-            combatModule.SetBlock(input.BlockHeld || input.ConsumeBlock());
-            combatModule.SetSlide(input.ConsumeSlide());
+            if (input.action.ConsumeAttack()) combatModule.TriggerAttack();
+            if (input.action.ConsumeHeavyAttack()) combatModule.TriggerHeavyAttack();
+            combatModule.SetBlock(input.motion.blockHold);
+            combatModule.SetSlide(input.action.ConsumeSlide());
             DispatchWeaponAction(input, combatModule);
 
-            if (input.ConsumeAim())
+            if (input.action.ConsumeAim())
                 combatModule.SetAim(!combatModule.isAiming);
 
-            combatModule.SetAimPeek(input.AimPeek);
+            combatModule.SetAimPeek(input.motion.AimPeek);
 
             var ikDriver = ResolveIKDriver();
             if (ikDriver != null)
@@ -556,14 +348,14 @@ namespace ES
 
         private void DispatchWeaponAction(EntityInputState input, EntityBasicCombatModule combatModule)
         {
-            if (input.ConsumeWeaponSlot1()) { combatModule.SwitchWeaponTo(0); return; }
-            if (input.ConsumeWeaponSlot2()) { combatModule.SwitchWeaponTo(1); return; }
-            if (input.ConsumeWeaponSlot3()) { combatModule.SwitchWeaponTo(2); return; }
-            if (input.ConsumeWeaponSlot4()) { combatModule.SwitchWeaponTo(3); return; }
-            if (input.ConsumeWeaponSlot5()) { combatModule.SwitchWeaponTo(4); return; }
-            if (input.ConsumeSwitchWeapon()) { combatModule.SwitchWeaponNext(); return; }
-            if (input.ConsumeEquipWeapon()) { combatModule.EquipCurrentWeapon(); return; }
-            if (input.ConsumeHolsterWeapon()) combatModule.HolsterCurrentWeapon();
+            if (input.action.ConsumeWeaponSlot1()) { combatModule.SwitchWeaponTo(0); return; }
+            if (input.action.ConsumeWeaponSlot2()) { combatModule.SwitchWeaponTo(1); return; }
+            if (input.action.ConsumeWeaponSlot3()) { combatModule.SwitchWeaponTo(2); return; }
+            if (input.action.ConsumeWeaponSlot4()) { combatModule.SwitchWeaponTo(3); return; }
+            if (input.action.ConsumeWeaponSlot5()) { combatModule.SwitchWeaponTo(4); return; }
+            if (input.action.ConsumeSwitchWeapon()) { combatModule.SwitchWeaponNext(); return; }
+            if (input.action.ConsumeEquipWeapon()) { combatModule.EquipCurrentWeapon(); return; }
+            if (input.action.ConsumeHolsterWeapon()) combatModule.HolsterCurrentWeapon();
         }
 
         private void DispatchSkill(EntityInputState input)
@@ -571,38 +363,29 @@ namespace ES
             if (!TryGetModule(out EntityBasicSkillModule skillModule))
                 return;
 
-            if (input.ConsumeSkill1()) skillModule.TriggerSkill(1);
-            if (input.ConsumeSkill2()) skillModule.TriggerSkill(2);
-            if (input.ConsumeSkill3()) skillModule.TriggerSkill(3);
+            if (input.action.ConsumeSkill1()) skillModule.TriggerSkill(1);
+            if (input.action.ConsumeSkill2()) skillModule.TriggerSkill(2);
+            if (input.action.ConsumeSkill3()) skillModule.TriggerSkill(3);
         }
 
-        private void ApplyMoveAndLook(EntityInputState input, Transform cam, bool isClimbing)
+        private void ApplyMoveAndLook(EntityInputState input, Transform cam)
         {
-            Vector3 moveWorld = GetMoveWorld(input.Move, cam, _lastLookWorld) * moveScale;
-            if (stopMoveWhenNoInput && input.Move.sqrMagnitude <= moveDeadZone * moveDeadZone)
+            Vector2 move = input.motion.move;
+            Vector3 moveWorld = GetMoveWorld(move, cam, _lastLookWorld);
+            if (stopMoveWhenNoInput && move.sqrMagnitude <= moveDeadZone * moveDeadZone)
             {
-                _smoothedMoveWorld = Vector3.zero;
                 moveWorld = Vector3.zero;
             }
 
-            if (disableMoveSmoothWhileClimbing && isClimbing)
-            {
-                _smoothedMoveWorld = moveWorld;
-                MyCore.SetMoveInput(moveWorld);
-            }
-            else
-            {
-                _smoothedMoveWorld = SmoothMove(_smoothedMoveWorld, moveWorld, moveSmooth);
-                MyCore.SetMoveInput(_smoothedMoveWorld);
-            }
+            // AI Domain 只负责把相机相对输入解析成世界意图；KCC 是唯一的运动响应层。
+            // 这样起步、松手和反向不会经过两套串联低通，响应由 KCC 的速度模型统一决定。
+            MyCore.SetMoveInput(moveWorld);
 
-            if (input.EyeHold)
-                return;
-
-            Vector3 targetLook = enableCameraLook && aimTransform != null && _aimAnglesInited
-                ? Quaternion.Euler(0f, _aimYawCurrent, 0f) * Vector3.forward
-                : GetLookWorld(input.Look, cam, _smoothedMoveWorld, turnMode);
-            _lastLookWorld = SmoothLook(_lastLookWorld, targetLook, lookSmooth);
+            // 相机 Look 只通过 SubmitCameraLook 驱动镜头。角色本体朝向严格由 turnMode
+            // 解析，避免拥有 AimTransform 的第三人称角色在转动视角时被强制转身。
+            Vector3 targetLook = GetLookWorld(input.motion.look, cam, moveWorld, turnMode);
+            // KCC 是唯一的角色转身响应层；Domain 不再对朝向做第二次 Slerp。
+            _lastLookWorld = targetLook;
             MyCore.SetLookInput(_lastLookWorld);
         }
 
@@ -768,7 +551,6 @@ namespace ES
 
                 case TurnMode.MoveDirection:
                     if (moveWorld.sqrMagnitude > 0.0001f) return moveWorld.normalized;
-                    if (cameraForward.sqrMagnitude > 0.0001f) return cameraForward;
                     break;
 
                 case TurnMode.FreeLook:
@@ -797,21 +579,7 @@ namespace ES
             return (rot * Vector3.forward).normalized;
         }
 
-        private static Vector3 SmoothLook(Vector3 current, Vector3 target, float smooth)
-        {
-            if (smooth <= 0f || target.sqrMagnitude <= 0.0001f) return target;
-            float t = 1f - Mathf.Exp(-smooth * Time.deltaTime);
-            return Vector3.Slerp(current, target, t).normalized;
-        }
-
-        private static Vector3 SmoothMove(Vector3 current, Vector3 target, float smooth)
-        {
-            if (smooth <= 0f) return target;
-            float t = 1f - Mathf.Exp(-smooth * Time.deltaTime);
-            return Vector3.Lerp(current, target, t);
-        }
-
-        private void ApplyAimLook(Vector2 lookInput, float scale, bool eyeHold)
+        private void ApplyAimLook(Vector2 lookInput)
         {
             if (aimTransform == null || MyCore == null) return;
 
@@ -826,41 +594,22 @@ namespace ES
 
             if (lookInput.sqrMagnitude > 0.0001f)
             {
-                float yawDelta = lookInput.x * cameraYawSpeed * yawMultiplier * scale * Time.deltaTime;
-                float pitchDelta = -lookInput.y * cameraPitchSpeed * pitchMultiplier * scale * Time.deltaTime;
+                float yawDelta = lookInput.x * cameraYawSpeed * yawMultiplier * Time.deltaTime;
+                float pitchDelta = -lookInput.y * cameraPitchSpeed * pitchMultiplier * Time.deltaTime;
 
-                if (eyeHold)
-                {
-                    _eyeYawOffset += yawDelta;
-                    _eyePitchOffset += pitchDelta;
-                }
-                else
-                {
-                    _aimYaw += yawDelta;
-                    _aimPitch = ApplySoftPitch(_aimPitch, pitchDelta, cameraPitchLimit, cameraPitchSoftZone, cameraPitchCorrectionSpeed);
-                }
-            }
-
-            if (eyeHold)
-            {
-                ClampEyeOffsetToLimits();
-            }
-            else
-            {
-                float tReturn = 1f - Mathf.Exp(-eyeReturnSpeed * Time.deltaTime);
-                _eyeYawOffset = Mathf.LerpAngle(_eyeYawOffset, 0f, tReturn);
-                _eyePitchOffset = Mathf.Lerp(_eyePitchOffset, 0f, tReturn);
+                _aimYaw += yawDelta;
+                _aimPitch = ApplySoftPitch(_aimPitch, pitchDelta, cameraPitchLimit, cameraPitchSoftZone, cameraPitchCorrectionSpeed);
             }
 
             float t = cameraLookSmooth <= 0f ? 1f : (1f - Mathf.Exp(-cameraLookSmooth * Time.deltaTime));
             _aimYawCurrent = Mathf.LerpAngle(_aimYawCurrent, _aimYaw, t);
             _aimPitchCurrent = Mathf.Lerp(_aimPitchCurrent, _aimPitch, t);
 
-            aimTransform.localRotation = Quaternion.Euler(_aimPitchCurrent + _eyePitchOffset, _eyeYawOffset, 0f);
+            aimTransform.localRotation = Quaternion.Euler(_aimPitchCurrent, 0f, 0f);
 
             if (debugCamera)
             {
-                Debug.Log($"[EntityAIInputDispatch] AimPitch={_aimPitchCurrent:F2}, EyePitch={_eyePitchOffset:F2}, TotalPitch={_aimPitchCurrent + _eyePitchOffset:F2}");
+                Debug.Log($"[EntityAIDomain] AimPitch={_aimPitchCurrent:F2}");
             }
         }
 
@@ -902,78 +651,6 @@ namespace ES
             return target;
         }
 
-        private void ClampEyeOffsetToLimits()
-        {
-            float min = cameraPitchLimit.x;
-            float max = cameraPitchLimit.y;
-            float total = _aimPitchCurrent + _eyePitchOffset;
-            if (total > max)
-            {
-                float target = max - _aimPitchCurrent;
-                _eyePitchOffset = Mathf.SmoothDamp(_eyePitchOffset, target, ref _eyePitchVel, 0.5f / Mathf.Max(cameraPitchCorrectionSpeed, 0.01f));
-            }
-            else if (total < min)
-            {
-                float target = min - _aimPitchCurrent;
-                _eyePitchOffset = Mathf.SmoothDamp(_eyePitchOffset, target, ref _eyePitchVel, 0.5f / Mathf.Max(cameraPitchCorrectionSpeed, 0.01f));
-            }
-
-        }
-
-        private void UpdateMoveStats(Vector3 moveWorld)
-        {
-            float speed = moveWorld.magnitude;
-            if (speed > 0.001f)
-            {
-                _totalMoveTime += Time.deltaTime;
-            }
-            totalMoveTime = _totalMoveTime;
-
-            float now = Time.time;
-            EnsureSpeedSampleBuffer();
-
-            if (_speedSampleCount == SpeedSampleCapacity)
-            {
-                _last1sSpeedSum -= _speedSamples[_speedSampleHead].speed;
-                AdvanceSpeedSampleHead();
-                _speedSampleCount--;
-            }
-
-            int tail = _speedSampleHead + _speedSampleCount;
-            if (tail >= SpeedSampleCapacity)
-                tail -= SpeedSampleCapacity;
-            _speedSamples[tail] = new SpeedSample(now, speed);
-            _speedSampleCount++;
-            _last1sSpeedSum += speed;
-
-            while (_speedSampleCount > 0 && now - _speedSamples[_speedSampleHead].time > 1f)
-            {
-                _last1sSpeedSum -= _speedSamples[_speedSampleHead].speed;
-                AdvanceSpeedSampleHead();
-                _speedSampleCount--;
-            }
-
-            avgSpeedLast1s = _speedSampleCount > 0 ? _last1sSpeedSum / _speedSampleCount : 0f;
-        }
-
-        private void EnsureSpeedSampleBuffer()
-        {
-            if (_speedSamples != null && _speedSamples.Length == SpeedSampleCapacity)
-                return;
-
-            _speedSamples = new SpeedSample[SpeedSampleCapacity];
-            _speedSampleHead = 0;
-            _speedSampleCount = 0;
-            _last1sSpeedSum = 0f;
-        }
-
-        private void AdvanceSpeedSampleHead()
-        {
-            _speedSampleHead++;
-            if (_speedSampleHead == SpeedSampleCapacity)
-                _speedSampleHead = 0;
-        }
-
         private Transform ResolveCameraTransform()
         {
             ESCameraModule camera = ESGameManager.Camera;
@@ -992,21 +669,25 @@ namespace ES
             if (!debugCamera) return;
             if (t == null)
             {
-                Debug.LogWarning($"[EntityAIInputDispatch] Camera {stage} is null");
+                Debug.LogWarning($"[EntityAIDomain] Camera {stage} is null");
                 return;
             }
-            Debug.Log($"[EntityAIInputDispatch] Camera {stage}: name={t.name}, pos={t.position}, fwd={t.forward}");
+            Debug.Log($"[EntityAIDomain] Camera {stage}: name={t.name}, pos={t.position}, fwd={t.forward}");
         }
 
         private void LogCameraNull(string reason)
         {
             if (!debugCamera) return;
-            Debug.LogWarning($"[EntityAIInputDispatch] Camera unavailable: {reason}");
+            Debug.LogWarning($"[EntityAIDomain] Camera unavailable: {reason}");
         }
 
-        public override void OnDestroy()
+        private void ResetInputDispatchForDisable()
         {
             MyCore?.ResetKCCInputs();
+        }
+
+        private void DestroyInputDispatchRuntime()
+        {
             _cachedIKDriver = null;
             _cachedIKDriverAnimator = null;
             if (_runtimeAimTarget != null)
@@ -1018,15 +699,6 @@ namespace ES
 
                 _runtimeAimTarget = null;
             }
-
-            base.OnDestroy();
-        }
-
-        protected override void OnDisable()
-        {
-            _smoothedMoveWorld = Vector3.zero;
-            MyCore?.ResetKCCInputs();
-            base.OnDisable();
         }
     }
 
@@ -1040,9 +712,6 @@ namespace ES
     [Serializable]
     public struct EntityMotionInputState
     {
-        [LabelText("帧")]
-        public int frameIndex;
-
         [LabelText("移动")]
         public Vector2 move;
 
@@ -1051,9 +720,6 @@ namespace ES
 
         [LabelText("飞行垂直")]
         public float flyVertical;
-
-        [LabelText("小眼睛(按住)")]
-        public bool eyeHold;
 
         [LabelText("格挡(按住)")]
         public bool blockHold;
@@ -1068,31 +734,18 @@ namespace ES
 
         public void Clear()
         {
-            frameIndex = 0;
-            move = Vector2.zero;
-            look = Vector2.zero;
-            flyVertical = 0f;
-            eyeHold = false;
-            blockHold = false;
-            peekLeftHold = false;
-            peekRightHold = false;
+            this = default;
         }
     }
 
     [Serializable]
     public struct EntityActionInputPulse
     {
-        [LabelText("帧")]
-        public int frameIndex;
-
         [LabelText("攻击")]
         public bool attack;
 
         [LabelText("重击")]
         public bool heavyAttack;
-
-        [LabelText("格挡")]
-        public bool block;
 
         [LabelText("滑行")]
         public bool slide;
@@ -1158,7 +811,6 @@ namespace ES
 
         public bool ConsumeAttack() => Consume(ref attack);
         public bool ConsumeHeavyAttack() => Consume(ref heavyAttack);
-        public bool ConsumeBlock() => Consume(ref block);
         public bool ConsumeSlide() => Consume(ref slide);
         public bool ConsumeSwitchWeapon() => Consume(ref switchWeapon);
         public bool ConsumeEquipWeapon() => Consume(ref equipWeapon);
@@ -1179,28 +831,27 @@ namespace ES
         public bool ConsumeClimbToggle() => Consume(ref climbToggle);
         public bool ConsumeInteract() => Consume(ref interact);
 
-        public void PulseAttack(int frame) => Pulse(ref attack, frame);
-        public void PulseHeavyAttack(int frame) => Pulse(ref heavyAttack, frame);
-        public void PulseBlock(int frame) => Pulse(ref block, frame);
-        public void PulseSlide(int frame) => Pulse(ref slide, frame);
-        public void PulseSwitchWeapon(int frame) => Pulse(ref switchWeapon, frame);
-        public void PulseEquipWeapon(int frame) => Pulse(ref equipWeapon, frame);
-        public void PulseHolsterWeapon(int frame) => Pulse(ref holsterWeapon, frame);
-        public void PulseWeaponSlot1(int frame) => Pulse(ref weaponSlot1, frame);
-        public void PulseWeaponSlot2(int frame) => Pulse(ref weaponSlot2, frame);
-        public void PulseWeaponSlot3(int frame) => Pulse(ref weaponSlot3, frame);
-        public void PulseWeaponSlot4(int frame) => Pulse(ref weaponSlot4, frame);
-        public void PulseWeaponSlot5(int frame) => Pulse(ref weaponSlot5, frame);
-        public void PulseAim(int frame) => Pulse(ref aim, frame);
-        public void PulseSkill1(int frame) => Pulse(ref skill1, frame);
-        public void PulseSkill2(int frame) => Pulse(ref skill2, frame);
-        public void PulseSkill3(int frame) => Pulse(ref skill3, frame);
-        public void PulseJump(int frame) => Pulse(ref jump, frame);
-        public void PulseCrouchToggle(int frame) => Pulse(ref crouchToggle, frame);
-        public void PulseFlyToggle(int frame) => Pulse(ref flyToggle, frame);
-        public void PulseMountToggle(int frame) => Pulse(ref mountToggle, frame);
-        public void PulseClimbToggle(int frame) => Pulse(ref climbToggle, frame);
-        public void PulseInteract(int frame) => Pulse(ref interact, frame);
+        public void PulseAttack() => Pulse(ref attack);
+        public void PulseHeavyAttack() => Pulse(ref heavyAttack);
+        public void PulseSlide() => Pulse(ref slide);
+        public void PulseSwitchWeapon() => Pulse(ref switchWeapon);
+        public void PulseEquipWeapon() => Pulse(ref equipWeapon);
+        public void PulseHolsterWeapon() => Pulse(ref holsterWeapon);
+        public void PulseWeaponSlot1() => Pulse(ref weaponSlot1);
+        public void PulseWeaponSlot2() => Pulse(ref weaponSlot2);
+        public void PulseWeaponSlot3() => Pulse(ref weaponSlot3);
+        public void PulseWeaponSlot4() => Pulse(ref weaponSlot4);
+        public void PulseWeaponSlot5() => Pulse(ref weaponSlot5);
+        public void PulseAim() => Pulse(ref aim);
+        public void PulseSkill1() => Pulse(ref skill1);
+        public void PulseSkill2() => Pulse(ref skill2);
+        public void PulseSkill3() => Pulse(ref skill3);
+        public void PulseJump() => Pulse(ref jump);
+        public void PulseCrouchToggle() => Pulse(ref crouchToggle);
+        public void PulseFlyToggle() => Pulse(ref flyToggle);
+        public void PulseMountToggle() => Pulse(ref mountToggle);
+        public void PulseClimbToggle() => Pulse(ref climbToggle);
+        public void PulseInteract() => Pulse(ref interact);
 
         private static bool Consume(ref bool value)
         {
@@ -1209,22 +860,9 @@ namespace ES
             return true;
         }
 
-        private void Pulse(ref bool value, int frame)
+        private static void Pulse(ref bool value)
         {
             value = true;
-            frameIndex = frame;
-        }
-    }
-
-    internal readonly struct SpeedSample
-    {
-        public readonly float time;
-        public readonly float speed;
-
-        public SpeedSample(float time, float speed)
-        {
-            this.time = time;
-            this.speed = speed;
         }
     }
 

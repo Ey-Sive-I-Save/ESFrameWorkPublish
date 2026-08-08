@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Sirenix.OdinInspector;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ES
 {
@@ -672,10 +673,12 @@ namespace ES
 
         [LabelText("启用武器后坐力档位")]
         [Tooltip("根据 weaponIndex 匹配后坐力曲线档位，形成不同枪感。")]
-        public bool enableWeaponRecoilProfiles = true;
+        [FormerlySerializedAs("enableWeaponRecoilProfiles")]
+        public bool enableWeaponRecoilSettings = true;
 
         [LabelText("武器后坐力档位")]
-        public System.Collections.Generic.List<WeaponRecoilProfile> recoilProfiles = new System.Collections.Generic.List<WeaponRecoilProfile>();
+        [FormerlySerializedAs("recoilProfiles")]
+        public System.Collections.Generic.List<WeaponRecoilSettings> recoilSettings = new System.Collections.Generic.List<WeaponRecoilSettings>();
 
         [LabelText("后坐力仅在瞄准时触发")]
         [Tooltip("开启后，只有瞄准生命周期激活时才触发后坐力 IK。")]
@@ -2519,10 +2522,10 @@ namespace ES
         private float ResolveFireRecoilMagnitude()
         {
             float baseMagnitude = Mathf.Max(0f, fireRecoilMagnitude);
-            if (!enableWeaponRecoilProfiles || recoilProfiles == null || recoilProfiles.Count == 0)
+            if (!enableWeaponRecoilSettings || recoilSettings == null || recoilSettings.Count == 0)
                 return baseMagnitude;
 
-            var profile = FindRecoilProfile(weaponIndex);
+            var profile = FindRecoilSettings(weaponIndex);
             if (profile == null)
                 return baseMagnitude;
 
@@ -2547,11 +2550,11 @@ namespace ES
             return baseMagnitude * profileScale * finalScale;
         }
 
-        private WeaponRecoilProfile FindRecoilProfile(int currentWeaponIndex)
+        private WeaponRecoilSettings FindRecoilSettings(int currentWeaponIndex)
         {
-            for (int i = 0; i < recoilProfiles.Count; i++)
+            for (int i = 0; i < recoilSettings.Count; i++)
             {
-                var profile = recoilProfiles[i];
+                var profile = recoilSettings[i];
                 if (profile == null)
                     continue;
 
@@ -2580,7 +2583,7 @@ namespace ES
         }
 
         [Serializable]
-        public class WeaponRecoilProfile
+        public class WeaponRecoilSettings
         {
             [LabelText("武器索引")]
             public int weaponIndex;

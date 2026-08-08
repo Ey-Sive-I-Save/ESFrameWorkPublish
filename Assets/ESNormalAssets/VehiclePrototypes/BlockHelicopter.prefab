@@ -111,7 +111,9 @@ MonoBehaviour:
   turnSpeed: 100
   useKinematicGravity: 0
   kinematicGravity: {x: 0, y: -9.81, z: 0}
-  driverCameraProfileKey: vehicle.chase
+  driverCameraDefinition:
+    enumKey: 2
+    stringKey: vehicle.chase
   driverCameraViewKey: MainView
   driverCameraPriority: 10
   driverCameraFollow: {fileID: 4001}

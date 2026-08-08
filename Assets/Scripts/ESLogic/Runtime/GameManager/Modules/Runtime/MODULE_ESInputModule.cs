@@ -40,6 +40,21 @@ namespace ES
         private readonly ESInputVirtualSource virtualSource = new ESInputVirtualSource();
 
         [NonSerialized]
+        private readonly ESInputVirtualSource aiTestSource = new ESInputVirtualSource();
+
+        [NonSerialized]
+        private string aiTestInputOwner;
+
+        [NonSerialized]
+        private int aiTestInputToken;
+
+        [NonSerialized]
+        private int aiTestInputGeneration = 1;
+
+        [NonSerialized]
+        private int nextAITestInputToken = 1;
+
+        [NonSerialized]
         private readonly ESInputSchemeResolver schemeResolver = new ESInputSchemeResolver();
 
         [NonSerialized]
@@ -89,6 +104,16 @@ namespace ES
         public ESInputVirtualSource VirtualSource
         {
             get { return virtualSource; }
+        }
+
+        public bool HasAITestInputControl
+        {
+            get { return !string.IsNullOrEmpty(aiTestInputOwner); }
+        }
+
+        public string AITestInputOwner
+        {
+            get { return aiTestInputOwner ?? string.Empty; }
         }
 
         public ESInputSchemeResolver SchemeResolver
@@ -752,12 +777,117 @@ namespace ES
             virtualSource.ClearAll();
         }
 
+        internal bool TryAcquireAITestInput(string owner, out int token, out int generation, out string error)
+        {
+            token = 0;
+            generation = aiTestInputGeneration;
+            error = string.Empty;
+            if (!runtimeBuilt || !inputEnabled)
+            {
+                error = "ESInputModule 尚未构建或启用。";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(owner))
+            {
+                error = "AI 测试输入控制必须声明 Owner。";
+                return false;
+            }
+
+            if (HasAITestInputControl)
+            {
+                error = "AI 测试输入已由其他 Run 持有：" + aiTestInputOwner;
+                return false;
+            }
+
+            if (nextAITestInputToken <= 0)
+                nextAITestInputToken = 1;
+
+            aiTestInputOwner = owner;
+            aiTestInputToken = nextAITestInputToken++;
+            token = aiTestInputToken;
+            generation = aiTestInputGeneration;
+            virtualSource.ClearAll();
+            aiTestSource.ClearAll();
+            service.ResetAll();
+            return true;
+        }
+
+        internal bool AITestSetButton(string owner, int token, int generation, ESInputActionId id, bool held)
+        {
+            if (!ValidateAITestInputLease(owner, token, generation))
+                return false;
+            aiTestSource.SetButton(id, held);
+            return true;
+        }
+
+        internal bool IsAITestInputLeaseHeld(string owner, int token, int generation)
+        {
+            return ValidateAITestInputLease(owner, token, generation);
+        }
+
+        internal bool AITestPulseButton(string owner, int token, int generation, ESInputActionId id)
+        {
+            if (!ValidateAITestInputLease(owner, token, generation))
+                return false;
+            aiTestSource.PulseButton(id);
+            return true;
+        }
+
+        internal bool AITestSetAxis(string owner, int token, int generation, ESInputActionId id, float value)
+        {
+            if (!ValidateAITestInputLease(owner, token, generation))
+                return false;
+            aiTestSource.SetAxis(id, value);
+            return true;
+        }
+
+        internal bool AITestSetVector2(string owner, int token, int generation, ESInputActionId id, Vector2 value)
+        {
+            if (!ValidateAITestInputLease(owner, token, generation))
+                return false;
+            aiTestSource.SetVector2(id, value);
+            return true;
+        }
+
+        internal bool AITestClearAction(string owner, int token, int generation, ESInputActionId id)
+        {
+            if (!ValidateAITestInputLease(owner, token, generation))
+                return false;
+            aiTestSource.ClearButton(id);
+            aiTestSource.ClearAxis(id);
+            aiTestSource.ClearVector2(id);
+            return true;
+        }
+
+        internal bool ReleaseAITestInput(string owner, int token, int generation)
+        {
+            if (!ValidateAITestInputLease(owner, token, generation))
+                return false;
+
+            aiTestSource.ClearAll();
+            service.ResetAll();
+            aiTestInputOwner = null;
+            aiTestInputToken = 0;
+            AdvanceAITestInputGeneration();
+            return true;
+        }
+
+        private bool ValidateAITestInputLease(string owner, int token, int generation)
+        {
+            return HasAITestInputControl
+                   && string.Equals(aiTestInputOwner, owner, StringComparison.Ordinal)
+                   && aiTestInputToken == token
+                   && aiTestInputGeneration == generation;
+        }
+
         private void InitializeInputRuntime(ESInputRuntimeBuildResult build, ESRuntimeModeService runtimeMode)
         {
             service.SetModeService(runtimeMode);
             service.SetCache(build != null ? build.cache : null);
             inputSystemSource.Initialize(build, service);
             virtualSource.Initialize(build, service);
+            aiTestSource.Initialize(build, service);
             schemeResolver.Initialize(build != null ? build.activeSchemeId : ESInputSchemeIds.KeyboardMouse);
         }
 
@@ -772,14 +902,25 @@ namespace ES
             schemeResolver.Disable();
             inputSystemSource.Disable();
             virtualSource.ClearAll();
+            aiTestSource.ClearAll();
+            aiTestInputOwner = null;
+            aiTestInputToken = 0;
+            AdvanceAITestInputGeneration();
             service.ResetAll();
         }
 
         private void UpdateInputRuntime(float time)
         {
             service.BeginFrame();
-            inputSystemSource.Update(time, false);
-            virtualSource.Update(time);
+            if (HasAITestInputControl)
+            {
+                aiTestSource.Update(time);
+            }
+            else
+            {
+                inputSystemSource.Update(time, false);
+                virtualSource.Update(time);
+            }
             service.EndFrame(time);
         }
 
@@ -788,8 +929,19 @@ namespace ES
             schemeResolver.Dispose();
             inputSystemSource.Dispose();
             virtualSource.Dispose();
+            aiTestSource.Dispose();
+            aiTestInputOwner = null;
+            aiTestInputToken = 0;
+            AdvanceAITestInputGeneration();
             service.SetCache(null);
             service.SetModeService(null);
+        }
+
+        private void AdvanceAITestInputGeneration()
+        {
+            aiTestInputGeneration++;
+            if (aiTestInputGeneration <= 0)
+                aiTestInputGeneration = 1;
         }
 
         private ESRuntimeModeService EnsureModeService()

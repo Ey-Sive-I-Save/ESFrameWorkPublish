@@ -98,6 +98,9 @@ namespace ES
         [LabelText("地面响应速度")]
         public float stableMovementSharpness;
 
+        [LabelText("朝向响应速度")]
+        public float orientationSharpness;
+
         [LabelText("最大空中速度")]
         public float maxAirMoveSpeed;
 
@@ -167,6 +170,7 @@ namespace ES
             enableGrappleMotion = false,
             maxStableMoveSpeed = 8f,
             stableMovementSharpness = 15f,
+            orientationSharpness = 10f,
             maxAirMoveSpeed = 8f,
             airAccelerationSpeed = 5f,
             jumpSpeed = 8f,
@@ -199,6 +203,7 @@ namespace ES
             enableGrappleMotion = false;
             maxStableMoveSpeed = 8f;
             stableMovementSharpness = 15f;
+            orientationSharpness = 10f;
             maxAirMoveSpeed = 8f;
             airAccelerationSpeed = 5f;
             jumpSpeed = 8f;

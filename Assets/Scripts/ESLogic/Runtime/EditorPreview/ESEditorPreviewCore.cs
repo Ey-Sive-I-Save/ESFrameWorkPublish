@@ -721,11 +721,16 @@ namespace ES
             if (string.IsNullOrWhiteSpace(value))
                 value = fallback;
 
+            value = value.Trim().Replace('/', '_').Replace('\\', '_').Replace(':', '_');
             char[] invalid = Path.GetInvalidFileNameChars();
             for (int i = 0; i < invalid.Length; i++)
                 value = value.Replace(invalid[i], '_');
 
-            return value.Trim();
+            value = value.Trim();
+            if (value.Length == 0 || string.Equals(value, ".", StringComparison.Ordinal)
+                || string.Equals(value, "..", StringComparison.Ordinal))
+                return fallback;
+            return value;
         }
     }
 }

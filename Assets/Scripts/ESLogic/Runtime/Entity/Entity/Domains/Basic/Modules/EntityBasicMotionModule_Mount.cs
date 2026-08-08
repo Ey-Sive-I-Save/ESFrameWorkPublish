@@ -330,19 +330,58 @@ namespace ES
             Vector3 dir = origin.forward;
             if (Physics.Raycast(origin.position, dir, out RaycastHit hit, mountDistance, mountLayerMask, mountQuery))
             {
+                EntityMountable mountable = ResolveMountableFromHit(hit.collider);
 #if UNITY_EDITOR
-                var mountable = hit.collider.GetComponentInParent<EntityMountable>();
                 if (debugMount)
                     Debug.Log($"[Mount] 射线命中: {hit.collider.name} | 距离={hit.distance:F2} | EntityMountable={(mountable != null ? mountable.name : "null（无法骑乘）")}");
                 return mountable;
 #else
-                return hit.collider.GetComponentInParent<EntityMountable>();
+                return mountable;
 #endif
             }
             if (debugMount)
                 Debug.Log("[Mount] 射线未命中可骑乘目标");
              
             return null;
+        }
+
+        /// <summary>
+        /// 将射线命中的任意载具碰撞体解析为可骑乘座位。
+        ///
+        /// 载具的根 Collider 经常位于 VehicleController 根节点，而 DriverSeat 是其子节点；
+        /// 仅调用 GetComponentInParent&lt;EntityMountable&gt; 会在命中根 Collider 时永远找不到座位。
+        /// 先保留直接/父级命中语义，再在同一载具层级内选择一个当前可用座位，避免跨物体扫描。
+        /// </summary>
+        private EntityMountable ResolveMountableFromHit(Collider hitCollider)
+        {
+            if (hitCollider == null)
+                return null;
+
+            EntityMountable direct = hitCollider.GetComponent<EntityMountable>()
+                ?? hitCollider.GetComponentInParent<EntityMountable>();
+            if (direct != null)
+                return direct;
+
+            VehicleController vehicle = hitCollider.GetComponentInParent<VehicleController>();
+            if (vehicle == null)
+                return null;
+
+            EntityMountable[] seats = vehicle.GetComponentsInChildren<EntityMountable>(true);
+            EntityMountable fallback = null;
+            for (int i = 0; i < seats.Length; i++)
+            {
+                EntityMountable seat = seats[i];
+                if (seat == null)
+                    continue;
+
+                if (fallback == null)
+                    fallback = seat;
+
+                if (seat.CanMount(MyCore))
+                    return seat;
+            }
+
+            return fallback;
         }
 
         private string ResolveMountStateKeyForLifecycle(StateBase state)

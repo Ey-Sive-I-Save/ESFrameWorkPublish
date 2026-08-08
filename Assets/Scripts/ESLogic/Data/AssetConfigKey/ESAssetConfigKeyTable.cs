@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 
 namespace ES
@@ -32,15 +33,161 @@ namespace ES
         }
 
         private readonly Dictionary<int, PendingLoad> pendingLoads;
+        private readonly Dictionary<int, int> payloadRetainCounts;
+        private readonly string diagnosticScope;
+        private readonly bool requiresCurrentCatalogBinding;
         private IESAssetConfigTableLoader<TConfigData, TAsset> loader;
 
-        public ESAssetConfigKeyTable(int capacity = 64, string keyScope = null) : base(capacity, keyScope)
+        public ESAssetConfigKeyTable(
+            int capacity = 64,
+            string keyScope = null,
+            bool requiresCurrentCatalogBinding = false) : base(capacity, keyScope)
         {
             pendingLoads = new Dictionary<int, PendingLoad>(capacity);
+            payloadRetainCounts = new Dictionary<int, int>(capacity);
+            diagnosticScope = string.IsNullOrWhiteSpace(keyScope) ? typeof(TConfigData).Name : keyScope;
+            this.requiresCurrentCatalogBinding = requiresCurrentCatalogBinding;
         }
 
         public bool HasLoader => loader != null;
         public bool HasPendingLoads => pendingLoads.Count != 0;
+
+        public override bool TryGet(int runtimeKey, out TConfigData data)
+        {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                data = null;
+                return false;
+            }
+            return base.TryGet(runtimeKey, out data);
+        }
+
+        public override bool TryGet<TEnumKey>(ESGameCoreConfigKey<TEnumKey> key, out TConfigData data)
+            where TEnumKey : struct
+        {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                data = null;
+                return false;
+            }
+            return base.TryGet(key, out data);
+        }
+
+        public override bool TryGet<TEnumKey>(ESAssetConfigKey<TEnumKey> key, out TConfigData data)
+            where TEnumKey : struct
+        {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                data = null;
+                return false;
+            }
+            return base.TryGet(key, out data);
+        }
+
+        public override TConfigData Get(int runtimeKey)
+        {
+            return requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable
+                ? null
+                : base.Get(runtimeKey);
+        }
+
+        public override bool TryGetRuntimeKey(string stringKey, out int runtimeKey)
+        {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                runtimeKey = 0;
+                return false;
+            }
+            return base.TryGetRuntimeKey(stringKey, out runtimeKey);
+        }
+
+        public override bool TryGetRuntimeKey(int enumKey, string stringKey, out int runtimeKey)
+        {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                runtimeKey = 0;
+                return false;
+            }
+            return base.TryGetRuntimeKey(enumKey, stringKey, out runtimeKey);
+        }
+
+        public override bool TryGetRuntimeKey(IESConfigKey key, out int runtimeKey)
+        {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                runtimeKey = 0;
+                return false;
+            }
+            return base.TryGetRuntimeKey(key, out runtimeKey);
+        }
+
+        public override int GetRuntimeKey(IESConfigKey key)
+        {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+                throw new InvalidOperationException(
+                    "AssetTable 当前 Catalog 尚未提交；上一代 RuntimeKey 不属于当前 Provider。");
+            return base.GetRuntimeKey(key);
+        }
+
+        public override bool TryGetByStringKey(string stringKey, out TConfigData data)
+        {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                data = null;
+                return false;
+            }
+            return base.TryGetByStringKey(stringKey, out data);
+        }
+
+        public override bool TryGetSlot(int runtimeKey, out int slot)
+        {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                slot = -1;
+                return false;
+            }
+            return base.TryGetSlot(runtimeKey, out slot);
+        }
+
+        public override bool TryGetSlotByEnumKey(int enumKey, out int slot)
+        {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                slot = -1;
+                return false;
+            }
+            return base.TryGetSlotByEnumKey(enumKey, out slot);
+        }
+
+        public override bool TryGetSlotByStringKey(string stringKey, out int slot)
+        {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                slot = -1;
+                return false;
+            }
+            return base.TryGetSlotByStringKey(stringKey, out slot);
+        }
+
+        public override bool TryGetBySlot(int slot, out TConfigData data)
+        {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                data = null;
+                return false;
+            }
+            return base.TryGetBySlot(slot, out data);
+        }
+
+        public override bool TryGetRuntimeKeyBySlot(int slot, out int runtimeKey)
+        {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                runtimeKey = 0;
+                return false;
+            }
+            return base.TryGetRuntimeKeyBySlot(slot, out runtimeKey);
+        }
 
         /// <summary>
         /// Catalog/Page 冷路径专用。当前活动表中任一业务别名已存在时保留首条记录，
@@ -63,11 +210,11 @@ namespace ES
 
             int existingRuntimeKey = 0;
             bool enumExists = key.EnumKeyInt != 0
-                && TryGetSlotByEnumKey(key.EnumKeyInt, out int enumSlot)
-                && TryGetRuntimeKeyBySlot(enumSlot, out existingRuntimeKey);
+                && base.TryGetSlotByEnumKey(key.EnumKeyInt, out int enumSlot)
+                && base.TryGetRuntimeKeyBySlot(enumSlot, out existingRuntimeKey);
             int stringRuntimeKey = 0;
             bool stringExists = !string.IsNullOrEmpty(key.StringKey)
-                && TryGetRuntimeKey(key.StringKey, out stringRuntimeKey);
+                && base.TryGetRuntimeKey(key.StringKey, out stringRuntimeKey);
             if (existingRuntimeKey == 0 && stringExists)
                 existingRuntimeKey = stringRuntimeKey;
 
@@ -118,7 +265,7 @@ namespace ES
 
                 for (int slot = 0; slot < Count; slot++)
                 {
-                    if (!TryGetRuntimeKeyBySlot(slot, out int runtimeKey))
+                    if (!base.TryGetRuntimeKeyBySlot(slot, out int runtimeKey))
                         continue;
                     Release(runtimeKey);
                 }
@@ -158,6 +305,7 @@ namespace ES
 
             IESAssetConfigTableLoader<TConfigData, TAsset> previousLoader = loader;
             loader = null;
+            payloadRetainCounts.Clear();
 
             int cleared = 0;
             try
@@ -169,7 +317,7 @@ namespace ES
             {
                 for (int i = 0; i < Count; i++)
                 {
-                    if (!TryGetBySlot(i, out TConfigData configData) || !configData.HasLoadedAsset)
+                    if (!base.TryGetBySlot(i, out TConfigData configData) || !configData.HasLoadedAsset)
                         continue;
                     configData.ClearLoadedAsset();
                     cleared++;
@@ -184,9 +332,28 @@ namespace ES
             return cleared;
         }
 
+        internal int ClearLoadedAssetPayloads()
+        {
+            int cleared = 0;
+            for (int slot = 0; slot < Count; slot++)
+            {
+                if (!base.TryGetBySlot(slot, out TConfigData configData) || !configData.HasLoadedAsset)
+                    continue;
+
+                configData.ClearLoadedAsset();
+                cleared++;
+            }
+            return cleared;
+        }
+
         /// <summary>热路径查询：只读取 Ready 缓存，绝不隐式触发加载。</summary>
         public bool TryGetReady(IESConfigKey key, out TAsset asset)
         {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                asset = null;
+                return false;
+            }
             if (TryGetRuntimeKey(key, out int runtimeKey))
                 return TryGetReady(runtimeKey, out asset);
 
@@ -197,6 +364,11 @@ namespace ES
         /// <summary>RuntimeKey 热路径重载；只读取 Ready 缓存，绝不隐式触发加载。</summary>
         public bool TryGetReady(int runtimeKey, out TAsset asset)
         {
+            if (requiresCurrentCatalogBinding && !ESRuntimeDataAsset.AssetConfigTablesAvailable)
+            {
+                asset = null;
+                return false;
+            }
             if (TryGet(runtimeKey, out TConfigData configData) && configData.HasLoadedAsset)
             {
                 asset = configData.LoadedAsset;
@@ -212,12 +384,43 @@ namespace ES
             return pendingLoads.ContainsKey(runtimeKey);
         }
 
+        internal bool TryRetainLoadedPayload(int runtimeKey)
+        {
+            if (!base.TryGet(runtimeKey, out TConfigData configData)
+                || configData == null
+                || !configData.HasLoadedAsset)
+                return false;
+
+            payloadRetainCounts.TryGetValue(runtimeKey, out int count);
+            if (count == int.MaxValue)
+                throw new InvalidOperationException("AssetTable Payload Lease 计数已溢出。");
+            payloadRetainCounts[runtimeKey] = count + 1;
+            return true;
+        }
+
+        internal void ReleaseLoadedPayload(int runtimeKey)
+        {
+            if (!payloadRetainCounts.TryGetValue(runtimeKey, out int count))
+                return;
+
+            if (count > 1)
+            {
+                payloadRetainCounts[runtimeKey] = count - 1;
+                return;
+            }
+
+            payloadRetainCounts.Remove(runtimeKey);
+            Release(runtimeKey);
+        }
+
         /// <summary>
         /// Ready 时立即回调缓存对象；未 Ready 时对同一个 RuntimeKey 合并请求，并交给当前 Loader。
         /// 回调仅发生于调用线程/Loader 完成线程；Unity Loader 必须保证在主线程回调。
         /// </summary>
         public void GetOrLoadAsync(IESConfigKey key, Action<TAsset, string> completed)
         {
+            if (!EnsureCurrentCatalogAvailable(completed))
+                return;
             if (!TryGetRuntimeKey(key, out int runtimeKey))
             {
                 string description = key == null
@@ -233,6 +436,8 @@ namespace ES
         /// <summary>RuntimeKey 热路径重载；未 Ready 时合并请求并交给当前 Loader。</summary>
         public void GetOrLoadAsync(int runtimeKey, Action<TAsset, string> completed)
         {
+            if (!EnsureCurrentCatalogAvailable(completed))
+                return;
             if (!TryGet(runtimeKey, out TConfigData configData))
             {
                 completed?.Invoke(null, $"AssetTable 未登记 RuntimeKey: {runtimeKey}");
@@ -283,6 +488,17 @@ namespace ES
             }
         }
 
+        private bool EnsureCurrentCatalogAvailable(Action<TAsset, string> completed)
+        {
+            if (!requiresCurrentCatalogBinding || ESRuntimeDataAsset.AssetConfigTablesAvailable)
+                return true;
+
+            const string error = "AssetTable 当前 Catalog 尚未提交；上一代配置表不会用于当前 Provider";
+            ESConfigKeyDiagnostics.ReportMissing(diagnosticScope, error);
+            completed?.Invoke(null, error);
+            return false;
+        }
+
         /// <summary>
         /// 按业务 Key 驱逐本表共享缓存；稳定配置外壳和业务 Key 映射继续保留。
         /// 仅供 ResourcePlan、Scope 或统一内存管理服务调用，普通业务不得把它当作调用者私有引用释放。
@@ -290,14 +506,17 @@ namespace ES
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public bool Release(IESConfigKey key)
         {
-            return TryGetRuntimeKey(key, out int runtimeKey) && Release(runtimeKey);
+            return base.TryGetRuntimeKey(key, out int runtimeKey) && Release(runtimeKey);
         }
 
         /// <summary>按 RuntimeKey 驱逐共享缓存。生命周期和依赖释放由当前 Loader 执行。</summary>
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public bool Release(int runtimeKey)
         {
-            if (!TryGet(runtimeKey, out TConfigData configData))
+            if (!base.TryGet(runtimeKey, out TConfigData configData))
+                return false;
+
+            if (payloadRetainCounts.TryGetValue(runtimeKey, out int retained) && retained > 0)
                 return false;
 
             if (pendingLoads.TryGetValue(runtimeKey, out PendingLoad pending))
@@ -374,6 +593,266 @@ namespace ES
         protected override void OnRetainedReleased(TConfigData data)
         {
             data?.ClearLoadedAsset();
+        }
+    }
+
+    internal delegate ESAssetConfigKeyTable<TConfigData, TAsset> ESAssetConfigTableSelector<TConfigData, TAsset>(
+        ESAssetConfigTableGenerationState state)
+        where TConfigData : ESAssetReferConfigDataBase<TAsset>
+        where TAsset : UnityEngine.Object;
+
+    /// <summary>
+    /// Pins one ConfigTable generation while a loaded asset is in use. Disposing the lease releases
+    /// the per-key payload ownership first, then allows a retired generation to reclaim its Loaders.
+    /// </summary>
+    public sealed class ESAssetConfigPayloadLease<TAsset> : IDisposable where TAsset : UnityEngine.Object
+    {
+        private Action release;
+        private TAsset asset;
+
+        internal ESAssetConfigPayloadLease(TAsset asset, long generation, Action release)
+        {
+            this.asset = asset;
+            Generation = generation;
+            this.release = release ?? throw new ArgumentNullException(nameof(release));
+        }
+
+        public TAsset Asset => asset;
+        public long Generation { get; }
+        public bool IsDisposed => Volatile.Read(ref release) == null;
+
+        public void Dispose()
+        {
+            Action ownedRelease = Interlocked.Exchange(ref release, null);
+            if (ownedRelease == null)
+                return;
+
+            asset = null;
+            try
+            {
+                ownedRelease();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+        }
+    }
+
+        internal sealed class ESAssetConfigDataReadLease<TConfigData, TAsset> : IDisposable
+        where TConfigData : ESAssetReferConfigDataBase<TAsset>
+        where TAsset : UnityEngine.Object
+        {
+            private ESAssetConfigTableGenerationLease generationLease;
+            private TConfigData data;
+
+        internal ESAssetConfigDataReadLease(
+            ESAssetConfigTableGenerationLease generationLease,
+            int runtimeKey,
+            TConfigData data)
+        {
+            this.generationLease = generationLease;
+            RuntimeKey = runtimeKey;
+            this.data = data;
+        }
+
+        public long Generation => generationLease?.Generation ?? 0;
+        public int RuntimeKey { get; }
+        public TConfigData Data => generationLease == null
+            ? throw new ObjectDisposedException(nameof(ESAssetConfigDataReadLease<TConfigData, TAsset>))
+            : data;
+
+        public void Dispose()
+        {
+            ESAssetConfigTableGenerationLease ownedLease = Interlocked.Exchange(ref generationLease, null);
+            data = null;
+            ownedLease?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Public Asset ConfigTable facade. It never exposes the mutable table or its dictionaries;
+    /// every operation first pins one immutable generation snapshot.
+    /// </summary>
+    public sealed class ESAssetConfigTableReader<TConfigData, TAsset>
+        where TConfigData : ESAssetReferConfigDataBase<TAsset>
+        where TAsset : UnityEngine.Object
+    {
+        private const string UnavailableError = "Asset ConfigTable 当前没有与 Provider 同代提交的可用状态";
+        private readonly ESAssetConfigTableSelector<TConfigData, TAsset> selectTable;
+
+        internal ESAssetConfigTableReader(ESAssetConfigTableSelector<TConfigData, TAsset> selectTable)
+        {
+            this.selectTable = selectTable ?? throw new ArgumentNullException(nameof(selectTable));
+        }
+
+        public long Generation => ESRuntimeDataAsset.AssetConfigTableGeneration;
+
+        public int Count
+        {
+            get
+            {
+                if (!ESRuntimeDataAsset.TryAcquireAssetConfigGeneration(false, out ESAssetConfigTableGenerationLease lease))
+                    return 0;
+                try { return selectTable(lease.State).Count; }
+                finally { lease.Dispose(); }
+            }
+        }
+
+        public bool TryResolveAssetIdentity(
+            int enumKey,
+            string stringKey,
+            out ESAssetIdentity identity)
+        {
+            identity = default;
+            if (!ESRuntimeDataAsset.TryAcquireAssetConfigGeneration(false, out ESAssetConfigTableGenerationLease lease))
+                return false;
+
+            try
+            {
+                ESAssetConfigKeyTable<TConfigData, TAsset> table = selectTable(lease.State);
+                if (!table.TryGetRuntimeKey(enumKey, stringKey, out int runtimeKey)
+                    || !table.TryGet(runtimeKey, out TConfigData data)
+                    || data == null)
+                    return false;
+
+                identity = new ESAssetIdentity(data.AssetGuid, data.AssetLocalFileId);
+                return identity.IsValid;
+            }
+            finally
+            {
+                lease.Dispose();
+            }
+        }
+
+        public bool TryAcquireReady(
+            IESConfigKey key,
+            out ESAssetConfigPayloadLease<TAsset> payloadLease)
+        {
+            payloadLease = null;
+            if (!ESRuntimeDataAsset.TryAcquireAssetConfigGeneration(true, out ESAssetConfigTableGenerationLease generationLease))
+                return false;
+
+            ESAssetConfigKeyTable<TConfigData, TAsset> table = selectTable(generationLease.State);
+            try
+            {
+                if (!table.TryGetRuntimeKey(key, out int runtimeKey)
+                    || !table.TryGetReady(runtimeKey, out TAsset asset)
+                    || !table.TryRetainLoadedPayload(runtimeKey))
+                {
+                    generationLease.Dispose();
+                    return false;
+                }
+
+                payloadLease = CreatePayloadLease(table, runtimeKey, asset, generationLease);
+                return true;
+            }
+            catch
+            {
+                generationLease.Dispose();
+                throw;
+            }
+        }
+
+        public void GetOrLoadAsync(
+            IESConfigKey key,
+            Action<ESAssetConfigPayloadLease<TAsset>, string> completed)
+        {
+            if (!ESRuntimeDataAsset.TryAcquireAssetConfigGeneration(true, out ESAssetConfigTableGenerationLease generationLease))
+            {
+                completed?.Invoke(null, UnavailableError);
+                return;
+            }
+
+            ESAssetConfigKeyTable<TConfigData, TAsset> table = selectTable(generationLease.State);
+            if (!table.TryGetRuntimeKey(key, out int runtimeKey))
+            {
+                generationLease.Dispose();
+                completed?.Invoke(null, "AssetTable 未登记业务 Key");
+                return;
+            }
+
+            try
+            {
+                table.GetOrLoadAsync(runtimeKey, (asset, error) =>
+                {
+                    if (asset == null || !string.IsNullOrEmpty(error)
+                        || !table.TryRetainLoadedPayload(runtimeKey))
+                    {
+                        generationLease.Dispose();
+                        completed?.Invoke(null, string.IsNullOrEmpty(error) ? "AssetTable 未能取得 Payload Lease" : error);
+                        return;
+                    }
+
+                    ESAssetConfigPayloadLease<TAsset> payload = CreatePayloadLease(
+                        table,
+                        runtimeKey,
+                        asset,
+                        generationLease);
+                    if (completed == null)
+                    {
+                        payload.Dispose();
+                        return;
+                    }
+
+                    try
+                    {
+                        completed(payload, null);
+                    }
+                    catch
+                    {
+                        payload.Dispose();
+                        throw;
+                    }
+                });
+            }
+            catch
+            {
+                generationLease.Dispose();
+                throw;
+            }
+        }
+
+        internal bool TryAcquireConfigData(
+            string stringKey,
+            out ESAssetConfigDataReadLease<TConfigData, TAsset> dataLease)
+        {
+            dataLease = null;
+            if (!ESRuntimeDataAsset.TryAcquireAssetConfigGeneration(false, out ESAssetConfigTableGenerationLease generationLease))
+                return false;
+
+            ESAssetConfigKeyTable<TConfigData, TAsset> table = selectTable(generationLease.State);
+            try
+            {
+                if (!table.TryGetRuntimeKey(stringKey, out int runtimeKey)
+                    || !table.TryGet(runtimeKey, out TConfigData data)
+                    || data == null)
+                {
+                    generationLease.Dispose();
+                    return false;
+                }
+
+                dataLease = new ESAssetConfigDataReadLease<TConfigData, TAsset>(generationLease, runtimeKey, data);
+                return true;
+            }
+            catch
+            {
+                generationLease.Dispose();
+                throw;
+            }
+        }
+
+        private static ESAssetConfigPayloadLease<TAsset> CreatePayloadLease(
+            ESAssetConfigKeyTable<TConfigData, TAsset> table,
+            int runtimeKey,
+            TAsset asset,
+            ESAssetConfigTableGenerationLease generationLease)
+        {
+            return new ESAssetConfigPayloadLease<TAsset>(asset, generationLease.Generation, () =>
+            {
+                try { table.ReleaseLoadedPayload(runtimeKey); }
+                finally { generationLease.Dispose(); }
+            });
         }
     }
 

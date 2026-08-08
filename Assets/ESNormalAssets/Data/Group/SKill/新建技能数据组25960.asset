@@ -61,7 +61,14 @@ MonoBehaviour:
           name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 1.3472527
           durationTime: 1.0000001
-          audioClip: {fileID: 8300000, guid: 720ed2b9ac2d7e844a7134533c1fa005, type: 3}
+          cue:
+            enumKey: 0
+            stringKey: 
+            definitionGuid: 
+            definitionLocalFileId: 0
+            definitionTypeName: 
+          legacyAudioClip: {fileID: 8300000, guid: 720ed2b9ac2d7e844a7134533c1fa005,
+            type: 3}
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0
@@ -77,11 +84,12 @@ MonoBehaviour:
         - enabled: 1
           name: "\u6587\u5316\u670D\u52A122235\u5243\u5200\u9AD8\u5730"
           startTime: 1.2255319
-          durationTime: 2.8851063
+          durationTime: 2.885106
           targetExpression:
             rid: -2
           AnimationClipName: {fileID: 7400010, guid: c79d18b7598993246a99ebc7c22b5f0d,
             type: 3}
+          clipMarker: 
           clipStartOffset: 0
           playbackSpeed: 1
           loopClip: 0
@@ -93,6 +101,7 @@ MonoBehaviour:
             rid: -2
           AnimationClipName: {fileID: 7400000, guid: c62dd38c11e60514cbfbd75556f131da,
             type: 3}
+          clipMarker: 
           clipStartOffset: 0
           playbackSpeed: 1
           loopClip: 0
@@ -103,6 +112,7 @@ MonoBehaviour:
           targetExpression:
             rid: -2
           AnimationClipName: {fileID: 0}
+          clipMarker: 
           clipStartOffset: 0
           playbackSpeed: 1
           loopClip: 0
@@ -113,6 +123,7 @@ MonoBehaviour:
           targetExpression:
             rid: -2
           AnimationClipName: {fileID: 0}
+          clipMarker: 
           clipStartOffset: 0
           playbackSpeed: 1
           loopClip: 0
@@ -124,6 +135,7 @@ MonoBehaviour:
             rid: -2
           AnimationClipName: {fileID: 7400000, guid: 38587c17cd6cfdd4b8e25d3326747748,
             type: 3}
+          clipMarker: 
           clipStartOffset: 0
           playbackSpeed: 1
           loopClip: 0
@@ -135,6 +147,7 @@ MonoBehaviour:
             rid: -2
           AnimationClipName: {fileID: 7400000, guid: baa3c56345be38e46b3cf654cf6e3c4c,
             type: 3}
+          clipMarker: 
           clipStartOffset: 0
           playbackSpeed: 1
           loopClip: 0
@@ -154,7 +167,14 @@ MonoBehaviour:
           name: "\u8F68\u9053\u7247\u6BB5dddaaaa"
           startTime: 1.5888842
           durationTime: 0.9999999
-          audioClip: {fileID: 8300000, guid: 45df00ec34648e240a5c0030f534ebe8, type: 3}
+          cue:
+            enumKey: 0
+            stringKey: 
+            definitionGuid: 
+            definitionLocalFileId: 0
+            definitionTypeName: 
+          legacyAudioClip: {fileID: 8300000, guid: 45df00ec34648e240a5c0030f534ebe8,
+            type: 3}
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0
@@ -162,7 +182,14 @@ MonoBehaviour:
           name: "\u8F68\u9053\u97F3\u9891"
           startTime: 3.7276595
           durationTime: 2.6938345
-          audioClip: {fileID: 8300000, guid: 259e3d9f89bea8049a6ec1bb94d9771f, type: 3}
+          cue:
+            enumKey: 0
+            stringKey: 
+            definitionGuid: 
+            definitionLocalFileId: 0
+            definitionTypeName: 
+          legacyAudioClip: {fileID: 8300000, guid: 259e3d9f89bea8049a6ec1bb94d9771f,
+            type: 3}
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0
@@ -170,7 +197,14 @@ MonoBehaviour:
           name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 5.268085
           durationTime: 0.97484064
-          audioClip: {fileID: 8300000, guid: c05bb84f3ad49934888c9b769073afe7, type: 3}
+          cue:
+            enumKey: 0
+            stringKey: 
+            definitionGuid: 
+            definitionLocalFileId: 0
+            definitionTypeName: 
+          legacyAudioClip: {fileID: 8300000, guid: c05bb84f3ad49934888c9b769073afe7,
+            type: 3}
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0
@@ -178,7 +212,14 @@ MonoBehaviour:
           name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 6.5617023
           durationTime: 1
-          audioClip: {fileID: 8300000, guid: 88af74873f18b1945822fc3f7da6a386, type: 3}
+          cue:
+            enumKey: 0
+            stringKey: 
+            definitionGuid: 
+            definitionLocalFileId: 0
+            definitionTypeName: 
+          legacyAudioClip: {fileID: 8300000, guid: 88af74873f18b1945822fc3f7da6a386,
+            type: 3}
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0
@@ -186,7 +227,14 @@ MonoBehaviour:
           name: "\u97F3\u9891\u7247\u6BB5"
           startTime: 8.655319
           durationTime: 1
-          audioClip: {fileID: 8300000, guid: c05bb84f3ad49934888c9b769073afe7, type: 3}
+          cue:
+            enumKey: 0
+            stringKey: 
+            definitionGuid: 
+            definitionLocalFileId: 0
+            definitionTypeName: 
+          legacyAudioClip: {fileID: 8300000, guid: c05bb84f3ad49934888c9b769073afe7,
+            type: 3}
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0

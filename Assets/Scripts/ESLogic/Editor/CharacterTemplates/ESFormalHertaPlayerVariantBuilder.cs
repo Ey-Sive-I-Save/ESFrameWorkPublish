@@ -10,6 +10,9 @@ namespace ES
     /// </summary>
     public static class ESFormalHertaPlayerVariantBuilder
     {
+        private const float PlayerGroundMovementSharpness = 20f;
+        private const float PlayerOrientationSharpness = 18f;
+
         public const string VariantFolder = "Assets/ESNormalAssets/CharacterVariants";
         public const string VariantPath = VariantFolder + "/大黑塔.prefab";
         public const string DataFolder = "Assets/ESNormalAssets/Data/CharacterVariants";
@@ -74,10 +77,10 @@ namespace ES
             {
                 variant.name = "大黑塔";
                 Entity entity = variant.GetComponent<Entity>();
-                EntityCharacterProfile profile = variant.GetComponent<EntityCharacterProfile>();
+                EntityCharacterIdentity profile = variant.GetComponent<EntityCharacterIdentity>();
                 EntityTransformMapping mapping = variant.GetComponent<EntityTransformMapping>();
                 if (entity == null || profile == null || mapping == null)
-                    throw new InvalidOperationException("新版通用角色模板缺少 Entity、EntityCharacterProfile 或 EntityTransformMapping。");
+                    throw new InvalidOperationException("新版通用角色模板缺少 Entity、EntityCharacterIdentity 或 EntityTransformMapping。");
 
                 Animator animator = ReplaceTemplateVisual(variant, legacy);
                 ConfigureVariantIdentity(profile, definition);
@@ -123,6 +126,8 @@ namespace ES
             definition.motionShared = EntityMotionSharedData.Default;
             definition.motionShared.enableClimb = true;
             definition.motionShared.enableMount = true;
+            definition.motionShared.stableMovementSharpness = PlayerGroundMovementSharpness;
+            definition.motionShared.orientationSharpness = PlayerOrientationSharpness;
             definition.motionVariable = EntityMotionVariableData.Default;
             EditorUtility.SetDirty(definition);
             return definition;
@@ -241,7 +246,7 @@ namespace ES
                    || component is LODGroup;
         }
 
-        private static void ConfigureVariantIdentity(EntityCharacterProfile profile, ActorDataInfo definition)
+        private static void ConfigureVariantIdentity(EntityCharacterIdentity profile, ActorDataInfo definition)
         {
             profile.prefabRole = EntityCharacterPrefabRole.CharacterVariant;
             profile.faction = EntityCharacterFaction.Player;
@@ -249,7 +254,7 @@ namespace ES
             profile.actorDefinition = definition;
             profile.monsterDefinition = null;
             profile.npcDefinition = null;
-            profile.defaultCameraProfileKey = ESCameraDefaultContentBuilder.PlayerThirdPersonProfileKey;
+            profile.defaultCameraDefinition = ESCameraDefaultContentBuilder.PlayerThirdPersonDefinition;
             profile.defaultCameraViewKey = ESCameraViewId.Main.Key;
             profile.defaultCameraPriority = 0;
         }
@@ -324,15 +329,12 @@ namespace ES
         private static void ConfigurePlayerModules(Entity entity, EntityTransformMapping mapping)
         {
             entity.EnsureEntityStructure();
-            entity.aiDomain.autoEnsurePlayerInputModules = false;
 
-            EntityAIInputDispatchModule dispatch = GetOrAddAiModule(entity, () => new EntityAIInputDispatchModule());
-            dispatch.turnMode = TurnMode.MoveDirection;
-            dispatch.enableCameraLook = true;
-            dispatch.driveAimIK = false;
-            dispatch.aimTransform = mapping.Resolve("CameraAimTarget");
-            dispatch.debugCamera = false;
-            dispatch.debugMount = false;
+            entity.aiDomain.turnMode = TurnMode.MoveDirection;
+            entity.aiDomain.enableCameraLook = true;
+            entity.aiDomain.driveAimIK = false;
+            entity.aiDomain.aimTransform = mapping.Resolve("CameraAimTarget");
+            entity.aiDomain.debugCamera = false;
 
             EntityPlayerInputWriteModule input = GetOrAddAiModule(entity, () => new EntityPlayerInputWriteModule());
             input.enablePlayerInput = true;
@@ -365,11 +367,13 @@ namespace ES
         private static void ConfigurePlayerKcc(Entity entity)
         {
             entity.kcc.maxStableMoveSpeed = 8f;
+            entity.kcc.stableMovementSharpness = PlayerGroundMovementSharpness;
             entity.kcc.maxAirMoveSpeed = 8f;
             entity.kcc.airAccelerationSpeed = 5f;
             entity.kcc.jumpSpeed = 8f;
-            entity.kcc.orientationSharpness = 15f;
+            entity.kcc.orientationSharpness = PlayerOrientationSharpness;
             entity.kcc.debugMonitor = false;
+
         }
 
         private static void ConfigureFormalHurtBox(Transform root)
@@ -521,7 +525,7 @@ namespace ES
 
                 root.layer = ESPhysicsLayers.WorldDynamic;
                 bodyCollider.isTrigger = false;
-                controller.driverCameraProfileKey = ESCameraDefaultContentBuilder.VehicleChaseProfileKey;
+                controller.driverCameraDefinition = ESCameraDefaultContentBuilder.VehicleChaseDefinition;
                 controller.driverCameraViewKey = ESCameraViewId.Main.Key;
                 controller.driverCameraPriority = 10;
                 controller.driverCameraFollow = root.transform;

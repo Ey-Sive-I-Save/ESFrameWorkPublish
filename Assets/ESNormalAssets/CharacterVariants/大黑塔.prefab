@@ -1062,7 +1062,7 @@ MonoBehaviour:
   kcc:
     motor: {fileID: 8862571015583691337}
     maxStableMoveSpeed: 8
-    stableMovementSharpness: 15
+    stableMovementSharpness: 20
     maxAirMoveSpeed: 8
     airAccelerationSpeed: 5
     drag: 0.1
@@ -1075,7 +1075,7 @@ MonoBehaviour:
     standingCapsuleHeight: 1.8
     crouchedCapsuleHeight: 1
     crouchSpeedMultiplier: 0.5
-    orientationSharpness: 15
+    orientationSharpness: 18
     gravity_: {x: 0, y: -9.81, z: 0}
     jumpRequestBufferTime: 0.12
     useRootMotion: 0
@@ -1112,57 +1112,43 @@ MonoBehaviour:
           MayHasAddingElement: 1
         autoEnsureFootPlacementModule: 0
         autoEnsureRuntimeWatchModule: 0
-        applyGroundDefaults: 1
-        groundedDefaults:
-          maxStableMoveSpeed: 8
-          stableMovementSharpness: 15
-          jumpSpeed: 8
-          orientationSharpness: 10
     - rid: 23629134621835265
       type: {class: EntityAIDomain, ns: ES, asm: ES_Logic}
       data:
         myCore: {fileID: 0}
         MyModules:
           ValuesNow:
-          - rid: 23629134621835269
           - rid: 5312547775011618851
           MayHasAddingElement: 1
-        inputState:
-          enableInput: 1
-          motion:
-            frameIndex: 0
-            move: {x: 0, y: 0}
-            look: {x: 0, y: 0}
-            flyVertical: 0
-            eyeHold: 0
-            blockHold: 0
-            peekLeftHold: 0
-            peekRightHold: 0
-          action:
-            frameIndex: 0
-            attack: 0
-            heavyAttack: 0
-            block: 0
-            slide: 0
-            switchWeapon: 0
-            equipWeapon: 0
-            holsterWeapon: 0
-            weaponSlot1: 0
-            weaponSlot2: 0
-            weaponSlot3: 0
-            weaponSlot4: 0
-            weaponSlot5: 0
-            aim: 0
-            skill1: 0
-            skill2: 0
-            skill3: 0
-            jump: 0
-            crouchToggle: 0
-            flyToggle: 0
-            mountToggle: 0
-            climbToggle: 0
-            interact: 0
-        autoEnsurePlayerInputModules: 0
+        dispatchTagCondition:
+          required: []
+          requiredAny: []
+          forbidden: []
+          requiredCore:
+          requiredAnyCore:
+          forbiddenCore:
+          requiredExtensions: []
+          requiredAnyExtensions: []
+          forbiddenExtensions: []
+        turnMode: 1
+        turnSpeed: 12
+        stopMoveWhenNoInput: 1
+        moveDeadZone: 0.05
+        enableCameraLook: 1
+        aimTransform: {fileID: 6854756157120340560}
+        driveAimIK: 0
+        aimIKWeight: 0
+        aimTargetDistance: 30
+        fallbackAimHeight: 1.5
+        cameraYawSpeed: 220
+        cameraPitchSpeed: 90
+        yawMultiplier: 1
+        pitchMultiplier: 1
+        cameraPitchLimit: {x: -80, y: 80}
+        cameraPitchSoftZone: 12
+        cameraPitchCorrectionSpeed: 12
+        cameraLookSmooth: 12
+        debugCamera: 0
     - rid: 23629134621835266
       type: {class: EntityBuffDomain, ns: ES, asm: ES_Logic}
       data:
@@ -1211,49 +1197,6 @@ MonoBehaviour:
         JUMP_StateName: "\u8DF3\u8DC3"
         Crouch_StateName: "\u4E0B\u8E72"
         avgSpeedWindowDuration: 0.5
-    - rid: 23629134621835269
-      type: {class: EntityAIInputDispatchModule, ns: ES, asm: ES_Logic}
-      data:
-        _enableSelf: 1
-        moveScale: 1
-        dispatchTagCondition:
-          required: []
-          requiredAny: []
-          forbidden: []
-          requiredCore: 
-          requiredAnyCore: 
-          forbiddenCore: 
-          requiredExtensions: []
-          requiredAnyExtensions: []
-          forbiddenExtensions: []
-        turnMode: 1
-        turnSpeed: 12
-        lookSmooth: 10
-        moveSmooth: 12
-        stopMoveWhenNoInput: 1
-        moveDeadZone: 0.05
-        disableMoveSmoothWhileClimbing: 1
-        enableCameraLook: 1
-        aimTransform: {fileID: 6854756157120340560}
-        driveAimIK: 0
-        aimIKWeight: 0
-        aimTargetDistance: 30
-        fallbackAimHeight: 1.5
-        cameraYawSpeed: 220
-        cameraPitchSpeed: 90
-        yawMultiplier: 1
-        pitchMultiplier: 1
-        cameraPitchLimit: {x: -80, y: 80}
-        cameraPitchSoftZone: 12
-        cameraPitchCorrectionSpeed: 12
-        cameraLookSmooth: 12
-        eyeLookScale: 1
-        eyeReturnSpeed: 10
-        debugCamera: 0
-        debugMount: 0
-        totalMoveTime: 0
-        avgSpeedLast1s: 0
-        lastJumpInputFrame: 0
     - rid: 5312547775011618849
       type: {class: EntityBasicMountModule, ns: ES, asm: ES_Logic}
       data:
@@ -1995,7 +1938,9 @@ MonoBehaviour:
   actorDefinition: {fileID: 11400000, guid: c66e7fee4b1475546b9de01baa5b089b, type: 2}
   monsterDefinition: {fileID: 0}
   npcDefinition: {fileID: 0}
-  defaultCameraProfileKey: player.third_person
+  defaultCameraDefinition:
+    enumKey: 1
+    stringKey: player.third_person
   defaultCameraViewKey: MainView
   defaultCameraPriority: 0
 --- !u!1 &483925811622213509
@@ -3556,7 +3501,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &9110934708180924597
 Transform:
   m_ObjectHideFlags: 0
@@ -9344,7 +9289,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &8438520869048464838
 Transform:
   m_ObjectHideFlags: 0
@@ -14447,7 +14392,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &6364900666871928537
 Transform:
   m_ObjectHideFlags: 0

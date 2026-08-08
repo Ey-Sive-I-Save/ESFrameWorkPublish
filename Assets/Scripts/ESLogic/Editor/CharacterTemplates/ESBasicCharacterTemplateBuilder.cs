@@ -421,7 +421,7 @@ namespace ES
                 generatedRoot,
                 debugRoot);
 
-            EntityCharacterProfile profile = root.AddComponent<EntityCharacterProfile>();
+            EntityCharacterIdentity profile = root.AddComponent<EntityCharacterIdentity>();
             profile.ConfigureBuildInput();
             mapping.RebuildRuntimeCache();
 
@@ -495,20 +495,14 @@ namespace ES
 
         private static void ConfigureDomains(Entity entity, Transform aimTarget)
         {
-            entity.basicDomain.applyGroundDefaults = true;
             entity.basicDomain.MyModules.Add(new EntityBasicMoveRotateModule());
             entity.basicDomain.MyModules.ApplyBuffers(true);
 
-            entity.aiDomain.autoEnsurePlayerInputModules = false;
-            entity.aiDomain.MyModules.Add(new EntityAIInputDispatchModule
-            {
-                turnMode = TurnMode.MoveDirection,
-                enableCameraLook = false,
-                driveAimIK = false,
-                aimTransform = aimTarget,
-                debugCamera = false,
-                debugMount = false,
-            });
+            entity.aiDomain.turnMode = TurnMode.MoveDirection;
+            entity.aiDomain.enableCameraLook = false;
+            entity.aiDomain.driveAimIK = false;
+            entity.aiDomain.aimTransform = aimTarget;
+            entity.aiDomain.debugCamera = false;
             entity.aiDomain.MyModules.ApplyBuffers(true);
 
             entity.stateDomain.stateAniDataPack =
@@ -630,7 +624,6 @@ namespace ES
 
             entity.EnsureEntityStructure();
             entity.kcc.debugMonitor = false;
-            entity.aiDomain.autoEnsurePlayerInputModules = false;
 
             Animator animator = entity.animator != null
                 ? entity.animator
@@ -645,20 +638,12 @@ namespace ES
             BakeHumanoidBinding(driver, animator);
             ConfigureFinalIKBaseline(driver);
 
-            EntityCharacterProfile profile = root.GetComponent<EntityCharacterProfile>();
+            EntityCharacterIdentity profile = root.GetComponent<EntityCharacterIdentity>();
             if (profile == null)
-                throw new InvalidOperationException("完整通用角色缺少 EntityCharacterProfile。");
+                throw new InvalidOperationException("完整通用角色缺少 EntityCharacterIdentity。");
             profile.ConfigureRuntimePoolTemplate();
 
-            int moduleCount = entity.aiDomain.MyModules?.ValuesNow?.Count ?? 0;
-            for (int i = 0; i < moduleCount; i++)
-            {
-                if (entity.aiDomain.MyModules.ValuesNow[i] is EntityAIInputDispatchModule dispatch)
-                {
-                    dispatch.debugCamera = false;
-                    dispatch.debugMount = false;
-                }
-            }
+            entity.aiDomain.debugCamera = false;
         }
 
         private static bool ValidateTemplate(string path, bool expectDebugRoot, out string report)
@@ -676,7 +661,7 @@ namespace ES
             CapsuleCollider[] capsules = prefab.GetComponentsInChildren<CapsuleCollider>(true);
             Collider[] colliders = prefab.GetComponentsInChildren<Collider>(true);
             EntityTransformMapping[] mappings = prefab.GetComponentsInChildren<EntityTransformMapping>(true);
-            EntityCharacterProfile[] profiles = prefab.GetComponentsInChildren<EntityCharacterProfile>(true);
+            EntityCharacterIdentity[] profiles = prefab.GetComponentsInChildren<EntityCharacterIdentity>(true);
             EntityWeaponBinding[] weaponBindings = prefab.GetComponentsInChildren<EntityWeaponBinding>(true);
             Animator[] animators = prefab.GetComponentsInChildren<Animator>(true);
             StateFinalIKDriver[] ikDrivers = prefab.GetComponentsInChildren<StateFinalIKDriver>(true);
@@ -687,7 +672,7 @@ namespace ES
             CapsuleCollider capsule = prefab.GetComponent<CapsuleCollider>();
             Rigidbody rootRigidbody = prefab.GetComponent<Rigidbody>();
             EntityTransformMapping mapping = prefab.GetComponent<EntityTransformMapping>();
-            EntityCharacterProfile profile = prefab.GetComponent<EntityCharacterProfile>();
+            EntityCharacterIdentity profile = prefab.GetComponent<EntityCharacterIdentity>();
             Animator animator = animators.Length == 1 ? animators[0] : null;
             StateFinalIKDriver ikDriver = animator != null ? animator.GetComponent<StateFinalIKDriver>() : null;
 
@@ -757,22 +742,19 @@ namespace ES
                 expectDebugRoot ? AuthoringTopLevelOrder : CompleteTopLevelOrder);
 
             int moveCount = CountBasicModule<EntityBasicMoveRotateModule>(entity);
-            int dispatchCount = CountAiModule<EntityAIInputDispatchModule>(entity);
             int playerWriterCount = CountAiModule<EntityPlayerInputWriteModule>(entity);
             int optionalMotionCount = CountOptionalMotionModules(entity);
             bool modulesValid = moveCount == 1
-                && dispatchCount == 1
                 && playerWriterCount == 0
                 && optionalMotionCount == 0
                 && entity != null
-                && entity.aiDomain != null
-                && !entity.aiDomain.autoEnsurePlayerInputModules;
+                && entity.aiDomain != null;
 
             bool mappingValid = ValidateAllMappings(mapping, prefab.transform, expectDebugRoot);
             EntityCharacterPrefabRole expectedProfileRole = expectDebugRoot
                 ? EntityCharacterPrefabRole.BuildInput
                 : EntityCharacterPrefabRole.RuntimePoolTemplate;
-            string profileError = profile == null ? "缺少 EntityCharacterProfile" : string.Empty;
+            string profileError = profile == null ? "缺少 EntityCharacterIdentity" : string.Empty;
             bool profileValid = profile != null && profile.ValidateTemplateRole(expectedProfileRole, out profileError);
             bool stripValid = ValidateEditorOnlyPolicy(prefab.transform, expectDebugRoot)
                 && ValidateRuntimeGeneratedIsEmpty(prefab.transform)
@@ -794,7 +776,7 @@ namespace ES
                 ? $"[{stage}检查] 通过：底盘组件唯一性、无武器内容组件、KCC胶囊契约、Entity四域、Playable动画、轻量禁用IK、全量Mapping、十区顺序、递归Missing Script、Rigidbody和运行时剥离规则完整。"
                 : $"[{stage}检查] 未通过 | Root={rootAuthorityValid} | Animation={animationValid} | "
                   + $"Components={componentCountValid} | Hierarchy={hierarchyValid} | Mapping={mappingValid} | Profile={profileValid}({profileError}) | Strip={stripValid} | MissingScripts={missingScripts} | "
-                  + $"Move={moveCount}, Dispatch={dispatchCount}, PlayerWriter={playerWriterCount}, OptionalMotion={optionalMotionCount}";
+                  + $"Move={moveCount}, DomainExecutor={(entity != null && entity.aiDomain != null ? "有效" : "缺失")}, PlayerWriter={playerWriterCount}, OptionalMotion={optionalMotionCount}";
             return valid;
         }
 
@@ -839,8 +821,8 @@ namespace ES
                 Require(driver != null && driver.BoundEntity == entity && driver.BoundAnimator == entity.animator,
                     "StateFinalIKDriver 未绑定当前 Entity/Animator");
                 Require(HasUniqueRuntimeModule<EntityBasicMoveRotateModule>(entity)
-                    && HasUniqueRuntimeModule<EntityAIInputDispatchModule>(entity),
-                    "运行时 ModuleTables 未形成唯一基础移动/输入分发入口");
+                    && entity.aiDomain != null,
+                    "运行时未形成唯一基础移动入口或 AI 域执行器缺失");
 
                 entity.SetMoveInput(new Vector3(3f, 4f, 0f));
                 entity.SetLookInput(new Vector3(0f, 0f, 8f));

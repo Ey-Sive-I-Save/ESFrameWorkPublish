@@ -638,10 +638,9 @@ namespace ES
                     TryStartClimb();
                 }
             }
-            else
-            {
-                ForceExitClimb();
-            }
+            // G 只负责“尝试进入攀爬”。攀爬中再次按 G 不得变成隐式退出，
+            // 否则输入抖动、重复按键或 UI/设备重复派发都会把 Approach/Climbing
+            // 直接打断。掉墙、落地、翻越完成和显式生命周期清理仍由本模块收口。
         }
 
         public bool TryStartClimb()
@@ -703,6 +702,10 @@ namespace ES
 
             ExitClimbingState();
             ResetClimbState();
+            if (MyCore != null && MyCore.kcc.CurrentSupportFlags == StateSupportFlags.Climbing)
+            {
+                MyCore.SetLocomotionSupportFlags(StateSupportFlags.Grounded);
+            }
             _exitClimbTimestamp = Time.time;
         }
 
@@ -939,6 +942,8 @@ namespace ES
                 return false;
             }
 
+            PrepareGroundedClimbAction();
+
             if (!TryActivateTrackedState(_vaultLifecycle, _activeVaultState, _activeVaultState != null ? _activeVaultState.strKey : Vault_StateName))
             {
                 if (debugClimb_) Debug.LogWarning($"[Climb] EnterVault失败: TryActivateState返回false (状态={_activeVaultState.strKey}, baseStatus={_activeVaultState.baseStatus})");
@@ -1046,6 +1051,10 @@ namespace ES
                 return;
             }
 
+            // ClimbOver/Vault 是 Grounded 动作状态。先提交唯一的运动环境切换，
+            // 再激活动作状态；否则状态机仍处于 Climbing 时会被支持环境/禁跳表拒绝。
+            PrepareGroundedClimbAction();
+
             Vector3 charPos = MyCore.kcc.motor.TransientPosition;
 
             // ── 最小墙高检测 ────────────────────────────────────────────────────────
@@ -1152,6 +1161,14 @@ namespace ES
             }
         }
 
+        private void PrepareGroundedClimbAction()
+        {
+            if (MyCore != null && MyCore.kcc.CurrentSupportFlags == StateSupportFlags.Climbing)
+            {
+                MyCore.SetLocomotionSupportFlags(StateSupportFlags.Grounded);
+            }
+        }
+
         private void UpdateApproach()
         {
             if (currentSurface == null) { ForceExitClimb(); return; }
@@ -1227,7 +1244,7 @@ namespace ES
             bool hasRawAxis = false;
             if (!disableClimbInputVelocity && useRawClimbInput && MyCore.aiDomain?.inputState != null)
             {
-                Vector2 rawMove = MyCore.aiDomain.inputState.Move;
+                Vector2 rawMove = MyCore.aiDomain.inputState.motion.move;
                 if (rawMove.sqrMagnitude > 0.0001f)
                 {
                     horizontal = Mathf.Clamp(rawMove.x, -1f, 1f);

@@ -37,8 +37,9 @@ namespace ES
     /// <summary>
     /// 状态机默认参数配置资产（Float/Int/Bool 分离枚举）。
     /// </summary>
-    [CreateAssetMenu(menuName = "【ES】/项目设置/状态机/默认数值参数配置", fileName = "StateDefaultNumericParameterProfile")]
-    public class StateDefaultNumericParameterProfile : ScriptableObject
+    [UnityEngine.Scripting.APIUpdating.MovedFrom(true, sourceNamespace: "ES", sourceAssembly: "ES_Logic", sourceClassName: "StateDefaultNumericParameterProfile")]
+    [CreateAssetMenu(menuName = "【ES】/项目设置/状态机/默认数值参数配置", fileName = "StateDefaultNumericParameterConfig")]
+    public class StateDefaultNumericParameterConfig : ScriptableObject
     {
         [Header("Default Float Parameters")]
         public List<StateDefaultFloatAssignment> floats = new List<StateDefaultFloatAssignment>();

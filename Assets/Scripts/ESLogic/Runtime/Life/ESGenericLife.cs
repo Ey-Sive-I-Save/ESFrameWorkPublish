@@ -19,12 +19,22 @@ namespace ES
     }
 
     /// <summary>
+    /// Cold-path installer for a root component that is explicitly an injected Pool extension.
+    /// It lets Profile cover inactive source Prefabs without making the Pool recognize concrete
+    /// feature types or scan child hierarchies.
+    /// </summary>
+    public interface IESGameObjectPoolLifecycleExtensionInstaller
+    {
+        bool TryInstallPoolLifecycleExtension(ESGenericLife life);
+    }
+
+    /// <summary>
     /// Generic root-life organizer for one GameObject. It owns no Entity, Item, Tag, Pool, or
     /// business state. Concrete capabilities are added only when a real caller exists. Pool is
     /// the first capability: one root receiver plus optional, type-unique injected receivers.
     /// </summary>
     [DisallowMultipleComponent]
-    [AddComponentMenu("【ES】/运行时/生命周期/ES Generic Life")]
+    [AddComponentMenu("【ES】/场景与对象/生命周期/ES 通用生命周期")]
     public sealed class ESGenericLife : MonoBehaviour
     {
         [SerializeField, Tooltip("对象池主生命周期接收者；必须与 ESGenericLife 位于同一根 GameObject。扩展接收者通过注册注入，不写入这里。")]
@@ -63,7 +73,7 @@ namespace ES
                 return false;
             }
 
-            if (!TryValidatePoolRoot(candidate, out string error))
+            if (!TryValidatePoolRoot(candidate, true, out string error))
             {
                 poolLifecycleInvalid = true;
                 Debug.LogError("[ESGenericLife] " + error, this);
@@ -72,6 +82,16 @@ namespace ES
 
             poolRootLifecycleComponent = candidateComponent;
             poolRootLifecycle = candidate;
+            MonoBehaviour[] components = gameObject.GetComponents<MonoBehaviour>();
+            if (!TryInstallDeclaredPoolExtensions(components)
+                || !TryValidatePoolRoot(candidate, false, out error))
+            {
+                poolLifecycleInvalid = true;
+                if (!string.IsNullOrEmpty(error))
+                    Debug.LogError("[ESGenericLife] " + error, this);
+                return false;
+            }
+
             poolLifecycleInvalid = false;
             return true;
         }
@@ -160,7 +180,7 @@ namespace ES
                 return false;
             }
 
-            if (!TryValidatePoolRoot(root, out string error))
+            if (!TryValidatePoolRoot(root, false, out string error))
             {
                 poolLifecycleInvalid = true;
                 Debug.LogError("[ESGenericLife] " + error, this);
@@ -198,11 +218,16 @@ namespace ES
             if (gameObject == null)
                 return null;
 
+            MonoBehaviour[] components = gameObject.GetComponents<MonoBehaviour>();
             ESGenericLife life = gameObject.GetComponent<ESGenericLife>();
             if (life == null)
             {
-                MonoBehaviour[] components = gameObject.GetComponents<MonoBehaviour>();
-                IESGameObjectPoolLifecycle discovered = FindSingleUnregisteredPoolRoot(components, null, out bool foundAny, out string discoveryError);
+                IESGameObjectPoolLifecycle discovered = FindSingleUnregisteredPoolRoot(
+                    components,
+                    null,
+                    true,
+                    out bool foundAny,
+                    out string discoveryError);
                 if (!string.IsNullOrEmpty(discoveryError))
                 {
                     // Return an invalid bridge instead of null so the Pool can reject this
@@ -226,12 +251,22 @@ namespace ES
 
             if (life.poolRootLifecycleComponent != null)
             {
+                if (!life.TryInstallDeclaredPoolExtensions(components))
+                {
+                    life.poolLifecycleInvalid = true;
+                    return life;
+                }
+
                 life.ValidatePoolLifecycle();
                 return life;
             }
 
-            MonoBehaviour[] rootComponents = gameObject.GetComponents<MonoBehaviour>();
-            IESGameObjectPoolLifecycle root = FindSingleUnregisteredPoolRoot(rootComponents, life, out bool hasRoot, out string error);
+            IESGameObjectPoolLifecycle root = FindSingleUnregisteredPoolRoot(
+                components,
+                life,
+                true,
+                out bool hasRoot,
+                out string error);
             if (!string.IsNullOrEmpty(error))
             {
                 life.poolLifecycleInvalid = true;
@@ -240,7 +275,9 @@ namespace ES
             }
 
             if (hasRoot)
+            {
                 life.BindPoolRoot(root);
+            }
             else
                 life.ValidatePoolLifecycle();
 
@@ -324,7 +361,10 @@ namespace ES
             return true;
         }
 
-        private bool TryValidatePoolRoot(IESGameObjectPoolLifecycle candidate, out string error)
+        private bool TryValidatePoolRoot(
+            IESGameObjectPoolLifecycle candidate,
+            bool ignoreDeclaredExtensions,
+            out string error)
         {
             error = null;
             if (!TryGetRootComponent(candidate, out _))
@@ -334,7 +374,12 @@ namespace ES
             }
 
             MonoBehaviour[] components = gameObject.GetComponents<MonoBehaviour>();
-            IESGameObjectPoolLifecycle discovered = FindSingleUnregisteredPoolRoot(components, this, out bool foundAny, out string discoveryError);
+            IESGameObjectPoolLifecycle discovered = FindSingleUnregisteredPoolRoot(
+                components,
+                this,
+                ignoreDeclaredExtensions,
+                out bool foundAny,
+                out string discoveryError);
             if (!string.IsNullOrEmpty(discoveryError))
             {
                 error = discoveryError;
@@ -353,6 +398,7 @@ namespace ES
         private static IESGameObjectPoolLifecycle FindSingleUnregisteredPoolRoot(
             MonoBehaviour[] components,
             ESGenericLife life,
+            bool ignoreDeclaredExtensions,
             out bool foundAny,
             out string error)
         {
@@ -362,6 +408,9 @@ namespace ES
             for (int i = 0; i < components.Length; i++)
             {
                 if (!(components[i] is IESGameObjectPoolLifecycle candidate))
+                    continue;
+
+                if (ignoreDeclaredExtensions && components[i] is IESGameObjectPoolLifecycleExtensionInstaller)
                     continue;
 
                 if (life != null && life.IsRegisteredPoolExtension(candidate))
@@ -378,6 +427,42 @@ namespace ES
             }
 
             return found;
+        }
+
+        private bool TryInstallDeclaredPoolExtensions(MonoBehaviour[] components)
+        {
+            if (components == null || gameObject.activeSelf || poolRootLifecycleComponent == null)
+                return components == null || !HasDeclaredPoolExtension(components);
+
+            bool success = true;
+            for (int i = 0; i < components.Length; i++)
+            {
+                if (!(components[i] is IESGameObjectPoolLifecycleExtensionInstaller installer))
+                    continue;
+
+                try
+                {
+                    success &= installer.TryInstallPoolLifecycleExtension(this);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception, components[i]);
+                    success = false;
+                }
+            }
+
+            return success;
+        }
+
+        private static bool HasDeclaredPoolExtension(MonoBehaviour[] components)
+        {
+            for (int i = 0; i < components.Length; i++)
+            {
+                if (components[i] is IESGameObjectPoolLifecycleExtensionInstaller)
+                    return true;
+            }
+
+            return false;
         }
 
         private bool IsRegisteredPoolExtension(IESGameObjectPoolLifecycle candidate)

@@ -7,7 +7,7 @@ namespace ES
     /// Consumer-loaded runtime root for the project's single Tag Catalog.
     /// It binds the Catalog only after the resource provider has loaded this GameCore asset.
     /// </summary>
-    [CreateAssetMenu(menuName = "【ES】/GameCore/Tag Catalog", fileName = "ESTagCatalogGameCore")]
+    [CreateAssetMenu(menuName = "【ES】/项目设置/GameCore/标签目录", fileName = "ESTagCatalogGameCore")]
     public sealed class ESTagCatalogGameCore : ScriptableObject, IGameCoreSO
     {
         [SerializeField] private ESTagBakeTable tagCatalog;

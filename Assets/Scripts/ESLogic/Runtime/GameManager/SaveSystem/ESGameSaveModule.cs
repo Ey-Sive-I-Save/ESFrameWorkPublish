@@ -52,8 +52,8 @@ namespace ES
         public bool enableCompression = true;
 
         [TabGroup("加密", TabLayouting = TabLayouting.MultiRow), LabelText("加密密码")]
-        [PropertyTooltip("正式项目不要用默认密码；建议由设备信息、账号信息或项目密钥组合派生。")]
-        public string encryptionPassword = "ESFrameWork_Save_ChangeMe";
+        [PropertyTooltip("启用加密时必须显式配置项目密钥；ES 不再提供可猜测的默认密码。")]
+        public string encryptionPassword = string.Empty;
 
         [TabGroup("迁移", TabLayouting = TabLayouting.MultiRow)]
         [SerializeReference, ListDrawerSettings(ShowIndexLabels = true, ListElementLabelName = "note")]
@@ -588,16 +588,52 @@ namespace ES
 
         private ES3Settings BuildSettings(string path)
         {
+            ValidateSavePath(path);
             ES3Settings settings = new ES3Settings(path);
             settings.location = ES3.Location.File;
             settings.directory = ES3.Directory.PersistentDataPath;
             settings.format = ES3.Format.JSON;
             settings.encryptionType = enableEncryption ? ES3.EncryptionType.AES : ES3.EncryptionType.None;
-            settings.encryptionPassword = string.IsNullOrEmpty(encryptionPassword) ? "password" : encryptionPassword;
+            if (enableEncryption && IsPlaceholderEncryptionPassword(encryptionPassword))
+                throw new InvalidOperationException("保存系统已启用 AES，但未配置有效项目密钥。请在 Inspector 中设置 encryptionPassword；禁止使用空密码或默认占位密码。" );
+            settings.encryptionPassword = encryptionPassword == null ? string.Empty : encryptionPassword.Trim();
             settings.compressionType = enableCompression ? ES3.CompressionType.Gzip : ES3.CompressionType.None;
             settings.prettyPrint = false;
             settings.safeReflection = true;
             return settings;
+        }
+
+        private static void ValidateSavePath(string relativePath)
+        {
+            string root = Path.GetFullPath(Application.persistentDataPath)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string candidate = Path.GetFullPath(Path.Combine(root, (relativePath ?? string.Empty).Replace('/', Path.DirectorySeparatorChar)));
+            string requiredPrefix = root + Path.DirectorySeparatorChar;
+            if (!candidate.StartsWith(requiredPrefix, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("存档路径越出 persistentDataPath：" + relativePath);
+
+            string current = root;
+            string relative = candidate.Substring(root.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string[] segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            for (int i = 0; i < segments.Length; i++)
+            {
+                if (string.IsNullOrEmpty(segments[i])) continue;
+                current = Path.Combine(current, segments[i]);
+                if (!File.Exists(current) && !Directory.Exists(current)) break;
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidDataException("存档路径不能穿过 junction/symlink：" + current);
+            }
+        }
+
+        private static bool IsPlaceholderEncryptionPassword(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return true;
+
+            string normalized = value.Trim();
+            return string.Equals(normalized, "password", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, "ESFrameWork_Save_ChangeMe", StringComparison.Ordinal)
+                || string.Equals(normalized, "ChangeMe", StringComparison.OrdinalIgnoreCase);
         }
 
         private string BuildSlotPath(string slotId)
@@ -620,7 +656,46 @@ namespace ES
             if (string.IsNullOrWhiteSpace(folder))
                 return ESGameSaveKeys.DefaultSaveFolder;
 
-            return folder.Replace('\\', '/').Trim().Trim('/');
+            string normalized = folder.Replace('\\', '/').Trim();
+            if (normalized.Length == 0 || normalized.StartsWith("/", StringComparison.Ordinal)
+                || Path.IsPathRooted(normalized))
+            {
+                Debug.LogWarning("存档目录必须是 persistentDataPath 下的相对目录，已回退到默认目录。");
+                return ESGameSaveKeys.DefaultSaveFolder;
+            }
+
+            normalized = normalized.TrimEnd('/');
+
+            string[] segments = normalized.Split('/');
+            var safeSegments = new List<string>(segments.Length);
+            for (int i = 0; i < segments.Length; i++)
+            {
+                string segment = segments[i];
+                if (string.IsNullOrEmpty(segment) || string.Equals(segment, ".", StringComparison.Ordinal))
+                    continue;
+                if (string.Equals(segment, "..", StringComparison.Ordinal)
+                    || segment.IndexOf(':') >= 0)
+                {
+                    Debug.LogWarning("存档目录包含非法路径片段，已回退到默认目录：" + folder);
+                    return ESGameSaveKeys.DefaultSaveFolder;
+                }
+
+                char[] invalidChars = Path.GetInvalidFileNameChars();
+                for (int j = 0; j < invalidChars.Length; j++)
+                {
+                    if (segment.IndexOf(invalidChars[j]) >= 0)
+                    {
+                        Debug.LogWarning("存档目录包含非法文件名字符，已回退到默认目录：" + folder);
+                        return ESGameSaveKeys.DefaultSaveFolder;
+                    }
+                }
+
+                safeSegments.Add(segment);
+            }
+
+            return safeSegments.Count == 0
+                ? ESGameSaveKeys.DefaultSaveFolder
+                : string.Join("/", safeSegments);
         }
 
         private static string NormalizeSlotId(string slotId)
@@ -632,6 +707,13 @@ namespace ES
             char[] invalidChars = Path.GetInvalidFileNameChars();
             for (int i = 0; i < invalidChars.Length; i++)
                 result = result.Replace(invalidChars[i], '_');
+
+            if (string.Equals(result, ".", StringComparison.Ordinal)
+                || string.Equals(result, "..", StringComparison.Ordinal)
+                || result.IndexOf('/') >= 0
+                || result.IndexOf('\\') >= 0
+                || result.IndexOf(':') >= 0)
+                return ESGameSaveKeys.DefaultSlotId;
 
             return result;
         }

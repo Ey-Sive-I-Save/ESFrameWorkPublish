@@ -2,6 +2,7 @@ using System;
 using KinematicCharacterController;
 using Sirenix.OdinInspector;
 using UnityEngine;
+using UnityEngine.Serialization;
 using ReadOnlyAttribute = Sirenix.OdinInspector.ReadOnlyAttribute;
 
 namespace ES
@@ -169,9 +170,12 @@ namespace ES
         public Vector3 kinematicGravity = new Vector3(0f, -9.81f, 0f);
 
         [Title("驾驶镜头", "可选。只在驾驶权授予期间提交一个 Shot；角色、座位和载具能力不持有 VCam。")]
-        [LabelText("ProfileKey")]
-        [Tooltip("留空表示该载具不申请驾驶镜头。必须是 Camera Catalog 中的稳定内容键。")]
-        public string driverCameraProfileKey;
+        [LabelText("Definition")]
+        [Tooltip("未配置表示该载具不申请驾驶镜头。必须是相机定义索引中的稳定内容引用。")]
+        public ESCameraDefinitionReference driverCameraDefinition;
+
+        [SerializeField, HideInInspector, FormerlySerializedAs("driverCameraProfileKey"), FormerlySerializedAs("driverCameraDefinitionKey")]
+        private string legacyDriverCameraDefinitionKey;
 
         [LabelText("ViewKey")]
         public string driverCameraViewKey = "MainView";
@@ -427,7 +431,7 @@ namespace ES
         private void RefreshDriverCameraRequest()
         {
             ReleaseDriverCameraRequest();
-            if (currentDriver == null || string.IsNullOrWhiteSpace(driverCameraProfileKey))
+            if (currentDriver == null || !driverCameraDefinition.IsConfigured)
                 return;
 
             Transform follow = driverCameraFollow != null ? driverCameraFollow : transform;
@@ -440,7 +444,7 @@ namespace ES
 
             ESCameraRequest request = ESCameraRequest.CreateShot(
                 new ESCameraViewId(driverCameraViewKey),
-                driverCameraProfileKey,
+                driverCameraDefinition,
                 driverCameraPriority,
                 currentDriver,
                 follow,

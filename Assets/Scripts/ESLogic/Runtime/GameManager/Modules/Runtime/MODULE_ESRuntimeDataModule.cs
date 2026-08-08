@@ -91,78 +91,129 @@ namespace ES
         }
     }
 
-    public static class ESRuntimeDataAsset
+    public struct ESAssetCatalogBuildValidation
     {
-        public static readonly ESAssetConfigKeyTable<ESAssetReferPrefabConfigData, GameObject> Prefabs = new ESAssetConfigKeyTable<ESAssetReferPrefabConfigData, GameObject>(256, "Asset.Prefab");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferSpriteConfigData, Sprite> Sprites = new ESAssetConfigKeyTable<ESAssetReferSpriteConfigData, Sprite>(256, "Asset.Sprite");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferAudioClipConfigData, AudioClip> AudioClips = new ESAssetConfigKeyTable<ESAssetReferAudioClipConfigData, AudioClip>(256, "Asset.AudioClip");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferAnimationClipConfigData, AnimationClip> AnimationClips = new ESAssetConfigKeyTable<ESAssetReferAnimationClipConfigData, AnimationClip>(256, "Asset.AnimationClip");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferAnimatorControllerConfigData, RuntimeAnimatorController> AnimatorControllers = new ESAssetConfigKeyTable<ESAssetReferAnimatorControllerConfigData, RuntimeAnimatorController>(128, "Asset.AnimatorController");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferMaterialConfigData, Material> Materials = new ESAssetConfigKeyTable<ESAssetReferMaterialConfigData, Material>(256, "Asset.Material");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferMeshConfigData, Mesh> Meshes = new ESAssetConfigKeyTable<ESAssetReferMeshConfigData, Mesh>(256, "Asset.Mesh");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferSceneConfigData, UnityEngine.Object> Scenes = new ESAssetConfigKeyTable<ESAssetReferSceneConfigData, UnityEngine.Object>(64, "Asset.Scene");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferTextureConfigData, Texture> Textures = new ESAssetConfigKeyTable<ESAssetReferTextureConfigData, Texture>(128, "Asset.Texture");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferTexture2DConfigData, Texture2D> Texture2Ds = new ESAssetConfigKeyTable<ESAssetReferTexture2DConfigData, Texture2D>(128, "Asset.Texture2D");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferSpriteAtlasConfigData, UnityEngine.U2D.SpriteAtlas> SpriteAtlases = new ESAssetConfigKeyTable<ESAssetReferSpriteAtlasConfigData, UnityEngine.U2D.SpriteAtlas>(64, "Asset.SpriteAtlas");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferAvatarConfigData, Avatar> Avatars = new ESAssetConfigKeyTable<ESAssetReferAvatarConfigData, Avatar>(64, "Asset.Avatar");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferPlayableAssetConfigData, UnityEngine.Playables.PlayableAsset> PlayableAssets = new ESAssetConfigKeyTable<ESAssetReferPlayableAssetConfigData, UnityEngine.Playables.PlayableAsset>(64, "Asset.PlayableAsset");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferScriptableObjectConfigData, ScriptableObject> ScriptableObjects = new ESAssetConfigKeyTable<ESAssetReferScriptableObjectConfigData, ScriptableObject>(128, "Asset.ScriptableObject");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferTimelineAssetConfigData, UnityEngine.Object> TimelineAssets = new ESAssetConfigKeyTable<ESAssetReferTimelineAssetConfigData, UnityEngine.Object>(64, "Asset.TimelineAsset");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferVideoClipConfigData, UnityEngine.Video.VideoClip> VideoClips = new ESAssetConfigKeyTable<ESAssetReferVideoClipConfigData, UnityEngine.Video.VideoClip>(64, "Asset.VideoClip");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferTerrainDataConfigData, TerrainData> TerrainDatas = new ESAssetConfigKeyTable<ESAssetReferTerrainDataConfigData, TerrainData>(32, "Asset.TerrainData");
-        public static readonly ESAssetConfigKeyTable<ESAssetReferRawConfigData, TextAsset> RawAssets = new ESAssetConfigKeyTable<ESAssetReferRawConfigData, TextAsset>(64, "Asset.Raw");
+        public int expectedBusinessEntries;
+        public int candidateEntries;
+        public int conflictCount;
+        public string conflictReport;
 
-        public static bool HasPendingAssetLoads =>
-            Prefabs.HasPendingLoads || Sprites.HasPendingLoads || AudioClips.HasPendingLoads
-            || AnimationClips.HasPendingLoads || AnimatorControllers.HasPendingLoads
-            || Materials.HasPendingLoads || Meshes.HasPendingLoads || Scenes.HasPendingLoads
-            || Textures.HasPendingLoads || Texture2Ds.HasPendingLoads || SpriteAtlases.HasPendingLoads
-            || Avatars.HasPendingLoads || PlayableAssets.HasPendingLoads || ScriptableObjects.HasPendingLoads
-            || TimelineAssets.HasPendingLoads || VideoClips.HasPendingLoads || TerrainDatas.HasPendingLoads || RawAssets.HasPendingLoads;
+        public bool IsValid => expectedBusinessEntries > 0
+            && candidateEntries == expectedBusinessEntries
+            && conflictCount == 0;
+    }
 
-        private static bool IsAnyAssetTableBuilding =>
-            Prefabs.IsBuilding || Sprites.IsBuilding || AudioClips.IsBuilding
-            || AnimationClips.IsBuilding || AnimatorControllers.IsBuilding
-            || Materials.IsBuilding || Meshes.IsBuilding || Scenes.IsBuilding
-            || Textures.IsBuilding || Texture2Ds.IsBuilding || SpriteAtlases.IsBuilding
-            || Avatars.IsBuilding || PlayableAssets.IsBuilding || ScriptableObjects.IsBuilding
-            || TimelineAssets.IsBuilding || VideoClips.IsBuilding || TerrainDatas.IsBuilding || RawAssets.IsBuilding;
+    internal readonly struct ESAssetConfigGenerationRecord
+    {
+        public readonly ESAssetReferKind Kind;
+        public readonly ESAssetConfigRecord Record;
 
-        public static void BeginBuild(bool clear)
+        public ESAssetConfigGenerationRecord(ESAssetReferKind kind, in ESAssetConfigRecord record)
         {
-            EnsureCanBeginBuild(clear);
+            Kind = kind;
+            Record = record;
+        }
+    }
 
-            Prefabs.BeginBuild(clear);
-            Sprites.BeginBuild(clear);
-            AudioClips.BeginBuild(clear);
-            AnimationClips.BeginBuild(clear);
-            AnimatorControllers.BeginBuild(clear);
-            Materials.BeginBuild(clear);
-            Meshes.BeginBuild(clear);
-            Scenes.BeginBuild(clear);
-            Textures.BeginBuild(clear);
-            Texture2Ds.BeginBuild(clear);
-            SpriteAtlases.BeginBuild(clear);
-            Avatars.BeginBuild(clear);
-            PlayableAssets.BeginBuild(clear);
-            ScriptableObjects.BeginBuild(clear);
-            TimelineAssets.BeginBuild(clear);
-            VideoClips.BeginBuild(clear);
-            TerrainDatas.BeginBuild(clear);
-            RawAssets.BeginBuild(clear);
+    /// <summary>
+    /// One immutable Asset ConfigTable generation. Tables and Loader handles are never shared
+    /// with another generation; only reader accounting and retirement state remain mutable.
+    /// </summary>
+    internal sealed class ESAssetConfigTableGenerationState
+    {
+        private readonly object lifetimeSync = new object();
+        private readonly Action<ESAssetConfigTableGenerationState, Exception> reclaimed;
+        private ESAssetConfigGenerationRecord[] records = Array.Empty<ESAssetConfigGenerationRecord>();
+        private int readerCount;
+        private bool buildCompleted;
+        private bool published;
+        private bool retired;
+        private bool reclaimStarted;
+        private bool reclaimedCompleted;
+
+        internal readonly ESAssetConfigKeyTable<ESAssetReferPrefabConfigData, GameObject> Prefabs = new ESAssetConfigKeyTable<ESAssetReferPrefabConfigData, GameObject>(256, "Asset.Prefab");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferSpriteConfigData, Sprite> Sprites = new ESAssetConfigKeyTable<ESAssetReferSpriteConfigData, Sprite>(256, "Asset.Sprite");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferAudioClipConfigData, AudioClip> AudioClips = new ESAssetConfigKeyTable<ESAssetReferAudioClipConfigData, AudioClip>(256, "Asset.AudioClip");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferAnimationClipConfigData, AnimationClip> AnimationClips = new ESAssetConfigKeyTable<ESAssetReferAnimationClipConfigData, AnimationClip>(256, "Asset.AnimationClip");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferAnimatorControllerConfigData, RuntimeAnimatorController> AnimatorControllers = new ESAssetConfigKeyTable<ESAssetReferAnimatorControllerConfigData, RuntimeAnimatorController>(128, "Asset.AnimatorController");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferMaterialConfigData, Material> Materials = new ESAssetConfigKeyTable<ESAssetReferMaterialConfigData, Material>(256, "Asset.Material");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferMeshConfigData, Mesh> Meshes = new ESAssetConfigKeyTable<ESAssetReferMeshConfigData, Mesh>(256, "Asset.Mesh");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferSceneConfigData, UnityEngine.Object> Scenes = new ESAssetConfigKeyTable<ESAssetReferSceneConfigData, UnityEngine.Object>(64, "Asset.Scene");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferTextureConfigData, Texture> Textures = new ESAssetConfigKeyTable<ESAssetReferTextureConfigData, Texture>(128, "Asset.Texture");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferTexture2DConfigData, Texture2D> Texture2Ds = new ESAssetConfigKeyTable<ESAssetReferTexture2DConfigData, Texture2D>(128, "Asset.Texture2D");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferSpriteAtlasConfigData, UnityEngine.U2D.SpriteAtlas> SpriteAtlases = new ESAssetConfigKeyTable<ESAssetReferSpriteAtlasConfigData, UnityEngine.U2D.SpriteAtlas>(64, "Asset.SpriteAtlas");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferAvatarConfigData, Avatar> Avatars = new ESAssetConfigKeyTable<ESAssetReferAvatarConfigData, Avatar>(64, "Asset.Avatar");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferPlayableAssetConfigData, UnityEngine.Playables.PlayableAsset> PlayableAssets = new ESAssetConfigKeyTable<ESAssetReferPlayableAssetConfigData, UnityEngine.Playables.PlayableAsset>(64, "Asset.PlayableAsset");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferScriptableObjectConfigData, ScriptableObject> ScriptableObjects = new ESAssetConfigKeyTable<ESAssetReferScriptableObjectConfigData, ScriptableObject>(128, "Asset.ScriptableObject");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferTimelineAssetConfigData, UnityEngine.Object> TimelineAssets = new ESAssetConfigKeyTable<ESAssetReferTimelineAssetConfigData, UnityEngine.Object>(64, "Asset.TimelineAsset");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferVideoClipConfigData, UnityEngine.Video.VideoClip> VideoClips = new ESAssetConfigKeyTable<ESAssetReferVideoClipConfigData, UnityEngine.Video.VideoClip>(64, "Asset.VideoClip");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferTerrainDataConfigData, TerrainData> TerrainDatas = new ESAssetConfigKeyTable<ESAssetReferTerrainDataConfigData, TerrainData>(32, "Asset.TerrainData");
+        internal readonly ESAssetConfigKeyTable<ESAssetReferRawConfigData, TextAsset> RawAssets = new ESAssetConfigKeyTable<ESAssetReferRawConfigData, TextAsset>(64, "Asset.Raw");
+
+        internal ESAssetConfigTableGenerationState(
+            long baseGeneration,
+            Action<ESAssetConfigTableGenerationState, Exception> reclaimed)
+        {
+            BaseGeneration = baseGeneration;
+            this.reclaimed = reclaimed;
         }
 
-        private static void EnsureCanBeginBuild(bool clear)
+        internal long BaseGeneration { get; }
+        internal long Generation { get; private set; }
+        internal string CatalogFingerprint { get; private set; } = string.Empty;
+        internal int ProviderGeneration { get; private set; }
+        internal int ReaderCount { get { lock (lifetimeSync) return readerCount; } }
+        internal bool IsRetired { get { lock (lifetimeSync) return retired; } }
+        internal bool IsReclaimed { get { lock (lifetimeSync) return reclaimedCompleted; } }
+        internal IReadOnlyList<ESAssetConfigGenerationRecord> Records => records;
+
+        internal int RegisteredCount => Prefabs.Count + Sprites.Count + AudioClips.Count
+            + AnimationClips.Count + AnimatorControllers.Count + Materials.Count + Meshes.Count
+            + Scenes.Count + Textures.Count + Texture2Ds.Count + SpriteAtlases.Count + Avatars.Count
+            + PlayableAssets.Count + ScriptableObjects.Count + TimelineAssets.Count + VideoClips.Count
+            + TerrainDatas.Count + RawAssets.Count;
+
+        internal int ConflictCount => Prefabs.ConflictCount + Sprites.ConflictCount + AudioClips.ConflictCount
+            + AnimationClips.ConflictCount + AnimatorControllers.ConflictCount + Materials.ConflictCount
+            + Meshes.ConflictCount + Scenes.ConflictCount + Textures.ConflictCount + Texture2Ds.ConflictCount
+            + SpriteAtlases.ConflictCount + Avatars.ConflictCount + PlayableAssets.ConflictCount
+            + ScriptableObjects.ConflictCount + TimelineAssets.ConflictCount + VideoClips.ConflictCount
+            + TerrainDatas.ConflictCount + RawAssets.ConflictCount;
+
+        internal bool HasPendingLoads => Prefabs.HasPendingLoads || Sprites.HasPendingLoads || AudioClips.HasPendingLoads
+            || AnimationClips.HasPendingLoads || AnimatorControllers.HasPendingLoads || Materials.HasPendingLoads
+            || Meshes.HasPendingLoads || Scenes.HasPendingLoads || Textures.HasPendingLoads
+            || Texture2Ds.HasPendingLoads || SpriteAtlases.HasPendingLoads || Avatars.HasPendingLoads
+            || PlayableAssets.HasPendingLoads || ScriptableObjects.HasPendingLoads || TimelineAssets.HasPendingLoads
+            || VideoClips.HasPendingLoads || TerrainDatas.HasPendingLoads || RawAssets.HasPendingLoads;
+
+        internal void BeginBuild()
         {
-            // 先全局预检，避免前几张分类表已经清空后才在后续表上发现冲突。
-            if (IsAnyAssetTableBuilding)
-                throw new InvalidOperationException("[ESAssetTable] 分类表已处于构建状态，不能重复开始全量构建。");
-            if (clear && HasPendingAssetLoads)
-                throw new InvalidOperationException("[ESAssetTable] 仍有加载请求，不能全量重建 Catalog。");
+            Prefabs.BeginBuild(true);
+            Sprites.BeginBuild(true);
+            AudioClips.BeginBuild(true);
+            AnimationClips.BeginBuild(true);
+            AnimatorControllers.BeginBuild(true);
+            Materials.BeginBuild(true);
+            Meshes.BeginBuild(true);
+            Scenes.BeginBuild(true);
+            Textures.BeginBuild(true);
+            Texture2Ds.BeginBuild(true);
+            SpriteAtlases.BeginBuild(true);
+            Avatars.BeginBuild(true);
+            PlayableAssets.BeginBuild(true);
+            ScriptableObjects.BeginBuild(true);
+            TimelineAssets.BeginBuild(true);
+            VideoClips.BeginBuild(true);
+            TerrainDatas.BeginBuild(true);
+            RawAssets.BeginBuild(true);
         }
 
-        public static void EndBuild()
+        internal void CompleteBuild(List<ESAssetConfigGenerationRecord> sourceRecords)
         {
+            if (buildCompleted)
+                throw new InvalidOperationException("Asset ConfigTable 候选代已完成构建。");
+
             Prefabs.EndBuild();
             Sprites.EndBuild();
             AudioClips.EndBuild();
@@ -181,184 +232,574 @@ namespace ES
             VideoClips.EndBuild();
             TerrainDatas.EndBuild();
             RawAssets.EndBuild();
+            records = sourceRecords == null ? Array.Empty<ESAssetConfigGenerationRecord>() : sourceRecords.ToArray();
+            buildCompleted = true;
         }
 
-        private sealed class AssetConfigPreflightData : ESAssetReferConfigDataBase<UnityEngine.Object>
+        internal void PrepareForCommit(long generation, string catalogFingerprint)
         {
+            if (!buildCompleted || published || retired)
+                throw new InvalidOperationException("Asset ConfigTable 候选代不处于可提交状态。");
+            if (generation <= 0)
+                throw new ArgumentOutOfRangeException(nameof(generation));
+
+            Generation = generation;
+            CatalogFingerprint = catalogFingerprint ?? string.Empty;
         }
 
-        /// <summary>
-        /// Catalog/Page 全量重建的隔离预检表。它执行正式表相同的强类型初始化、重复键、
-        /// 别名和 RuntimeKey 规则，但绝不触碰正式驻留外壳、Ready 或 Loader Handle。
-        /// </summary>
-        private sealed class AssetConfigBuildPreflight
+        internal void BindProvider(IESAssetRuntimeProvider provider, int providerGeneration)
         {
-            private static readonly Func<AssetConfigPreflightData> CreateShell = CreatePreflightShell;
-            private readonly Dictionary<ESAssetReferKind, ESAssetConfigKeyTable<AssetConfigPreflightData, UnityEngine.Object>> tables
-                = new Dictionary<ESAssetReferKind, ESAssetConfigKeyTable<AssetConfigPreflightData, UnityEngine.Object>>(17);
+            if (!buildCompleted || published || retired)
+                throw new InvalidOperationException("只能在候选代发布前绑定 Provider。");
+            if (provider == null)
+                throw new ArgumentNullException(nameof(provider));
+            if (providerGeneration <= 0)
+                throw new ArgumentOutOfRangeException(nameof(providerGeneration));
 
-            public bool Stage<TData, TKey, TAsset>(ESAssetReferKind kind, in ESAssetConfigRecord record)
-                where TData : ESAssetReferConfigDataBase<TAsset>, IESAssetConfigDataInitializer<TKey>, new()
-                where TKey : class, IESAssetConfigKeyInitializer, new()
-                where TAsset : UnityEngine.Object
+            Prefabs.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferPrefabConfigData, GameObject>(provider));
+            Sprites.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferSpriteConfigData, Sprite>(provider));
+            AudioClips.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferAudioClipConfigData, AudioClip>(provider));
+            AnimationClips.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferAnimationClipConfigData, AnimationClip>(provider));
+            AnimatorControllers.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferAnimatorControllerConfigData, RuntimeAnimatorController>(provider));
+            Materials.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferMaterialConfigData, Material>(provider));
+            Meshes.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferMeshConfigData, Mesh>(provider));
+            Scenes.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferSceneConfigData, UnityEngine.Object>(provider));
+            Textures.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferTextureConfigData, Texture>(provider));
+            Texture2Ds.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferTexture2DConfigData, Texture2D>(provider));
+            SpriteAtlases.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferSpriteAtlasConfigData, UnityEngine.U2D.SpriteAtlas>(provider));
+            Avatars.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferAvatarConfigData, Avatar>(provider));
+            PlayableAssets.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferPlayableAssetConfigData, UnityEngine.Playables.PlayableAsset>(provider));
+            ScriptableObjects.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferScriptableObjectConfigData, ScriptableObject>(provider));
+            TimelineAssets.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferTimelineAssetConfigData, UnityEngine.Object>(provider));
+            VideoClips.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferVideoClipConfigData, UnityEngine.Video.VideoClip>(provider));
+            TerrainDatas.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferTerrainDataConfigData, TerrainData>(provider));
+            RawAssets.SetLoader(new ESRuntimeAssetTableLoader<ESAssetReferRawConfigData, TextAsset>(provider));
+            ProviderGeneration = providerGeneration;
+        }
+
+        internal void Publish()
+        {
+            if (!buildCompleted || Generation <= 0 || retired)
+                throw new InvalidOperationException("Asset ConfigTable 候选代尚未准备完成。");
+            published = true;
+        }
+
+        internal bool TryAcquire(out ESAssetConfigTableGenerationLease lease)
+        {
+            lock (lifetimeSync)
             {
-                TKey key = new TKey();
-                key.InitializeRuntimeKey(
-                    record.enumKey,
-                    record.stringKey,
-                    record.assetGuid,
-                    record.assetLocalFileId,
-                    record.assetTypeName,
-                    record.assetPath);
+                if (!published || retired || reclaimStarted)
+                {
+                    lease = null;
+                    return false;
+                }
+                if (readerCount == int.MaxValue)
+                    throw new InvalidOperationException("Asset ConfigTable generation reader 计数已溢出。");
 
-                // 在临时对象上执行真实字段初始化，确保正式外壳在任何初始化异常前保持原样。
-                TData validationData = new TData();
-                validationData.InitializeFromRecord(key, in record);
+                readerCount++;
+                lease = new ESAssetConfigTableGenerationLease(this);
+                return true;
+            }
+        }
 
-                ESAssetConfigKeyTable<AssetConfigPreflightData, UnityEngine.Object> table = GetOrCreateTable(kind);
-                if (!table.TryAcquireBuildRecord(
-                        key,
-                        CreateShell,
-                        record.assetGuid + ":" + record.assetLocalFileId,
-                        out AssetConfigPreflightData shell))
+        internal void ReleaseReader()
+        {
+            bool reclaimNow = false;
+            lock (lifetimeSync)
+            {
+                if (readerCount <= 0)
+                    return;
+                readerCount--;
+                if (readerCount == 0 && retired && !reclaimStarted)
+                {
+                    reclaimStarted = true;
+                    reclaimNow = true;
+                }
+            }
+            if (reclaimNow)
+                ReclaimLoaders();
+        }
+
+        internal void Retire()
+        {
+            bool reclaimNow = false;
+            lock (lifetimeSync)
+            {
+                if (retired)
+                    return;
+                retired = true;
+                published = false;
+                if (readerCount == 0 && !reclaimStarted)
+                {
+                    reclaimStarted = true;
+                    reclaimNow = true;
+                }
+            }
+            if (reclaimNow)
+                ReclaimLoaders();
+        }
+
+        internal string GetConflictReport()
+        {
+            var builder = new System.Text.StringBuilder(512);
+            AppendConflict(builder, "Prefab", Prefabs.GetConflictReport());
+            AppendConflict(builder, "Sprite", Sprites.GetConflictReport());
+            AppendConflict(builder, "AudioClip", AudioClips.GetConflictReport());
+            AppendConflict(builder, "AnimationClip", AnimationClips.GetConflictReport());
+            AppendConflict(builder, "AnimatorController", AnimatorControllers.GetConflictReport());
+            AppendConflict(builder, "Material", Materials.GetConflictReport());
+            AppendConflict(builder, "Mesh", Meshes.GetConflictReport());
+            AppendConflict(builder, "Scene", Scenes.GetConflictReport());
+            AppendConflict(builder, "Texture", Textures.GetConflictReport());
+            AppendConflict(builder, "Texture2D", Texture2Ds.GetConflictReport());
+            AppendConflict(builder, "SpriteAtlas", SpriteAtlases.GetConflictReport());
+            AppendConflict(builder, "Avatar", Avatars.GetConflictReport());
+            AppendConflict(builder, "PlayableAsset", PlayableAssets.GetConflictReport());
+            AppendConflict(builder, "ScriptableObject", ScriptableObjects.GetConflictReport());
+            AppendConflict(builder, "TimelineAsset", TimelineAssets.GetConflictReport());
+            AppendConflict(builder, "VideoClip", VideoClips.GetConflictReport());
+            AppendConflict(builder, "TerrainData", TerrainDatas.GetConflictReport());
+            AppendConflict(builder, "Raw", RawAssets.GetConflictReport());
+            return builder.ToString();
+        }
+
+        private static void AppendConflict(System.Text.StringBuilder builder, string title, string report)
+        {
+            if (string.IsNullOrEmpty(report))
+                return;
+            builder.Append('[').Append(title).Append(']').AppendLine();
+            builder.Append(report);
+        }
+
+        private void ReclaimLoaders()
+        {
+            List<Exception> failures = null;
+            ResetLoader(Prefabs.ResetLoader, ref failures);
+            ResetLoader(Sprites.ResetLoader, ref failures);
+            ResetLoader(AudioClips.ResetLoader, ref failures);
+            ResetLoader(AnimationClips.ResetLoader, ref failures);
+            ResetLoader(AnimatorControllers.ResetLoader, ref failures);
+            ResetLoader(Materials.ResetLoader, ref failures);
+            ResetLoader(Meshes.ResetLoader, ref failures);
+            ResetLoader(Scenes.ResetLoader, ref failures);
+            ResetLoader(Textures.ResetLoader, ref failures);
+            ResetLoader(Texture2Ds.ResetLoader, ref failures);
+            ResetLoader(SpriteAtlases.ResetLoader, ref failures);
+            ResetLoader(Avatars.ResetLoader, ref failures);
+            ResetLoader(PlayableAssets.ResetLoader, ref failures);
+            ResetLoader(ScriptableObjects.ResetLoader, ref failures);
+            ResetLoader(TimelineAssets.ResetLoader, ref failures);
+            ResetLoader(VideoClips.ResetLoader, ref failures);
+            ResetLoader(TerrainDatas.ResetLoader, ref failures);
+            ResetLoader(RawAssets.ResetLoader, ref failures);
+
+            Exception failure = failures == null
+                ? null
+                : failures.Count == 1 ? failures[0] : new AggregateException(
+                    "Asset ConfigTable 旧代 Loader 回收发生多个异常。",
+                    failures);
+            lock (lifetimeSync)
+                reclaimedCompleted = true;
+            reclaimed?.Invoke(this, failure);
+        }
+
+        private static void ResetLoader(Func<int> reset, ref List<Exception> failures)
+        {
+            try { reset(); }
+            catch (Exception exception)
+            {
+                if (failures == null)
+                    failures = new List<Exception>(2);
+                failures.Add(exception);
+            }
+        }
+    }
+
+    internal sealed class ESAssetConfigTableGenerationLease : IDisposable
+    {
+        private ESAssetConfigTableGenerationState state;
+
+        internal ESAssetConfigTableGenerationLease(ESAssetConfigTableGenerationState state)
+        {
+            this.state = state ?? throw new ArgumentNullException(nameof(state));
+        }
+
+        internal ESAssetConfigTableGenerationState State => state
+            ?? throw new ObjectDisposedException(nameof(ESAssetConfigTableGenerationLease));
+        internal long Generation => state?.Generation ?? 0;
+
+        public void Dispose()
+        {
+            Interlocked.Exchange(ref state, null)?.ReleaseReader();
+        }
+    }
+
+    public static class ESRuntimeDataAsset
+    {
+        private static readonly object commitSync = new object();
+        private static readonly List<ESAssetConfigTableGenerationState> retiredStates = new List<ESAssetConfigTableGenerationState>(4);
+        private static long editorCatalogCommitGeneration;
+        private static long authorityEpoch;
+        private static bool assetConfigTablesAvailable;
+        private static ESAssetConfigTableGenerationState currentState;
+        private static ESAssetConfigTableGenerationState pendingProviderCandidate;
+        private static string pendingProviderFingerprint = string.Empty;
+        private static bool providerCandidateBuildActive;
+        private static IESAssetRuntimeProvider activeProvider;
+        private static int activeProviderGeneration;
+        private static int reclamationFailureCount;
+        private static string lastReclamationFailure = string.Empty;
+
+        public static long EditorCatalogCommitGeneration => editorCatalogCommitGeneration;
+        public static long AssetConfigTableGeneration => Volatile.Read(ref currentState)?.Generation ?? 0;
+        public static int AssetConfigProviderGeneration => Volatile.Read(ref currentState)?.ProviderGeneration ?? 0;
+        public static bool AssetConfigTablesAvailable => Volatile.Read(ref assetConfigTablesAvailable);
+        public static bool AssetConfigProviderBindingCurrent
+            => AssetConfigTablesAvailable
+                && activeProvider != null
+                && ESAssets.IsReady
+                && AssetConfigProviderGeneration == activeProviderGeneration
+                && AssetConfigProviderGeneration == ESAssets.RuntimeBackendGeneration;
+        public static string EditorCatalogCommittedFingerprint
+            => AssetConfigTablesAvailable ? Volatile.Read(ref currentState)?.CatalogFingerprint ?? string.Empty : string.Empty;
+        public static long EditorCatalogCommittedConfigTableGeneration
+            => string.IsNullOrWhiteSpace(EditorCatalogCommittedFingerprint) ? 0 : AssetConfigTableGeneration;
+        public static int RetiredAssetConfigGenerationCount { get { lock (commitSync) return retiredStates.Count; } }
+        public static int ActiveAssetConfigReaderCount
+        {
+            get
+            {
+                lock (commitSync)
+                {
+                    int count = currentState?.ReaderCount ?? 0;
+                    for (int i = 0; i < retiredStates.Count; i++)
+                        if (!ReferenceEquals(retiredStates[i], currentState))
+                            count += retiredStates[i].ReaderCount;
+                    return count;
+                }
+            }
+        }
+        public static int AssetConfigReclamationFailureCount => Volatile.Read(ref reclamationFailureCount);
+        public static string LastAssetConfigReclamationFailure { get { lock (commitSync) return lastReclamationFailure; } }
+
+        public static readonly ESAssetConfigTableReader<ESAssetReferPrefabConfigData, GameObject> Prefabs = new ESAssetConfigTableReader<ESAssetReferPrefabConfigData, GameObject>(state => state.Prefabs);
+        public static readonly ESAssetConfigTableReader<ESAssetReferSpriteConfigData, Sprite> Sprites = new ESAssetConfigTableReader<ESAssetReferSpriteConfigData, Sprite>(state => state.Sprites);
+        public static readonly ESAssetConfigTableReader<ESAssetReferAudioClipConfigData, AudioClip> AudioClips = new ESAssetConfigTableReader<ESAssetReferAudioClipConfigData, AudioClip>(state => state.AudioClips);
+        public static readonly ESAssetConfigTableReader<ESAssetReferAnimationClipConfigData, AnimationClip> AnimationClips = new ESAssetConfigTableReader<ESAssetReferAnimationClipConfigData, AnimationClip>(state => state.AnimationClips);
+        public static readonly ESAssetConfigTableReader<ESAssetReferAnimatorControllerConfigData, RuntimeAnimatorController> AnimatorControllers = new ESAssetConfigTableReader<ESAssetReferAnimatorControllerConfigData, RuntimeAnimatorController>(state => state.AnimatorControllers);
+        public static readonly ESAssetConfigTableReader<ESAssetReferMaterialConfigData, Material> Materials = new ESAssetConfigTableReader<ESAssetReferMaterialConfigData, Material>(state => state.Materials);
+        public static readonly ESAssetConfigTableReader<ESAssetReferMeshConfigData, Mesh> Meshes = new ESAssetConfigTableReader<ESAssetReferMeshConfigData, Mesh>(state => state.Meshes);
+        public static readonly ESAssetConfigTableReader<ESAssetReferSceneConfigData, UnityEngine.Object> Scenes = new ESAssetConfigTableReader<ESAssetReferSceneConfigData, UnityEngine.Object>(state => state.Scenes);
+        public static readonly ESAssetConfigTableReader<ESAssetReferTextureConfigData, Texture> Textures = new ESAssetConfigTableReader<ESAssetReferTextureConfigData, Texture>(state => state.Textures);
+        public static readonly ESAssetConfigTableReader<ESAssetReferTexture2DConfigData, Texture2D> Texture2Ds = new ESAssetConfigTableReader<ESAssetReferTexture2DConfigData, Texture2D>(state => state.Texture2Ds);
+        public static readonly ESAssetConfigTableReader<ESAssetReferSpriteAtlasConfigData, UnityEngine.U2D.SpriteAtlas> SpriteAtlases = new ESAssetConfigTableReader<ESAssetReferSpriteAtlasConfigData, UnityEngine.U2D.SpriteAtlas>(state => state.SpriteAtlases);
+        public static readonly ESAssetConfigTableReader<ESAssetReferAvatarConfigData, Avatar> Avatars = new ESAssetConfigTableReader<ESAssetReferAvatarConfigData, Avatar>(state => state.Avatars);
+        public static readonly ESAssetConfigTableReader<ESAssetReferPlayableAssetConfigData, UnityEngine.Playables.PlayableAsset> PlayableAssets = new ESAssetConfigTableReader<ESAssetReferPlayableAssetConfigData, UnityEngine.Playables.PlayableAsset>(state => state.PlayableAssets);
+        public static readonly ESAssetConfigTableReader<ESAssetReferScriptableObjectConfigData, ScriptableObject> ScriptableObjects = new ESAssetConfigTableReader<ESAssetReferScriptableObjectConfigData, ScriptableObject>(state => state.ScriptableObjects);
+        public static readonly ESAssetConfigTableReader<ESAssetReferTimelineAssetConfigData, UnityEngine.Object> TimelineAssets = new ESAssetConfigTableReader<ESAssetReferTimelineAssetConfigData, UnityEngine.Object>(state => state.TimelineAssets);
+        public static readonly ESAssetConfigTableReader<ESAssetReferVideoClipConfigData, UnityEngine.Video.VideoClip> VideoClips = new ESAssetConfigTableReader<ESAssetReferVideoClipConfigData, UnityEngine.Video.VideoClip>(state => state.VideoClips);
+        public static readonly ESAssetConfigTableReader<ESAssetReferTerrainDataConfigData, TerrainData> TerrainDatas = new ESAssetConfigTableReader<ESAssetReferTerrainDataConfigData, TerrainData>(state => state.TerrainDatas);
+        public static readonly ESAssetConfigTableReader<ESAssetReferRawConfigData, TextAsset> RawAssets = new ESAssetConfigTableReader<ESAssetReferRawConfigData, TextAsset>(state => state.RawAssets);
+
+        public static bool HasPendingAssetLoads
+        {
+            get
+            {
+                lock (commitSync)
+                {
+                    if (currentState?.HasPendingLoads == true || pendingProviderCandidate?.HasPendingLoads == true)
+                        return true;
+                    for (int i = 0; i < retiredStates.Count; i++)
+                        if (retiredStates[i].HasPendingLoads)
+                            return true;
+                    return false;
+                }
+            }
+        }
+
+        internal static UniTask WaitForAssetConfigReadersAsync(CancellationToken cancellationToken)
+            => UniTask.WaitUntil(() => ActiveAssetConfigReaderCount == 0, cancellationToken: cancellationToken);
+
+        internal static bool TryAcquireAssetConfigGeneration(
+            bool requireProvider,
+            out ESAssetConfigTableGenerationLease lease)
+        {
+            lease = null;
+            for (int attempt = 0; attempt < 4; attempt++)
+            {
+                long epoch = Volatile.Read(ref authorityEpoch);
+                if ((epoch & 1L) != 0 || !Volatile.Read(ref assetConfigTablesAvailable))
                     return false;
 
-                return table.RegisterPreparedBuildRecord(key, shell, record.stringKey) != 0;
+                ESAssetConfigTableGenerationState state = Volatile.Read(ref currentState);
+                if (state == null || !state.TryAcquire(out ESAssetConfigTableGenerationLease acquired))
+                    return false;
+
+                bool providerCurrent = !requireProvider
+                    || (activeProvider != null
+                        && ESAssets.IsReady
+                        && state.ProviderGeneration == activeProviderGeneration
+                        && state.ProviderGeneration == ESAssets.RuntimeBackendGeneration);
+                if (providerCurrent
+                    && ReferenceEquals(state, Volatile.Read(ref currentState))
+                    && epoch == Volatile.Read(ref authorityEpoch)
+                    && Volatile.Read(ref assetConfigTablesAvailable))
+                {
+                    lease = acquired;
+                    return true;
+                }
+
+                acquired.Dispose();
+                if (!providerCurrent)
+                    return false;
             }
-
-            public void EndBuild()
-            {
-                foreach (KeyValuePair<ESAssetReferKind, ESAssetConfigKeyTable<AssetConfigPreflightData, UnityEngine.Object>> pair in tables)
-                    pair.Value.EndBuild();
-            }
-
-            private ESAssetConfigKeyTable<AssetConfigPreflightData, UnityEngine.Object> GetOrCreateTable(ESAssetReferKind kind)
-            {
-                if (tables.TryGetValue(kind, out ESAssetConfigKeyTable<AssetConfigPreflightData, UnityEngine.Object> table))
-                    return table;
-
-                table = new ESAssetConfigKeyTable<AssetConfigPreflightData, UnityEngine.Object>(16, "Asset." + kind);
-                table.BeginBuild(true);
-                tables.Add(kind, table);
-                return table;
-            }
-
-            private static AssetConfigPreflightData CreatePreflightShell()
-            {
-                return new AssetConfigPreflightData();
-            }
-        }
-
-        public static bool SetLoadedAsset<TData, TAsset>(ESConfigKeyTable<TData> table, int runtimeKey, TAsset asset)
-            where TData : ESAssetReferConfigDataBase<TAsset>
-            where TAsset : UnityEngine.Object
-        {
-            if (table == null || runtimeKey == 0 || !table.TryGet(runtimeKey, out TData data))
-                return false;
-
-            data.SetLoadedAsset(asset);
-            return true;
-        }
-
-        public static bool ClearLoadedAsset<TData>(ESConfigKeyTable<TData> table, int runtimeKey)
-            where TData : class, IESAssetReferConfigData
-        {
-            if (table == null || runtimeKey == 0 || !table.TryGet(runtimeKey, out TData data))
-                return false;
-
-            data.ClearLoadedAsset();
-            return true;
-        }
-
-        public static int ClearAllLoadedAssets()
-        {
-            int count = 0;
-            count += ClearLoadedAssets(Prefabs);
-            count += ClearLoadedAssets(Sprites);
-            count += ClearLoadedAssets(AudioClips);
-            count += ClearLoadedAssets(AnimationClips);
-            count += ClearLoadedAssets(AnimatorControllers);
-            count += ClearLoadedAssets(Materials);
-            count += ClearLoadedAssets(Meshes);
-            count += ClearLoadedAssets(Scenes);
-            count += ClearLoadedAssets(Textures);
-            count += ClearLoadedAssets(Texture2Ds);
-            count += ClearLoadedAssets(SpriteAtlases);
-            count += ClearLoadedAssets(Avatars);
-            count += ClearLoadedAssets(PlayableAssets);
-            count += ClearLoadedAssets(ScriptableObjects);
-            count += ClearLoadedAssets(TimelineAssets);
-            count += ClearLoadedAssets(VideoClips);
-            count += ClearLoadedAssets(TerrainDatas);
-            count += ClearLoadedAssets(RawAssets);
-            return count;
+            return false;
         }
 
         /// <summary>
-        /// 全量资源安全点/Provider 重建专用：逐表释放 AssetTable Loader 持有的
-        /// Runtime Handle，并清理表内 LoadedAsset 状态。仅清字段会留下旧 Handle，
-        /// 导致同一 RuntimeKey 下一次加载时发生重复键。
+        /// Provider/Catalog 切换开始时使当前权威代失效并进入退休流程。已有 Lease 可以
+        /// 完成，但新调用不能再取得旧代；Loader 只在最后一个读者退出后回收。
         /// </summary>
-        public static int ResetAllAssetLoaders()
+        public static void InvalidateAssetConfigTableBinding()
         {
-            int count = 0;
-            count += Prefabs.ResetLoader();
-            count += Sprites.ResetLoader();
-            count += AudioClips.ResetLoader();
-            count += AnimationClips.ResetLoader();
-            count += AnimatorControllers.ResetLoader();
-            count += Materials.ResetLoader();
-            count += Meshes.ResetLoader();
-            count += Scenes.ResetLoader();
-            count += Textures.ResetLoader();
-            count += Texture2Ds.ResetLoader();
-            count += SpriteAtlases.ResetLoader();
-            count += Avatars.ResetLoader();
-            count += PlayableAssets.ResetLoader();
-            count += ScriptableObjects.ResetLoader();
-            count += TimelineAssets.ResetLoader();
-            count += VideoClips.ResetLoader();
-            count += TerrainDatas.ResetLoader();
-            count += RawAssets.ResetLoader();
-            return count;
-        }
-
-        public static void ClearAllPendingAssetLoads()
-        {
-            Prefabs.ClearPendingLoads();
-            Sprites.ClearPendingLoads();
-            AudioClips.ClearPendingLoads();
-            AnimationClips.ClearPendingLoads();
-            AnimatorControllers.ClearPendingLoads();
-            Materials.ClearPendingLoads();
-            Meshes.ClearPendingLoads();
-            Scenes.ClearPendingLoads();
-            Textures.ClearPendingLoads();
-            Texture2Ds.ClearPendingLoads();
-            SpriteAtlases.ClearPendingLoads();
-            Avatars.ClearPendingLoads();
-            PlayableAssets.ClearPendingLoads();
-            ScriptableObjects.ClearPendingLoads();
-            TimelineAssets.ClearPendingLoads();
-            VideoClips.ClearPendingLoads();
-            TerrainDatas.ClearPendingLoads();
-            RawAssets.ClearPendingLoads();
-        }
-
-        private static int ClearLoadedAssets<TData>(ESConfigKeyTable<TData> table)
-            where TData : class, IESAssetReferConfigData
-        {
-            int count = 0;
-            for (int i = 0; i < table.Count; i++)
+            lock (commitSync)
             {
-                if (!table.TryGetBySlot(i, out TData data) || !data.HasLoadedAsset)
-                    continue;
+                BeginAuthorityMutationLocked();
+                RetireStateLocked(currentState);
+                EndAuthorityMutationLocked(false);
+            }
+        }
 
-                data.ClearLoadedAsset();
-                count++;
+        public static bool IsCurrentEditorCatalogCommit(
+            string catalogSetFingerprint,
+            long configTableGeneration)
+        {
+            ESAssetConfigTableGenerationState state = Volatile.Read(ref currentState);
+            return AssetConfigTablesAvailable
+                && state != null
+                && configTableGeneration == state.Generation
+                && activeProvider != null
+                && ESAssets.IsReady
+                && state.ProviderGeneration == activeProviderGeneration
+                && state.ProviderGeneration == ESAssets.RuntimeBackendGeneration
+                && !string.IsNullOrWhiteSpace(catalogSetFingerprint)
+                && string.Equals(
+                    catalogSetFingerprint,
+                    state.CatalogFingerprint,
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static void BeginProviderCandidateBuild()
+        {
+            lock (commitSync)
+            {
+                if (providerCandidateBuildActive)
+                    throw new InvalidOperationException("Provider Catalog 候选构建事务已经开始。");
+                DisposePendingCandidateLocked();
+                providerCandidateBuildActive = true;
+            }
+        }
+
+        internal static void CancelProviderCandidateBuild()
+        {
+            lock (commitSync)
+            {
+                providerCandidateBuildActive = false;
+                DisposePendingCandidateLocked();
+            }
+        }
+
+        internal static void AttachRuntimeProvider(IESAssetRuntimeProvider provider, int providerGeneration)
+        {
+            if (provider == null)
+                throw new ArgumentNullException(nameof(provider));
+            lock (commitSync)
+            {
+                activeProvider = provider;
+                activeProviderGeneration = providerGeneration;
+                providerCandidateBuildActive = false;
+                if (pendingProviderCandidate != null)
+                {
+                    ESAssetConfigTableGenerationState candidate = pendingProviderCandidate;
+                    string fingerprint = pendingProviderFingerprint;
+                    pendingProviderCandidate = null;
+                    pendingProviderFingerprint = string.Empty;
+                    CommitCandidateLocked(candidate, fingerprint, provider, providerGeneration);
+                }
+            }
+        }
+
+        internal static void DetachRuntimeProvider(IESAssetRuntimeProvider provider)
+        {
+            lock (commitSync)
+            {
+                if (provider != null && !ReferenceEquals(activeProvider, provider))
+                    return;
+                activeProvider = null;
+                activeProviderGeneration = 0;
+                providerCandidateBuildActive = false;
+                DisposePendingCandidateLocked();
+                BeginAuthorityMutationLocked();
+                RetireStateLocked(currentState);
+                EndAuthorityMutationLocked(false);
+            }
+        }
+
+        internal static void RotateGenerationAtSafePoint(
+            IESAssetRuntimeProvider provider,
+            int providerGeneration)
+        {
+            if (provider == null)
+                throw new ArgumentNullException(nameof(provider));
+
+            ESAssetConfigGenerationRecord[] records;
+            string fingerprint;
+            long sourceGeneration;
+            lock (commitSync)
+            {
+                if (!ReferenceEquals(activeProvider, provider) || activeProviderGeneration != providerGeneration)
+                    throw new InvalidOperationException("安全点代际旋转的 Provider 已变化。");
+                ESAssetConfigTableGenerationState state = currentState;
+                if (!assetConfigTablesAvailable || state == null || state.IsRetired
+                    || state.ProviderGeneration != providerGeneration)
+                    return;
+                records = state?.Records.ToArray() ?? Array.Empty<ESAssetConfigGenerationRecord>();
+                fingerprint = state?.CatalogFingerprint ?? string.Empty;
+                sourceGeneration = state?.Generation ?? 0;
             }
 
-            return count;
+            ESAssetConfigTableGenerationState candidate = BuildCandidateFromGenerationRecords(
+                records,
+                sourceGeneration,
+                out _);
+            lock (commitSync)
+                CommitCandidateLocked(candidate, fingerprint, provider, providerGeneration);
+        }
+
+        public static void ClearAssetConfigTables()
+        {
+            InvalidateAssetConfigTableBinding();
+        }
+
+        internal static void CommitOrStageCandidate(
+            ESAssetConfigTableGenerationState candidate,
+            string catalogFingerprint)
+        {
+            if (candidate == null)
+                throw new ArgumentNullException(nameof(candidate));
+            lock (commitSync)
+            {
+                if (providerCandidateBuildActive && activeProvider == null)
+                {
+                    DisposePendingCandidateLocked();
+                    pendingProviderCandidate = candidate;
+                    pendingProviderFingerprint = catalogFingerprint ?? string.Empty;
+                    return;
+                }
+                CommitCandidateLocked(candidate, catalogFingerprint, activeProvider, activeProviderGeneration);
+            }
+        }
+
+        public static void ResetAllAssetLoaders()
+        {
+            InvalidateAssetConfigTableBinding();
+        }
+
+        private static void CommitCandidateLocked(
+            ESAssetConfigTableGenerationState candidate,
+            string catalogFingerprint,
+            IESAssetRuntimeProvider provider,
+            int providerGeneration)
+        {
+            long currentGeneration = currentState?.Generation ?? 0;
+            if (candidate.BaseGeneration != currentGeneration)
+            {
+                candidate.Retire();
+                throw new InvalidOperationException(
+                    "Asset ConfigTable 候选代已过期：构建基线 " + candidate.BaseGeneration
+                    + "，当前权威代 " + currentGeneration + "。");
+            }
+
+            BeginAuthorityMutationLocked();
+            ESAssetConfigTableGenerationState previous;
+            try
+            {
+                long nextGeneration = currentGeneration == long.MaxValue
+                    ? 1
+                    : currentGeneration + 1;
+                candidate.PrepareForCommit(nextGeneration, catalogFingerprint);
+                if (provider != null)
+                    candidate.BindProvider(provider, providerGeneration);
+                candidate.Publish();
+                previous = Interlocked.Exchange(ref currentState, candidate);
+            }
+            catch
+            {
+                EndAuthorityMutationLocked(false);
+                candidate.Retire();
+                throw;
+            }
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(catalogFingerprint))
+                    editorCatalogCommitGeneration = editorCatalogCommitGeneration == long.MaxValue
+                        ? 1
+                        : editorCatalogCommitGeneration + 1;
+                RetireStateLocked(previous);
+            }
+            catch (Exception exception)
+            {
+                reclamationFailureCount++;
+                lastReclamationFailure = "Asset ConfigTable 新代已提交，但旧代退休登记失败：" + exception;
+                Debug.LogException(exception);
+            }
+            finally { EndAuthorityMutationLocked(true); }
+        }
+
+        private static void BeginAuthorityMutationLocked()
+        {
+            Volatile.Write(ref assetConfigTablesAvailable, false);
+            Interlocked.Increment(ref authorityEpoch);
+        }
+
+        private static void EndAuthorityMutationLocked(bool available)
+        {
+            Interlocked.Increment(ref authorityEpoch);
+            Volatile.Write(ref assetConfigTablesAvailable, available);
+        }
+
+        private static void RetireStateLocked(ESAssetConfigTableGenerationState state)
+        {
+            if (state == null || state.IsRetired)
+                return;
+            retiredStates.Add(state);
+            state.Retire();
+        }
+
+        private static void DisposePendingCandidateLocked()
+        {
+            ESAssetConfigTableGenerationState pending = pendingProviderCandidate;
+            pendingProviderCandidate = null;
+            pendingProviderFingerprint = string.Empty;
+            pending?.Retire();
+        }
+
+        private static void OnGenerationReclaimed(
+            ESAssetConfigTableGenerationState state,
+            Exception failure)
+        {
+            lock (commitSync)
+            {
+                if (failure == null)
+                {
+                    retiredStates.Remove(state);
+                    return;
+                }
+                reclamationFailureCount++;
+                lastReclamationFailure = failure.ToString();
+                Debug.LogException(failure);
+            }
         }
 
 #if UNITY_EDITOR
@@ -403,121 +844,33 @@ namespace ES
 
         public static int RebuildAssetConfigTablesFromPages(IReadOnlyList<ESAssetPage> pages)
         {
-            EnsureCanBeginBuild(true);
-            PreflightAssetConfigTablesFromPages(pages);
-            BeginBuild(true);
-            try
+            var records = new List<ESAssetConfigGenerationRecord>(pages?.Count ?? 0);
+            if (pages != null)
             {
-                int count = 0;
-                if (pages != null)
-                {
-                    for (int i = 0; i < pages.Count; i++)
-                    {
-                        if (RegisterPageAsAssetConfigData(pages[i]))
-                            count++;
-                    }
-                }
-
-                return count;
-            }
-            finally
-            {
-                EndBuild();
-            }
-        }
-
-        private static void PreflightAssetConfigTablesFromPages(IReadOnlyList<ESAssetPage> pages)
-        {
-            var preflight = new AssetConfigBuildPreflight();
-            try
-            {
-                if (pages == null)
-                    return;
-
                 for (int i = 0; i < pages.Count; i++)
-                    StagePageAsAssetConfigData(pages[i], preflight);
+                {
+                    ESAssetPage page = pages[i];
+                    if (page == null)
+                        continue;
+                    if (page.Kind == ESAssetReferKind.ScriptableObject && page.OB is ScriptableObject scriptableObject
+                        && ESScriptableObjectClassification.GetClass(scriptableObject) == ESScriptableObjectClass.GameCore)
+                        continue;
+                    if (!ESAssetReferConfigKeySwitch.IsSupportedKind(page.Kind))
+                        throw new InvalidOperationException("AssetPage 包含不受支持的资源类型：" + page.Kind);
+
+                    ESAssetConfigRecord record = CreateAssetConfigRecord(page);
+                    records.Add(new ESAssetConfigGenerationRecord(page.Kind, in record));
+                }
             }
-            finally
+
+            ESAssetConfigTableGenerationState candidate = BuildCandidateFromGenerationRecords(records, out ESAssetCatalogBuildValidation validation);
+            if (validation.conflictCount != 0 || validation.candidateEntries != validation.expectedBusinessEntries)
             {
-                preflight.EndBuild();
+                candidate.Retire();
+                throw new InvalidOperationException("AssetPage 候选表不完整或存在冲突：\n" + validation.conflictReport);
             }
-        }
-
-        private static bool StagePageAsAssetConfigData(ESAssetPage page, AssetConfigBuildPreflight preflight)
-        {
-            if (page == null)
-                return false;
-
-            if (page.Kind == ESAssetReferKind.ScriptableObject && page.OB is ScriptableObject scriptableObject
-                && ESScriptableObjectClassification.GetClass(scriptableObject) == ESScriptableObjectClass.GameCore)
-                return false;
-
-            ESAssetConfigRecord record = CreateAssetConfigRecord(page);
-            return StageAssetConfigRecord(page.Kind, in record, preflight);
-        }
-
-        private static bool RegisterPageAsAssetConfigData(ESAssetPage page)
-        {
-            if (page == null)
-                return false;
-
-            // GameCore SO is Consumer-owned and intentionally has no global AssetTable entry.
-            if (page.Kind == ESAssetReferKind.ScriptableObject && page.OB is ScriptableObject scriptableObject
-                && ESScriptableObjectClassification.GetClass(scriptableObject) == ESScriptableObjectClass.GameCore)
-                return false;
-
-            switch (page.Kind)
-            {
-                case ESAssetReferKind.Prefab:
-                    return RegisterPrefab(CreateAssetDataFromPage<ESAssetReferPrefabConfigData, ESAssetReferPrefabConfigKey, GameObject>(page, Prefabs));
-                case ESAssetReferKind.Scene:
-                    return RegisterScene(CreateAssetDataFromPage<ESAssetReferSceneConfigData, ESAssetReferSceneConfigKey, UnityEngine.Object>(page, Scenes));
-                case ESAssetReferKind.Sprite:
-                    return RegisterSprite(CreateAssetDataFromPage<ESAssetReferSpriteConfigData, ESAssetReferSpriteConfigKey, Sprite>(page, Sprites));
-                case ESAssetReferKind.Texture2D:
-                    return RegisterTexture2D(CreateAssetDataFromPage<ESAssetReferTexture2DConfigData, ESAssetReferTexture2DConfigKey, Texture2D>(page, Texture2Ds));
-                case ESAssetReferKind.Texture:
-                    return RegisterTexture(CreateAssetDataFromPage<ESAssetReferTextureConfigData, ESAssetReferTextureConfigKey, Texture>(page, Textures));
-                case ESAssetReferKind.SpriteAtlas:
-                    return RegisterSpriteAtlas(CreateAssetDataFromPage<ESAssetReferSpriteAtlasConfigData, ESAssetReferSpriteAtlasConfigKey, UnityEngine.U2D.SpriteAtlas>(page, SpriteAtlases));
-                case ESAssetReferKind.Material:
-                    return RegisterMaterial(CreateAssetDataFromPage<ESAssetReferMaterialConfigData, ESAssetReferMaterialConfigKey, Material>(page, Materials));
-                case ESAssetReferKind.Mesh:
-                    return RegisterMesh(CreateAssetDataFromPage<ESAssetReferMeshConfigData, ESAssetReferMeshConfigKey, Mesh>(page, Meshes));
-                case ESAssetReferKind.AnimationClip:
-                    return RegisterAnimationClip(CreateAssetDataFromPage<ESAssetReferAnimationClipConfigData, ESAssetReferAnimationClipConfigKey, AnimationClip>(page, AnimationClips));
-                case ESAssetReferKind.AnimatorController:
-                    return RegisterAnimatorController(CreateAssetDataFromPage<ESAssetReferAnimatorControllerConfigData, ESAssetReferAnimatorControllerConfigKey, RuntimeAnimatorController>(page, AnimatorControllers));
-                case ESAssetReferKind.Avatar:
-                    return RegisterAvatar(CreateAssetDataFromPage<ESAssetReferAvatarConfigData, ESAssetReferAvatarConfigKey, Avatar>(page, Avatars));
-                case ESAssetReferKind.AudioClip:
-                    return RegisterAudioClip(CreateAssetDataFromPage<ESAssetReferAudioClipConfigData, ESAssetReferAudioClipConfigKey, AudioClip>(page, AudioClips));
-                case ESAssetReferKind.VideoClip:
-                    return RegisterVideoClip(CreateAssetDataFromPage<ESAssetReferVideoClipConfigData, ESAssetReferVideoClipConfigKey, UnityEngine.Video.VideoClip>(page, VideoClips));
-                case ESAssetReferKind.TimelineAsset:
-                    return RegisterTimelineAsset(CreateAssetDataFromPage<ESAssetReferTimelineAssetConfigData, ESAssetReferTimelineAssetConfigKey, UnityEngine.Object>(page, TimelineAssets));
-                case ESAssetReferKind.PlayableAsset:
-                    return RegisterPlayableAsset(CreateAssetDataFromPage<ESAssetReferPlayableAssetConfigData, ESAssetReferPlayableAssetConfigKey, UnityEngine.Playables.PlayableAsset>(page, PlayableAssets));
-                case ESAssetReferKind.ScriptableObject:
-                    return RegisterScriptableObject(CreateAssetDataFromPage<ESAssetReferScriptableObjectConfigData, ESAssetReferScriptableObjectConfigKey, ScriptableObject>(page, ScriptableObjects));
-                case ESAssetReferKind.TerrainData:
-                    return RegisterTerrainData(CreateAssetDataFromPage<ESAssetReferTerrainDataConfigData, ESAssetReferTerrainDataConfigKey, TerrainData>(page, TerrainDatas));
-                case ESAssetReferKind.Raw:
-                    return RegisterRaw(CreateAssetDataFromPage<ESAssetReferRawConfigData, ESAssetReferRawConfigKey, TextAsset>(page, RawAssets));
-                default:
-                    return false;
-            }
-        }
-
-        private static TData CreateAssetDataFromPage<TData, TKey, TAsset>(
-            ESAssetPage page,
-            ESAssetConfigKeyTable<TData, TAsset> table)
-            where TData : ESAssetReferConfigDataBase<TAsset>, IESAssetConfigDataInitializer<TKey>, new()
-            where TKey : class, IESAssetConfigKeyInitializer, new()
-            where TAsset : UnityEngine.Object
-        {
-            ESAssetConfigRecord record = CreateAssetConfigRecord(page);
-            return CreateAssetDataFromRecord<TData, TKey, TAsset>(in record, table);
+            CommitOrStageCandidate(candidate, string.Empty);
+            return validation.candidateEntries;
         }
 
         private static ESAssetConfigRecord CreateAssetConfigRecord(ESAssetPage page)
@@ -536,140 +889,226 @@ namespace ES
 
         public static int RebuildAssetConfigTablesFromCatalogs(IReadOnlyList<ESRuntimeCatalog> catalogs)
         {
-            EnsureCanBeginBuild(true);
-            PreflightAssetConfigTablesFromCatalogs(catalogs);
-            BeginBuild(true);
-            try
+            List<ESAssetConfigGenerationRecord> records = CollectCatalogRecords(catalogs);
+            ESAssetConfigTableGenerationState candidate = BuildCandidateFromGenerationRecords(records, out ESAssetCatalogBuildValidation validation);
+            if (validation.conflictCount != 0 || validation.candidateEntries != validation.expectedBusinessEntries)
             {
-                int count = 0;
-                if (catalogs == null)
-                    return count;
-
-                for (int catalogIndex = 0; catalogIndex < catalogs.Count; catalogIndex++)
-                {
-                    ESRuntimeCatalog catalog = catalogs[catalogIndex];
-                    if (catalog?.assets == null)
-                        continue;
-
-                    for (int assetIndex = 0; assetIndex < catalog.assets.Count; assetIndex++)
-                        if (RegisterCatalogEntryAsAssetConfigData(catalog.assets[assetIndex]))
-                            count++;
-                }
-                return count;
+                candidate.Retire();
+                throw new InvalidOperationException(
+                    "Catalog 候选表不完整或存在冲突：期望 " + validation.expectedBusinessEntries
+                    + " 项，候选 " + validation.candidateEntries + " 项，冲突 " + validation.conflictCount
+                    + " 项。\n" + validation.conflictReport);
             }
-            finally
-            {
-                EndBuild();
-            }
+            CommitOrStageCandidate(candidate, string.Empty);
+            return validation.candidateEntries;
         }
 
-        private static void PreflightAssetConfigTablesFromCatalogs(IReadOnlyList<ESRuntimeCatalog> catalogs)
+        public static bool TryValidateAssetConfigTablesFromCatalogs(
+            IReadOnlyList<ESRuntimeCatalog> catalogs,
+            out ESAssetCatalogBuildValidation validation,
+            out string error)
         {
-            var preflight = new AssetConfigBuildPreflight();
+            validation = new ESAssetCatalogBuildValidation();
+            error = string.Empty;
             try
             {
-                if (catalogs == null)
-                    return;
+                List<ESAssetConfigGenerationRecord> records = CollectCatalogRecords(catalogs);
+                ESAssetConfigTableGenerationState candidate = BuildCandidateFromGenerationRecords(records, out validation);
+                candidate.Retire();
+                if (validation.conflictCount > 0)
+                    error = "ConfigKey/ConfigData 候选表存在冲突：" + validation.conflictCount + " 项。\n" + validation.conflictReport;
+                else if (validation.expectedBusinessEntries == 0)
+                    error = "Editor Catalog 不包含可注入的业务资源。";
+                else if (validation.candidateEntries != validation.expectedBusinessEntries)
+                    error = "ConfigKey/ConfigData 候选表不完整：期望 " + validation.expectedBusinessEntries
+                        + " 项，候选 " + validation.candidateEntries + " 项。";
 
-                for (int catalogIndex = 0; catalogIndex < catalogs.Count; catalogIndex++)
-                {
-                    ESRuntimeCatalog catalog = catalogs[catalogIndex];
-                    if (catalog?.assets == null)
-                        continue;
-
-                    for (int assetIndex = 0; assetIndex < catalog.assets.Count; assetIndex++)
-                        StageCatalogEntryAsAssetConfigData(catalog.assets[assetIndex], preflight);
-                }
+                return string.IsNullOrEmpty(error);
             }
-            finally
+            catch (Exception exception)
             {
-                preflight.EndBuild();
-            }
-        }
-
-        private static bool StageCatalogEntryAsAssetConfigData(
-            ESRuntimeCatalogEntry entry,
-            AssetConfigBuildPreflight preflight)
-        {
-            if (entry == null || !entry.isBusinessAsset || entry.identity == null
-                || !entry.identity.IsValid || !Enum.TryParse(entry.kind, out ESAssetReferKind kind))
+                error = "ConfigKey/ConfigData 候选表预检失败：" + exception.Message;
                 return false;
-            if (entry.enumKey == 0 && string.IsNullOrEmpty(entry.stringKey))
-                throw new InvalidOperationException("Catalog 业务资产缺少 EnumKey/StringKey：" + entry.identity.guid);
-
-            ESAssetConfigRecord record = CreateAssetConfigRecord(entry);
-            return StageAssetConfigRecord(kind, in record, preflight);
+            }
         }
 
-        private static bool StageAssetConfigRecord(
+        public static bool CommitValidatedAssetConfigTablesFromCatalogs(
+            IReadOnlyList<ESRuntimeCatalog> catalogs,
+            ESAssetCatalogBuildValidation validation,
+            string catalogSetFingerprint,
+            out int injectedEntries,
+            out string error)
+        {
+            injectedEntries = 0;
+            error = string.Empty;
+            if (!validation.IsValid)
+            {
+                error = "ConfigKey/ConfigData 候选表未通过预检，拒绝提交。";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(catalogSetFingerprint))
+            {
+                error = "ConfigKey/ConfigData 候选表缺少 Catalog 集合指纹，拒绝提交。";
+                return false;
+            }
+
+            try
+            {
+                List<ESAssetConfigGenerationRecord> records = CollectCatalogRecords(catalogs);
+                ESAssetConfigTableGenerationState candidate = BuildCandidateFromGenerationRecords(
+                    records,
+                    out ESAssetCatalogBuildValidation commitValidation);
+                injectedEntries = commitValidation.candidateEntries;
+                if (!commitValidation.IsValid
+                    || commitValidation.expectedBusinessEntries != validation.expectedBusinessEntries
+                    || commitValidation.candidateEntries != validation.candidateEntries)
+                {
+                    candidate.Retire();
+                    error = "ConfigKey/ConfigData 候选提交结果不完整：期望 " + validation.expectedBusinessEntries
+                        + " 项，实际 " + injectedEntries + " 项，冲突 " + commitValidation.conflictCount + " 项。\n"
+                        + commitValidation.conflictReport;
+                    return false;
+                }
+
+                CommitOrStageCandidate(candidate, catalogSetFingerprint);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = "ConfigKey/ConfigData 候选提交失败：" + exception.Message;
+                return false;
+            }
+        }
+
+        private static List<ESAssetConfigGenerationRecord> CollectCatalogRecords(
+            IReadOnlyList<ESRuntimeCatalog> catalogs)
+        {
+            var records = new List<ESAssetConfigGenerationRecord>();
+            if (catalogs == null)
+                return records;
+
+            for (int catalogIndex = 0; catalogIndex < catalogs.Count; catalogIndex++)
+            {
+                ESRuntimeCatalog catalog = catalogs[catalogIndex];
+                if (catalog?.assets == null)
+                    continue;
+                for (int assetIndex = 0; assetIndex < catalog.assets.Count; assetIndex++)
+                {
+                    ESRuntimeCatalogEntry entry = catalog.assets[assetIndex];
+                    if (entry == null || !entry.isBusinessAsset || entry.identity == null || !entry.identity.IsValid)
+                        continue;
+                    if (!Enum.TryParse(entry.kind, out ESAssetReferKind kind)
+                        || !ESAssetReferConfigKeySwitch.IsSupportedKind(kind))
+                        throw new InvalidOperationException("Catalog 业务资产包含不受支持的资源类型：" + entry.kind);
+                    ESAssetConfigRecord record = CreateAssetConfigRecord(entry);
+                    records.Add(new ESAssetConfigGenerationRecord(kind, in record));
+                }
+            }
+            return records;
+        }
+
+        internal static ESAssetConfigTableGenerationState BuildCandidateFromGenerationRecords(
+            IReadOnlyList<ESAssetConfigGenerationRecord> source,
+            out ESAssetCatalogBuildValidation validation)
+            => BuildCandidateFromGenerationRecords(source, AssetConfigTableGeneration, out validation);
+
+        private static ESAssetConfigTableGenerationState BuildCandidateFromGenerationRecords(
+            IReadOnlyList<ESAssetConfigGenerationRecord> source,
+            long baseGeneration,
+            out ESAssetCatalogBuildValidation validation)
+        {
+            var candidate = new ESAssetConfigTableGenerationState(baseGeneration, OnGenerationReclaimed);
+            var accepted = new List<ESAssetConfigGenerationRecord>(source?.Count ?? 0);
+            try
+            {
+                candidate.BeginBuild();
+                if (source != null)
+                {
+                    for (int i = 0; i < source.Count; i++)
+                    {
+                        ESAssetConfigGenerationRecord item = source[i];
+                        if (RegisterGenerationRecord(candidate, item.Kind, in item.Record))
+                            accepted.Add(item);
+                    }
+                }
+                candidate.CompleteBuild(accepted);
+                validation = new ESAssetCatalogBuildValidation
+                {
+                    expectedBusinessEntries = source?.Count ?? 0,
+                    candidateEntries = candidate.RegisteredCount,
+                    conflictCount = candidate.ConflictCount,
+                    conflictReport = candidate.GetConflictReport()
+                };
+                return candidate;
+            }
+            catch
+            {
+                candidate.Retire();
+                throw;
+            }
+        }
+
+        private static bool RegisterGenerationRecord(
+            ESAssetConfigTableGenerationState state,
             ESAssetReferKind kind,
+            in ESAssetConfigRecord record)
+        {
+            switch (kind)
+            {
+                case ESAssetReferKind.Prefab: return RegisterRecord<ESAssetReferPrefabConfigData, ESAssetReferPrefabConfigKey, GameObject>(in record, state.Prefabs, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.Scene: return RegisterRecord<ESAssetReferSceneConfigData, ESAssetReferSceneConfigKey, UnityEngine.Object>(in record, state.Scenes, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.Sprite: return RegisterRecord<ESAssetReferSpriteConfigData, ESAssetReferSpriteConfigKey, Sprite>(in record, state.Sprites, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.Texture2D: return RegisterRecord<ESAssetReferTexture2DConfigData, ESAssetReferTexture2DConfigKey, Texture2D>(in record, state.Texture2Ds, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.Texture: return RegisterRecord<ESAssetReferTextureConfigData, ESAssetReferTextureConfigKey, Texture>(in record, state.Textures, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.SpriteAtlas: return RegisterRecord<ESAssetReferSpriteAtlasConfigData, ESAssetReferSpriteAtlasConfigKey, UnityEngine.U2D.SpriteAtlas>(in record, state.SpriteAtlases, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.Material: return RegisterRecord<ESAssetReferMaterialConfigData, ESAssetReferMaterialConfigKey, Material>(in record, state.Materials, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.Mesh: return RegisterRecord<ESAssetReferMeshConfigData, ESAssetReferMeshConfigKey, Mesh>(in record, state.Meshes, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.AnimationClip: return RegisterRecord<ESAssetReferAnimationClipConfigData, ESAssetReferAnimationClipConfigKey, AnimationClip>(in record, state.AnimationClips, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.AnimatorController: return RegisterRecord<ESAssetReferAnimatorControllerConfigData, ESAssetReferAnimatorControllerConfigKey, RuntimeAnimatorController>(in record, state.AnimatorControllers, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.Avatar: return RegisterRecord<ESAssetReferAvatarConfigData, ESAssetReferAvatarConfigKey, Avatar>(in record, state.Avatars, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.AudioClip: return RegisterRecord<ESAssetReferAudioClipConfigData, ESAssetReferAudioClipConfigKey, AudioClip>(in record, state.AudioClips, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.VideoClip: return RegisterRecord<ESAssetReferVideoClipConfigData, ESAssetReferVideoClipConfigKey, UnityEngine.Video.VideoClip>(in record, state.VideoClips, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.TimelineAsset: return RegisterRecord<ESAssetReferTimelineAssetConfigData, ESAssetReferTimelineAssetConfigKey, UnityEngine.Object>(in record, state.TimelineAssets, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.PlayableAsset: return RegisterRecord<ESAssetReferPlayableAssetConfigData, ESAssetReferPlayableAssetConfigKey, UnityEngine.Playables.PlayableAsset>(in record, state.PlayableAssets, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.ScriptableObject: return RegisterRecord<ESAssetReferScriptableObjectConfigData, ESAssetReferScriptableObjectConfigKey, ScriptableObject>(in record, state.ScriptableObjects, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.TerrainData: return RegisterRecord<ESAssetReferTerrainDataConfigData, ESAssetReferTerrainDataConfigKey, TerrainData>(in record, state.TerrainDatas, (data, key) => data.runtimeKey = key);
+                case ESAssetReferKind.Raw: return RegisterRecord<ESAssetReferRawConfigData, ESAssetReferRawConfigKey, TextAsset>(in record, state.RawAssets, (data, key) => data.runtimeKey = key);
+                default: throw new InvalidOperationException("不受支持的 Asset ConfigTable 类型：" + kind);
+            }
+        }
+
+        private static bool RegisterRecord<TData, TKey, TAsset>(
             in ESAssetConfigRecord record,
-            AssetConfigBuildPreflight preflight)
-        {
-            switch (kind)
-            {
-                case ESAssetReferKind.Prefab: return preflight.Stage<ESAssetReferPrefabConfigData, ESAssetReferPrefabConfigKey, GameObject>(kind, in record);
-                case ESAssetReferKind.Scene: return preflight.Stage<ESAssetReferSceneConfigData, ESAssetReferSceneConfigKey, UnityEngine.Object>(kind, in record);
-                case ESAssetReferKind.Sprite: return preflight.Stage<ESAssetReferSpriteConfigData, ESAssetReferSpriteConfigKey, Sprite>(kind, in record);
-                case ESAssetReferKind.Texture2D: return preflight.Stage<ESAssetReferTexture2DConfigData, ESAssetReferTexture2DConfigKey, Texture2D>(kind, in record);
-                case ESAssetReferKind.Texture: return preflight.Stage<ESAssetReferTextureConfigData, ESAssetReferTextureConfigKey, Texture>(kind, in record);
-                case ESAssetReferKind.SpriteAtlas: return preflight.Stage<ESAssetReferSpriteAtlasConfigData, ESAssetReferSpriteAtlasConfigKey, UnityEngine.U2D.SpriteAtlas>(kind, in record);
-                case ESAssetReferKind.Material: return preflight.Stage<ESAssetReferMaterialConfigData, ESAssetReferMaterialConfigKey, Material>(kind, in record);
-                case ESAssetReferKind.Mesh: return preflight.Stage<ESAssetReferMeshConfigData, ESAssetReferMeshConfigKey, Mesh>(kind, in record);
-                case ESAssetReferKind.AnimationClip: return preflight.Stage<ESAssetReferAnimationClipConfigData, ESAssetReferAnimationClipConfigKey, AnimationClip>(kind, in record);
-                case ESAssetReferKind.AnimatorController: return preflight.Stage<ESAssetReferAnimatorControllerConfigData, ESAssetReferAnimatorControllerConfigKey, RuntimeAnimatorController>(kind, in record);
-                case ESAssetReferKind.Avatar: return preflight.Stage<ESAssetReferAvatarConfigData, ESAssetReferAvatarConfigKey, Avatar>(kind, in record);
-                case ESAssetReferKind.AudioClip: return preflight.Stage<ESAssetReferAudioClipConfigData, ESAssetReferAudioClipConfigKey, AudioClip>(kind, in record);
-                case ESAssetReferKind.VideoClip: return preflight.Stage<ESAssetReferVideoClipConfigData, ESAssetReferVideoClipConfigKey, UnityEngine.Video.VideoClip>(kind, in record);
-                case ESAssetReferKind.TimelineAsset: return preflight.Stage<ESAssetReferTimelineAssetConfigData, ESAssetReferTimelineAssetConfigKey, UnityEngine.Object>(kind, in record);
-                case ESAssetReferKind.PlayableAsset: return preflight.Stage<ESAssetReferPlayableAssetConfigData, ESAssetReferPlayableAssetConfigKey, UnityEngine.Playables.PlayableAsset>(kind, in record);
-                case ESAssetReferKind.ScriptableObject: return preflight.Stage<ESAssetReferScriptableObjectConfigData, ESAssetReferScriptableObjectConfigKey, ScriptableObject>(kind, in record);
-                case ESAssetReferKind.TerrainData: return preflight.Stage<ESAssetReferTerrainDataConfigData, ESAssetReferTerrainDataConfigKey, TerrainData>(kind, in record);
-                case ESAssetReferKind.Raw: return preflight.Stage<ESAssetReferRawConfigData, ESAssetReferRawConfigKey, TextAsset>(kind, in record);
-                default: return false;
-            }
-        }
-
-        private static bool RegisterCatalogEntryAsAssetConfigData(ESRuntimeCatalogEntry entry)
-        {
-            if (entry == null || !entry.isBusinessAsset || entry.identity == null || !entry.identity.IsValid || !Enum.TryParse(entry.kind, out ESAssetReferKind kind))
-                return false;
-            if (entry.enumKey == 0 && string.IsNullOrEmpty(entry.stringKey))
-                throw new InvalidOperationException("Catalog \u4e1a\u52a1\u8d44\u4ea7\u7f3a\u5c11 EnumKey/StringKey\uff1a" + entry.identity.guid);
-
-            switch (kind)
-            {
-                case ESAssetReferKind.Prefab: return RegisterPrefab(CreateAssetDataFromCatalog<ESAssetReferPrefabConfigData, ESAssetReferPrefabConfigKey, GameObject>(entry, Prefabs));
-                case ESAssetReferKind.Scene: return RegisterScene(CreateAssetDataFromCatalog<ESAssetReferSceneConfigData, ESAssetReferSceneConfigKey, UnityEngine.Object>(entry, Scenes));
-                case ESAssetReferKind.Sprite: return RegisterSprite(CreateAssetDataFromCatalog<ESAssetReferSpriteConfigData, ESAssetReferSpriteConfigKey, Sprite>(entry, Sprites));
-                case ESAssetReferKind.Texture2D: return RegisterTexture2D(CreateAssetDataFromCatalog<ESAssetReferTexture2DConfigData, ESAssetReferTexture2DConfigKey, Texture2D>(entry, Texture2Ds));
-                case ESAssetReferKind.Texture: return RegisterTexture(CreateAssetDataFromCatalog<ESAssetReferTextureConfigData, ESAssetReferTextureConfigKey, Texture>(entry, Textures));
-                case ESAssetReferKind.SpriteAtlas: return RegisterSpriteAtlas(CreateAssetDataFromCatalog<ESAssetReferSpriteAtlasConfigData, ESAssetReferSpriteAtlasConfigKey, UnityEngine.U2D.SpriteAtlas>(entry, SpriteAtlases));
-                case ESAssetReferKind.Material: return RegisterMaterial(CreateAssetDataFromCatalog<ESAssetReferMaterialConfigData, ESAssetReferMaterialConfigKey, Material>(entry, Materials));
-                case ESAssetReferKind.Mesh: return RegisterMesh(CreateAssetDataFromCatalog<ESAssetReferMeshConfigData, ESAssetReferMeshConfigKey, Mesh>(entry, Meshes));
-                case ESAssetReferKind.AnimationClip: return RegisterAnimationClip(CreateAssetDataFromCatalog<ESAssetReferAnimationClipConfigData, ESAssetReferAnimationClipConfigKey, AnimationClip>(entry, AnimationClips));
-                case ESAssetReferKind.AnimatorController: return RegisterAnimatorController(CreateAssetDataFromCatalog<ESAssetReferAnimatorControllerConfigData, ESAssetReferAnimatorControllerConfigKey, RuntimeAnimatorController>(entry, AnimatorControllers));
-                case ESAssetReferKind.Avatar: return RegisterAvatar(CreateAssetDataFromCatalog<ESAssetReferAvatarConfigData, ESAssetReferAvatarConfigKey, Avatar>(entry, Avatars));
-                case ESAssetReferKind.AudioClip: return RegisterAudioClip(CreateAssetDataFromCatalog<ESAssetReferAudioClipConfigData, ESAssetReferAudioClipConfigKey, AudioClip>(entry, AudioClips));
-                case ESAssetReferKind.VideoClip: return RegisterVideoClip(CreateAssetDataFromCatalog<ESAssetReferVideoClipConfigData, ESAssetReferVideoClipConfigKey, UnityEngine.Video.VideoClip>(entry, VideoClips));
-                case ESAssetReferKind.TimelineAsset: return RegisterTimelineAsset(CreateAssetDataFromCatalog<ESAssetReferTimelineAssetConfigData, ESAssetReferTimelineAssetConfigKey, UnityEngine.Object>(entry, TimelineAssets));
-                case ESAssetReferKind.PlayableAsset: return RegisterPlayableAsset(CreateAssetDataFromCatalog<ESAssetReferPlayableAssetConfigData, ESAssetReferPlayableAssetConfigKey, UnityEngine.Playables.PlayableAsset>(entry, PlayableAssets));
-                case ESAssetReferKind.ScriptableObject: return RegisterScriptableObject(CreateAssetDataFromCatalog<ESAssetReferScriptableObjectConfigData, ESAssetReferScriptableObjectConfigKey, ScriptableObject>(entry, ScriptableObjects));
-                case ESAssetReferKind.TerrainData: return RegisterTerrainData(CreateAssetDataFromCatalog<ESAssetReferTerrainDataConfigData, ESAssetReferTerrainDataConfigKey, TerrainData>(entry, TerrainDatas));
-                case ESAssetReferKind.Raw: return RegisterRaw(CreateAssetDataFromCatalog<ESAssetReferRawConfigData, ESAssetReferRawConfigKey, TextAsset>(entry, RawAssets));
-                default: return false;
-            }
-        }
-
-        private static TData CreateAssetDataFromCatalog<TData, TKey, TAsset>(
-            ESRuntimeCatalogEntry entry,
-            ESAssetConfigKeyTable<TData, TAsset> table)
+            ESAssetConfigKeyTable<TData, TAsset> table,
+            Action<TData, int> setRuntimeKey)
             where TData : ESAssetReferConfigDataBase<TAsset>, IESAssetConfigDataInitializer<TKey>, new()
             where TKey : class, IESAssetConfigKeyInitializer, new()
             where TAsset : UnityEngine.Object
         {
-            ESAssetConfigRecord record = CreateAssetConfigRecord(entry);
-            return CreateAssetDataFromRecord<TData, TKey, TAsset>(in record, table);
+            if (!ESConfigKeyMatch.IsConfigured(record.enumKey, record.stringKey))
+                throw new InvalidOperationException("Catalog 业务资产缺少 EnumKey/StringKey：" + record.assetGuid);
+
+            TKey key = new TKey();
+            key.InitializeRuntimeKey(
+                record.enumKey,
+                record.stringKey,
+                record.assetGuid,
+                record.assetLocalFileId,
+                record.assetTypeName,
+                record.assetPath);
+            if (!table.TryAcquireBuildRecord(
+                    key,
+                    AssetConfigDataFactory<TData>.Create,
+                    record.assetGuid + ":" + record.assetLocalFileId,
+                    out TData data))
+                return false;
+
+            data.InitializeFromRecord(key, in record);
+            int runtimeKey = table.RegisterPreparedBuildRecord(key, data, record.stringKey);
+            if (runtimeKey == 0)
+                return false;
+            setRuntimeKey(data, runtimeKey);
+            return true;
         }
 
         private static ESAssetConfigRecord CreateAssetConfigRecord(ESRuntimeCatalogEntry entry)
@@ -685,33 +1124,6 @@ namespace ES
                 entry.libraryFolder);
         }
 
-        private static TData CreateAssetDataFromRecord<TData, TKey, TAsset>(
-            in ESAssetConfigRecord record,
-            ESAssetConfigKeyTable<TData, TAsset> table)
-            where TData : ESAssetReferConfigDataBase<TAsset>, IESAssetConfigDataInitializer<TKey>, new()
-            where TKey : class, IESAssetConfigKeyInitializer, new()
-            where TAsset : UnityEngine.Object
-        {
-            TKey key = new TKey();
-            key.InitializeRuntimeKey(
-                record.enumKey,
-                record.stringKey,
-                record.assetGuid,
-                record.assetLocalFileId,
-                record.assetTypeName,
-                record.assetPath);
-
-            if (!table.TryAcquireBuildRecord(
-                    key,
-                    AssetConfigDataFactory<TData>.Create,
-                    record.assetGuid + ":" + record.assetLocalFileId,
-                    out TData data))
-                return null;
-
-            data.InitializeFromRecord(key, in record);
-            return data;
-        }
-
         private static class AssetConfigDataFactory<TData> where TData : new()
         {
             public static readonly Func<TData> Create = CreateInstance;
@@ -724,219 +1136,18 @@ namespace ES
 
         public static int GetAssetConflictCount()
         {
-            return Prefabs.ConflictCount
-                + Sprites.ConflictCount
-                + AudioClips.ConflictCount
-                + AnimationClips.ConflictCount
-                + AnimatorControllers.ConflictCount
-                + Materials.ConflictCount
-                + Meshes.ConflictCount
-                + Scenes.ConflictCount
-                + Textures.ConflictCount
-                + Texture2Ds.ConflictCount
-                + SpriteAtlases.ConflictCount
-                + Avatars.ConflictCount
-                + PlayableAssets.ConflictCount
-                + ScriptableObjects.ConflictCount
-                + TimelineAssets.ConflictCount
-                + VideoClips.ConflictCount
-                + TerrainDatas.ConflictCount
-                + RawAssets.ConflictCount;
+            if (!TryAcquireAssetConfigGeneration(false, out ESAssetConfigTableGenerationLease lease))
+                return 0;
+            try { return lease.State.ConflictCount; }
+            finally { lease.Dispose(); }
         }
 
         public static string GetAssetConflictReport()
         {
-            System.Text.StringBuilder builder = new System.Text.StringBuilder(512);
-            AppendConflictReport(builder, "Prefab", Prefabs.GetConflictReport());
-            AppendConflictReport(builder, "Sprite", Sprites.GetConflictReport());
-            AppendConflictReport(builder, "AudioClip", AudioClips.GetConflictReport());
-            AppendConflictReport(builder, "AnimationClip", AnimationClips.GetConflictReport());
-            AppendConflictReport(builder, "AnimatorController", AnimatorControllers.GetConflictReport());
-            AppendConflictReport(builder, "Material", Materials.GetConflictReport());
-            AppendConflictReport(builder, "Mesh", Meshes.GetConflictReport());
-            AppendConflictReport(builder, "Scene", Scenes.GetConflictReport());
-            AppendConflictReport(builder, "Texture", Textures.GetConflictReport());
-            AppendConflictReport(builder, "Texture2D", Texture2Ds.GetConflictReport());
-            AppendConflictReport(builder, "SpriteAtlas", SpriteAtlases.GetConflictReport());
-            AppendConflictReport(builder, "Avatar", Avatars.GetConflictReport());
-            AppendConflictReport(builder, "PlayableAsset", PlayableAssets.GetConflictReport());
-            AppendConflictReport(builder, "ScriptableObject", ScriptableObjects.GetConflictReport());
-            AppendConflictReport(builder, "TimelineAsset", TimelineAssets.GetConflictReport());
-            AppendConflictReport(builder, "VideoClip", VideoClips.GetConflictReport());
-            AppendConflictReport(builder, "TerrainData", TerrainDatas.GetConflictReport());
-            AppendConflictReport(builder, "Raw", RawAssets.GetConflictReport());
-            return builder.ToString();
-        }
-
-        private static void AppendConflictReport(System.Text.StringBuilder builder, string title, string report)
-        {
-            if (string.IsNullOrEmpty(report))
-                return;
-
-            builder.Append('[').Append(title).Append(']').AppendLine();
-            builder.Append(report);
-        }
-
-        public static bool RegisterPrefab(ESAssetReferPrefabConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = Prefabs.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterSprite(ESAssetReferSpriteConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = Sprites.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterAudioClip(ESAssetReferAudioClipConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = AudioClips.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterAnimationClip(ESAssetReferAnimationClipConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = AnimationClips.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterAnimatorController(ESAssetReferAnimatorControllerConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = AnimatorControllers.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterMaterial(ESAssetReferMaterialConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = Materials.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterMesh(ESAssetReferMeshConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = Meshes.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterScene(ESAssetReferSceneConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = Scenes.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterTexture(ESAssetReferTextureConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = Textures.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterTexture2D(ESAssetReferTexture2DConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = Texture2Ds.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterSpriteAtlas(ESAssetReferSpriteAtlasConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = SpriteAtlases.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterAvatar(ESAssetReferAvatarConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = Avatars.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterPlayableAsset(ESAssetReferPlayableAssetConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = PlayableAssets.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterScriptableObject(ESAssetReferScriptableObjectConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = ScriptableObjects.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterTimelineAsset(ESAssetReferTimelineAssetConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = TimelineAssets.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterVideoClip(ESAssetReferVideoClipConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = VideoClips.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterTerrainData(ESAssetReferTerrainDataConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = TerrainDatas.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
-        }
-
-        public static bool RegisterRaw(ESAssetReferRawConfigData data)
-        {
-            if (data == null || data.key == null)
-                return false;
-
-            data.runtimeKey = RawAssets.RegisterAndGetRuntimeKey(data.key, data, data.keyName);
-            return data.runtimeKey != 0;
+            if (!TryAcquireAssetConfigGeneration(false, out ESAssetConfigTableGenerationLease lease))
+                return string.Empty;
+            try { return lease.State.GetConflictReport(); }
+            finally { lease.Dispose(); }
         }
 
     }
@@ -999,11 +1210,13 @@ namespace ES
         [NonSerialized]
         private ESRuntimeReleaseDownloadResult activeReleaseResult;
         [NonSerialized]
-        private readonly SemaphoreSlim onDemandReleaseGate = new SemaphoreSlim(1, 1);
+        private readonly SemaphoreSlim releaseStateGate = new SemaphoreSlim(1, 1);
         [NonSerialized]
         private readonly HashSet<string> activeConsumerIds = new HashSet<string>(StringComparer.Ordinal);
         [NonSerialized]
         private readonly HashSet<string> activeLibraryKeys = new HashSet<string>(StringComparer.Ordinal);
+        [NonSerialized]
+        private long releaseGeneration;
 
         public ESConsumerResidentAssetPreloadReport LastResidentAssetPreloadReport { get; private set; }
 
@@ -1047,29 +1260,87 @@ namespace ES
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
             if (result == null || result.RuntimeMap == null) throw new ArgumentNullException(nameof(result));
-            bool releaseChanged = activeReleaseResult == null
-                || !string.Equals(activeReleaseResult.ReleaseVersion, result.ReleaseVersion, StringComparison.Ordinal);
-            DisposeConsumerStartupAssets();
-            IESAssetRuntimeProvider provider = ESAssetRuntimeProviderFactory.Create(result.RuntimeMap, settings, ESRuntimeRetryPolicy.Default);
-            await AssetLoadingService.InitializeAsync(
-                provider,
-                () => ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(result.Catalogs),
-                cancellationToken);
-            await PreloadConsumerResidentAssetsAsync(result.ResidentAssets, cancellationToken);
-            await PreloadGameCoreAssetsAsync(result.GameCoreAssets, cancellationToken);
-
-            // Only this point means the release is genuinely usable: its Provider is attached,
-            // resident assets are retained, and GameCore tables have injected successfully.
-            activeReleaseSettings = settings;
-            activeReleaseResult = result;
-            if (releaseChanged)
+            await releaseStateGate.WaitAsync(cancellationToken);
+            try
             {
+                // Acquire the single transition gate before invalidating the active release.
+                // If cancellation happens while another activation owns the gate, the old
+                // Provider and its matching active result remain a valid pair; invalidating
+                // before the wait would leave ESAssets Ready with a cleared release state.
+                long generation = InvalidateActiveReleaseState();
+                EnsureReleaseGeneration(generation);
+                await InitializeAssetLoadingFromReleaseResultCoreAsync(
+                    settings,
+                    result,
+                    cancellationToken,
+                    preserveOnDemandActivationState: false,
+                    expectedReleaseGeneration: generation);
+            }
+            finally { releaseStateGate.Release(); }
+        }
+
+        private async UniTask InitializeAssetLoadingFromReleaseResultCoreAsync(
+            ESGlobalResSetting settings,
+            ESRuntimeReleaseDownloadResult result,
+            CancellationToken cancellationToken,
+            bool preserveOnDemandActivationState,
+            long expectedReleaseGeneration)
+        {
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            if (result == null || result.RuntimeMap == null) throw new ArgumentNullException(nameof(result));
+            EnsureReleaseGeneration(expectedReleaseGeneration);
+
+            try
+            {
+                // A complete Bootstrap creates a new Provider/RuntimeMap. Its result contains
+                // boot-required content only, so every previous on-demand activation marker is
+                // invalid even when the release version is unchanged. Only the incremental merge
+                // path is allowed to preserve these markers.
+                if (preserveOnDemandActivationState)
+                {
+                    // The current Provider is about to be replaced as well. Keep the activation
+                    // markers for a successful merge, but make a failed transition fail closed.
+                    activeReleaseSettings = null;
+                    activeReleaseResult = null;
+                }
+                DisposeConsumerStartupAssets();
+                IESAssetRuntimeProvider provider = ESAssetRuntimeProviderFactory.Create(result.RuntimeMap, settings, ESRuntimeRetryPolicy.Default);
+                await AssetLoadingService.InitializeAsync(
+                    provider,
+                    () => ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(result.Catalogs),
+                    cancellationToken);
+                await PreloadConsumerResidentAssetsAsync(result.ResidentAssets, cancellationToken);
+                await PreloadGameCoreAssetsAsync(result.GameCoreAssets, cancellationToken);
+                EnsureReleaseGeneration(expectedReleaseGeneration);
+
+                // Only this point means the release is genuinely usable: its Provider is attached,
+                // resident assets are retained, and GameCore tables have injected successfully.
+                activeReleaseSettings = settings;
+                activeReleaseResult = result;
+                if (ESAssetRunModeSession.Lock(settings) == ESAssetRunMode.HotUpdate
+                    && !ESRuntimeReleaseDownloader.TryCommitLastKnownGood(settings, result.ReleaseVersion, out string fallbackError))
+                    Debug.LogWarning("[ESRes][Release] 无法提交离线回退版本：" + fallbackError);
+            }
+            catch
+            {
+                // Provider attachment happens before resident/GameCore warm-up because those
+                // assets must load through the new provider. Any failure before the commit
+                // point must therefore tear that provider back down as well; otherwise
+                // ESAssets can remain Ready while activeReleaseResult is null or incomplete.
+                activeReleaseSettings = null;
+                activeReleaseResult = null;
                 activeConsumerIds.Clear();
                 activeLibraryKeys.Clear();
+                try
+                {
+                    AssetLoadingService.Dispose();
+                }
+                catch (Exception cleanupException)
+                {
+                    Debug.LogException(cleanupException);
+                }
+                throw;
             }
-            if (ESAssetRunModeSession.Lock(settings) == ESAssetRunMode.HotUpdate
-                && !ESRuntimeReleaseDownloader.TryCommitLastKnownGood(settings, result.ReleaseVersion, out string fallbackError))
-                Debug.LogWarning("[ESRes][Release] 无法提交离线回退版本：" + fallbackError);
         }
 
         /// <summary>
@@ -1081,18 +1352,22 @@ namespace ES
         public async UniTask EnsureConsumerAvailableAsync(string consumerId, CancellationToken cancellationToken = default)
         {
             string key = NormalizeOnDemandId(consumerId, nameof(consumerId));
-            await onDemandReleaseGate.WaitAsync(cancellationToken);
+            await releaseStateGate.WaitAsync(cancellationToken);
             try
             {
                 EnsureOnDemandReleaseReady();
                 if (activeConsumerIds.Contains(key))
                     return;
-                var downloader = new ESRuntimeReleaseDownloader(activeReleaseSettings, ESAssetRunModeSession.Lock(activeReleaseSettings));
+                long generation = releaseGeneration;
+                ESGlobalResSetting settings = activeReleaseSettings;
+                ESRuntimeReleaseDownloadResult current = activeReleaseResult;
+                var downloader = new ESRuntimeReleaseDownloader(settings, ESAssetRunModeSession.Lock(settings));
                 ESRuntimeReleaseDownloadResult addition = await downloader.DownloadConsumerAsync(key, cancellationToken);
-                await ActivateReleaseAdditionAsync(addition, cancellationToken);
+                await ActivateReleaseAdditionAsync(settings, current, generation, addition, cancellationToken);
+                EnsureReleaseGeneration(generation);
                 activeConsumerIds.Add(key);
             }
-            finally { onDemandReleaseGate.Release(); }
+            finally { releaseStateGate.Release(); }
         }
 
         /// <summary>Ensures one Library declared by a Consumer is downloaded and active without
@@ -1102,18 +1377,22 @@ namespace ES
             string consumerKey = NormalizeOnDemandId(consumerId, nameof(consumerId));
             string libraryKey = NormalizeOnDemandId(libraryFolder, nameof(libraryFolder));
             string activeKey = consumerKey + "/" + libraryKey;
-            await onDemandReleaseGate.WaitAsync(cancellationToken);
+            await releaseStateGate.WaitAsync(cancellationToken);
             try
             {
                 EnsureOnDemandReleaseReady();
                 if (activeLibraryKeys.Contains(activeKey))
                     return;
-                var downloader = new ESRuntimeReleaseDownloader(activeReleaseSettings, ESAssetRunModeSession.Lock(activeReleaseSettings));
+                long generation = releaseGeneration;
+                ESGlobalResSetting settings = activeReleaseSettings;
+                ESRuntimeReleaseDownloadResult current = activeReleaseResult;
+                var downloader = new ESRuntimeReleaseDownloader(settings, ESAssetRunModeSession.Lock(settings));
                 ESRuntimeReleaseDownloadResult addition = await downloader.DownloadLibraryAsync(consumerKey, libraryKey, cancellationToken);
-                await ActivateReleaseAdditionAsync(addition, cancellationToken);
+                await ActivateReleaseAdditionAsync(settings, current, generation, addition, cancellationToken);
+                EnsureReleaseGeneration(generation);
                 activeLibraryKeys.Add(activeKey);
             }
-            finally { onDemandReleaseGate.Release(); }
+            finally { releaseStateGate.Release(); }
         }
 
         /// <summary>Content Info entry point. The binding's Consumer SO is editor authority only;
@@ -1155,6 +1434,22 @@ namespace ES
                 throw new InvalidOperationException("[ESRes][OnDemand] 当前尚未通过新版 Release Bootstrap 初始化，不能增量激活 Consumer/Library。");
         }
 
+        private long InvalidateActiveReleaseState()
+        {
+            releaseGeneration = releaseGeneration == long.MaxValue ? 1 : releaseGeneration + 1;
+            activeReleaseSettings = null;
+            activeReleaseResult = null;
+            activeConsumerIds.Clear();
+            activeLibraryKeys.Clear();
+            return releaseGeneration;
+        }
+
+        private void EnsureReleaseGeneration(long expectedReleaseGeneration)
+        {
+            if (releaseGeneration != expectedReleaseGeneration)
+                throw new OperationCanceledException("[ESRes][Release] 资源发布代际已变化，丢弃迟到的旧初始化结果。");
+        }
+
         private static string NormalizeOnDemandId(string value, string parameterName)
         {
             string normalized = value?.Trim();
@@ -1163,18 +1458,30 @@ namespace ES
             return normalized;
         }
 
-        private async UniTask ActivateReleaseAdditionAsync(ESRuntimeReleaseDownloadResult addition, CancellationToken cancellationToken)
+        private async UniTask ActivateReleaseAdditionAsync(
+            ESGlobalResSetting settings,
+            ESRuntimeReleaseDownloadResult current,
+            long expectedReleaseGeneration,
+            ESRuntimeReleaseDownloadResult addition,
+            CancellationToken cancellationToken)
         {
+            EnsureReleaseGeneration(expectedReleaseGeneration);
             if (addition == null || addition.RuntimeMap == null)
                 throw new InvalidOperationException("[ESRes][OnDemand] 下载结果缺少 RuntimeMap。");
-            if (!string.Equals(activeReleaseResult.ReleaseVersion, addition.ReleaseVersion, StringComparison.Ordinal))
+            if (!string.Equals(current.ReleaseVersion, addition.ReleaseVersion, StringComparison.Ordinal))
                 throw new InvalidOperationException("[ESRes][OnDemand] 下载期间发布版本已变化；请在下一个安全点重新执行完整 Bootstrap。");
 
             // A changed code hash deliberately throws here: HybridCLR cannot replace an already
             // loaded assembly in-process, so the user gets the same explicit restart boundary as boot.
             await ESRuntimeReleaseBootstrap.InitializeAdditionalCodePackagesAsync(addition.DownloadedCodePackages, cancellationToken);
-            ESRuntimeReleaseDownloadResult merged = ESRuntimeReleaseDownloadResult.Merge(activeReleaseResult, addition);
-            await InitializeAssetLoadingFromReleaseResultAsync(activeReleaseSettings, merged, cancellationToken);
+            EnsureReleaseGeneration(expectedReleaseGeneration);
+            ESRuntimeReleaseDownloadResult merged = ESRuntimeReleaseDownloadResult.Merge(current, addition);
+            await InitializeAssetLoadingFromReleaseResultCoreAsync(
+                settings,
+                merged,
+                cancellationToken,
+                preserveOnDemandActivationState: true,
+                expectedReleaseGeneration: expectedReleaseGeneration);
         }
 
         /// <summary>Consumer 启动常驻资产在 GameCore 注入前加载；由模块持有到资源系统重置。</summary>
@@ -1386,7 +1693,6 @@ namespace ES
 
             isBuilding = true;
             ESRuntimeDataGameCore.BeginBuild(clear);
-            ESRuntimeDataAsset.BeginBuild(clear);
         }
 
         public static void EndBuildStatic()
@@ -1401,11 +1707,11 @@ namespace ES
 
             try
             {
-                // Finish every RuntimeData table before publishing the AudioCue-ready edge.
+                // Asset ConfigTables have an independent immutable generation transaction.
+                // GameCore injection must not open or mutate the current Asset generation.
                 // The callback may immediately start a Cue load, so it must never observe the
-                // asset tables or the enclosing RuntimeData transaction half-built.
+                // enclosing RuntimeData transaction half-built.
                 ESRuntimeDataGameCore.EndBuild(false);
-                ESRuntimeDataAsset.EndBuild();
             }
             finally
             {

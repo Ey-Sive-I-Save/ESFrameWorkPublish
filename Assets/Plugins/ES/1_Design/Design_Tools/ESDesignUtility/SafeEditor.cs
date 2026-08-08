@@ -786,21 +786,17 @@ namespace ES
                     return paths;
                 }
 
-                string[] allFiles;
                 try
                 {
-                    allFiles = Directory.GetFiles(path, patten, SearchOption.AllDirectories);
+                    foreach (string file in ESManagedFileIO.EnumerateFilesSafely(path, patten))
+                    {
+                        string relativePath = "Assets" + file.Replace(UnityEngine.Application.dataPath, "").Replace('\\', '/');
+                        paths.Add(relativePath);
+                    }
                 }
                 catch
                 {
                     return paths;
-                }
-
-                foreach (string file in allFiles)
-                {
-                    // 转换为Unity相对路径（如 "Assets/Scenes/Menu.unity"）
-                    string relativePath = "Assets" + file.Replace(UnityEngine.Application.dataPath, "").Replace('\\', '/');
-                    paths.Add(relativePath);
                 }
                 return paths;
             }

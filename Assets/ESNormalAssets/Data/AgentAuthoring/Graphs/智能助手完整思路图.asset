@@ -1,0 +1,283 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac77c2c23f1f433dad6bd984e9fbc1ee, type: 3}
+  m_Name: "\u667A\u80FD\u52A9\u624B\u5B8C\u6574\u601D\u8DEF\u56FE"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  schemaVersion: 2
+  graphId: b1490c67637d41a790c2fd05fe5fc37a
+  originGraphId: 
+  domainId: es.agent-authoring
+  allowCycles: 0
+  nodes:
+  - nodeId: 2e78890e4f39470e94577165f8fbed46
+    typeId: es.agent-authoring.goal
+    version: 1
+    title: "\u751F\u6210\u76EE\u6807"
+    payloadJson: "{\"schemaVersion\":1,\"title\":\"\u5B8C\u6574 Agent Artifact \u9700\u6C42\u601D\u8DEF\u56FE\",\"objective\":\"\u628A\u7528\u6237\u76EE\u6807\u3001\u6743\u5A01\u4E0A\u4E0B\u6587\u3001\u6743\u9650\u8FB9\u754C\u3001\u8D28\u91CF\u95E8\u7981\u548C\u6700\u7EC8
+      AICommand/Agent Skill \u4EA7\u7269\u7EC4\u7EC7\u4E3A\u53EF\u5BA1\u67E5\u7684\u751F\u6210\u5408\u540C\u3002\",\"context\":\"\u6240\u6709\u5206\u652F\u6700\u7EC8\u6C47\u5408\u5230\u5019\u9009\u4EA7\u7269\u4E0E\u4EBA\u5DE5\u6279\u51C6\uFF0C\u4E0D\u5F62\u6210\u73A9\u6CD5\u8FD0\u884C\u65F6\u3002\",\"targetUsers\":\"\u9700\u8981\u901A\u8FC7
+      Graph \u7F16\u6392\u590D\u6742 AI \u534F\u4F5C\u4EFB\u52A1\u7684 ESFramework
+      \u5F00\u53D1\u8005\u3002\",\"successCriteria\":\"AI \u80FD\u6309\u5173\u7CFB\u56FE\u7406\u89E3\u9700\u6C42\u5F52\u5C5E\uFF0C\u751F\u6210\u7ED3\u6784\u6E05\u6670\u4E14\u53EF\u901A\u8FC7
+      Diff Review \u7684\u914D\u5957\u5019\u9009\u3002\"}"
+    position: {x: -301.5, y: 207}
+    ports:
+    - portId: 8dc9a75a8fd44fbb942ac032eb633c79
+      stableKey: agent.context.out
+      name: "\u9700\u6C42\u4E0A\u4E0B\u6587"
+      valueTypeId: es.agent-authoring.context
+      direction: 1
+      capacity: 1
+  - nodeId: 6137fc23b8fa4ba78eaf02b5fecc6808
+    typeId: es.agent-authoring.reference
+    version: 1
+    title: "\u9879\u76EE\u89C4\u5219\u5165\u53E3"
+    payloadJson: "{\"schemaVersion\":1,\"referenceKind\":0,\"projectPath\":\"Assets/Plugins/ES/AIWarnings/00_\u5F00\u59CB\u9605\u8BFB\uFF08Start\uFF09/\u89C4\u5219\u7D22\u5F15\uFF08RuleIndex\uFF09.md\",\"purpose\":\"\u6839\u636E\u4EFB\u52A1\u9886\u57DF\u9009\u62E9\u5FC5\u987B\u8BFB\u53D6\u7684
+      P0 \u4E0E\u4E13\u9879\u89C4\u5219\",\"required\":true}"
+    position: {x: 68, y: 207}
+    ports:
+    - portId: e2ec84f5d28e401fa2da58baf6846d50
+      stableKey: flow.input
+      name: "\u4E0A\u6E38\u4E0A\u4E0B\u6587"
+      valueTypeId: es.agent-authoring.context
+      direction: 0
+      capacity: 1
+    - portId: 2c0811c0f0af44bc85ada6dcee11ea55
+      stableKey: agent.context.out
+      name: "\u8865\u5145\u4E0A\u4E0B\u6587"
+      valueTypeId: es.agent-authoring.context
+      direction: 1
+      capacity: 1
+  - nodeId: 96f0048919ca4c4d82e7589c4afdff60
+    typeId: es.agent-authoring.reference
+    version: 1
+    title: "\u5019\u9009\u751F\u6210\u5408\u540C"
+    payloadJson: "{\"schemaVersion\":1,\"referenceKind\":2,\"projectPath\":\".agents/skills/es-generate-agent-artifacts/SKILL.md\",\"purpose\":\"\u5019\u9009\u9694\u79BB\u3001Manifest\u3001\u9A8C\u8BC1\u4E0E\u4EBA\u5DE5\u6279\u51C6\u5DE5\u4F5C\u6D41\",\"required\":true}"
+    position: {x: 407.5, y: 71}
+    ports:
+    - portId: 5945d28ca5ad498eae1cfc997fa75480
+      stableKey: flow.input
+      name: "\u4E0A\u6E38\u4E0A\u4E0B\u6587"
+      valueTypeId: es.agent-authoring.context
+      direction: 0
+      capacity: 1
+    - portId: 7864b1cf6de54181bef9f52c1b1dc8b5
+      stableKey: agent.context.out
+      name: "\u8865\u5145\u4E0A\u4E0B\u6587"
+      valueTypeId: es.agent-authoring.context
+      direction: 1
+      capacity: 1
+  - nodeId: 650db7ce5bd04b45b12cba30ca8f393b
+    typeId: es.agent-authoring.constraint
+    version: 1
+    title: "\u751F\u6210\u7EA6\u675F"
+    payloadJson: "{\"schemaVersion\":1,\"kind\":0,\"statement\":\"\u5FC5\u987B\u628A
+      Graph \u4E2D\u6BCF\u6761\u5173\u7CFB\u3001\u5F15\u7528\u3001\u89C4\u5219\u3001\u8F93\u51FA\u548C
+      Validation \u5199\u5165\u751F\u6210\u8BF7\u6C42\u3002\",\"rationale\":\"\u9632\u6B62
+      AI \u53EA\u8BFB\u53D6\u6241\u5E73\u5B57\u6BB5\u800C\u4E22\u5931\u601D\u8DEF\u7ED3\u6784\u3002\",\"verification\":\"generation-request.json
+      \u4E0E Prompt \u5305\u542B relations \u548C Mermaid \u601D\u8DEF\u56FE\u3002\"}"
+    position: {x: 720, y: 0}
+    ports:
+    - portId: 651465190c994f938dc4b510a852fbc8
+      stableKey: flow.input
+      name: "\u9700\u6C42\u4E0A\u4E0B\u6587"
+      valueTypeId: es.agent-authoring.context
+      direction: 0
+      capacity: 1
+    - portId: e83f77ca4a2a4c0c9e512d9223c7e099
+      stableKey: agent.requirement.out
+      name: "\u4EA7\u7269\u8981\u6C42"
+      valueTypeId: es.agent-authoring.requirement
+      direction: 1
+      capacity: 1
+  - nodeId: 2a582b040de240c3beaf9121fc77484e
+    typeId: es.agent-authoring.constraint
+    version: 1
+    title: "\u751F\u6210\u7EA6\u675F"
+    payloadJson: "{\"schemaVersion\":1,\"kind\":1,\"statement\":\"\u7981\u6B62\u76F4\u63A5\u5199\u6B63\u5F0F
+      AICommands\u3001.agents/skills\u3001\u8FD0\u884C\u65F6\u6E90\u7801\u6216\u751F\u6210\u7684
+      .csproj\u3002\",\"rationale\":\"Graph \u53EA\u6388\u6743\u751F\u6210\u5019\u9009\u3002\",\"verification\":\"\u6240\u6709\u8F93\u51FA\u8DEF\u5F84\u90FD\u4F4D\u4E8E
+      request/candidate\uFF0C\u6B63\u5F0F\u5BFC\u5165\u53EA\u7531\u4EBA\u5DE5\u6279\u51C6\u89E6\u53D1\u3002\"}"
+    position: {x: 736, y: 160.5}
+    ports:
+    - portId: 89a2521d62a7452e85305670dfab6467
+      stableKey: flow.input
+      name: "\u9700\u6C42\u4E0A\u4E0B\u6587"
+      valueTypeId: es.agent-authoring.context
+      direction: 0
+      capacity: 1
+    - portId: fda7ce34a1fa4350894532af710d6f44
+      stableKey: agent.requirement.out
+      name: "\u4EA7\u7269\u8981\u6C42"
+      valueTypeId: es.agent-authoring.requirement
+      direction: 1
+      capacity: 1
+  - nodeId: 884175894b514cc192bc206f62eb72cc
+    typeId: es.agent-authoring.constraint
+    version: 1
+    title: "\u751F\u6210\u7EA6\u675F"
+    payloadJson: "{\"schemaVersion\":1,\"kind\":2,\"statement\":\"\u53EA\u5141\u8BB8\u8BFB\u53D6
+      Graph \u58F0\u660E\u7684 References\uFF0C\u5E76\u5728\u5019\u9009\u76EE\u5F55\u521B\u5EFA\u58F0\u660E\u7684
+      OutputArtifact\u3002\",\"rationale\":\"\u628A AI \u6743\u9650\u9650\u5236\u5728\u7528\u6237\u53EF\u89C1\u7684\u56FE\u7ED3\u6784\u5185\u3002\",\"verification\":\"Manifest
+      \u4E2D\u6BCF\u4E2A\u76EE\u6807\u90FD\u80FD\u6620\u5C04\u5230 GenerationSpec.outputs\u3002\"}"
+    position: {x: 720, y: 320}
+    ports:
+    - portId: 3e712fd7cb7d4b5db5ee2be6db7b70d5
+      stableKey: flow.input
+      name: "\u9700\u6C42\u4E0A\u4E0B\u6587"
+      valueTypeId: es.agent-authoring.context
+      direction: 0
+      capacity: 1
+    - portId: 0ace008b361c41f8aff6b7ffd04bc71a
+      stableKey: agent.requirement.out
+      name: "\u4EA7\u7269\u8981\u6C42"
+      valueTypeId: es.agent-authoring.requirement
+      direction: 1
+      capacity: 1
+  - nodeId: 31d9c3da00bf461ab88577fbbafa966c
+    typeId: es.agent-authoring.constraint
+    version: 1
+    title: "\u751F\u6210\u7EA6\u675F"
+    payloadJson: "{\"schemaVersion\":1,\"kind\":3,\"statement\":\"\u7ED3\u679C\u5FC5\u987B\u6E05\u6670\u3001\u5B8C\u6574\u3001\u4E25\u683C
+      UTF-8\uFF0C\u5E76\u660E\u786E\u5DF2\u6267\u884C\u4E0E\u672A\u6267\u884C\u7684\u9A8C\u8BC1\u3002\",\"rationale\":\"\u8BA9\u5019\u9009\u53EF\u4EE5\u88AB\u4EBA\u548C\u540E\u7EED
+      AI \u53EF\u9760\u590D\u6838\u3002\",\"verification\":\"UTF-8 Guard\u3001\u7ED3\u6784\u9A8C\u8BC1\u3001Diff
+      Review \u6E05\u5355\u5168\u90E8\u53EF\u89C1\u3002\"}"
+    position: {x: 720, y: 480}
+    ports:
+    - portId: 366a3b1c8f594f3ea76e567569c836ca
+      stableKey: flow.input
+      name: "\u9700\u6C42\u4E0A\u4E0B\u6587"
+      valueTypeId: es.agent-authoring.context
+      direction: 0
+      capacity: 1
+    - portId: c8804797ed06456c95aabca793de7b7f
+      stableKey: agent.requirement.out
+      name: "\u4EA7\u7269\u8981\u6C42"
+      valueTypeId: es.agent-authoring.requirement
+      direction: 1
+      capacity: 1
+  - nodeId: b67e4d7c54bb4b44981e61159409e744
+    typeId: es.agent-authoring.output.ai-command
+    version: 1
+    title: "\u751F\u6210 AICommand \u547D\u4EE4"
+    payloadJson: "{\"schemaVersion\":1,\"commandName\":\"\u751F\u6210_\u65B0\u4EFB\u52A1_AI\u547D\u4EE4\",\"targetProjectPath\":\"Assets/Plugins/ES/AICommands/\u65B0_AI\u547D\u4EE4_AI\u547D\u4EE4.md\",\"operationMode\":0,\"commandType\":\"\u660E\u786E\u6267\u884C\",\"defaultWrite\":\"\u7531\u672C\u8282\u70B9\u7EA6\u675F\",\"riskLevel\":\"L2\",\"purpose\":\"\u63CF\u8FF0\u8BE5
+      AICommand \u8981\u6388\u6743\u548C\u7EA6\u675F\u7684\u5355\u6B21\u4EFB\u52A1\u3002\",\"expectedInputs\":\"\u7528\u6237\u76EE\u6807\u3001\u8303\u56F4\u3001\u6743\u5A01\u89C4\u5219\u548C\u76F8\u5173\u9879\u76EE\u8DEF\u5F84\u3002\",\"executionOutline\":\"\u8BFB\u53D6\u89C4\u5219\\n\u6838\u5BF9\u73B0\u72B6\\n\u6267\u884C\u53D7\u63A7\u4FEE\u6539\\n\u9A8C\u8BC1\\n\u4EA4\u4ED8\",\"acceptanceCriteria\":\"\u8F93\u51FA\u5FC5\u987B\u5305\u542B\u5DF2\u8BFB\u89C4\u5219\u3001\u6539\u52A8\u3001\u9A8C\u8BC1\u548C\u5269\u4F59\u98CE\u9669\u3002\",\"requiredSections\":\"\u5FC5\u987B\u5148\u8BFB\\n\u6267\u884C\u8981\u6C42\\n\u4EA4\u4ED8\u683C\u5F0F\\n\u9700\u6C42\"}"
+    position: {x: 1217, y: 71}
+    ports:
+    - portId: f177bc7bd5474f83a8294a47dea378fe
+      stableKey: flow.input
+      name: "\u4EA7\u7269\u8981\u6C42"
+      valueTypeId: es.agent-authoring.requirement
+      direction: 0
+      capacity: 1
+    - portId: af44c34cbfc94744b00bf0bb8735dd79
+      stableKey: agent.artifact.out
+      name: "\u5019\u9009\u4EA7\u7269"
+      valueTypeId: es.agent-authoring.artifact
+      direction: 1
+      capacity: 0
+  - nodeId: 2a931d280e124f4c9193d1b3ac57222b
+    typeId: es.agent-authoring.output.agent-skill
+    version: 1
+    title: "\u751F\u6210 Agent Skill \u6280\u80FD"
+    payloadJson: "{\"schemaVersion\":1,\"skillName\":\"es-generated-workflow\",\"targetProjectPath\":\".agents/skills/es-generated-workflow/\",\"operationMode\":0,\"description\":\"\u63CF\u8FF0\u8BE5
+      Skill \u7684\u80FD\u529B\u3001\u89E6\u53D1\u573A\u666F\u548C\u9002\u7528\u4EFB\u52A1\u3002\",\"triggerScenarios\":\"\u8BF4\u660E\u4F55\u65F6\u5FC5\u987B\u4F7F\u7528\u8BE5
+      Skill\uFF0C\u4EE5\u53CA\u4F55\u65F6\u4E0D\u5E94\u89E6\u53D1\u3002\",\"workflow\":\"\u8BFB\u53D6\u6743\u5A01\u89C4\u5219\\n\u6267\u884C\u53D7\u63A7\u6B65\u9AA4\\n\u9A8C\u8BC1\\n\u4EA4\u4ED8\",\"nonGoals\":\"\u4E0D\u5F97\u6269\u5927\u7528\u6237\u6388\u6743\uFF0C\u4E0D\u5F97\u7ED5\u8FC7
+      AICommand\u3001\u5019\u9009\u76EE\u5F55\u6216\u4EBA\u5DE5\u6279\u51C6\u3002\",\"validationSteps\":\"\u4E25\u683C
+      UTF-8\\n\u76EE\u6807\u8DEF\u5F84\u767D\u540D\u5355\\n\u5019\u9009\u5B8C\u6574\u6027\\nDiff
+      Review\",\"includeAgentsMetadata\":true,\"includeReferences\":true,\"includeScripts\":false,\"defaultPrompt\":\"Use
+      $es-generated-workflow to complete the requested ESFramework workflow.\"}"
+    position: {x: 1217, y: 281}
+    ports:
+    - portId: 730ecd27887843efacc0ba31f06d2b20
+      stableKey: flow.input
+      name: "\u4EA7\u7269\u8981\u6C42"
+      valueTypeId: es.agent-authoring.requirement
+      direction: 0
+      capacity: 1
+    - portId: 468267e9fb1c4a9782f95fe640ddd692
+      stableKey: agent.artifact.out
+      name: "\u5019\u9009\u4EA7\u7269"
+      valueTypeId: es.agent-authoring.artifact
+      direction: 1
+      capacity: 0
+  - nodeId: b21d0cc83d344a1b9fc8d55a4fadf38b
+    typeId: es.agent-authoring.validation
+    version: 1
+    title: "\u9A8C\u8BC1\u4E0E\u6279\u51C6"
+    payloadJson: "{\"schemaVersion\":1,\"validateAICommand\":true,\"validateAgentSkill\":true,\"validateUtf8\":true,\"requireDiffReview\":true,\"requireHumanApproval\":true,\"additionalRequirements\":\"\u4E0D\u5F97\u5305\u542B
+      U+FFFD\uFF1B\u4E0D\u5F97\u8D8A\u8FC7\u5019\u9009\u76EE\u5F55\u3002\",\"reviewChecklist\":\"\u76EE\u6807\u8DEF\u5F84\u6B63\u786E\\n\u5185\u5BB9\u7B26\u5408
+      Graph\\n\u6CA1\u6709\u8D8A\u6743\u4FEE\u6539\\n\u9A8C\u8BC1\u8BC1\u636E\u771F\u5B9E\"}"
+    position: {x: 1604.5, y: 199.5}
+    ports:
+    - portId: 30b497b7758f473ba06828194b374402
+      stableKey: flow.input
+      name: "\u5019\u9009\u4EA7\u7269"
+      valueTypeId: es.agent-authoring.artifact
+      direction: 0
+      capacity: 1
+  edges:
+  - edgeId: 34234d17898846d98a2dbb47df19ce72
+    outputPortId: 8dc9a75a8fd44fbb942ac032eb633c79
+    inputPortId: e2ec84f5d28e401fa2da58baf6846d50
+  - edgeId: 09ea0201ddc24cf2a9344ea789453bc1
+    outputPortId: 2c0811c0f0af44bc85ada6dcee11ea55
+    inputPortId: 5945d28ca5ad498eae1cfc997fa75480
+  - edgeId: ae834f8ad8a64d828640d28eee528d66
+    outputPortId: 7864b1cf6de54181bef9f52c1b1dc8b5
+    inputPortId: 651465190c994f938dc4b510a852fbc8
+  - edgeId: b41c84b9484a487abecabc6e4bafc659
+    outputPortId: e83f77ca4a2a4c0c9e512d9223c7e099
+    inputPortId: f177bc7bd5474f83a8294a47dea378fe
+  - edgeId: 8f21c797baf04d3f8282f6a68510bb50
+    outputPortId: e83f77ca4a2a4c0c9e512d9223c7e099
+    inputPortId: 730ecd27887843efacc0ba31f06d2b20
+  - edgeId: f3acb22aa03b4492a68fbe70f1a0e60b
+    outputPortId: 7864b1cf6de54181bef9f52c1b1dc8b5
+    inputPortId: 89a2521d62a7452e85305670dfab6467
+  - edgeId: d21b20d8e75149d897bf6704e653646d
+    outputPortId: fda7ce34a1fa4350894532af710d6f44
+    inputPortId: 730ecd27887843efacc0ba31f06d2b20
+  - edgeId: e878cae9d40844b8b35de799fd68d206
+    outputPortId: 7864b1cf6de54181bef9f52c1b1dc8b5
+    inputPortId: 3e712fd7cb7d4b5db5ee2be6db7b70d5
+  - edgeId: 13439ca454964d8c9bc15bb4d3a5f162
+    outputPortId: 0ace008b361c41f8aff6b7ffd04bc71a
+    inputPortId: f177bc7bd5474f83a8294a47dea378fe
+  - edgeId: 8c5464a37afa46008e9bd9fa3e147e22
+    outputPortId: 0ace008b361c41f8aff6b7ffd04bc71a
+    inputPortId: 730ecd27887843efacc0ba31f06d2b20
+  - edgeId: a6186b9c11d34eccb3031991c738ba7f
+    outputPortId: 7864b1cf6de54181bef9f52c1b1dc8b5
+    inputPortId: 366a3b1c8f594f3ea76e567569c836ca
+  - edgeId: 84e362060ba9463994fbbd710b058a6a
+    outputPortId: c8804797ed06456c95aabca793de7b7f
+    inputPortId: f177bc7bd5474f83a8294a47dea378fe
+  - edgeId: 48a98d64422a4454a8059100323bed96
+    outputPortId: c8804797ed06456c95aabca793de7b7f
+    inputPortId: 730ecd27887843efacc0ba31f06d2b20
+  - edgeId: 4c8c90e9b47f4a8f8f8d1a159699ae83
+    outputPortId: af44c34cbfc94744b00bf0bb8735dd79
+    inputPortId: 30b497b7758f473ba06828194b374402
+  - edgeId: 2a3a7edefc564b9c9f189805d6da0443
+    outputPortId: 468267e9fb1c4a9782f95fe640ddd692
+    inputPortId: 30b497b7758f473ba06828194b374402
+  - edgeId: de225fbbaf464da580278c47e956dfa8
+    outputPortId: fda7ce34a1fa4350894532af710d6f44
+    inputPortId: f177bc7bd5474f83a8294a47dea378fe

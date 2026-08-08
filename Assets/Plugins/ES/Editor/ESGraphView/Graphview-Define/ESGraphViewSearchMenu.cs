@@ -15,15 +15,19 @@ namespace ES.EditorInternal
         {
             
             var entries = new List<SearchTreeEntry>();
+#pragma warning disable CS0618 // 历史 GraphView 兼容层：不作为正式业务实现使用。
             if (!ESGraphViewWindow.SContainer.IsNotNull()) {
                 entries.Add(new SearchTreeGroupEntry(new GUIContent("未选中合适的容器")));
                 return entries; }
+#pragma warning restore CS0618
             entries.Add(new SearchTreeGroupEntry(new GUIContent("创建新节点")));                //添加了一个一级菜单
            
 
             //USENODES
             var usenodes = ESNodeUtility.UseNodes;
+#pragma warning disable CS0618 // 历史 GraphView 兼容层：不作为正式业务实现使用。
             NodeEnvironment environment = ESGraphViewWindow.SContainer.environment;
+#pragma warning restore CS0618
             var items = usenodes.GetGroupDirectly(environment);
             HashSet<string> groupNames = new HashSet<string>();
             

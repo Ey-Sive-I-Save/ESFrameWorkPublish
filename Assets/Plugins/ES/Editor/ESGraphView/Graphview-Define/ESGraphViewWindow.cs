@@ -8,6 +8,7 @@ using System.Collections.Generic;
 namespace ES.EditorInternal
 {
 
+[System.Obsolete("历史实验窗口，不得用于正式业务。请使用 ESStableGraphViewWindow。")]
 public class ESGraphViewWindow : EditorWindow
 {
     [SerializeField]
@@ -20,11 +21,11 @@ public class ESGraphViewWindow : EditorWindow
     public INodeContainer Container { get { return m_NodeContainer; } set { if (value != m_NodeContainer) { SContainer= m_NodeContainer = value; OnTargetContainerChanged();} } }
     private INodeContainer m_NodeContainer;
 
-    [MenuItem(MenuItemPathDefine.CONTENT_CREATION_PATH + "图与流程/图编辑器", false, 30)]
+    [MenuItem(MenuItemPathDefine.CONTENT_CREATION_PATH + "图与流程/历史实验 NodeRunner 图编辑器（勿用于正式业务）", false, 90)]
     public static ESGraphViewWindow ShowWindow()
     {
         window = GetWindow<ESGraphViewWindow>();
-        window.titleContent = new GUIContent("ES 图编辑器");
+        window.titleContent = new GUIContent("历史实验 NodeRunner 图编辑器");
         return window;
     }
     public void CreateGUI()
@@ -93,17 +94,9 @@ public class ESGraphViewWindow : EditorWindow
     {
         public override void InitInvoke()
         {
-            Selection.selectionChanged -= OnGlobalSelectionChanged;
-            Selection.selectionChanged += OnGlobalSelectionChanged;
-        }
-
-        private static void OnGlobalSelectionChanged()
-        {
-            if (Selection.activeObject is INodeContainer container)
-            {
-                var w = ESGraphViewWindow.ShowWindow();
-                w.Container = container;
-            }
+            // P0 boundary: this historical NodeRunner window must never auto-open from
+            // global selection changes. It remains an explicit, visibly deprecated menu
+            // entry until the stable graph model and runtime snapshot are complete.
         }
     }
 

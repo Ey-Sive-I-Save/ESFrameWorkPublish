@@ -1056,6 +1056,52 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260808-004",
+                        "status":  "documented",
+                        "summary":  "提交 Graph V2、Agent Authoring、旧 NodeRunner 隔离与图形资产的稳定身份、保存回滚和编辑器创作入口。",
+                        "sourcePaths":  [
+                                            "Assets/ESNormalAssets/Data/AgentAuthoring",
+                                            "Assets/Plugins/ES/1_Design/Define/0Define-NodeRunner",
+                                            "Assets/Plugins/ES/1_Design/Design_Tools/ESDesignUtility",
+                                            "Assets/Plugins/ES/1_Design/Graph",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESAgentAuthoringGraphTests.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESAgentAuthoringGraphTests.cs.meta",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESGraphAssetTests.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESGraphAssetTests.cs.meta",
+                                            "Assets/Plugins/ES/Editor/ESGraphView",
+                                            "Assets/Plugins/ES/Editor/ESGraphViewV2",
+                                            "Assets/Plugins/ES/Editor/ESGraphViewV2.meta"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/1_Design/Graph/ESGraphAsset.cs",
+                                              "Assets/Plugins/ES/Editor/ESGraphViewV2/ESStableGraphViewWindow.cs",
+                                              "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentAuthoringGraphIntegration.cs",
+                                              "Assets/Plugins/ES/1_Design/Tests/ESGraphAssetTests.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "Graph 数据模型、稳定 GUID/GraphId、Editor 事务保护、Agent Authoring 资产和旧 NodeRunner 的显式 legacy scope 共同定义图形编辑行为。拆分会导致资产无法被当前编辑器打开或回滚语义失效。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "批次包含 Graph 合同与 Agent Authoring 测试入口",
+                                                            "提交前由 staged-only 门禁核对路径清单和补丁指纹"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "Unity 中的真实 Undo/Redo、域重载和外部修改故障注入仍需实际 Editor 验收",
+                                                             "旧 NodeRunner 的完整 Graph V2 迁移不因本提交自动完成"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1068,13 +1114,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-08T18:57:16+08:00",
-                       "head":  "69a27307739105ea2c9e437f0c6134c76d288703",
-                       "stagedSourcePatchSha256":  "7f2eff16a2b69d127e7d8abc6147c1e02ffef8fa52c378087572a1f5b50127c9",
-                       "stagedSourceManifestSha256":  "961ab641d2de931a0dff2a341e143965555d06a0cbf2d446817afe468f8f68aa",
-                       "stagedSourceFileCount":  87,
+                       "preparedAt":  "2026-08-08T18:58:18+08:00",
+                       "head":  "893466f646b5ff871d6595b4ef52f9ef25cfacab",
+                       "stagedSourcePatchSha256":  "bd3d75c296eddd11bfac83f2757980228e535b524b87eb4d00705ad36b098811",
+                       "stagedSourceManifestSha256":  "ab2d38a2536911f9a784d778f3e3c467d5af715015b5eefff405ec8e687aabd2",
+                       "stagedSourceFileCount":  34,
                        "entryIds":  [
-                                        "LOCAL-20260808-003"
+                                        "LOCAL-20260808-004"
                                     ]
                    }
 }

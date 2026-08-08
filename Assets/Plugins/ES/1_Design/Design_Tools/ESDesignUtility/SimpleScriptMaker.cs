@@ -7,7 +7,9 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using UnityEngine;
 
 namespace ES
@@ -47,7 +49,11 @@ namespace ES
                     return "";
                 }
 
-                string fullPath = Path.Combine(Folderpath, fileName);
+                if (!TryResolveScriptPath(Folderpath, fileName, out string fullPath, out string pathError))
+                {
+                    Debug.LogError("脚本生成已拒绝：" + pathError);
+                    return string.Empty;
+                }
 
                 // 基础脚本模板
                 string scriptContent =
@@ -65,8 +71,8 @@ $@"{using_}
 #endif
                         Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
 
-                    // 写入文件
-                    File.WriteAllText(fullPath, scriptContent, encoding: Encoding.UTF8);
+                    // 通过受管路径策略原子提升，避免 junction/symlink 与半写文件。
+                    ESManagedFileIO.WriteTextAtomic(fullPath, scriptContent, Encoding.UTF8, Application.dataPath);
 #if UNITY_EDITOR
                     AssetDatabase.Refresh();
                     AssetDatabase.SaveAssets();
@@ -94,7 +100,11 @@ $@"{using_}
                     return;
                 }
 
-                string fullPath = Path.Combine(Folderpath, className+AdditonFileName + ".cs");
+                if (!TryResolveScriptPath(Folderpath, className + AdditonFileName + ".cs", out string fullPath, out string pathError))
+                {
+                    Debug.LogError("脚本生成已拒绝：" + pathError);
+                    return;
+                }
 
                 // 基础脚本模板
                 string scriptContent =
@@ -115,8 +125,8 @@ using UnityEngine;
 #endif
                     Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
 
-                // 写入文件
-                File.WriteAllText(fullPath, scriptContent, encoding: Encoding.UTF8);
+                // 通过受管路径策略原子提升，避免 junction/symlink 与半写文件。
+                ESManagedFileIO.WriteTextAtomic(fullPath, scriptContent, Encoding.UTF8, Application.dataPath);
 
                 Debug.Log($"创建脚本: {fullPath}");
             }
@@ -128,7 +138,11 @@ using UnityEngine;
                     return;
                 }
 
-                string fullPath = Path.Combine(Folderpath, HandleString_ToValidName(className).Replace(" ", "")+AdditonFileName + ".cs");
+                if (!TryResolveScriptPath(Folderpath, HandleString_ToValidName(className).Replace(" ", "") + AdditonFileName + ".cs", out string fullPath, out string pathError))
+                {
+                    Debug.LogError("脚本生成已拒绝：" + pathError);
+                    return;
+                }
 
                 // 基础脚本模板
                 string scriptContent =
@@ -150,8 +164,8 @@ using UnityEngine;
 #endif
                     Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
 
-                // 写入文件
-                File.WriteAllText(fullPath, scriptContent, encoding: Encoding.UTF8);
+                // 通过受管路径策略原子提升，避免 junction/symlink 与半写文件。
+                ESManagedFileIO.WriteTextAtomic(fullPath, scriptContent, Encoding.UTF8, Application.dataPath);
 
                 Debug.Log($"创建脚本: {fullPath}");
 
@@ -159,6 +173,73 @@ using UnityEngine;
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
 #endif
+            }
+
+            /// <summary>
+            /// 脚本生成只能落在当前工程 Assets 内。
+            /// 生成器常被编辑器表单和 AI 工具调用，不能把调用方传入的任意字符串
+            /// 直接交给 Path.Combine/File.WriteAllText，否则一个 .. 或绝对路径即可覆盖工程外文件。
+            /// </summary>
+            private static bool TryResolveScriptPath(string folderPath, string fileName, out string fullPath, out string error)
+            {
+                fullPath = string.Empty;
+                error = string.Empty;
+                if (string.IsNullOrWhiteSpace(folderPath) || string.IsNullOrWhiteSpace(fileName))
+                {
+                    error = "脚本目录和文件名不能为空。";
+                    return false;
+                }
+
+                string normalizedFolder = folderPath.Trim().Replace('\\', '/');
+                if (normalizedFolder.Contains("://", StringComparison.Ordinal)
+                    || normalizedFolder.StartsWith("jar:", StringComparison.OrdinalIgnoreCase))
+                {
+                    error = "脚本目录不能是 URI。";
+                    return false;
+                }
+
+                string[] folderSegments = normalizedFolder.Split('/');
+                for (int i = 0; i < folderSegments.Length; i++)
+                {
+                    if (string.Equals(folderSegments[i], "..", StringComparison.Ordinal))
+                    {
+                        error = "脚本目录不能包含 .. 逃逸片段。";
+                        return false;
+                    }
+                }
+
+                string normalizedFileName = fileName.Trim().Replace('\\', '/');
+                if (normalizedFileName.IndexOf('/') >= 0
+                    || normalizedFileName.IndexOf(':') >= 0
+                    || string.Equals(normalizedFileName, ".", StringComparison.Ordinal)
+                    || string.Equals(normalizedFileName, "..", StringComparison.Ordinal))
+                {
+                    error = "脚本文件名只能是单个文件名，不能包含目录或盘符。";
+                    return false;
+                }
+
+                string assetsRoot = Path.GetFullPath(Application.dataPath)
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string projectRoot = Directory.GetParent(assetsRoot)?.FullName ?? assetsRoot;
+                string candidateFolder = Path.IsPathRooted(normalizedFolder)
+                    ? Path.GetFullPath(normalizedFolder)
+                    : Path.GetFullPath(Path.Combine(projectRoot, normalizedFolder));
+                string candidate = Path.GetFullPath(Path.Combine(candidateFolder, normalizedFileName));
+                string requiredPrefix = assetsRoot + Path.DirectorySeparatorChar;
+                if (!candidate.StartsWith(requiredPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    error = "脚本生成路径必须位于当前工程 Assets 目录内。";
+                    return false;
+                }
+
+                if (ESManagedFileIO.ContainsExistingReparsePoint(candidateFolder))
+                {
+                    error = "脚本生成目录不能穿过 junction/symlink。";
+                    return false;
+                }
+
+                fullPath = candidate;
+                return true;
             }
             public static string CreateClassContentByString(string className, string beforeClassName = "", string insideClass = "", string parent = ":MonoBehaviour", string Attribute = "")
             {

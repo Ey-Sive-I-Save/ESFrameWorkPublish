@@ -4,8 +4,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
+using System.Xml;
 using System.Xml.Serialization;
 using UnityEngine;
 using static ES.ESDesignUtility;
@@ -302,7 +302,9 @@ namespace ES
             {
                 if (obj == null) return;
                 string json = ToJson(obj, prettyPrint);
-                await System.IO.File.WriteAllTextAsync(filePath, json);
+                // 序列化 API 只允许写入当前受管工作根目录，并使用原子提升。
+                await System.Threading.Tasks.Task.Run(() =>
+                    ESManagedFileIO.WriteTextAtomic(filePath, json, new UTF8Encoding(false), GetSerializationRoot()));
             }
 
             /// <summary>
@@ -330,45 +332,19 @@ namespace ES
             /// <summary>
             /// 使用 BinaryFormatter 将对象序列化为字节数组 (注意安全风险)
             /// </summary>
+            [Obsolete("BinaryFormatter 已禁用。该入口仅保留兼容签名，请改用 ToOdinBinary。", false)]
             public static byte[] ToBinary(object obj)
             {
                 if (obj == null) return null;
-
-                try
-                {
-                    using (MemoryStream ms = new MemoryStream())
-                    {
-                        BinaryFormatter formatter = new BinaryFormatter();
-                        formatter.Serialize(ms, obj);
-                        return ms.ToArray();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"二进制序列化失败: {ex.Message}");
-                    return null;
-                }
+                return SerializationUtility.SerializeValue(obj, DataFormat.Binary);
             }
             /// <summary>
             /// 使用 BinaryFormatter 从字节数组反序列化为对象 (注意安全风险)
             /// </summary>
+            [Obsolete("BinaryFormatter 反序列化已禁用。请使用 ESDesignUtility.Matcher.FromOdinBinary 或显式 JSON 协议。", false)]
             public static T FromBinary<T>(byte[] data) where T : class
             {
-                if (data == null || data.Length == 0) return default;
-
-                try
-                {
-                    using (MemoryStream ms = new MemoryStream(data))
-                    {
-                        BinaryFormatter formatter = new BinaryFormatter();
-                        return (T)formatter.Deserialize(ms);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"二进制反序列化失败: {ex.Message}");
-                    return default;
-                }
+                throw new NotSupportedException("BinaryFormatter 反序列化已禁用，拒绝处理不受信任的二进制输入。");
             }
             #endregion
 
@@ -532,7 +508,7 @@ namespace ES
             {
                 if (obj == null) return;
                 byte[] data = ToMessagePack(obj);
-                File.WriteAllBytes(filePath, data);
+                ESManagedFileIO.WriteBytesAtomic(filePath, data, GetSerializationRoot());
             }
 
             /// <summary>
@@ -556,6 +532,13 @@ namespace ES
             }
 #endif
             #endregion
+
+            private static string GetSerializationRoot()
+            {
+                // 该通用工具没有“任意绝对路径写入”权限；调用方若需导出到外部目录，
+                // 应在 Editor 层显式使用 SaveFilePanel 后调用 ESManagedFileIO.WriteTextAtUserSelectedPath。
+                return Directory.GetCurrentDirectory();
+            }
 
             #region XML序列化支持
             /// <summary>
@@ -630,8 +613,9 @@ namespace ES
                     XmlSerializer serializer = new XmlSerializer(typeof(T));
 
                     using (StringReader reader = new StringReader(xmlString))
+                    using (XmlReader xmlReader = XmlReader.Create(reader, CreateSafeXmlReaderSettings()))
                     {
-                        return (T)serializer.Deserialize(reader);
+                        return (T)serializer.Deserialize(xmlReader);
                     }
                 }
                 catch (System.Exception ex)
@@ -673,18 +657,13 @@ namespace ES
                 {
                     XmlSerializer serializer = new XmlSerializer(typeof(T));
                     encoding = encoding ?? Encoding.UTF8;
-                    string directoryPath = Path.GetDirectoryName(filePath);
-
-                    // 确保目录存在
-                    if (!Directory.Exists(directoryPath))
-                    {
-                        Directory.CreateDirectory(directoryPath);
-                    }
-
-                    using (StreamWriter writer = new StreamWriter(filePath, false, encoding)) // false 表示覆盖而非追加
+                    string xml;
+                    using (StringWriter writer = new StringWriterWithEncoding(encoding))
                     {
                         serializer.Serialize(writer, obj);
+                        xml = writer.ToString();
                     }
+                    ESManagedFileIO.WriteTextAtomic(filePath, xml, encoding, GetSerializationRoot());
 
                     Debug.Log($"XML 文件保存成功: {filePath}");
                     return true;
@@ -726,8 +705,9 @@ namespace ES
                     XmlSerializer serializer = new XmlSerializer(typeof(T));
 
                     using (StreamReader reader = new StreamReader(filePath))
+                    using (XmlReader xmlReader = XmlReader.Create(reader, CreateSafeXmlReaderSettings()))
                     {
-                        return (T)serializer.Deserialize(reader);
+                        return (T)serializer.Deserialize(xmlReader);
                     }
                 }
                 catch (System.Exception ex)
@@ -735,6 +715,17 @@ namespace ES
                     Debug.LogError($"读取 XML 文件失败: {ex.Message}");
                     return null;
                 }
+            }
+
+            private static XmlReaderSettings CreateSafeXmlReaderSettings()
+            {
+                return new XmlReaderSettings
+                {
+                    DtdProcessing = DtdProcessing.Prohibit,
+                    XmlResolver = null,
+                    MaxCharactersFromEntities = 0,
+                    MaxCharactersInDocument = 16 * 1024 * 1024
+                };
             }
 
             // 辅助类，用于 StringWriter 指定编码

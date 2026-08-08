@@ -105,7 +105,17 @@ namespace ES.EditorInternal
                     if (elem is BaseNodeViewer viewer)
                     {
                         if (viewer.Runner != null)
-                            window.Container.RemoveRunner(viewer.Runner);
+                        {
+                            if (window.Container is NodeContainerSO nodeContainer)
+                            {
+                                using (NodeContainerSO.BeginLegacyEditorWriteScope())
+                                    nodeContainer.RemoveRunner(viewer.Runner);
+                            }
+                            else
+                            {
+                                window.Container.RemoveRunner(viewer.Runner);
+                            }
+                        }
                         foreach (var i in edges)
                         {
                             if (i.input.node == viewer || i.output.node == viewer)
@@ -177,7 +187,9 @@ namespace ES.EditorInternal
             return graphViewChange;
         }
 
+#pragma warning disable CS0618 // 历史 GraphView 兼容层：不作为正式业务实现使用。
         public ESGraphViewWindow window;
+#pragma warning restore CS0618
         public Action<BaseNodeViewer> OnSelectNodeViewer;
 
         public void ResetNodeViewers()
@@ -344,7 +356,20 @@ namespace ES.EditorInternal
             }
 
             //创建出来
-            var r = runner != null ? runner : window.Container.AddNodeByType(type);
+            INodeRunner r;
+            if (runner != null)
+            {
+                r = runner;
+            }
+            else if (window.Container is NodeContainerSO nodeContainer)
+            {
+                using (NodeContainerSO.BeginLegacyEditorWriteScope())
+                    r = nodeContainer.AddNodeByType(type);
+            }
+            else
+            {
+                r = window.Container.AddNodeByType(type);
+            }
             if (r != null)
             {
                 nodeView.SetPosition(new Rect(runner != null ? runner.Editor_GetPos() : atPos, nodeView.GetPosition().size + new Vector2(50, 50)));
@@ -483,7 +508,16 @@ namespace ES.EditorInternal
                 {
                     offset++;
 
-                    var runnerC = window.Container.CopyNodeRunner(fromViewer.Runner);
+                    INodeRunner runnerC;
+                    if (window.Container is NodeContainerSO nodeContainer)
+                    {
+                        using (NodeContainerSO.BeginLegacyEditorWriteScope())
+                            runnerC = nodeContainer.CopyNodeRunner(fromViewer.Runner);
+                    }
+                    else
+                    {
+                        runnerC = window.Container.CopyNodeRunner(fromViewer.Runner);
+                    }
                     var nodeView = CreateBaseNodeViewer(runnerC);
 
                     //新旧节点映射

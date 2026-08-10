@@ -137,6 +137,9 @@ namespace ES
         private void LateUpdate()
         {
             Camera?.LateTick();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            ESDeveloperObservationController.SampleFrame();
+#endif
         }
     }
 }

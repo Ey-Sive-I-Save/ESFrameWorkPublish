@@ -1,7 +1,9 @@
 {
-  "name": "ESFramework.AITest",
+  "name": "ESFramework.AITest.Runtime",
   "rootNamespace": "ESFramework.ESAITest",
   "references": [
+    "ESFramework.AITest.Contracts",
+    "ES_Stand",
     "Unity.ugui"
   ],
   "includePlatforms": [],

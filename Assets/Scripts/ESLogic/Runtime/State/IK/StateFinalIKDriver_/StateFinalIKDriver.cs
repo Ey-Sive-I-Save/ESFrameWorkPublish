@@ -14,9 +14,10 @@ namespace ES
     // ============================================================================
 
     [DisallowMultipleComponent]
+    [RequireComponent(typeof(Animator))]
     [DefaultExecutionOrder(-1)]
     public sealed partial class StateFinalIKDriver : MonoBehaviour
     {
-        
+
     }
 }

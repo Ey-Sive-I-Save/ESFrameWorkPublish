@@ -77,6 +77,7 @@ namespace ES
             if (provider == null) throw new ArgumentNullException(nameof(provider));
             if (ReferenceEquals(provider, runtimeProvider))
                 return;
+            cancellationToken.ThrowIfCancellationRequested();
 
             ESAssets.BeginProviderTransition();
             try

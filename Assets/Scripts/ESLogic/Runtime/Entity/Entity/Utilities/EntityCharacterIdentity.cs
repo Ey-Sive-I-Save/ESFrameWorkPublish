@@ -10,6 +10,8 @@ namespace ES
     /// 骨骼/Socket 映射和碰撞体分别由 EntityTransformMapping 和标准 Collider 节点负责。
     /// </summary>
     [DisallowMultipleComponent]
+    [RequireComponent(typeof(Entity))]
+    [RequireComponent(typeof(EntityTransformMapping))]
     [UnityEngine.Scripting.APIUpdating.MovedFrom(true, sourceNamespace: "ES", sourceAssembly: "ES_Logic", sourceClassName: "EntityCharacterProfile")]
     [AddComponentMenu("【ES】/场景与对象/角色身份")]
     public sealed class EntityCharacterIdentity : MonoBehaviour
@@ -205,6 +207,15 @@ namespace ES
             if (faction == EntityCharacterFaction.Unspecified)
             {
                 error = "正式角色必须声明阵营。";
+                return false;
+            }
+
+            if (faction == EntityCharacterFaction.Player
+                && (definitionSource != EntityCharacterDefinitionSource.Actor
+                    || actorDefinition == null
+                    || actorDefinition.actorKind != ActorDataKind.Player))
+            {
+                error = "Player 正式角色必须使用 ActorDataInfo，且 ActorDataKind 必须为 Player。";
                 return false;
             }
 

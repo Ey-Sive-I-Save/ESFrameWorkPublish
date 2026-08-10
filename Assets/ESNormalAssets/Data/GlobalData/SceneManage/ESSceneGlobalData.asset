@@ -52,7 +52,8 @@ MonoBehaviour:
     Group: "\u6838\u5FC3\u573A\u666F"
     Enabled: 1
   - DisplayName: New Scene 1
-    ScenePath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_SimpleTools/New Scene 1.unity
+    ScenePath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_SimpleTools/New Scene
+      1.unity
     SceneAsset: {fileID: 102900000, guid: b4b75588872fe9740ab90f542b86ce3e, type: 3}
     Color: {r: 1, g: 1, b: 1, a: 1}
     Description: 
@@ -94,6 +95,10 @@ MonoBehaviour:
     Asset: {fileID: -4032791083603288687, guid: 3bbbfb0eae070104295366fdaf88f52a,
       type: 2}
     Group: "\u914D\u7F6E"
+    Enabled: 1
+  - DisplayName: Directional Light
+    Asset: {fileID: 0}
+    Group: "\u9884\u5236\u4F53"
     Enabled: 1
   AssetGroups:
   - "\u9ED8\u8BA4"

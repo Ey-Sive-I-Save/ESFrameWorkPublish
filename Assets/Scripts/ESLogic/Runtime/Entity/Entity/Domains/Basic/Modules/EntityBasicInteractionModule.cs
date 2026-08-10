@@ -115,8 +115,29 @@ namespace ES
         private int _bindingGeneration;
         private ESInteractionBinding _activeBinding;
         private bool _isEndingInteraction;
+        [NonSerialized] private int poolSpawnCount;
+        [NonSerialized] private int poolDespawnCount;
 
         public ESInteractionBinding ActiveBinding => _activeBinding;
+        internal int PoolSpawnCount => poolSpawnCount;
+        internal int PoolDespawnCount => poolDespawnCount;
+
+        public void OnPoolSpawned()
+        {
+            poolSpawnCount++;
+            currentCandidate = null;
+            _nextDetectTime = 0f;
+            _interactableByColliderId?.Clear();
+        }
+
+        public void OnPoolDespawned()
+        {
+            poolDespawnCount++;
+            if (isInteracting)
+                EndInteraction(false, ESInteractionEndReason.ModuleDisabled);
+            currentCandidate = null;
+            _interactableByColliderId?.Clear();
+        }
 
         public bool TryGetActiveBinding(ESInteractable target, out ESInteractionBinding binding)
         {

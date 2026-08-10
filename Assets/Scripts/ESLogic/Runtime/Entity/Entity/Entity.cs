@@ -186,20 +186,33 @@ namespace ES
         /// </summary>
         public void OnPoolDespawned()
         {
+            ESActionPoolLifecycleDiagnostics.RecordDespawn();
+            basicDomain?.NotifyPoolDespawned();
+            ESActionPoolLifecycleDiagnostics.Record("Entity.CameraRelease");
+            ESGameManager.Camera?.ReleaseOwnedBy(this);
+            ESActionPoolLifecycleDiagnostics.Record("Entity.DefaultCameraRelease");
             ReleaseDefaultCameraRequest();
             aiDomain?.ResetControlArbitrationForLifecycle();
+            ESActionPoolLifecycleDiagnostics.Record("Entity.TagCatalogUnsubscribe");
             UnsubscribeFromTagCatalog();
+            ESActionPoolLifecycleDiagnostics.Record("Entity.AttributeCatalogUnsubscribe");
             UnsubscribeFromAttributeCatalog();
+            ESActionPoolLifecycleDiagnostics.Record("Entity.BuffClear");
             buffDomain?.ClearAllBuffs();
+            ESActionPoolLifecycleDiagnostics.Record("Entity.ClearDefinition");
             ClearDefinition();
+            ESActionPoolLifecycleDiagnostics.Record("Entity.ValueChangeReset");
             ResetValueChangesForLifecycleEnd();
+            ESActionPoolLifecycleDiagnostics.Record("Entity.TagReset");
             tags?.ResetForReuse();
         }
 
         /// <summary>Called by the pool while inactive, before the next activation.</summary>
         public void OnPoolSpawned()
         {
+            ESActionPoolLifecycleDiagnostics.RecordSpawn();
             EnsureEntityStructure();
+            basicDomain?.NotifyPoolSpawned();
             CaptureAuthoringMotionBaseline();
             EnsureEntityOpSupport();
             Tags.Warmup();
@@ -211,6 +224,7 @@ namespace ES
 
         protected override void OnDestroy()
         {
+            ESGameManager.Camera?.ReleaseOwnedBy(this);
             ReleaseDefaultCameraRequest();
             UnsubscribeFromTagCatalog();
             UnsubscribeFromAttributeCatalog();

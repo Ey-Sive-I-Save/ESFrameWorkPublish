@@ -43,6 +43,11 @@ namespace ESFramework.ESAITest
                 + (autonomyRequested ? 1 : 0)
                 + (existingAutonomyRequested ? 1 : 0)
                 + (autonomyPrepareRequested ? 1 : 0);
+            if (requestedStartCount > 0 && !CanActivateAcceptanceRuntime())
+            {
+                Debug.LogError("[ESAITest] 生产策略拒绝启动：仅允许 Editor、DevelopmentBuild 或显式 ES_AITEST_ACCEPTANCE 构建通过参数激活。");
+                return;
+            }
             if (requestedStartCount > 1)
             {
                 Debug.LogError("[ESAITest] 启动参数互斥：一次只能使用 -esAITestPlan/-esAITestInbox、-esTest、-esAITestAutonomy、-esAITestAutonomyExisting 或 -esAITestAutonomyPrepare 之一。");
@@ -87,6 +92,15 @@ namespace ESFramework.ESAITest
                 if (forceQuit)
                     Application.Quit(2);
             }
+        }
+
+        private static bool CanActivateAcceptanceRuntime()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || ES_AITEST_ACCEPTANCE
+            return true;
+#else
+            return false;
+#endif
         }
 
         public static bool TryStartFromPath(string planPath, bool forceQuit, out string error)
@@ -352,6 +366,12 @@ namespace ESFramework.ESAITest
                 return false;
             }
 
+            if (!CanActivateAcceptanceRuntime())
+            {
+                error = "生产策略拒绝启动：仅允许 Editor、DevelopmentBuild 或显式 ES_AITEST_ACCEPTANCE 构建激活。";
+                return false;
+            }
+
             activeHost = new GameObject("ESAITest Player Runner");
             UnityEngine.Object.DontDestroyOnLoad(activeHost);
             ActiveRunner = activeHost.AddComponent<ESAITestRunner>();
@@ -427,7 +447,7 @@ namespace ESFramework.ESAITest
             }
             else
             {
-                UnityEngine.Object.Destroy(host, 30f);
+                UnityEngine.Object.Destroy(host);
             }
         }
 

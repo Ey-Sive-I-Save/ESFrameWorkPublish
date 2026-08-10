@@ -118,8 +118,8 @@ namespace ES
         [LabelText("武器类型")]
         public ItemWeaponKind weaponKind;
 
-        [LabelText("默认飞行物Key")]
-        public string defaultShotKey;
+        [LabelText("默认飞行物 Key")]
+        public ESShotConfigKey defaultShot = new ESShotConfigKey();
 
         [LabelText("攻击检测半径")]
         public float hitRadius;
@@ -130,23 +130,152 @@ namespace ES
         [LabelText("挂点名")]
         public string socketName;
 
+        [Title("射击定义")]
+        [InlineProperty]
+        public WeaponFireDefinitionData fire = WeaponFireDefinitionData.Default;
+
+        [Title("后坐力定义")]
+        [InlineProperty]
+        public WeaponRecoilDefinitionData recoil = WeaponRecoilDefinitionData.Default;
+
         public static ItemWeaponSharedData Default => new ItemWeaponSharedData
         {
             weaponKind = ItemWeaponKind.None,
-            defaultShotKey = string.Empty,
+            defaultShot = new ESShotConfigKey(),
             hitRadius = 0.2f,
             cooldown = 0.2f,
-            socketName = string.Empty
+            socketName = string.Empty,
+            fire = WeaponFireDefinitionData.Default,
+            recoil = WeaponRecoilDefinitionData.Default
         };
 
         /// <summary>把 Table 自有的运行时默认对象原位恢复为领域默认值，不产生新对象。</summary>
         internal void ResetToDefaults()
         {
             weaponKind = ItemWeaponKind.None;
-            defaultShotKey = string.Empty;
+            defaultShot = new ESShotConfigKey();
             hitRadius = 0.2f;
             cooldown = 0.2f;
             socketName = string.Empty;
+            fire = WeaponFireDefinitionData.Default;
+            recoil = WeaponRecoilDefinitionData.Default;
+        }
+
+        public bool ValidateDefinition(out string error)
+        {
+            if (fire == null)
+            {
+                error = "正式 WeaponDefinition 缺少射击定义。";
+                return false;
+            }
+
+            if (!fire.Validate(out error))
+                return false;
+
+            if (recoil == null)
+            {
+                error = "正式 WeaponDefinition 缺少后坐力定义。";
+                return false;
+            }
+
+            return recoil.Validate(out error);
+        }
+    }
+
+    [Serializable]
+    public sealed class WeaponFireDefinitionData
+    {
+        [LabelText("启用射击")]
+        public bool enabled;
+
+        [LabelText("射击间隔（秒）"), MinValue(0.01f)]
+        public float interval = 0.12f;
+
+        [LabelText("射击距离"), MinValue(0.5f)]
+        public float distance = 120f;
+
+        [LabelText("命中层")]
+        public LayerMask hitMask = Physics.DefaultRaycastLayers;
+
+        [LabelText("射线命中触发器")]
+        public QueryTriggerInteraction triggerInteraction = QueryTriggerInteraction.Ignore;
+
+        [LabelText("必须在瞄准中")]
+        public bool requiresAiming = true;
+
+        public static WeaponFireDefinitionData Default => new WeaponFireDefinitionData();
+
+        public bool Validate(out string error)
+        {
+            if (interval < 0.01f)
+            {
+                error = "WeaponDefinition 的射击间隔必须不小于 0.01 秒。";
+                return false;
+            }
+
+            if (distance < 0.5f)
+            {
+                error = "WeaponDefinition 的射击距离必须不小于 0.5。";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+    }
+
+    [Serializable]
+    public sealed class WeaponRecoilDefinitionData
+    {
+        [LabelText("启用后坐力")]
+        public bool enabled = true;
+
+        [LabelText("基础强度"), MinValue(0f)]
+        public float baseMagnitude = 1f;
+
+        [LabelText("仅在瞄准时触发")]
+        public bool onlyWhenAiming = true;
+
+        [LabelText("连发时间窗（秒）"), MinValue(0.01f)]
+        public float burstWindow = 0.22f;
+
+        [LabelText("最大连发计数"), MinValue(1)]
+        public int maxBurstShots = 8;
+
+        [LabelText("随机抖动"), Range(0f, 1f)]
+        public float randomJitter = 0.06f;
+
+        [LabelText("后坐力曲线")]
+        [Tooltip("X=连发进度（0~1），Y=曲线倍率。")]
+        public AnimationCurve recoilCurve = new AnimationCurve(
+            new Keyframe(0f, 1f),
+            new Keyframe(0.35f, 1.15f),
+            new Keyframe(1f, 1.35f));
+
+        public static WeaponRecoilDefinitionData Default => new WeaponRecoilDefinitionData();
+
+        public bool Validate(out string error)
+        {
+            if (baseMagnitude < 0f)
+            {
+                error = "WeaponDefinition 的后坐力基础强度不能小于零。";
+                return false;
+            }
+
+            if (burstWindow < 0.01f)
+            {
+                error = "WeaponDefinition 的后坐力连发时间窗必须不小于 0.01 秒。";
+                return false;
+            }
+
+            if (maxBurstShots < 1)
+            {
+                error = "WeaponDefinition 的最大连发计数必须不小于 1。";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
         }
     }
 
@@ -362,7 +491,6 @@ namespace ES
         [HideLabel] public ItemWeaponSharedData sharedData = ItemWeaponSharedData.Default;
         [HideLabel, InlineProperty] public ESWeaponConfigKey key = new ESWeaponConfigKey();
         [HideLabel] public ItemWeaponVariableData initialState = ItemWeaponVariableData.Default;
-        [HideLabel] public ItemWeaponConfig config = new ItemWeaponConfig();
 
         public static ItemWeaponDataBlock Default => new ItemWeaponDataBlock();
     }

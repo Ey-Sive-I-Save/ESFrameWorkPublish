@@ -12,15 +12,6 @@ using UnityEngine.UI;
 namespace ESFramework.ESAITest
 {
     [Serializable]
-    public sealed class ESAITestArtifactDto
-    {
-        public string relativePath;
-        public string kind;
-        public long byteLength;
-        public string sha256;
-    }
-
-    [Serializable]
     public sealed class ESAITestScreenCaptureDto
     {
         public string relativePath;

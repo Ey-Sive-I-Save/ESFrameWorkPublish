@@ -1,0 +1,20 @@
+{
+    "name": "ES_AITest.Runtime.Adapters",
+    "rootNamespace": "ES",
+    "references": [
+        "ESFramework.AITest.Contracts",
+        "ESFramework.AITest.Runtime",
+        "ES_Stand",
+        "ES_Design",
+        "ES_Logic"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

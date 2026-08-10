@@ -45,6 +45,8 @@ namespace ES
         public static ESNpcConfigKeyTable RuntimeNpcData => ESRuntimeDataGameCore.Npcs;
         public static ESWeaponConfigKeyTable RuntimeWeaponData => ESRuntimeDataGameCore.Weapons;
         public static ESSkillConfigKeyTable RuntimeSkillData => ESRuntimeDataGameCore.Skills;
+        public static ESActionConfigKeyTable RuntimeActionData => ESRuntimeDataGameCore.Actions;
+        public static ESSkillTrackConfigKeyTable RuntimeSkillTrackData => ESRuntimeDataGameCore.SkillTracks;
         public static ESAssetConfigTableReader<ESAssetReferPrefabConfigData, UnityEngine.GameObject> RuntimePrefabAssets => ESRuntimeDataAsset.Prefabs;
         public static ESAssetConfigTableReader<ESAssetReferSpriteConfigData, UnityEngine.Sprite> RuntimeSpriteAssets => ESRuntimeDataAsset.Sprites;
         public static ESAssetConfigTableReader<ESAssetReferAudioClipConfigData, UnityEngine.AudioClip> RuntimeAudioClipAssets => ESRuntimeDataAsset.AudioClips;

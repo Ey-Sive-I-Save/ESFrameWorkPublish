@@ -56,8 +56,12 @@ MonoBehaviour:
       type: {class: SkillTrackItem_Audio, ns: ES, asm: ES_Logic}
       data:
         enabled: 1
+        trackId: 3938d57dedaa4ad3877affad9cf7daca
+        trackSchema: 1
         clips:
-        - enabled: 1
+        - clipId: 2aebaf1c1a84440b886270dfceb6f02b
+          clipSchema: 1
+          enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 1.3472527
           durationTime: 1.0000001
@@ -80,11 +84,15 @@ MonoBehaviour:
       type: {class: SkillTrackItem_Animation, ns: ES, asm: ES_Logic}
       data:
         enabled: 1
+        trackId: 030bb86aa9ff4820b0a23c701824e4d3
+        trackSchema: 1
         clips:
-        - enabled: 1
+        - clipId: bbe0594b9cd34cd0b2179117023ead98
+          clipSchema: 1
+          enabled: 1
           name: "\u6587\u5316\u670D\u52A122235\u5243\u5200\u9AD8\u5730"
-          startTime: 1.2255319
-          durationTime: 2.885106
+          startTime: 1.0315567
+          durationTime: 2.8851066
           targetExpression:
             rid: -2
           AnimationClipName: {fileID: 7400010, guid: c79d18b7598993246a99ebc7c22b5f0d,
@@ -93,7 +101,9 @@ MonoBehaviour:
           clipStartOffset: 0
           playbackSpeed: 1
           loopClip: 0
-        - enabled: 1
+        - clipId: 5b8e7994eff549a0b224faf37d34776a
+          clipSchema: 1
+          enabled: 1
           name: 1aaaa55999
           startTime: 3.6765957
           durationTime: 2.5301216
@@ -105,7 +115,9 @@ MonoBehaviour:
           clipStartOffset: 0
           playbackSpeed: 1
           loopClip: 0
-        - enabled: 0
+        - clipId: 14e95ea6d7e640bcaf47b6a87c5af5c6
+          clipSchema: 1
+          enabled: 0
           name: "\u8F68\u9053\u7247\u6BB5233"
           startTime: 5.4948072
           durationTime: 1
@@ -116,7 +128,9 @@ MonoBehaviour:
           clipStartOffset: 0
           playbackSpeed: 1
           loopClip: 0
-        - enabled: 0
+        - clipId: 6f2644d1c23b49ee8198a404cc463d6d
+          clipSchema: 1
+          enabled: 0
           name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 5.8240566
           durationTime: 1
@@ -127,7 +141,9 @@ MonoBehaviour:
           clipStartOffset: 0
           playbackSpeed: 1
           loopClip: 0
-        - enabled: 1
+        - clipId: ea7e3be2bb0d46528a1ed09bfdff3a84
+          clipSchema: 1
+          enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 6.5534983
           durationTime: 1.7041101
@@ -139,7 +155,9 @@ MonoBehaviour:
           clipStartOffset: 0
           playbackSpeed: 1
           loopClip: 0
-        - enabled: 1
+        - clipId: 49c05f0dbdcb4f9a889e420db8b2238f
+          clipSchema: 1
+          enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 8.594968
           durationTime: 1
@@ -162,8 +180,12 @@ MonoBehaviour:
       type: {class: SkillTrackItem_Audio, ns: ES, asm: ES_Logic}
       data:
         enabled: 1
+        trackId: 4ffed724aa2947a4aa82b26186fe7186
+        trackSchema: 1
         clips:
-        - enabled: 1
+        - clipId: d9c7b1f0cc1d4b4bb6026aa54c258936
+          clipSchema: 1
+          enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5dddaaaa"
           startTime: 1.5888842
           durationTime: 0.9999999
@@ -178,7 +200,9 @@ MonoBehaviour:
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0
-        - enabled: 1
+        - clipId: 33b57721c8d74e6f9313f151c1355240
+          clipSchema: 1
+          enabled: 1
           name: "\u8F68\u9053\u97F3\u9891"
           startTime: 3.7276595
           durationTime: 2.6938345
@@ -193,7 +217,9 @@ MonoBehaviour:
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0
-        - enabled: 1
+        - clipId: ffd1e5fa029b41768793bfcef84b77c7
+          clipSchema: 1
+          enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 5.268085
           durationTime: 0.97484064
@@ -208,7 +234,9 @@ MonoBehaviour:
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0
-        - enabled: 1
+        - clipId: 17cfc064314147328cc290a094675b54
+          clipSchema: 1
+          enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 6.5617023
           durationTime: 1
@@ -223,10 +251,12 @@ MonoBehaviour:
           volume: 1
           addAudioSourceIfMissing: 1
           stopOnClipExit: 0
-        - enabled: 1
+        - clipId: 01879709f52343ddbffe85d060cbf536
+          clipSchema: 1
+          enabled: 1
           name: "\u97F3\u9891\u7247\u6BB5"
-          startTime: 8.655319
-          durationTime: 1
+          startTime: 7.5456204
+          durationTime: 2.4954982
           cue:
             enumKey: 0
             stringKey: 
@@ -246,8 +276,12 @@ MonoBehaviour:
       type: {class: SkillTrackItem_GameObject, ns: ES, asm: ES_Logic}
       data:
         enabled: 1
+        trackId: d5048954161241018c68f060d92759c1
+        trackSchema: 1
         clips:
-        - enabled: 1
+        - clipId: 121c719cece94bb29cfee5d89b130dc1
+          clipSchema: 1
+          enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5tttt"
           startTime: 1.7561727
           durationTime: 0.9999999
@@ -255,7 +289,9 @@ MonoBehaviour:
           targetExpression:
             rid: 8409197517669138443
           Activate: 0
-        - enabled: 1
+        - clipId: a9f40db50c184219b34d0d68f563c07c
+          clipSchema: 1
+          enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5"
           startTime: 4.114642
           durationTime: 1.233192
@@ -263,17 +299,21 @@ MonoBehaviour:
           targetExpression:
             rid: 8409197517669138470
           Activate: 0
-        - enabled: 1
+        - clipId: 4dcceba1b2bf40bb9d6d30a81100f493
+          clipSchema: 1
+          enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 7.843985
-          durationTime: 1.0000005
+          startTime: 6.297738
+          durationTime: 1.0000024
           targetMode: 1
           targetExpression:
             rid: 8409197517669138474
           Activate: 0
-        - enabled: 1
+        - clipId: 5c1aaf93870c4cbb946c96fd46191580
+          clipSchema: 1
+          enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5"
-          startTime: 9.242381
+          startTime: 9.280877
           durationTime: 1
           targetMode: 0
           targetExpression:
@@ -287,11 +327,15 @@ MonoBehaviour:
       type: {class: SkillTrackItem_Operation, ns: ES, asm: ES_Logic}
       data:
         enabled: 1
+        trackId: 375ea2e89d0d46008093fb425418c3e4
+        trackSchema: 1
         clips:
-        - enabled: 1
+        - clipId: 809a1129303b43beb9aa86a132ff2202
+          clipSchema: 1
+          enabled: 1
           name: "\u8F68\u9053\u7247\u6BB5\u6D4B\u8BD5wwww"
           startTime: 1.9716997
-          durationTime: 2.5206764
+          durationTime: 2.5206766
           OperationDescription: 
           op:
             rid: 23628769593655300
@@ -323,6 +367,8 @@ MonoBehaviour:
       type: {class: SkillTrackItem_GameObject, ns: ES, asm: ES_Logic}
       data:
         enabled: 0
+        trackId: 5a63d04c305d4b3481e18b53d9b82722
+        trackSchema: 1
         clips: []
         displayName: 
         overrideTrackPreviewTarget: 0
@@ -332,6 +378,8 @@ MonoBehaviour:
       type: {class: SkillTrackItem_Animation, ns: ES, asm: ES_Logic}
       data:
         enabled: 1
+        trackId: d8b524e9165c40e8a386b493bf6fd4a0
+        trackSchema: 1
         clips: []
         displayName: "\u7B2C\u4E8C\u53EA\u52A8\u753B"
         overrideTrackPreviewTarget: 0
@@ -395,6 +443,8 @@ MonoBehaviour:
       type: {class: SkillTrackItem_Animation, ns: ES, asm: ES_Logic}
       data:
         enabled: 1
+        trackId: 
+        trackSchema: 1
         clips: []
         displayName: "\u52A8\u753B\u8F68\u9053"
         overrideTrackPreviewTarget: 0

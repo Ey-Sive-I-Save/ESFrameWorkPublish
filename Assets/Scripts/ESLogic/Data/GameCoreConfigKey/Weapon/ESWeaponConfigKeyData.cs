@@ -143,7 +143,7 @@ namespace ES
             string sourcePackage = null,
             string version = null,
             ItemWeaponKind? weaponKind = null,
-            string defaultShotKey = null,
+            ESShotConfigKey defaultShot = null,
             float? hitRadius = null,
             float? cooldown = null,
             string socketName = null,
@@ -161,7 +161,7 @@ namespace ES
                 ItemWeaponSharedData ownedShared = runtimeData.PrepareDefaultSharedData();
                 ResolveDefaults(
                     ownedShared, null,
-                    weaponKind, defaultShotKey, hitRadius, cooldown, socketName,
+                    weaponKind, defaultShot, hitRadius, cooldown, socketName,
                     durability, cooldownLeft, ammo, logicSeed,
                     fillShared, fillVariable,
                     out ItemWeaponSharedData sharedData, out ItemWeaponVariableData resolvedVariableData);
@@ -188,7 +188,7 @@ namespace ES
             string sourcePackage = null,
             string version = null,
             ItemWeaponKind? weaponKind = null,
-            string defaultShotKey = null,
+            ESShotConfigKey defaultShot = null,
             float? hitRadius = null,
             float? cooldown = null,
             string socketName = null,
@@ -210,7 +210,7 @@ namespace ES
                 ItemWeaponSharedData ownedShared = runtimeData.PrepareDefaultSharedData();
                 ResolveDefaults(
                     ownedShared, null,
-                    weaponKind, defaultShotKey, hitRadius, cooldown, socketName,
+                    weaponKind, defaultShot, hitRadius, cooldown, socketName,
                     durability, cooldownLeft, ammo, logicSeed,
                     fillShared, fillVariable,
                     out ItemWeaponSharedData sharedData, out ItemWeaponVariableData resolvedVariableData);
@@ -243,6 +243,9 @@ namespace ES
             string sourcePackage,
             string version)
         {
+            if (!sharedData.ValidateDefinition(out string validationError))
+                throw new InvalidOperationException("WeaponDefinition 校验失败：" + validationError);
+
             string keyName = ESConfigKeyMatch.Describe(key.EnumKeyInt, key.StringKey);
             runtimeData.keyName = keyName;
             runtimeData.displayName = string.IsNullOrWhiteSpace(displayName) ? keyName : displayName;
@@ -259,7 +262,7 @@ namespace ES
             ItemWeaponSharedData sharedData,
             ItemWeaponVariableData? variableData,
             ItemWeaponKind? weaponKind,
-            string defaultShotKey,
+            ESShotConfigKey defaultShot,
             float? hitRadius,
             float? cooldown,
             string socketName,
@@ -276,7 +279,7 @@ namespace ES
             resolvedVariable = variableData ?? ItemWeaponVariableData.Default;
 
             if (weaponKind.HasValue) resolvedShared.weaponKind = weaponKind.Value;
-            if (defaultShotKey != null) resolvedShared.defaultShotKey = defaultShotKey;
+            if (defaultShot != null) resolvedShared.defaultShot = defaultShot;
             if (hitRadius.HasValue) resolvedShared.hitRadius = hitRadius.Value;
             if (cooldown.HasValue) resolvedShared.cooldown = cooldown.Value;
             if (socketName != null) resolvedShared.socketName = socketName;

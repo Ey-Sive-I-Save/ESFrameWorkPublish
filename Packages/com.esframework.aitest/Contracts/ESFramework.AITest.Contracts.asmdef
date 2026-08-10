@@ -1,0 +1,16 @@
+{
+    "name": "ESFramework.AITest.Contracts",
+    "rootNamespace": "ESFramework.ESAITest",
+    "references": [
+        "ES_Stand"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

@@ -23,26 +23,6 @@ namespace ESFramework.ESAITest
     }
 
     [Serializable]
-    public sealed class ESAITestNaturalLanguageRouteDto
-    {
-        public const string Schema = "esaitest.natural-language-route/v1";
-
-        public string schema = Schema;
-        public int protocolVersion = ESAITestProtocol.CurrentVersion;
-        public bool accepted;
-        public bool requiresClarification;
-        public string intent;
-        public string normalizedText;
-        public string boundRunId;
-        public string message;
-        public string goal;
-        public string priority = ESAITestAIPromptPriority.P2.ToString();
-        public float ttlSeconds = 60f;
-        public float confidence;
-        public string rejectionReason;
-    }
-
-    [Serializable]
     public sealed class ESAITestNaturalLanguageExecutionResultDto
     {
         public const string Schema = "esaitest.natural-language-execution/v1";

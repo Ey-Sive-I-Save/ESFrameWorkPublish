@@ -111,7 +111,20 @@ MonoBehaviour:
     CustomIcon: {fileID: 0}
     ColorTag: 0
     Desc: ESAssetReferScene
-    pages: []
+    pages:
+    - Name: ESBootstrap
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 102900000, guid: 6bd32f5e9a6645199c104bf1d0f2095a, type: 3}
+      Kind: 2
+      EnumKey: 0
+      StringKey: ESBootstrap
+      AssetGuid: 6bd32f5e9a6645199c104bf1d0f2095a
+      LocalFileId: 0
+      AssetPath: Assets/Plugins/ES/0_Stand/_Res/Bootstrap/ESBootstrap.unity
+      AssetTypeName: UnityEditor.SceneAsset
+      SourceLibrary: bd6a374707a713e4eb09b6802f8fe4aa
+      SourceBook: "\u9ED8\u8BA4 \u573A\u666F Book"
   DefaultSpriteBook:
     Name: "\u9ED8\u8BA4 \u7CBE\u7075 Book"
     WritableDefaultMessageOnEditor: 0

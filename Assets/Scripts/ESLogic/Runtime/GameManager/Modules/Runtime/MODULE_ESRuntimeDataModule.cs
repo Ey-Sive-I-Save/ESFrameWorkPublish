@@ -20,6 +20,8 @@ namespace ES
         public static readonly ESWeaponConfigKeyTable Weapons = new ESWeaponConfigKeyTable(64);
         public static readonly ESSkillConfigKeyTable Skills = new ESSkillConfigKeyTable(128);
         public static readonly ESAudioCueConfigKeyTable AudioCues = new ESAudioCueConfigKeyTable(128);
+        public static readonly ESActionConfigKeyTable Actions = new ESActionConfigKeyTable(64);
+        public static readonly ESSkillTrackConfigKeyTable SkillTracks = new ESSkillTrackConfigKeyTable(128);
 
         public static void BeginBuild(bool clear)
         {
@@ -31,6 +33,9 @@ namespace ES
             Weapons.BeginBuild(clear);
             Skills.BeginBuild(clear);
             AudioCues.BeginBuild(clear);
+            Actions.BeginBuild(clear);
+            SkillTracks.BeginBuild(clear);
+            ESActionPresentationMappingTable.BeginBuild(clear);
         }
 
         public static void EndBuild()
@@ -47,6 +52,9 @@ namespace ES
             Weapons.EndBuild();
             Skills.EndBuild();
             AudioCues.EndBuild();
+            Actions.EndBuild();
+            SkillTracks.EndBuild();
+            ESActionPresentationMappingTable.EndBuild();
             if (audioCueCatalogReady)
                 ESAudioGameCoreTable.NotifyCatalogBuildCompleted();
             else
@@ -60,7 +68,9 @@ namespace ES
         public static void ResetForResourceTransition()
         {
             if (Buffs.IsBuilding || Shots.IsBuilding || Monsters.IsBuilding || Npcs.IsBuilding
-                || Weapons.IsBuilding || Skills.IsBuilding || AudioCues.IsBuilding)
+                || Weapons.IsBuilding || Skills.IsBuilding || AudioCues.IsBuilding
+                || Actions.IsBuilding || SkillTracks.IsBuilding
+                || ESActionPresentationMappingTable.IsBuilding)
                 throw new InvalidOperationException("[ESGameCore] 正在构建 GameCore 表，不能执行资源生命周期切换。");
 
             BeginBuild(true);
@@ -720,22 +730,31 @@ namespace ES
                     + "，当前权威代 " + currentGeneration + "。");
             }
 
-            BeginAuthorityMutationLocked();
-            ESAssetConfigTableGenerationState previous;
+            long nextGeneration = currentGeneration == long.MaxValue
+                ? 1
+                : currentGeneration + 1;
             try
             {
-                long nextGeneration = currentGeneration == long.MaxValue
-                    ? 1
-                    : currentGeneration + 1;
                 candidate.PrepareForCommit(nextGeneration, catalogFingerprint);
                 if (provider != null)
                     candidate.BindProvider(provider, providerGeneration);
                 candidate.Publish();
+            }
+            catch
+            {
+                candidate.Retire();
+                throw;
+            }
+
+            BeginAuthorityMutationLocked();
+            ESAssetConfigTableGenerationState previous = null;
+            try
+            {
                 previous = Interlocked.Exchange(ref currentState, candidate);
             }
             catch
             {
-                EndAuthorityMutationLocked(false);
+                EndAuthorityMutationLocked(true);
                 candidate.Retire();
                 throw;
             }
@@ -864,10 +883,15 @@ namespace ES
             }
 
             ESAssetConfigTableGenerationState candidate = BuildCandidateFromGenerationRecords(records, out ESAssetCatalogBuildValidation validation);
-            if (validation.conflictCount != 0 || validation.candidateEntries != validation.expectedBusinessEntries)
+            if (validation.conflictCount != 0
+                || validation.expectedBusinessEntries == 0
+                || validation.candidateEntries != validation.expectedBusinessEntries)
             {
                 candidate.Retire();
-                throw new InvalidOperationException("AssetPage 候选表不完整或存在冲突：\n" + validation.conflictReport);
+                throw new InvalidOperationException(
+                    "AssetPage 候选表为空、不完整或存在冲突：期望 " + validation.expectedBusinessEntries
+                    + " 项，候选 " + validation.candidateEntries + " 项，冲突 " + validation.conflictCount
+                    + " 项。\n" + validation.conflictReport);
             }
             CommitOrStageCandidate(candidate, string.Empty);
             return validation.candidateEntries;
@@ -891,11 +915,13 @@ namespace ES
         {
             List<ESAssetConfigGenerationRecord> records = CollectCatalogRecords(catalogs);
             ESAssetConfigTableGenerationState candidate = BuildCandidateFromGenerationRecords(records, out ESAssetCatalogBuildValidation validation);
-            if (validation.conflictCount != 0 || validation.candidateEntries != validation.expectedBusinessEntries)
+            if (validation.conflictCount != 0
+                || validation.expectedBusinessEntries == 0
+                || validation.candidateEntries != validation.expectedBusinessEntries)
             {
                 candidate.Retire();
                 throw new InvalidOperationException(
-                    "Catalog 候选表不完整或存在冲突：期望 " + validation.expectedBusinessEntries
+                    "Catalog 候选表为空、不完整或存在冲突：期望 " + validation.expectedBusinessEntries
                     + " 项，候选 " + validation.candidateEntries + " 项，冲突 " + validation.conflictCount
                     + " 项。\n" + validation.conflictReport);
             }
@@ -1170,6 +1196,8 @@ namespace ES
         public static readonly ESWeaponConfigKeyTable WeaponTable = ESRuntimeDataGameCore.Weapons;
         public static readonly ESSkillConfigKeyTable SkillTable = ESRuntimeDataGameCore.Skills;
         public static readonly ESAudioCueConfigKeyTable AudioCueTable = ESRuntimeDataGameCore.AudioCues;
+        public static readonly ESActionConfigKeyTable ActionTable = ESRuntimeDataGameCore.Actions;
+        public static readonly ESSkillTrackConfigKeyTable SkillTrackTable = ESRuntimeDataGameCore.SkillTracks;
         public static readonly ESRuntimeInstanceIndex<ESActiveBuffRuntime> BuffInstanceIndex = new ESRuntimeInstanceIndex<ESActiveBuffRuntime>(128);
         public static readonly ESRuntimeInstanceIndex<Item> ShotInstanceIndex = new ESRuntimeInstanceIndex<Item>(128);
 
@@ -1190,6 +1218,10 @@ namespace ES
         public readonly ESAudioCueConfigKeyTable AudioCues = AudioCueTable;
         [ShowInInspector, ReadOnly, LabelText("\u6280\u80fd\u8868")]
         public readonly ESSkillConfigKeyTable Skills = SkillTable;
+        [ShowInInspector, ReadOnly, LabelText("Action Table")]
+        public readonly ESActionConfigKeyTable Actions = ActionTable;
+        [ShowInInspector, ReadOnly, LabelText("SkillTrack Table")]
+        public readonly ESSkillTrackConfigKeyTable SkillTracks = SkillTrackTable;
         [ShowInInspector, ReadOnly, LabelText("Buff\u5b9e\u4f8b\u7d22\u5f15")]
         public readonly ESRuntimeInstanceIndex<ESActiveBuffRuntime> BuffInstances = BuffInstanceIndex;
 
@@ -1730,6 +1762,8 @@ namespace ES
         public bool TryGetNpc(int runtimeKey, out ESNpcRuntimeData data) => Npcs.TryGet(runtimeKey, out data);
         public bool TryGetWeapon(int runtimeKey, out ESWeaponRuntimeData data) => Weapons.TryGet(runtimeKey, out data);
         public bool TryGetSkill(int runtimeKey, out ESSkillRuntimeData data) => Skills.TryGet(runtimeKey, out data);
+        public bool TryGetAction(int runtimeKey, out ESActionRuntimeData data) => Actions.TryGet(runtimeKey, out data);
+        public bool TryGetSkillTrack(int runtimeKey, out ESSkillTrackRuntimeData data) => SkillTracks.TryGet(runtimeKey, out data);
 
         public bool TryGetBuff(ESBuffEnumKey enumKey, out ESBuffRuntimeData data) => Buffs.TryGet((int)enumKey, out data);
         public bool TryGetShot(ESShotEnumKey enumKey, out ESShotRuntimeData data) => Shots.TryGet((int)enumKey, out data);
@@ -1737,6 +1771,8 @@ namespace ES
         public bool TryGetNpc(ESNpcEnumKey enumKey, out ESNpcRuntimeData data) => Npcs.TryGet((int)enumKey, out data);
         public bool TryGetWeapon(ESWeaponEnumKey enumKey, out ESWeaponRuntimeData data) => Weapons.TryGet((int)enumKey, out data);
         public bool TryGetSkill(ESSkillEnumKey enumKey, out ESSkillRuntimeData data) => Skills.TryGet((int)enumKey, out data);
+        public bool TryGetAction(ESActionEnumKey enumKey, out ESActionRuntimeData data) => Actions.TryGet((int)enumKey, out data);
+        public bool TryGetSkillTrack(ESSkillTrackEnumKey enumKey, out ESSkillTrackRuntimeData data) => SkillTracks.TryGet((int)enumKey, out data);
 
         public bool TryGetBuff(string stringKey, out ESBuffRuntimeData data) => TryGetByString(Buffs, stringKey, out data);
         public bool TryGetShot(string stringKey, out ESShotRuntimeData data) => TryGetByString(Shots, stringKey, out data);
@@ -1744,6 +1780,8 @@ namespace ES
         public bool TryGetNpc(string stringKey, out ESNpcRuntimeData data) => TryGetByString(Npcs, stringKey, out data);
         public bool TryGetWeapon(string stringKey, out ESWeaponRuntimeData data) => TryGetByString(Weapons, stringKey, out data);
         public bool TryGetSkill(string stringKey, out ESSkillRuntimeData data) => TryGetByString(Skills, stringKey, out data);
+        public bool TryGetAction(string stringKey, out ESActionRuntimeData data) => TryGetByString(Actions, stringKey, out data);
+        public bool TryGetSkillTrack(string stringKey, out ESSkillTrackRuntimeData data) => TryGetByString(SkillTracks, stringKey, out data);
 
         public string GetConflictReport()
         {
@@ -1754,6 +1792,8 @@ namespace ES
             AppendConflictReport(builder, "Npc", Npcs);
             AppendConflictReport(builder, "Weapon", Weapons);
             AppendConflictReport(builder, "Skill", Skills);
+            AppendConflictReport(builder, "Action", Actions);
+            AppendConflictReport(builder, "SkillTrack", SkillTracks);
             return builder.ToString();
         }
 

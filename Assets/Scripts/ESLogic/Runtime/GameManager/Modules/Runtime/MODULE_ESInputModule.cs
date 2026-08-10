@@ -1,8 +1,11 @@
+using System.Runtime.CompilerServices;
 using System;
 using System.Collections.Generic;
 using ES.Internal;
 using Sirenix.OdinInspector;
 using UnityEngine;
+
+[assembly: InternalsVisibleTo("ES_AITest.Runtime.Adapters")]
 
 namespace ES
 {

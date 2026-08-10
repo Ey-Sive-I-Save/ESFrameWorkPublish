@@ -23,6 +23,7 @@ namespace ES
     }
 
     [Serializable]
+    [RequireComponent(typeof(Entity))]
     public class EntityTransformMapping : SerializedMonoBehaviour
     {
         [Title("Default (Enum)")]

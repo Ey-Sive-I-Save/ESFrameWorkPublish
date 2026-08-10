@@ -42,9 +42,14 @@ namespace ES
         public AudioClip LegacyAudioClip => legacyAudioClip;
 
         [TitleGroup("音频片段")]
-        [LabelText("音量")]
-        [Range(0f, 1f)]
+        [LabelText("音量"), OnValueChanged(nameof(ClampVolume))]
+        [SuffixLabel("0–1", true)]
         public float volume = 1f;
+
+        private void ClampVolume()
+        {
+            volume = Mathf.Clamp01(volume);
+        }
 
         [TitleGroup("音频片段")]
         [HideInInspector]

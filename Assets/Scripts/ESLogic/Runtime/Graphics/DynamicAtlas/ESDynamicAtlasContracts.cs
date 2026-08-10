@@ -34,6 +34,18 @@ namespace ES
         [InspectorName("自定义材质")] Custom = 3
     }
 
+    /// <summary>Page 处于隔离时 Lease 不解析，Graphic 应显示占位，直到安全探针结束。</summary>
+    public enum ESDynamicAtlasLeaseState : byte
+    {
+        Invalid = 0,
+        Ready = 1,
+        Retired = 2,
+        Recovering = 3,
+        Quarantined = 4,
+        Failed = 5,
+        Lost = 6
+    }
+
     public enum ESDynamicAtlasEntryState : byte
     {
         PendingSource = 0,
@@ -42,7 +54,8 @@ namespace ES
         Ready = 3,
         Retired = 4,
         Failed = 5,
-        Lost = 6
+        Lost = 6,
+        Quarantined = 7
     }
 
     public enum ESDynamicAtlasUploadPath : byte
@@ -251,6 +264,7 @@ namespace ES
     internal interface IESDynamicAtlasLeaseHost
     {
         bool TryResolve(long leaseToken, out ESDynamicAtlasResolved resolved);
+        bool TryGetLeaseState(long leaseToken, out ESDynamicAtlasLeaseState state);
         void Release(long leaseToken);
         long Subscribe(long leaseToken, Action changed);
         void Unsubscribe(long observationToken);
@@ -306,6 +320,24 @@ namespace ES
 
         public static ESDynamicAtlasLease Invalid => default;
         public bool IsValid => host != null && token != 0;
+
+        public ESDynamicAtlasLeaseState State
+        {
+            get
+            {
+                TryGetState(out ESDynamicAtlasLeaseState state);
+                return state;
+            }
+        }
+
+        public bool TryGetState(out ESDynamicAtlasLeaseState state)
+        {
+            if (host != null && token != 0 && host.TryGetLeaseState(token, out state))
+                return true;
+
+            state = ESDynamicAtlasLeaseState.Invalid;
+            return false;
+        }
 
         public bool TryResolve(out ESDynamicAtlasResolved resolved)
         {
@@ -417,11 +449,19 @@ namespace ES
         public int paddingShaderCount;
         public int deferredFenceFallbackCount;
         public int pendingFenceReleaseCount;
+        public int quarantinedCount;
+        public int quarantinedTerminalCount;
+        public int quarantineRetryCount;
+        public int quarantineFailureCount;
+        public int shutdownQuarantinedCount;
+        public int shutdownQuarantineFoldedCount;
         public int pageLostCount;
         public float uploadP50Milliseconds;
         public float uploadP95Milliseconds;
         public float uploadP99Milliseconds;
         public readonly List<ESDynamicAtlasPageSnapshot> pages = new List<ESDynamicAtlasPageSnapshot>();
         public readonly List<ESDynamicAtlasEntrySnapshot> entries = new List<ESDynamicAtlasEntrySnapshot>();
+        public readonly List<int> quarantinedPageIds = new List<int>();
+        public readonly List<string> quarantineReasons = new List<string>();
     }
 }

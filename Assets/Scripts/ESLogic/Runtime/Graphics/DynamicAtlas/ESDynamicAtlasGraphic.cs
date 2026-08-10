@@ -50,6 +50,7 @@ namespace ES
         private ESDynamicAtlasLease lease;
         private ESDynamicAtlasObservation observation;
         private CancellationTokenSource autoAcquireCancellation;
+        private bool providerEventsBound;
         private int requestRevision;
         [ShowInInspector, ReadOnly, LabelText("状态")]
         private string status = "未开始";
@@ -82,7 +83,7 @@ namespace ES
             return SetAsync(domain, content, refer, ESDynamicAtlasRequest.Default, cancellationToken);
         }
 
-        public async UniTask SetAsync(
+        public UniTask SetAsync(
             ESDynamicAtlasDomainKey domain,
             ESDynamicAtlasContentKey content,
             ESAssetReferTexture2D refer,
@@ -90,6 +91,18 @@ namespace ES
             CancellationToken cancellationToken = default)
         {
             EnsureRuntimeOnly();
+            ValidateSetArguments(domain, content, refer);
+            CancelAutoAcquireForManualRequest();
+            return SetAsyncCore(domain, content, refer, request, cancellationToken);
+        }
+
+        private async UniTask SetAsyncCore(
+            ESDynamicAtlasDomainKey domain,
+            ESDynamicAtlasContentKey content,
+            ESAssetReferTexture2D refer,
+            ESDynamicAtlasRequest request,
+            CancellationToken cancellationToken)
+        {
             int revision = ++requestRevision;
             ESDynamicAtlasLease acquired = await ESDynamicAtlas.LoadAsync(domain, content, refer, request, cancellationToken);
             if (revision != requestRevision || !isActiveAndEnabled || this == null)
@@ -101,16 +114,16 @@ namespace ES
             Bind(acquired);
         }
 
-        public async UniTask CopyAsync(
+        public UniTask CopyAsync(
             ESDynamicAtlasDomainKey domain,
             ESDynamicAtlasContentKey content,
             Texture texture,
             CancellationToken cancellationToken = default)
         {
-            await CopyAsync(domain, content, texture, ESDynamicAtlasRequest.Default, cancellationToken);
+            return CopyAsync(domain, content, texture, ESDynamicAtlasRequest.Default, cancellationToken);
         }
 
-        public async UniTask CopyAsync(
+        public UniTask CopyAsync(
             ESDynamicAtlasDomainKey domain,
             ESDynamicAtlasContentKey content,
             Texture texture,
@@ -118,6 +131,18 @@ namespace ES
             CancellationToken cancellationToken = default)
         {
             EnsureRuntimeOnly();
+            ValidateCopyArguments(domain, content, texture);
+            CancelAutoAcquireForManualRequest();
+            return CopyAsyncCore(domain, content, texture, request, cancellationToken);
+        }
+
+        private async UniTask CopyAsyncCore(
+            ESDynamicAtlasDomainKey domain,
+            ESDynamicAtlasContentKey content,
+            Texture texture,
+            ESDynamicAtlasRequest request,
+            CancellationToken cancellationToken)
+        {
             int revision = ++requestRevision;
             ESDynamicAtlasLease acquired = await ESDynamicAtlas.CopyAsync(domain, content, texture, request, cancellationToken);
             if (revision != requestRevision || !isActiveAndEnabled || this == null)
@@ -127,6 +152,47 @@ namespace ES
             }
 
             Bind(acquired);
+        }
+
+        public UniTask SetAsync(
+            ESAssetReferTexture2D refer,
+            string revision = null,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureRuntimeOnly();
+            if (refer == null)
+                throw new ArgumentNullException(nameof(refer));
+            if (!refer.IsValid)
+                throw new ArgumentException("动态图集资源引用无效。", nameof(refer));
+            string resolvedRevision = string.IsNullOrWhiteSpace(revision)
+                ? contentRevision
+                : revision.Trim();
+            ESDynamicAtlasContentKey content = new ESDynamicAtlasContentKey(
+                ResolveContentKey(refer), resolvedRevision);
+            return SetAsync(ResolveDomain(), content, refer, request, cancellationToken);
+        }
+
+        public UniTask CopyAsync(
+            Texture texture,
+            string revision = null,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureRuntimeOnly();
+            if (texture == null)
+                throw new ArgumentNullException(nameof(texture));
+            if (texture.dimension != UnityEngine.Rendering.TextureDimension.Tex2D)
+                throw new ArgumentException("动态图集只接受二维 Texture。", nameof(texture));
+            string resolvedRevision = string.IsNullOrWhiteSpace(revision)
+                ? contentRevision
+                : revision.Trim();
+            string identity = string.IsNullOrWhiteSpace(contentKey)
+                ? "texture:runtime:" + texture.GetInstanceID()
+                : contentKey.Trim();
+            ESDynamicAtlasContentKey content = new ESDynamicAtlasContentKey(
+                identity, resolvedRevision);
+            // 沿用 Graphic 当前 Request，不静默改写 Alpha/Padding；
+            // 仅当 padding=0、Straight 且格式匹配时 Runtime 才会选择 CopyTexture。
+            return CopyAsync(ResolveDomain(), content, texture, request, cancellationToken);
         }
 
         public void Clear()
@@ -145,10 +211,21 @@ namespace ES
             SetMaterialDirty();
         }
 
+        private void CancelAutoAcquireForManualRequest()
+        {
+            autoAcquireCancellation?.Cancel();
+            autoAcquireCancellation?.Dispose();
+            autoAcquireCancellation = null;
+        }
+
         protected override void OnEnable()
         {
             base.OnEnable();
-            if (Application.isPlaying && autoAcquire)
+            if (!Application.isPlaying)
+                return;
+
+            BindProviderEvents();
+            if (autoAcquire)
                 StartAutoAcquire();
         }
 
@@ -175,28 +252,71 @@ namespace ES
 
         private async UniTaskVoid AcquireFromInspectorAsync(CancellationToken cancellationToken)
         {
-            status = "等待资源系统就绪";
+            CancellationTokenSource currentAutoAcquire = autoAcquireCancellation;
+            if (CanWriteAutoAcquireStatus(currentAutoAcquire))
+                status = "等待资源系统就绪";
             try
             {
                 await ESAssets.WaitUntilReadyAsync(cancellationToken);
-                status = "正在加载并上传";
+                if (CanWriteAutoAcquireStatus(currentAutoAcquire))
+                    status = "正在加载并上传";
                 ESDynamicAtlasDomainKey domain = ResolveDomain();
                 ESDynamicAtlasContentKey content = new ESDynamicAtlasContentKey(
                     ResolveContentKey(), contentRevision);
-                await SetAsync(domain, content, sourceRefer, request, cancellationToken);
-                status = HasContent
-                    ? "已完成：正在使用动态图集"
-                    : "加载完成，但当前没有可用图集内容";
+                await SetAsyncCore(domain, content, sourceRefer, request, cancellationToken);
+                if (CanWriteAutoAcquireStatus(currentAutoAcquire))
+                {
+                    status = HasContent
+                        ? "已完成：正在使用动态图集"
+                        : "加载完成，但当前没有可用图集内容";
+                }
             }
             catch (OperationCanceledException)
             {
-                status = "已取消";
+                if (CanWriteAutoAcquireStatus(currentAutoAcquire))
+                    status = "已取消";
             }
             catch (System.Exception exception)
             {
-                status = "加载失败：" + exception.Message;
-                Debug.LogWarning("[ES动态图集] " + status, this);
+                if (CanWriteAutoAcquireStatus(currentAutoAcquire))
+                {
+                    status = "加载失败：" + exception.Message;
+                    Debug.LogWarning("[ES动态图集] " + status, this);
+                }
             }
+        }
+
+        private bool CanWriteAutoAcquireStatus(CancellationTokenSource currentAutoAcquire)
+            => ReferenceEquals(currentAutoAcquire, autoAcquireCancellation)
+               && currentAutoAcquire != null
+               && !currentAutoAcquire.IsCancellationRequested;
+
+        private static void ValidateSetArguments(
+            ESDynamicAtlasDomainKey domain,
+            ESDynamicAtlasContentKey content,
+            ESAssetReferTexture2D refer)
+        {
+            if (!domain.IsValid)
+                throw new ArgumentException("动态图集 Domain Key 不能为空。", nameof(domain));
+            if (!content.IsValid)
+                throw new ArgumentException("动态图集 Content Key 不能为空。", nameof(content));
+            if (refer == null || !refer.IsValid)
+                throw new ArgumentException("动态图集资源引用无效。", nameof(refer));
+        }
+
+        private static void ValidateCopyArguments(
+            ESDynamicAtlasDomainKey domain,
+            ESDynamicAtlasContentKey content,
+            Texture texture)
+        {
+            if (!domain.IsValid)
+                throw new ArgumentException("动态图集 Domain Key 不能为空。", nameof(domain));
+            if (!content.IsValid)
+                throw new ArgumentException("动态图集 Content Key 不能为空。", nameof(content));
+            if (texture == null)
+                throw new ArgumentNullException(nameof(texture));
+            if (texture.dimension != UnityEngine.Rendering.TextureDimension.Tex2D)
+                throw new ArgumentException("动态图集只接受二维 Texture。", nameof(texture));
         }
 
         private ESDynamicAtlasDomainKey ResolveDomain()
@@ -215,26 +335,31 @@ namespace ES
         }
 
         private string ResolveContentKey()
+            => ResolveContentKey(sourceRefer);
+
+        private string ResolveContentKey(ESAssetReferTexture2D refer)
         {
             if (!string.IsNullOrWhiteSpace(contentKey))
                 return contentKey.Trim();
 
-            string identity = sourceRefer?.GUID;
+            string identity = refer?.GUID;
             if (string.IsNullOrWhiteSpace(identity))
                 return "texture:unknown";
 
-            return "texture:" + identity + ":" + sourceRefer.LocalFileId;
+            return "texture:" + identity + ":" + refer.LocalFileId;
         }
 
         protected override void OnDisable()
         {
             Clear();
+            UnbindProviderEvents();
             base.OnDisable();
         }
 
         protected override void OnDestroy()
         {
             Clear();
+            UnbindProviderEvents();
             base.OnDestroy();
         }
 
@@ -401,11 +526,72 @@ namespace ES
 
         private void OnAtlasChanged()
         {
-            if (!lease.TryResolve(out _))
+            if (lease.TryGetState(out ESDynamicAtlasLeaseState state))
+            {
+                switch (state)
+                {
+                    case ESDynamicAtlasLeaseState.Ready:
+                        status = "已完成：正在使用动态图集";
+                        break;
+                    case ESDynamicAtlasLeaseState.Retired:
+                        status = "Provider 切换兼容显示：正在使用旧代动态图集";
+                        break;
+                    case ESDynamicAtlasLeaseState.Recovering:
+                        status = "动态图集页面恢复中，正在显示占位图";
+                        break;
+                    case ESDynamicAtlasLeaseState.Quarantined:
+                        status = "GPU 完成状态未知，动态图集内容已隔离";
+                        break;
+                    case ESDynamicAtlasLeaseState.Failed:
+                        status = "动态图集内容终态失败，正在显示占位图";
+                        break;
+                    case ESDynamicAtlasLeaseState.Lost:
+                        status = "动态图集页面已丢失，正在显示占位图";
+                        break;
+                    default:
+                        status = "动态图集内容暂不可用，正在显示占位图";
+                        break;
+                }
+            }
+            else
+            {
                 status = "动态图集内容暂不可用，正在显示占位图";
+            }
             RefreshMaterialMode();
             SetVerticesDirty();
             SetMaterialDirty();
+        }
+
+        private void BindProviderEvents()
+        {
+            if (providerEventsBound)
+                return;
+
+            ESAssets.RuntimeBackendRebuilt += HandleRuntimeBackendRebuilt;
+            providerEventsBound = true;
+        }
+
+        private void UnbindProviderEvents()
+        {
+            if (!providerEventsBound)
+                return;
+
+            ESAssets.RuntimeBackendRebuilt -= HandleRuntimeBackendRebuilt;
+            providerEventsBound = false;
+        }
+
+        private void HandleRuntimeBackendRebuilt()
+        {
+            if (!Application.isPlaying || !isActiveAndEnabled || !autoAcquire)
+                return;
+
+            if (sourceRefer == null || !sourceRefer.IsValid)
+            {
+                status = "请先拖入 ES 资源引用";
+                return;
+            }
+
+            StartAutoAcquire();
         }
 
         private void RefreshMaterialMode()

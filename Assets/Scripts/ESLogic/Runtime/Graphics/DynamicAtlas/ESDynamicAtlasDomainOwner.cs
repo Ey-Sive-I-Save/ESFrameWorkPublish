@@ -24,14 +24,9 @@ namespace ES
             TryOpen();
         }
 
-        private void Start()
-        {
-            TryOpen();
-        }
-
         private void Update()
         {
-            // GameManager may register after this component's OnEnable/Start
+            // GameManager may register after this component's OnEnable
             // (for example when the owner lives in a bootstrap scene). Keep the
             // retry cheap and stop checking permanently once the Domain Lease is
             // acquired.

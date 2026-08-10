@@ -45,11 +45,58 @@ MonoBehaviour:
   PackageCollectPath:
   - Assets/Plugins/ES
   - Assets/Scripts/ESLogic
+  - Assets/KinematicCharacterController
+  - Assets/Packages/Newtonsoft.Json.13.0.4
+  - Assets/Plugins/Sirenix
+  - Assets/Plugins/RootMotion
+  - Assets/Plugins/Easy Save 3
   - Assets/ESNormalAssets/Data/GlobalData
   - Assets/NuGet
   - Assets/Settings
   - Assets/ScriptTemplates
   - Assets/Packages
+  PackagePublishAssetPaths:
+  - Assets/Plugins/ES
+  - Assets/Scripts/ESLogic
+  - Assets/KinematicCharacterController
+  - Assets/Packages/Newtonsoft.Json.13.0.4
+  - Assets/Plugins/Sirenix
+  - Assets/Plugins/RootMotion
+  - Assets/Plugins/Easy Save 3
+  - Assets/ESNormalAssets/Camera
+  - Assets/ESNormalAssets/Data/GlobalData/EditorConfi
+  - Assets/ESNormalAssets/Data/GlobalData/EditorTheme
+  - Assets/ESNormalAssets/Data/GlobalData/GameCore
+  PackagePublishRequiredAssetPaths:
+  - Assets/ESNormalAssets/Data/GlobalData/AssetSettings/ESAssetReleaseUploadSettings.asset
+  - "Assets/ESNormalAssets/Data/GlobalData/AssetSettings/\u5168\u5C40\u8D44\u6E90\u7BA1\u7406\u8BBE\u7F6E.asset"
+  - Assets/ESNormalAssets/Data/GlobalData/TrackSequenceEditorSettings/TrackSequenceEditorSettings.asset
+  PackagePublishDependencyAllowPaths:
+  - Assets/ESNormalAssets
+  - Assets/LoafbrrAssets
+  - Assets/Demo_FGT
+  PackagePublishExternalReferencePaths: []
+  PackagePublishMaxAssetCount: 12000
+  PackagePublishMaxSourceBytes: 100663296
+  PackagePublishExcludePaths:
+  - Assets/Plugins/ES/Obsolete
+  - Assets/Plugins/ES/Editor/Installer/Downloads
+  - Assets/Plugins/ES/0_Stand/Tests
+  - Assets/Plugins/ES/1_Design/Tests
+  - Assets/Scripts/ESLogic/Tests
+  - Assets/Scripts/ESLogic/Editor/Generation/Tests
+  - Assets/Scripts/ESLogic/Runtime/Developer/AITest
+  - Assets/Plugins/RootMotion/Shared Demo Assets
+  - Assets/Plugins/RootMotion/FinalIK/_DEMOS
+  - Assets/Plugins/RootMotion/FinalIK/_Integration
+  - Assets/Plugins/RootMotion/Baker
+  - Assets/Plugins/RootMotion/Editor/Baker
+  - Assets/Plugins/RootMotion/Editor/FinalIK/_DEMOS
+  - Assets/Plugins/RootMotion/Editor/Shared Demo Scripts
+  - Assets/Plugins/RootMotion/FinalIK/Tools/VRIK Animated Locomotion.controller
+  - Assets/Plugins/Easy Save 3/Scripts/Save Slots
+  - Assets/Plugins/ES/3_Examples/1_Runtime/Example_SimpleTools/New Scene 1.unity
+  - Assets/Plugins/ES/ThirdParty/JUMP_SystemSpeech.asset
   IncludeDependencies_: 0
   PackagePublishPath: Assets\Plugins\ES\Editor\Installer
   ExtendedPackageConfigs:

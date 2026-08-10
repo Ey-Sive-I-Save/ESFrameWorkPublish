@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 using UnityEngine.UI;
 
 namespace ES.Tests.DynamicAtlas
@@ -18,6 +20,14 @@ namespace ES.Tests.DynamicAtlas
             public bool TryResolve(long leaseToken, out ESDynamicAtlasResolved resolved)
             {
                 resolved = default;
+                return live.Contains(leaseToken);
+            }
+
+            public bool TryGetLeaseState(long leaseToken, out ESDynamicAtlasLeaseState state)
+            {
+                state = live.Contains(leaseToken)
+                    ? ESDynamicAtlasLeaseState.Ready
+                    : ESDynamicAtlasLeaseState.Invalid;
                 return live.Contains(leaseToken);
             }
 
@@ -64,6 +74,74 @@ namespace ES.Tests.DynamicAtlas
 
             Assert.That(host.releaseCount, Is.EqualTo(1));
             Assert.That(copied.TryResolve(out _), Is.False);
+        }
+
+        [Test]
+        public void Lease_DefaultStateIsInvalidAndLiveStateIsReady()
+        {
+            var host = new FakeLeaseHost();
+            var lease = new ESDynamicAtlasLease(host, 7);
+
+            Assert.That(default(ESDynamicAtlasLease).State,
+                Is.EqualTo(ESDynamicAtlasLeaseState.Invalid));
+            Assert.That(lease.State, Is.EqualTo(ESDynamicAtlasLeaseState.Ready));
+            Assert.That(lease.TryGetState(out ESDynamicAtlasLeaseState state), Is.True);
+            Assert.That(state, Is.EqualTo(ESDynamicAtlasLeaseState.Ready));
+        }
+
+        [Test]
+        public void Graphic_NarrowApiContentKey_UsesGuidAndLocalFileId()
+        {
+            var gameObject = new GameObject("ES Dynamic Atlas Narrow API Key Test",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(ESDynamicAtlasGraphic));
+            var refer = new ESAssetReferTexture2D();
+            refer.InitializeGeneratedReference(
+                "guid-abc", 42, ESAssetReferKind.Texture2D, 0, null);
+            try
+            {
+                ESDynamicAtlasGraphic graphic = gameObject.GetComponent<ESDynamicAtlasGraphic>();
+                string key = InvokePrivateResult<string>(
+                    graphic, "ResolveContentKey", refer);
+                Assert.That(key, Is.EqualTo("texture:guid-abc:42"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void Graphic_AutoAcquireStatusWriteIsGenerationGuarded()
+        {
+            var gameObject = new GameObject("ES Dynamic Atlas Auto Acquire Guard Test",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(ESDynamicAtlasGraphic));
+            var current = new CancellationTokenSource();
+            var replacement = new CancellationTokenSource();
+            try
+            {
+                ESDynamicAtlasGraphic graphic = gameObject.GetComponent<ESDynamicAtlasGraphic>();
+                SetPrivateField(graphic, "autoAcquireCancellation", current);
+                Assert.That(InvokePrivateResult<bool>(
+                    graphic, "CanWriteAutoAcquireStatus", current), Is.True);
+
+                current.Cancel();
+                Assert.That(InvokePrivateResult<bool>(
+                    graphic, "CanWriteAutoAcquireStatus", current), Is.False);
+
+                SetPrivateField(graphic, "autoAcquireCancellation", replacement);
+                Assert.That(InvokePrivateResult<bool>(
+                    graphic, "CanWriteAutoAcquireStatus", current), Is.False);
+
+                SetPrivateField<object>(graphic, "autoAcquireCancellation", null);
+                Assert.That(InvokePrivateResult<bool>(
+                    graphic, "CanWriteAutoAcquireStatus", current), Is.False);
+            }
+            finally
+            {
+                current.Dispose();
+                replacement.Dispose();
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
         }
 
         [Test]
@@ -154,7 +232,10 @@ namespace ES.Tests.DynamicAtlas
                 {
                     UIVertex vertex = default;
                     mesh.PopulateUIVertex(ref vertex, index);
-                    Assert.That(vertex.uv0, Is.EqualTo(expectedUvs[index]));
+                    Assert.That(vertex.uv0.x, Is.EqualTo(expectedUvs[index].x),
+                        $"Sprite UV {index} X 应匹配。 ");
+                    Assert.That(vertex.uv0.y, Is.EqualTo(expectedUvs[index].y),
+                        $"Sprite UV {index} Y 应匹配。 ");
                 }
             }
             finally
@@ -332,6 +413,104 @@ namespace ES.Tests.DynamicAtlas
             }
         }
 
+        [Test]
+        public void ShutdownQuarantine_DiagnosticsAreBoundedAndNativeRetentionIsKept()
+        {
+            Type runtimeType = typeof(ESDynamicAtlasRuntime);
+            Type uploadJobType = runtimeType.GetNestedType("UploadJob", BindingFlags.NonPublic);
+            Type pageType = runtimeType.GetNestedType("Page", BindingFlags.NonPublic);
+            Assert.That(uploadJobType, Is.Not.Null);
+            Assert.That(pageType, Is.Not.Null);
+
+            FieldInfo diagnosticsField = runtimeType.GetField(
+                "shutdownQuarantineDiagnostics", BindingFlags.Static | BindingFlags.NonPublic);
+            FieldInfo nativeField = runtimeType.GetField(
+                "shutdownQuarantines", BindingFlags.Static | BindingFlags.NonPublic);
+            FieldInfo foldedField = runtimeType.GetField(
+                "shutdownQuarantineFoldedCount", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(diagnosticsField, Is.Not.Null);
+            Assert.That(nativeField, Is.Not.Null);
+            Assert.That(foldedField, Is.Not.Null);
+
+            var diagnostics = (System.Collections.IList)diagnosticsField.GetValue(null);
+            var nativeRetentions = (System.Collections.IList)nativeField.GetValue(null);
+            int foldedBefore = (int)foldedField.GetValue(null);
+            var originalDiagnostics = new List<object>();
+            var originalNativeRetentions = new List<object>();
+            try
+            {
+                foreach (object diagnostic in diagnostics)
+                    originalDiagnostics.Add(diagnostic);
+                foreach (object nativeRetention in nativeRetentions)
+                    originalNativeRetentions.Add(nativeRetention);
+                diagnostics.Clear();
+                nativeRetentions.Clear();
+
+                MethodInfo retain = runtimeType.GetMethod(
+                    "RetainShutdownQuarantine", BindingFlags.Static | BindingFlags.NonPublic);
+                Assert.That(retain, Is.Not.Null);
+
+                LogAssert.ignoreFailingMessages = true;
+                Type uploadJobListType = typeof(List<>).MakeGenericType(uploadJobType);
+                Type pageListType = typeof(List<>).MakeGenericType(pageType);
+                for (int index = 0; index < 20; index++)
+                {
+                    var uploads = (System.Collections.IList)Activator.CreateInstance(uploadJobListType);
+                    uploads.Add(Activator.CreateInstance(uploadJobType, true));
+
+                    var pages = (System.Collections.IList)Activator.CreateInstance(pageListType);
+                    object page = Activator.CreateInstance(pageType, true);
+                    FieldInfo pageIdField = pageType.GetField("id",
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    Assert.That(pageIdField, Is.Not.Null);
+                    pageIdField.SetValue(page, index + 1);
+                    pages.Add(page);
+
+                    retain.Invoke(null, new object[]
+                    {
+                        uploads,
+                        pages,
+                        null,
+                        new InvalidOperationException("测试隔离诊断折叠。")
+                    });
+                }
+
+                Assert.That(diagnostics.Count, Is.LessThanOrEqualTo(16),
+                    "停机隔离诊断记录必须受上限约束。 ");
+                Assert.That(nativeRetentions.Count, Is.EqualTo(20),
+                    "诊断折叠只能淘汰诊断元数据，不能淘汰未知 GPU 使用中的原生保留对象。 ");
+
+                int expectedFolded = foldedBefore + 4;
+                Assert.That((int)foldedField.GetValue(null), Is.EqualTo(expectedFolded),
+                    "因上限折叠的数量必须可观测。 ");
+
+                Assert.That(ESDynamicAtlasRuntime.TryCreateShutdownQuarantineSnapshot(
+                    out ESDynamicAtlasSnapshot snapshot), Is.True);
+                Assert.That(snapshot.shutdownQuarantinedCount, Is.GreaterThan(0));
+                Assert.That(snapshot.shutdownQuarantineFoldedCount, Is.GreaterThan(0));
+                Assert.That(snapshot.quarantinedPageIds, Does.Contain(20),
+                    "折叠后仍应能看到最近保留的隔离 Page 诊断。 ");
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = false;
+                if (diagnostics != null)
+                {
+                    diagnostics.Clear();
+                    for (int index = 0; index < originalDiagnostics.Count; index++)
+                        diagnostics.Add(originalDiagnostics[index]);
+                }
+                if (nativeRetentions != null)
+                {
+                    nativeRetentions.Clear();
+                    for (int index = 0; index < originalNativeRetentions.Count; index++)
+                        nativeRetentions.Add(originalNativeRetentions[index]);
+                }
+                if (foldedField != null)
+                    foldedField.SetValue(null, foldedBefore);
+            }
+        }
+
         private static void SetPrivateField<T>(object target, string fieldName, T value)
         {
             FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
@@ -348,9 +527,32 @@ namespace ES.Tests.DynamicAtlas
 
         private static void InvokePrivate(object target, string methodName, params object[] arguments)
         {
-            MethodInfo method = target.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+            MethodInfo method = target.GetType().GetMethod(
+                methodName, BindingFlags.Instance | BindingFlags.NonPublic,
+                null, GetParameterTypes(arguments), null);
             Assert.That(method, Is.Not.Null, "缺少测试方法：" + methodName);
             method.Invoke(target, arguments);
+        }
+
+        private static T InvokePrivateResult<T>(
+            object target, string methodName, params object[] arguments)
+        {
+            MethodInfo method = target.GetType().GetMethod(
+                methodName, BindingFlags.Instance | BindingFlags.NonPublic,
+                null, GetParameterTypes(arguments), null);
+            Assert.That(method, Is.Not.Null, "缺少测试方法：" + methodName);
+            return (T)method.Invoke(target, arguments);
+        }
+
+        private static Type[] GetParameterTypes(object[] arguments)
+        {
+            if (arguments == null || arguments.Length == 0)
+                return Type.EmptyTypes;
+
+            var parameterTypes = new Type[arguments.Length];
+            for (int index = 0; index < arguments.Length; index++)
+                parameterTypes[index] = arguments[index]?.GetType() ?? typeof(object);
+            return parameterTypes;
         }
 
     }

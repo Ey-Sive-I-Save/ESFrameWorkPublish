@@ -161,19 +161,26 @@ namespace ES
             UnbindLocalControl();
             subscribedLocalControl = localControl;
             if (subscribedLocalControl != null)
-                subscribedLocalControl.OnControlledEntityChanged += OnControlledEntityChanged;
+                subscribedLocalControl.OnControlledEntityChanged += HandleControlledEntityChanged;
         }
 
         private void UnbindLocalControl()
         {
             if (subscribedLocalControl != null)
-                subscribedLocalControl.OnControlledEntityChanged -= OnControlledEntityChanged;
+                subscribedLocalControl.OnControlledEntityChanged -= HandleControlledEntityChanged;
 
             subscribedLocalControl = null;
         }
 
-        private static void OnControlledEntityChanged(Entity previous, Entity current)
+        private void HandleControlledEntityChanged(Entity previous, Entity current)
         {
+            OnControlledEntityChanged(previous, current);
+        }
+
+        internal void OnControlledEntityChanged(Entity previous, Entity current)
+        {
+            if (previous != null)
+                ReleaseOwnedBy(previous);
             previous?.ReleaseDefaultCameraRequest();
             current?.RefreshDefaultCameraRequest();
         }

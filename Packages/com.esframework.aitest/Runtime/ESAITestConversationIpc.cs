@@ -281,11 +281,27 @@ namespace ESFramework.ESAITest
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Install()
         {
+            ESAITestRuntime.Activated -= EnsureHost;
+            ESAITestRuntime.Activated += EnsureHost;
+            ESAITestRuntime.Deactivated -= DestroyHost;
+            ESAITestRuntime.Deactivated += DestroyHost;
+        }
+
+        private static void EnsureHost()
+        {
             if (host != null)
                 return;
             host = new GameObject("ESAITest Conversation IPC");
             UnityEngine.Object.DontDestroyOnLoad(host);
             host.AddComponent<ESAITestConversationIpc>();
+        }
+
+        private static void DestroyHost()
+        {
+            if (host == null)
+                return;
+            UnityEngine.Object.Destroy(host);
+            host = null;
         }
     }
 }

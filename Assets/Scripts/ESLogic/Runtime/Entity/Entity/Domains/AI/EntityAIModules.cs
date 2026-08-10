@@ -330,8 +330,14 @@ namespace ES
             if (!TryGetModule(out EntityBasicCombatModule combatModule))
                 return;
 
-            if (input.action.ConsumeAttack()) combatModule.TriggerAttack();
-            if (input.action.ConsumeHeavyAttack()) combatModule.TriggerHeavyAttack();
+            if (input.action.ConsumeAttack()
+                && !combatModule.TrySubmitMeleeAttack(out bool meleeActionRegistered)
+                && !meleeActionRegistered)
+                combatModule.TriggerAttack();
+            if (input.action.ConsumeHeavyAttack()
+                && !combatModule.TrySubmitHeavyAttack(out bool heavyActionRegistered)
+                && !heavyActionRegistered)
+                combatModule.TriggerHeavyAttack();
             combatModule.SetBlock(input.motion.blockHold);
             combatModule.SetSlide(input.action.ConsumeSlide());
             DispatchWeaponAction(input, combatModule);

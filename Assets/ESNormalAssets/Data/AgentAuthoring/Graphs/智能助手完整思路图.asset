@@ -69,7 +69,7 @@ MonoBehaviour:
     version: 1
     title: "\u5019\u9009\u751F\u6210\u5408\u540C"
     payloadJson: "{\"schemaVersion\":1,\"referenceKind\":2,\"projectPath\":\".agents/skills/es-generate-agent-artifacts/SKILL.md\",\"purpose\":\"\u5019\u9009\u9694\u79BB\u3001Manifest\u3001\u9A8C\u8BC1\u4E0E\u4EBA\u5DE5\u6279\u51C6\u5DE5\u4F5C\u6D41\",\"required\":true}"
-    position: {x: 407.5, y: 71}
+    position: {x: 299, y: 378.5}
     ports:
     - portId: 5945d28ca5ad498eae1cfc997fa75480
       stableKey: flow.input
@@ -110,11 +110,11 @@ MonoBehaviour:
     typeId: es.agent-authoring.constraint
     version: 1
     title: "\u751F\u6210\u7EA6\u675F"
-    payloadJson: "{\"schemaVersion\":1,\"kind\":1,\"statement\":\"\u7981\u6B62\u76F4\u63A5\u5199\u6B63\u5F0F
+    payloadJson: "{\"schemaVersion\":1,\"kind\":2,\"statement\":\"\u7981\u6B62\u76F4\u63A5\u5199\u6B63\u5F0F
       AICommands\u3001.agents/skills\u3001\u8FD0\u884C\u65F6\u6E90\u7801\u6216\u751F\u6210\u7684
       .csproj\u3002\",\"rationale\":\"Graph \u53EA\u6388\u6743\u751F\u6210\u5019\u9009\u3002\",\"verification\":\"\u6240\u6709\u8F93\u51FA\u8DEF\u5F84\u90FD\u4F4D\u4E8E
       request/candidate\uFF0C\u6B63\u5F0F\u5BFC\u5165\u53EA\u7531\u4EBA\u5DE5\u6279\u51C6\u89E6\u53D1\u3002\"}"
-    position: {x: 736, y: 160.5}
+    position: {x: 720, y: 197}
     ports:
     - portId: 89a2521d62a7452e85305670dfab6467
       stableKey: flow.input
@@ -136,7 +136,7 @@ MonoBehaviour:
       Graph \u58F0\u660E\u7684 References\uFF0C\u5E76\u5728\u5019\u9009\u76EE\u5F55\u521B\u5EFA\u58F0\u660E\u7684
       OutputArtifact\u3002\",\"rationale\":\"\u628A AI \u6743\u9650\u9650\u5236\u5728\u7528\u6237\u53EF\u89C1\u7684\u56FE\u7ED3\u6784\u5185\u3002\",\"verification\":\"Manifest
       \u4E2D\u6BCF\u4E2A\u76EE\u6807\u90FD\u80FD\u6620\u5C04\u5230 GenerationSpec.outputs\u3002\"}"
-    position: {x: 720, y: 320}
+    position: {x: 768, y: 333}
     ports:
     - portId: 3e712fd7cb7d4b5db5ee2be6db7b70d5
       stableKey: flow.input
@@ -158,7 +158,7 @@ MonoBehaviour:
       UTF-8\uFF0C\u5E76\u660E\u786E\u5DF2\u6267\u884C\u4E0E\u672A\u6267\u884C\u7684\u9A8C\u8BC1\u3002\",\"rationale\":\"\u8BA9\u5019\u9009\u53EF\u4EE5\u88AB\u4EBA\u548C\u540E\u7EED
       AI \u53EF\u9760\u590D\u6838\u3002\",\"verification\":\"UTF-8 Guard\u3001\u7ED3\u6784\u9A8C\u8BC1\u3001Diff
       Review \u6E05\u5355\u5168\u90E8\u53EF\u89C1\u3002\"}"
-    position: {x: 720, y: 480}
+    position: {x: 720, y: 576}
     ports:
     - portId: 366a3b1c8f594f3ea76e567569c836ca
       stableKey: flow.input
@@ -203,7 +203,7 @@ MonoBehaviour:
       UTF-8\\n\u76EE\u6807\u8DEF\u5F84\u767D\u540D\u5355\\n\u5019\u9009\u5B8C\u6574\u6027\\nDiff
       Review\",\"includeAgentsMetadata\":true,\"includeReferences\":true,\"includeScripts\":false,\"defaultPrompt\":\"Use
       $es-generated-workflow to complete the requested ESFramework workflow.\"}"
-    position: {x: 1217, y: 281}
+    position: {x: 1238, y: 720}
     ports:
     - portId: 730ecd27887843efacc0ba31f06d2b20
       stableKey: flow.input
@@ -224,7 +224,7 @@ MonoBehaviour:
     payloadJson: "{\"schemaVersion\":1,\"validateAICommand\":true,\"validateAgentSkill\":true,\"validateUtf8\":true,\"requireDiffReview\":true,\"requireHumanApproval\":true,\"additionalRequirements\":\"\u4E0D\u5F97\u5305\u542B
       U+FFFD\uFF1B\u4E0D\u5F97\u8D8A\u8FC7\u5019\u9009\u76EE\u5F55\u3002\",\"reviewChecklist\":\"\u76EE\u6807\u8DEF\u5F84\u6B63\u786E\\n\u5185\u5BB9\u7B26\u5408
       Graph\\n\u6CA1\u6709\u8D8A\u6743\u4FEE\u6539\\n\u9A8C\u8BC1\u8BC1\u636E\u771F\u5B9E\"}"
-    position: {x: 1604.5, y: 199.5}
+    position: {x: 1596.5, y: 272}
     ports:
     - portId: 30b497b7758f473ba06828194b374402
       stableKey: flow.input
@@ -251,9 +251,6 @@ MonoBehaviour:
   - edgeId: f3acb22aa03b4492a68fbe70f1a0e60b
     outputPortId: 7864b1cf6de54181bef9f52c1b1dc8b5
     inputPortId: 89a2521d62a7452e85305670dfab6467
-  - edgeId: d21b20d8e75149d897bf6704e653646d
-    outputPortId: fda7ce34a1fa4350894532af710d6f44
-    inputPortId: 730ecd27887843efacc0ba31f06d2b20
   - edgeId: e878cae9d40844b8b35de799fd68d206
     outputPortId: 7864b1cf6de54181bef9f52c1b1dc8b5
     inputPortId: 3e712fd7cb7d4b5db5ee2be6db7b70d5
@@ -269,9 +266,6 @@ MonoBehaviour:
   - edgeId: 84e362060ba9463994fbbd710b058a6a
     outputPortId: c8804797ed06456c95aabca793de7b7f
     inputPortId: f177bc7bd5474f83a8294a47dea378fe
-  - edgeId: 48a98d64422a4454a8059100323bed96
-    outputPortId: c8804797ed06456c95aabca793de7b7f
-    inputPortId: 730ecd27887843efacc0ba31f06d2b20
   - edgeId: 4c8c90e9b47f4a8f8f8d1a159699ae83
     outputPortId: af44c34cbfc94744b00bf0bb8735dd79
     inputPortId: 30b497b7758f473ba06828194b374402
@@ -281,3 +275,9 @@ MonoBehaviour:
   - edgeId: de225fbbaf464da580278c47e956dfa8
     outputPortId: fda7ce34a1fa4350894532af710d6f44
     inputPortId: f177bc7bd5474f83a8294a47dea378fe
+  - edgeId: f50edc97c2d64375a3631e72b4cd560c
+    outputPortId: fda7ce34a1fa4350894532af710d6f44
+    inputPortId: 730ecd27887843efacc0ba31f06d2b20
+  - edgeId: 4c59551c0eeb42029247f46653ad8423
+    outputPortId: c8804797ed06456c95aabca793de7b7f
+    inputPortId: 730ecd27887843efacc0ba31f06d2b20

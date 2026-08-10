@@ -308,7 +308,7 @@ namespace ES
                     // ★ 实际速度转换为角色局部空间
                     Vector3 actualVelocity = MyCore.kcc.monitor.velocity;
                     Vector3 localVelocity = MyCore.transform.InverseTransformDirection(actualVelocity);
-                    
+
                     // 设置当前帧速度参数（性能热点：直写快路径）
                     stateMachine.SetMotionSpeedXZ(localVelocity.x, localVelocity.z);
                     stateMachine.Set(StateCoreParams.VerticalSpeed, localVelocity.y);
@@ -416,6 +416,12 @@ namespace ES
         [LabelText("起始武器索引")]
         public int startWeaponIndex;
 
+        [LabelText("默认普攻 Action")]
+        public ESActionConfigKey defaultMeleeAttackAction = "melee.attack";
+
+        [LabelText("默认重击 Action")]
+        public ESActionConfigKey defaultHeavyAttackAction = "melee.heavy_attack";
+
         [LabelText("启动时持枪")]
         public bool startWithWeaponInHand = false;
 
@@ -465,6 +471,37 @@ namespace ES
 
         [LabelText("输出挂载成功日志")]
         public bool logWeaponMountSuccess;
+
+        [NonSerialized]
+        public ESActionEventHub actionEventHub = new ESActionEventHub();
+
+        [NonSerialized]
+        private ESActionRuntime actionRuntime;
+
+        [NonSerialized]
+        private ESActionPresentationBridge actionPresentationBridge;
+
+        internal ESActionPresentationBridge ActionPresentationBridge => actionPresentationBridge;
+        internal bool HasActionRuntime => actionRuntime != null;
+        [NonSerialized] private int poolSpawnCount;
+        [NonSerialized] private int poolDespawnCount;
+        internal int PoolSpawnCount => poolSpawnCount;
+        internal int PoolDespawnCount => poolDespawnCount;
+
+        public void OnPoolSpawned()
+        {
+            poolSpawnCount++;
+        }
+
+        public void OnPoolDespawned()
+        {
+            poolDespawnCount++;
+            ESActionPoolLifecycleDiagnostics.Record("Combat.BridgeDispose");
+            actionPresentationBridge?.Dispose();
+            actionPresentationBridge = null;
+            actionRuntime?.ResetForLifecycle();
+            actionRuntime = null;
+        }
 
         [LabelText("阻止收枪挂到手臂链")]
         [Tooltip("开启后，如果 holsterMount 落在手臂/手腕骨链上，将自动回退到默认身上挂点或自动背挂点。")]
@@ -628,6 +665,8 @@ namespace ES
             }
 
             TickWeaponFusion(Time.deltaTime);
+            if (actionRuntime != null && actionRuntime.IsRunning)
+                actionRuntime.Tick(Time.deltaTime);
         }
 
         [Title("最近触发")]
@@ -641,48 +680,6 @@ namespace ES
         [LabelText("攻击输入触发开火")]
         [Tooltip("开启后，左键攻击输入会直接走枪械开火逻辑。")]
         public bool fireOnAttackInput = true;
-
-        [LabelText("必须在瞄准中")]
-        [Tooltip("开启后，只有进入瞄准状态时左键才会开火。")]
-        public bool requireAimToFire = true;
-
-        [LabelText("射击间隔(秒)")]
-        [MinValue(0.01f)]
-        public float fireInterval = 0.12f;
-
-        [LabelText("射击距离")]
-        [MinValue(0.5f)]
-        public float fireDistance = 120f;
-
-        [LabelText("枪口/开火原点")]
-        [Tooltip("优先作为子弹/射线的发射原点；为空时回退到相机或角色自身。")]
-        public Transform fireOrigin;
-
-        [LabelText("命中层")]
-        public LayerMask fireLayerMask = Physics.DefaultRaycastLayers;
-
-        [LabelText("射线命中触发器")]
-        public QueryTriggerInteraction fireQueryTriggerInteraction = QueryTriggerInteraction.Ignore;
-
-        [LabelText("开火触发后坐力")]
-        public bool recoilOnFire = true;
-
-        [LabelText("后坐力强度")]
-        [Range(0f, 2f)]
-        public float fireRecoilMagnitude = 1f;
-
-        [LabelText("启用武器后坐力档位")]
-        [Tooltip("根据 weaponIndex 匹配后坐力曲线档位，形成不同枪感。")]
-        [FormerlySerializedAs("enableWeaponRecoilProfiles")]
-        public bool enableWeaponRecoilSettings = true;
-
-        [LabelText("武器后坐力档位")]
-        [FormerlySerializedAs("recoilProfiles")]
-        public System.Collections.Generic.List<WeaponRecoilSettings> recoilSettings = new System.Collections.Generic.List<WeaponRecoilSettings>();
-
-        [LabelText("后坐力仅在瞄准时触发")]
-        [Tooltip("开启后，只有瞄准生命周期激活时才触发后坐力 IK。")]
-        public bool recoilOnlyWhenAiming = true;
 
         [LabelText("后坐力IK缺失告警")]
         [Tooltip("当 Recoil IK 不可用时输出节流警告，便于排查配置问题。")]
@@ -707,6 +704,7 @@ namespace ES
         public string lastFireHitName;
 
         [NonSerialized] private float _lastRecoilWarnTime = -999f;
+        [NonSerialized] private float _lastWeaponDefinitionWarnTime = -999f;
         [NonSerialized] private int _recoilBurstShotCount;
         [NonSerialized] private int _recoilBurstWeaponIndex = int.MinValue;
         [NonSerialized] private float _recoilBurstLastShotTime = -999f;
@@ -992,30 +990,40 @@ namespace ES
             if (enableWeaponFusion && !_weaponInHand)
                 return false;
 
-            if (requireAimToFire && !isAiming)
+            if (!TryResolveCurrentWeaponDefinition(out ItemWeaponSharedData weaponDefinition))
+                return false;
+
+            WeaponFireDefinitionData fireDefinition = weaponDefinition.fire;
+            if (!fireDefinition.enabled)
+                return false;
+
+            if (fireDefinition.requiresAiming && !isAiming)
             {
                 if (debugFireLog)
                     Debug.Log("[EntityBasicCombatModule] 开火被忽略：当前未处于瞄准状态。", MyCore);
                 return false;
             }
 
-            if (Time.time - lastFireTime < fireInterval)
+            if (Time.time - lastFireTime < fireDefinition.interval)
                 return false;
+
+            float distance = Mathf.Max(0.5f, fireDefinition.distance);
+            LayerMask hitMask = fireDefinition.hitMask;
+            QueryTriggerInteraction triggerInteraction = fireDefinition.triggerInteraction;
 
             Vector3 rayOrigin;
             Vector3 rayDirection;
             Vector3 visualOrigin;
-            ResolveFireRay(out rayOrigin, out rayDirection, out visualOrigin);
+            ResolveFireRay(distance, hitMask, triggerInteraction, out rayOrigin, out rayDirection, out visualOrigin);
 
-            float distance = Mathf.Max(0.5f, fireDistance);
             RaycastHit hit;
             bool hasHit = Physics.Raycast(
                 rayOrigin,
                 rayDirection,
                 out hit,
                 distance,
-                fireLayerMask,
-                fireQueryTriggerInteraction);
+                hitMask,
+                triggerInteraction);
 
             Vector3 endPoint = hasHit ? hit.point : rayOrigin + rayDirection * distance;
 
@@ -1034,8 +1042,9 @@ namespace ES
                 "Fire");
             TriggerFirePulse();
 
-            if (recoilOnFire)
-                TryApplyRecoilIK();
+            WeaponRecoilDefinitionData recoilDefinition = weaponDefinition.recoil;
+            if (recoilDefinition.enabled)
+                TryApplyRecoilIK(recoilDefinition);
 
             if (debugDrawFireRay)
                 Debug.DrawLine(visualOrigin, endPoint, hasHit ? Color.red : Color.yellow, 0.2f);
@@ -1051,6 +1060,189 @@ namespace ES
             return true;
         }
 
+        public bool TrySubmitAction(ESActionIntent intent)
+        {
+            EnsureActionRuntime();
+            return actionRuntime != null && actionRuntime.TrySubmit(intent, out _);
+        }
+
+        public bool TrySubmitAction(ESActionIntent intent, out string error)
+        {
+            EnsureActionRuntime();
+            if (actionRuntime == null)
+            {
+                error = "ActionRuntime 未初始化。";
+                return false;
+            }
+
+            return actionRuntime.TrySubmit(intent, out error);
+        }
+
+        public bool TrySubmitMeleeAttack()
+        {
+            return TrySubmitMeleeAttack(out _);
+        }
+
+        /// <summary>
+        /// 提交近战 Action。actionRegistered 只表示当前 Catalog 已有该定义；调用方可据此
+        /// 区分迁移期的“未接入 Action 内容”与“已接入但本次 Intent 被运行时拒绝”。
+        /// </summary>
+        public bool TrySubmitMeleeAttack(out bool actionRegistered)
+        {
+            EnsureActionRuntime();
+            actionRegistered = defaultMeleeAttackAction != null
+                && defaultMeleeAttackAction.IsConfigured
+                && ESActionGameCoreTable.Table.TryGet(defaultMeleeAttackAction, out _);
+            if (actionRuntime == null)
+                return false;
+
+            if (!actionRegistered)
+                return false;
+
+            return actionRuntime.TrySubmit(
+                new ESActionIntent(
+                    defaultMeleeAttackAction,
+                    actionRuntime.LifecycleGeneration,
+                    Time.frameCount,
+                    MyCore),
+                out _);
+        }
+
+        public bool TrySubmitHeavyAttack()
+        {
+            return TrySubmitHeavyAttack(out _);
+        }
+
+        public bool TrySubmitHeavyAttack(out bool actionRegistered)
+        {
+            EnsureActionRuntime();
+            actionRegistered = defaultHeavyAttackAction != null
+                && defaultHeavyAttackAction.IsConfigured
+                && ESActionGameCoreTable.Table.TryGet(defaultHeavyAttackAction, out _);
+            if (actionRuntime == null)
+                return false;
+
+            if (!actionRegistered)
+                return false;
+
+            return actionRuntime.TrySubmit(
+                new ESActionIntent(
+                    defaultHeavyAttackAction,
+                    actionRuntime.LifecycleGeneration,
+                    Time.frameCount,
+                    MyCore),
+                out _);
+        }
+
+        public bool TryResolveActionHit(
+            ESActionRuntimeHandle handle,
+            UnityEngine.Object target,
+            out ESActionHitResult result)
+        {
+            EnsureActionRuntime();
+            result = default;
+            return actionRuntime != null && actionRuntime.TryResolveHit(handle, target, out result);
+        }
+
+        public bool TryCancelAction(
+            ESActionCategory category,
+            ESActionConfigKey targetActionKey,
+            out string error)
+        {
+            EnsureActionRuntime();
+            if (actionRuntime == null)
+            {
+                error = "ActionRuntime 未初始化。";
+                return false;
+            }
+
+            return actionRuntime.TryCancel(category, targetActionKey, out error);
+        }
+
+        public void InterruptAction()
+        {
+            actionRuntime?.Interrupt();
+        }
+
+        private Transform ResolveCurrentWeaponMount()
+        {
+            if (!TryGetWeaponSlot(_activeWeaponSlot, out GunWeaponSlot slot) || slot.weaponRoot == null)
+                return null;
+
+            EntityWeaponBinding binding = GetWeaponBinding(slot);
+            if (binding != null && binding.handMount != null)
+                return binding.handMount;
+
+            return slot.weaponRoot;
+        }
+
+        private ESWeaponConfigKey ResolveCurrentWeaponKey()
+        {
+            return TryGetWeaponSlot(_activeWeaponSlot, out GunWeaponSlot slot)
+                && slot.weaponKey != null
+                && slot.weaponKey.IsConfigured
+                ? slot.weaponKey
+                : null;
+        }
+
+        private bool TryResolveCurrentWeaponDefinition(out ItemWeaponSharedData definition)
+        {
+            definition = null;
+
+            ESWeaponConfigKey key = ResolveCurrentWeaponKey();
+            if (key == null)
+            {
+                TryWarnWeaponDefinition("枪械开火必须配置当前 GunWeaponSlot 的 Weapon Key。");
+                return false;
+            }
+
+            if (!ESWeaponGameCoreTable.Table.TryGet(key, out ESWeaponRuntimeData runtimeData)
+                || runtimeData == null
+                || runtimeData.sharedData == null)
+            {
+                TryWarnWeaponDefinition("已配置的 Weapon Key 未在 GameCore Weapon Table 解析："
+                                        + ESConfigKeyMatch.Describe(key.EnumKeyInt, key.StringKey));
+                return false;
+            }
+
+            definition = runtimeData.sharedData;
+            if (!definition.ValidateDefinition(out string validationError))
+            {
+                TryWarnWeaponDefinition("WeaponDefinition 无效：" + validationError);
+                return false;
+            }
+
+            return true;
+        }
+
+        private void TryWarnWeaponDefinition(string reason)
+        {
+            if (Time.time - _lastWeaponDefinitionWarnTime < RecoilWarnInterval)
+                return;
+
+            _lastWeaponDefinitionWarnTime = Time.time;
+            Debug.LogWarning("[EntityBasicCombatModule] " + reason, MyCore);
+        }
+
+        private void EnsureActionRuntime()
+        {
+            if (actionRuntime != null || MyCore == null)
+                return;
+
+            actionEventHub ??= new ESActionEventHub();
+            actionRuntime = new ESActionRuntime(ESActionGameCoreTable.Table, actionEventHub, MyCore);
+            if (actionPresentationBridge == null)
+            {
+                actionPresentationBridge = new ESActionPresentationBridge(
+                    actionEventHub,
+                    ESActionGameCoreTable.Table,
+                    MyCore,
+                    null,
+                    ResolveCurrentWeaponMount,
+                    ResolveCurrentWeaponKey);
+            }
+        }
+
         private void CacheStateMachine()
         {
             if (_sm == null && MyCore != null && MyCore.stateDomain != null)
@@ -1059,13 +1251,19 @@ namespace ES
             }
         }
 
-        private void ResolveFireRay(out Vector3 rayOrigin, out Vector3 rayDirection, out Vector3 visualOrigin)
+        private void ResolveFireRay(
+            float distance,
+            LayerMask hitMask,
+            QueryTriggerInteraction triggerInteraction,
+            out Vector3 rayOrigin,
+            out Vector3 rayDirection,
+            out Vector3 visualOrigin)
         {
             Transform cameraTransform = GetActiveCameraTransform();
             Transform slotFireOrigin = GetCurrentWeaponFireOrigin();
             Transform actualOrigin = slotFireOrigin != null
                 ? slotFireOrigin
-                : (fireOrigin != null ? fireOrigin : (cameraTransform != null ? cameraTransform : MyCore.transform));
+                : (cameraTransform != null ? cameraTransform : MyCore.transform);
 
             Vector3 aimingOrigin = cameraTransform != null ? cameraTransform.position : actualOrigin.position;
             Vector3 aimingDirection = cameraTransform != null ? cameraTransform.forward : actualOrigin.forward;
@@ -1078,9 +1276,8 @@ namespace ES
 
             if (cameraTransform != null && actualOrigin != cameraTransform)
             {
-                float distance = Mathf.Max(0.5f, fireDistance);
                 Vector3 targetPoint = aimingOrigin + rayDirection * distance;
-                if (Physics.Raycast(aimingOrigin, rayDirection, out RaycastHit preHit, distance, fireLayerMask, fireQueryTriggerInteraction))
+                if (Physics.Raycast(aimingOrigin, rayDirection, out RaycastHit preHit, distance, hitMask, triggerInteraction))
                     targetPoint = preHit.point;
 
                 Vector3 muzzleDirection = targetPoint - actualOrigin.position;
@@ -1249,8 +1446,26 @@ namespace ES
             return ReferenceEquals(state.stateSharedData, info.sharedData);
         }
 
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+        }
+
+        protected override void OnDisable()
+        {
+            actionPresentationBridge?.Dispose();
+            actionPresentationBridge = null;
+            actionRuntime?.ResetForLifecycle();
+            actionRuntime = null;
+            base.OnDisable();
+        }
+
         public override void OnDestroy()
         {
+            actionPresentationBridge?.Dispose();
+            actionPresentationBridge = null;
+            actionRuntime?.ResetForLifecycle();
+            actionRuntime = null;
             UnbindSwitchAssistIKPostProcess();
 
             if (_aimLifecycle.Release())
@@ -2486,9 +2701,9 @@ namespace ES
             return "<unknown>";
         }
 
-        private void TryApplyRecoilIK()
+        private void TryApplyRecoilIK(WeaponRecoilDefinitionData weaponDefinition)
         {
-            if (recoilOnlyWhenAiming && !_aimLifecycle.IsActive)
+            if (weaponDefinition.onlyWhenAiming && !_aimLifecycle.IsActive)
                 return;
 
             var ikDriver = ResolveIKDriver();
@@ -2498,7 +2713,7 @@ namespace ES
                 return;
             }
 
-            float recoilMagnitude = ResolveFireRecoilMagnitude();
+            float recoilMagnitude = ResolveFireRecoilMagnitude(weaponDefinition);
             lastAppliedRecoilMagnitude = recoilMagnitude;
 
             if (ikDriver.IKPlayRecoil(recoilMagnitude))
@@ -2519,50 +2734,24 @@ namespace ES
             Debug.LogWarning($"[EntityBasicCombatModule] 后坐力触发失败 | Reason={reason}", MyCore);
         }
 
-        private float ResolveFireRecoilMagnitude()
+        private float ResolveFireRecoilMagnitude(WeaponRecoilDefinitionData weaponDefinition)
         {
-            float baseMagnitude = Mathf.Max(0f, fireRecoilMagnitude);
-            if (!enableWeaponRecoilSettings || recoilSettings == null || recoilSettings.Count == 0)
-                return baseMagnitude;
-
-            var profile = FindRecoilSettings(weaponIndex);
-            if (profile == null)
-                return baseMagnitude;
-
-            float burstWindow = Mathf.Max(0.01f, profile.burstWindow);
+            float burstWindow = Mathf.Max(0.01f, weaponDefinition.burstWindow);
             if (_recoilBurstWeaponIndex != weaponIndex || Time.time - _recoilBurstLastShotTime > burstWindow)
                 _recoilBurstShotCount = 0;
 
             _recoilBurstWeaponIndex = weaponIndex;
             _recoilBurstLastShotTime = Time.time;
 
-            int maxBurstShots = Mathf.Max(1, profile.maxBurstShots);
+            int maxBurstShots = Mathf.Max(1, weaponDefinition.maxBurstShots);
             _recoilBurstShotCount = Mathf.Min(_recoilBurstShotCount + 1, maxBurstShots);
 
             float t = maxBurstShots <= 1 ? 1f : (float)(_recoilBurstShotCount - 1) / (maxBurstShots - 1);
-            float curveScale = profile.recoilCurve != null ? profile.recoilCurve.Evaluate(t) : 1f;
-            float jitter = profile.randomJitter > 0f
-                ? UnityEngine.Random.Range(-profile.randomJitter, profile.randomJitter)
+            float curveScale = weaponDefinition.recoilCurve != null ? weaponDefinition.recoilCurve.Evaluate(t) : 1f;
+            float jitter = weaponDefinition.randomJitter > 0f
+                ? UnityEngine.Random.Range(-weaponDefinition.randomJitter, weaponDefinition.randomJitter)
                 : 0f;
-
-            float profileScale = Mathf.Max(0f, profile.overallMultiplier);
-            float finalScale = Mathf.Max(0f, curveScale + jitter);
-            return baseMagnitude * profileScale * finalScale;
-        }
-
-        private WeaponRecoilSettings FindRecoilSettings(int currentWeaponIndex)
-        {
-            for (int i = 0; i < recoilSettings.Count; i++)
-            {
-                var profile = recoilSettings[i];
-                if (profile == null)
-                    continue;
-
-                if (profile.weaponIndex == currentWeaponIndex)
-                    return profile;
-            }
-
-            return null;
+            return Mathf.Max(0f, weaponDefinition.baseMagnitude) * Mathf.Max(0f, curveScale + jitter);
         }
 
         private void ResetRecoilBurst()
@@ -2578,39 +2767,14 @@ namespace ES
             [LabelText("显示名")]
             public string displayName;
 
+            [LabelText("武器定义 Key")]
+            [Tooltip("当前槽位对应的正式武器定义身份；动作表现可用它选择武器特化映射。")]
+            public ESWeaponConfigKey weaponKey = new ESWeaponConfigKey();
+
             [LabelText("武器根节点")]
             public Transform weaponRoot;
         }
 
-        [Serializable]
-        public class WeaponRecoilSettings
-        {
-            [LabelText("武器索引")]
-            public int weaponIndex;
-
-            [LabelText("总体倍率")]
-            [MinValue(0f)]
-            public float overallMultiplier = 1f;
-
-            [LabelText("连发时间窗(秒)")]
-            [MinValue(0.01f)]
-            public float burstWindow = 0.22f;
-
-            [LabelText("最大连发计数")]
-            [MinValue(1)]
-            public int maxBurstShots = 8;
-
-            [LabelText("随机抖动")]
-            [Range(0f, 1f)]
-            public float randomJitter = 0.06f;
-
-            [LabelText("后坐力曲线")]
-            [Tooltip("X=连发进度(0~1), Y=该档位曲线倍率。")]
-            public AnimationCurve recoilCurve = new AnimationCurve(
-                new Keyframe(0f, 1f),
-                new Keyframe(0.35f, 1.15f),
-                new Keyframe(1f, 1.35f));
-        }
     }
 
 
@@ -2775,13 +2939,13 @@ namespace ES
 
     /// <summary>
     /// 急停模块 — 完全独立，可自由添加/移除。
-    /// 
+    ///
     /// 检测原理：
     ///   每帧监测角色实际移动速度（monitor.velocity）的幅度变化率。
     ///   当速度幅度在短时间内骤减（如从跑步松手），且当前处于地面常态移动时，
     ///   尝试激活"急停"状态。同时将触发时的AvgSpeedX/Z写入Context，
     ///   供急停动画BlendTree读取行进方向。
-    /// 
+    ///
     /// 优先级设计：
     ///   急停状态的代价(cost)很低，容易与跑步等常态移动状态合并；
     ///   但其打断能力很弱，几乎无法打断技能、跳跃等高优先级状态。

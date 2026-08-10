@@ -30,6 +30,18 @@ namespace ES
             base._AwakeRegisterAllModules();
         }
 
+        public void NotifyPoolSpawned()
+        {
+            FindMyModule<EntityBasicCombatModule>()?.OnPoolSpawned();
+            FindMyModule<EntityBasicInteractionModule>()?.OnPoolSpawned();
+        }
+
+        public void NotifyPoolDespawned()
+        {
+            FindMyModule<EntityBasicCombatModule>()?.OnPoolDespawned();
+            FindMyModule<EntityBasicInteractionModule>()?.OnPoolDespawned();
+        }
+
         [Button("确保脚贴合模块存在"), PropertyOrder(-10)]
         public void EnsureFootPlacementModuleExists(bool applyRecommendedDefaults = true)
         {

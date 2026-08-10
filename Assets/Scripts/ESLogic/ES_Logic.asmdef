@@ -10,8 +10,7 @@
         "KCC",
         "Unity.InputSystem",
         "RootMotion",
-        "EasySave3",
-        "ESFramework.AITest"
+        "EasySave3"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

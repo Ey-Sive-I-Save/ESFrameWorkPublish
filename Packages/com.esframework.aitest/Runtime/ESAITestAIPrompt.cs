@@ -4,27 +4,6 @@ using UnityEngine;
 
 namespace ESFramework.ESAITest
 {
-    public enum ESAITestAIPromptPriority
-    {
-        P0 = 0,
-        P1 = 1,
-        P2 = 2,
-        P3 = 3,
-        P4 = 4,
-    }
-
-    [Serializable]
-    public sealed class ESAITestAIPromptDto
-    {
-        public string promptId;
-        public string source;
-        public string message;
-        public string priority;
-        public long sequence;
-        public long publishedUtcTicks;
-        public long expiresUtcTicks;
-    }
-
     [Serializable]
     public sealed class ESAITestAIPromptPublishResultDto
     {

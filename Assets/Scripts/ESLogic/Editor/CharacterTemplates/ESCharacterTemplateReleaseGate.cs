@@ -200,12 +200,16 @@ namespace ES
                     case EntityCharacterPrefabRole.CharacterVariant:
                         if (!profile.ValidateFormalCharacter(out string formalError))
                             errors.Add(context + "中的正式角色 Prefab 不合格：" + prefabPath + " | " + formalError);
+                        else if (!ValidateFormalCharacterDefinitionKind(profile, out string definitionKindError))
+                            errors.Add(context + "中的正式角色定义类型不合格：" + prefabPath + " | " + definitionKindError);
                         else if (!ValidateCharacterPrefabModuleContract(profile, entity, out string moduleError))
                             errors.Add(context + "中的正式角色基础模块不合格：" + prefabPath + " | " + moduleError);
                         else if (!ValidateFormalCharacterPresentation(entity, out string presentationError))
                             errors.Add(context + "中的正式角色模型/动画配置不合格：" + prefabPath + " | " + presentationError);
                         else if (!ValidateFormalCharacterPhysics(entity, out string physicsError))
                             errors.Add(context + "中的正式角色物理/挂点配置不合格：" + prefabPath + " | " + physicsError);
+                        else if (!ValidateFormalCharacterCameraMapping(entity, out string cameraMappingError))
+                            errors.Add(context + "中的正式角色相机挂点配置不合格：" + prefabPath + " | " + cameraMappingError);
                         else if (!ValidateFormalCharacterIk(entity, out string ikError))
                             errors.Add(context + "中的正式角色 FinalIK 配置不合格：" + prefabPath + " | " + ikError);
                         break;
@@ -294,6 +298,44 @@ namespace ES
                     error = "玩家正式角色的骑乘与攀爬模块必须启用。";
                     return false;
                 }
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        internal static bool ValidateFormalCharacterDefinitionKind(
+            EntityCharacterIdentity profile,
+            out string error)
+        {
+            if (profile == null)
+            {
+                error = "缺少 EntityCharacterIdentity。";
+                return false;
+            }
+
+            if (profile.faction == EntityCharacterFaction.Player)
+            {
+                if (profile.definitionSource != EntityCharacterDefinitionSource.Actor
+                    || profile.actorDefinition == null)
+                {
+                    error = "Player 正式角色必须使用 ActorDataInfo。";
+                    return false;
+                }
+
+                if (profile.actorDefinition.actorKind != ActorDataKind.Player)
+                {
+                    error = "Player 正式角色必须指向 ActorDataKind.Player，当前="
+                            + profile.actorDefinition.actorKind + "。";
+                    return false;
+                }
+            }
+            else if (profile.definitionSource == EntityCharacterDefinitionSource.Actor
+                     && profile.actorDefinition != null
+                     && profile.actorDefinition.actorKind == ActorDataKind.Player)
+            {
+                error = "非 Player 正式角色不能使用 ActorDataKind.Player 的 ActorDataInfo。";
+                return false;
             }
 
             error = string.Empty;
@@ -435,6 +477,29 @@ namespace ES
             if (!hasHurtBox)
             {
                 error = "正式角色至少需要一个 EntityHurtbox Trigger Collider。";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        internal static bool ValidateFormalCharacterCameraMapping(Entity entity, out string error)
+        {
+            if (entity == null)
+            {
+                error = "缺少 Entity。";
+                return false;
+            }
+
+            EntityTransformMapping mapping = entity.GetComponent<EntityTransformMapping>();
+            Transform cameraTarget = mapping != null ? mapping.Resolve("CameraTarget") : null;
+            if (cameraTarget == null && mapping != null)
+                cameraTarget = mapping.Resolve(DefaultTransformKey.Camera);
+
+            if (cameraTarget == null || !cameraTarget.IsChildOf(entity.transform))
+            {
+                error = "必须在 EntityTransformMapping 中解析 CameraTarget 或 DefaultTransformKey.Camera 到角色内挂点。";
                 return false;
             }
 

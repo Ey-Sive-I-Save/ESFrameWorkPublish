@@ -30,6 +30,7 @@ MonoBehaviour:
   EnableResVerboseLog: 0
   Path_Net: https://eysive-teset.oss-cn-beijing.aliyuncs.com
   Path_AssetLibraryFolder: Assets/ESNormalAssets/Data/AssetLibrary
+  GlobalExcludedFolderPaths: []
   Path_ABHelperCodeGen: Assets/Scripts/ESLogic/Runtime/CodeGen/ESABHelper
   Path_Sub_DownloadRelative_: Res
   editorRunModeSnapshotInitialized: 1

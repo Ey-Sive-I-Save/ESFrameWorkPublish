@@ -1,0 +1,21 @@
+{
+    "name": "ESFramework.AITest.Editor",
+    "rootNamespace": "ESFramework.ESAITest",
+    "references": [
+        "ESFramework.AITest.Contracts",
+        "ESFramework.AITest.Runtime",
+        "ES_Editor",
+        "ES_Stand"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

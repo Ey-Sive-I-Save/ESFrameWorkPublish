@@ -189,7 +189,7 @@ namespace ESFramework.ESAITest
 
     public static class ESAITestConversationRuntimeState
     {
-        public static ESAITestConversationReceiptDto LastReceipt { get; internal set; }
+        public static ESAITestConversationReceiptDto LastReceipt { get; set; }
     }
 
     [Serializable]
@@ -482,12 +482,12 @@ namespace ESFramework.ESAITest
     /// project snapshots can validate the public bootstrap API even before they refresh the
     /// optional MonoBehaviour bridge file. It never checks platform or starts a process.
     /// </summary>
-    internal static class ESAITestAutonomyExternalBridgeEnvironment
+    public static class ESAITestAutonomyExternalBridgeEnvironment
     {
-        internal const string AgentPathEnvironmentVariable = "ESAITEST_AUTONOMY_AGENT_PATH";
-        internal const string AgentSha256EnvironmentVariable = "ESAITEST_AUTONOMY_AGENT_SHA256";
+        public const string AgentPathEnvironmentVariable = "ESAITEST_AUTONOMY_AGENT_PATH";
+        public const string AgentSha256EnvironmentVariable = "ESAITEST_AUTONOMY_AGENT_SHA256";
 
-        internal static bool TryResolve(out string executablePath, out string error)
+        public static bool TryResolve(out string executablePath, out string error)
         {
             executablePath = string.Empty;
             error = string.Empty;

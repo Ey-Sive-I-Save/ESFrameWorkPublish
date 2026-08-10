@@ -33,8 +33,9 @@ namespace ES
         }
 
         /// <summary>
-        /// 调用方持有的临时 Texture 上传入口。GPU Fence 完成后图集不再引用源 Texture；
-        /// 此入口无法在 RenderTexture Page 丢失后自动重载，长期内容应优先使用 ESAssetReferTexture2D。
+        /// 调用方持有的临时 Texture 上传入口。调用方必须保持源 Texture 有效，直到返回的 UniTask 完成；
+        /// GPU Fence 完成后图集不再引用源 Texture。此入口无法在 RenderTexture Page 丢失后自动重载，
+        /// 长期内容应优先使用 ESAssetReferTexture2D。
         /// </summary>
         public static UniTask<ESDynamicAtlasLease> CopyAsync(
             ESDynamicAtlasDomainKey domain,
@@ -87,8 +88,7 @@ namespace ES
                 return true;
             }
 
-            snapshot = null;
-            return false;
+            return ESDynamicAtlasRuntime.TryCreateShutdownQuarantineSnapshot(out snapshot);
         }
 
         private static ESDynamicAtlasModule RequireModule()

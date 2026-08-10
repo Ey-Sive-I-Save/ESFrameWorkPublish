@@ -88,9 +88,30 @@ namespace ES.Editor
                 EditorGUILayout.LabelField("估算页面显存", EditorUtility.FormatBytes(snapshot.estimatedGpuBytes));
                 EditorGUILayout.LabelField("条目", $"Pending {snapshot.pendingCount} / Ready {snapshot.readyCount} / Retired {snapshot.retiredCount} / Failed {snapshot.failedCount} / Lost {snapshot.lostCount}");
                 EditorGUILayout.LabelField("GPU 完成令牌", $"等待 {snapshot.waitingFenceCount} / 延迟释放 {snapshot.pendingFenceReleaseCount}");
+                EditorGUILayout.LabelField("GPU 完成隔离", $"活动 {snapshot.quarantinedCount} / 终态 {snapshot.quarantinedTerminalCount} / 停机保留 {snapshot.shutdownQuarantinedCount} / 诊断折叠 {snapshot.shutdownQuarantineFoldedCount} / 累计探测 {snapshot.quarantineRetryCount} / 累计失败 {snapshot.quarantineFailureCount}");
                 EditorGUILayout.LabelField("上传路径", $"精确 GPU 复制 {snapshot.copyTextureCount} / GPU 转换与扩边 {snapshot.paddingShaderCount} / AsyncGPUReadback 完成回退 {snapshot.deferredFenceFallbackCount}");
                 EditorGUILayout.LabelField("上传耗时", $"p50 {snapshot.uploadP50Milliseconds:F2} ms / p95 {snapshot.uploadP95Milliseconds:F2} ms / p99 {snapshot.uploadP99Milliseconds:F2} ms");
                 EditorGUILayout.LabelField("页面丢失/重建", snapshot.pageLostCount.ToString());
+            }
+
+            if (snapshot.quarantinedCount > 0 || snapshot.quarantinedTerminalCount > 0
+                || snapshot.shutdownQuarantinedCount > 0)
+            {
+                string pages = snapshot.quarantinedPageIds.Count == 0
+                    ? "未记录"
+                    : string.Join(", ", snapshot.quarantinedPageIds);
+                string reason = snapshot.quarantineReasons.Count == 0
+                    ? "未返回详细原因。"
+                    : snapshot.quarantineReasons[0];
+                string status = snapshot.quarantinedTerminalCount > 0 || snapshot.shutdownQuarantinedCount > 0
+                    ? "终态隔离不会自动释放；请保留该进程诊断并重启运行环境后复查图形后端。"
+                    : "系统会以 0.25 秒间隔发起安全探针；确认完成前，该 Page 不接收新上传。";
+                EditorGUILayout.HelpBox(
+                    "检测到 GPU 完成状态隔离。影响：源 Texture Lease 与 Page 会继续保留，避免未知 GPU 使用导致过早释放。"
+                    + " 页面：" + pages + "。原因：" + reason + " 恢复：" + status,
+                    snapshot.quarantinedTerminalCount > 0 || snapshot.shutdownQuarantinedCount > 0
+                        ? MessageType.Error
+                        : MessageType.Warning);
             }
             EditorGUILayout.Space();
         }
@@ -222,6 +243,8 @@ namespace ES.Editor
                     return "失败";
                 case ESDynamicAtlasEntryState.Lost:
                     return "页面丢失";
+                case ESDynamicAtlasEntryState.Quarantined:
+                    return "GPU 隔离";
                 default:
                     return "未知";
             }

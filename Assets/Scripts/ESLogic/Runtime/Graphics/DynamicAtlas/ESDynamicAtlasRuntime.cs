@@ -90,7 +90,11 @@ namespace ES
             public RenderTexture texture;
             public ESDynamicAtlasAllocator allocator;
             public int inFlightUploadCount;
+            public int quarantinedUploadCount;
             public bool recoveryPending;
+
+            public bool IsQuarantined => quarantinedUploadCount > 0;
+            public bool HasUnsafeGpuUse => inFlightUploadCount > 0 || quarantinedUploadCount > 0;
 
             public GraphicsFormat GraphicsFormat => colorSpace == ESDynamicAtlasColorSpace.SRGB
                 ? GraphicsFormat.R8G8B8A8_SRGB
@@ -164,6 +168,7 @@ namespace ES
             public bool sourceHeld;
             public bool pageRecoveryPending;
             public bool pageLost;
+            public bool placementReleasePending;
             public bool resolveInvalidated;
             public string failureMessage;
             public ESDynamicAtlasUploadPath uploadPath;
@@ -210,7 +215,41 @@ namespace ES
             public bool hasReadbackRequest;
             public Exception completionFailure;
             public float startedAt;
-            public ESDynamicAtlasUploadPath path;
+            public bool quarantined;
+            public bool quarantineTerminal;
+            public int quarantineFailureCount;
+            public float lastProbeTime;
+        }
+
+        private sealed class ShutdownQuarantine
+        {
+            public readonly List<UploadJob> uploads;
+            public readonly List<Page> pages;
+            public readonly Material paddingMaterial;
+            public readonly string reason;
+
+            public ShutdownQuarantine(List<UploadJob> uploads, List<Page> pages,
+                Material paddingMaterial, string reason)
+            {
+                this.uploads = uploads;
+                this.pages = pages;
+                this.paddingMaterial = paddingMaterial;
+                this.reason = reason;
+            }
+        }
+
+        private sealed class ShutdownQuarantineDiagnostic
+        {
+            public readonly int uploadCount;
+            public readonly List<int> pageIds;
+            public readonly string reason;
+
+            public ShutdownQuarantineDiagnostic(int uploadCount, List<int> pageIds, string reason)
+            {
+                this.uploadCount = uploadCount;
+                this.pageIds = pageIds;
+                this.reason = reason;
+            }
         }
 
         private sealed class AcquireWaiter
@@ -233,12 +272,23 @@ namespace ES
             Failed = 2
         }
 
+        private const float QuarantineProbeIntervalSeconds = 0.25f;
+        private const int MaxQuarantineProbeFailures = 3;
+        private const int MaxShutdownQuarantineDiagnostics = 16;
+
+        private static readonly List<ShutdownQuarantine> shutdownQuarantines
+            = new List<ShutdownQuarantine>();
+        private static readonly List<ShutdownQuarantineDiagnostic> shutdownQuarantineDiagnostics
+            = new List<ShutdownQuarantineDiagnostic>();
+        private static int shutdownQuarantineFoldedCount;
         private readonly Dictionary<EntryKey, Entry> entries = new Dictionary<EntryKey, Entry>();
         private readonly Dictionary<ESDynamicAtlasDomainKey, ESDynamicAtlasDomainPolicy> policies
             = new Dictionary<ESDynamicAtlasDomainKey, ESDynamicAtlasDomainPolicy>();
         private readonly List<Page> pages = new List<Page>();
         private readonly Queue<Entry> uploadQueue = new Queue<Entry>();
         private readonly List<UploadJob> inFlightUploads = new List<UploadJob>();
+        private readonly List<UploadJob> quarantinedUploads = new List<UploadJob>();
+        private readonly Stack<CommandBuffer> reusableUploadCommandBuffers = new Stack<CommandBuffer>();
         private readonly Dictionary<long, LeaseRecord> leases = new Dictionary<long, LeaseRecord>();
         private readonly Dictionary<long, ObservationRecord> observations = new Dictionary<long, ObservationRecord>();
 
@@ -276,23 +326,27 @@ namespace ES
         private int deferredFenceFallbackCount;
         private int pageLostCount;
         private int deferredFenceReleaseCount;
+        private int quarantineRetryCount;
+        private int quarantineFailureCount;
         private bool graphicsFencePollingUnavailable;
 
         public bool IsAcceptingRequests => !disposed && acceptingRequests && ESAssets.IsReady;
 
         private bool IsAcceptingDirectRequests => !disposed && acceptingRequests;
 
-        // White-box test control for exercising the readback completion path on
-        // backends whose GraphicsFence.passed polling normally works.
+#if UNITY_EDITOR
+        // Editor-only white-box controls keep GPU failure-path coverage out of
+        // Player builds. They are internal and visible only to the dedicated
+        // DynamicAtlas test assemblies.
         internal bool ForceAsyncGpuReadbackCompletionForTests
         {
             get => graphicsFencePollingUnavailable;
             set => graphicsFencePollingUnavailable = value;
         }
 
-        // White-box test control for the conservative path used when a command
-        // submission throws after the GPU might already have observed the source.
         internal bool ForceUnknownGpuSubmissionForTests { get; set; }
+        internal bool ForceAsyncGpuReadbackFailureForTests { get; set; }
+#endif
 
         public void ConfigureDomain(ESDynamicAtlasDomainKey domain, ESDynamicAtlasDomainPolicy policy)
         {
@@ -452,6 +506,15 @@ namespace ES
         {
             request = request.Sanitized();
             var key = new EntryKey(domain, content, request, providerGeneration, GetDomainGeneration(domain));
+            if (entries.TryGetValue(key, out Entry failedEntry)
+                && failedEntry.state == ESDynamicAtlasEntryState.Failed
+                && failedEntry.refCount == 0)
+            {
+                // A failed entry has no lease to preserve. Remove it before a retry so
+                // callers do not depend on a later Tick() merely to make the same key
+                // loadable again. EvictEntry still refuses unsafe GPU/page states.
+                EvictEntry(failedEntry);
+            }
             if (!entries.TryGetValue(key, out Entry entry))
             {
                 entry = new Entry
@@ -484,6 +547,7 @@ namespace ES
             using (TickMarker.Auto())
             {
                 CompleteFinishedUploads();
+                ProbeQuarantinedUploads();
                 DetectLostPages();
                 StartBudgetedUploads();
                 EvictUnusedEntries();
@@ -526,6 +590,12 @@ namespace ES
                         entry.initialCompletion.TrySetException(
                             new OperationCanceledException("资源 Provider 正在切换，动态图集旧代上传不再交付新 Lease。"));
                     }
+                    continue;
+                }
+
+                if (entry.state == ESDynamicAtlasEntryState.Quarantined)
+                {
+                    Notify(entry);
                     continue;
                 }
 
@@ -579,6 +649,12 @@ namespace ES
                     continue;
                 }
 
+                if (entry.state == ESDynamicAtlasEntryState.Quarantined)
+                {
+                    Notify(entry);
+                    continue;
+                }
+
                 entry.sourceHold?.Dispose();
                 entry.sourceHold = null;
                 entry.sourceHeld = false;
@@ -615,6 +691,8 @@ namespace ES
                 paddingShaderCount = paddingShaderCount,
                 deferredFenceFallbackCount = deferredFenceFallbackCount,
                 pendingFenceReleaseCount = deferredFenceReleaseCount,
+                quarantineRetryCount = quarantineRetryCount,
+                quarantineFailureCount = quarantineFailureCount,
                 pageLostCount = pageLostCount
             };
 
@@ -651,6 +729,9 @@ namespace ES
                         snapshot.pendingCount++;
                         snapshot.waitingFenceCount++;
                         break;
+                    case ESDynamicAtlasEntryState.Quarantined:
+                        snapshot.pendingCount++;
+                        break;
                 }
 
                 if (snapshot.entries.Count < maxEntryDetails)
@@ -677,7 +758,112 @@ namespace ES
 
             CalculatePercentiles(out snapshot.uploadP50Milliseconds,
                 out snapshot.uploadP95Milliseconds, out snapshot.uploadP99Milliseconds);
+            AppendQuarantineDiagnostics(snapshot);
             return snapshot;
+        }
+
+        internal static bool TryCreateShutdownQuarantineSnapshot(out ESDynamicAtlasSnapshot snapshot)
+        {
+            if (shutdownQuarantineDiagnostics.Count == 0 && shutdownQuarantineFoldedCount == 0)
+            {
+                snapshot = null;
+                return false;
+            }
+
+            snapshot = new ESDynamicAtlasSnapshot();
+            AppendShutdownQuarantineDiagnostics(snapshot);
+            return true;
+        }
+
+        private void AppendQuarantineDiagnostics(ESDynamicAtlasSnapshot snapshot)
+        {
+            for (int i = 0; i < quarantinedUploads.Count; i++)
+            {
+                UploadJob job = quarantinedUploads[i];
+                snapshot.quarantinedCount++;
+                if (job.quarantineTerminal)
+                    snapshot.quarantinedTerminalCount++;
+                AddQuarantineDiagnostic(snapshot, job.page, job.completionFailure?.Message);
+            }
+
+            AppendShutdownQuarantineDiagnostics(snapshot);
+        }
+
+        private static void AppendShutdownQuarantineDiagnostics(ESDynamicAtlasSnapshot snapshot)
+        {
+            snapshot.shutdownQuarantineFoldedCount = shutdownQuarantineFoldedCount;
+            for (int quarantineIndex = 0; quarantineIndex < shutdownQuarantineDiagnostics.Count; quarantineIndex++)
+            {
+                ShutdownQuarantineDiagnostic diagnostic = shutdownQuarantineDiagnostics[quarantineIndex];
+                snapshot.shutdownQuarantinedCount += diagnostic.uploadCount;
+                snapshot.quarantinedTerminalCount += diagnostic.uploadCount;
+                AddQuarantineDiagnostic(snapshot, null, diagnostic.reason);
+                AddQuarantineDiagnostic(snapshot, diagnostic.pageIds);
+            }
+        }
+
+        private static void AddQuarantineDiagnostic(
+            ESDynamicAtlasSnapshot snapshot,
+            Page page,
+            string reason)
+        {
+            if (page != null && page.id != 0 && !snapshot.quarantinedPageIds.Contains(page.id))
+                snapshot.quarantinedPageIds.Add(page.id);
+            if (!string.IsNullOrWhiteSpace(reason))
+                snapshot.quarantineReasons.Add(reason);
+        }
+
+        private static void AddQuarantineDiagnostic(
+            ESDynamicAtlasSnapshot snapshot,
+            List<int> pageIds)
+        {
+            if (pageIds == null)
+                return;
+
+            for (int pageIndex = 0; pageIndex < pageIds.Count; pageIndex++)
+            {
+                int pageId = pageIds[pageIndex];
+                if (pageId != 0 && !snapshot.quarantinedPageIds.Contains(pageId))
+                    snapshot.quarantinedPageIds.Add(pageId);
+            }
+        }
+
+        private static void RetainShutdownQuarantine(
+            List<UploadJob> uploads,
+            List<Page> pendingPages,
+            Material pendingPaddingMaterial,
+            Exception exception)
+        {
+            if (uploads == null || uploads.Count == 0)
+                return;
+
+            string reason = exception?.Message ?? "动态图集 Runtime 关闭时无法确认 GPU 完成状态。";
+            shutdownQuarantines.Add(new ShutdownQuarantine(
+                uploads,
+                pendingPages,
+                pendingPaddingMaterial,
+                reason));
+            var pageIds = new List<int>();
+            if (pendingPages != null)
+            {
+                for (int pageIndex = 0; pageIndex < pendingPages.Count; pageIndex++)
+                {
+                    Page page = pendingPages[pageIndex];
+                    if (page != null && page.id != 0)
+                        pageIds.Add(page.id);
+                }
+            }
+            shutdownQuarantineDiagnostics.Add(new ShutdownQuarantineDiagnostic(
+                uploads.Count,
+                pageIds,
+                reason));
+            if (shutdownQuarantineDiagnostics.Count > MaxShutdownQuarantineDiagnostics)
+            {
+                shutdownQuarantineDiagnostics.RemoveAt(0);
+                shutdownQuarantineFoldedCount++;
+            }
+            Debug.LogError($"[ES动态图集] Runtime 已关闭，但仍有 {uploads.Count} 个 GPU 上传处于隔离状态；" +
+                           "源 Texture Lease 和 Page 已保留到进程结束。原因：" + reason);
         }
 
         public bool TryResolve(long leaseToken, out ESDynamicAtlasResolved resolved)
@@ -690,7 +876,8 @@ namespace ES
                     && !entry.pageLost
                     && !entry.resolveInvalidated
                     && (entry.state == ESDynamicAtlasEntryState.Ready || entry.state == ESDynamicAtlasEntryState.Retired)
-                    && page != null && page.texture != null && page.texture.IsCreated())
+                    && page != null && page.texture != null && page.texture.IsCreated()
+                    && !page.IsQuarantined)
                 {
                     float inverse = 1f / page.size;
                     var uv = new Rect(entry.contentRect.x * inverse, entry.contentRect.y * inverse,
@@ -703,6 +890,74 @@ namespace ES
 
             resolved = default;
             return false;
+        }
+
+        public bool TryGetLeaseState(long leaseToken, out ESDynamicAtlasLeaseState state)
+        {
+            if (disposed || !leases.TryGetValue(leaseToken, out LeaseRecord lease))
+            {
+                state = ESDynamicAtlasLeaseState.Invalid;
+                return false;
+            }
+
+            Entry entry = lease.entry;
+            if (entry.page != null && entry.page.IsQuarantined)
+            {
+                state = ESDynamicAtlasLeaseState.Quarantined;
+                return true;
+            }
+            if (lease.slotGeneration != entry.slotGeneration
+                || entry.resolveInvalidated
+                || entry.page == null
+                || entry.page.texture == null
+                || !entry.page.texture.IsCreated())
+            {
+                if (entry.state == ESDynamicAtlasEntryState.Quarantined)
+                {
+                    state = ESDynamicAtlasLeaseState.Quarantined;
+                }
+                else if (entry.source.CanReload
+                         && (entry.pageRecoveryPending
+                             || entry.state == ESDynamicAtlasEntryState.PendingSource
+                             || entry.state == ESDynamicAtlasEntryState.QueuedUpload
+                             || entry.state == ESDynamicAtlasEntryState.WaitingGpuFence))
+                {
+                    state = ESDynamicAtlasLeaseState.Recovering;
+                }
+                else if (entry.state == ESDynamicAtlasEntryState.Ready
+                         || entry.state == ESDynamicAtlasEntryState.Retired)
+                {
+                    state = ESDynamicAtlasLeaseState.Lost;
+                }
+                else
+                {
+                    state = ESDynamicAtlasLeaseState.Failed;
+                }
+                return true;
+            }
+
+            switch (entry.state)
+            {
+                case ESDynamicAtlasEntryState.Ready:
+                    state = ESDynamicAtlasLeaseState.Ready;
+                    break;
+                case ESDynamicAtlasEntryState.Retired:
+                    state = ESDynamicAtlasLeaseState.Retired;
+                    break;
+                case ESDynamicAtlasEntryState.Quarantined:
+                    state = ESDynamicAtlasLeaseState.Quarantined;
+                    break;
+                case ESDynamicAtlasEntryState.Failed:
+                    state = ESDynamicAtlasLeaseState.Failed;
+                    break;
+                case ESDynamicAtlasEntryState.Lost:
+                    state = ESDynamicAtlasLeaseState.Lost;
+                    break;
+                default:
+                    state = ESDynamicAtlasLeaseState.Recovering;
+                    break;
+            }
+            return true;
         }
 
         public void Release(long leaseToken)
@@ -767,14 +1022,20 @@ namespace ES
                 }
             }
 
-            List<UploadJob> pendingUploads = inFlightUploads.Count == 0
+            List<UploadJob> pendingUploads = inFlightUploads.Count == 0 && quarantinedUploads.Count == 0
                 ? null
-                : new List<UploadJob>(inFlightUploads);
+                : new List<UploadJob>(inFlightUploads.Count + quarantinedUploads.Count);
+            if (pendingUploads != null)
+            {
+                pendingUploads.AddRange(inFlightUploads);
+                pendingUploads.AddRange(quarantinedUploads);
+            }
             List<Page> pendingPages = pages.Count == 0
                 ? null
                 : new List<Page>(pages);
             Material pendingPaddingMaterial = paddingMaterial;
             inFlightUploads.Clear();
+            quarantinedUploads.Clear();
             pages.Clear();
 
             if (pendingUploads != null && pendingUploads.Count > 0)
@@ -793,6 +1054,7 @@ namespace ES
             paddingMaterial = null;
             entries.Clear();
             uploadQueue.Clear();
+            DisposeReusableUploadCommandBuffers();
             leases.Clear();
             observations.Clear();
             domainLeaseTokens.Clear();
@@ -822,8 +1084,9 @@ namespace ES
             catch (Exception exception)
             {
                 // Releasing a source or page after an unknown GPU completion state is unsafe.
-                // Keep the native objects alive rather than turning shutdown into a GPU use-after-free.
-                Debug.LogException(exception);
+                // Retain them in the process-level diagnostic quarantine instead of losing
+                // ownership after this Runtime has been disposed.
+                RetainShutdownQuarantine(uploads, pendingPages, pendingPaddingMaterial, exception);
                 return;
             }
 
@@ -850,6 +1113,12 @@ namespace ES
             for (int i = 0; i < uploads.Count; i++)
             {
                 UploadJob job = uploads[i];
+                if (job != null && job.quarantined)
+                {
+                    completionFailure = job.completionFailure ?? new InvalidOperationException(
+                        "动态图集 Runtime 关闭时仍有 GPU 完成状态未知的隔离上传。 ");
+                    return false;
+                }
                 UploadCompletionState state = GetUploadCompletionState(job, out completionFailure);
                 if (state == UploadCompletionState.Completed)
                     continue;
@@ -1003,7 +1272,8 @@ namespace ES
             for (int i = 0; i < pages.Count; i++)
             {
                 Page page = pages[i];
-                if (!page.Matches(entry.key.domain, entry.key.request)
+                if (page.IsQuarantined
+                    || !page.Matches(entry.key.domain, entry.key.request)
                     || !page.allocator.TryAllocate(allocatedWidth, allocatedHeight, out RectInt allocated))
                 {
                     continue;
@@ -1064,7 +1334,8 @@ namespace ES
                 for (int pageIndex = 0; pageIndex < pages.Count; pageIndex++)
                 {
                     Page page = pages[pageIndex];
-                    if (!page.Matches(target.key.domain, target.key.request)
+                    if (page.IsQuarantined
+                        || !page.Matches(target.key.domain, target.key.request)
                         || !page.allocator.TryAllocate(allocatedWidth, allocatedHeight, out RectInt allocated))
                     {
                         continue;
@@ -1092,6 +1363,7 @@ namespace ES
                 entry.slotGeneration = nextSlotGeneration;
             }
             entry.resolveInvalidated = false;
+            entry.placementReleasePending = false;
             entry.placementRevision++;
             Notify(entry);
         }
@@ -1124,10 +1396,18 @@ namespace ES
             while (uploadQueue.Count > 0 && safety-- > 0)
             {
                 Entry entry = uploadQueue.Dequeue();
-                if (entry.state != ESDynamicAtlasEntryState.QueuedUpload || entry.sourceHold?.texture == null)
+                if (entry.state != ESDynamicAtlasEntryState.QueuedUpload)
                     continue;
 
-                if (entry.page != null && entry.page.recoveryPending)
+                if (entry.sourceHold?.texture == null)
+                {
+                    string sourceKind = entry.source.IsResourceBacked ? "资源加载结果" : "调用方提供的 Texture";
+                    FailEntry(entry, new InvalidOperationException(
+                        "动态图集上传开始前 " + sourceKind + " 已失效；请求不会继续等待或交付 Lease。"));
+                    continue;
+                }
+
+                if (entry.page != null && (entry.page.recoveryPending || entry.page.IsQuarantined))
                 {
                     uploadQueue.Enqueue(entry);
                     continue;
@@ -1162,6 +1442,8 @@ namespace ES
             using (UploadMarker.Auto())
             {
                 Page page = entry.page ?? throw new InvalidOperationException("动态图集上传没有目标页面。 ");
+                if (page.IsQuarantined)
+                    throw new InvalidOperationException("动态图集 Page 正处于 GPU 完成隔离，不能开始新上传。 ");
                 if (page.texture == null || !page.texture.IsCreated())
                 {
                     if (page.recoveryPending)
@@ -1178,7 +1460,7 @@ namespace ES
 
                 SourceHold uploadHold = entry.sourceHold;
                 Texture source = uploadHold.texture;
-                CommandBuffer command = new CommandBuffer { name = $"ES Dynamic Atlas Upload {entry.key.content}" };
+                CommandBuffer command = GetUploadCommandBuffer($"ES Dynamic Atlas Upload {entry.key.content}");
                 try
                 {
                     ESDynamicAtlasUploadPath path;
@@ -1240,23 +1522,28 @@ namespace ES
 
                     try
                     {
+#if UNITY_EDITOR
                         if (ForceUnknownGpuSubmissionForTests)
                         {
                             throw new InvalidOperationException(
                                 "测试注入：无法确认动态图集上传命令是否已提交到 GPU。 ");
                         }
+#endif
 
                         Graphics.ExecuteCommandBuffer(command);
                     }
                     catch (Exception exception)
                     {
-                        PreserveUnknownSubmission(entry, page, uploadHold, path, exception);
+                        PreserveUnknownSubmission(entry, page, uploadHold, exception);
                         return;
                     }
                     finally
                     {
-                        command?.Dispose();
-                        command = null;
+                        if (command != null)
+                        {
+                            ReturnUploadCommandBuffer(command);
+                            command = null;
+                        }
                     }
 
                     entry.sourceHold = null;
@@ -1270,26 +1557,56 @@ namespace ES
                         sourceHold = uploadHold,
                         fence = fence,
                         hasFence = hasFence,
-                        startedAt = Time.realtimeSinceStartup,
-                        path = path
+                        startedAt = Time.realtimeSinceStartup
                     };
                     inFlightUploads.Add(job);
 
                     if (!hasFence && !TryStartAsyncGpuReadbackFallback(job, fenceCreationFailure, out Exception failure))
-                        FailUploadCompletion(job, failure);
+                        QuarantineUpload(job, failure);
                 }
                 finally
                 {
-                    command?.Dispose();
+                    if (command != null)
+                        ReturnUploadCommandBuffer(command);
                 }
             }
+        }
+
+        private CommandBuffer GetUploadCommandBuffer(string name)
+        {
+            CommandBuffer command = reusableUploadCommandBuffers.Count > 0
+                ? reusableUploadCommandBuffers.Pop()
+                : new CommandBuffer();
+            command.Clear();
+            command.name = name;
+            return command;
+        }
+
+        private void ReturnUploadCommandBuffer(CommandBuffer command)
+        {
+            if (command == null)
+                return;
+
+            command.Clear();
+            if (disposed)
+            {
+                command.Dispose();
+                return;
+            }
+
+            reusableUploadCommandBuffers.Push(command);
+        }
+
+        private void DisposeReusableUploadCommandBuffers()
+        {
+            while (reusableUploadCommandBuffers.Count > 0)
+                reusableUploadCommandBuffers.Pop().Dispose();
         }
 
         private void PreserveUnknownSubmission(
             Entry entry,
             Page page,
             SourceHold uploadHold,
-            ESDynamicAtlasUploadPath path,
             Exception submissionFailure)
         {
             // ExecuteCommandBuffer can fail after the native side has accepted some
@@ -1304,8 +1621,7 @@ namespace ES
                 entry = entry,
                 page = page,
                 sourceHold = uploadHold,
-                startedAt = Time.realtimeSinceStartup,
-                path = path
+                startedAt = Time.realtimeSinceStartup
             };
             inFlightUploads.Add(job);
 
@@ -1314,14 +1630,19 @@ namespace ES
                 preserveInFlightSourceHold: true);
 
             if (!TryStartAsyncGpuReadbackFallback(job, submissionFailure, out Exception completionFailure))
-                FailUploadCompletion(job, completionFailure);
+                QuarantineUpload(job, completionFailure);
         }
 
         private static bool CanUseCopyTexture(Texture source, Page page, Entry entry)
         {
+            CopyTextureSupport support = SystemInfo.copyTextureSupport;
+            bool sourceIsRenderTexture = source is RenderTexture;
+            bool supportsCopyToPage = sourceIsRenderTexture
+                ? (support & CopyTextureSupport.Basic) != 0
+                : (support & (CopyTextureSupport.TextureToRT | CopyTextureSupport.DifferentTypes)) != 0;
             return entry.key.request.padding == 0
                    && entry.key.request.alphaMode == ESDynamicAtlasAlphaMode.Straight
-                   && SystemInfo.copyTextureSupport != CopyTextureSupport.None
+                   && supportsCopyToPage
                    && source != null
                    && source.graphicsFormat == page.GraphicsFormat;
         }
@@ -1348,7 +1669,7 @@ namespace ES
             completionFailure = null;
             if (job == null)
                 return UploadCompletionState.Completed;
-            if (job.completionFailure != null)
+            if (job.completionFailure != null && !job.quarantined)
             {
                 completionFailure = job.completionFailure;
                 return UploadCompletionState.Failed;
@@ -1444,6 +1765,15 @@ namespace ES
 
             try
             {
+#if UNITY_EDITOR
+                if (ForceAsyncGpuReadbackFailureForTests)
+                {
+                    completionFailure = new InvalidOperationException(
+                        "测试注入：无法创建动态图集 AsyncGPUReadback 完成令牌。", fenceFailure);
+                    return false;
+                }
+#endif
+
                 // The request is issued after the upload command buffer. One target-page
                 // pixel is sufficient as a GPU queue completion token; the uploaded image
                 // is never read as CPU data and no full-image readback is requested.
@@ -1453,9 +1783,9 @@ namespace ES
                     0, 1, null);
                 job.hasReadbackRequest = true;
                 job.hasFence = false;
-                job.path = ESDynamicAtlasUploadPath.DeferredFenceFallback;
                 entry.uploadPath = ESDynamicAtlasUploadPath.DeferredFenceFallback;
-                deferredFenceFallbackCount++;
+                if (!job.quarantined)
+                    deferredFenceFallbackCount++;
                 return true;
             }
             catch (Exception exception)
@@ -1466,23 +1796,213 @@ namespace ES
             }
         }
 
-        private void FailUploadCompletion(UploadJob job, Exception completionFailure)
+        private static void ClearReadbackCompletionToken(UploadJob job)
         {
             if (job == null)
                 return;
 
-            job.completionFailure ??= completionFailure ?? new InvalidOperationException(
-                "动态图集上传无法确认 GPU 完成状态。 ");
-            Entry entry = job.entry;
-            if (entry == null)
+            job.hasReadbackRequest = false;
+            job.readbackRequest = default;
+            job.hasFence = false;
+        }
+
+        private UploadCompletionState GetQuarantineProbeCompletionState(
+            UploadJob job,
+            out Exception completionFailure)
+        {
+            completionFailure = null;
+            if (job == null || !job.hasReadbackRequest)
+            {
+                completionFailure = new InvalidOperationException(
+                    "动态图集隔离上传缺少 AsyncGPUReadback 探针。 ");
+                return UploadCompletionState.Failed;
+            }
+
+            try
+            {
+                if (!job.readbackRequest.done)
+                    return UploadCompletionState.Pending;
+                if (!job.readbackRequest.hasError)
+                    return UploadCompletionState.Completed;
+
+                completionFailure = new InvalidOperationException(
+                    "动态图集隔离上传的 AsyncGPUReadback 探针返回错误；继续保留 Source Lease 与 Page。 ");
+                return UploadCompletionState.Failed;
+            }
+            catch (Exception exception)
+            {
+                completionFailure = new InvalidOperationException(
+                    "动态图集隔离上传的 AsyncGPUReadback 探针状态无法读取；继续保留 Source Lease 与 Page。",
+                    exception);
+                return UploadCompletionState.Failed;
+            }
+        }
+
+        private void QuarantineUpload(UploadJob job, Exception completionFailure)
+        {
+            if (job == null || job.quarantined)
                 return;
 
-            if (entry.state != ESDynamicAtlasEntryState.Failed && entry.state != ESDynamicAtlasEntryState.Retired)
-                FailEntry(entry, job.completionFailure, preserveInFlightSourceHold: true);
+            job.completionFailure ??= completionFailure ?? new InvalidOperationException(
+                "动态图集上传无法确认 GPU 完成状态。 ");
+            bool removedFromInFlight = inFlightUploads.Remove(job);
+            job.quarantined = true;
+            job.lastProbeTime = float.NegativeInfinity;
+            ClearReadbackCompletionToken(job);
+            bool pageEnteredQuarantine = false;
+            if (job.page != null)
+            {
+                pageEnteredQuarantine = job.page.quarantinedUploadCount == 0;
+                if (removedFromInFlight)
+                    job.page.inFlightUploadCount = Mathf.Max(0, job.page.inFlightUploadCount - 1);
+                job.page.quarantinedUploadCount++;
+            }
+            quarantinedUploads.Add(job);
 
-            // A failed completion token is not evidence that the GPU has stopped using the
-            // source. Keep the in-flight hold and page alive until a known-safe completion.
-            entry.sourceHeld = job.sourceHold != null;
+            Entry entry = job.entry;
+            if (entry != null)
+            {
+                entry.sourceHeld = job.sourceHold != null;
+                entry.resolveInvalidated = true;
+                entry.state = ESDynamicAtlasEntryState.Quarantined;
+                entry.failureMessage = "动态图集 GPU 完成状态未知，上传已隔离；Source Lease 与目标 Page 会保留至安全探针确认。原因："
+                    + job.completionFailure.Message;
+                if (!entry.initialCompletionSettled)
+                {
+                    entry.initialCompletionSettled = true;
+                    entry.initialCompletion.TrySetException(new InvalidOperationException(
+                        "动态图集上传 GPU 完成状态未知，当前请求不会交付 Lease。", job.completionFailure));
+                }
+            }
+
+            if (pageEnteredQuarantine)
+                NotifyPageEntries(job.page);
+            else if (entry != null)
+                Notify(entry);
+        }
+
+        private void ProbeQuarantinedUploads()
+        {
+            if (quarantinedUploads.Count == 0)
+                return;
+
+            float now = Time.realtimeSinceStartup;
+            for (int i = quarantinedUploads.Count - 1; i >= 0; i--)
+            {
+                UploadJob job = quarantinedUploads[i];
+                if (job == null)
+                {
+                    quarantinedUploads.RemoveAt(i);
+                    continue;
+                }
+                if (job.quarantineTerminal)
+                    continue;
+
+                if (job.hasReadbackRequest)
+                {
+                    UploadCompletionState completion = GetQuarantineProbeCompletionState(job, out Exception probeFailure);
+                    if (completion == UploadCompletionState.Pending)
+                        continue;
+                    if (completion == UploadCompletionState.Completed)
+                    {
+                        CompleteQuarantinedUpload(i);
+                        continue;
+                    }
+
+                    ClearReadbackCompletionToken(job);
+                    RecordQuarantineProbeFailure(job, probeFailure, now);
+                    continue;
+                }
+
+                if (now - job.lastProbeTime < QuarantineProbeIntervalSeconds)
+                    continue;
+
+                job.lastProbeTime = now;
+                quarantineRetryCount++;
+                if (!TryStartAsyncGpuReadbackFallback(job, job.completionFailure, out Exception requestFailure))
+                {
+                    RecordQuarantineProbeFailure(job, requestFailure, now);
+                    continue;
+                }
+
+                UploadCompletionState immediate = GetQuarantineProbeCompletionState(job, out Exception immediateFailure);
+                if (immediate == UploadCompletionState.Completed)
+                {
+                    CompleteQuarantinedUpload(i);
+                }
+                else if (immediate == UploadCompletionState.Failed)
+                {
+                    ClearReadbackCompletionToken(job);
+                    RecordQuarantineProbeFailure(job, immediateFailure, now);
+                }
+            }
+        }
+
+        private void RecordQuarantineProbeFailure(UploadJob job, Exception failure, float now)
+        {
+            if (job == null)
+                return;
+
+            job.quarantineFailureCount++;
+            job.lastProbeTime = now;
+            quarantineFailureCount++;
+            if (job.quarantineFailureCount < MaxQuarantineProbeFailures)
+                return;
+
+            job.quarantineTerminal = true;
+            Entry entry = job.entry;
+            string reason = failure?.Message ?? job.completionFailure?.Message ?? "未返回详细错误。";
+            if (entry != null)
+            {
+                entry.failureMessage = "动态图集 GPU 完成状态连续探针失败，已进入终态隔离；"
+                    + "该 Page 不会接收新上传，Source Lease 与原生对象会保留到进程结束。最后原因：" + reason;
+                Notify(entry);
+            }
+
+            Debug.LogError("[ES动态图集] GPU 完成状态终态隔离：Page " + (job.page?.id ?? 0)
+                + "，连续探针失败 " + job.quarantineFailureCount + " 次。原因：" + reason);
+        }
+
+        private void CompleteQuarantinedUpload(int index)
+        {
+            if (index < 0 || index >= quarantinedUploads.Count)
+                return;
+
+            UploadJob job = quarantinedUploads[index];
+            quarantinedUploads.RemoveAt(index);
+            job.quarantined = false;
+            ClearReadbackCompletionToken(job);
+            bool pageExitedQuarantine = job.page != null && job.page.quarantinedUploadCount == 1;
+            if (job.page != null)
+                job.page.quarantinedUploadCount = Mathf.Max(0, job.page.quarantinedUploadCount - 1);
+
+            job.sourceHold?.Dispose();
+            job.sourceHold = null;
+            Entry entry = job.entry;
+            if (entry != null)
+            {
+                entry.sourceHeld = false;
+                if (entry.state == ESDynamicAtlasEntryState.Quarantined)
+                {
+                    entry.state = ESDynamicAtlasEntryState.Failed;
+                    entry.placementReleasePending = true;
+                    entry.failureMessage = "动态图集隔离探针已确认 GPU 不再使用 Source；原上传不会交付 Lease。原因："
+                        + (job.completionFailure?.Message ?? "未知完成状态。");
+                    if (!pageExitedQuarantine)
+                        Notify(entry);
+                    if (entry.refCount == 0)
+                        EvictEntry(entry);
+                }
+            }
+
+            if (pageExitedQuarantine)
+                NotifyPageEntries(job.page);
+
+            if (job.page != null && !job.page.HasUnsafeGpuUse)
+                ReleasePendingPlacements(job.page);
+
+            if (job.page != null && job.page.recoveryPending && !job.page.HasUnsafeGpuUse)
+                RecoverLostPage(job.page);
         }
 
         private void CompleteFinishedUploads()
@@ -1496,7 +2016,7 @@ namespace ES
 
                 if (completion == UploadCompletionState.Failed)
                 {
-                    FailUploadCompletion(job, completionFailure);
+                    QuarantineUpload(job, completionFailure);
                     continue;
                 }
 
@@ -1510,7 +2030,7 @@ namespace ES
                     entry.sourceHeld = false;
 
                 if (job.page != null && job.page.recoveryPending
-                    && job.page.inFlightUploadCount == 0)
+                    && !job.page.HasUnsafeGpuUse)
                 {
                     RecoverLostPage(job.page);
                 }
@@ -1563,7 +2083,7 @@ namespace ES
                     continue;
 
                 pageLostCount++;
-                page.recoveryPending = page.inFlightUploadCount > 0;
+                page.recoveryPending = page.HasUnsafeGpuUse;
                 List<Entry> pageEntries = new List<Entry>(entries.Values);
                 for (int entryIndex = 0; entryIndex < pageEntries.Count; entryIndex++)
                 {
@@ -1590,9 +2110,16 @@ namespace ES
                         Notify(entry);
                         continue;
                     }
+                    if (entry.state == ESDynamicAtlasEntryState.Quarantined)
+                    {
+                        entry.pageRecoveryPending = true;
+                        Notify(entry);
+                        continue;
+                    }
                     if (entry.providerRetired || !entry.source.CanReload)
                     {
                         entry.state = ESDynamicAtlasEntryState.Failed;
+                        entry.placementReleasePending = true;
                         Notify(entry);
                         continue;
                     }
@@ -1601,15 +2128,69 @@ namespace ES
                 }
 
                 if (!page.recoveryPending)
+                {
+                    ReleasePendingPlacements(page);
                     RecoverLostPage(page);
+                }
             }
+        }
+
+        private void ReleasePendingPlacements(Page page)
+        {
+            if (page == null || page.HasUnsafeGpuUse)
+                return;
+
+            List<Entry> pageEntries = new List<Entry>(entries.Values);
+            for (int entryIndex = 0; entryIndex < pageEntries.Count; entryIndex++)
+            {
+                Entry entry = pageEntries[entryIndex];
+                if (!entries.TryGetValue(entry.key, out Entry current)
+                    || !ReferenceEquals(current, entry))
+                {
+                    continue;
+                }
+                if (!ReferenceEquals(entry.page, page) || !entry.placementReleasePending)
+                    continue;
+
+                ReleasePlacement(entry);
+            }
+        }
+
+        private bool ReleasePlacement(Entry entry, bool notify = true)
+        {
+            if (entry == null || entry.page == null || entry.page.HasUnsafeGpuUse)
+                return false;
+
+            Page page = entry.page;
+            page.allocator.Free(entry.allocatedRect);
+            entry.page = null;
+            entry.allocatedRect = default;
+            entry.contentRect = default;
+            entry.placementReleasePending = false;
+            entry.pageLost = true;
+            entry.resolveInvalidated = true;
+            if (entry.slotGeneration == 0)
+            {
+                nextSlotGeneration++;
+                if (nextSlotGeneration == 0)
+                    nextSlotGeneration++;
+                entry.slotGeneration = nextSlotGeneration;
+            }
+            else
+            {
+                entry.slotGeneration++;
+            }
+            if (notify)
+                Notify(entry);
+            return true;
         }
 
         private void RecoverLostPage(Page page)
         {
-            if (page == null || page.inFlightUploadCount > 0)
+            if (page == null || page.HasUnsafeGpuUse)
                 return;
 
+            ReleasePendingPlacements(page);
             if (page.texture == null || !page.texture.IsCreated())
                 page.CreateTexture();
             page.recoveryPending = false;
@@ -1670,6 +2251,7 @@ namespace ES
                 if (entry.refCount != 0 || entry.state == ESDynamicAtlasEntryState.PendingSource
                     || entry.state == ESDynamicAtlasEntryState.QueuedUpload
                     || entry.state == ESDynamicAtlasEntryState.WaitingGpuFence
+                    || entry.state == ESDynamicAtlasEntryState.Quarantined
                     || entry.pageRecoveryPending)
                 {
                     continue;
@@ -1694,8 +2276,9 @@ namespace ES
                 return;
 
             if (entry.state == ESDynamicAtlasEntryState.WaitingGpuFence
+                || entry.state == ESDynamicAtlasEntryState.Quarantined
                 || entry.pageRecoveryPending
-                || (entry.page != null && entry.page.inFlightUploadCount > 0))
+                || (entry.page != null && entry.page.HasUnsafeGpuUse))
             {
                 return;
             }
@@ -1734,7 +2317,41 @@ namespace ES
                 entry.initialCompletionSettled = true;
                 entry.initialCompletion.TrySetException(exception ?? new InvalidOperationException("动态图集条目失败。 "));
             }
+
+            // A page that was lost has no usable pixels at this placement. If its
+            // recovery then fails, keeping the rectangle until an old Lease is
+            // disposed turns a terminal failure into silent atlas exhaustion.
+            // Releasing the placement does not release or mutate the caller Lease;
+            // it only makes that Lease observably Failed/Lost and returns the slot
+            // after all GPU use is known to be safe.
+            if (entry.pageLost && entry.page != null)
+            {
+                entry.placementReleasePending = true;
+                if (!entry.page.HasUnsafeGpuUse)
+                    ReleasePlacement(entry, notify: false);
+            }
             Notify(entry);
+        }
+
+        private void NotifyPageEntries(Page page)
+        {
+            if (page == null)
+                return;
+
+            List<Entry> pageEntries = new List<Entry>(entries.Values);
+            for (int entryIndex = 0; entryIndex < pageEntries.Count; entryIndex++)
+            {
+                Entry entry = pageEntries[entryIndex];
+                if (!entries.TryGetValue(entry.key, out Entry current)
+                    || !ReferenceEquals(current, entry))
+                {
+                    continue;
+                }
+                if (!ReferenceEquals(entry.page, page))
+                    continue;
+
+                Notify(entry);
+            }
         }
 
         private void Notify(Entry entry)
@@ -1822,7 +2439,7 @@ namespace ES
                     continue;
                 if (page.allocator.UsedPixels != 0)
                     continue;
-                if (page.inFlightUploadCount != 0 || page.recoveryPending)
+                if (page.HasUnsafeGpuUse || page.recoveryPending)
                     continue;
 
                 page.Dispose();

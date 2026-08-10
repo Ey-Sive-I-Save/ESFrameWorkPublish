@@ -146,7 +146,7 @@ namespace ES
                 case ItemWeaponDataBlock weapon:
                     if (weapon.sharedData == null) return ESItemDataValidationCode.MissingSharedData;
                     if (weapon.key == null || !weapon.key.IsConfigured) return ESItemDataValidationCode.MissingGameCoreKey;
-                    if (weapon.config == null) return ESItemDataValidationCode.MissingWeaponConfig;
+                    if (!weapon.sharedData.ValidateDefinition(out _)) return ESItemDataValidationCode.MissingWeaponConfig;
                     break;
                 case ItemDoorDataBlock door when door.sharedData == null:
                 case ItemTrapDataBlock trap when trap.sharedData == null:
@@ -251,7 +251,6 @@ namespace ES
                     bool changed = false;
                     if (weapon.sharedData == null) { weapon.sharedData = ItemWeaponSharedData.Default; changed = true; }
                     if (weapon.key == null) { weapon.key = new ESWeaponConfigKey(); changed = true; }
-                    if (weapon.config == null) { weapon.config = new ItemWeaponConfig(); changed = true; }
                     return changed;
                 }
                 case ItemPickupDataBlock pickup when pickup.sharedData == null:
@@ -564,6 +563,11 @@ namespace ES
                 ESWeaponRuntimeData data = Table.AcquireRetained(block.key);
                 try
                 {
+                    if (block.sharedData == null)
+                        throw new System.InvalidOperationException("WeaponDefinition 缺少 SharedData | " + info.name);
+                    if (!block.sharedData.ValidateDefinition(out string validationError))
+                        throw new System.InvalidOperationException("WeaponDefinition 校验失败：" + validationError + " | " + info.name);
+
                     data.keyName = ESConfigKeyMatch.Describe(block.key.EnumKeyInt, block.key.StringKey);
                     data.displayName = ESItemGameCoreDisplayName.Get(info);
                     data.sourcePackage = info.name;

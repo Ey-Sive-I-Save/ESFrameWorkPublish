@@ -28,6 +28,7 @@
 - [ES_SCENE_VALIDATION_GUIDE_STANDARD.md](ES_SCENE_VALIDATION_GUIDE_STANDARD.md)：测试场景导视、诊断、路线与输入说明的复用边界；Unity / PlayMode / Profiler 验收待完成。
 - [SKILL_OPERATION_LIFECYCLE.md](SKILL_OPERATION_LIFECYCLE.md)：Skill Operation 默认无 Stop、按需清理及运行时所有权规则。
 - [ES_EDITOR_TOOL_WORKBENCH_STANDARD.md](ES_EDITOR_TOOL_WORKBENCH_STANDARD.md)：SimpleTools 的目录分组、页面状态、配置目录、按钮层级、安全与迁移验收规范；每个工具迁移仍须补 Unity 视觉和真实操作验证。
+- [ES_INSTALLER_SIGNED_UNITYPACKAGE_STANDARD.md](ES_INSTALLER_SIGNED_UNITYPACKAGE_STANDARD.md)：`Assets/Plugins/ES + .unitypackage + 旧 ESInstaller` 唯一安装发布主链、AI 快速升级步骤、签名门禁与当前恢复缺口。
 
 修改这些主题时，必须同时检查 `Assets/Plugins/ES/AIWarnings` 的对应 P0 规则。
 
@@ -94,6 +95,10 @@
 ### UI 与动态图集
 
 - `ES_UI_AUTHORING_WORKFLOW.md`：UI 组件选择、资源/输入/生命周期权威链、动态图集最短用法和 UI 风险专项计划；已通过 Unity BatchMode 脚本编译与 EditMode 10/10，仍待 PlayMode、Frame Debugger、Profiler、Player/IL2CPP 与目标平台复验。
+
+### AI 测试与自动化
+
+- [ESAITEST_IMPLEMENTATION_OVERVIEW.md](ESAITEST_IMPLEMENTATION_OVERVIEW.md)：ESAITest 当前已实现能力、优势、创新点、完成度和使用方式的源码级总结；Unity PlayMode、Profiler、Player 与 IL2CPP 结论仍须以当前运行证据复验。
 
 ### 运动与其他运行时主题
 

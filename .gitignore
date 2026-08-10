@@ -81,3 +81,7 @@ crashlytics-build.properties
 /ES/ResourcePipeline/BuildStaging/
 /ES/ResourcePipeline/Published/
 /ES/Output/
+
+# External editor feedback source packs are kept out of Git. Built-in WAV schemes
+# are runtime-imported from outside Assets and tracked so fresh clones get them.
+/ES/EditorFeedbackPacks/

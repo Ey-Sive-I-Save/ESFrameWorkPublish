@@ -18,10 +18,10 @@ namespace ES
         public virtual int Order { get; }
 
         /// <summary>
-        /// 核心逻辑绘制入口。
+        /// 核心逻辑绘制入口。路由必须传入当前 Inspector 上下文。
         /// </summary>
-        /// <param name="ob">当前选中的物体</param>
+        /// <param name="context">当前 Inspector 绘制上下文。</param>
         /// <returns>true 会拦截后续扩展，false 则允许继续执行下一个扩展。</returns>
-        public abstract bool Apply(UnityEngine.Object ob);
+        public abstract bool Apply(ESEditorInspectorContext context);
     }
 }

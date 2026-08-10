@@ -19,6 +19,8 @@ namespace ES.EditorInternal
     {
         private static bool skinInitialized;
         private static bool cachedProSkin;
+        private static int skinGeneration;
+        private static int globalEditorSkinGeneration;
         private static GUIStyle surfaceStyle;
         private static GUIStyle headerStyle;
         private static GUIStyle subtitleStyle;
@@ -30,6 +32,7 @@ namespace ES.EditorInternal
         private static Texture2D compactCollectionBodyTexture;
         private static ESGlobalEditorTheme theme;
         private static bool themeInitialized;
+        private static int themeGeneration;
         private static readonly Dictionary<int, WindowBinding> windowBindings =
             new Dictionary<int, WindowBinding>(32);
 
@@ -50,11 +53,10 @@ namespace ES.EditorInternal
         private const float GlobalSweepDuration = 0.52f;
         private static bool globalEditorAdaptersInstalled;
         private static bool globalEditorAdapterLifecycleInstalled;
-        private static string selectedAssetGuid = string.Empty;
-        private static int selectedHierarchyInstanceId = int.MinValue;
+        private static bool deepSkinSyncQueued;
 
         /// <summary>
-        /// 安装 ES 对 Unity 原生编辑器区域的轻量表现适配。只订阅官方绘制回调，
+        /// 安装 ES 对 Unity 原生 Inspector/SceneView 的轻量表现适配。只订阅官方绘制回调，
         /// 不枚举 EditorWindow、不扫描资产、不修改 Unity 控件布局或业务数据。
         /// </summary>
         public static void InstallGlobalEditorAdapters()
@@ -70,6 +72,7 @@ namespace ES.EditorInternal
                 return;
 
             InstallGlobalEditorAdapterCallbacks();
+            QueueDeepSkinSynchronization();
         }
 
         /// <summary>全局 ES 外观是否由主题启用，且当前处于编辑模式。</summary>
@@ -83,6 +86,9 @@ namespace ES.EditorInternal
             }
         }
 
+        /// <summary>主题/皮肤缓存世代，供已接入窗口判断是否需要重建样式。</summary>
+        internal static int ThemeGeneration => themeGeneration;
+
         private static void InstallGlobalEditorAdapterCallbacks()
         {
             if (globalEditorAdaptersInstalled)
@@ -90,13 +96,6 @@ namespace ES.EditorInternal
 
             UnityEditor.Editor.finishedDefaultHeaderGUI -= DrawGlobalInspectorHeader;
             UnityEditor.Editor.finishedDefaultHeaderGUI += DrawGlobalInspectorHeader;
-            EditorApplication.hierarchyWindowItemOnGUI -= DrawGlobalHierarchyItem;
-            EditorApplication.hierarchyWindowItemOnGUI += DrawGlobalHierarchyItem;
-            EditorApplication.projectWindowItemOnGUI -= DrawGlobalProjectItem;
-            EditorApplication.projectWindowItemOnGUI += DrawGlobalProjectItem;
-            Selection.selectionChanged -= RefreshSelectedAssetGuid;
-            Selection.selectionChanged += RefreshSelectedAssetGuid;
-            RefreshSelectedAssetGuid();
             SceneView.duringSceneGui -= DrawGlobalSceneViewChrome;
             SceneView.duringSceneGui += DrawGlobalSceneViewChrome;
             globalEditorAdaptersInstalled = true;
@@ -108,6 +107,9 @@ namespace ES.EditorInternal
             UninstallGlobalEditorAdapterCallbacks();
             EditorApplication.playModeStateChanged -= OnGlobalPlayModeStateChanged;
             globalEditorAdapterLifecycleInstalled = false;
+            EditorApplication.delayCall -= SynchronizeDeepSkinWithTheme;
+            deepSkinSyncQueued = false;
+            ESGlobalEditorSkinExperiment.Restore();
             UnbindAllWindowBindings();
         }
 
@@ -117,13 +119,8 @@ namespace ES.EditorInternal
                 return;
 
             UnityEditor.Editor.finishedDefaultHeaderGUI -= DrawGlobalInspectorHeader;
-            EditorApplication.hierarchyWindowItemOnGUI -= DrawGlobalHierarchyItem;
-            EditorApplication.projectWindowItemOnGUI -= DrawGlobalProjectItem;
-            Selection.selectionChanged -= RefreshSelectedAssetGuid;
             SceneView.duringSceneGui -= DrawGlobalSceneViewChrome;
             globalEditorAdaptersInstalled = false;
-            selectedAssetGuid = string.Empty;
-            selectedHierarchyInstanceId = int.MinValue;
         }
 
         private static void OnGlobalPlayModeStateChanged(PlayModeStateChange state)
@@ -146,6 +143,28 @@ namespace ES.EditorInternal
             }
         }
 
+        private static void QueueDeepSkinSynchronization()
+        {
+            if (deepSkinSyncQueued)
+                return;
+
+            deepSkinSyncQueued = true;
+            EditorApplication.delayCall -= SynchronizeDeepSkinWithTheme;
+            EditorApplication.delayCall += SynchronizeDeepSkinWithTheme;
+        }
+
+        private static void SynchronizeDeepSkinWithTheme()
+        {
+            EditorApplication.delayCall -= SynchronizeDeepSkinWithTheme;
+            deepSkinSyncQueued = false;
+
+            ESGlobalEditorTheme current = CurrentTheme;
+            bool shouldApply = GlobalEditorShellEnabled
+                && current != null
+                && current.enableDeepEditorSkin;
+            ESGlobalEditorSkinExperiment.Synchronize(shouldApply);
+        }
+
         private static void UnbindAllWindowBindings()
         {
             if (windowBindings.Count == 0)
@@ -160,6 +179,15 @@ namespace ES.EditorInternal
                 UnbindWindow(windows[i]);
         }
 
+        private static void UnregisterWindowCallbacks(WindowBinding binding)
+        {
+            if (binding == null || binding.root == null)
+                return;
+
+            binding.root.UnregisterCallback<FocusInEvent>(OnWindowFocusIn, TrickleDown.TrickleDown);
+            binding.root.UnregisterCallback<PointerDownEvent>(OnWindowPointerDown, TrickleDown.TrickleDown);
+        }
+
         private static void SuspendWindowBindings()
         {
             foreach (WindowBinding binding in windowBindings.Values)
@@ -167,6 +195,7 @@ namespace ES.EditorInternal
                 if (binding == null)
                     continue;
                 binding.animation?.Pause();
+                UnregisterWindowCallbacks(binding);
                 binding.host?.RemoveFromHierarchy();
                 binding.root = null;
             }
@@ -193,46 +222,6 @@ namespace ES.EditorInternal
             Rect rect = EditorGUILayout.GetControlRect(false, 2f, GUILayout.ExpandWidth(true));
             if (Event.current.type == EventType.Repaint)
                 EditorGUI.DrawRect(rect, GetDepthAccent(0));
-        }
-
-        private static void DrawGlobalHierarchyItem(int instanceId, Rect selectionRect)
-        {
-            if (Event.current.type != EventType.Repaint || selectionRect.width <= 0f || selectionRect.height <= 0f)
-                return;
-
-            if (selectedHierarchyInstanceId != instanceId)
-                return;
-
-            Color accent = GetDepthAccent(0);
-            accent.a = IsProSkin ? 0.88f : 0.72f;
-            Color previousGuiColor = GUI.color;
-            GUI.color = Color.white;
-            EditorGUI.DrawRect(new Rect(selectionRect.x, selectionRect.y, 2f, selectionRect.height), accent);
-            GUI.color = previousGuiColor;
-        }
-
-        private static void DrawGlobalProjectItem(string guid, Rect selectionRect)
-        {
-            if (Event.current.type != EventType.Repaint || selectionRect.width <= 0f || selectionRect.height <= 0f)
-                return;
-
-            if (string.IsNullOrEmpty(guid) || !string.Equals(guid, selectedAssetGuid, System.StringComparison.OrdinalIgnoreCase))
-                return;
-
-            Color accent = GetDepthAccent(0);
-            accent.a = IsProSkin ? 0.88f : 0.72f;
-            Color previousGuiColor = GUI.color;
-            GUI.color = Color.white;
-            EditorGUI.DrawRect(new Rect(selectionRect.x, selectionRect.y, 2f, selectionRect.height), accent);
-            GUI.color = previousGuiColor;
-        }
-
-        private static void RefreshSelectedAssetGuid()
-        {
-            UnityEngine.Object selected = Selection.activeObject;
-            selectedHierarchyInstanceId = Selection.activeInstanceID;
-            string path = selected == null ? string.Empty : AssetDatabase.GetAssetPath(selected);
-            selectedAssetGuid = string.IsNullOrEmpty(path) ? string.Empty : AssetDatabase.AssetPathToGUID(path);
         }
 
         private static void DrawGlobalSceneViewChrome(SceneView sceneView)
@@ -272,6 +261,16 @@ namespace ES.EditorInternal
             }
         }
 
+        internal static int SkinGeneration
+        {
+            get { return skinGeneration + globalEditorSkinGeneration * 100000; }
+        }
+
+        internal static void NotifyGlobalEditorSkinChanged()
+        {
+            globalEditorSkinGeneration++;
+        }
+
         public static GUIStyle HeaderStyle
         {
             get
@@ -307,7 +306,7 @@ namespace ES.EditorInternal
                         padding = new RectOffset(0, 0, Metric(1f), Metric(3f))
                     };
                     subtitleStyle.normal.textColor = cachedProSkin
-                        ? new Color(0.61f, 0.64f, 0.68f, 1f)
+                        ? new Color(0.72f, 0.76f, 0.82f, 1f)
                         : new Color(0.39f, 0.42f, 0.45f, 1f);
                 }
 
@@ -329,7 +328,7 @@ namespace ES.EditorInternal
                         padding = new RectOffset(0, 0, 0, Metric(1f))
                     };
                     metaStyle.normal.textColor = cachedProSkin
-                        ? new Color(0.60f, 0.64f, 0.69f, 1f)
+                        ? new Color(0.70f, 0.74f, 0.80f, 1f)
                         : new Color(0.37f, 0.40f, 0.44f, 1f);
                 }
 
@@ -528,13 +527,9 @@ namespace ES.EditorInternal
 
             if (binding.animation != null)
                 binding.animation.Pause();
+            UnregisterWindowCallbacks(binding);
             if (binding.host != null)
             {
-                if (binding.root != null)
-                {
-                    binding.root.UnregisterCallback<FocusInEvent>(OnWindowFocusIn, TrickleDown.TrickleDown);
-                    binding.root.UnregisterCallback<PointerDownEvent>(OnWindowPointerDown, TrickleDown.TrickleDown);
-                }
                 binding.host.RemoveFromHierarchy();
             }
             windowBindings.Remove(id);
@@ -565,6 +560,7 @@ namespace ES.EditorInternal
             VisualElement root = binding.window.rootVisualElement;
             if (root == null)
                 return;
+            UnregisterWindowCallbacks(binding);
             binding.root = root;
 
             if (binding.host != null)
@@ -603,8 +599,10 @@ namespace ES.EditorInternal
             root.Add(binding.host);
             binding.host.BringToFront();
 
-            binding.animation = binding.host.schedule.Execute(() => UpdateWindowOverlay(binding)).Every(33);
-            binding.animation.Pause();
+            binding.animation = MotionEnabled
+                ? binding.host.schedule.Execute(() => UpdateWindowOverlay(binding)).Every(33)
+                : null;
+            binding.animation?.Pause();
         }
 
         private static void OnWindowFocusIn(FocusInEvent evt)
@@ -636,33 +634,58 @@ namespace ES.EditorInternal
 
         private static void UpdateWindowOverlay(WindowBinding binding)
         {
-            if (binding == null || binding.window == null || binding.host == null || binding.host.parent == null)
-                return;
-
-            float pulse = EvaluatePulse(binding.pulseStartedAt, binding.pulseDuration);
-            if (pulse <= 0f)
+            if (!IsWindowOverlayAttached(binding))
             {
-                binding.animation?.Pause();
-                binding.sweep.style.width = 0f;
-                binding.accentLine.style.backgroundColor = GetDepthAccent(0);
+                binding?.animation?.Pause();
                 return;
             }
 
-            Color accent = GetStatusAccent(0, binding.pulseStatus);
-            accent.a = Mathf.Clamp01(0.62f + pulse * 0.34f);
-            binding.accentLine.style.backgroundColor = accent;
+            try
+            {
+                float pulse = EvaluatePulse(binding.pulseStartedAt, binding.pulseDuration);
+                if (pulse <= 0f)
+                {
+                    binding.animation?.Pause();
+                    binding.sweep.style.width = 0f;
+                    binding.accentLine.style.backgroundColor = GetDepthAccent(0);
+                    return;
+                }
 
-            float progress = Mathf.Clamp01((float)((EditorApplication.timeSinceStartup - binding.pulseStartedAt) / binding.pulseDuration));
-            float hostWidth = binding.host.resolvedStyle.width;
-            if (float.IsNaN(hostWidth) || float.IsInfinity(hostWidth) || hostWidth <= 0f)
-                hostWidth = 180f;
-            float width = Mathf.Clamp(hostWidth * 0.16f, 24f, 180f);
-            binding.sweep.style.width = width;
-            binding.sweep.style.left = Mathf.Lerp(-width, hostWidth, progress);
-            Color sweepColor = accent;
-            sweepColor.a = Mathf.Clamp01(0.10f + pulse * 0.24f);
-            binding.sweep.style.backgroundColor = sweepColor;
-            binding.window.Repaint();
+                Color accent = GetStatusAccent(0, binding.pulseStatus);
+                accent.a = Mathf.Clamp01(0.62f + pulse * 0.34f);
+                binding.accentLine.style.backgroundColor = accent;
+
+                float progress = Mathf.Clamp01((float)((EditorApplication.timeSinceStartup - binding.pulseStartedAt) / binding.pulseDuration));
+                float hostWidth = binding.host.resolvedStyle.width;
+                if (float.IsNaN(hostWidth) || float.IsInfinity(hostWidth) || hostWidth <= 0f)
+                    hostWidth = 180f;
+                float width = Mathf.Clamp(hostWidth * 0.16f, 24f, 180f);
+                binding.sweep.style.width = width;
+                binding.sweep.style.left = Mathf.Lerp(-width, hostWidth, progress);
+                Color sweepColor = accent;
+                sweepColor.a = Mathf.Clamp01(0.10f + pulse * 0.24f);
+                binding.sweep.style.backgroundColor = sweepColor;
+                binding.window.Repaint();
+            }
+            catch (NullReferenceException)
+            {
+                // Unity may invalidate an internal InlineStyleAccess between DetachFromPanel and
+                // the scheduled callback. Stop this local animation; the window content remains intact.
+                binding.animation?.Pause();
+            }
+        }
+
+        private static bool IsWindowOverlayAttached(WindowBinding binding)
+        {
+            return binding != null
+                && binding.window != null
+                && binding.root != null
+                && binding.root.panel != null
+                && binding.host != null
+                && binding.host.panel != null
+                && ReferenceEquals(binding.host.parent, binding.root)
+                && binding.accentLine != null
+                && binding.sweep != null;
         }
 
         /// <summary>Normalized global motion strength used by all ES editor surfaces.</summary>
@@ -778,7 +801,7 @@ namespace ES.EditorInternal
             {
                 EnsureSkin();
                 return cachedProSkin
-                    ? new Color(0.72f, 0.74f, 0.77f, 1f)
+                    ? new Color(0.88f, 0.91f, 0.96f, 1f)
                     : new Color(0.28f, 0.30f, 0.33f, 1f);
             }
         }
@@ -794,7 +817,7 @@ namespace ES.EditorInternal
             {
                 EnsureSkin();
                 return cachedProSkin
-                    ? new Color(0.42f, 0.44f, 0.48f, 1f)
+                    ? new Color(0.64f, 0.69f, 0.77f, 1f)
                     : new Color(0.50f, 0.52f, 0.55f, 1f);
             }
         }
@@ -854,7 +877,7 @@ namespace ES.EditorInternal
             {
                 EnsureSkin();
                 return cachedProSkin
-                    ? new Color(0.63f, 0.66f, 0.70f, 1f)
+                    ? new Color(0.74f, 0.78f, 0.85f, 1f)
                     : new Color(0.38f, 0.41f, 0.45f, 1f);
             }
         }
@@ -900,10 +923,10 @@ namespace ES.EditorInternal
                 if (surfaceTexture == null)
                 {
                     Color borderColor = cachedProSkin
-                        ? new Color(0.34f, 0.37f, 0.40f, 1f)
+                        ? new Color(0.28f, 0.34f, 0.42f, 1f)
                         : new Color(0.58f, 0.61f, 0.64f, 1f);
                     Color fillColor = cachedProSkin
-                        ? new Color(0.22f, 0.23f, 0.25f, 1f)
+                        ? new Color(0.13f, 0.17f, 0.23f, 1f)
                         : new Color(0.91f, 0.92f, 0.93f, 1f);
 
                     // Keep the constructor version-neutral. Unity versions differ in the
@@ -986,8 +1009,8 @@ namespace ES.EditorInternal
             float progress = GetDepthProgress(depth);
             return cachedProSkin
                 ? Color.Lerp(
-                    new Color(0.28f, 0.29f, 0.32f, 0.90f),
-                    new Color(0.08f, 0.15f, 0.23f, 0.96f),
+                    new Color(0.12f, 0.15f, 0.19f, 0.98f),
+                    new Color(0.025f, 0.055f, 0.10f, 0.99f),
                     progress)
                 : Color.Lerp(
                     new Color(0.96f, 0.96f, 0.97f, 1f),
@@ -1001,8 +1024,8 @@ namespace ES.EditorInternal
             float progress = GetDepthProgress(depth);
             return cachedProSkin
                 ? Color.Lerp(
-                    new Color(0.35f, 0.44f, 0.54f, 0.88f),
-                    new Color(0.12f, 0.24f, 0.36f, 0.94f),
+                    new Color(0.08f, 0.14f, 0.22f, 0.94f),
+                    new Color(0.04f, 0.08f, 0.13f, 0.96f),
                     progress)
                 : Color.Lerp(
                     new Color(0.88f, 0.93f, 0.98f, 1f),
@@ -1128,6 +1151,7 @@ namespace ES.EditorInternal
 
         public static void InvalidateTheme()
         {
+            themeGeneration++;
             themeInitialized = false;
             theme = null;
             InvalidateSkinCache();
@@ -1138,15 +1162,23 @@ namespace ES.EditorInternal
                 UninstallGlobalEditorAdapterCallbacks();
                 UnbindAllWindowBindings();
             }
+            QueueDeepSkinSynchronization();
             foreach (WindowBinding binding in windowBindings.Values)
             {
-                if (binding == null || binding.host == null || binding.host.parent == null)
+                if (!IsWindowOverlayAttached(binding))
                     continue;
-                Color accent = GetDepthAccent(0);
-                binding.host.style.backgroundColor = accent;
-                if (binding.accentLine != null)
+
+                try
+                {
+                    Color accent = GetDepthAccent(0);
+                    binding.host.style.backgroundColor = accent;
                     binding.accentLine.style.backgroundColor = accent;
-                binding.window.Repaint();
+                    binding.window.Repaint();
+                }
+                catch (NullReferenceException)
+                {
+                    binding.animation?.Pause();
+                }
             }
             SceneView.RepaintAll();
             EditorApplication.RepaintHierarchyWindow();
@@ -1180,6 +1212,7 @@ namespace ES.EditorInternal
 
             cachedProSkin = proSkin;
             skinInitialized = true;
+            skinGeneration++;
             surfaceStyle = null;
             headerStyle = null;
             subtitleStyle = null;
@@ -1203,127 +1236,739 @@ namespace ES.EditorInternal
     }
 
     /// <summary>
-    /// zios/unity-themes inspired experiment. It is intentionally opt-in and only adjusts a
-    /// small, known set of EditorStyles GUIStyle fields for Unity 2022.3. It never runs during
-    /// AssemblyStream initialization, never scans assets and always keeps a restore snapshot.
+    /// Reversible Unity 2022.3 deep-skin layer. The project theme explicitly opts in; application
+    /// performs one bounded EditorStyles reflection pass and one enumeration of open EditorWindow
+    /// instances. No asset scan, global window polling or per-frame skin work is used.
     /// </summary>
     internal static class ESGlobalEditorSkinExperiment
     {
-        private static readonly Dictionary<FieldInfo, GUIStyle> snapshots =
-            new Dictionary<FieldInfo, GUIStyle>(32);
+        private enum StyleRole
+        {
+            None,
+            Text,
+            InteractiveText,
+            Toolbar,
+            Button,
+            Input,
+            Header,
+            Help,
+            Selection
+        }
+
+        private enum SkinTone
+        {
+            Surface,
+            Raised,
+            Hover,
+            Active,
+            Focused,
+            Input,
+            Toolbar,
+            Help
+        }
+
+        private sealed class StateSnapshot
+        {
+            public GUIStyleState state;
+            public Color textColor;
+            public Texture2D background;
+            public Texture2D[] scaledBackgrounds;
+        }
+
+        private sealed class StyleSnapshot
+        {
+            public GUIStyle style;
+            public StateSnapshot[] states;
+        }
+
+        private sealed class RootSnapshot
+        {
+            public VisualElement root;
+        }
+
+        private const string GlobalStyleSheetPath =
+            "Assets/Plugins/ES/Editor/ESPresentation/Styles/ESGlobalEditorDeepSkin.uss";
+        private const string RootClass = "es-global-editor-skin";
+        private const string DarkRootClass = "es-global-editor-skin--dark";
+        private const string LightRootClass = "es-global-editor-skin--light";
+        private const int MaxTintTexturePixels = 262144;
+        private const int MaxCreatedTextureCount = 64;
+        private const long MaxCreatedTextureBytes = 16L * 1024L * 1024L;
+        private const int MaxEditorStylesInitializationRetries = 8;
+
+        private static readonly List<StyleSnapshot> snapshots = new List<StyleSnapshot>(96);
+        private static readonly List<RootSnapshot> rootSnapshots = new List<RootSnapshot>(32);
+        private static readonly Dictionary<long, Texture2D> themedTextureCache =
+            new Dictionary<long, Texture2D>(96);
+        private static readonly List<Texture2D> createdTextures = new List<Texture2D>(96);
+        private static long createdTextureBytes;
         private static bool applied;
+        private static bool editorStylesInitializationPending;
+        private static bool initializationRetryQueued;
+        private static int initializationRetryCount;
+        private static StyleSheet globalStyleSheet;
 
         public static bool IsApplied => applied;
+        public static int StyledWindowCount => rootSnapshots.Count;
 
         public static bool TryApply(out string message)
         {
             if (applied)
             {
-                message = "ES 深度皮肤实验已经启用。";
+                RefreshOpenWindowRoots();
+                message = BuildAppliedMessage();
                 return true;
+            }
+
+            if (Application.isBatchMode)
+            {
+                message = "BatchMode 不加载 ES 深度皮肤，未改变 Unity 原生样式。";
+                return false;
+            }
+
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                message = "PlayMode 中不会启用 ES 深度皮肤，请返回 EditMode 后重试。";
+                return false;
             }
 
             if (!Application.unityVersion.StartsWith("2022.3.", StringComparison.Ordinal))
             {
-                message = "当前 Unity 版本不是 2022.3，实验皮肤已拒绝运行。";
+                message = "当前 Unity 版本不是 2022.3，深度皮肤已拒绝运行。";
                 return false;
             }
 
             snapshots.Clear();
-            FieldInfo[] fields = typeof(EditorStyles).GetFields(
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-            Color accent = ESEditorPresentation.LogicSteelBlue;
-            Color textAccent = Color.Lerp(
-                EditorGUIUtility.isProSkin ? new Color(0.82f, 0.86f, 0.91f) : new Color(0.18f, 0.21f, 0.25f),
-                accent,
-                0.16f);
+            rootSnapshots.Clear();
+            themedTextureCache.Clear();
+            DestroyCreatedTextures();
 
-            for (int i = 0; i < fields.Length; i++)
+            if (!TryGetCurrentEditorStyles(out object currentStyles, out message))
             {
-                FieldInfo field = fields[i];
-                if (field.FieldType != typeof(GUIStyle) || field.IsInitOnly || field.IsLiteral)
-                    continue;
-
-                string name = field.Name;
-                if (!IsSupportedStyleName(name))
-                    continue;
-
-                try
-                {
-                    GUIStyle original = field.GetValue(null) as GUIStyle;
-                    if (original == null)
-                        continue;
-
-                    GUIStyle clone = new GUIStyle(original);
-                    clone.normal.textColor = textAccent;
-                    clone.hover.textColor = Color.Lerp(clone.hover.textColor, ESEditorPresentation.LogicGold, 0.12f);
-                    snapshots[field] = original;
-                    field.SetValue(null, clone);
-                }
-                catch
-                {
-                    // Unity 内部字段可能受版本或权限限制；单个字段失败不影响其余字段。
-                }
-            }
-
-            if (snapshots.Count == 0)
-            {
-                message = "没有找到可安全调整的 EditorStyles 字段，未改变 Unity 原生样式。";
+                if (editorStylesInitializationPending)
+                    QueueInitializationRetry();
                 return false;
             }
 
-            InvokeSkinChanged();
+            ApplyEditorStyles(currentStyles);
+            RefreshOpenWindowRoots();
+            if (snapshots.Count == 0 && rootSnapshots.Count == 0)
+            {
+                Restore();
+                message = "没有找到可安全调整的 Unity 编辑器表面，未改变原生样式。";
+                return false;
+            }
+
             applied = true;
+            ESEditorPresentation.NotifyGlobalEditorSkinChanged();
+            CancelInitializationRetry();
+            EditorApplication.delayCall -= RefreshOpenWindowRoots;
+            EditorApplication.delayCall += RefreshOpenWindowRoots;
             InternalEditorUtility.RepaintAllViews();
-            message = "ES 深度皮肤实验已启用；可随时恢复 Unity 原生样式。";
+            message = BuildAppliedMessage();
             return true;
         }
 
         public static void Restore()
         {
-            if (!applied && snapshots.Count == 0)
-                return;
+            bool wasApplied = applied;
+            CancelInitializationRetry();
+            EditorApplication.delayCall -= RefreshOpenWindowRoots;
 
-            foreach (KeyValuePair<FieldInfo, GUIStyle> pair in snapshots)
-            {
-                try
-                {
-                    pair.Key.SetValue(null, pair.Value);
-                }
-                catch
-                {
-                    // 恢复逐字段隔离；剩余字段继续恢复，避免半途退出。
-                }
-            }
+            for (int i = 0; i < snapshots.Count; i++)
+                RestoreStyle(snapshots[i]);
+
+            for (int i = 0; i < rootSnapshots.Count; i++)
+                RestoreRoot(rootSnapshots[i]);
 
             snapshots.Clear();
+            rootSnapshots.Clear();
+            themedTextureCache.Clear();
+            DestroyCreatedTextures();
+            globalStyleSheet = null;
             applied = false;
-            InvokeSkinChanged();
+            if (wasApplied)
+                ESEditorPresentation.NotifyGlobalEditorSkinChanged();
             InternalEditorUtility.RepaintAllViews();
         }
 
-        private static bool IsSupportedStyleName(string name)
+        public static void Synchronize(bool shouldApply)
         {
-            return name.IndexOf("label", StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("foldout", StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("toolbar", StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("helpBox", StringComparison.OrdinalIgnoreCase) >= 0
-                || name.IndexOf("objectField", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (!shouldApply || EditorApplication.isPlayingOrWillChangePlaymode || Application.isBatchMode)
+            {
+                Restore();
+                return;
+            }
+
+            if (applied)
+            {
+                RefreshOpenWindowRoots();
+                return;
+            }
+
+            TryApply(out _);
         }
 
-        private static void InvokeSkinChanged()
+        public static bool Refresh(out string message)
         {
+            Restore();
+            return TryApply(out message);
+        }
+
+        private static bool TryGetCurrentEditorStyles(out object currentStyles, out string message)
+        {
+            editorStylesInitializationPending = false;
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                currentStyles = null;
+                editorStylesInitializationPending = true;
+                message = "Unity 正在编译或导入资源，ES 全局皮肤将在 Editor 空闲后重试。";
+                return false;
+            }
+
+            // Force common lazy properties to initialize before the bounded field pass.
+            GUIStyle currentLabel;
+            GUIStyle currentToolbar;
+            GUIStyle currentTextField;
+            GUIStyle currentButton;
+            GUIStyle currentHelpBox;
             try
             {
-                MethodInfo method = typeof(EditorGUIUtility).GetMethod(
-                    "SkinChanged",
-                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                method?.Invoke(null, null);
+                currentLabel = EditorStyles.label;
+                currentToolbar = EditorStyles.toolbar;
+                currentTextField = EditorStyles.textField;
+                currentButton = EditorStyles.miniButton;
+                currentHelpBox = EditorStyles.helpBox;
+            }
+            catch (NullReferenceException)
+            {
+                currentStyles = null;
+                editorStylesInitializationPending = true;
+                message = "Unity EditorStyles 正在初始化，ES 全局皮肤将在下一次 Editor 回调中重试。";
+                return false;
+            }
+            if (currentLabel == null || currentToolbar == null || currentTextField == null
+                || currentButton == null || currentHelpBox == null)
+            {
+                currentStyles = null;
+                editorStylesInitializationPending = true;
+                message = "Unity 2022.3 的 EditorStyles 尚未准备完成，ES 全局皮肤将延迟重试。";
+                return false;
+            }
+
+            FieldInfo currentField = typeof(EditorStyles).GetField(
+                "s_Current",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            currentStyles = currentField?.GetValue(null);
+            if (currentStyles == null)
+            {
+                editorStylesInitializationPending = true;
+                message = "Unity 2022.3 的 EditorStyles 当前容器尚未初始化，ES 全局皮肤将延迟重试。";
+                return false;
+            }
+
+            message = string.Empty;
+            return true;
+        }
+
+        private static void QueueInitializationRetry()
+        {
+            if (initializationRetryQueued
+                || initializationRetryCount >= MaxEditorStylesInitializationRetries
+                || EditorApplication.isPlayingOrWillChangePlaymode
+                || Application.isBatchMode)
+                return;
+
+            initializationRetryQueued = true;
+            initializationRetryCount++;
+            EditorApplication.delayCall -= RetryInitialization;
+            EditorApplication.delayCall += RetryInitialization;
+        }
+
+        private static void RetryInitialization()
+        {
+            EditorApplication.delayCall -= RetryInitialization;
+            initializationRetryQueued = false;
+
+            ESGlobalEditorTheme current = ESGlobalEditorTheme.Instance;
+            bool shouldApply = current != null
+                && current.enableGlobalEditorShell
+                && current.enableDeepEditorSkin
+                && !EditorApplication.isPlayingOrWillChangePlaymode;
+            if (!shouldApply)
+            {
+                CancelInitializationRetry();
+                return;
+            }
+
+            TryApply(out _);
+        }
+
+        private static void CancelInitializationRetry()
+        {
+            EditorApplication.delayCall -= RetryInitialization;
+            initializationRetryQueued = false;
+            initializationRetryCount = 0;
+            editorStylesInitializationPending = false;
+        }
+
+        private static void ApplyEditorStyles(object currentStyles)
+        {
+            FieldInfo[] fields = currentStyles.GetType().GetFields(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            Color normalText = EditorGUIUtility.isProSkin
+                ? new Color(0.84f, 0.88f, 0.92f, 1f)
+                : new Color(0.15f, 0.18f, 0.22f, 1f);
+            Color interactiveText = Color.Lerp(normalText, ESEditorPresentation.LogicSteelBlue,
+                EditorGUIUtility.isProSkin ? 0.34f : 0.28f);
+            Color selectedText = EditorGUIUtility.isProSkin
+                ? new Color(0.94f, 0.97f, 1f, 1f)
+                : new Color(0.06f, 0.13f, 0.19f, 1f);
+
+            for (int i = 0; i < fields.Length; i++)
+            {
+                FieldInfo field = fields[i];
+                if (field.FieldType != typeof(GUIStyle) || field.IsLiteral)
+                    continue;
+
+                try
+                {
+                    GUIStyle style = field.GetValue(currentStyles) as GUIStyle;
+                    if (style == null || ContainsStyle(style))
+                        continue;
+
+                    StyleRole role = ClassifyStyle(field.Name, style.name);
+                    if (role == StyleRole.None)
+                        continue;
+
+                    StyleSnapshot snapshot = CaptureStyle(style);
+                    snapshots.Add(snapshot);
+                    ApplyStyle(style, role, normalText, interactiveText, selectedText);
+                }
+                catch
+                {
+                    // Unity 内部字段逐项隔离；不可访问字段不会中断其余可逆样式。
+                }
+            }
+
+            // Unity 内置 Inspector/Scene GUISkin 是跨窗口共享对象。修改它会污染所有
+            // Editor 页面，因此深度皮肤只处理已识别的 EditorStyles 文本语义。
+        }
+
+        private static void ApplyBuiltInSkin(
+            EditorSkin editorSkin,
+            Color normalText,
+            Color interactiveText,
+            Color selectedText)
+        {
+            GUISkin skin;
+            try
+            {
+                skin = EditorGUIUtility.GetBuiltinSkin(editorSkin);
             }
             catch
             {
-                // SkinChanged 是 Unity 内部实现细节；调用失败时仍保留当前快照和恢复路径。
+                return;
+            }
+            if (skin == null)
+                return;
+
+            ApplyKnownStyle(skin.label, StyleRole.Text, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.button, StyleRole.Button, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.box, StyleRole.Header, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.toggle, StyleRole.InteractiveText, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.textField, StyleRole.Input, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.textArea, StyleRole.Input, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.window, StyleRole.Header, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.horizontalSlider, StyleRole.Input, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.horizontalSliderThumb, StyleRole.Button, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.verticalSlider, StyleRole.Input, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.verticalSliderThumb, StyleRole.Button, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.horizontalScrollbar, StyleRole.Input, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.horizontalScrollbarThumb, StyleRole.Button, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.verticalScrollbar, StyleRole.Input, normalText, interactiveText, selectedText);
+            ApplyKnownStyle(skin.verticalScrollbarThumb, StyleRole.Button, normalText, interactiveText, selectedText);
+
+            GUIStyle[] customStyles = skin.customStyles;
+            if (customStyles == null)
+                return;
+            for (int i = 0; i < customStyles.Length; i++)
+            {
+                GUIStyle style = customStyles[i];
+                if (style == null)
+                    continue;
+                StyleRole role = ClassifyStyle(style.name, style.name);
+                ApplyKnownStyle(style, role, normalText, interactiveText, selectedText);
             }
         }
+
+        private static void ApplyKnownStyle(
+            GUIStyle style,
+            StyleRole role,
+            Color normalText,
+            Color interactiveText,
+            Color selectedText)
+        {
+            if (style == null || role == StyleRole.None || ContainsStyle(style))
+                return;
+            try
+            {
+                StyleSnapshot snapshot = CaptureStyle(style);
+                snapshots.Add(snapshot);
+                ApplyStyle(style, role, normalText, interactiveText, selectedText);
+            }
+            catch
+            {
+                // 内置皮肤逐样式隔离，保留已捕获快照供完整恢复。
+            }
+        }
+
+        private static StyleSnapshot CaptureStyle(GUIStyle style)
+        {
+            return new StyleSnapshot
+            {
+                style = style,
+                states = new[]
+                {
+                    CaptureState(style.normal),
+                    CaptureState(style.hover),
+                    CaptureState(style.active),
+                    CaptureState(style.focused),
+                    CaptureState(style.onNormal),
+                    CaptureState(style.onHover),
+                    CaptureState(style.onActive),
+                    CaptureState(style.onFocused)
+                }
+            };
+        }
+
+        private static StateSnapshot CaptureState(GUIStyleState state)
+        {
+            Texture2D[] scaled = state.scaledBackgrounds;
+            return new StateSnapshot
+            {
+                state = state,
+                textColor = state.textColor,
+                background = state.background,
+                scaledBackgrounds = scaled == null ? null : (Texture2D[])scaled.Clone()
+            };
+        }
+
+        private static void ApplyStyle(
+            GUIStyle style,
+            StyleRole role,
+            Color normalText,
+            Color interactiveText,
+            Color selectedText)
+        {
+            Color baseText = role == StyleRole.Text ? normalText : interactiveText;
+            ApplyState(style.normal, baseText, GetNormalTone(role));
+            ApplyState(style.hover, selectedText, SkinTone.Hover);
+            ApplyState(style.active, selectedText, SkinTone.Active);
+            ApplyState(style.focused, selectedText, SkinTone.Focused);
+            ApplyState(style.onNormal, selectedText, SkinTone.Active);
+            ApplyState(style.onHover, selectedText, SkinTone.Hover);
+            ApplyState(style.onActive, selectedText, SkinTone.Active);
+            ApplyState(style.onFocused, selectedText, SkinTone.Focused);
+        }
+
+        private static void ApplyState(GUIStyleState state, Color textColor, SkinTone tone)
+        {
+            // background == null 在 Unity IMGUI 中通常表示透明宿主表面，不能替换为
+            // 不透明纯色纹理。仅对已有背景保留透明度与形状后做 ES 色调染色。
+            state.textColor = textColor;
+            if (state.background == null)
+                return;
+
+            state.background = GetThemedTexture(state.background, tone);
+            Texture2D[] scaled = state.scaledBackgrounds;
+            if (scaled == null || scaled.Length == 0)
+                return;
+
+            Texture2D[] themedScaled = new Texture2D[scaled.Length];
+            for (int i = 0; i < scaled.Length; i++)
+                themedScaled[i] = scaled[i] == null ? null : GetThemedTexture(scaled[i], tone);
+            state.scaledBackgrounds = themedScaled;
+        }
+
+        private static SkinTone GetNormalTone(StyleRole role)
+        {
+            switch (role)
+            {
+                case StyleRole.Toolbar:
+                    return SkinTone.Toolbar;
+                case StyleRole.Input:
+                    return SkinTone.Input;
+                case StyleRole.Help:
+                    return SkinTone.Help;
+                case StyleRole.Button:
+                case StyleRole.Header:
+                    return SkinTone.Raised;
+                case StyleRole.Selection:
+                    return SkinTone.Active;
+                default:
+                    return SkinTone.Surface;
+            }
+        }
+
+        private static bool ProvidesBackground(StyleRole role)
+        {
+            return role == StyleRole.Toolbar
+                || role == StyleRole.Button
+                || role == StyleRole.Input
+                || role == StyleRole.Header
+                || role == StyleRole.Help
+                || role == StyleRole.Selection;
+        }
+
+        private static StyleRole ClassifyStyle(string fieldName, string styleName)
+        {
+            string name = (fieldName ?? string.Empty) + " " + (styleName ?? string.Empty);
+            if (ContainsIgnoreCase(name, "toolbar"))
+                return StyleRole.Toolbar;
+            if (ContainsIgnoreCase(name, "helpbox") || ContainsIgnoreCase(name, "notification"))
+                return StyleRole.Help;
+            if (ContainsIgnoreCase(name, "textfield") || ContainsIgnoreCase(name, "textarea")
+                || ContainsIgnoreCase(name, "numberfield") || ContainsIgnoreCase(name, "objectfield")
+                || ContainsIgnoreCase(name, "colorfield") || ContainsIgnoreCase(name, "searchfield")
+                || ContainsIgnoreCase(name, "popup") || ContainsIgnoreCase(name, "dropdown")
+                || ContainsIgnoreCase(name, "layermask"))
+                return StyleRole.Input;
+            if (ContainsIgnoreCase(name, "button"))
+                return StyleRole.Button;
+            if (ContainsIgnoreCase(name, "titlebar") || ContainsIgnoreCase(name, "header"))
+                return StyleRole.Header;
+            if (ContainsIgnoreCase(name, "selection") || ContainsIgnoreCase(name, "selected"))
+                return StyleRole.Selection;
+            if (ContainsIgnoreCase(name, "foldout") || ContainsIgnoreCase(name, "toggle")
+                || ContainsIgnoreCase(name, "radio"))
+                return StyleRole.InteractiveText;
+            if (ContainsIgnoreCase(name, "label") || ContainsIgnoreCase(name, "link"))
+                return StyleRole.Text;
+            return StyleRole.None;
+        }
+
+        private static bool ContainsIgnoreCase(string source, string value)
+        {
+            return source.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static Texture2D GetThemedTexture(Texture2D source, SkinTone tone)
+        {
+            if (source == null)
+                return null;
+
+            int sourceId = source.GetInstanceID();
+            long key = ((long)sourceId << 8) ^ (int)tone;
+            if (themedTextureCache.TryGetValue(key, out Texture2D cached))
+                return cached;
+
+            Texture2D themed = CreateTintedTexture(source, tone);
+            if (themed == null)
+                themed = source;
+            themedTextureCache[key] = themed;
+            return themed;
+        }
+
+        private static Texture2D CreateTintedTexture(Texture2D source, SkinTone tone)
+        {
+            long pixelCount = source == null ? 0L : (long)source.width * source.height;
+            long requiredBytes = pixelCount * 4L;
+            if (source == null || source.width <= 0 || source.height <= 0
+                || pixelCount > MaxTintTexturePixels || !CanCreateTexture(requiredBytes))
+                return source;
+
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture temporary = null;
+            Texture2D output = null;
+            try
+            {
+                temporary = RenderTexture.GetTemporary(
+                    source.width,
+                    source.height,
+                    0,
+                    RenderTextureFormat.ARGB32,
+                    RenderTextureReadWrite.Default);
+                Graphics.Blit(source, temporary);
+                RenderTexture.active = temporary;
+                output = new Texture2D(source.width, source.height, UnityEngine.TextureFormat.RGBA32, false)
+                {
+                    name = "ES Deep Skin " + source.name + " " + tone,
+                    hideFlags = HideFlags.HideAndDontSave,
+                    filterMode = source.filterMode,
+                    wrapMode = source.wrapMode
+                };
+                output.ReadPixels(new Rect(0f, 0f, source.width, source.height), 0, 0, false);
+                Color32[] pixels = output.GetPixels32();
+                Color target = GetToneColor(tone);
+                for (int i = 0; i < pixels.Length; i++)
+                {
+                    Color original = pixels[i];
+                    float luminance = original.r * 0.2126f + original.g * 0.7152f + original.b * 0.0722f;
+                    float brightness = Mathf.Lerp(0.72f, 1.18f, luminance);
+                    Color tinted = new Color(
+                        Mathf.Clamp01(target.r * brightness),
+                        Mathf.Clamp01(target.g * brightness),
+                        Mathf.Clamp01(target.b * brightness),
+                        original.a);
+                    Color blended = Color.Lerp(original, tinted, 0.76f);
+                    blended.a = original.a;
+                    pixels[i] = blended;
+                }
+
+                output.SetPixels32(pixels);
+                output.Apply(false, true);
+                createdTextures.Add(output);
+                createdTextureBytes += requiredBytes;
+                return output;
+            }
+            catch
+            {
+                if (output != null)
+                    UnityEngine.Object.DestroyImmediate(output);
+                return source;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                if (temporary != null)
+                    RenderTexture.ReleaseTemporary(temporary);
+            }
+        }
+
+        private static Color GetToneColor(SkinTone tone)
+        {
+            if (!EditorGUIUtility.isProSkin)
+            {
+                switch (tone)
+                {
+                    case SkinTone.Toolbar: return new Color(0.78f, 0.82f, 0.86f, 1f);
+                    case SkinTone.Input: return new Color(0.86f, 0.89f, 0.92f, 1f);
+                    case SkinTone.Raised: return new Color(0.80f, 0.84f, 0.88f, 1f);
+                    case SkinTone.Hover: return new Color(0.63f, 0.76f, 0.86f, 1f);
+                    case SkinTone.Active: return new Color(0.36f, 0.62f, 0.80f, 1f);
+                    case SkinTone.Focused: return new Color(0.48f, 0.70f, 0.84f, 1f);
+                    case SkinTone.Help: return new Color(0.76f, 0.83f, 0.88f, 1f);
+                    default: return new Color(0.83f, 0.86f, 0.89f, 1f);
+                }
+            }
+
+            switch (tone)
+            {
+                case SkinTone.Toolbar: return new Color(0.105f, 0.13f, 0.16f, 1f);
+                case SkinTone.Input: return new Color(0.13f, 0.17f, 0.205f, 1f);
+                case SkinTone.Raised: return new Color(0.17f, 0.215f, 0.255f, 1f);
+                case SkinTone.Hover: return new Color(0.18f, 0.30f, 0.38f, 1f);
+                case SkinTone.Active: return new Color(0.12f, 0.38f, 0.55f, 1f);
+                case SkinTone.Focused: return new Color(0.14f, 0.32f, 0.44f, 1f);
+                case SkinTone.Help: return new Color(0.16f, 0.22f, 0.27f, 1f);
+                default: return new Color(0.135f, 0.165f, 0.195f, 1f);
+            }
+        }
+
+        private static void RefreshOpenWindowRoots()
+        {
+            EditorApplication.delayCall -= RefreshOpenWindowRoots;
+            if (EditorApplication.isPlayingOrWillChangePlaymode || Application.isBatchMode)
+                return;
+
+            if (globalStyleSheet == null)
+                globalStyleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(GlobalStyleSheetPath);
+            if (globalStyleSheet == null)
+                return;
+
+            EditorWindow[] windows = Resources.FindObjectsOfTypeAll<EditorWindow>();
+            for (int i = 0; i < windows.Length; i++)
+            {
+                EditorWindow window = windows[i];
+                VisualElement root = window == null ? null : window.rootVisualElement;
+                if (root == null || ContainsRoot(root))
+                    continue;
+
+                if (!root.styleSheets.Contains(globalStyleSheet))
+                    root.styleSheets.Add(globalStyleSheet);
+                root.AddToClassList(RootClass);
+                root.EnableInClassList(DarkRootClass, EditorGUIUtility.isProSkin);
+                root.EnableInClassList(LightRootClass, !EditorGUIUtility.isProSkin);
+                rootSnapshots.Add(new RootSnapshot { root = root });
+                root.MarkDirtyRepaint();
+            }
+        }
+
+        private static void RestoreStyle(StyleSnapshot snapshot)
+        {
+            if (snapshot == null || snapshot.style == null || snapshot.states == null)
+                return;
+
+            for (int i = 0; i < snapshot.states.Length; i++)
+            {
+                StateSnapshot state = snapshot.states[i];
+                if (state == null || state.state == null)
+                    continue;
+                try
+                {
+                    state.state.textColor = state.textColor;
+                    state.state.background = state.background;
+                    state.state.scaledBackgrounds = state.scaledBackgrounds;
+                }
+                catch
+                {
+                    // 恢复逐状态隔离；一个 Unity 内部状态失效不阻断其余样式恢复。
+                }
+            }
+        }
+
+        private static void RestoreRoot(RootSnapshot snapshot)
+        {
+            VisualElement root = snapshot == null ? null : snapshot.root;
+            if (root == null)
+                return;
+            root.RemoveFromClassList(RootClass);
+            root.RemoveFromClassList(DarkRootClass);
+            root.RemoveFromClassList(LightRootClass);
+            if (globalStyleSheet != null && root.styleSheets.Contains(globalStyleSheet))
+                root.styleSheets.Remove(globalStyleSheet);
+            root.MarkDirtyRepaint();
+        }
+
+        private static void DestroyCreatedTextures()
+        {
+            for (int i = 0; i < createdTextures.Count; i++)
+                if (createdTextures[i] != null)
+                    UnityEngine.Object.DestroyImmediate(createdTextures[i]);
+            createdTextures.Clear();
+            createdTextureBytes = 0L;
+        }
+
+        private static bool CanCreateTexture(long requiredBytes)
+        {
+            return requiredBytes > 0L
+                && createdTextures.Count < MaxCreatedTextureCount
+                && createdTextureBytes + requiredBytes <= MaxCreatedTextureBytes;
+        }
+
+        private static string BuildAppliedMessage()
+        {
+            return "ES 全局深度皮肤已覆盖 " + snapshots.Count + " 个 IMGUI 文字样式和 "
+                + rootSnapshots.Count + " 个 UI Toolkit 窗口；纯色只应用到安全内容容器，"
+                + "原生窗口根节点与透明绘制层保持不变。进入 PlayMode 自动停用，可随时恢复原生样式。";
+        }
+
+        private static bool ContainsStyle(GUIStyle style)
+        {
+            for (int i = 0; i < snapshots.Count; i++)
+                if (ReferenceEquals(snapshots[i].style, style))
+                    return true;
+            return false;
+        }
+
+        private static bool ContainsRoot(VisualElement root)
+        {
+            for (int i = 0; i < rootSnapshots.Count; i++)
+                if (ReferenceEquals(rootSnapshots[i].root, root))
+                    return true;
+            return false;
+        }
+
     }
 }

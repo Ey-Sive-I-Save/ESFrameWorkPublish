@@ -15,6 +15,35 @@ namespace ES
     [ESSimpleToolsLayout]
     public class Page_UnityPackageTool : ESWindowPageBase
     {
+        [Serializable]
+        private sealed class InstallerPackageMetadata
+        {
+            public string version = string.Empty;
+            public InstallerDependencyMetadata[] unityDependencies = Array.Empty<InstallerDependencyMetadata>();
+            public InstallerDependencyMetadata[] gitDependencies = Array.Empty<InstallerDependencyMetadata>();
+        }
+
+        [Serializable]
+        private sealed class InstallerDependencyMetadata
+        {
+            public string name = string.Empty;
+            public string packageId = string.Empty;
+            public string checkClass = string.Empty;
+            public string gitUrl = string.Empty;
+            public bool isRequired;
+        }
+
+        private sealed class PublishAssetPlan
+        {
+            public readonly List<string> assetPaths = new List<string>();
+            public readonly List<string> packageDependencies = new List<string>();
+            public readonly List<string> externalAssetDependencies = new List<string>();
+            public int directAssetCount;
+            public int dependencyAssetCount;
+            public int requiredAssetCount;
+            public long sourceBytes;
+            public ESFrameworkPublishHardcodedPathAudit hardcodedPathAudit;
+        }
 
 
         [HideInInspector]
@@ -47,12 +76,23 @@ namespace ES
         private int packagePreviewPageIndex;
         private const int PackagePreviewPageSize = 14;
         private readonly List<string> cachedPackagePreviewPaths = new List<string>();
+        private readonly List<string> cachedFilteredPackagePreviewPaths = new List<string>();
         private string cachedPackagePreviewSignature = "";
+        private string cachedPackagePreviewFilterSearch = null;
+        private bool packagePreviewLoaded;
         private bool cachedPackagePreviewConfigValid;
         private string cachedPackagePreviewConfigName = "";
         private string cachedPackagePreviewOutputPath = "";
         private string cachedPackagePreviewPackageName = "";
         private bool cachedPackagePreviewIncludeDependencies;
+        private const double PublishConfigValidationIntervalSeconds = 2d;
+        [NonSerialized] private double nextPublishConfigValidationTime;
+        [NonSerialized] private bool cachedPublishConfigValid;
+        [NonSerialized] private List<string> cachedPublishRoots = new List<string>();
+        [NonSerialized] private List<string> cachedPublishDependencyAllowRoots = new List<string>();
+        [NonSerialized] private List<string> cachedPublishExternalReferenceRoots = new List<string>();
+        [NonSerialized] private List<string> cachedPublishExclusions = new List<string>();
+        [NonSerialized] private string cachedPublishConfigError = string.Empty;
 
         [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
@@ -73,7 +113,7 @@ namespace ES
 
         private void DrawPackageActionPanel(int previewCount, bool configValid)
         {
-            SimpleToolsPanelUtility.DrawSectionTitle("执行操作", "先刷新/确认资源清单，再选择普通导出或发布打包。");
+            SimpleToolsPanelUtility.DrawSectionTitle("执行操作", "普通导出不进入发布链；正式主包必须先通过闭包检查，再签名并交给旧 ESInstaller。");
             using (SimpleToolsPanelUtility.BeginContentSection())
             {
                 using (new EditorGUILayout.HorizontalScope())
@@ -82,20 +122,79 @@ namespace ES
                         GetSelectedAssets();
                     if (SimpleToolsPanelUtility.DrawActionButton("应用到全局设置", SimpleToolsActionTone.Warning, 30, GUILayout.MinWidth(120)))
                         ApplyToGlobalConfig();
+                    if (SimpleToolsPanelUtility.DrawActionButton("定位发布配置", SimpleToolsActionTone.Neutral, 30, GUILayout.MinWidth(110)))
+                    {
+                        var config = ESGlobalEditorDefaultConfi.Instance;
+                        if (config != null)
+                        {
+                            Selection.activeObject = config;
+                            EditorGUIUtility.PingObject(config);
+                        }
+                    }
                     GUILayout.FlexibleSpace();
                 }
 
+                bool publishConfigValid = TryResolvePublishAssetRootsForDisplay(
+                    out List<string> publishRoots,
+                    out List<string> dependencyAllowRoots,
+                    out List<string> externalReferenceRoots,
+                    out List<string> publishExclusions,
+                    out string publishRootsError);
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     GUI.enabled = configValid && previewCount > 0;
-                    if (SimpleToolsPanelUtility.DrawActionButton("导出 UnityPackage", SimpleToolsActionTone.Primary, 34, GUILayout.MinWidth(150)))
+                    if (SimpleToolsPanelUtility.DrawActionButton("普通导出（非发布）", SimpleToolsActionTone.Neutral, 34, GUILayout.MinWidth(150)))
                         ExportPackage();
-                    if (SimpleToolsPanelUtility.DrawActionButton("发布打包", SimpleToolsActionTone.Success, 34, GUILayout.MinWidth(110)))
+                    GUI.enabled = publishConfigValid;
+                    if (SimpleToolsPanelUtility.DrawActionButton("闭包检查", SimpleToolsActionTone.Primary, 34, GUILayout.MinWidth(100)))
+                        AuditPublishPackage();
+                    if (SimpleToolsPanelUtility.DrawActionButton("正式发布", SimpleToolsActionTone.Success, 34, GUILayout.MinWidth(105)))
                         PublishPackage();
                     GUI.enabled = true;
                     GUILayout.FlexibleSpace();
                 }
+
+                if (publishConfigValid)
+                {
+                    EditorGUILayout.LabelField(
+                        "正式发布白名单：" + string.Join("、", publishRoots)
+                        + (dependencyAllowRoots.Count > 0 ? " | 依赖允许根：" + string.Join("、", dependencyAllowRoots) : string.Empty)
+                        + (externalReferenceRoots.Count > 0 ? " | 外部引用根：" + string.Join("、", externalReferenceRoots) : string.Empty)
+                        + (publishExclusions.Count > 0 ? " | 排除：" + string.Join("、", publishExclusions) : string.Empty),
+                        EditorStyles.wordWrappedMiniLabel);
+                }
+                else
+                {
+                    SimpleToolsPanelUtility.DrawWarning("正式发布不可用：" + publishRootsError);
+                }
             }
+        }
+
+        private bool TryResolvePublishAssetRootsForDisplay(
+            out List<string> publishRoots,
+            out List<string> dependencyAllowRoots,
+            out List<string> externalReferenceRoots,
+            out List<string> publishExclusions,
+            out string error)
+        {
+            double now = EditorApplication.timeSinceStartup;
+            if (now >= nextPublishConfigValidationTime)
+            {
+                cachedPublishConfigValid = TryResolvePublishAssetRoots(
+                    out cachedPublishRoots,
+                    out cachedPublishDependencyAllowRoots,
+                    out cachedPublishExternalReferenceRoots,
+                    out cachedPublishExclusions,
+                    out cachedPublishConfigError);
+                nextPublishConfigValidationTime = now + PublishConfigValidationIntervalSeconds;
+            }
+
+            publishRoots = cachedPublishRoots;
+            dependencyAllowRoots = cachedPublishDependencyAllowRoots;
+            externalReferenceRoots = cachedPublishExternalReferenceRoots;
+            publishExclusions = cachedPublishExclusions;
+            error = cachedPublishConfigError;
+            return cachedPublishConfigValid;
         }
 
         private void DrawPackagePreviewPanel(List<string> previewPaths, string configName, string outputPath, string packageName, bool includeDependencies)
@@ -124,6 +223,11 @@ namespace ES
                 }
 
                 var rows = FilterPackagePreview(previewPaths);
+                if (!packagePreviewLoaded)
+                {
+                    SimpleToolsPanelUtility.DrawEmptyState("尚未生成资源预览。点击“刷新预览”后才会扫描当前配置，首次打开不会自动遍历项目资源。");
+                    return;
+                }
                 if (rows.Count == 0)
                 {
                     SimpleToolsPanelUtility.DrawEmptyState("当前配置没有可导出的资源，或搜索条件没有命中。");
@@ -170,7 +274,18 @@ namespace ES
                 return paths;
 
             string keyword = packagePreviewSearch.Trim();
-            return paths.Where(path => path != null && path.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+            if (string.Equals(cachedPackagePreviewFilterSearch, keyword, StringComparison.Ordinal))
+                return cachedFilteredPackagePreviewPaths;
+
+            cachedFilteredPackagePreviewPaths.Clear();
+            for (int i = 0; i < paths.Count; i++)
+            {
+                string path = paths[i];
+                if (path != null && path.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
+                    cachedFilteredPackagePreviewPaths.Add(path);
+            }
+            cachedPackagePreviewFilterSearch = keyword;
+            return cachedFilteredPackagePreviewPaths;
         }
 
         private List<string> BuildExpandedPackageAssetPaths(out string configName, out string outputPath, out string packageName, out bool includeDependencies)
@@ -178,19 +293,32 @@ namespace ES
             List<string> selectedAssets;
             if (!ResolveCurrentPackageConfig(out selectedAssets, out outputPath, out packageName, out includeDependencies, out configName))
                 return new List<string>();
-            return ExpandPackageAssetPaths(selectedAssets);
+            return ExpandPackageAssetPaths(selectedAssets, ResolveCurrentPackageExcludePaths());
         }
 
         private List<string> EnsurePackagePreviewCache(bool forceRefresh, out string configName, out string outputPath, out string packageName, out bool includeDependencies, out bool configValid)
         {
             string signature = BuildPackagePreviewSignature(out configValid, out configName, out outputPath, out packageName, out includeDependencies);
-            if (forceRefresh || signature != cachedPackagePreviewSignature)
+            if (signature != cachedPackagePreviewSignature)
             {
                 cachedPackagePreviewPaths.Clear();
+                InvalidatePackagePreviewFilter();
+                packagePreviewLoaded = false;
+                cachedPackagePreviewSignature = signature;
+                cachedPackagePreviewConfigValid = configValid;
+                cachedPackagePreviewConfigName = configName;
+                cachedPackagePreviewOutputPath = outputPath;
+                cachedPackagePreviewPackageName = packageName;
+                cachedPackagePreviewIncludeDependencies = includeDependencies;
+            }
+
+            if (forceRefresh)
+            {
+                cachedPackagePreviewPaths.Clear();
+                InvalidatePackagePreviewFilter();
                 if (configValid)
                     cachedPackagePreviewPaths.AddRange(BuildExpandedPackageAssetPaths(out configName, out outputPath, out packageName, out includeDependencies));
-
-                cachedPackagePreviewSignature = signature;
+                packagePreviewLoaded = true;
                 cachedPackagePreviewConfigValid = configValid;
                 cachedPackagePreviewConfigName = configName;
                 cachedPackagePreviewOutputPath = outputPath;
@@ -203,14 +331,21 @@ namespace ES
             outputPath = cachedPackagePreviewOutputPath;
             packageName = cachedPackagePreviewPackageName;
             includeDependencies = cachedPackagePreviewIncludeDependencies;
-            return new List<string>(cachedPackagePreviewPaths);
+            return cachedPackagePreviewPaths;
+        }
+
+        private void InvalidatePackagePreviewFilter()
+        {
+            cachedPackagePreviewFilterSearch = null;
+            cachedFilteredPackagePreviewPaths.Clear();
         }
 
         private string BuildPackagePreviewSignature(out bool configValid, out string configName, out string outputPath, out string packageName, out bool includeDependencies)
         {
             configValid = ResolveCurrentPackageConfig(out var selectedAssets, out outputPath, out packageName, out includeDependencies, out configName);
             string pathPart = selectedAssets == null ? "<null>" : string.Join("|", selectedAssets.Select(SimpleToolsSafetyUtility.NormalizeAssetPath));
-            return $"{currentConfigIndex}|{configValid}|{configName}|{outputPath}|{packageName}|{includeDependencies}|{pathPart}";
+            string excludePart = string.Join("|", ResolveCurrentPackageExcludePaths().Select(SimpleToolsSafetyUtility.NormalizeAssetPath));
+            return $"{currentConfigIndex}|{configValid}|{configName}|{outputPath}|{packageName}|{includeDependencies}|{pathPart}|{excludePart}";
         }
 
         private bool ResolveCurrentPackageConfig(out List<string> selectedAssets, out string outputPath, out string packageName, out bool includeDependencies, out string configName)
@@ -248,10 +383,27 @@ namespace ES
             return true;
         }
 
-        private List<string> ExpandPackageAssetPaths(IEnumerable<string> selectedAssets)
+        private IEnumerable<string> ResolveCurrentPackageExcludePaths()
+        {
+            if (currentConfigIndex < 0)
+                return Array.Empty<string>();
+            var globalConfigs = GlobalPackageConfigs;
+            if (currentConfigIndex >= globalConfigs.Count)
+                return Array.Empty<string>();
+            return globalConfigs[currentConfigIndex]?.ExcludeFolders ?? new List<string>();
+        }
+
+        private List<string> ExpandPackageAssetPaths(IEnumerable<string> selectedAssets, IEnumerable<string> excludedPaths = null)
         {
             var expandedPaths = new List<string>();
             var expandedPathSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var normalizedExclusions = new List<string>();
+            foreach (string excludedPath in excludedPaths ?? Array.Empty<string>())
+            {
+                string normalizedExclusion = SimpleToolsSafetyUtility.NormalizeAssetPath(excludedPath)?.TrimEnd('/');
+                if (!string.IsNullOrWhiteSpace(normalizedExclusion))
+                    normalizedExclusions.Add(normalizedExclusion);
+            }
             if (selectedAssets == null)
                 return expandedPaths;
 
@@ -267,13 +419,18 @@ namespace ES
                     foreach (var guid in guids)
                     {
                         var assetPath = SimpleToolsSafetyUtility.NormalizeAssetPath(AssetDatabase.GUIDToAssetPath(guid));
-                        if (CanExportPackageAsset(assetPath) && expandedPathSet.Add(assetPath))
+                        if (!AssetDatabase.IsValidFolder(assetPath)
+                            && !IsExcludedPackageAsset(assetPath, normalizedExclusions)
+                            && CanExportPackageAsset(assetPath)
+                            && expandedPathSet.Add(assetPath))
                             expandedPaths.Add(assetPath);
                     }
                 }
                 else if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(normalizedPath) != null)
                 {
-                    if (CanExportPackageAsset(normalizedPath) && expandedPathSet.Add(normalizedPath))
+                    if (!IsExcludedPackageAsset(normalizedPath, normalizedExclusions)
+                        && CanExportPackageAsset(normalizedPath)
+                        && expandedPathSet.Add(normalizedPath))
                         expandedPaths.Add(normalizedPath);
                 }
             }
@@ -282,13 +439,26 @@ namespace ES
             return expandedPaths;
         }
 
+        private static bool IsExcludedPackageAsset(string assetPath, IReadOnlyList<string> excludedRoots)
+        {
+            for (int i = 0; i < excludedRoots.Count; i++)
+            {
+                string excludedRoot = excludedRoots[i];
+                if (assetPath.Equals(excludedRoot, StringComparison.OrdinalIgnoreCase)
+                    || assetPath.StartsWith(excludedRoot + "/", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
         private static bool CanExportPackageAsset(string assetPath)
         {
             if (!SimpleToolsSafetyUtility.IsAssetPath(assetPath))
                 return false;
 
-            return !assetPath.StartsWith("Assets/Plugins/ES/Editor/Installer/", StringComparison.OrdinalIgnoreCase) &&
-                   !assetPath.Equals("Assets/Plugins/ES/Editor/Installer", StringComparison.OrdinalIgnoreCase);
+            const string installerDownloads = "Assets/Plugins/ES/Editor/Installer/Downloads";
+            return !assetPath.Equals(installerDownloads, StringComparison.OrdinalIgnoreCase)
+                && !assetPath.StartsWith(installerDownloads + "/", StringComparison.OrdinalIgnoreCase);
         }
 
         #region 配置管理
@@ -694,6 +864,12 @@ namespace ES
 
         public override ESWindowPageBase ES_Refresh()
         {
+            nextPublishConfigValidationTime = 0d;
+            cachedPackagePreviewSignature = string.Empty;
+            cachedPackagePreviewPaths.Clear();
+            InvalidatePackagePreviewFilter();
+            packagePreviewLoaded = false;
+
             // 初始化全局配置列表
             var globalConfigs = GlobalPackageConfigs;
             if (globalConfigs == null || globalConfigs.Count == 0)
@@ -967,7 +1143,7 @@ namespace ES
                 return;
             }
 
-            var expandedPaths = ExpandPackageAssetPaths(selectedAssets);
+            var expandedPaths = ExpandPackageAssetPaths(selectedAssets, ResolveCurrentPackageExcludePaths());
             var assetPaths = expandedPaths.ToArray();
             if (assetPaths.Length == 0)
             {
@@ -1004,71 +1180,73 @@ namespace ES
                 lastResultSummary = $"打包完成: {assetPaths.Length} 个资源 | 配置 {configName} | 依赖 {GetDependencyInclusionText(includeDependencies)}";
                 lastResultDetail = $"输出文件:\n{finalOutputPath}\n\n资源预览:\n" + SimpleToolsSafetyUtility.JoinPreview(assetPaths, 12);
                 EditorUtility.DisplayDialog("成功", $"Package导出成功！\n配置: {configName}\n路径: {finalOutputPath}", "确定");
+                ESEditorFeedbackSoundHook.NotifyBuildCompleted(true);
                 EditorUtility.RevealInFinder(finalOutputPath);
             }
             catch (System.Exception e)
             {
                 lastResultSummary = $"打包失败: 配置 {configName} | 资源 {assetPaths.Length} 个";
                 lastResultDetail = e.Message;
+                ESEditorFeedbackSoundHook.NotifyBuildCompleted(false);
                 EditorUtility.DisplayDialog("错误", $"导出失败: {e.Message}", "确定");
             }
         }
 
+        private void AuditPublishPackage()
+        {
+            if (!TryBuildPublishAssetPlan(out PublishAssetPlan plan, out string error))
+            {
+                lastResultSummary = "发布闭包检查失败";
+                lastResultDetail = error;
+                EditorUtility.DisplayDialog("发布闭包未通过", error, "确定");
+                return;
+            }
+
+            string packageText = plan.packageDependencies.Count == 0
+                ? "无"
+                : string.Join("、", plan.packageDependencies);
+            lastResultSummary =
+                $"发布闭包通过: 直接 {plan.directAssetCount} | 必需 {plan.requiredAssetCount} | 依赖 {plan.dependencyAssetCount} | 总计 {plan.assetPaths.Count} | {FormatBytes(plan.sourceBytes)}";
+            lastResultDetail =
+                "UPM/Git 依赖（不进入 unitypackage，由 ESInstaller 配置负责）：\n" + packageText
+                + "\n\n商业/外部 Assets 依赖（只允许引用，不进入 unitypackage）：\n"
+                + (plan.externalAssetDependencies.Count == 0 ? "无" : string.Join("、", plan.externalAssetDependencies))
+                + "\n\n硬编码资产路径分类：随包 " + (plan.hardcodedPathAudit?.requiredCount ?? 0)
+                + " | 按需生成 " + (plan.hardcodedPathAudit?.generatedCount ?? 0)
+                + " | 项目状态 " + (plan.hardcodedPathAudit?.projectOwnedCount ?? 0)
+                + " | 可选重内容 " + (plan.hardcodedPathAudit?.optionalHeavyCount ?? 0)
+                + "\n\n最终资源预览：\n" + SimpleToolsSafetyUtility.JoinPreview(plan.assetPaths, 40);
+            EditorUtility.DisplayDialog(
+                "发布闭包通过",
+                $"直接资源：{plan.directAssetCount}\n必需资产：{plan.requiredAssetCount}\n依赖资源：{plan.dependencyAssetCount}\n总计：{plan.assetPaths.Count}\n源文件体积：{FormatBytes(plan.sourceBytes)}\n外部包：{packageText}\n外部 Assets：{string.Join("、", plan.externalAssetDependencies)}",
+                "确定");
+        }
+
         public void PublishPackage()
         {
-            var config = ESGlobalEditorDefaultConfi.Instance;
-            if (config == null)
+            const string packageId = "es_main";
+            if (!TryBuildPublishAssetPlan(out PublishAssetPlan publishPlan, out string publishPlanError))
             {
-                EditorUtility.DisplayDialog("错误", "未找到全局配置对象！", "确定");
+                EditorUtility.DisplayDialog("正式发布闭包无效", publishPlanError, "确定");
                 return;
             }
 
-            // 使用PackagePublishPath作为构建路径
-            var publishPath = config.PackagePublishPath;
-            if (string.IsNullOrEmpty(publishPath))
-            {
-                EditorUtility.DisplayDialog("错误", "发布路径未设置！", "确定");
-                return;
-            }
-
-            // 检查路径是否存在。
-            if (!AssetDatabase.IsValidFolder(publishPath))
-            {
-                EditorUtility.DisplayDialog("错误", $"发布路径不存在: {publishPath}", "确定");
-                return;
-            }
-
-            // 收集发布路径下的所有资源。
-            var guids = AssetDatabase.FindAssets("", new[] { publishPath });
-            var assetPaths = new List<string>();
-            var assetPathSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var guid in guids)
-            {
-                var assetPath = SimpleToolsSafetyUtility.NormalizeAssetPath(AssetDatabase.GUIDToAssetPath(guid));
-                if (CanExportPackageAsset(assetPath) && assetPathSet.Add(assetPath))
-                    assetPaths.Add(assetPath);
-            }
+            List<string> assetPaths = publishPlan.assetPaths;
 
             if (assetPaths.Count == 0)
             {
-                EditorUtility.DisplayDialog("错误", "发布路径下没有找到任何资源！", "确定");
+                EditorUtility.DisplayDialog("错误", "正式发布白名单中没有可发布资源。", "确定");
                 return;
             }
 
-            // 使用PackageOutputPath作为输出目录
-            var outputDir = config.PackageOutputPathForPublish;
-            if (string.IsNullOrEmpty(outputDir))
+            if (!TryReadMainPackageVersion(out string packageVersion, out string versionError))
             {
-                outputDir = ESGlobalEditorDefaultConfi.DefaultUnityPackageOutputPath;
+                EditorUtility.DisplayDialog("主包元数据无效", versionError, "确定");
+                return;
             }
 
-            // 生成包名（使用全局配置的固定包名加时间戳）。
-            var packageName = config.PackageName;
-            if (string.IsNullOrEmpty(packageName))
-            {
-                packageName = "ESPackage";
-            }
-            var timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string outputDir = ESGlobalEditorDefaultConfi.DefaultUnityPackageOutputPath;
+            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             string managedOutputDirectory;
             string outputPathError;
             if (!TryResolveManagedPackageOutputDirectory(outputDir, true, out managedOutputDirectory, out outputPathError))
@@ -1077,14 +1255,15 @@ namespace ES
                 return;
             }
 
-            var outputPath = Path.Combine(managedOutputDirectory, $"{SanitizeFileName(packageName)}_{timestamp}.unitypackage");
+            string packageName = "ESFramework_" + packageVersion + "_" + timestamp;
+            string outputPath = Path.Combine(managedOutputDirectory, SanitizeFileName(packageName) + ".unitypackage");
 
             string publishPreview = SimpleToolsSafetyUtility.JoinPreview(assetPaths, 12);
             if (!SimpleToolsPanelUtility.ConfirmHeavyOperation(
-                "确认发布打包",
+                "确认发布 ES Framework 主包",
                 assetPaths.Count,
-                $"从发布路径导出 {assetPaths.Count} 个资源。\n\n发布路径：{publishPath}\n输出：{outputPath}\n包含依赖：否\n\n{publishPreview}",
-                "发布打包不会包含依赖，适合明确发布目录已经完整的情况。请确认发布目录没有临时文件。"))
+                $"直接资源：{publishPlan.directAssetCount}\n必需资产：{publishPlan.requiredAssetCount}\n闭包依赖：{publishPlan.dependencyAssetCount}\n总计：{publishPlan.assetPaths.Count}\n源文件体积：{FormatBytes(publishPlan.sourceBytes)}\n外部包：{string.Join("、", publishPlan.packageDependencies)}\n外部 Assets：{string.Join("、", publishPlan.externalAssetDependencies)}\n\n版本：{packageVersion}\n归档输出：{outputPath}\n安装入口：旧 ESInstaller Downloads/Main\n自动包含全部依赖：否\n\n{publishPreview}",
+                "发布会精确加入允许根内的资源依赖，归档 Downloads/Main 中的旧正式包，再写入新主包和 ESInstaller 签名清单。"))
                 return;
 
             try
@@ -1092,19 +1271,634 @@ namespace ES
                 // 不包含依赖的发布打包
                 string stagedOutputPath = BuildUniqueStagingPackagePath(managedOutputDirectory, outputPath);
                 AssetDatabase.ExportPackage(assetPaths.ToArray(), stagedOutputPath, ExportPackageOptions.Default);
+                if (!ESFrameworkPublishContentPolicy.TryValidateExportedUnityPackage(
+                        stagedOutputPath,
+                        assetPaths,
+                        out int packagedPathCount,
+                        out string packageContentError))
+                    throw new InvalidDataException(packageContentError);
                 PromoteExportedPackage(stagedOutputPath, outputPath, managedOutputDirectory);
 
-                lastResultSummary = $"发布打包完成: {assetPaths.Count} 个资源 | 发布路径 {publishPath}";
-                lastResultDetail = $"输出文件:\n{outputPath}\n\n资源预览:\n" + SimpleToolsSafetyUtility.JoinPreview(assetPaths, 12);
-                EditorUtility.DisplayDialog("成功", $"发布包导出成功！\n路径: {outputPath}", "确定");
-                EditorUtility.RevealInFinder(outputPath);
+                if (!TryPublishThroughExistingInstaller(
+                        outputPath,
+                        packageId,
+                        packageVersion,
+                        out string installerPackagePath,
+                        out string manifestPath,
+                        out string signingKeyId,
+                        out string publishError))
+                    throw new InvalidOperationException(publishError);
+
+                AssetDatabase.Refresh();
+                bool developmentSigned = string.Equals(
+                    signingKeyId,
+                    "es-local-dev",
+                    StringComparison.Ordinal);
+                string trustText = developmentSigned
+                    ? "本机开发签名，仅用于本机安装验证"
+                    : "生产签名 " + signingKeyId;
+                lastResultSummary = $"主包发布完成: 计划 {assetPaths.Count} 个资源 | 包内路径 {packagedPathCount} 个 | {packageVersion} | {trustText}";
+                lastResultDetail =
+                    "归档产物:\n" + outputPath
+                    + "\n\nESInstaller 主包:\n" + installerPackagePath
+                    + "\n\n签名清单:\n" + manifestPath
+                    + "\n\n资源预览:\n" + SimpleToolsSafetyUtility.JoinPreview(assetPaths, 12);
+                EditorUtility.DisplayDialog(
+                    "发布完成",
+                    "主包和签名清单已接入旧 ESInstaller。\n\n版本：" + packageVersion
+                    + "\n签名：" + trustText
+                    + "\n安装目录：" + Path.GetDirectoryName(installerPackagePath),
+                    "确定");
+                ESEditorFeedbackSoundHook.NotifyBuildCompleted(true);
+                EditorUtility.RevealInFinder(installerPackagePath);
             }
             catch (System.Exception e)
             {
-                lastResultSummary = $"发布打包失败: 发布路径 {publishPath}";
+                lastResultSummary = "发布打包失败：正式发布白名单未能完成导出或签名。";
                 lastResultDetail = e.Message;
+                ESEditorFeedbackSoundHook.NotifyBuildCompleted(false);
                 EditorUtility.DisplayDialog("错误", $"发布打包失败: {e.Message}", "确定");
             }
+        }
+
+        private bool TryBuildPublishAssetPlan(out PublishAssetPlan plan, out string error)
+        {
+            plan = null;
+            error = string.Empty;
+            if (!TryResolvePublishAssetRoots(
+                    out List<string> publishRoots,
+                    out List<string> dependencyAllowRoots,
+                    out List<string> externalReferenceRoots,
+                    out List<string> publishExclusions,
+                    out error))
+                return false;
+
+            ESGlobalEditorDefaultConfi config = ESGlobalEditorDefaultConfi.Instance;
+            List<string> requiredAssetPaths = ResolveRequiredPublishAssetPaths(config);
+            if (!ESFrameworkPublishContentPolicy.TryValidateConfiguration(
+                    publishRoots,
+                    requiredAssetPaths,
+                    publishExclusions,
+                    out error))
+                return false;
+
+            if (!ESFrameworkPublishContentPolicy.TryAuditHardcodedAssetPaths(
+                    new[] { "Assets/Plugins/ES", "Assets/Scripts/ESLogic" },
+                    out ESFrameworkPublishHardcodedPathAudit hardcodedPathAudit,
+                    out error))
+                return false;
+
+            if (!TryValidateMainPackageDependencyMetadata(out error))
+                return false;
+
+            List<string> rootAssets = ExpandPackageAssetPaths(publishRoots, publishExclusions);
+            List<string> requiredAssets = ExpandPackageAssetPaths(requiredAssetPaths, publishExclusions);
+            var directAssetSet = new HashSet<string>(rootAssets, StringComparer.OrdinalIgnoreCase);
+            directAssetSet.UnionWith(requiredAssets);
+            List<string> directAssets = directAssetSet
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (directAssets.Count == 0)
+            {
+                error = "正式发布白名单中没有可发布资源。";
+                return false;
+            }
+
+            var assetSet = new HashSet<string>(directAssets, StringComparer.OrdinalIgnoreCase);
+            var packageSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var externalAssetSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var rejectedDependencies = new List<string>();
+            string[] dependencies;
+            try
+            {
+                dependencies = AssetDatabase.GetDependencies(directAssets.ToArray(), true);
+            }
+            catch (Exception exception)
+            {
+                error = "读取发布资源依赖失败：" + exception.Message;
+                return false;
+            }
+
+            foreach (string dependency in dependencies ?? Array.Empty<string>())
+            {
+                string normalizedDependency = SimpleToolsSafetyUtility.NormalizeAssetPath(dependency);
+                if (string.IsNullOrWhiteSpace(normalizedDependency)
+                    || AssetDatabase.IsValidFolder(normalizedDependency)
+                    || assetSet.Contains(normalizedDependency))
+                    continue;
+
+                if (normalizedDependency.StartsWith("Packages/", StringComparison.OrdinalIgnoreCase))
+                {
+                    string[] segments = normalizedDependency.Split('/');
+                    if (segments.Length >= 2)
+                        packageSet.Add(segments[1]);
+                    continue;
+                }
+
+                if (IsUnityBuiltInDependency(normalizedDependency))
+                    continue;
+
+                if (!SimpleToolsSafetyUtility.IsAssetPath(normalizedDependency))
+                {
+                    rejectedDependencies.Add(normalizedDependency + "（不是受管 Assets/Packages 路径）");
+                    continue;
+                }
+
+                if (IsExcludedPackageAsset(normalizedDependency, publishExclusions))
+                {
+                    rejectedDependencies.Add(normalizedDependency + "（命中正式发布排除路径）");
+                    continue;
+                }
+
+                bool isInsideDirectRoot = publishRoots.Any(root => IsPathAtOrUnder(normalizedDependency, root));
+                bool isInsideDependencyAllowRoot = dependencyAllowRoots.Any(root => IsPathAtOrUnder(normalizedDependency, root));
+                string externalReferenceRoot = externalReferenceRoots.FirstOrDefault(root => IsPathAtOrUnder(normalizedDependency, root));
+                if (!string.IsNullOrEmpty(externalReferenceRoot))
+                {
+                    externalAssetSet.Add(externalReferenceRoot);
+                    continue;
+                }
+                if (!isInsideDirectRoot && !isInsideDependencyAllowRoot)
+                {
+                    rejectedDependencies.Add(normalizedDependency + "（未进入依赖允许根）");
+                    continue;
+                }
+
+                if (CanExportPackageAsset(normalizedDependency))
+                    assetSet.Add(normalizedDependency);
+            }
+
+            if (rejectedDependencies.Count > 0)
+            {
+                rejectedDependencies.Sort(StringComparer.OrdinalIgnoreCase);
+                error =
+                    "发现 " + rejectedDependencies.Count + " 个未闭合依赖，正式发布已拒绝。"
+                    + "\n请把确属框架/示例的上级目录加入“发布依赖允许根”，或修复/移除该引用。"
+                    + "\n不要开启 IncludeDependencies 绕过门禁。\n\n"
+                    + SimpleToolsSafetyUtility.JoinPreview(rejectedDependencies, 40);
+                return false;
+            }
+
+            var result = new PublishAssetPlan
+            {
+                directAssetCount = directAssets.Count,
+                requiredAssetCount = requiredAssets.Count,
+                dependencyAssetCount = assetSet.Count - directAssets.Count,
+                hardcodedPathAudit = hardcodedPathAudit
+            };
+            result.assetPaths.AddRange(assetSet.OrderBy(path => path, StringComparer.OrdinalIgnoreCase));
+            result.packageDependencies.AddRange(packageSet.OrderBy(path => path, StringComparer.OrdinalIgnoreCase));
+            result.externalAssetDependencies.AddRange(externalAssetSet.OrderBy(path => path, StringComparer.OrdinalIgnoreCase));
+
+            int maxAssetCount = config?.PackagePublishMaxAssetCount
+                ?? ESGlobalEditorDefaultConfi.DefaultPackagePublishMaxAssetCount;
+            long maxSourceBytes = config?.PackagePublishMaxSourceBytes
+                ?? ESGlobalEditorDefaultConfi.DefaultPackagePublishMaxSourceBytes;
+            if (maxAssetCount <= 0 || maxSourceBytes <= 0)
+            {
+                error = "正式发布资源数/源文件体积预算必须大于 0。";
+                return false;
+            }
+            if (result.assetPaths.Count > maxAssetCount)
+            {
+                error = $"正式发布资源数 {result.assetPaths.Count} 超过预算 {maxAssetCount}。请先审计新增内容，不允许静默放宽。";
+                return false;
+            }
+            if (!ESFrameworkPublishContentPolicy.TryMeasureSourceBytes(result.assetPaths, out result.sourceBytes, out error))
+                return false;
+            if (result.sourceBytes > maxSourceBytes)
+            {
+                error = $"正式发布源文件体积 {FormatBytes(result.sourceBytes)} 超过预算 {FormatBytes(maxSourceBytes)}。请拆分可选重内容或显式调整预算。";
+                return false;
+            }
+
+            plan = result;
+            return true;
+        }
+
+        private static List<string> ResolveRequiredPublishAssetPaths(ESGlobalEditorDefaultConfi config)
+        {
+            IEnumerable<string> configured = config?.PackagePublishRequiredAssetPaths;
+            if (configured == null || !configured.Any())
+                configured = ESGlobalEditorDefaultConfi.CreateDefaultPackagePublishRequiredAssetPaths();
+
+            return configured
+                .Select(SimpleToolsSafetyUtility.NormalizeAssetPath)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static bool TryResolvePublishAssetRoots(
+            out List<string> publishRoots,
+            out List<string> dependencyAllowRoots,
+            out List<string> externalReferenceRoots,
+            out List<string> publishExclusions,
+            out string error)
+        {
+            publishRoots = new List<string>();
+            dependencyAllowRoots = new List<string>();
+            externalReferenceRoots = new List<string>();
+            publishExclusions = new List<string>();
+            error = string.Empty;
+            var config = ESGlobalEditorDefaultConfi.Instance;
+            if (config == null)
+            {
+                error = "未找到 ES 全局编辑器配置。";
+                return false;
+            }
+
+            IEnumerable<string> configuredRoots = config.PackagePublishAssetPaths;
+            if (configuredRoots == null || !configuredRoots.Any())
+                configuredRoots = ESGlobalEditorDefaultConfi.CreateDefaultPackagePublishAssetPaths();
+
+            var uniqueRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string configuredRoot in configuredRoots)
+            {
+                string normalizedRoot = SimpleToolsSafetyUtility.NormalizeAssetPath(configuredRoot);
+                if (!SimpleToolsSafetyUtility.IsAssetPath(normalizedRoot))
+                {
+                    error = "发布白名单只允许项目 Assets 路径：" + configuredRoot;
+                    return false;
+                }
+                if (normalizedRoot.Equals("Assets", StringComparison.OrdinalIgnoreCase))
+                {
+                    error = "发布白名单不能直接使用整个 Assets 根。";
+                    return false;
+                }
+                if (!AssetDatabase.IsValidFolder(normalizedRoot))
+                {
+                    error = "发布白名单目录不存在：" + normalizedRoot;
+                    return false;
+                }
+                if (normalizedRoot.Equals("Assets/Plugins/ES/Editor/Installer/Downloads", StringComparison.OrdinalIgnoreCase)
+                    || normalizedRoot.StartsWith("Assets/Plugins/ES/Editor/Installer/Downloads/", StringComparison.OrdinalIgnoreCase))
+                {
+                    error = "发布白名单不能包含 Installer/Downloads：" + normalizedRoot;
+                    return false;
+                }
+                if (uniqueRoots.Add(normalizedRoot))
+                    publishRoots.Add(normalizedRoot);
+            }
+
+            if (!uniqueRoots.Contains("Assets/Plugins/ES"))
+            {
+                error = "正式主包必须包含权威框架根 Assets/Plugins/ES。";
+                return false;
+            }
+
+            publishRoots.Sort(StringComparer.OrdinalIgnoreCase);
+
+            IEnumerable<string> configuredDependencyAllowRoots = config.PackagePublishDependencyAllowPaths;
+            if (configuredDependencyAllowRoots == null || !configuredDependencyAllowRoots.Any())
+            {
+                configuredDependencyAllowRoots = new[]
+                {
+                    "Assets/ESNormalAssets",
+                    "Assets/LoafbrrAssets",
+                    "Assets/Demo_FGT"
+                };
+            }
+
+            var uniqueDependencyAllowRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string configuredDependencyAllowRoot in configuredDependencyAllowRoots)
+            {
+                string normalizedRoot = SimpleToolsSafetyUtility.NormalizeAssetPath(configuredDependencyAllowRoot)?.TrimEnd('/');
+                if (!SimpleToolsSafetyUtility.IsAssetPath(normalizedRoot)
+                    || normalizedRoot.Equals("Assets", StringComparison.OrdinalIgnoreCase)
+                    || !AssetDatabase.IsValidFolder(normalizedRoot))
+                {
+                    error = "发布依赖允许根不存在、过宽或不是 Assets 目录：" + configuredDependencyAllowRoot;
+                    return false;
+                }
+                if (uniqueDependencyAllowRoots.Add(normalizedRoot))
+                    dependencyAllowRoots.Add(normalizedRoot);
+            }
+            dependencyAllowRoots.Sort(StringComparer.OrdinalIgnoreCase);
+
+            IEnumerable<string> configuredExternalReferenceRoots = config.PackagePublishExternalReferencePaths;
+            if (configuredExternalReferenceRoots == null)
+                configuredExternalReferenceRoots = Array.Empty<string>();
+
+            var uniqueExternalReferenceRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string configuredExternalReferenceRoot in configuredExternalReferenceRoots)
+            {
+                string normalizedRoot = SimpleToolsSafetyUtility.NormalizeAssetPath(configuredExternalReferenceRoot)?.TrimEnd('/');
+                if (!SimpleToolsSafetyUtility.IsAssetPath(normalizedRoot)
+                    || normalizedRoot.Equals("Assets", StringComparison.OrdinalIgnoreCase)
+                    || !AssetDatabase.IsValidFolder(normalizedRoot))
+                {
+                    error = "外部依赖引用根不存在、过宽或不是 Assets 目录：" + configuredExternalReferenceRoot;
+                    return false;
+                }
+                if (publishRoots.Any(root => IsPathAtOrUnder(normalizedRoot, root) || IsPathAtOrUnder(root, normalizedRoot))
+                    || dependencyAllowRoots.Any(root => IsPathAtOrUnder(normalizedRoot, root) || IsPathAtOrUnder(root, normalizedRoot)))
+                {
+                    error = "外部依赖引用根不能与导出根或依赖允许根重叠：" + normalizedRoot;
+                    return false;
+                }
+                if (uniqueExternalReferenceRoots.Add(normalizedRoot))
+                    externalReferenceRoots.Add(normalizedRoot);
+            }
+            externalReferenceRoots.Sort(StringComparer.OrdinalIgnoreCase);
+
+            IEnumerable<string> configuredExclusions = config.PackagePublishExcludePaths;
+            if (configuredExclusions == null || !configuredExclusions.Any())
+            {
+                configuredExclusions = new[]
+                {
+                    "Assets/Plugins/ES/Obsolete",
+                    "Assets/Plugins/ES/Editor/Installer/Downloads",
+                    "Assets/Plugins/ES/0_Stand/Tests",
+                    "Assets/Plugins/ES/1_Design/Tests",
+                    "Assets/Scripts/ESLogic/Tests",
+                    "Assets/Scripts/ESLogic/Editor/Generation/Tests",
+                    "Assets/Scripts/ESLogic/Runtime/Developer/AITest",
+                    "Assets/Plugins/RootMotion/Shared Demo Assets",
+                    "Assets/Plugins/RootMotion/FinalIK/_DEMOS",
+                    "Assets/Plugins/RootMotion/FinalIK/_Integration",
+                    "Assets/Plugins/RootMotion/Baker",
+                    "Assets/Plugins/RootMotion/Editor/Baker",
+                    "Assets/Plugins/RootMotion/Editor/FinalIK/_DEMOS",
+                    "Assets/Plugins/RootMotion/Editor/Shared Demo Scripts",
+                    "Assets/Plugins/RootMotion/FinalIK/Tools/VRIK Animated Locomotion.controller",
+                    "Assets/Plugins/Easy Save 3/Scripts/Save Slots",
+                    "Assets/Plugins/ES/3_Examples/1_Runtime/Example_SimpleTools/New Scene 1.unity",
+                    "Assets/Plugins/ES/ThirdParty/JUMP_SystemSpeech.asset"
+                };
+            }
+            var uniqueExclusions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string configuredExclusion in configuredExclusions)
+            {
+                string normalizedExclusion = SimpleToolsSafetyUtility.NormalizeAssetPath(configuredExclusion)?.TrimEnd('/');
+                if (!SimpleToolsSafetyUtility.IsAssetPath(normalizedExclusion))
+                {
+                    error = "正式发布排除路径不是受管 Assets 文件/目录：" + configuredExclusion;
+                    return false;
+                }
+                bool exclusionExists = AssetDatabase.IsValidFolder(normalizedExclusion)
+                    || !string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(normalizedExclusion));
+                if (!exclusionExists)
+                {
+                    error = "正式发布排除路径不存在：" + configuredExclusion;
+                    return false;
+                }
+                if (normalizedExclusion.Equals("Assets/Plugins/ES", StringComparison.OrdinalIgnoreCase))
+                {
+                    error = "不能排除权威框架根 Assets/Plugins/ES。";
+                    return false;
+                }
+                bool belongsToPublishRoot = publishRoots.Any(root =>
+                    normalizedExclusion.Equals(root, StringComparison.OrdinalIgnoreCase)
+                    || normalizedExclusion.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase));
+                if (!belongsToPublishRoot)
+                {
+                    error = "排除路径必须位于正式发布白名单内：" + normalizedExclusion;
+                    return false;
+                }
+                if (uniqueExclusions.Add(normalizedExclusion))
+                    publishExclusions.Add(normalizedExclusion);
+            }
+            publishExclusions.Sort(StringComparer.OrdinalIgnoreCase);
+            return true;
+        }
+
+        private static bool IsPathAtOrUnder(string assetPath, string root)
+        {
+            return assetPath.Equals(root, StringComparison.OrdinalIgnoreCase)
+                || assetPath.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsUnityBuiltInDependency(string path)
+        {
+            return path.Equals("Resources/unity_builtin_extra", StringComparison.OrdinalIgnoreCase)
+                || path.Equals("Library/unity default resources", StringComparison.OrdinalIgnoreCase)
+                || path.Equals("Library/unity editor resources", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool TryPublishThroughExistingInstaller(
+            string exportedPackagePath,
+            string packageId,
+            string packageVersion,
+            out string installerPackagePath,
+            out string manifestPath,
+            out string signingKeyId,
+            out string error)
+        {
+            installerPackagePath = string.Empty;
+            manifestPath = string.Empty;
+            signingKeyId = string.Empty;
+            error = string.Empty;
+            try
+            {
+                Type publisherType = Type.GetType(
+                    "ES.EditorInternal.Installer.ESInstallerPackageTrust, ESInstaller",
+                    false);
+                if (publisherType == null)
+                {
+                    error = "旧 ESInstaller 发布模块未加载；请确认 ESInstaller.asmdef 已成功编译。";
+                    return false;
+                }
+
+                var publishMethod = publisherType.GetMethod(
+                    "TryPublishMainPackage",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+                if (publishMethod == null)
+                {
+                    error = "旧 ESInstaller 发布模块缺少固定入口 TryPublishMainPackage。";
+                    return false;
+                }
+
+                object[] arguments =
+                {
+                    exportedPackagePath,
+                    packageId,
+                    packageVersion,
+                    null,
+                    null,
+                    null,
+                    null,
+                };
+                bool succeeded = (bool)publishMethod.Invoke(null, arguments);
+                installerPackagePath = arguments[3] as string ?? string.Empty;
+                manifestPath = arguments[4] as string ?? string.Empty;
+                signingKeyId = arguments[5] as string ?? string.Empty;
+                error = arguments[6] as string ?? string.Empty;
+                return succeeded;
+            }
+            catch (Exception exception)
+            {
+                error = "调用旧 ESInstaller 发布模块失败：" + (exception.InnerException?.Message ?? exception.Message);
+                return false;
+            }
+        }
+
+        private static readonly string[] RequiredUnityDependencyPackageIds =
+        {
+            "com.unity.textmeshpro",
+            "com.unity.ugui",
+            "com.unity.timeline",
+            "com.unity.render-pipelines.universal",
+            "com.unity.inputsystem",
+            "com.unity.cinemachine"
+        };
+
+        private static readonly string[] RequiredGitDependencyCheckClasses =
+        {
+            "Cysharp.Threading.Tasks.UniTask",
+            "MemoryPack.MemoryPackSerializer",
+            "HybridCLR.RuntimeApi",
+            "Luban.EditorBeanBase",
+            "PrimeTween.Tween"
+        };
+
+        private static bool TryValidateMainPackageDependencyMetadata(out string error)
+        {
+            error = string.Empty;
+            if (!TryReadMainPackageMetadata(out InstallerPackageMetadata metadata, out error))
+                return false;
+
+            InstallerDependencyMetadata[] unityDependencies = metadata.unityDependencies
+                ?? Array.Empty<InstallerDependencyMetadata>();
+            InstallerDependencyMetadata[] gitDependencies = metadata.gitDependencies
+                ?? Array.Empty<InstallerDependencyMetadata>();
+
+            List<string> duplicateUnityIds = unityDependencies
+                .Where(dependency => dependency != null && !string.IsNullOrWhiteSpace(dependency.packageId))
+                .GroupBy(dependency => dependency.packageId.Trim(), StringComparer.OrdinalIgnoreCase)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key)
+                .ToList();
+            if (duplicateUnityIds.Count > 0)
+            {
+                error = "package.json 存在重复 Unity 依赖：" + string.Join("、", duplicateUnityIds);
+                return false;
+            }
+
+            for (int i = 0; i < RequiredUnityDependencyPackageIds.Length; i++)
+            {
+                string packageId = RequiredUnityDependencyPackageIds[i];
+                InstallerDependencyMetadata dependency = unityDependencies.FirstOrDefault(candidate =>
+                    candidate != null
+                    && string.Equals(candidate.packageId?.Trim(), packageId, StringComparison.OrdinalIgnoreCase));
+                if (dependency == null || !dependency.isRequired)
+                {
+                    error = "package.json 缺少必需 Unity 依赖或未标记为必需：" + packageId;
+                    return false;
+                }
+            }
+
+            for (int i = 0; i < RequiredGitDependencyCheckClasses.Length; i++)
+            {
+                string checkClass = RequiredGitDependencyCheckClasses[i];
+                InstallerDependencyMetadata dependency = gitDependencies.FirstOrDefault(candidate =>
+                    candidate != null
+                    && string.Equals(candidate.checkClass?.Trim(), checkClass, StringComparison.Ordinal));
+                if (dependency == null || !dependency.isRequired)
+                {
+                    error = "package.json 缺少必需 Git 依赖或未标记为必需：" + checkClass;
+                    return false;
+                }
+                if (!IsPinnedGitUrl(dependency.gitUrl))
+                {
+                    error = "package.json 的必需 Git 依赖没有固定到完整 commit：" + dependency.name;
+                    return false;
+                }
+            }
+
+            InstallerDependencyMetadata whisper = gitDependencies.FirstOrDefault(candidate =>
+                candidate != null
+                && string.Equals(candidate.checkClass?.Trim(), "Whisper.WhisperManager", StringComparison.Ordinal));
+            if (whisper != null && whisper.isRequired)
+            {
+                error = "Whisper 未进入主包源码，不能标记为主包必需依赖。请改为可选扩展。";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsPinnedGitUrl(string gitUrl)
+        {
+            string value = gitUrl?.Trim() ?? string.Empty;
+            int marker = value.LastIndexOf('#');
+            if (marker <= 0 || marker == value.Length - 1)
+                return false;
+
+            string commit = value.Substring(marker + 1);
+            return (commit.Length == 40 || commit.Length == 64) && commit.All(Uri.IsHexDigit);
+        }
+
+        private static bool TryReadMainPackageMetadata(out InstallerPackageMetadata metadata, out string error)
+        {
+            metadata = null;
+            error = string.Empty;
+            try
+            {
+                string metadataPath = Path.Combine(
+                    ProjectRootPath,
+                    "Assets",
+                    "Plugins",
+                    "ES",
+                    "Editor",
+                    "Installer",
+                    "Downloads",
+                    "Main",
+                    "package.json");
+                if (!File.Exists(metadataPath))
+                {
+                    error = "旧 ESInstaller 主包元数据不存在：" + metadataPath;
+                    return false;
+                }
+
+                metadata = JsonUtility.FromJson<InstallerPackageMetadata>(
+                    File.ReadAllText(metadataPath, System.Text.Encoding.UTF8));
+                if (metadata == null)
+                {
+                    error = "package.json 无法反序列化。";
+                    return false;
+                }
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = "读取旧 ESInstaller 主包版本失败：" + exception.Message;
+                return false;
+            }
+        }
+
+        private static bool TryReadMainPackageVersion(out string version, out string error)
+        {
+            version = string.Empty;
+            if (!TryReadMainPackageMetadata(out InstallerPackageMetadata metadata, out error))
+                return false;
+
+            version = metadata.version?.Trim() ?? string.Empty;
+            if (string.IsNullOrEmpty(version)
+                || version.Length > 64
+                || version.Any(character =>
+                    !char.IsLetterOrDigit(character)
+                    && character != '.'
+                    && character != '_'
+                    && character != '-'))
+            {
+                error = "package.json 中的 version 为空或包含非法字符。";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static string FormatBytes(long bytes)
+        {
+            if (bytes < 1024L)
+                return bytes + " B";
+            if (bytes < 1024L * 1024L)
+                return (bytes / 1024d).ToString("F1") + " KiB";
+            if (bytes < 1024L * 1024L * 1024L)
+                return (bytes / (1024d * 1024d)).ToString("F1") + " MiB";
+            return (bytes / (1024d * 1024d * 1024d)).ToString("F2") + " GiB";
         }
 
         private string SanitizeFileName(string fileName)

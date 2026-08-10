@@ -949,6 +949,14 @@ namespace ES
             EditorUtility.DisplayDialog("操作完成",
                 $"成功应用 {appliedCount} / {prefabCount} 个Prefab实例的更改。{BuildFailureDetail(failedMessages)}",
                 "确定");
+            if (failedMessages.Count == 0 && appliedCount > 0)
+            {
+                ESEditorFeedbackSoundHook.NotifyPrefabApplied();
+            }
+            else if (failedMessages.Count > 0)
+            {
+                ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Error);
+            }
             Debug.Log($"[Prefab管理] 应用完成 - 成功: {appliedCount} / 总数: {prefabCount}");
         }
 
@@ -1010,6 +1018,14 @@ namespace ES
             EditorUtility.DisplayDialog("操作完成",
                 $"成功还原 {revertedCount} / {prefabCount} 个Prefab实例的更改。{BuildFailureDetail(failedMessages)}",
                 "确定");
+            if (failedMessages.Count == 0 && revertedCount > 0)
+            {
+                ESEditorFeedbackSoundHook.NotifyPrefabReverted();
+            }
+            else if (failedMessages.Count > 0)
+            {
+                ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Error);
+            }
             Debug.Log($"[Prefab管理] 还原完成 - 成功: {revertedCount} / 总数: {prefabCount}");
         }
 

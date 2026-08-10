@@ -1,0 +1,223 @@
+.es-global-editor-skin--dark .unity-list-view,
+.es-global-editor-skin--dark .unity-tree-view,
+.es-global-editor-skin--dark .unity-collection-view,
+.es-global-editor-skin--dark .unity-scroll-view__content-container {
+    background-color: rgb(29, 35, 42);
+}
+
+.es-global-editor-skin--dark .unity-toolbar,
+.es-global-editor-skin--dark .unity-toolbar__contents-container {
+    background-color: rgb(21, 27, 33);
+    border-bottom-color: rgb(57, 82, 101);
+    border-bottom-width: 1px;
+}
+
+.es-global-editor-skin--dark .unity-toolbar-button,
+.es-global-editor-skin--dark .unity-toolbar-menu {
+    background-color: rgba(40, 51, 61, 0.82);
+    color: rgb(210, 222, 231);
+    border-left-color: rgb(52, 68, 80);
+    border-right-color: rgb(52, 68, 80);
+    border-top-color: rgb(52, 68, 80);
+    border-bottom-color: rgb(52, 68, 80);
+}
+
+.es-global-editor-skin--dark .unity-toolbar-button:hover,
+.es-global-editor-skin--dark .unity-toolbar-menu:hover,
+.es-global-editor-skin--dark .unity-button:hover {
+    background-color: rgb(42, 70, 86);
+    border-left-color: rgb(83, 145, 184);
+    border-right-color: rgb(83, 145, 184);
+    border-top-color: rgb(83, 145, 184);
+    border-bottom-color: rgb(83, 145, 184);
+}
+
+.es-global-editor-skin--dark .unity-button {
+    background-color: rgb(42, 52, 62);
+    color: rgb(222, 231, 237);
+    border-left-color: rgb(66, 82, 95);
+    border-right-color: rgb(66, 82, 95);
+    border-top-color: rgb(66, 82, 95);
+    border-bottom-color: rgb(66, 82, 95);
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    border-bottom-left-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+
+.es-global-editor-skin--dark .unity-button:active,
+.es-global-editor-skin--dark .unity-button:checked {
+    background-color: rgb(31, 96, 132);
+    border-left-color: rgb(102, 178, 220);
+    border-right-color: rgb(102, 178, 220);
+    border-top-color: rgb(102, 178, 220);
+    border-bottom-color: rgb(102, 178, 220);
+}
+
+.es-global-editor-skin--dark .unity-base-field__label,
+.es-global-editor-skin--dark .unity-foldout__text {
+    color: rgb(190, 208, 220);
+}
+
+.es-global-editor-skin--dark .unity-base-field__input,
+.es-global-editor-skin--dark .unity-base-text-field__input,
+.es-global-editor-skin--dark .unity-text-input,
+.es-global-editor-skin--dark .unity-object-field__input {
+    background-color: rgb(26, 34, 41);
+    color: rgb(226, 234, 240);
+    border-left-color: rgb(59, 78, 92);
+    border-right-color: rgb(59, 78, 92);
+    border-top-color: rgb(59, 78, 92);
+    border-bottom-color: rgb(59, 78, 92);
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
+    border-bottom-left-radius: 2px;
+    border-bottom-right-radius: 2px;
+}
+
+.es-global-editor-skin--dark .unity-base-field__input:focus,
+.es-global-editor-skin--dark .unity-base-text-field__input:focus,
+.es-global-editor-skin--dark .unity-text-input:focus,
+.es-global-editor-skin--dark .unity-object-field__input:focus {
+    border-left-color: rgb(92, 166, 207);
+    border-right-color: rgb(92, 166, 207);
+    border-top-color: rgb(92, 166, 207);
+    border-bottom-color: rgb(92, 166, 207);
+}
+
+.es-global-editor-skin--dark .unity-foldout__toggle:hover,
+.es-global-editor-skin--dark .unity-collection-view__item:hover,
+.es-global-editor-skin--dark .unity-list-view__item:hover,
+.es-global-editor-skin--dark .unity-tree-view__item:hover {
+    background-color: rgba(54, 91, 111, 0.50);
+}
+
+.es-global-editor-skin--dark .unity-collection-view__item--selected,
+.es-global-editor-skin--dark .unity-list-view__item--selected,
+.es-global-editor-skin--dark .unity-tree-view__item--selected {
+    background-color: rgb(32, 91, 123);
+    color: rgb(241, 247, 250);
+}
+
+.es-global-editor-skin--dark .unity-help-box {
+    background-color: rgb(34, 46, 55);
+    border-left-color: rgb(78, 117, 141);
+    border-right-color: rgb(57, 76, 89);
+    border-top-color: rgb(57, 76, 89);
+    border-bottom-color: rgb(57, 76, 89);
+    border-left-width: 3px;
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
+    border-bottom-left-radius: 2px;
+    border-bottom-right-radius: 2px;
+}
+
+.es-global-editor-skin--dark .unity-help-box__message {
+    color: rgb(211, 223, 231);
+}
+
+.es-global-editor-skin--dark .unity-scroll-view__horizontal-scroller,
+.es-global-editor-skin--dark .unity-scroll-view__vertical-scroller {
+    background-color: rgb(24, 30, 36);
+}
+
+.es-global-editor-skin--light .unity-list-view,
+.es-global-editor-skin--light .unity-tree-view,
+.es-global-editor-skin--light .unity-collection-view,
+.es-global-editor-skin--light .unity-scroll-view__content-container {
+    background-color: rgb(220, 225, 230);
+}
+
+.es-global-editor-skin--light .unity-toolbar,
+.es-global-editor-skin--light .unity-toolbar__contents-container {
+    background-color: rgb(195, 204, 212);
+    border-bottom-color: rgb(102, 131, 151);
+    border-bottom-width: 1px;
+}
+
+.es-global-editor-skin--light .unity-toolbar-button,
+.es-global-editor-skin--light .unity-toolbar-menu,
+.es-global-editor-skin--light .unity-button {
+    background-color: rgb(205, 213, 220);
+    color: rgb(37, 49, 58);
+    border-left-color: rgb(137, 153, 165);
+    border-right-color: rgb(137, 153, 165);
+    border-top-color: rgb(137, 153, 165);
+    border-bottom-color: rgb(137, 153, 165);
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    border-bottom-left-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+
+.es-global-editor-skin--light .unity-toolbar-button:hover,
+.es-global-editor-skin--light .unity-toolbar-menu:hover,
+.es-global-editor-skin--light .unity-button:hover {
+    background-color: rgb(169, 196, 213);
+    border-left-color: rgb(66, 128, 166);
+    border-right-color: rgb(66, 128, 166);
+    border-top-color: rgb(66, 128, 166);
+    border-bottom-color: rgb(66, 128, 166);
+}
+
+.es-global-editor-skin--light .unity-base-field__label,
+.es-global-editor-skin--light .unity-foldout__text {
+    color: rgb(49, 73, 89);
+}
+
+.es-global-editor-skin--light .unity-base-field__input,
+.es-global-editor-skin--light .unity-base-text-field__input,
+.es-global-editor-skin--light .unity-text-input,
+.es-global-editor-skin--light .unity-object-field__input {
+    background-color: rgb(232, 235, 238);
+    color: rgb(30, 39, 47);
+    border-left-color: rgb(137, 153, 165);
+    border-right-color: rgb(137, 153, 165);
+    border-top-color: rgb(137, 153, 165);
+    border-bottom-color: rgb(137, 153, 165);
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
+    border-bottom-left-radius: 2px;
+    border-bottom-right-radius: 2px;
+}
+
+.es-global-editor-skin--light .unity-base-field__input:focus,
+.es-global-editor-skin--light .unity-base-text-field__input:focus,
+.es-global-editor-skin--light .unity-text-input:focus,
+.es-global-editor-skin--light .unity-object-field__input:focus {
+    border-left-color: rgb(48, 119, 163);
+    border-right-color: rgb(48, 119, 163);
+    border-top-color: rgb(48, 119, 163);
+    border-bottom-color: rgb(48, 119, 163);
+}
+
+.es-global-editor-skin--light .unity-foldout__toggle:hover,
+.es-global-editor-skin--light .unity-collection-view__item:hover,
+.es-global-editor-skin--light .unity-list-view__item:hover,
+.es-global-editor-skin--light .unity-tree-view__item:hover {
+    background-color: rgba(112, 161, 190, 0.34);
+}
+
+.es-global-editor-skin--light .unity-collection-view__item--selected,
+.es-global-editor-skin--light .unity-list-view__item--selected,
+.es-global-editor-skin--light .unity-tree-view__item--selected {
+    background-color: rgb(103, 158, 190);
+    color: rgb(18, 35, 46);
+}
+
+.es-global-editor-skin--light .unity-help-box {
+    background-color: rgb(205, 216, 224);
+    border-left-color: rgb(76, 128, 158);
+    border-right-color: rgb(143, 160, 172);
+    border-top-color: rgb(143, 160, 172);
+    border-bottom-color: rgb(143, 160, 172);
+    border-left-width: 3px;
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
+    border-bottom-left-radius: 2px;
+    border-bottom-right-radius: 2px;
+}
+
+.es-global-editor-skin--light .unity-help-box__message {
+    color: rgb(37, 51, 60);
+}

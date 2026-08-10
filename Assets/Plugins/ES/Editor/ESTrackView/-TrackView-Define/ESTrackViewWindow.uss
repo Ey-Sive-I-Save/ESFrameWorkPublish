@@ -200,34 +200,38 @@ Button:disabled,
     width: 320px;
     min-width: 320px;
     flex-direction: column;
-    background-color: rgb(23, 26, 31);
+    background-color: rgb(20, 34, 51);
     border-left-width: 1px;
-    border-left-color: rgb(82, 97, 114);
+    border-left-color: rgb(73, 115, 153);
     border-top-width: 1px;
-    border-top-color: rgba(82, 97, 114, 0.8);
+    border-top-color: rgba(88, 133, 173, 0.8);
     border-bottom-width: 1px;
     border-bottom-color: rgba(10, 13, 16, 0.95);
 }
 
 .track-inspector-header {
-    height: 30px;
-    min-height: 30px;
+    height: 42px;
+    min-height: 42px;
     flex-direction: row;
     align-items: center;
-    background-color: rgb(30, 35, 42);
+    padding-left: 10px;
+    padding-right: 8px;
+    background-color: rgb(43, 58, 76);
     border-bottom-width: 1px;
-    border-bottom-color: rgb(56, 66, 78);
+    border-bottom-color: rgb(73, 99, 128);
 }
 
 .track-inspector-summary {
     flex-direction: column;
-    padding-left: 8px;
-    padding-right: 8px;
-    padding-top: 7px;
-    padding-bottom: 7px;
-    background-color: rgba(17, 21, 26, 0.96);
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 8px;
+    padding-bottom: 9px;
+    background-color: rgb(37, 59, 82);
+    border-left-width: 3px;
+    border-left-color: rgb(84, 171, 232);
     border-bottom-width: 1px;
-    border-bottom-color: rgba(67, 80, 96, 0.82);
+    border-bottom-color: rgba(102, 139, 174, 0.82);
 }
 
 .track-inspector-summary-title-row,
@@ -244,8 +248,8 @@ Button:disabled,
 .track-inspector-target {
     flex-grow: 1;
     min-width: 0;
-    color: rgb(226, 232, 240);
-    font-size: 12px;
+    color: rgb(112, 194, 255);
+    font-size: 14px;
     -unity-font-style: bold;
     white-space: nowrap;
     overflow: hidden;
@@ -256,7 +260,7 @@ Button:disabled,
     max-width: 118px;
     min-width: 0;
     margin-left: 8px;
-    color: rgb(145, 164, 186);
+    color: rgb(184, 202, 220);
     font-size: 11px;
     white-space: nowrap;
     overflow: hidden;
@@ -266,6 +270,7 @@ Button:disabled,
 
 .track-inspector-summary-status-row {
     margin-top: 4px;
+    overflow: hidden;
 }
 
 .track-inspector-status-badge {
@@ -274,7 +279,7 @@ Button:disabled,
     padding-left: 6px;
     padding-right: 6px;
     color: rgb(198, 208, 220);
-    background-color: rgba(37, 48, 61, 0.94);
+    background-color: rgba(54, 91, 126, 0.94);
     border-left-width: 2px;
     border-left-color: rgba(104, 142, 181, 0.88);
     border-top-width: 1px;
@@ -289,18 +294,20 @@ Button:disabled,
 
 .track-inspector-hint {
     flex-grow: 1;
+    flex-shrink: 1;
     min-width: 0;
     margin-left: 7px;
-    color: rgb(150, 162, 177);
+    color: rgb(190, 204, 219);
     font-size: 11px;
-    white-space: normal;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
     min-height: 20px;
 }
 
 .track-inspector-detail-button {
     flex-shrink: 0;
-    min-width: 62px;
+    min-width: 70px;
     height: 22px;
     margin-left: 6px;
     padding-left: 5px;
@@ -322,6 +329,7 @@ Button:disabled,
 
 .track-inspector-title {
     flex-grow: 1;
+    flex-shrink: 1;
     min-width: 0;
     margin-left: 9px;
     color: rgb(212, 220, 229);
@@ -333,7 +341,9 @@ Button:disabled,
 }
 
 .track-inspector-header-button {
-    min-width: 38px;
+    flex-grow: 0;
+    flex-shrink: 0;
+    min-width: 52px;
     height: 24px;
     margin-right: 4px;
     padding-left: 5px;
@@ -342,6 +352,8 @@ Button:disabled,
 }
 
 .track-inspector-save-button {
+    flex-grow: 0;
+    flex-shrink: 0;
     min-width: 58px;
     height: 24px;
     margin-right: 4px;
@@ -364,10 +376,10 @@ Button:disabled,
 
 .track-inspector-content {
     flex-grow: 1;
-    padding-left: 6px;
-    padding-right: 6px;
-    padding-top: 5px;
-    padding-bottom: 6px;
+    padding-left: 10px;
+    padding-right: 12px;
+    padding-top: 8px;
+    padding-bottom: 12px;
     overflow: hidden;
 }
 
@@ -377,12 +389,12 @@ Button:disabled,
     padding-right: 8px;
     padding-top: 5px;
     padding-bottom: 3px;
-    color: rgb(164, 190, 218);
+    color: rgb(126, 195, 247);
     font-size: 11px;
     -unity-font-style: bold;
-    background-color: rgba(26, 32, 40, 0.96);
+    background-color: rgba(31, 54, 76, 0.96);
     border-bottom-width: 1px;
-    border-bottom-color: rgba(71, 87, 105, 0.72);
+    border-bottom-color: rgba(91, 132, 166, 0.72);
 }
 
 .track-inspector-toggle {

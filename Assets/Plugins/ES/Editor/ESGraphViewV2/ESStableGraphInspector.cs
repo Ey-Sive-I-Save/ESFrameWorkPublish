@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Sirenix.OdinInspector;
+using Sirenix.OdinInspector.Editor;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEditor.UIElements;
@@ -306,6 +308,7 @@ namespace ES.EditorInternal
         private readonly Action<string> report;
         private readonly Action<string> locate;
         private readonly Action requestAutoSave;
+        private readonly ESGraphEditService editService;
         private readonly EditorWindow hostWindow;
         private readonly VisualElement headerContainer;
         private readonly Label contextLabel;
@@ -327,15 +330,17 @@ namespace ES.EditorInternal
         private int validatedRevision = -1;
         private bool issueListExpanded;
         private bool issueExpansionInitialized;
+        private ESGraphOdinPayloadSession odinPayloadSession;
 
         public ESStableGraphInspector(EditorWindow hostWindow, Action rebuildGraph, Action<string> report, Action<string> locate,
-            Action requestAutoSave = null)
+            Action requestAutoSave = null, ESGraphEditService editService = null)
         {
             this.hostWindow = hostWindow;
             this.rebuildGraph = rebuildGraph;
             this.report = report;
             this.locate = locate;
             this.requestAutoSave = requestAutoSave;
+            this.editService = editService;
             style.minWidth = 340f;
             style.flexGrow = 1f;
             style.backgroundColor = ESEditorPresentation.GetDepthBackground(3);
@@ -441,7 +446,11 @@ namespace ES.EditorInternal
             Add(validationPanel);
             // 质量结论必须出现在首屏，业务详情随后展开；避免用户先滚到底部才知道图能否继续。
             Add(details);
-            RegisterCallback<DetachFromPanelEvent>(_ => CancelScheduledValidation());
+            RegisterCallback<DetachFromPanelEvent>(_ =>
+            {
+                CancelScheduledValidation();
+                ClearOdinPayloadSession();
+            });
         }
 
         public void SetAsset(ESGraphAsset value)
@@ -641,7 +650,7 @@ namespace ES.EditorInternal
 
         private void ShowGraphInspector()
         {
-            details.Clear();
+            ClearDetails();
             if (asset == null)
             {
                 SetHeader("图资产", "尚未打开图", "新建、打开或拖入图资产后开始编辑",
@@ -748,34 +757,65 @@ namespace ES.EditorInternal
                         HelpBoxMessageType.Error));
                 }
                 VisualElement immediate = CreateSection("即时使用",
-                    "直接执行或复制给其他 AI，不生成永久命令与技能。", 2, "本次任务");
+                    "同类 Output 唯一时可从这里使用；多个 Output 请直接使用目标节点卡片。", 2, "本次任务");
+                int commandOutputCount = asset.Nodes.Count(node => node != null
+                    && node.BuiltInKind == ESGraphBuiltInNodeKind.AgentAICommandOutput);
+                int skillOutputCount = asset.Nodes.Count(node => node != null
+                    && node.BuiltInKind == ESGraphBuiltInNodeKind.AgentSkillOutput);
+                bool hasCommandOutput = commandOutputCount > 0;
+                bool hasSkillOutput = skillOutputCount > 0;
                 VisualElement immediateActions = ESGraphInspectorVisuals.CreateActionRow();
-                immediateActions.Add(ESGraphInspectorVisuals.CreateButton("让 AI 执行当前图",
-                    "把最终目的、实现链、参考资料和约束交给 Cmd Agent；不会生成永久产物。",
-                    SendImmediateAgentExecution, true));
+                Button useAsCommand = ESGraphInspectorVisuals.CreateButton("作为单次 Command",
+                    "只使用 AICommand Output 关联的整图分支执行一次；不生成或安装永久产物。",
+                    () => SendSingleUseAgentArtifact(ESAgentArtifactKind.AICommand), true);
+                useAsCommand.SetEnabled(commandOutputCount == 1);
+                immediateActions.Add(useAsCommand);
+                Button useAsSkill = ESGraphInspectorVisuals.CreateButton("作为临时 Skill",
+                    "只在本次任务中使用 Agent Skill Output 关联的整图分支；不会写入 .agents/skills。",
+                    () => SendSingleUseAgentArtifact(ESAgentArtifactKind.AgentSkill));
+                useAsSkill.SetEnabled(skillOutputCount == 1);
+                immediateActions.Add(useAsSkill);
                 Button copyGraph = null;
                 copyGraph = new Button(() => OpenAgentCopyMenu(copyGraph))
                 {
-                    text = "复制图信息…",
+                    text = "复制整图…",
                     tooltip = "复制即时执行提示、生成/更新请求 JSON，或包含 Mermaid 的完整中文图说明。"
                 };
                 ESGraphInspectorVisuals.StyleButton(copyGraph);
                 immediateActions.Add(copyGraph);
                 immediate.Add(immediateActions);
+                if (commandOutputCount > 1 || skillOutputCount > 1)
+                {
+                    immediate.Add(ESGraphInspectorVisuals.CreateNotice(
+                        "检测到多个同类 Output。为避免执行错误分支，全局即时入口已禁用；请在目标 Output 节点卡片中执行局部使用。",
+                        HelpBoxMessageType.Warning));
+                }
                 workflow.Add(immediate);
 
                 VisualElement permanent = CreateSection("永久化流程",
                     "候选隔离 → Diff 审查 → 人工批准 → 独立窗口实现。", 2, "可持续更新");
-                permanent.Add(CreateWorkflowStep("1", "生成或更新候选",
-                    "只写入隔离候选目录，不覆盖正式 AICommand / Agent Skill。",
-                    ESGraphInspectorVisuals.CreateButton("生成 / 更新候选",
-                        "按稳定 ArtifactId 创建或更新隔离候选。", SendAgentGenerationRequest, true)));
+                VisualElement saveActions = ESGraphInspectorVisuals.CreateActionRow();
+                Button saveCommand = ESGraphInspectorVisuals.CreateButton("保存为 AICommand 候选",
+                    "只保留 AICommand Output 关联分支，写入隔离候选目录。",
+                    () => SendAgentGenerationRequest(ESAgentArtifactKind.AICommand), true);
+                saveCommand.SetEnabled(hasCommandOutput);
+                saveActions.Add(saveCommand);
+                Button saveSkill = ESGraphInspectorVisuals.CreateButton("保存为 Agent Skill 候选",
+                    "只保留 Agent Skill Output 关联分支，写入隔离候选目录。",
+                    () => SendAgentGenerationRequest(ESAgentArtifactKind.AgentSkill));
+                saveSkill.SetEnabled(hasSkillOutput);
+                saveActions.Add(saveSkill);
+                Button saveAll = ESGraphInspectorVisuals.CreateButton("同时保存",
+                    "把整图声明的全部 AICommand 与 Agent Skill Output 放入同一候选请求。",
+                    SendAgentGenerationRequest);
+                saveAll.SetEnabled(hasCommandOutput && hasSkillOutput);
+                saveActions.Add(saveAll);
+                permanent.Add(saveActions);
                 permanent.Add(CreateWorkflowStep("2", "审查并批准",
                     "查看新增、删除与修改差异，确认后才允许导入正式位置。",
                     ESGraphInspectorVisuals.CreateButton("查看候选差异",
                         "打开候选 Diff 审查窗口。", ESAgentArtifactCandidateReviewWindow.OpenLatest)));
-                if (asset.Nodes.Any(node => node != null
-                    && node.BuiltInKind == ESGraphBuiltInNodeKind.AgentAICommandOutput))
+                if (hasCommandOutput)
                 {
                     Button launchImplementation = null;
                     launchImplementation = new Button(() => LaunchApprovedAgentImplementation(launchImplementation))
@@ -815,7 +855,7 @@ namespace ES.EditorInternal
 
         private void ShowMultipleSelectionInspector()
         {
-            details.Clear();
+            ClearDetails();
             int total = selectedNodeCount + selectedEdgeCount;
             SetHeader("批量选择", total + " 个图元素",
                 selectedNodeCount + " 个节点 · " + selectedEdgeCount + " 条关系",
@@ -873,7 +913,7 @@ namespace ES.EditorInternal
 
         private void ShowNodeInspector(string nodeId)
         {
-            details.Clear();
+            ClearDetails();
             ESGraphNodeRecord node = asset?.FindNode(nodeId);
             if (node == null)
             {
@@ -938,22 +978,33 @@ namespace ES.EditorInternal
             ESGraphInspectorVisuals.StyleTextField(title);
             business.Add(title);
             TextField payload = null;
-            bool hasSpecializedPayload = ESGraphAuthoringRegistry.TryCreatePayloadInspector(
-                asset.DomainKey, node.TypeKey, node.payloadJson,
-                value => CommitPayload(node.nodeId, value), out VisualElement specializedPayload);
-            if (hasSpecializedPayload)
-                business.Add(specializedPayload);
+            bool hasOdinPayload = TryCreateOdinPayloadInspector(node, out VisualElement odinPayload);
+            bool hasSpecializedPayload = false;
+            if (hasOdinPayload)
+            {
+                business.Add(odinPayload);
+            }
             else
             {
-                payload = new TextField("业务内容（JSON）")
+                hasSpecializedPayload = ESGraphAuthoringRegistry.TryCreatePayloadInspector(
+                    asset.DomainKey, node.TypeKey, node.payloadJson,
+                    value => CommitPayload(node.nodeId, value), out VisualElement specializedPayload);
+                if (hasSpecializedPayload)
                 {
-                    value = node.payloadJson ?? string.Empty,
-                    multiline = true
-                };
-                payload.tooltip = "当前节点没有注册中文业务编辑器，因此暂时显示结构化内容。";
-                payload.style.minHeight = 100f;
-                ESGraphInspectorVisuals.StyleTextField(payload);
-                business.Add(payload);
+                    business.Add(specializedPayload);
+                }
+                else
+                {
+                    payload = new TextField("业务内容（JSON）")
+                    {
+                        value = node.payloadJson ?? string.Empty,
+                        multiline = true
+                    };
+                    payload.tooltip = "当前节点没有注册中文业务编辑器，因此暂时显示结构化内容。";
+                    payload.style.minHeight = 100f;
+                    ESGraphInspectorVisuals.StyleTextField(payload);
+                    business.Add(payload);
+                }
             }
 
             TextField typeId = new TextField("节点类型") { value = node.typeId ?? string.Empty };
@@ -984,17 +1035,39 @@ namespace ES.EditorInternal
                 bool payloadChanged = !string.Equals(current.payloadJson, payloadValue, StringComparison.Ordinal);
                 if (!projectionChanged && !payloadChanged)
                     return;
-                Undo.RecordObject(asset, "修改图节点");
-                if (!asset.UpdateNode(node.nodeId, nextTypeId, nextVersion, nextTitle, payloadValue, out error))
+                ESGraphEditResult result;
+                if (editService != null)
                 {
-                    report?.Invoke(string.IsNullOrWhiteSpace(error) ? "节点内容更新失败。" : error);
+                    result = editService.SetNodeContent(
+                        asset, node.nodeId, nextTypeId, nextVersion, nextTitle, payloadValue);
+                }
+                else
+                {
+                    Undo.RecordObject(asset, "修改图节点");
+                    if (!asset.UpdateNode(node.nodeId, nextTypeId, nextVersion, nextTitle,
+                            payloadValue, out error))
+                    {
+                        report?.Invoke(string.IsNullOrWhiteSpace(error) ? "节点内容更新失败。" : error);
+                        return;
+                    }
+                    result = new ESGraphEditResult
+                    {
+                        changed = true,
+                        rebuildRequired = projectionChanged || payloadChanged
+                    };
+                }
+                if (!result.changed)
+                {
+                    report?.Invoke(string.IsNullOrWhiteSpace(result.error)
+                        ? "节点内容更新失败。" : result.error);
                     return;
                 }
                 MarkChanged(successMessage);
-                if (projectionChanged)
+                if (result.rebuildRequired)
                 {
                     rebuildGraph?.Invoke();
-                    locate?.Invoke(node.nodeId);
+                    if (projectionChanged)
+                        locate?.Invoke(node.nodeId);
                 }
             }
 
@@ -1056,7 +1129,7 @@ namespace ES.EditorInternal
                         HelpBoxMessageType.Error));
                 }
             }
-            if (hasSpecializedPayload)
+            if (hasOdinPayload || hasSpecializedPayload)
             {
                 TextField rawPayload = new TextField("原始业务数据")
                 {
@@ -1205,9 +1278,87 @@ namespace ES.EditorInternal
             parent.Add(creator);
         }
 
+        private void ClearDetails()
+        {
+            ClearOdinPayloadSession();
+            details.Clear();
+        }
+
+        private void ClearOdinPayloadSession()
+        {
+            if (odinPayloadSession == null)
+                return;
+            odinPayloadSession.Dispose();
+            odinPayloadSession = null;
+        }
+
+        private bool TryCreateOdinPayloadInspector(ESGraphNodeRecord node, out VisualElement inspector)
+        {
+            inspector = null;
+            Type payloadType = ResolveOdinPayloadType(node);
+            if (payloadType == null)
+                return false;
+
+            if (!ESGraphOdinPayloadSession.TryCreate(payloadType, node.payloadJson,
+                    value => CommitPayload(node.nodeId, value), out ESGraphOdinPayloadSession session))
+            {
+                return false;
+            }
+
+            odinPayloadSession = session;
+            var root = new VisualElement { name = "es-graph-odin-payload" };
+            root.style.marginTop = 3f;
+            root.style.marginBottom = 4f;
+            root.style.paddingTop = 5f;
+            root.style.paddingBottom = 5f;
+            root.style.paddingLeft = 7f;
+            root.style.paddingRight = 7f;
+            root.style.backgroundColor = ESEditorPresentation.GetDepthBackground(2);
+            root.style.borderLeftWidth = 2f;
+            root.style.borderLeftColor = ESEditorPresentation.GetDepthAccent(1);
+            root.style.borderBottomWidth = 1f;
+            root.style.borderBottomColor = ESEditorPresentation.DividerColor;
+
+            var caption = new Label("业务字段");
+            caption.style.fontSize = 10f;
+            caption.style.unityFontStyleAndWeight = FontStyle.Bold;
+            caption.style.color = ESEditorPresentation.SectionMutedTextColor;
+            caption.style.marginBottom = 3f;
+            root.Add(caption);
+
+            var content = new IMGUIContainer(session.Draw);
+            content.style.marginLeft = 1f;
+            content.style.marginRight = 1f;
+            content.style.paddingTop = 2f;
+            content.style.paddingBottom = 3f;
+            root.Add(content);
+            inspector = root;
+            return true;
+        }
+
+        private Type ResolveOdinPayloadType(ESGraphNodeRecord node)
+        {
+            if (node == null || asset == null
+                || asset.DomainKind != ESGraphDomainKind.AgentAuthoring)
+            {
+                return null;
+            }
+
+            switch (node.BuiltInKind)
+            {
+                case ESGraphBuiltInNodeKind.AgentGoal: return typeof(ESAgentGoalPayload);
+                case ESGraphBuiltInNodeKind.AgentReference: return typeof(ESAgentReferencePayload);
+                case ESGraphBuiltInNodeKind.AgentConstraint: return typeof(ESAgentConstraintPayload);
+                case ESGraphBuiltInNodeKind.AgentAICommandOutput: return typeof(ESAgentAICommandOutputPayload);
+                case ESGraphBuiltInNodeKind.AgentSkillOutput: return typeof(ESAgentSkillOutputPayload);
+                case ESGraphBuiltInNodeKind.AgentValidation: return typeof(ESAgentValidationPayload);
+                default: return null;
+            }
+        }
+
         private void ShowEdgeInspector(string edgeId)
         {
-            details.Clear();
+            ClearDetails();
             ESGraphEdgeRecord edge = asset?.FindEdge(edgeId);
             if (edge == null)
             {
@@ -1316,26 +1467,86 @@ namespace ES.EditorInternal
         {
             if (!TryBakeAgentSpec("生成请求", out ESAgentArtifactGenerationSpec spec))
                 return;
+            SendAgentGenerationRequest(spec, "全部产物");
+        }
+
+        private void SendAgentGenerationRequest(ESAgentArtifactKind artifactKind)
+        {
+            if (!TryBakeAgentSpec("生成请求", out ESAgentArtifactGenerationSpec spec))
+                return;
+            if (!ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(spec, artifactKind,
+                    out ESAgentArtifactGenerationSpec artifactView, out string filterError))
+            {
+                report?.Invoke(filterError);
+                return;
+            }
+            SendAgentGenerationRequest(artifactView,
+                artifactKind == ESAgentArtifactKind.AICommand ? "AICommand" : "Agent Skill");
+        }
+
+        private void SendAgentGenerationRequest(ESAgentArtifactGenerationSpec spec, string displayName)
+        {
             if (!ESAgentArtifactGenerationWorkspace.CreateAndSend(spec, out string requestDirectory,
                     out string dispatchMessage, out string error))
             {
                 report?.Invoke(error);
                 return;
             }
-            report?.Invoke("永久产物请求已创建；Cmd Agent：" + dispatchMessage + "；候选目录：" + requestDirectory);
+            report?.Invoke(displayName + "候选请求已创建；Cmd Agent：" + dispatchMessage
+                + "；候选目录：" + requestDirectory);
         }
 
-        private void SendImmediateAgentExecution()
+        internal bool CanExecuteNodeCardAction(string nodeId, ESGraphNodeCardActionKey action)
+        {
+            return TryCreateNodeCardActionContext(nodeId, out ESGraphNodeCardActionContext context)
+                && ESGraphAuthoringRegistry.CanExecuteNodeCardAction(context, action, out _);
+        }
+
+        internal void ExecuteNodeCardAction(string nodeId, ESGraphNodeCardActionKey action)
+        {
+            if (!TryCreateNodeCardActionContext(nodeId, out ESGraphNodeCardActionContext context))
+            {
+                report?.Invoke("节点局部动作目标不存在或上下文已失效。");
+                return;
+            }
+            if (!ESGraphAuthoringRegistry.TryExecuteNodeCardAction(context, action, out string error))
+                report?.Invoke(error);
+        }
+
+        private bool TryCreateNodeCardActionContext(string nodeId, out ESGraphNodeCardActionContext context)
+        {
+            context = null;
+            ESGraphNodeRecord node = asset?.FindNode(nodeId);
+            if (node == null)
+                return false;
+
+            ESGraphAuthoringRegistry.TryGetNodeDefinition(asset.DomainKey, node.TypeKey,
+                out IESGraphNodeDefinition definition);
+            bool futureGraphSchema = asset.schemaVersion > ESGraphAsset.CurrentSchemaVersion;
+            bool unsupportedGraphSchema = asset.schemaVersion != ESGraphAsset.CurrentSchemaVersion;
+            bool futureNodeSchema = definition != null && node.version > definition.CurrentVersion;
+            context = new ESGraphNodeCardActionContext(asset, node,
+                unsupportedGraphSchema || futureNodeSchema,
+                futureGraphSchema || futureNodeSchema,
+                ShowIssues,
+                report);
+            return true;
+        }
+
+        private void SendSingleUseAgentArtifact(ESAgentArtifactKind artifactKind)
         {
             if (!TryBakeAgentSpec("即时执行", out ESAgentArtifactGenerationSpec spec))
                 return;
-            if (!ESAgentArtifactGenerationWorkspace.SendImmediateExecution(spec, out string requestId,
+            if (!ESAgentArtifactGenerationWorkspace.SendSingleUse(spec, artifactKind, out string requestId,
                     out string dispatchMessage, out string error))
             {
                 report?.Invoke(error);
                 return;
             }
-            report?.Invoke("即时执行请求 " + requestId + " 已交给 Cmd Agent：" + dispatchMessage);
+            string displayName = artifactKind == ESAgentArtifactKind.AICommand
+                ? "单次 Command" : "临时 Skill";
+            report?.Invoke(displayName + "请求 " + requestId + " 已提交至 Cmd Agent；状态："
+                + dispatchMessage + "。当前只确认发送或排队，不代表 AI 已确认接收或完成。");
         }
 
         private void OpenAgentCopyMenu(Button anchor)
@@ -1421,9 +1632,20 @@ namespace ES.EditorInternal
             ESGraphNodeRecord node = asset?.FindNode(nodeId);
             if (node == null || string.Equals(node.payloadJson, payloadJson, StringComparison.Ordinal))
                 return;
-            Undo.RecordObject(asset, "修改节点业务内容");
-            asset.UpdateNode(node.nodeId, node.typeId, node.version, node.title, payloadJson, out _);
+            if (editService != null)
+            {
+                ESGraphEditResult result = editService.SetNodeContent(
+                    asset, node.nodeId, node.typeId, node.version, node.title, payloadJson);
+                if (!result.changed)
+                    return;
+            }
+            else
+            {
+                Undo.RecordObject(asset, "修改节点业务内容");
+                asset.UpdateNode(node.nodeId, node.typeId, node.version, node.title, payloadJson, out _);
+            }
             MarkChanged("业务内容已更新，正在自动检查整张图。");
+            rebuildGraph?.Invoke();
         }
 
         private void MigrateNode(string nodeId)
@@ -1834,6 +2056,91 @@ namespace ES.EditorInternal
             }
             error = "TypeId 不能为空，节点版本必须大于 0。";
             return false;
+        }
+
+        private sealed class ESGraphOdinPayloadSession : IDisposable
+        {
+            private readonly ESGraphOdinPayloadHost host;
+            private readonly OdinEditor editor;
+            private readonly Action<string> commit;
+            private string committedJson;
+            private bool disposed;
+
+            private ESGraphOdinPayloadSession(ESGraphOdinPayloadHost host, OdinEditor editor,
+                string committedJson, Action<string> commit)
+            {
+                this.host = host;
+                this.editor = editor;
+                this.committedJson = committedJson ?? string.Empty;
+                this.commit = commit;
+            }
+
+            public static bool TryCreate(Type payloadType, string payloadJson,
+                Action<string> commit, out ESGraphOdinPayloadSession session)
+            {
+                session = null;
+                if (payloadType == null || payloadType.IsAbstract || payloadType.IsInterface)
+                    return false;
+                try
+                {
+                    object payload = JsonUtility.FromJson(payloadJson ?? string.Empty, payloadType)
+                        ?? Activator.CreateInstance(payloadType);
+                    if (payload == null)
+                        return false;
+
+                    ESGraphOdinPayloadHost host = ScriptableObject.CreateInstance<ESGraphOdinPayloadHost>();
+                    host.hideFlags = HideFlags.HideAndDontSave;
+                    host.payload = payload;
+                    OdinEditor editor = OdinEditor.CreateEditor(host, typeof(OdinEditor)) as OdinEditor;
+                    if (editor == null)
+                    {
+                        UnityEngine.Object.DestroyImmediate(host);
+                        return false;
+                    }
+
+                    session = new ESGraphOdinPayloadSession(host, editor, payloadJson, commit);
+                    return true;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            public void Draw()
+            {
+                if (disposed || host == null || editor == null)
+                    return;
+
+                EditorGUI.BeginChangeCheck();
+                editor.DrawDefaultInspector();
+                if (!EditorGUI.EndChangeCheck())
+                    return;
+
+                string nextJson = JsonUtility.ToJson(host.payload);
+                if (string.Equals(committedJson, nextJson, StringComparison.Ordinal))
+                    return;
+                committedJson = nextJson;
+                commit?.Invoke(nextJson);
+            }
+
+            public void Dispose()
+            {
+                if (disposed)
+                    return;
+                disposed = true;
+                if (editor != null)
+                    UnityEngine.Object.DestroyImmediate(editor);
+                if (host != null)
+                    UnityEngine.Object.DestroyImmediate(host);
+            }
+        }
+
+        private sealed class ESGraphOdinPayloadHost : ScriptableObject
+        {
+            [TitleGroup("业务内容")]
+            [HideLabel, HideReferenceObjectPicker, InlineProperty, SerializeReference]
+            public object payload;
         }
     }
 }

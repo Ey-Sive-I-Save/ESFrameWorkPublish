@@ -263,7 +263,11 @@ namespace ES
             EditorGUILayout.Space(6f);
             EditorGUI.BeginChangeCheck();
             foreach (ESAdvancedDialogField field in request.fields) DrawField(field);
-            if (EditorGUI.EndChangeCheck()) RefreshValidation();
+            if (EditorGUI.EndChangeCheck())
+            {
+                ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Type);
+                RefreshValidation();
+            }
             EditorGUILayout.EndScrollView();
 
             if (!string.IsNullOrWhiteSpace(validationMessage))
@@ -273,10 +277,18 @@ namespace ES
             using (new EditorGUILayout.HorizontalScope())
             {
                 GUILayout.FlexibleSpace();
-                if (GUILayout.Button(request.cancelText, GUILayout.MinWidth(96f), GUILayout.Height(26f))) Complete(false);
+                if (GUILayout.Button(request.cancelText, GUILayout.MinWidth(96f), GUILayout.Height(26f)))
+                {
+                    ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Cancel);
+                    Complete(false);
+                }
                 using (new EditorGUI.DisabledScope(!string.IsNullOrWhiteSpace(validationMessage)))
                 {
-                    if (GUILayout.Button(request.confirmText, GUILayout.MinWidth(96f), GUILayout.Height(26f))) Complete(true);
+                    if (GUILayout.Button(request.confirmText, GUILayout.MinWidth(96f), GUILayout.Height(26f)))
+                    {
+                        ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Confirm);
+                        Complete(true);
+                    }
                 }
             }
             EditorGUILayout.Space(6f);
@@ -329,6 +341,7 @@ namespace ES
                 field.stringValue = EditorGUILayout.TextField(field.label, field.stringValue ?? string.Empty);
                 if (GUILayout.Button("选择…", GUILayout.Width(58f)))
                 {
+                    ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Click);
                     string startDirectory = string.IsNullOrWhiteSpace(field.browseStartDirectory) ? Application.dataPath : field.browseStartDirectory;
                     string selected = folder
                         ? EditorUtility.OpenFolderPanel(field.label, startDirectory, string.Empty)

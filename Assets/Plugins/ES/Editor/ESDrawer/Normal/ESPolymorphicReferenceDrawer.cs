@@ -133,6 +133,12 @@ namespace ES.EditorInternal
                 return;
             }
 
+            if (Property?.GetAttribute<HideReferenceObjectPickerAttribute>() != null)
+            {
+                DrawHiddenReferencePickerFields(label);
+                return;
+            }
+
             Type baseType = GetCachedBaseType();
             if (!IsSupportedReferenceBaseType(baseType))
             {
@@ -261,6 +267,29 @@ namespace ES.EditorInternal
                     status,
                     activeHeaderHeight);
             }
+        }
+
+        private void DrawHiddenReferencePickerFields(GUIContent label)
+        {
+            if (Property == null || Property.Children == null || Property.Children.Count == 0)
+            {
+                CallNextDrawer(label);
+                return;
+            }
+
+            EditorGUILayout.Space(2f);
+            for (int i = 0; i < Property.Children.Count; i++)
+            {
+                if (i > 0)
+                {
+                    EditorGUILayout.Space(2f);
+                    DrawDivider();
+                    EditorGUILayout.Space(2f);
+                }
+
+                Property.Children[i].Draw();
+            }
+            EditorGUILayout.Space(2f);
         }
 
         private int GetNestingDepth()

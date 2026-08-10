@@ -1,10 +1,9 @@
 using ES;
-using Sirenix.OdinInspector;
 using Sirenix.OdinInspector.Editor;
 using Sirenix.Utilities.Editor;
 using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditorInternal;
@@ -21,6 +20,15 @@ namespace ES
 
     public class ESResWindow : ESMenuTreeWindowAB<ESResWindow> //OdinMenuEditorWindow
     {
+        public override bool UseScrollView => true;
+
+        internal static void SetRemotePlanPreflightStatus(string status, string detail)
+        {
+            Page_Root_GlobalSetting.SetRemotePlanPreflightStatus(status, detail);
+        }
+
+        private bool consumerConfigurationWarningShown;
+
         internal static void RegisterEditorBridge()
         {
             ESAssetReferEditorBridge.OpenRegistryPage = OpenAndSelectAssetPage;
@@ -92,62 +100,98 @@ namespace ES
             PartPage_Setting(tree);
             PartPage_Build(tree);
         }
+
+        protected override void DrawEditors()
+        {
+            if (MenuTree?.Selection?.SelectedValue is Page_Root_GlobalSetting settingsPage)
+            {
+                Matrix4x4 previousMatrix = GUI.matrix;
+                Color previousColor = GUI.color;
+                Color previousContentColor = GUI.contentColor;
+                Color previousBackgroundColor = GUI.backgroundColor;
+                bool previousEnabled = GUI.enabled;
+                int previousIndentLevel = EditorGUI.indentLevel;
+                float previousLabelWidth = EditorGUIUtility.labelWidth;
+                float previousFieldWidth = EditorGUIUtility.fieldWidth;
+                try
+                {
+                    // Odin and embedded inspectors are allowed to be nested here. Keep this
+                    // page from inheriting a leaked transform/indent from another drawer.
+                    GUI.matrix = Matrix4x4.identity;
+                    EditorGUI.indentLevel = 0;
+                    EditorGUIUtility.labelWidth = 0f;
+                    EditorGUIUtility.fieldWidth = 0f;
+                    settingsPage.DrawPageWithoutScroll();
+                }
+                finally
+                {
+                    GUI.matrix = previousMatrix;
+                    GUI.color = previousColor;
+                    GUI.contentColor = previousContentColor;
+                    GUI.backgroundColor = previousBackgroundColor;
+                    GUI.enabled = previousEnabled;
+                    EditorGUI.indentLevel = previousIndentLevel;
+                    EditorGUIUtility.labelWidth = previousLabelWidth;
+                    EditorGUIUtility.fieldWidth = previousFieldWidth;
+                }
+                return;
+            }
+
+            base.DrawEditors();
+        }
+
         void PartPage_Library(OdinMenuTree tree)
         {
-            EnsureConsumerConfiguration();
+            string issue = GetResourceMenuConfigurationIssue();
+            if (!string.IsNullOrEmpty(issue))
+            {
+                if (!consumerConfigurationWarningShown)
+                {
+                    consumerConfigurationWarningShown = true;
+                    Debug.LogWarning(
+                        "[ESResWindow] " + issue
+                        + " 已跳过资源库/Consumer 菜单生成；窗口不会自动创建、改名或设置 Consumer，请手动修正后刷新窗口。");
+                }
+                return;
+            }
             menuTemplate.ApplyTemplateToMenuTree(this, tree, MenuNameForLibraryRoot);
         }
 
-        private static void EnsureConsumerConfiguration()
+        private static string GetResourceMenuConfigurationIssue()
         {
+            List<ESAssetLibrary> libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>()
+                ?.Where(item => item != null)
+                .ToList() ?? new List<ESAssetLibrary>();
+            var duplicateLibraryName = libraries
+                .GroupBy(item => item.Name, StringComparer.Ordinal)
+                .FirstOrDefault(group => group.Count() > 1);
+            if (duplicateLibraryName != null)
+                return "存在同名 Library [" + duplicateLibraryName.Key + "]。";
+
             List<ESAssetLibraryConsumer> consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
                 ?.Where(item => item != null)
                 .ToList() ?? new List<ESAssetLibraryConsumer>();
-            bool changed = false;
 
             if (consumers.Count == 0)
-            {
-                var consumer = ScriptableObject.CreateInstance<ESAssetLibraryConsumer>();
-                consumer.Name = "DefaultConsumer";
-                consumer.Desc = "自动创建的默认资源消费入口。";
-                consumer.IsTotalConsumer = true;
-                consumer.Channel = "default";
-                consumer.EnsureStableIdentity();
-                List<ESAssetLibrary> libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>();
-                if (libraries != null)
-                    consumer.ConsumerLibFolders.AddRange(libraries.Where(item => item != null && item.ContainsBuild));
+                return "未找到 Consumer。";
 
-                string basePath = ESGlobalEditorDefaultConfi.Instance.Path_AllLibraryFolder_;
-                if (!AssetDatabase.IsValidFolder(basePath))
-                    ESDesignUtility.SafeEditor.Quick_CreateAssetFolder(basePath);
-                string consumerFolder = basePath + "/Consumer";
-                if (!AssetDatabase.IsValidFolder(consumerFolder))
-                    AssetDatabase.CreateFolder(basePath, "Consumer");
-                string path = AssetDatabase.GenerateUniqueAssetPath(consumerFolder + "/DefaultConsumer.asset");
-                AssetDatabase.CreateAsset(consumer, path);
-                consumers.Add(consumer);
-                changed = true;
-                Debug.Log("[ESResWindow] 未发现 Consumer，已自动创建 DefaultConsumer 并设为总入口。");
-            }
+            int totalConsumerCount = consumers.Count(item => item.IsTotalConsumer);
+            if (totalConsumerCount > 1)
+                return "检测到 " + totalConsumerCount + " 个 Total Consumer。";
+            if (totalConsumerCount == 0)
+                return "存在 Consumer，但未设置 Total Consumer。";
 
-            if (!consumers.Any(item => item.IsTotalConsumer))
-            {
-                Undo.RecordObject(consumers[0], "Assign Default Total Consumer");
-                consumers[0].IsTotalConsumer = true;
-                EditorUtility.SetDirty(consumers[0]);
-                changed = true;
-            }
+            var duplicateName = consumers
+                .GroupBy(item => item.Name, StringComparer.Ordinal)
+                .FirstOrDefault(group => group.Count() > 1);
+            if (duplicateName != null)
+                return "存在同名 Consumer [" + duplicateName.Key + "]。";
 
             foreach (ESAssetLibraryConsumer consumer in consumers)
-            {
-                bool consumerChanged = consumer.EnsureStableIdentity();
-                if (!consumerChanged) continue;
-                EditorUtility.SetDirty(consumer);
-                changed = true;
-            }
+                if (string.IsNullOrWhiteSpace(consumer.ConsumerId))
+                    return "Consumer [" + consumer.Name + "] 缺少稳定 ID。";
 
-            if (changed)
-                AssetDatabase.SaveAssets();
+            return null;
         }
 
         void PartPage_Setting(OdinMenuTree tree)
@@ -160,19 +204,85 @@ namespace ES
             //  QuickBuildRootMenu(tree, "构建", ref page_index_Build, SdfIconType.Building);
         }
 
-        [Title("全局设置与构建", "配置整体资源路径与构建选项", bold: true, titleAlignment: TitleAlignments.Centered)]
-
         public class Page_Root_GlobalSetting : ESWindowPageBase
         {
+            internal static void SetRemotePlanPreflightStatus(string status, string detail)
+            {
+                ESResWindow.UsingWindow?.Repaint();
+            }
+
             private const string ResourcePipelineTaskKey = "ES.ResourcePipeline";
+            private const string SelectedLibraryGuidSessionKey = "ES.ResWindow.Settings.SelectedLibraryGuid";
+            private const int LibraryVisibleLimit = 5;
+
             /*
              直接绘制本体了哈 ESGlobalResSetting
              */
             private OdinEditor editor;
-            [HorizontalGroup("设置"), PropertyOrder(-1)]
-            [OnInspectorGUI]
-            public void Draw()
+            private SerializedObject resSettingSerializedObject;
+            private bool showFullSettings;
+            private PipelineStageState currentPipelineStageState;
+            private bool pipelineStageStateAvailable;
+            private string pipelineStageStateError = string.Empty;
+            private float currentLeftColumnWidth;
+
+            private struct PipelineStageState
             {
+                public bool CatalogPassed;
+                public bool PlanPassed;
+                public bool BuildExists;
+                public bool PublishPassed;
+                public bool ConsumerReleasePrepared;
+            }
+
+            internal void DrawPageWithoutScroll()
+            {
+                DrawPublishSettings();
+                EditorGUILayout.Space(8f);
+
+                // Use the width Odin assigned to this content area. The window width
+                // includes the menu and outer padding, and feeding it back into GUILayout
+                // can make the parent layout grow on every repaint.
+                float availableWidth = EditorGUIUtility.currentViewWidth;
+                availableWidth = Mathf.Max(0f, availableWidth);
+
+                if (availableWidth < 720f)
+                {
+                    currentLeftColumnWidth = availableWidth;
+                    DrawLeftColumn();
+                    EditorGUILayout.Space(8f);
+                    DrawRightColumn();
+                    return;
+                }
+
+                float leftWidth = Mathf.Clamp(availableWidth * 0.46f, 280f, 520f);
+                currentLeftColumnWidth = leftWidth;
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    using (new EditorGUILayout.VerticalScope(
+                        GUILayout.Width(leftWidth),
+                        GUILayout.MinWidth(0f),
+                        GUILayout.MaxWidth(leftWidth)))
+                        DrawLeftColumn();
+
+                    EditorGUILayout.Space(8f);
+
+                    using (new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true)))
+                        DrawRightColumn();
+                }
+            }
+
+            private void DrawPublishSettings()
+            {
+                SimpleToolsPanelUtility.DrawSectionTitle(
+                    "发布设置",
+                    "平台、模式和版本在这里统一配置。");
+                DrawCompactPublishSettings();
+                showFullSettings = EditorGUILayout.Foldout(showFullSettings, "完整设置", true);
+                if (!showFullSettings)
+                    return;
+
                 editor ??= OdinEditor.CreateEditor(ESGlobalResSetting.Instance, typeof(OdinEditor)) as OdinEditor;
                 if (editor != null)
                 {
@@ -180,229 +290,720 @@ namespace ES
                 }
             }
 
+            private void DrawCompactPublishSettings()
+            {
+                ESGlobalResSetting settings = ESGlobalResSetting.Instance;
+                if (settings == null)
+                {
+                    EditorGUILayout.HelpBox("未找到全局资源设置。", MessageType.Error);
+                    return;
+                }
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    DrawPublishSummaryValue("平台", settings.applyPlatform.ToString());
+                    DrawPublishSummaryValue("模式", GetAssetRunModeDisplayName(settings.AssetRunMode));
+                    DrawPublishSummaryValue("版本", settings.Version);
+                }
+            }
+
+            private static string GetAssetRunModeDisplayName(ESAssetRunMode mode)
+            {
+                switch (mode)
+                {
+                    case ESAssetRunMode.EditorDirect: return "编辑器直连";
+                    case ESAssetRunMode.EditorSimulateBuild: return "编辑器模拟发布";
+                    case ESAssetRunMode.LocalBuild: return "本地构建资源";
+                    case ESAssetRunMode.HotUpdate: return "热更新资源";
+                    default: return mode.ToString();
+                }
+            }
+
+            private static void DrawPublishSummaryValue(string label, string value)
+            {
+                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.ExpandWidth(true)))
+                {
+                    EditorGUILayout.LabelField(label, EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(value) ? "未设置" : value);
+                }
+            }
+
+            private void EnsureResSettingSerializedObject()
+            {
+                ESGlobalResSetting settings = ESGlobalResSetting.Instance;
+                if (settings == null)
+                {
+                    resSettingSerializedObject = null;
+                    return;
+                }
+
+                if (resSettingSerializedObject == null
+                    || resSettingSerializedObject.targetObject != settings)
+                {
+                    resSettingSerializedObject = new SerializedObject(settings);
+                }
+            }
+
+            private void DrawResSettingProperty(string propertyPath, string label)
+            {
+                EnsureResSettingSerializedObject();
+                if (resSettingSerializedObject == null)
+                    return;
+
+                SerializedProperty property = resSettingSerializedObject.FindProperty(propertyPath);
+                if (property == null)
+                    return;
+
+                EditorGUILayout.PropertyField(property, new GUIContent(label), true);
+                resSettingSerializedObject.ApplyModifiedProperties();
+            }
+
             public override void OnPageDisable()
             {
                 base.OnPageDisable();
+                showFullSettings = false;
+                reorderableListForLibraries = null;
+                filteredLibraries.Clear();
+                visibleLibraries.Clear();
+                resSettingSerializedObject = null;
                 if (editor != null)
                 {
                     UnityEngine.Object.DestroyImmediate(editor);
                     editor = null;
                 }
             }
-            [PropertySpace(12, 18)]
-            // 根组先纵向排标题和内容；只有“内容”子组需要左右分栏。
-            [VerticalGroup("总组")]
-            [DisplayAsString(fontSize: 24, Alignment = TextAlignment.Center), HideLabel, GUIColor("@ESDesignUtility.ColorSelector.Color_01")]
-            [VerticalGroup("总组/标题")]
-            public string createText = "--构建流程--";
             private ReorderableList reorderableListForLibraries;
             private List<ESAssetLibrary> libraries;
-            // “内容”是横向容器：左侧库列表，右侧依次显示四个流程步骤。
-            // 子组必须使用不同路径，不能让 HorizontalGroup 与 VerticalGroup 共用同一路径。
-            [HorizontalGroup("总组/内容")]
-            [HorizontalGroup("总组/内容/库", Width = 285)]
-            [OnInspectorGUI]
+            private List<ESAssetLibrary> filteredLibraries = new List<ESAssetLibrary>();
+            private List<ESAssetLibrary> visibleLibraries = new List<ESAssetLibrary>();
+            private string selectedLibraryGuid = string.Empty;
+            private string librarySearch = string.Empty;
+            private bool onlyBuildEnabled;
+            private bool onlyHasIssues;
+            private ESAssetLibrary selectedLibrary;
+            private Dictionary<ESAssetLibrary, LibrarySummary> librarySummaries =
+                new Dictionary<ESAssetLibrary, LibrarySummary>();
+
+            private void DrawLeftColumn()
+            {
+                DrawLibs();
+                EditorGUILayout.Space(6f);
+                DrawBuildAndRun();
+            }
+
             public void DrawLibs()
             {
-                SirenixEditorGUI.BeginBox();
+                float columnWidth = currentLeftColumnWidth > 0f
+                    ? currentLeftColumnWidth
+                    : Mathf.Max(0f, EditorGUIUtility.currentViewWidth);
+                using (new EditorGUILayout.VerticalScope(
+                    GUILayout.MinWidth(0f),
+                    GUILayout.MaxWidth(columnWidth),
+                    GUILayout.ExpandWidth(true)))
+                {
+                    SirenixEditorGUI.BeginBox();
+                SimpleToolsPanelUtility.DrawSectionTitle(
+                    "资源库",
+                    "选择要查看或发布参与的 Library；参与构建的库会进入发布链路。");
+                EditorGUI.BeginChangeCheck();
+                librarySearch = EditorGUILayout.TextField("搜索", librarySearch);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    onlyBuildEnabled = EditorGUILayout.ToggleLeft("仅参与构建", onlyBuildEnabled, GUILayout.Width(110f));
+                    onlyHasIssues = EditorGUILayout.ToggleLeft("仅异常", onlyHasIssues, GUILayout.Width(90f));
+                }
+                if (EditorGUI.EndChangeCheck())
+                    RefreshVisibleLibraries(revealSelection: true);
+
+                if (filteredLibraries.Count > visibleLibraries.Count)
+                {
+                    EditorGUILayout.HelpBox(
+                        "筛选结果过多，仅显示 5 个。请使用搜索或过滤缩小范围。",
+                        MessageType.Info);
+                }
 
                 if (reorderableListForLibraries != null) reorderableListForLibraries.DoLayoutList();
                 SirenixEditorGUI.EndBox();
+                }
 
             }
+
+            private void DrawBuildAndRun()
+            {
+                SirenixEditorGUI.BeginBox();
+                SimpleToolsPanelUtility.DrawSectionTitle(
+                    "构建与运行",
+                    "平台、运行模式和版本会直接参与发布链路。");
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    DrawResSettingProperty("applyPlatform", "应用平台");
+                    DrawResSettingProperty("AssetRunMode", "资源加载模式");
+                }
+                DrawResSettingProperty("Version", "游戏版本号");
+                DrawResSettingProperty("EnableResVerboseLog", "输出资源详细流程日志");
+                SirenixEditorGUI.EndBox();
+            }
+
             public override ESWindowPageBase ES_Refresh()
             {
                 libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>();
                 if (libraries != null)
                 {
-                    reorderableListForLibraries = new ReorderableList(libraries, typeof(ESAssetLibrary))
+                    librarySummaries = new Dictionary<ESAssetLibrary, LibrarySummary>();
+                    for (int index = 0; index < libraries.Count; index++)
                     {
-                        draggable = false,      // 允许拖拽排序
-                        displayAdd = false, // 显示添加按钮
-                        displayRemove = false, // 显示移除按钮
+                        ESAssetLibrary library = libraries[index];
+                        if (library == null)
+                            continue;
+                        List<ESAssetBook> books = library.GetAllUseableBooks()
+                            ?.Where(book => book != null)
+                            .ToList() ?? new List<ESAssetBook>();
+                        librarySummaries[library] = new LibrarySummary
+                        {
+                            Folder = library.LibFolderName,
+                            BundleCode = library.AssetBundleCode ?? string.Empty,
+                            ContainsBuild = library.ContainsBuild,
+                            BookCount = books.Count,
+                            PageCount = books.Sum(book => book.pages?.Count ?? 0),
+                            HasIssue = library.ContainsBuild
+                                && (string.IsNullOrWhiteSpace(library.AssetBundleCode)
+                                    || books.Sum(book => book.pages?.Count ?? 0) == 0
+                                    || !IsCatalogValidAtPath(library))
+                        };
+                    }
+
+                    selectedLibraryGuid = SessionState.GetString(SelectedLibraryGuidSessionKey, string.Empty);
+                    if (!string.IsNullOrEmpty(selectedLibraryGuid))
+                    {
+                        selectedLibrary = libraries.FirstOrDefault(library =>
+                            library != null
+                            && string.Equals(
+                                GetLibraryGuid(library),
+                                selectedLibraryGuid,
+                                StringComparison.OrdinalIgnoreCase));
+                    }
+                    if (selectedLibrary == null || !libraries.Contains(selectedLibrary))
+                    {
+                        selectedLibrary = libraries.FirstOrDefault(library => library != null && library.ContainsBuild)
+                            ?? libraries.FirstOrDefault(library => library != null);
+                        selectedLibraryGuid = selectedLibrary == null ? string.Empty : GetLibraryGuid(selectedLibrary);
+                        SessionState.SetString(SelectedLibraryGuidSessionKey, selectedLibraryGuid);
+                    }
+                    RefreshVisibleLibraries(revealSelection: true);
+                    reorderableListForLibraries = new ReorderableList(visibleLibraries, typeof(ESAssetLibrary))
+                    {
+                        draggable = false,
+                        displayAdd = false,
+                        displayRemove = false,
+                        elementHeight = 46f
                     };
                     SetupCallBackLibs();
+                    reorderableListForLibraries.index = visibleLibraries.IndexOf(selectedLibrary);
                 }
 
                 return base.ES_Refresh();
 
             }
+            private void RefreshVisibleLibraries(bool revealSelection = false)
+            {
+                filteredLibraries = (libraries ?? new List<ESAssetLibrary>())
+                    .Where(library => library != null && IsLibraryVisible(library))
+                    .ToList();
+
+                visibleLibraries = filteredLibraries
+                    .Take(LibraryVisibleLimit)
+                    .ToList();
+                if (revealSelection
+                    && selectedLibrary != null
+                    && filteredLibraries.Contains(selectedLibrary)
+                    && !visibleLibraries.Contains(selectedLibrary))
+                {
+                    if (visibleLibraries.Count < LibraryVisibleLimit)
+                        visibleLibraries.Add(selectedLibrary);
+                    else
+                        visibleLibraries[LibraryVisibleLimit - 1] = selectedLibrary;
+                }
+                if (reorderableListForLibraries != null)
+                {
+                    reorderableListForLibraries.list = visibleLibraries;
+                    reorderableListForLibraries.index = visibleLibraries.IndexOf(selectedLibrary);
+                }
+                ESResWindow.UsingWindow?.Repaint();
+            }
+
+            private bool IsLibraryVisible(ESAssetLibrary library)
+            {
+                if (library == null)
+                    return false;
+                if (onlyBuildEnabled && !library.ContainsBuild)
+                    return false;
+                librarySummaries.TryGetValue(library, out LibrarySummary summary);
+                if (onlyHasIssues && summary is { HasIssue: false })
+                    return false;
+                if (!string.IsNullOrWhiteSpace(librarySearch))
+                {
+                    string needle = librarySearch.Trim();
+                    if (library.Name.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0
+                        && (library.LibFolderName ?? string.Empty).IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0)
+                        return false;
+                }
+                return true;
+            }
+
+            private static bool IsCatalogValidAtPath(ESAssetLibrary library)
+            {
+                string path = Path.Combine(
+                    ESAssetPipelineIO.LibraryBakeFolder(library.LibFolderName),
+                    ESAssetPipelineIO.CatalogFileName);
+                return TryReadJson(path, out ESAssetLibraryCatalog catalog)
+                    && ESResourcePipelineStageValidators.IsCatalogValid(catalog);
+            }
+
+            private static string GetLibraryGuid(ESAssetLibrary library)
+            {
+                if (library == null)
+                    return string.Empty;
+                string path = AssetDatabase.GetAssetPath(library);
+                return string.IsNullOrWhiteSpace(path)
+                    ? string.Empty
+                    : AssetDatabase.AssetPathToGUID(path);
+            }
+
             private static Color colorBL = Color.blue._WithAlpha(0.05f);
             private void SetupCallBackLibs()
             {
                 reorderableListForLibraries.drawHeaderCallback = (Rect rect) =>
                 {
-
-                    EditorGUI.LabelField(rect, "全部库");
-
-
+                    EditorGUI.LabelField(
+                        rect,
+                        "显示 " + visibleLibraries.Count
+                        + " / 筛选结果 " + filteredLibraries.Count
+                        + " / 全部 " + (libraries?.Count ?? 0));
                 };
 
+                reorderableListForLibraries.onSelectCallback = list =>
+                {
+                    if (visibleLibraries == null || list.index < 0 || list.index >= visibleLibraries.Count)
+                        return;
+                    selectedLibrary = visibleLibraries[list.index];
+                    selectedLibraryGuid = GetLibraryGuid(selectedLibrary);
+                    SessionState.SetString(SelectedLibraryGuidSessionKey, selectedLibraryGuid);
+                    ESResWindow.UsingWindow?.Repaint();
+                };
 
                 reorderableListForLibraries.drawElementCallback = (Rect rect, int index, bool isActive, bool isFocused) =>
                 {
-                    if (libraries == null) return;
-                    var lib = libraries[index];
+                    if (visibleLibraries == null) return;
+                    var lib = visibleLibraries[index];
                     if (lib == null) return;
-                    var color = isActive ? Color.yellow : (isFocused ? Color.white : Color.white);
+                    librarySummaries.TryGetValue(lib, out LibrarySummary summary);
+                    bool selected = ReferenceEquals(lib, selectedLibrary);
 
-                    GUIHelper.PushColor(color);
-                    EditorGUILayout.BeginHorizontal();
-                    Rect left = new Rect(rect.x, rect.y, rect.width * 0.2f, rect.height);
-                    bool containsBuild = EditorGUI.ToggleLeft(left, "参与构建", lib.ContainsBuild);
-                    if (containsBuild != lib.ContainsBuild)
+                    Rect border = new Rect(rect.x + 1f, rect.y + 1f, rect.width - 2f, rect.height - 2f);
+                    EditorGUI.DrawRect(border, selected
+                        ? new Color(0.22f, 0.55f, 0.95f, 0.18f)
+                        : new Color(0f, 0f, 0f, 0.04f));
+
+                    Rect toggleRect = new Rect(rect.x + 6f, rect.y + 4f, 78f, 18f);
+                    bool containsBuild = EditorGUI.ToggleLeft(
+                        toggleRect,
+                        "参与构建",
+                        summary?.ContainsBuild ?? lib.ContainsBuild);
+                    if (containsBuild != (summary?.ContainsBuild ?? lib.ContainsBuild))
                     {
                         Undo.RecordObject(lib, "Change Library Build Inclusion");
                         lib.ContainsBuild = containsBuild;
+                        if (summary != null)
+                            summary.ContainsBuild = containsBuild;
                         EditorUtility.SetDirty(lib);
                     }
-                    Rect right = new Rect(rect.x + 0.22f * rect.width, rect.y, rect.width * 0.73f, rect.height);
-                    Rect rightOFF = right;
-                    rightOFF.x -= 10;
-                    SirenixEditorGUI.DrawBorders(rightOFF, (int)(rect.width * 0.73f), 0, (int)rect.height, 0, colorBL);
-                    EditorGUI.LabelField(right, lib.Name._AddPreAndLast("【", "】"));
 
-                    SirenixEditorGUI.DrawBorders(rect, 2);
+                    Rect nameRect = new Rect(rect.x + 88f, rect.y + 4f, rect.width - 98f, 18f);
+                    EditorGUI.LabelField(nameRect, new GUIContent(lib.Name, lib.Name));
 
-                    EditorGUILayout.EndHorizontal();
-                    GUIHelper.PopColor();
+                    Rect summaryRect = new Rect(rect.x + 8f, rect.y + 25f, rect.width - 16f, 18f);
+                    string summaryText = "Book "
+                        + (summary?.BookCount ?? 0)
+                        + " | Page "
+                        + (summary?.PageCount ?? 0)
+                        + " | AB "
+                        + (string.IsNullOrWhiteSpace(summary?.BundleCode) ? "未设置" : summary.BundleCode);
+                    EditorGUI.LabelField(
+                        summaryRect,
+                        new GUIContent(summaryText, summaryText),
+                        EditorStyles.miniLabel);
                 };
             }
 
-            [HorizontalGroup("总组/内容/操作")]
-            [OnInspectorGUI()]
-            public void AnalyzeAndAssignAssetPaths()
+            private sealed class LibrarySummary
             {
-                bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
-                EditorGUI.BeginDisabledGroup(pipelineBusy);
-                if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "1. 烘焙引用", GUILayout.Height(42)))
-                {
-                    ESEditorHandle.AddSimpleHandleTask(() =>
-                    {
-                        if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-烘焙资产引用", "只分析资产身份与引用关系，不修改 AB 标签。", "开始", "取消"))
-                        {
-                            ESAssetReferenceBaker.Bake();
-                        }
-                        else
-                        {
-                            Debug.LogWarning("放弃-<资源去向生成>");
-                        }
-
-
-                    }, key: ResourcePipelineTaskKey);
-                }
-                EditorGUI.EndDisabledGroup();
-                ;
-                SirenixEditorGUI.InfoMessageBox("生成 Catalog 与引用图；不改标签。");
-
+                public string Folder;
+                public string BundleCode;
+                public bool ContainsBuild;
+                public int BookCount;
+                public int PageCount;
+                public bool HasIssue;
             }
 
-            [HorizontalGroup("总组/内容/操作")]
-            [OnInspectorGUI()]
-            public void BuildAssetBundlesAndDependencies()
+            private void DrawActionGateSummary(PipelineStageState state)
             {
-                bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
-                EditorGUI.BeginDisabledGroup(pipelineBusy);
-                if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "2. 规划并标记", GUILayout.Height(42)))
+                if (!state.CatalogPassed)
                 {
-                    ESEditorHandle.AddSimpleHandleTask(() =>
+                    EditorGUILayout.HelpBox("先完成 1. 烘焙引用，规划与后续步骤会保持禁用。", MessageType.Warning);
+                    return;
+                }
+                if (!state.PlanPassed)
+                {
+                    EditorGUILayout.HelpBox("Catalog 已有效；下一步执行 2. 规划并标记。", MessageType.Info);
+                    return;
+                }
+                if (!state.BuildExists)
+                {
+                    EditorGUILayout.HelpBox("规划已通过；下一步执行 3. 构建资源包。", MessageType.Info);
+                    return;
+                }
+                if (!state.ConsumerReleasePrepared)
+                {
+                    EditorGUILayout.HelpBox("资源包产物已存在；发布前先执行 Consumer 代码包准备。", MessageType.Warning);
+                    return;
+                }
+                if (!state.PublishPassed)
+                {
+                    EditorGUILayout.HelpBox("构建与 Consumer 准备已满足；下一步执行 4. 发布资源包。", MessageType.Info);
+                    return;
+                }
+                EditorGUILayout.HelpBox("本地发布已通过；第五步将打开远端发布工作台。", MessageType.Info);
+            }
+
+            private static bool IsResourcePipelineBusy()
+            {
+                return ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey)
+                    || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
+            }
+
+            private static List<ESAssetLibraryConsumer> GetConsumers()
+            {
+                return ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
+                    ?.Where(item => item != null)
+                    .ToList() ?? new List<ESAssetLibraryConsumer>();
+            }
+
+            private bool TryGetPipelineStageState(
+                out PipelineStageState state,
+                out string error)
+            {
+                state = default;
+                error = string.Empty;
+                try
+                {
+                    string platform = ESAssetPipelineIO.PlatformName;
+                    bool catalogPassed = HasCatalogStage(platform);
+                    bool planPassed = HasPlanStage(platform);
+                    bool buildExists = HasBuildStage(platform);
+                    bool publishPassed = HasPublishStage(platform);
+                    state = new PipelineStageState
                     {
-                        try
+                        CatalogPassed = catalogPassed,
+                        PlanPassed = planPassed,
+                        BuildExists = buildExists,
+                        PublishPassed = publishPassed,
+                        ConsumerReleasePrepared = HasConsumerReleasePreparation(platform)
+                    };
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    error = exception.Message;
+                    return false;
+                }
+            }
+
+            private static bool HasConsumerReleasePreparation(string platform)
+            {
+                try
+                {
+                    ESCodeModuleEditorIntegration.ValidateConsumerReleasePrepared(
+                        GetConsumers(),
+                        platform);
+                    return true;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            private static bool HasCatalogStage(string platform)
+            {
+                return ESResourcePipelineStageValidators.HasCatalogStage(
+                    ESEditorSO.GetGroupOfType<ESAssetLibrary>(),
+                    library => Path.Combine(
+                        ESAssetPipelineIO.LibraryBakeFolder(library.LibFolderName),
+                        ESAssetPipelineIO.CatalogFileName),
+                    library => Path.Combine(
+                        ESAssetPipelineIO.LibraryBakeFolder(library.LibFolderName),
+                        ESAssetPipelineIO.ReferenceGraphFileName));
+            }
+
+            private static bool HasPlanStage(string platform)
+            {
+                return ESResourcePipelineStageValidators.HasPlanStage(
+                    Path.Combine(ESAssetPipelineIO.PlanRoot(platform), ESAssetPipelineIO.PlanFileName),
+                    Path.Combine(ESAssetPipelineIO.PlanRoot(platform), ESAssetPipelineIO.AssetListFileName));
+            }
+
+            private static bool HasBuildStage(string platform)
+            {
+                string path = Path.Combine(
+                    ESAssetPipelineIO.StagingRoot(platform),
+                    ESAssetPipelineIO.BuildSetFileName);
+                return TryReadJson(path, out ESAssetBuildSet _);
+            }
+
+            private static bool HasPublishStage(string platform)
+            {
+                string rootPath = Path.Combine(
+                    ESAssetPipelineIO.LocalTestRoot(platform),
+                    ESAssetPipelineIO.ReleaseManifestFileName);
+                if (!TryReadJson(rootPath, out ESAssetReleaseManifest release)
+                    || string.IsNullOrWhiteSpace(release.releaseVersion)
+                    || string.IsNullOrWhiteSpace(release.totalConsumerUrl))
+                    return false;
+
+                string releaseFolder = Path.Combine(
+                    ESAssetPipelineIO.LocalTestRoot(platform),
+                    release.releaseVersion);
+                string consumerUrl = release.totalConsumerUrl.Replace('\\', '/');
+                int slash = consumerUrl.LastIndexOf('/');
+                string consumerFileName = slash >= 0 ? consumerUrl.Substring(slash + 1) : consumerUrl;
+                string consumerPath = Path.Combine(releaseFolder, "Consumers", consumerFileName);
+                return ESResourcePipelineStageValidators.HasPublishStage(rootPath, releaseFolder, consumerPath);
+            }
+
+            private static bool TryReadJson<T>(string path, out T value) where T : class
+            {
+                value = null;
+                if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                    return false;
+                try
+                {
+                    value = ESAssetPipelineIO.ReadJson<T>(path);
+                    return value != null;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            private const float PipelineActionButtonHeight = 30f;
+
+            private void DrawRightColumn()
+            {
+                DrawPublishActions();
+                EditorGUILayout.Space(6f);
+                DrawFolderPaths();
+            }
+
+            private void DrawPublishActions()
+            {
+                SimpleToolsPanelUtility.DrawSectionTitle(
+                    "五步发布",
+                    "按 1~5 顺序执行；后续步骤依赖前置门禁。");
+
+                pipelineStageStateAvailable = TryGetPipelineStageState(
+                    out currentPipelineStageState,
+                    out pipelineStageStateError);
+
+                SirenixEditorGUI.BeginBox();
+                try
+                {
+                    if (IsResourcePipelineBusy())
+                    {
+                        EditorGUILayout.HelpBox("资源任务执行中，其他管线操作暂时锁定。", MessageType.Info);
+                    }
+                    else if (!pipelineStageStateAvailable)
+                    {
+                        EditorGUILayout.HelpBox(
+                            "当前无法读取阶段门禁：" + pipelineStageStateError,
+                            MessageType.Error);
+                    }
+                    else
+                    {
+                        DrawActionGateSummary(currentPipelineStageState);
+                    }
+
+                    AnalyzeAndAssignAssetPaths();
+                    BuildAssetBundlesAndDependencies();
+                    Click_Server();
+                    Click_PrepareConsumerCode();
+                    Click_ALL();
+                    Click_RemotePublish();
+                }
+                finally
+                {
+                    SirenixEditorGUI.EndBox();
+                }
+            }
+
+            public void AnalyzeAndAssignAssetPaths()
+            {
+                bool pipelineBusy = IsResourcePipelineBusy();
+                using (new EditorGUI.DisabledScope(pipelineBusy || !pipelineStageStateAvailable))
+                {
+                    if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "1. 烘焙引用", GUILayout.Height(PipelineActionButtonHeight)))
+                    {
+                        ESEditorHandle.AddSimpleHandleTask(() =>
                         {
-                            if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-规划并标记 AB", "读取烘焙结果，生成可审查计划并仅修改 ES 管理标签。", "开始", "取消"))
+                            if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-烘焙资产引用", "只分析资产身份与引用关系，不修改 AB 标签。", "开始", "取消"))
                             {
-                                ESAssetBundleBuildPlanner.PlanAndMark();
-                                Debug.Log("资源包构建规划完成。");
+                                ESAssetReferenceBaker.Bake();
                             }
                             else
                             {
-                                Debug.LogWarning("已取消资源包构建规划。");
+                                Debug.LogWarning("放弃-<资源去向生成>");
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.LogError($"资源包构建规划失败: {ex.Message}");
-                        }
-                    }, key: ResourcePipelineTaskKey);
+                        }, key: ResourcePipelineTaskKey);
+                    }
                 }
-                EditorGUI.EndDisabledGroup();
-                ;
-
-
-                SirenixEditorGUI.InfoMessageBox("生成计划并写入 ES 管理的 AB 标签。");
-
             }
 
-            [HorizontalGroup("总组/内容/操作")]
-            [OnInspectorGUI()]
+            public void BuildAssetBundlesAndDependencies()
+            {
+                bool pipelineBusy = IsResourcePipelineBusy();
+                bool stageAllowed = pipelineStageStateAvailable && currentPipelineStageState.CatalogPassed;
+                using (new EditorGUI.DisabledScope(pipelineBusy || !stageAllowed))
+                {
+                    if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "2. 规划并标记", GUILayout.Height(PipelineActionButtonHeight)))
+                    {
+                        ESEditorHandle.AddSimpleHandleTask(() =>
+                        {
+                            try
+                            {
+                                if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-规划并标记 AB", "读取烘焙结果，生成可审查计划并仅修改 ES 管理标签。", "开始", "取消"))
+                                {
+                                    ESAssetBundleBuildPlanner.PlanAndMark();
+                                    Debug.Log("资源包构建规划完成。");
+                                }
+                                else
+                                {
+                                    Debug.LogWarning("已取消资源包构建规划。");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.LogError($"资源包构建规划失败: {ex.Message}");
+                            }
+                        }, key: ResourcePipelineTaskKey);
+                    }
+                }
+            }
+
             public void Click_Server()
             {
-                bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
-                EditorGUI.BeginDisabledGroup(pipelineBusy);
-                if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "3. 构建资源包", GUILayout.Height(42)))
+                bool pipelineBusy = IsResourcePipelineBusy();
+                bool stageAllowed = pipelineStageStateAvailable && currentPipelineStageState.PlanPassed;
+                using (new EditorGUI.DisabledScope(pipelineBusy || !stageAllowed))
                 {
-                    ESEditorHandle.AddSimpleHandleTask(() =>
+                    if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "3. 构建资源包", GUILayout.Height(PipelineActionButtonHeight)))
                     {
-                        if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始构建资源包", "校验标签与计划一致后，构建到资源包暂存目录。", "开始", "取消"))
+                        ESEditorHandle.AddSimpleHandleTask(() =>
                         {
-                            ESAssetBundleBuilder.Build();
-                        }
-                        else
-                        {
-                            Debug.LogWarning("放弃-<上传到服务器>");
-                        }
-
-
-                    }, key: ResourcePipelineTaskKey);
+                            if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始构建资源包", "校验标签与计划一致后，构建到资源包暂存目录。", "开始", "取消"))
+                            {
+                                ESAssetBundleBuilder.Build();
+                            }
+                            else
+                            {
+                                Debug.LogWarning("放弃-<上传到服务器>");
+                            }
+                        }, key: ResourcePipelineTaskKey);
+                    }
                 }
-                EditorGUI.EndDisabledGroup();
-                ;
-
-
-                SirenixEditorGUI.InfoMessageBox("执行 Unity AB 构建，输出到暂存目录。");
-
             }
 
-            [HorizontalGroup("总组/内容/操作")]
-            [OnInspectorGUI()]
+            public void Click_PrepareConsumerCode()
+            {
+                bool pipelineBusy = IsResourcePipelineBusy();
+                bool stageAllowed = pipelineStageStateAvailable && currentPipelineStageState.BuildExists;
+                using (new EditorGUI.DisabledScope(pipelineBusy || !stageAllowed))
+                {
+                    if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "Consumer 代码包准备", GUILayout.Height(PipelineActionButtonHeight)))
+                    {
+                        ESEditorHandle.AddSimpleHandleTask(() =>
+                        {
+                            if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog(
+                                "准备 Consumer 代码包",
+                                "会按当前 Consumer 配置生成代码包并写入幂等准备标记。没有热更包的 Consumer 也会写入已准备标记，避免发布误拒绝。",
+                                "准备",
+                                "取消"))
+                            {
+                                List<ESAssetLibraryConsumer> consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
+                                    ?.Where(item => item != null)
+                                    .ToList() ?? new List<ESAssetLibraryConsumer>();
+                                ESCodeModuleEditorIntegration.PrepareConsumerReleaseCode(
+                                    consumers,
+                                    ESAssetPipelineIO.PlatformName);
+                                Debug.Log("Consumer 代码包准备完成。");
+                            }
+                            else
+                            {
+                                Debug.LogWarning("已取消 Consumer 代码包准备。");
+                            }
+                        }, key: ResourcePipelineTaskKey);
+                    }
+                }
+            }
+
             public void Click_ALL()
             {
-                bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
-                EditorGUI.BeginDisabledGroup(pipelineBusy);
-                if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "4. 发布资源包", GUILayout.Height(42)))
+                bool pipelineBusy = IsResourcePipelineBusy();
+                bool stageAllowed = pipelineStageStateAvailable
+                    && currentPipelineStageState.BuildExists
+                    && currentPipelineStageState.ConsumerReleasePrepared;
+                using (new EditorGUI.DisabledScope(pipelineBusy || !stageAllowed))
                 {
-                    ESEditorHandle.AddSimpleHandleTask(() =>
+                    if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "4. 发布资源包", GUILayout.Height(PipelineActionButtonHeight)))
                     {
-                        if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始发布资源包", "只发布已经校验的暂存产物，并在最后写入根发布清单。", "开始", "取消"))
+                        ESEditorHandle.AddSimpleHandleTask(() =>
                         {
-                            ESAssetBundlePublisher.Publish();
-                        }
-                        else
-                        {
-                            Debug.LogWarning("放弃-<一键完成>");
-                        }
-
-
-                    }, key: ResourcePipelineTaskKey);
+                            if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始发布资源包", "只发布已经校验的暂存产物，并在最后写入根发布清单。", "开始", "取消"))
+                            {
+                                ESAssetBundlePublisher.Publish();
+                            }
+                            else
+                            {
+                                Debug.LogWarning("放弃-<一键完成>");
+                            }
+                        }, key: ResourcePipelineTaskKey);
+                    }
                 }
-                EditorGUI.EndDisabledGroup();
-                ;
-
-
-                SirenixEditorGUI.InfoMessageBox("校验并发布，最后写入根清单。");
-
             }
 
-            [HorizontalGroup("总组/内容/操作")]
-            [OnInspectorGUI()]
             public void Click_RemotePublish()
             {
-                bool pipelineBusy = ESEditorHandle.IsSimpleTaskKeyActive(ResourcePipelineTaskKey) || ESEditorHandle.IsLongTaskKeyActive(ResourcePipelineTaskKey);
-                EditorGUI.BeginDisabledGroup(pipelineBusy);
-                if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "5. 发布到远端", GUILayout.Height(42)))
-                    ESAssetReleaseUploadWindow.Open();
-                EditorGUI.EndDisabledGroup();
-                SirenixEditorGUI.InfoMessageBox("读取第四步上传计划；预检通过后上传版本化文件，并将 Root 清单最后切换。凭据不保存到工程资产。");
+                bool pipelineBusy = IsResourcePipelineBusy();
+                bool stageAllowed = pipelineStageStateAvailable && currentPipelineStageState.PublishPassed;
+                using (new EditorGUI.DisabledScope(pipelineBusy || !stageAllowed))
+                {
+                    if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "5. 打开远端发布工作台", GUILayout.Height(PipelineActionButtonHeight)))
+                        ESAssetReleaseUploadWindow.Open();
+                }
+            }
+
+            private void DrawFolderPaths()
+            {
+                SirenixEditorGUI.BeginBox();
+                SimpleToolsPanelUtility.DrawSectionTitle(
+                    "文件夹",
+                    "资源库根目录、远端地址与发布管线目录。");
+                DrawResSettingProperty("Path_Net", "服务器网络路径");
+                DrawResSettingProperty("Path_AssetLibraryFolder", "默认资源库放置文件夹");
+                DrawResSettingProperty("Path_ABHelperCodeGen", "AB 帮助代码生成文件夹");
+                DrawResSettingProperty("GlobalExcludedFolderPaths", "全局排除文件夹");
+                DrawResSettingProperty("Path_Sub_DownloadRelative_", "下载持久相对路径");
+                ESGlobalResSetting.Instance?.DrawGeneratedFolderShortcuts();
+                SirenixEditorGUI.EndBox();
             }
 
         }

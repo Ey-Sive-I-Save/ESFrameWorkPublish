@@ -13,7 +13,7 @@ using UnityEngine.SceneManagement;
 
 /// <summary>
 /// 保存并恢复已加载场景中 GameObject 在 Hierarchy 面板里的展开状态。
-/// 项目级持久化数据归属 ESGlobalProjectAssetGuideData；EditorPrefs 仅用于读取旧数据并迁移。
+/// 展开状态使用 ESGlobalProjectAssetGuideData；上次场景、SceneView 相机等轻量编辑器状态使用 EditorPrefs。
 /// </summary>
 public static class SceneHierarchyExpansionState
 {
@@ -35,14 +35,39 @@ public static class SceneHierarchyExpansionState
     private const bool AutoLoadOnSceneOpened = true;
     private const bool AutoSaveBeforeAssemblyReload = true;
     private const bool AutoRestoreAfterPlayMode = true;
+    private const bool AutoOpenLastSceneOnStartupDefault = true;
+    private const bool AutoRestoreLastSelectedSceneObjectOnLastSceneOpen = true;
+    private const bool AutoRestoreSceneViewCameraOnLastSceneOpen = true;
+    private const int SceneViewCameraRecordMaxAgeDays = 30;
+    private const float SceneViewCameraBaselineTimeoutSeconds = 5f;
     private static readonly bool LogTiming = true;
 
     private const string MenuRoot = MenuItemPathDefine.SCENE_TOOLS_PATH + "层级展开/";
     private const string StoragePrefix = "Standalone.SceneHierarchyExpansionState.";
+    private const string LastOpenedScenePathKeyPrefix = StoragePrefix + "LastOpenedScenePath.";
+    private const string LastOpenedSceneAutoOpenedKeyPrefix = StoragePrefix + "LastOpenedSceneAutoOpened.";
+    private const string AutoOpenLastSceneOnStartupKeyPrefix = StoragePrefix + "AutoOpenLastSceneOnStartup.";
+    private const string SceneViewCameraStateKeyPrefix = StoragePrefix + "SceneViewCamera.";
 
     private static int restoreRetryCount;
     private static int pendingRestoreDelayTicks;
     private static bool restoreScheduled;
+    private static int lastSceneOpenRetryCount;
+    private static int lastSceneOpenDelayTicks;
+    private static bool lastSceneOpenScheduled;
+    private static string pendingLastScenePath = string.Empty;
+    private static bool restoreSelectionAfterLastSceneOpen;
+    private static bool selectionRestoreScheduled;
+    private static int selectionRestoreRetryCount;
+    private static int selectionRestoreDelayTicks;
+    private static ESEditorRememberedObjectTarget<GameObject> lastSelectedSceneObject;
+    private static bool restoreCameraAfterLastSceneOpen;
+    private static bool cameraRestoreScheduled;
+    private static int cameraRestoreRetryCount;
+    private static int cameraRestoreDelayTicks;
+    private static bool hasPendingSceneViewCameraBaseline;
+    private static Scene pendingSceneViewCameraBaselineScene;
+    private static double sceneViewCameraBaselineStartedAt;
 
     internal static void RegisterEditorCallbacks()
     {
@@ -58,6 +83,9 @@ public static class SceneHierarchyExpansionState
             EditorSceneManager.sceneOpened += OnSceneOpened;
         }
 
+        EditorSceneManager.activeSceneChangedInEditMode -= OnActiveSceneChangedInEditMode;
+        EditorSceneManager.activeSceneChangedInEditMode += OnActiveSceneChangedInEditMode;
+
         if (AutoSaveBeforeSceneClosing)
         {
             EditorSceneManager.sceneClosing -= OnSceneClosing;
@@ -68,6 +96,10 @@ public static class SceneHierarchyExpansionState
         {
             AssemblyReloadEvents.beforeAssemblyReload -= SaveLoadedScenesExpansionState;
             AssemblyReloadEvents.beforeAssemblyReload += SaveLoadedScenesExpansionState;
+            AssemblyReloadEvents.beforeAssemblyReload -= RememberActiveSceneViewCameraState;
+            AssemblyReloadEvents.beforeAssemblyReload += RememberActiveSceneViewCameraState;
+            AssemblyReloadEvents.beforeAssemblyReload -= CancelSceneViewCameraBaseline;
+            AssemblyReloadEvents.beforeAssemblyReload += CancelSceneViewCameraBaseline;
         }
 
         if (AutoRestoreAfterPlayMode)
@@ -78,13 +110,109 @@ public static class SceneHierarchyExpansionState
 
         EditorApplication.quitting -= SaveLoadedScenesExpansionState;
         EditorApplication.quitting += SaveLoadedScenesExpansionState;
+        EditorApplication.quitting -= RememberActiveSceneAsLastOpened;
+        EditorApplication.quitting += RememberActiveSceneAsLastOpened;
+        EditorApplication.quitting -= RememberActiveSceneViewCameraState;
+        EditorApplication.quitting += RememberActiveSceneViewCameraState;
+        EditorApplication.quitting -= CancelSceneViewCameraBaseline;
+        EditorApplication.quitting += CancelSceneViewCameraBaseline;
+        Selection.selectionChanged -= RememberLastSelectedSceneObject;
+        Selection.selectionChanged += RememberLastSelectedSceneObject;
         EditorApplication.delayCall -= ScheduleInitialRestoreLoadedScenes;
         EditorApplication.delayCall += ScheduleInitialRestoreLoadedScenes;
     }
 
     private static void ScheduleInitialRestoreLoadedScenes()
     {
+        TryScheduleAutoOpenLastSceneOnStartup();
         ScheduleRestoreLoadedScenes(RestoreDelayTicks);
+    }
+
+    [MenuItem(MenuRoot + "打开上次打开场景", false, 5)]
+    public static void OpenLastOpenedScene()
+    {
+        string lastScenePath = GetLastOpenedScenePath();
+        if (string.IsNullOrWhiteSpace(lastScenePath) || AssetDatabase.LoadAssetAtPath<SceneAsset>(lastScenePath) == null)
+        {
+            Debug.LogWarning("[SceneHierarchyExpansionState] 未找到上次打开的场景记录。");
+            return;
+        }
+
+        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            return;
+
+        RememberActiveSceneViewCameraState();
+        restoreSelectionAfterLastSceneOpen = AutoRestoreLastSelectedSceneObjectOnLastSceneOpen;
+        restoreCameraAfterLastSceneOpen = AutoRestoreSceneViewCameraOnLastSceneOpen;
+        try
+        {
+            EditorSceneManager.OpenScene(lastScenePath, OpenSceneMode.Single);
+        }
+        catch
+        {
+            restoreSelectionAfterLastSceneOpen = false;
+            restoreCameraAfterLastSceneOpen = false;
+            throw;
+        }
+    }
+
+    [MenuItem(MenuRoot + "打开上次打开场景", true, 5)]
+    private static bool ValidateOpenLastOpenedScene()
+    {
+        return !EditorApplication.isPlayingOrWillChangePlaymode;
+    }
+
+    [MenuItem(MenuRoot + "恢复上次选中对象", false, 6)]
+    public static void RestoreLastSelectedSceneObject()
+    {
+        if (GetLastSelectedSceneObjectTarget().TryResolve(out GameObject target) && target != null)
+            Selection.activeGameObject = target;
+    }
+
+    [MenuItem(MenuRoot + "恢复上次选中对象", true, 6)]
+    private static bool ValidateRestoreLastSelectedSceneObject()
+    {
+        return !EditorApplication.isPlayingOrWillChangePlaymode;
+    }
+
+    [MenuItem(MenuRoot + "保存当前 SceneView 相机位置", false, 7)]
+    public static void SaveCurrentSceneViewCameraState()
+    {
+        RememberActiveSceneViewCameraState();
+        Debug.Log("[SceneHierarchyExpansionState] 已保存当前场景 SceneView 相机位置。");
+    }
+
+    [MenuItem(MenuRoot + "保存当前 SceneView 相机位置", true, 7)]
+    private static bool ValidateSaveCurrentSceneViewCameraState()
+    {
+        return !EditorApplication.isPlayingOrWillChangePlaymode;
+    }
+
+    [MenuItem(MenuRoot + "恢复当前场景 SceneView 相机位置", false, 8)]
+    public static void RestoreCurrentSceneViewCameraState()
+    {
+        if (!RestoreActiveSceneViewCameraNow())
+            Debug.LogWarning("[SceneHierarchyExpansionState] 当前场景没有可恢复的 SceneView 相机位置。");
+    }
+
+    [MenuItem(MenuRoot + "恢复当前场景 SceneView 相机位置", true, 8)]
+    private static bool ValidateRestoreCurrentSceneViewCameraState()
+    {
+        return !EditorApplication.isPlayingOrWillChangePlaymode;
+    }
+
+    [MenuItem(MenuRoot + "启动时自动打开上次场景", false, 4)]
+    public static void ToggleAutoOpenLastSceneOnStartup()
+    {
+        bool enabled = !GetAutoOpenLastSceneOnStartup();
+        EditorPrefs.SetBool(GetAutoOpenLastSceneOnStartupKey(), enabled);
+        Debug.Log("[SceneHierarchyExpansionState] 启动时自动打开上次场景：" + (enabled ? "已开启" : "已关闭"));
+    }
+
+    [MenuItem(MenuRoot + "启动时自动打开上次场景", true, 4)]
+    private static bool ValidateToggleAutoOpenLastSceneOnStartup()
+    {
+        return !Application.isBatchMode;
     }
 
     public class SceneHierarchyExpansionStateInitializer : EditorInvoker_Level2
@@ -172,17 +300,37 @@ public static class SceneHierarchyExpansionState
 
     private static void OnSceneSaving(Scene scene, string path)
     {
+        RememberLastOpenedScenePath(path);
+        RememberSceneViewCameraState(scene);
         SaveLoadedScenesExpansionState();
     }
 
     private static void OnSceneOpened(Scene scene, OpenSceneMode mode)
     {
+        RememberLastOpenedScene(scene);
+        if (restoreSelectionAfterLastSceneOpen)
+        {
+            restoreSelectionAfterLastSceneOpen = false;
+            ScheduleRestoreLastSelectedSceneObject();
+        }
+        if (restoreCameraAfterLastSceneOpen)
+        {
+            restoreCameraAfterLastSceneOpen = false;
+            ScheduleRestoreSceneViewCamera();
+        }
         restoreRetryCount = 0;
         ScheduleRestoreLoadedScenes(RestoreDelayTicks);
     }
 
+    private static void OnActiveSceneChangedInEditMode(Scene previousActiveScene, Scene newActiveScene)
+    {
+        SaveSceneViewCameraState(previousActiveScene);
+        ScheduleSceneViewCameraBaseline(newActiveScene);
+    }
+
     private static void OnSceneClosing(Scene scene, bool removingScene)
     {
+        RememberSceneViewCameraState(scene);
         SaveLoadedScenesExpansionState();
     }
 
@@ -190,6 +338,7 @@ public static class SceneHierarchyExpansionState
     {
         if (state == PlayModeStateChange.ExitingEditMode)
         {
+            RememberActiveSceneViewCameraState();
             SaveLoadedScenesExpansionState();
             return;
         }
@@ -314,6 +463,104 @@ public static class SceneHierarchyExpansionState
         return !EditorApplication.isCompiling
             && !EditorApplication.isUpdating
             && !EditorApplication.isPlayingOrWillChangePlaymode;
+    }
+
+    private static void TryScheduleAutoOpenLastSceneOnStartup()
+    {
+        if (!GetAutoOpenLastSceneOnStartup() || Application.isBatchMode)
+            return;
+
+        if (SessionState.GetBool(GetLastOpenedSceneAutoOpenedSessionKey(), false))
+            return;
+
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (!string.IsNullOrEmpty(activeScene.path))
+        {
+            SessionState.SetBool(GetLastOpenedSceneAutoOpenedSessionKey(), true);
+            return;
+        }
+
+        string lastScenePath = GetLastOpenedScenePath();
+        if (string.IsNullOrWhiteSpace(lastScenePath))
+        {
+            SessionState.SetBool(GetLastOpenedSceneAutoOpenedSessionKey(), true);
+            return;
+        }
+
+        ScheduleOpenLastScene(lastScenePath);
+    }
+
+    private static void ScheduleOpenLastScene(string scenePath)
+    {
+        if (lastSceneOpenScheduled)
+            return;
+
+        lastSceneOpenScheduled = true;
+        pendingLastScenePath = scenePath;
+        lastSceneOpenRetryCount = 0;
+        lastSceneOpenDelayTicks = RestoreDelayTicks;
+        EditorApplication.update += TryOpenLastSceneWhenReady;
+    }
+
+    private static void TryOpenLastSceneWhenReady()
+    {
+        if (lastSceneOpenDelayTicks > 0)
+        {
+            lastSceneOpenDelayTicks--;
+            return;
+        }
+
+        if (!IsEditorReadyForRestore())
+        {
+            RetryOpenLastScene();
+            return;
+        }
+
+        EditorApplication.update -= TryOpenLastSceneWhenReady;
+        lastSceneOpenScheduled = false;
+
+        try
+        {
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(pendingLastScenePath) == null)
+                throw new InvalidOperationException("上次场景资产已不存在：" + pendingLastScenePath);
+
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            {
+                SessionState.SetBool(GetLastOpenedSceneAutoOpenedSessionKey(), true);
+                return;
+            }
+
+            RememberActiveSceneViewCameraState();
+            restoreSelectionAfterLastSceneOpen = AutoRestoreLastSelectedSceneObjectOnLastSceneOpen;
+            restoreCameraAfterLastSceneOpen = AutoRestoreSceneViewCameraOnLastSceneOpen;
+            EditorSceneManager.OpenScene(pendingLastScenePath, OpenSceneMode.Single);
+        }
+        catch (Exception exception)
+        {
+            restoreSelectionAfterLastSceneOpen = false;
+            restoreCameraAfterLastSceneOpen = false;
+            Debug.LogWarning("[SceneHierarchyExpansionState] 自动打开上次场景失败：" + exception.Message);
+        }
+        finally
+        {
+            pendingLastScenePath = string.Empty;
+            SessionState.SetBool(GetLastOpenedSceneAutoOpenedSessionKey(), true);
+        }
+    }
+
+    private static void RetryOpenLastScene()
+    {
+        lastSceneOpenRetryCount++;
+        if (lastSceneOpenRetryCount <= RetryLimit)
+        {
+            lastSceneOpenDelayTicks = RestoreDelayTicks;
+            return;
+        }
+
+        EditorApplication.update -= TryOpenLastSceneWhenReady;
+        lastSceneOpenScheduled = false;
+        pendingLastScenePath = string.Empty;
+        SessionState.SetBool(GetLastOpenedSceneAutoOpenedSessionKey(), true);
     }
 
     private static void CollectExpandedPaths(Transform transform, HashSet<int> expandedIds, List<string> paths, ref int scannedTransformCount)
@@ -645,6 +892,308 @@ public static class SceneHierarchyExpansionState
         }
     }
 
+    private static string GetLastOpenedScenePathKey()
+    {
+        return LastOpenedScenePathKeyPrefix + GetProjectHash();
+    }
+
+    private static string GetLastOpenedSceneAutoOpenedSessionKey()
+    {
+        return LastOpenedSceneAutoOpenedKeyPrefix + GetProjectHash();
+    }
+
+    private static string GetLastOpenedScenePath()
+    {
+        return EditorPrefs.GetString(GetLastOpenedScenePathKey(), string.Empty);
+    }
+
+    private static bool GetAutoOpenLastSceneOnStartup()
+    {
+        return EditorPrefs.GetBool(GetAutoOpenLastSceneOnStartupKey(), AutoOpenLastSceneOnStartupDefault);
+    }
+
+    private static string GetAutoOpenLastSceneOnStartupKey()
+    {
+        return AutoOpenLastSceneOnStartupKeyPrefix + GetProjectHash();
+    }
+
+    private static void RememberLastOpenedScene(Scene scene)
+    {
+        if (CanStoreScene(scene))
+            EditorPrefs.SetString(GetLastOpenedScenePathKey(), scene.path);
+    }
+
+    private static void RememberLastOpenedScenePath(string scenePath)
+    {
+        if (!string.IsNullOrWhiteSpace(scenePath))
+            EditorPrefs.SetString(GetLastOpenedScenePathKey(), scenePath);
+    }
+
+    private static void RememberActiveSceneAsLastOpened()
+    {
+        RememberLastOpenedScene(SceneManager.GetActiveScene());
+    }
+
+    private static ESEditorRememberedObjectTarget<GameObject> GetLastSelectedSceneObjectTarget()
+    {
+        if (lastSelectedSceneObject == null)
+        {
+            lastSelectedSceneObject = new ESEditorRememberedObjectTarget<GameObject>(
+                StoragePrefix + "LastSelectedSceneObject." + GetProjectHash(),
+                ESEditorRememberedTargetFallbackStrategy.SceneAndPath,
+                30);
+        }
+
+        return lastSelectedSceneObject;
+    }
+
+    private static void RememberLastSelectedSceneObject()
+    {
+        GameObject selected = Selection.activeGameObject;
+        if (selected == null || EditorUtility.IsPersistent(selected))
+            return;
+
+        Scene scene = selected.scene;
+        if (!scene.IsValid() || !scene.isLoaded)
+            return;
+
+        GetLastSelectedSceneObjectTarget().Remember(selected);
+    }
+
+    private static void ScheduleRestoreLastSelectedSceneObject()
+    {
+        if (selectionRestoreScheduled)
+            return;
+
+        selectionRestoreScheduled = true;
+        selectionRestoreRetryCount = 0;
+        selectionRestoreDelayTicks = RestoreDelayTicks;
+        EditorApplication.update += RestoreLastSelectedSceneObjectWhenReady;
+    }
+
+    private static void RestoreLastSelectedSceneObjectWhenReady()
+    {
+        if (selectionRestoreDelayTicks > 0)
+        {
+            selectionRestoreDelayTicks--;
+            return;
+        }
+
+        if (!IsEditorReadyForRestore())
+        {
+            RetryRestoreLastSelectedSceneObject();
+            return;
+        }
+
+        EditorApplication.update -= RestoreLastSelectedSceneObjectWhenReady;
+        selectionRestoreScheduled = false;
+
+        if (GetLastSelectedSceneObjectTarget().TryResolve(out GameObject target) && target != null)
+            Selection.activeGameObject = target;
+    }
+
+    private static void RetryRestoreLastSelectedSceneObject()
+    {
+        selectionRestoreRetryCount++;
+        if (selectionRestoreRetryCount <= RetryLimit)
+        {
+            selectionRestoreDelayTicks = RestoreDelayTicks;
+            return;
+        }
+
+        EditorApplication.update -= RestoreLastSelectedSceneObjectWhenReady;
+        selectionRestoreScheduled = false;
+    }
+
+    private static string GetSceneViewCameraStateKey(Scene scene)
+    {
+        return SceneViewCameraStateKeyPrefix + GetProjectHash() + "." + GetSceneGuid(scene);
+    }
+
+    private static bool IsSceneActive(Scene scene)
+    {
+        return scene.IsValid() && scene.isLoaded && scene == SceneManager.GetActiveScene();
+    }
+
+    private static void RememberSceneViewCameraState(Scene scene)
+    {
+        if (!IsSceneActive(scene))
+            return;
+
+        SaveSceneViewCameraState(scene);
+    }
+
+    private static void SaveSceneViewCameraState(Scene scene)
+    {
+        SaveSceneViewCameraState(scene, SceneView.lastActiveSceneView);
+    }
+
+    private static void SaveSceneViewCameraState(Scene scene, SceneView sceneView)
+    {
+        if (!CanStoreScene(scene))
+            return;
+
+        if (sceneView == null || sceneView.camera == null)
+            return;
+
+        var record = new SceneViewCameraRecord
+        {
+            scenePath = scene.path,
+            savedUtcTicks = DateTime.UtcNow.Ticks,
+            pivot = sceneView.pivot,
+            rotation = sceneView.rotation,
+            size = sceneView.size,
+            isOrtho = sceneView.orthographic,
+            fieldOfView = sceneView.cameraSettings.fieldOfView
+        };
+
+        EditorPrefs.SetString(GetSceneViewCameraStateKey(scene), JsonUtility.ToJson(record));
+    }
+
+    private static void ScheduleSceneViewCameraBaseline(Scene scene)
+    {
+        CancelSceneViewCameraBaseline();
+
+        if (!CanStoreScene(scene) || TryGetSceneViewCameraRecord(scene, out _))
+            return;
+
+        // 等活动场景真正进入第一个 SceneView 绘制帧后再记基线，避免把切换前的旧视角写进新场景。
+        pendingSceneViewCameraBaselineScene = scene;
+        hasPendingSceneViewCameraBaseline = true;
+        sceneViewCameraBaselineStartedAt = EditorApplication.timeSinceStartup;
+        SceneView.duringSceneGui -= CaptureSceneViewCameraBaseline;
+        SceneView.duringSceneGui += CaptureSceneViewCameraBaseline;
+        EditorApplication.update -= CheckSceneViewCameraBaselineTimeout;
+        EditorApplication.update += CheckSceneViewCameraBaselineTimeout;
+    }
+
+    private static void CaptureSceneViewCameraBaseline(SceneView sceneView)
+    {
+        if (!hasPendingSceneViewCameraBaseline
+            || !IsSceneActive(pendingSceneViewCameraBaselineScene)
+            || (SceneView.lastActiveSceneView != null && sceneView != SceneView.lastActiveSceneView))
+            return;
+
+        if (!TryGetSceneViewCameraRecord(pendingSceneViewCameraBaselineScene, out _))
+            SaveSceneViewCameraState(pendingSceneViewCameraBaselineScene, sceneView);
+
+        CancelSceneViewCameraBaseline();
+    }
+
+    private static void CancelSceneViewCameraBaseline()
+    {
+        SceneView.duringSceneGui -= CaptureSceneViewCameraBaseline;
+        EditorApplication.update -= CheckSceneViewCameraBaselineTimeout;
+        hasPendingSceneViewCameraBaseline = false;
+        pendingSceneViewCameraBaselineScene = default;
+    }
+
+    private static void CheckSceneViewCameraBaselineTimeout()
+    {
+        if (!hasPendingSceneViewCameraBaseline)
+        {
+            EditorApplication.update -= CheckSceneViewCameraBaselineTimeout;
+            return;
+        }
+
+        if (EditorApplication.timeSinceStartup - sceneViewCameraBaselineStartedAt < SceneViewCameraBaselineTimeoutSeconds)
+            return;
+
+        CancelSceneViewCameraBaseline();
+        Debug.LogWarning("[SceneHierarchyExpansionState] 未等到 SceneView 绘制帧，已取消本次场景相机基线。");
+    }
+
+    private static void RememberActiveSceneViewCameraState()
+    {
+        RememberSceneViewCameraState(SceneManager.GetActiveScene());
+    }
+
+    private static bool TryGetSceneViewCameraRecord(Scene scene, out SceneViewCameraRecord record)
+    {
+        record = null;
+        if (!CanStoreScene(scene))
+            return false;
+
+        string json = EditorPrefs.GetString(GetSceneViewCameraStateKey(scene), string.Empty);
+        if (string.IsNullOrEmpty(json))
+            return false;
+
+        record = JsonUtility.FromJson<SceneViewCameraRecord>(json);
+        if (record == null || record.savedUtcTicks <= 0)
+            return false;
+
+        DateTime savedUtc = new DateTime(record.savedUtcTicks, DateTimeKind.Utc);
+        return SceneViewCameraRecordMaxAgeDays <= 0
+            || DateTime.UtcNow - savedUtc <= TimeSpan.FromDays(SceneViewCameraRecordMaxAgeDays);
+    }
+
+    private static bool RestoreActiveSceneViewCameraNow()
+    {
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (!TryGetSceneViewCameraRecord(activeScene, out SceneViewCameraRecord record))
+            return false;
+
+        SceneView sceneView = SceneView.lastActiveSceneView;
+        if (sceneView == null)
+            return false;
+
+        sceneView.pivot = record.pivot;
+        sceneView.rotation = record.rotation;
+        sceneView.size = record.size;
+        if (sceneView.orthographic != record.isOrtho)
+            sceneView.orthographic = record.isOrtho;
+        if (record.fieldOfView > 0f)
+            sceneView.cameraSettings.fieldOfView = record.fieldOfView;
+
+        SceneView.RepaintAll();
+        return true;
+    }
+
+    private static void ScheduleRestoreSceneViewCamera()
+    {
+        if (cameraRestoreScheduled)
+            return;
+
+        cameraRestoreScheduled = true;
+        cameraRestoreRetryCount = 0;
+        cameraRestoreDelayTicks = RestoreDelayTicks;
+        EditorApplication.update += RestoreSceneViewCameraWhenReady;
+    }
+
+    private static void RestoreSceneViewCameraWhenReady()
+    {
+        if (cameraRestoreDelayTicks > 0)
+        {
+            cameraRestoreDelayTicks--;
+            return;
+        }
+
+        if (!IsEditorReadyForRestore())
+        {
+            RetryRestoreSceneViewCamera();
+            return;
+        }
+
+        EditorApplication.update -= RestoreSceneViewCameraWhenReady;
+        cameraRestoreScheduled = false;
+
+        if (!RestoreActiveSceneViewCameraNow())
+            Debug.LogWarning("[SceneHierarchyExpansionState] 当前场景没有可恢复的 SceneView 相机位置。");
+    }
+
+    private static void RetryRestoreSceneViewCamera()
+    {
+        cameraRestoreRetryCount++;
+        if (cameraRestoreRetryCount <= RetryLimit)
+        {
+            cameraRestoreDelayTicks = RestoreDelayTicks;
+            return;
+        }
+
+        EditorApplication.update -= RestoreSceneViewCameraWhenReady;
+        cameraRestoreScheduled = false;
+    }
+
     private static int ComparePathDepthThenName(string a, string b)
     {
         int depthCompare = GetPathDepth(a).CompareTo(GetPathDepth(b));
@@ -670,6 +1219,18 @@ public static class SceneHierarchyExpansionState
     private sealed class SceneExpansionData
     {
         public List<string> expandedTransformPaths = new List<string>();
+    }
+
+    [Serializable]
+    private sealed class SceneViewCameraRecord
+    {
+        public string scenePath = string.Empty;
+        public long savedUtcTicks;
+        public Vector3 pivot;
+        public Quaternion rotation;
+        public float size;
+        public bool isOrtho;
+        public float fieldOfView;
     }
 
     private static class SceneHierarchyReflection

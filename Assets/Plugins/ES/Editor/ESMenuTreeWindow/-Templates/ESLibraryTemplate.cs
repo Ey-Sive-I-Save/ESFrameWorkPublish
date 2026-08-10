@@ -7,6 +7,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using ES.EditorInternal;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
@@ -1912,7 +1913,13 @@ namespace ES
 
         public class Page_Index_Consumer : ESWindowPageBase
         {
-            private static readonly string[] TabNames = { "基础与备注", "Library 配置", "发布关系", "代码与文件" };
+            private static readonly ESEditorSectionNavigatorItem[] ConsumerSections =
+            {
+                new ESEditorSectionNavigatorItem("basic", "基础与备注", "Consumer 身份、GameCore、常驻资产与制作备注。"),
+                new ESEditorSectionNavigatorItem("libraries", "Library 配置", "启动必需与可选下载 Library。"),
+                new ESEditorSectionNavigatorItem("publish", "发布关系", "总入口、渠道、依赖 Consumer 与构建版本。"),
+                new ESEditorSectionNavigatorItem("code", "代码与文件", "代码热更、附加文件与发布准备。")
+            };
 
             [HideInInspector]
             public TConsumer package;
@@ -1930,7 +1937,24 @@ namespace ES
                     return;
                 }
 
-                selectedTab = GUILayout.Toolbar(selectedTab, TabNames, GUILayout.Height(28));
+                DrawConsumerSummary();
+
+                string assetPath = AssetDatabase.GetAssetPath(package);
+                string assetGuid = AssetDatabase.AssetPathToGUID(assetPath);
+                string navigatorKey = "ES.ConsumerEditor."
+                    + (string.IsNullOrEmpty(assetGuid) ? package.GetInstanceID().ToString() : assetGuid);
+                string currentId = selectedTab == 1 ? "libraries"
+                    : selectedTab == 2 ? "publish"
+                    : selectedTab == 3 ? "code"
+                    : "basic";
+                string selectedId = ESEditorSectionNavigatorIMGUI.Draw(
+                    navigatorKey,
+                    currentId,
+                    ConsumerSections);
+                selectedTab = string.Equals(selectedId, "libraries", StringComparison.Ordinal) ? 1
+                    : string.Equals(selectedId, "publish", StringComparison.Ordinal) ? 2
+                    : string.Equals(selectedId, "code", StringComparison.Ordinal) ? 3
+                    : 0;
                 EditorGUILayout.Space(8);
                 switch (selectedTab)
                 {
@@ -1949,8 +1973,31 @@ namespace ES
                 }
             }
 
+            private void DrawConsumerSummary()
+            {
+                SimpleToolsPanelUtility.DrawSectionTitle(
+                    "Consumer 概览",
+                    "身份、入口与运行版本，先确认当前资产再进入配置。");
+                using (new EditorGUILayout.VerticalScope())
+                {
+                    string stableId = package is ESAssetLibraryConsumer resourceConsumer
+                        ? (string.IsNullOrWhiteSpace(resourceConsumer.ConsumerId) ? "未生成" : resourceConsumer.ConsumerId)
+                        : string.Empty;
+                    string totalText = package is ESAssetLibraryConsumer totalConsumer
+                        ? (totalConsumer.IsTotalConsumer ? "总入口" : "普通 Consumer")
+                        : "普通 Consumer";
+                    SimpleToolsPanelUtility.DrawSummary(
+                        "名称: " + package.Name,
+                        "版本: " + package.Version,
+                        "必需库: " + (package.ConsumerLibFolders?.Count ?? 0).ToString(),
+                        "入口: " + totalText,
+                        string.IsNullOrEmpty(stableId) ? null : "ID: " + stableId);
+                }
+            }
+
             private void DrawBasicInfo()
             {
+                SimpleToolsPanelUtility.DrawSectionTitle("基础与备注", "先确认名称、版本、GameCore 与常驻资产，再进入发布配置。");
                 SirenixEditorGUI.BeginBox();
                 EditorGUILayout.LabelField("Consumer 基础信息", EditorStyles.boldLabel);
                 EditorGUI.BeginChangeCheck();
@@ -2149,6 +2196,7 @@ namespace ES
 
             private void DrawLibraries()
             {
+                SimpleToolsPanelUtility.DrawSectionTitle("Library 配置", "启动必需 Library 会进入启动包；可选下载 Library 按需拉取。");
                 DrawLibraryList("启动必需 Library", package.ConsumerLibFolders, "Required");
                 if (package is ESAssetLibraryConsumer resourceConsumer)
                     DrawResourceLibraryList("可选下载 Library", resourceConsumer.OptionalLibFolders, "Optional");
@@ -2162,6 +2210,7 @@ namespace ES
                     return;
                 }
 
+                SimpleToolsPanelUtility.DrawSectionTitle("发布关系", "总入口必须唯一；稳定 ID、渠道与依赖 Consumer 是发布清单权威。");
                 SirenixEditorGUI.BeginBox();
                 EditorGUILayout.LabelField("发布身份", EditorStyles.boldLabel);
                 EditorGUILayout.LabelField("稳定 ID", string.IsNullOrEmpty(resourceConsumer.ConsumerId) ? "未生成" : resourceConsumer.ConsumerId);
@@ -2216,6 +2265,7 @@ namespace ES
                     return;
                 }
 
+                SimpleToolsPanelUtility.DrawSectionTitle("代码与文件", "代码热更与附加文件只在这里显式配置；发布前必须完成 Consumer 代码包准备。");
                 resourceConsumer.CodePackages ??= new List<ESConsumerCodePackageConfig>();
                 SirenixEditorGUI.BeginBox();
                 EditorGUILayout.LabelField("代码更新", EditorStyles.boldLabel);

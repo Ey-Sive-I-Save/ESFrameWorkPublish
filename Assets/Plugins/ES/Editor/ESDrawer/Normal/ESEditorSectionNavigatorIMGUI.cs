@@ -52,6 +52,7 @@ namespace ES.EditorInternal
         private static GUIStyle statusStyle;
         private static bool stylesInitialized;
         private static bool stylesProSkin;
+        private static int cachedSkinGeneration = -1;
 
         public static string Draw(
             string persistenceKey,
@@ -203,12 +204,14 @@ namespace ES.EditorInternal
 
         private static void EnsureStyles()
         {
+            int currentSkinGeneration = ESEditorPresentation.SkinGeneration;
             bool proSkin = EditorGUIUtility.isProSkin;
-            if (stylesInitialized && stylesProSkin == proSkin)
+            if (stylesInitialized && stylesProSkin == proSkin && cachedSkinGeneration == currentSkinGeneration)
                 return;
 
             stylesInitialized = true;
             stylesProSkin = proSkin;
+            cachedSkinGeneration = currentSkinGeneration;
             normalStyle = new GUIStyle(EditorStyles.miniLabel)
             {
                 alignment = TextAnchor.MiddleLeft,

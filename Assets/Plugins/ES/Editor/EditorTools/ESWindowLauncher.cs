@@ -188,6 +188,11 @@ namespace ES
             DrawSections();
         }
 
+        private void OnDisable()
+        {
+            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this);
+        }
+
         private void OnDestroy()
         {
             ES.EditorInternal.ESEditorPresentation.UnbindWindow(this);

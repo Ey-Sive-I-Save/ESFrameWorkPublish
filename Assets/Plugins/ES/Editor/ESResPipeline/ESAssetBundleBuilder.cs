@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 
@@ -19,8 +21,6 @@ namespace ES
         {
             BeforeBuildValidation?.Invoke();
             ESAssetPipelineIO.EnsureAssetBundleReleaseMode();
-            if (ESGlobalResSetting.Instance.AssetRunMode == ESAssetRunMode.HotUpdate)
-                ESAssetBundlePublisher.RemoveGeneratedStreamingAssets(ESAssetPipelineIO.PlatformName);
             string platform = ESAssetPipelineIO.PlatformName;
             string planFolder = ESAssetPipelineIO.PlanRoot(platform);
             var plan = ESAssetPipelineIO.ReadJson<ESAssetBundleBuildPlan>(Path.Combine(planFolder, ESAssetPipelineIO.PlanFileName));
@@ -28,6 +28,11 @@ namespace ES
             if (plan.errors.Count > 0) throw new InvalidOperationException("[ESRes][Build] BuildPlan 包含错误，拒绝构建。");
             ValidatePlanAndAssetList(plan, assetList);
             ValidateLabels(plan);
+            string sourceFingerprint = ComputeSourceFingerprint(plan);
+            string planFingerprint = ESResManifestIntegrity.ComputeFileSha256(
+                Path.Combine(planFolder, ESAssetPipelineIO.PlanFileName));
+            string assetListFingerprint = ESResManifestIntegrity.ComputeFileSha256(
+                Path.Combine(planFolder, ESAssetPipelineIO.AssetListFileName));
 
             string buildId = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff");
             string stagingRoot = ESAssetPipelineIO.StagingRoot(platform);
@@ -45,6 +50,7 @@ namespace ES
             AssetBundleManifest unityManifest = BuildPipeline.BuildAssetBundles(buildRoot, builds, BuildAssetBundleOptions.ChunkBasedCompression, target);
             if (unityManifest == null) throw new InvalidOperationException("[ESRes][Build] BuildPipeline.BuildAssetBundles 返回 null。");
             ValidateBuiltBundleGraph(plan, unityManifest);
+            ValidateBuiltAssetContent(plan, assetList);
             PruneBuildCache(buildRoot, builds.Select(item => item.assetBundleName));
 
             var ownerByBundle = plan.assignments.GroupBy(item => item.assetBundleKey, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.Select(item => item.ownerLibrary).OrderBy(item => item, StringComparer.Ordinal).First(), StringComparer.Ordinal);
@@ -56,7 +62,10 @@ namespace ES
                 platform = platform,
                 buildId = buildId,
                 builtUtc = DateTime.UtcNow.ToString("O"),
-                libraryFolders = owners.Select(ESAssetPipelineIO.SafeSegment).ToList()
+                libraryFolders = owners.Select(ESAssetPipelineIO.SafeSegment).ToList(),
+                sourceFingerprint = sourceFingerprint,
+                planFingerprint = planFingerprint,
+                assetListFingerprint = assetListFingerprint
             }, true);
             Debug.Log($"[ESAssetBundleBuilder] 构建完成，共 {builds.Length} 个 AB。输出：{stagingRoot}");
         }
@@ -146,6 +155,94 @@ namespace ES
                 visited.Add(key);
             }
             foreach (string key in built) Visit(key);
+        }
+
+        private static void ValidateBuiltAssetContent(ESAssetBundleBuildPlan plan, ESAssetBundleAssetList assetList)
+        {
+            var expectedPathsByBundle = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            foreach (ESAssetBundleAssignment assignment in plan.assignments ?? new List<ESAssetBundleAssignment>())
+            {
+                if (assignment == null || string.IsNullOrWhiteSpace(assignment.assetPath)
+                    || string.IsNullOrWhiteSpace(assignment.assetBundleKey))
+                    continue;
+
+                if (!expectedPathsByBundle.TryGetValue(
+                        assignment.assetBundleKey,
+                        out HashSet<string> expectedPaths))
+                    expectedPathsByBundle[assignment.assetBundleKey] = expectedPaths =
+                        new HashSet<string>(StringComparer.Ordinal);
+                expectedPaths.Add(assignment.assetPath);
+            }
+
+            foreach (KeyValuePair<string, HashSet<string>> pair in expectedPathsByBundle)
+            {
+                string[] actualPaths = AssetDatabase.GetAssetPathsFromAssetBundle(pair.Key)
+                    ?? Array.Empty<string>();
+                var actual = new HashSet<string>(actualPaths, StringComparer.Ordinal);
+                foreach (string expectedPath in pair.Value)
+                    if (!actual.Contains(expectedPath))
+                        throw new InvalidOperationException(
+                            "[ESRes][Build] 计划资产未进入实际 AB：BundleKey=" + pair.Key
+                            + ", Path=" + expectedPath);
+            }
+
+            foreach (ESAssetBundleAssetEntry asset in assetList.assets ?? new List<ESAssetBundleAssetEntry>())
+            {
+                if (asset == null || asset.identity == null || !asset.identity.IsValid
+                    || string.IsNullOrWhiteSpace(asset.internalName))
+                    continue;
+                if (!IdentityExistsAtPath(asset))
+                    throw new InvalidOperationException(
+                        "[ESRes][Build] AssetList 中的资产身份未在目标资产文件内找到："
+                        + asset.identity.Key + ", Path=" + asset.internalName);
+            }
+        }
+
+        private static bool IdentityExistsAtPath(ESAssetBundleAssetEntry asset)
+        {
+            if (asset == null || asset.identity == null || string.IsNullOrWhiteSpace(asset.internalName))
+                return false;
+
+            if (!asset.identity.IsSubAsset)
+                return string.Equals(
+                    AssetDatabase.AssetPathToGUID(asset.internalName),
+                    asset.identity.guid,
+                    StringComparison.Ordinal);
+
+            foreach (UnityEngine.Object loaded in AssetDatabase.LoadAllAssetsAtPath(asset.internalName))
+            {
+                if (loaded == null
+                    || !AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                        loaded,
+                        out string guid,
+                        out long localFileId))
+                    continue;
+                if (string.Equals(guid, asset.identity.guid, StringComparison.Ordinal)
+                    && localFileId == asset.identity.localFileId)
+                    return true;
+            }
+            return false;
+        }
+
+        internal static string ComputeSourceFingerprint(ESAssetBundleBuildPlan plan)
+        {
+            var builder = new StringBuilder();
+            foreach (ESAssetBundleAssignment assignment in (plan?.assignments ?? new List<ESAssetBundleAssignment>())
+                .Where(item => item != null && !string.IsNullOrWhiteSpace(item.assetPath))
+                .OrderBy(item => item.assetPath, StringComparer.Ordinal))
+            {
+                string guid = AssetDatabase.AssetPathToGUID(assignment.assetPath) ?? string.Empty;
+                string dependencyHash = AssetDatabase.GetAssetDependencyHash(assignment.assetPath).ToString();
+                builder.Append(assignment.assetPath).Append('|');
+                builder.Append(guid).Append('|');
+                builder.Append(dependencyHash).Append('\n');
+            }
+
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString()));
+                return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
+            }
         }
 
         private static void BuildLibraryStage(string platform, string owner, List<string> bundleKeys, string buildRoot, AssetBundleManifest unityManifest, ESAssetBundleAssetList assetList)

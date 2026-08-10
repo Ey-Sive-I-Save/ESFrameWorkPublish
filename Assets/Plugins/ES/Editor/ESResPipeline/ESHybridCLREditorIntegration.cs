@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using HybridCLR.Editor;
 using HybridCLR.Editor.Commands;
@@ -143,6 +145,77 @@ namespace ES
             AssetDatabase.SaveAssets();
         }
 
+        public static void PrepareConsumerReleaseCode(
+            IEnumerable<ESAssetLibraryConsumer> sourceConsumers,
+            string platform)
+        {
+            List<ESAssetLibraryConsumer> consumers = (sourceConsumers ?? Enumerable.Empty<ESAssetLibraryConsumer>())
+                .Where(item => item != null)
+                .OrderBy(item => item.ConsumerId, StringComparer.Ordinal)
+                .ToList();
+            if (consumers.Count == 0)
+                throw new InvalidOperationException("准备 Consumer 代码包前至少需要一个 Consumer。");
+
+            string fingerprint = ComputeConsumerPreparationFingerprint(consumers);
+            string markerPath = ESAssetPipelineIO.ConsumerReleasePreparationPath(platform);
+            ESConsumerReleasePreparationMarker existing = null;
+            if (File.Exists(markerPath))
+                existing = ESAssetPipelineIO.ReadJson<ESConsumerReleasePreparationMarker>(markerPath);
+
+            if (existing != null
+                && existing.formatVersion == 1
+                && string.Equals(existing.fingerprint, fingerprint, StringComparison.Ordinal))
+            {
+                Debug.Log("[ESCodeModule] Consumer 代码包已准备且指纹未变化，跳过重复准备。");
+                return;
+            }
+
+            bool requiresCode = consumers.Any(consumer =>
+                consumer.EnableCodeHotUpdate
+                || (consumer.CodePackages?.Any(package => package != null && package.Enabled && package.ManagedByHybridCLR) ?? false));
+            if (requiresCode)
+            {
+                GenerateAndSyncAll(consumers);
+            }
+            ESAssetConsumerBuildRevision.IncrementAllForBuild();
+
+            string folder = Path.GetDirectoryName(markerPath);
+            if (!string.IsNullOrWhiteSpace(folder))
+                ESAssetPipelineIO.EnsureGeneratedDirectory(folder);
+            ESAssetPipelineIO.WriteJson(markerPath, new ESConsumerReleasePreparationMarker
+            {
+                platform = platform,
+                fingerprint = fingerprint,
+                preparedUtc = DateTime.UtcNow.ToString("O"),
+                consumerCount = consumers.Count
+            }, true);
+            Debug.Log("[ESCodeModule] Consumer 代码包准备完成：" + platform + "，Consumer=" + consumers.Count);
+        }
+
+        public static void ValidateConsumerReleasePrepared(
+            IEnumerable<ESAssetLibraryConsumer> sourceConsumers,
+            string platform)
+        {
+            List<ESAssetLibraryConsumer> consumers = (sourceConsumers ?? Enumerable.Empty<ESAssetLibraryConsumer>())
+                .Where(item => item != null)
+                .OrderBy(item => item.ConsumerId, StringComparer.Ordinal)
+                .ToList();
+            string fingerprint = ComputeConsumerPreparationFingerprint(consumers);
+            string markerPath = ESAssetPipelineIO.ConsumerReleasePreparationPath(platform);
+            if (!File.Exists(markerPath))
+                throw new InvalidOperationException(
+                    "Consumer 代码包尚未准备。请先执行“Consumer 代码包准备”，再发布资源包。");
+
+            ESConsumerReleasePreparationMarker marker =
+                ESAssetPipelineIO.ReadJson<ESConsumerReleasePreparationMarker>(markerPath);
+            if (marker == null
+                || marker.formatVersion != 1
+                || !string.Equals(marker.platform, platform, StringComparison.Ordinal)
+                || !string.Equals(marker.fingerprint, fingerprint, StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    "Consumer 代码包准备标记已过期或平台不匹配。请重新执行“Consumer 代码包准备”。");
+        }
+
         public static void GenerateAndSyncAll(IEnumerable<ESAssetLibraryConsumer> sourceConsumers)
         {
             List<ESAssetLibraryConsumer> consumers = (sourceConsumers ?? Enumerable.Empty<ESAssetLibraryConsumer>()).Where(item => item != null).ToList();
@@ -169,6 +242,42 @@ namespace ES
             AssetDatabase.SaveAssets();
             Debug.Log("[ESCodeModule] 已准备框架默认热更程序集 ES_Design、ES_Logic、ESPlayer（不包含 Assembly-CSharp），附加 Consumer 代码模块 "
                 + enabledConsumers.Count + " 个。");
+        }
+
+        private static string ComputeConsumerPreparationFingerprint(
+            IEnumerable<ESAssetLibraryConsumer> sourceConsumers)
+        {
+            var builder = new StringBuilder();
+            foreach (ESAssetLibraryConsumer consumer in (sourceConsumers ?? Enumerable.Empty<ESAssetLibraryConsumer>())
+                .Where(item => item != null)
+                .OrderBy(item => item.ConsumerId, StringComparer.Ordinal))
+            {
+                builder.Append(consumer.ConsumerId ?? string.Empty).Append('\n');
+                builder.Append(consumer.IsTotalConsumer).Append('\n');
+                builder.Append(consumer.EnableCodeHotUpdate).Append('\n');
+                builder.Append(consumer.HotUpdateAssemblyDefinitionGuid ?? string.Empty).Append('\n');
+                builder.Append(consumer.HotUpdateAssemblyName ?? string.Empty).Append('\n');
+                builder.Append(consumer.HotUpdateSourceFolder ?? string.Empty).Append('\n');
+                foreach (ESConsumerCodePackageConfig package in (consumer.CodePackages ?? new List<ESConsumerCodePackageConfig>())
+                    .Where(item => item != null)
+                    .OrderBy(item => item.PackageKey, StringComparer.Ordinal))
+                {
+                    builder.Append(package.Enabled).Append('|');
+                    builder.Append(package.Kind).Append('|');
+                    builder.Append(package.PackageKey ?? string.Empty).Append('|');
+                    builder.Append(package.SourcePath ?? string.Empty).Append('|');
+                    builder.Append(package.RequiredAtBoot).Append('|');
+                    builder.Append(package.LoadOrder).Append('|');
+                    builder.Append(package.ManagedByHybridCLR).Append('|');
+                    builder.Append(package.Notes ?? string.Empty).Append('\n');
+                }
+            }
+
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(builder.ToString()));
+                return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
+            }
         }
 
         public static void OpenConsumerCodeFolder(ESAssetLibraryConsumer consumer)

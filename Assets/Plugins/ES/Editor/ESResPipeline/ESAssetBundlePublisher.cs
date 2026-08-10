@@ -25,17 +25,13 @@ namespace ES
         private static void PublishCore()
         {
             ESAssetPipelineIO.EnsureAssetBundleReleaseMode();
-            var sourceLibraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>()
-                .Where(item => item != null && item.ContainsBuild)
-                .OrderBy(item => item.LibFolderName, StringComparer.Ordinal)
-                .ToList();
-            ESAssetReferenceBaker.ValidateSourceStateForBuild(sourceLibraries);
             string platform = ESAssetPipelineIO.PlatformName;
             string stagingRoot = ESAssetPipelineIO.StagingRoot(platform);
             if (!Directory.Exists(stagingRoot)) throw new DirectoryNotFoundException("资源包暂存目录不存在，请先执行“构建资源包”：" + stagingRoot);
             var buildSet = ESAssetPipelineIO.ReadJson<ESAssetBuildSet>(Path.Combine(stagingRoot, ESAssetPipelineIO.BuildSetFileName));
             var stageFolders = buildSet.libraryFolders.Select(folder => ESAssetPipelineIO.StagingLibraryFolder(platform, folder)).ToList();
             if (stageFolders.Count == 0) throw new InvalidOperationException("资源包暂存目录中没有可发布的资源库。");
+            ValidateBuildSetFingerprints(buildSet, platform);
             SetPublishProgress("校验暂存资源、Manifest 与 Hash", 0.05f);
             ValidateAll(stageFolders);
             var consumers = ESEditorSO.GetGroupOfType<ESAssetLibraryConsumer>()
@@ -43,12 +39,9 @@ namespace ES
                 .OrderBy(item => AssetDatabase.GetAssetPath(item), StringComparer.Ordinal)
                 .ToList();
             if (consumers.Count == 0) throw new InvalidOperationException("未找到资源使用者（Consumer）。请先创建至少一个 Consumer。\n");
+            ESCodeModuleEditorIntegration.ValidateConsumerReleasePrepared(consumers, platform);
             ValidateConsumerIdentities(consumers);
             ValidatePathSegment(ESGlobalResSetting.Instance.Version, "资源发布版本");
-            SetPublishProgress("生成 HybridCLR AOT 元数据与热更代码包（此阶段通常最耗时）", 0.10f);
-            ESCodeModuleEditorIntegration.GenerateAndSyncAll(consumers);
-            SetPublishProgress("同步 Consumer 构建修订", 0.48f);
-            ESAssetConsumerBuildRevision.IncrementAllForBuild();
 
             DateTime publishLocalTime = DateTime.Now;
             string releaseVersion = ESGlobalResSetting.Instance.Version + "." + publishLocalTime.ToString("yyyyMMddHHmmssfff");
@@ -246,6 +239,32 @@ namespace ES
             }
             foreach (var package in packages.Values) foreach (string dependency in package.dependencies)
                 if (!packages.ContainsKey(dependency)) throw new InvalidDataException($"AB 依赖缺失：{package.assetBundleKey} -> {dependency}");
+        }
+
+        private static void ValidateBuildSetFingerprints(ESAssetBuildSet buildSet, string platform)
+        {
+            if (buildSet == null)
+                throw new InvalidDataException("BuildSet 缺失，请重新执行 AB 构建。");
+            string planFolder = ESAssetPipelineIO.PlanRoot(platform);
+            string planPath = Path.Combine(planFolder, ESAssetPipelineIO.PlanFileName);
+            string assetListPath = Path.Combine(planFolder, ESAssetPipelineIO.AssetListFileName);
+            if (!File.Exists(planPath) || !File.Exists(assetListPath))
+                throw new FileNotFoundException("BuildPlan/AssetList 缺失，请重新执行规划与构建。", planPath);
+
+            string currentPlanFingerprint = ESResManifestIntegrity.ComputeFileSha256(planPath);
+            string currentAssetListFingerprint = ESResManifestIntegrity.ComputeFileSha256(assetListPath);
+            if (string.IsNullOrWhiteSpace(buildSet.planFingerprint)
+                || !string.Equals(buildSet.planFingerprint, currentPlanFingerprint, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("BuildPlan 已变化，拒绝发布。请重新执行规划与构建。");
+            if (string.IsNullOrWhiteSpace(buildSet.assetListFingerprint)
+                || !string.Equals(buildSet.assetListFingerprint, currentAssetListFingerprint, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("AssetList 已变化，拒绝发布。请重新执行规划与构建。");
+
+            ESAssetBundleBuildPlan plan = ESAssetPipelineIO.ReadJson<ESAssetBundleBuildPlan>(planPath);
+            string currentSourceFingerprint = ESAssetBundleBuilder.ComputeSourceFingerprint(plan);
+            if (string.IsNullOrWhiteSpace(buildSet.sourceFingerprint)
+                || !string.Equals(buildSet.sourceFingerprint, currentSourceFingerprint, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("构建源指纹已变化，拒绝发布。请重新执行构建。");
         }
 
         private static string WriteManualUploadPlan(string cdnRoot, string platform, string releaseVersion)
@@ -530,6 +549,8 @@ namespace ES
                     : FindSubAsset(path, id.Guid, id.LocalFileId);
                 if (asset == null || ESAssetPipelineIO.IsEditorOnly(path, asset) || asset is SceneAsset)
                     throw new InvalidOperationException("Consumer 启动常驻资产无效、属于 EditorOnly 或为 Scene：" + path);
+                if (ESAssetPipelineIO.IsExcludedFolderPath(path))
+                    throw new InvalidOperationException("Consumer 启动常驻资产位于全局排除目录：" + path);
                 if (asset is ScriptableObject scriptableObject
                     && ESScriptableObjectClassification.GetClass(scriptableObject) == ESScriptableObjectClass.GameCore)
                     throw new InvalidOperationException("GameCore 资产不能重复进入 ResidentAssets：" + path);

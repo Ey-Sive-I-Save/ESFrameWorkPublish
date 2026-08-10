@@ -69,6 +69,16 @@ namespace ES.EditorInternal
         {
         }
 
+        public ESStableGraphNodeTemplate(ESGraphDomainKind domainKind, ESGraphBuiltInNodeKind nodeKind,
+            string menuPath, string defaultTitle, string defaultPayloadJson,
+            ESGraphNodeCategory category, ESGraphNodeTheme theme, int currentVersion,
+            params ESGraphPortDefinition[] ports)
+            : this(ESGraphDomainKey.FromKind(domainKind), ESGraphNodeTypeKey.FromKind(nodeKind), menuPath,
+                defaultTitle, defaultPayloadJson, category, theme, defaultTitle, string.Empty,
+                currentVersion, 0, default, ports)
+        {
+        }
+
         public ESStableGraphNodeTemplate(ESGraphDomainKey domain, ESGraphNodeTypeKey nodeType,
             string menuPath, string defaultTitle, string defaultPayloadJson,
             ESGraphNodeCategory category, ESGraphNodeTheme theme, string badgeText,
@@ -282,6 +292,283 @@ namespace ES.EditorInternal
         VisualElement Create(string payloadJson, Action<string> commitPayload);
     }
 
+    public sealed class ESGraphNodeCardPortSummary
+    {
+        public string PortId { get; }
+        public string StableKey { get; }
+        public string DisplayName { get; }
+        public string ValueTypeId { get; }
+        public ESGraphPortDirection Direction { get; }
+        public ESGraphPortCapacity Capacity { get; }
+        public int ConnectionCount { get; }
+
+        internal ESGraphNodeCardPortSummary(ESGraphPortRecord port, int connectionCount)
+        {
+            PortId = port?.portId ?? string.Empty;
+            StableKey = port?.stableKey ?? string.Empty;
+            DisplayName = port?.name ?? string.Empty;
+            ValueTypeId = port?.valueTypeId ?? string.Empty;
+            Direction = port?.direction ?? default;
+            Capacity = port?.capacity ?? default;
+            ConnectionCount = Math.Max(0, connectionCount);
+        }
+    }
+
+    public readonly struct ESGraphNodeCardActionKey : IEquatable<ESGraphNodeCardActionKey>
+    {
+        public string StableId { get; }
+        public bool IsValid => ESGraphStableIdUtility.IsValid(StableId);
+
+        private ESGraphNodeCardActionKey(string stableId)
+        {
+            StableId = stableId ?? string.Empty;
+        }
+
+        public static ESGraphNodeCardActionKey FromStableId(string stableId)
+        {
+            stableId = stableId?.Trim();
+            if (!ESGraphStableIdUtility.IsValid(stableId))
+                throw new ArgumentException("节点卡片动作稳定标识非法。", nameof(stableId));
+            return new ESGraphNodeCardActionKey(stableId);
+        }
+
+        public bool Equals(ESGraphNodeCardActionKey other)
+        {
+            return string.Equals(StableId, other.StableId, StringComparison.Ordinal);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is ESGraphNodeCardActionKey other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return StableId == null ? 0 : StringComparer.Ordinal.GetHashCode(StableId);
+        }
+
+        public static bool operator ==(ESGraphNodeCardActionKey left, ESGraphNodeCardActionKey right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(ESGraphNodeCardActionKey left, ESGraphNodeCardActionKey right)
+        {
+            return !left.Equals(right);
+        }
+
+        public override string ToString()
+        {
+            return StableId ?? string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Immutable node-card projection. It intentionally exposes no Graph Asset, GraphView or edit service;
+    /// all mutations and navigation stay behind the controlled methods below.
+    /// </summary>
+    public sealed class ESGraphNodeCardContext
+    {
+        private readonly Action<string> commitPayload;
+        private readonly Action openDetails;
+        private readonly Action<string> focusNode;
+        private readonly Action<string> selectNode;
+        private readonly Action<string> report;
+        private readonly Action<string> copyText;
+        private readonly Func<bool> isSelected;
+        private readonly Func<ESGraphNodeCardActionKey, bool> canExecuteAction;
+        private readonly Action<ESGraphNodeCardActionKey> executeAction;
+
+        public string GraphId { get; }
+        public int GraphSchemaVersion { get; }
+        public string DomainId { get; }
+        public string NodeId { get; }
+        public string NodeTypeId { get; }
+        public int NodeVersion { get; }
+        public string Title { get; }
+        public string PayloadJson { get; }
+        public bool IsReadOnly { get; }
+        public bool HasFutureSchema { get; }
+        public bool CanEditPayload => !IsReadOnly && commitPayload != null;
+        public bool IsSelected => isSelected?.Invoke() ?? false;
+        public IReadOnlyList<ESGraphNodeCardPortSummary> Ports { get; }
+        public IReadOnlyList<string> IncomingNodeIds { get; }
+        public IReadOnlyList<string> OutgoingNodeIds { get; }
+        public int IncomingConnectionCount => IncomingNodeIds.Count;
+        public int OutgoingConnectionCount => OutgoingNodeIds.Count;
+
+        internal ESGraphNodeCardContext(string graphId, int graphSchemaVersion, string domainId,
+            ESGraphNodeRecord node, bool isReadOnly, bool hasFutureSchema,
+            ESGraphNodeCardPortSummary[] ports, string[] incomingNodeIds, string[] outgoingNodeIds,
+            Action<string> commitPayload, Action openDetails, Action<string> focusNode,
+            Action<string> selectNode, Action<string> report, Action<string> copyText,
+            Func<bool> isSelected, Func<ESGraphNodeCardActionKey, bool> canExecuteAction = null,
+            Action<ESGraphNodeCardActionKey> executeAction = null)
+        {
+            GraphId = graphId ?? string.Empty;
+            GraphSchemaVersion = graphSchemaVersion;
+            DomainId = domainId ?? string.Empty;
+            NodeId = node?.nodeId ?? string.Empty;
+            NodeTypeId = node?.typeId ?? string.Empty;
+            NodeVersion = node?.version ?? 0;
+            Title = node?.title ?? string.Empty;
+            PayloadJson = node?.payloadJson ?? string.Empty;
+            IsReadOnly = isReadOnly;
+            HasFutureSchema = hasFutureSchema;
+            Ports = Array.AsReadOnly(ports ?? Array.Empty<ESGraphNodeCardPortSummary>());
+            IncomingNodeIds = Array.AsReadOnly(incomingNodeIds ?? Array.Empty<string>());
+            OutgoingNodeIds = Array.AsReadOnly(outgoingNodeIds ?? Array.Empty<string>());
+            this.commitPayload = commitPayload;
+            this.openDetails = openDetails;
+            this.focusNode = focusNode;
+            this.selectNode = selectNode;
+            this.report = report;
+            this.copyText = copyText;
+            this.isSelected = isSelected;
+            this.canExecuteAction = canExecuteAction;
+            this.executeAction = executeAction;
+        }
+
+        public bool CommitPayload(string payloadJson)
+        {
+            if (!CanEditPayload)
+            {
+                Report(HasFutureSchema
+                    ? "节点来自未来版本，关键信息卡保持只读。"
+                    : "当前图或节点不允许从关键信息卡修改。");
+                return false;
+            }
+            commitPayload(payloadJson ?? string.Empty);
+            return true;
+        }
+
+        public void OpenDetails()
+        {
+            openDetails?.Invoke();
+        }
+
+        public void FocusNode(string nodeId = null)
+        {
+            focusNode?.Invoke(string.IsNullOrEmpty(nodeId) ? NodeId : nodeId);
+        }
+
+        public void SelectNode(string nodeId = null)
+        {
+            selectNode?.Invoke(string.IsNullOrEmpty(nodeId) ? NodeId : nodeId);
+        }
+
+        public void Report(string message)
+        {
+            if (!string.IsNullOrWhiteSpace(message))
+                report?.Invoke(message);
+        }
+
+        public void CopyText(string value)
+        {
+            if (!string.IsNullOrEmpty(value))
+                copyText?.Invoke(value);
+        }
+
+        public bool CanExecuteNodeAction(ESGraphNodeCardActionKey action)
+        {
+            return action.IsValid && canExecuteAction != null && canExecuteAction(action);
+        }
+
+        public bool ExecuteNodeAction(ESGraphNodeCardActionKey action)
+        {
+            if (!action.IsValid)
+            {
+                Report("不支持的节点局部动作。");
+                return false;
+            }
+            if (executeAction == null || !CanExecuteNodeAction(action))
+            {
+                Report("当前节点没有注册该局部动作：" + action.StableId);
+                return false;
+            }
+            executeAction(action);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Short-lived execution context for a registered node-card action. It exposes immutable identity
+    /// and a validated bake operation instead of handing mutable Graph assets to domain handlers.
+    /// </summary>
+    public sealed class ESGraphNodeCardActionContext
+    {
+        private readonly ESGraphAsset asset;
+        private readonly Action<List<ESGraphValidationIssue>> showIssues;
+        private readonly Action<string> report;
+
+        public string GraphId { get; }
+        public int GraphSchemaVersion { get; }
+        public string DomainId { get; }
+        public string NodeId { get; }
+        public string NodeTypeId { get; }
+        public int NodeVersion { get; }
+        public bool IsReadOnly { get; }
+        public bool HasFutureSchema { get; }
+
+        internal ESGraphNodeCardActionContext(ESGraphAsset asset, ESGraphNodeRecord node,
+            bool isReadOnly, bool hasFutureSchema, Action<List<ESGraphValidationIssue>> showIssues,
+            Action<string> report)
+        {
+            this.asset = asset;
+            this.showIssues = showIssues;
+            this.report = report;
+            GraphId = asset?.GraphId ?? string.Empty;
+            GraphSchemaVersion = asset?.schemaVersion ?? 0;
+            DomainId = asset?.DomainId ?? string.Empty;
+            NodeId = node?.nodeId ?? string.Empty;
+            NodeTypeId = node?.typeId ?? string.Empty;
+            NodeVersion = node?.version ?? 0;
+            IsReadOnly = isReadOnly;
+            HasFutureSchema = hasFutureSchema;
+        }
+
+        public bool TryBake(out ESBakedGraphSnapshot snapshot, out IESBakedGraphPlan domainPlan)
+        {
+            bool succeeded = ESGraphAuthoringRegistry.TryBake(asset, out snapshot, out domainPlan,
+                out List<ESGraphValidationIssue> issues);
+            showIssues?.Invoke(issues);
+            return succeeded;
+        }
+
+        public void Report(string message)
+        {
+            if (!string.IsNullOrWhiteSpace(message))
+                report?.Invoke(message);
+        }
+    }
+
+    /// <summary>
+    /// Optional compact projection for the node body. Implementations choose only the fields that
+    /// are useful while reading the graph and commit mutations through the supplied payload callback.
+    /// </summary>
+    public interface IESGraphNodeCardProvider
+    {
+        ESGraphDomainKey Domain { get; }
+        ESGraphNodeTypeKey NodeType { get; }
+        int Priority { get; }
+        VisualElement CreateCard(ESGraphNodeCardContext context);
+    }
+
+    /// <summary>
+    /// Editor-only domain action extension. Every handler claims explicit domain, node-type and action
+    /// combinations so one domain cannot become the fallback dispatcher for unrelated Graph semantics.
+    /// </summary>
+    public interface IESGraphNodeCardActionHandler
+    {
+        ESGraphDomainKey Domain { get; }
+        IReadOnlyList<ESGraphNodeTypeKey> NodeTypes { get; }
+        IReadOnlyList<ESGraphNodeCardActionKey> Actions { get; }
+        int Priority { get; }
+        bool CanExecute(ESGraphNodeCardActionContext context, ESGraphNodeCardActionKey action,
+            out string unavailableReason);
+        void Execute(ESGraphNodeCardActionContext context, ESGraphNodeCardActionKey action);
+    }
+
     public static class ESGraphAuthoringRegistry
     {
         private readonly struct NodeRegistrationKey : IEquatable<NodeRegistrationKey>
@@ -349,6 +636,42 @@ namespace ES.EditorInternal
             }
         }
 
+        private readonly struct NodeActionRegistrationKey : IEquatable<NodeActionRegistrationKey>
+        {
+            public readonly ESGraphDomainKey Domain;
+            public readonly ESGraphNodeTypeKey NodeType;
+            public readonly ESGraphNodeCardActionKey Action;
+
+            public NodeActionRegistrationKey(ESGraphDomainKey domain, ESGraphNodeTypeKey nodeType,
+                ESGraphNodeCardActionKey action)
+            {
+                Domain = domain;
+                NodeType = nodeType;
+                Action = action;
+            }
+
+            public bool Equals(NodeActionRegistrationKey other)
+            {
+                return Domain.Equals(other.Domain) && NodeType.Equals(other.NodeType)
+                    && Action.Equals(other.Action);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is NodeActionRegistrationKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hashCode = Domain.GetHashCode();
+                    hashCode = (hashCode * 397) ^ NodeType.GetHashCode();
+                    return (hashCode * 397) ^ Action.GetHashCode();
+                }
+            }
+        }
+
         private static readonly Dictionary<ESGraphDomainKey, IESGraphAuthoringProfile> Profiles =
             new Dictionary<ESGraphDomainKey, IESGraphAuthoringProfile>();
         private static readonly Dictionary<NodeRegistrationKey, IESGraphNodeDefinition> NodeDefinitions =
@@ -361,6 +684,14 @@ namespace ES.EditorInternal
             new Dictionary<NodeRegistrationKey, IESGraphPayloadInspector>();
         private static readonly Dictionary<NodeRegistrationKey, string> PayloadInspectorSources =
             new Dictionary<NodeRegistrationKey, string>();
+        private static readonly Dictionary<NodeRegistrationKey, IESGraphNodeCardProvider> NodeCardProviders =
+            new Dictionary<NodeRegistrationKey, IESGraphNodeCardProvider>();
+        private static readonly Dictionary<NodeRegistrationKey, string> NodeCardProviderSources =
+            new Dictionary<NodeRegistrationKey, string>();
+        private static readonly Dictionary<NodeActionRegistrationKey, IESGraphNodeCardActionHandler> NodeActionHandlers =
+            new Dictionary<NodeActionRegistrationKey, IESGraphNodeCardActionHandler>();
+        private static readonly Dictionary<NodeActionRegistrationKey, string> NodeActionHandlerSources =
+            new Dictionary<NodeActionRegistrationKey, string>();
         private static readonly Dictionary<MigrationKey, IESGraphNodeMigrator> Migrators =
             new Dictionary<MigrationKey, IESGraphNodeMigrator>();
         private static readonly Dictionary<MigrationKey, string> MigratorSources =
@@ -373,6 +704,8 @@ namespace ES.EditorInternal
             DiscoverStandaloneNodeDefinitions();
             DiscoverMigrators();
             DiscoverPayloadInspectors();
+            DiscoverNodeCardProviders();
+            DiscoverNodeCardActionHandlers();
             BuildDomainDefinitionIndex();
         }
 
@@ -549,6 +882,77 @@ namespace ES.EditorInternal
         {
             return TryCreatePayloadInspector(ESGraphDomainKey.Parse(domainId), ESGraphNodeTypeKey.Parse(nodeTypeId),
                 payloadJson, commitPayload, out inspector);
+        }
+
+        public static bool TryCreateNodeCard(ESGraphNodeCardContext context, out VisualElement card)
+        {
+            ESGraphDomainKey domain = ESGraphDomainKey.Parse(context?.DomainId);
+            ESGraphNodeTypeKey nodeType = ESGraphNodeTypeKey.Parse(context?.NodeTypeId);
+            NodeRegistrationKey key = new NodeRegistrationKey(domain, nodeType);
+            if (NodeCardProviders.TryGetValue(key, out IESGraphNodeCardProvider provider))
+            {
+                try
+                {
+                    card = provider.CreateCard(context);
+                    return card != null;
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError("图节点关键信息卡创建失败：" + nodeType.StableId + "\n" + exception);
+                }
+            }
+            card = null;
+            return false;
+        }
+
+        public static bool CanExecuteNodeCardAction(ESGraphNodeCardActionContext context,
+            ESGraphNodeCardActionKey action, out string unavailableReason)
+        {
+            unavailableReason = string.Empty;
+            if (context == null || !action.IsValid)
+            {
+                unavailableReason = "节点局部动作参数无效。";
+                return false;
+            }
+            var key = new NodeActionRegistrationKey(ESGraphDomainKey.Parse(context.DomainId),
+                ESGraphNodeTypeKey.Parse(context.NodeTypeId), action);
+            if (!NodeActionHandlers.TryGetValue(key, out IESGraphNodeCardActionHandler handler))
+            {
+                unavailableReason = "当前节点没有注册该局部动作：" + action.StableId;
+                return false;
+            }
+            try
+            {
+                return handler.CanExecute(context, action, out unavailableReason);
+            }
+            catch (Exception exception)
+            {
+                unavailableReason = "节点局部动作能力检查失败：" + exception.Message;
+                Debug.LogError(unavailableReason + "\n" + exception);
+                return false;
+            }
+        }
+
+        public static bool TryExecuteNodeCardAction(ESGraphNodeCardActionContext context,
+            ESGraphNodeCardActionKey action, out string error)
+        {
+            if (!CanExecuteNodeCardAction(context, action, out error))
+                return false;
+            var key = new NodeActionRegistrationKey(ESGraphDomainKey.Parse(context.DomainId),
+                ESGraphNodeTypeKey.Parse(context.NodeTypeId), action);
+            IESGraphNodeCardActionHandler handler = NodeActionHandlers[key];
+            try
+            {
+                handler.Execute(context, action);
+                error = string.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = "节点局部动作执行失败：" + exception.Message;
+                Debug.LogError(error + "\n" + exception);
+                return false;
+            }
         }
 
         public static bool TryMigrateNode(ESGraphAsset asset, string nodeId, out string error)
@@ -804,6 +1208,117 @@ namespace ES.EditorInternal
             }
         }
 
+        private static void DiscoverNodeCardProviders()
+        {
+            foreach (Type type in TypeCache.GetTypesDerivedFrom<IESGraphNodeCardProvider>())
+            {
+                if (type.IsAbstract || type.IsInterface || type.GetConstructor(Type.EmptyTypes) == null)
+                    continue;
+                try
+                {
+                    var provider = (IESGraphNodeCardProvider)Activator.CreateInstance(type);
+                    if (!provider.Domain.IsValid || !provider.NodeType.IsValid)
+                    {
+                        Debug.LogError("忽略非法图节点卡片提供器：" + type.FullName);
+                        continue;
+                    }
+                    string source = type.FullName ?? type.Name;
+                    NodeRegistrationKey key = new NodeRegistrationKey(provider.Domain, provider.NodeType);
+                    if (NodeCardProviders.TryGetValue(key, out IESGraphNodeCardProvider current))
+                    {
+                        string currentSource = NodeCardProviderSources[key];
+                        bool replace = provider.Priority > current.Priority
+                            || provider.Priority == current.Priority
+                            && string.CompareOrdinal(source, currentSource) < 0;
+                        if (!replace)
+                        {
+                            Debug.LogWarning("忽略重复图节点卡片提供器：" + provider.NodeType.StableId
+                                + "\n保留来源：" + currentSource + "\n忽略来源：" + source);
+                            continue;
+                        }
+                        Debug.LogWarning("图节点卡片提供器被更高优先级实现替换："
+                            + provider.NodeType.StableId + "\n旧来源：" + currentSource + "\n新来源：" + source);
+                    }
+                    NodeCardProviders[key] = provider;
+                    NodeCardProviderSources[key] = source;
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError("图节点卡片提供器注册失败：" + type.FullName + "\n" + exception);
+                }
+            }
+        }
+
+        private static void DiscoverNodeCardActionHandlers()
+        {
+            foreach (Type type in TypeCache.GetTypesDerivedFrom<IESGraphNodeCardActionHandler>())
+            {
+                if (type.IsAbstract || type.IsInterface || type.GetConstructor(Type.EmptyTypes) == null)
+                    continue;
+                try
+                {
+                    var handler = (IESGraphNodeCardActionHandler)Activator.CreateInstance(type);
+                    RegisterNodeCardActionHandler(handler, type.FullName ?? type.Name);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError("图节点局部动作处理器注册失败：" + type.FullName + "\n" + exception);
+                }
+            }
+        }
+
+        private static void RegisterNodeCardActionHandler(IESGraphNodeCardActionHandler handler, string source)
+        {
+            if (handler == null || !handler.Domain.IsValid || handler.NodeTypes == null
+                || handler.NodeTypes.Count == 0 || handler.Actions == null || handler.Actions.Count == 0)
+            {
+                Debug.LogError("忽略非法图节点局部动作处理器：" + (source ?? "<未知来源>"));
+                return;
+            }
+
+            var localKeys = new HashSet<NodeActionRegistrationKey>();
+            for (int nodeIndex = 0; nodeIndex < handler.NodeTypes.Count; nodeIndex++)
+            {
+                ESGraphNodeTypeKey nodeType = handler.NodeTypes[nodeIndex];
+                if (!nodeType.IsValid)
+                {
+                    Debug.LogError("图节点局部动作处理器包含非法节点类型：" + source);
+                    continue;
+                }
+                for (int actionIndex = 0; actionIndex < handler.Actions.Count; actionIndex++)
+                {
+                    ESGraphNodeCardActionKey action = handler.Actions[actionIndex];
+                    if (!action.IsValid)
+                    {
+                        Debug.LogError("图节点局部动作处理器包含非法动作键：" + source);
+                        continue;
+                    }
+                    var key = new NodeActionRegistrationKey(handler.Domain, nodeType, action);
+                    if (!localKeys.Add(key))
+                        continue;
+                    if (NodeActionHandlers.TryGetValue(key, out IESGraphNodeCardActionHandler current))
+                    {
+                        string currentSource = NodeActionHandlerSources[key];
+                        bool replace = handler.Priority > current.Priority
+                            || handler.Priority == current.Priority
+                            && string.CompareOrdinal(source, currentSource) < 0;
+                        if (!replace)
+                        {
+                            Debug.LogWarning("忽略重复图节点局部动作路由：" + handler.Domain.StableId
+                                + " / " + nodeType.StableId + " / " + action.StableId
+                                + "\n保留来源：" + currentSource + "\n忽略来源：" + source);
+                            continue;
+                        }
+                        Debug.LogWarning("图节点局部动作路由被更高优先级实现替换："
+                            + handler.Domain.StableId + " / " + nodeType.StableId + " / " + action.StableId
+                            + "\n旧来源：" + currentSource + "\n新来源：" + source);
+                    }
+                    NodeActionHandlers[key] = handler;
+                    NodeActionHandlerSources[key] = source ?? "<未知来源>";
+                }
+            }
+        }
+
         private static bool HasErrors(List<ESGraphValidationIssue> issues)
         {
             for (int i = 0; i < issues.Count; i++)
@@ -990,6 +1505,7 @@ namespace ES.EditorInternal
                 "智能助手编排/生成约束", "生成约束",
                 JsonUtility.ToJson(new ESAgentConstraintPayload()),
                 ESGraphNodeCategory.Constraint, ESGraphNodeTheme.Constraint,
+                ESAgentConstraintPayload.CurrentSchemaVersion,
                 Input("需求上下文", ESGraphPortCapacity.Multi, ESGraphPortValueKind.AgentContext),
                 Output("产物要求", "agent.requirement.out", ESGraphPortCapacity.Multi,
                     ESGraphPortValueKind.AgentRequirement)),
@@ -997,6 +1513,7 @@ namespace ES.EditorInternal
                 "智能助手编排/产物输出/AI 命令", "生成 AICommand 命令",
                 JsonUtility.ToJson(new ESAgentAICommandOutputPayload()),
                 ESGraphNodeCategory.Output, ESGraphNodeTheme.CommandOutput,
+                ESAgentAICommandOutputPayload.CurrentSchemaVersion,
                 Input("产物要求", ESGraphPortCapacity.Multi, ESGraphPortValueKind.AgentRequirement),
                 Output("候选产物", "agent.artifact.out", ESGraphPortCapacity.Single,
                     ESGraphPortValueKind.AgentArtifact)),
@@ -1004,6 +1521,7 @@ namespace ES.EditorInternal
                 "智能助手编排/产物输出/代理技能", "生成 Agent Skill 技能",
                 JsonUtility.ToJson(new ESAgentSkillOutputPayload()),
                 ESGraphNodeCategory.Output, ESGraphNodeTheme.SkillOutput,
+                ESAgentSkillOutputPayload.CurrentSchemaVersion,
                 Input("产物要求", ESGraphPortCapacity.Multi, ESGraphPortValueKind.AgentRequirement),
                 Output("候选产物", "agent.artifact.out", ESGraphPortCapacity.Single,
                     ESGraphPortValueKind.AgentArtifact)),

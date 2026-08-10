@@ -1263,6 +1263,7 @@ namespace ES
                     if (newSortMode != assetSortMode)
                     {
                         assetSortMode = newSortMode;
+                        ESEditorFeedbackSound.NotifyEnumChanged();
                         currentPage = 0;
                         SaveState();
                     }
@@ -1274,6 +1275,7 @@ namespace ES
                         if (newClassFilter != animationClassFilter)
                         {
                             animationClassFilter = newClassFilter;
+                            ESEditorFeedbackSound.NotifyEnumChanged();
                             currentPage = 0;
                             SaveState();
                         }

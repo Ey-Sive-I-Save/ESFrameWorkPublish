@@ -16,6 +16,7 @@ namespace ES
         /// </summary>
         public static ESEditorLongTask Bake(Action<ESEditorLongTask> onFinished = null)
         {
+            ESAssetPipelineIO.RefreshGlobalExcludedFolders();
             var libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>()
                 .Where(item => item != null && item.ContainsBuild)
                 .OrderBy(item => item.LibFolderName, StringComparer.Ordinal)
@@ -30,6 +31,7 @@ namespace ES
         internal static ESEditorLongTask BakeForCatalogRecovery(
             string transactionId, Action<ESEditorLongTask> onFinished = null)
         {
+            ESAssetPipelineIO.RefreshGlobalExcludedFolders();
             if (string.IsNullOrWhiteSpace(transactionId))
                 throw new ArgumentException("Catalog 恢复事务 ID 不能为空。", nameof(transactionId));
 
@@ -259,6 +261,11 @@ namespace ES
                 foreach (var page in book.pages.Where(item => item != null && item.OB != null))
                 {
                     string path = AssetDatabase.GetAssetPath(page.OB);
+                    if (ESAssetPipelineIO.IsExcludedFolderPath(path))
+                    {
+                        AddFolderExclusion(catalog, path, $"已排除全局排除文件夹内容：{library.Name}/{page.Name} ({path})");
+                        continue;
+                    }
                     if (AssetDatabase.IsValidFolder(path))
                     {
                         AddFolderAssets(catalog, library, page, path);
@@ -346,6 +353,11 @@ namespace ES
         {
             if (string.IsNullOrWhiteSpace(assetPath) || nodes.ContainsKey(assetPath))
                 return;
+            if (ESAssetPipelineIO.IsExcludedFolderPath(assetPath))
+            {
+                graph.errors.Add("资产位于全局排除目录，不能作为业务引用依赖：" + assetPath);
+                return;
+            }
             if (!visiting.Add(assetPath))
             {
                 graph.errors.Add("资产引用存在循环：" + assetPath);
@@ -356,7 +368,8 @@ namespace ES
             {
                 UnityEngine.Object asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
                 ESPipelineAssetIdentity identity = ESAssetPipelineIO.GetMainIdentity(assetPath);
-                bool editorOnly = ESAssetPipelineIO.IsEditorOnly(assetPath, asset);
+                bool editorOnly = ESAssetPipelineIO.IsEditorOnly(assetPath, asset)
+                    || ESAssetPipelineIO.IsExcludedFolderPath(assetPath);
                 string[] directDependencies = AssetDatabase.GetDependencies(assetPath, false)
                     .Where(path => !string.IsNullOrWhiteSpace(path) && !string.Equals(path, assetPath, StringComparison.Ordinal))
                     .Distinct(StringComparer.Ordinal)
@@ -425,6 +438,11 @@ namespace ES
                 if (AssetDatabase.IsValidFolder(assetPath)) continue;
                 UnityEngine.Object asset = AssetDatabase.LoadMainAssetAtPath(assetPath);
                 if (asset == null) continue;
+                if (ESAssetPipelineIO.IsExcludedFolderPath(assetPath))
+                {
+                    AddFolderExclusion(catalog, assetPath, $"文件夹 Page 中已排除全局排除目录资产：{assetPath}");
+                    continue;
+                }
                 if (ESAssetPipelineIO.IsEditorOnly(assetPath, asset))
                 {
                     AddEditorOnlyExclusion(catalog, assetPath, $"文件夹 Page 中已排除 EditorOnly 资产：{assetPath}");
@@ -500,6 +518,14 @@ namespace ES
             catalog.warnings.Add(warning);
         }
 
+        private static void AddFolderExclusion(ESAssetLibraryCatalog catalog, string path, string warning)
+        {
+            string normalized = (path ?? string.Empty).Replace('\\', '/');
+            if (!string.IsNullOrEmpty(normalized) && !catalog.excludedFolderPaths.Contains(normalized))
+                catalog.excludedFolderPaths.Add(normalized);
+            catalog.warnings.Add(warning);
+        }
+
         internal static void ValidateConsumerGameCoreAssetsForBuild(IReadOnlyCollection<ESAssetLibrary> libraries)
         {
             var errors = new List<string>();
@@ -539,7 +565,31 @@ namespace ES
             if (!expected.SequenceEqual(actual, StringComparer.Ordinal))
                 errors.Add("Consumer [" + consumer.Name + "] 的 GameCoreAssets 快照已过期；请执行‘同步并检查’，Bake 不会自动改写 Consumer。");
 
+            ValidateConsumerReferenceList(consumer, consumer.GameCoreAssets, errors, "GameCoreAssets");
+            ValidateConsumerReferenceList(consumer, consumer.ManualGameCoreAssets, errors, "ManualGameCoreAssets");
+            ValidateConsumerReferenceList(consumer, consumer.ResidentAssets, errors, "ResidentAssets");
+
             return errors.Distinct(StringComparer.Ordinal).ToList();
+        }
+
+        private static void ValidateConsumerReferenceList(
+            ESAssetLibraryConsumer consumer,
+            IEnumerable<ESAssetReferBase> references,
+            List<string> errors,
+            string fieldName)
+        {
+            if (consumer == null || references == null || errors == null)
+                return;
+            foreach (ESAssetReferBase refer in references)
+            {
+                if (refer == null || !refer.IsValid)
+                    continue;
+                string path = AssetDatabase.GUIDToAssetPath(refer.GUID);
+                if (ESAssetPipelineIO.IsExcludedFolderPath(path))
+                    errors.Add(
+                        "Consumer [" + consumer.Name + "] 的 " + fieldName
+                        + " 引用全局排除目录资产：" + path);
+            }
         }
 
         internal static List<string> BuildConsumerGameCoreSnapshot(

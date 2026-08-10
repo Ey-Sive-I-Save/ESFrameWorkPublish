@@ -8,7 +8,10 @@ using UnityEditor.Callbacks;
 using UnityEditor.Experimental.GraphView;
 using UnityEditor.UIElements;
 using UnityEngine;
+using Unity.Profiling;
 using UnityEngine.UIElements;
+
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("ES_Design.ConfigKey.Tests")]
 
 namespace ES.EditorInternal
 {
@@ -45,15 +48,24 @@ namespace ES.EditorInternal
         private const string DefaultGraphFolder = "Assets/ESNormalAssets/Data/Graphs";
         private const string OnboardingPreferencePrefix = "ES.StableGraphV2.OnboardingCompleted.";
         private const string EdgeFlowPreferenceKey = "ES.StableGraphV2.EdgeFlowEnabled";
-        // Coalesce a burst of graph edits into one disk write while still protecting normal editor work.
-        private const double AutoSaveDelaySeconds = 1.25d;
+        // Keep synchronous Asset Pipeline refreshes outside active editing bursts.
+        private const double AutoSaveDelaySeconds = 4d;
+        private const double AutoSaveMinimumIntervalSeconds = 12d;
+        private const double AutoSaveInteractionRetrySeconds = 0.5d;
         private const double AssetRevisionPollSeconds = 0.2d;
         private const double ProjectChangeDebounceSeconds = 0.15d;
         private const long SearchDelayMilliseconds = 250L;
         private const float InitialWindowMargin = 24f;
         private static readonly Vector2 MinimumWindowSize = new Vector2(760f, 500f);
         private static readonly Vector2 DefaultWindowSize = new Vector2(1180f, 720f);
+        private static readonly ProfilerMarker SaveAssetMarker =
+            new ProfilerMarker("ES.GraphV2.SaveAssetIfDirty");
+        private static readonly ProfilerMarker DependencyHashMarker =
+            new ProfilerMarker("ES.GraphV2.DependencyHash");
+        private static readonly ProfilerMarker RevisionSyncMarker =
+            new ProfilerMarker("ES.GraphV2.RevisionSync");
         private enum ToolbarLayoutMode : byte { Compact, Standard, Wide }
+        private ESGraphEditService editService;
         private ESStableGraphView graphView;
         private ESStableGraphInspector inspector;
         private VisualElement toolbarContainer;
@@ -79,6 +91,7 @@ namespace ES.EditorInternal
         private ToolbarLayoutMode toolbarLayoutMode = (ToolbarLayoutMode)byte.MaxValue;
         private ESGraphAsset autoSaveAsset;
         private double autoSaveDueTime;
+        private double lastAutoSaveTime = double.NegativeInfinity;
         private bool autoSavePending;
         private ESGraphAsset observedAsset;
         private int observedAssetDirtyCount = int.MinValue;
@@ -166,6 +179,7 @@ namespace ES.EditorInternal
 
         private void CreateGUI()
         {
+            DisposeGraphProjection();
             rootVisualElement.Clear();
             ESEditorPresentation.BindWindow(this);
             toolbarContainer = new VisualElement();
@@ -186,13 +200,13 @@ namespace ES.EditorInternal
                 () => ShowCreationTemplateMenu(createButton));
             openButton = CreateToolbarButton("打开已有", "搜索并打开项目中的已有图资产。",
                 () => OpenExistingAssetMenu(openButton));
-            addNodeButton = CreateToolbarButton("添加节点", "在画布中选择一个中文节点模板。",
+            addNodeButton = CreateToolbarButton("添加节点", "在画布中选择一个中文节点模板；快捷键：空格。",
                 () => graphView?.OpenNodeSearchAtCenter());
             duplicateButton = CreateToolbarButton("复制选中", "复制当前选中的节点及其内部连线。",
                 () => graphView?.DuplicateSelection());
             organizeMenu = CreateOrganizeMenu();
             frameAllButton = CreateToolbarButton("视图居中", "把当前图完整显示在画布中央。",
-                () => graphView?.FrameAll());
+                () => graphView?.SmoothFrameAll());
             validateButton = CreateToolbarButton("检查图", "检查节点、连线和业务规则，定位需要修正的地方。",
                 ValidateCurrentAsset);
             bakeButton = CreateToolbarButton("生成检查快照", "生成只读检查结果，不会运行图，也不会直接写正式文件。",
@@ -228,13 +242,17 @@ namespace ES.EditorInternal
             rootVisualElement.UnregisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
             rootVisualElement.RegisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
 
-            graphView = new ESStableGraphView(this, UpdateStatus);
+            editService = new ESGraphEditService(
+                asset => EditorUtility.SetDirty(asset),
+                () => RequestAutoSave(graphView?.Asset),
+                NotifyGraphModelChanged);
+            graphView = new ESStableGraphView(this, UpdateStatus, editService);
             graphView.SetEdgeFlowEnabled(EditorPrefs.GetBool(EdgeFlowPreferenceKey, true));
             graphView.SetOnboardingVisible(!HasCompletedOnboarding());
             graphView.style.flexGrow = 1f;
             graphView.style.backgroundColor = new Color(0.075f, 0.085f, 0.11f, 1f);
             inspector = new ESStableGraphInspector(this, () => graphView?.Rebuild(), UpdateStatus,
-                id => graphView?.FindAndFrame(id), () => RequestAutoSave(graphView?.Asset));
+                id => graphView?.FindAndFrame(id), () => RequestAutoSave(graphView?.Asset), editService);
             TwoPaneSplitView workspace = new TwoPaneSplitView(1, 360f, TwoPaneSplitViewOrientation.Horizontal);
             workspace.style.flexGrow = 1f;
             workspace.Add(graphView);
@@ -269,7 +287,7 @@ namespace ES.EditorInternal
             AppendOrganizeActions(menu.menu, "整理/");
             menu.menu.AppendAction("视图/聚焦选中    F", _ => graphView?.FrameSelectionOrAll(),
                 _ => graphView?.Asset != null ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
-            menu.menu.AppendAction("视图/显示整张图", _ => graphView?.FrameAll(),
+            menu.menu.AppendAction("视图/显示整张图", _ => graphView?.SmoothFrameAll(),
                 _ => graphView?.Asset != null ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
             menu.menu.AppendAction("显示/关系流向动效", _ => ToggleEdgeFlow(),
                 _ => graphView == null || !graphView.SupportsEdgeFlow
@@ -431,7 +449,18 @@ namespace ES.EditorInternal
             EditorApplication.projectChanged -= OnProjectChanged;
             Selection.selectionChanged -= OnGlobalSelectionChanged;
             FlushAutoSave();
+            DisposeGraphProjection();
+        }
+
+        private void DisposeGraphProjection()
+        {
+            searchSchedule?.Pause();
+            searchSchedule = null;
+            if (graphView != null && inspector != null)
+                graphView.SelectionChanged -= inspector.SetSelection;
             graphView?.Dispose();
+            graphView = null;
+            inspector = null;
         }
 
         private void OnUndoRedo()
@@ -519,11 +548,21 @@ namespace ES.EditorInternal
             Focus();
         }
 
+        internal void ExecuteNodeCardAction(string nodeId, ESGraphNodeCardActionKey action)
+        {
+            inspector?.ExecuteNodeCardAction(nodeId, action);
+        }
+
+        internal bool CanExecuteNodeCardAction(string nodeId, ESGraphNodeCardActionKey action)
+        {
+            return inspector?.CanExecuteNodeCardAction(nodeId, action) ?? false;
+        }
+
         private void FocusAssetAfterOpen()
         {
             if (graphView == null || graphView.Asset == null)
                 return;
-            graphView.schedule.Execute(() => graphView.FrameAll()).StartingIn(80);
+            graphView.schedule.Execute(() => graphView.SmoothFrameAll()).StartingIn(80);
         }
 
         private void ShowCreationTemplateMenu(VisualElement anchor)
@@ -885,8 +924,9 @@ namespace ES.EditorInternal
                 autoSavePending = false;
                 autoSaveAsset = null;
             }
-            EditorUtility.SetDirty(asset);
-            AssetDatabase.SaveAssetIfDirty(asset);
+            using (SaveAssetMarker.Auto())
+                AssetDatabase.SaveAssetIfDirty(asset);
+            lastAutoSaveTime = EditorApplication.timeSinceStartup;
             CaptureAssetRevision(asset, true);
             UpdateStatus("已保存：" + AssetDatabase.GetAssetPath(asset));
             ESEditorPresentation.PulseWindow(this, ESStatusKind.Modified);
@@ -973,7 +1013,10 @@ namespace ES.EditorInternal
             if (asset == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(asset)))
                 return;
             autoSaveAsset = asset;
-            autoSaveDueTime = EditorApplication.timeSinceStartup + AutoSaveDelaySeconds;
+            double now = EditorApplication.timeSinceStartup;
+            autoSaveDueTime = Math.Max(
+                now + AutoSaveDelaySeconds,
+                lastAutoSaveTime + AutoSaveMinimumIntervalSeconds);
             autoSavePending = true;
             CaptureAssetRevision(asset, false);
         }
@@ -995,7 +1038,12 @@ namespace ES.EditorInternal
                 SynchronizeCurrentAssetIfChanged(forceDependencyCheck);
             }
             if (autoSavePending && now >= autoSaveDueTime)
-                FlushAutoSave();
+            {
+                if (graphView != null && graphView.IsEditingInteractionActive)
+                    autoSaveDueTime = now + AutoSaveInteractionRetrySeconds;
+                else
+                    FlushAutoSave();
+            }
         }
 
         private void OnProjectChanged()
@@ -1008,6 +1056,7 @@ namespace ES.EditorInternal
 
         private void SynchronizeCurrentAssetIfChanged(bool includeDependencyHash)
         {
+            using var marker = RevisionSyncMarker.Auto();
             ESGraphAsset asset = graphView?.Asset;
             if (asset == null)
             {
@@ -1051,8 +1100,11 @@ namespace ES.EditorInternal
                 return;
             if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(asset)))
                 return;
-            EditorUtility.SetDirty(asset);
-            AssetDatabase.SaveAssetIfDirty(asset);
+            if (!EditorUtility.IsDirty(asset))
+                return;
+            using (SaveAssetMarker.Auto())
+                AssetDatabase.SaveAssetIfDirty(asset);
+            lastAutoSaveTime = EditorApplication.timeSinceStartup;
             CaptureAssetRevision(asset, true);
             if (asset == graphView?.Asset)
                 UpdateStatus("已自动保存：" + AssetDatabase.GetAssetPath(asset));
@@ -1072,7 +1124,10 @@ namespace ES.EditorInternal
         private static Hash128 GetAssetDependencyHash(ESGraphAsset asset)
         {
             string path = asset == null ? string.Empty : AssetDatabase.GetAssetPath(asset);
-            return string.IsNullOrEmpty(path) ? default : AssetDatabase.GetAssetDependencyHash(path);
+            if (string.IsNullOrEmpty(path))
+                return default;
+            using (DependencyHashMarker.Auto())
+                return AssetDatabase.GetAssetDependencyHash(path);
         }
 
         private void UpdateStatus(string message)
@@ -1127,6 +1182,16 @@ namespace ES.EditorInternal
         private const float LayoutHorizontalSpacing = 310f;
         private const float LayoutVerticalSpacing = 180f;
         private const float PositionGridSize = 32f;
+        private const float PointerDragThreshold = 4f;
+        private const float SnapGuideThreshold = 8f;
+        private const float SnapGuideLineWidth = 1.5f;
+        private const float NudgeStep = 1f;
+        private const float NudgeLargeStep = 8f;
+        private const float PasteStaggerStep = 24f;
+        private const float SnapSpatialCellSize = 256f;
+        private const int SnapGridListPoolCapacity = 256;
+        private const int SnapGridListCapacitySoftLimit = 32;
+        private const long NudgeFlushMilliseconds = 600L;
 
         private readonly struct EdgeEndpointKey : IEquatable<EdgeEndpointKey>
         {
@@ -1158,11 +1223,13 @@ namespace ES.EditorInternal
 
         private readonly ESStableGraphViewWindow ownerWindow;
         private readonly Action<string> report;
+        private readonly ESGraphEditService editService;
         private readonly ESStableGraphNodeSearchProvider searchProvider;
         private readonly ESStableGraphEdgeConnectorListener edgeConnectorListener;
         private readonly VisualElement emptyState;
         private readonly MiniMap miniMap;
         private readonly VisualElement edgeFlowOverlay;
+        private readonly VisualElement snapGuideOverlay;
         private readonly Dictionary<string, ESStableGraphNodeView> nodeViews = new Dictionary<string, ESStableGraphNodeView>(StringComparer.Ordinal);
         private readonly Dictionary<string, Edge> edgeViews = new Dictionary<string, Edge>(StringComparer.Ordinal);
         private readonly Dictionary<string, float> edgeFlowPhases = new Dictionary<string, float>(StringComparer.Ordinal);
@@ -1192,14 +1259,61 @@ namespace ES.EditorInternal
         private int lastSelectionHash;
         private int lastSelectionCount = -1;
         private bool rebuilding;
+        private bool adjustingSnapPosition;
         private bool moveUndoRecorded;
         private bool onboardingVisible;
         private bool edgeFlowGeometryAvailable;
         private bool edgeFlowEnabled;
+        private bool mouseButtonPressed;
+        private int pressedMouseButtons;
+        private bool pointerDragging;
+        private bool allowDragSnapping;
+        private Vector2 mouseDownPosition;
+        private Vector2 lastGraphPointerPosition;
+        private Vector2 lastScreenPointerPosition;
+        private bool hasLastPointerPosition;
+        private double lastPointerMoveTime;
+        private int clipboardPasteCount;
+        private bool nudgeBatchActive;
+        private readonly HashSet<string> nudgeBatchSelectionIds =
+            new HashSet<string>(StringComparer.Ordinal);
+        private IVisualElementScheduledItem nudgeFlushSchedule;
+        private string previewDragPortId;
+        private string activeDragPortId;
+        private readonly HashSet<string> compatibleHighlightPortIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> snapMovingNodeIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly List<ESStableGraphNodeView> snapMovingViews = new List<ESStableGraphNodeView>();
+        private readonly List<Rect> snapCandidateBounds = new List<Rect>();
+        private readonly Dictionary<int, List<string>> snapXGrid = new Dictionary<int, List<string>>();
+        private readonly Dictionary<int, List<string>> snapYGrid = new Dictionary<int, List<string>>();
+        private readonly Stack<List<string>> snapGridListPool = new Stack<List<string>>();
+        private readonly HashSet<string> snapCandidateIds = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> snapGridMovingIds = new HashSet<string>(StringComparer.Ordinal);
+        private bool snapGridDirty = true;
+        private readonly List<Rect> snapGuideLines = new List<Rect>(2);
         private Edge pendingEdgeReconnect;
         private Vector2 pendingEdgeReconnectStart;
         private IVisualElementScheduledItem edgeReconnectSchedule;
         private bool edgeReconnectTriggered;
+        private const double ViewAnimationDurationSeconds = 0.18d;
+        private const float WheelDeltaPerTick = 15f;
+        private const string ClipboardSchema = "ESStableGraph.Clipboard.V1";
+        private IVisualElementScheduledItem viewAnimationSchedule;
+        private Vector2 viewAnimationFromScale = Vector2.one;
+        private Vector2 viewAnimationFromTranslation = Vector2.zero;
+        private Vector2 viewAnimationTargetScale = Vector2.one;
+        private Vector2 viewAnimationTargetTranslation = Vector2.zero;
+        private double viewAnimationStartedAt;
+
+        [Serializable]
+        private sealed class ESGraphClipboardPackage
+        {
+            public string schema = ClipboardSchema;
+            public string sourceDomainId = string.Empty;
+            public int sourceSchemaVersion;
+            public List<ESGraphNodeRecord> nodes = new List<ESGraphNodeRecord>();
+            public List<ESGraphEdgeRecord> edges = new List<ESGraphEdgeRecord>();
+        }
 
         public ESGraphAsset Asset { get; private set; }
         public int SelectedNodeCount
@@ -1216,12 +1330,24 @@ namespace ES.EditorInternal
         public bool HasSelection => selection.Count > 0;
         public bool EdgeFlowEnabled => edgeFlowEnabled && edgeFlowGeometryAvailable;
         public bool SupportsEdgeFlow => edgeFlowGeometryAvailable;
+        internal bool IsEditingInteractionActive => pressedMouseButtons != 0
+            || pointerDragging
+            || moveUndoRecorded
+            || nudgeBatchActive
+            || !string.IsNullOrEmpty(activeDragPortId)
+            || pendingEdgeReconnect != null
+            || edgeReconnectTriggered;
         public event Action<IEnumerable<ISelectable>> SelectionChanged;
 
-        public ESStableGraphView(ESStableGraphViewWindow ownerWindow, Action<string> report)
+        public ESStableGraphView(ESStableGraphViewWindow ownerWindow, Action<string> report,
+            ESGraphEditService editService = null)
         {
             this.ownerWindow = ownerWindow;
             this.report = report;
+            this.editService = editService ?? new ESGraphEditService(
+                asset => EditorUtility.SetDirty(asset),
+                () => ownerWindow?.RequestAutoSave(Asset),
+                () => ownerWindow?.NotifyGraphModelChanged());
             // EdgeControl 的内部渲染点属于 Unity 私有实现，不能作为动画可用性的唯一门禁。
             // 如果当前 Unity 版本没有该字段，后续会退回到端口中心的稳定贝塞尔路径。
             edgeFlowGeometryAvailable = true;
@@ -1233,7 +1359,6 @@ namespace ES.EditorInternal
             focusable = true;
             tabIndex = 0;
             Insert(0, new GridBackground());
-            SetupZoom(ContentZoomer.DefaultMinScale, ContentZoomer.DefaultMaxScale);
             this.AddManipulator(new ContentDragger());
             this.AddManipulator(new SelectionDragger());
             this.AddManipulator(new RectangleSelector());
@@ -1250,6 +1375,19 @@ namespace ES.EditorInternal
             edgeFlowOverlay.style.overflow = Overflow.Hidden;
             edgeFlowOverlay.generateVisualContent += OnGenerateEdgeFlowVisualContent;
             Add(edgeFlowOverlay);
+            snapGuideOverlay = new VisualElement
+            {
+                name = "es-stable-graph-snap-guide-overlay",
+                pickingMode = PickingMode.Ignore
+            };
+            snapGuideOverlay.style.position = Position.Absolute;
+            snapGuideOverlay.style.left = 0f;
+            snapGuideOverlay.style.top = 0f;
+            snapGuideOverlay.style.right = 0f;
+            snapGuideOverlay.style.bottom = 0f;
+            snapGuideOverlay.style.overflow = Overflow.Hidden;
+            snapGuideOverlay.generateVisualContent += OnGenerateSnapGuideVisualContent;
+            Add(snapGuideOverlay);
             miniMap = new MiniMap { anchored = true };
             miniMap.SetPosition(new Rect(12f, 12f, 210f, 145f));
             Add(miniMap);
@@ -1288,7 +1426,9 @@ namespace ES.EditorInternal
                 "3. 从输出端口拖到输入端口建立关系\n" +
                 "4. 在右侧填写标题和业务内容\n\n" +
                 "高效操作：拖动空白区域可框选，Shift / Ctrl 可增减选择；\n" +
-                "Ctrl/Cmd+A 全选，Ctrl/Cmd+D 复制，F 聚焦，“整理”可对齐和等距。\n\n" +
+                "空格 快速创建节点；Ctrl/Cmd+A 全选，Ctrl/Cmd+D 复制，F 聚焦。\n" +
+                "拖线时兼容端口会高亮，拖动节点会自动出现对齐参考线。\n" +
+                "方向键微调节点，右键连线可在中间插入节点。\n\n" +
                 "图形编辑会自动保存；正式产物仍需检查和人工批准。\n" +
                 "以后可以点击顶部“使用引导”再次查看。");
             guideBody.style.whiteSpace = WhiteSpace.Normal;
@@ -1303,7 +1443,7 @@ namespace ES.EditorInternal
                 contentViewContainer.WorldToLocal(context.screenMousePosition - ownerWindow.position.position));
             serializeGraphElements = SerializeSelection;
             unserializeAndPaste = PasteSelection;
-            canPasteSerializedData = data => Asset != null && string.Equals(data, "ESStableGraph.Selection", StringComparison.Ordinal);
+            canPasteSerializedData = CanPasteSerializedData;
             RegisterCallback<MouseUpEvent>(_ =>
             {
                 moveUndoRecorded = false;
@@ -1314,6 +1454,9 @@ namespace ES.EditorInternal
             RegisterCallback<MouseUpEvent>(OnGraphMouseUp, TrickleDown.TrickleDown);
             RegisterCallback<KeyUpEvent>(_ => NotifySelectionChanged());
             RegisterCallback<KeyDownEvent>(OnGraphKeyDown);
+            RegisterCallback<WheelEvent>(OnGraphWheelZoom, TrickleDown.TrickleDown);
+            RegisterCallback<MouseCaptureOutEvent>(OnGraphMouseCaptureOut, TrickleDown.TrickleDown);
+            RegisterCallback<FocusOutEvent>(OnGraphFocusOut);
             RegisterCallback<GeometryChangedEvent>(OnGraphGeometryChanged);
             edgeAnimationSchedule = edgeFlowOverlay.schedule.Execute(OnEdgeAnimationTick)
                 .Every(EdgeAnimationIntervalMilliseconds);
@@ -1329,13 +1472,23 @@ namespace ES.EditorInternal
             SelectionChanged = null;
             edgeAnimationSchedule?.Pause();
             edgeAnimationSchedule = null;
+            CancelViewAnimation();
             CancelEdgeReconnect();
+            CancelNudgeBatch();
+            ClearSnapGrids();
+            ClearSnapGridPool();
             if (edgeFlowOverlay != null)
                 edgeFlowOverlay.generateVisualContent -= OnGenerateEdgeFlowVisualContent;
+            if (snapGuideOverlay != null)
+                snapGuideOverlay.generateVisualContent -= OnGenerateSnapGuideVisualContent;
+            ClearSnapGuides();
             UnregisterCallback<MouseDownEvent>(OnGraphMouseDown, TrickleDown.TrickleDown);
             UnregisterCallback<MouseMoveEvent>(OnGraphMouseMove, TrickleDown.TrickleDown);
             UnregisterCallback<MouseUpEvent>(OnGraphMouseUp, TrickleDown.TrickleDown);
             UnregisterCallback<KeyDownEvent>(OnGraphKeyDown);
+            UnregisterCallback<WheelEvent>(OnGraphWheelZoom, TrickleDown.TrickleDown);
+            UnregisterCallback<MouseCaptureOutEvent>(OnGraphMouseCaptureOut, TrickleDown.TrickleDown);
+            UnregisterCallback<FocusOutEvent>(OnGraphFocusOut);
             UnregisterCallback<GeometryChangedEvent>(OnGraphGeometryChanged);
             if (searchProvider != null)
                 UnityEngine.Object.DestroyImmediate(searchProvider);
@@ -1365,6 +1518,7 @@ namespace ES.EditorInternal
 
         public void Rebuild()
         {
+            FlushNudgeBatchBeforeStructuralChange();
             rebuildSelectedNodeIds.Clear();
             rebuildSelectedEdgeIds.Clear();
             for (int i = 0; i < selection.Count; i++)
@@ -1446,7 +1600,7 @@ namespace ES.EditorInternal
                         ESGraphAuthoringRegistry.TryGetNodeDefinition(Asset.DomainKey, pair.Value.TypeKey,
                             out IESGraphNodeDefinition definition);
                         nodeView = new ESStableGraphNodeView(Asset.DomainKey, pair.Value, definition,
-                            edgeConnectorListener);
+                            edgeConnectorListener, OpenNodeDetails);
                         nodeViews[pair.Key] = nodeView;
                         AddElement(nodeView);
                     }
@@ -1457,6 +1611,7 @@ namespace ES.EditorInternal
                 }
 
                 BuildGraphIndexes();
+                RefreshNodeCards();
                 foreach (KeyValuePair<string, ESGraphEdgeRecord> pair in rebuildDesiredEdges)
                 {
                     if (edgeViews.ContainsKey(pair.Key)
@@ -1501,6 +1656,7 @@ namespace ES.EditorInternal
             rebuilding = true;
             try
             {
+                EndPointerInteraction();
                 graphElementRemovalBuffer.Clear();
                 foreach (GraphElement element in graphElements)
                     if (element is ESStableGraphNodeView || element is Edge)
@@ -1509,6 +1665,9 @@ namespace ES.EditorInternal
                     RemoveGraphElementSafe(graphElementRemovalBuffer[i]);
                 graphElementRemovalBuffer.Clear();
                 ClearSelection();
+                previewDragPortId = null;
+                ClearPortCompatibilityHighlight();
+                ClearSnapGrids();
                 nodeViews.Clear();
                 edgeViews.Clear();
                 edgeFlowPhases.Clear();
@@ -1586,6 +1745,125 @@ namespace ES.EditorInternal
                     incomingNodes[to] = incoming = new List<string>();
                 outgoing.Add(to);
                 incoming.Add(from);
+            }
+        }
+
+        private void RefreshNodeCards()
+        {
+            if (Asset == null)
+                return;
+
+            for (int i = 0; i < Asset.Nodes.Count; i++)
+            {
+                ESGraphNodeRecord node = Asset.Nodes[i];
+                if (node == null || string.IsNullOrEmpty(node.nodeId)
+                    || !nodeViews.TryGetValue(node.nodeId, out ESStableGraphNodeView nodeView))
+                    continue;
+
+                incomingNodes.TryGetValue(node.nodeId, out List<string> incoming);
+                outgoingNodes.TryGetValue(node.nodeId, out List<string> outgoing);
+                ulong signature = ComputeNodeCardContextSignature(node, incoming, outgoing);
+                if (!nodeView.NeedsNodeCardRefresh(signature))
+                    continue;
+
+                int portCount = node.ports?.Count ?? 0;
+                var ports = new ESGraphNodeCardPortSummary[portCount];
+                for (int p = 0; p < portCount; p++)
+                {
+                    ESGraphPortRecord port = node.ports[p];
+                    connectionCounts.TryGetValue(port?.portId ?? string.Empty, out int count);
+                    ports[p] = new ESGraphNodeCardPortSummary(port, count);
+                }
+
+                ESGraphAuthoringRegistry.TryGetNodeDefinition(Asset.DomainKey, node.TypeKey,
+                    out IESGraphNodeDefinition definition);
+                bool futureGraphSchema = Asset.schemaVersion > ESGraphAsset.CurrentSchemaVersion;
+                bool unsupportedGraphSchema = Asset.schemaVersion != ESGraphAsset.CurrentSchemaVersion;
+                bool futureNodeSchema = definition != null && node.version > definition.CurrentVersion;
+                string nodeId = node.nodeId;
+                ESStableGraphNodeView currentView = nodeView;
+                var context = new ESGraphNodeCardContext(
+                    Asset.GraphId,
+                    Asset.schemaVersion,
+                    Asset.DomainId,
+                    node,
+                    unsupportedGraphSchema || futureNodeSchema,
+                    futureGraphSchema || futureNodeSchema,
+                    ports,
+                    incoming?.ToArray() ?? Array.Empty<string>(),
+                    outgoing?.ToArray() ?? Array.Empty<string>(),
+                    payload => CommitNodeCardPayload(nodeId, payload),
+                    () => OpenNodeDetails(currentView),
+                    FocusNodeFromCard,
+                    SelectNodeFromCard,
+                    report,
+                    value => EditorGUIUtility.systemCopyBuffer = value,
+                    () => currentView.panel != null && currentView.selected,
+                    action => ownerWindow?.CanExecuteNodeCardAction(nodeId, action) ?? false,
+                    action => ownerWindow?.ExecuteNodeCardAction(nodeId, action));
+                nodeView.SetKeyFields(context, signature);
+            }
+        }
+
+        private ulong ComputeNodeCardContextSignature(ESGraphNodeRecord node, List<string> incoming,
+            List<string> outgoing)
+        {
+            unchecked
+            {
+                ulong hash = 1469598103934665603UL;
+                AppendIntToHash(ref hash, Asset.schemaVersion);
+                AppendStringToHash(ref hash, Asset.GraphId);
+                AppendStringToHash(ref hash, node?.nodeId);
+                AppendIntToHash(ref hash, node?.version ?? 0);
+                if (node?.ports != null)
+                {
+                    for (int i = 0; i < node.ports.Count; i++)
+                    {
+                        ESGraphPortRecord port = node.ports[i];
+                        AppendStringToHash(ref hash, port?.portId);
+                        connectionCounts.TryGetValue(port?.portId ?? string.Empty, out int count);
+                        AppendIntToHash(ref hash, count);
+                    }
+                }
+                AppendNodeIdsToHash(ref hash, incoming);
+                AppendNodeIdsToHash(ref hash, outgoing);
+                return hash;
+            }
+        }
+
+        private static void AppendNodeIdsToHash(ref ulong hash, List<string> nodeIds)
+        {
+            unchecked
+            {
+                AppendIntToHash(ref hash, nodeIds?.Count ?? 0);
+                if (nodeIds == null)
+                    return;
+                for (int i = 0; i < nodeIds.Count; i++)
+                    AppendStringToHash(ref hash, nodeIds[i]);
+            }
+        }
+
+        private static void AppendIntToHash(ref ulong hash, int value)
+        {
+            unchecked
+            {
+                hash ^= (uint)value;
+                hash *= 1099511628211UL;
+            }
+        }
+
+        private static void AppendStringToHash(ref ulong hash, string value)
+        {
+            unchecked
+            {
+                AppendIntToHash(ref hash, value?.Length ?? -1);
+                if (value == null)
+                    return;
+                for (int i = 0; i < value.Length; i++)
+                {
+                    hash ^= value[i];
+                    hash *= 1099511628211UL;
+                }
             }
         }
 
@@ -1997,6 +2275,8 @@ namespace ES.EditorInternal
                 evt.menu.AppendAction("关系/断开并续接...",
                     _ => OpenCompatibleNodeSearch(contextEdge.output,
                         ownerWindow.position.position + contextEdge.worldBound.center, contextEdgeId));
+                evt.menu.AppendAction("关系/在中间插入节点...",
+                    _ => OpenInsertNodeSearch(contextEdge, screenPosition, position));
                 evt.menu.AppendSeparator();
             }
             evt.menu.AppendAction("创建节点...", _ => OpenNodeSearch(screenPosition, position));
@@ -2030,7 +2310,7 @@ namespace ES.EditorInternal
             evt.menu.AppendAction("整理/选中节点吸附网格", _ => SnapSelectionToGrid(),
                 _ => GetSelectionStatus(1));
             evt.menu.AppendAction("视图/聚焦选中    F", _ => FrameSelectionOrAll());
-            evt.menu.AppendAction("视图/显示整张图", _ => FrameAll());
+            evt.menu.AppendAction("视图/显示整张图", _ => SmoothFrameAll());
             evt.menu.AppendSeparator();
             evt.menu.AppendAction("检查当前图", _ => ReportValidation());
         }
@@ -2040,8 +2320,25 @@ namespace ES.EditorInternal
             if (Asset == null)
                 return;
             Vector2 panelCenter = layout.center;
-            Vector2 graphPosition = contentViewContainer.WorldToLocal(panelCenter);
+            Vector2 graphPosition = VisualElementExtensions.ChangeCoordinatesTo(
+                this, contentViewContainer, panelCenter);
             OpenNodeSearch(ownerWindow.position.position + panelCenter, graphPosition);
+        }
+
+        private void OpenNodeSearchAtPointerOrCenter()
+        {
+            if (Asset == null)
+                return;
+            if (hasLastPointerPosition
+                && EditorApplication.timeSinceStartup - lastPointerMoveTime < 5d
+                && IsUsableWorldBound(contentViewContainer?.layout ?? default))
+            {
+                Vector2 graphPosition = VisualElementExtensions.ChangeCoordinatesTo(
+                    this, contentViewContainer, lastGraphPointerPosition);
+                OpenNodeSearch(lastScreenPointerPosition, graphPosition);
+                return;
+            }
+            OpenNodeSearchAtCenter();
         }
 
         private void OpenNodeSearch(Vector2 screenPosition, Vector2 graphPosition)
@@ -2115,26 +2412,121 @@ namespace ES.EditorInternal
             SearchWindow.Open(new SearchWindowContext(screenPosition), searchProvider);
         }
 
+        internal void OpenInsertNodeSearch(Edge edge, Vector2 screenPosition, Vector2 graphPosition)
+        {
+            if (Asset == null
+                || edge?.output == null
+                || edge.input == null
+                || !(edge.output.userData is string outputPortId)
+                || !(edge.input.userData is string inputPortId)
+                || !portRecords.TryGetValue(outputPortId, out ESGraphPortRecord outputRecord)
+                || !portRecords.TryGetValue(inputPortId, out ESGraphPortRecord inputRecord))
+                return;
+
+            IReadOnlyList<IESGraphNodeDefinition> definitions = ESGraphAuthoringRegistry.GetNodeDefinitions(Asset);
+            var choices = new List<ESStableGraphNodeCreationChoice>();
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                IESGraphNodeDefinition definition = definitions[i];
+                if (definition?.Ports == null)
+                    continue;
+                bool addedChoice = false;
+                for (int inputIndex = 0; inputIndex < definition.Ports.Count; inputIndex++)
+                {
+                    ESGraphPortDefinition input = definition.Ports[inputIndex];
+                    if (input == null || input.direction != ESGraphPortDirection.Input
+                        || !ArePortTypesCompatible(outputRecord.valueTypeId, input.valueTypeId))
+                        continue;
+                    for (int outputIndex = 0; outputIndex < definition.Ports.Count; outputIndex++)
+                    {
+                        ESGraphPortDefinition output = definition.Ports[outputIndex];
+                        if (output == null || output.direction != ESGraphPortDirection.Output
+                            || !ArePortTypesCompatible(output.valueTypeId, inputRecord.valueTypeId))
+                            continue;
+                        choices.Add(new ESStableGraphNodeCreationChoice(
+                            definition, input, inputIndex, output, outputIndex,
+                            edge.userData as string));
+                        addedChoice = true;
+                        break;
+                    }
+                    if (addedChoice)
+                        break;
+                }
+            }
+
+            if (choices.Count == 0)
+            {
+                report?.Invoke("没有找到可插入到这条关系中间的节点类型。");
+                return;
+            }
+
+            string profileName = ESGraphAuthoringRegistry.TryGetProfile(Asset.DomainKey,
+                out IESGraphAuthoringProfile profile) ? profile.DisplayName : Asset.DomainId;
+            string sourceName = ESGraphChinesePresentation.GetPortName(outputRecord.name)
+                + " → " + ESGraphChinesePresentation.GetPortName(inputRecord.name);
+            searchProvider.SetInsertionChoices(choices, profileName, "在「" + sourceName + "」中间插入");
+            searchProvider.SetGraphPosition(graphPosition);
+            SearchWindow.Open(new SearchWindowContext(screenPosition), searchProvider);
+        }
+
         internal void CreateNode(ESStableGraphNodeCreationChoice choice, Vector2 position)
         {
-            if (choice.AutoConnect)
+            if (choice.IsInsertion)
+                CreateInsertionNode(choice, position);
+            else if (choice.AutoConnect)
                 CreateNodeAndConnect(choice, position);
             else
                 CreateNode(choice.Definition, position);
+        }
+
+        internal void CreateInsertionNode(ESStableGraphNodeCreationChoice choice, Vector2 position)
+        {
+            IESGraphNodeDefinition definition = choice.Definition;
+            if (Asset == null
+                || !choice.IsInsertion
+                || definition == null
+                || choice.CompatiblePort == null
+                || choice.InsertOutputPort == null
+                || !definition.Domain.Equals(Asset.DomainKey))
+                return;
+
+            FlushNudgeBatchBeforeStructuralChange();
+            ESGraphEditResult result = editService.InsertNodeOnEdge(
+                Asset,
+                definition,
+                choice.CompatiblePortIndex,
+                choice.InsertOutputPortIndex,
+                choice.InsertEdgeId,
+                position);
+            if (!result.changed || result.createdNodeIds == null || result.createdNodeIds.Count == 0)
+            {
+                report?.Invoke("插入节点失败：" + result.error);
+                return;
+            }
+            Rebuild();
+            string createdNodeId = result.createdNodeIds[0];
+            if (nodeViews.TryGetValue(createdNodeId, out ESStableGraphNodeView view))
+            {
+                ClearSelection();
+                AddToSelection(view);
+                NotifySelectionChanged();
+            }
+            report?.Invoke("已在关系中间插入：" + definition.DisplayName);
         }
 
         private void CreateNode(IESGraphNodeDefinition definition, Vector2 position)
         {
             if (Asset == null || definition == null || !definition.Domain.Equals(Asset.DomainKey))
                 return;
-            Undo.RecordObject(Asset, "创建图节点");
-            ESGraphNodeRecord created = Asset.AddNode(definition.NodeType, definition.DisplayName, position,
-                definition.Ports);
-            Asset.UpdateNode(created.nodeId, definition.NodeType, definition.CurrentVersion, created.title,
-                definition.CreateDefaultPayload(), out _);
-            MarkAssetDirty();
+            FlushNudgeBatchBeforeStructuralChange();
+            ESGraphEditResult result = editService.CreateNode(Asset, definition, position);
+            if (!result.changed || result.createdNodeIds == null || result.createdNodeIds.Count == 0)
+            {
+                report?.Invoke("创建节点失败：" + result.error);
+                return;
+            }
             Rebuild();
-            if (nodeViews.TryGetValue(created.nodeId, out ESStableGraphNodeView view))
+            if (nodeViews.TryGetValue(result.createdNodeIds[0], out ESStableGraphNodeView view))
             {
                 ClearSelection();
                 AddToSelection(view);
@@ -2150,64 +2542,22 @@ namespace ES.EditorInternal
                 || !definition.Domain.Equals(Asset.DomainKey))
                 return;
 
-            Undo.IncrementCurrentGroup();
-            int undoGroup = Undo.GetCurrentGroup();
-            Undo.SetCurrentGroupName("创建并连接图节点");
-            Undo.RegisterCompleteObjectUndo(Asset, "创建并连接图节点");
-            try
+            FlushNudgeBatchBeforeStructuralChange();
+            ESGraphEditResult result = editService.CreateNodeAndConnect(Asset, choice, position);
+            if (!result.changed || result.createdNodeIds == null || result.createdNodeIds.Count == 0)
             {
-                ESGraphNodeRecord created = Asset.AddNode(definition.NodeType, definition.DisplayName, position,
-                    definition.Ports);
-                Asset.UpdateNode(created.nodeId, definition.NodeType, definition.CurrentVersion, created.title,
-                    definition.CreateDefaultPayload(), out _);
-                ESGraphPortRecord targetPort = choice.CompatiblePortIndex >= 0
-                    && created.ports != null && choice.CompatiblePortIndex < created.ports.Count
-                    ? created.ports[choice.CompatiblePortIndex] : null;
-                if (targetPort == null || targetPort.direction != choice.CompatiblePort.direction)
-                    targetPort = created.ports?.FirstOrDefault(port => port != null
-                        && string.Equals(port.stableKey, choice.CompatiblePort.stableKey, StringComparison.Ordinal)
-                        && port.direction == choice.CompatiblePort.direction);
-                if (targetPort == null)
-                    throw new InvalidOperationException("新节点没有找到预期的兼容端口。");
-                if (!Asset.TryFindPort(choice.SourcePortId, out _, out ESGraphPortRecord sourcePort))
-                    throw new InvalidOperationException("起始端口已不存在，请重新拖线。");
-
-                if (!string.IsNullOrEmpty(choice.ReplaceEdgeId))
-                {
-                    ESGraphEdgeRecord replacement = Asset.FindEdge(choice.ReplaceEdgeId);
-                    if (replacement == null
-                        || (!string.Equals(replacement.outputPortId, choice.SourcePortId, StringComparison.Ordinal)
-                            && !string.Equals(replacement.inputPortId, choice.SourcePortId, StringComparison.Ordinal)))
-                        throw new InvalidOperationException("原关系已不存在，请重新选择续接目标。");
-                    if (!Asset.RemoveEdge(choice.ReplaceEdgeId))
-                        throw new InvalidOperationException("原关系删除失败，请重试。");
-                }
-
-                string outputPortId = sourcePort.direction == ESGraphPortDirection.Output
-                    ? sourcePort.portId : targetPort.portId;
-                string inputPortId = sourcePort.direction == ESGraphPortDirection.Input
-                    ? sourcePort.portId : targetPort.portId;
-                if (!Asset.TryAddEdge(outputPortId, inputPortId, out _, out string error))
-                    throw new InvalidOperationException(error);
-
-                Undo.CollapseUndoOperations(undoGroup);
-                MarkAssetDirty();
-                Rebuild();
-                if (nodeViews.TryGetValue(created.nodeId, out ESStableGraphNodeView view))
-                {
-                    ClearSelection();
-                    AddToSelection(view);
-                    NotifySelectionChanged();
-                }
-                report?.Invoke("已创建并连接：" + definition.DisplayName + " · "
-                    + ESGraphChinesePresentation.GetPortName(choice.CompatiblePort.name));
+                report?.Invoke("创建并连接失败：" + result.error);
+                return;
             }
-            catch (Exception exception)
+            Rebuild();
+            if (nodeViews.TryGetValue(result.createdNodeIds[0], out ESStableGraphNodeView view))
             {
-                Undo.RevertAllDownToGroup(undoGroup);
-                Rebuild();
-                report?.Invoke("创建并连接失败：" + exception.Message);
+                ClearSelection();
+                AddToSelection(view);
+                NotifySelectionChanged();
             }
+            report?.Invoke("已创建并连接：" + definition.DisplayName + " · "
+                + ESGraphChinesePresentation.GetPortName(choice.CompatiblePort.name));
         }
 
         internal void CommitDraggedEdge(Edge edge)
@@ -2217,21 +2567,21 @@ namespace ES.EditorInternal
                 || !(edge.input.userData is string inputPortId))
                 return;
 
-            Undo.RecordObject(Asset, "创建图连线");
-            if (!Asset.TryAddEdge(outputPortId, inputPortId, out ESGraphEdgeRecord record, out string error))
+            FlushNudgeBatchBeforeStructuralChange();
+            ESGraphEditResult result = editService.AddEdge(Asset, outputPortId, inputPortId);
+            if (!result.changed || string.IsNullOrEmpty(result.createdEdgeId))
             {
-                report?.Invoke(string.IsNullOrEmpty(error) ? "连线被模型拒绝" : error);
+                report?.Invoke(string.IsNullOrEmpty(result.error) ? "连线被模型拒绝" : result.error);
                 return;
             }
 
-            edge.userData = record.edgeId;
-            edgeViews[record.edgeId] = edge;
+            edge.userData = result.createdEdgeId;
+            edgeViews[result.createdEdgeId] = edge;
             ConfigureEdgeReconnectGesture(edge);
             RegisterEdgeFlowGeometry(edge);
             AddElement(edge);
             edge.output.Connect(edge);
             edge.input.Connect(edge);
-            MarkAssetDirty();
             BuildGraphIndexes();
             RefreshPortRelationVisuals();
             edgeFlowOverlay?.MarkDirtyRepaint();
@@ -2242,16 +2592,60 @@ namespace ES.EditorInternal
 
         private void OnGraphKeyDown(KeyDownEvent evt)
         {
-            if (Asset == null || evt.altKey || IsTextEditingTarget(evt.target))
+            if (Asset == null || evt.altKey || IsInteractiveControlTarget(evt.target))
                 return;
             bool actionKey = evt.ctrlKey || evt.commandKey;
+            bool handled = false;
             if (actionKey && evt.keyCode == KeyCode.A)
+            {
                 SelectAllNodes();
+                handled = true;
+            }
             else if (actionKey && evt.keyCode == KeyCode.D)
+            {
                 DuplicateSelection();
+                handled = true;
+            }
             else if (!actionKey && evt.keyCode == KeyCode.F)
+            {
                 FrameSelectionOrAll();
+                handled = true;
+            }
+            else if (!actionKey && (evt.keyCode == KeyCode.LeftArrow
+                || evt.keyCode == KeyCode.RightArrow
+                || evt.keyCode == KeyCode.UpArrow
+                || evt.keyCode == KeyCode.DownArrow))
+            {
+                if (mouseButtonPressed || pointerDragging || moveUndoRecorded)
+                    return;
+                float step = evt.shiftKey ? NudgeLargeStep : NudgeStep;
+                Vector2 delta = Vector2.zero;
+                if (evt.keyCode == KeyCode.LeftArrow) delta.x = -step;
+                else if (evt.keyCode == KeyCode.RightArrow) delta.x = step;
+                else if (evt.keyCode == KeyCode.UpArrow) delta.y = -step;
+                else delta.y = step;
+                if (!NudgeSelection(delta))
+                    return;
+                handled = true;
+            }
+            else if (!actionKey && !evt.shiftKey && evt.keyCode == KeyCode.Space)
+            {
+                if (mouseButtonPressed || pointerDragging || moveUndoRecorded
+                    || pendingEdgeReconnect != null || edgeReconnectTriggered)
+                    return;
+                OpenNodeSearchAtPointerOrCenter();
+                handled = true;
+            }
+            else if (!actionKey && evt.keyCode == KeyCode.Escape
+                && (pendingEdgeReconnect != null || edgeReconnectTriggered))
+            {
+                CancelEdgeReconnect();
+                EndPointerInteraction();
+                handled = true;
+            }
             else
+                return;
+            if (!handled)
                 return;
             evt.PreventDefault();
             evt.StopImmediatePropagation();
@@ -2259,12 +2653,42 @@ namespace ES.EditorInternal
 
         private void OnGraphMouseDown(MouseDownEvent evt)
         {
-            if (evt.button == 0 && !IsTextEditingTarget(evt.target))
-                Focus();
+            CancelViewAnimation();
+            if (evt.button < 0 || evt.button > 31)
+                return;
+            if (IsInteractiveControlTarget(evt.target))
+                return;
+            pressedMouseButtons |= 1 << evt.button;
+            mouseButtonPressed = true;
+            mouseDownPosition = evt.mousePosition;
+            if (evt.button != 0)
+                return;
+            pointerDragging = false;
+            allowDragSnapping = true;
+            snapGridDirty = true;
+            lastGraphPointerPosition = evt.localMousePosition;
+            lastScreenPointerPosition = ownerWindow == null
+                ? evt.mousePosition
+                : ownerWindow.position.position + evt.mousePosition;
+            hasLastPointerPosition = true;
+            lastPointerMoveTime = EditorApplication.timeSinceStartup;
+            if (TryGetAncestorPort(evt.target, out Port port) && port.userData is string portId)
+                previewDragPortId = portId;
+            Focus();
         }
 
         private void OnGraphMouseMove(MouseMoveEvent evt)
         {
+            lastGraphPointerPosition = evt.localMousePosition;
+            lastScreenPointerPosition = ownerWindow == null
+                ? evt.mousePosition
+                : ownerWindow.position.position + evt.mousePosition;
+            hasLastPointerPosition = true;
+            lastPointerMoveTime = EditorApplication.timeSinceStartup;
+            if (mouseButtonPressed
+                && (evt.mousePosition - mouseDownPosition).sqrMagnitude
+                    > PointerDragThreshold * PointerDragThreshold)
+                pointerDragging = true;
             if (pendingEdgeReconnect == null)
                 return;
             if ((evt.mousePosition - pendingEdgeReconnectStart).sqrMagnitude
@@ -2274,9 +2698,44 @@ namespace ES.EditorInternal
 
         private void OnGraphMouseUp(MouseUpEvent evt)
         {
-            if (evt.button == 0 && !edgeReconnectTriggered)
+            if (evt.button >= 0 && evt.button < 32)
+            {
+                pressedMouseButtons &= ~(1 << evt.button);
+                if (pressedMouseButtons == 0)
+                    EndPointerInteraction();
+            }
+            if (evt.button == 0)
                 CancelEdgeReconnect();
             edgeReconnectTriggered = false;
+        }
+
+        private void OnGraphMouseCaptureOut(MouseCaptureOutEvent evt)
+        {
+            EndPointerInteraction();
+        }
+
+        private void OnGraphFocusOut(FocusOutEvent evt)
+        {
+            if (evt.relatedTarget is VisualElement next
+                && (next == this || next.GetFirstAncestorOfType<ESStableGraphView>() == this))
+                return;
+            EndPointerInteraction();
+        }
+
+        private bool TryGetAncestorPort(IEventHandler target, out Port port)
+        {
+            if (target is Port directPort)
+            {
+                port = directPort;
+                return true;
+            }
+            if (target is VisualElement element)
+            {
+                port = element.GetFirstAncestorOfType<Port>();
+                return port != null;
+            }
+            port = null;
+            return false;
         }
 
         private void ConfigureEdgeReconnectGesture(Edge edge)
@@ -2331,11 +2790,21 @@ namespace ES.EditorInternal
             edgeReconnectTriggered = false;
         }
 
-        private static bool IsTextEditingTarget(IEventHandler target)
+        private static bool IsInteractiveControlTarget(IEventHandler target)
         {
-            if (target is TextField)
-                return true;
-            return target is VisualElement element && element.GetFirstAncestorOfType<TextField>() != null;
+            VisualElement element = target as VisualElement;
+            while (element != null)
+            {
+                if (element is TextField
+                    || element is Toggle
+                    || element is PopupField<string>
+                    || element is Button)
+                    return true;
+                if (element is ESStableGraphView)
+                    break;
+                element = element.parent;
+            }
+            return false;
         }
 
         public void SelectAllNodes()
@@ -2393,9 +2862,197 @@ namespace ES.EditorInternal
         public void FrameSelectionOrAll()
         {
             if (selection.OfType<GraphElement>().Any())
-                FrameSelection();
+                SmoothFrameSelection();
             else
-                FrameAll();
+                SmoothFrameAll();
+        }
+
+        public void SmoothFrameAll()
+        {
+            if (Asset == null || nodeViews == null || nodeViews.Count == 0)
+                return;
+
+            Rect bounds = Rect.zero;
+            bool hasBounds = false;
+            foreach (KeyValuePair<string, ESStableGraphNodeView> pair in nodeViews)
+            {
+                ESStableGraphNodeView view = pair.Value;
+                if (view == null)
+                    continue;
+                Rect rect = view.GetPosition();
+                if (!IsUsableWorldBound(rect))
+                    continue;
+                bounds = hasBounds ? UnionRect(bounds, rect) : rect;
+                hasBounds = true;
+            }
+
+            if (hasBounds)
+                SmoothFrameRect(bounds, 80f);
+        }
+
+        public void SmoothFrameSelection()
+        {
+            List<ESStableGraphNodeView> selectedViews = GetSelectedNodeViews();
+            Rect bounds = Rect.zero;
+            bool hasBounds = false;
+            for (int i = 0; i < selectedViews.Count; i++)
+            {
+                Rect rect = selectedViews[i].GetPosition();
+                if (!IsUsableWorldBound(rect))
+                    continue;
+                bounds = hasBounds ? UnionRect(bounds, rect) : rect;
+                hasBounds = true;
+            }
+
+            if (!hasBounds)
+            {
+                for (int i = 0; i < selection.Count; i++)
+                {
+                    if (!(selection[i] is Edge edge))
+                        continue;
+                    AddNodeRect(edge.output?.node as ESStableGraphNodeView, ref bounds, ref hasBounds);
+                    AddNodeRect(edge.input?.node as ESStableGraphNodeView, ref bounds, ref hasBounds);
+                }
+            }
+
+            if (hasBounds)
+                SmoothFrameRect(bounds, 72f);
+            else
+                SmoothFrameAll();
+        }
+
+        private void AddNodeRect(ESStableGraphNodeView node, ref Rect bounds, ref bool hasBounds)
+        {
+            if (node == null)
+                return;
+            Rect rect = node.GetPosition();
+            if (!IsUsableWorldBound(rect))
+                return;
+            bounds = hasBounds ? UnionRect(bounds, rect) : rect;
+            hasBounds = true;
+        }
+
+        public void SmoothFrameRect(Rect bounds, float padding = 80f)
+        {
+            if (!IsUsableWorldBound(bounds) || contentViewContainer == null)
+                return;
+
+            VisualElement viewportElement = contentViewContainer.parent;
+            if (viewportElement == null)
+                return;
+            Rect viewport = viewportElement.layout;
+            if (viewport.width <= 0f || viewport.height <= 0f)
+                return;
+
+            float horizontalPadding = Mathf.Min(padding, viewport.width * 0.25f);
+            float verticalPadding = Mathf.Min(padding, viewport.height * 0.25f);
+            float usableWidth = Mathf.Max(1f, viewport.width - horizontalPadding * 2f);
+            float usableHeight = Mathf.Max(1f, viewport.height - verticalPadding * 2f);
+            float targetScale = Mathf.Clamp(
+                Mathf.Min(usableWidth / Mathf.Max(1f, bounds.width),
+                    usableHeight / Mathf.Max(1f, bounds.height)),
+                ContentZoomer.DefaultMinScale,
+                ContentZoomer.DefaultMaxScale);
+            Vector2 translation = new Vector2(
+                viewport.width * 0.5f - bounds.center.x * targetScale,
+                viewport.height * 0.5f - bounds.center.y * targetScale);
+            AnimateViewTransform(new Vector2(targetScale, targetScale), translation);
+        }
+
+        private void AnimateViewTransform(Vector2 targetScale, Vector2 targetTranslation)
+        {
+            if (contentViewContainer == null)
+                return;
+
+            Vector3 currentScale = viewTransform.scale;
+            Vector3 currentPosition = viewTransform.position;
+            viewAnimationFromScale = new Vector2(currentScale.x, currentScale.y);
+            viewAnimationFromTranslation = new Vector2(currentPosition.x, currentPosition.y);
+            viewAnimationTargetScale = targetScale;
+            viewAnimationTargetTranslation = targetTranslation;
+            viewAnimationStartedAt = EditorApplication.timeSinceStartup;
+            viewAnimationSchedule?.Pause();
+            viewAnimationSchedule = schedule.Execute(UpdateViewAnimation).Every(16);
+        }
+
+        private void UpdateViewAnimation()
+        {
+            if (contentViewContainer == null)
+                return;
+
+            double elapsed = EditorApplication.timeSinceStartup - viewAnimationStartedAt;
+            float t = Mathf.Clamp01((float)(elapsed / ViewAnimationDurationSeconds));
+            float smooth = t * t * (3f - 2f * t);
+            Vector2 scale = Vector2.LerpUnclamped(viewAnimationFromScale, viewAnimationTargetScale, smooth);
+            Vector2 translation = Vector2.LerpUnclamped(
+                viewAnimationFromTranslation,
+                viewAnimationTargetTranslation,
+                smooth);
+            ApplyViewTransform(scale, translation);
+            if (t >= 1f)
+            {
+                viewAnimationSchedule?.Pause();
+                viewAnimationSchedule = null;
+            }
+        }
+
+        private void ApplyViewTransform(Vector2 scale, Vector2 translation)
+        {
+            UpdateViewTransform(
+                new Vector3(translation.x, translation.y, 0f),
+                new Vector3(scale.x, scale.y, 1f));
+        }
+
+        private void CancelViewAnimation()
+        {
+            viewAnimationSchedule?.Pause();
+            viewAnimationSchedule = null;
+        }
+
+        private void OnGraphWheelZoom(WheelEvent evt)
+        {
+            if (Asset == null
+                || contentViewContainer == null
+                || mouseButtonPressed
+                || moveUndoRecorded
+                || pendingEdgeReconnect != null
+                || edgeReconnectTriggered)
+            {
+                return;
+            }
+
+            CancelViewAnimation();
+            Vector3 currentScale = viewTransform.scale;
+            float deltaY = evt.delta.y;
+            if (Mathf.Approximately(deltaY, 0f))
+                return;
+
+            float sign = Mathf.Sign(deltaY);
+            float tickCount = Mathf.Clamp(Mathf.Abs(deltaY) / WheelDeltaPerTick, 0.25f, 3f);
+            float factor = Mathf.Pow(1f + 0.15f, -sign * tickCount);
+            float targetScale = Mathf.Clamp(
+                currentScale.x * factor,
+                ContentZoomer.DefaultMinScale,
+                ContentZoomer.DefaultMaxScale);
+            if (Mathf.Approximately(targetScale, currentScale.x))
+                return;
+
+            Vector2 localMouse = evt.localMousePosition;
+            Vector2 graphPoint = VisualElementExtensions.ChangeCoordinatesTo(
+                this, contentViewContainer, localMouse);
+            Vector2 translation = localMouse - graphPoint * targetScale;
+            ApplyViewTransform(new Vector2(targetScale, targetScale), translation);
+            evt.PreventDefault();
+            evt.StopImmediatePropagation();
+        }
+
+        private static Rect UnionRect(Rect left, Rect right)
+        {
+            float xMin = Mathf.Min(left.xMin, right.xMin);
+            float yMin = Mathf.Min(left.yMin, right.yMin);
+            float xMax = Mathf.Max(left.xMax, right.xMax);
+            float yMax = Mathf.Max(left.yMax, right.yMax);
+            return Rect.MinMaxRect(xMin, yMin, xMax, yMax);
         }
 
         private DropdownMenuAction.Status GetSelectionStatus(int minimumCount)
@@ -2416,11 +3073,17 @@ namespace ES.EditorInternal
             List<string> selectedIds = selection.OfType<ESStableGraphNodeView>().Select(view => view.NodeId).ToList();
             if (selectedIds.Count == 0)
                 return;
-            Undo.RecordObject(Asset, "复制图节点");
-            List<string> createdIds = Asset.DuplicateNodes(selectedIds, new Vector2(32f, 32f));
-            MarkAssetDirty();
+            FlushNudgeBatchBeforeStructuralChange();
+            ESGraphEditResult result = editService.DuplicateNodes(
+                Asset, selectedIds, new Vector2(32f, 32f));
+            if (!result.changed || result.createdNodeIds == null || result.createdNodeIds.Count == 0)
+            {
+                report?.Invoke("复制节点失败：" + result.error);
+                return;
+            }
             Rebuild();
             ClearSelection();
+            List<string> createdIds = result.createdNodeIds;
             for (int i = 0; i < createdIds.Count; i++)
             {
                 if (nodeViews.TryGetValue(createdIds[i], out ESStableGraphNodeView view))
@@ -2564,9 +3227,9 @@ namespace ES.EditorInternal
                     "已稳定整理 " + nodesById.Count + " 个节点，并优化连线交叉。" + cycleNote))
                 return;
             if (selectionOnly)
-                FrameSelection();
+                SmoothFrameSelection();
             else
-                FrameAll();
+                SmoothFrameAll();
         }
 
         private static string FindStableCycleEntry(Dictionary<string, ESGraphNodeRecord> nodesById,
@@ -2781,6 +3444,104 @@ namespace ES.EditorInternal
             ApplyNodePositions(positions, "节点吸附网格", "已将选中节点吸附到 32 像素网格。");
         }
 
+        public bool NudgeSelection(Vector2 delta)
+        {
+            if (Asset == null || delta.sqrMagnitude <= 0.0001f)
+                return false;
+            List<ESStableGraphNodeView> selectedViews = GetSelectedNodeViews();
+            if (selectedViews.Count == 0)
+                return false;
+            bool selectionMatches = nudgeBatchSelectionIds.Count == selectedViews.Count;
+            if (selectionMatches)
+            {
+                for (int i = 0; i < selectedViews.Count; i++)
+                {
+                    ESStableGraphNodeView view = selectedViews[i];
+                    if (view == null || !nudgeBatchSelectionIds.Contains(view.NodeId))
+                    {
+                        selectionMatches = false;
+                        break;
+                    }
+                }
+            }
+            if (nudgeBatchActive && !selectionMatches)
+                CancelNudgeBatch();
+
+            if (!nudgeBatchActive)
+            {
+                Undo.RecordObject(Asset, "微调图节点");
+                nudgeBatchActive = true;
+                nudgeBatchSelectionIds.Clear();
+                for (int i = 0; i < selectedViews.Count; i++)
+                {
+                    ESStableGraphNodeView view = selectedViews[i];
+                    if (view != null && !string.IsNullOrEmpty(view.NodeId))
+                        nudgeBatchSelectionIds.Add(view.NodeId);
+                }
+            }
+            adjustingSnapPosition = true;
+            try
+            {
+                for (int i = 0; i < selectedViews.Count; i++)
+                {
+                    ESStableGraphNodeView view = selectedViews[i];
+                    if (view == null)
+                        continue;
+                    Rect rect = view.GetPosition();
+                    rect.position += delta;
+                    view.SetPosition(rect);
+                    Asset.SetNodePosition(view.NodeId, rect.position);
+                }
+            }
+            finally
+            {
+                adjustingSnapPosition = false;
+            }
+            nudgeFlushSchedule?.Pause();
+            nudgeFlushSchedule = schedule.Execute(FlushNudgeBatch)
+                .StartingIn(NudgeFlushMilliseconds);
+            return true;
+        }
+
+        private void FlushNudgeBatch()
+        {
+            nudgeFlushSchedule = null;
+            if (!nudgeBatchActive)
+                return;
+            nudgeBatchActive = false;
+            nudgeBatchSelectionIds.Clear();
+            if (Asset != null)
+                MarkAssetDirty(false);
+            edgeFlowOverlay?.MarkDirtyRepaint();
+            NotifySelectionChanged(true);
+        }
+
+        private void CancelNudgeBatch()
+        {
+            nudgeFlushSchedule?.Pause();
+            nudgeFlushSchedule = null;
+            if (nudgeBatchActive)
+            {
+                if (panel == null)
+                {
+                    if (Asset != null)
+                        MarkAssetDirty(false);
+                    nudgeBatchActive = false;
+                    nudgeBatchSelectionIds.Clear();
+                }
+                else
+                {
+                    FlushNudgeBatch();
+                }
+            }
+        }
+
+        private void FlushNudgeBatchBeforeStructuralChange()
+        {
+            if (nudgeBatchActive)
+                CancelNudgeBatch();
+        }
+
         private bool ApplyNodePositions(Dictionary<string, Vector2> positions, string undoName, string successMessage)
         {
             if (Asset == null || positions == null || positions.Count == 0)
@@ -2801,10 +3562,13 @@ namespace ES.EditorInternal
                 return false;
             }
 
-            Undo.RecordObject(Asset, undoName);
-            foreach (KeyValuePair<string, Vector2> pair in positions)
-                Asset.SetNodePosition(pair.Key, pair.Value);
-            MarkAssetDirty(false);
+            FlushNudgeBatchBeforeStructuralChange();
+            ESGraphEditResult result = editService.SetNodePositions(Asset, positions, undoName);
+            if (!result.changed)
+            {
+                report?.Invoke("节点位置更新失败：" + result.error);
+                return false;
+            }
             Rebuild();
             report?.Invoke(successMessage);
             return true;
@@ -2848,7 +3612,7 @@ namespace ES.EditorInternal
             if (foundNode != null)
             {
                 AddToSelection(foundNode);
-                FrameSelection();
+                SmoothFrameSelection();
                 NotifySelectionChanged();
                 return;
             }
@@ -2857,7 +3621,7 @@ namespace ES.EditorInternal
                 if (edge.userData is string edgeId && string.Equals(edgeId, query, StringComparison.Ordinal))
                 {
                     AddToSelection(edge);
-                    FrameSelection();
+                    SmoothFrameSelection();
                     NotifySelectionChanged();
                     return;
                 }
@@ -2905,7 +3669,54 @@ namespace ES.EditorInternal
                     continue;
                 compatible.Add(candidate);
             }
+            UpdatePortCompatibilityHighlight(startPortId, compatible);
             return compatible;
+        }
+
+        private void UpdatePortCompatibilityHighlight(string startPortId, IReadOnlyList<Port> compatible)
+        {
+            if (!string.IsNullOrEmpty(previewDragPortId)
+                && !string.Equals(previewDragPortId, startPortId, StringComparison.Ordinal))
+                return;
+            activeDragPortId = startPortId;
+            compatibleHighlightPortIds.Clear();
+            for (int i = 0; i < compatible.Count; i++)
+            {
+                if (compatible[i] != null && compatible[i].userData is string portId)
+                    compatibleHighlightPortIds.Add(portId);
+            }
+            ApplyPortCompatibilityHighlights();
+        }
+
+        internal void ClearPortCompatibilityHighlight()
+        {
+            activeDragPortId = null;
+            compatibleHighlightPortIds.Clear();
+            ApplyPortCompatibilityHighlights();
+        }
+
+        internal void EndPointerInteraction()
+        {
+            pressedMouseButtons = 0;
+            mouseButtonPressed = false;
+            pointerDragging = false;
+            allowDragSnapping = false;
+            moveUndoRecorded = false;
+            previewDragPortId = null;
+            CancelEdgeReconnect();
+            CancelNudgeBatch();
+            ClearPortCompatibilityHighlight();
+            ClearSnapGuides();
+        }
+
+        private void ApplyPortCompatibilityHighlights()
+        {
+            foreach (KeyValuePair<string, Port> pair in portViews)
+            {
+                if (!(pair.Value is ESStableGraphPortView portView))
+                    continue;
+                portView.SetCompatibilityHighlight(compatibleHighlightPortIds.Contains(pair.Key));
+            }
         }
 
         private HashSet<string> CollectReachable(string startNodeId,
@@ -2961,30 +3772,339 @@ namespace ES.EditorInternal
                 || string.Equals(inputType, "*", StringComparison.Ordinal);
         }
 
+        private void TrySnapMovedNodes(IEnumerable<GraphElement> movedElements)
+        {
+            if (!allowDragSnapping || Asset == null || nodeViews.Count == 0)
+            {
+                ClearSnapGuides();
+                return;
+            }
+
+            snapMovingNodeIds.Clear();
+            snapMovingViews.Clear();
+            snapCandidateBounds.Clear();
+            foreach (GraphElement element in movedElements)
+            {
+                if (!(element is ESStableGraphNodeView nodeView)
+                    || nodeView == null
+                    || string.IsNullOrEmpty(nodeView.NodeId)
+                    || !nodeViews.TryGetValue(nodeView.NodeId, out ESStableGraphNodeView known)
+                    || !ReferenceEquals(known, nodeView))
+                    continue;
+                if (snapMovingNodeIds.Add(nodeView.NodeId))
+                    snapMovingViews.Add(nodeView);
+            }
+
+            if (snapMovingViews.Count == 0)
+            {
+                ClearSnapGuides();
+                return;
+            }
+
+            Rect group = GetGroupBounds(snapMovingViews);
+            if (!IsUsableWorldBound(group))
+            {
+                ClearSnapGuides();
+                return;
+            }
+            EnsureSnapSpatialGrid();
+            float snapThreshold = Mathf.Max(1f,
+                SnapGuideThreshold / Mathf.Max(0.1f, viewTransform.scale.x));
+            CollectSnapCandidates(group, snapThreshold);
+            if (snapCandidateBounds.Count == 0)
+            {
+                ClearSnapGuides();
+                return;
+            }
+
+            float bestDx = 0f;
+            float bestDy = 0f;
+            bool hasDx = false;
+            bool hasDy = false;
+            Rect verticalGuide = default;
+            Rect horizontalGuide = default;
+            for (int i = 0; i < snapCandidateBounds.Count; i++)
+            {
+                Rect candidate = snapCandidateBounds[i];
+                float verticalStart = Mathf.Min(group.yMin, candidate.yMin);
+                float verticalEnd = Mathf.Max(group.yMax, candidate.yMax);
+                float horizontalStart = Mathf.Min(group.xMin, candidate.xMin);
+                float horizontalEnd = Mathf.Max(group.xMax, candidate.xMax);
+
+                TryUpdateSnapAlignment(group.xMin, candidate.xMin,
+                    verticalStart, verticalEnd, true, snapThreshold,
+                    ref bestDx, ref hasDx, ref verticalGuide);
+                TryUpdateSnapAlignment(group.center.x, candidate.center.x,
+                    verticalStart, verticalEnd, true, snapThreshold,
+                    ref bestDx, ref hasDx, ref verticalGuide);
+                TryUpdateSnapAlignment(group.xMax, candidate.xMax,
+                    verticalStart, verticalEnd, true, snapThreshold,
+                    ref bestDx, ref hasDx, ref verticalGuide);
+                TryUpdateSnapAlignment(group.yMin, candidate.yMin,
+                    horizontalStart, horizontalEnd, false, snapThreshold,
+                    ref bestDy, ref hasDy, ref horizontalGuide);
+                TryUpdateSnapAlignment(group.center.y, candidate.center.y,
+                    horizontalStart, horizontalEnd, false, snapThreshold,
+                    ref bestDy, ref hasDy, ref horizontalGuide);
+                TryUpdateSnapAlignment(group.yMax, candidate.yMax,
+                    horizontalStart, horizontalEnd, false, snapThreshold,
+                    ref bestDy, ref hasDy, ref horizontalGuide);
+            }
+
+            if (!hasDx && !hasDy)
+            {
+                ClearSnapGuides();
+                return;
+            }
+
+            adjustingSnapPosition = true;
+            try
+            {
+                for (int i = 0; i < snapMovingViews.Count; i++)
+                {
+                    ESStableGraphNodeView view = snapMovingViews[i];
+                    if (view == null)
+                        continue;
+                    Rect rect = view.GetPosition();
+                    rect.x += bestDx;
+                    rect.y += bestDy;
+                    view.SetPosition(rect);
+                }
+            }
+            finally
+            {
+                adjustingSnapPosition = false;
+            }
+
+            snapGuideLines.Clear();
+            if (hasDx)
+                snapGuideLines.Add(verticalGuide);
+            if (hasDy)
+                snapGuideLines.Add(horizontalGuide);
+            snapGuideOverlay?.MarkDirtyRepaint();
+        }
+
+        private void EnsureSnapSpatialGrid()
+        {
+            if (!snapGridDirty && snapGridMovingIds.SetEquals(snapMovingNodeIds))
+                return;
+            snapGridDirty = false;
+            snapGridMovingIds.Clear();
+            foreach (string movingId in snapMovingNodeIds)
+                snapGridMovingIds.Add(movingId);
+            RecycleSnapGridLists();
+
+            foreach (KeyValuePair<string, ESStableGraphNodeView> pair in nodeViews)
+            {
+                if (pair.Value == null || snapGridMovingIds.Contains(pair.Key))
+                    continue;
+                Rect rect = pair.Value.GetPosition();
+                if (!IsUsableWorldBound(rect))
+                    continue;
+                int minXCell = SnapAxis(rect.xMin);
+                int maxXCell = SnapAxis(rect.xMax);
+                for (int x = minXCell; x <= maxXCell; x++)
+                    AddSnapGridEntry(snapXGrid, x, pair.Key);
+                int minYCell = SnapAxis(rect.yMin);
+                int maxYCell = SnapAxis(rect.yMax);
+                for (int y = minYCell; y <= maxYCell; y++)
+                    AddSnapGridEntry(snapYGrid, y, pair.Key);
+            }
+        }
+
+        private void RecycleSnapGridLists()
+        {
+            foreach (List<string> ids in snapXGrid.Values)
+            {
+                ids.Clear();
+                if (ids.Capacity > SnapGridListCapacitySoftLimit)
+                    ids.Capacity = SnapGridListCapacitySoftLimit;
+                if (snapGridListPool.Count < SnapGridListPoolCapacity)
+                    snapGridListPool.Push(ids);
+            }
+            foreach (List<string> ids in snapYGrid.Values)
+            {
+                ids.Clear();
+                if (ids.Capacity > SnapGridListCapacitySoftLimit)
+                    ids.Capacity = SnapGridListCapacitySoftLimit;
+                if (snapGridListPool.Count < SnapGridListPoolCapacity)
+                    snapGridListPool.Push(ids);
+            }
+            snapXGrid.Clear();
+            snapYGrid.Clear();
+        }
+
+        private void ClearSnapGrids()
+        {
+            RecycleSnapGridLists();
+            snapGridMovingIds.Clear();
+            snapMovingNodeIds.Clear();
+            snapMovingViews.Clear();
+            snapCandidateBounds.Clear();
+            snapCandidateIds.Clear();
+            snapGridDirty = true;
+        }
+
+        private void ClearSnapGridPool()
+        {
+            snapGridListPool.Clear();
+        }
+
+        private void AddSnapGridEntry(Dictionary<int, List<string>> grid, int cell, string nodeId)
+        {
+            if (!grid.TryGetValue(cell, out List<string> ids))
+            {
+                ids = snapGridListPool.Count > 0
+                    ? snapGridListPool.Pop()
+                    : new List<string>(4);
+                grid[cell] = ids;
+            }
+            ids.Add(nodeId);
+        }
+
+        private void CollectSnapCandidates(Rect group, float threshold)
+        {
+            snapCandidateBounds.Clear();
+            snapCandidateIds.Clear();
+            int minXCell = SnapAxis(group.xMin - threshold);
+            int maxXCell = SnapAxis(group.xMax + threshold);
+            for (int x = minXCell; x <= maxXCell; x++)
+            {
+                if (snapXGrid.TryGetValue(x, out List<string> ids))
+                    AddSnapCandidates(ids);
+            }
+            int minYCell = SnapAxis(group.yMin - threshold);
+            int maxYCell = SnapAxis(group.yMax + threshold);
+            for (int y = minYCell; y <= maxYCell; y++)
+            {
+                if (snapYGrid.TryGetValue(y, out List<string> ids))
+                    AddSnapCandidates(ids);
+            }
+        }
+
+        private void AddSnapCandidates(List<string> ids)
+        {
+            if (ids == null)
+                return;
+            for (int i = 0; i < ids.Count; i++)
+            {
+                string nodeId = ids[i];
+                if (!snapCandidateIds.Add(nodeId)
+                    || !nodeViews.TryGetValue(nodeId, out ESStableGraphNodeView view)
+                    || view == null)
+                    continue;
+                Rect candidate = view.GetPosition();
+                if (IsUsableWorldBound(candidate))
+                    snapCandidateBounds.Add(candidate);
+            }
+        }
+
+        private int SnapAxis(float value)
+        {
+            return Mathf.FloorToInt(value / SnapSpatialCellSize);
+        }
+
+        private void TryUpdateSnapAlignment(float movingFeature, float candidateFeature,
+            float axisStart, float axisEnd, bool vertical, float threshold,
+            ref float best, ref bool has, ref Rect guide)
+        {
+            float delta = candidateFeature - movingFeature;
+            float distance = Mathf.Abs(delta);
+            if (distance > threshold)
+                return;
+            if (has && distance >= Mathf.Abs(best))
+                return;
+            best = delta;
+            has = true;
+            guide = vertical
+                ? new Rect(candidateFeature, axisStart, 0f, Mathf.Max(0f, axisEnd - axisStart))
+                : new Rect(axisStart, candidateFeature, Mathf.Max(0f, axisEnd - axisStart), 0f);
+        }
+
+        private Rect GetGroupBounds(IReadOnlyList<ESStableGraphNodeView> views)
+        {
+            Rect bounds = Rect.zero;
+            bool hasBounds = false;
+            for (int i = 0; i < views.Count; i++)
+            {
+                if (views[i] == null)
+                    continue;
+                Rect rect = views[i].GetPosition();
+                if (!IsUsableWorldBound(rect))
+                    continue;
+                bounds = hasBounds ? UnionRect(bounds, rect) : rect;
+                hasBounds = true;
+            }
+            return hasBounds ? bounds : default;
+        }
+
+        private void ClearSnapGuides()
+        {
+            if (snapGuideLines.Count == 0 && snapGuideOverlay != null)
+                return;
+            snapGuideLines.Clear();
+            snapGuideOverlay?.MarkDirtyRepaint();
+        }
+
+        private void OnGenerateSnapGuideVisualContent(MeshGenerationContext context)
+        {
+            if (snapGuideLines.Count == 0
+                || snapGuideOverlay == null
+                || contentViewContainer == null
+                || snapGuideOverlay.panel == null)
+                return;
+
+            Painter2D painter = context.painter2D;
+            painter.strokeColor = new Color(0.16f, 0.78f, 0.9f, 0.9f);
+            painter.lineWidth = SnapGuideLineWidth;
+            for (int i = 0; i < snapGuideLines.Count; i++)
+            {
+                Rect line = snapGuideLines[i];
+                Vector2 start = VisualElementExtensions.LocalToWorld(
+                    contentViewContainer, new Vector2(line.xMin, line.yMin));
+                Vector2 end = VisualElementExtensions.LocalToWorld(
+                    contentViewContainer, new Vector2(line.xMax, line.yMax));
+                Vector2 localStart = VisualElementExtensions.WorldToLocal(snapGuideOverlay, start);
+                Vector2 localEnd = VisualElementExtensions.WorldToLocal(snapGuideOverlay, end);
+                if (!IsFinite(localStart) || !IsFinite(localEnd))
+                    continue;
+                painter.BeginPath();
+                painter.MoveTo(localStart);
+                painter.LineTo(localEnd);
+                painter.Stroke();
+            }
+        }
+
         private GraphViewChange OnGraphViewChanged(GraphViewChange change)
         {
-            if (rebuilding || Asset == null)
+            if (rebuilding || adjustingSnapPosition || Asset == null)
                 return change;
+            bool structuralChange = false;
 
             if (change.elementsToRemove != null && change.elementsToRemove.Count > 0)
             {
-                Undo.RecordObject(Asset, "删除图元素");
+                structuralChange = true;
+                FlushNudgeBatchBeforeStructuralChange();
+                List<string> nodeIds = new List<string>();
+                List<string> edgeIds = new List<string>();
                 for (int i = 0; i < change.elementsToRemove.Count; i++)
                 {
                     GraphElement element = change.elementsToRemove[i];
                     if (element is ESStableGraphNodeView nodeView)
-                        Asset.RemoveNode(nodeView.NodeId);
+                        nodeIds.Add(nodeView.NodeId);
                     else if (element is Edge edge && edge.userData is string edgeId)
                     {
                         if (ReferenceEquals(pendingEdgeReconnect, edge))
                             CancelEdgeReconnect();
-                        Asset.RemoveEdge(edgeId);
+                        edgeIds.Add(edgeId);
                         edgeViews.Remove(edgeId);
                         edgeFlowPhases.Remove(edgeId);
                         edgeRenderPointViews.Remove(edge);
                     }
                 }
-                MarkAssetDirty();
+                ESGraphEditResult deleteResult = editService.DeleteElements(Asset, nodeIds, edgeIds);
+                if (!deleteResult.changed)
+                    report?.Invoke("删除图元素失败：" + deleteResult.error);
                 BuildGraphIndexes();
                 RefreshPortRelationVisuals();
                 schedule.Execute(Rebuild).StartingIn(1);
@@ -2992,32 +4112,38 @@ namespace ES.EditorInternal
 
             if (change.edgesToCreate != null && change.edgesToCreate.Count > 0)
             {
-                List<Edge> accepted = new List<Edge>(change.edgesToCreate.Count);
-                Undo.RecordObject(Asset, "创建图连线");
-                bool changed = false;
+                structuralChange = true;
+                FlushNudgeBatchBeforeStructuralChange();
+                var endpoints = new List<KeyValuePair<string, string>>(change.edgesToCreate.Count);
                 for (int i = 0; i < change.edgesToCreate.Count; i++)
                 {
                     Edge edge = change.edgesToCreate[i];
-                    string error = null;
-                    if (edge?.output?.userData is string outputPortId && edge.input?.userData is string inputPortId
-                        && Asset.TryAddEdge(outputPortId, inputPortId, out ESGraphEdgeRecord record, out error))
+                    if (edge?.output?.userData is string outputPortId
+                        && edge.input?.userData is string inputPortId)
+                        endpoints.Add(new KeyValuePair<string, string>(outputPortId, inputPortId));
+                }
+                ESGraphEditResult createResult = editService.AddEdges(Asset, endpoints);
+                if (!createResult.changed
+                    || createResult.createdEdgeIds == null
+                    || createResult.createdEdgeIds.Count != change.edgesToCreate.Count)
+                {
+                    change.edgesToCreate = new List<Edge>();
+                    report?.Invoke("创建图连线失败：" + createResult.error);
+                }
+                else
+                {
+                    var accepted = new List<Edge>(change.edgesToCreate.Count);
+                    for (int i = 0; i < change.edgesToCreate.Count; i++)
                     {
-                        edge.userData = record.edgeId;
-                        edgeViews[record.edgeId] = edge;
+                        Edge edge = change.edgesToCreate[i];
+                        string edgeId = createResult.createdEdgeIds[i];
+                        edge.userData = edgeId;
+                        edgeViews[edgeId] = edge;
                         ConfigureEdgeReconnectGesture(edge);
                         RegisterEdgeFlowGeometry(edge);
                         accepted.Add(edge);
-                        changed = true;
                     }
-                    else
-                    {
-                        report?.Invoke(string.IsNullOrEmpty(error) ? "连线被模型拒绝" : error);
-                    }
-                }
-                change.edgesToCreate = accepted;
-                if (changed)
-                {
-                    MarkAssetDirty();
+                    change.edgesToCreate = accepted;
                     BuildGraphIndexes();
                     RefreshPortRelationVisuals();
                     edgeFlowOverlay?.MarkDirtyRepaint();
@@ -3026,6 +4152,8 @@ namespace ES.EditorInternal
 
             if (change.movedElements != null && change.movedElements.Count > 0)
             {
+                FlushNudgeBatchBeforeStructuralChange();
+                TrySnapMovedNodes(change.movedElements);
                 bool recorded = false;
                 bool moved = false;
                 for (int i = 0; i < change.movedElements.Count; i++)
@@ -3045,19 +4173,181 @@ namespace ES.EditorInternal
                     MarkAssetDirty(false);
             }
 
+            if (!structuralChange
+                && change.movedElements != null
+                && change.movedElements.Count > 0)
+                return change;
             report?.Invoke(Asset.Nodes.Count + " 个节点 / " + Asset.Edges.Count + " 条连线");
             return change;
         }
 
+        private Vector2 GetPasteAnchor()
+        {
+            if (hasLastPointerPosition
+                && EditorApplication.timeSinceStartup - lastPointerMoveTime < 5d
+                && contentViewContainer != null)
+                return VisualElementExtensions.ChangeCoordinatesTo(
+                    this, contentViewContainer, lastGraphPointerPosition);
+            if (contentViewContainer != null)
+                return VisualElementExtensions.ChangeCoordinatesTo(
+                    this, contentViewContainer, layout.center);
+            return Vector2.zero;
+        }
+
+        private bool TryGetClipboardBoundsCenter(
+            IReadOnlyList<ESGraphNodeRecord> nodes, out Vector2 center)
+        {
+            Rect bounds = Rect.zero;
+            bool hasBounds = false;
+            if (nodes != null)
+            {
+                for (int i = 0; i < nodes.Count; i++)
+                {
+                    ESGraphNodeRecord node = nodes[i];
+                    if (node == null || !IsFinite(node.position))
+                        continue;
+                    Rect rect = new Rect(node.position, Vector2.one);
+                    bounds = hasBounds ? UnionRect(bounds, rect) : rect;
+                    hasBounds = true;
+                }
+            }
+            center = hasBounds ? bounds.center : Vector2.zero;
+            return hasBounds;
+        }
+
         private string SerializeSelection(IEnumerable<GraphElement> elements)
         {
-            return elements.OfType<ESStableGraphNodeView>().Any() ? "ESStableGraph.Selection" : string.Empty;
+            if (Asset == null || elements == null)
+                return string.Empty;
+
+            var selectedViews = elements.OfType<ESStableGraphNodeView>().ToList();
+            if (selectedViews.Count == 0)
+                return string.Empty;
+
+            var selectedNodeIds = new HashSet<string>(
+                selectedViews.Select(view => view.NodeId),
+                StringComparer.Ordinal);
+            var portToNode = new Dictionary<string, string>(StringComparer.Ordinal);
+            var package = new ESGraphClipboardPackage();
+            package.sourceDomainId = Asset.DomainId;
+            package.sourceSchemaVersion = Asset.schemaVersion;
+            for (int i = 0; i < Asset.Nodes.Count; i++)
+            {
+                ESGraphNodeRecord node = Asset.Nodes[i];
+                if (node == null || !selectedNodeIds.Contains(node.nodeId))
+                    continue;
+                package.nodes.Add(node);
+                if (node.ports == null)
+                    continue;
+                for (int p = 0; p < node.ports.Count; p++)
+                {
+                    ESGraphPortRecord port = node.ports[p];
+                    if (port != null && !string.IsNullOrEmpty(port.portId))
+                        portToNode[port.portId] = node.nodeId;
+                }
+            }
+
+            if (package.nodes.Count == 0)
+                return string.Empty;
+            clipboardPasteCount = 0;
+
+            for (int i = 0; i < Asset.Edges.Count; i++)
+            {
+                ESGraphEdgeRecord edge = Asset.Edges[i];
+                if (edge != null
+                    && portToNode.ContainsKey(edge.outputPortId)
+                    && portToNode.ContainsKey(edge.inputPortId))
+                {
+                    package.edges.Add(edge);
+                }
+            }
+
+            return JsonUtility.ToJson(package, true);
         }
 
         private void PasteSelection(string operationName, string data)
         {
+            if (Asset == null || string.IsNullOrEmpty(data))
+                return;
             if (string.Equals(data, "ESStableGraph.Selection", StringComparison.Ordinal))
+            {
                 DuplicateSelection();
+                return;
+            }
+
+            ESGraphClipboardPackage package;
+            try
+            {
+                package = JsonUtility.FromJson<ESGraphClipboardPackage>(data);
+            }
+            catch
+            {
+                return;
+            }
+
+            if (package == null
+                || !string.Equals(package.schema, ClipboardSchema, StringComparison.Ordinal)
+                || package.nodes == null
+                || package.nodes.Count == 0)
+            {
+                return;
+            }
+
+            FlushNudgeBatchBeforeStructuralChange();
+            Vector2 pasteAnchor = GetPasteAnchor();
+            Vector2 pasteOffset = TryGetClipboardBoundsCenter(package.nodes, out Vector2 sourceCenter)
+                ? pasteAnchor - sourceCenter
+                : new Vector2(32f, 32f);
+            pasteOffset += new Vector2(
+                clipboardPasteCount * PasteStaggerStep,
+                clipboardPasteCount * PasteStaggerStep);
+            ESGraphEditResult result = editService.PasteNodes(
+                Asset,
+                package.nodes,
+                package.edges,
+                pasteOffset,
+                package.sourceSchemaVersion,
+                package.sourceDomainId);
+            if (!result.changed || result.createdNodeIds == null || result.createdNodeIds.Count == 0)
+            {
+                report?.Invoke(string.IsNullOrEmpty(result.error) ? "剪贴板粘贴失败。" : result.error);
+                return;
+            }
+
+            clipboardPasteCount++;
+            Rebuild();
+            ClearSelection();
+            List<string> createdIds = result.createdNodeIds;
+            for (int i = 0; i < createdIds.Count; i++)
+            {
+                if (nodeViews.TryGetValue(createdIds[i], out ESStableGraphNodeView view))
+                    AddToSelection(view);
+            }
+            NotifySelectionChanged();
+            report?.Invoke("已粘贴 " + createdIds.Count + " 个节点 / "
+                + (package.edges == null ? 0 : package.edges.Count) + " 条内部连线");
+        }
+
+        private new bool CanPasteSerializedData(string data)
+        {
+            if (Asset == null || string.IsNullOrEmpty(data))
+                return false;
+            if (string.Equals(data, "ESStableGraph.Selection", StringComparison.Ordinal))
+                return true;
+            try
+            {
+                ESGraphClipboardPackage package = JsonUtility.FromJson<ESGraphClipboardPackage>(data);
+                return package != null
+                    && string.Equals(package.schema, ClipboardSchema, StringComparison.Ordinal)
+                    && package.sourceSchemaVersion == ESGraphAsset.CurrentSchemaVersion
+                    && string.Equals(package.sourceDomainId, Asset.DomainId, StringComparison.Ordinal)
+                    && package.nodes != null
+                    && package.nodes.Count > 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void ReportValidation()
@@ -3108,7 +4398,63 @@ namespace ES.EditorInternal
                 return;
             lastSelectionCount = count;
             lastSelectionHash = hash;
+            ApplyNodeSelectionVisuals();
             SelectionChanged?.Invoke(selection);
+        }
+
+        private void ApplyNodeSelectionVisuals()
+        {
+            foreach (KeyValuePair<string, ESStableGraphNodeView> pair in nodeViews)
+                pair.Value?.SetSelectedVisual(pair.Value.selected);
+        }
+
+        private void OpenNodeDetails(ESStableGraphNodeView view)
+        {
+            if (Asset == null || view == null || string.IsNullOrEmpty(view.NodeId))
+                return;
+            ClearSelection();
+            AddToSelection(view);
+            NotifySelectionChanged(true);
+            ownerWindow?.Focus();
+        }
+
+        private void SelectNodeFromCard(string nodeId)
+        {
+            if (string.IsNullOrEmpty(nodeId)
+                || !nodeViews.TryGetValue(nodeId, out ESStableGraphNodeView view))
+                return;
+            ClearSelection();
+            AddToSelection(view);
+            NotifySelectionChanged(true);
+        }
+
+        private void FocusNodeFromCard(string nodeId)
+        {
+            SelectNodeFromCard(nodeId);
+            if (nodeViews.ContainsKey(nodeId ?? string.Empty))
+                SmoothFrameSelection();
+        }
+
+        private void CommitNodeCardPayload(string nodeId, string payloadJson)
+        {
+            if (Asset == null || string.IsNullOrEmpty(nodeId))
+                return;
+            ESGraphNodeRecord node = Asset.FindNode(nodeId);
+            if (node == null || string.Equals(node.payloadJson ?? string.Empty,
+                    payloadJson ?? string.Empty, StringComparison.Ordinal))
+                return;
+
+            FlushNudgeBatchBeforeStructuralChange();
+            ESGraphEditResult result = editService.SetNodeContent(
+                Asset, node.nodeId, node.typeId, node.version, node.title, payloadJson ?? string.Empty);
+            if (!result.changed)
+            {
+                report?.Invoke(string.IsNullOrWhiteSpace(result.error)
+                    ? "节点关键信息更新失败。" : result.error);
+                return;
+            }
+            Rebuild();
+            report?.Invoke("节点关键信息已更新，并进入自动保存队列。");
         }
 
         private static bool ContainsIgnoreCase(string value, string query)
@@ -3124,8 +4470,12 @@ namespace ES.EditorInternal
         public readonly int CompatiblePortIndex;
         public readonly string SourcePortId;
         public readonly string ReplaceEdgeId;
+        public readonly ESGraphPortDefinition InsertOutputPort;
+        public readonly int InsertOutputPortIndex;
+        public readonly string InsertEdgeId;
 
         public bool AutoConnect => CompatiblePort != null && !string.IsNullOrEmpty(SourcePortId);
+        public bool IsInsertion => !string.IsNullOrEmpty(InsertEdgeId);
 
         public ESStableGraphNodeCreationChoice(IESGraphNodeDefinition definition,
             ESGraphPortDefinition compatiblePort = null, string sourcePortId = null,
@@ -3136,6 +4486,24 @@ namespace ES.EditorInternal
             CompatiblePortIndex = compatiblePortIndex;
             SourcePortId = sourcePortId;
             ReplaceEdgeId = replaceEdgeId;
+            InsertOutputPort = null;
+            InsertOutputPortIndex = -1;
+            InsertEdgeId = null;
+        }
+
+        public ESStableGraphNodeCreationChoice(IESGraphNodeDefinition definition,
+            ESGraphPortDefinition insertInputPort, int insertInputPortIndex,
+            ESGraphPortDefinition insertOutputPort, int insertOutputPortIndex,
+            string insertEdgeId)
+        {
+            Definition = definition;
+            CompatiblePort = insertInputPort;
+            CompatiblePortIndex = insertInputPortIndex;
+            SourcePortId = null;
+            ReplaceEdgeId = null;
+            InsertOutputPort = insertOutputPort;
+            InsertOutputPortIndex = insertOutputPortIndex;
+            InsertEdgeId = insertEdgeId;
         }
     }
 
@@ -3145,6 +4513,7 @@ namespace ES.EditorInternal
         private IReadOnlyList<ESStableGraphNodeCreationChoice> choices;
         private string profileName;
         private string sourcePortName;
+        private bool insertionMode;
         private Vector2 graphPosition;
 
         public void Initialize(ESStableGraphView value)
@@ -3161,6 +4530,7 @@ namespace ES.EditorInternal
             choices = nextChoices;
             profileName = domainDisplayName;
             sourcePortName = null;
+            insertionMode = false;
         }
 
         public void SetConnectionChoices(IReadOnlyList<ESStableGraphNodeCreationChoice> value,
@@ -3169,6 +4539,16 @@ namespace ES.EditorInternal
             choices = value;
             profileName = domainDisplayName;
             sourcePortName = sourceName;
+            insertionMode = false;
+        }
+
+        public void SetInsertionChoices(IReadOnlyList<ESStableGraphNodeCreationChoice> value,
+            string domainDisplayName, string sourceName)
+        {
+            choices = value;
+            profileName = domainDisplayName;
+            sourcePortName = sourceName;
+            insertionMode = true;
         }
 
         public void SetGraphPosition(Vector2 value)
@@ -3178,11 +4558,14 @@ namespace ES.EditorInternal
 
         public List<SearchTreeEntry> CreateSearchTree(SearchWindowContext context)
         {
+            string title = insertionMode
+                ? "插入节点 · " + (sourcePortName ?? profileName ?? "未指定领域")
+                : string.IsNullOrEmpty(sourcePortName)
+                    ? "创建节点 · " + (profileName ?? "未指定领域")
+                    : "从「" + sourcePortName + "」继续 · " + (profileName ?? "未指定领域");
             List<SearchTreeEntry> tree = new List<SearchTreeEntry>
             {
-                new SearchTreeGroupEntry(new GUIContent(string.IsNullOrEmpty(sourcePortName)
-                    ? "创建节点 · " + (profileName ?? "未指定领域")
-                    : "从「" + sourcePortName + "」继续 · " + (profileName ?? "未指定领域")), 0)
+                new SearchTreeGroupEntry(new GUIContent(title), 0)
             };
             if (choices == null)
                 return tree;
@@ -3202,7 +4585,11 @@ namespace ES.EditorInternal
                         tree.Add(new SearchTreeGroupEntry(new GUIContent(group), 1));
                     label = label.Substring(separator + 1);
                 }
-                if (choice.AutoConnect)
+                if (choice.IsInsertion)
+                {
+                    label += "  · 插入到关系中间";
+                }
+                else if (choice.AutoConnect)
                 {
                     string portName = ESGraphChinesePresentation.GetPortName(
                         string.IsNullOrWhiteSpace(choice.CompatiblePort.name)
@@ -3245,7 +4632,10 @@ namespace ES.EditorInternal
         {
             if (!(entry.userData is ESStableGraphNodeCreationChoice choice) || graphView == null)
                 return false;
-            graphView.CreateNode(choice, graphPosition);
+            if (choice.IsInsertion)
+                graphView.CreateInsertionNode(choice, graphPosition);
+            else
+                graphView.CreateNode(choice, graphPosition);
             return true;
         }
     }
@@ -3262,6 +4652,7 @@ namespace ES.EditorInternal
         public void OnDrop(GraphView targetGraphView, Edge edge)
         {
             graphView?.CommitDraggedEdge(edge);
+            graphView?.EndPointerInteraction();
         }
 
         public void OnDropOutsidePort(Edge edge, Vector2 position)
@@ -3270,6 +4661,7 @@ namespace ES.EditorInternal
                 ? edge.output.edgeConnector.edgeDragHelper.draggedPort : null)
                 ?? (edge?.input != null ? edge.input.edgeConnector.edgeDragHelper.draggedPort : null);
             graphView?.OpenCompatibleNodeSearch(draggedPort, position);
+            graphView?.EndPointerInteraction();
         }
     }
 
@@ -3278,6 +4670,8 @@ namespace ES.EditorInternal
         private readonly ESGraphPortDirection semanticDirection;
         private string baseName = string.Empty;
         private string baseTooltip = string.Empty;
+        private bool isConnected;
+        private bool compatibilityHighlight;
 
         private ESStableGraphPortView(Orientation orientation, Direction direction, Capacity capacity,
             Type portType, ESGraphPortDirection semanticDirection)
@@ -3304,11 +4698,13 @@ namespace ES.EditorInternal
             baseName = displayName ?? string.Empty;
             baseTooltip = tooltipText ?? string.Empty;
             SetConnectionCount(0);
+            ApplyPortLabelLayout();
         }
 
         public void SetConnectionCount(int count)
         {
-            bool connected = count > 0;
+            isConnected = count > 0;
+            bool connected = isConnected;
             string countText = count > 1 ? " ×" + count : string.Empty;
             if (semanticDirection == ESGraphPortDirection.Input)
                 portName = (connected ? "◀ " : "◁ ") + baseName + countText;
@@ -3318,6 +4714,54 @@ namespace ES.EditorInternal
                 + (semanticDirection == ESGraphPortDirection.Output
                     ? "\n拖到空白处可创建匹配节点并自动连接。" : string.Empty);
             style.opacity = connected ? 1f : 0.68f;
+            ApplyPortLabelLayout();
+        }
+
+        public void SetCompatibilityHighlight(bool active)
+        {
+            if (compatibilityHighlight == active)
+                return;
+            compatibilityHighlight = active;
+            if (active)
+            {
+                Color highlight = new Color(0.16f, 0.78f, 0.9f, 1f);
+                style.borderTopWidth = 2f;
+                style.borderBottomWidth = 2f;
+                style.borderLeftWidth = 2f;
+                style.borderRightWidth = 2f;
+                style.borderTopColor = highlight;
+                style.borderBottomColor = highlight;
+                style.borderLeftColor = highlight;
+                style.borderRightColor = highlight;
+                style.backgroundColor = new Color(0.12f, 0.64f, 0.76f, 0.18f);
+                style.opacity = 1f;
+            }
+            else
+            {
+                style.borderTopWidth = 0f;
+                style.borderBottomWidth = 0f;
+                style.borderLeftWidth = 0f;
+                style.borderRightWidth = 0f;
+                style.backgroundColor = Color.clear;
+                style.opacity = isConnected ? 1f : 0.68f;
+            }
+            MarkDirtyRepaint();
+        }
+
+        private void ApplyPortLabelLayout()
+        {
+            style.flexShrink = 1f;
+            style.maxWidth = 220f;
+            Label label = contentContainer.Q<Label>() ?? this.Q<Label>();
+            if (label == null)
+                return;
+
+            label.style.flexShrink = 1f;
+            label.style.minWidth = 0f;
+            label.style.maxWidth = 150f;
+            label.style.whiteSpace = WhiteSpace.NoWrap;
+            label.style.overflow = Overflow.Hidden;
+            label.style.textOverflow = TextOverflow.Ellipsis;
         }
     }
 
@@ -3329,7 +4773,14 @@ namespace ES.EditorInternal
         private readonly string projectedTypeId;
         private readonly int projectedVersion;
         private readonly string projectedTitle;
+        private readonly string projectedPayloadJson;
         private readonly PortProjectionState[] projectedPorts;
+        private readonly Color projectedAccent;
+        private readonly Color projectedBorder;
+        private readonly Action<ESStableGraphNodeView> openDetails;
+        private VisualElement keyFields;
+        private ulong nodeCardContextSignature;
+        private bool hasNodeCardContextSignature;
 
         private readonly struct PortProjectionState
         {
@@ -3369,12 +4820,15 @@ namespace ES.EditorInternal
         public IReadOnlyDictionary<string, Port> PortViews => portViews;
 
         public ESStableGraphNodeView(ESGraphDomainKey domain, ESGraphNodeRecord record,
-            IESGraphNodeDefinition definition, IEdgeConnectorListener edgeConnectorListener)
+            IESGraphNodeDefinition definition, IEdgeConnectorListener edgeConnectorListener,
+            Action<ESStableGraphNodeView> openDetails = null)
         {
             NodeId = record.nodeId;
+            this.openDetails = openDetails;
             projectedTypeId = record.typeId;
             projectedVersion = record.version;
             projectedTitle = record.title;
+            projectedPayloadJson = record.payloadJson ?? string.Empty;
             int portCount = record.ports?.Count ?? 0;
             projectedPorts = portCount == 0 ? Array.Empty<PortProjectionState>() : new PortProjectionState[portCount];
             for (int i = 0; i < portCount; i++)
@@ -3392,16 +4846,31 @@ namespace ES.EditorInternal
             Color accent = ESGraphNodeThemePalette.GetAccentColor(definition);
             Color surface = new Color(0.115f, 0.13f, 0.17f, 0.98f);
             Color border = new Color(0.28f, 0.32f, 0.4f, 0.95f);
+            projectedAccent = accent;
+            projectedBorder = border;
             titleContainer.style.height = 31f;
+            titleContainer.style.overflow = Overflow.Hidden;
             titleContainer.style.paddingLeft = 8f;
             titleContainer.style.paddingRight = 6f;
             titleContainer.style.backgroundColor = new Color(accent.r * 0.38f, accent.g * 0.38f, accent.b * 0.38f, 1f);
+            Label titleLabel = titleContainer.Q<Label>();
+            if (titleLabel != null)
+            {
+                titleLabel.style.flexGrow = 1f;
+                titleLabel.style.flexShrink = 1f;
+                titleLabel.style.minWidth = 0f;
+                titleLabel.style.whiteSpace = WhiteSpace.NoWrap;
+                titleLabel.style.overflow = Overflow.Hidden;
+                titleLabel.style.textOverflow = TextOverflow.Ellipsis;
+                titleLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
+            }
             mainContainer.style.backgroundColor = surface;
             mainContainer.style.paddingLeft = 6f;
             mainContainer.style.paddingRight = 6f;
             style.width = NodeWidth;
             style.minWidth = NodeWidth;
             style.maxWidth = NodeWidth;
+            style.minHeight = NodeHeight;
             style.borderTopWidth = 3f;
             style.borderBottomWidth = 1f;
             style.borderLeftWidth = 1f;
@@ -3428,17 +4897,45 @@ namespace ES.EditorInternal
             typeBadge.style.paddingLeft = 5f;
             typeBadge.style.paddingRight = 5f;
             typeBadge.style.marginLeft = 5f;
+            typeBadge.style.flexShrink = 0f;
+            typeBadge.style.maxWidth = 120f;
+            typeBadge.style.whiteSpace = WhiteSpace.NoWrap;
+            typeBadge.style.overflow = Overflow.Hidden;
+            typeBadge.style.textOverflow = TextOverflow.Ellipsis;
             titleContainer.Add(typeBadge);
 
             VisualElement metadata = new VisualElement();
             metadata.style.flexDirection = FlexDirection.Row;
+            metadata.style.alignItems = Align.Center;
             metadata.style.marginTop = 3f;
             metadata.style.marginBottom = 2f;
-            Label versionLabel = new Label("数据版本 " + record.version + " · 编号 " + ShortId(record.nodeId));
+            Label versionLabel = new Label(
+                "V" + record.version + " · " + ShortId(record.nodeId)
+                + " · " + ShortPayload(record));
             versionLabel.style.fontSize = 9f;
             versionLabel.style.color = new Color(0.62f, 0.68f, 0.78f, 0.95f);
+            versionLabel.style.flexGrow = 1f;
+            versionLabel.style.flexShrink = 1f;
+            versionLabel.style.minWidth = 0f;
+            versionLabel.style.whiteSpace = WhiteSpace.NoWrap;
+            versionLabel.style.overflow = Overflow.Hidden;
+            versionLabel.style.textOverflow = TextOverflow.Ellipsis;
             metadata.Add(versionLabel);
-            extensionContainer.Add(metadata);
+            Button detailsButton = new Button(() => openDetails?.Invoke(this))
+            {
+                name = "es-node-details",
+                text = "详情",
+                tooltip = "选中并打开该节点的独立信息与操作面板。"
+            };
+            detailsButton.style.minWidth = 48f;
+            detailsButton.style.minHeight = 20f;
+            detailsButton.style.fontSize = 10f;
+            detailsButton.style.paddingLeft = 5f;
+            detailsButton.style.paddingRight = 5f;
+            detailsButton.style.marginLeft = 6f;
+            detailsButton.style.flexShrink = 0f;
+            metadata.Add(detailsButton);
+            mainContainer.Add(metadata);
 
             if (record.ports != null)
             {
@@ -3465,8 +4962,58 @@ namespace ES.EditorInternal
                 }
             }
 
+            expanded = true;
+            style.height = StyleKeyword.Auto;
             RefreshExpandedState();
             RefreshPorts();
+        }
+
+        public bool NeedsNodeCardRefresh(ulong contextSignature)
+        {
+            return !hasNodeCardContextSignature || nodeCardContextSignature != contextSignature;
+        }
+
+        public void SetKeyFields(ESGraphNodeCardContext context, ulong contextSignature)
+        {
+            if (!NeedsNodeCardRefresh(contextSignature))
+                return;
+            keyFields?.RemoveFromHierarchy();
+            keyFields = null;
+            nodeCardContextSignature = contextSignature;
+            hasNodeCardContextSignature = true;
+            if (ESGraphAuthoringRegistry.TryCreateNodeCard(context, out VisualElement created))
+            {
+                keyFields = created;
+                mainContainer.Add(keyFields);
+            }
+        }
+
+        public void SetSelectedVisual(bool selected)
+        {
+            Color selectedColor = new Color(0.16f, 0.78f, 0.9f, 1f);
+            if (selected)
+            {
+                style.borderTopWidth = 3f;
+                style.borderBottomWidth = 1f;
+                style.borderLeftWidth = 1f;
+                style.borderRightWidth = 1f;
+                style.borderTopColor = selectedColor;
+                style.borderBottomColor = selectedColor;
+                style.borderLeftColor = selectedColor;
+                style.borderRightColor = selectedColor;
+            }
+            else
+            {
+                style.borderTopWidth = 3f;
+                style.borderBottomWidth = 1f;
+                style.borderLeftWidth = 1f;
+                style.borderRightWidth = 1f;
+                style.borderTopColor = projectedAccent;
+                style.borderBottomColor = projectedBorder;
+                style.borderLeftColor = projectedBorder;
+                style.borderRightColor = projectedBorder;
+            }
+            MarkDirtyRepaint();
         }
 
         public bool MatchesRecord(ESGraphNodeRecord record)
@@ -3474,7 +5021,9 @@ namespace ES.EditorInternal
             if (record == null || !string.Equals(NodeId, record.nodeId, StringComparison.Ordinal)
                 || !string.Equals(projectedTypeId, record.typeId, StringComparison.Ordinal)
                 || projectedVersion != record.version
-                || !string.Equals(projectedTitle, record.title, StringComparison.Ordinal))
+                || !string.Equals(projectedTitle, record.title, StringComparison.Ordinal)
+                || !string.Equals(projectedPayloadJson, record.payloadJson ?? string.Empty,
+                    StringComparison.Ordinal))
                 return false;
             int portCount = record.ports?.Count ?? 0;
             if (projectedPorts.Length != portCount)
@@ -3528,6 +5077,18 @@ namespace ES.EditorInternal
         {
             if (string.IsNullOrEmpty(value)) return "无身份";
             return value.Length <= 8 ? value : value.Substring(0, 8);
+        }
+
+        private static string ShortPayload(ESGraphNodeRecord record)
+        {
+            string payload = record?.payloadJson;
+            if (string.IsNullOrWhiteSpace(payload))
+                return "无业务内容";
+            string flattened = payload.Replace("\r", " ").Replace("\n", " ").Trim();
+            const int maxLength = 52;
+            if (flattened.Length <= maxLength)
+                return flattened;
+            return flattened.Substring(0, maxLength) + "...";
         }
     }
 }

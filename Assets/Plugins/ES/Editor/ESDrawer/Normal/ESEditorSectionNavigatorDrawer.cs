@@ -163,6 +163,7 @@ namespace ES.EditorInternal
             private static GUIStyle directoryToggleStyle;
             private static bool stylesProSkin;
             private static bool stylesInitialized;
+            private static int cachedSkinGeneration = -1;
             private readonly string navigatorId;
             private readonly GUIContent directoryToggleContent = new GUIContent();
 
@@ -1003,12 +1004,14 @@ namespace ES.EditorInternal
 
             private static void EnsureStyles()
             {
+                int currentSkinGeneration = ESEditorPresentation.SkinGeneration;
                 bool proSkin = ESEditorPresentation.IsProSkin;
-                if (stylesInitialized && stylesProSkin == proSkin)
+                if (stylesInitialized && stylesProSkin == proSkin && cachedSkinGeneration == currentSkinGeneration)
                     return;
 
                 stylesInitialized = true;
                 stylesProSkin = proSkin;
+                cachedSkinGeneration = currentSkinGeneration;
                 sectionStyle = null;
                 selectedSectionStyle = null;
                 separatorStyle = null;

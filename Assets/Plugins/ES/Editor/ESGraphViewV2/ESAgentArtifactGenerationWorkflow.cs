@@ -129,20 +129,40 @@ namespace ES.EditorInternal
             {
                 commandName = "生成_新模块工作流_AI命令",
                 targetProjectPath = "Assets/Plugins/ES/AICommands/生成_新模块工作流_AI命令.md",
-                commandType = "明确执行", defaultWrite = "由用户在 Graph Constraint 中限定", riskLevel = "L2",
+                commandIntent = ESAgentCommandIntent.ControlledExecution,
+                writeAuthorization = ESAgentWriteAuthorization.ScopedWrites,
+                riskLevel = ESAgentRiskLevel.L2,
+                failurePolicy = ESAgentFailurePolicy.RollbackAndReport,
                 purpose = kind == ESAgentAuthoringPresetKind.AICommandOnly
                     ? "把文本需求转换为 AI 可以真正执行的 ESFramework 实现合同。"
                     : "生成一个有明确权限、必读规则、执行步骤和交付格式的任务合同。",
                 expectedInputs = "用户目标、当前实现事实、必读规则、允许修改路径、验收标准。",
+                preconditions = "目标范围、权威规则和允许修改路径已明确；并行工作树已完成只读核对。",
+                allowedWriteScopes = "只允许修改用户目标和 Graph Constraint 明确列出的项目文件。",
+                forbiddenOperations = "不得扩大用户授权；不得擅自删除、提交 Git、发布、上传或修改无关并行分支。",
                 executionOutline = "读取权威规则\n核对分支、HEAD 与工作树\n按实现链修改目标文件\n运行相关编译和测试\n交付真实证据与剩余风险",
                 acceptanceCriteria = "不得只输出建议；必须完成授权范围内的真实实现，并逐项报告改动、验证和未完成项。",
+                requiredEvidence = "源码差异、目标工程编译、适用测试及未执行的 Unity 运行验证必须分层报告。",
+                blockedHandling = "遇到越权、依赖缺失或并行冲突时停止相关写入，报告阻断与所需决策。",
+                rollbackStrategy = "本轮写入失败时只回滚本事务产生的改动，不撤销用户或其他 AI 的并行修改。",
                 requiredSections = "必须先读\n执行边界\n实现步骤\n验证结果\n改动文件\n剩余风险"
             }), out _);
             if (skill != null) asset.UpdateNode(skill.nodeId, skill.typeId, skill.version, skill.title, JsonUtility.ToJson(new ESAgentSkillOutputPayload
             {
                 skillName = "es-new-module-workflow", targetProjectPath = ".agents/skills/es-new-module-workflow/",
                 description = "Execute a repeatable ESFramework module workflow with live rule reading, scoped writes, validation, and evidence-backed delivery.",
+                effectKind = ESAgentSkillEffectKind.ControlledMutation,
+                idempotency = ESAgentSkillIdempotency.BestEffort,
+                triggerScenarios = "需要按 ESFramework 项目规则实现或修改一个边界明确的模块任务时使用。",
+                nonTriggerScenarios = "纯解释、无项目上下文或用户未授权写入时不自动执行修改阶段。",
+                preconditions = "项目规则可读取，用户目标和授权范围明确，目标工作树可安全核对。",
+                requiredDependencies = "项目 AIWarnings、适用的项目 Skill、工作树审计和目标模块源码。",
+                inputContract = "用户目标、允许修改范围、目标模块路径和验收层级。",
                 workflow = "读取 Graph References\n核对工作树与模块事实\n执行受控修改\n运行验证\n交付证据与剩余风险",
+                outputContract = "实际改动、文件清单、分层验证证据、未完成项和剩余风险。",
+                sideEffects = "只在当前用户或 AICommand 已授权的项目范围内修改文件和运行验证。",
+                failureRecovery = "停止后续副作用，仅恢复本次可安全撤销的修改并保留诊断证据。",
+                permissionBoundary = "Skill 只定义工作流，不扩大用户或 AICommand 的权限。",
                 defaultPrompt = "Use $es-new-module-workflow to implement the scoped ESFramework module task."
             }), out _);
             asset.UpdateNode(validation.nodeId, validation.typeId, validation.version, validation.title,
@@ -323,7 +343,9 @@ namespace ES.EditorInternal
     [Serializable]
     public sealed class ESAgentArtifactGenerationRequest
     {
-        public int schemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
+
+        public int schemaVersion = CurrentSchemaVersion;
         public string requestId;
         public string createdAtUtc;
         public string requestDirectory;
@@ -334,7 +356,9 @@ namespace ES.EditorInternal
     [Serializable]
     public sealed class ESAgentGraphClipboardPackage
     {
-        public int schemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
+
+        public int schemaVersion = CurrentSchemaVersion;
         public ESAgentGraphCopyFormat format;
         public string requestId;
         public string generatedAtUtc;
@@ -386,6 +410,209 @@ namespace ES.EditorInternal
         public const string CandidateRoot = "ES/Automation/Candidates/AgentAuthoring";
         private const string LatestRequestEditorPref = "ES.AgentAuthoring.LatestRequest";
         private const string ArtifactIdentityMarkerLabel = "ES-AGENT-ARTIFACT-ID:";
+
+        public static bool TryCreateArtifactView(ESAgentArtifactGenerationSpec source,
+            ESAgentArtifactKind artifactKind, out ESAgentArtifactGenerationSpec artifactView,
+            out string error)
+        {
+            if (!Enum.IsDefined(typeof(ESAgentArtifactKind), artifactKind))
+            {
+                artifactView = null;
+                error = "GenerationSpec 或产物类型无效。";
+                return false;
+            }
+
+            string missingOutputError = artifactKind == ESAgentArtifactKind.AICommand
+                ? "整图没有 AICommand Output，无法作为 Command 使用或保存。"
+                : "整图没有 Agent Skill Output，无法作为 Skill 使用或保存。";
+            return TryCreateArtifactView(source, item => item.artifactKind == artifactKind,
+                false, missingOutputError, out artifactView, out error);
+        }
+
+        public static bool TryCreateArtifactView(ESAgentArtifactGenerationSpec source,
+            string outputNodeId, out ESAgentArtifactGenerationSpec artifactView, out string error)
+        {
+            if (string.IsNullOrWhiteSpace(outputNodeId))
+            {
+                artifactView = null;
+                error = "Output NodeId 不能为空。";
+                return false;
+            }
+
+            return TryCreateArtifactView(source,
+                item => string.Equals(item.nodeId, outputNodeId, StringComparison.Ordinal),
+                true, "GenerationSpec 中没有稳定 NodeId 对应的 Output：" + outputNodeId,
+                out artifactView, out error);
+        }
+
+        private static bool TryCreateArtifactView(ESAgentArtifactGenerationSpec source,
+            Func<ESAgentGenerationOutput, bool> selector, bool requireSingleOutput,
+            string missingOutputError, out ESAgentArtifactGenerationSpec artifactView, out string error)
+        {
+            artifactView = null;
+            if (source?.goal == null || selector == null)
+            {
+                error = "GenerationSpec 不完整。";
+                return false;
+            }
+            if (!ESAgentGenerationIntentValidator.TryValidate(source, out error))
+                return false;
+
+            ESAgentArtifactGenerationSpec cloned;
+            try
+            {
+                cloned = JsonUtility.FromJson<ESAgentArtifactGenerationSpec>(JsonUtility.ToJson(source));
+            }
+            catch (ArgumentException exception)
+            {
+                error = "无法建立独立整图视图：" + exception.Message;
+                return false;
+            }
+            if (cloned?.goal == null)
+            {
+                error = "GenerationSpec 缺少最终目的。";
+                return false;
+            }
+
+            ESAgentGenerationOutput[] selectedOutputs = (cloned.outputs
+                    ?? Array.Empty<ESAgentGenerationOutput>())
+                .Where(item => item != null && selector(item))
+                .ToArray();
+            if (selectedOutputs.Length == 0)
+            {
+                error = missingOutputError;
+                return false;
+            }
+            if (requireSingleOutput && selectedOutputs.Length != 1)
+            {
+                error = "Output NodeId 在 GenerationSpec 中不唯一，已拒绝局部执行。";
+                return false;
+            }
+            if (selectedOutputs.Any(item => !Enum.IsDefined(typeof(ESAgentArtifactKind), item.artifactKind)))
+            {
+                error = "所选 Output 的产物类型无效。";
+                return false;
+            }
+
+            ESAgentGenerationRelation[] sourceRelations = cloned.relations
+                ?? Array.Empty<ESAgentGenerationRelation>();
+            var incoming = new Dictionary<string, List<ESAgentGenerationRelation>>(StringComparer.Ordinal);
+            var outgoing = new Dictionary<string, List<ESAgentGenerationRelation>>(StringComparer.Ordinal);
+            for (int i = 0; i < sourceRelations.Length; i++)
+            {
+                ESAgentGenerationRelation relation = sourceRelations[i];
+                if (relation == null || string.IsNullOrWhiteSpace(relation.fromNodeId)
+                    || string.IsNullOrWhiteSpace(relation.toNodeId))
+                {
+                    error = "GenerationSpec 包含无法解析的思路图关系。";
+                    return false;
+                }
+                AddRelation(incoming, relation.toNodeId, relation);
+                AddRelation(outgoing, relation.fromNodeId, relation);
+            }
+
+            var retainedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+            var selectedOutputIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < selectedOutputs.Length; i++)
+            {
+                string nodeId = selectedOutputs[i].nodeId;
+                if (string.IsNullOrWhiteSpace(nodeId))
+                {
+                    error = "所选 Output 缺少稳定 NodeId。";
+                    return false;
+                }
+                retainedNodeIds.Add(nodeId);
+                selectedOutputIds.Add(nodeId);
+            }
+
+            TraverseRelations(selectedOutputIds, incoming, true, retainedNodeIds);
+            TraverseRelations(selectedOutputIds, outgoing, false, retainedNodeIds);
+            if (string.IsNullOrWhiteSpace(cloned.goal.nodeId)
+                || !retainedNodeIds.Contains(cloned.goal.nodeId))
+            {
+                error = "所选 Output 无法沿 Relations 回溯到最终目的。";
+                return false;
+            }
+
+            ESAgentGenerationValidation[] selectedValidations = (cloned.validations
+                    ?? Array.Empty<ESAgentGenerationValidation>())
+                .Where(item => item != null && retainedNodeIds.Contains(item.nodeId))
+                .ToArray();
+            if (selectedValidations.Length == 0)
+            {
+                error = "所选 Output 没有连接 Validation，不能绕过审查和人工批准门禁。";
+                return false;
+            }
+
+            ESAgentGenerationRelation[] retainedRelations = sourceRelations
+                .Where(item => retainedNodeIds.Contains(item.fromNodeId)
+                    && retainedNodeIds.Contains(item.toNodeId))
+                .ToArray();
+            for (int i = 0; i < selectedOutputs.Length; i++)
+            {
+                string outputId = selectedOutputs[i].nodeId;
+                bool hasRequirement = retainedRelations.Any(item => item.toNodeId == outputId);
+                bool hasValidation = retainedRelations.Any(item => item.fromNodeId == outputId
+                    && selectedValidations.Any(validation => validation.nodeId == item.toNodeId));
+                if (!hasRequirement || !hasValidation)
+                {
+                    error = "Output 的要求或 Validation 关系不完整：" + selectedOutputs[i].artifactName;
+                    return false;
+                }
+            }
+
+            artifactView = new ESAgentArtifactGenerationSpec
+            {
+                sourceGraphId = cloned.sourceGraphId,
+                sourceOriginGraphId = cloned.sourceOriginGraphId,
+                sourceContentSignature = cloned.sourceContentSignature,
+                goal = cloned.goal,
+                references = (cloned.references ?? Array.Empty<ESAgentGenerationReference>())
+                    .Where(item => item != null && retainedNodeIds.Contains(item.nodeId)).ToArray(),
+                constraints = (cloned.constraints ?? Array.Empty<ESAgentGenerationConstraint>())
+                    .Where(item => item != null && retainedNodeIds.Contains(item.nodeId)).ToArray(),
+                outputs = selectedOutputs,
+                validations = selectedValidations,
+                relations = retainedRelations
+            };
+            if (!ESAgentGenerationIntentValidator.TryValidate(artifactView, out error))
+            {
+                artifactView = null;
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+
+        private static void AddRelation(Dictionary<string, List<ESAgentGenerationRelation>> index,
+            string nodeId, ESAgentGenerationRelation relation)
+        {
+            if (!index.TryGetValue(nodeId, out List<ESAgentGenerationRelation> relations))
+            {
+                relations = new List<ESAgentGenerationRelation>();
+                index.Add(nodeId, relations);
+            }
+            relations.Add(relation);
+        }
+
+        private static void TraverseRelations(IEnumerable<string> roots,
+            Dictionary<string, List<ESAgentGenerationRelation>> index, bool traverseIncoming,
+            HashSet<string> retainedNodeIds)
+        {
+            var queue = new Queue<string>(roots);
+            while (queue.Count > 0)
+            {
+                string nodeId = queue.Dequeue();
+                if (!index.TryGetValue(nodeId, out List<ESAgentGenerationRelation> relations))
+                    continue;
+                for (int i = 0; i < relations.Count; i++)
+                {
+                    string next = traverseIncoming ? relations[i].fromNodeId : relations[i].toNodeId;
+                    if (retainedNodeIds.Add(next))
+                        queue.Enqueue(next);
+                }
+            }
+        }
 
         public static bool CreateAndSend(ESAgentArtifactGenerationSpec spec, out string requestDirectory,
             out string error)
@@ -476,10 +703,24 @@ namespace ES.EditorInternal
             requestId = string.Empty;
             dispatchMessage = string.Empty;
             if (spec?.goal == null || string.IsNullOrWhiteSpace(spec.goal.objective)
-                || string.IsNullOrWhiteSpace(spec.goal.successCriteria))
+                || string.IsNullOrWhiteSpace(spec.goal.successCriteria)
+                || spec.outputs == null || spec.outputs.Length == 0)
             {
                 error = "即时执行失败：最终目的和成功标准不能为空。";
                 return false;
+            }
+            if (!ESAgentGenerationIntentValidator.TryValidate(spec, out error))
+            {
+                error = "即时执行失败：" + error;
+                return false;
+            }
+            foreach (ESAgentGenerationOutput output in spec.outputs ?? Array.Empty<ESAgentGenerationOutput>())
+            {
+                if (!ESAgentGenerationContractValidator.TryValidate(output, out error))
+                {
+                    error = "即时执行失败：" + error;
+                    return false;
+                }
             }
             requestId = CreateRequestId("run");
             string prompt = BuildImmediateExecutionPrompt(spec, requestId);
@@ -493,6 +734,84 @@ namespace ES.EditorInternal
             if (!dispatch.IsDispatched)
             {
                 error = "即时执行未能发送（同步启动/配置失败）：" + dispatch.Message;
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+
+        public static bool SendSingleUse(ESAgentArtifactGenerationSpec spec,
+            ESAgentArtifactKind artifactKind, out string requestId, out string dispatchMessage,
+            out string error)
+        {
+            if (!TryCreateArtifactView(spec, artifactKind,
+                    out ESAgentArtifactGenerationSpec artifactView, out error))
+            {
+                requestId = string.Empty;
+                dispatchMessage = string.Empty;
+                return false;
+            }
+            if (artifactView.outputs.Length != 1)
+            {
+                requestId = string.Empty;
+                dispatchMessage = string.Empty;
+                error = "检测到多个同类 Output，请在目标节点卡片中执行局部使用。";
+                return false;
+            }
+
+            return SendSingleUseArtifactView(artifactView, out requestId, out dispatchMessage, out error);
+        }
+
+        public static bool SendSingleUse(ESAgentArtifactGenerationSpec spec, string outputNodeId,
+            out string requestId, out string dispatchMessage, out string error)
+        {
+            if (!TryCreateArtifactView(spec, outputNodeId,
+                    out ESAgentArtifactGenerationSpec artifactView, out error))
+            {
+                requestId = string.Empty;
+                dispatchMessage = string.Empty;
+                return false;
+            }
+
+            return SendSingleUseArtifactView(artifactView, out requestId, out dispatchMessage, out error);
+        }
+
+        private static bool SendSingleUseArtifactView(ESAgentArtifactGenerationSpec artifactView,
+            out string requestId, out string dispatchMessage, out string error)
+        {
+            requestId = string.Empty;
+            dispatchMessage = string.Empty;
+            if (artifactView?.outputs == null || artifactView.outputs.Length != 1)
+            {
+                error = "单次使用请求必须包含唯一且有效的 Output。";
+                return false;
+            }
+            if (artifactView.contractSchemaVersion != ESAgentArtifactGenerationSpec.CurrentContractSchemaVersion)
+            {
+                error = "单次使用请求的语义契约版本不受支持。";
+                return false;
+            }
+            ESAgentGenerationOutput output = artifactView.outputs[0];
+            if (!ESAgentGenerationContractValidator.TryValidate(output, out error))
+            {
+                return false;
+            }
+
+            requestId = CreateRequestId(output.artifactKind == ESAgentArtifactKind.AICommand
+                ? "command" : "skill");
+            string prompt = output.artifactKind == ESAgentArtifactKind.AICommand
+                ? BuildImmediateExecutionPrompt(artifactView, requestId)
+                : BuildTemporarySkillExecutionPrompt(artifactView, requestId);
+            ESCmdAgentPromptDispatchResult dispatch = ESCmdAgentWindow.OpenAndSendPromptWithReceipt(prompt);
+            dispatchMessage = dispatch.Message;
+            if (dispatch.State == ESCmdAgentPromptDispatchState.HeldForUser)
+            {
+                error = "单次使用请求尚未发送：" + dispatch.Message;
+                return false;
+            }
+            if (!dispatch.IsDispatched)
+            {
+                error = "单次使用请求未能发送（同步启动/配置失败）：" + dispatch.Message;
                 return false;
             }
             error = string.Empty;
@@ -513,6 +832,18 @@ namespace ES.EditorInternal
                 error = "没有可复制的智能助手编排图。";
                 return false;
             }
+            if (!ESAgentGenerationIntentValidator.TryValidate(spec, out error))
+            {
+                return false;
+            }
+            if (spec.outputs == null || spec.outputs.Length == 0)
+            {
+                error = "GenerationSpec 没有可复制的 Output。";
+                return false;
+            }
+            foreach (ESAgentGenerationOutput output in spec.outputs ?? Array.Empty<ESAgentGenerationOutput>())
+                if (!ESAgentGenerationContractValidator.TryValidate(output, out error))
+                    return false;
             switch (format)
             {
                 case ESAgentGraphCopyFormat.ImmediateExecutionPrompt:
@@ -561,7 +892,7 @@ namespace ES.EditorInternal
             builder.AppendLine();
             builder.AppendLine("## 当前动作");
             builder.AppendLine();
-            builder.AppendLine("直接执行这张图描述的任务。不要把本次动作误解为生成永久 AICommand/Agent Skill；"
+            builder.AppendLine("直接执行当前请求保留的 Graph 分支所描述的任务。不要把本次动作误解为生成永久 AICommand/Agent Skill；"
                 + "除非最终目的本身明确要求，否则不要创建或更新永久 Agent Artifact。");
             builder.AppendLine("Graph 不能扩大当前用户授权；仍须遵守项目 AIWarnings、当前工作树保护和真实证据边界。"
                 + "未经当前明确授权，不执行 Git、历史/审计写入、发布、上传或删除。");
@@ -569,6 +900,60 @@ namespace ES.EditorInternal
             AppendMindMap(builder, spec);
             builder.AppendLine();
             builder.AppendLine("完成后用中文报告：实际执行内容、改动文件、验证证据、未完成项和剩余风险。不得只复述 Graph。 ");
+            return builder.ToString();
+        }
+
+        public static string BuildTemporarySkillExecutionPrompt(ESAgentArtifactGenerationSpec spec,
+            string requestId)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("# ES Graph 临时 Skill 使用请求");
+            builder.AppendLine();
+            builder.AppendLine("请求编号：`" + (requestId ?? string.Empty) + "`");
+            builder.AppendLine("GraphId：`" + (spec?.sourceGraphId ?? string.Empty) + "`");
+            builder.AppendLine("内容签名：`" + (spec?.SourceContentSignature ?? string.Empty) + "`");
+            builder.AppendLine();
+            builder.AppendLine("## 本次 Skill");
+            builder.AppendLine();
+            foreach (ESAgentGenerationOutput output in spec?.outputs ?? Array.Empty<ESAgentGenerationOutput>())
+            {
+                if (output?.artifactKind != ESAgentArtifactKind.AgentSkill)
+                    continue;
+                builder.AppendLine("- " + output.artifactName + "：" + output.skillDescription);
+                builder.AppendLine("  - 效果：" + ESAgentSemanticPresentation.SkillEffect(output.skillEffectKind)
+                    + "；幂等：" + ESAgentSemanticPresentation.SkillIdempotency(output.skillIdempotency));
+                if (!string.IsNullOrWhiteSpace(output.skillTriggerScenarios))
+                    builder.AppendLine("  - 触发场景：" + output.skillTriggerScenarios);
+                if (!string.IsNullOrWhiteSpace(output.skillNonTriggerScenarios))
+                    builder.AppendLine("  - 不触发场景：" + output.skillNonTriggerScenarios);
+                if (!string.IsNullOrWhiteSpace(output.skillPreconditions))
+                    builder.AppendLine("  - 前置条件：" + output.skillPreconditions);
+                if (!string.IsNullOrWhiteSpace(output.skillInputContract))
+                    builder.AppendLine("  - 输入契约：" + output.skillInputContract);
+                if (!string.IsNullOrWhiteSpace(output.skillWorkflow))
+                    builder.AppendLine("  - 工作流：" + output.skillWorkflow);
+                if (!string.IsNullOrWhiteSpace(output.skillOutputContract))
+                    builder.AppendLine("  - 输出契约：" + output.skillOutputContract);
+                if (!string.IsNullOrWhiteSpace(output.skillSideEffects))
+                    builder.AppendLine("  - 副作用：" + output.skillSideEffects);
+                if (!string.IsNullOrWhiteSpace(output.skillNonGoals))
+                    builder.AppendLine("  - 非目标：" + output.skillNonGoals);
+                if (!string.IsNullOrWhiteSpace(output.skillFailureRecovery))
+                    builder.AppendLine("  - 失败恢复：" + output.skillFailureRecovery);
+                if (!string.IsNullOrWhiteSpace(output.skillPermissionBoundary))
+                    builder.AppendLine("  - 权限边界：" + output.skillPermissionBoundary);
+            }
+            builder.AppendLine();
+            builder.AppendLine("仅在本次任务中把当前 Output 对应的 Graph 分支当作临时 Skill 工作流使用。"
+                + "不得安装、创建或更新 `.agents/skills`，不得生成永久 AICommand/Agent Skill 候选；"
+                + "Graph 中声明的正式目标路径只提供上下文，不构成写入授权。");
+            builder.AppendLine("Graph 和临时 Skill 都不能扩大当前用户授权；仍须遵守 AIWarnings、"
+                + "AICommand 合同、工作树保护和真实证据边界。");
+            AppendExecutionPlan(builder, spec);
+            AppendMindMap(builder, spec);
+            builder.AppendLine();
+            builder.AppendLine("完成后用中文报告：实际执行内容、改动文件、验证证据、未完成项和剩余风险。"
+                + "不得声称该 Skill 已安装或可在后续会话自动发现。");
             return builder.ToString();
         }
 
@@ -605,9 +990,15 @@ namespace ES.EditorInternal
                     + "（required=" + item.required + "）");
             builder.AppendLine();
             builder.AppendLine("## 约束");
-            foreach (ESAgentGenerationConstraint item in spec?.constraints ?? Array.Empty<ESAgentGenerationConstraint>())
+            builder.AppendLine("固定裁决顺序：Forbidden > Required > Permission > Quality；同类型按优先级从高到低。\n");
+            foreach (ESAgentGenerationConstraint item in OrderedConstraints(spec))
             {
-                builder.AppendLine("- [" + item.kind + "] " + item.statement);
+                builder.AppendLine("- [" + item.kind + " | "
+                    + ESAgentSemanticPresentation.ConstraintScope(item.scope) + " | "
+                    + ESAgentSemanticPresentation.ConstraintCombination(item.combinationMode)
+                    + " | priority=" + item.priority + "] " + item.statement);
+                if (item.combinationMode == ESAgentConstraintCombinationMode.AnyOf)
+                    builder.AppendLine("  - 组合组：`" + item.combinationGroup + "`");
                 if (!string.IsNullOrWhiteSpace(item.rationale)) builder.AppendLine("  - 原因：" + item.rationale);
                 if (!string.IsNullOrWhiteSpace(item.verification)) builder.AppendLine("  - 验证：" + item.verification);
             }
@@ -621,15 +1012,35 @@ namespace ES.EditorInternal
                 builder.AppendLine("  - 创建 / 更新方式：" + OperationModeCaption(item.operationMode));
                 if (item.artifactKind == ESAgentArtifactKind.AICommand)
                 {
+                    builder.AppendLine("  - 任务意图：" + ESAgentSemanticPresentation.CommandIntent(item.commandIntent));
+                    builder.AppendLine("  - 写入授权：" + ESAgentSemanticPresentation.WriteAuthorization(item.writeAuthorization));
+                    builder.AppendLine("  - 风险等级：" + ESAgentSemanticPresentation.RiskLevel(item.commandRiskLevel));
+                    builder.AppendLine("  - 失败策略：" + ESAgentSemanticPresentation.FailurePolicy(item.failurePolicy));
                     if (!string.IsNullOrWhiteSpace(item.expectedInputs)) builder.AppendLine("  - 预期输入：" + item.expectedInputs);
+                    if (!string.IsNullOrWhiteSpace(item.preconditions)) builder.AppendLine("  - 前置条件：" + item.preconditions);
+                    if (!string.IsNullOrWhiteSpace(item.allowedWriteScopes)) builder.AppendLine("  - 允许写入范围：" + item.allowedWriteScopes);
+                    if (!string.IsNullOrWhiteSpace(item.forbiddenOperations)) builder.AppendLine("  - 禁止操作：" + item.forbiddenOperations);
                     if (!string.IsNullOrWhiteSpace(item.executionOutline)) builder.AppendLine("  - 执行步骤：" + item.executionOutline);
-                    if (!string.IsNullOrWhiteSpace(item.acceptanceCriteria)) builder.AppendLine("  - 验收标准：" + item.acceptanceCriteria);
+                    if (!string.IsNullOrWhiteSpace(item.acceptanceCriteria)) builder.AppendLine("  - 完成定义：" + item.acceptanceCriteria);
+                    if (!string.IsNullOrWhiteSpace(item.requiredEvidence)) builder.AppendLine("  - 必须证据：" + item.requiredEvidence);
+                    if (!string.IsNullOrWhiteSpace(item.blockedHandling)) builder.AppendLine("  - 阻断处理：" + item.blockedHandling);
+                    if (!string.IsNullOrWhiteSpace(item.rollbackStrategy)) builder.AppendLine("  - 回滚要求：" + item.rollbackStrategy);
                 }
                 else
                 {
+                    builder.AppendLine("  - 效果类型：" + ESAgentSemanticPresentation.SkillEffect(item.skillEffectKind));
+                    builder.AppendLine("  - 幂等策略：" + ESAgentSemanticPresentation.SkillIdempotency(item.skillIdempotency));
                     if (!string.IsNullOrWhiteSpace(item.skillTriggerScenarios)) builder.AppendLine("  - 触发场景：" + item.skillTriggerScenarios);
+                    if (!string.IsNullOrWhiteSpace(item.skillNonTriggerScenarios)) builder.AppendLine("  - 不触发场景：" + item.skillNonTriggerScenarios);
+                    if (!string.IsNullOrWhiteSpace(item.skillPreconditions)) builder.AppendLine("  - 前置条件：" + item.skillPreconditions);
+                    if (!string.IsNullOrWhiteSpace(item.skillRequiredDependencies)) builder.AppendLine("  - 必要依赖：" + item.skillRequiredDependencies);
+                    if (!string.IsNullOrWhiteSpace(item.skillInputContract)) builder.AppendLine("  - 输入契约：" + item.skillInputContract);
                     if (!string.IsNullOrWhiteSpace(item.skillWorkflow)) builder.AppendLine("  - 工作流程：" + item.skillWorkflow);
+                    if (!string.IsNullOrWhiteSpace(item.skillOutputContract)) builder.AppendLine("  - 输出契约：" + item.skillOutputContract);
+                    if (!string.IsNullOrWhiteSpace(item.skillSideEffects)) builder.AppendLine("  - 副作用：" + item.skillSideEffects);
+                    if (!string.IsNullOrWhiteSpace(item.skillFailureRecovery)) builder.AppendLine("  - 失败恢复：" + item.skillFailureRecovery);
                     if (!string.IsNullOrWhiteSpace(item.skillValidationSteps)) builder.AppendLine("  - 验证步骤：" + item.skillValidationSteps);
+                    if (!string.IsNullOrWhiteSpace(item.skillPermissionBoundary)) builder.AppendLine("  - 权限边界：" + item.skillPermissionBoundary);
                 }
             }
             builder.AppendLine();
@@ -652,6 +1063,10 @@ namespace ES.EditorInternal
                 error = "GenerationSpec 不能为空。";
                 return false;
             }
+            if (!ESAgentGenerationIntentValidator.TryValidate(spec, out error))
+            {
+                return false;
+            }
             if (!ESGraphIdentity.IsValid(spec.sourceGraphId))
             {
                 error = "GenerationSpec 缺少有效 GraphId。";
@@ -664,6 +1079,8 @@ namespace ES.EditorInternal
                     error = "GenerationSpec 包含空输出。";
                     return false;
                 }
+                if (!ESAgentGenerationContractValidator.TryValidate(output, out error))
+                    return false;
                 if (string.IsNullOrWhiteSpace(output.artifactId))
                     output.artifactId = ESAgentArtifactIdentity.Create(spec.sourceGraphId, output.nodeId);
                 if (string.IsNullOrWhiteSpace(output.artifactId))
@@ -931,9 +1348,14 @@ namespace ES.EditorInternal
                 builder.AppendLine("- [" + item.referenceKind + "] " + item.projectPath + " | " + item.purpose + " | required=" + item.required);
             builder.AppendLine();
             builder.AppendLine("Constraints：");
-            foreach (ESAgentGenerationConstraint item in request.spec.constraints ?? Array.Empty<ESAgentGenerationConstraint>())
+            builder.AppendLine("- precedence: Forbidden > Required > Permission > Quality; same kind uses descending priority.");
+            foreach (ESAgentGenerationConstraint item in OrderedConstraints(request.spec))
             {
-                builder.AppendLine("- [" + item.kind + "] " + item.statement);
+                builder.AppendLine("- [" + item.kind + "] scope=" + item.scope + ", combination="
+                    + item.combinationMode + ", priority=" + item.priority
+                    + (item.combinationMode == ESAgentConstraintCombinationMode.AnyOf
+                        ? ", group=" + item.combinationGroup : string.Empty)
+                    + " | " + item.statement);
                 if (!string.IsNullOrWhiteSpace(item.rationale)) builder.AppendLine("  原因：" + item.rationale);
                 if (!string.IsNullOrWhiteSpace(item.verification)) builder.AppendLine("  验证：" + item.verification);
             }
@@ -952,9 +1374,21 @@ namespace ES.EditorInternal
                 {
                     builder.AppendLine("  AICommand 候选正文必须原样包含 required marker；缺失或变更将被 Unity 候选校验拒绝。");
                     builder.AppendLine("  metadata: commandType=" + item.commandType + ", defaultWrite=" + item.defaultWrite + ", riskLevel=" + item.riskLevel);
+                    builder.AppendLine("  AICommand 必须原样包含以下元数据行：");
+                    builder.AppendLine("  命令类型：" + item.commandType);
+                    builder.AppendLine("  默认改文件：" + item.defaultWrite);
+                    builder.AppendLine("  风险等级：" + item.riskLevel);
+                    builder.AppendLine("  semantic contract: intent=" + item.commandIntent + ", writeAuthorization="
+                        + item.writeAuthorization + ", risk=" + item.commandRiskLevel + ", failurePolicy=" + item.failurePolicy);
                     builder.AppendLine("  expected inputs: " + item.expectedInputs);
+                    builder.AppendLine("  preconditions: " + item.preconditions);
+                    builder.AppendLine("  allowed write scopes: " + item.allowedWriteScopes);
+                    builder.AppendLine("  forbidden operations: " + item.forbiddenOperations);
                     builder.AppendLine("  execution outline: " + item.executionOutline);
-                    builder.AppendLine("  acceptance criteria: " + item.acceptanceCriteria);
+                    builder.AppendLine("  completion definition: " + item.acceptanceCriteria);
+                    builder.AppendLine("  required evidence: " + item.requiredEvidence);
+                    builder.AppendLine("  blocked handling: " + item.blockedHandling);
+                    builder.AppendLine("  rollback strategy: " + item.rollbackStrategy);
                 }
                 else
                 {
@@ -962,9 +1396,18 @@ namespace ES.EditorInternal
                     builder.AppendLine("  skill: description=" + item.skillDescription + ", workflow=" + item.skillWorkflow
                         + ", openaiYaml=" + item.includeAgentsMetadata + ", references=" + item.includeReferences
                         + ", scripts=" + item.includeScripts + ", defaultPrompt=" + item.defaultPrompt);
+                    builder.AppendLine("  semantic contract: effect=" + item.skillEffectKind + ", idempotency=" + item.skillIdempotency);
                     builder.AppendLine("  triggers: " + item.skillTriggerScenarios);
+                    builder.AppendLine("  non-triggers: " + item.skillNonTriggerScenarios);
+                    builder.AppendLine("  preconditions: " + item.skillPreconditions);
+                    builder.AppendLine("  dependencies: " + item.skillRequiredDependencies);
+                    builder.AppendLine("  input contract: " + item.skillInputContract);
+                    builder.AppendLine("  output contract: " + item.skillOutputContract);
+                    builder.AppendLine("  side effects: " + item.skillSideEffects);
                     builder.AppendLine("  non-goals: " + item.skillNonGoals);
+                    builder.AppendLine("  failure recovery: " + item.skillFailureRecovery);
                     builder.AppendLine("  validation: " + item.skillValidationSteps);
+                    builder.AppendLine("  permission boundary: " + item.skillPermissionBoundary);
                 }
                 if (item.resolvedOperation == ESAgentArtifactResolvedOperation.Update)
                     builder.AppendLine("  更新规则：只读现有正式目标，基于现有完整内容生成完整替换候选；禁止直接覆盖、局部追加或删除正式文件。");
@@ -990,6 +1433,16 @@ namespace ES.EditorInternal
             return builder.ToString();
         }
 
+        internal static IEnumerable<ESAgentGenerationConstraint> OrderedConstraints(
+            ESAgentArtifactGenerationSpec spec)
+        {
+            return (spec?.constraints ?? Array.Empty<ESAgentGenerationConstraint>())
+                .Where(item => item != null)
+                .OrderByDescending(item => ESAgentSemanticPresentation.ConstraintKindPrecedence(item.kind))
+                .ThenByDescending(item => item.priority)
+                .ThenBy(item => item.nodeId, StringComparer.Ordinal);
+        }
+
         private static string OperationModeCaption(ESAgentArtifactOperationMode value)
         {
             switch (value)
@@ -1012,7 +1465,7 @@ namespace ES.EditorInternal
         {
             ESAgentGenerationRelation[] relations = spec.relations ?? Array.Empty<ESAgentGenerationRelation>();
             builder.AppendLine();
-            builder.AppendLine("思路图关系（这是需求归属与生成顺序，不是运行时执行图）：");
+            builder.AppendLine("思路图关系（这是需求归属、约束作用和审查链，不是运行时执行图）：");
             if (relations.Length == 0)
             {
                 builder.AppendLine("- 无关系数据；拒绝猜测节点归属。 ");
@@ -1022,7 +1475,9 @@ namespace ES.EditorInternal
             {
                 ESAgentGenerationRelation relation = relations[i];
                 builder.AppendLine("- " + SafeTitle(relation.fromNodeTitle, relation.fromNodeTypeId) + " → "
-                    + SafeTitle(relation.toNodeTitle, relation.toNodeTypeId) + " [" + relation.semanticType + "]");
+                    + SafeTitle(relation.toNodeTitle, relation.toNodeTypeId) + " ["
+                    + ESAgentSemanticPresentation.RelationKind(relation.relationKind)
+                    + " / " + relation.semanticType + "]");
             }
             builder.AppendLine();
             builder.AppendLine("```mermaid");
@@ -1036,7 +1491,8 @@ namespace ES.EditorInternal
                 string toAlias = GetAlias(aliases, relation.toNodeId, ref nextAlias);
                 builder.AppendLine("    " + fromAlias + "[\"" + EscapeMermaid(SafeTitle(relation.fromNodeTitle, relation.fromNodeTypeId)) + "\"]");
                 builder.AppendLine("    " + toAlias + "[\"" + EscapeMermaid(SafeTitle(relation.toNodeTitle, relation.toNodeTypeId)) + "\"]");
-                builder.AppendLine("    " + fromAlias + " -->|" + EscapeMermaid(relation.semanticType) + "| " + toAlias);
+                builder.AppendLine("    " + fromAlias + " -->|"
+                    + EscapeMermaid(ESAgentSemanticPresentation.RelationKind(relation.relationKind)) + "| " + toAlias);
             }
             builder.AppendLine("```");
         }
@@ -1448,9 +1904,15 @@ namespace ES.EditorInternal
             builder.AppendLine();
             builder.AppendLine("## 约束");
             builder.AppendLine();
-            foreach (ESAgentGenerationConstraint item in spec?.constraints ?? Array.Empty<ESAgentGenerationConstraint>())
+            builder.AppendLine("固定裁决顺序：Forbidden > Required > Permission > Quality；同类型按优先级从高到低。\n");
+            foreach (ESAgentGenerationConstraint item in ESAgentArtifactGenerationWorkspace.OrderedConstraints(spec))
             {
-                builder.AppendLine("- [" + item.kind + "] " + item.statement);
+                builder.AppendLine("- [" + item.kind + " | "
+                    + ESAgentSemanticPresentation.ConstraintScope(item.scope) + " | "
+                    + ESAgentSemanticPresentation.ConstraintCombination(item.combinationMode)
+                    + " | priority=" + item.priority + "] " + item.statement);
+                if (item.combinationMode == ESAgentConstraintCombinationMode.AnyOf)
+                    AppendIndentedValue(builder, "组合组", item.combinationGroup);
                 AppendIndentedValue(builder, "原因", item.rationale);
                 AppendIndentedValue(builder, "验证", item.verification);
             }
@@ -1463,9 +1925,19 @@ namespace ES.EditorInternal
                 if (item.artifactKind != ESAgentArtifactKind.AICommand) continue;
                 AppendValue(builder, "命令名称", item.artifactName);
                 AppendValue(builder, "用途", item.requirements);
+                AppendValue(builder, "任务意图", ESAgentSemanticPresentation.CommandIntent(item.commandIntent));
+                AppendValue(builder, "写入授权", ESAgentSemanticPresentation.WriteAuthorization(item.writeAuthorization));
+                AppendValue(builder, "风险等级", ESAgentSemanticPresentation.RiskLevel(item.commandRiskLevel));
+                AppendValue(builder, "失败策略", ESAgentSemanticPresentation.FailurePolicy(item.failurePolicy));
                 AppendValue(builder, "预期输入", item.expectedInputs);
+                AppendValue(builder, "前置条件", item.preconditions);
+                AppendValue(builder, "允许写入范围", item.allowedWriteScopes);
+                AppendValue(builder, "禁止操作", item.forbiddenOperations);
                 AppendValue(builder, "执行步骤", item.executionOutline);
-                AppendValue(builder, "验收标准", item.acceptanceCriteria);
+                AppendValue(builder, "完成定义", item.acceptanceCriteria);
+                AppendValue(builder, "必须证据", item.requiredEvidence);
+                AppendValue(builder, "阻断处理", item.blockedHandling);
+                AppendValue(builder, "回滚要求", item.rollbackStrategy);
             }
 
             builder.AppendLine();
@@ -1529,11 +2001,18 @@ namespace ES.EditorInternal
                     ESAgentArtifactGenerationWorkspace.ReadUtf8(candidateManifestPath));
                 approval = JsonUtility.FromJson<ESAgentArtifactApprovalManifest>(
                     ESAgentArtifactGenerationWorkspace.ReadUtf8(approvalPath));
-                if (request?.spec == null || candidate == null || approval == null || approval.schemaVersion != 2
+                if (request?.spec == null || request.schemaVersion != ESAgentArtifactGenerationRequest.CurrentSchemaVersion
+                    || request.spec.contractSchemaVersion != ESAgentArtifactGenerationSpec.CurrentContractSchemaVersion
+                    || candidate == null || approval == null || approval.schemaVersion != 2
                     || !string.Equals(request.requestId, candidate.requestId, StringComparison.Ordinal)
                     || !string.Equals(request.requestId, approval.requestId, StringComparison.Ordinal))
                 {
                     error = "请求、候选和批准清单的身份不一致。";
+                    return false;
+                }
+                if (!ESAgentGenerationIntentValidator.TryValidate(request.spec, out string intentError))
+                {
+                    error = "请求的开发意图合同无效：" + intentError;
                     return false;
                 }
                 if (!string.Equals(currentSpec.sourceGraphId, request.spec.sourceGraphId, StringComparison.Ordinal)
@@ -1837,6 +2316,11 @@ namespace ES.EditorInternal
         {
             var errors = new List<string>();
             if (request == null || manifest == null) { errors.Add("请求或候选 Manifest 无法读取。"); return errors; }
+            if (request.schemaVersion != ESAgentArtifactGenerationRequest.CurrentSchemaVersion
+                || request.spec?.contractSchemaVersion != ESAgentArtifactGenerationSpec.CurrentContractSchemaVersion)
+                errors.Add("generation-request.json 的语义契约版本不受支持，请从当前 Graph 重新生成请求。");
+            else if (!ESAgentGenerationIntentValidator.TryValidate(request.spec, out string intentError))
+                errors.Add("generation-request.json 的开发意图合同无效：" + intentError);
             if (manifest.schemaVersion != 1 || !string.Equals(manifest.requestId, request.requestId, StringComparison.Ordinal))
                 errors.Add("candidate-manifest.json 与请求身份不匹配。");
             if (manifest.files == null || manifest.files.Length == 0) errors.Add("候选 Manifest 没有文件。\n");
@@ -1864,8 +2348,10 @@ namespace ES.EditorInternal
                 {
                     string text = StrictUtf8.GetString(File.ReadAllBytes(candidate));
                     if (text.IndexOf('\uFFFD') >= 0) errors.Add("包含 U+FFFD：" + file.candidateRelativePath);
-                    if (file.artifactKind == ESAgentArtifactKind.AICommand) ValidateAICommand(text, file, errors);
-                    else ValidateAgentSkillFile(text, file, errors);
+                    if (file.artifactKind == ESAgentArtifactKind.AICommand)
+                        ValidateAICommand(text, file, output, errors);
+                    else
+                        ValidateAgentSkillFile(text, file, output, errors);
                     ValidateArtifactIdentity(text, file, output, errors);
                 }
                 catch (Exception exception) { errors.Add("严格 UTF-8 失败 " + file.candidateRelativePath + "：" + exception.Message); }
@@ -2028,13 +2514,29 @@ namespace ES.EditorInternal
             return false;
         }
 
-        private static void ValidateAICommand(string text, ESAgentArtifactCandidateFile file, List<string> errors)
+        private static void ValidateAICommand(string text, ESAgentArtifactCandidateFile file,
+            ESAgentGenerationOutput output, List<string> errors)
         {
             string path = Normalize(file.targetProjectPath);
             if (!path.StartsWith("Assets/Plugins/ES/AICommands/", StringComparison.Ordinal) || !path.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
                 errors.Add("AICommand 正式路径非法：" + path);
             foreach (string metadata in new[] { "命令类型：", "默认改文件：", "风险等级：" })
                 if (text.IndexOf(metadata, StringComparison.Ordinal) < 0) errors.Add("AICommand 缺少元数据 " + metadata + " " + path);
+            if (output != null)
+            {
+                RequireContractText(text, "命令类型：" + output.commandType, "命令类型", path, errors);
+                RequireContractText(text, "默认改文件：" + output.defaultWrite, "写入授权与范围", path, errors);
+                RequireContractText(text, "风险等级：" + output.riskLevel, "风险等级", path, errors);
+                RequireContractText(text, output.expectedInputs, "输入契约", path, errors);
+                RequireContractText(text, output.preconditions, "前置条件", path, errors);
+                RequireContractText(text, output.allowedWriteScopes, "允许写入范围", path, errors);
+                RequireContractText(text, output.forbiddenOperations, "禁止操作", path, errors);
+                RequireContractText(text, output.executionOutline, "执行步骤", path, errors);
+                RequireContractText(text, output.acceptanceCriteria, "完成定义", path, errors);
+                RequireContractText(text, output.requiredEvidence, "证据要求", path, errors);
+                RequireContractText(text, output.blockedHandling, "阻断处理", path, errors);
+                RequireContractText(text, output.rollbackStrategy, "回滚策略", path, errors);
+            }
             foreach (string line in text.Replace("\r\n", "\n").Split('\n'))
             {
                 string value = line.Trim().Trim('`');
@@ -2044,7 +2546,8 @@ namespace ES.EditorInternal
             }
         }
 
-        private static void ValidateAgentSkillFile(string text, ESAgentArtifactCandidateFile file, List<string> errors)
+        private static void ValidateAgentSkillFile(string text, ESAgentArtifactCandidateFile file,
+            ESAgentGenerationOutput output, List<string> errors)
         {
             string target = Normalize(file.targetProjectPath);
             if (!IsAllowedAgentSkillFileTarget(target, out string targetError)) errors.Add(targetError);
@@ -2053,6 +2556,45 @@ namespace ES.EditorInternal
                 if (!text.StartsWith("---", StringComparison.Ordinal) || text.IndexOf("\nname:", StringComparison.Ordinal) < 0
                     || text.IndexOf("\ndescription:", StringComparison.Ordinal) < 0)
                     errors.Add("SKILL.md 缺少标准 YAML frontmatter：" + target);
+                if (output != null)
+                {
+                    RequireContractText(text, output.skillDescription, "能力说明", target, errors);
+                    RequireContractText(text, output.skillTriggerScenarios, "触发场景", target, errors);
+                    RequireContractText(text, output.skillNonTriggerScenarios, "非触发场景", target, errors);
+                    RequireContractText(text, output.skillPreconditions, "前置条件", target, errors);
+                    RequireContractText(text, output.skillRequiredDependencies, "必要依赖", target, errors);
+                    RequireContractText(text, output.skillInputContract, "输入契约", target, errors);
+                    RequireContractText(text, output.skillWorkflow, "工作流", target, errors);
+                    RequireContractText(text, output.skillOutputContract, "输出契约", target, errors);
+                    RequireContractText(text, output.skillSideEffects, "副作用", target, errors);
+                    RequireContractText(text, output.skillNonGoals, "非目标", target, errors);
+                    RequireContractText(text, output.skillFailureRecovery, "失败恢复", target, errors);
+                    RequireContractText(text, output.skillValidationSteps, "验证要求", target, errors);
+                    RequireContractText(text, output.skillPermissionBoundary, "权限边界", target, errors);
+                }
+            }
+        }
+
+        private static void RequireContractText(string text, string required, string label,
+            string path, List<string> errors)
+        {
+            if (string.IsNullOrWhiteSpace(required))
+            {
+                errors.Add("GenerationSpec 缺少" + label + "语义：" + path);
+                return;
+            }
+            string candidate = (text ?? string.Empty).Replace("\r\n", "\n");
+            string[] clauses = required.Replace("\r\n", "\n")
+                .Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < clauses.Length; i++)
+            {
+                string clause = clauses[i].Trim();
+                if (!string.IsNullOrEmpty(clause)
+                    && candidate.IndexOf(clause, StringComparison.Ordinal) < 0)
+                {
+                    errors.Add("候选未原样保留" + label + "语义：" + path + "；缺少：" + clause);
+                    return;
+                }
             }
         }
 

@@ -313,6 +313,24 @@ namespace ES
             this.RegisterCallback<PointerMoveEvent>(OnPointerMove);
         }
 
+        internal void RebindTrackClip(ITrackClip clip)
+        {
+            if (clip == null || ReferenceEquals(trackClip, clip))
+                return;
+
+            CancelPointerInteraction(false);
+            if (isRenaming)
+                CancelRename();
+
+            trackClip = clip;
+            UserData = clip;
+            m_ClipNameCache = clip.DisplayName ?? string.Empty;
+            m_LastAppliedClipName = null;
+            UpdateNodeView();
+            RefreshClipIcon();
+            RefreshEnabledVisual();
+        }
+
         public void SetSelected(bool selected)
         {
             SetSelected(selected, false);

@@ -1,12 +1,12 @@
 {
     "displayName": "ES Framework 主包",
     "version": "0.37.0",
-    "description": "ES框架的核心包，包含所有基础功能和组件",
+    "description": "ESFramework 内部完整包，包含框架源码、ESLogic、KCC、Newtonsoft.Json、受控 3_Examples、Odin、FinalIK 精简运行集、Easy Save 3 运行时及受控资源依赖闭包",
     "folderName": "Main",
     "unityDependencies": [
         {
             "name": "TextMeshPro",
-            "version": "3.0.6",
+            "version": "3.0.9",
             "description": "Unity文本渲染系统",
             "isRequired": true,
             "isInstalled": true,
@@ -26,7 +26,7 @@
         },
         {
             "name": "Timeline",
-            "version": "1.8.2",
+            "version": "1.7.6",
             "description": "Unity时间轴系统，用于创建复杂的动画和叙事序列",
             "isRequired": true,
             "isInstalled": true,
@@ -36,48 +36,85 @@
         },
         {
             "name": "Universal RP",
-            "version": "14.0.8",
+            "version": "14.0.11",
             "description": "Universal Render Pipeline，Unity的通用渲染管线",
             "isRequired": true,
             "isInstalled": true,
             "installUrl": "",
             "packageId": "com.unity.render-pipelines.universal",
             "checkClass": "UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset"
+        },
+        {
+            "name": "Input System",
+            "version": "1.11.2",
+            "description": "ES 输入与虚拟输入路由依赖",
+            "isRequired": true,
+            "packageId": "com.unity.inputsystem",
+            "checkClass": "UnityEngine.InputSystem.InputAction"
+        },
+        {
+            "name": "Cinemachine",
+            "version": "2.10.5",
+            "description": "ES 相机模块与项目逻辑程序集依赖",
+            "isRequired": true,
+            "packageId": "com.unity.cinemachine",
+            "checkClass": "Cinemachine.CinemachineVirtualCamera"
         }
     ],
     "gitDependencies": [
         {
-            "name": "Whisper",
-            "version": "1.0.0",
-            "description": "语音转文字支持",
+            "name": "UniTask",
+            "version": "2.5.11",
+            "description": "ES 异步资源与运行时任务基础依赖",
             "isRequired": true,
+            "gitUrl": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask#2e993ff18f28c931602a07292df0b0804eebef99",
+            "checkClass": "Cysharp.Threading.Tasks.UniTask"
+        },
+        {
+            "name": "MemoryPack",
+            "version": "1.21.4",
+            "description": "ES 数据序列化依赖",
+            "isRequired": true,
+            "gitUrl": "https://github.com/Cysharp/MemoryPack.git?path=src/MemoryPack.Unity/Assets/MemoryPack.Unity#0f2fe0827907940768293b7bb81b9605a7d8cba8",
+            "checkClass": "MemoryPack.MemoryPackSerializer"
+        },
+        {
+            "name": "HybridCLR",
+            "version": "8.12.0",
+            "description": "ES 热更新运行时与编辑器集成依赖",
+            "isRequired": true,
+            "gitUrl": "https://github.com/focus-creative-games/hybridclr_unity.git#e4def761d69b27b7b51a5de0f6d272861416a2d6",
+            "checkClass": "HybridCLR.RuntimeApi"
+        },
+        {
+            "name": "Luban",
+            "version": "061314200e2f",
+            "description": "ES 配置表生成工具依赖",
+            "isRequired": true,
+            "gitUrl": "https://github.com/focus-creative-games/luban_unity.git#061314200e2f03307c4d90b448e1de7b85431905",
+            "checkClass": "Luban.EditorBeanBase"
+        },
+        {
+            "name": "PrimeTween",
+            "version": "1.4.11",
+            "description": "ES 当前补间动画依赖",
+            "isRequired": true,
+            "gitUrl": "https://github.com/KyryloKuzyk/PrimeTween.git#3f06f369143fc896bc19cf346468818a0853ca11",
+            "checkClass": "PrimeTween.Tween"
+        },
+        {
+            "name": "Whisper",
+            "version": "f55ed3de1fa0",
+            "description": "可选语音转文字扩展；不属于 ESFramework 主包编译闭包",
+            "isRequired": false,
             "isInstalled": false,
-            "gitUrl": "https://gitcode.com/gh_mirrors/wh/whisper.unity.git",
+            "gitUrl": "https://gitcode.com/gh_mirrors/wh/whisper.unity.git?path=/Packages/com.whisper.unity#f55ed3de1fa08abc1924c95aef26ce86fba7b5dc",
             "checkClass": "Whisper.WhisperManager"
         }
     ],
-    "userDependencies": [
-        {
-            "name": "Odin Inspector",
-            "version": "3.1.0",
-            "description": "强大的Unity编辑器扩展，提供高级序列化、属性绘制器和编辑器工具",
-            "isRequired": false,
-            "isInstalled": true,
-            "checkClass": "Sirenix.OdinInspector.Editor.OdinEditorWindow",
-            "installInstructions": "从Unity Asset Store下载并导入Odin Inspector，或从Sirenix网站购买"
-        },
-        {
-            "name": "DOTween",
-            "version": "1.2.0",
-            "description": "快速、灵活的动画引擎，用于创建平滑的补间动画",
-            "isRequired": false,
-            "isInstalled": true,
-            "checkClass": "DG.Tweening.DOTween",
-            "installInstructions": "从Unity Asset Store下载并导入DOTween Pro，或使用免费版本"
-        }
-    ],
+    "userDependencies": [],
     "requiredMainPackages": [],
-    "installationNotes": "这是ES框架的核心包，必须首先安装",
+    "installationNotes": "先完成必需 UPM/Git 依赖检查，再安装主包。主包保留 3_Examples 主体，并直接包含 Odin、FinalIK 运行时/Inspector 和 Easy Save 3 运行时；项目绑定的 New Scene 1、Easy Save Save Slots 示例 UI、RootMotion 官方 Demo/Shared Demo Assets/Baker/第三方 Integration 和未纳入主包的 System.Speech 支持资产不进入正式包。只能在对应商业授权覆盖的项目和团队内使用或分发。测试程序集、Obsolete、Installer/Downloads 与可选 AITest Adapter 也不进入正式主包。",
     "tags": [
         "Core",
         "Framework",
@@ -85,6 +122,6 @@
     ],
     "author": "ES Framework Team",
     "website": "https://esframework.com",
-    "license": "MIT",
+    "license": "Mixed: ES MIT + bundled third-party commercial licenses",
     "checkClass": "ES.ESResMaster"
 }

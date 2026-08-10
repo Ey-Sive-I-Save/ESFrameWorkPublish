@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEditor;
@@ -37,68 +38,46 @@ namespace ES.EditorInternal.Installer
 
         private static async void CheckDependenciesOnStartup()
         {
-            // 只在有ESInstaller脚本的情况下检查
-            if (HasESInstallerScript())
-            {
-                await CheckAndShowInstallerIfNeededAsync();
-            }
+            if (!EditorPrefs.GetBool(GetAutoCheckPreferenceKey(), false))
+                return;
 
-
-        }
-
-        private static bool HasESInstallerScript()
-        {
-            // 检查ESInstaller脚本是否存在
-            var script = Resources.FindObjectsOfTypeAll<MonoScript>()
-                .FirstOrDefault(s => s.GetClass() == typeof(ESInstaller));
-            return script != null;
+            await CheckAndShowInstallerIfNeededAsync();
         }
 
         public static ESInstaller installer;
 
         private static async Task CheckAndShowInstallerIfNeededAsync()
         {
+            ESInstaller checkInstance = installer;
+            bool createdTemporaryInstance = false;
             try
             {
-
-
                 // 创建临时实例来检查配置
-                if (installer == null)
+                if (checkInstance == null)
                 {
-                    installer = EditorWindow.CreateInstance<ESInstaller>();
-
+                    checkInstance = EditorWindow.CreateInstance<ESInstaller>();
+                    installer = checkInstance;
+                    createdTemporaryInstance = true;
                 }
-                installer.InitializePaths();
-             //   Debug.Log("ES Installer 启动检查中..." + installer.configFilePath);
-                // 加载配置
-                if (File.Exists(installer.configFilePath))
+                if (checkInstance.currentProfile == null)
                 {
-//                    Debug.Log("加载配置文件: " + installer.configFilePath);
-                    string json = File.ReadAllText(installer.configFilePath);
-                    installer.currentProfile = JsonUtility.FromJson<InstallationProfile>(json);
-                }
-                else
-                {
-                    installer.InitializeDefaultProfile();
+                    checkInstance.InitializePaths();
+                    checkInstance.LoadConfiguration();
                 }
 
                 // 检查是否启用自动检查
-                if (!installer.currentProfile.enableAutoCheck)
-                {
-                    DestroyImmediate(installer);
+                if (!checkInstance.currentProfile.enableAutoCheck)
                     return;
-                }
 
                 // 检查是否跳过此次检查
-                if (installer.currentProfile.skipNextAutoCheck)
+                if (checkInstance.currentProfile.skipNextAutoCheck)
                 {
-                    installer.currentProfile.skipNextAutoCheck = false;
-                    installer.SaveConfiguration();
-                    DestroyImmediate(installer);
+                    checkInstance.currentProfile.skipNextAutoCheck = false;
+                    SessionState.SetBool(GetSkipNextAutoCheckSessionKey(), false);
                     return;
                 }
                 // 检查是否有未安装的必需依赖
-                bool hasUninstalledRequiredDependencies = await CheckForUninstalledRequiredDependenciesAsync(installer.currentProfile.mainPackage);
+                bool hasUninstalledRequiredDependencies = await CheckForUninstalledRequiredDependenciesAsync(checkInstance.currentProfile.mainPackage);
 
                 // 如果有未安装的必需依赖，显示安装器
                 if (hasUninstalledRequiredDependencies)
@@ -113,6 +92,15 @@ namespace ES.EditorInternal.Installer
             catch (Exception e)
             {
                 Debug.LogWarning($"ES Installer 启动检查失败: {e.Message}");
+            }
+            finally
+            {
+                if (createdTemporaryInstance && checkInstance != null)
+                {
+                    if (installer == checkInstance)
+                        installer = null;
+                    DestroyImmediate(checkInstance);
+                }
             }
         }
 
@@ -268,21 +256,15 @@ namespace ES.EditorInternal.Installer
 
         private static async Task QuickCheckAndShowResultAsync()
         {
+            ESInstaller tempInstance = null;
             try
             {
                 // 创建临时实例来检查配置
-                var tempInstance = EditorWindow.CreateInstance<ESInstaller>();
-                tempInstance.InitializePaths();
-
-                // 加载配置
-                if (File.Exists(tempInstance.configFilePath))
+                tempInstance = EditorWindow.CreateInstance<ESInstaller>();
+                if (tempInstance.currentProfile == null)
                 {
-                    string json = File.ReadAllText(tempInstance.configFilePath);
-                    tempInstance.currentProfile = JsonUtility.FromJson<InstallationProfile>(json);
-                }
-                else
-                {
-                    tempInstance.InitializeDefaultProfile();
+                    tempInstance.InitializePaths();
+                    tempInstance.LoadConfiguration();
                 }
 
                 // 检查是否有未安装的必需依赖
@@ -355,9 +337,6 @@ namespace ES.EditorInternal.Installer
                         "确定"
                     );
                 }
-
-                // 清理临时实例
-                DestroyImmediate(tempInstance);
             }
             catch (Exception e)
             {
@@ -367,6 +346,11 @@ namespace ES.EditorInternal.Installer
                     $"依赖检查过程中出现错误:\n\n{e.Message}",
                     "确定"
                 );
+            }
+            finally
+            {
+                if (tempInstance != null)
+                    DestroyImmediate(tempInstance);
             }
         }
 
@@ -638,7 +622,7 @@ namespace ES.EditorInternal.Installer
 
             public string installationNotes;
             public DateTime lastModified;
-            public bool enableAutoCheck = true; // 是否启用编辑器启动时自动检查
+            public bool enableAutoCheck = false; // 外部依赖检查默认由用户显式触发
             public bool skipNextAutoCheck = false; // 跳过下次自动检查
 
             /// <summary>
@@ -648,17 +632,13 @@ namespace ES.EditorInternal.Installer
             {
                 try
                 {
-                    // 查找ESInstaller脚本的路径
-                    string[] guids = AssetDatabase.FindAssets("ESInstaller t:MonoScript");
-                    if (guids.Length == 0)
-                    {
-                        Debug.LogWarning("无法找到ESInstaller脚本");
-                        return CreateDefaultProfile();
-                    }
-
-                    string scriptPath = AssetDatabase.GUIDToAssetPath(guids[0]);
-                    string scriptFolder = Path.GetDirectoryName(scriptPath);
-                    string downloadsFolder = Path.Combine(scriptFolder, "Downloads");
+                    string downloadsFolder = Path.Combine(
+                        Application.dataPath,
+                        "Plugins",
+                        "ES",
+                        "Editor",
+                        "Installer",
+                        "Downloads");
 
                     if (!Directory.Exists(downloadsFolder))
                     {
@@ -717,7 +697,7 @@ namespace ES.EditorInternal.Installer
                 {
                     profileName = "Default Profile",
                     mainPackage = new ESMainPackage(),
-                    enableAutoCheck = true,
+                    enableAutoCheck = false,
                     skipNextAutoCheck = false,
                     lastModified = DateTime.Now
                 };
@@ -746,11 +726,14 @@ namespace ES.EditorInternal.Installer
         private bool showESPackageSystem = true;
         private bool showInstallation = true;
         private bool showDebug = false;
+        private bool showDependencyEditor;
         private string statusMessage = "";
         private MessageType statusType = MessageType.Info;
 
         private string downloadsFolderPath;
         private const string DOWNLOADS_FOLDER_NAME = "Downloads";
+        private const string AutoCheckPreferencePrefix = "ESInstaller.AutoCheck.";
+        private const string SkipNextAutoCheckSessionPrefix = "ESInstaller.SkipNextAutoCheck.";
 
         // UI样式
         private GUIStyle headerStyle;
@@ -759,7 +742,7 @@ namespace ES.EditorInternal.Installer
         private GUIStyle packageNameStyle;
 
         // UI状态
-        private bool hasInitialized = false;
+        private bool isRefreshingStatuses;
         private bool isMainPackageInstalled = false; // 主包是否已安装
 
         // 包选择相关
@@ -771,7 +754,7 @@ namespace ES.EditorInternal.Installer
         private bool isConfigModified = false;
         private string configFilePath;
 
-        private const string UnityPackageTrustManifestFileName = "es-unitypackage.manifest.json";
+        private const string UnityPackageTrustManifestFileName = ESInstallerPackageTrust.ManifestFileName;
         private readonly Queue<VerifiedUnityPackage> verifiedImportQueue = new Queue<VerifiedUnityPackage>();
         private VerifiedUnityPackage activeVerifiedImport;
         private string lastImportReceiptPath;
@@ -783,29 +766,10 @@ namespace ES.EditorInternal.Installer
         [MenuItem(MenuItemPathDefine.INSTALL_DEPENDENCY_PATH + "安装管理器", false, 0)]
         static void ShowInstaller()
         {
-            if (installer == null)
-            {
-                installer = GetWindow<ESInstaller>("ES 安装管理器");
-            }
+            installer = GetWindow<ESInstaller>("ES 安装管理器");
             installer.minSize = new Vector2(600, 500);
             installer.Show();
-
-            installer.InitializePaths();
-            installer.LoadConfiguration();
-            // 加载配置
-            if (File.Exists(installer.configFilePath))
-            {
-                string json = File.ReadAllText(installer.configFilePath);
-                installer.currentProfile = JsonUtility.FromJson<InstallationProfile>(json);
-            }
-            else
-            {
-                installer.InitializeDefaultProfile();
-            }
-
-            //在这个地方开始执行异步方法,检查全部资源
-            installer.ScanAndLoadAllPackages();
-            _ = installer.CheckAllPackagesInstallStateAsync();
+            installer.Focus();
         }
 
         [MenuItem(MenuItemPathDefine.INSTALL_DEPENDENCY_PATH + "检查依赖", false, 2)]
@@ -832,8 +796,12 @@ namespace ES.EditorInternal.Installer
           //  Debug.Log("ES Installer 窗口已启用"); 
             InitializePaths();
             LoadConfiguration();
-            ScanAndLoadAllPackages(); // 扫描并加载所有包
-            _ = CheckAllPackagesInstallStateAsync(); // 异步检查所有包的安装状态
+
+            if (string.IsNullOrEmpty(statusMessage))
+            {
+                statusMessage = "配置和本地包已加载；点击“刷新状态”检查外部依赖。";
+                statusType = MessageType.Info;
+            }
 
             AssetDatabase.importPackageCompleted -= OnTrustedImportCompleted;
             AssetDatabase.importPackageCompleted += OnTrustedImportCompleted;
@@ -862,26 +830,6 @@ namespace ES.EditorInternal.Installer
             {
                 Directory.CreateDirectory(downloadsFolderPath);
             }
-        }
-
-        [Serializable]
-        private sealed class UnityPackageTrustManifest
-        {
-            public int schemaVersion;
-            public string keyId = string.Empty;
-            public string packageId = string.Empty;
-            public string packageVersion = string.Empty;
-            public string source = string.Empty;
-            public List<UnityPackageTrustArtifact> artifacts = new List<UnityPackageTrustArtifact>();
-            public string signature = string.Empty;
-        }
-
-        [Serializable]
-        private sealed class UnityPackageTrustArtifact
-        {
-            public string relativePath = string.Empty;
-            public long size;
-            public string sha256 = string.Empty;
         }
 
         private sealed class VerifiedUnityPackage
@@ -922,18 +870,9 @@ namespace ES.EditorInternal.Installer
 
         private static class ESInstallerTrustedKeys
         {
-            private static readonly Dictionary<string, string> TrustedRsaPublicKeys =
-                new Dictionary<string, string>(StringComparer.Ordinal)
-                {
-                    // 只能由发布责任人通过代码审查提交 RSA 公钥；包目录和 package.json 不能注册 key。
-                };
-
             public static bool TryGetRsaPublicKey(string keyId, out string publicKeyXml)
             {
-                publicKeyXml = null;
-                return !string.IsNullOrWhiteSpace(keyId)
-                    && TrustedRsaPublicKeys.TryGetValue(keyId, out publicKeyXml)
-                    && !string.IsNullOrWhiteSpace(publicKeyXml);
+                return ESInstallerPackageTrust.TryGetTrustedRsaPublicKey(keyId, out publicKeyXml);
             }
         }
 
@@ -1212,31 +1151,7 @@ namespace ES.EditorInternal.Installer
             UnityPackageTrustManifest manifest,
             List<UnityPackageTrustArtifact> artifacts)
         {
-            var ordered = new List<UnityPackageTrustArtifact>(artifacts);
-            ordered.Sort((left, right) => StringComparer.Ordinal.Compare(left.relativePath, right.relativePath));
-            var builder = new StringBuilder();
-            builder.Append("ESInstaller.UnityPackageManifest\n");
-            builder.Append("schemaVersion=").Append(manifest.schemaVersion).Append('\n');
-            AppendCanonicalManifestField(builder, "keyId", manifest.keyId);
-            AppendCanonicalManifestField(builder, "packageId", manifest.packageId);
-            AppendCanonicalManifestField(builder, "packageVersion", manifest.packageVersion);
-            AppendCanonicalManifestField(builder, "source", manifest.source);
-            builder.Append("artifactCount=").Append(ordered.Count).Append('\n');
-            for (int i = 0; i < ordered.Count; i++)
-            {
-                UnityPackageTrustArtifact artifact = ordered[i];
-                builder.Append("artifact[").Append(i).Append("]\n");
-                AppendCanonicalManifestField(builder, "relativePath", artifact.relativePath);
-                builder.Append("size=").Append(artifact.size).Append('\n');
-                AppendCanonicalManifestField(builder, "sha256", artifact.sha256.ToLowerInvariant());
-            }
-
-            return builder.ToString();
-        }
-
-        private static void AppendCanonicalManifestField(StringBuilder builder, string fieldName, string value)
-        {
-            builder.Append(fieldName).Append('=').Append(value).Append('\n');
+            return ESInstallerPackageTrust.BuildCanonicalManifestPayload(manifest, artifacts);
         }
 
         private static bool TryResolveManifestArtifactPath(string packageDirectory, string relativePath, out string fullPath, out string error)
@@ -1344,6 +1259,49 @@ namespace ES.EditorInternal.Installer
             ShowStatus(operationName + "：已完成签名、Size、SHA-256 与受信暂存校验，准备导入 " + verifiedPackages.Count + " 个包。", MessageType.Info);
             StartNextTrustedImport();
             return true;
+        }
+
+        private static bool ConfirmTrustedImportPreview(
+            IReadOnlyList<VerifiedUnityPackage> verifiedPackages,
+            string operationName)
+        {
+            if (verifiedPackages == null || verifiedPackages.Count == 0)
+                return false;
+
+            long totalBytes = 0;
+            bool containsDevelopmentSignature = false;
+            var preview = new StringBuilder();
+            for (int i = 0; i < verifiedPackages.Count; i++)
+            {
+                VerifiedUnityPackage package = verifiedPackages[i];
+                totalBytes += package.size;
+                containsDevelopmentSignature |= string.Equals(
+                    package.keyId,
+                    ESInstallerPackageTrust.LocalDevelopmentKeyId,
+                    StringComparison.Ordinal);
+                preview.Append("• ")
+                    .Append(Path.GetFileName(package.originalPath))
+                    .Append(" | ")
+                    .Append(package.packageVersion)
+                    .Append(" | ")
+                    .Append(package.size / 1024L)
+                    .Append(" KB | SHA-256 ")
+                    .Append(package.sha256.Substring(0, Math.Min(12, package.sha256.Length)))
+                    .Append("…\n");
+            }
+
+            string trustWarning = containsDevelopmentSignature
+                ? "\n警告：其中包含仅本机受信的开发签名，不能作为生产发布证据。\n"
+                : string.Empty;
+            return EditorUtility.DisplayDialog(
+                operationName + "影响预览",
+                "以下包已通过签名、Size、SHA-256 和可信暂存校验：\n\n"
+                + preview
+                + "\n合计：" + verifiedPackages.Count + " 个包，" + (totalBytes / 1024L) + " KB。"
+                + trustWarning
+                + "\n继续后将打开 Unity 标准 Import Package 面板；最终导入内容仍由你确认。",
+                "继续导入",
+                "取消");
         }
 
         private void StartNextTrustedImport()
@@ -1662,10 +1620,38 @@ namespace ES.EditorInternal.Installer
 
         private void LoadConfiguration()
         {
-            currentProfile = InstallationProfile.LoadFromFile();
+            // InitializePaths 已给出受控 Downloads 根，不需要为定位本脚本执行全项目 FindAssets。
+            currentProfile = new InstallationProfile();
+            ScanAndLoadAllPackages();
+            currentProfile.enableAutoCheck = EditorPrefs.GetBool(GetAutoCheckPreferenceKey(), false);
+            currentProfile.skipNextAutoCheck = SessionState.GetBool(GetSkipNextAutoCheckSessionKey(), false);
+        }
 
-            // 检查主包安装状态
-            CheckMainPackageInstallation();
+        private static string GetAutoCheckPreferenceKey()
+        {
+            return AutoCheckPreferencePrefix + GetProjectIdentityHash();
+        }
+
+        private static string GetSkipNextAutoCheckSessionKey()
+        {
+            return SkipNextAutoCheckSessionPrefix + GetProjectIdentityHash();
+        }
+
+        private static string GetProjectIdentityHash()
+        {
+            string projectRoot = (Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath)
+                .Replace('\\', '/')
+                .TrimEnd('/')
+                .ToLowerInvariant();
+            byte[] bytes = Encoding.UTF8.GetBytes(projectRoot);
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                byte[] hash = sha256.ComputeHash(bytes);
+                var builder = new StringBuilder(16);
+                for (int i = 0; i < 8; i++)
+                    builder.Append(hash[i].ToString("x2"));
+                return builder.ToString();
+            }
         }
 
         /// <summary>
@@ -1882,14 +1868,20 @@ namespace ES.EditorInternal.Installer
                     currentProfile.mainPackage.displayName = packageData.displayName;
                     currentProfile.mainPackage.version = packageData.version;
                     currentProfile.mainPackage.description = packageData.description;
+                    currentProfile.mainPackage.folderName = string.IsNullOrWhiteSpace(packageData.folderName) ? "Main" : packageData.folderName;
                     currentProfile.mainPackage.checkClass = packageData.checkClass;
                     currentProfile.mainPackage.assetPath = packageData.assetPath;
                     currentProfile.mainPackage.installNotes = packageData.installationNotes;
+                    currentProfile.mainPackage.tags = packageData.tags != null ? new List<string>(packageData.tags) : new List<string>();
+                    currentProfile.mainPackage.author = packageData.author;
+                    currentProfile.mainPackage.website = packageData.website;
+                    currentProfile.mainPackage.license = packageData.license;
 
                     // 更新依赖项
                     currentProfile.mainPackage.unityDependencies?.Clear();
                     currentProfile.mainPackage.gitDependencies?.Clear();
                     currentProfile.mainPackage.userDependencies?.Clear();
+                    currentProfile.mainPackage.assetFileDependencies?.Clear();
 
 
                     if (packageData.unityDependencies != null)
@@ -1904,7 +1896,8 @@ namespace ES.EditorInternal.Installer
                                 description = dep.description,
                                 packageId = dep.packageId,
                                 isRequired = dep.isRequired,
-                                checkClass = dep.checkClass
+                                checkClass = dep.checkClass,
+                                installUrl = dep.installUrl
                             });
                         }
                     }
@@ -1918,6 +1911,7 @@ namespace ES.EditorInternal.Installer
                             {
                                 name = dep.name,
                                 version = dep.version,
+                                description = dep.description,
                                 gitUrl = dep.gitUrl,
                                 checkClass = dep.checkClass,
                                 isRequired = dep.isRequired
@@ -1933,6 +1927,7 @@ namespace ES.EditorInternal.Installer
                             {
                                 name = dep.name,
                                 version = dep.version,
+                                description = dep.description,
                                 checkClass = dep.checkClass,
                                 installInstructions = dep.installInstructions,
                                 isRequired = dep.isRequired
@@ -1948,6 +1943,7 @@ namespace ES.EditorInternal.Installer
                             {
                                 name = dep.name,
                                 version = dep.version,
+                                description = dep.description,
                                 assetPath = dep.assetPath,
                                 checkClass = dep.checkClass,
                                 isRequired = dep.isRequired
@@ -2062,7 +2058,8 @@ namespace ES.EditorInternal.Installer
                         description = dep.description,
                         packageId = dep.packageId,
                         isRequired = dep.isRequired,
-                        checkClass = dep.checkClass
+                        checkClass = dep.checkClass,
+                        installUrl = dep.installUrl
                     });
                 }
             }
@@ -2076,6 +2073,7 @@ namespace ES.EditorInternal.Installer
                     {
                         name = dep.name,
                         version = dep.version,
+                        description = dep.description,
                         gitUrl = dep.gitUrl,
                         checkClass = dep.checkClass,
                         isRequired = dep.isRequired
@@ -2092,6 +2090,7 @@ namespace ES.EditorInternal.Installer
                     {
                         name = dep.name,
                         version = dep.version,
+                        description = dep.description,
                         checkClass = dep.checkClass,
                         installInstructions = dep.installInstructions,
                         isRequired = dep.isRequired
@@ -2137,7 +2136,8 @@ namespace ES.EditorInternal.Installer
                         description = dep.description,
                         packageId = dep.packageId,
                         isRequired = dep.isRequired,
-                        checkClass = dep.checkClass
+                        checkClass = dep.checkClass,
+                        installUrl = dep.installUrl
                     });
                 }
             }
@@ -2150,6 +2150,7 @@ namespace ES.EditorInternal.Installer
                     {
                         name = dep.name,
                         version = dep.version,
+                        description = dep.description,
                         gitUrl = dep.gitUrl,
                         checkClass = dep.checkClass,
                         isRequired = dep.isRequired
@@ -2165,6 +2166,7 @@ namespace ES.EditorInternal.Installer
                     {
                         name = dep.name,
                         version = dep.version,
+                        description = dep.description,
                         checkClass = dep.checkClass,
                         installInstructions = dep.installInstructions,
                         isRequired = dep.isRequired
@@ -2180,6 +2182,7 @@ namespace ES.EditorInternal.Installer
                     {
                         name = dep.name,
                         version = dep.version,
+                        description = dep.description,
                         assetPath = dep.assetPath,
                         checkClass = dep.checkClass,
                         isRequired = dep.isRequired
@@ -2286,6 +2289,7 @@ namespace ES.EditorInternal.Installer
             public bool isRequired;
             public string checkClass; // 可选：用于验证安装状态的完整类名
             public string packageId; // Unity Package Manager ID
+            public string installUrl;
         }
 
         [System.Serializable]
@@ -2293,6 +2297,7 @@ namespace ES.EditorInternal.Installer
         {
             public string name;
             public string version;
+            public string description;
             public string gitUrl;
             public string checkClass;
             public bool isRequired;
@@ -2303,6 +2308,7 @@ namespace ES.EditorInternal.Installer
         {
             public string name;
             public string version;
+            public string description;
             public string checkClass;
             public string installInstructions;
             public bool isRequired;
@@ -2313,6 +2319,7 @@ namespace ES.EditorInternal.Installer
         {
             public string name;
             public string version;
+            public string description;
             public string assetPath;
             public string checkClass;
             public bool isRequired;
@@ -2355,13 +2362,6 @@ namespace ES.EditorInternal.Installer
             {
                 InitializePaths();
                 LoadConfiguration();
-            }
-
-            // 首次显示时自动刷新所有状态
-            if (!hasInitialized)
-            {
-                RefreshAllStatuses();
-                hasInitialized = true;
             }
 
             // 标题
@@ -2756,12 +2756,35 @@ namespace ES.EditorInternal.Installer
             // 自动检查设置
             EditorGUILayout.Space(5);
             EditorGUILayout.LabelField("自动检查设置", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField($"启用编辑器启动时自动检查: {(currentProfile.enableAutoCheck ? "是" : "否")}");
+            EditorGUI.BeginChangeCheck();
+            bool enableAutoCheck = EditorGUILayout.ToggleLeft(
+                "启动 Unity 后自动检查外部依赖（可能访问 Package Manager / Git）",
+                currentProfile.enableAutoCheck);
+            if (EditorGUI.EndChangeCheck())
+            {
+                currentProfile.enableAutoCheck = enableAutoCheck;
+                EditorPrefs.SetBool(GetAutoCheckPreferenceKey(), enableAutoCheck);
+                ShowStatus(enableAutoCheck ? "已启用项目级启动依赖检查。" : "已关闭项目级启动依赖检查。", MessageType.Info);
+            }
 
             if (currentProfile.enableAutoCheck)
             {
-                EditorGUILayout.LabelField($"跳过下次自动检查: {(currentProfile.skipNextAutoCheck ? "是" : "否")}");
-                EditorGUILayout.HelpBox("启用后，每次打开Unity编辑器时会自动检查依赖状态，如果发现未安装的必需依赖会弹出安装器。", MessageType.Info);
+                EditorGUILayout.HelpBox("该开关按项目保存。默认关闭；启用后会在启动时检查必需依赖。", MessageType.Info);
+                if (GUILayout.Button(currentProfile.skipNextAutoCheck ? "已设置跳过下次启动检查" : "跳过下次启动检查", GUILayout.MinHeight(24)))
+                {
+                    currentProfile.skipNextAutoCheck = true;
+                    SessionState.SetBool(GetSkipNextAutoCheckSessionKey(), true);
+                }
+            }
+
+            EditorGUILayout.Space(5);
+            showDependencyEditor = EditorGUILayout.Foldout(showDependencyEditor, "编辑主包依赖清单", true);
+            if (showDependencyEditor)
+            {
+                EditorGUILayout.HelpBox(
+                    "这里编辑的是 Downloads/Main/package.json。Git 依赖必须固定到完整 commit；商业插件只声明检查，不会被打进主包。",
+                    MessageType.Info);
+                DrawMainDependencyConfigurationEditor();
             }
 
             EditorGUILayout.BeginHorizontal();
@@ -2792,6 +2815,21 @@ namespace ES.EditorInternal.Installer
                 }
             }
 
+            if (GUILayout.Button("定位配置"))
+            {
+                string assetPath = configFilePath.Replace('\\', '/');
+                TextAsset configAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(assetPath);
+                if (configAsset != null)
+                {
+                    Selection.activeObject = configAsset;
+                    EditorGUIUtility.PingObject(configAsset);
+                }
+                else
+                {
+                    ShowStatus("无法在 Project 中定位主包配置：" + assetPath, MessageType.Warning);
+                }
+            }
+
             if (GUILayout.Button("🔄 重置为默认"))
             {
                 bool confirmReset = EditorUtility.DisplayDialog(
@@ -2813,6 +2851,164 @@ namespace ES.EditorInternal.Installer
             EditorGUILayout.LabelField($"最后修改: {currentProfile.lastModified:yyyy-MM-dd HH:mm:ss}", EditorStyles.miniLabel);
 
             EditorGUILayout.EndVertical();
+        }
+
+        private void DrawMainDependencyConfigurationEditor()
+        {
+            ESMainPackage package = currentProfile.mainPackage;
+            package.unityDependencies ??= new List<UnityPackageDependency>();
+            package.gitDependencies ??= new List<GitPackageDependency>();
+            package.userDependencies ??= new List<UserPackageDependency>();
+            package.assetFileDependencies ??= new List<AssetFileDependency>();
+
+            EditorGUI.BeginChangeCheck();
+            DrawUnityDependencyConfiguration(package.unityDependencies);
+            DrawGitDependencyConfiguration(package.gitDependencies);
+            DrawUserDependencyConfiguration(package.userDependencies);
+            DrawAssetDependencyConfiguration(package.assetFileDependencies);
+            if (EditorGUI.EndChangeCheck())
+                isConfigModified = true;
+
+            if (GUILayout.Button("校验依赖配置", GUILayout.MinHeight(26)))
+            {
+                if (TryValidateMainPackageConfiguration(out string validationError))
+                    ShowStatus("主包依赖配置有效，可以保存。", MessageType.Info);
+                else
+                    ShowStatus("主包依赖配置无效：" + validationError, MessageType.Error);
+            }
+        }
+
+        private void DrawUnityDependencyConfiguration(List<UnityPackageDependency> dependencies)
+        {
+            EditorGUILayout.LabelField("Unity / Registry 依赖", EditorStyles.boldLabel);
+            for (int i = 0; i < dependencies.Count; i++)
+            {
+                UnityPackageDependency dependency = dependencies[i] ?? (dependencies[i] = new UnityPackageDependency());
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.BeginHorizontal();
+                dependency.name = EditorGUILayout.TextField("名称", dependency.name);
+                if (GUILayout.Button("删除", GUILayout.MinWidth(52), GUILayout.MaxWidth(64)))
+                {
+                    dependencies.RemoveAt(i);
+                    isConfigModified = true;
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUILayout.EndVertical();
+                    break;
+                }
+                EditorGUILayout.EndHorizontal();
+                dependency.version = EditorGUILayout.TextField("版本", dependency.version);
+                dependency.packageId = EditorGUILayout.TextField("Package ID", dependency.packageId);
+                dependency.checkClass = EditorGUILayout.TextField("检查类", dependency.checkClass);
+                dependency.description = EditorGUILayout.TextField("说明", dependency.description);
+                dependency.isRequired = EditorGUILayout.Toggle("必需", dependency.isRequired);
+                EditorGUILayout.EndVertical();
+            }
+            if (GUILayout.Button("添加 Unity 依赖", GUILayout.MinHeight(24)))
+            {
+                dependencies.Add(new UnityPackageDependency());
+                isConfigModified = true;
+            }
+        }
+
+        private void DrawGitDependencyConfiguration(List<GitPackageDependency> dependencies)
+        {
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("Git UPM 依赖", EditorStyles.boldLabel);
+            for (int i = 0; i < dependencies.Count; i++)
+            {
+                GitPackageDependency dependency = dependencies[i] ?? (dependencies[i] = new GitPackageDependency());
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.BeginHorizontal();
+                dependency.name = EditorGUILayout.TextField("名称", dependency.name);
+                if (GUILayout.Button("删除", GUILayout.MinWidth(52), GUILayout.MaxWidth(64)))
+                {
+                    dependencies.RemoveAt(i);
+                    isConfigModified = true;
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUILayout.EndVertical();
+                    break;
+                }
+                EditorGUILayout.EndHorizontal();
+                dependency.version = EditorGUILayout.TextField("版本", dependency.version);
+                dependency.gitUrl = EditorGUILayout.TextField("Git URL", dependency.gitUrl);
+                dependency.checkClass = EditorGUILayout.TextField("检查类", dependency.checkClass);
+                dependency.description = EditorGUILayout.TextField("说明", dependency.description);
+                dependency.isRequired = EditorGUILayout.Toggle("必需", dependency.isRequired);
+                if (!TryValidatePinnedGitUrl(dependency.gitUrl, out _, out _, out string pinError))
+                    EditorGUILayout.HelpBox(pinError, MessageType.Error);
+                EditorGUILayout.EndVertical();
+            }
+            if (GUILayout.Button("添加 Git 依赖", GUILayout.MinHeight(24)))
+            {
+                dependencies.Add(new GitPackageDependency());
+                isConfigModified = true;
+            }
+        }
+
+        private void DrawUserDependencyConfiguration(List<UserPackageDependency> dependencies)
+        {
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("手动 / 商业插件依赖", EditorStyles.boldLabel);
+            for (int i = 0; i < dependencies.Count; i++)
+            {
+                UserPackageDependency dependency = dependencies[i] ?? (dependencies[i] = new UserPackageDependency());
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.BeginHorizontal();
+                dependency.name = EditorGUILayout.TextField("名称", dependency.name);
+                if (GUILayout.Button("删除", GUILayout.MinWidth(52), GUILayout.MaxWidth(64)))
+                {
+                    dependencies.RemoveAt(i);
+                    isConfigModified = true;
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUILayout.EndVertical();
+                    break;
+                }
+                EditorGUILayout.EndHorizontal();
+                dependency.version = EditorGUILayout.TextField("版本", dependency.version);
+                dependency.checkClass = EditorGUILayout.TextField("检查类", dependency.checkClass);
+                dependency.installInstructions = EditorGUILayout.TextField("安装说明", dependency.installInstructions);
+                dependency.description = EditorGUILayout.TextField("说明", dependency.description);
+                dependency.isRequired = EditorGUILayout.Toggle("必需", dependency.isRequired);
+                EditorGUILayout.EndVertical();
+            }
+            if (GUILayout.Button("添加手动依赖", GUILayout.MinHeight(24)))
+            {
+                dependencies.Add(new UserPackageDependency());
+                isConfigModified = true;
+            }
+        }
+
+        private void DrawAssetDependencyConfiguration(List<AssetFileDependency> dependencies)
+        {
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField("项目资产依赖", EditorStyles.boldLabel);
+            for (int i = 0; i < dependencies.Count; i++)
+            {
+                AssetFileDependency dependency = dependencies[i] ?? (dependencies[i] = new AssetFileDependency());
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.BeginHorizontal();
+                dependency.name = EditorGUILayout.TextField("名称", dependency.name);
+                if (GUILayout.Button("删除", GUILayout.MinWidth(52), GUILayout.MaxWidth(64)))
+                {
+                    dependencies.RemoveAt(i);
+                    isConfigModified = true;
+                    EditorGUILayout.EndHorizontal();
+                    EditorGUILayout.EndVertical();
+                    break;
+                }
+                EditorGUILayout.EndHorizontal();
+                dependency.version = EditorGUILayout.TextField("版本", dependency.version);
+                dependency.assetPath = EditorGUILayout.TextField("Assets 路径", dependency.assetPath);
+                dependency.checkClass = EditorGUILayout.TextField("检查类", dependency.checkClass);
+                dependency.description = EditorGUILayout.TextField("说明", dependency.description);
+                dependency.isRequired = EditorGUILayout.Toggle("必需", dependency.isRequired);
+                EditorGUILayout.EndVertical();
+            }
+            if (GUILayout.Button("添加资产依赖", GUILayout.MinHeight(24)))
+            {
+                dependencies.Add(new AssetFileDependency());
+                isConfigModified = true;
+            }
         }
 
         /// <summary>
@@ -3618,6 +3814,7 @@ namespace ES.EditorInternal.Installer
                         else
                         {
                             EditorGUILayout.HelpBox($"找到 {scannedFiles.Length} 个Unity Package文件", MessageType.Info);
+                            DrawUnityPackageTrustSummary(package, packagePath, scannedFiles.Length);
 
                             // 显社找到的包文件
                             EditorGUILayout.LabelField("包文件列表:", EditorStyles.miniBoldLabel);
@@ -3689,6 +3886,59 @@ namespace ES.EditorInternal.Installer
             }
 
             EditorGUILayout.EndVertical();
+        }
+
+        private static void DrawUnityPackageTrustSummary(
+            ESPackageBase package,
+            string packagePath,
+            int unityPackageCount)
+        {
+            string manifestPath = Path.Combine(packagePath, UnityPackageTrustManifestFileName);
+            if (!File.Exists(manifestPath))
+            {
+                EditorGUILayout.HelpBox(
+                    "缺少 " + UnityPackageTrustManifestFileName + "；旧 ESInstaller 会按 fail-closed 拒绝安装。请使用 UnityPackage 工具的“发布打包”生成正式主包与清单。",
+                    MessageType.Error);
+                return;
+            }
+
+            try
+            {
+                UnityPackageTrustManifest manifest = JsonUtility.FromJson<UnityPackageTrustManifest>(
+                    File.ReadAllText(manifestPath, Encoding.UTF8));
+                if (manifest == null)
+                {
+                    EditorGUILayout.HelpBox("签名清单无法解析。", MessageType.Error);
+                    return;
+                }
+
+                bool identityMatches = string.Equals(manifest.packageId, package.packageId, StringComparison.Ordinal)
+                    && string.Equals(manifest.packageVersion, package.version, StringComparison.Ordinal);
+                bool artifactCountMatches = manifest.artifacts != null
+                    && manifest.artifacts.Count == unityPackageCount;
+                MessageType type = identityMatches && artifactCountMatches
+                    ? MessageType.Info
+                    : MessageType.Error;
+                string trustKind = string.Equals(
+                    manifest.keyId,
+                    ESInstallerPackageTrust.LocalDevelopmentKeyId,
+                    StringComparison.Ordinal)
+                    ? "本机开发签名"
+                    : "生产签名";
+                EditorGUILayout.HelpBox(
+                    "供应链清单：" + trustKind
+                    + " | keyId " + manifest.keyId
+                    + " | 版本 " + manifest.packageVersion
+                    + " | 声明 " + (manifest.artifacts?.Count ?? 0) + " 个包"
+                    + (identityMatches ? string.Empty : "\n清单 packageId/version 与当前安装配置不一致。")
+                    + (artifactCountMatches ? string.Empty : "\n清单 artifact 数量与目录内 .unitypackage 数量不一致。")
+                    + "\n安装时仍会完整复核 RSA 签名、Size、SHA-256 和可信暂存。",
+                    type);
+            }
+            catch (Exception exception)
+            {
+                EditorGUILayout.HelpBox("读取签名清单失败：" + exception.Message, MessageType.Error);
+            }
         }
 
         /// <summary>
@@ -3793,10 +4043,12 @@ namespace ES.EditorInternal.Installer
                 GenerateInstallationReport();
             }
 
-            if (GUILayout.Button("🔄 刷新状态"))
+            EditorGUI.BeginDisabledGroup(isRefreshingStatuses);
+            if (GUILayout.Button(isRefreshingStatuses ? "正在刷新..." : "🔄 刷新状态"))
             {
                 RefreshAllStatuses();
             }
+            EditorGUI.EndDisabledGroup();
 
             if (GUILayout.Button("❓ 帮助"))
             {
@@ -3873,6 +4125,14 @@ namespace ES.EditorInternal.Installer
             if (!TryPrepareTrustedUnityPackages(package, out List<VerifiedUnityPackage> verifiedPackages, out string trustError))
             {
                 ShowStatus("安装被 .unitypackage 供应链门禁拒绝：" + trustError, MessageType.Error);
+                return;
+            }
+
+            if (!ConfirmTrustedImportPreview(verifiedPackages, package.displayName + " " + installMode))
+            {
+                foreach (VerifiedUnityPackage verified in verifiedPackages)
+                    CleanupTrustedStagingDirectoryIfUnused(verified.stagingDirectory);
+                ShowStatus("安装已在影响预览阶段取消。", MessageType.Info);
                 return;
             }
 
@@ -3956,9 +4216,16 @@ namespace ES.EditorInternal.Installer
         {
             try
             {
+                if (!TryValidateMainPackageConfiguration(out string validationError))
+                {
+                    ShowStatus("配置未保存：" + validationError, MessageType.Error);
+                    return;
+                }
+
                 currentProfile.lastModified = DateTime.Now;
-                string json = JsonUtility.ToJson(currentProfile, true);
-                ESManagedFileIO.WriteTextAtomic(configFilePath, json, Encoding.UTF8, Application.dataPath);
+                ExtensionPackageJsonData jsonData = CreateJsonData(currentProfile.mainPackage);
+                string json = JsonUtility.ToJson(jsonData, true);
+                ESManagedFileIO.WriteTextAtomic(configFilePath, json, new UTF8Encoding(false), Application.dataPath);
                 isConfigModified = false; // 重置未保存更改标志
                 AssetDatabase.Refresh();
             }
@@ -3973,15 +4240,8 @@ namespace ES.EditorInternal.Installer
         {
             try
             {
-                if (File.Exists(configFilePath))
-                {
-                    string json = File.ReadAllText(configFilePath);
-                    currentProfile = JsonUtility.FromJson<InstallationProfile>(json);
-                }
-                else
-                {
-                    InitializeDefaultProfile();
-                }
+                LoadConfiguration();
+                isConfigModified = false;
             }
             catch (Exception e)
             {
@@ -3989,6 +4249,125 @@ namespace ES.EditorInternal.Installer
                 ShowStatus($"加载配置失败: {e.Message}", MessageType.Error);
                 InitializeDefaultProfile();
             }
+        }
+
+        private bool TryValidateMainPackageConfiguration(out string error)
+        {
+            error = string.Empty;
+            ESMainPackage package = currentProfile?.mainPackage;
+            if (package == null)
+            {
+                error = "主包配置为空。";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(package.displayName) || string.IsNullOrWhiteSpace(package.version))
+            {
+                error = "主包名称和版本不能为空。";
+                return false;
+            }
+
+            foreach (UnityPackageDependency dependency in package.unityDependencies ?? new List<UnityPackageDependency>())
+            {
+                if (dependency == null || string.IsNullOrWhiteSpace(dependency.name) || string.IsNullOrWhiteSpace(dependency.packageId))
+                {
+                    error = "Unity 依赖必须填写名称和 Package ID。";
+                    return false;
+                }
+            }
+            foreach (GitPackageDependency dependency in package.gitDependencies ?? new List<GitPackageDependency>())
+            {
+                if (dependency == null || string.IsNullOrWhiteSpace(dependency.name))
+                {
+                    error = "Git 依赖必须填写名称。";
+                    return false;
+                }
+                if (!TryValidatePinnedGitUrl(dependency.gitUrl, out _, out _, out string pinError))
+                {
+                    error = "Git 依赖“" + dependency.name + "”无效：" + pinError;
+                    return false;
+                }
+            }
+            foreach (UserPackageDependency dependency in package.userDependencies ?? new List<UserPackageDependency>())
+            {
+                if (dependency == null || string.IsNullOrWhiteSpace(dependency.name) || string.IsNullOrWhiteSpace(dependency.checkClass))
+                {
+                    error = "手动依赖必须填写名称和检查类名。";
+                    return false;
+                }
+            }
+            foreach (AssetFileDependency dependency in package.assetFileDependencies ?? new List<AssetFileDependency>())
+            {
+                if (dependency == null || string.IsNullOrWhiteSpace(dependency.name) || string.IsNullOrWhiteSpace(dependency.assetPath))
+                {
+                    error = "资产依赖必须填写名称和 Assets 路径。";
+                    return false;
+                }
+                string normalizedPath = dependency.assetPath.Replace('\\', '/');
+                if (!normalizedPath.StartsWith("Assets/", StringComparison.Ordinal)
+                    || normalizedPath.Contains("/../")
+                    || normalizedPath.EndsWith("/..", StringComparison.Ordinal))
+                {
+                    error = "资产依赖路径不安全：" + dependency.assetPath;
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static ExtensionPackageJsonData CreateJsonData(ESMainPackage package)
+        {
+            return new ExtensionPackageJsonData
+            {
+                displayName = package.displayName,
+                folderName = "Main",
+                version = package.version,
+                description = package.description,
+                unityDependencies = (package.unityDependencies ?? new List<UnityPackageDependency>()).Select(dependency => new DependencyJsonData
+                {
+                    name = dependency.name,
+                    version = dependency.version,
+                    description = dependency.description,
+                    isRequired = dependency.isRequired,
+                    checkClass = dependency.checkClass,
+                    packageId = dependency.packageId,
+                    installUrl = dependency.installUrl
+                }).ToArray(),
+                gitDependencies = (package.gitDependencies ?? new List<GitPackageDependency>()).Select(dependency => new GitDependencyJsonData
+                {
+                    name = dependency.name,
+                    version = dependency.version,
+                    description = dependency.description,
+                    gitUrl = dependency.gitUrl,
+                    checkClass = dependency.checkClass,
+                    isRequired = dependency.isRequired
+                }).ToArray(),
+                userDependencies = (package.userDependencies ?? new List<UserPackageDependency>()).Select(dependency => new UserDependencyJsonData
+                {
+                    name = dependency.name,
+                    version = dependency.version,
+                    description = dependency.description,
+                    checkClass = dependency.checkClass,
+                    installInstructions = dependency.installInstructions,
+                    isRequired = dependency.isRequired
+                }).ToArray(),
+                assetFileDependencies = (package.assetFileDependencies ?? new List<AssetFileDependency>()).Select(dependency => new AssetFileDependencyJsonData
+                {
+                    name = dependency.name,
+                    version = dependency.version,
+                    description = dependency.description,
+                    assetPath = dependency.assetPath,
+                    checkClass = dependency.checkClass,
+                    isRequired = dependency.isRequired
+                }).ToArray(),
+                requiredMainPackages = Array.Empty<string>(),
+                installationNotes = package.installNotes,
+                checkClass = package.checkClass,
+                assetPath = package.assetPath,
+                tags = package.tags?.ToArray() ?? Array.Empty<string>(),
+                author = package.author,
+                website = package.website,
+                license = package.license
+            };
         }
 
         private async Task CheckAllUnityPackages()
@@ -4411,6 +4790,14 @@ namespace ES.EditorInternal.Installer
                 verifiedPackages.AddRange(prepared);
             }
 
+            if (!ConfirmTrustedImportPreview(verifiedPackages, "ES 框架批量安装"))
+            {
+                foreach (VerifiedUnityPackage verified in verifiedPackages)
+                    CleanupTrustedStagingDirectoryIfUnused(verified.stagingDirectory);
+                ShowStatus("批量安装已在影响预览阶段取消。", MessageType.Info);
+                return;
+            }
+
             if (!TryQueueTrustedImports(verifiedPackages, "ES 框架批量安装", out string queueError))
             {
                 foreach (VerifiedUnityPackage verified in verifiedPackages)
@@ -4421,11 +4808,12 @@ namespace ES.EditorInternal.Installer
 
         private async void RefreshAllStatuses()
         {
-            if (currentProfile == null)
+            if (isRefreshingStatuses || currentProfile == null)
             {
                 return;
             }
 
+            isRefreshingStatuses = true;
             ShowStatus("正在全面刷新所有状态...", MessageType.Info);
 
             try
@@ -4451,8 +4839,11 @@ namespace ES.EditorInternal.Installer
                 ShowStatus($"刷新状态时出现错误: {e.Message}", MessageType.Error);
                 Debug.LogError($"RefreshAllStatuses error: {e}");
             }
-
-            Repaint();
+            finally
+            {
+                isRefreshingStatuses = false;
+                Repaint();
+            }
         }
 
         private void GenerateInstallationReport()
@@ -4629,5 +5020,353 @@ namespace ES.EditorInternal.Installer
         }
 
         #endregion
+    }
+
+    internal static class ESInstallerPackageTrust
+    {
+        internal const string ManifestFileName = "es-unitypackage.manifest.json";
+        internal const string LocalDevelopmentKeyId = "es-local-dev";
+
+        private const string SigningKeyIdEnvironmentVariable = "ES_INSTALLER_SIGNING_KEY_ID";
+        private const string SigningPrivateKeyPathEnvironmentVariable = "ES_INSTALLER_SIGNING_PRIVATE_KEY_PATH";
+
+        private static readonly Dictionary<string, string> ProductionPublicKeys =
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                // Production public keys must be committed through code review. Private keys never belong in the project.
+            };
+
+        internal static bool TryPublishMainPackage(
+            string exportedPackagePath,
+            string packageId,
+            string packageVersion,
+            out string installedPackagePath,
+            out string manifestPath,
+            out string signingKeyId,
+            out string error)
+        {
+            installedPackagePath = string.Empty;
+            manifestPath = string.Empty;
+            signingKeyId = string.Empty;
+            error = string.Empty;
+
+            try
+            {
+                ValidateIdentity(packageId, nameof(packageId));
+                ValidateIdentity(packageVersion, nameof(packageVersion));
+
+                string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
+                string outputRoot = Path.Combine(projectRoot, "ES", "Output", "UnityPackages");
+                string mainRoot = Path.Combine(projectRoot, "Assets", "Plugins", "ES", "Editor", "Installer", "Downloads", "Main");
+                string sourcePath = Path.GetFullPath(exportedPackagePath ?? string.Empty);
+                ESManagedFileIO.EnsurePath(sourcePath, true, outputRoot);
+                if (!File.Exists(sourcePath) || !sourcePath.EndsWith(".unitypackage", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("发布源必须是 ES/Output/UnityPackages 下存在的 .unitypackage。");
+
+                Directory.CreateDirectory(mainRoot);
+                ESManagedFileIO.EnsurePath(mainRoot, false, mainRoot);
+                ESManagedFileIO.EnsureNoNestedReparsePoints(mainRoot);
+
+                string archiveRoot = ArchiveCurrentMainArtifacts(mainRoot, outputRoot);
+                string targetPath = Path.Combine(mainRoot, Path.GetFileName(sourcePath));
+                try
+                {
+                    ESManagedFileIO.CopyFileAtomic(sourcePath, targetPath, outputRoot, mainRoot);
+                    if (!TryWriteSignedManifest(mainRoot, packageId, packageVersion, out manifestPath, out signingKeyId, out error))
+                        throw new InvalidDataException(error);
+                    installedPackagePath = targetPath;
+                    return true;
+                }
+                catch
+                {
+                    TryDeletePublishedFile(targetPath, mainRoot);
+                    TryDeletePublishedFile(Path.Combine(mainRoot, ManifestFileName), mainRoot);
+                    RestoreArchivedMainArtifacts(archiveRoot, mainRoot, outputRoot);
+                    throw;
+                }
+            }
+            catch (Exception exception)
+            {
+                error = "发布到旧 ESInstaller 主目录失败：" + exception.Message;
+                return false;
+            }
+        }
+
+        internal static bool TryGetTrustedRsaPublicKey(string keyId, out string publicKeyXml)
+        {
+            publicKeyXml = null;
+            if (string.IsNullOrWhiteSpace(keyId))
+                return false;
+            if (ProductionPublicKeys.TryGetValue(keyId, out publicKeyXml) && !string.IsNullOrWhiteSpace(publicKeyXml))
+                return true;
+            if (!string.Equals(keyId, LocalDevelopmentKeyId, StringComparison.Ordinal))
+                return false;
+
+            string path = GetLocalDevelopmentPublicKeyPath();
+            if (!File.Exists(path) || ESManagedFileIO.ContainsExistingReparsePoint(path))
+                return false;
+            publicKeyXml = File.ReadAllText(path, Encoding.UTF8);
+            return !string.IsNullOrWhiteSpace(publicKeyXml);
+        }
+
+        internal static string BuildCanonicalManifestPayload(
+            UnityPackageTrustManifest manifest,
+            IEnumerable<UnityPackageTrustArtifact> artifacts)
+        {
+            var ordered = new List<UnityPackageTrustArtifact>(artifacts ?? Enumerable.Empty<UnityPackageTrustArtifact>());
+            ordered.Sort((left, right) => StringComparer.Ordinal.Compare(left.relativePath, right.relativePath));
+            var builder = new StringBuilder();
+            builder.Append("ESInstaller.UnityPackageManifest\n");
+            builder.Append("schemaVersion=").Append(manifest.schemaVersion).Append('\n');
+            AppendField(builder, "keyId", manifest.keyId);
+            AppendField(builder, "packageId", manifest.packageId);
+            AppendField(builder, "packageVersion", manifest.packageVersion);
+            AppendField(builder, "source", manifest.source);
+            builder.Append("artifactCount=").Append(ordered.Count).Append('\n');
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                UnityPackageTrustArtifact artifact = ordered[i];
+                builder.Append("artifact[").Append(i).Append("]\n");
+                AppendField(builder, "relativePath", artifact.relativePath);
+                builder.Append("size=").Append(artifact.size).Append('\n');
+                AppendField(builder, "sha256", artifact.sha256.ToLowerInvariant());
+            }
+            return builder.ToString();
+        }
+
+        private static bool TryWriteSignedManifest(
+            string packageDirectory,
+            string packageId,
+            string packageVersion,
+            out string manifestPath,
+            out string signingKeyId,
+            out string error)
+        {
+            manifestPath = Path.Combine(packageDirectory, ManifestFileName);
+            signingKeyId = string.Empty;
+            error = string.Empty;
+            try
+            {
+                if (!TryResolveSigningKey(out signingKeyId, out string privateKeyXml, out string source, out error))
+                    return false;
+                if (!TryGetTrustedRsaPublicKey(signingKeyId, out string publicKeyXml))
+                    throw new InvalidDataException(
+                        "签名 keyId“" + signingKeyId + "”没有对应的安装器受信公钥；拒绝生成无法安装的发布物。");
+
+                string[] packageFiles = Directory.GetFiles(packageDirectory, "*.unitypackage", SearchOption.TopDirectoryOnly);
+                if (packageFiles.Length != 1)
+                    throw new InvalidDataException("旧 ESInstaller 主目录必须且只能保留一个正式 .unitypackage。");
+
+                var manifest = new UnityPackageTrustManifest
+                {
+                    schemaVersion = 1,
+                    keyId = signingKeyId,
+                    packageId = packageId,
+                    packageVersion = packageVersion,
+                    source = source,
+                };
+
+                foreach (string packageFile in packageFiles)
+                {
+                    if (!ESArtifactTrustVerifier.TryCaptureStableFileIdentity(packageFile, out long size, out string sha256, out string identityError))
+                        throw new IOException("无法读取发布包身份：" + identityError);
+                    manifest.artifacts.Add(new UnityPackageTrustArtifact
+                    {
+                        relativePath = Path.GetFileName(packageFile),
+                        size = size,
+                        sha256 = sha256.ToLowerInvariant(),
+                    });
+                }
+
+                byte[] payload = Encoding.UTF8.GetBytes(BuildCanonicalManifestPayload(manifest, manifest.artifacts));
+                using (var rsa = new RSACryptoServiceProvider())
+                {
+                    rsa.PersistKeyInCsp = false;
+                    rsa.FromXmlString(privateKeyXml);
+                    manifest.signature = Convert.ToBase64String(rsa.SignData(payload, CryptoConfig.MapNameToOID("SHA256")));
+                }
+                if (!ESArtifactTrustVerifier.TryVerifyRsaSha256(publicKeyXml, payload, manifest.signature, out string signatureError))
+                    throw new CryptographicException("签名私钥与受信公钥不匹配：" + signatureError);
+
+                ESManagedFileIO.WriteTextAtomic(manifestPath, JsonUtility.ToJson(manifest, true), new UTF8Encoding(false), packageDirectory);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = "签名清单生成失败：" + exception.Message;
+                return false;
+            }
+        }
+
+        private static bool TryResolveSigningKey(out string keyId, out string privateKeyXml, out string source, out string error)
+        {
+            keyId = (Environment.GetEnvironmentVariable(SigningKeyIdEnvironmentVariable) ?? string.Empty).Trim();
+            string configuredPath = (Environment.GetEnvironmentVariable(SigningPrivateKeyPathEnvironmentVariable) ?? string.Empty).Trim();
+            privateKeyXml = string.Empty;
+            source = string.Empty;
+            error = string.Empty;
+
+            if (!string.IsNullOrEmpty(keyId) || !string.IsNullOrEmpty(configuredPath))
+            {
+                if (string.IsNullOrEmpty(keyId) || string.IsNullOrEmpty(configuredPath))
+                {
+                    error = SigningKeyIdEnvironmentVariable + " 与 " + SigningPrivateKeyPathEnvironmentVariable + " 必须同时配置。";
+                    return false;
+                }
+                ValidateIdentity(keyId, SigningKeyIdEnvironmentVariable);
+                string fullPath = Path.GetFullPath(configuredPath);
+                if (!File.Exists(fullPath) || ESManagedFileIO.ContainsExistingReparsePoint(fullPath))
+                {
+                    error = "生产签名私钥不存在或位于重解析路径：" + fullPath;
+                    return false;
+                }
+                privateKeyXml = File.ReadAllText(fullPath, Encoding.UTF8);
+                source = "production-release";
+                return !string.IsNullOrWhiteSpace(privateKeyXml);
+            }
+
+            keyId = LocalDevelopmentKeyId;
+            source = "local-development";
+            return TryGetOrCreateLocalDevelopmentKey(out privateKeyXml, out error);
+        }
+
+        private static bool TryGetOrCreateLocalDevelopmentKey(out string privateKeyXml, out string error)
+        {
+            privateKeyXml = string.Empty;
+            error = string.Empty;
+            try
+            {
+                string privatePath = GetLocalDevelopmentPrivateKeyPath();
+                string publicPath = GetLocalDevelopmentPublicKeyPath();
+                if (File.Exists(privatePath) && File.Exists(publicPath))
+                {
+                    string existingPrivateKey = File.ReadAllText(privatePath, Encoding.UTF8);
+                    string existingPublicKey = File.ReadAllText(publicPath, Encoding.UTF8);
+                    if (IsMatchingKeyPair(existingPrivateKey, existingPublicKey))
+                    {
+                        privateKeyXml = existingPrivateKey;
+                        return true;
+                    }
+                }
+
+                string privateRoot = Path.GetDirectoryName(privatePath);
+                string publicRoot = Path.GetDirectoryName(publicPath);
+                Directory.CreateDirectory(privateRoot);
+                Directory.CreateDirectory(publicRoot);
+                using (var rsa = new RSACryptoServiceProvider(3072))
+                {
+                    rsa.PersistKeyInCsp = false;
+                    privateKeyXml = rsa.ToXmlString(true);
+                    ESManagedFileIO.WriteTextAtomic(privatePath, privateKeyXml, new UTF8Encoding(false), privateRoot);
+                    ESManagedFileIO.WriteTextAtomic(publicPath, rsa.ToXmlString(false), new UTF8Encoding(false), publicRoot);
+                }
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = "本机开发签名密钥初始化失败：" + exception.Message;
+                return false;
+            }
+        }
+
+        private static bool IsMatchingKeyPair(string privateKeyXml, string publicKeyXml)
+        {
+            try
+            {
+                byte[] probe = Encoding.UTF8.GetBytes("ESInstaller.LocalDevelopmentKeyPair");
+                string signature;
+                using (var rsa = new RSACryptoServiceProvider())
+                {
+                    rsa.PersistKeyInCsp = false;
+                    rsa.FromXmlString(privateKeyXml);
+                    signature = Convert.ToBase64String(rsa.SignData(probe, CryptoConfig.MapNameToOID("SHA256")));
+                }
+                return ESArtifactTrustVerifier.TryVerifyRsaSha256(publicKeyXml, probe, signature, out _);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string ArchiveCurrentMainArtifacts(string mainRoot, string outputRoot)
+        {
+            string[] packages = Directory.GetFiles(mainRoot, "*.unitypackage", SearchOption.TopDirectoryOnly);
+            string manifest = Path.Combine(mainRoot, ManifestFileName);
+            if (packages.Length == 0 && !File.Exists(manifest))
+                return string.Empty;
+
+            string archiveRoot = Path.Combine(outputRoot, "Archive", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(archiveRoot);
+            ESManagedFileIO.EnsurePath(archiveRoot, false, outputRoot);
+            foreach (string package in packages)
+            {
+                File.Move(package, Path.Combine(archiveRoot, Path.GetFileName(package)));
+                MoveCompanionMetaIfPresent(package, archiveRoot);
+            }
+            if (File.Exists(manifest))
+            {
+                File.Move(manifest, Path.Combine(archiveRoot, ManifestFileName));
+                MoveCompanionMetaIfPresent(manifest, archiveRoot);
+            }
+            return archiveRoot;
+        }
+
+        private static void RestoreArchivedMainArtifacts(string archiveRoot, string mainRoot, string outputRoot)
+        {
+            if (string.IsNullOrWhiteSpace(archiveRoot) || !Directory.Exists(archiveRoot))
+                return;
+            ESManagedFileIO.EnsurePath(archiveRoot, false, outputRoot);
+            foreach (string file in Directory.GetFiles(archiveRoot, "*", SearchOption.TopDirectoryOnly))
+                File.Move(file, Path.Combine(mainRoot, Path.GetFileName(file)));
+        }
+
+        private static void MoveCompanionMetaIfPresent(string assetPath, string destinationRoot)
+        {
+            string metaPath = assetPath + ".meta";
+            if (File.Exists(metaPath))
+                File.Move(metaPath, Path.Combine(destinationRoot, Path.GetFileName(metaPath)));
+        }
+
+        private static void TryDeletePublishedFile(string path, string root)
+        {
+            try
+            {
+                if (File.Exists(path))
+                    ESManagedFileIO.DeleteFile(path, root);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("[ESInstaller] 发布失败后的文件清理失败：" + exception.Message);
+            }
+        }
+
+        private static string GetLocalDevelopmentPrivateKeyPath()
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ESFramework", "InstallerSigning", "es-local-dev.private.xml");
+        }
+
+        private static string GetLocalDevelopmentPublicKeyPath()
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
+            return Path.Combine(projectRoot, "Library", "ESInstaller", "TrustRoots", "es-local-dev.public.xml");
+        }
+
+        private static void ValidateIdentity(string value, string name)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length > 64 || !string.Equals(value, value.Trim(), StringComparison.Ordinal))
+                throw new InvalidDataException(name + " 为空、过长或包含首尾空白。");
+            foreach (char character in value)
+            {
+                bool valid = char.IsLetterOrDigit(character) || character == '.' || character == '_' || character == '-';
+                if (!valid)
+                    throw new InvalidDataException(name + " 只能包含字母、数字、点、下划线和连字符。");
+            }
+        }
+
+        private static void AppendField(StringBuilder builder, string name, string value)
+        {
+            builder.Append(name).Append('=').Append(value).Append('\n');
+        }
     }
 }

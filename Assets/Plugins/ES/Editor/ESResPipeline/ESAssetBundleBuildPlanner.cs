@@ -11,6 +11,7 @@ namespace ES
     {
         public static void PlanAndMark()
         {
+            ESAssetPipelineIO.RefreshGlobalExcludedFolders();
             ESAssetPipelineIO.EnsureAssetBundleReleaseMode();
             string platform = ESAssetPipelineIO.PlatformName;
             string outputFolder = ESAssetPipelineIO.PlanRoot(platform);
@@ -48,7 +49,8 @@ namespace ES
             var dependencyIdentities = new Dictionary<string, ESPipelineAssetIdentity>(StringComparer.Ordinal);
             var dependencyTypes = new Dictionary<string, string>(StringComparer.Ordinal);
             var collectedGameCorePaths = GetCollectedGameCorePaths();
-            var editorOnlyPaths = new HashSet<string>(catalogs.SelectMany(item => item.excludedEditorOnlyPaths ?? new List<string>()), StringComparer.Ordinal);
+            var editorOnlyPaths = new HashSet<string>(catalogs.SelectMany(item => item.excludedEditorOnlyPaths ?? new List<string>())
+                .Concat(catalogs.SelectMany(item => item.excludedFolderPaths ?? new List<string>())), StringComparer.Ordinal);
             var businessPaths = new HashSet<string>(catalogs.SelectMany(item => item.assets).Where(item => item.isBusinessAsset).Select(item => item.assetPath), StringComparer.Ordinal);
 
             foreach (var catalog in catalogs)
@@ -64,6 +66,12 @@ namespace ES
                     {
                         editorOnlyPaths.Add(asset.assetPath);
                         plan.warnings.Add("跳过并清理 EditorOnly 资产的 AB 标签：" + asset.assetPath);
+                        continue;
+                    }
+                    if (ESAssetPipelineIO.IsExcludedFolderPath(asset.assetPath))
+                    {
+                        editorOnlyPaths.Add(asset.assetPath);
+                        plan.warnings.Add("跳过并清理全局排除目录资产的 AB 标签：" + asset.assetPath);
                         continue;
                     }
                     if (!asset.isBusinessAsset && businessPaths.Contains(asset.assetPath)) continue;
@@ -82,6 +90,13 @@ namespace ES
                         {
                             editorOnlyPaths.Add(dependencyPath);
                             continue;
+                        }
+                        if (ESAssetPipelineIO.IsExcludedFolderPath(dependencyPath))
+                        {
+                            editorOnlyPaths.Add(dependencyPath);
+                            throw new InvalidDataException(
+                                "[ESRes][Plan] 业务资产引用全局排除目录依赖："
+                                + asset.assetPath + " -> " + dependencyPath);
                         }
                         if (!dependency.markable || dependency.identity == null || !dependency.identity.IsValid)
                         {
@@ -159,7 +174,8 @@ namespace ES
                     || !string.Equals(node.identity.guid, currentIdentity.guid, StringComparison.Ordinal))
                     throw new InvalidDataException("[ESRes][Plan] 引用图资产身份已变化，请重新烘焙：" + node.assetPath);
                 UnityEngine.Object currentAsset = AssetDatabase.LoadMainAssetAtPath(node.assetPath);
-                bool currentEditorOnly = ESAssetPipelineIO.IsEditorOnly(node.assetPath, currentAsset);
+                bool currentEditorOnly = ESAssetPipelineIO.IsEditorOnly(node.assetPath, currentAsset)
+                    || ESAssetPipelineIO.IsExcludedFolderPath(node.assetPath);
                 bool currentMarkable = !currentEditorOnly && currentIdentity.IsValid && node.assetPath.StartsWith("Assets/", StringComparison.Ordinal);
                 if (node.editorOnly != currentEditorOnly || node.markable != currentMarkable)
                     throw new InvalidDataException("[ESRes][Plan] 引用图资产分类已变化，请重新烘焙：" + node.assetPath);
@@ -260,6 +276,9 @@ namespace ES
                     string path = AssetDatabase.GUIDToAssetPath(refer.GUID);
                     if (string.IsNullOrWhiteSpace(path) || ESAssetPipelineIO.IsEditorOnly(path))
                         throw new InvalidOperationException("GameCore 资产无效或不可发布：Consumer=" + consumer.Name + ", GUID=" + refer.GUID);
+                    if (ESAssetPipelineIO.IsExcludedFolderPath(path))
+                        throw new InvalidOperationException(
+                            "GameCore 资产位于全局排除目录：Consumer=" + consumer.Name + ", Path=" + path);
                     UnityEngine.Object asset = refer.LocalFileId == 0 ? AssetDatabase.LoadMainAssetAtPath(path) : FindSubAsset(path, refer.GUID, refer.LocalFileId);
                     if (!(asset is ScriptableObject) || ESScriptableObjectClassification.GetClass((ScriptableObject)asset) != ESScriptableObjectClass.GameCore)
                         throw new InvalidOperationException("GameCore 清单包含非 IGameCoreSO 资产：Consumer=" + consumer.Name + ", Path=" + path);
@@ -355,6 +374,22 @@ namespace ES
             {
                 var importer = AssetImporter.GetAtPath(path);
                 if (importer != null && (!string.IsNullOrEmpty(importer.assetBundleName) || !string.IsNullOrEmpty(importer.assetBundleVariant))) ClearBundleLabel(importer);
+            }
+            foreach (string excludedFolder in ESAssetPipelineIO.GetGlobalExcludedFolderPaths())
+            {
+                if (!AssetDatabase.IsValidFolder(excludedFolder))
+                    continue;
+                foreach (string guid in AssetDatabase.FindAssets(string.Empty, new[] { excludedFolder }))
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    if (string.IsNullOrWhiteSpace(path) || AssetDatabase.IsValidFolder(path))
+                        continue;
+                    var importer = AssetImporter.GetAtPath(path);
+                    if (importer != null
+                        && (!string.IsNullOrEmpty(importer.assetBundleName)
+                            || !string.IsNullOrEmpty(importer.assetBundleVariant)))
+                        ClearBundleLabel(importer);
+                }
             }
             foreach (var assignment in current.assignments)
             {

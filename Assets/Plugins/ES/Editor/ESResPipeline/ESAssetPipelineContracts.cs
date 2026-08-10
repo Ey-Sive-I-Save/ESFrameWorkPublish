@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using UnityEditor;
@@ -35,6 +36,7 @@ namespace ES
         public string libraryName = string.Empty, libraryFolder = string.Empty, libraryBundleCode = string.Empty, libraryAssetGuid = string.Empty, generatedUtc = string.Empty;
         public List<ESAssetCatalogEntry> assets = new List<ESAssetCatalogEntry>();
         public List<string> excludedEditorOnlyPaths = new List<string>();
+        public List<string> excludedFolderPaths = new List<string>();
         public List<string> errors = new List<string>(), warnings = new List<string>();
     }
     [Serializable] public sealed class ESAssetCatalogBakeOutput
@@ -141,6 +143,10 @@ namespace ES
         public int formatVersion = 1;
         public string platform = string.Empty, buildId = string.Empty, builtUtc = string.Empty;
         public List<string> libraryFolders = new List<string>();
+        public string sourceFingerprint = string.Empty;
+        public string planFingerprint = string.Empty;
+        public string assetListFingerprint = string.Empty;
+        public string codePackagePreparedHash = string.Empty;
     }
     [Serializable] public sealed class ESAssetReleaseLibrary
     {
@@ -160,7 +166,8 @@ namespace ES
     /// </summary>
     [Serializable] public sealed class ESAssetReleaseUploadPlan
     {
-        public int formatVersion = 1;
+        public const int UploadPlanFormatVersion = 1;
+        public int formatVersion = UploadPlanFormatVersion;
         public string platform = string.Empty, releaseVersion = string.Empty, sourceRoot = string.Empty, publicBaseUrl = string.Empty, generatedUtc = string.Empty;
         public string instruction = "按 uploadOrder 升序上传；ESAssetReleaseManifest.json 必须最后上传并设置 Cache-Control: no-cache, max-age=0, must-revalidate；其余版本化文件使用 immutable 长缓存。";
         public List<ESAssetReleaseUploadPlanFile> files = new List<ESAssetReleaseUploadPlanFile>();
@@ -173,6 +180,14 @@ namespace ES
         public long size;
         public int uploadOrder;
         public bool uploadLast;
+    }
+    [Serializable] public sealed class ESConsumerReleasePreparationMarker
+    {
+        public int formatVersion = 1;
+        public string platform = string.Empty;
+        public string fingerprint = string.Empty;
+        public string preparedUtc = string.Empty;
+        public int consumerCount;
     }
     [Serializable] public sealed class ESAssetReleaseBundleRecord
     {
@@ -233,6 +248,24 @@ namespace ES
 
     internal static class ESAssetPipelineIO
     {
+        public static readonly string[] StaticExcludedFolderPaths =
+        {
+            "Assets/ESNormalAssets/CharacterTemplates",
+            "Assets/ESNormalAssets/EditorTools",
+            "Assets/ESNormalAssets/VehiclePrototypes",
+            "Assets/Scenes/Tests",
+            "Assets/Plugins/ES/1_Design/Tests",
+            "Assets/ESNormalAssets/Data/GlobalData/EditorTheme",
+            "Assets/ESNormalAssets/Data/GlobalData/CmdAgent",
+            "Assets/ESNormalAssets/Data/GlobalData/ProjectAssetGuide",
+            "Assets/ESNormalAssets/Data/AgentAuthoring"
+        };
+        private static readonly HashSet<string> s_StaticExcludedFolders =
+            BuildStaticExcludedFolders();
+        private static readonly HashSet<string> s_CachedExcludedFolders =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static bool s_ExcludedFoldersCacheDirty = true;
+
         public const int ReferenceGraphFormatVersion = 1;
         public const int CatalogFormatVersion = 3;
         public const int RuntimeProtocolFormatVersion = 5;
@@ -240,6 +273,8 @@ namespace ES
         public const string CatalogOutputKind = "Catalog", ReferenceGraphOutputKind = "ReferenceGraph";
         public const string CatalogFileName = "ESAssetLibraryCatalog.json", ReferenceGraphFileName = "ESAssetReferenceGraph.json", CatalogBakeCommitFileName = "ESAssetCatalogBakeCommit.json", PlanFileName = "ESAssetBundleBuildPlan.json", AssetListFileName = "ESAssetBundleAssetList.json";
         public const string BundleManifestFileName = "ESAssetBundleManifest.json", LibraryIdentityFileName = "ESAssetLibraryIdentity.json", BuildSetFileName = "ESAssetBuildSet.json", ReleaseManifestFileName = "ESAssetReleaseManifest.json", ConsumerManifestFileName = "ESAssetConsumerManifest.json", ReleaseBundleIndexFileName = "ESAssetReleaseBundleIndex.json";
+        public const string ConsumerReleasePreparationFolderName = "PreparedConsumerRelease";
+        public const string ConsumerReleasePreparationFileName = "ESConsumerReleasePreparation.json";
         public static string ProjectRoot => Directory.GetParent(Application.dataPath).FullName;
         public static string PipelineRoot => Path.Combine(ProjectRoot, "ES", "ResourcePipeline");
         // Unity 原始 AB 与 AssetBundleManifest 的专用构建缓存，永不参与发布或下载。
@@ -255,6 +290,11 @@ namespace ES
         public static string LocalTestRoot(string platform) => Path.Combine(PublishedRoot, "LocalTest", platform);
         public static string ManualUploadPlansRoot(string platform) => Path.Combine(PublishedRoot, "ManualUploadPlans", platform);
         public static string ReleasesRoot => Path.Combine(PipelineRoot, "Releases");
+        public static string ConsumerReleasePreparationRoot => Path.Combine(PipelineRoot, ConsumerReleasePreparationFolderName);
+        public static string ConsumerReleasePreparationPath(string platform)
+            => Path.Combine(
+                ConsumerReleasePreparationRoot,
+                SafeSegment(platform) + ".json");
         public static string StagingLibrariesRoot(string platform) => Path.Combine(StagingRoot(platform), LibrariesFolderName);
         public static string StagingLibraryFolder(string platform, string libraryFolder) => Path.Combine(StagingLibrariesRoot(platform), SafeSegment(libraryFolder));
         public static string AssetBundleRelativePath(string fileName) => AssetBundlesFolderName + "/" + ESAssetBundleUtility.ToSafeAssetBundleFileName(fileName);
@@ -524,6 +564,73 @@ namespace ES
             return assetType != null
                 && typeof(ScriptableObject).IsAssignableFrom(assetType)
                 && Attribute.IsDefined(assetType, typeof(ESOnlyEditorSOAttribute), true);
+        }
+
+        public static IReadOnlyList<string> GetGlobalExcludedFolderPaths()
+        {
+            EnsureExcludedFolderCache();
+            return s_CachedExcludedFolders.ToArray();
+        }
+
+        public static bool IsExcludedFolderPath(string assetPath)
+        {
+            EnsureExcludedFolderCache();
+            string normalizedAsset = NormalizeAssetFolder(assetPath);
+            if (string.IsNullOrEmpty(normalizedAsset))
+                return false;
+
+            foreach (string excluded in s_CachedExcludedFolders)
+            {
+                if (string.Equals(normalizedAsset, excluded, StringComparison.OrdinalIgnoreCase)
+                    || normalizedAsset.StartsWith(excluded + "/", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
+        public static void RefreshGlobalExcludedFolders()
+        {
+            s_CachedExcludedFolders.Clear();
+            foreach (string path in s_StaticExcludedFolders)
+                s_CachedExcludedFolders.Add(path);
+
+            if (ESGlobalResSetting.Instance != null)
+            {
+                List<string> configured = ESGlobalResSetting.Instance.GlobalExcludedFolderPaths
+                    ?? new List<string>();
+                foreach (string path in configured)
+                    AddNormalizedFolder(s_CachedExcludedFolders, path);
+            }
+            s_ExcludedFoldersCacheDirty = false;
+        }
+
+        private static HashSet<string> BuildStaticExcludedFolders()
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in StaticExcludedFolderPaths)
+                AddNormalizedFolder(result, path);
+            return result;
+        }
+
+        private static void EnsureExcludedFolderCache()
+        {
+            if (s_ExcludedFoldersCacheDirty)
+                RefreshGlobalExcludedFolders();
+        }
+
+        private static void AddNormalizedFolder(HashSet<string> destination, string path)
+        {
+            string normalized = NormalizeAssetFolder(path);
+            if (!string.IsNullOrEmpty(normalized))
+                destination.Add(normalized);
+        }
+
+        private static string NormalizeAssetFolder(string path)
+        {
+            string value = (path ?? string.Empty).Trim().Replace('\\', '/').Trim('/');
+            return value.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+                ? value
+                : value;
         }
         public static void WriteJson<T>(string path, T value, bool atomic = true)
         {

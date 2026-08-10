@@ -22,6 +22,7 @@ namespace ES
     {
         public new class UxmlFactory : UxmlFactory<ESEditorTrackItem, UxmlTraits> { }
         private const float TrackRowHeight = 40f;
+        private const float CollapsedTrackHeight = 32f;
         private VisualElement m_LeftPanel;
         private VisualElement m_RightPanel;
         private VisualElement m_Header;
@@ -60,8 +61,38 @@ namespace ES
         public Vector2 recordLocalClipsMousePos;
 
         public List<ESEditorTrackClip> TrackClips = new List<ESEditorTrackClip>();
+        private readonly Dictionary<string, ESEditorTrackClip> m_ClipsById =
+            new Dictionary<string, ESEditorTrackClip>(StringComparer.Ordinal);
+        private readonly Dictionary<ITrackClip, ESEditorTrackClip> m_ClipsByReference =
+            new Dictionary<ITrackClip, ESEditorTrackClip>(TrackClipReferenceComparer.Instance);
+        private readonly HashSet<ESEditorTrackClip> m_ReconcileKeepClips =
+            new HashSet<ESEditorTrackClip>();
+        private readonly HashSet<string> m_ReconcileSeenIds =
+            new HashSet<string>(StringComparer.Ordinal);
+        private readonly List<ESEditorTrackClip> m_ReconciledClipOrder =
+            new List<ESEditorTrackClip>();
+        private bool m_IsCollapsed;
+        private bool m_HasEverAttached;
+
+        private sealed class TrackClipReferenceComparer : IEqualityComparer<ITrackClip>
+        {
+            public static readonly TrackClipReferenceComparer Instance = new TrackClipReferenceComparer();
+
+            public bool Equals(ITrackClip x, ITrackClip y)
+            {
+                return ReferenceEquals(x, y);
+            }
+
+            public int GetHashCode(ITrackClip obj)
+            {
+                return obj == null
+                    ? 0
+                    : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
+            }
+        }
         public ESEditorTrackItem()
         {
+            RegisterCallback<AttachToPanelEvent>(OnAttachToPanel);
             CreateUIStructure();
             // 应用初始状态
             UpdateMuteButton();
@@ -75,6 +106,26 @@ namespace ES
             item = trackItem;
             IsProtectedBasicTrack = isProtectedBasicTrack;
 
+            if (ESTrackViewWindow.TrackContainer is UnityEngine.Object)
+            {
+                if (trackItem is IStableTrackItem stableTrack)
+                {
+                    if (stableTrack.TrackSchema <= ESTrackIdentity.CurrentTrackSchema)
+                        stableTrack.EnsureStableTrackIdentity();
+                }
+                else if (trackItem != null && trackItem.Clips != null)
+                {
+                    foreach (ITrackClip clip in trackItem.Clips)
+                    {
+                        if (clip is IStableTrackClip stableClip
+                            && stableClip.ClipSchema <= ESTrackIdentity.CurrentClipSchema)
+                        {
+                            stableClip.EnsureStableClipIdentity();
+                        }
+                    }
+                }
+            }
+
             UpdateTrackMessage();
             UpdateTrackColor();
             UpdateBasicTrackStyle();
@@ -86,6 +137,12 @@ namespace ES
         public void UpdateWhenEdit()
         {
             UpdateTrackMessage();
+        }
+
+        private void OnAttachToPanel(AttachToPanelEvent evt)
+        {
+            if (panel != null)
+                m_HasEverAttached = true;
         }
 
         internal void RefreshProjectionAfterUndoRedo()
@@ -256,21 +313,24 @@ namespace ES
             m_EnableButton.AddToClassList("track-enable-button");
             m_Header.Add(m_EnableButton);
 
-            // 折叠/展开按钮
-            // m_CollapseButton = new Button(ToggleCollapse)
-            // {
-            //     name = "collapse-button",
-            //     text = "▼",
-            //     style =
-            //     {
-            //         width = 20,
-            //         height = 20,
-            //         marginRight = 4,
-            //         fontSize = 10
-            //     }
-            // };
-            // m_CollapseButton.AddToClassList("track-control-button");
-            // m_Header.Add(m_CollapseButton);
+            m_CollapseButton = new Button(ToggleCollapse)
+            {
+                name = "collapse-button",
+                text = "▼",
+                tooltip = "折叠/展开轨道，减少当前时间轴占用高度。",
+                style =
+                {
+                    width = 20,
+                    minWidth = 20,
+                    height = 20,
+                    marginRight = 4,
+                    paddingLeft = 0,
+                    paddingRight = 0,
+                    fontSize = 10
+                }
+            };
+            m_CollapseButton.AddToClassList("track-control-button");
+            m_Header.Add(m_CollapseButton);
 
             // 轨道图标
             m_Icon = new VisualElement
@@ -388,19 +448,42 @@ namespace ES
 
         internal void ApplyTimelineLayout(float trackPanelWidth, float timelineWidth)
         {
+            if (m_LeftPanel == null || m_RightPanel == null || m_TrackClipsContainer == null)
+                return;
+
+            bool attachedToCurrentPanel = parent != null
+                && panel != null
+                && ESTrackViewWindow.window != null
+                && ESTrackViewWindow.window.rootVisualElement != null
+                && ESTrackViewWindow.window.rootVisualElement.panel != null
+                && ReferenceEquals(panel, ESTrackViewWindow.window.rootVisualElement.panel);
+            if (m_HasEverAttached && !attachedToCurrentPanel)
+                return;
+
             float canvasWidth = Mathf.Max(1f, timelineWidth);
             float itemWidth = trackPanelWidth + canvasWidth;
+            float rowHeight = CurrentHeight;
 
             style.width = itemWidth;
             style.minWidth = itemWidth;
+            style.height = rowHeight;
+            style.minHeight = rowHeight;
+            style.maxHeight = rowHeight;
             m_LeftPanel.style.width = trackPanelWidth;
             m_LeftPanel.style.minWidth = trackPanelWidth;
             m_LeftPanel.style.maxWidth = trackPanelWidth;
+            m_LeftPanel.style.height = rowHeight;
+            m_LeftPanel.style.minHeight = rowHeight;
+            m_LeftPanel.style.maxHeight = rowHeight;
             m_RightPanel.style.left = trackPanelWidth;
             m_RightPanel.style.width = canvasWidth;
             m_RightPanel.style.minWidth = canvasWidth;
+            m_RightPanel.style.height = rowHeight;
+            m_RightPanel.style.minHeight = rowHeight;
+            m_RightPanel.style.maxHeight = rowHeight;
             m_TrackClipsContainer.style.width = canvasWidth;
             m_TrackClipsContainer.style.minWidth = canvasWidth;
+            m_TrackClipsContainer.style.display = m_IsCollapsed ? DisplayStyle.None : DisplayStyle.Flex;
         }
         private void UpdateTrackColor()
         {
@@ -831,6 +914,14 @@ namespace ES
                 Debug.LogError("尝试添加空的轨道片段");
                 return null;
             }
+
+            if (clip is IStableTrackClip stableClip
+                && ESTrackViewWindow.TrackContainer is UnityEngine.Object
+                && stableClip.ClipSchema <= ESTrackIdentity.CurrentClipSchema)
+            {
+                stableClip.EnsureStableClipIdentity();
+            }
+
             //如果只是 Update 的话 就可以直接加  如果 是新建的话 就需要新加入
             if (onlyUpdate || item.TryAddTrackClip(clip))
             {
@@ -857,26 +948,35 @@ namespace ES
 
             m_TrackClipsContainer.Add(clipEditor);
             TrackClips.Add(clipEditor);
+            RegisterClip(clipEditor);
             MarkVisibilityCacheDirty();
             return clipEditor;
         }
         public void RemoveClip(ESEditorTrackClip clip)
         {
-            TrackClips.Remove(clip);
-            MarkVisibilityCacheDirty();
+            ITrackClip sourceClip = clip != null ? clip.trackClip : null;
+            RemoveClipProjection(clip);
+            if (sourceClip != null)
+                item.TryRemoveTrackClip(sourceClip);
+        }
 
-            if (clip != null)
-            {
-                clip.RemoveFromHierarchy();
-                //  OnNodeRemoved?.Invoke(this, node);
-                item.TryRemoveTrackClip(clip.trackClip);
-            }
+        private void RemoveClipProjection(ESEditorTrackClip clip)
+        {
+            TrackClips.Remove(clip);
+            UnregisterClip(clip);
+            MarkVisibilityCacheDirty();
+            clip?.RemoveFromHierarchy();
         }
 
         public void ClearClips()
         {
             m_TrackClipsContainer.Clear();
             TrackClips.Clear();
+            m_ClipsById.Clear();
+            m_ClipsByReference.Clear();
+            m_ReconcileKeepClips.Clear();
+            m_ReconcileSeenIds.Clear();
+            m_ReconciledClipOrder.Clear();
             MarkVisibilityCacheDirty();
         }
 
@@ -940,24 +1040,70 @@ namespace ES
         // 公共方法：设置轨道高度
         public void SetTrackHeight(float height)
         {
-            // m_ExpandedHeight = height;
-            // if (!m_IsCollapsed)
-            // {
-            //     style.height = height;
-            // }
+            if (m_IsCollapsed)
+                return;
+
+            float clamped = Mathf.Max(24f, height);
+            style.height = clamped;
+            style.minHeight = clamped;
+            style.maxHeight = clamped;
+            if (m_LeftPanel != null)
+            {
+                m_LeftPanel.style.height = clamped;
+                m_LeftPanel.style.minHeight = clamped;
+                m_LeftPanel.style.maxHeight = clamped;
+            }
+            if (m_RightPanel != null)
+            {
+                m_RightPanel.style.height = clamped;
+                m_RightPanel.style.minHeight = clamped;
+                m_RightPanel.style.maxHeight = clamped;
+            }
+        }
+
+        public bool IsCollapsed => m_IsCollapsed;
+        public float CurrentHeight => m_IsCollapsed ? CollapsedTrackHeight : TrackRowHeight;
+
+        public void ToggleCollapse()
+        {
+            m_IsCollapsed = !m_IsCollapsed;
+            UpdateCollapseVisual();
+            ESTrackViewWindow.window?.UpdateTimelineContentHeight();
+            ESTrackViewWindow.window?.ApplyTrackPanelLayout(false);
+        }
+
+        private void UpdateCollapseVisual()
+        {
+            if (m_CollapseButton == null)
+                return;
+
+            m_CollapseButton.text = m_IsCollapsed ? "▶" : "▼";
+            m_CollapseButton.tooltip = m_IsCollapsed
+                ? "展开当前轨道，恢复片段时间线显示。"
+                : "折叠当前轨道，减少时间轴占用高度。";
+            if (m_TrackClipsContainer != null)
+                m_TrackClipsContainer.style.display = m_IsCollapsed ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
         
 
         internal void UpdateNodes()
         {
-            float visibleStart = ESTrackViewWindow.window.StartShow;
-            float visibleEnd = ESTrackViewWindow.window.GetVisibleEndTime();
+            ESTrackViewWindow hostWindow = ESTrackViewWindow.window;
+            if (hostWindow == null)
+                return;
+
+            float visibleStart = hostWindow.StartShow;
+            float visibleEnd = hostWindow.GetVisibleEndTime();
             UpdateNodes(visibleStart, visibleEnd, ESTrackClipUpdateFlags.All);
         }
 
         internal void UpdateNodes(float visibleStart, float visibleEnd, ESTrackClipUpdateFlags flags = ESTrackClipUpdateFlags.All)
         {
+            ESTrackViewWindow hostWindow = ESTrackViewWindow.window;
+            if (hostWindow == null)
+                return;
+
             EnsureVisibilityCache();
 
             int visibleStartIndex = FindFirstClipPotentiallyVisibleAtOrAfter(visibleStart);
@@ -977,7 +1123,7 @@ namespace ES
                     continue;
 
                 if ((flags & ESTrackClipUpdateFlags.Layout) != 0)
-                    node.SetTimeScaleAndStartShowVisible(ESTrackViewWindow.window.pixelPerSecond, visibleStart, visibleEnd);
+                    node.SetTimeScaleAndStartShowVisible(hostWindow.pixelPerSecond, visibleStart, visibleEnd);
 
                 if ((flags & ESTrackClipUpdateFlags.Content) != 0 && node.resolvedStyle.display != DisplayStyle.None)
                     node.UpdateNodeView();
@@ -1120,29 +1266,152 @@ namespace ES
         //检查节点是否对其
         public void UpdateNodeMatchAndForeachUpdate(bool update = true)
         {
-            var listEditorNow = this.TrackClips.ToList();
-            foreach (var clip in item.Clips)
+            if (item == null)
             {
-                var matchNode = listEditorNow.Find(n => n.trackClip == clip);
-                if (matchNode != null)
+                ClearClips();
+                return;
+            }
+
+            m_ClipsById.Clear();
+            m_ClipsByReference.Clear();
+            for (int i = 0; i < TrackClips.Count; i++)
+            {
+                if (TrackClips[i] != null)
+                    RegisterClip(TrackClips[i]);
+            }
+
+            m_ReconcileKeepClips.Clear();
+            m_ReconcileSeenIds.Clear();
+            m_ReconciledClipOrder.Clear();
+            foreach (ITrackClip clip in item.Clips)
+            {
+                if (clip == null)
+                    continue;
+
+                string clipId = ResolveClipId(clip);
+                if (!string.IsNullOrEmpty(clipId) && m_ReconcileSeenIds.Add(clipId))
                 {
-                    //好啊 
-                    listEditorNow.Remove(matchNode);
+                    if (m_ClipsById.TryGetValue(clipId, out ESEditorTrackClip existing)
+                        && existing != null)
+                    {
+                        if (!ReferenceEquals(existing.trackClip, clip))
+                        {
+                            UnregisterClip(existing);
+                            existing.RebindTrackClip(clip);
+                            RegisterClip(existing);
+                        }
+
+                        KeepReconciledClip(existing);
+                        continue;
+                    }
+
+                    ESEditorTrackClip created = AddClip(clip, true);
+                    if (created != null)
+                        KeepReconciledClip(created);
+                    continue;
                 }
-                else
+
+                if (m_ClipsByReference.TryGetValue(clip, out ESEditorTrackClip referenceMatch)
+                    && referenceMatch != null)
                 {
-                    // 添加新节点
-                    AddClip(clip, true);
+                    KeepReconciledClip(referenceMatch);
+                    continue;
+                }
+
+                ESEditorTrackClip fallback = AddClip(clip, true);
+                if (fallback != null)
+                    KeepReconciledClip(fallback);
+            }
+
+            for (int i = 0; i < TrackClips.Count; i++)
+            {
+                ESEditorTrackClip clip = TrackClips[i];
+                if (clip == null || !m_ReconcileKeepClips.Contains(clip))
+                {
+                    UnregisterClip(clip);
+                    clip?.RemoveFromHierarchy();
                 }
             }
 
-            foreach (var toRemove in listEditorNow)
+            TrackClips.Clear();
+            TrackClips.AddRange(m_ReconciledClipOrder);
+
+            m_ClipsById.Clear();
+            m_ClipsByReference.Clear();
+            for (int i = 0; i < TrackClips.Count; i++)
             {
-                // 移除多余节点
-                RemoveClip(toRemove);
+                if (TrackClips[i] != null)
+                    RegisterClip(TrackClips[i]);
             }
 
-            UpdateNodes();
+            MarkVisibilityCacheDirty();
+            if (update)
+                UpdateNodes();
+        }
+
+        private void KeepReconciledClip(ESEditorTrackClip clip)
+        {
+            if (clip != null && m_ReconcileKeepClips.Add(clip))
+                m_ReconciledClipOrder.Add(clip);
+        }
+
+        private static string ResolveClipId(ITrackClip clip)
+        {
+            return clip is IStableTrackClip stable
+                   && ESTrackIdentity.IsValidStableId(stable.ClipId)
+                ? stable.ClipId
+                : string.Empty;
+        }
+
+        private void RegisterClip(ESEditorTrackClip clip)
+        {
+            if (clip == null)
+                return;
+
+            string clipId = ResolveClipId(clip.trackClip);
+            if (!string.IsNullOrEmpty(clipId))
+                m_ClipsById[clipId] = clip;
+            if (clip.trackClip != null)
+                m_ClipsByReference[clip.trackClip] = clip;
+        }
+
+        private void UnregisterClip(ESEditorTrackClip clip)
+        {
+            if (clip == null)
+                return;
+
+            string clipId = ResolveClipId(clip.trackClip);
+            if (!string.IsNullOrEmpty(clipId)
+                && m_ClipsById.TryGetValue(clipId, out ESEditorTrackClip current)
+                && ReferenceEquals(current, clip))
+            {
+                m_ClipsById.Remove(clipId);
+            }
+
+            if (clip.trackClip != null
+                && m_ClipsByReference.TryGetValue(clip.trackClip, out ESEditorTrackClip referenceCurrent)
+                && ReferenceEquals(referenceCurrent, clip))
+            {
+                m_ClipsByReference.Remove(clip.trackClip);
+            }
+        }
+
+        internal bool TryGetEditorClip(ITrackClip clip, out ESEditorTrackClip editorClip)
+        {
+            editorClip = null;
+            if (clip == null)
+                return false;
+
+            string clipId = ResolveClipId(clip);
+            if (!string.IsNullOrEmpty(clipId)
+                && m_ClipsById.TryGetValue(clipId, out editorClip)
+                && editorClip != null)
+            {
+                return true;
+            }
+
+            return m_ClipsByReference.TryGetValue(clip, out editorClip)
+                   && editorClip != null;
         }
     }
 

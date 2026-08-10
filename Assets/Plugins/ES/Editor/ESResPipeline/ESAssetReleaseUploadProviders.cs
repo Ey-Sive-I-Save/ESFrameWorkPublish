@@ -179,8 +179,9 @@ namespace ES
             try
             {
                 if (request == null) throw new ArgumentNullException(nameof(request));
-                if (!TryGetOrderedFiles(request.Plan, out List<ESAssetReleaseUploadPlanFile> ordered, out string error))
-                    throw new InvalidOperationException(error);
+                if (!TryValidateUploadPlanSource(request.Plan, out string planError))
+                    throw new InvalidOperationException(planError);
+                TryGetOrderedFiles(request.Plan, out List<ESAssetReleaseUploadPlanFile> ordered, out _);
                 ValidateTargetPublicRoot(request.Target, request.Plan);
                 IESAssetReleaseUploadProvider provider = ESAssetReleaseUploadProviderFactory.Get(request.Target.mode);
                 if (!provider.CanHandle(request.Target, out string reason))
@@ -214,6 +215,61 @@ namespace ES
             return result;
         }
 
+        internal static bool TryValidateUploadPlanSource(
+            ESAssetReleaseUploadPlan plan,
+            out string error)
+        {
+            error = string.Empty;
+            if (plan == null || plan.formatVersion != ESAssetReleaseUploadPlan.UploadPlanFormatVersion)
+            {
+                error = "上传计划协议版本不受支持，请重新执行第 4 步发布资源包。";
+                return false;
+            }
+            if (!TryGetOrderedFiles(plan, out _, out error))
+                return false;
+
+            if (string.IsNullOrWhiteSpace(plan.sourceRoot) || !Directory.Exists(plan.sourceRoot))
+            {
+                error = "上传计划 sourceRoot 不存在：" + (plan.sourceRoot ?? "<empty>");
+                return false;
+            }
+
+            string actualRoot = Path.GetFullPath(plan.sourceRoot)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string expectedRoot = GetCurrentReleaseSourceRoot(plan.platform);
+            if (!string.Equals(actualRoot, expectedRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                error = "上传计划 sourceRoot 与当前管线发布根不一致：实际=" + actualRoot
+                    + "，期望=" + expectedRoot;
+                return false;
+            }
+
+            foreach (ESAssetReleaseUploadPlanFile file in plan.files ?? new List<ESAssetReleaseUploadPlanFile>())
+            {
+                try
+                {
+                    ValidateUploadSourcePath(plan, file);
+                }
+                catch (Exception exception)
+                {
+                    error = exception.Message;
+                    return false;
+                }
+
+                if (string.IsNullOrWhiteSpace(file.sourcePath)
+                    || !File.Exists(file.sourcePath)
+                    || new FileInfo(file.sourcePath).Length != file.size
+                    || string.IsNullOrWhiteSpace(file.sha256)
+                    || !ESResManifestIntegrity.VerifyFileSha256(file.sourcePath, file.sha256))
+                {
+                    error = "上传源文件缺失、大小或 SHA-256 不匹配：" + file.relativePath;
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         internal static void ValidateUploadSourcePath(ESAssetReleaseUploadPlan plan, ESAssetReleaseUploadPlanFile file)
         {
             if (plan == null || file == null)
@@ -236,6 +292,18 @@ namespace ES
 
             if (ContainsExistingReparsePoint(root, source))
                 throw new UnauthorizedAccessException("上传源文件不能穿过 junction/symlink：" + file.sourcePath);
+        }
+
+        private static string GetCurrentReleaseSourceRoot(string platform)
+        {
+            string root = ESGlobalResSetting.Instance.Path_RemoteResOutBuildPath;
+            if (string.IsNullOrWhiteSpace(platform))
+                return Path.GetFullPath(root).TrimEnd(
+                    Path.DirectorySeparatorChar,
+                    Path.AltDirectorySeparatorChar);
+            return Path.GetFullPath(Path.Combine(root, platform)).TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar);
         }
 
         private static bool ContainsExistingReparsePoint(string root, string candidate)

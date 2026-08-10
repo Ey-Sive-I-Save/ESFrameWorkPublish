@@ -211,7 +211,7 @@ namespace ES
             EntityStatusGroup.style.backgroundColor = new Color(0.064f, 0.074f, 0.084f, 0.96f);
             EntityStatusGroup.style.borderLeftColor = new Color(0.28f, 0.38f, 0.48f, 0.95f);
             EntityStatusGroup.style.borderLeftWidth = 2;
-            EntityStatusGroup.tooltip = "编辑器预览目标。开始预览时会封存使用者。";
+            EntityStatusGroup.tooltip = "点击选择预览使用者；开始预览时会封存该使用者。";
             EntityStatusGroup.AddToClassList("normalBlock");
 
             EntityLabel.text = "使用者：<无>";
@@ -237,6 +237,13 @@ namespace ES
             ConfigureActionButton(SelectEntityButton, "选择预览使用者", "从当前场景中选择用于预览和释放测试的 Entity");
 
             // 这是高频动作，必须在顶栏常驻，不能要求用户先打开 Inspector 或“更多”菜单。
+            AddToolbarButton(m_RightGroup, SelectOtherTimeLine, null, 86, 26, "切换当前编辑时间轴");
+            SelectOtherTimeLine.style.minWidth = 86;
+            SelectOtherTimeLine.style.color = new Color(0.86f, 0.93f, 1f, 1f);
+            SelectOtherTimeLine.style.backgroundColor = new Color(0.12f, 0.21f, 0.30f, 1f);
+            SelectOtherTimeLine.style.borderLeftColor = new Color(0.36f, 0.62f, 0.82f, 0.9f);
+            SelectOtherTimeLine.style.borderTopColor = new Color(0.36f, 0.62f, 0.82f, 0.9f);
+
             ConfigureActionButton(OpenInspectorButton, "弹出编辑器", "在独立窗口中编辑当前选中的轨道或片段；也可 Shift + 右键直接弹出");
             AddToolbarButton(m_RightGroup, OpenInspectorButton, null, 76, 26, OpenInspectorButton.tooltip);
             OpenInspectorButton.style.minWidth = 76;
@@ -263,6 +270,7 @@ namespace ES
 
         private void BindEvents()
         {
+            EntityStatusGroup.RegisterCallback<ClickEvent>(evt => ShowEntityMenu());
             PreviewButton.clicked += () =>
             {
                 ESTrackViewWindow.window?.TryStartPreview();
@@ -367,6 +375,9 @@ namespace ES
             OpenInspectorButton.text = compactActions ? "属性" : "弹出编辑器";
             OpenInspectorButton.style.width = ultraCompact ? 42f : compactActions ? 52f : 76f;
             OpenInspectorButton.style.minWidth = ultraCompact ? 42f : compactActions ? 52f : 76f;
+            SelectOtherTimeLine.text = ultraCompact ? "轴" : compactActions ? "切换" : "切换时间轴";
+            SelectOtherTimeLine.style.width = ultraCompact ? 30f : compactActions ? 52f : 86f;
+            SelectOtherTimeLine.style.minWidth = ultraCompact ? 30f : compactActions ? 52f : 86f;
             MoreButton.text = ultraCompact ? "⋯" : "更多";
             MoreButton.style.width = ultraCompact ? 30f : 42f;
             MoreButton.style.minWidth = ultraCompact ? 30f : 42f;
@@ -426,6 +437,7 @@ namespace ES
             else
                 menu.AddDisabledItem(new GUIContent("【属性】/弹出当前属性编辑器（请先选择轨道或片段）"));
             menu.AddSeparator("");
+            menu.AddItem(new GUIContent("【技能】/新建技能…"), false, ESCreateSkillWindow.Open);
             menu.AddItem(new GUIContent("【技能】/打开当前技能配置"), false, () => ESTrackSkillDataEditorActions.OpenCurrentSkillDataInfoEditor(ESTrackViewWindow.window));
             menu.AddItem(new GUIContent("【技能】/绑定到预览使用者并释放"), false, () => ESTrackSkillDataEditorActions.BindCurrentSkillDataToEntityAndPlay(ESTrackViewWindow.window));
             menu.AddSeparator("");
@@ -476,7 +488,7 @@ namespace ES
             string compactName = runningEntity != null ? runningName : preselectName;
             EntityLabel.text = $"使用者：{compactName}";
             UserEntityLabel.text = $"候选目标：{preselectName}";
-            EntityStatusGroup.tooltip = $"候选目标：{preselectName}\n使用者：{runningName}";
+            EntityStatusGroup.tooltip = $"点击选择预览使用者\n候选目标：{preselectName}\n使用者：{runningName}";
         }
 
         internal void UpdateTime(float time)

@@ -6,32 +6,6 @@ using UnityEngine;
 
 namespace ES
 {
-    /// <summary>第五步远端发布的非敏感项目配置。访问密钥只允许由 Provider 的凭据源在执行时读取。</summary>
-    public sealed class ESAssetReleaseUploadSettings : ScriptableObject
-    {
-        internal const string AssetPath = "Assets/ESNormalAssets/Data/GlobalData/AssetSettings/ESAssetReleaseUploadSettings.asset";
-
-        public ESAssetReleaseUploadTarget target = new ESAssetReleaseUploadTarget();
-
-        internal static ESAssetReleaseUploadSettings Load()
-        {
-            return AssetDatabase.LoadAssetAtPath<ESAssetReleaseUploadSettings>(AssetPath);
-        }
-
-        internal static ESAssetReleaseUploadSettings Create()
-        {
-            ESAssetReleaseUploadSettings existing = Load();
-            if (existing != null) return existing;
-            string folder = Path.GetDirectoryName(AssetPath)?.Replace('\\', '/');
-            if (string.IsNullOrEmpty(folder)) throw new InvalidOperationException("远端发布设置路径无效。");
-            Directory.CreateDirectory(folder);
-            var settings = CreateInstance<ESAssetReleaseUploadSettings>();
-            AssetDatabase.CreateAsset(settings, AssetPath);
-            AssetDatabase.SaveAssets();
-            return settings;
-        }
-    }
-
     /// <summary>
     /// 资源四步构建后的第五步。此窗口从已生成上传计划读取输入，绝不重新构建、重写 Root 或保存凭据。
     /// </summary>
@@ -40,6 +14,11 @@ namespace ES
         private ESAssetReleaseUploadSettings settings;
         private ESAssetReleaseUploadPlan selectedPlan;
         private string selectedPlanPath = string.Empty;
+        private string selectedPlanFingerprint = string.Empty;
+        private string selectedPlanHash = string.Empty;
+        private bool preflightPassed;
+        private bool lastUploadFailed;
+        private ESEditorLongTask activeUploadTask;
         private string status = "请选择或读取第四步生成的上传计划。";
         private Vector2 scrollPosition;
 
@@ -59,6 +38,7 @@ namespace ES
 
         private void OnGUI()
         {
+            RefreshPlanStateIfChanged();
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
             DrawHeader();
             DrawTarget();
@@ -70,7 +50,7 @@ namespace ES
         private void DrawHeader()
         {
             EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField("第五步：发布到远端", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("第五步：远端发布工作台", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
                 "此步骤只上传第四步已经生成并校验的 Release。所有版本化文件先上传，ESAssetReleaseManifest.json 必须最后上传；它是客户端发现新版本的唯一开关。",
                 MessageType.Info);
@@ -130,6 +110,10 @@ namespace ES
                     long bytes = selectedPlan.files?.Where(item => item != null).Sum(item => item.size) ?? 0L;
                     EditorGUILayout.LabelField("版本", selectedPlan.platform + " / " + selectedPlan.releaseVersion);
                     EditorGUILayout.LabelField("文件", (selectedPlan.files?.Count ?? 0) + " 个，" + EditorUtility.FormatBytes(bytes));
+                    EditorGUILayout.LabelField("Generation", string.IsNullOrWhiteSpace(selectedPlan.generatedUtc) ? "未知" : selectedPlan.generatedUtc);
+                    EditorGUILayout.LabelField("计划指纹", string.IsNullOrWhiteSpace(selectedPlanHash) ? "未知" : selectedPlanHash);
+                    EditorGUILayout.LabelField("目标", settings?.target == null ? "未配置" : settings.target.displayName);
+                    EditorGUILayout.LabelField("预检状态", preflightPassed ? "已通过" : "未预检 / 已过期");
                 }
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -151,12 +135,18 @@ namespace ES
                 EditorGUILayout.LabelField("执行", EditorStyles.boldLabel);
                 EditorGUILayout.LabelField(status, EditorStyles.wordWrappedMiniLabel);
                 bool hasInput = settings != null && selectedPlan != null;
+                bool taskActive = activeUploadTask != null && !activeUploadTask.IsFinished;
                 using (new EditorGUI.DisabledScope(!hasInput))
                 {
                     if (GUILayout.Button("初步验证远端隔离区", GUILayout.Height(30f))) BeginValidation();
                     if (GUILayout.Button("预检远端发布", GUILayout.Height(30f))) RunPreflight();
-                    if (GUILayout.Button("正式发布到远端", GUILayout.Height(38f))) BeginPublish();
                 }
+                using (new EditorGUI.DisabledScope(!hasInput || !preflightPassed || taskActive))
+                    if (GUILayout.Button("确认发布到远端", GUILayout.Height(38f))) BeginPublish();
+                if (taskActive && GUILayout.Button("取消上传", GUILayout.Height(28f)))
+                    CancelUpload();
+                if (!taskActive && lastUploadFailed && hasInput)
+                    if (GUILayout.Button("重试上传", GUILayout.Height(28f))) BeginPublish();
                 EditorGUILayout.HelpBox("初步验证只写入验证隔离前缀（默认 .es-validation），执行一次探针上传、HEAD 校验和清理，不接触正式版本目录与 Root。正式发布前仍必须运行预检。", MessageType.None);
             }
         }
@@ -164,7 +154,11 @@ namespace ES
         private void RunPreflight()
         {
             ESAssetReleaseUploadPreflightResult result = ESAssetReleaseUploadCoordinator.Preflight(CreateRequest());
+            preflightPassed = result.IsSuccess;
             status = result.Message;
+            ESResWindow.SetRemotePlanPreflightStatus(
+                result.IsSuccess ? "Ready" : "不可用",
+                result.Message);
             Repaint();
         }
 
@@ -191,21 +185,48 @@ namespace ES
 
         private void BeginPublish()
         {
+            if (!preflightPassed)
+            {
+                status = "发布未开始：请先运行预检并确认上传计划未变化。";
+                return;
+            }
+            if (activeUploadTask != null && !activeUploadTask.IsFinished)
+            {
+                status = "发布未开始：已有上传任务正在执行。";
+                return;
+            }
+
             ESAssetReleaseUploadPreflightResult preflight = ESAssetReleaseUploadCoordinator.Preflight(CreateRequest());
             if (!preflight.IsSuccess)
             {
                 status = "发布未开始：" + preflight.Message;
+                preflightPassed = false;
                 return;
             }
             if (!EditorUtility.DisplayDialog("确认发布到远端", preflight.Message + "\n\n确认后将开始上传；根发布清单会在所有叶子文件成功后最后上传。", "发布", "取消"))
                 return;
-            ESAssetReleaseUploadCoordinator.Enqueue(CreateRequest(), result =>
+            lastUploadFailed = false;
+            activeUploadTask = ESAssetReleaseUploadCoordinator.Enqueue(CreateRequest(), result =>
             {
+                activeUploadTask = null;
+                lastUploadFailed = !result.IsSuccess;
                 status = result.Message;
+                ESResWindow.SetRemotePlanPreflightStatus(
+                    result.IsSuccess ? "Ready" : "不可用",
+                    result.Message);
                 ShowNotification(new GUIContent(result.IsSuccess ? "远端发布完成" : "远端发布失败"));
                 Repaint();
             });
             status = "远端发布任务已加入队列。";
+        }
+
+        private void CancelUpload()
+        {
+            if (activeUploadTask == null || activeUploadTask.IsFinished)
+                return;
+            activeUploadTask.Cancel();
+            status = "已请求取消上传；请等待任务停止。";
+            Repaint();
         }
 
         private ESAssetReleaseUploadRequest CreateRequest()
@@ -223,9 +244,45 @@ namespace ES
             string path = Directory.EnumerateFiles(folder, "*.json", SearchOption.TopDirectoryOnly)
                 .OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault();
             if (string.IsNullOrEmpty(path)) { status = "尚未找到上传计划。请先执行“4. 发布资源包”。"; return; }
-            selectedPlan = ESAssetPipelineIO.ReadJson<ESAssetReleaseUploadPlan>(path);
+            ESAssetReleaseUploadPlan candidate = ESAssetPipelineIO.ReadJson<ESAssetReleaseUploadPlan>(path);
+            if (candidate == null)
+            {
+                status = "上传计划无法读取：" + path;
+                return;
+            }
+            if (!ESAssetReleaseUploadCoordinator.TryValidateUploadPlanSource(candidate, out string planError))
+            {
+                selectedPlan = null;
+                selectedPlanPath = string.Empty;
+                status = "不可用上传计划：" + planError;
+                Debug.LogWarning("[ESAssetReleaseUploadWindow] " + status + "\n" + path);
+                return;
+            }
+            selectedPlan = candidate;
             selectedPlanPath = path;
+            selectedPlanFingerprint = ESResourcePipelineStageValidators.GetUploadPlanFingerprint(path);
+            selectedPlanHash = File.Exists(path)
+                ? ESResManifestIntegrity.ComputeFileSha256(path)
+                : string.Empty;
+            preflightPassed = false;
             status = selectedPlan == null ? "上传计划无法读取：" + path : "已读取第四步上传计划；请先运行预检。";
+        }
+
+        private void RefreshPlanStateIfChanged()
+        {
+            if (string.IsNullOrEmpty(selectedPlanPath))
+                return;
+            string currentFingerprint = ESResourcePipelineStageValidators.GetUploadPlanFingerprint(selectedPlanPath);
+            if (string.Equals(currentFingerprint, selectedPlanFingerprint, StringComparison.Ordinal))
+                return;
+
+            selectedPlanFingerprint = currentFingerprint;
+            selectedPlanHash = File.Exists(selectedPlanPath)
+                ? ESResManifestIntegrity.ComputeFileSha256(selectedPlanPath)
+                : string.Empty;
+            preflightPassed = false;
+            status = "上传计划已变化，请重新预检。";
+            Repaint();
         }
 
         private static string ToProjectRelativePath(string fullPath)

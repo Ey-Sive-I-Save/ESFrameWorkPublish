@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine.TestTools;
@@ -308,6 +309,200 @@ namespace ES.Tests
             }
         }
 
+        [Test]
+        public void StableIdentity_AssignsOnceForTrackAndClips()
+        {
+            var clip = new ProbeClip(new ProbeClipPlayer(), 0f, 1f);
+            var track = new ProbeTrack(new ProbeTrackPlayer(), clip);
+
+            Assert.That(track.TrackId, Is.Empty);
+            Assert.That(clip.ClipId, Is.Empty);
+
+            Assert.That(track.EnsureStableTrackIdentity(), Is.True);
+
+            string trackId = track.TrackId;
+            string clipId = clip.ClipId;
+            Assert.That(trackId, Is.Not.Empty);
+            Assert.That(clipId, Is.Not.Empty);
+            Assert.That(track.TrackSchema, Is.EqualTo(ESTrackIdentity.CurrentTrackSchema));
+            Assert.That(clip.ClipSchema, Is.EqualTo(ESTrackIdentity.CurrentClipSchema));
+
+            Assert.That(track.EnsureStableTrackIdentity(), Is.False);
+            Assert.That(track.TrackId, Is.EqualTo(trackId));
+            Assert.That(clip.ClipId, Is.EqualTo(clipId));
+        }
+
+        [Test]
+        public void StableIdentity_LegacyZeroSchemaUpgradesToCurrent()
+        {
+            var clip = new ProbeClip(new ProbeClipPlayer(), 0f, 1f)
+            {
+                ClipSchema = 0
+            };
+            var track = new ProbeTrack(new ProbeTrackPlayer(), clip)
+            {
+                TrackSchema = 0
+            };
+
+            Assert.That(track.EnsureStableTrackIdentity(), Is.True);
+            Assert.That(track.TrackSchema, Is.EqualTo(ESTrackIdentity.CurrentTrackSchema));
+            Assert.That(clip.ClipSchema, Is.EqualTo(ESTrackIdentity.CurrentClipSchema));
+        }
+
+        [Test]
+        public void StableIdentity_RepairsDuplicateTrackAndClipIds()
+        {
+            var clipA = new ProbeClip(new ProbeClipPlayer(), 0f, 1f)
+            {
+                ClipId = "dup-clip"
+            };
+            var clipB = new ProbeClip(new ProbeClipPlayer(), 0f, 1f)
+            {
+                ClipId = "dup-clip"
+            };
+            var trackA = new ProbeTrack(new ProbeTrackPlayer(), clipA)
+            {
+                TrackId = "dup-track"
+            };
+            var trackB = new ProbeTrack(new ProbeTrackPlayer(), clipB)
+            {
+                TrackId = "dup-track"
+            };
+            SkillProcessTrackSequence sequence = CreateSequence(trackA, trackB);
+
+            Assert.That(ESTrackIdentity.ValidateSequenceIdentity(sequence, out _, out _, out _, out _), Is.True);
+
+            Assert.That(
+                ESTrackIdentity.RepairSequenceIdentity(
+                    sequence,
+                    out int trackRepairs,
+                    out int clipRepairs,
+                    out _,
+                    out _),
+                Is.True);
+            Assert.That(trackRepairs, Is.EqualTo(1));
+            Assert.That(clipRepairs, Is.EqualTo(1));
+            Assert.That(trackA.TrackId, Is.EqualTo("dup-track"));
+            Assert.That(trackB.TrackId, Is.Not.EqualTo("dup-track"));
+            Assert.That(clipA.ClipId, Is.EqualTo("dup-clip"));
+            Assert.That(clipB.ClipId, Is.Not.EqualTo("dup-clip"));
+            Assert.That(ESTrackIdentity.ValidateSequenceIdentity(sequence, out _, out _, out _, out _), Is.False);
+        }
+
+        [Test]
+        public void StableIdentity_RepairFillsMissingIdsAndUpgradesSchema()
+        {
+            var clip = new ProbeClip(new ProbeClipPlayer(), 0f, 1f)
+            {
+                ClipId = null,
+                ClipSchema = 0
+            };
+            var track = new ProbeTrack(new ProbeTrackPlayer(), clip)
+            {
+                TrackId = "   ",
+                TrackSchema = 0
+            };
+            SkillProcessTrackSequence sequence = CreateSequence(track);
+
+            Assert.That(
+                ESTrackIdentity.RepairSequenceIdentity(
+                    sequence,
+                    out int trackRepairs,
+                    out int clipRepairs,
+                    out _,
+                    out _),
+                Is.True);
+            Assert.That(trackRepairs, Is.GreaterThanOrEqualTo(1));
+            Assert.That(clipRepairs, Is.GreaterThanOrEqualTo(1));
+            Assert.That(ESTrackIdentity.IsValidStableId(track.TrackId), Is.True);
+            Assert.That(ESTrackIdentity.IsValidStableId(clip.ClipId), Is.True);
+            Assert.That(track.TrackSchema, Is.EqualTo(ESTrackIdentity.CurrentTrackSchema));
+            Assert.That(clip.ClipSchema, Is.EqualTo(ESTrackIdentity.CurrentClipSchema));
+            Assert.That(ESTrackIdentity.ValidateSequenceIdentity(sequence, out _, out _, out _, out _), Is.False);
+        }
+
+        [Test]
+        public void StableIdentity_RepairIsIdempotentAfterValidState()
+        {
+            var track = new ProbeTrack(new ProbeTrackPlayer(), new ProbeClip(new ProbeClipPlayer(), 0f, 1f));
+            SkillProcessTrackSequence sequence = CreateSequence(track);
+            track.EnsureStableTrackIdentity();
+
+            Assert.That(
+                ESTrackIdentity.RepairSequenceIdentity(
+                    sequence,
+                    out _,
+                    out _,
+                    out _,
+                    out _),
+                Is.False);
+        }
+
+        [Test]
+        public void StableIdentity_FutureSchemaIsNotAutoDowngraded()
+        {
+            var clip = new ProbeClip(new ProbeClipPlayer(), 0f, 1f)
+            {
+                ClipId = "valid-clip",
+                ClipSchema = ESTrackIdentity.CurrentClipSchema + 1
+            };
+            var track = new ProbeTrack(new ProbeTrackPlayer(), clip)
+            {
+                TrackId = "valid-track",
+                TrackSchema = ESTrackIdentity.CurrentTrackSchema + 1
+            };
+            SkillProcessTrackSequence sequence = CreateSequence(track);
+
+            Assert.That(ESTrackIdentity.ValidateSequenceIdentity(sequence, out _, out _, out _, out _), Is.True);
+            Assert.That(
+                ESTrackIdentity.HasFutureSchema(
+                    sequence,
+                    out int futureTrackCount,
+                    out int futureClipCount),
+                Is.True);
+            Assert.That(futureTrackCount, Is.EqualTo(1));
+            Assert.That(futureClipCount, Is.EqualTo(1));
+            Assert.That(ESTrackIdentity.RepairSequenceIdentity(sequence, out _, out _, out _, out _), Is.False);
+            Assert.That(track.TrackSchema, Is.EqualTo(ESTrackIdentity.CurrentTrackSchema + 1));
+            Assert.That(clip.ClipSchema, Is.EqualTo(ESTrackIdentity.CurrentClipSchema + 1));
+        }
+
+        [Test]
+        public void StableIdentity_ReportsUnsupportedTrackAndClipContracts()
+        {
+            var sequence = new SkillProcessTrackSequence();
+            sequence.tracks_.Add(new RawTrack());
+
+            Assert.That(
+                ESTrackIdentity.ValidateSequenceIdentity(
+                    sequence,
+                    out _,
+                    out _,
+                    out int unsupportedTrackCount,
+                    out int unsupportedClipCount),
+                Is.False);
+            Assert.That(unsupportedTrackCount, Is.EqualTo(1));
+            Assert.That(unsupportedClipCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void StableIdentity_RepairDoesNotClaimUnsupportedContractsChanged()
+        {
+            var sequence = new SkillProcessTrackSequence();
+            sequence.tracks_.Add(new RawTrack());
+
+            Assert.That(
+                ESTrackIdentity.RepairSequenceIdentity(
+                    sequence,
+                    out _,
+                    out _,
+                    out int unsupportedTrackCount,
+                    out int unsupportedClipCount),
+                Is.False);
+            Assert.That(unsupportedTrackCount, Is.EqualTo(1));
+            Assert.That(unsupportedClipCount, Is.EqualTo(1));
+        }
+
         private static EntityState_Skill PrepareState(SkillProcessTrackSequence sequence)
         {
             var state = new EntityState_Skill();
@@ -376,6 +571,34 @@ namespace ES.Tests
             {
                 return player;
             }
+        }
+
+        private sealed class RawTrack : ITrackItem, ISkillTrackItem
+        {
+            public bool Enabled { get; set; } = true;
+            public IEnumerable<ITrackClip> Clips => new ITrackClip[] { new RawClip() };
+            public UnityEngine.Color ItemBGColor => UnityEngine.Color.white;
+            public string DisplayName { get; set; } = "RawTrack";
+            public bool TryAddTrackClip(ITrackClip item) => false;
+            public bool TryRemoveTrackClip(ITrackClip item) => false;
+            public bool SortClipsByTime() => false;
+            public IEnumerable<Type> SupportedClipTypes() => new Type[] { typeof(RawClip) };
+            public List<IEditorTimeSampler> CreateSamplers(ITrackSequence sequence) => new List<IEditorTimeSampler>();
+#if UNITY_EDITOR
+            public List<IEditorTimeSampler> CreateEditorSamplers(ITrackSequence sequence, object editorTarget) => new List<IEditorTimeSampler>();
+#endif
+        }
+
+        private sealed class RawClip : ITrackClip
+        {
+            public bool Enabled { get; set; } = true;
+            public string DisplayName { get; set; } = "RawClip";
+            public float StartTime { get; set; }
+            public float DurationTime { get; set; } = 1f;
+            public IEditorTimeSampler CreateSampler(ITrackSequence sequence, ITrackItem track) => null;
+#if UNITY_EDITOR
+            public IEditorTimeSampler CreateEditorSampler(ITrackSequence sequence, ITrackItem track, object editorTarget) => null;
+#endif
         }
 
         private sealed class ProbeTrackPlayer : ISkillRuntimeTrackPlayer

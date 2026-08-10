@@ -686,6 +686,193 @@ namespace ES
 
             return createdNodeIds;
         }
+
+        public List<string> PasteNodes(
+            IReadOnlyList<ESGraphNodeRecord> sourceNodes,
+            IReadOnlyList<ESGraphEdgeRecord> sourceEdges,
+            Vector2 offset,
+            out string error,
+            int sourceSchemaVersion,
+            string sourceDomainId,
+            out int createdEdgeCount)
+        {
+            EnsureCollections();
+            error = null;
+            createdEdgeCount = 0;
+            List<string> createdNodeIds = new List<string>();
+            if (sourceNodes == null || sourceNodes.Count == 0)
+            {
+                error = "剪贴板没有可粘贴的节点。";
+                return createdNodeIds;
+            }
+            if (sourceSchemaVersion > CurrentSchemaVersion)
+            {
+                error = "剪贴板图 Schema 来自未来版本：" + sourceSchemaVersion;
+                return createdNodeIds;
+            }
+            if (sourceSchemaVersion < CurrentSchemaVersion)
+            {
+                error = "剪贴板图 Schema " + sourceSchemaVersion
+                    + " 需要显式迁移到 Schema " + CurrentSchemaVersion
+                    + "，当前粘贴入口拒绝自动升级。";
+                return createdNodeIds;
+            }
+            if (string.IsNullOrWhiteSpace(sourceDomainId)
+                || !string.Equals(sourceDomainId, DomainId, StringComparison.Ordinal))
+            {
+                error = "剪贴板图 Domain 与当前图不一致。";
+                return createdNodeIds;
+            }
+
+            HashSet<string> sourceNodeIds = new HashSet<string>(StringComparer.Ordinal);
+            HashSet<string> sourcePortIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < sourceNodes.Count; i++)
+            {
+                ESGraphNodeRecord source = sourceNodes[i];
+                if (source == null)
+                {
+                    error = "剪贴板包含空节点。";
+                    return createdNodeIds;
+                }
+                if (!ESGraphIdentity.IsValid(source.nodeId))
+                {
+                    error = "剪贴板节点身份非法：" + source.nodeId;
+                    return createdNodeIds;
+                }
+                if (!sourceNodeIds.Add(source.nodeId))
+                {
+                    error = "剪贴板节点身份重复：" + source.nodeId;
+                    return createdNodeIds;
+                }
+                if (string.IsNullOrWhiteSpace(source.typeId)
+                    || !ESGraphNodeTypeKey.Parse(source.typeId).IsValid)
+                {
+                    error = "剪贴板节点类型非法：" + source.typeId;
+                    return createdNodeIds;
+                }
+                if (source.version < 1)
+                {
+                    error = "剪贴板节点版本非法：" + source.nodeId;
+                    return createdNodeIds;
+                }
+                if (source.ports == null)
+                    continue;
+                HashSet<string> nodeStableKeys = new HashSet<string>(StringComparer.Ordinal);
+                for (int p = 0; p < source.ports.Count; p++)
+                {
+                    ESGraphPortRecord port = source.ports[p];
+                    if (port == null)
+                    {
+                        error = "剪贴板节点包含空端口：" + source.nodeId;
+                        return createdNodeIds;
+                    }
+                    if (!ESGraphIdentity.IsValid(port.portId))
+                    {
+                        error = "剪贴板端口身份非法：" + port.portId;
+                        return createdNodeIds;
+                    }
+                    if (!sourcePortIds.Add(port.portId))
+                    {
+                        error = "剪贴板端口身份重复：" + port.portId;
+                        return createdNodeIds;
+                    }
+                    if (string.IsNullOrWhiteSpace(port.stableKey)
+                        || string.IsNullOrWhiteSpace(port.valueTypeId))
+                    {
+                        error = "剪贴板端口 StableKey 或类型缺失：" + port.portId;
+                        return createdNodeIds;
+                    }
+                    if (!System.Enum.IsDefined(typeof(ESGraphPortDirection), port.direction)
+                        || !System.Enum.IsDefined(typeof(ESGraphPortCapacity), port.capacity))
+                    {
+                        error = "剪贴板端口方向或容量枚举非法：" + port.portId;
+                        return createdNodeIds;
+                    }
+                    if (!nodeStableKeys.Add(port.stableKey))
+                    {
+                        error = "剪贴板节点端口 StableKey 重复：" + source.nodeId;
+                        return createdNodeIds;
+                    }
+                }
+            }
+
+            if (sourceEdges != null)
+            {
+                HashSet<string> sourceEdgeIds = new HashSet<string>(StringComparer.Ordinal);
+                for (int i = 0; i < sourceEdges.Count; i++)
+                {
+                    ESGraphEdgeRecord source = sourceEdges[i];
+                    if (source == null)
+                    {
+                        error = "剪贴板包含空连线。";
+                        return createdNodeIds;
+                    }
+                    if (!ESGraphIdentity.IsValid(source.edgeId))
+                    {
+                        error = "剪贴板连线身份非法：" + source.edgeId;
+                        return createdNodeIds;
+                    }
+                    if (!sourceEdgeIds.Add(source.edgeId))
+                    {
+                        error = "剪贴板连线身份重复：" + source.edgeId;
+                        return createdNodeIds;
+                    }
+                    if (!sourcePortIds.Contains(source.outputPortId)
+                        || !sourcePortIds.Contains(source.inputPortId))
+                    {
+                        error = "剪贴板连线引用了未知端口：" + source.edgeId;
+                        return createdNodeIds;
+                    }
+                    if (string.Equals(source.outputPortId, source.inputPortId, StringComparison.Ordinal))
+                    {
+                        error = "剪贴板连线不能连接同一端口：" + source.edgeId;
+                        return createdNodeIds;
+                    }
+                }
+            }
+
+            Dictionary<string, string> portIdMap = new Dictionary<string, string>(StringComparer.Ordinal);
+            List<ESGraphNodeRecord> clones = new List<ESGraphNodeRecord>(sourceNodes.Count);
+            for (int i = 0; i < sourceNodes.Count; i++)
+            {
+                ESGraphNodeRecord source = sourceNodes[i];
+                ESGraphNodeRecord clone = source.CloneWithNewIdentity(offset, portIdMap);
+                clones.Add(clone);
+                createdNodeIds.Add(clone.nodeId);
+            }
+
+            if (clones.Count == 0)
+            {
+                error = "剪贴板节点均不可用。";
+                return createdNodeIds;
+            }
+
+            int startNodeCount = nodes.Count;
+            int startEdgeCount = edges.Count;
+            nodes.AddRange(clones);
+            if (sourceEdges != null)
+            {
+                for (int i = 0; i < sourceEdges.Count; i++)
+                {
+                    ESGraphEdgeRecord source = sourceEdges[i];
+                    portIdMap.TryGetValue(source.outputPortId, out string clonedOutput);
+                    portIdMap.TryGetValue(source.inputPortId, out string clonedInput);
+                    if (!TryAddEdge(clonedOutput, clonedInput, out _, out string edgeError))
+                    {
+                        nodes.RemoveRange(startNodeCount, nodes.Count - startNodeCount);
+                        if (edges.Count > startEdgeCount)
+                            edges.RemoveRange(startEdgeCount, edges.Count - startEdgeCount);
+                        createdNodeIds.Clear();
+                        createdEdgeCount = 0;
+                        error = "剪贴板连线违反图连接契约：" + edgeError;
+                        return createdNodeIds;
+                    }
+                    createdEdgeCount++;
+                }
+            }
+
+            return createdNodeIds;
+        }
 #endif
 
         public ESGraphNodeRecord FindNode(string nodeId)

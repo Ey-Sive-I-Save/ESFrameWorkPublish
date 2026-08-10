@@ -35,6 +35,10 @@ namespace ES
         [Tooltip("为 Unity 公开 Editor 回调和 ES 窗口启用统一视觉；进入 PlayMode 时会自动停用，返回编辑模式后恢复。")]
         public bool enableGlobalEditorShell = true;
 
+        [LabelText("启用 Unity 全局深度皮肤（实验）")]
+        [Tooltip("为安全内容容器应用 ES 纯色表面，并染色已有控件背景；不填充窗口根节点，不遮挡原生内容。仅支持 Unity 2022.3，可随时恢复，进入 PlayMode 时自动停用。")]
+        public bool enableDeepEditorSkin = false;
+
         [Title("交互反馈与动效")]
         [LabelText("启用编辑器动效")]
         [Tooltip("控制选中呼吸、状态闪光和轻量扫光。关闭后所有界面仍保持完整信息和颜色语义。")]
@@ -88,6 +92,7 @@ namespace ES
             showSectionSubtitle = true;
             useCustomPalette = true;
             enableGlobalEditorShell = true;
+            enableDeepEditorSkin = false;
             enableMotion = true;
             motionIntensity = 0.78f;
 

@@ -5,6 +5,7 @@ using UnityEditor;
 #endif
 using UnityEngine;
 using UnityEngine.Serialization;
+using System.Collections.Generic;
 using System.IO;
 
 namespace ES
@@ -91,6 +92,11 @@ namespace ES
         [HideInInspector]
         [FormerlySerializedAs("Path_ResLibraryFolder")]
         public string Path_AssetLibraryFolder = "";
+
+        [VerticalGroup("Main/FolderPath")]
+        [LabelText("全局排除文件夹")]
+        [Tooltip("这些文件夹及其子目录不进入资源构建。支持 Assets 下相对路径，例如 Assets/ESNormalAssets/CharacterTemplates。")]
+        public List<string> GlobalExcludedFolderPaths = new List<string>();
 
         [VerticalGroup("Main/FolderPath")]
         [FolderPath, LabelText("AB帮助代码生成文件夹")]
@@ -200,9 +206,7 @@ namespace ES
             return false;
         }
 
-        [VerticalGroup("Main/FolderPath")]
-        [OnInspectorGUI]
-        private void DrawGeneratedFolderShortcuts()
+        public void DrawGeneratedFolderShortcuts()
         {
 #if UNITY_EDITOR
             EditorGUILayout.Space(4);
@@ -220,6 +224,7 @@ namespace ES
             DrawFolderShortcut("手工上传计划", Path_ManualUploadPlans);
             DrawFolderShortcut("分包计划 Planned", Path_PipelinePlanned);
             DrawFolderShortcut("引用烘焙 Baked", Path_PipelineBaked);
+            DrawFolderShortcut("构建初始目标", Path_BuildInitialTarget);
 #endif
         }
 
@@ -234,24 +239,31 @@ namespace ES
 
             string fullPath = Path.GetFullPath(path);
             string displayPath = GetCompactDisplayPath(fullPath);
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                bool exists = Directory.Exists(fullPath);
-                var labelContent = new GUIContent((exists ? "● " : "○ ") + label, fullPath);
-                Color previousContentColor = GUI.contentColor;
-                if (important) GUI.contentColor = new Color(1f, 0.72f, 0.20f);
-                EditorGUILayout.LabelField(labelContent, important ? EditorStyles.boldLabel : EditorStyles.label, GUILayout.Width(155));
-                GUI.contentColor = previousContentColor;
-                var pathContent = new GUIContent(displayPath, fullPath + "\n点击文本可选择并复制；点击右侧按钮可创建并打开目录。");
-                EditorGUILayout.SelectableLabel(pathContent.text, EditorStyles.textField,
-                    GUILayout.Height(EditorGUIUtility.singleLineHeight), GUILayout.MinWidth(80));
-                Color previousBackgroundColor = GUI.backgroundColor;
-                if (important) GUI.backgroundColor = new Color(1f, 0.67f, 0.15f);
-                bool open = GUILayout.Button(new GUIContent("打开", fullPath), GUILayout.Width(48), GUILayout.Height(EditorGUIUtility.singleLineHeight));
-                GUI.backgroundColor = previousBackgroundColor;
-                if (open)
-                    OpenGeneratedFolder(fullPath);
-            }
+            Rect rowRect = EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight);
+            const float gap = 4f;
+            float usableWidth = Mathf.Max(0f, rowRect.width - gap * 2f);
+            float labelWidth = Mathf.Min(155f, usableWidth * 0.32f);
+            float buttonWidth = Mathf.Min(48f, usableWidth * 0.18f);
+            float pathWidth = Mathf.Max(0f, usableWidth - labelWidth - buttonWidth);
+            Rect labelRect = new Rect(rowRect.x, rowRect.y, labelWidth, rowRect.height);
+            Rect pathRect = new Rect(labelRect.xMax + gap, rowRect.y, pathWidth, rowRect.height);
+            Rect buttonRect = new Rect(pathRect.xMax + gap, rowRect.y, buttonWidth, rowRect.height);
+
+            bool exists = Directory.Exists(fullPath);
+            var labelContent = new GUIContent((exists ? "● " : "○ ") + label, fullPath);
+            Color previousContentColor = GUI.contentColor;
+            if (important) GUI.contentColor = new Color(1f, 0.72f, 0.20f);
+            EditorGUI.LabelField(labelRect, labelContent, important ? EditorStyles.boldLabel : EditorStyles.label);
+            GUI.contentColor = previousContentColor;
+
+            EditorGUI.SelectableLabel(pathRect, displayPath, EditorStyles.textField);
+
+            Color previousBackgroundColor = GUI.backgroundColor;
+            if (important) GUI.backgroundColor = new Color(1f, 0.67f, 0.15f);
+            bool open = GUI.Button(buttonRect, new GUIContent("打开", fullPath));
+            GUI.backgroundColor = previousBackgroundColor;
+            if (open)
+                OpenGeneratedFolder(fullPath);
         }
 
         private static string GetCompactDisplayPath(string fullPath)

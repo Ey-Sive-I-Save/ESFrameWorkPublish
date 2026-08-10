@@ -49,6 +49,8 @@ README
 
 ## 当前强制结论
 
+- 编辑器扩展 AI 常识（`40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md`）现为 Project Authority / P0；编辑器 UI 的事件隔离、目标正确性、单一滚动容器、重绘性能和 Unity 实机交互验收优先于视觉增强与功能新增。
+
 - 所有文本文件统一使用 UTF-8；禁止默认代码页覆写和机械转码。
 - RuntimeKey 仅在当前进程、当前强类型表生命周期内有效，禁止持久化。
 - Tag 使用 `ESTagCollection` 的 Host SetTag 与 Lease/LeaseSet 所有权模型；禁止恢复无来源 Add/Remove API、第二套 Tag event 或旧 Tag 容器。
@@ -69,8 +71,8 @@ README
 - `Documentation/DOCUMENTATION_CATALOG.md` 是文档分类唯一入口。历史归档、未来方案、生成报告和待源码复验资料不得替代现行规范或 AIWarnings。
 - 不恢复 `EntityAIInputSystemModule`、`EntityInputStateModule` 等旧输入兼容类型；应清理序列化坏引用。
 - ES 自有 Unity 菜单根统一为 `【ES】/`。
-- 项目级 Agent Skills 位于 `.agents/skills`。当前基础层包含 `es-codex-session-bootstrap`、`es-use-ai-command`、`es-unity-compile`、`es-fix-compile-error`、`es-utf8-guard`、`es-worktree-audit`；跨系统治理层包含 `es-module-lifecycle`；ES 领域层包含 `es-gamecore-integration`、`es-resource-pipeline`、`es-tag-config`、`es-entity-authoring`、`es-input-action`、`es-command-authoring`、`es-editor-tooling`、`es-release-acceptance`。Skill 不进入 Unity `Assets`，不生成 `.meta`，不属于运行时或发布内容。
-- 项目级 AI 文件夹归属、Skill 内部结构和 15 个 Skill 的简介统一见 `.agents/README.md`；不得在其他目录另建重复 Skill 清单。
+- 项目级 Agent Skills 位于 `.agents/skills`。可用 Skill 的唯一事实来源是 `.agents/skills/*/SKILL.md` 的实际目录；Skill 不进入 Unity `Assets`，不生成 `.meta`，不属于运行时或发布内容。
+- 项目级 AI 文件夹归属、Skill 内部结构和分类简介统一见 `.agents/README.md`；不得在其他目录另建重复 Skill 清单或维护易漂移的固定数量。
 
 ## 协作边界
 

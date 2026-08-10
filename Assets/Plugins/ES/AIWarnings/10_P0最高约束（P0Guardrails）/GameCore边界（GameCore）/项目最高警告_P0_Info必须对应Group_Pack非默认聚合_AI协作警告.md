@@ -23,6 +23,14 @@
 
 `SoDataPack<TInfo>` 不是 Group 的同义词，不是新领域的默认容器，不是资源包、发布包、ResourcePlan 或运行时生命周期所有者。没有通过本规则定义的额外契约前，禁止新增业务对 Pack 的依赖。
 
+## 默认路径与合理例外
+
+`SoDataGroup` 是同类可枚举内容的首选聚合入口。`ActionTemplate`、`AudioCue`、武器、Buff、角色定义、`Presentation Mapping` 等会持续新增、多条配置共存、需要 Editor 列表管理或批量注入的 `SoDataInfo`，应优先通过对应 Group 进入 GameCore。
+
+单例全局设置、明确由 GameCore Root 字段唯一持有的配置、场景绑定对象和纯运行时状态可以不使用 Group，但必须有清晰且可验证的显式根入口。
+
+Builder 创建可枚举内容时，应优先创建或更新对应 Group；未能接入 Group 时必须明确标记为“孤立候选资产”，不能宣称已进入运行时 Table。
+
 ## P0：Info 类型闭包与资产归属
 
 ### 类型闭包

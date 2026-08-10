@@ -260,6 +260,14 @@ KCC 应用：
 - 每个任务入口快速判断自身是否可用，不可用立即 return。
 - 核心依赖初始化时准备好，热路径不要重复判空。
 
+生命周期与职责边界：
+
+- `ESWorkScheduler` 只负责已注册任务的稳定顺序、注册 Handle、更新期安全增删和额度；它不是业务状态机、请求仲裁器、全局事件总线或万能框架。业务层先决定“谁该做什么”，再将确定的执行任务注册到 Scheduler。
+- 每个 Scheduler 必须有明确的生命周期宿主和作用域，例如 Entity、Vehicle、一次 ActionRuntime 或一个表现实例；禁止默认提升为全局静态 Scheduler。
+- 宿主回池、销毁或动作结束时，必须清理本作用域任务并推进宿主 generation。`ESWorkHandle.version` 只校验 Scheduler 注册槽位是否复用，不能替代 Entity、Action 或表现实例的生命周期 generation；延迟回调同时校验 Handle 与宿主 generation。
+- 热路径不得反复注册/注销任务、创建闭包或依赖容量扩容；初始化阶段应 `Warmup()` 并保存 `ESWorkHandle`，动作结束和生命周期结束按 Handle 注销。
+- `order` 是受代码与文档共同维护的稳定合同。接口应按明确执行阶段拆分，禁止业务侧随意填入魔法数字抢占优先级。
+
 ## LOD
 
 当前设计结论：LOD 是 GameManager 的运行时模块，名为 `ESLODModule`，不是 `LODManager`。

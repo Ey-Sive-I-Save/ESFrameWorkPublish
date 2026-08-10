@@ -48,6 +48,22 @@
 6. 联机、云档案、跨版本导入前比较 Catalog 名称/Scope 与 SchemaHash。不同则执行明确迁移，或拒绝并回退安全默认值。
 7. 编辑器必须能验证别名、类型、重复声明、未使用项、读写所有者和跨资产稳定 ID 冲突。审计失败不得伪装为运行时可接受警告。
 
+## AI 自动化内容定义门禁
+
+AI 生成、选择或迁移 GameCore 内容时，只能把强类型稳定 Key 与可序列化结构化参数作为跨定义协议。`RuntimeKey`、运行时 Handle、`InstanceID`、委托、自由字符串约定以及裸 `ScriptableObject`、Prefab、`GameObject`、`Transform` 均不得成为 AI 输入输出、持久化内容身份或 Player 运行时权威。
+
+作者侧 Inspector 可以提供 SO 或资源对象选择体验，但必须在 Bake、注入或发布边界转换为稳定 Key / 类型化 AssetKey，并校验对象与稳定身份指向同一条定义。运行时对象只能由领域 Table、Catalog 或资源 Provider 解析获得；作者引用不得绕过这些权威入口。
+
+新增一类内容 Key 前必须同时满足：
+
+1. 该对象是可独立复用、查询、版本化或迁移的内容定义，而不是耐久、冷却、弹药、目标、仇恨、阶段等实例状态，也不是某个 Owner 内部的局部槽位。
+2. 面向正式可枚举 ES 内容资产时，同一实施批次交付 `Info + Group -> GameCore 注入 -> 强类型 RuntimeTable -> Consumer`；涉及资源时再接入 AssetKey / ResourcePlan / Provider。服务器数据、JSON/二进制、程序生成数据等非 SO 来源可以按 GameCore P0 直接使用领域 `InjectWith/TryInjectWith`，但仍必须交付强类型 Schema、Table、Consumer 和验证。只有 Key、空表或占位 DTO 不构成正式内容链。
+3. AI 候选进入正式内容前，必须验证未配置 Key、重复或歧义别名、缺失引用、错误类型、循环依赖、未接入 Consumer 和 Schema/迁移缺口；任一失败都必须 fail-closed。
+4. 行为、技能或世界定义 Key 不得兼任 Prefab、AudioClip、VFX、Bundle、地址或路径。资源身份继续由类型化 AssetKey 和资源系统负责。
+5. 尚未拥有正式定义、聚合、运行表和消费者的 Targeting、Behavior、Perception 等领域，禁止预建万能空 Key。若内容仅属于 Action、Skill 或其他 Owner 的内部编排，应优先采用 Owner Key 加稳定局部 ID，而不是升级为全局 ConfigKey。
+
+具体 GameCore 根、Info/Group 和资源反向依赖规则仍以 `GameCore边界（GameCore）` 下的现行 P0 为权威；本节只补充 AI 内容协议与新增 Key 的组合准入条件，不复制其注入实现。
+
 ## 当前实现入口
 
 - 通用基础：`Assets/Plugins/ES/1_Design/ConfigKey/ESKeyCatalog.cs`

@@ -68,6 +68,28 @@ namespace ES.Tests
         }
 
         [Test]
+        public void ControlSwitch_ReleasesAllLeasesOwnedByPreviousEntity()
+        {
+            Entity previous = CreateObject("Previous Local Entity").AddComponent<Entity>();
+            Entity current = CreateObject("Next Local Entity").AddComponent<Entity>();
+            ESGameManager.LocalControl.SetControlledEntity(previous, new ESRuntimeModeService());
+
+            ESCameraLease defaultLease = module.Push(CreateRequest(previous, "default"));
+            ESCameraRequest vehicleRequest = CreateRequest(previous, "vehicle");
+            vehicleRequest.kind = ESCameraRequestKind.Shot;
+            ESCameraLease vehicleLease = module.Push(vehicleRequest);
+            Assert.That(defaultLease.IsValid, Is.True);
+            Assert.That(vehicleLease.IsValid, Is.True);
+
+            module.OnControlledEntityChanged(previous, current);
+
+            Assert.That(module.TrySetLook(defaultLease, Vector2.one), Is.False);
+            Assert.That(module.TrySetLook(vehicleLease, Vector2.one), Is.False);
+            Assert.That(module.Release(defaultLease), Is.False);
+            Assert.That(module.Release(vehicleLease), Is.False);
+        }
+
+        [Test]
         public void ControlRevocation_RejectsWritesButStillAllowsLeaseCleanup()
         {
             Entity localEntity = CreateObject("Local Entity").AddComponent<Entity>();

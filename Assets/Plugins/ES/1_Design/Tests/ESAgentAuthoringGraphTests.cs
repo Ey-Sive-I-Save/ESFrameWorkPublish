@@ -41,6 +41,15 @@ namespace ES.EditorInternal.Tests
                     Is.EqualTo("es." + graph.GraphId + "." + outputNode.nodeId));
                 Assert.That(spec.outputs.Single().operationMode,
                     Is.EqualTo(ESAgentArtifactOperationMode.CreateOrUpdate));
+                Assert.That(spec.outputs.Single().commandIntent,
+                    Is.EqualTo(ESAgentCommandIntent.ControlledExecution));
+                Assert.That(spec.outputs.Single().writeAuthorization,
+                    Is.EqualTo(ESAgentWriteAuthorization.ConfirmBeforeWrite));
+                Assert.That(spec.outputs.Single().commandRiskLevel, Is.EqualTo(ESAgentRiskLevel.L2));
+                Assert.That(spec.outputs.Single().preconditions, Is.Not.Empty);
+                Assert.That(spec.outputs.Single().forbiddenOperations, Is.Not.Empty);
+                Assert.That(spec.outputs.Single().requiredEvidence, Is.Not.Empty);
+                Assert.That(spec.outputs.Single().rollbackStrategy, Is.Not.Empty);
                 Assert.That(spec.validations.Single().requireHumanApproval, Is.True);
                 Assert.That(spec.relations.Length, Is.EqualTo(4));
                 Assert.That(spec.relations.Select(item => item.semanticType), Is.EquivalentTo(new[]
@@ -280,6 +289,213 @@ namespace ES.EditorInternal.Tests
             Assert.That(profile.NodeDefinitions.Any(item => item.NodeType.Kind == ESGraphBuiltInNodeKind.AgentAICommandOutput), Is.True);
             Assert.That(profile.NodeDefinitions.Any(item => item.NodeType.Kind == ESGraphBuiltInNodeKind.AgentSkillOutput), Is.True);
             Assert.That(profile.NodeDefinitions.Any(item => item.NodeType.StableId == "es.agent-authoring.output-artifact"), Is.False);
+            Assert.That(profile.NodeDefinitions.Single(item => item.NodeType.Kind == ESGraphBuiltInNodeKind.AgentAICommandOutput).CurrentVersion,
+                Is.EqualTo(ESAgentAICommandOutputPayload.CurrentSchemaVersion));
+            Assert.That(profile.NodeDefinitions.Single(item => item.NodeType.Kind == ESGraphBuiltInNodeKind.AgentSkillOutput).CurrentVersion,
+                Is.EqualTo(ESAgentSkillOutputPayload.CurrentSchemaVersion));
+            Assert.That(profile.NodeDefinitions.Single(item => item.NodeType.Kind == ESGraphBuiltInNodeKind.AgentConstraint).CurrentVersion,
+                Is.EqualTo(ESAgentConstraintPayload.CurrentSchemaVersion));
+        }
+
+        [Test]
+        public void AgentAuthoring_ConstraintPayloadV1MigratesToScopedV2Contract()
+        {
+            ESGraphAsset graph = CreateValidGraph(out _);
+            try
+            {
+                ESGraphNodeRecord constraintNode = graph.Nodes.First(node =>
+                    node.BuiltInKind == ESGraphBuiltInNodeKind.AgentConstraint);
+                constraintNode.version = 1;
+                constraintNode.payloadJson = JsonUtility.ToJson(new LegacyConstraintPayload
+                {
+                    kind = ESAgentConstraintKind.Forbidden,
+                    statement = "不得写入正式目录。",
+                    rationale = "候选必须先审查。",
+                    verification = "检查目标路径和 Diff。"
+                });
+
+                Assert.That(ESGraphAuthoringRegistry.TryMigrateNode(graph, constraintNode.nodeId,
+                    out string error), Is.True, error);
+                ESAgentConstraintPayload migrated = JsonUtility.FromJson<ESAgentConstraintPayload>(
+                    constraintNode.payloadJson);
+                Assert.That(constraintNode.version, Is.EqualTo(ESAgentConstraintPayload.CurrentSchemaVersion));
+                Assert.That(migrated.schemaVersion, Is.EqualTo(ESAgentConstraintPayload.CurrentSchemaVersion));
+                Assert.That(migrated.kind, Is.EqualTo(ESAgentConstraintKind.Forbidden));
+                Assert.That(migrated.scope, Is.EqualTo(ESAgentConstraintScope.WholeArtifact));
+                Assert.That(migrated.combinationMode, Is.EqualTo(ESAgentConstraintCombinationMode.AllOf));
+                Assert.That(migrated.priority, Is.EqualTo(50));
+                Assert.That(migrated.combinationGroup, Is.Empty);
+            }
+            finally { Object.DestroyImmediate(graph); }
+        }
+
+        [Test]
+        public void AgentAuthoring_BakePreservesConstraintAndRelationSemantics()
+        {
+            ESGraphAsset graph = CreateValidGraph(out _);
+            try
+            {
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot snapshot,
+                    out List<ESGraphValidationIssue> graphIssues), Is.True, Describe(graphIssues));
+                Assert.That(new ESAgentArtifactGenerationBaker().TryBake(snapshot,
+                    out ESAgentArtifactGenerationSpec spec, out IReadOnlyList<ESGraphValidationIssue> bakeIssues),
+                    Is.True, Describe(bakeIssues));
+
+                Assert.That(spec.contractSchemaVersion,
+                    Is.EqualTo(ESAgentArtifactGenerationSpec.CurrentContractSchemaVersion));
+                Assert.That(spec.constraints.Single().scope, Is.EqualTo(ESAgentConstraintScope.WholeArtifact));
+                Assert.That(spec.constraints.Single().combinationMode,
+                    Is.EqualTo(ESAgentConstraintCombinationMode.AllOf));
+                Assert.That(spec.constraints.Single().priority, Is.EqualTo(50));
+                Assert.That(spec.relations.Select(item => item.relationKind), Is.EquivalentTo(new[]
+                {
+                    ESAgentRelationKind.ProvidesContext,
+                    ESAgentRelationKind.ProvidesContext,
+                    ESAgentRelationKind.AppliesConstraint,
+                    ESAgentRelationKind.RequiresValidation
+                }));
+            }
+            finally { Object.DestroyImmediate(graph); }
+        }
+
+        [Test]
+        public void AgentAuthoring_RejectsSingletonAnyOfConstraintGroup()
+        {
+            ESGraphAsset graph = CreateValidGraph(out _);
+            try
+            {
+                ESGraphNodeRecord constraintNode = graph.Nodes.First(node =>
+                    node.BuiltInKind == ESGraphBuiltInNodeKind.AgentConstraint);
+                ESAgentConstraintPayload payload = JsonUtility.FromJson<ESAgentConstraintPayload>(
+                    constraintNode.payloadJson);
+                payload.combinationMode = ESAgentConstraintCombinationMode.AnyOf;
+                payload.combinationGroup = "implementation-option";
+                graph.UpdateNode(constraintNode.nodeId, constraintNode.TypeKey, constraintNode.version,
+                    constraintNode.title, JsonUtility.ToJson(payload), out _);
+
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot snapshot,
+                    out List<ESGraphValidationIssue> graphIssues), Is.True, Describe(graphIssues));
+                Assert.That(new ESAgentArtifactGenerationBaker().TryBake(snapshot, out _,
+                    out IReadOnlyList<ESGraphValidationIssue> bakeIssues), Is.False);
+                Assert.That(bakeIssues.Any(issue => issue?.code == "AgentAuthoring.Intent.Bake"
+                    && issue.message.Contains("至少需要两条")), Is.True, Describe(bakeIssues));
+            }
+            finally { Object.DestroyImmediate(graph); }
+        }
+
+        [Test]
+        public void AgentAuthoring_OutputPayloadV1MigratesToStructuredV2Contracts()
+        {
+            ESGraphAsset graph = CreateValidGraph(out ESGraphNodeRecord commandNode);
+            try
+            {
+                commandNode.version = 1;
+                commandNode.payloadJson = JsonUtility.ToJson(new LegacyAICommandPayload
+                {
+                    commandName = "检查_迁移_AI命令",
+                    targetProjectPath = "Assets/Plugins/ES/AICommands/检查_迁移_AI命令.md",
+                    operationMode = ESAgentArtifactOperationMode.UpdateOnly,
+                    commandType = "只读体检",
+                    defaultWrite = "否",
+                    riskLevel = "L1",
+                    purpose = "验证旧 AICommand 契约迁移。",
+                    expectedInputs = "目标路径。",
+                    executionOutline = "读取\n检查\n报告",
+                    acceptanceCriteria = "报告真实检查结果。",
+                    requiredSections = "必须先读\n交付格式"
+                });
+
+                Assert.That(ESGraphAuthoringRegistry.TryMigrateNode(graph, commandNode.nodeId,
+                    out string commandError), Is.True, commandError);
+                ESAgentAICommandOutputPayload command = JsonUtility.FromJson<ESAgentAICommandOutputPayload>(
+                    commandNode.payloadJson);
+                Assert.That(commandNode.version, Is.EqualTo(2));
+                Assert.That(command.schemaVersion, Is.EqualTo(2));
+                Assert.That(command.commandIntent, Is.EqualTo(ESAgentCommandIntent.ReadOnlyReview));
+                Assert.That(command.writeAuthorization, Is.EqualTo(ESAgentWriteAuthorization.NoWrites));
+                Assert.That(command.riskLevel, Is.EqualTo(ESAgentRiskLevel.L1));
+                Assert.That(command.preconditions, Is.Not.Empty);
+                Assert.That(command.blockedHandling, Is.Not.Empty);
+
+                ESGraphNodeRecord skillNode = AddFromProfile(graph,
+                    ESGraphBuiltInNodeKind.AgentSkillOutput, new Vector2(540f, 220f));
+                skillNode.version = 1;
+                skillNode.payloadJson = JsonUtility.ToJson(new LegacySkillPayload
+                {
+                    skillName = "es-migrated-workflow",
+                    targetProjectPath = ".agents/skills/es-migrated-workflow/",
+                    operationMode = ESAgentArtifactOperationMode.CreateOrUpdate,
+                    description = "迁移旧 Skill。",
+                    triggerScenarios = "需要迁移验证时使用。",
+                    workflow = "读取\n执行\n验证",
+                    nonGoals = "不得扩大授权。",
+                    validationSteps = "检查输出。",
+                    defaultPrompt = "Use $es-migrated-workflow.",
+                    includeReferences = true
+                });
+
+                Assert.That(ESGraphAuthoringRegistry.TryMigrateNode(graph, skillNode.nodeId,
+                    out string skillError), Is.True, skillError);
+                ESAgentSkillOutputPayload skill = JsonUtility.FromJson<ESAgentSkillOutputPayload>(skillNode.payloadJson);
+                Assert.That(skillNode.version, Is.EqualTo(2));
+                Assert.That(skill.schemaVersion, Is.EqualTo(2));
+                Assert.That(skill.includeAgentsMetadata, Is.True);
+                Assert.That(skill.nonTriggerScenarios, Is.Not.Empty);
+                Assert.That(skill.inputContract, Is.Not.Empty);
+                Assert.That(skill.outputContract, Is.Not.Empty);
+                Assert.That(skill.permissionBoundary, Does.Contain("不扩大"));
+            }
+            finally { Object.DestroyImmediate(graph); }
+        }
+
+        [Test]
+        public void AgentAuthoring_OutputMigrationRejectsFuturePayloadWithoutMutation()
+        {
+            ESGraphAsset graph = CreateValidGraph(out ESGraphNodeRecord outputNode);
+            try
+            {
+                outputNode.version = 1;
+                outputNode.payloadJson = "{\"schemaVersion\":99,\"commandName\":\"future\"}";
+                string before = outputNode.payloadJson;
+
+                Assert.That(ESGraphAuthoringRegistry.TryMigrateNode(graph, outputNode.nodeId,
+                    out string error), Is.False);
+                Assert.That(error, Does.Contain("不支持"));
+                Assert.That(outputNode.version, Is.EqualTo(1));
+                Assert.That(outputNode.payloadJson, Is.EqualTo(before));
+            }
+            finally { Object.DestroyImmediate(graph); }
+        }
+
+        [Test]
+        public void AgentAuthoring_SemanticContractsRejectAuthorizationAndIdempotencyConflicts()
+        {
+            ESGraphAsset graph = CreateValidGraph(out ESGraphNodeRecord commandNode);
+            try
+            {
+                ESAgentAICommandOutputPayload command = JsonUtility.FromJson<ESAgentAICommandOutputPayload>(
+                    commandNode.payloadJson);
+                command.commandIntent = ESAgentCommandIntent.ReadOnlyReview;
+                command.writeAuthorization = ESAgentWriteAuthorization.ScopedWrites;
+                graph.UpdateNode(commandNode.nodeId, commandNode.typeId, commandNode.version,
+                    commandNode.title, JsonUtility.ToJson(command), out _);
+
+                ESGraphNodeRecord skillNode = AddFromProfile(graph,
+                    ESGraphBuiltInNodeKind.AgentSkillOutput, new Vector2(540f, 220f));
+                ESAgentSkillOutputPayload skill = JsonUtility.FromJson<ESAgentSkillOutputPayload>(skillNode.payloadJson);
+                skill.effectKind = ESAgentSkillEffectKind.ControlledMutation;
+                skill.idempotency = ESAgentSkillIdempotency.NotApplicable;
+                graph.UpdateNode(skillNode.nodeId, skillNode.typeId, skillNode.version,
+                    skillNode.title, JsonUtility.ToJson(skill), out _);
+
+                List<ESGraphValidationIssue> issues = graph.ValidateGraph();
+                new ESAgentAuthoringGraphProfile().Validate(graph, issues);
+                Assert.That(issues.Any(item => item?.code == "AgentAuthoring.AICommandOutput"
+                    && item.message.Contains("受控执行")), Is.True, Describe(issues));
+                Assert.That(issues.Any(item => item?.code == "AgentAuthoring.AgentSkillOutput"
+                    && item.message.Contains("幂等")), Is.True, Describe(issues));
+            }
+            finally { Object.DestroyImmediate(graph); }
         }
 
         [Test]
@@ -814,6 +1030,377 @@ namespace ES.EditorInternal.Tests
             finally { Object.DestroyImmediate(skillGraph); }
         }
 
+        [Test]
+        public void AgentAuthoring_ArtifactViewsKeepOnlyTheSelectedConnectedBranch()
+        {
+            ESAgentArtifactGenerationSpec source = CreateArtifactSpec();
+
+            Assert.That(ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(source,
+                ESAgentArtifactKind.AICommand, out ESAgentArtifactGenerationSpec commandView,
+                out string commandError), Is.True, commandError);
+            Assert.That(ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(source,
+                ESAgentArtifactKind.AgentSkill, out ESAgentArtifactGenerationSpec skillView,
+                out string skillError), Is.True, skillError);
+
+            Assert.That(commandView.outputs.Select(item => item.artifactKind),
+                Is.EqualTo(new[] { ESAgentArtifactKind.AICommand }));
+            Assert.That(commandView.references.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "reference-command" }));
+            Assert.That(commandView.constraints.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "constraint-command" }));
+            Assert.That(commandView.validations.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "validation-command" }));
+            Assert.That(commandView.relations, Has.Length.EqualTo(4));
+            Assert.That(commandView.outputs.Single().preconditions, Is.EqualTo("command-preconditions"));
+            Assert.That(commandView.outputs.Single().writeAuthorization,
+                Is.EqualTo(ESAgentWriteAuthorization.ConfirmBeforeWrite));
+
+            Assert.That(skillView.outputs.Select(item => item.artifactKind),
+                Is.EqualTo(new[] { ESAgentArtifactKind.AgentSkill }));
+            Assert.That(skillView.references.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "reference-skill" }));
+            Assert.That(skillView.constraints.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "constraint-skill" }));
+            Assert.That(skillView.validations.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "validation-skill" }));
+            Assert.That(skillView.relations, Has.Length.EqualTo(4));
+            Assert.That(skillView.outputs.Single().skillPermissionBoundary,
+                Is.EqualTo("skill-permission-boundary"));
+            Assert.That(skillView.outputs.Single().skillIdempotency,
+                Is.EqualTo(ESAgentSkillIdempotency.Required));
+        }
+
+        [Test]
+        public void AgentAuthoring_ArtifactViewDoesNotMutateTheSourceSpec()
+        {
+            ESAgentArtifactGenerationSpec source = CreateArtifactSpec();
+            ESAgentGenerationOutput originalCommand = source.outputs[0];
+
+            Assert.That(ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(source,
+                ESAgentArtifactKind.AICommand, out ESAgentArtifactGenerationSpec commandView,
+                out string error), Is.True, error);
+
+            Assert.That(source.outputs, Has.Length.EqualTo(2));
+            Assert.That(source.references, Has.Length.EqualTo(2));
+            Assert.That(source.constraints, Has.Length.EqualTo(2));
+            Assert.That(source.validations, Has.Length.EqualTo(2));
+            Assert.That(source.relations, Has.Length.EqualTo(8));
+            Assert.That(source.outputs[0], Is.SameAs(originalCommand));
+            Assert.That(commandView.outputs[0], Is.Not.SameAs(originalCommand));
+        }
+
+        [Test]
+        public void AgentAuthoring_ArtifactViewByNodeIdIsolatesOneOutputAmongTheSameKind()
+        {
+            ESAgentArtifactGenerationSpec source = CreateArtifactSpec();
+            AddSecondCommandBranch(source);
+            ESAgentGenerationOutput originalOutput = source.outputs[0];
+
+            Assert.That(ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(source,
+                "command-output", out ESAgentArtifactGenerationSpec firstView,
+                out string firstError), Is.True, firstError);
+            Assert.That(ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(source,
+                "command-output-secondary", out ESAgentArtifactGenerationSpec secondView,
+                out string secondError), Is.True, secondError);
+
+            Assert.That(firstView.outputs.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "command-output" }));
+            Assert.That(firstView.references.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "reference-command" }));
+            Assert.That(firstView.constraints.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "constraint-command" }));
+            Assert.That(firstView.validations.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "validation-command" }));
+            Assert.That(firstView.relations, Has.Length.EqualTo(4));
+            Assert.That(firstView.relations.Any(item => item.fromNodeId.Contains("secondary")
+                || item.toNodeId.Contains("secondary")), Is.False);
+
+            Assert.That(secondView.outputs.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "command-output-secondary" }));
+            Assert.That(secondView.references.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "reference-command-secondary" }));
+            Assert.That(secondView.constraints.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "constraint-command-secondary" }));
+            Assert.That(secondView.validations.Select(item => item.nodeId),
+                Is.EqualTo(new[] { "validation-command-secondary" }));
+            Assert.That(secondView.relations, Has.Length.EqualTo(4));
+
+            Assert.That(source.outputs, Has.Length.EqualTo(3));
+            Assert.That(source.outputs[0], Is.SameAs(originalOutput));
+            Assert.That(firstView.outputs[0], Is.Not.SameAs(originalOutput));
+        }
+
+        [Test]
+        public void AgentAuthoring_ArtifactViewByNodeIdRejectsMissingNonOutputAndDuplicateIdentity()
+        {
+            ESAgentArtifactGenerationSpec source = CreateArtifactSpec();
+
+            Assert.That(ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(source,
+                "goal", out ESAgentArtifactGenerationSpec nonOutputView,
+                out string nonOutputError), Is.False);
+            Assert.That(nonOutputView, Is.Null);
+            Assert.That(nonOutputError, Does.Contain("没有稳定 NodeId 对应的 Output"));
+
+            Assert.That(ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(source,
+                "missing-output", out ESAgentArtifactGenerationSpec missingView,
+                out string missingError), Is.False);
+            Assert.That(missingView, Is.Null);
+            Assert.That(missingError, Does.Contain("missing-output"));
+
+            source.outputs = source.outputs.Concat(new[]
+            {
+                new ESAgentGenerationOutput
+                {
+                    nodeId = "command-output",
+                    artifactKind = ESAgentArtifactKind.AICommand,
+                    artifactId = "es.command-output.duplicate",
+                    artifactName = "command-output-duplicate"
+                }
+            }).ToArray();
+            Assert.That(ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(source,
+                "command-output", out ESAgentArtifactGenerationSpec duplicateView,
+                out string duplicateError), Is.False);
+            Assert.That(duplicateView, Is.Null);
+            Assert.That(duplicateError, Does.Contain("不唯一"));
+        }
+
+        [Test]
+        public void AgentAuthoring_ArtifactViewRejectsMissingOutputKind()
+        {
+            ESAgentArtifactGenerationSpec source = CreateArtifactSpec();
+            source.outputs = new[] { source.outputs[0] };
+
+            Assert.That(ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(source,
+                ESAgentArtifactKind.AgentSkill, out ESAgentArtifactGenerationSpec skillView,
+                out string error), Is.False);
+            Assert.That(skillView, Is.Null);
+            Assert.That(error, Does.Contain("Agent Skill Output"));
+        }
+
+        [Test]
+        public void AgentAuthoring_TemporarySkillPromptCannotClaimInstallationOrPersistence()
+        {
+            ESAgentArtifactGenerationSpec source = CreateArtifactSpec();
+            Assert.That(ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(source,
+                ESAgentArtifactKind.AgentSkill, out ESAgentArtifactGenerationSpec skillView,
+                out string error), Is.True, error);
+
+            string prompt = ESAgentArtifactGenerationWorkspace.BuildTemporarySkillExecutionPrompt(
+                skillView, "skill-test");
+
+            Assert.That(prompt, Does.Contain("仅在本次任务"));
+            Assert.That(prompt, Does.Contain("不得安装、创建或更新 `.agents/skills`"));
+            Assert.That(prompt, Does.Contain("不构成写入授权"));
+            Assert.That(prompt, Does.Contain("不得声称该 Skill 已安装"));
+            Assert.That(prompt, Does.Contain("skill-output"));
+        }
+
+        [Test]
+        public void AgentAuthoring_ArtifactViewPreservesValidAnyOfGroup()
+        {
+            ESAgentArtifactGenerationSpec source = CreateArtifactSpec();
+            ESAgentGenerationConstraint first = source.constraints.Single(item =>
+                item.nodeId == "constraint-command");
+            first.combinationMode = ESAgentConstraintCombinationMode.AnyOf;
+            first.combinationGroup = "command-implementation";
+            source.constraints = source.constraints.Concat(new[]
+            {
+                new ESAgentGenerationConstraint
+                {
+                    nodeId = "constraint-command-alternative",
+                    kind = ESAgentConstraintKind.Required,
+                    scope = ESAgentConstraintScope.Execution,
+                    combinationMode = ESAgentConstraintCombinationMode.AnyOf,
+                    combinationGroup = "command-implementation",
+                    priority = 40,
+                    statement = "使用另一条受控实现路径。",
+                    rationale = "允许实现环境差异。",
+                    verification = "任一路径均需提供相同证据。"
+                }
+            }).ToArray();
+            first.scope = ESAgentConstraintScope.Execution;
+            source.relations = source.relations.Concat(new[]
+            {
+                Relation("edge-command-alternative-1", "reference-command", "constraint-command-alternative"),
+                Relation("edge-command-alternative-2", "constraint-command-alternative", "command-output")
+            }).ToArray();
+
+            Assert.That(ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(source,
+                "command-output", out ESAgentArtifactGenerationSpec view, out string error), Is.True, error);
+            Assert.That(view.constraints.Count(item => item.combinationMode
+                == ESAgentConstraintCombinationMode.AnyOf), Is.EqualTo(2));
+            Assert.That(view.constraints.All(item => item.nodeId.Contains("command")), Is.True);
+        }
+
+        [Test]
+        public void AgentAuthoring_ArtifactViewRejectsRelationSemanticTampering()
+        {
+            ESAgentArtifactGenerationSpec source = CreateArtifactSpec();
+            ESAgentGenerationRelation relation = source.relations.Single(item =>
+                item.edgeId == "edge-command-3");
+            relation.semanticType = ESGraphPortValueIds.AgentArtifact;
+
+            Assert.That(ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(source,
+                "command-output", out ESAgentArtifactGenerationSpec view, out string error), Is.False);
+            Assert.That(view, Is.Null);
+            Assert.That(error, Does.Contain("数据语义"));
+        }
+
+        private static ESAgentArtifactGenerationSpec CreateArtifactSpec()
+        {
+            return new ESAgentArtifactGenerationSpec
+            {
+                sourceGraphId = "1234567890abcdef1234567890abcdef",
+                sourceContentSignature = "artifact-view-signature",
+                goal = new ESAgentGenerationGoal
+                {
+                    nodeId = "goal",
+                    title = "整图复用",
+                    objective = "把整张图作为可选择的 Command 或 Skill 使用。",
+                    successCriteria = "所选分支完整且不扩大授权。"
+                },
+                references = new[]
+                {
+                    new ESAgentGenerationReference { nodeId = "reference-command", projectPath = "command.md" },
+                    new ESAgentGenerationReference { nodeId = "reference-skill", projectPath = "skill.md" }
+                },
+                constraints = new[]
+                {
+                    new ESAgentGenerationConstraint
+                    {
+                        nodeId = "constraint-command", priority = 50, statement = "Command 约束",
+                        rationale = "限定 Command 分支。", verification = "核对 Command 产物。"
+                    },
+                    new ESAgentGenerationConstraint
+                    {
+                        nodeId = "constraint-skill", priority = 50, statement = "Skill 约束",
+                        rationale = "限定 Skill 分支。", verification = "核对 Skill 产物。"
+                    }
+                },
+                outputs = new[]
+                {
+                    new ESAgentGenerationOutput
+                    {
+                        nodeId = "command-output",
+                        artifactKind = ESAgentArtifactKind.AICommand,
+                        artifactId = "es.command-output",
+                        artifactName = "command-output",
+                        commandIntent = ESAgentCommandIntent.ControlledExecution,
+                        writeAuthorization = ESAgentWriteAuthorization.ConfirmBeforeWrite,
+                        commandRiskLevel = ESAgentRiskLevel.L2,
+                        preconditions = "command-preconditions"
+                    },
+                    new ESAgentGenerationOutput
+                    {
+                        nodeId = "skill-output",
+                        artifactKind = ESAgentArtifactKind.AgentSkill,
+                        artifactId = "es.skill-output",
+                        artifactName = "skill-output",
+                        skillDescription = "临时 Skill",
+                        skillWorkflow = "执行工作流",
+                        skillEffectKind = ESAgentSkillEffectKind.GuidanceOnly,
+                        skillIdempotency = ESAgentSkillIdempotency.Required,
+                        skillPermissionBoundary = "skill-permission-boundary"
+                    }
+                },
+                validations = new[]
+                {
+                    new ESAgentGenerationValidation { nodeId = "validation-command", requireHumanApproval = true },
+                    new ESAgentGenerationValidation { nodeId = "validation-skill", requireHumanApproval = true }
+                },
+                relations = new[]
+                {
+                    Relation("edge-command-1", "goal", "reference-command"),
+                    Relation("edge-command-2", "reference-command", "constraint-command"),
+                    Relation("edge-command-3", "constraint-command", "command-output"),
+                    Relation("edge-command-4", "command-output", "validation-command"),
+                    Relation("edge-skill-1", "goal", "reference-skill"),
+                    Relation("edge-skill-2", "reference-skill", "constraint-skill"),
+                    Relation("edge-skill-3", "constraint-skill", "skill-output"),
+                    Relation("edge-skill-4", "skill-output", "validation-skill")
+                }
+            };
+        }
+
+        private static void AddSecondCommandBranch(ESAgentArtifactGenerationSpec source)
+        {
+            source.references = source.references.Concat(new[]
+            {
+                new ESAgentGenerationReference
+                {
+                    nodeId = "reference-command-secondary",
+                    projectPath = "command-secondary.md"
+                }
+            }).ToArray();
+            source.constraints = source.constraints.Concat(new[]
+            {
+                new ESAgentGenerationConstraint
+                {
+                    nodeId = "constraint-command-secondary",
+                    priority = 50,
+                    statement = "第二个 Command 约束",
+                    rationale = "限定第二个 Command 分支。",
+                    verification = "核对第二个 Command 产物。"
+                }
+            }).ToArray();
+            source.outputs = source.outputs.Concat(new[]
+            {
+                new ESAgentGenerationOutput
+                {
+                    nodeId = "command-output-secondary",
+                    artifactKind = ESAgentArtifactKind.AICommand,
+                    artifactId = "es.command-output.secondary",
+                    artifactName = "command-output-secondary"
+                }
+            }).ToArray();
+            source.validations = source.validations.Concat(new[]
+            {
+                new ESAgentGenerationValidation
+                {
+                    nodeId = "validation-command-secondary",
+                    requireHumanApproval = true
+                }
+            }).ToArray();
+            source.relations = source.relations.Concat(new[]
+            {
+                Relation("edge-command-secondary-1", "goal", "reference-command-secondary"),
+                Relation("edge-command-secondary-2", "reference-command-secondary", "constraint-command-secondary"),
+                Relation("edge-command-secondary-3", "constraint-command-secondary", "command-output-secondary"),
+                Relation("edge-command-secondary-4", "command-output-secondary", "validation-command-secondary")
+            }).ToArray();
+        }
+
+        private static ESAgentGenerationRelation Relation(string edgeId, string fromNodeId, string toNodeId)
+        {
+            ESAgentRelationKind relationKind;
+            string semanticType;
+            if ((fromNodeId ?? string.Empty).Contains("constraint"))
+            {
+                relationKind = ESAgentRelationKind.AppliesConstraint;
+                semanticType = ESGraphPortValueIds.AgentRequirement;
+            }
+            else if ((fromNodeId ?? string.Empty).Contains("output"))
+            {
+                relationKind = ESAgentRelationKind.RequiresValidation;
+                semanticType = ESGraphPortValueIds.AgentArtifact;
+            }
+            else
+            {
+                relationKind = ESAgentRelationKind.ProvidesContext;
+                semanticType = ESGraphPortValueIds.AgentContext;
+            }
+            return new ESAgentGenerationRelation
+            {
+                edgeId = edgeId,
+                fromNodeId = fromNodeId,
+                fromNodeTitle = fromNodeId,
+                toNodeId = toNodeId,
+                toNodeTitle = toNodeId,
+                relationKind = relationKind,
+                semanticType = semanticType
+            };
+        }
+
         private static ESGraphAsset CreateValidGraph(out ESGraphNodeRecord outputNode)
         {
             ESGraphAsset graph = ScriptableObject.CreateInstance<ESGraphAsset>();
@@ -873,6 +1460,51 @@ namespace ES.EditorInternal.Tests
         private static string GetProjectRootForTests()
         {
             return Directory.GetParent(Application.dataPath)?.FullName ?? Directory.GetCurrentDirectory();
+        }
+
+        [Serializable]
+        private sealed class LegacyAICommandPayload
+        {
+            public int schemaVersion = 1;
+            public string commandName;
+            public string targetProjectPath;
+            public ESAgentArtifactOperationMode operationMode;
+            public string commandType;
+            public string defaultWrite;
+            public string riskLevel;
+            public string purpose;
+            public string expectedInputs;
+            public string executionOutline;
+            public string acceptanceCriteria;
+            public string requiredSections;
+        }
+
+        [Serializable]
+        private sealed class LegacySkillPayload
+        {
+            public int schemaVersion = 1;
+            public string skillName;
+            public string targetProjectPath;
+            public ESAgentArtifactOperationMode operationMode;
+            public string description;
+            public string triggerScenarios;
+            public string workflow;
+            public string nonGoals;
+            public string validationSteps;
+            public string defaultPrompt;
+            public bool includeAgentsMetadata = false;
+            public bool includeReferences;
+            public bool includeScripts = false;
+        }
+
+        [Serializable]
+        private sealed class LegacyConstraintPayload
+        {
+            public int schemaVersion = 1;
+            public ESAgentConstraintKind kind;
+            public string statement;
+            public string rationale;
+            public string verification;
         }
 
         private sealed class FakeArtifactFileIO : IESAgentArtifactFileIO

@@ -112,9 +112,109 @@ namespace ES
     [LabelText("UnityPackage默认包名")]
     public string PackageName = "ESPackage0.35_";
 
+    public const int DefaultPackagePublishMaxAssetCount = 12000;
+    public const long DefaultPackagePublishMaxSourceBytes = 96L * 1024L * 1024L;
+
+    public static List<string> CreateDefaultPackagePublishAssetPaths()
+    {
+      return new List<string>
+      {
+        "Assets/Plugins/ES",
+        "Assets/Scripts/ESLogic",
+        "Assets/KinematicCharacterController",
+        "Assets/Packages/Newtonsoft.Json.13.0.4",
+        "Assets/Plugins/Sirenix",
+        "Assets/Plugins/RootMotion",
+        "Assets/Plugins/Easy Save 3",
+        "Assets/ESNormalAssets/Camera",
+        "Assets/ESNormalAssets/Data/GlobalData/EditorConfi",
+        "Assets/ESNormalAssets/Data/GlobalData/EditorTheme",
+        "Assets/ESNormalAssets/Data/GlobalData/GameCore"
+      };
+    }
+
+    public static List<string> CreateDefaultPackagePublishRequiredAssetPaths()
+    {
+      return new List<string>
+      {
+        "Assets/ESNormalAssets/Data/GlobalData/AssetSettings/ESAssetReleaseUploadSettings.asset",
+        "Assets/ESNormalAssets/Data/GlobalData/AssetSettings/全局资源管理设置.asset",
+        "Assets/ESNormalAssets/Data/GlobalData/TrackSequenceEditorSettings/TrackSequenceEditorSettings.asset"
+      };
+    }
+
     [TabGroup("UnityPackage打包构建")]
     [LabelText("收集的路径ES"), FolderPath]
-    public List<string> PackageCollectPath = new List<string>() { "Assets/Plugins/ES", "Assets/Scripts/ESLogic" };
+    public List<string> PackageCollectPath = new List<string>()
+    {
+      "Assets/Plugins/ES",
+      "Assets/Scripts/ESLogic",
+      "Assets/KinematicCharacterController",
+      "Assets/Packages/Newtonsoft.Json.13.0.4",
+      "Assets/Plugins/Sirenix",
+      "Assets/Plugins/RootMotion",
+      "Assets/Plugins/Easy Save 3"
+    };
+
+    [TabGroup("UnityPackage打包构建")]
+    [LabelText("正式发布资产白名单"), FolderPath]
+    [InfoBox("正式发布会完整导出这里的目录。当前完整包包含 3_Examples、Odin、RootMotion 和 Easy Save 3，只能在相应授权允许的范围内使用或分发。")]
+    public List<string> PackagePublishAssetPaths = CreateDefaultPackagePublishAssetPaths();
+
+    [TabGroup("UnityPackage打包构建")]
+    [LabelText("正式发布必需资产（文件或文件夹）")]
+    [InfoBox("这里保存不能由 Unity 序列化依赖自动发现、但完整框架必须携带的稳定默认资产。删除内置必需项会导致闭包检查失败。")]
+    public List<string> PackagePublishRequiredAssetPaths = CreateDefaultPackagePublishRequiredAssetPaths();
+
+    [TabGroup("UnityPackage打包构建")]
+    [LabelText("发布依赖允许根"), FolderPath]
+    [InfoBox("这些目录不会整体打包。发布工具只纳入正式根实际引用到的资源；发现未允许的包外 Assets 依赖时会拒绝发布。")]
+    public List<string> PackagePublishDependencyAllowPaths = new List<string>()
+    {
+      "Assets/ESNormalAssets",
+      "Assets/LoafbrrAssets",
+      "Assets/Demo_FGT"
+    };
+
+    [TabGroup("UnityPackage打包构建")]
+    [LabelText("外部依赖引用根"), FolderPath]
+    [InfoBox("这里用于未来仍需预装、允许引用但禁止随包导出的 Assets 依赖。当前完整包没有此类默认目录。")]
+    public List<string> PackagePublishExternalReferencePaths = new List<string>();
+
+    [TabGroup("UnityPackage打包构建")]
+    [LabelText("正式发布最大资源数")]
+    [MinValue(1)]
+    public int PackagePublishMaxAssetCount = DefaultPackagePublishMaxAssetCount;
+
+    [TabGroup("UnityPackage打包构建")]
+    [LabelText("正式发布最大源文件字节")]
+    [MinValue(1)]
+    public long PackagePublishMaxSourceBytes = DefaultPackagePublishMaxSourceBytes;
+
+    [TabGroup("UnityPackage打包构建")]
+    [LabelText("正式发布排除路径（文件或文件夹）")]
+    [InfoBox("排除测试、Obsolete、安装产物、可选 AITest 适配器，以及会引入项目专用资源或已裁剪依赖的示例资产。3_Examples 主体、FinalIK 运行时和 Easy Save 3 运行时继续保留。")]
+    public List<string> PackagePublishExcludePaths = new List<string>()
+    {
+      "Assets/Plugins/ES/Obsolete",
+      "Assets/Plugins/ES/Editor/Installer/Downloads",
+      "Assets/Plugins/ES/0_Stand/Tests",
+      "Assets/Plugins/ES/1_Design/Tests",
+      "Assets/Scripts/ESLogic/Tests",
+      "Assets/Scripts/ESLogic/Editor/Generation/Tests",
+      "Assets/Scripts/ESLogic/Runtime/Developer/AITest",
+      "Assets/Plugins/RootMotion/Shared Demo Assets",
+      "Assets/Plugins/RootMotion/FinalIK/_DEMOS",
+      "Assets/Plugins/RootMotion/FinalIK/_Integration",
+      "Assets/Plugins/RootMotion/Baker",
+      "Assets/Plugins/RootMotion/Editor/Baker",
+      "Assets/Plugins/RootMotion/Editor/FinalIK/_DEMOS",
+      "Assets/Plugins/RootMotion/Editor/Shared Demo Scripts",
+      "Assets/Plugins/RootMotion/FinalIK/Tools/VRIK Animated Locomotion.controller",
+      "Assets/Plugins/Easy Save 3/Scripts/Save Slots",
+      "Assets/Plugins/ES/3_Examples/1_Runtime/Example_SimpleTools/New Scene 1.unity",
+      "Assets/Plugins/ES/ThirdParty/JUMP_SystemSpeech.asset"
+    };
 
     [TabGroup("UnityPackage打包构建")]
     [LabelText("包含依赖项")]
@@ -198,6 +298,11 @@ namespace ES
     public void ValidateAndCleanPackagePaths()
     {
       CleanPathList(PackageCollectPath, nameof(PackageCollectPath), true);
+      CleanPathList(PackagePublishAssetPaths, nameof(PackagePublishAssetPaths), true);
+      CleanAssetPathList(PackagePublishRequiredAssetPaths, nameof(PackagePublishRequiredAssetPaths));
+      CleanPathList(PackagePublishDependencyAllowPaths, nameof(PackagePublishDependencyAllowPaths), true);
+      CleanPathList(PackagePublishExternalReferencePaths, nameof(PackagePublishExternalReferencePaths), true);
+      CleanPathList(PackagePublishExcludePaths, nameof(PackagePublishExcludePaths), true);
 
       if (ExtendedPackageConfigs != null)
       {
@@ -282,6 +387,28 @@ namespace ES
           paths[i] = path;
           used.Add(path);
         }
+      }
+    }
+
+    private static void CleanAssetPathList(List<string> paths, string label)
+    {
+      if (paths == null) return;
+
+      HashSet<string> used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      for (int i = paths.Count - 1; i >= 0; i--)
+      {
+        string path = NormalizeAssetPath(paths[i]);
+        bool exists = AssetDatabase.IsValidFolder(path)
+          || !string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(path));
+        if (string.IsNullOrEmpty(path) || !exists || !used.Add(path))
+        {
+          if (!string.IsNullOrEmpty(path) && !exists)
+            Debug.LogWarning($"[ESGlobalEditorDefaultConfi] Remove invalid asset path in {label}: {path}");
+          paths.RemoveAt(i);
+          continue;
+        }
+
+        paths[i] = path;
       }
     }
 #endif

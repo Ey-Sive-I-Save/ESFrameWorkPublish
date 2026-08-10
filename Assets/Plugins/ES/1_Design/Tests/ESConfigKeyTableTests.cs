@@ -398,6 +398,64 @@ namespace ES.Tests
         }
 
         [Test]
+        public void AssetCatalog_CommitStageFailure_PreservesOldAuthorityAvailability()
+        {
+            const string retainedKey = "characters.commit-stage-retained";
+            const string stagedKey = "characters.commit-stage-staged";
+            var seedCatalog = new ESRuntimeCatalog();
+            seedCatalog.assets.Add(CreatePrefabCatalogEntry(
+                retainedKey,
+                "guid-commit-stage-old",
+                "Commit Stage Old",
+                "commit-old-library"));
+
+            var stagedRecord = new ESAssetConfigRecord(
+                0,
+                stagedKey,
+                "guid-commit-stage-new",
+                0,
+                typeof(GameObject).FullName,
+                null,
+                "Commit Stage New",
+                "commit-new-library");
+            var stagedRecords = new[]
+            {
+                new ESAssetConfigGenerationRecord(ESAssetReferKind.Prefab, in stagedRecord)
+            };
+
+            try
+            {
+                Assert.That(ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(
+                    new[] { seedCatalog }), Is.EqualTo(1));
+                long committedGeneration = ESRuntimeDataAsset.AssetConfigTableGeneration;
+
+                ESAssetConfigTableGenerationState candidate =
+                    ESRuntimeDataAsset.BuildCandidateFromGenerationRecords(
+                        stagedRecords,
+                        out ESAssetCatalogBuildValidation validation);
+                Assert.That(validation.candidateEntries, Is.EqualTo(1));
+
+                candidate.Retire();
+                Assert.Throws<System.InvalidOperationException>(() =>
+                    ESRuntimeDataAsset.CommitOrStageCandidate(candidate, string.Empty));
+
+                Assert.That(ESRuntimeDataAsset.AssetConfigTableGeneration, Is.EqualTo(committedGeneration));
+                Assert.That(ESRuntimeDataAsset.AssetConfigTablesAvailable, Is.True,
+                    "提交阶段异常不得挂起旧权威表。");
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryResolveAssetIdentity(
+                    0,
+                    retainedKey,
+                    out ESAssetIdentity retainedIdentity), Is.True);
+                Assert.That(retainedIdentity.Guid, Is.EqualTo("guid-commit-stage-old"));
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryResolveAssetIdentity(0, stagedKey, out _), Is.False);
+            }
+            finally
+            {
+                ESRuntimeDataAsset.ClearAssetConfigTables();
+            }
+        }
+
+        [Test]
         public void AssetCatalog_DuplicateCandidate_IsRejectedWithoutChangingAuthority()
         {
             const string businessKey = "characters.duplicate-candidate";
@@ -1205,6 +1263,46 @@ namespace ES.Tests
             Assert.That(first.TryGetRuntimeKey(new ESStableKey("Tests.Attribute", 0, "combat.attack"), out int stringAliasRuntime), Is.True);
             Assert.That(stringAliasRuntime, Is.EqualTo(firstRuntime));
             Assert.That(first.IsCompatibleWith(second.CreateHandshake(), out _), Is.True);
+        }
+
+        [Test]
+        public void WeaponDefinitionSchema_RejectsInvalidFormalFireData_BeforeTableCommit()
+        {
+            var shared = ItemWeaponSharedData.Default;
+            shared.fire.enabled = true;
+            shared.fire.interval = 0f;
+
+            Assert.That(shared.ValidateDefinition(out string error), Is.False);
+            Assert.That(error, Does.Contain("射击间隔"));
+
+            var table = new ESWeaponConfigKeyTable(4);
+            var key = new ESWeaponConfigKey { stringKey = "tests.weapon.invalid-fire" };
+            var exception = Assert.Throws<System.InvalidOperationException>(() =>
+                table.InjectWith(key, shared, ItemWeaponVariableData.Default));
+
+            Assert.That(exception.Message, Does.Contain("WeaponDefinition 校验失败"));
+            Assert.That(table.TryGet(key, out _), Is.False);
+        }
+
+        [Test]
+        public void WeaponDefinitionSchema_CommitsFormalData_WithoutLegacyCombatParameters()
+        {
+            var shared = ItemWeaponSharedData.Default;
+            shared.fire.enabled = true;
+            shared.fire.interval = 0.2f;
+            shared.fire.distance = 80f;
+            shared.recoil.enabled = true;
+            shared.recoil.baseMagnitude = 0.8f;
+
+            var table = new ESWeaponConfigKeyTable(4);
+            var key = new ESWeaponConfigKey { stringKey = "tests.weapon.formal" };
+            int runtimeKey = table.InjectWith(key, shared, ItemWeaponVariableData.Default);
+
+            Assert.That(runtimeKey, Is.Not.Zero);
+            Assert.That(table.TryGet(key, out ESWeaponRuntimeData data), Is.True);
+            Assert.That(data.sharedData, Is.SameAs(shared));
+            Assert.That(data.sharedData.fire.interval, Is.EqualTo(0.2f));
+            Assert.That(data.sharedData.recoil.baseMagnitude, Is.EqualTo(0.8f));
         }
 
         private static ESKeyCatalog CreateTestCatalog(bool reverse)

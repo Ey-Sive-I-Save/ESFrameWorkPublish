@@ -6,7 +6,7 @@ using UnityEngine;
 namespace ES
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("【ES】/配置/Profile/ES 通用 Profile")]
+    [AddComponentMenu("【ES】/基础设施/Profile/ES 通用 Profile")]
     public sealed class ESGenericProfile : MonoBehaviour,
         IESGameObjectPoolLifecycle,
         IESGameObjectPoolLifecycleExtensionInstaller

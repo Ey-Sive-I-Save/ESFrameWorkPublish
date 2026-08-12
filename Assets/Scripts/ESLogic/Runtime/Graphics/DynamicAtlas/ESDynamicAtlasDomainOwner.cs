@@ -6,7 +6,7 @@ namespace ES
     /// 可选的场景/UI Root 聚合器。多个 Owner 使用同一 Key 时共享 Domain；最后一个 Owner
     /// Disable/Destroy 后关闭 Domain，旧 Entry Lease 会立即失效并由 Graphic 回退到占位内容。
     /// </summary>
-    [AddComponentMenu("【ES】/场景与对象/动态图集 Domain Owner")]
+    [AddComponentMenu("【ES】/UI/动态图集 Domain Owner")]
     [DisallowMultipleComponent]
     public sealed class ESDynamicAtlasDomainOwner : MonoBehaviour
     {

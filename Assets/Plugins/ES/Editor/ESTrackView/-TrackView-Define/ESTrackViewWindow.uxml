@@ -1,10 +1,10 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
     <Style src="project://database/Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.uss?fileID=7433441132597879392&amp;guid=94a24e6f1db27d4449be2f6fbeb9eb40&amp;type=3#ESTrackViewWindow" />
-    <ui:VisualElement name="TopPart" style="flex-grow: 0; background-color: rgb(17, 19, 22);">
-        <ES.ESTrackTimerToolbar name="ESTrackTimerToolbar" style="background-color: rgb(15, 17, 20);" />
-        <ui:VisualElement class="normalBlock" style="flex-grow: 1; height: 8px; width: 100%; flex-direction: row; background-color: rgb(18, 20, 23);" />
+    <ui:VisualElement name="TopPart" style="flex-grow: 0;">
+        <ES.ESTrackTimerToolbar name="ESTrackTimerToolbar" />
+        <ui:VisualElement name="ToolbarDivider" class="normalBlock" style="flex-grow: 1; height: 8px; width: 100%; flex-direction: row;" />
     </ui:VisualElement>
-    <ui:ScrollView horizontal-scroller-visibility="Hidden" vertical-scroller-visibility="AlwaysVisible" name="ScrollView" style="flex-grow: 1; background-color: rgb(27, 29, 33); max-height: none;">
+    <ui:ScrollView horizontal-scroller-visibility="Hidden" vertical-scroller-visibility="AlwaysVisible" name="ScrollView" style="flex-grow: 1; max-height: none;">
         <ui:VisualElement name="DownPart" class="timeline-workspace">
             <ui:VisualElement name="DownRightPart" focusable="true" class="timeline-canvas">
                 <ES.ESTrackRuler name="ESTrackRuler" class="timeline-ruler" />
@@ -13,7 +13,7 @@
             </ui:VisualElement>
             <ui:VisualElement name="TrackPanelSplitter" class="track-panel-splitter" />
             <ui:VisualElement name="DownLeftPart" class="track-panel">
-                <ES.ESTrackCreatorToolbar name="ESTrackCreatorToolbar" class="normalBlock" style="height: 40px; width: 100%; background-color: rgb(20, 22, 25); max-height: 40px;" />
+                <ES.ESTrackCreatorToolbar name="ESTrackCreatorToolbar" class="normalBlock" style="height: 40px; width: 100%; max-height: 40px;" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:ScrollView>

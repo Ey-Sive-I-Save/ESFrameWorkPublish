@@ -170,6 +170,7 @@ namespace ES
             return RebuildFreeLookRig(
                 PlayerThirdPersonRigPath,
                 "PlayerThirdPersonRig",
+                CinemachineOrbitalTransposer.BindingMode.LockToTargetOnAssign,
                 new[]
                 {
                     new CinemachineFreeLook.Orbit(3.0f, 2.0f),
@@ -183,6 +184,7 @@ namespace ES
             return RebuildFreeLookRig(
                 VehicleChaseRigPath,
                 "VehicleChaseRig",
+                CinemachineOrbitalTransposer.BindingMode.LockToTargetWithWorldUp,
                 new[]
                 {
                     new CinemachineFreeLook.Orbit(3.8f, 5.0f),
@@ -191,7 +193,11 @@ namespace ES
                 });
         }
 
-        private static GameObject RebuildFreeLookRig(string prefabPath, string rigName, CinemachineFreeLook.Orbit[] orbits)
+        private static GameObject RebuildFreeLookRig(
+            string prefabPath,
+            string rigName,
+            CinemachineOrbitalTransposer.BindingMode bindingMode,
+            CinemachineFreeLook.Orbit[] orbits)
         {
             GameObject root = new GameObject(rigName);
             try
@@ -205,7 +211,7 @@ namespace ES
                 freeLook.m_YAxis.m_InputAxisName = string.Empty;
                 freeLook.m_XAxis.m_MaxSpeed = 0f;
                 freeLook.m_YAxis.m_MaxSpeed = 0f;
-                freeLook.m_BindingMode = CinemachineOrbitalTransposer.BindingMode.LockToTargetWithWorldUp;
+                freeLook.m_BindingMode = bindingMode;
                 freeLook.m_Orbits = orbits;
                 obstruction.m_CollideAgainst = ESPhysicsLayers.CameraObstacleMask;
                 obstruction.m_CameraRadius = 0.2f;

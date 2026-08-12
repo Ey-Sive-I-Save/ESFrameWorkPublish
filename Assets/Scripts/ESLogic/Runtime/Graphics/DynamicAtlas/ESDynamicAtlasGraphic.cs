@@ -7,7 +7,7 @@ using UnityEngine.UI;
 
 namespace ES
 {
-    [AddComponentMenu("【ES】/场景与对象/动态图集 Graphic")]
+    [AddComponentMenu("【ES】/UI/动态图集 Graphic")]
     [DisallowMultipleComponent]
     public sealed class ESDynamicAtlasGraphic : MaskableGraphic
     {

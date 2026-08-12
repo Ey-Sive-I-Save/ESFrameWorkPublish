@@ -11,7 +11,7 @@ namespace ES
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(-8)]
-    [AddComponentMenu("【ES】/场景与对象/相机场景绑定")]
+    [AddComponentMenu("【ES】/相机与表现/相机场景绑定")]
     public sealed class ESCameraSceneBinding : MonoBehaviour
     {
         [SerializeField] private string viewKey = "MainView";

@@ -1,9 +1,10 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
 namespace ES.Editor
 {
-    public sealed class ESDynamicAtlasMonitorWindow : EditorWindow
+    public sealed class ESDynamicAtlasMonitorWindow : ESSinglePageIMGUIWindow<ESDynamicAtlasMonitorWindow>
     {
         private const int SnapshotEntryDetailLimit = 300;
 
@@ -17,20 +18,62 @@ namespace ES.Editor
         private ESDynamicAtlasContentKey selectedContent;
         private int selectedSlotGeneration;
 
-        [MenuItem("【ES】/运行时诊断/动态图集监视器")]
+        [MenuItem("【ES】/验证与诊断/运行时监视/动态图集/打开动态图集监视器")]
         private static void Open()
         {
             GetWindow<ESDynamicAtlasMonitorWindow>("ES 动态图集");
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent()
+        {
+            return new GUIContent("ES 动态图集", "只读观察动态图集页面、条目、上传和 GPU 隔离状态");
+        }
+
+        protected override string ESWindow_Subtitle => "运行时页面与上传诊断";
+        protected override Vector2 ESWindow_MinSize => new Vector2(620f, 420f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(980f, 720f);
+        protected override string ESWindow_PageStableId => "runtime.dynamic-atlas";
+        protected override string ESWindow_PageTitle => "动态图集监视器";
+        protected override string ESWindow_PageKeywords => "动态图集 Atlas GPU 上传 页面 条目 监视";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "atlas.refresh",
+                    "刷新",
+                    "立即获取一份新的只读快照。",
+                    context =>
+                    {
+                        RefreshSnapshot();
+                        Repaint();
+                        context.SetStatus("动态图集快照已刷新");
+                    })
+                .WithUnityIcon("Refresh")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "atlas.auto-refresh",
+                    "自动刷新",
+                    "每 0.25 秒获取一次只读快照。",
+                    context =>
+                    {
+                        autoRefresh = !autoRefresh;
+                        nextRefreshTime = 0d;
+                        context.RefreshPageActions();
+                        context.SetStatus(autoRefresh ? "已启用自动刷新" : "已暂停自动刷新");
+                    })
+                .WithCheckedState(() => autoRefresh)
+                .WithPriority(80));
+        }
+
+        protected override void ESWindow_OnHostEnable()
         {
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.update += OnEditorUpdate;
             RefreshSnapshot();
         }
 
-        private void OnDisable()
+        protected override void ESWindow_OnHostDisable()
         {
             EditorApplication.update -= OnEditorUpdate;
             snapshot = null;
@@ -48,19 +91,14 @@ namespace ES.Editor
             Repaint();
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             if (Event.current.type == EventType.Layout)
                 PromotePendingSnapshot();
 
-            using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
-            {
-                autoRefresh = GUILayout.Toggle(autoRefresh, "自动刷新", EditorStyles.toolbarButton);
-                if (GUILayout.Button("刷新", EditorStyles.toolbarButton, GUILayout.Width(56f)))
-                    RefreshSnapshot();
-                GUILayout.FlexibleSpace();
-                GUILayout.Label(EditorApplication.isPlaying ? "运行状态" : "非运行状态", EditorStyles.miniLabel);
-            }
+            EditorGUILayout.LabelField(
+                EditorApplication.isPlaying ? "运行状态" : "非运行状态",
+                EditorStyles.miniBoldLabel);
 
             if (snapshot == null)
             {

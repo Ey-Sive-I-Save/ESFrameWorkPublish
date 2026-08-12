@@ -13,7 +13,7 @@ namespace ES
     [CreateTrackItem(TrackItemType.Skill, "相机轨道")]
     public sealed class SkillTrackItem_Camera : SkillTrackItem<SkillTrackClip_Camera>
     {
-        public override Color ItemBGColor => new Color(0.28f, 0.48f, 0.78f, 0.42f);
+        public override Color ItemBGColor => new Color(0.18f, 0.62f, 0.72f, 0.42f);
 
         public SkillTrackItem_Camera()
         {
@@ -97,23 +97,28 @@ namespace ES
     [System.Serializable, ESCreatePath("技能轨道剪辑", "相机轨道剪辑")]
     public sealed class SkillTrackClip_Camera : SkillTrackClip, ISkillRuntimeClipCompiler
     {
-        [TitleGroup("相机片段", "进入片段申请 Shot；离开、打断或补偿清理时释放对应 Lease。")]
-        [LabelText("Definition")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.ContentOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Content, "进入片段申请相机 Shot；离开、打断或补偿清理时释放对应 Lease。")]
+        [LabelText("相机定义")]
         [Tooltip("稳定相机内容引用；不得填入 VCam、Rig Prefab 或场景对象。")]
         public ESCameraDefinitionReference definition;
 
         [SerializeField, HideInInspector, FormerlySerializedAs("profileKey"), FormerlySerializedAs("definitionKey")]
         private string legacyDefinitionKey;
 
-        [TitleGroup("相机片段")]
-        [LabelText("ViewKey")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.ContentOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Content)]
+        [LabelText("视图键")]
+        [Tooltip("相机模块中的逻辑视图名称，不是场景对象名称。")]
         public string viewKey = "MainView";
 
-        [TitleGroup("相机片段")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.BehaviorOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Behavior, "优先级用于同一视图内的请求仲裁。")]
         [LabelText("优先级")]
         public int priority = 100;
 
-        [TitleGroup("相机片段")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TargetOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Target, "选择相机请求跟随技能使用者还是当前主目标。")]
         [LabelText("目标来源")]
         public SkillCameraTargetSource targetSource = SkillCameraTargetSource.SkillUser;
 

@@ -388,9 +388,9 @@ namespace ES.Tests.DynamicAtlas
             Assert.That(graphicMenu, Is.Not.Null);
             Assert.That(ownerMenu, Is.Not.Null);
             Assert.That(graphicMenu.componentMenu,
-                Is.EqualTo("【ES】/场景与对象/动态图集 Graphic"));
+                Is.EqualTo("【ES】/UI/动态图集 Graphic"));
             Assert.That(ownerMenu.componentMenu,
-                Is.EqualTo("【ES】/场景与对象/动态图集 Domain Owner"));
+                Is.EqualTo("【ES】/UI/动态图集 Domain Owner"));
         }
 
         [Test]

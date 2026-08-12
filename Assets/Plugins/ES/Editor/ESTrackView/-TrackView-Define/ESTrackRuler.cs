@@ -106,17 +106,17 @@ namespace ES
             }
         }
         #region  颜色
-        public static Color levelup_1 = new Color(0.72f, 0.76f, 0.82f, 0.4f);
-        public static Color levelup_2 = new Color(0.9f, 0.92f, 0.96f, 0.68f);
-        public static Color levelup_down1 = new Color(0.55f, 0.6f, 0.68f, 0.045f);
-        public static Color levelup_down2 = new Color(0.62f, 0.67f, 0.74f, 0.11f);
+        public static Color levelup_1 => ESTrackViewTheme.RulerMinorTick;
+        public static Color levelup_2 => ESTrackViewTheme.RulerMajorTick;
+        public static Color levelup_down1 => ESTrackViewTheme.RulerMinorGrid;
+        public static Color levelup_down2 => ESTrackViewTheme.RulerMajorGrid;
         #endregion
         
         
         public HashSet<int> rec = new HashSet<int>(100);
         public void DrawLevel(int level, Painter2D painter, MeshGenerationContext context)
         {
-            painter.fillColor = Color.white;
+            painter.fillColor = ESTrackViewTheme.RulerText;
 
             int off = level - LevelLow.GetHashCode();
            
@@ -128,7 +128,7 @@ namespace ES
             {
              
                 var f = LevelsPX[(RulerLevel)level];
-                if (off == 0) painter.strokeColor = new Color(0.5f, 0.55f, 0.62f, 0.28f);
+                if (off == 0) painter.strokeColor = ESTrackViewTheme.RulerMinorTick;
                 else painter.strokeColor = off > 1 ? levelup_2 : levelup_1;
                 painter.lineWidth = off + 1;
                 float firstTick = Mathf.Ceil(showStart / f) * f;
@@ -157,7 +157,7 @@ namespace ES
                             
                             rec.Add(pixel);
                             painter.BeginPath();
-                            context.DrawText(FormatSecondsToMinuteSecondCached(realSecondPoint), vv, FontSize, new Color(0.86f, 0.89f, 0.94f, 0.92f));
+                            context.DrawText(FormatSecondsToMinuteSecondCached(realSecondPoint), vv, FontSize, ESTrackViewTheme.RulerText);
                             painter.lineWidth = 1;
                             painter.strokeColor = off > 1 ? levelup_down2 : levelup_down1;
 
@@ -166,7 +166,7 @@ namespace ES
                             painter.LineTo(vv);
                             painter.Stroke();
                             painter.ClosePath();
-                            if (off == 0) painter.strokeColor = Color.gray;
+                            if (off == 0) painter.strokeColor = ESTrackViewTheme.RulerMinorTick;
                             else painter.strokeColor = off > 1 ? levelup_2 : levelup_1;
                             painter.lineWidth = off + 1;
                         }
@@ -205,7 +205,7 @@ namespace ES
             painter.Stroke();
             painter.ClosePath();
 
-            context.DrawText(FormatSecondsToMinuteSecondCached(showEnd), new Vector2(labelX, height), fontSize, new Color(0.86f, 0.89f, 0.94f, 0.92f));
+            context.DrawText(FormatSecondsToMinuteSecondCached(showEnd), new Vector2(labelX, height), fontSize, ESTrackViewTheme.RulerText);
         }
         public static string FormatSecondsToMinuteSecondCached(float totalSeconds)
         {

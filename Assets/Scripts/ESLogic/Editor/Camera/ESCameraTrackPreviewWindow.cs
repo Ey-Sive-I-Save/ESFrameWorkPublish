@@ -9,10 +9,12 @@ namespace ES
     /// 当前 EditorSequencePlayer 发现 CameraTrackEditorSampler，并渲染该 Sampler 已拥有的
     /// 独立 Preview View。因此关闭面板不会影响轨道播放，停止轨道才会销毁全部预览资源。
     /// </summary>
-    public sealed class ESCameraTrackPreviewWindow : EditorWindow
+    public sealed class ESCameraTrackPreviewWindow : ESSinglePageIMGUIWindow<ESCameraTrackPreviewWindow>
     {
         private readonly List<CameraTrackEditorSampler> samplers = new List<CameraTrackEditorSampler>(4);
+        private string[] samplerNames = new string[0];
         private int selectedIndex;
+        private double nextRepaintTime;
 
         [MenuItem("【ES】/内容制作/相机/打开轨道相机预览", false, 141)]
         public static void Open()
@@ -23,18 +25,44 @@ namespace ES
             window.Show();
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent()
+        {
+            return new GUIContent("轨道相机预览", "查看当前 TrackView 相机轨道拥有的独立预览输出");
+        }
+
+        protected override string ESWindow_Subtitle => "TrackView 相机输出";
+        protected override Vector2 ESWindow_MinSize => new Vector2(360f, 220f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(760f, 520f);
+        protected override string ESWindow_PageStableId => "camera.track-preview";
+        protected override string ESWindow_PageTitle => "相机预览";
+        protected override string ESWindow_PageKeywords => "TrackView 相机 轨道 预览";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "camera.open-track-view",
+                    "轨道编辑器",
+                    "打开 TrackView 轨道编辑器。",
+                    _ => ESTrackViewWindow.OpenWindow())
+                .WithUnityIcon("TimelineAsset Icon")
+                .WithPriority(100));
+        }
+
+        protected override void ESWindow_OnHostEnable()
         {
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.update += OnEditorUpdate;
         }
 
-        private void OnDisable()
+        protected override void ESWindow_OnHostDisable()
         {
             EditorApplication.update -= OnEditorUpdate;
+            samplers.Clear();
+            nextRepaintTime = 0d;
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             CollectSamplers();
             if (samplers.Count == 0)
@@ -42,18 +70,17 @@ namespace ES
                 EditorGUILayout.HelpBox(
                     "当前 TrackView 预览没有活动的相机轨道。打开轨道编辑器、选择包含“相机轨道”的技能序列，然后点击预览。",
                     MessageType.Info);
-                if (GUILayout.Button("打开轨道编辑器"))
-                    ESTrackViewWindow.OpenWindow();
                 return;
             }
 
             selectedIndex = Mathf.Clamp(selectedIndex, 0, samplers.Count - 1);
             if (samplers.Count > 1)
             {
-                string[] names = new string[samplers.Count];
+                if (samplerNames.Length != samplers.Count)
+                    samplerNames = new string[samplers.Count];
                 for (int i = 0; i < samplers.Count; i++)
-                    names[i] = samplers[i].Track != null ? samplers[i].Track.DisplayName : "相机轨道";
-                selectedIndex = EditorGUILayout.Popup("相机轨道", selectedIndex, names);
+                    samplerNames[i] = samplers[i].Track != null ? samplers[i].Track.DisplayName : "相机轨道";
+                selectedIndex = EditorGUILayout.Popup("相机轨道", selectedIndex, samplerNames);
             }
 
             ESCameraTrackPreviewSession session = samplers[selectedIndex].Session;
@@ -70,8 +97,16 @@ namespace ES
 
         private void OnEditorUpdate()
         {
-            if (hasFocus || EditorTimelinePlayer.Instance.ActiveSequence != null)
-                Repaint();
+            bool hasActiveSequence = EditorTimelinePlayer.Instance.ActiveSequence != null;
+            if (!hasFocus && !hasActiveSequence)
+                return;
+
+            double now = EditorApplication.timeSinceStartup;
+            double interval = hasFocus ? 1d / 30d : 0.2d;
+            if (now < nextRepaintTime)
+                return;
+            nextRepaintTime = now + interval;
+            Repaint();
         }
 
         private void CollectSamplers()

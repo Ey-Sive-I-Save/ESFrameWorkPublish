@@ -49,10 +49,10 @@ namespace ES
             style.flexDirection = FlexDirection.Column;
             style.alignItems = Align.Stretch;
             style.flexShrink = 0;
-            style.color = Color.gray;
-            style.backgroundColor = new Color(0.058f, 0.064f, 0.074f, 1f);
+            style.color = ESTrackViewTheme.Text;
+            style.backgroundColor = ESTrackViewTheme.ToolbarBackground;
             style.borderBottomWidth = 1;
-            style.borderBottomColor = new Color(0.18f, 0.2f, 0.22f, 1f);
+            style.borderBottomColor = ESTrackViewTheme.Divider;
             style.paddingLeft = 5;
             style.paddingRight = 5;
             style.paddingTop = 2;
@@ -78,7 +78,7 @@ namespace ES
             m_CompactContextRow.style.flexShrink = 0;
             m_CompactContextRow.style.display = DisplayStyle.None;
             m_CompactContextRow.style.borderTopWidth = 1;
-            m_CompactContextRow.style.borderTopColor = new Color(0.18f, 0.2f, 0.22f, 1f);
+            m_CompactContextRow.style.borderTopColor = ESTrackViewTheme.Divider;
             m_CompactContextRow.style.paddingLeft = 5;
             m_CompactContextRow.style.paddingRight = 5;
             m_ContextGroup.style.marginLeft = 4;
@@ -131,14 +131,11 @@ namespace ES
 
             PreviewButton.text = "预";
             PreviewButton.style.fontSize = 12;
-            PreviewButton.style.color = new Color(0.92f, 0.96f, 1f, 1f);
-            PreviewButton.style.backgroundColor = new Color(0.12f, 0.17f, 0.23f, 1f);
-            PreviewButton.style.borderLeftColor = new Color(0.34f, 0.48f, 0.62f, 0.85f);
-            PreviewButton.style.borderTopColor = new Color(0.34f, 0.48f, 0.62f, 0.85f);
+            ESTrackViewTheme.ApplyAccentButton(PreviewButton);
 
-            PlayButton.style.backgroundColor = new Color(0.15f, 0.2f, 0.17f, 1f);
-            PlayButton.style.borderLeftColor = new Color(0.32f, 0.48f, 0.38f, 0.78f);
-            PlayButton.style.borderTopColor = new Color(0.32f, 0.48f, 0.38f, 0.78f);
+            PlayButton.style.backgroundColor = ESTrackViewTheme.PlayBackground;
+            PlayButton.style.borderLeftColor = ESTrackViewTheme.Accent;
+            PlayButton.style.borderTopColor = ESTrackViewTheme.Accent;
 
             TimeLabel.label = "";
             TimeLabel.value = "0:00.00";
@@ -147,14 +144,14 @@ namespace ES
             TimeLabel.style.height = 26;
             TimeLabel.style.width = 62;
             TimeLabel.style.fontSize = 13;
-            TimeLabel.style.color = Color.white;
+            TimeLabel.style.color = ESTrackViewTheme.Text;
             TimeLabel.style.marginLeft = 4;
 
             var input = TimeLabel.Q<VisualElement>("unity-text-input");
             if (input != null)
             {
                 input.AddToClassList("normalBlock");
-                input.style.color = Color.white;
+                input.style.color = ESTrackViewTheme.Text;
                 input.style.paddingTop = 1;
                 input.style.paddingLeft = 3;
                 input.style.paddingBottom = 1;
@@ -179,7 +176,7 @@ namespace ES
             Name.style.minWidth = 80;
             Name.style.flexGrow = 1;
             Name.style.flexShrink = 1;
-            Name.style.color = new Color(0.76f, 0.8f, 0.86f, 1f);
+            Name.style.color = ESTrackViewTheme.Text;
             Name.style.unityTextAlign = TextAnchor.MiddleLeft;
             Name.style.overflow = Overflow.Hidden;
             Name.AddToClassList("normalBlock");
@@ -195,7 +192,7 @@ namespace ES
             SaveStatusLabel.style.paddingRight = 4;
             SaveStatusLabel.style.fontSize = 10;
             SaveStatusLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            SaveStatusLabel.style.color = new Color(0.64f, 0.67f, 0.72f, 1f);
+            SaveStatusLabel.style.color = ESTrackViewTheme.MutedText;
             SaveStatusLabel.AddToClassList("normalBlock");
             m_ContextGroup.Add(SaveStatusLabel);
 
@@ -208,8 +205,8 @@ namespace ES
             EntityStatusGroup.style.marginLeft = 4;
             EntityStatusGroup.style.paddingLeft = 6;
             EntityStatusGroup.style.paddingRight = 6;
-            EntityStatusGroup.style.backgroundColor = new Color(0.064f, 0.074f, 0.084f, 0.96f);
-            EntityStatusGroup.style.borderLeftColor = new Color(0.28f, 0.38f, 0.48f, 0.95f);
+            EntityStatusGroup.style.backgroundColor = ESTrackViewTheme.SecondarySurface;
+            EntityStatusGroup.style.borderLeftColor = ESTrackViewTheme.Accent;
             EntityStatusGroup.style.borderLeftWidth = 2;
             EntityStatusGroup.tooltip = "点击选择预览使用者；开始预览时会封存该使用者。";
             EntityStatusGroup.AddToClassList("normalBlock");
@@ -218,7 +215,7 @@ namespace ES
             EntityLabel.style.height = 18;
             EntityLabel.style.flexGrow = 1;
             EntityLabel.style.flexShrink = 1;
-            EntityLabel.style.color = new Color(0.7f, 0.86f, 0.74f, 1f);
+            EntityLabel.style.color = ESTrackViewTheme.Text;
             EntityLabel.style.fontSize = 11;
             EntityLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
             EntityLabel.style.overflow = Overflow.Hidden;
@@ -239,23 +236,17 @@ namespace ES
             // 这是高频动作，必须在顶栏常驻，不能要求用户先打开 Inspector 或“更多”菜单。
             AddToolbarButton(m_RightGroup, SelectOtherTimeLine, null, 86, 26, "切换当前编辑时间轴");
             SelectOtherTimeLine.style.minWidth = 86;
-            SelectOtherTimeLine.style.color = new Color(0.86f, 0.93f, 1f, 1f);
-            SelectOtherTimeLine.style.backgroundColor = new Color(0.12f, 0.21f, 0.30f, 1f);
-            SelectOtherTimeLine.style.borderLeftColor = new Color(0.36f, 0.62f, 0.82f, 0.9f);
-            SelectOtherTimeLine.style.borderTopColor = new Color(0.36f, 0.62f, 0.82f, 0.9f);
+            ESTrackViewTheme.ApplyAccentButton(SelectOtherTimeLine);
 
             ConfigureActionButton(OpenInspectorButton, "弹出编辑器", "在独立窗口中编辑当前选中的轨道或片段；也可 Shift + 右键直接弹出");
             AddToolbarButton(m_RightGroup, OpenInspectorButton, null, 76, 26, OpenInspectorButton.tooltip);
             OpenInspectorButton.style.minWidth = 76;
-            OpenInspectorButton.style.color = new Color(0.92f, 0.96f, 1f, 1f);
-            OpenInspectorButton.style.backgroundColor = new Color(0.12f, 0.18f, 0.25f, 1f);
-            OpenInspectorButton.style.borderLeftColor = new Color(0.34f, 0.5f, 0.68f, 0.9f);
-            OpenInspectorButton.style.borderTopColor = new Color(0.34f, 0.5f, 0.68f, 0.9f);
+            ESTrackViewTheme.ApplyAccentButton(OpenInspectorButton);
 
             AddToolbarButton(m_RightGroup, MoreButton, null, 42, 26, "打开时间轴低频操作菜单");
             MoreButton.text = "更多";
             MoreButton.style.fontSize = 12;
-            MoreButton.style.backgroundColor = new Color(0.085f, 0.095f, 0.11f, 1f);
+            MoreButton.style.backgroundColor = ESTrackViewTheme.ButtonBackground;
         }
 
         private static void ConfigureActionButton(Button button, string text, string tooltip)
@@ -264,8 +255,7 @@ namespace ES
             button.tooltip = tooltip;
             button.style.height = 26;
             button.style.minWidth = 64;
-            button.style.color = Color.white;
-            button.style.backgroundColor = new Color(0.105f, 0.118f, 0.132f, 1f);
+            ESTrackViewTheme.ApplyStandardButton(button);
         }
 
         private void BindEvents()
@@ -296,6 +286,44 @@ namespace ES
             OpenInspectorButton.tooltip = enabled
                 ? "在独立窗口中编辑当前选中的轨道或片段；也可 Shift + 右键直接弹出。"
                 : "请先选择轨道或片段，再弹出独立编辑器。";
+        }
+
+        internal void RefreshTheme()
+        {
+            style.color = ESTrackViewTheme.Text;
+            style.backgroundColor = ESTrackViewTheme.ToolbarBackground;
+            style.borderBottomColor = ESTrackViewTheme.Divider;
+            m_CompactContextRow.style.borderTopColor = ESTrackViewTheme.Divider;
+
+            ESTrackViewTheme.ApplyAccentButton(PreviewButton);
+            ESTrackViewTheme.ApplyStandardButton(ReStartButton);
+            ESTrackViewTheme.ApplyStandardButton(LastBlockButton);
+            ESTrackViewTheme.ApplyStandardButton(NextBlockButton);
+            ESTrackViewTheme.ApplyStandardButton(PlayButton);
+            PlayButton.style.backgroundColor = ESTrackViewTheme.PlayBackground;
+            PlayButton.style.borderLeftColor = ESTrackViewTheme.Accent;
+            PlayButton.style.borderTopColor = ESTrackViewTheme.Accent;
+
+            ESTrackViewTheme.ApplyAccentButton(SelectOtherTimeLine);
+            ESTrackViewTheme.ApplyAccentButton(OpenInspectorButton);
+            ESTrackViewTheme.ApplyStandardButton(MoreButton);
+
+            TimeLabel.style.color = ESTrackViewTheme.Text;
+            TimeLabel.style.backgroundColor = ESTrackViewTheme.SecondarySurface;
+            VisualElement input = TimeLabel.Q<VisualElement>("unity-text-input");
+            if (input != null)
+            {
+                input.style.color = ESTrackViewTheme.Text;
+                input.style.backgroundColor = ESTrackViewTheme.CanvasBackground;
+            }
+
+            Name.style.color = ESTrackViewTheme.Text;
+            Name.style.backgroundColor = ESTrackViewTheme.SecondarySurface;
+            SaveStatusLabel.style.backgroundColor = ESTrackViewTheme.SecondarySurface;
+            EntityStatusGroup.style.backgroundColor = ESTrackViewTheme.SecondarySurface;
+            EntityStatusGroup.style.borderLeftColor = ESTrackViewTheme.Accent;
+            EntityLabel.style.color = ESTrackViewTheme.Text;
+            MarkDirtyRepaint();
         }
 
         private void OnGeometryChanged(GeometryChangedEvent evt)
@@ -402,11 +430,7 @@ namespace ES
             button.style.borderTopRightRadius = 3;
             button.style.borderBottomLeftRadius = 3;
             button.style.borderBottomRightRadius = 3;
-            button.style.backgroundColor = new Color(0.105f, 0.118f, 0.132f, 1f);
-            button.style.borderLeftColor = new Color(0.25f, 0.29f, 0.34f, 0.75f);
-            button.style.borderTopColor = new Color(0.25f, 0.29f, 0.34f, 0.75f);
-            button.style.borderRightColor = new Color(0.045f, 0.05f, 0.06f, 0.9f);
-            button.style.borderBottomColor = new Color(0.045f, 0.05f, 0.06f, 0.9f);
+            ESTrackViewTheme.ApplyStandardButton(button);
             button.AddToClassList("track-toolbar-button");
             parent.Add(button);
         }
@@ -414,34 +438,58 @@ namespace ES
         private void ShowMoreMenu()
         {
             var menu = new GenericMenu();
-            menu.AddItem(new GUIContent("【预览】/停止并回到时间 0"), false, OnStopAndReset);
+            menu.AddItem(new GUIContent("预览/停止并回到时间 0"), false, OnStopAndReset);
             menu.AddSeparator("");
-            menu.AddItem(new GUIContent("【时间轴】/切换当前编辑时间轴"), false, ShowTimelineMenuFromMoreMenu);
+            menu.AddItem(new GUIContent("时间轴/切换当前编辑时间轴"), false, ShowTimelineMenuFromMoreMenu);
             if (ESTrackViewWindow.TrackContainer != null && ESTrackViewWindow.Sequence != null)
-                menu.AddItem(new GUIContent("【时间轴】/立即保存当前时间轴"), false, ESTrackViewWindowHelper.SaveContainerNow);
+                menu.AddItem(new GUIContent("时间轴/立即保存当前时间轴"), false, ESTrackViewWindowHelper.SaveContainerNow);
             else
-                menu.AddDisabledItem(new GUIContent("【时间轴】/立即保存当前时间轴（未选择）"));
+                menu.AddDisabledItem(new GUIContent("时间轴/立即保存当前时间轴（未选择）"));
             if (ESTrackViewWindow.window != null && ESTrackViewWindow.TrackContainer != null && ESTrackViewWindow.Sequence != null)
-                menu.AddItem(new GUIContent("【时间轴】/保存为新资产…"), false, ESTrackViewWindowHelper.SaveContainerAsNewAsset);
+                menu.AddItem(new GUIContent("时间轴/保存为新资产…"), false, ESTrackViewWindowHelper.SaveContainerAsNewAsset);
             else
-                menu.AddDisabledItem(new GUIContent("【时间轴】/保存为新资产…（未选择）"));
+                menu.AddDisabledItem(new GUIContent("时间轴/保存为新资产…（未选择）"));
             if (ESTrackViewWindow.TrackContainer != null && ESTrackViewWindow.Sequence != null)
-                menu.AddItem(new GUIContent("【时间轴】/复制结构摘要"), false, ESTrackViewWindowHelper.CopyCurrentSequenceSummary);
+                menu.AddItem(new GUIContent("时间轴/复制结构摘要"), false, ESTrackViewWindowHelper.CopyCurrentSequenceSummary);
             else
-                menu.AddDisabledItem(new GUIContent("【时间轴】/复制结构摘要（未选择）"));
+                menu.AddDisabledItem(new GUIContent("时间轴/复制结构摘要（未选择）"));
             if (ESTrackViewWindow.window != null && ESTrackViewWindow.window.CanOpenCurrentInspectorInSeparateWindow)
-                menu.AddItem(new GUIContent("【属性】/弹出当前属性编辑器"), false, () =>
+                menu.AddItem(new GUIContent("属性/弹出当前属性编辑器"), false, () =>
                 {
                     ESTrackViewWindow.window?.OpenCurrentInspectorInSeparateWindow();
                 });
             else
-                menu.AddDisabledItem(new GUIContent("【属性】/弹出当前属性编辑器（请先选择轨道或片段）"));
+                menu.AddDisabledItem(new GUIContent("属性/弹出当前属性编辑器（请先选择轨道或片段）"));
+            if (ESTrackViewWindow.window != null && ESTrackViewWindow.Sequence != null)
+            {
+                menu.AddItem(new GUIContent("轨道显示/折叠全部轨道"), false, () =>
+                {
+                    ESTrackViewWindow.window?.SetAllTracksCollapsed(true);
+                });
+                menu.AddItem(new GUIContent("轨道显示/展开全部轨道"), false, () =>
+                {
+                    ESTrackViewWindow.window?.SetAllTracksCollapsed(false);
+                });
+            }
+            else
+            {
+                menu.AddDisabledItem(new GUIContent("轨道显示/折叠全部轨道（未选择）"));
+                menu.AddDisabledItem(new GUIContent("轨道显示/展开全部轨道（未选择）"));
+            }
             menu.AddSeparator("");
-            menu.AddItem(new GUIContent("【技能】/新建技能…"), false, ESCreateSkillWindow.Open);
-            menu.AddItem(new GUIContent("【技能】/打开当前技能配置"), false, () => ESTrackSkillDataEditorActions.OpenCurrentSkillDataInfoEditor(ESTrackViewWindow.window));
-            menu.AddItem(new GUIContent("【技能】/绑定到预览使用者并释放"), false, () => ESTrackSkillDataEditorActions.BindCurrentSkillDataToEntityAndPlay(ESTrackViewWindow.window));
+            menu.AddItem(new GUIContent("技能/新建技能…"), false, ESCreateSkillWindow.Open);
+            menu.AddItem(new GUIContent("技能/打开当前技能配置"), false, () => ESTrackSkillDataEditorActions.OpenCurrentSkillDataInfoEditor(ESTrackViewWindow.window));
+            menu.AddItem(new GUIContent("技能/绑定到预览使用者并释放"), false, () => ESTrackSkillDataEditorActions.BindCurrentSkillDataToEntityAndPlay(ESTrackViewWindow.window));
             menu.AddSeparator("");
-            menu.AddItem(new GUIContent("【预览目标】/从场景选择预览使用者"), false, ShowEntityMenu);
+            menu.AddItem(new GUIContent("预览目标/从场景选择预览使用者"), false, ShowEntityMenu);
+            menu.AddItem(
+                new GUIContent("窗口行为/选择时间轴资产时自动打开"),
+                ESTrackViewWindowHelper.AutoOpenFromSelection,
+                () => ESTrackViewWindowHelper.AutoOpenFromSelection = !ESTrackViewWindowHelper.AutoOpenFromSelection);
+            menu.AddItem(
+                new GUIContent("窗口行为/跟随场景 Selection 更新预览目标"),
+                ESTrackViewWindowHelper.AutoFollowPreviewEntity,
+                () => ESTrackViewWindowHelper.AutoFollowPreviewEntity = !ESTrackViewWindowHelper.AutoFollowPreviewEntity);
             menu.DropDown(MoreButton.worldBound);
         }
 
@@ -589,23 +637,14 @@ namespace ES
             if (trackWindow == null)
                 trackWindow = ESTrackViewWindow.window;
 
-            if (trackWindow != null && trackWindow.Last_EditorWindowForSkillDataInfo != null)
-                trackWindow.Last_EditorWindowForSkillDataInfo.Close();
+            ESTrackSkillDataTemporaryInspectorWindow.CloseCurrentWindow();
+            if (trackWindow != null)
+                trackWindow.Last_EditorWindowForSkillDataInfo = null;
 
-            IEditorTrackSupport_GetSequence sourceContainer = ESTrackViewWindow.TrackContainer;
             var editorWindow = ESTrackSkillDataTemporaryInspectorWindow.OpenFor(
                 skillData,
                 "编辑技能 <" + skillData.name + ">",
-                "技能配置",
-                () =>
-            {
-                EditorUtility.SetDirty(skillData);
-                if (trackWindow != null)
-                    trackWindow.Last_EditorWindowForSkillDataInfo = null;
-
-                ESTrackViewWindowHelper.SaveContainerChangesImmediately(sourceContainer);
-                AssetDatabase.SaveAssetIfDirty(skillData);
-            });
+                "技能配置");
 
             if (trackWindow != null)
                 trackWindow.Last_EditorWindowForSkillDataInfo = editorWindow;

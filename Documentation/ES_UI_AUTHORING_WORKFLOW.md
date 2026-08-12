@@ -94,8 +94,8 @@ Custom 材质由调用者拥有时，Graphic 在 Bind、Clear、失效、Disable
 ES 入口规划与当前实现：
 
 - `【ES】/内容制作/UI/UI 工作台`：创建、绑定和检查 UI View，不承载运行时业务权威。
-- `【ES】/开发与维护/审计/UI 风险体检`：已实现第一阶段版本，只扫描当前选中的 UI Root，输出可定位的风险项。
-- `【ES】/运行时诊断/UI/UI 性能监视器`：只读显示 Canvas rebuild、材质/Page、Stencil 和列表可见窗口等运行数据。
+- `【ES】/验证与诊断/静态审计/打开 UI 风险体检`：已实现第一阶段版本，只扫描当前选中的 UI Root，输出可定位的风险项。
+- `【ES】/验证与诊断/运行时监视/UI/UI 性能监视器`：只读显示 Canvas rebuild、材质/Page、Stencil 和列表可见窗口等运行数据。
 
 除 UI 风险体检外，其余入口仍是专项工具的规划名；在对应代码和 Unity 验收完成前，不把菜单规划写成已存在功能。
 
@@ -158,7 +158,7 @@ ES 入口规划与当前实现：
 2. 在显示节点挂 `ESDynamicAtlasGraphic`，先拖入 ES 纹理引用；没有运行时引用时只填“仅编辑器预览纹理/Sprite”。
 3. 头像或远端图片填写稳定 Content Key 和版本号；换图只更新版本号，不复用旧 Key。
 4. 进入 PlayMode 后观察 Graphic 状态；“等待资源系统就绪”是正常等待，不要在编辑器里点击运行时加载按钮。
-5. 发布前选中 UI Root，运行 `【ES】/开发与维护/审计/UI 风险体检`，先处理“严重”和“警告”，再做 Frame Debugger/Profiler 验收。
+5. 发布前选中 UI Root，运行 `【ES】/验证与诊断/静态审计/打开 UI 风险体检`，先处理“严重”和“警告”，再做 Frame Debugger/Profiler 验收。
 
 ### 权威边界速查
 

@@ -1,13 +1,7 @@
 
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.PlayerLoop;
 using UnityEngine.UIElements;
 namespace ES
 {
@@ -49,9 +43,10 @@ namespace ES
         private bool m_IsSelected;
         private bool m_IsPrimarySelection;
         private bool m_IsHovering;
+        private bool m_IsFocusedEditing;
         private bool m_HasValidationWarning;
         private string m_ValidationWarning;
-        private Color m_LastTrackAccentColor = new Color(0.42f, 0.46f, 0.52f, 1f);
+        private Color m_LastTrackAccentColor;
         private double m_IgnoreRenameFocusOutUntil;
         private float m_LastAppliedLeft = float.NaN;
         private float m_LastAppliedWidth = float.NaN;
@@ -65,9 +60,6 @@ namespace ES
         private Vector2 m_PointerDownPosition;
 
         public event Action<ESEditorTrackClip> OnClipClicked;
-#pragma warning disable CS0067
-        public event Action<ESEditorTrackClip> OnClipDragged;
-#pragma warning restore CS0067
 
         public ESEditorTrackClip(ITrackClip clip, string name, float startTime, float duration, object data = null)
         {
@@ -76,6 +68,7 @@ namespace ES
             StartTime = startTime;
             Duration = duration;
             UserData = data;
+            m_LastTrackAccentColor = ESTrackViewTheme.Accent;
             this.focusable = true;
             tooltip = name;
             // 基础样式
@@ -85,27 +78,12 @@ namespace ES
             style.minWidth = 30;
             style.minHeight = 26;
             style.maxHeight = 26;
-            style.backgroundColor = new Color(0.18f, 0.31f, 0.44f, 0.95f);
+            style.backgroundColor = ESTrackViewTheme.ClipSurface(m_LastTrackAccentColor);
             style.borderTopLeftRadius = 3;
             style.borderTopRightRadius = 3;
             style.borderBottomLeftRadius = 3;
             style.borderBottomRightRadius = 3;
             style.position = Position.Absolute;
-            // style.borderLeftWidth = 2;
-            // style.borderRightWidth = 2;
-            // style.borderTopWidth = 2;
-            // style.borderBottomWidth = 2;
-            // style.borderLeftColor = new Color(0.3f, 0.5f, 0.8f);
-            // style.borderRightColor = new Color(0.3f, 0.5f, 0.8f);
-            // style.borderTopColor = new Color(0.5f, 0.8f, 1f);
-            // style.borderBottomColor = new Color(0.2f, 0.4f, 0.7f);
-            // style.borderTopLeftRadius = 4;
-            // style.borderTopRightRadius = 4;
-            // style.borderBottomLeftRadius = 4;
-            // style.borderBottomRightRadius = 4;
-
-
-
             // 创建内容
             m_ClipContent = new VisualElement
             {
@@ -142,7 +120,7 @@ namespace ES
             {
                 unityFontStyleAndWeight = FontStyle.Bold,
                 fontSize = 10,
-                color = new Color(0.93f, 0.96f, 1f, 1f),
+                color = ESTrackViewTheme.Text,
                 unityTextAlign = TextAnchor.MiddleLeft,
                 whiteSpace = WhiteSpace.NoWrap,
                 overflow = Overflow.Hidden,
@@ -160,7 +138,7 @@ namespace ES
                     flexGrow = 1,
                     minWidth = 0,
                     fontSize = 9,
-                    color = new Color(0.93f, 0.96f, 1f, 1f),
+                    color = ESTrackViewTheme.Text,
                     unityFontStyleAndWeight = FontStyle.Bold,
                     unityTextAlign = TextAnchor.MiddleCenter,
                     whiteSpace = WhiteSpace.NoWrap,
@@ -180,10 +158,10 @@ namespace ES
                     height = 16,
                     marginLeft = 3,
                     fontSize = 9,
-                    color = Color.white,
+                    color = ESTrackViewTheme.SelectedText,
                     unityFontStyleAndWeight = FontStyle.Bold,
                     unityTextAlign = TextAnchor.MiddleCenter,
-                    backgroundColor = new Color(0.38f, 0.11f, 0.08f, 0.95f),
+                    backgroundColor = ESTrackViewTheme.StateBadgeSurface(ESTrackViewTheme.StatusWarning),
                     borderTopLeftRadius = 3,
                     borderTopRightRadius = 3,
                     borderBottomLeftRadius = 3,
@@ -201,7 +179,7 @@ namespace ES
             m_ResizeHandle.style.top = 2;
             m_ResizeHandle.style.bottom = 2;
             m_ResizeHandle.style.width = 5;
-            m_ResizeHandle.style.backgroundColor = new Color(0.7f, 0.84f, 1f, 0.18f);
+            m_ResizeHandle.style.backgroundColor = ESTrackViewTheme.WithAlpha(m_LastTrackAccentColor, 0.22f);
             m_ResizeHandle.style.borderTopLeftRadius = 2;
             m_ResizeHandle.style.borderBottomLeftRadius = 2;
             m_ResizeHandle.style.cursor = new UnityEngine.UIElements.Cursor
@@ -233,6 +211,7 @@ namespace ES
 
                 OnClipClicked?.Invoke(this);
             });
+            RegisterCallback<ContextClickEvent>(OnContextClick);
 
             RegisterCallback<WheelEvent>(evt =>
            {
@@ -271,7 +250,7 @@ namespace ES
             popup.style.width = Length.Percent(100);
             popup.style.height = 30;
             // popup.style.translate = new Translate(new Length(-50, LengthUnit.Percent), 0);
-            popup.style.backgroundColor = new Color(0, 0, 0, 0.5f);
+            popup.style.backgroundColor = ESTrackViewTheme.WithAlpha(ESTrackViewTheme.SecondarySurface, 0.96f);
             popup.style.borderTopLeftRadius = 3;
             popup.style.borderTopRightRadius = 3;
             popup.style.borderBottomLeftRadius = 3;
@@ -283,7 +262,7 @@ namespace ES
             popLabel.style.overflow = Overflow.Hidden;
             popLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
             popLabel.style.textOverflow = TextOverflow.Ellipsis;
-            popLabel.style.color = Color.white;
+            popLabel.style.color = ESTrackViewTheme.Text;
             popLabel.style.fontSize = 12;
 
             // 基础边框（半透明白色，像素宽度 1）
@@ -291,10 +270,10 @@ namespace ES
             style.borderRightWidth = 1;
             style.borderTopWidth = 1;
             style.borderBottomWidth = 1;
-            style.borderLeftColor = new Color(0.04f, 0.05f, 0.06f, 0.9f);
-            style.borderRightColor = new Color(0.42f, 0.5f, 0.6f, 0.28f);
-            style.borderTopColor = new Color(0.52f, 0.58f, 0.66f, 0.32f);
-            style.borderBottomColor = new Color(0.04f, 0.05f, 0.06f, 0.7f);
+            style.borderLeftColor = m_LastTrackAccentColor;
+            style.borderRightColor = ESTrackViewTheme.Divider;
+            style.borderTopColor = ESTrackViewTheme.Divider;
+            style.borderBottomColor = ESTrackViewTheme.Divider;
 
             this.Add(popup);
 
@@ -345,15 +324,11 @@ namespace ES
 
         public void SetFocusedEditing(bool focused)
         {
+            m_IsFocusedEditing = focused;
             if (m_EditingFocusFrame == null)
                 CreateEditingFocusFrame();
 
-            if (m_EditingFocusFrame != null)
-            {
-                m_EditingFocusFrame.style.display = focused ? DisplayStyle.Flex : DisplayStyle.None;
-                if (focused)
-                    m_EditingFocusFrame.BringToFront();
-            }
+            ApplyVisualState();
 
             if (focused)
                 tooltip = ClipName + "\n正在弹窗编辑";
@@ -380,16 +355,15 @@ namespace ES
             m_EditingFocusFrame.style.borderRightWidth = 3;
             m_EditingFocusFrame.style.borderTopWidth = 3;
             m_EditingFocusFrame.style.borderBottomWidth = 3;
-            Color gold = new Color(1f, 0.78f, 0.18f, 1f);
-            m_EditingFocusFrame.style.borderLeftColor = gold;
-            m_EditingFocusFrame.style.borderRightColor = gold;
-            m_EditingFocusFrame.style.borderTopColor = gold;
-            m_EditingFocusFrame.style.borderBottomColor = gold;
+            m_EditingFocusFrame.style.borderLeftColor = ESTrackViewTheme.EditingAccent;
+            m_EditingFocusFrame.style.borderRightColor = ESTrackViewTheme.EditingAccent;
+            m_EditingFocusFrame.style.borderTopColor = ESTrackViewTheme.EditingAccent;
+            m_EditingFocusFrame.style.borderBottomColor = ESTrackViewTheme.EditingAccent;
             m_EditingFocusFrame.style.borderTopLeftRadius = 4;
             m_EditingFocusFrame.style.borderTopRightRadius = 4;
             m_EditingFocusFrame.style.borderBottomLeftRadius = 4;
             m_EditingFocusFrame.style.borderBottomRightRadius = 4;
-            m_EditingFocusFrame.style.backgroundColor = new Color(1f, 0.72f, 0.12f, 0.06f);
+            m_EditingFocusFrame.style.backgroundColor = ESTrackViewTheme.WithAlpha(ESTrackViewTheme.EditingAccent, 0.07f);
             m_EditingFocusFrame.style.display = DisplayStyle.None;
             Add(m_EditingFocusFrame);
         }
@@ -423,42 +397,7 @@ namespace ES
 
         private void RefreshInteractionVisual()
         {
-            if (m_ClipContent != null)
-            {
-                m_ClipContent.style.backgroundColor = m_IsSelected
-                    ? new Color(0.35f, 0.52f, 0.76f, 0.32f)
-                    : m_IsHovering
-                        ? new Color(1f, 1f, 1f, 0.035f)
-                    : Color.clear;
-            }
-
-            style.borderRightWidth = m_IsSelected ? 2 : 1;
-            style.borderRightColor = m_IsSelected
-                ? new Color(0.48f, 0.68f, 0.95f, 0.72f)
-                : new Color(0.08f, 0.09f, 0.11f, 0.82f);
-
-            if (m_SelectionFrame != null)
-            {
-                m_SelectionFrame.style.display = m_IsSelected ? DisplayStyle.Flex : DisplayStyle.None;
-                if (m_IsSelected)
-                {
-                    Color frameColor = m_IsPrimarySelection
-                        ? new Color(0.18f, 0.62f, 1f, 1f)
-                        : new Color(0.22f, 1f, 0.86f, 1f);
-                    m_SelectionFrame.style.borderLeftColor = frameColor;
-                    m_SelectionFrame.style.borderRightColor = frameColor;
-                    m_SelectionFrame.style.borderTopColor = frameColor;
-                    m_SelectionFrame.style.borderBottomColor = frameColor;
-                    m_SelectionFrame.style.backgroundColor = m_IsPrimarySelection
-                        ? new Color(0.1f, 0.36f, 0.78f, 0.18f)
-                        : new Color(0.06f, 0.62f, 0.52f, 0.16f);
-                    m_SelectionFrame.BringToFront();
-                    if (m_EditingFocusFrame != null && m_EditingFocusFrame.style.display.value == DisplayStyle.Flex)
-                        m_EditingFocusFrame.BringToFront();
-                }
-
-                m_ResizeHandle?.BringToFront();
-            }
+            ApplyVisualState();
         }
 
         private void OnPointerDown(PointerDownEvent evt)
@@ -488,13 +427,8 @@ namespace ES
                 }
             }
 
-            if (evt.button == 1 && evt.shiftKey)
-            {
-                // Shift + 右键是“直接弹出独立编辑器”的快捷入口；普通右键仍显示上下文菜单。
-                ESTrackViewWindow.window?.EditClip(this, true);
-                evt.StopPropagation();
+            if (evt.button == 1)
                 return;
-            }
 
             if (evt.button == 0 && evt.clickCount >= 2)
             {
@@ -540,12 +474,31 @@ namespace ES
                     evt.StopPropagation();
                 }
             }
-            else if (evt.button == 1) //右键
+        }
+
+        private void OnContextClick(ContextClickEvent evt)
+        {
+            if (evt.button != 1)
+                return;
+
+            if (isRenaming)
             {
-                //显示菜单
-                ESTrackViewWindow.window.ShowMenu_SelectClip(this);
                 evt.StopPropagation();
+                return;
             }
+
+            ESTrackViewWindow hostWindow = ESTrackViewWindow.window;
+            if (evt.shiftKey)
+            {
+                if (hostWindow != null && !hostWindow.IsClipSelected(this))
+                    hostWindow.SelectClip(this, false);
+                hostWindow?.EditClip(this, true);
+            }
+            else
+                hostWindow?.ShowClipContextMenu(this);
+
+            evt.PreventDefault();
+            evt.StopImmediatePropagation();
         }
 
         private void OnPointerUp(PointerUpEvent evt)
@@ -580,6 +533,7 @@ namespace ES
                 bool committed = m_GestureActivated;
                 m_GestureActivated = false;
                 RemoveFromClassList("dragging");
+                ApplyVisualState();
                 popup.style.display = DisplayStyle.None;
                 if (pointerId >= 0 && this.HasPointerCapture(pointerId))
                     this.ReleasePointer(pointerId);
@@ -593,6 +547,7 @@ namespace ES
                 bool committed = m_GestureActivated;
                 m_GestureActivated = false;
                 RemoveFromClassList("expanding");
+                ApplyVisualState();
                 popup.style.display = DisplayStyle.None;
                 if (pointerId >= 0 && this.HasPointerCapture(pointerId))
                     this.ReleasePointer(pointerId);
@@ -620,6 +575,7 @@ namespace ES
             m_GestureActivated = false;
             RemoveFromClassList("dragging");
             RemoveFromClassList("expanding");
+            ApplyVisualState();
             if (popup != null)
                 popup.style.display = DisplayStyle.None;
             if (pointerId >= 0 && this.HasPointerCapture(pointerId))
@@ -642,8 +598,11 @@ namespace ES
             popup.style.display = DisplayStyle.None;
 
             m_ClipNameLabel.style.display = DisplayStyle.None;
+            if (m_ClipShortLabel != null)
+                m_ClipShortLabel.style.display = DisplayStyle.None;
             if (m_ClipIcon != null)
                 m_ClipIcon.style.display = DisplayStyle.None;
+            ApplyVisualState();
 
             if (m_RenameField == null)
             {
@@ -659,8 +618,8 @@ namespace ES
                 m_RenameField.style.top = 4;
                 m_RenameField.style.height = 22;
                 m_RenameField.style.fontSize = 11;
-                m_RenameField.style.color = new Color(0.92f, 0.95f, 1f, 1f);
-                m_RenameField.style.backgroundColor = new Color(0.075f, 0.085f, 0.1f, 1f);
+                m_RenameField.style.color = ESTrackViewTheme.Text;
+                m_RenameField.style.backgroundColor = ESTrackViewTheme.SecondarySurface;
                 m_RenameField.tooltip = "正在重命名片段：Enter 确认，Esc 取消";
                 m_RenameField.RegisterCallback<KeyDownEvent>(OnRenameKeyDown);
                 Add(m_RenameField);
@@ -676,6 +635,16 @@ namespace ES
                 m_RenameField.Focus();
                 m_RenameField.SelectAll();
             }).ExecuteLater(0);
+        }
+
+        internal void BeginRenameFromContext()
+        {
+            BeginRename();
+        }
+
+        internal void CommitRenameBeforeLayoutMutation()
+        {
+            CommitRename();
         }
 
         private void StopRenameFieldPointerEvent(PointerDownEvent evt)
@@ -742,7 +711,17 @@ namespace ES
                     Undo.RecordObject(undoTarget, "重命名轨道片段");
 
                 ClipName = newName;
-                ESTrackViewWindowHelper.SaveContainerDisplayChanges();
+                if (ESTrackViewWindow.window != null)
+                {
+                    ESTrackViewWindow.window.ApplyAuthoringChange(
+                        trackClip,
+                        ESTrackAuthoringChangeFlags.ValueEdit,
+                        "重命名片段");
+                }
+                else
+                {
+                    ESTrackViewWindowHelper.SaveContainerDisplayChanges("重命名片段");
+                }
             }
 
             EndRename();
@@ -760,9 +739,10 @@ namespace ES
             if (m_RenameField != null)
                 m_RenameField.style.display = DisplayStyle.None;
 
-            m_ClipNameLabel.style.display = DisplayStyle.Flex;
             RefreshClipIcon();
             UpdateNodeView();
+            ApplyVisualState();
+            UpdateCompactMetadataVisibility(style.width.value.value);
         }
 
         private void OnPointerLeave(PointerLeaveEvent evt)
@@ -793,6 +773,7 @@ namespace ES
                     m_GestureActivated = true;
                     ESTrackViewWindow.window?.BeginClipGroupDrag(this);
                     AddToClassList("dragging");
+                    ApplyVisualState();
                     popup.style.display = DisplayStyle.Flex;
                 }
 
@@ -817,6 +798,7 @@ namespace ES
                     m_GestureActivated = true;
                     ESTrackViewWindow.window?.BeginClipResize(this);
                     AddToClassList("expanding");
+                    ApplyVisualState();
                     popup.style.display = DisplayStyle.Flex;
                 }
 
@@ -935,38 +917,14 @@ namespace ES
 
         public void SetClipColor(Color color)
         {
-            m_LastTrackAccentColor = color;
-            if (m_HasValidationWarning)
-                return;
-
-            ApplyNormalClipColor(color);
-            RefreshEnabledVisual();
-        }
-
-        private void ApplyNormalClipColor(Color color)
-        {
-            Color baseColor = new Color(
-                Mathf.Clamp01(color.r * 0.42f + 0.035f),
-                Mathf.Clamp01(color.g * 0.42f + 0.035f),
-                Mathf.Clamp01(color.b * 0.42f + 0.035f),
-                0.96f);
-            Color accentColor = new Color(color.r * 0.88f, color.g * 0.88f, color.b * 0.88f, 0.9f);
-            style.backgroundColor = baseColor;
-            style.borderLeftColor = accentColor;
-            if (!m_IsSelected)
-                style.borderRightColor = new Color(0.08f, 0.09f, 0.11f, 0.82f);
-            style.borderTopColor = new Color(0.42f, 0.47f, 0.54f, 0.34f);
-            style.borderBottomColor = new Color(0.02f, 0.025f, 0.03f, 0.82f);
+            m_LastTrackAccentColor = ESTrackViewTheme.SanitizeAccent(color);
+            ApplyVisualState();
         }
 
         public void SetValidationWarning(string warning)
         {
             m_HasValidationWarning = !string.IsNullOrWhiteSpace(warning);
             m_ValidationWarning = warning;
-            if (!m_HasValidationWarning)
-                ApplyNormalClipColor(m_LastTrackAccentColor);
-
-            ApplyValidationVisual();
             RefreshEnabledVisual();
         }
 
@@ -980,76 +938,166 @@ namespace ES
                 Undo.RecordObject(undoTarget, trackClip.Enabled ? "禁用片段" : "启用片段");
 
             trackClip.Enabled = !trackClip.Enabled;
-            RefreshEnabledVisual();
-            ESTrackViewWindowHelper.SaveContainerDisplayChanges();
-            if (ESTrackViewWindow.Sequence != null)
-                SkillSequenceRuntimeCache.NotifySequenceChanged(ESTrackViewWindow.Sequence);
-            ESTrackViewWindow.window?.RebuildActivePreviewPlayer();
+            if (ESTrackViewWindow.window != null)
+            {
+                ESTrackViewWindow.window.ApplyAuthoringChange(
+                    trackClip,
+                    ESTrackAuthoringChangeFlags.ValueEdit,
+                    trackClip.Enabled ? "启用片段" : "禁用片段");
+            }
+            else
+            {
+                RefreshEnabledVisual();
+                ESTrackViewWindowHelper.SaveContainerDisplayChanges();
+                if (ESTrackViewWindow.Sequence != null)
+                    SkillSequenceRuntimeCache.NotifySequenceChanged(ESTrackViewWindow.Sequence);
+            }
         }
 
         public void RefreshEnabledVisual()
         {
             bool enabled = trackClip == null || trackClip.Enabled;
-            style.opacity = enabled ? 1f : 0.92f;
             tooltip = m_HasValidationWarning
                 ? ClipName + "\n预警：" + m_ValidationWarning
                 : enabled ? ClipName : ClipName + "（已禁用）";
 
-            if (m_ClipNameLabel != null)
-                m_ClipNameLabel.style.color = enabled
-                    ? new Color(0.93f, 0.96f, 1f, 1f)
-                    : new Color(0.38f, 0.40f, 0.44f, 1f);
-
             if (m_ClipStateBadge != null)
             {
-                bool showBadge = !enabled || m_HasValidationWarning;
                 m_ClipStateBadge.text = m_HasValidationWarning ? "警" : "禁";
                 m_ClipStateBadge.tooltip = m_HasValidationWarning
                     ? m_ValidationWarning
                     : "片段已禁用";
-                m_ClipStateBadge.style.color = m_HasValidationWarning
-                    ? new Color(1f, 0.82f, 0.42f, 1f)
-                    : new Color(0.68f, 0.72f, 0.78f, 1f);
-                m_ClipStateBadge.style.backgroundColor = m_HasValidationWarning
-                    ? new Color(0.42f, 0.25f, 0.05f, 0.96f)
-                    : new Color(0.14f, 0.16f, 0.19f, 0.96f);
-                m_ClipStateBadge.style.display = showBadge ? DisplayStyle.Flex : DisplayStyle.None;
             }
 
-            if (!enabled && !m_HasValidationWarning)
-            {
-                style.backgroundColor = new Color(0.012f, 0.013f, 0.016f, 1f);
-                style.borderLeftColor = new Color(0.035f, 0.038f, 0.045f, 1f);
-                style.borderRightColor = new Color(0.006f, 0.007f, 0.009f, 1f);
-                style.borderTopColor = new Color(0.04f, 0.043f, 0.05f, 1f);
-                style.borderBottomColor = new Color(0.002f, 0.003f, 0.004f, 1f);
-            }
-
-            ApplyValidationVisual();
+            ApplyVisualState();
             UpdateCompactMetadataVisibility(style.width.value.value);
         }
 
-        private void ApplyValidationVisual()
+        private void ApplyVisualState()
         {
-            if (!m_HasValidationWarning)
-                return;
-
+            // 单一渲染顺序：业务底色 → 警告/禁用 → 活跃 → 选择/悬停 → 独立编辑焦点。
+            // 后一层只负责自己的视觉通道，不能缓存并回滚前一层颜色。
             bool enabled = trackClip == null || trackClip.Enabled;
-            style.opacity = enabled ? 1f : 0.92f;
-            style.backgroundColor = enabled
-                ? new Color(0.48f, 0.30f, 0.06f, 0.98f)
-                : new Color(0.12f, 0.10f, 0.055f, 1f);
-            style.borderLeftWidth = 4;
-            style.borderRightWidth = 2;
-            style.borderTopWidth = 2;
-            style.borderBottomWidth = 2;
-            style.borderLeftColor = enabled ? new Color(1f, 0.72f, 0.18f, 1f) : new Color(0.48f, 0.36f, 0.12f, 1f);
-            style.borderRightColor = enabled ? new Color(1f, 0.86f, 0.42f, 0.95f) : new Color(0.28f, 0.22f, 0.08f, 1f);
-            style.borderTopColor = enabled ? new Color(1f, 0.9f, 0.58f, 0.95f) : new Color(0.38f, 0.29f, 0.10f, 0.95f);
-            style.borderBottomColor = enabled ? new Color(0.34f, 0.20f, 0.02f, 1f) : new Color(0.12f, 0.08f, 0.02f, 1f);
+            bool showActive = m_IsActive && enabled && !m_HasValidationWarning;
+            Color accent = m_LastTrackAccentColor.a > 0f
+                ? m_LastTrackAccentColor
+                : ESTrackViewTheme.Accent;
+            Color background = m_HasValidationWarning
+                ? ESTrackViewTheme.ClipWarningSurface(enabled)
+                : enabled
+                    ? ESTrackViewTheme.ClipSurface(accent)
+                    : ESTrackViewTheme.ClipDisabledSurface(accent);
 
+            if (showActive)
+                background = ESTrackViewTheme.Blend(background, ESTrackViewTheme.ActiveAccent, 0.10f);
+            if (m_GestureActivated && isDragging)
+                background = ESTrackViewTheme.ClipDraggingSurface(background);
+            else if (m_GestureActivated && isExpanding)
+                background = ESTrackViewTheme.ClipResizingSurface(background);
+
+            Color sideAccent = m_HasValidationWarning
+                ? ESTrackViewTheme.StatusWarning
+                : enabled ? accent : ESTrackViewTheme.SubduedAccent(accent);
+            Color edge = m_HasValidationWarning
+                ? ESTrackViewTheme.WithAlpha(ESTrackViewTheme.StatusWarning, enabled ? 0.88f : 0.46f)
+                : ESTrackViewTheme.Divider;
+
+            style.opacity = enabled ? 1f : 0.80f;
+            style.backgroundColor = background;
+            style.borderLeftWidth = m_HasValidationWarning ? 4 : 3;
+            style.borderRightWidth = m_HasValidationWarning ? 2 : 1;
+            style.borderTopWidth = m_HasValidationWarning || showActive ? 2 : 1;
+            style.borderBottomWidth = m_HasValidationWarning || showActive ? 2 : 1;
+            style.borderLeftColor = sideAccent;
+            style.borderRightColor = edge;
+            style.borderTopColor = m_HasValidationWarning
+                ? edge
+                : showActive ? ESTrackViewTheme.ActiveAccent : ESTrackViewTheme.Divider;
+            style.borderBottomColor = m_HasValidationWarning
+                ? edge
+                : showActive
+                    ? ESTrackViewTheme.WithAlpha(ESTrackViewTheme.ActiveAccent, 0.72f)
+                    : ESTrackViewTheme.Divider;
+
+            Color textColor = m_HasValidationWarning && enabled
+                ? ESTrackViewTheme.StatusWarning
+                : !enabled
+                    ? ESTrackViewTheme.MutedText
+                    : m_IsSelected ? ESTrackViewTheme.SelectedText : ESTrackViewTheme.Text;
             if (m_ClipNameLabel != null)
-                m_ClipNameLabel.style.color = enabled ? new Color(1f, 0.96f, 0.84f, 1f) : new Color(0.62f, 0.58f, 0.46f, 1f);
+                m_ClipNameLabel.style.color = textColor;
+            if (m_ClipShortLabel != null)
+                m_ClipShortLabel.style.color = textColor;
+
+            if (m_ClipContent != null)
+                m_ClipContent.style.backgroundColor = !m_IsSelected && m_IsHovering
+                    ? ESTrackViewTheme.HoverOverlay
+                    : ESTrackViewTheme.Transparent;
+
+            if (m_SelectionFrame != null)
+            {
+                m_SelectionFrame.style.display = m_IsSelected ? DisplayStyle.Flex : DisplayStyle.None;
+                Color selectionColor = ESTrackViewTheme.SelectionFrame(m_IsPrimarySelection);
+                m_SelectionFrame.style.borderLeftColor = selectionColor;
+                m_SelectionFrame.style.borderRightColor = selectionColor;
+                m_SelectionFrame.style.borderTopColor = selectionColor;
+                m_SelectionFrame.style.borderBottomColor = selectionColor;
+                m_SelectionFrame.style.backgroundColor = ESTrackViewTheme.SelectionFill(m_IsPrimarySelection);
+                if (m_IsSelected)
+                    m_SelectionFrame.BringToFront();
+            }
+
+            if (m_EditingFocusFrame != null)
+            {
+                m_EditingFocusFrame.style.display = m_IsFocusedEditing ? DisplayStyle.Flex : DisplayStyle.None;
+                m_EditingFocusFrame.style.borderLeftColor = ESTrackViewTheme.EditingAccent;
+                m_EditingFocusFrame.style.borderRightColor = ESTrackViewTheme.EditingAccent;
+                m_EditingFocusFrame.style.borderTopColor = ESTrackViewTheme.EditingAccent;
+                m_EditingFocusFrame.style.borderBottomColor = ESTrackViewTheme.EditingAccent;
+                m_EditingFocusFrame.style.backgroundColor = ESTrackViewTheme.WithAlpha(ESTrackViewTheme.EditingAccent, 0.07f);
+                if (m_IsFocusedEditing)
+                    m_EditingFocusFrame.BringToFront();
+            }
+
+            if (m_ClipStateBadge != null)
+            {
+                float currentWidth = resolvedStyle.width > 0f
+                    ? resolvedStyle.width
+                    : style.width.value.value;
+                bool showBadge = !isRenaming
+                                 && currentWidth >= 54f
+                                 && (!enabled || m_HasValidationWarning);
+                Color status = m_HasValidationWarning
+                    ? ESTrackViewTheme.StatusWarning
+                    : ESTrackViewTheme.StatusReadOnly;
+                m_ClipStateBadge.style.display = showBadge ? DisplayStyle.Flex : DisplayStyle.None;
+                m_ClipStateBadge.style.color = status;
+                m_ClipStateBadge.style.backgroundColor = ESTrackViewTheme.StateBadgeSurface(status);
+            }
+
+            if (m_ClipIcon != null)
+            {
+                m_ClipIcon.style.backgroundColor = ESTrackViewTheme.IconBackground(accent);
+                m_ClipIcon.style.opacity = enabled ? 1f : 0.42f;
+            }
+
+            if (m_ResizeHandle != null)
+                m_ResizeHandle.style.backgroundColor = ESTrackViewTheme.WithAlpha(
+                    enabled ? accent : ESTrackViewTheme.StatusReadOnly,
+                    m_IsHovering || m_IsSelected ? 0.34f : 0.18f);
+
+            if (m_RenameField != null)
+            {
+                m_RenameField.style.color = ESTrackViewTheme.Text;
+                m_RenameField.style.backgroundColor = ESTrackViewTheme.SecondarySurface;
+            }
+
+            if (popup != null)
+                popup.style.backgroundColor = ESTrackViewTheme.WithAlpha(ESTrackViewTheme.SecondarySurface, 0.96f);
+            if (popLabel != null)
+                popLabel.style.color = ESTrackViewTheme.Text;
+
+            m_ResizeHandle?.BringToFront();
         }
 
         public void RefreshClipIcon()
@@ -1061,13 +1109,11 @@ namespace ES
             if (icon != null)
                 m_ClipIcon.style.backgroundImage = icon;
 
-            m_ClipIcon.style.backgroundColor = ESTrackViewIconUtility.ResolveIconBackColor(trackClip != null ? trackClip.GetType() : null);
+            m_ClipIcon.style.backgroundColor = ESTrackViewTheme.IconBackground(m_LastTrackAccentColor);
             m_ClipIcon.tooltip = trackClip != null ? trackClip.DisplayName : "片段";
             if (!isRenaming)
                 m_ClipIcon.style.display = resolvedStyle.width >= 44f ? DisplayStyle.Flex : DisplayStyle.None;
         }
-        private Color originalBgColor;
-        private bool hasSetORI=false;
         public void HighlightIfActive(float currentTime)
         {
             SetActiveHighlight(currentTime >= StartTime && currentTime <= StartTime + Duration);
@@ -1079,34 +1125,12 @@ namespace ES
                 return;
 
             m_IsActive = active;
-            if (active)
-            {
-                if (!hasSetORI)
-                    originalBgColor = style.backgroundColor.value;
-                hasSetORI = true;
+            ApplyVisualState();
+        }
 
-                style.borderTopColor = new Color(0.82f, 0.76f, 0.48f, 0.95f);
-                style.borderTopWidth = 1;
-                style.borderBottomColor = new Color(0.82f, 0.76f, 0.48f, 0.78f);
-                style.borderBottomWidth = 1;
-                style.backgroundColor = new Color(
-                    Mathf.Clamp01(originalBgColor.r + 0.035f),
-                    Mathf.Clamp01(originalBgColor.g + 0.035f),
-                    Mathf.Clamp01(originalBgColor.b + 0.035f),
-                    originalBgColor.a);
-            }
-            else
-            {
-                if (hasSetORI)
-                {
-                    style.backgroundColor = originalBgColor;
-                }
-
-                style.borderTopWidth = 1;
-                style.borderBottomWidth = 1;
-                style.borderTopColor = new Color(0.42f, 0.47f, 0.54f, 0.34f);
-                style.borderBottomColor = new Color(0.02f, 0.025f, 0.03f, 0.82f);
-            }
+        internal void RefreshTheme()
+        {
+            ApplyVisualState();
         }
 
         private void OnPointerEnter(PointerEnterEvent evt)
@@ -1141,15 +1165,32 @@ namespace ES
 
         private void UpdateCompactMetadataVisibility(float width)
         {
+            if (isRenaming)
+            {
+                if (m_ClipNameLabel != null)
+                    m_ClipNameLabel.style.display = DisplayStyle.None;
+                if (m_ClipShortLabel != null)
+                    m_ClipShortLabel.style.display = DisplayStyle.None;
+                if (m_ClipIcon != null)
+                    m_ClipIcon.style.display = DisplayStyle.None;
+                if (m_ClipStateBadge != null)
+                    m_ClipStateBadge.style.display = DisplayStyle.None;
+                return;
+            }
+
             bool compact = width > 0f && width < 64f;
             if (m_ClipNameLabel != null)
                 m_ClipNameLabel.style.display = compact ? DisplayStyle.None : DisplayStyle.Flex;
             if (m_ClipShortLabel != null)
                 m_ClipShortLabel.style.display = compact ? DisplayStyle.Flex : DisplayStyle.None;
             if (m_ClipIcon != null)
-                m_ClipIcon.style.display = width >= 30f ? DisplayStyle.Flex : DisplayStyle.None;
-            if (m_ClipStateBadge != null && width < 54f)
-                m_ClipStateBadge.style.display = DisplayStyle.None;
+                m_ClipIcon.style.display = width >= 44f ? DisplayStyle.Flex : DisplayStyle.None;
+            if (m_ClipStateBadge != null)
+            {
+                bool enabled = trackClip == null || trackClip.Enabled;
+                bool showBadge = width >= 54f && (!enabled || m_HasValidationWarning);
+                m_ClipStateBadge.style.display = showBadge ? DisplayStyle.Flex : DisplayStyle.None;
+            }
         }
 
         private void AdjustFontToFit()

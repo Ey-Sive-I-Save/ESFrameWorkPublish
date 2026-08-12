@@ -1,14 +1,27 @@
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.Linq;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.UIElements;
 namespace ES
 {
+    [Flags]
+    internal enum ESTrackAuthoringChangeFlags
+    {
+        None = 0,
+        Projection = 1 << 0,
+        TimelineDuration = 1 << 1,
+        Preview = 1 << 2,
+        Inspector = 1 << 3,
+        Save = 1 << 4,
+        Repaint = 1 << 5,
+
+        InspectorEdit = Projection | TimelineDuration | Preview | Inspector | Save | Repaint,
+        StructuralEdit = TimelineDuration | Preview | Inspector | Save | Repaint,
+        ValueEdit = Projection | Preview | Inspector | Save | Repaint
+    }
+
     [Flags]
     public enum ESTrackClipUpdateFlags
     {
@@ -32,10 +45,12 @@ namespace ES
         private Label m_TrackStateBadge;
         private TextField m_RenameField;
         private VisualElement m_TrackClipsContainer;
+        private VisualElement m_Separator;
         private bool m_IsSortDragging;
         private bool m_CanStartSortDrag;
         private Vector2 m_SortDragStartPosition;
         private bool m_IsRenaming;
+        private bool m_IsSelected;
         private readonly List<ESEditorTrackClip> m_VisibilitySortedClips = new List<ESEditorTrackClip>();
         private readonly List<float> m_VisibilityPrefixMaxEnd = new List<float>();
         private bool m_VisibilityCacheDirty = true;
@@ -48,6 +63,7 @@ namespace ES
         #region  运行时
         public ITrackItem item;
         public bool IsProtectedBasicTrack { get; private set; }
+        internal bool IsEnabled => item == null || item.Enabled;
 
 
         #endregion
@@ -57,8 +73,6 @@ namespace ES
         private Button m_LockButton = null;
         private Button m_DeleteButton;
         private Button m_CollapseButton;
-
-        public Vector2 recordLocalClipsMousePos;
 
         public List<ESEditorTrackClip> TrackClips = new List<ESEditorTrackClip>();
         private readonly Dictionary<string, ESEditorTrackClip> m_ClipsById =
@@ -131,6 +145,7 @@ namespace ES
             UpdateBasicTrackStyle();
             UpdateTrackEnabledVisual();
             UpdateNodeMatchAndForeachUpdate(true);
+            SetCollapsed(ESTrackViewWindow.window?.IsTrackCollapsed(trackItem) == true, false);
             //Debug.Log("初始化轨道项：" + item.GetType() + item.DisplayName);
             return this;
         }
@@ -157,7 +172,11 @@ namespace ES
         }
         private void UpdateTrackMessage()
         {
-            m_TrackNameLabel.text = item.DisplayName;
+            string displayName = item != null && !string.IsNullOrWhiteSpace(item.DisplayName)
+                ? item.DisplayName
+                : "未命名轨道";
+            m_TrackNameLabel.text = displayName;
+            m_TrackNameLabel.tooltip = displayName + "\n双击轨道名称或按 F2 重命名。";
             UpdateTrackIcon();
         }
 
@@ -185,29 +204,39 @@ namespace ES
 
 
             // 分隔线
-            var separator = new VisualElement
+            m_Separator = new VisualElement
             {
                 name = "track-separator",
                 style =
             {
                 width = 1,
-                backgroundColor = new Color(0.1f, 0.1f, 0.1f, 1f)
+                backgroundColor = ESTrackViewTheme.Divider
             }
             };
-            Add(separator);
+            Add(m_Separator);
         }
 
         private void BindClipsArea()
         {
             m_TrackClipsContainer.RegisterCallback<ContextClickEvent>(evt =>
             {
-                if (evt.button == 1)
-                {
-                    recordLocalClipsMousePos = evt.localMousePosition;
-                    //  Debug.Log("右键点击轨道节点区域");
-                    ESTrackViewWindow.window.ShowMenu_SelectTrackAndAddTrack(this);
-                }
+                if (evt.button != 1)
+                    return;
 
+                ESTrackViewWindow hostWindow = ESTrackViewWindow.window;
+                float contextTime = hostWindow != null
+                    ? hostWindow.GetTimeAtCanvasLocalX(evt.localMousePosition.x)
+                    : 0f;
+                if (evt.shiftKey)
+                {
+                    hostWindow?.SelectTrack(this);
+                    hostWindow?.EditTrack(this, true);
+                }
+                else
+                    hostWindow?.ShowTrackContextMenu(this, contextTime, "右键位置");
+
+                evt.PreventDefault();
+                evt.StopImmediatePropagation();
             });
 
             m_TrackClipsContainer.RegisterCallback<WheelEvent>(evt =>
@@ -236,11 +265,12 @@ namespace ES
                 flexDirection = FlexDirection.Column,
                 paddingTop = 4,
                 paddingBottom = 4,
-                paddingLeft = 8,
-                paddingRight = 8,
-                backgroundColor = new StyleColor(new Color(0.074f, 0.081f, 0.092f, 1f)),
+                 paddingLeft = 8,
+                 paddingRight = 8,
+                overflow = Overflow.Hidden,
+                backgroundColor = ESTrackViewTheme.SecondarySurface,
                 borderRightWidth = 1,
-                borderRightColor = new Color(0.22f, 0.24f, 0.27f, 1f)
+                borderRightColor = ESTrackViewTheme.Divider
             }
             };
 
@@ -261,10 +291,14 @@ namespace ES
             {
                 flexDirection = FlexDirection.Row,
                 alignItems = Align.Center,
+                flexGrow = 1,
+                flexShrink = 1,
+                minWidth = 0,
                 height = 24,
-                marginBottom = 4,
+                marginBottom = 0,
                 paddingLeft = 2,
-                paddingRight = 2
+                paddingRight = 2,
+                overflow = Overflow.Hidden
             }
             };
 
@@ -274,13 +308,15 @@ namespace ES
                 style =
                 {
                     width = 3,
+                    minWidth = 3,
+                    flexShrink = 0,
                     height = 15,
                     marginRight = 7,
                     borderTopLeftRadius = 2,
                     borderTopRightRadius = 2,
                     borderBottomLeftRadius = 2,
                     borderBottomRightRadius = 2,
-                    backgroundColor = new Color(0.4f, 0.45f, 0.52f, 1f)
+                    backgroundColor = ESTrackViewTheme.Accent
                 }
             };
             m_Header.Add(m_AccentBar);
@@ -294,6 +330,7 @@ namespace ES
                 {
                     width = 42,
                     minWidth = 42,
+                    flexShrink = 0,
                     height = 22,
                     marginRight = 6,
                     paddingLeft = 0,
@@ -311,6 +348,7 @@ namespace ES
                 }
             };
             m_EnableButton.AddToClassList("track-enable-button");
+            ESTrackViewTheme.ApplyStandardButton(m_EnableButton);
             m_Header.Add(m_EnableButton);
 
             m_CollapseButton = new Button(ToggleCollapse)
@@ -322,6 +360,7 @@ namespace ES
                 {
                     width = 20,
                     minWidth = 20,
+                    flexShrink = 0,
                     height = 20,
                     marginRight = 4,
                     paddingLeft = 0,
@@ -330,6 +369,7 @@ namespace ES
                 }
             };
             m_CollapseButton.AddToClassList("track-control-button");
+            ESTrackViewTheme.ApplyStandardButton(m_CollapseButton);
             m_Header.Add(m_CollapseButton);
 
             // 轨道图标
@@ -341,6 +381,7 @@ namespace ES
                 width = 14,
                 height = 14,
                 minWidth = 14,
+                flexShrink = 0,
                 marginRight = 7,
                 borderTopLeftRadius = 2,
                 borderTopRightRadius = 2,
@@ -352,16 +393,19 @@ namespace ES
             m_Icon.AddToClassList("icon-default");
             m_Header.Add(m_Icon);
 
-            // 轨道名称
+            // 名称是 Header 中唯一允许伸缩的区域。左右操作控件和状态徽章保持固定尺寸、固定顺序，
+            // 长文本只在这里截断，不能推动、隐藏或重排相邻控件。
             m_TrackNameLabel = new Label("轨道")
             {
                 name = "track-name",
                 style =
             {
                 flexGrow = 1,
+                flexShrink = 1,
+                minWidth = 0,
                 unityFontStyleAndWeight = FontStyle.Bold,
                 fontSize = 11,
-                color = new Color(0.74f, 0.8f, 0.87f, 1f),
+                color = ESTrackViewTheme.Text,
                 unityTextAlign = TextAnchor.MiddleLeft,
                 overflow = Overflow.Hidden,
                 textOverflow = TextOverflow.Ellipsis,
@@ -374,8 +418,10 @@ namespace ES
             {
                 style =
                 {
+                    display = DisplayStyle.None,
                     minWidth = 32,
                     width = 32,
+                    flexShrink = 0,
                     height = 18,
                     marginLeft = 5,
                     fontSize = 9,
@@ -393,16 +439,28 @@ namespace ES
 
             m_LeftPanel.RegisterCallback<ContextClickEvent>(evt =>
             {
-                recordLocalClipsMousePos = new Vector2(0f, evt.localMousePosition.y);
-                if (evt.shiftKey)
+                if (evt.button != 1)
+                    return;
+
+                if (m_IsRenaming)
                 {
-                    ESTrackViewWindow.window?.EditTrack(this, true);
                     evt.StopPropagation();
                     return;
                 }
 
-                ESTrackViewWindow.window?.ShowMenu_SelectTrackAndAddTrack(this);
-                evt.StopPropagation();
+                ESTrackViewWindow hostWindow = ESTrackViewWindow.window;
+                if (evt.shiftKey)
+                {
+                    hostWindow?.SelectTrack(this);
+                    hostWindow?.EditTrack(this, true);
+                    evt.PreventDefault();
+                    evt.StopImmediatePropagation();
+                    return;
+                }
+
+                hostWindow?.ShowTrackContextMenu(this, hostWindow.CursorTime, "播放头");
+                evt.PreventDefault();
+                evt.StopImmediatePropagation();
             });
         }
         private void CreateRightPanel()
@@ -415,7 +473,7 @@ namespace ES
 
                 position = Position.Absolute,
                 flexDirection = FlexDirection.Column,
-                backgroundColor = new StyleColor(new Color(0.052f, 0.057f, 0.066f, 1f)),
+                backgroundColor = ESTrackViewTheme.CanvasBackground,
                 height = TrackRowHeight,
                 minHeight = TrackRowHeight,
                 maxHeight = TrackRowHeight
@@ -463,7 +521,6 @@ namespace ES
             float canvasWidth = Mathf.Max(1f, timelineWidth);
             float itemWidth = trackPanelWidth + canvasWidth;
             float rowHeight = CurrentHeight;
-
             style.width = itemWidth;
             style.minWidth = itemWidth;
             style.height = rowHeight;
@@ -487,27 +544,10 @@ namespace ES
         }
         private void UpdateTrackColor()
         {
+            ApplyTrackVisualState();
             Color accent = ResolveTrackAccentColor();
-            if (m_Icon != null)
-            {
-                m_Icon.style.backgroundColor = ESTrackViewIconUtility.ResolveIconBackColor(item != null ? item.GetType() : null);
-            }
-            if (m_AccentBar != null)
-            {
-                m_AccentBar.style.backgroundColor = accent;
-            }
-            if (m_TrackClipsContainer != null)
-            {
-                m_TrackClipsContainer.style.backgroundColor = new Color(
-                    0.054f + accent.r * 0.035f,
-                    0.058f + accent.g * 0.035f,
-                    0.066f + accent.b * 0.035f,
-                    0.72f);
-                m_TrackClipsContainer.style.borderBottomWidth = 1;
-                m_TrackClipsContainer.style.borderBottomColor = new Color(0.105f, 0.115f, 0.135f, 0.66f);
-            }
-
-            UpdateTrackEnabledVisual();
+            for (int i = 0; i < TrackClips.Count; i++)
+                TrackClips[i]?.SetClipColor(accent);
         }
 
         private void ToggleTrackEnabled()
@@ -520,15 +560,31 @@ namespace ES
                 UnityEditor.Undo.RecordObject(undoTarget, item.Enabled ? "禁用轨道" : "启用轨道");
 
             item.Enabled = !item.Enabled;
-            UpdateTrackEnabledVisual();
-            ESTrackViewWindowHelper.SaveContainerChanges();
-            ESTrackViewWindow.window?.RebuildActivePreviewPlayer();
+            if (ESTrackViewWindow.window != null)
+            {
+                ESTrackViewWindow.window.ApplyAuthoringChange(
+                    item,
+                    ESTrackAuthoringChangeFlags.ValueEdit,
+                    item.Enabled ? "启用轨道" : "禁用轨道");
+            }
+            else
+            {
+                UpdateTrackEnabledVisual();
+                ESTrackViewWindowHelper.SaveContainerChanges();
+            }
+        }
+
+        internal void ToggleEnabledFromContext()
+        {
+            ToggleTrackEnabled();
         }
 
         private void UpdateTrackEnabledVisual()
         {
             bool enabled = item == null || item.Enabled;
-            Color accent = ResolveTrackAccentColor();
+
+            if (!enabled)
+                ClearActiveClipHighlights();
 
             if (m_EnableButton != null)
             {
@@ -536,53 +592,95 @@ namespace ES
                 m_EnableButton.tooltip = enabled
                     ? "当前轨道已启用。点击后禁用，运行时烘焙、运行和编辑器预览都会跳过这条轨道。"
                     : "当前轨道已禁用。点击后重新启用。";
-                m_EnableButton.style.color = enabled
-                    ? new Color(0.78f, 1f, 0.78f, 1f)
-                    : new Color(0.68f, 0.72f, 0.78f, 1f);
-                m_EnableButton.style.backgroundColor = enabled
-                    ? new Color(0.08f, 0.18f, 0.12f, 0.92f)
-                    : new Color(0.14f, 0.16f, 0.19f, 0.96f);
-                Color borderColor = enabled
-                    ? new Color(0.25f, 0.62f, 0.34f, 0.9f)
-                    : new Color(0.42f, 0.47f, 0.54f, 0.82f);
-                m_EnableButton.style.borderTopColor = borderColor;
-                m_EnableButton.style.borderRightColor = borderColor;
-                m_EnableButton.style.borderBottomColor = borderColor;
-                m_EnableButton.style.borderLeftColor = borderColor;
             }
 
             if (m_TrackStateBadge != null)
             {
-                m_TrackStateBadge.text = enabled ? "正常" : "停用";
-                m_TrackStateBadge.tooltip = enabled
-                    ? "轨道已启用"
-                    : "轨道已禁用，预览与运行时会跳过此轨道";
-                m_TrackStateBadge.style.color = enabled
-                    ? new Color(0.68f, 0.95f, 0.76f, 1f)
-                    : new Color(0.68f, 0.72f, 0.78f, 1f);
-                m_TrackStateBadge.style.backgroundColor = enabled
-                    ? new Color(0.08f, 0.2f, 0.13f, 0.92f)
-                    : new Color(0.14f, 0.16f, 0.19f, 0.95f);
+                m_TrackStateBadge.text = "停用";
+                m_TrackStateBadge.tooltip = "轨道已禁用，预览与运行时会跳过此轨道";
             }
+
+            ApplyTrackVisualState();
+        }
+
+        private void ApplyTrackVisualState()
+        {
+            bool enabled = item == null || item.Enabled;
+            Color accent = ResolveTrackAccentColor();
+            Color disabledAccent = ESTrackViewTheme.SubduedAccent(accent);
+
+            if (m_LeftPanel != null)
+            {
+                m_LeftPanel.style.backgroundColor = ESTrackViewTheme.TrackHeaderSurface(
+                    accent,
+                    m_IsSelected,
+                    IsProtectedBasicTrack);
+                m_LeftPanel.style.borderRightWidth = 1;
+                m_LeftPanel.style.borderRightColor = ESTrackViewTheme.Divider;
+                m_LeftPanel.style.borderLeftWidth = m_IsSelected ? 3 : IsProtectedBasicTrack ? 2 : 0;
+                m_LeftPanel.style.borderLeftColor = m_IsSelected
+                    ? ESTrackViewTheme.Accent
+                    : IsProtectedBasicTrack
+                        ? ESTrackViewTheme.WithAlpha(accent, 0.68f)
+                        : ESTrackViewTheme.Transparent;
+            }
+
+            if (m_RightPanel != null)
+                m_RightPanel.style.backgroundColor = ESTrackViewTheme.CanvasBackground;
+
+            if (m_TrackClipsContainer != null)
+            {
+                m_TrackClipsContainer.style.backgroundColor = ESTrackViewTheme.TrackCanvasSurface(accent);
+                m_TrackClipsContainer.style.borderBottomWidth = 1;
+                m_TrackClipsContainer.style.borderBottomColor = ESTrackViewTheme.Divider;
+                m_TrackClipsContainer.style.opacity = enabled ? 1f : 0.62f;
+            }
+
+            if (m_Separator != null)
+                m_Separator.style.backgroundColor = ESTrackViewTheme.Divider;
 
             if (m_TrackNameLabel != null)
-            {
-                m_TrackNameLabel.style.color = enabled
-                    ? new Color(0.74f, 0.8f, 0.87f, 1f)
-                    : new Color(0.48f, 0.5f, 0.54f, 1f);
-            }
+                m_TrackNameLabel.style.color = !enabled
+                    ? ESTrackViewTheme.MutedText
+                    : m_IsSelected ? ESTrackViewTheme.SelectedText : ESTrackViewTheme.Text;
 
             if (m_Icon != null)
+            {
+                m_Icon.style.backgroundColor = ESTrackViewTheme.IconBackground(accent);
                 m_Icon.style.opacity = enabled ? 1f : 0.34f;
+            }
 
             if (m_AccentBar != null)
             {
-                m_AccentBar.style.opacity = enabled ? 1f : 0.38f;
-                m_AccentBar.style.backgroundColor = enabled ? accent : new Color(0.26f, 0.27f, 0.3f, 0.8f);
+                m_AccentBar.style.backgroundColor = enabled ? accent : disabledAccent;
+                m_AccentBar.style.opacity = enabled ? 1f : 0.52f;
             }
 
-            if (m_TrackClipsContainer != null)
-                m_TrackClipsContainer.style.opacity = enabled ? 1f : 0.42f;
+            if (m_EnableButton != null)
+            {
+                ESTrackViewTheme.ApplyStandardButton(m_EnableButton);
+                if (!enabled)
+                {
+                    m_EnableButton.style.color = ESTrackViewTheme.MutedText;
+                    m_EnableButton.style.backgroundColor = ESTrackViewTheme.StateBadgeSurface(ESTrackViewTheme.StatusReadOnly);
+                    m_EnableButton.style.borderLeftColor = ESTrackViewTheme.StatusReadOnly;
+                    m_EnableButton.style.borderTopColor = ESTrackViewTheme.StatusReadOnly;
+                    m_EnableButton.style.borderRightColor = ESTrackViewTheme.StatusReadOnly;
+                    m_EnableButton.style.borderBottomColor = ESTrackViewTheme.StatusReadOnly;
+                }
+            }
+
+            if (m_CollapseButton != null)
+                ESTrackViewTheme.ApplyStandardButton(m_CollapseButton);
+
+            if (m_TrackStateBadge != null)
+            {
+                m_TrackStateBadge.style.display = !m_IsRenaming && !enabled
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+                m_TrackStateBadge.style.color = ESTrackViewTheme.MutedText;
+                m_TrackStateBadge.style.backgroundColor = ESTrackViewTheme.StateBadgeSurface(ESTrackViewTheme.StatusReadOnly);
+            }
         }
 
         private void OnTrackPointerDown(PointerDownEvent evt)
@@ -667,67 +765,38 @@ namespace ES
 
         private bool IsPointerOnHeaderButton(Vector2 worldPosition)
         {
-            return m_EnableButton != null && m_EnableButton.worldBound.Contains(worldPosition);
+            bool onEnableButton = m_EnableButton != null && m_EnableButton.worldBound.Contains(worldPosition);
+            bool onCollapseButton = m_CollapseButton != null && m_CollapseButton.worldBound.Contains(worldPosition);
+            return onEnableButton || onCollapseButton;
         }
 
         private void UpdateBasicTrackStyle()
         {
-            if (!IsProtectedBasicTrack)
-                return;
-
-            string basicTrackTooltip = "基础轨道：不可删除，不参与轨道拖拽排序。扩展轨道只能排在基础轨道之后。";
-            tooltip = string.Empty;
-            style.borderLeftWidth = 1;
-            style.borderTopWidth = 0;
-            style.borderBottomWidth = 0;
-            style.borderLeftColor = new Color(0.56f, 0.5f, 0.28f, 0.55f);
-            style.borderTopColor = Color.clear;
-            style.borderBottomColor = Color.clear;
-
-            if (m_LeftPanel != null)
+            if (IsProtectedBasicTrack)
             {
-                m_LeftPanel.style.backgroundColor = new Color(0.086f, 0.092f, 0.102f, 1f);
-                m_LeftPanel.style.borderTopWidth = 0;
-                m_LeftPanel.style.borderBottomWidth = 0;
-                m_LeftPanel.style.borderLeftWidth = 2;
-                m_LeftPanel.style.borderLeftColor = new Color(0.54f, 0.49f, 0.28f, 0.65f);
-                m_LeftPanel.style.borderTopColor = Color.clear;
-                m_LeftPanel.style.borderBottomColor = Color.clear;
+                string basicTrackTooltip = "基础轨道：不可删除，不参与轨道拖拽排序。扩展轨道只能排在基础轨道之后。";
+                tooltip = string.Empty;
+
+                if (m_Header != null)
+                    m_Header.tooltip = basicTrackTooltip;
+
+                if (m_LeftPanel != null)
+                    m_LeftPanel.tooltip = basicTrackTooltip;
+
+                if (m_TrackClipsContainer != null)
+                    m_TrackClipsContainer.tooltip = string.Empty;
+
+                if (m_RightPanel != null)
+                    m_RightPanel.tooltip = string.Empty;
             }
 
-            if (m_Header != null)
-                m_Header.tooltip = basicTrackTooltip;
-
-            if (m_LeftPanel != null)
-                m_LeftPanel.tooltip = basicTrackTooltip;
-
-            if (m_TrackClipsContainer != null)
-                m_TrackClipsContainer.tooltip = string.Empty;
-
-            if (m_RightPanel != null)
-                m_RightPanel.tooltip = string.Empty;
+            ApplyTrackVisualState();
         }
 
         public void SetSelected(bool selected)
         {
-            if (m_LeftPanel == null)
-                return;
-
-            if (selected)
-            {
-                m_LeftPanel.style.backgroundColor = new Color(0.105f, 0.125f, 0.15f, 1f);
-                m_LeftPanel.style.borderLeftWidth = 3;
-                m_LeftPanel.style.borderLeftColor = new Color(0.38f, 0.58f, 0.78f, 0.9f);
-                return;
-            }
-
-            m_LeftPanel.style.backgroundColor = IsProtectedBasicTrack
-                ? new Color(0.086f, 0.092f, 0.102f, 1f)
-                : new Color(0.074f, 0.081f, 0.092f, 1f);
-            m_LeftPanel.style.borderLeftWidth = IsProtectedBasicTrack ? 2 : 0;
-            m_LeftPanel.style.borderLeftColor = IsProtectedBasicTrack
-                ? new Color(0.54f, 0.49f, 0.28f, 0.65f)
-                : Color.clear;
+            m_IsSelected = selected;
+            ApplyTrackVisualState();
         }
 
         public void SetSortDragging(bool dragging)
@@ -758,18 +827,29 @@ namespace ES
                 m_RenameField.selectAllOnFocus = false;
                 m_RenameField.selectAllOnMouseUp = false;
                 m_RenameField.style.position = Position.Absolute;
-                m_RenameField.style.left = 30;
-                m_RenameField.style.right = 6;
-                m_RenameField.style.top = 3;
+                m_RenameField.style.left = 2;
+                m_RenameField.style.right = 2;
+                m_RenameField.style.top = 1;
                 m_RenameField.style.height = 22;
+                m_RenameField.style.minWidth = 0;
+                m_RenameField.style.flexShrink = 1;
                 m_RenameField.style.fontSize = 11;
-                m_RenameField.style.color = new Color(0.92f, 0.95f, 1f, 1f);
-                m_RenameField.style.backgroundColor = new Color(0.075f, 0.085f, 0.1f, 1f);
+                m_RenameField.style.color = ESTrackViewTheme.Text;
+                m_RenameField.style.backgroundColor = ESTrackViewTheme.SecondarySurface;
                 m_RenameField.tooltip = "正在重命名轨道：Enter 确认，Esc 取消；点击输入框外保存";
                 m_RenameField.RegisterCallback<KeyDownEvent>(OnRenameKeyDown);
-                m_LeftPanel.Add(m_RenameField);
+                m_Header.Add(m_RenameField);
+
+                VisualElement textInput = m_RenameField.Q<VisualElement>(className: "unity-text-input");
+                if (textInput != null)
+                {
+                    textInput.style.minWidth = 0;
+                    textInput.style.flexGrow = 1;
+                    textInput.style.flexShrink = 1;
+                }
             }
 
+            SetHeaderControlsVisible(false);
             m_RenameField.SetValueWithoutNotify(item.DisplayName);
             m_RenameField.style.display = DisplayStyle.Flex;
             schedule.Execute(() =>
@@ -780,6 +860,16 @@ namespace ES
                 m_RenameField.Focus();
                 m_RenameField.SelectAll();
             }).ExecuteLater(0);
+        }
+
+        internal void BeginRenameFromContext()
+        {
+            BeginRename();
+        }
+
+        internal void CommitRenameBeforeLayoutMutation()
+        {
+            CommitRename();
         }
 
         public void CommitRenameIfPointerOutsideRenameField(Vector2 worldPosition)
@@ -824,7 +914,17 @@ namespace ES
 
                 item.DisplayName = newName;
                 m_TrackNameLabel.text = newName;
-                ESTrackViewWindowHelper.SaveContainerDisplayChanges();
+                if (ESTrackViewWindow.window != null)
+                {
+                    ESTrackViewWindow.window.ApplyAuthoringChange(
+                        item,
+                        ESTrackAuthoringChangeFlags.ValueEdit,
+                        "重命名轨道");
+                }
+                else
+                {
+                    ESTrackViewWindowHelper.SaveContainerDisplayChanges("重命名轨道");
+                }
             }
 
             EndRename();
@@ -842,8 +942,29 @@ namespace ES
             if (m_RenameField != null)
                 m_RenameField.style.display = DisplayStyle.None;
 
+            SetHeaderControlsVisible(true);
             m_TrackNameLabel.style.display = DisplayStyle.Flex;
             UpdateTrackMessage();
+        }
+
+        private void SetHeaderControlsVisible(bool visible)
+        {
+            DisplayStyle display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            if (m_AccentBar != null)
+                m_AccentBar.style.display = display;
+            if (m_EnableButton != null)
+                m_EnableButton.style.display = display;
+            if (m_CollapseButton != null)
+                m_CollapseButton.style.display = display;
+            if (m_Icon != null)
+                m_Icon.style.display = display;
+            if (m_TrackStateBadge != null)
+                m_TrackStateBadge.style.display = display;
+            if (m_TrackNameLabel != null)
+                m_TrackNameLabel.style.display = display;
+
+            if (visible)
+                ApplyTrackVisualState();
         }
 
         private void UpdateTrackIcon()
@@ -861,14 +982,19 @@ namespace ES
         private Color ResolveTrackAccentColor()
         {
             if (item == null)
-                return new Color(0.42f, 0.46f, 0.52f, 1f);
+                return ESTrackViewTheme.Accent;
 
-            Color color = item.ItemBGColor;
-            return new Color(
-                Mathf.Clamp01(color.r * 0.85f + 0.08f),
-                Mathf.Clamp01(color.g * 0.85f + 0.08f),
-                Mathf.Clamp01(color.b * 0.85f + 0.08f),
-                0.82f);
+            return ESTrackViewTheme.ResolveBusinessAccent(item.ItemBGColor);
+        }
+
+        internal void RefreshTheme()
+        {
+            UpdateTrackColor();
+            if (m_RenameField != null)
+            {
+                m_RenameField.style.color = ESTrackViewTheme.Text;
+                m_RenameField.style.backgroundColor = ESTrackViewTheme.SecondarySurface;
+            }
         }
         private void UpdateMuteButton()
         {
@@ -886,27 +1012,6 @@ namespace ES
                 // m_TrackNodesContainer.SetEnabled(!m_IsLocked);
             }
         }
-        public ESEditorTrackClip AddClipTEST(string name, float startTime, float duration, object data = null)
-        {
-            var node = new ESEditorTrackClip(null, name, startTime, duration, data)
-            {
-                style =
-            {
-                marginLeft = 2,
-                marginRight = 2
-            }
-            };
-
-            m_TrackClipsContainer.Add(node);
-            TrackClips.Add(node);
-            MarkVisibilityCacheDirty();
-
-            //  OnNodeAdded?.Invoke(this, node);
-            return node;
-        }
-
-
-
         public ESEditorTrackClip AddClip(ITrackClip clip, bool onlyUpdate = true)
         {
             if (clip == null)
@@ -994,10 +1099,16 @@ namespace ES
             }
         }
 
-        
+
 
         public void SetCurrentTime(float time)
         {
+            if (item != null && !item.Enabled)
+            {
+                ClearActiveClipHighlights();
+                return;
+            }
+
             EnsureVisibilityCache();
 
             int activeStartIndex = FindFirstClipPotentiallyVisibleAtOrAfter(time);
@@ -1066,10 +1177,28 @@ namespace ES
 
         public void ToggleCollapse()
         {
-            m_IsCollapsed = !m_IsCollapsed;
+            SetCollapsed(!m_IsCollapsed, true);
+        }
+
+        internal void SetCollapsed(bool collapsed, bool notifyHost)
+        {
+            if (m_IsCollapsed == collapsed)
+            {
+                UpdateCollapseVisual();
+                return;
+            }
+
+            ESTrackViewWindow hostWindow = ESTrackViewWindow.window;
+            hostWindow?.CommitActiveRenameBeforeLayoutMutation();
+            m_IsCollapsed = collapsed;
             UpdateCollapseVisual();
-            ESTrackViewWindow.window?.UpdateTimelineContentHeight();
-            ESTrackViewWindow.window?.ApplyTrackPanelLayout(false);
+            hostWindow?.SetTrackCollapsedState(item, collapsed);
+            if (!notifyHost)
+                return;
+
+            hostWindow?.UpdateTimelineContentHeight();
+            hostWindow?.ApplyTrackPanelLayout(false);
+            hostWindow?.Repaint();
         }
 
         private void UpdateCollapseVisual()
@@ -1085,7 +1214,7 @@ namespace ES
                 m_TrackClipsContainer.style.display = m_IsCollapsed ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
-        
+
 
         internal void UpdateNodes()
         {
@@ -1429,21 +1558,6 @@ namespace ES
             return ResolveIcon(clip != null ? clip.GetType() : null);
         }
 
-        public static Color ResolveIconBackColor(Type type)
-        {
-            string typeName = type != null ? type.Name : string.Empty;
-            if (typeName.Contains("Animation"))
-                return new Color(0.18f, 0.31f, 0.54f, 0.92f);
-            if (typeName.Contains("GameObject"))
-                return new Color(0.17f, 0.38f, 0.22f, 0.92f);
-            if (typeName.Contains("Audio"))
-                return new Color(0.48f, 0.34f, 0.12f, 0.92f);
-            if (typeName.Contains("Operation"))
-                return new Color(0.50f, 0.10f, 0.34f, 0.92f);
-
-            return new Color(0.24f, 0.27f, 0.32f, 0.92f);
-        }
-
         public static bool TryGetBasicTrackKey(ITrackItem item, out string key)
         {
             key = null;
@@ -1475,6 +1589,8 @@ namespace ES
                 return GetUnityObjectIcon(typeof(GameObject));
             if (typeName.Contains("Audio"))
                 return GetUnityObjectIcon(typeof(AudioClip));
+            if (typeName.Contains("Camera"))
+                return GetUnityObjectIcon(typeof(Camera));
             if (typeName.Contains("Operation"))
                 return GetUnityObjectIcon(typeof(UnityEditor.MonoScript));
 

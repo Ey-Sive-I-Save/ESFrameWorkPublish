@@ -21,7 +21,7 @@ namespace ES
     /// 项目启动期的核心资产预热清单。预热结果进入 ESAssets 全局驻留缓存，
     /// 不会因技能、UI 或 Owner 生命周期被卸载；只随资源安全点统一清理。
     /// </summary>
-    [CreateAssetMenu(fileName = "ESGameCoreAssetPreloadCatalog", menuName = "【ES】/资源与发布/运行时配置/GameCore 预加载目录")]
+    [CreateAssetMenu(fileName = "ESGameCoreAssetPreloadCatalog", menuName = "【ES】/资源管线/运行时配置/GameCore 预加载目录")]
     public sealed class ESGameCoreAssetPreloadCatalog : ScriptableObject
     {
         [SerializeReference] public List<ESAssetReferBase> assets = new List<ESAssetReferBase>();

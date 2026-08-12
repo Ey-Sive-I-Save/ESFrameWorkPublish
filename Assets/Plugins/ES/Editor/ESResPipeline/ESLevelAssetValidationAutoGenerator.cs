@@ -15,7 +15,7 @@ namespace ES
         private const string MaterialsRoot = "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Materials";
         private const string EntryScenePath = "Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/ESLevelAssetValidation.unity";
 
-        [MenuItem("【ES】/示例与测试/资源卸载验收/检查并修复关卡资源验收集", false, 1)]
+        [MenuItem("【ES】/验证与诊断/验证环境/资源卸载验收/检查并修复关卡资源验收集", false, 1)]
         private static void RepairIfNeededFromMenu()
         {
             RepairIfNeeded();

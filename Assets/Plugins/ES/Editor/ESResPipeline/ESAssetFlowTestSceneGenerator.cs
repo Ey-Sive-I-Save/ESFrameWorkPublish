@@ -11,7 +11,7 @@ namespace ES
         public const string Folder = "Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate";
         public const string ScenePath = Folder + "/ESAssetGameCoreFlowHotUpdateTest.unity";
 
-        [MenuItem("【ES】/示例与测试/资源热更新/创建或刷新 Asset 与 GameCore 热更新场景")]
+        [MenuItem("【ES】/验证与诊断/验证环境/资源热更新/创建或刷新 Asset 与 GameCore 热更新场景")]
         public static void CreateOrRefresh()
         {
             Directory.CreateDirectory(Folder);

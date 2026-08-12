@@ -49,7 +49,14 @@ namespace ES
         public int enumKey;
         public bool isBusinessAsset;
     }
-    [Serializable] public sealed class ESRuntimeCatalog { public int formatVersion; public string libraryName, libraryFolder, libraryBundleCode, libraryAssetGuid, generatedUtc; public List<ESRuntimeCatalogEntry> assets = new List<ESRuntimeCatalogEntry>(); }
+    [Serializable] public sealed class ESRuntimeCatalog
+    {
+        public const int CurrentFormatVersion = 4;
+
+        public int formatVersion;
+        public string libraryName, libraryFolder, libraryBundleCode, libraryAssetGuid, librarySourceRevision, generatedUtc;
+        public List<ESRuntimeCatalogEntry> assets = new List<ESRuntimeCatalogEntry>();
+    }
     [Serializable] public sealed class ESRuntimeBundleRecord { public string assetBundleKey, fileName, unityHash, sha256, localRelativePath; public uint crc; public long size; public List<string> dependencies = new List<string>(); }
     [Serializable] public sealed class ESRuntimeReleaseMainAssetRecord { public string guid, assetBundleKey, internalName, typeName; }
     [Serializable] public sealed class ESRuntimeReleaseSubAssetRecord { public string guid, assetBundleKey, internalName, subAssetName, typeName; public long localFileId; }
@@ -898,7 +905,8 @@ namespace ES
             Report(ESRuntimeReleaseDownloadStage.ReadingCatalog, libraryFolder);
             var catalog = await DownloadJsonAsync<ESRuntimeCatalog>(catalogSource, Path.Combine(libraryRoot, "ESAssetLibraryCatalog.json"), identity.catalogSha256, token, useEmbedded);
             if (catalog == null || catalog.assets == null) throw new InvalidDataException("Catalog 解析失败：" + library.libraryFolder);
-            if (catalog.formatVersion != 3) throw new InvalidDataException("Catalog 命名协议版本不匹配：" + library.libraryFolder);
+            if (catalog.formatVersion != ESRuntimeCatalog.CurrentFormatVersion)
+                throw new InvalidDataException("Catalog 命名协议版本不匹配：" + library.libraryFolder);
             if (string.IsNullOrWhiteSpace(identity.libraryBundleCode)
                 || !string.Equals(identity.libraryBundleCode, catalog.libraryBundleCode, StringComparison.Ordinal))
                 throw new InvalidDataException("Catalog 与 LibraryIdentity 的 AB 短码不一致：" + library.libraryFolder);

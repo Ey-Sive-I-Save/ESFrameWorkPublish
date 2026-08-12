@@ -75,10 +75,6 @@ namespace ES
     public bool ExcludeWindow = true;
 
     [TabGroup("SO管理支持")]
-    [LabelText("常规排除NodeRunner类")]
-    public bool ExcludeNodeRunner = true;
-
-    [TabGroup("SO管理支持")]
     [LabelText("常规排除Global类")]
     public bool ExcludeGlobal = true;
 
@@ -475,14 +471,6 @@ namespace ES
         if (ESGlobalEditorDefaultConfi.Instance.ExcludeWindow)
         {
           if (t.IsSubclassOf(typeof(EditorWindow)))
-          {
-            listToRemove.Add(ESEditorSO.AllSoNames.GetKey(t));
-          }
-        }
-
-        if (ESGlobalEditorDefaultConfi.Instance.ExcludeNodeRunner)
-        {
-          if (typeof(INodeRunner_Origin).IsAssignableFrom(t))
           {
             listToRemove.Add(ESEditorSO.AllSoNames.GetKey(t));
           }

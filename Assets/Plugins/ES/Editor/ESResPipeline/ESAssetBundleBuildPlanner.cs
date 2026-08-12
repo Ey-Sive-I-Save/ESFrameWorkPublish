@@ -26,12 +26,20 @@ namespace ES
             {
                 string folder = ESAssetPipelineIO.LibraryBakeFolder(library.LibFolderName);
                 var catalog = ESAssetPipelineIO.ReadJson<ESAssetLibraryCatalog>(Path.Combine(folder, ESAssetPipelineIO.CatalogFileName));
-                if (catalog == null || catalog.formatVersion != 3)
+                if (catalog == null || catalog.formatVersion != ESAssetPipelineIO.CatalogFormatVersion)
                     throw new InvalidDataException("[ESRes][Plan] Catalog 命名协议已过期，请重新烘焙：" + library.LibFolderName);
                 if (!string.Equals(catalog.libraryBundleCode, library.AssetBundleCode, StringComparison.Ordinal)
                     || !ESAssetBundleUtility.IsValidLibraryCode(catalog.libraryBundleCode)
                     || string.IsNullOrWhiteSpace(catalog.libraryAssetGuid))
                     throw new InvalidDataException("[ESRes][Plan] Catalog LibraryCode/GUID 无效或已变化，请重新烘焙：" + library.LibFolderName);
+                string currentSourceRevision = ESAssetReferenceBaker.GetLibrarySourceRevision(library);
+                if (string.IsNullOrEmpty(catalog.librarySourceRevision)
+                    || !string.Equals(catalog.librarySourceRevision, currentSourceRevision, StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException(
+                        "[ESRes][Plan] Catalog 源修订已过期；Library 或依赖在 Bake 后发生变化，请合并后重新烘焙："
+                        + library.LibFolderName);
+                }
                 if (catalog.errors.Count > 0) throw new InvalidOperationException($"Library [{catalog.libraryName}] 的烘焙结果包含错误。");
                 if (catalog.warnings != null) bakeWarnings.AddRange(catalog.warnings);
                 var graph = ESAssetPipelineIO.ReadJson<ESAssetReferenceGraph>(Path.Combine(folder, ESAssetPipelineIO.ReferenceGraphFileName));

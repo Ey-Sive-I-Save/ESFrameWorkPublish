@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -9,7 +10,7 @@ namespace ES
     /// <summary>
     /// 资源四步构建后的第五步。此窗口从已生成上传计划读取输入，绝不重新构建、重写 Root 或保存凭据。
     /// </summary>
-    public sealed class ESAssetReleaseUploadWindow : EditorWindow
+    public sealed class ESAssetReleaseUploadWindow : ESSinglePageIMGUIWindow<ESAssetReleaseUploadWindow>
     {
         private ESAssetReleaseUploadSettings settings;
         private ESAssetReleaseUploadPlan selectedPlan;
@@ -30,13 +31,86 @@ namespace ES
             window.Show();
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent()
+        {
+            return new GUIContent("ES 远端发布", "上传第四步生成并验证的 Release 产物");
+        }
+
+        protected override string ESWindow_Subtitle => "第五步：远端发布工作台";
+        protected override Vector2 ESWindow_MinSize => new Vector2(640f, 440f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(900f, 720f);
+        protected override string ESWindow_PageStableId => "resource.release-upload";
+        protected override string ESWindow_PageTitle => "远端发布";
+        protected override string ESWindow_PageKeywords => "资源 Release 上传 OSS S3 HTTP 预检 发布";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "release.reload-plan",
+                    "读取计划",
+                    "重新读取第四步生成的最新上传计划。",
+                    context =>
+                    {
+                        TryLoadLatestPlan();
+                        context.RefreshPageActions();
+                        context.SetStatus(status, selectedPlan != null
+                            ? ESMenuTreePageStatus.Info
+                            : ESMenuTreePageStatus.Warning);
+                        Repaint();
+                    })
+                .WithUnityIcon("Refresh")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "release.preflight",
+                    "发布预检",
+                    "校验上传计划、目标配置和发布顺序。",
+                    context =>
+                    {
+                        RunPreflight();
+                        context.RefreshPageActions();
+                        context.SetStatus(status, preflightPassed
+                            ? ESMenuTreePageStatus.Info
+                            : ESMenuTreePageStatus.Error);
+                    })
+                .When(HasUploadInput)
+                .WithUnityIcon("TestPassed")
+                .WithPriority(90));
+            actions.Add(new ESMenuTreePageAction(
+                    "release.publish",
+                    "发布",
+                    "确认后执行远端发布；Root Manifest 最后上传。",
+                    context =>
+                    {
+                        BeginPublish();
+                        context.RefreshPageActions();
+                        context.SetStatus(status);
+                    })
+                .When(() => HasUploadInput() && preflightPassed && !IsUploadTaskActive())
+                .WithUnityIcon("CloudConnect")
+                .WithPriority(80));
+            actions.Add(new ESMenuTreePageAction(
+                    "release.cancel",
+                    "取消上传",
+                    "请求取消当前上传任务。",
+                    context =>
+                    {
+                        CancelUpload();
+                        context.RefreshPageActions();
+                        context.SetStatus(status, ESMenuTreePageStatus.Warning);
+                    })
+                .WhenVisible(IsUploadTaskActive)
+                .WithUnityIcon("PauseButton")
+                .WithPriority(110));
+        }
+
+        protected override void ESWindow_OnHostEnable()
         {
             settings = ESAssetReleaseUploadSettings.Load();
             TryLoadLatestPlan();
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             RefreshPlanStateIfChanged();
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
@@ -117,7 +191,6 @@ namespace ES
                 }
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("读取最新上传计划")) TryLoadLatestPlan();
                     if (!string.IsNullOrEmpty(selectedPlanPath) && GUILayout.Button("定位计划"))
                     {
                         UnityEngine.Object asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(ToProjectRelativePath(selectedPlanPath));
@@ -136,17 +209,10 @@ namespace ES
                 EditorGUILayout.LabelField(status, EditorStyles.wordWrappedMiniLabel);
                 bool hasInput = settings != null && selectedPlan != null;
                 bool taskActive = activeUploadTask != null && !activeUploadTask.IsFinished;
-                using (new EditorGUI.DisabledScope(!hasInput))
-                {
+                using (new EditorGUI.DisabledScope(!hasInput || taskActive))
                     if (GUILayout.Button("初步验证远端隔离区", GUILayout.Height(30f))) BeginValidation();
-                    if (GUILayout.Button("预检远端发布", GUILayout.Height(30f))) RunPreflight();
-                }
-                using (new EditorGUI.DisabledScope(!hasInput || !preflightPassed || taskActive))
-                    if (GUILayout.Button("确认发布到远端", GUILayout.Height(38f))) BeginPublish();
-                if (taskActive && GUILayout.Button("取消上传", GUILayout.Height(28f)))
-                    CancelUpload();
-                if (!taskActive && lastUploadFailed && hasInput)
-                    if (GUILayout.Button("重试上传", GUILayout.Height(28f))) BeginPublish();
+                if (lastUploadFailed && !taskActive)
+                    EditorGUILayout.HelpBox("上次上传失败；确认计划未变化后，可使用右上“发布”动作重试。", MessageType.Warning);
                 EditorGUILayout.HelpBox("初步验证只写入验证隔离前缀（默认 .es-validation），执行一次探针上传、HEAD 校验和清理，不接触正式版本目录与 Root。正式发布前仍必须运行预检。", MessageType.None);
             }
         }
@@ -159,6 +225,7 @@ namespace ES
             ESResWindow.SetRemotePlanPreflightStatus(
                 result.IsSuccess ? "Ready" : "不可用",
                 result.Message);
+            ESWindow_CurrentPageContext?.RefreshPageActions();
             Repaint();
         }
 
@@ -172,6 +239,7 @@ namespace ES
                 ESAssetReleaseUploadCoordinator.EnqueueValidation(settings.target, result =>
                 {
                     status = result.Message;
+                    ESWindow_CurrentPageContext?.RefreshPageActions();
                     ShowNotification(new GUIContent(result.IsSuccess ? "远端隔离区验证通过" : "远端隔离区验证失败"));
                     Repaint();
                 });
@@ -214,6 +282,7 @@ namespace ES
                 ESResWindow.SetRemotePlanPreflightStatus(
                     result.IsSuccess ? "Ready" : "不可用",
                     result.Message);
+                ESWindow_CurrentPageContext?.RefreshPageActions();
                 ShowNotification(new GUIContent(result.IsSuccess ? "远端发布完成" : "远端发布失败"));
                 Repaint();
             });
@@ -226,7 +295,18 @@ namespace ES
                 return;
             activeUploadTask.Cancel();
             status = "已请求取消上传；请等待任务停止。";
+            ESWindow_CurrentPageContext?.RefreshPageActions();
             Repaint();
+        }
+
+        private bool HasUploadInput()
+        {
+            return settings != null && selectedPlan != null;
+        }
+
+        private bool IsUploadTaskActive()
+        {
+            return activeUploadTask != null && !activeUploadTask.IsFinished;
         }
 
         private ESAssetReleaseUploadRequest CreateRequest()

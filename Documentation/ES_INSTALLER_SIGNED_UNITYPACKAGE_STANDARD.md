@@ -49,7 +49,7 @@
 - 主包版本和依赖：`Assets/Plugins/ES/Editor/Installer/Downloads/Main/package.json`，或安装器内“编辑主包依赖清单”。保存后 JSON 必须继续保持扁平 Main schema。
 - 正式发布白名单：`ESGlobalEditorDefaultConfi.PackagePublishAssetPaths`，可从 UnityPackage 工具的“定位发布配置”进入。
 - 普通导出排除项：各 `UnityPackageConfig.ExcludeFolders`；它不替代正式发布的固定排除规则。
-- 安装状态刷新：`【ES】/安装与集成/安装管理器` 内显式点击“刷新状态”。首开和默认启动路径不得扫描项目或访问外部依赖源。
+- 安装状态刷新：`【ES】/自动化与开发/依赖与集成/打开安装管理器` 内显式点击“刷新状态”。首开和默认启动路径不得扫描项目或访问外部依赖源。
 
 ### 禁止绕路
 

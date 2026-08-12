@@ -3,46 +3,34 @@ using UnityEngine;
 
 namespace ES
 {
-    [ESOnlyEditorSO("ESCmdAgent 只保存编辑器内 Codex 命令行 Agent 配置和会话状态，不应进入运行时构建或 AB 资源包。")]
+    [ESOnlyEditorSO("ESCmdAgent 只保存编辑器内受管 Codex 工作台配置，不应进入运行时构建或 AB 资源包。")]
     [CreateAssetMenu(fileName = "ESCmdAgent", menuName = MenuItemPathDefine.ASSET_GLOBAL_SO_PATH + "ES Cmd Agent")]
     public class ESCmdAgent : ESEditorGlobalSo<ESCmdAgent>
     {
         [Title("ES Cmd Agent")]
-        [LabelText("启用 Agent")]
+        [LabelText("允许新建、恢复与投递")]
+        [InfoBox("关闭后，工作台仍可查看、同步和关闭已有受管会话；不会新建、恢复或投递 AI 任务。")]
         public bool enableAgent = true;
 
-        [LabelText("Codex 命令")]
+        // Kept only to preserve existing assets. The workspace always uses the project bootstrap registry.
+        [HideInInspector]
         public string codexCommand = "codex.cmd";
 
         [LabelText("工作目录")]
         [FolderPath(AbsolutePath = true)]
         public string workspacePath = "";
 
-        [LabelText("恢复指定会话 ID")]
-        public string resumeSessionId = "";
+        [LabelText("打开时恢复工作台")]
+        public bool restoreWorkspaceOnOpen = true;
 
-        [LabelText("最近恢复会话 ID"), ReadOnly]
-        public string lastResumeSessionId = "";
+        // Preserved only so existing configuration assets deserialize without data loss.
+        // Session history is never silently deleted; this is intentionally not a user setting.
+        [HideInInspector]
+        public int maxLocalSessions = 12;
 
-        [LabelText("最近启动时间"), ReadOnly]
-        public string lastStartTime = "";
-
-        [LabelText("打开入口后自动 resume")]
-        public bool autoResumeOnOpen = true;
-
-        [LabelText("优先后台 CMD 中转")]
-        public bool preferExternalTerminal = true;
-
-        [LabelText("自动记录恢复 Key")]
-        public bool autoCaptureResumeKey = true;
-
-        [LabelText("本地页签上限")]
-        [Range(1, 12)]
-        public int maxLocalTabsToKeep = 4;
-
-        [LabelText("单页签输出上限")]
-        [Range(2000, 200000)]
-        public int maxOutputCharsPerTab = 12000;
+        [LabelText("每个会话消息上限")]
+        [Range(20, 300)]
+        public int maxMessagesPerSession = 120;
 
         public string GetWorkspacePath()
         {

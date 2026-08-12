@@ -244,6 +244,7 @@ namespace ES
         private void OnValidate()
         {
             MarkFastIndexDirty();
+            ESAssetReferEditorBridge.NotifyAssetLibraryChanged?.Invoke(this);
             EditorApplication.delayCall -= InjectToAssetRegistryEditor;
             EditorApplication.delayCall += InjectToAssetRegistryEditor;
         }
@@ -261,28 +262,7 @@ namespace ES
         public override void EditorOnly_DragAssetsToBooks(UnityEngine.Object[] assets)
         {
 #if UNITY_EDITOR
-            if (assets == null || assets.Length == 0)
-                return;
-
-            foreach (var asset in assets)
-            {
-                if (asset == null)
-                    continue;
-
-                var kind = ESAssetPage.DetermineKind(asset);
-                var targetBook = GetDefaultBookByKind(kind);
-                if (targetBook == null)
-                {
-                    Debug.LogWarning($"[ESAssetLibrary] Unsupported asset kind [{kind}] for [{asset.name}].");
-                    continue;
-                }
-
-                targetBook.EditorOnly_DragAtArea(new[] { asset });
-            }
-
-            MarkFastIndexDirty();
-            InjectToAssetRegistryEditor();
-            EditorUtility.SetDirty(this);
+            throw new InvalidOperationException("ESAssetLibrary 禁止直接写入；请使用 ESContentRegistrationAuthoring。");
 #endif
         }
 

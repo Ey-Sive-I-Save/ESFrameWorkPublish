@@ -14,7 +14,7 @@ namespace ES
     /// 资产收集、ConfigKey 查询和 ResourcePlan 构建前检查的统一入口。
     /// 目标是让“资产在哪里、对应哪个 Key、是否已烘焙”在一个窗口内完成确认。
     /// </summary>
-    public sealed class ESResourceCollectionWorkflowWindow : EditorWindow
+    public sealed class ESResourceCollectionWorkflowWindow : ESSinglePageIMGUIWindow<ESResourceCollectionWorkflowWindow>
     {
         private struct PlanField
         {
@@ -120,7 +120,7 @@ namespace ES
         /// </summary>
         private static class PipelineStageValidator
         {
-            private const int CatalogFormatVersion = 3;
+            private const int CatalogFormatVersion = ESAssetPipelineIO.CatalogFormatVersion;
             private const int BuildPlanFormatVersion = 2;
             private const int MaxReportedIssues = 8;
             private static readonly Dictionary<string, IntegrityCacheEntry> IntegrityCache = new Dictionary<string, IntegrityCacheEntry>(StringComparer.OrdinalIgnoreCase);
@@ -841,6 +841,7 @@ namespace ES
         [SerializeField] private UnityEngine.Object selectedAsset;
         [SerializeField] private ESResourcePlanInfo targetPlan;
         [SerializeField] private Vector2 scrollPosition;
+        [SerializeField] private ESContentRegistrationPanel contentRegistration = new ESContentRegistrationPanel();
         private readonly List<Issue> issues = new List<Issue>();
         private string scanSummary = "尚未扫描 ResourcePlan。";
         private string catalogSummary = "尚未检查 Catalog。";
@@ -856,20 +857,125 @@ namespace ES
         [MenuItem("【ES】/资源与发布/资源收集/资源收集工作流", false, 2201)]
         public static void Open()
         {
-            ESResourceCollectionWorkflowWindow window = GetWindow<ESResourceCollectionWorkflowWindow>();
-            window.titleContent = new GUIContent("ES收集与Key");
-            window.minSize = new Vector2(640f, 520f);
-            window.Show();
+            OpenWindow();
         }
 
-        private void OnEnable()
+        public static void OpenForAssetRegistration(UnityEngine.Object asset, ESAssetLibrary library = null)
+        {
+            ESResourceCollectionWorkflowWindow window = GetOrCreateWindow();
+            window.selectedAsset = asset;
+            window.contentRegistration ??= new ESContentRegistrationPanel();
+            window.contentRegistration.ConfigureOrdinaryAsset(
+                asset,
+                library != null ? library : ESGlobalResToolsSupportConfig.ActiveCollectLibrary);
+            window.scrollPosition = Vector2.zero;
+            window.Show();
+            window.Focus();
+        }
+
+        public static void OpenForAssetKeyUpdate(ESAssetPage page, int desiredEnumKey, string desiredStringKey)
+        {
+            if (page == null)
+                return;
+            ESResourceCollectionWorkflowWindow window = GetOrCreateWindow();
+            window.selectedAsset = page.OB;
+            window.contentRegistration ??= new ESContentRegistrationPanel();
+            window.contentRegistration.ConfigureAssetKeyUpdate(page, desiredEnumKey, desiredStringKey);
+            window.scrollPosition = Vector2.zero;
+            window.Show();
+            window.Focus();
+        }
+
+        public static void OpenForGameCoreRootRegistration(ScriptableObject source, ESAssetLibraryConsumer consumer)
+        {
+            ESResourceCollectionWorkflowWindow window = GetOrCreateWindow();
+            window.selectedAsset = source;
+            window.contentRegistration ??= new ESContentRegistrationPanel();
+            window.contentRegistration.ConfigureGameCoreRoot(source, consumer);
+            window.scrollPosition = Vector2.zero;
+            window.Show();
+            window.Focus();
+        }
+
+        public static void OpenForGameCoreRegistration(
+            ScriptableObject source,
+            ScriptableObject group,
+            ESAssetLibraryConsumer consumer,
+            string groupKey)
+        {
+            ESResourceCollectionWorkflowWindow window = GetOrCreateWindow();
+            window.selectedAsset = source;
+            window.contentRegistration ??= new ESContentRegistrationPanel();
+            window.contentRegistration.ConfigureGameCore(source, group, consumer, groupKey);
+            window.scrollPosition = Vector2.zero;
+            window.Show();
+            window.Focus();
+        }
+
+        public static void OpenForConsumerSynchronization(ESAssetLibraryConsumer consumer)
+        {
+            if (consumer == null)
+                return;
+            ESResourceCollectionWorkflowWindow window = GetOrCreateWindow();
+            window.selectedAsset = consumer;
+            window.contentRegistration ??= new ESContentRegistrationPanel();
+            window.contentRegistration.ConfigureConsumer(consumer);
+            window.scrollPosition = Vector2.zero;
+            window.Show();
+            window.Focus();
+        }
+
+        private static ESResourceCollectionWorkflowWindow GetOrCreateWindow()
+        {
+            return OpenWindow();
+        }
+
+        public override GUIContent ESWindow_GetWindowGUIContent()
+        {
+            return new GUIContent("ES 收集与 Key", "统一完成资源注册、稳定 Key、ResourcePlan 与构建前检查");
+        }
+
+        protected override string ESWindow_Subtitle => "资源注册、稳定 Key 与管线检查";
+        protected override Vector2 ESWindow_MinSize => new Vector2(640f, 520f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(980f, 760f);
+        protected override string ESWindow_PageStableId => "resource.collection-workflow";
+        protected override string ESWindow_PageTitle => "资源收集工作流";
+        protected override string ESWindow_PageKeywords => "ResourcePlan ConfigKey Catalog 注册 收集 Bake 资源";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "resource-workflow.refresh",
+                    "刷新状态",
+                    "刷新选择与资源管线阶段状态。",
+                    context =>
+                    {
+                        SyncFromSelection();
+                        InvalidateStageStatus();
+                        Repaint();
+                        context.SetStatus("资源工作流状态已刷新");
+                    })
+                .WithUnityIcon("Refresh")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "resource-workflow.open-res-window",
+                    "资源窗口",
+                    "打开资产管理窗口。",
+                    _ => ESResWindow.TryOpenWindow())
+                .WithUnityIcon("Project")
+                .WithPriority(40));
+        }
+
+        protected override void ESWindow_OnHostEnable()
         {
             SyncFromSelection();
             InvalidateStageStatus();
+            Selection.selectionChanged -= OnSelectionChanged;
             Selection.selectionChanged += OnSelectionChanged;
         }
 
-        private void OnDisable()
+        protected override void ESWindow_OnHostDisable()
         {
             Selection.selectionChanged -= OnSelectionChanged;
         }
@@ -891,16 +997,25 @@ namespace ES
                 selectedAsset = Selection.activeObject;
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             DrawToolbar();
             DrawProductSummary();
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
-            DrawWorkflowGuide();
-            DrawSelectedAssetSection();
-            DrawPipelineSection();
-            DrawIssueSection();
-            EditorGUILayout.EndScrollView();
+            try
+            {
+                DrawWorkflowGuide();
+                contentRegistration ??= new ESContentRegistrationPanel();
+                if (contentRegistration.Draw(selectedAsset, ResolveCollectionTarget()))
+                    InvalidateStageStatus();
+                DrawSelectedAssetSection();
+                DrawPipelineSection();
+                DrawIssueSection();
+            }
+            finally
+            {
+                EditorGUILayout.EndScrollView();
+            }
         }
 
         private void DrawProductSummary()
@@ -1144,7 +1259,7 @@ namespace ES
             }
             int selectedCount = Selection.objects.Count(IsCollectableAsset);
             using (new EditorGUI.DisabledScope(target == null || selectedCount == 0))
-                if (GUILayout.Button("收集当前选择(" + selectedCount + ")", EditorStyles.miniButton, GUILayout.Width(108f)))
+                if (GUILayout.Button("准备注册(" + selectedCount + ")", EditorStyles.miniButton, GUILayout.MinWidth(96f)))
                     CollectAssets(Selection.objects);
             if (GUILayout.Button("资源窗口设置", EditorStyles.miniButton, GUILayout.Width(90f)))
                 ESResWindow.TryOpenWindow();
@@ -1153,7 +1268,7 @@ namespace ES
         private void DrawAssetDropArea()
         {
             Rect rect = GUILayoutUtility.GetRect(0f, 42f, GUILayout.ExpandWidth(true));
-            GUI.Box(rect, "拖入一个或多个资产：自动加入当前收集 Library", EditorStyles.helpBox);
+            GUI.Box(rect, "拖入资产：进入统一注册预检", EditorStyles.helpBox);
             Event current = Event.current;
             if (!rect.Contains(current.mousePosition)
                 || (current.type != EventType.DragUpdated && current.type != EventType.DragPerform))
@@ -1207,25 +1322,26 @@ namespace ES
                 workflowStatus = "所选资产均已存在于 Library 注册表，本次未重复收集。";
                 return true;
             }
-            if (assets.Length > 1 && !EditorUtility.DisplayDialog(
-                    "批量收集资产",
-                    "将 " + assets.Length + " 个资产加入 Library【" + library.Name + "】的默认 Book？",
-                    "收集",
-                    "取消"))
+            if (assets.Length > 1)
+            {
+                selectedAsset = assets[0];
+                contentRegistration ??= new ESContentRegistrationPanel();
+                contentRegistration.ConfigureOrdinaryAsset(selectedAsset, library);
+                scrollPosition = Vector2.zero;
+                workflowStatus = "注册未提交：批量资产不能静默生成稳定 Key。已载入第一项，请逐项预检并确认 StringKey。";
+                Repaint();
                 return false;
+            }
 
-            Undo.RecordObject(library, "Collect Assets To Active Library");
-            library.EditorOnly_DragAssetsToBooks(assets);
-            EditorUtility.SetDirty(library);
-            AssetDatabase.SaveAssets();
-            ESAssetCatalogKeyPicker.Invalidate();
-            InvalidateStageStatus();
             selectedAsset = assets[0];
-            workflowStatus = "已收集 " + assets.Length + " 个资产到 Library【" + library.Name + "】"
+            contentRegistration ??= new ESContentRegistrationPanel();
+            contentRegistration.ConfigureOrdinaryAsset(selectedAsset, library);
+            scrollPosition = Vector2.zero;
+            workflowStatus = "注册尚未写入：已在统一注册区载入资产与 Library"
                 + (alreadyRegistered > 0 ? "，已登记资产跳过 " + alreadyRegistered + " 个" : string.Empty)
-                + "；现在可直接配置 Key，构建前再统一烘焙。";
+                + "。请填写稳定 Key，先预检，再显式提交。";
             Repaint();
-            return true;
+            return false;
         }
 
         private static bool IsRegisteredAsset(UnityEngine.Object asset)
@@ -1603,9 +1719,22 @@ namespace ES
                     scanSummary = "ResourcePlan ConfigKey validation failed. Resolve or synchronize stale bound Keys before baking.";
                     return;
                 }
-                ESAssetReferenceBaker.Bake();
+                contentRegistration ??= new ESContentRegistrationPanel();
+                ESContentRegistrationResult result = contentRegistration.StartBakeWithConfirmation();
+                if (result == null)
+                {
+                    scanSummary = "Bake 已取消，未写入生成目录。";
+                    return;
+                }
+                if (!result.success)
+                {
+                    scanSummary = "Bake 启动失败：" + result.message;
+                    return;
+                }
                 InvalidateStageStatus();
-                scanSummary = "已启动烘焙长任务；完成后重新扫描 Plan。";
+                scanSummary = result.status == "pending"
+                    ? "Bake 已通过统一注册合同入队，RunId=" + result.runId + "；请在上方刷新状态。"
+                    : result.message;
             }
             catch (Exception exception)
             {
@@ -1796,5 +1925,542 @@ namespace ES
                     EditorGUILayout.LabelField("没有扫描结果。先点击“扫描 ResourcePlan”或“检查 Catalog”。", EditorStyles.miniLabel);
             }
         }
+    }
+
+    [Serializable]
+    internal sealed class ESContentRegistrationPanel
+    {
+        private enum RegistrationMode : byte
+        {
+            OrdinaryAsset = 0,
+            AssetKeyUpdate = 1,
+            GameCore = 2,
+            GameCoreRoot = 3,
+            Consumer = 4,
+            Bake = 5
+        }
+
+        private static readonly string[] ModeLabels = { "普通资产", "资产改 Key", "GameCore", "核心根", "Consumer", "Bake" };
+
+        [SerializeField] private bool expanded = true;
+        [SerializeField] private RegistrationMode mode;
+        [SerializeField] private string assetPath = string.Empty;
+        [SerializeField] private long assetLocalFileId;
+        [SerializeField] private string libraryPath = string.Empty;
+        [SerializeField] private string dataInfoPath = string.Empty;
+        [SerializeField] private string gameCorePath = string.Empty;
+        [SerializeField] private string groupPath = string.Empty;
+        [SerializeField] private string consumerPath = string.Empty;
+        [SerializeField] private string groupKey = string.Empty;
+        [SerializeField] private string gameCoreRoute = "auto";
+        [SerializeField] private ESContentStableKeyMode keyMode = ESContentStableKeyMode.StringOnly;
+        [SerializeField] private int enumKey;
+        [SerializeField] private string stringKey = string.Empty;
+        [SerializeField] private bool showDetails;
+        [SerializeField] private bool previewSucceeded;
+        [SerializeField] private string previewFingerprint = string.Empty;
+        [SerializeField] private string requestId = string.Empty;
+        [SerializeField] private string runId = string.Empty;
+        [SerializeField] private string expectedGuid = string.Empty;
+        [SerializeField] private string expectedLibraryRevision = string.Empty;
+        [SerializeField] private string expectedSourceGuid = string.Empty;
+        [SerializeField] private string expectedGroupGuid = string.Empty;
+        [SerializeField] private string expectedConsumerGuid = string.Empty;
+        [SerializeField] private string expectedSourceRevision = string.Empty;
+        [SerializeField] private string expectedGroupRevision = string.Empty;
+        [SerializeField] private string expectedConsumerRevision = string.Empty;
+        [SerializeField] private int expectedCurrentEnumKey;
+        [SerializeField] private string expectedCurrentStringKey = string.Empty;
+        [SerializeField] private ESContentRegistrationResult lastResult;
+
+        public bool Draw(UnityEngine.Object suggestedAsset, ESAssetLibrary suggestedLibrary)
+        {
+            EditorGUILayout.Space(8f);
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                expanded = EditorGUILayout.Foldout(expanded, "统一内容注册", true);
+                if (!expanded)
+                    return false;
+
+                EditorGUILayout.LabelField(
+                    "人工、MCP 与 C# API 共用同一请求合同。写入前必须先预检，提交时绑定 GUID、revision 与 requestId。",
+                    EditorStyles.wordWrappedMiniLabel);
+
+                int nextMode = GUILayout.Toolbar((int)mode, ModeLabels);
+                if (nextMode != (int)mode)
+                {
+                    mode = (RegistrationMode)nextMode;
+                    ClearPreview();
+                }
+
+                EditorGUI.BeginChangeCheck();
+                DrawInputs(suggestedAsset, suggestedLibrary);
+                if (EditorGUI.EndChangeCheck())
+                    ClearPreview();
+
+                bool changed = DrawActions();
+                DrawResult();
+                return changed;
+            }
+        }
+
+        public void ConfigureOrdinaryAsset(UnityEngine.Object asset, ESAssetLibrary library)
+        {
+            mode = RegistrationMode.OrdinaryAsset;
+            expanded = true;
+            SetAssetIdentity(asset);
+            libraryPath = AssetDatabase.GetAssetPath(library) ?? string.Empty;
+            ClearPreview();
+        }
+
+        public void ConfigureAssetKeyUpdate(ESAssetPage page, int desiredEnumKey, string desiredStringKey)
+        {
+            mode = RegistrationMode.AssetKeyUpdate;
+            expanded = true;
+            SetAssetIdentity(page?.OB);
+            libraryPath = page == null || string.IsNullOrEmpty(page.SourceLibrary)
+                ? string.Empty
+                : AssetDatabase.GUIDToAssetPath(page.SourceLibrary);
+            keyMode = ESContentStableKeyMode.Auto;
+            enumKey = desiredEnumKey;
+            stringKey = desiredStringKey ?? string.Empty;
+            ClearPreview();
+        }
+
+        public void ConfigureGameCoreRoot(ScriptableObject source, ESAssetLibraryConsumer consumer)
+        {
+            mode = RegistrationMode.GameCoreRoot;
+            expanded = true;
+            gameCorePath = AssetDatabase.GetAssetPath(source) ?? string.Empty;
+            SetAssetIdentity(source);
+            consumerPath = AssetDatabase.GetAssetPath(consumer) ?? string.Empty;
+            ClearPreview();
+        }
+
+        public void ConfigureGameCore(
+            ScriptableObject source,
+            ScriptableObject group,
+            ESAssetLibraryConsumer consumer,
+            string desiredGroupKey)
+        {
+            mode = RegistrationMode.GameCore;
+            expanded = true;
+            dataInfoPath = AssetDatabase.GetAssetPath(source) ?? string.Empty;
+            groupPath = AssetDatabase.GetAssetPath(group) ?? string.Empty;
+            consumerPath = AssetDatabase.GetAssetPath(consumer) ?? string.Empty;
+            groupKey = desiredGroupKey ?? string.Empty;
+            gameCoreRoute = "auto";
+            keyMode = ESContentStableKeyMode.Auto;
+            enumKey = 0;
+            stringKey = string.Empty;
+            ClearPreview();
+        }
+
+        public void ConfigureConsumer(ESAssetLibraryConsumer consumer)
+        {
+            mode = RegistrationMode.Consumer;
+            expanded = true;
+            consumerPath = AssetDatabase.GetAssetPath(consumer) ?? string.Empty;
+            ClearPreview();
+        }
+
+        public ESContentRegistrationResult StartBakeWithConfirmation()
+        {
+            mode = RegistrationMode.Bake;
+            expanded = true;
+            RunPreview();
+            if (lastResult == null || !lastResult.success)
+                return lastResult;
+            if (!EditorUtility.DisplayDialog(
+                    "启动资源引用 Bake",
+                    "预检已通过。Bake 将写入 ES/ResourcePipeline/Baked，并在任务完成前冻结注册源。是否继续？",
+                    "启动 Bake",
+                    "取消"))
+            {
+                return null;
+            }
+
+            RunCommit();
+            return lastResult;
+        }
+
+        private void DrawInputs(UnityEngine.Object suggestedAsset, ESAssetLibrary suggestedLibrary)
+        {
+            switch (mode)
+            {
+                case RegistrationMode.OrdinaryAsset:
+                    if (string.IsNullOrEmpty(assetPath) && suggestedAsset != null)
+                        SetAssetIdentity(suggestedAsset);
+                    if (string.IsNullOrEmpty(libraryPath) && suggestedLibrary != null)
+                        libraryPath = AssetDatabase.GetAssetPath(suggestedLibrary) ?? string.Empty;
+                    DrawOrdinaryAssetInputs(true);
+                    break;
+                case RegistrationMode.AssetKeyUpdate:
+                    DrawOrdinaryAssetInputs(false);
+                    break;
+                case RegistrationMode.GameCore:
+                    DrawGameCoreInputs();
+                    break;
+                case RegistrationMode.GameCoreRoot:
+                    gameCorePath = DrawMainAssetField("GameCore Root", gameCorePath, typeof(ScriptableObject));
+                    consumerPath = DrawMainAssetField("Consumer", consumerPath, typeof(ESAssetLibraryConsumer));
+                    DrawPath("GameCore 路径", gameCorePath);
+                    DrawPath("Consumer 路径", consumerPath);
+                    break;
+                case RegistrationMode.Consumer:
+                    consumerPath = DrawMainAssetField("Consumer", consumerPath, typeof(ESAssetLibraryConsumer));
+                    break;
+                case RegistrationMode.Bake:
+                    EditorGUILayout.HelpBox(
+                        "只执行第一阶段 Catalog/ReferenceGraph Bake。规划、构建、发布仍保持独立阶段。",
+                        MessageType.Info);
+                    break;
+            }
+        }
+
+        private void DrawOrdinaryAssetInputs(bool identityEditable)
+        {
+            UnityEngine.Object current = LoadAssetAtPath(assetPath, assetLocalFileId);
+            UnityEngine.Object next;
+            using (new EditorGUI.DisabledScope(!identityEditable))
+                next = EditorGUILayout.ObjectField("业务资产", current, typeof(UnityEngine.Object), false);
+            if (next != current)
+                SetAssetIdentity(next);
+            using (new EditorGUI.DisabledScope(!identityEditable))
+                libraryPath = DrawMainAssetField("目标 Library", libraryPath, typeof(ESAssetLibrary));
+            DrawStableKeyInputs();
+            DrawPath("资产路径", assetPath);
+            DrawPath("Library 路径", libraryPath);
+        }
+
+        private void DrawGameCoreInputs()
+        {
+            dataInfoPath = DrawMainAssetField("DataInfo", dataInfoPath, typeof(ScriptableObject));
+            groupPath = DrawMainAssetField("DataGroup", groupPath, typeof(ScriptableObject));
+            consumerPath = DrawMainAssetField("Consumer", consumerPath, typeof(ESAssetLibraryConsumer));
+            groupKey = EditorGUILayout.TextField("Group 组织 Key", groupKey ?? string.Empty);
+            gameCoreRoute = EditorGUILayout.TextField("GameCore Route", gameCoreRoute ?? "auto");
+            DrawStableKeyInputs();
+            DrawPath("DataInfo 路径", dataInfoPath);
+            DrawPath("DataGroup 路径", groupPath);
+            DrawPath("Consumer 路径", consumerPath);
+        }
+
+        private void DrawStableKeyInputs()
+        {
+            keyMode = (ESContentStableKeyMode)EditorGUILayout.EnumPopup("稳定 Key 模式", keyMode);
+            if (keyMode == ESContentStableKeyMode.EnumOnly || keyMode == ESContentStableKeyMode.DualAlias)
+                enumKey = EditorGUILayout.IntField("EnumKey", enumKey);
+            if (keyMode != ESContentStableKeyMode.EnumOnly)
+                stringKey = EditorGUILayout.TextField("StringKey", stringKey ?? string.Empty);
+            EditorGUILayout.LabelField("StringKey 按原值保存，不自动 Trim、归一化或生成。", EditorStyles.miniLabel);
+        }
+
+        private bool DrawActions()
+        {
+            bool changed = false;
+            ESContentRegistrationRequest currentPreview = BuildRequest(false);
+            bool inputMatchesPreview = previewSucceeded
+                                       && string.Equals(previewFingerprint, JsonUtility.ToJson(currentPreview), StringComparison.Ordinal);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("预检", GUILayout.Height(26f)))
+                    RunPreview();
+
+                using (new EditorGUI.DisabledScope(!inputMatchesPreview))
+                {
+                    string label = mode == RegistrationMode.Bake ? "启动 Bake" : "确认提交";
+                    if (GUILayout.Button(label, GUILayout.Height(26f)))
+                    {
+                        string title = mode == RegistrationMode.Bake ? "启动资源引用 Bake" : "确认内容注册写入";
+                        string body = mode == RegistrationMode.Bake
+                            ? "将写入 ES/ResourcePipeline/Baked，并冻结注册源直到任务结束。"
+                            : "将按预检返回的 GUID 与 revision 写入作者资产。冲突时会拒绝提交。";
+                        if (EditorUtility.DisplayDialog(title, body, label, "取消"))
+                        {
+                            RunCommit();
+                            changed = lastResult != null && lastResult.success && lastResult.changed;
+                        }
+                    }
+                }
+
+                using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(runId)))
+                    if (GUILayout.Button("刷新状态", GUILayout.Height(26f)))
+                        RefreshStatus();
+            }
+            return changed;
+        }
+
+        private void RunPreview()
+        {
+            ESContentRegistrationRequest request = BuildRequest(false);
+            lastResult = ESContentRegistrationAuthoring.Execute(request);
+            previewSucceeded = lastResult != null && lastResult.success;
+            previewFingerprint = previewSucceeded ? JsonUtility.ToJson(request) : string.Empty;
+            requestId = previewSucceeded ? lastResult.requestId : string.Empty;
+            CaptureExpectedState(lastResult);
+        }
+
+        private void RunCommit()
+        {
+            ESContentRegistrationRequest preview = BuildRequest(false);
+            if (!previewSucceeded
+                || !string.Equals(previewFingerprint, JsonUtility.ToJson(preview), StringComparison.Ordinal))
+            {
+                lastResult = ESContentRegistrationResult.Failure(preview, "preview_required", "输入已变化，请重新预检后再提交。");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(requestId))
+            {
+                lastResult = ESContentRegistrationResult.Failure(preview, "preview_required", "预检未返回 requestId，请重新预检。");
+                return;
+            }
+            ESContentRegistrationRequest commit = BuildRequest(true);
+            commit.requestId = requestId;
+            lastResult = ESContentRegistrationAuthoring.Execute(commit);
+            if (lastResult != null && !string.IsNullOrEmpty(lastResult.runId))
+                runId = lastResult.runId;
+        }
+
+        private void RefreshStatus()
+        {
+            lastResult = ESContentRegistrationAuthoring.Execute(new ESContentRegistrationRequest
+            {
+                action = ESContentRegistrationAction.Status,
+                requestId = requestId,
+                runId = runId,
+                commit = false
+            });
+        }
+
+        private ESContentRegistrationRequest BuildRequest(bool commit)
+        {
+            var request = new ESContentRegistrationRequest
+            {
+                commit = commit,
+                requestId = commit ? requestId : string.Empty,
+                keyMode = keyMode,
+                enumKey = enumKey,
+                stringKey = stringKey ?? string.Empty,
+                expectedGuid = commit ? expectedGuid : string.Empty,
+                expectedLocalFileId = assetLocalFileId,
+                expectedLibraryRevision = commit ? expectedLibraryRevision : string.Empty,
+                expectedSourceGuid = commit ? expectedSourceGuid : string.Empty,
+                expectedGroupGuid = commit ? expectedGroupGuid : string.Empty,
+                expectedConsumerGuid = commit ? expectedConsumerGuid : string.Empty,
+                expectedSourceRevision = commit ? expectedSourceRevision : string.Empty,
+                expectedGroupRevision = commit ? expectedGroupRevision : string.Empty,
+                expectedConsumerRevision = commit ? expectedConsumerRevision : string.Empty,
+                expectedCurrentEnumKey = commit ? expectedCurrentEnumKey : 0,
+                expectedCurrentStringKey = commit ? expectedCurrentStringKey : string.Empty,
+                hasExpectedCurrentKey = commit && mode == RegistrationMode.AssetKeyUpdate
+            };
+
+            switch (mode)
+            {
+                case RegistrationMode.OrdinaryAsset:
+                    request.action = ESContentRegistrationAction.RegisterAsset;
+                    request.assetPath = assetPath ?? string.Empty;
+                    request.libraryPath = libraryPath ?? string.Empty;
+                    request.assetKind = "auto";
+                    break;
+                case RegistrationMode.AssetKeyUpdate:
+                    request.action = ESContentRegistrationAction.UpdateAssetKey;
+                    request.assetPath = assetPath ?? string.Empty;
+                    request.libraryPath = libraryPath ?? string.Empty;
+                    request.assetKind = "auto";
+                    break;
+                case RegistrationMode.GameCore:
+                    request.action = ESContentRegistrationAction.RegisterGameCore;
+                    request.dataInfoPath = dataInfoPath ?? string.Empty;
+                    request.groupPath = groupPath ?? string.Empty;
+                    request.consumerPath = consumerPath ?? string.Empty;
+                    request.groupKey = groupKey ?? string.Empty;
+                    request.gameCoreRoute = gameCoreRoute ?? "auto";
+                    break;
+                case RegistrationMode.GameCoreRoot:
+                    request.action = ESContentRegistrationAction.RegisterGameCoreRoot;
+                    request.gameCorePath = gameCorePath ?? string.Empty;
+                    request.consumerPath = consumerPath ?? string.Empty;
+                    break;
+                case RegistrationMode.Consumer:
+                    request.action = ESContentRegistrationAction.Synchronize;
+                    request.consumerPath = consumerPath ?? string.Empty;
+                    break;
+                default:
+                    request.action = ESContentRegistrationAction.Bake;
+                    break;
+            }
+            return request;
+        }
+
+        private void CaptureExpectedState(ESContentRegistrationResult result)
+        {
+            expectedGuid = result?.sourceGuid ?? string.Empty;
+            if (string.IsNullOrEmpty(expectedGuid))
+                expectedGuid = result?.guid ?? string.Empty;
+            expectedLibraryRevision = result?.targetRevision ?? string.Empty;
+            expectedSourceGuid = result?.sourceGuid ?? string.Empty;
+            expectedGroupGuid = result?.groupGuid ?? string.Empty;
+            expectedConsumerGuid = result?.consumerGuid ?? string.Empty;
+            expectedSourceRevision = result?.sourceRevision ?? string.Empty;
+            expectedGroupRevision = result?.groupRevision ?? string.Empty;
+            expectedConsumerRevision = result?.consumerRevision ?? string.Empty;
+            expectedCurrentEnumKey = result?.currentEnumKey ?? 0;
+            expectedCurrentStringKey = result?.currentStringKey ?? string.Empty;
+            if (result != null && (mode == RegistrationMode.OrdinaryAsset
+                                   || mode == RegistrationMode.AssetKeyUpdate
+                                   || mode == RegistrationMode.GameCoreRoot))
+            {
+                assetLocalFileId = result.localFileId;
+            }
+        }
+
+        private void DrawResult()
+        {
+            if (lastResult == null)
+                return;
+
+            MessageType type = lastResult.success
+                ? (lastResult.status == "pending" ? MessageType.Warning : MessageType.Info)
+                : MessageType.Error;
+            string summary = "状态：" + lastResult.status + "\n" + lastResult.message;
+            if (!lastResult.success)
+                summary += "\n影响：本次操作未完成，不得视为已注册或已 Bake。\n恢复：修正原因后重新预检；不要复用不同输入的 requestId。";
+            EditorGUILayout.HelpBox(summary, type);
+
+            if (!string.IsNullOrEmpty(requestId))
+                DrawCopyable("RequestId", requestId);
+            if (!string.IsNullOrEmpty(runId))
+                DrawCopyable("RunId", runId);
+
+            showDetails = EditorGUILayout.Foldout(showDetails, "身份、revision 与原始结果", true);
+            if (!showDetails)
+                return;
+
+            DrawCopyable("GUID", lastResult.guid);
+            DrawCopyable("Library GUID", lastResult.libraryGuid);
+            DrawCopyable("Source GUID", lastResult.sourceGuid);
+            DrawCopyable("Group GUID", lastResult.groupGuid);
+            DrawCopyable("Consumer GUID", lastResult.consumerGuid);
+            DrawCopyable("Target Revision", lastResult.targetRevision);
+            DrawCopyable("Source Revision", lastResult.sourceRevision);
+            DrawCopyable("Group Revision", lastResult.groupRevision);
+            DrawCopyable("Consumer Revision", lastResult.consumerRevision);
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("复制完整结果", EditorStyles.miniButton))
+                    EditorGUIUtility.systemCopyBuffer = JsonUtility.ToJson(lastResult, true);
+                if (mode == RegistrationMode.Bake && GUILayout.Button("打开 Bake 目录", EditorStyles.miniButton))
+                    RevealBakeRoot();
+                if (!string.IsNullOrEmpty(lastResult.assetPath)
+                    && GUILayout.Button("定位目标", EditorStyles.miniButton))
+                    PingAsset(lastResult.assetPath);
+            }
+        }
+
+        private void ClearPreview()
+        {
+            previewSucceeded = false;
+            previewFingerprint = string.Empty;
+            requestId = string.Empty;
+            runId = string.Empty;
+            lastResult = null;
+            expectedGuid = string.Empty;
+            expectedLibraryRevision = string.Empty;
+            expectedSourceGuid = string.Empty;
+            expectedGroupGuid = string.Empty;
+            expectedConsumerGuid = string.Empty;
+            expectedSourceRevision = string.Empty;
+            expectedGroupRevision = string.Empty;
+            expectedConsumerRevision = string.Empty;
+            expectedCurrentEnumKey = 0;
+            expectedCurrentStringKey = string.Empty;
+        }
+
+        private void SetAssetIdentity(UnityEngine.Object asset)
+        {
+            assetPath = AssetDatabase.GetAssetPath(asset) ?? string.Empty;
+            assetLocalFileId = 0;
+            if (asset != null && ESAssetPage.TryGetAssetIdentityEditor(asset, out _, out long localFileId))
+                assetLocalFileId = localFileId;
+        }
+
+        private static string DrawMainAssetField(string label, string path, Type expectedType)
+        {
+            UnityEngine.Object current = string.IsNullOrEmpty(path)
+                ? null
+                : AssetDatabase.LoadMainAssetAtPath(path);
+            UnityEngine.Object next = EditorGUILayout.ObjectField(label, current, expectedType, false);
+            return next != current ? AssetDatabase.GetAssetPath(next) ?? string.Empty : path ?? string.Empty;
+        }
+
+        private static UnityEngine.Object LoadAssetAtPath(string path, long localFileId)
+        {
+            if (string.IsNullOrEmpty(path))
+                return null;
+            if (localFileId == 0)
+                return AssetDatabase.LoadMainAssetAtPath(path);
+            foreach (UnityEngine.Object candidate in AssetDatabase.LoadAllAssetsAtPath(path))
+            {
+                if (candidate != null
+                    && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(candidate, out _, out long candidateLocalFileId)
+                    && candidateLocalFileId == localFileId)
+                {
+                    return candidate;
+                }
+            }
+            return null;
+        }
+
+        private static void DrawPath(string label, string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return;
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.SelectableLabel(label + "：" + value, EditorStyles.miniLabel, GUILayout.Height(16f));
+                if (GUILayout.Button("复制", EditorStyles.miniButton, GUILayout.Width(42f)))
+                    EditorGUIUtility.systemCopyBuffer = value;
+            }
+        }
+
+        private static void DrawCopyable(string label, string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return;
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                EditorGUILayout.SelectableLabel(label + "：" + value, EditorStyles.miniLabel, GUILayout.Height(16f));
+                if (GUILayout.Button("复制", EditorStyles.miniButton, GUILayout.Width(42f)))
+                    EditorGUIUtility.systemCopyBuffer = value;
+            }
+        }
+
+        private static void PingAsset(string path)
+        {
+            if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets/", StringComparison.Ordinal))
+                return;
+            UnityEngine.Object asset = AssetDatabase.LoadMainAssetAtPath(path);
+            if (asset == null)
+                return;
+            Selection.activeObject = asset;
+            EditorGUIUtility.PingObject(asset);
+        }
+
+        private static void RevealBakeRoot()
+        {
+            string root = Path.GetFullPath(ESAssetPipelineIO.BakeRoot);
+            string projectRoot = Path.GetFullPath(ESAssetPipelineIO.ProjectRoot)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            if (!root.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
+                return;
+            if (Directory.Exists(root))
+                EditorUtility.RevealInFinder(root);
+        }
+
     }
 }

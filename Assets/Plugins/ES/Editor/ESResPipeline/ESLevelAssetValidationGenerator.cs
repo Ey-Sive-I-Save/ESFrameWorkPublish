@@ -19,7 +19,7 @@ namespace ES
         private static readonly PrimitiveType[] Shapes = { PrimitiveType.Cube, PrimitiveType.Sphere, PrimitiveType.Cylinder };
         private static readonly string[] LevelNames = { "Level01_Blocks", "Level02_Spheres", "Level03_Cylinders" };
 
-        [MenuItem("【ES】/示例与测试/资源卸载验收/生成关卡资源验收集")]
+        [MenuItem("【ES】/验证与诊断/验证环境/资源卸载验收/生成关卡资源验收集")]
         public static void Generate()
         {
             GenerateInternal(true);
@@ -82,8 +82,12 @@ namespace ES
 
             ESAssetReferScene[] levelScenes = CreateOrUpdateLevelScenes(levelPrefabs);
             ESLevelAssetValidationGameCore gameCore = CreateOrReplaceGameCore(levelPrefabs, levelScenes);
-            ESAssetLibrary library = CreateOrUpdateLibrary(levelPrefabs, gameCore);
-            ESAssetLibraryConsumer consumer = CreateOrUpdateConsumer(library, gameCore);
+            ESAssetLibrary library = CreateOrUpdateLibrary();
+            ESAssetLibraryConsumer consumer = CreateOrUpdateConsumer(library);
+            AssetDatabase.SaveAssetIfDirty(library);
+            AssetDatabase.SaveAssetIfDirty(consumer);
+            RegisterGeneratedAssets(levelPrefabs, library);
+            RegisterGeneratedGameCoreRoot(gameCore, consumer);
             CreateOrUpdateScene();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -225,7 +229,7 @@ namespace ES
             return result;
         }
 
-        private static ESAssetLibrary CreateOrUpdateLibrary(IReadOnlyList<GameObject>[] levelPrefabs, ESLevelAssetValidationGameCore gameCore)
+        private static ESAssetLibrary CreateOrUpdateLibrary()
         {
             const string path = Root + "/Data/ESLevelAssetValidationLibrary.asset";
             ESAssetLibrary library = AssetDatabase.LoadAssetAtPath<ESAssetLibrary>(path);
@@ -238,50 +242,11 @@ namespace ES
                 library.DeliveryMode = ESAssetDeliveryMode.Updateable;
                 AssetDatabase.CreateAsset(library, path);
             }
-            var assets = new List<UnityEngine.Object>();
-            assets.Add(gameCore);
-            for (int level = 0; level < 3; level++)
-            {
-                assets.AddRange(levelPrefabs[level]);
-                assets.Add(AssetDatabase.LoadAssetAtPath<SceneAsset>(Root + "/Scenes/" + LevelNames[level] + ".unity"));
-            }
-            foreach (string guid in AssetDatabase.FindAssets("t:Material", new[] { Root + "/Materials" }))
-            {
-                Material material = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));
-                if (material != null) assets.Add(material);
-            }
-            // 验收资产需要先写入稳定测试 Key，再进行首次 Registry 注入。
-            // 通用 EditorOnly_DragAssetsToBooks 会立即注入，随后改 Key 会被正确但无意义地报告为“资产自覆盖”。
-            foreach (UnityEngine.Object asset in assets)
-            {
-                if (asset == null) continue;
-                ESAssetReferKind kind = ESAssetPage.DetermineKind(asset);
-                ESAssetBook targetBook = library.GetDefaultBookByKind(kind);
-                if (targetBook == null)
-                    throw new InvalidOperationException("验收资产类型不受 AssetLibrary 支持：" + asset.name + " / " + kind);
-                targetBook.EditorOnly_DragAtArea(new[] { asset });
-            }
-            library.MarkFastIndexDirty();
-            library.NormalizePagesEditor();
-            foreach (ESAssetPage page in library.GetPagesByKind(ESAssetReferKind.Prefab))
-            {
-                for (int level = 0; level < 3; level++)
-                    for (int index = 0; index < levelPrefabs[level].Count; index++)
-                        if (page.OB == levelPrefabs[level][index]) page.StringKey = GetKey(level, index);
-            }
-            foreach (ESAssetPage page in library.GetPagesByKind(ESAssetReferKind.Scene))
-                for (int level = 0; level < LevelNames.Length; level++)
-                    if (page?.OB != null && page.OB.name == LevelNames[level])
-                        page.StringKey = "level_validation_scene_" + (level + 1);
-            foreach (ESAssetPage page in library.GetPagesByKind(ESAssetReferKind.Material))
-                if (page?.OB != null)
-                    page.StringKey = "level_validation_material_" + page.OB.name.ToLowerInvariant();
             EditorUtility.SetDirty(library);
-            library.InjectToAssetRegistryEditor();
             return library;
         }
 
-        private static ESAssetLibraryConsumer CreateOrUpdateConsumer(ESAssetLibrary library, ESLevelAssetValidationGameCore gameCore)
+        private static ESAssetLibraryConsumer CreateOrUpdateConsumer(ESAssetLibrary library)
         {
             const string path = Root + "/Data/ESLevelAssetValidationConsumer.asset";
             ESAssetLibraryConsumer consumer = AssetDatabase.LoadAssetAtPath<ESAssetLibraryConsumer>(path);
@@ -296,10 +261,88 @@ namespace ES
             }
             consumer.ConsumerLibFolders.Clear();
             consumer.ConsumerLibFolders.Add(library);
-            // GameCore 同时保留在普通 Assets 和 Consumer 收集链中；Baker 按 GUID 静默去重。
-            consumer.ManualGameCoreAssets.Clear();
             EditorUtility.SetDirty(consumer);
             return consumer;
+        }
+
+        private static void RegisterGeneratedAssets(
+            IReadOnlyList<GameObject>[] levelPrefabs,
+            ESAssetLibrary library)
+        {
+            for (int level = 0; level < levelPrefabs.Length; level++)
+            {
+                for (int index = 0; index < levelPrefabs[level].Count; index++)
+                    RegisterOrdinaryAsset(levelPrefabs[level][index], library, GetKey(level, index));
+
+                string scenePath = Root + "/Scenes/" + LevelNames[level] + ".unity";
+                RegisterOrdinaryAsset(
+                    AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePath),
+                    library,
+                    "level_validation_scene_" + (level + 1));
+            }
+
+            foreach (string guid in AssetDatabase.FindAssets("t:Material", new[] { Root + "/Materials" }))
+            {
+                Material material = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(guid));
+                if (material != null)
+                    RegisterOrdinaryAsset(material, library, "level_validation_material_" + material.name.ToLowerInvariant());
+            }
+        }
+
+        private static void RegisterOrdinaryAsset(UnityEngine.Object asset, ESAssetLibrary library, string stableKey)
+        {
+            if (asset == null || library == null)
+                throw new InvalidOperationException("验收资产或目标 Library 为空，无法注册。");
+            var previewRequest = new ESContentRegistrationRequest
+            {
+                action = ESContentRegistrationAction.RegisterAsset,
+                assetPath = AssetDatabase.GetAssetPath(asset),
+                libraryPath = AssetDatabase.GetAssetPath(library),
+                expectedLocalFileId = 0,
+                assetKind = "auto",
+                keyMode = ESContentStableKeyMode.StringOnly,
+                stringKey = stableKey,
+                commit = false
+            };
+            ESContentRegistrationResult preview = RequireSuccess(previewRequest);
+            previewRequest.commit = true;
+            previewRequest.requestId = preview.requestId;
+            previewRequest.expectedGuid = preview.guid;
+            previewRequest.expectedLocalFileId = preview.localFileId;
+            previewRequest.expectedLibraryRevision = preview.targetRevision;
+            RequireSuccess(previewRequest);
+        }
+
+        private static void RegisterGeneratedGameCoreRoot(
+            ESLevelAssetValidationGameCore gameCore,
+            ESAssetLibraryConsumer consumer)
+        {
+            var previewRequest = new ESContentRegistrationRequest
+            {
+                action = ESContentRegistrationAction.RegisterGameCoreRoot,
+                gameCorePath = AssetDatabase.GetAssetPath(gameCore),
+                consumerPath = AssetDatabase.GetAssetPath(consumer),
+                expectedLocalFileId = 0,
+                commit = false
+            };
+            ESContentRegistrationResult preview = RequireSuccess(previewRequest);
+            previewRequest.commit = true;
+            previewRequest.requestId = preview.requestId;
+            previewRequest.expectedSourceGuid = preview.sourceGuid;
+            previewRequest.expectedConsumerGuid = preview.consumerGuid;
+            previewRequest.expectedLocalFileId = preview.localFileId;
+            previewRequest.expectedSourceRevision = preview.sourceRevision;
+            previewRequest.expectedConsumerRevision = preview.consumerRevision;
+            RequireSuccess(previewRequest);
+        }
+
+        private static ESContentRegistrationResult RequireSuccess(ESContentRegistrationRequest request)
+        {
+            ESContentRegistrationResult result = ESContentRegistrationAuthoring.Execute(request);
+            if (result == null || !result.success)
+                throw new InvalidOperationException(
+                    "统一内容注册失败：" + (result?.status ?? "null") + " / " + (result?.message ?? "无结果"));
+            return result;
         }
 
         private static void CreateOrUpdateScene()

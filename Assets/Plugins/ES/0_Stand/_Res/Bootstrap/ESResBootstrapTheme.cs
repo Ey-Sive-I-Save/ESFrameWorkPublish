@@ -3,7 +3,7 @@ using TMPro;
 
 namespace ES
 {
-    [CreateAssetMenu(menuName = "【ES】/资源与发布/运行时配置/启动界面主题", fileName = "ESResBootstrapTheme")]
+    [CreateAssetMenu(menuName = "【ES】/资源管线/运行时配置/启动界面主题", fileName = "ESResBootstrapTheme")]
     public sealed class ESResBootstrapTheme : ScriptableObject
     {
         [Header("Brand")]

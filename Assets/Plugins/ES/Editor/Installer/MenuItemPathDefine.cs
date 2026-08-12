@@ -6,6 +6,6 @@ namespace ES.EditorInternal.Installer
     public static class MenuItemPathDefine
     {
         public const string ROOT_MENU = "【ES】";
-        public const string INSTALL_DEPENDENCY_PATH = ROOT_MENU + "/安装与集成/依赖管理/";
+        public const string INSTALL_DEPENDENCY_PATH = ROOT_MENU + "/自动化与开发/依赖与集成/";
     }
 }

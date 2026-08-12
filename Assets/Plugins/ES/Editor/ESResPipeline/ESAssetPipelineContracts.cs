@@ -32,8 +32,8 @@ namespace ES
     }
     [Serializable] public sealed class ESAssetLibraryCatalog
     {
-        public int formatVersion = 3;
-        public string libraryName = string.Empty, libraryFolder = string.Empty, libraryBundleCode = string.Empty, libraryAssetGuid = string.Empty, generatedUtc = string.Empty;
+        public int formatVersion = ESRuntimeCatalog.CurrentFormatVersion;
+        public string libraryName = string.Empty, libraryFolder = string.Empty, libraryBundleCode = string.Empty, libraryAssetGuid = string.Empty, librarySourceRevision = string.Empty, generatedUtc = string.Empty;
         public List<ESAssetCatalogEntry> assets = new List<ESAssetCatalogEntry>();
         public List<string> excludedEditorOnlyPaths = new List<string>();
         public List<string> excludedFolderPaths = new List<string>();
@@ -267,7 +267,7 @@ namespace ES
         private static bool s_ExcludedFoldersCacheDirty = true;
 
         public const int ReferenceGraphFormatVersion = 1;
-        public const int CatalogFormatVersion = 3;
+        public const int CatalogFormatVersion = ESRuntimeCatalog.CurrentFormatVersion;
         public const int RuntimeProtocolFormatVersion = 5;
         public const int CatalogBakeCommitFormatVersion = 2;
         public const string CatalogOutputKind = "Catalog", ReferenceGraphOutputKind = "ReferenceGraph";

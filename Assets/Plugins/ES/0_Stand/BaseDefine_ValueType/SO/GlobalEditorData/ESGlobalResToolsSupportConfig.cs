@@ -371,9 +371,12 @@ namespace ES
         /// <param name="showConfirmDialog">是否显示确认对话框（null则使用全局配置）</param>
         /// <param name="silent">静默模式，不输出日志</param>
         /// <returns>成功收集的Library，失败返回null</returns>
+        [Obsolete("旧收集 API 已禁用。人工请打开统一内容注册窗口；代码与 MCP 请调用 ESContentRegistrationAuthoring.Execute。", true)]
         public static ESAssetLibrary CollectAssetToRecommendedLibrary(UnityEngine.Object asset, bool? showConfirmDialog = null, bool silent = false)
         {
 #if UNITY_EDITOR
+            throw new NotSupportedException("旧收集 API 已禁用，请使用统一内容注册事务。");
+#pragma warning disable CS0162
             if (asset == null)
             {
                 if (!silent) Debug.LogError("[资产收集] 资产为null");
@@ -508,6 +511,7 @@ namespace ES
 
             if (!silent) Debug.Log($"[资产收集] 成功收集资产 [{asset.name}] 到 Library [{bestLibrary.Name}] 的 Book [{targetBook.Name}]");
             return bestLibrary;
+#pragma warning restore CS0162
 #else
             return null;
 #endif
@@ -519,9 +523,12 @@ namespace ES
         /// <param name="assets">要收集的资产数组</param>
         /// <param name="showConfirmDialog">是否显示确认对话框（null则使用全局配置）</param>
         /// <returns>成功收集的数量</returns>
+        [Obsolete("旧批量收集 API 已禁用。每个资产必须通过统一内容注册事务获得独立预检、revision 与 requestId。", true)]
         public static int CollectAssetsToRecommendedLibraries(UnityEngine.Object[] assets, bool? showConfirmDialog = null)
         {
 #if UNITY_EDITOR
+            throw new NotSupportedException("旧批量收集 API 已禁用，请逐项使用统一内容注册事务。");
+#pragma warning disable CS0162
             if (assets == null || assets.Length == 0)
             {
                 Debug.LogWarning("[资产收集] 资产数组为空");
@@ -600,6 +607,7 @@ namespace ES
                 "确定");
 
             return successCount;
+#pragma warning restore CS0162
 #else
             return 0;
 #endif

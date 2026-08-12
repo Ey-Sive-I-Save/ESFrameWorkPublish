@@ -10,12 +10,21 @@ namespace ES
 {
     public static class ESAssetReferenceBaker
     {
+        private const string ResourcePipelineTaskKey = "ES.ResourcePipeline";
+
+        internal static bool IsBakeActive
+            => ESEditorHandle.TryGetActiveLongTaskByKey(ResourcePipelineTaskKey, out ESEditorLongTask active)
+               && active is ESAssetReferenceBakeLongTask;
+
         /// <summary>
         /// 烘焙入口改为编辑器长任务。每帧只推进一个 Library 或输出文件；
         /// AssetDatabase 的原子调用仍保持在主线程，避免额外线程同步和 GC 压力。
         /// </summary>
         public static ESEditorLongTask Bake(Action<ESEditorLongTask> onFinished = null)
         {
+            if (TryJoinActiveBake(ESAssetPipelineIO.BakeRoot, null, false, onFinished, out ESEditorLongTask joined))
+                return joined;
+
             ESAssetPipelineIO.RefreshGlobalExcludedFolders();
             var libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>()
                 .Where(item => item != null && item.ContainsBuild)
@@ -24,17 +33,21 @@ namespace ES
             // EditorDirect 只生成编辑器 Catalog/ReferenceGraph。正式 AB 命名、Consumer
             // 快照和发布 ConfigKey 门禁由 Planner/Publisher 的独立入口执行。
             ESResourcePlanConfigKeySynchronizer.ValidateAllForBake();
-            return ESEditorHandle.EnqueueLongTask(new ESAssetReferenceBakeLongTask(
-                libraries, ESAssetPipelineIO.BakeRoot, null, false, onFinished));
+            return EnqueueOrJoinBake(
+                libraries, ESAssetPipelineIO.BakeRoot, null, false, onFinished);
         }
 
         internal static ESEditorLongTask BakeForCatalogRecovery(
             string transactionId, Action<ESEditorLongTask> onFinished = null)
         {
-            ESAssetPipelineIO.RefreshGlobalExcludedFolders();
             if (string.IsNullOrWhiteSpace(transactionId))
                 throw new ArgumentException("Catalog 恢复事务 ID 不能为空。", nameof(transactionId));
 
+            string outputRoot = ESAssetPipelineIO.RecoveryBakeRoot(transactionId);
+            if (TryJoinActiveBake(outputRoot, transactionId, true, onFinished, out ESEditorLongTask joined))
+                return joined;
+
+            ESAssetPipelineIO.RefreshGlobalExcludedFolders();
             var libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>()
                 .Where(item => item != null && item.ContainsBuild)
                 .OrderBy(item => item.LibFolderName, StringComparer.Ordinal)
@@ -42,9 +55,56 @@ namespace ES
             // EditorDirect 恢复只负责 Catalog/ReferenceGraph，不提前引入正式
             // LocalBuild/HotUpdate 的 AB 短码门禁；正式发布门禁仍由独立阶段负责。
             ESResourcePlanConfigKeySynchronizer.ValidateAllForBake();
-            string outputRoot = ESAssetPipelineIO.RecoveryBakeRoot(transactionId);
-            return ESEditorHandle.EnqueueLongTask(new ESAssetReferenceBakeLongTask(
-                libraries, outputRoot, transactionId, true, onFinished));
+            return EnqueueOrJoinBake(
+                libraries, outputRoot, transactionId, true, onFinished);
+        }
+
+        private static bool TryJoinActiveBake(
+            string outputRoot,
+            string transactionId,
+            bool writeCommitMarker,
+            Action<ESEditorLongTask> onFinished,
+            out ESEditorLongTask joined)
+        {
+            joined = null;
+            if (!ESEditorHandle.TryGetActiveLongTaskByKey(ResourcePipelineTaskKey, out ESEditorLongTask active))
+                return false;
+            if (!(active is ESAssetReferenceBakeLongTask existing)
+                || !existing.Matches(outputRoot, transactionId, writeCommitMarker))
+            {
+                throw new InvalidOperationException(
+                    "ES.ResourcePipeline 已有不同类型或不同输出身份的任务；拒绝把 Bake 回调挂到无关任务。");
+            }
+
+            existing.AddFinishedCallback(onFinished);
+            joined = existing;
+            return true;
+        }
+
+        private static ESEditorLongTask EnqueueOrJoinBake(
+            List<ESAssetLibrary> libraries,
+            string outputRoot,
+            string transactionId,
+            bool writeCommitMarker,
+            Action<ESEditorLongTask> onFinished)
+        {
+            if (ESEditorHandle.TryGetActiveLongTaskByKey(ResourcePipelineTaskKey, out ESEditorLongTask active))
+            {
+                if (!(active is ESAssetReferenceBakeLongTask existing)
+                    || !existing.Matches(outputRoot, transactionId, writeCommitMarker))
+                {
+                    throw new InvalidOperationException(
+                        "ES.ResourcePipeline 已有不同类型或不同输出身份的任务；拒绝把 Bake 回调挂到无关任务。");
+                }
+
+                existing.AddFinishedCallback(onFinished);
+                return existing;
+            }
+
+            var task = new ESAssetReferenceBakeLongTask(
+                libraries, outputRoot, transactionId, writeCommitMarker);
+            task.AddFinishedCallback(onFinished);
+            return ESEditorHandle.EnqueueLongTask(task);
         }
 
         internal static void ValidateSourceStateForBuild(IReadOnlyCollection<ESAssetLibrary> libraries)
@@ -54,6 +114,20 @@ namespace ES
             ESResourcePlanConfigKeySynchronizer.ValidateAllForBake();
             ValidateLibraryBundleCodes(libraries);
             ValidateConsumerGameCoreAssetsForBuild(libraries);
+        }
+
+        internal static string GetLibrarySourceRevision(ESAssetLibrary library)
+        {
+            string assetPath = AssetDatabase.GetAssetPath(library);
+            if (library == null || string.IsNullOrEmpty(assetPath))
+                return string.Empty;
+
+            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? string.Empty;
+            string absolutePath = Path.GetFullPath(Path.Combine(projectRoot, assetPath));
+            string fileHash = File.Exists(absolutePath)
+                ? ESResManifestIntegrity.ComputeFileSha256(absolutePath)
+                : string.Empty;
+            return AssetDatabase.GetAssetDependencyHash(assetPath) + ":" + fileHash;
         }
 
         private static void ValidateLibraryBundleCodes(IReadOnlyCollection<ESAssetLibrary> libraries)
@@ -83,7 +157,7 @@ namespace ES
             private readonly List<ESAssetLibrary> libraries;
             private readonly Dictionary<ESAssetLibrary, ESAssetLibraryCatalog> catalogs = new Dictionary<ESAssetLibrary, ESAssetLibraryCatalog>();
             private readonly Dictionary<ESAssetLibrary, ESAssetReferenceGraph> graphs = new Dictionary<ESAssetLibrary, ESAssetReferenceGraph>();
-            private readonly Action<ESEditorLongTask> onFinished;
+            private readonly List<LibrarySourceState> sourceStates;
             private readonly string outputRoot;
             private readonly string transactionId;
             private readonly bool writeCommitMarker;
@@ -95,20 +169,21 @@ namespace ES
                 List<ESAssetLibrary> libraries,
                 string outputRoot,
                 string transactionId,
-                bool writeCommitMarker,
-                Action<ESEditorLongTask> onFinished)
-                : base("烘焙资产引用", "ES.ResourcePipeline", 10)
+                bool writeCommitMarker)
+                : base("烘焙资产引用", ResourcePipelineTaskKey, 10)
             {
                 this.libraries = libraries ?? new List<ESAssetLibrary>();
-                this.outputRoot = outputRoot ?? throw new ArgumentNullException(nameof(outputRoot));
+                this.outputRoot = Path.GetFullPath(outputRoot ?? throw new ArgumentNullException(nameof(outputRoot)));
                 this.transactionId = transactionId;
                 this.writeCommitMarker = writeCommitMarker;
-                this.onFinished = onFinished;
+                sourceStates = this.libraries.Select(LibrarySourceState.Capture).ToList();
             }
 
-            protected override void OnFinish()
+            public bool Matches(string candidateOutputRoot, string candidateTransactionId, bool candidateWriteCommitMarker)
             {
-                onFinished?.Invoke(this);
+                return string.Equals(outputRoot, Path.GetFullPath(candidateOutputRoot ?? string.Empty), StringComparison.OrdinalIgnoreCase)
+                       && string.Equals(transactionId ?? string.Empty, candidateTransactionId ?? string.Empty, StringComparison.Ordinal)
+                       && writeCommitMarker == candidateWriteCommitMarker;
             }
 
             public override ESEditorLongTaskStepResult ProcessStep(ESEditorLongTaskContext context)
@@ -141,10 +216,12 @@ namespace ES
                         return ESEditorLongTaskStepResult.Continue;
                     case Phase.ValidateKeys:
                         SetProgress(libraries.Count * 2, TotalSteps, "校验业务资源键");
+                        ValidateSourceStates();
                         ValidateBusinessKeys(catalogs.Values);
                         phase = Phase.WriteOutputs;
                         return ESEditorLongTaskStepResult.Continue;
                     case Phase.WriteOutputs:
+                        ValidateSourceStates();
                         if (index < libraries.Count)
                         {
                             ESAssetLibrary library = libraries[index];
@@ -249,12 +326,80 @@ namespace ES
             }
 
             private int TotalSteps => libraries.Count * 3 + 2;
+
+            private void ValidateSourceStates()
+            {
+                for (int i = 0; i < sourceStates.Count; i++)
+                    sourceStates[i].Validate();
+            }
+
+            private sealed class LibrarySourceState
+            {
+                private readonly ESAssetLibrary library;
+                private readonly string assetPath;
+                private readonly string assetGuid;
+                private readonly string dependencyHash;
+                private readonly string fileHash;
+
+                private LibrarySourceState(
+                    ESAssetLibrary library,
+                    string assetPath,
+                    string assetGuid,
+                    string dependencyHash,
+                    string fileHash)
+                {
+                    this.library = library;
+                    this.assetPath = assetPath;
+                    this.assetGuid = assetGuid;
+                    this.dependencyHash = dependencyHash;
+                    this.fileHash = fileHash;
+                }
+
+                public static LibrarySourceState Capture(ESAssetLibrary library)
+                {
+                    string path = AssetDatabase.GetAssetPath(library);
+                    if (string.IsNullOrEmpty(path) || EditorUtility.IsDirty(library))
+                        throw new InvalidOperationException("[ESRes][Bake] Library 必须先保存且具有稳定路径：" + (library != null ? library.Name : "<null>"));
+
+                    return new LibrarySourceState(
+                        library,
+                        path,
+                        AssetDatabase.AssetPathToGUID(path),
+                        AssetDatabase.GetAssetDependencyHash(path).ToString(),
+                        ComputeDiskHash(path));
+                }
+
+                public void Validate()
+                {
+                    bool changed = library == null
+                                   || EditorUtility.IsDirty(library)
+                                   || !string.Equals(AssetDatabase.GetAssetPath(library), assetPath, StringComparison.Ordinal)
+                                   || !string.Equals(AssetDatabase.AssetPathToGUID(assetPath), assetGuid, StringComparison.OrdinalIgnoreCase)
+                                   || !string.Equals(AssetDatabase.GetAssetDependencyHash(assetPath).ToString(), dependencyHash, StringComparison.Ordinal)
+                                   || !string.Equals(ComputeDiskHash(assetPath), fileHash, StringComparison.Ordinal);
+                    if (changed)
+                    {
+                        throw new InvalidOperationException(
+                            "[ESRes][Bake] Bake 执行期间注册源发生变化，已中止输出：" + assetPath);
+                    }
+                }
+
+                private static string ComputeDiskHash(string assetPath)
+                {
+                    string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ?? string.Empty;
+                    string absolutePath = Path.GetFullPath(Path.Combine(projectRoot, assetPath));
+                    return File.Exists(absolutePath)
+                        ? ESResManifestIntegrity.ComputeFileSha256(absolutePath)
+                        : string.Empty;
+                }
+            }
         }
         private static ESAssetLibraryCatalog CreateCatalog(ESAssetLibrary library, string generatedUtc)
         {
             string libraryAssetGuid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(library));
             var catalog = new ESAssetLibraryCatalog { libraryName = library.Name, libraryFolder = library.LibFolderName,
-                libraryBundleCode = library.AssetBundleCode, libraryAssetGuid = libraryAssetGuid, generatedUtc = generatedUtc };
+                libraryBundleCode = library.AssetBundleCode, libraryAssetGuid = libraryAssetGuid,
+                librarySourceRevision = GetLibrarySourceRevision(library), generatedUtc = generatedUtc };
             foreach (var book in library.GetAllUseableBooks().Where(item => item != null))
             {
                 if (book.pages == null) continue;
@@ -804,11 +949,13 @@ namespace ES
             string path = AssetDatabase.GUIDToAssetPath(guid);
             if (string.IsNullOrWhiteSpace(path)) return null;
             foreach (UnityEngine.Object loaded in AssetDatabase.LoadAllAssetsAtPath(path))
-                if (loaded is ScriptableObject asset
-                    && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string candidateGuid, out long candidateLocalFileId)
-                    && string.Equals(candidateGuid, guid, StringComparison.Ordinal)
-                    && candidateLocalFileId == localFileId)
+            {
+                if (!(loaded is ScriptableObject asset)) continue;
+                ESPipelineAssetIdentity candidate = ESAssetPipelineIO.GetIdentity(asset);
+                if (string.Equals(candidate.guid, guid, StringComparison.Ordinal)
+                    && candidate.localFileId == localFileId)
                     return asset;
+            }
             return null;
         }
 
@@ -847,13 +994,25 @@ namespace ES
                 return;
             }
             if (ReferenceEquals(existing, asset)) return;
-            if (existing.identity != null && asset.identity != null
-                && string.Equals(existing.identity.Key, asset.identity.Key, StringComparison.Ordinal))
+            if (AreEquivalentBusinessRegistrations(existing, asset))
             {
-                catalog.warnings.Add($"{label} 对同一资产重复注册，构建时静默去重：{existing.libraryName}/{existing.pageName} 与 {asset.libraryName}/{asset.pageName}");
+                catalog.warnings.Add($"{label} 对同一资产等价重复注册，构建时合并为一条：{existing.libraryName}/{existing.pageName} 与 {asset.libraryName}/{asset.pageName}");
                 return;
             }
             catalog.errors.Add($"{label} 指向不同资产，无法确定业务寻址：{existing.libraryName}/{existing.pageName} 与 {asset.libraryName}/{asset.pageName}");
+        }
+
+        private static bool AreEquivalentBusinessRegistrations(
+            ESAssetCatalogEntry left,
+            ESAssetCatalogEntry right)
+        {
+            return left?.identity != null
+                   && right?.identity != null
+                   && string.Equals(left.identity.Key, right.identity.Key, StringComparison.Ordinal)
+                   && string.Equals(left.kind, right.kind, StringComparison.Ordinal)
+                   && left.enumKey == right.enumKey
+                   && string.Equals(left.stringKey, right.stringKey, StringComparison.Ordinal)
+                   && string.Equals(left.assetTypeName, right.assetTypeName, StringComparison.Ordinal);
         }
     }
 }

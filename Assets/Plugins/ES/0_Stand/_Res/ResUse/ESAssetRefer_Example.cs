@@ -26,7 +26,7 @@ public sealed class ESAssetReferExample : MonoBehaviour
     }
 }
 
-[CreateAssetMenu(fileName = "EnemyData", menuName = "Game/Enemy Data")]
+[CreateAssetMenu(fileName = "EnemyData", menuName = "【ES】/示例/资源/Enemy Data")]
 public sealed class EnemyDataConfig : ScriptableObject
 {
     public ESAssetReferPrefab prefab;

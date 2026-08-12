@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using Cysharp.Threading.Tasks;
@@ -8,7 +9,7 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>资源系统运行时观察与安全点验收入口。</summary>
-    public sealed class ESResourceRuntimeMonitorWindow : EditorWindow
+    public sealed class ESResourceRuntimeMonitorWindow : ESSinglePageIMGUIWindow<ESResourceRuntimeMonitorWindow>
     {
         private Vector2 scrollPosition;
         private bool autoRefresh = true;
@@ -18,7 +19,7 @@ namespace ES
         private ESResourcePlanInfo lifecycleValidationPlan;
         private ESResourcePlanInfo manualValidationPlan;
 
-        [MenuItem("【ES】/运行时诊断/资源系统/资源运行时监视器", false, 2200)]
+        [MenuItem("【ES】/验证与诊断/运行时监视/资源系统/打开资源运行时监视器", false, 2200)]
         public static void Open()
         {
             ESResourceRuntimeMonitorWindow window = GetWindow<ESResourceRuntimeMonitorWindow>();
@@ -27,14 +28,69 @@ namespace ES
             window.Show();
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent()
         {
-            EditorApplication.update += OnEditorUpdate;
+            return new GUIContent("ES 资源诊断", "观察资源 Bootstrap、Provider、Scope 与 ResourcePlan 状态");
         }
 
-        private void OnDisable()
+        protected override string ESWindow_Subtitle => "资源运行时观察与安全点验收";
+        protected override Vector2 ESWindow_MinSize => new Vector2(560f, 480f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(920f, 720f);
+        protected override string ESWindow_PageStableId => "resource.runtime-monitor";
+        protected override string ESWindow_PageTitle => "资源运行时监视器";
+        protected override string ESWindow_PageKeywords => "资源 Bootstrap Provider Scope ResourcePlan 下载 诊断";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "resource-monitor.refresh",
+                    "立即刷新",
+                    "立即重绘当前资源诊断快照。",
+                    context =>
+                    {
+                        Repaint();
+                        context.SetStatus("资源诊断视图已刷新");
+                    })
+                .WithUnityIcon("Refresh")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "resource-monitor.auto-refresh",
+                    "自动刷新",
+                    "每 0.25 秒刷新一次运行状态。",
+                    context =>
+                    {
+                        autoRefresh = !autoRefresh;
+                        nextRepaintTime = 0d;
+                        context.RefreshPageActions();
+                        context.SetStatus(autoRefresh ? "已启用自动刷新" : "已暂停自动刷新");
+                    })
+                .WithCheckedState(() => autoRefresh)
+                .WithPriority(90));
+            actions.Add(new ESMenuTreePageAction(
+                    "resource-monitor.copy-report",
+                    "复制报告",
+                    "复制完整资源诊断报告到剪贴板。",
+                    context =>
+                    {
+                        EditorGUIUtility.systemCopyBuffer = BuildDiagnosticReport();
+                        context.Notify("资源诊断报告已复制");
+                    })
+                .WithUnityIcon("Clipboard")
+                .WithPriority(80));
+        }
+
+        protected override void ESWindow_OnHostEnable()
         {
             EditorApplication.update -= OnEditorUpdate;
+            EditorApplication.update += OnEditorUpdate;
+            nextRepaintTime = 0d;
+        }
+
+        protected override void ESWindow_OnHostDisable()
+        {
+            EditorApplication.update -= OnEditorUpdate;
+            nextRepaintTime = 0d;
         }
 
         private void OnEditorUpdate()
@@ -45,32 +101,17 @@ namespace ES
             Repaint();
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
-            DrawToolbar();
+            GUILayout.Label(
+                EditorApplication.isPlaying ? "PLAY MODE" : "EDIT MODE",
+                EditorStyles.miniBoldLabel);
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
             DrawBootstrapSection();
             DrawAssetCoreSection();
             DrawResourcePlanSection();
             DrawValidationSection();
             EditorGUILayout.EndScrollView();
-        }
-
-        private void DrawToolbar()
-        {
-            using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
-            {
-                GUILayout.Label(EditorApplication.isPlaying ? "PLAY MODE" : "EDIT MODE", EditorStyles.miniBoldLabel, GUILayout.Width(78f));
-                autoRefresh = GUILayout.Toggle(autoRefresh, "自动刷新", EditorStyles.toolbarButton, GUILayout.Width(72f));
-                if (GUILayout.Button("立即刷新", EditorStyles.toolbarButton, GUILayout.Width(72f)))
-                    Repaint();
-                GUILayout.FlexibleSpace();
-                if (GUILayout.Button("复制诊断报告", EditorStyles.toolbarButton, GUILayout.Width(100f)))
-                {
-                    EditorGUIUtility.systemCopyBuffer = BuildDiagnosticReport();
-                    ShowNotification(new GUIContent("诊断报告已复制"));
-                }
-            }
         }
 
         private static void DrawSectionTitle(string title)

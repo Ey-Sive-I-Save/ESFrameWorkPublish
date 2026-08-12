@@ -25,7 +25,7 @@ namespace ES.EditorInternal.Installer
     /// <summary>
     /// ES框架安装器 - 商业级Unity插件安装管理工具
     /// </summary>
-    public class ESInstaller : EditorWindow
+    public class ESInstaller : ESSinglePageIMGUIWindow<ESInstaller>
     {
         #region 静态初始化
 
@@ -749,6 +749,7 @@ namespace ES.EditorInternal.Installer
         private List<string> availablePackageIds = new List<string>();
         private Dictionary<string, string> packageDisplayNames = new Dictionary<string, string>();
         private string currentSelectedPackageId = "es_main";
+        private string[] packageDisplayNameBuffer = Array.Empty<string>();
 
         // 配置相关
         private bool isConfigModified = false;
@@ -763,7 +764,7 @@ namespace ES.EditorInternal.Installer
 
         #region 菜单项
 
-        [MenuItem(MenuItemPathDefine.INSTALL_DEPENDENCY_PATH + "安装管理器", false, 0)]
+        [MenuItem(MenuItemPathDefine.INSTALL_DEPENDENCY_PATH + "打开安装管理器", false, 0)]
         static void ShowInstaller()
         {
             installer = GetWindow<ESInstaller>("ES 安装管理器");
@@ -783,7 +784,56 @@ namespace ES.EditorInternal.Installer
 
         #region Unity生命周期
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent()
+        {
+            return new GUIContent("ES 安装管理器", "检查并安装 ES 主包、扩展包及外部依赖");
+        }
+
+        protected override string ESWindow_Subtitle => "包依赖、受信导入与安装回执";
+        protected override Vector2 ESWindow_MinSize => new Vector2(600f, 500f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(980f, 760f);
+        protected override string ESWindow_PageStableId => "installer.packages";
+        protected override string ESWindow_PageTitle => "安装与依赖";
+        protected override string ESWindow_PageKeywords => "安装器 依赖 UPM Git UnityPackage 扩展包 回执";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "installer.refresh-status",
+                    "刷新状态",
+                    "重新加载配置并检查所有包与依赖状态。",
+                    context =>
+                    {
+                        RefreshAllStatuses();
+                        context.RefreshPageActions();
+                        context.SetStatus("正在刷新安装状态");
+                    })
+                .When(() => !isRefreshingStatuses && currentProfile != null)
+                .WithUnityIcon("Refresh")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "installer.report",
+                    "安装报告",
+                    "生成当前包与依赖安装报告。",
+                    context =>
+                    {
+                        GenerateInstallationReport();
+                        context.SetStatus("安装报告已生成");
+                    })
+                .When(() => currentProfile != null)
+                .WithUnityIcon("Clipboard")
+                .WithPriority(80));
+            actions.Add(new ESMenuTreePageAction(
+                    "installer.help",
+                    "帮助",
+                    "打开安装管理器帮助。",
+                    _ => ShowHelp())
+                .WithUnityIcon("_Help")
+                .WithPriority(20));
+        }
+
+        protected override void ESWindow_OnHostEnable()
         {
             // 确保静态引用正确设置
             if (installer == null)
@@ -2325,7 +2375,7 @@ namespace ES.EditorInternal.Installer
             public bool isRequired;
         }
 
-        private void OnDisable()
+        protected override void ESWindow_OnHostDisable()
         {
             AssetDatabase.importPackageCompleted -= OnTrustedImportCompleted;
             AssetDatabase.importPackageCancelled -= OnTrustedImportCancelled;
@@ -2353,7 +2403,7 @@ namespace ES.EditorInternal.Installer
             }
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             InitializeStyles();
 
@@ -2476,10 +2526,18 @@ namespace ES.EditorInternal.Installer
             int currentIndex = availablePackageIds.IndexOf(currentSelectedPackageId);
             if (currentIndex < 0) currentIndex = 0;
 
-            string[] displayNames = availablePackageIds.Select(id => packageDisplayNames.ContainsKey(id) ? packageDisplayNames[id] : id).ToArray();
+            if (packageDisplayNameBuffer.Length != availablePackageIds.Count)
+                packageDisplayNameBuffer = new string[availablePackageIds.Count];
+            for (int i = 0; i < availablePackageIds.Count; i++)
+            {
+                string packageId = availablePackageIds[i];
+                packageDisplayNameBuffer[i] = packageDisplayNames.TryGetValue(packageId, out string displayName)
+                    ? displayName
+                    : packageId;
+            }
 
             EditorGUI.BeginChangeCheck();
-            int newIndex = EditorGUILayout.Popup("选择包:", currentIndex, displayNames);
+            int newIndex = EditorGUILayout.Popup("选择包:", currentIndex, packageDisplayNameBuffer);
             if (EditorGUI.EndChangeCheck() && newIndex != currentIndex && newIndex >= 0 && newIndex < availablePackageIds.Count)
             {
                 string newPackageId = availablePackageIds[newIndex];
@@ -4027,36 +4085,6 @@ namespace ES.EditorInternal.Installer
         {
             EditorGUILayout.Space(10);
 
-            // 快速刷新按钮 - 更突出显示
-            EditorGUILayout.BeginHorizontal();
-            GUI.backgroundColor = new Color(0.3f, 0.6f, 1.0f); // 蓝色背景
-            GUI.backgroundColor = Color.white;
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.Space(5);
-
-            // 其他按钮
-            EditorGUILayout.BeginHorizontal();
-
-            if (GUILayout.Button("📋 生成安装报告"))
-            {
-                GenerateInstallationReport();
-            }
-
-            EditorGUI.BeginDisabledGroup(isRefreshingStatuses);
-            if (GUILayout.Button(isRefreshingStatuses ? "正在刷新..." : "🔄 刷新状态"))
-            {
-                RefreshAllStatuses();
-            }
-            EditorGUI.EndDisabledGroup();
-
-            if (GUILayout.Button("❓ 帮助"))
-            {
-                ShowHelp();
-            }
-
-            EditorGUILayout.EndHorizontal();
-
             if (!string.IsNullOrWhiteSpace(lastImportReceiptPath))
             {
                 EditorGUILayout.Space(4);
@@ -4842,6 +4870,7 @@ namespace ES.EditorInternal.Installer
             finally
             {
                 isRefreshingStatuses = false;
+                ESWindow_CurrentPageContext?.RefreshPageActions();
                 Repaint();
             }
         }

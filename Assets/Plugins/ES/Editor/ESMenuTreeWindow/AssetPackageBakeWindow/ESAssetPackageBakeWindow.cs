@@ -24,19 +24,19 @@ namespace ES
         }
     }
 
-    public class ESAssetPackageBakeWindow : ESMenuTreeWindowAB<ESAssetPackageBakeWindow>
+    public class ESAssetPackageBakeWindow : ESMenuTreeWindow<ESAssetPackageBakeWindow>
     {
         internal const string CodeVersion = "ESAssetBakePreview_20260721_0310_PreviewWorkflow";
+        public const string PageIdHome = "asset-package.home";
+        public const string PageIdCurrentOverview = "asset-package.current.overview";
+        private const string PageIdCategoryPrefix = "asset-package.current.category.";
         private const string PageNameHome = "资产包分离";
         private const string PageNameCurrent = "当前分离配置";
         private const string PrefKeySelectedBakeGuid = "ES.AssetPackageBakeWindow.SelectedBakeGuid";
-        private const string PrefKeyLastPageKind = "ES.AssetPackageBakeWindow.LastPageKind";
-        private const string PrefKeyLastCategory = "ES.AssetPackageBakeWindow.LastCategory";
-        private const string PageKindHome = "Home";
-        private const string PageKindIndex = "Index";
-        private const string PageKindCategory = "Category";
 
         [NonSerialized] public Page_AssetPackageBakeHome homePage;
+        [NonSerialized] private Page_AssetPackageBakeIndex indexPage;
+        [NonSerialized] private Dictionary<ESAssetPackageCategory, Page_AssetPackageBakeCategory> categoryPages;
         private static ESAssetPackageBakeData selectedBake;
 
         [MenuItem(MenuItemPathDefine.RESOURCE_DELIVERY_PATH + "构建与发布/资产包分离窗口", false, 20)]
@@ -47,19 +47,20 @@ namespace ES
 
         public override GUIContent ESWindow_GetWindowGUIContent()
         {
-            return new GUIContent("ES 资产包分离 [" + CodeVersion + "]", "按资源包分离数据管理资产复制、分类预览和使用选择");
+            return new GUIContent("ES 资产包分离", "按资源包分离数据管理资产复制、分类预览和使用选择");
         }
+
+        protected override string ESWindow_Subtitle => "资源烘焙、分类预览、使用标记、依赖导出与链路回退";
+        protected override Vector2 ESWindow_MinSize => new Vector2(1040f, 640f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(1480f, 900f);
+        protected override float ESWindow_MenuWidth => 252f;
 
         internal void ReleaseInstancePreviewResources()
         {
-            if (MenuTree == null)
+            if (categoryPages == null)
                 return;
-
-            foreach (OdinMenuItem item in MenuTree.EnumerateTree())
-            {
-                if (item?.Value is Page_AssetPackageBakeCategory categoryPage)
-                    categoryPage.ReleasePreviewResources();
-            }
+            foreach (Page_AssetPackageBakeCategory page in categoryPages.Values)
+                page?.ReleasePreviewResources();
         }
 
         public static void SelectBake(ESAssetPackageBakeData bake, bool refreshWindow)
@@ -70,81 +71,284 @@ namespace ES
                 ES_RefreshWindow();
         }
 
-        public override void ESWindow_OnOpen()
+        public static string GetCategoryPageId(ESAssetPackageCategory category)
+        {
+            return PageIdCategoryPrefix + category.ToString().ToLowerInvariant();
+        }
+
+        protected override void ESWindow_OnOpen()
         {
             LoadSelectedBakeFromPrefs();
         }
 
-        protected override void ES_OnBuildMenuTree(OdinMenuTree tree)
-        {
-            LoadSelectedBakeFromPrefs();
-            base.ES_OnBuildMenuTree(tree);
-
-            QuickBuildRootMenu(tree, PageNameHome, ref homePage, SdfIconType.Box);
-            homePage.selectedBake = selectedBake;
-
-            if (selectedBake == null)
-                return;
-
-            RegisterAndAddPage(tree, PageNameCurrent + "/总览", new Page_AssetPackageBakeIndex(selectedBake), SdfIconType.Grid);
-
-            foreach (ESAssetPackageCategory category in Enum.GetValues(typeof(ESAssetPackageCategory)))
-            {
-                int count = selectedBake.records != null ? selectedBake.records.Count(r => r != null && r.category == category) : 0;
-                if (count <= 0)
-                    continue;
-
-                string menuName = $"{PageNameCurrent}/{GetCategoryDisplayName(category)} ({count})";
-                RegisterAndAddPage(tree, menuName, new Page_AssetPackageBakeCategory(selectedBake, category), GetCategoryIcon(category));
-            }
-
-            ScheduleRestoreMenuSelection();
-        }
-
-        protected override void DrawEditors()
-        {
-            float rawPageWidth = position.width - MenuWidth - 36f;
-            if (float.IsNaN(rawPageWidth) || float.IsInfinity(rawPageWidth))
-                rawPageWidth = 1120f;
-            float pageWidth = Mathf.Clamp(rawPageWidth, 760f, 1380f);
-            if (MenuTree?.Selection?.SelectedValue is Page_AssetPackageBakeHome home)
-            {
-                SaveCurrentPage(PageKindHome, null);
-                home.DrawHomePage(pageWidth);
-                return;
-            }
-
-            if (MenuTree?.Selection?.SelectedValue is Page_AssetPackageBakeCategory categoryPage)
-            {
-                SaveCurrentPage(PageKindCategory, categoryPage.category);
-                categoryPage.DrawPreviewPage(pageWidth);
-                return;
-            }
-
-            if (MenuTree?.Selection?.SelectedValue is Page_AssetPackageBakeIndex indexPage)
-            {
-                SaveCurrentPage(PageKindIndex, null);
-                indexPage.DrawIndexPage(pageWidth);
-                return;
-            }
-
-            base.DrawEditors();
-        }
-
-        public override void ES_LoadData()
-        {
-            LoadSelectedBakeFromPrefs();
-        }
-
-        public override void ES_SaveData()
+        protected override void ESWindow_OnHostDisable()
         {
             SaveSelectedBakeGuid(selectedBake);
-            if (MenuTree?.Selection?.SelectedValue is Page_AssetPackageBakeCategory categoryPage)
-                SaveCurrentPage(PageKindCategory, categoryPage.category);
-            else if (MenuTree?.Selection?.SelectedValue is Page_AssetPackageBakeIndex)
-                SaveCurrentPage(PageKindIndex, null);
-            else if (MenuTree?.Selection?.SelectedValue is Page_AssetPackageBakeHome)
-                SaveCurrentPage(PageKindHome, null);
+            base.ESWindow_OnHostDisable();
+        }
+
+        protected override void ESWindow_BuildGlobalActions(
+            ICollection<ESMenuTreeGlobalAction> actions)
+        {
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.show-configurations",
+                    "配置列表",
+                    "返回资产包烘焙配置列表。",
+                    () => UsingWindow?.ESWindow_TrySelectPage(PageIdHome))
+                .WithUnityIcon("d_Folder Icon")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreeGlobalAction(
+                    "asset-package.locate-current",
+                    "定位配置",
+                    "在 Project 窗口定位当前烘焙配置。",
+                    LocateSelectedBake)
+                .WithUnityIcon("d_Search Icon")
+                .When(() => selectedBake != null)
+                .WithPriority(90));
+        }
+
+        protected override void ESWindow_BuildMenuTree(ESMenuTreeBuilder builder)
+        {
+            LoadSelectedBakeFromPrefs();
+            homePage ??= new Page_AssetPackageBakeHome();
+            homePage.selectedBake = selectedBake;
+            builder.Add(CreateHomeDefinition(homePage));
+
+            categoryPages ??= new Dictionary<ESAssetPackageCategory, Page_AssetPackageBakeCategory>();
+            categoryPages.Clear();
+            indexPage = null;
+
+            if (selectedBake != null)
+            {
+                indexPage = new Page_AssetPackageBakeIndex(selectedBake);
+                builder.Add(CreateIndexDefinition(indexPage));
+
+                foreach (ESAssetPackageCategory category in Enum.GetValues(typeof(ESAssetPackageCategory)))
+                {
+                    int count = selectedBake.records != null
+                        ? selectedBake.records.Count(record => record != null && record.category == category)
+                        : 0;
+                    if (count <= 0)
+                        continue;
+
+                    var categoryPage = new Page_AssetPackageBakeCategory(selectedBake, category);
+                    categoryPages.Add(category, categoryPage);
+                    builder.Add(CreateCategoryDefinition(categoryPage, count));
+                }
+            }
+
+        }
+
+        private ESMenuTreePageDefinition CreateHomeDefinition(Page_AssetPackageBakeHome page)
+        {
+            var imguiPage = new ESMenuTreeIMGUIPage<Page_AssetPackageBakeHome>(
+                    page,
+                    (_, state) => state.DrawHomePage(GetCurrentPageWidth()),
+                    false)
+                .WithOnDispose(state => state.OnPageDisable());
+            return new ESMenuTreePageDefinition(PageIdHome, PageNameHome, imguiPage)
+                .WithUnityIcon("d_Folder Icon")
+                .WithKeywords("资产包 烘焙 配置 新建 选择 Package Bake")
+                .WithLayout(ESMenuTreePageLayout.Wide, 1180f, 18f)
+                .WithSelectionFeedback("已打开资产包烘焙配置列表", ESEditorFeedbackSoundKind.Navigate)
+                .AddPageAction(new ESMenuTreePageAction(
+                        "asset-package.home.refresh",
+                        "刷新配置",
+                        "重新加载资产包烘焙配置列表。",
+                        context => context.RequestMenuRebuild())
+                    .WithUnityIcon("Refresh")
+                    .WithPriority(100));
+        }
+
+        private ESMenuTreePageDefinition CreateIndexDefinition(Page_AssetPackageBakeIndex page)
+        {
+            var imguiPage = new ESMenuTreeIMGUIPage<Page_AssetPackageBakeIndex>(
+                    page,
+                    (_, state) => state.DrawIndexPage(GetCurrentPageWidth()),
+                    false)
+                .WithOnDispose(state => state.OnPageDisable());
+            return new ESMenuTreePageDefinition(
+                    PageIdCurrentOverview,
+                    PageNameCurrent + "/总览",
+                    imguiPage)
+                .WithUnityIcon("d_UnityEditor.InspectorWindow")
+                .WithKeywords("当前配置 总览 路径 分类统计 导出 链路 回退")
+                .WithLayout(ESMenuTreePageLayout.Wide, 1380f, 18f)
+                .WithSelectionFeedback("已打开当前资产包配置总览", ESEditorFeedbackSoundKind.Navigate)
+                .AddPageAction(CreateSaveAction<Page_AssetPackageBakeIndex>(
+                    "asset-package.index.save", state => state.SaveBake()))
+                .AddPageAction(CreateBakeAction<Page_AssetPackageBakeIndex>(
+                    "asset-package.index.bake", state => state.bake))
+                .AddPageAction(CreateExportAction<Page_AssetPackageBakeIndex>(
+                    "asset-package.index.export", state => state.bake))
+                .AddPageAction(CreateRollbackAction<Page_AssetPackageBakeIndex>(
+                    "asset-package.index.rollback", state => state.bake));
+        }
+
+        private ESMenuTreePageDefinition CreateCategoryDefinition(
+            Page_AssetPackageBakeCategory page,
+            int count)
+        {
+            var imguiPage = new ESMenuTreeIMGUIPage<Page_AssetPackageBakeCategory>(
+                    page,
+                    (context, state) => state.DrawPreviewPage(GetCurrentPageWidth(), context),
+                    false)
+                .WithOnHide(state => state.SuspendPreviewResources())
+                .WithOnReleaseView(state => state.SuspendPreviewResources())
+                .WithOnDispose(state =>
+                {
+                    state.OnPageDisable();
+                    state.ReleasePreviewResources();
+                });
+            string displayName = GetCategoryDisplayName(page.category);
+            return new ESMenuTreePageDefinition(
+                    GetCategoryPageId(page.category),
+                    $"{PageNameCurrent}/{displayName} ({count})",
+                    imguiPage)
+                .WithUnityIcon(GetCategoryIconName(page.category))
+                .WithKeywords(displayName + " 分类 预览 搜索 排序 标记使用 导出")
+                .WithLayout(ESMenuTreePageLayout.Wide, 1380f, 18f)
+                .WithSelectionFeedback("已打开" + displayName + "分类", ESEditorFeedbackSoundKind.Navigate)
+                .AddPageAction(CreateSaveAction<Page_AssetPackageBakeCategory>(
+                    "asset-package.category.save", state => state.SaveBake()))
+                .AddPageAction(new ESMenuTreePageAction(
+                        "asset-package.category.refresh-preview",
+                        "刷新预览",
+                        "释放当前分类预览实例并刷新静态预览缓存。",
+                        context => context.GetPageState<Page_AssetPackageBakeCategory>()?.RefreshPreview())
+                    .WithUnityIcon("Refresh")
+                    .WithPriority(110))
+                .AddPageAction(new ESMenuTreePageAction(
+                        "asset-package.category.select-used",
+                        "选中已使用",
+                        "在 Project 窗口选中本分类已标记使用的资产。",
+                        context => context.GetPageState<Page_AssetPackageBakeCategory>()?.SelectUsedInCategory())
+                    .WithUnityIcon("d_Search Icon")
+                    .WithPriority(90))
+                .AddPageAction(new ESMenuTreePageAction(
+                        "asset-package.category.mark-all",
+                        "本类全用",
+                        "将当前分类全部标记为使用。",
+                        context => context.GetPageState<Page_AssetPackageBakeCategory>()?.MarkAllUsed())
+                    .WithUnityIcon("FilterSelectedOnly")
+                    .WithPriority(60))
+                .AddPageAction(new ESMenuTreePageAction(
+                        "asset-package.category.unmark-all",
+                        "本类全不使用",
+                        "取消当前分类全部使用标记。",
+                        context => context.GetPageState<Page_AssetPackageBakeCategory>()?.UnmarkAllUsed())
+                    .WithUnityIcon("FilterByLabel")
+                    .WithPriority(50))
+                .AddPageAction(CreateExportAction<Page_AssetPackageBakeCategory>(
+                    "asset-package.category.export", state => state.bake))
+                .AddPageAction(CreateRollbackAction<Page_AssetPackageBakeCategory>(
+                    "asset-package.category.rollback", state => state.bake));
+        }
+
+        private static ESMenuTreePageAction CreateSaveAction<TState>(
+            string id,
+            Action<TState> save)
+            where TState : class
+        {
+            return new ESMenuTreePageAction(
+                    id,
+                    "保存配置",
+                    "保存当前烘焙配置和使用标记。",
+                    context =>
+                    {
+                        TState state = context.GetPageState<TState>();
+                        if (state != null)
+                            save(state);
+                    })
+                .WithUnityIcon("SaveAs")
+                .WithSuccessFeedback("资产包烘焙配置已保存", ESEditorFeedbackSoundKind.Confirm)
+                .WithPriority(120);
+        }
+
+        private static ESMenuTreePageAction CreateBakeAction<TState>(
+            string id,
+            Func<TState, ESAssetPackageBakeData> getBake)
+            where TState : class
+        {
+            return new ESMenuTreePageAction(
+                    id,
+                    "重新烘焙",
+                    "重新扫描目标文件夹并建立分类记录。",
+                    context =>
+                    {
+                        TState state = context.GetPageState<TState>();
+                        ESAssetPackageBakeData bake = state != null ? getBake(state) : null;
+                        if (bake == null)
+                            return;
+                        ESAssetPackageBakeUtility.Bake(bake);
+                        SelectBake(bake, true);
+                    })
+                .WithUnityIcon("d_Refresh")
+                .WithPriority(110);
+        }
+
+        private static ESMenuTreePageAction CreateExportAction<TState>(
+            string id,
+            Func<TState, ESAssetPackageBakeData> getBake)
+            where TState : class
+        {
+            return new ESMenuTreePageAction(
+                    id,
+                    "复制勾选资产",
+                    "执行依赖通报后，将全部已标记使用的资产复制到分类目录。",
+                    context =>
+                    {
+                        TState state = context.GetPageState<TState>();
+                        ESAssetPackageBakeData bake = state != null ? getBake(state) : null;
+                        if (bake == null)
+                            return;
+                        ESAssetPackageBakeUtility.ExportSelectedAssetsByCategory(bake);
+                        SelectBake(bake, true);
+                    })
+                .WithUnityIcon("BuildSettings.Editor.Small")
+                .When(context =>
+                {
+                    TState state = context.GetPageState<TState>();
+                    ESAssetPackageBakeData bake = state != null ? getBake(state) : null;
+                    return bake?.records != null && bake.records.Any(record => record != null && record.selectedForUse);
+                })
+                .WithPriority(100);
+        }
+
+        private static ESMenuTreePageAction CreateRollbackAction<TState>(
+            string id,
+            Func<TState, ESAssetPackageBakeData> getBake)
+            where TState : class
+        {
+            return new ESMenuTreePageAction(
+                    id,
+                    "回退最近导出",
+                    "经确认后回退最近一次导出会话。",
+                    context =>
+                    {
+                        TState state = context.GetPageState<TState>();
+                        ESAssetPackageBakeData bake = state != null ? getBake(state) : null;
+                        if (bake == null)
+                            return;
+                        ESAssetPackageBakeUtility.RollbackLastExport(bake);
+                        SelectBake(bake, true);
+                    })
+                .WithUnityIcon("TreeEditor.Trash")
+                .When(context =>
+                {
+                    TState state = context.GetPageState<TState>();
+                    ESAssetPackageBakeData bake = state != null ? getBake(state) : null;
+                    return bake?.exportSessions != null && bake.exportSessions.Count > 0;
+                })
+                .WithPriority(10);
+        }
+
+        private static float GetCurrentPageWidth()
+        {
+            float width = EditorGUIUtility.currentViewWidth - 24f;
+            if (float.IsNaN(width) || float.IsInfinity(width))
+                width = 1120f;
+            return Mathf.Clamp(width, 760f, 1380f);
         }
 
         private static void LoadSelectedBakeFromPrefs()
@@ -172,102 +376,30 @@ namespace ES
                 EditorPrefs.SetString(PrefKeySelectedBakeGuid, guid);
         }
 
-        private static void SaveCurrentPage(string pageKind, ESAssetPackageCategory? category)
+        private static void LocateSelectedBake()
         {
-            EditorPrefs.SetString(PrefKeyLastPageKind, pageKind ?? PageKindHome);
-            if (category.HasValue)
-                EditorPrefs.SetInt(PrefKeyLastCategory, (int)category.Value);
-        }
-
-        private void ScheduleRestoreMenuSelection()
-        {
-            string pageKind = EditorPrefs.GetString(PrefKeyLastPageKind, PageKindHome);
-            int categoryValue = EditorPrefs.GetInt(PrefKeyLastCategory, -1);
-            EditorApplication.delayCall += () =>
-            {
-                if (UsingWindow != this || MenuTree == null)
-                    return;
-
-                OdinMenuItem item = null;
-                if (pageKind == PageKindIndex)
-                {
-                    MenuItems.TryGetValue(PageNameCurrent + "/总览", out item);
-                }
-                else if (pageKind == PageKindCategory && Enum.IsDefined(typeof(ESAssetPackageCategory), categoryValue))
-                {
-                    string prefix = PageNameCurrent + "/" + GetCategoryDisplayName((ESAssetPackageCategory)categoryValue);
-                    item = MenuItems.FirstOrDefault(pair => pair.Key.StartsWith(prefix, StringComparison.Ordinal)).Value;
-                }
-                else
-                {
-                    MenuItems.TryGetValue(PageNameHome, out item);
-                }
-
-                if (item == null)
-                    return;
-
-                SetMenuItemExpandedRecursive(item, true);
-                MenuTree.Selection.Clear();
-                MenuTree.Selection.Add(item);
-                Repaint();
-            };
-        }
-
-        private static void SetMenuItemExpandedRecursive(OdinMenuItem item, bool expanded)
-        {
-            OdinMenuItem current = item;
-            while (current != null)
-            {
-                SetMenuItemExpanded(current, expanded);
-                current = GetParentMenuItem(current);
-            }
-        }
-
-        private static OdinMenuItem GetParentMenuItem(OdinMenuItem item)
-        {
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-            return item?.GetType().GetProperty("Parent", flags)?.GetValue(item, null) as OdinMenuItem;
-        }
-
-        private static void SetMenuItemExpanded(OdinMenuItem item, bool expanded)
-        {
-            if (item == null)
+            if (selectedBake == null)
                 return;
-
-            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-            Type type = item.GetType();
-            PropertyInfo property = type.GetProperty("Toggled", flags)
-                ?? type.GetProperty("IsExpanded", flags)
-                ?? type.GetProperty("Expanded", flags);
-            if (property != null && property.CanWrite && property.PropertyType == typeof(bool))
-            {
-                property.SetValue(item, expanded);
-                return;
-            }
-
-            FieldInfo field = type.GetField("Toggled", flags)
-                ?? type.GetField("IsExpanded", flags)
-                ?? type.GetField("Expanded", flags);
-            if (field != null && field.FieldType == typeof(bool))
-                field.SetValue(item, expanded);
+            Selection.activeObject = selectedBake;
+            EditorGUIUtility.PingObject(selectedBake);
         }
 
-        private static SdfIconType GetCategoryIcon(ESAssetPackageCategory category)
+        private static string GetCategoryIconName(ESAssetPackageCategory category)
         {
             switch (category)
             {
-                case ESAssetPackageCategory.Prefab: return SdfIconType.Box;
-                case ESAssetPackageCategory.Scene: return SdfIconType.Map;
-                case ESAssetPackageCategory.Material: return SdfIconType.Palette;
-                case ESAssetPackageCategory.Texture: return SdfIconType.Image;
-                case ESAssetPackageCategory.Model: return SdfIconType.Grid;
-                case ESAssetPackageCategory.Audio: return SdfIconType.Play;
-                case ESAssetPackageCategory.Animation: return SdfIconType.Play;
-                case ESAssetPackageCategory.ScriptableObject: return SdfIconType.FileEarmarkCode;
-                case ESAssetPackageCategory.Shader: return SdfIconType.Lightbulb;
-                case ESAssetPackageCategory.Font: return SdfIconType.FileEarmarkCode;
-                case ESAssetPackageCategory.Video: return SdfIconType.Play;
-                default: return SdfIconType.Search;
+                case ESAssetPackageCategory.Prefab: return "d_Prefab Icon";
+                case ESAssetPackageCategory.Scene: return "d_SceneAsset Icon";
+                case ESAssetPackageCategory.Material: return "d_Material Icon";
+                case ESAssetPackageCategory.Texture: return "d_Texture Icon";
+                case ESAssetPackageCategory.Model: return "d_Mesh Icon";
+                case ESAssetPackageCategory.Audio: return "d_AudioClip Icon";
+                case ESAssetPackageCategory.Animation: return "d_AnimationClip Icon";
+                case ESAssetPackageCategory.ScriptableObject: return "d_ScriptableObject Icon";
+                case ESAssetPackageCategory.Shader: return "d_Shader Icon";
+                case ESAssetPackageCategory.Font: return "d_Font Icon";
+                case ESAssetPackageCategory.Video: return "d_VideoClip Icon";
+                default: return "d_DefaultAsset Icon";
             }
         }
 
@@ -641,27 +773,6 @@ namespace ES
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField($"总数 {bake.totalAssetCount} | 已使用 {bake.selectedUseCount} | 最后烘焙 {SafeText(bake.lastBakeTime)}", EditorStyles.miniLabel);
-                    GUILayout.FlexibleSpace();
-                    if (GUILayout.Button("保存配置", GUILayout.Width(76)))
-                        SaveBake();
-                    if (GUILayout.Button("重新烘焙", GUILayout.Width(76)))
-                    {
-                        ESAssetPackageBakeUtility.Bake(bake);
-                        ESAssetPackageBakeWindow.SelectBake(bake, true);
-                    }
-                    if (GUILayout.Button("复制勾选资产", GUILayout.Width(96)))
-                    {
-                        ESAssetPackageBakeUtility.ExportSelectedAssetsByCategory(bake);
-                        ESAssetPackageBakeWindow.SelectBake(bake, true);
-                    }
-                    using (new EditorGUI.DisabledScope(bake.exportSessions == null || bake.exportSessions.Count == 0))
-                    {
-                        if (GUILayout.Button("回退最近导出", GUILayout.Width(98)))
-                        {
-                            ESAssetPackageBakeUtility.RollbackLastExport(bake);
-                            ESAssetPackageBakeWindow.SelectBake(bake, true);
-                        }
-                    }
                 }
                 EditorGUILayout.Space(4);
                 DrawExportStateBanner(width);
@@ -893,7 +1004,7 @@ namespace ES
             }
         }
 
-        private void SaveBake()
+        public void SaveBake()
         {
             bake.EnsureCategoryFolderSettings();
             bake.RebuildStats();
@@ -1001,6 +1112,7 @@ namespace ES
         [NonSerialized] private int gridAnimationViewIndex = 0;
         [NonSerialized] private string gridAnimationPriorityScope = string.Empty;
         [NonSerialized] private int gridAnimationPriorityGeneration;
+        [NonSerialized] private ESMenuTreePageContext pageContext;
         [NonSerialized] private readonly Dictionary<string, ESAssetPackageAnimationPreviewPlayer> gridAnimationPlayers = new Dictionary<string, ESAssetPackageAnimationPreviewPlayer>();
         [NonSerialized] private readonly Dictionary<string, double> gridAnimationLastSeen = new Dictionary<string, double>();
         [NonSerialized] private readonly HashSet<string> gridAnimationVisibleKeys = new HashSet<string>();
@@ -1101,8 +1213,11 @@ namespace ES
             DrawPreviewPage(Mathf.Max(760f, EditorGUIUtility.currentViewWidth));
         }
 
-        public void DrawPreviewPage(float pageWidth)
+        public void DrawPreviewPage(
+            float pageWidth,
+            ESMenuTreePageContext context = null)
         {
+            pageContext = context;
             if (bake == null)
             {
                 EditorGUILayout.HelpBox("未选择烘焙数据。", MessageType.Warning);
@@ -1198,6 +1313,20 @@ namespace ES
             ClearGridAnimationPlayers();
         }
 
+        public void SuspendPreviewResources()
+        {
+            pageContext = null;
+            SuspendGridAnimationPlayers();
+        }
+
+        public void RefreshPreview()
+        {
+            ClearGridAnimationPlayers();
+            ESAssetPackagePreviewWorkflow.RefreshStaticPreviewCache(
+                Mathf.Max(256, itemsPerPage * 4));
+            ESAssetPackageBakeWindow.UsingWindow?.Repaint();
+        }
+
         private void DrawToolbar(float pageWidth)
         {
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(pageWidth)))
@@ -1205,29 +1334,6 @@ namespace ES
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField(Summary, EditorStyles.boldLabel);
-                    GUILayout.FlexibleSpace();
-
-                    if (GUILayout.Button("本类全用", EditorStyles.toolbarButton, GUILayout.Width(74)))
-                        MarkAllUsed();
-                    if (GUILayout.Button("本类全不使用", EditorStyles.toolbarButton, GUILayout.Width(90)))
-                        UnmarkAllUsed();
-                    if (GUILayout.Button("选中已使用", EditorStyles.toolbarButton, GUILayout.Width(86)))
-                        SelectUsedInCategory();
-                    if (GUILayout.Button("保存", EditorStyles.toolbarButton, GUILayout.Width(52)))
-                        SaveBake();
-                    if (GUILayout.Button("复制勾选资产", EditorStyles.toolbarButton, GUILayout.Width(96)))
-                    {
-                        ESAssetPackageBakeUtility.ExportSelectedAssetsByCategory(bake);
-                        ESAssetPackageBakeWindow.SelectBake(bake, true);
-                    }
-                    using (new EditorGUI.DisabledScope(bake == null || bake.exportSessions == null || bake.exportSessions.Count == 0))
-                    {
-                        if (GUILayout.Button("回退导出", EditorStyles.toolbarButton, GUILayout.Width(74)))
-                        {
-                            ESAssetPackageBakeUtility.RollbackLastExport(bake);
-                            ESAssetPackageBakeWindow.SelectBake(bake, true);
-                        }
-                    }
                 }
 
                 using (new EditorGUILayout.HorizontalScope())
@@ -1246,14 +1352,6 @@ namespace ES
                     DrawCopyFilterButton("已复制", ESAssetPackageCopyFilter.Copied, 58);
                     DrawCopyFilterButton("未复制", ESAssetPackageCopyFilter.NotCopied, 58);
                     DrawCopyFilterButton("目标丢失", ESAssetPackageCopyFilter.MissingTarget, 70);
-
-
-                    if (GUILayout.Button("刷新预览", GUILayout.Width(76)))
-                    {
-                        ClearGridAnimationPlayers();
-                        ESAssetPackagePreviewWorkflow.RefreshStaticPreviewCache(Mathf.Max(256, itemsPerPage * 4));
-                        ESAssetPackageBakeWindow.UsingWindow?.Repaint();
-                    }
                 }
 
                 using (new EditorGUILayout.HorizontalScope())
@@ -1516,7 +1614,13 @@ namespace ES
             {
                 record.selectedForUse = newUse;
                 SetSelectedRecord(record);
+                int recordCount = bake.records != null ? bake.records.Count : 0;
+                bake.selectedUseCount = Mathf.Clamp(
+                    bake.selectedUseCount + (newUse ? 1 : -1),
+                    0,
+                    recordCount);
                 EditorUtility.SetDirty(bake);
+                pageContext?.RefreshPageActions();
                 Event.current.Use();
             }
 
@@ -2104,7 +2208,7 @@ namespace ES
         }
     }
 
-    public class ESAssetPackageRecordPreviewWindow : EditorWindow
+    public class ESAssetPackageRecordPreviewWindow : ESSinglePageIMGUIWindow<ESAssetPackageRecordPreviewWindow>
     {
         private const string PrefKeyBakeGuid = "ES.AssetPackageRecordPreviewWindow.BakeGuid";
         private const string PrefKeyRecordId = "ES.AssetPackageRecordPreviewWindow.RecordId";
@@ -2143,14 +2247,60 @@ namespace ES
                 Selection.activeObject = asset;
             window.Show();
             window.Focus();
+            window.ESWindow_CurrentPageContext?.RefreshPageActions();
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent()
+        {
+            return new GUIContent(
+                record != null ? "预览: " + record.assetName : "资产完整预览",
+                "查看资产包记录、复制链路和分类专属预览");
+        }
+
+        protected override string ESWindow_Subtitle => "资产包记录与完整内容预览";
+        protected override Vector2 ESWindow_MinSize => new Vector2(520f, 640f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(820f, 820f);
+        protected override string ESWindow_PageStableId => "asset-package.record-preview";
+        protected override string ESWindow_PageTitle => "资产完整预览";
+        protected override string ESWindow_PageKeywords => "资产包 Bake Record 预览 模型 动画 复制链路";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "asset-preview.locate",
+                    "定位资源",
+                    "在 Project 中选中并定位当前记录资源。",
+                    context =>
+                    {
+                        record.SelectAsset();
+                        record.Ping();
+                        context.SetStatus("已定位当前资产包记录资源");
+                    })
+                .When(() => record != null)
+                .WithUnityIcon("Project")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "asset-preview.open",
+                    "打开资源",
+                    "使用 Unity 默认编辑器打开当前资源。",
+                    _ =>
+                    {
+                        UnityEngine.Object asset = record?.LoadAsset();
+                        if (asset != null)
+                            AssetDatabase.OpenAsset(asset);
+                    })
+                .When(() => record != null)
+                .WithUnityIcon("UnityEditor.InspectorWindow")
+                .WithPriority(90));
+        }
+
+        protected override void ESWindow_OnHostEnable()
         {
             RestoreWindowState();
         }
 
-        private void OnDisable() 
+        protected override void ESWindow_OnHostDisable()
         {
             SaveWindowState();
             ReleasePreviewResources();
@@ -2161,9 +2311,8 @@ namespace ES
             animationPreview.Dispose();
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
-            RestoreWindowState();
             if (record == null)
             {
                 EditorGUILayout.HelpBox("没有可预览资源。", MessageType.Warning);
@@ -2180,21 +2329,14 @@ namespace ES
                 EditorGUILayout.LabelField("大小", record.fileSize);
                 DrawExportLinkInfo();
 
-                using (new EditorGUILayout.HorizontalScope())
+                bool newUse = GUILayout.Toggle(
+                    record.selectedForUse,
+                    record.selectedForUse ? "已标记使用" : "未标记使用",
+                    EditorStyles.toolbarButton);
+                if (newUse != record.selectedForUse)
                 {
-                    bool newUse = GUILayout.Toggle(record.selectedForUse, record.selectedForUse ? "已标记使用" : "未标记使用", EditorStyles.toolbarButton);
-                    if (newUse != record.selectedForUse)
-                    {
-                        record.selectedForUse = newUse;
-                        SaveBake();
-                    }
-
-                    if (GUILayout.Button("Ping", GUILayout.Width(70)))
-                        record.Ping();
-                    if (GUILayout.Button("选中", GUILayout.Width(70)))
-                        record.SelectAsset();
-                    if (GUILayout.Button("打开", GUILayout.Width(70)) && asset != null)
-                        AssetDatabase.OpenAsset(asset);
+                    record.selectedForUse = newUse;
+                    SaveBake();
                 }
             }
 

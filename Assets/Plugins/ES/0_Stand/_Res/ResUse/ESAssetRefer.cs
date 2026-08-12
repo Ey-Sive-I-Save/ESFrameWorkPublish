@@ -19,6 +19,12 @@ namespace ES
     public static class ESAssetReferEditorBridge
     {
         public static Action<ESAssetPage> OpenRegistryPage;
+        public static Action<UnityEngine.Object> OpenAssetRegistration;
+        public static Action<ESAssetPage, int, string> OpenAssetKeyUpdate;
+        public static Action<ESAssetLibrary> NotifyAssetLibraryChanged;
+        public static Action<ScriptableObject, ESAssetLibraryConsumer> OpenGameCoreRootRegistration;
+        public static Action<ESAssetLibraryConsumer> OpenConsumerSynchronization;
+        public static Func<bool> IsAuthoringWriteLocked;
     }
 #endif
 
@@ -309,7 +315,6 @@ namespace ES
             if (newAsset != null)
             {
                 SetEditorAssetIdentity(newAsset);
-                TryAutoCollectAsset(newAsset);
                 TryResolveCollectedKey(newAsset);
             }
             else
@@ -513,17 +518,12 @@ namespace ES
         {
             if (_editorAsset == null)
                 return;
-            ESAssetLibrary library = ESGlobalResToolsSupportConfig.CollectAssetToRecommendedLibrary(
-                _editorAsset, showConfirmDialog: false, silent: false);
-            if (library == null)
+            if (ESAssetReferEditorBridge.OpenAssetRegistration == null)
             {
-                Debug.LogWarning("[ESRes][Register] 当前资产没有匹配的 Library 收集规则。", _editorAsset);
+                Debug.LogError("[ESRes][Register] 统一内容注册入口尚未初始化。", _editorAsset);
                 return;
             }
-            library.InjectToAssetRegistryEditor();
-            BeginEditorChange("注册并同步 ESAssetRefer");
-            TryResolveCollectedKey(_editorAsset);
-            CommitEditorChange();
+            ESAssetReferEditorBridge.OpenAssetRegistration(_editorAsset);
         }
 
         private void RenameStringKey(ESAssetPage page, string newKey)
@@ -534,43 +534,22 @@ namespace ES
                 Debug.LogWarning("[ESRes][Register] String Key 不能为空。", _editorAsset);
                 return;
             }
-            ESAssetLibrary library = RecordLibraryUndo(page, "修改资源 String Key");
-            BeginEditorChange("同步 ESAssetRefer String Key");
-            if (ESAssetRegistry.RenameStringKey(page, newKey))
+            if (ESAssetReferEditorBridge.OpenAssetKeyUpdate == null)
             {
-                SetResolvedAssetTableKey(page.Kind, page.EnumKey, page.EffectiveStringKey);
-                PersistLibraryAndRefer(library);
+                Debug.LogError("[ESRes][Register] 统一 Key 迁移入口尚未初始化。", _editorAsset);
+                return;
             }
+            ESAssetReferEditorBridge.OpenAssetKeyUpdate(page, page.EnumKey, newKey);
         }
 
         private void RenameEnumKey(ESAssetPage page, int newKey)
         {
-            ESAssetLibrary library = RecordLibraryUndo(page, "修改资源 Enum Key");
-            BeginEditorChange("同步 ESAssetRefer Enum Key");
-            if (ESAssetRegistry.RenameEnumKey(page, newKey))
+            if (ESAssetReferEditorBridge.OpenAssetKeyUpdate == null)
             {
-                SetResolvedAssetTableKey(page.Kind, page.EnumKey, page.EffectiveStringKey);
-                PersistLibraryAndRefer(library);
+                Debug.LogError("[ESRes][Register] 统一 Key 迁移入口尚未初始化。", _editorAsset);
+                return;
             }
-        }
-
-        private void PersistLibraryAndRefer(ESAssetLibrary library)
-        {
-            if (library != null)
-                EditorUtility.SetDirty(library);
-            CommitEditorChange();
-            AssetDatabase.SaveAssets();
-        }
-
-        private static ESAssetLibrary RecordLibraryUndo(ESAssetPage page, string action)
-        {
-            if (page == null || string.IsNullOrEmpty(page.SourceLibrary))
-                return null;
-            string path = AssetDatabase.GUIDToAssetPath(page.SourceLibrary);
-            ESAssetLibrary library = string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<ESAssetLibrary>(path);
-            if (library != null)
-                Undo.RecordObject(library, action);
-            return library;
+            ESAssetReferEditorBridge.OpenAssetKeyUpdate(page, newKey, page.EffectiveStringKey);
         }
 
         private static void PingSourceLibrary(ESAssetPage page)
@@ -677,45 +656,6 @@ namespace ES
         /// <summary>加载到合法业务前缀的 StringKey 资源域；首次使用会自动创建。</summary>
         public UniTask<T> LoadAsync(string scopeKey, CancellationToken cancellationToken = default)
             => ESAssets.LoadAsync(this, scopeKey, cancellationToken);
-
-        #endregion
-
-        #region 编辑器自动收集
-        
-#if UNITY_EDITOR
-        /// <summary>
-        /// 检测资产收集状态并提示
-        /// 集成 ESGlobalResToolsSupportConfig 的自动收集功能
-        /// </summary>
-        /// <param name="asset">资产对象</param>
-        private void TryAutoCollectAsset(UnityEngine.Object asset)
-        {
-            if (asset == null) return;
-            
-            try
-            {
-                // 调用全局配置的收集方法
-                var collectedLibrary = ESGlobalResToolsSupportConfig.CollectAssetToRecommendedLibrary(
-                    asset, 
-                    showConfirmDialog: true,  // 拖入时弹窗确认
-                    silent: false             // 输出日志
-                );
-                
-                // CollectAssetToRecommendedLibrary 已经处理所有逻辑：
-                // - 类型判断
-                // - 去重检查
-                // - 优先级查找
-                // - 弹窗确认
-                // - 实际收集
-                // - 日志输出
-            }
-            catch (System.Exception ex)
-            {
-                // 仅在出现异常时输出错误
-                UnityEngine.Debug.LogError($"[ESAssetRefer] 资产收集状态检测失败: {ex.Message}\n{ex.StackTrace}");
-            }
-        }
-#endif
 
         #endregion
 
@@ -974,7 +914,6 @@ namespace ES
             BeginEditorChange("修改场景引用");
             _editorScene = newScene;
             SetAssetIdentity(ESStandUtility.SafeEditor.GetAssetGUID(newScene), 0);
-            ESGlobalResToolsSupportConfig.CollectAssetToRecommendedLibrary(newScene, showConfirmDialog: true, silent: false);
             if (ESAssetRegistry.TryGetByAssetIdentity(ESAssetReferKind.Scene, _guid, 0, out ESAssetPage page))
                 SetResolvedAssetTableKey(page.Kind, page.EnumKey, page.EffectiveStringKey);
             else

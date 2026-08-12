@@ -1,9 +1,8 @@
 {
-    "name": "ESInstaller",
-    "rootNamespace": "",
+    "name": "ES_Stand.Dialog.Tests",
+    "rootNamespace": "ES.Tests",
     "references": [
-        "ES_Stand",
-        "ES_Editor"
+        "ES_Stand"
     ],
     "includePlatforms": [
         "Editor"
@@ -15,5 +14,8 @@
     "autoReferenced": false,
     "defineConstraints": [],
     "versionDefines": [],
-    "noEngineReferences": false
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
 }

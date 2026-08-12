@@ -104,6 +104,19 @@ MonoBehaviour:
       AssetTypeName: UnityEngine.GameObject
       SourceLibrary: bd6a374707a713e4eb09b6802f8fe4aa
       SourceBook: "\u9ED8\u8BA4 \u9ED8\u8BA4\u9884\u5236\u4F53Book"
+    - Name: "\u5927\u957F\u6761"
+      ColorTag: 0
+      namedOption: 0
+      OB: {fileID: 1579695714562835741, guid: bf2dc9bca456f2848b25fc58ea478f1f, type: 3}
+      Kind: 1
+      EnumKey: 0
+      StringKey: prefab.weapon.melee.long_bar
+      AssetGuid: bf2dc9bca456f2848b25fc58ea478f1f
+      LocalFileId: 0
+      AssetPath: "Assets/ESNormalAssets/WeaponPrototypes/\u5927\u957F\u6761.prefab"
+      AssetTypeName: UnityEngine.GameObject
+      SourceLibrary: bd6a374707a713e4eb09b6802f8fe4aa
+      SourceBook: "\u9ED8\u8BA4 \u9ED8\u8BA4\u9884\u5236\u4F53Book"
   DefaultSceneBook:
     Name: "\u9ED8\u8BA4 \u573A\u666F Book"
     WritableDefaultMessageOnEditor: 0

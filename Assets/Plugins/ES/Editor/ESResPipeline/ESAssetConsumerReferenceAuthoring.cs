@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using ES.EditorInternal;
 using UnityEditor;
 using UnityEngine;
 
@@ -11,25 +10,9 @@ namespace ES
     /// Consumer 引用的显式编辑入口。所有源资产写入都由用户操作触发，
     /// 与只分析并输出 Catalog/ReferenceGraph 的 ESAssetReferenceBaker 分离。
     /// </summary>
-    public static class ESAssetConsumerReferenceAuthoring
+    internal static class ESAssetConsumerReferenceAuthoring
     {
-        public static void SyncConsumerGameCoreAssets(ESAssetLibraryConsumer consumer)
-        {
-            if (consumer == null) throw new ArgumentNullException(nameof(consumer));
-            List<ESAssetLibrary> libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>()
-                ?.Where(item => item != null).ToList() ?? new List<ESAssetLibrary>();
-            Undo.RecordObject(consumer, "Sync Consumer GameCore Assets");
-            consumer.EnsureStableIdentity();
-            List<string> errors = ESAssetReferenceBaker.BuildConsumerGameCoreSnapshot(
-                consumer, libraries, out List<ESAssetReferBase> generated);
-            consumer.GameCoreAssets = generated.GroupBy(item => item.AssetIdentity).Select(group => group.First()).ToList();
-            consumer.GameCoreValidationErrors = errors.Distinct(StringComparer.Ordinal).ToList();
-            EditorUtility.SetDirty(consumer);
-            AssetDatabase.SaveAssets();
-            if (errors.Count > 0) throw new InvalidOperationException(string.Join("\n", errors));
-        }
-
-        public static bool TryAddManualGameCoreAsset(ESAssetLibraryConsumer consumer, UnityEngine.Object asset)
+        internal static bool TryAddManualGameCoreAsset(ESAssetLibraryConsumer consumer, UnityEngine.Object asset)
         {
             if (consumer == null || !(asset is ScriptableObject scriptableObject)
                 || ESScriptableObjectClassification.GetClass(scriptableObject) != ESScriptableObjectClass.GameCore)
@@ -47,7 +30,7 @@ namespace ES
             return true;
         }
 
-        public static bool TryAddResidentAsset(ESAssetLibraryConsumer consumer, UnityEngine.Object asset, out string error)
+        internal static bool TryAddResidentAsset(ESAssetLibraryConsumer consumer, UnityEngine.Object asset, out string error)
         {
             error = string.Empty;
             if (consumer == null || asset == null)

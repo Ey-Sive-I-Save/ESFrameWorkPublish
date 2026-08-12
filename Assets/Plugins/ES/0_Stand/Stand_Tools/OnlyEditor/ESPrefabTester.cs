@@ -15,7 +15,7 @@ namespace ES
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
-    [AddComponentMenu("ES/Editor/Prefab Tester")]
+    [AddComponentMenu("【ES】/开发与验证/编辑器/Prefab Tester")]
     public sealed class ESPrefabTester : MonoBehaviour
     {
         [SerializeField, HideInInspector]

@@ -991,7 +991,7 @@ namespace ES
 
     /// <summary>将资源计划绑定到 GameObject 生命周期，无需编写加载和释放代码。</summary>
     [DisallowMultipleComponent]
-    [AddComponentMenu("【ES】/资源与发布/运行时组件/资源计划绑定器")]
+    [AddComponentMenu("【ES】/资源/资源计划绑定器")]
     public sealed class ESResourcePlanBinder : MonoBehaviour
     {
         [SerializeField, LabelText("资源计划"), Tooltip("此对象启用期间需要使用的资源计划。")]

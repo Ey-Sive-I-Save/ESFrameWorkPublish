@@ -144,7 +144,7 @@ namespace ES
                 "992a331a462668449953985468822d17")
         };
 
-        [MenuItem("【ES】/开发与维护/审计/Mono脚本名称与GUID")]
+        [MenuItem("【ES】/验证与诊断/静态审计/Mono脚本名称与GUID")]
         private static void RunAndLog()
         {
             List<string> errors = new List<string>(Contracts.Length * 2);
@@ -238,7 +238,7 @@ namespace ES
     {
         private static readonly string[] AssetSearchRoots = { "Assets" };
 
-        [MenuItem("【ES】/开发与维护/审计/音频内容与对象池")]
+        [MenuItem("【ES】/验证与诊断/静态审计/音频内容与对象池")]
         private static void RunAndLog()
         {
             var errors = new List<string>(32);

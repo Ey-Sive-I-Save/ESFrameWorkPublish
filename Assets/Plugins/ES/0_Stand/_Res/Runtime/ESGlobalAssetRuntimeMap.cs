@@ -9,7 +9,7 @@ namespace ES
     /// <summary>
     /// 全局运行时资产映射：只负责稳定资产身份到当前构建物理加载位置的映射。
     /// </summary>
-    [CreateAssetMenu(menuName = "【ES】/资源与发布/运行时配置/全局资源运行时映射")]
+    [CreateAssetMenu(menuName = "【ES】/资源管线/运行时配置/全局资源运行时映射")]
     public class ESGlobalAssetRuntimeMap : ScriptableObject
     {
         [FormerlySerializedAs("packages")]

@@ -124,9 +124,12 @@ Unity 的 `SceneManager.LoadSceneAsync` 一旦启动，不能可靠中止。
 
 旧 V1/V3 产物不能因为文件存在就被当成当前发布成功。清理旧产物必须是独立、显式、可确认的动作，不能成为 Bake 的隐式副作用。
 
-### Legacy Graph/NodeRunner
+### Stable Graph V2
 
-GraphView/NodeRunner 当前不作为正式商业扩展能力宣传。稳定身份、Undo、迁移、运行时快照和新增类型垂直切片完成前，不能把它描述为稳定生产工具。
+Legacy Graph/NodeRunner 已删除，不再作为兼容或商业入口。正式图基础统一为
+`ESGraphAsset -> ESBakedGraphSnapshot -> Domain Baked Plan`；Stable Graph V2 当前处于
+`Verifying`，只有在 Unity Test Runner、真实 Automation RunRecord 闭环、失败恢复和性能证据齐备后，
+才可宣传为稳定生产能力。
 
 ## 宣传升级门槛
 

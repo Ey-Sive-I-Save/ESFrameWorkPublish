@@ -14,7 +14,7 @@ namespace ES
     }
 
     /// <summary>三关几何资源验收的 GameCore 根。构建时应放入 Consumer 的启动 GameCore 列表。</summary>
-    [CreateAssetMenu(fileName = "ESLevelAssetValidationGameCore", menuName = "【ES】/示例与测试/资源卸载验收/关卡 GameCore")]
+    [CreateAssetMenu(fileName = "ESLevelAssetValidationGameCore", menuName = "【ES】/示例/资源卸载验收/关卡 GameCore")]
     public sealed class ESLevelAssetValidationGameCore : ScriptableObject, IGameCoreSO
     {
         public const string TableKey = "es_level_asset_validation";

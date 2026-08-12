@@ -39,6 +39,11 @@ namespace ES
         [Tooltip("为安全内容容器应用 ES 纯色表面，并染色已有控件背景；不填充窗口根节点，不遮挡原生内容。仅支持 Unity 2022.3，可随时恢复，进入 PlayMode 时自动停用。")]
         public bool enableDeepEditorSkin = false;
 
+        [Title("ES 品牌字体")]
+        [LabelText("启用品牌标题字体")]
+        [Tooltip("使用随包分发的中文圆体，仅作用于 ES 自有窗口的标题、数字和徽章。正文、输入框、日志、代码与路径继续使用 Unity 默认字体。")]
+        public bool enableBrandTypography = true;
+
         [Title("交互反馈与动效")]
         [LabelText("启用编辑器动效")]
         [Tooltip("控制选中呼吸、状态闪光和轻量扫光。关闭后所有界面仍保持完整信息和颜色语义。")]
@@ -93,6 +98,7 @@ namespace ES
             useCustomPalette = true;
             enableGlobalEditorShell = true;
             enableDeepEditorSkin = false;
+            enableBrandTypography = true;
             enableMotion = true;
             motionIntensity = 0.78f;
 

@@ -67,6 +67,7 @@ namespace ES
         [NonSerialized] private ESRuntimeSceneHandle testSceneHandle;
 
         [TitleGroup("Test Root")]
+        [ESConfigKeyUsage(ESConfigKeyUsage.Declaration)]
         [HideLabel, InlineProperty]
         public ESFlowTestConfigKey testKey = new ESFlowTestConfigKey
         {

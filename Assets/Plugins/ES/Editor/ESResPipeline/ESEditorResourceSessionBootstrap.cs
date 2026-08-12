@@ -32,6 +32,7 @@ namespace ES
     {
         internal readonly List<ESRuntimeCatalog> catalogs = new List<ESRuntimeCatalog>();
         internal readonly List<string> failures = new List<string>();
+        internal readonly List<string> blockingFailures = new List<string>();
         internal int discoveredFileCount;
         internal int expectedBusinessEntryCount;
         internal int injectedBusinessEntryCount;
@@ -40,11 +41,27 @@ namespace ES
         internal string catalogSetFingerprint = string.Empty;
 
         internal bool HasFailures => failures.Count > 0;
+        internal bool HasBlockingFailures => blockingFailures.Count > 0;
+        internal bool CanContinueDegraded => HasFailures && !HasBlockingFailures;
 
         internal void AddFailure(string message)
         {
-            if (!string.IsNullOrWhiteSpace(message) && !failures.Contains(message))
+            AddFailure(message, true);
+        }
+
+        internal void AddDegradableFailure(string message)
+        {
+            AddFailure(message, false);
+        }
+
+        private void AddFailure(string message, bool blocking)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return;
+            if (!failures.Contains(message))
                 failures.Add(message);
+            if (blocking && !blockingFailures.Contains(message))
+                blockingFailures.Add(message);
         }
 
         internal string BuildMessage()
@@ -145,7 +162,6 @@ namespace ES
             SessionState.SetString(CatalogRecoveryCatalogFingerprintKey, string.Empty);
             SessionState.SetString(CatalogRecoveryConfigTableGenerationKey, string.Empty);
             SessionState.SetString(CatalogRecoveryDomainEpochKey, string.Empty);
-            SessionState.SetBool(CatalogRecoveryPromptShownKey, false);
         }
 
         private static string RecoveryTransactionId
@@ -231,12 +247,22 @@ namespace ES
                     + " 批处理模式禁止在 PlayMode 内请求编辑器烘焙。");
             if (SessionState.GetBool(CatalogRecoveryPromptShownKey, false))
             {
-                Debug.LogError("[ESRes][CatalogRecovery] 已在本次编辑器会话询问过恢复操作，继续使用降级模式。\n"
+                if (report.HasBlockingFailures)
+                {
+                    Debug.LogError("[ESRes][CatalogRecovery] 本次 PlayMode 已显示过恢复提示，但随后发现 Catalog 完整性故障；禁止降级并停止本次运行。\n"
+                        + report.BuildMessage());
+                    StopForCatalogIntegrityFailure();
+                    return ESEditorCatalogRecoveryAction.StopForConfiguration;
+                }
+                Debug.LogWarning("[ESRes][CatalogRecovery] 本次 PlayMode 已询问过恢复操作；忽略重复缺失并继续使用降级模式。\n"
                     + report.BuildMessage());
                 return ESEditorCatalogRecoveryAction.ContinueDegraded;
             }
 
             SessionState.SetBool(CatalogRecoveryPromptShownKey, true);
+            if (report.HasBlockingFailures)
+                return HandleBlockingCatalogFailure(settings, report);
+
             int choice = EditorUtility.DisplayDialogComplex(
                 "ES EditorDirect Catalog 恢复",
                 report.BuildMessage()
@@ -256,9 +282,43 @@ namespace ES
                 return ESEditorCatalogRecoveryAction.StopForConfiguration;
             }
 
-            Debug.LogError("[ESRes][CatalogRecovery] 用户选择继续使用降级模式；ConfigKey/ConfigData 不可用。\n"
+            Debug.LogWarning("[ESRes][CatalogRecovery] 用户选择继续使用降级模式；ConfigKey/ConfigData 不可用。\n"
                 + report.BuildMessage());
             return ESEditorCatalogRecoveryAction.ContinueDegraded;
+        }
+
+        private static ESEditorCatalogRecoveryAction HandleBlockingCatalogFailure(
+            ESGlobalResSetting settings,
+            ESEditorCatalogRecoveryReport report)
+        {
+            int choice = EditorUtility.DisplayDialogComplex(
+                "ES EditorDirect Catalog 完整性失败",
+                report.BuildMessage()
+                    + "\n\n该问题可能导致稳定 Key 指向错误资产，禁止以降级模式继续。",
+                "烘焙并重试",
+                "停止本次运行",
+                "打开资源配置");
+            if (choice == 0)
+            {
+                RequestCatalogBakeAndRestart(settings);
+                return ESEditorCatalogRecoveryAction.RetryAfterBake;
+            }
+            if (choice == 2)
+            {
+                RequestCatalogConfigurationOpen(settings);
+                return ESEditorCatalogRecoveryAction.StopForConfiguration;
+            }
+
+            Debug.LogError("[ESRes][CatalogRecovery] Catalog 完整性失败，已停止本次 PlayMode。\n"
+                + report.BuildMessage());
+            StopForCatalogIntegrityFailure();
+            return ESEditorCatalogRecoveryAction.StopForConfiguration;
+        }
+
+        private static void StopForCatalogIntegrityFailure()
+        {
+            ESEditorResourceSessionBootstrap.DisposeCurrent();
+            Schedule(ExitPlayModeForCatalogRecovery);
         }
 
         private static void RequestCatalogBakeAndRestart(ESGlobalResSetting settings)
@@ -632,7 +692,6 @@ namespace ES
             SetRecoveryState(ESEditorCatalogRecoveryState.Failed);
             SessionState.SetBool(CatalogRecoveryBakeRequestedKey, false);
             SessionState.SetBool(CatalogRecoveryOpenConfigRequestedKey, false);
-            SessionState.SetBool(CatalogRecoveryPromptShownKey, false);
             SessionState.SetString(CatalogRecoveryCatalogGenerationKey, string.Empty);
             SessionState.SetString(CatalogRecoveryCommitGenerationKey, string.Empty);
             SessionState.SetString(CatalogRecoveryCatalogFingerprintKey, string.Empty);
@@ -702,16 +761,21 @@ namespace ES
         {
             if (missingConfigPromptShown || !EditorApplication.isPlaying || !ESAssets.IsReady || Application.isBatchMode)
                 return;
+            if (!ESAssetRunModeSession.TryGetLockedModes(out _, out ESAssetRunMode effectiveMode)
+                || effectiveMode != ESAssetRunMode.EditorDirect)
+                return;
             missingConfigPromptShown = true;
             Schedule(() =>
             {
-                if (!EditorApplication.isPlaying)
+                if (!EditorApplication.isPlaying
+                    || !ESAssetRunModeSession.TryGetLockedModes(out _, out ESAssetRunMode scheduledMode)
+                    || scheduledMode != ESAssetRunMode.EditorDirect)
                     return;
                 var report = new ESEditorCatalogRecoveryReport();
-                report.AddFailure("检测到 ConfigKey/ConfigData 未注入当前运行表。Scope=" + scope + "，" + description);
+                report.AddDegradableFailure("检测到 ConfigKey/ConfigData 未注入当前运行表。Scope=" + scope + "，" + description);
                 string diagnostic = ESEditorResourceSessionBootstrap.EditorDirectCatalogDiagnostic;
                 if (!string.IsNullOrWhiteSpace(diagnostic))
-                    report.AddFailure(diagnostic);
+                    report.AddDegradableFailure(diagnostic);
                 HandleCatalogRecovery(ESGlobalResSetting.Instance, report);
             });
         }
@@ -722,6 +786,14 @@ namespace ES
             {
                 ESEditorResourceSessionBootstrap.DisposeCurrent();
                 handledThisPlaySession = false;
+                if (!IsRecoveryReentryPending())
+                {
+                    // ExitingEditMode starts a new user-initiated PlayMode attempt.
+                    // Automatic Catalog recovery reentry keeps the original prompt
+                    // decision so a repeated missing key cannot reopen the dialog.
+                    missingConfigPromptShown = false;
+                    SessionState.SetBool(CatalogRecoveryPromptShownKey, false);
+                }
                 return;
             }
 
@@ -730,11 +802,6 @@ namespace ES
                 ESEditorResourceSessionBootstrap.DisposeCurrent();
                 if (state == PlayModeStateChange.EnteredEditMode)
                 {
-                    missingConfigPromptShown = false;
-                    // A new explicit PlayMode run is a new recovery opportunity. The
-                    // current transaction state still governs automatic continuation;
-                    // this flag only suppresses duplicate prompts within one run.
-                    SessionState.SetBool(CatalogRecoveryPromptShownKey, false);
                     ScheduleRecoveryContinuationAfterReload();
                 }
                 return;
@@ -1126,10 +1193,9 @@ namespace ES
         private bool ResolveEditorCatalogFailure(ESEditorCatalogRecoveryReport report)
         {
             editorCatalogDiagnostic = report?.BuildMessage() ?? "EditorDirect Catalog 不可用。";
-            // EditorDirect 的 Provider 不依赖 Catalog。Catalog 只在 ConfigKey、ConfigData
-            // 或其他明确需要稳定键的功能真正访问时才弹出恢复门禁。候选表失败时保留
-            // 之前已提交的正式表，避免“先清空再失败”破坏上一份可用映射；本会话仍以
-            // editorCatalogDegraded 标记当前 Catalog 不可作为成功证据。
+            // EditorDirect 的 Provider 不依赖 Catalog，但缺失 Catalog 仍必须由用户
+            // 明确选择是否降级。候选表失败时保留之前已提交的正式表，避免“先清空
+            // 再失败”破坏上一份可用映射；本会话仍不得把降级状态作为成功证据。
             editorCatalogDegraded = true;
             editorCatalogValidated = false;
             editorCatalogCommitGeneration = 0;
@@ -1137,9 +1203,20 @@ namespace ES
             recoveryCommitGeneration = 0;
             editorCatalogFingerprint = string.Empty;
             ESRuntimeDataAsset.InvalidateAssetConfigTableBinding();
+            if (!report.CanContinueDegraded)
+            {
+                Debug.LogError("[ESRes][EditorSession] EditorDirect Catalog 完整性失败，禁止建立降级会话："
+                    + editorCatalogDiagnostic);
+                ESEditorResourceSessionPrompt.HandleCatalogRecovery(settings, report);
+                return false;
+            }
+
             Debug.LogWarning("[ESRes][EditorSession] EditorDirect 进入 Catalog 降级模式："
                 + editorCatalogDiagnostic + "\n直接 ESAssetRefer 仍可使用。");
-            return true;
+            ESEditorCatalogRecoveryAction action = ESEditorResourceSessionPrompt.HandleCatalogRecovery(
+                settings,
+                report);
+            return action == ESEditorCatalogRecoveryAction.ContinueDegraded;
         }
 
         internal static bool TryBuildEditorCatalogTables(ESEditorCatalogRecoveryReport report, out string error)
@@ -1240,7 +1317,7 @@ namespace ES
             report.discoveredFileCount = paths.Count;
             if (paths.Count == 0)
             {
-                report.AddFailure("未找到 ESAssetLibraryCatalog.json；请先执行“烘焙引用”。");
+                report.AddDegradableFailure("未找到 ESAssetLibraryCatalog.json；请先执行“烘焙引用”。");
                 return report;
             }
             var libraries = new Dictionary<string, string>(StringComparer.Ordinal);

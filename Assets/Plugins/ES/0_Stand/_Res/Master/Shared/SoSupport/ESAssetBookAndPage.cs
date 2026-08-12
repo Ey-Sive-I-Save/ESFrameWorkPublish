@@ -22,6 +22,13 @@ namespace ES
         {
             return ESAssetPage.Create(uo);
         }
+
+        public override void EditorOnly_DragAtArea(UnityEngine.Object[] assets)
+        {
+#if UNITY_EDITOR
+            throw new InvalidOperationException("ESAssetBook 禁止直接写入；请使用 ESContentRegistrationAuthoring。");
+#endif
+        }
     }
 
     [Serializable, Obsolete("Use ESAssetBook.")]
@@ -84,52 +91,27 @@ namespace ES
             {
                 dirty = true;
             }
-            var pre = OB;
-            OB = EditorGUILayout.ObjectField("文件夹或资源", OB, typeof(UnityEngine.Object), allowSceneObjects: false);
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.ObjectField("文件夹或资源", OB, typeof(UnityEngine.Object), allowSceneObjects: false);
             if (OB != null)
             {
-                if (pre != OB)
-                {
-                    Name = OB.name;
-                    RefreshAssetIdentityEditor();
-                    dirty = true;
-                    AssetDatabase.SaveAssets();
-                }
-
                 EditorGUILayout.Space(4);
-                EditorGUILayout.LabelField("资源键", EditorStyles.boldLabel);
-                var preKind = Kind;
-                Kind = (ESAssetReferKind)EditorGUILayout.EnumPopup("资产引用类型", Kind);
-                if (preKind != Kind)
+                EditorGUILayout.LabelField("注册快照（只读）", EditorStyles.boldLabel);
+                using (new EditorGUI.DisabledScope(true))
                 {
-                    dirty = true;
+                    EditorGUILayout.EnumPopup("资产引用类型", Kind);
+                    EditorGUILayout.IntField("枚举键", EnumKey);
+                    EditorGUILayout.TextField("字符串键", StringKey);
+                    EditorGUILayout.TextField("GUID", AssetGuid);
+                    EditorGUILayout.LongField("Local File ID", LocalFileId);
+                    EditorGUILayout.TextField("资产类型", AssetTypeName);
                 }
-
-                var preEnumKey = EnumKey;
-                EnumKey = EditorGUILayout.IntField("枚举键", EnumKey);
-                if (preEnumKey != EnumKey)
+                if (GUILayout.Button("在统一入口编辑稳定 Key", GUILayout.Height(22)))
                 {
-                    dirty = true;
-                }
-
-                var preStringKey = StringKey;
-                StringKey = EditorGUILayout.TextField("字符串键", StringKey);
-                if (preStringKey != StringKey)
-                {
-                    dirty = true;
-                }
-
-                EditorGUILayout.TextField("GUID", AssetGuid);
-                EditorGUILayout.LongField("Local File ID", LocalFileId);
-                EditorGUILayout.TextField("资产类型", AssetTypeName);
-
-                if (Kind == ESAssetReferKind.None)
-                {
-                    if (GUILayout.Button("按绑定资源推断类型", GUILayout.Height(22)))
-                    {
-                        Kind = DetermineKind(OB);
-                        dirty = true;
-                    }
+                    if (ESAssetReferEditorBridge.OpenAssetKeyUpdate != null)
+                        ESAssetReferEditorBridge.OpenAssetKeyUpdate(this, EnumKey, EffectiveStringKey);
+                    else
+                        Debug.LogError("[ESRes][Register] 统一 Key 迁移入口尚未初始化。", OB);
                 }
 
                 var path = ESStandUtility.SafeEditor.Wrap_GetAssetPath(OB);
@@ -172,12 +154,6 @@ namespace ES
 
 
             }
-            if (dirty)
-            {
-                ESAssetRegistry.RegisterAsset(this, SourceLibrary, SourceBook, startOrderIndex: 0);
-                ESAssetRegistry.MarkSourceLibraryDirtyByPage(this, startOrderIndex: 0);
-            }
-
             return dirty;
 #else
             return false;

@@ -9,8 +9,8 @@ using UnityEngine;
 
 namespace ES {
     /// <summary>
-    /// 多键字典：支持使用两种不同的键中的任意一个查询同一个值
-    /// 用于资源加载系统中，可以通过资源名或资源ID等不同方式查询同一资源
+    /// 遗留兼容容器：支持使用两种异构键中的任意一个查询同一个值。
+    /// 当前仅发现由 Obsolete Resource V1 使用；新代码不应继续新增调用。
     /// </summary>
     /// <typeparam name="TKey1">第一个键类型</typeparam>
     /// <typeparam name="TKey2">第二个键类型</typeparam>
@@ -260,8 +260,8 @@ namespace ES {
     }
 
     /// <summary>
-    /// 双键字典：支持使用两种不同的string键中的任意一个查询同一个值
-    /// 用于资源加载系统中，可以通过资源名或资源ID等不同方式查询同一资源
+    /// 遗留兼容字符串双键容器：支持两个 string 键查询同一个值。
+    /// 当前仅发现由 Obsolete Resource V1 使用；新代码不应继续新增调用。
     /// </summary>
     /// <typeparam name="TValue">存储的值类型</typeparam>
     public class TwoStringKeyDictionary<TValue> : MultiKeyDictionary<string, string, TValue>

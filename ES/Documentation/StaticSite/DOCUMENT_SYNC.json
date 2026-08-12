@@ -28,7 +28,7 @@
     "localUpdateLedger":  {
                               "manifestPath":  "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.json",
                               "summaryPath":  "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.md",
-                              "manifestSha256":  "115a821f38040ddd9f2d6f92cd24aa4f74f64c80a6baf561fc344544d688341b",
+                              "manifestSha256":  "b1d32dc3b204a6c8dc7b00c6baea415cef6aa5c1d80921398138dcd08b3a0e93",
                               "batchId":  "LOCAL-2026-08-02-OPEN",
                               "status":  "ready-for-html",
                               "htmlWritePolicy":  "batch-only-after-ready-for-html"

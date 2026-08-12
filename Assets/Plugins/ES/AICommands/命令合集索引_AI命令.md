@@ -1,6 +1,6 @@
 # AI Commands 合集索引
 
-本目录不是“越多越好”的命令堆，而是 ESFramework 给 AI 使用的项目命令库。使用方式：把下面任意一个 `Assets/Plugins/ES/AICommands/xxx.md` 路径复制给 AI，AI 必须先读取该文件全文，再按文件内规则执行。
+本目录不是“越多越好”的命令堆，而是 ESFramework 给 AI 使用的项目命令库。本文件是给人和 AI 导航的说明，不是可执行任务合同；可选择合同的机器目录是 `Assets/Plugins/ES/AICommands/AICommandCatalog.json`。选中任意具体 Markdown 后，AI 必须先读取该文件全文，再按文件内规则执行。
 
 优先级原则：P0 必须服务游戏核心搭建，不把某个工具窗口、某次故障、某个临时问题误升为 P0。工具维护类命令即使常用，也只能算 P1/P2。
 

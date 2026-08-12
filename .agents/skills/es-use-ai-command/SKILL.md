@@ -15,8 +15,8 @@ Treat the selected AICommand as the project-specific task contract. Do not infer
    - `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md`
    - `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md`
    - `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md`
-4. If the user supplied a command path, read that file completely. Otherwise inspect `命令合集索引_AI命令.md` and select exactly one command whose scope matches the request.
-5. Restate the command type, write permission, risk level, required inputs, required reading, affected paths, and verification contract.
+4. If the user supplied a command path, verify it belongs to `AICommandCatalog.json` before reading it completely. Otherwise read `AICommandCatalog.json` first, select exactly one catalog entry whose scope matches the request, then read only that Markdown contract in full. `README.md` and `命令合集索引_AI命令.md` are navigation documents, not authorization contracts.
+5. Recompute the selected Markdown SHA-256 immediately before relying on it. Restate the command ID, path, hash, command type, write permission, risk level, required inputs, required reading, affected paths, and verification contract.
 6. Inspect the worktree before editing. Preserve unrelated user or agent changes.
 7. Apply only the intersection of the user's request and the command's authorization. Ask before proceeding when a required parameter is genuinely missing.
 8. Run the verification required by the command. Keep `.csproj` compilation, Unity Editor compilation, Test Runner, PlayMode, Profiler, IL2CPP, and release evidence distinct.
@@ -35,4 +35,4 @@ Report: selected command, rules read, work performed, changed files, validation 
 
 ## Script
 
-`scripts/Test-ESAICommands.ps1` validates UTF-8, required metadata, and project-relative references for every command. It does not modify files.
+`scripts/Test-ESAICommands.ps1` validates the versioned catalog, navigation-role separation, strict UTF-8, required metadata, and project-relative references. It does not modify files.

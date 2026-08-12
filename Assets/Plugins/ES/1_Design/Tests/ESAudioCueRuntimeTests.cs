@@ -117,16 +117,16 @@ namespace ES.Tests
             Assert.That(config.overrideCategory, Is.False);
             Assert.That(config.overrideSpatialMode, Is.False);
             Assert.That(config.TryValidate(out string validError), Is.True, validError);
-            Assert.That(config.ResolveCategory(ESAudioCategory.UI), Is.EqualTo(ESAudioCategory.UI));
-            Assert.That(config.ResolveSpatialMode(ESAudioSpatialMode.ThreeD), Is.EqualTo(ESAudioSpatialMode.ThreeD));
+            Assert.That(config.GetEffectiveCategory(ESAudioCategory.UI), Is.EqualTo(ESAudioCategory.UI));
+            Assert.That(config.GetEffectiveSpatialMode(ESAudioSpatialMode.ThreeD), Is.EqualTo(ESAudioSpatialMode.ThreeD));
 
             config.overrideCategory = true;
             config.category = ESAudioCategory.UI;
             config.overrideSpatialMode = true;
             config.spatialMode = ESAudioSpatialMode.ThreeD;
             Assert.That(config.TryValidate(out validError), Is.True, validError);
-            Assert.That(config.ResolveCategory(ESAudioCategory.Sfx), Is.EqualTo(ESAudioCategory.UI));
-            Assert.That(config.ResolveSpatialMode(ESAudioSpatialMode.TwoD), Is.EqualTo(ESAudioSpatialMode.ThreeD));
+            Assert.That(config.GetEffectiveCategory(ESAudioCategory.Sfx), Is.EqualTo(ESAudioCategory.UI));
+            Assert.That(config.GetEffectiveSpatialMode(ESAudioSpatialMode.TwoD), Is.EqualTo(ESAudioSpatialMode.ThreeD));
 
             config.pitch = float.NaN;
             Assert.That(config.TryValidate(out _), Is.False);

@@ -282,10 +282,10 @@ namespace ES
             return true;
         }
 
-        public ESAudioCategory ResolveCategory(ESAudioCategory entryDefault)
+        public ESAudioCategory GetEffectiveCategory(ESAudioCategory entryDefault)
             => overrideCategory ? category : entryDefault;
 
-        public ESAudioSpatialMode ResolveSpatialMode(ESAudioSpatialMode entryDefault)
+        public ESAudioSpatialMode GetEffectiveSpatialMode(ESAudioSpatialMode entryDefault)
             => overrideSpatialMode ? spatialMode : entryDefault;
 
         private static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
@@ -1606,8 +1606,8 @@ namespace ES
                 return default;
             }
 
-            ESAudioCategory category = config != null ? config.ResolveCategory(defaultCategory) : defaultCategory;
-            ESAudioSpatialMode spatialMode = config != null ? config.ResolveSpatialMode(defaultSpatialMode) : defaultSpatialMode;
+            ESAudioCategory category = config != null ? config.GetEffectiveCategory(defaultCategory) : defaultCategory;
+            ESAudioSpatialMode spatialMode = config != null ? config.GetEffectiveSpatialMode(defaultSpatialMode) : defaultSpatialMode;
             ESAudioCuePreemptionPolicy preemptionPolicy = config != null
                 ? config.preemptionPolicy
                 : ESAudioCuePreemptionPolicy.StopLowerPriority;

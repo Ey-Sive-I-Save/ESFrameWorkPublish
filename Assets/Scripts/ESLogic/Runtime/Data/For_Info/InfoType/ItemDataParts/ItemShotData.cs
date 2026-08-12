@@ -76,8 +76,8 @@ namespace ES
         public bool allowMustHit;
 
         [ShowIf(nameof(enabled)), Title("命中资格")]
-        [LabelText("HitResolver Tag 条件")]
-        [Tooltip("飞行物只生成物理候选。实际 HitResolver 读取此条件决定是否继续命中，不在这里结算伤害、阵营或部位倍率。")]
+        [LabelText("命中 Tag 条件")]
+        [Tooltip("飞行物只生成物理候选。命中判定会读取此条件决定是否继续命中；这里不结算伤害、阵营或部位倍率。")]
         public ESHitTagEligibility hitTagEligibility = new ESHitTagEligibility();
 
         public static ItemShotSharedData Default => new ItemShotSharedData

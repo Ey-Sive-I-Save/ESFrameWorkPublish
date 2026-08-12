@@ -351,7 +351,7 @@ namespace ES
             ESZoneProfileRuntimeContext context = EnsureRuntimeContext();
             if (!context.EnableLifecycleActive || member.Key == null)
                 return true;
-            if (context.Members.ContainsKey(member.Key))
+            if (context.ContainsMember(member.Key))
                 return true;
 
             IReadOnlyList<ESZoneProfileRuntimeContext.ExtensionBinding> bindings = context.Extensions;
@@ -393,7 +393,7 @@ namespace ES
             }
 
             if (enteredMask != 0UL)
-                context.Members.Add(
+                context.SetMember(
                     member.Key,
                     ESZoneProfileRuntimeContext.CreateMemberState(member, enteredMask));
             return true;
@@ -402,7 +402,7 @@ namespace ES
         internal void ExitMember(ESZoneMember member)
         {
             if (runtimeContext == null || member.Key == null
-                || !runtimeContext.Members.TryGetValue(member.Key, out var state))
+                || !runtimeContext.TryGetMember(member.Key, out var state))
                 return;
 
             ExitMemberState(member.Key, state);
@@ -410,7 +410,7 @@ namespace ES
 
         private bool ExitAllMembers()
         {
-            if (runtimeContext == null || runtimeContext.Members.Count == 0)
+            if (runtimeContext == null || runtimeContext.ActiveMemberCount == 0)
                 return true;
 
             bool success = true;
@@ -418,7 +418,7 @@ namespace ES
             for (int i = 0; i < keys.Count; i++)
             {
                 UnityEngine.Object key = keys[i];
-                if (runtimeContext.Members.TryGetValue(key, out var state)
+                if (runtimeContext.TryGetMember(key, out var state)
                     && !ExitMemberState(key, state))
                     success = false;
             }
@@ -451,11 +451,11 @@ namespace ES
 
             if (state.EnteredExtensionMask == 0UL)
             {
-                runtimeContext.Members.Remove(key);
+                runtimeContext.RemoveMember(key);
             }
             else
             {
-                runtimeContext.Members[key] = state;
+                runtimeContext.SetMember(key, state);
             }
             return success;
         }
@@ -488,7 +488,7 @@ namespace ES
             ulong enteredMask)
         {
             if (enteredMask != 0UL)
-                runtimeContext.Members[member.Key] =
+                runtimeContext.SetMember(member.Key,
                     ESZoneProfileRuntimeContext.CreateMemberState(member, enteredMask);
         }
 

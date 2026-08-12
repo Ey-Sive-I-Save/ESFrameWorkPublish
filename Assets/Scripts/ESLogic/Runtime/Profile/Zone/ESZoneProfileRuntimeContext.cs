@@ -32,20 +32,42 @@ namespace ES
             public ulong EnteredExtensionMask;
         }
 
-        private readonly List<ExtensionBinding> extensions = new List<ExtensionBinding>();
-        private readonly Dictionary<UnityEngine.Object, MemberState> members =
-            new Dictionary<UnityEngine.Object, MemberState>(InitialMemberCapacity);
-        private readonly List<UnityEngine.Object> memberKeyBuffer =
-            new List<UnityEngine.Object>(InitialMemberCapacity);
+        private List<ExtensionBinding> extensions;
+        private Dictionary<UnityEngine.Object, MemberState> members;
+        private List<UnityEngine.Object> memberKeyBuffer;
 
         public bool AwakeLifecycleCompleted { get; internal set; }
         public bool EnableLifecycleActive { get; internal set; }
         public bool PoolLifecycleActive { get; internal set; }
         public bool DestroyLifecycleCompleted { get; internal set; }
-        public int ActiveMemberCount => members.Count;
+        public int ActiveMemberCount => members?.Count ?? 0;
 
-        internal IReadOnlyList<ExtensionBinding> Extensions => extensions;
-        internal Dictionary<UnityEngine.Object, MemberState> Members => members;
+        internal IReadOnlyList<ExtensionBinding> Extensions =>
+            extensions ?? (IReadOnlyList<ExtensionBinding>)Array.Empty<ExtensionBinding>();
+
+        internal bool ContainsMember(UnityEngine.Object key)
+        {
+            return members != null && members.ContainsKey(key);
+        }
+
+        internal bool TryGetMember(UnityEngine.Object key, out MemberState state)
+        {
+            if (members != null)
+                return members.TryGetValue(key, out state);
+            state = default;
+            return false;
+        }
+
+        internal void SetMember(UnityEngine.Object key, MemberState state)
+        {
+            members ??= new Dictionary<UnityEngine.Object, MemberState>(InitialMemberCapacity);
+            members[key] = state;
+        }
+
+        internal bool RemoveMember(UnityEngine.Object key)
+        {
+            return members != null && members.Remove(key);
+        }
 
         internal static MemberState CreateMemberState(ESZoneMember member, ulong enteredMask)
         {
@@ -58,7 +80,10 @@ namespace ES
 
         internal List<UnityEngine.Object> PrepareMemberKeyBuffer()
         {
+            memberKeyBuffer ??= new List<UnityEngine.Object>(Mathf.Max(InitialMemberCapacity, ActiveMemberCount));
             memberKeyBuffer.Clear();
+            if (members == null)
+                return memberKeyBuffer;
             foreach (UnityEngine.Object key in members.Keys)
                 memberKeyBuffer.Add(key);
             return memberKeyBuffer;
@@ -69,13 +94,16 @@ namespace ES
             if (capacity <= 0)
                 return;
 
+            members ??= new Dictionary<UnityEngine.Object, MemberState>(capacity);
             members.EnsureCapacity(capacity);
+            memberKeyBuffer ??= new List<UnityEngine.Object>(capacity);
             if (memberKeyBuffer.Capacity < capacity)
                 memberKeyBuffer.Capacity = capacity;
         }
 
         internal void SetExtensions(List<ExtensionBinding> bindings)
         {
+            extensions ??= new List<ExtensionBinding>(bindings?.Count ?? 0);
             extensions.Clear();
             if (bindings != null)
                 extensions.AddRange(bindings);
@@ -104,8 +132,8 @@ namespace ES
 
         protected override void ClearTransientState()
         {
-            members.Clear();
-            memberKeyBuffer.Clear();
+            members?.Clear();
+            memberKeyBuffer?.Clear();
         }
     }
 }

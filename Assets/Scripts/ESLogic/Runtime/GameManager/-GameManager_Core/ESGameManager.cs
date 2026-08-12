@@ -143,7 +143,7 @@ namespace ES
         // DefaultExecutionOrder(-9) 使结果在 CinemachineBrain 的 LateUpdate 前写入。
         private void LateUpdate()
         {
-            ESZoneMaintenance.Tick(Time.frameCount);
+            ESZoneMaintenance.Tick();
             Camera?.LateTick();
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             ESDeveloperObservationController.SampleFrame();

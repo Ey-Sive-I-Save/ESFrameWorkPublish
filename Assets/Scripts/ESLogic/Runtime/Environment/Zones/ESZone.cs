@@ -64,7 +64,6 @@ namespace ES
             public int cleanupIndex;
         }
 
-        private const int CleanupIntervalFrames = 8;
         private const int CleanupBudgetPerPass = 16;
         private const int InitialMemberCapacity = 4;
         private const int InitialColliderCapacity = 8;
@@ -74,6 +73,7 @@ namespace ES
         private List<Collider> trackedColliders;
         private ESZoneProfile profile;
         private int cleanupCursor;
+        private bool maintenanceRegistered;
 
         public ESZoneProfile Profile => profile;
         public int Priority => Profile != null ? Profile.Settings.Priority : 0;
@@ -236,7 +236,7 @@ namespace ES
             RemoveColliderOverlap(other, overlap, false);
         }
 
-        internal void RunMaintenance(int frameCount)
+        internal void RunMaintenance()
         {
             if (trackedColliders == null
                 || trackedColliders.Count == 0)
@@ -269,13 +269,8 @@ namespace ES
 
         private void OnDisable()
         {
-            ESZoneMaintenance.Unregister(this);
+            UnregisterMaintenance();
             ClearMembers();
-        }
-
-        private void OnEnable()
-        {
-            ESZoneMaintenance.Register(this);
         }
 
         private void RemoveColliderOverlap(Collider collider, ColliderOverlap overlap, bool removeAll)
@@ -335,6 +330,8 @@ namespace ES
             Collider moved = trackedColliders[lastIndex];
             trackedColliders[index] = moved;
             trackedColliders.RemoveAt(lastIndex);
+            if (trackedColliders.Count == 0)
+                UnregisterMaintenance();
 
             if (index < trackedColliders.Count
                 && colliderOverlaps.TryGetValue(moved, out ColliderOverlap movedOverlap))
@@ -418,6 +415,19 @@ namespace ES
             occupants ??= new Dictionary<UnityEngine.Object, Occupant>(InitialMemberCapacity);
             colliderOverlaps ??= new Dictionary<Collider, ColliderOverlap>(InitialColliderCapacity);
             trackedColliders ??= new List<Collider>(InitialColliderCapacity);
+            if (!maintenanceRegistered)
+            {
+                ESZoneMaintenance.Register(this);
+                maintenanceRegistered = true;
+            }
+        }
+
+        private void UnregisterMaintenance()
+        {
+            if (!maintenanceRegistered)
+                return;
+            ESZoneMaintenance.Unregister(this);
+            maintenanceRegistered = false;
         }
     }
 
@@ -455,7 +465,7 @@ namespace ES
                 cursor = 0;
         }
 
-        internal static void Tick(int frameCount)
+        internal static void Tick()
         {
             int budget = Mathf.Min(ZoneBudgetPerFrame, Zones.Count);
             while (budget-- > 0 && Zones.Count > 0)
@@ -465,7 +475,7 @@ namespace ES
 
                 ESZone zone = Zones[cursor++];
                 if (zone != null && zone.isActiveAndEnabled)
-                    zone.RunMaintenance(frameCount);
+                    zone.RunMaintenance();
             }
         }
     }

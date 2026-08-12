@@ -101,6 +101,7 @@ namespace ES
             public Dictionary<TEnum, int> sparseEnumEntries;
             public Dictionary<string, int> stringEntries;
             public EnumMirrorKind enumMirrorKind;
+            public int enumEntryCount;
         }
 
         private static class EnumNumeric
@@ -122,6 +123,7 @@ namespace ES
         [NonSerialized] private Dictionary<TEnum, int> sparseEnumEntries;
         [NonSerialized] private Dictionary<string, int> stringEntries;
         [NonSerialized] private EnumMirrorKind enumMirrorKind;
+        [NonSerialized] private int enumEntryCount;
         [NonSerialized] private Conflict lastConflict;
         [NonSerialized] private bool isReady;
         [NonSerialized] private bool isDirty = true;
@@ -345,12 +347,15 @@ namespace ES
             if (!TryFindEntryIndex(existingStringKey, out int entryIndex, out conflict))
                 return false;
 
-            List<Entry> candidate = CloneEntries();
-            Entry entry = candidate[entryIndex];
+            Entry entry = entries[entryIndex];
+            if (entry.hasEnumKey && EqualityComparer<TEnum>.Default.Equals(entry.enumKey, enumKey))
+            {
+                conflict = Conflict.None;
+                return true;
+            }
             entry.hasEnumKey = true;
             entry.enumKey = enumKey;
-            candidate[entryIndex] = entry;
-            return TryCommit(candidate, out conflict);
+            return TryReplaceEntryAtInternal(entryIndex, entry, out conflict);
         }
 
         /// <summary>Adds or replaces the string alias on the entry identified by its enum alias.</summary>
@@ -362,11 +367,14 @@ namespace ES
                 return false;
             }
 
-            List<Entry> candidate = CloneEntries();
-            Entry entry = candidate[entryIndex];
+            Entry entry = entries[entryIndex];
+            if (string.Equals(entry.stringKey, stringKey, StringComparison.Ordinal))
+            {
+                conflict = Conflict.None;
+                return true;
+            }
             entry.stringKey = stringKey;
-            candidate[entryIndex] = entry;
-            return TryCommit(candidate, out conflict);
+            return TryReplaceEntryAtInternal(entryIndex, entry, out conflict);
         }
 
         public bool TryReplaceEnumKey(TEnum currentKey, TEnum replacementKey, out Conflict conflict)
@@ -374,11 +382,14 @@ namespace ES
             if (!TryFindEntryIndex(currentKey, out int entryIndex, out conflict))
                 return false;
 
-            List<Entry> candidate = CloneEntries();
-            Entry entry = candidate[entryIndex];
+            Entry entry = entries[entryIndex];
+            if (EqualityComparer<TEnum>.Default.Equals(entry.enumKey, replacementKey))
+            {
+                conflict = Conflict.None;
+                return true;
+            }
             entry.enumKey = replacementKey;
-            candidate[entryIndex] = entry;
-            return TryCommit(candidate, out conflict);
+            return TryReplaceEntryAtInternal(entryIndex, entry, out conflict);
         }
 
         public bool TryReplaceStringKey(string currentKey, string replacementKey, out Conflict conflict)
@@ -389,18 +400,21 @@ namespace ES
                 return false;
             }
 
-            List<Entry> candidate = CloneEntries();
-            Entry entry = candidate[entryIndex];
+            Entry entry = entries[entryIndex];
+            if (string.Equals(entry.stringKey, replacementKey, StringComparison.Ordinal))
+            {
+                conflict = Conflict.None;
+                return true;
+            }
             entry.stringKey = replacementKey;
-            candidate[entryIndex] = entry;
-            return TryCommit(candidate, out conflict);
+            return TryReplaceEntryAtInternal(entryIndex, entry, out conflict);
         }
 
         public bool TryReplaceEntry(TEnum currentKey, Entry replacement, out Conflict conflict)
         {
             if (!TryFindEntryIndex(currentKey, out int entryIndex, out conflict))
                 return false;
-            return TryReplaceEntryAt(entryIndex, replacement, out conflict);
+            return TryReplaceEntryAtInternal(entryIndex, replacement, out conflict);
         }
 
         public bool TryReplaceEntry(string currentKey, Entry replacement, out Conflict conflict)
@@ -418,24 +432,34 @@ namespace ES
             return TryReplaceEntryAtInternal(index, replacement, out conflict);
         }
 
-        /// <summary>Inserts into the current authoring order after validating the whole result.</summary>
+        /// <summary>Inserts into the current authoring order and adjusts only affected mirror indexes.</summary>
         public bool TryInsertEntry(int index, Entry entry, out Conflict conflict)
         {
-            int count = entries?.Count ?? 0;
+            if (!EnsureReady())
+            {
+                conflict = lastConflict;
+                return false;
+            }
+
+            int count = entries.Count;
             if ((uint)index > (uint)count)
             {
                 conflict = NewInvalidIndexConflict(index, count, true);
                 return false;
             }
 
-            List<Entry> candidate = CloneEntriesWithAdditionalCapacity();
-            candidate.Insert(index, entry);
-            return TryCommit(candidate, out conflict);
+            return TryInsertEntryIncremental(index, entry, out conflict);
         }
 
-        /// <summary>Moves one entry in authoring order and rebuilds both mirrors atomically.</summary>
+        /// <summary>Moves one entry in authoring order and adjusts only the moved index range.</summary>
         public bool TryMoveEntry(int fromIndex, int toIndex, out Conflict conflict)
         {
+            if (!EnsureReady())
+            {
+                conflict = lastConflict;
+                return false;
+            }
+
             int count = entries?.Count ?? 0;
             if ((uint)fromIndex >= (uint)count)
             {
@@ -453,11 +477,13 @@ namespace ES
                 return true;
             }
 
-            List<Entry> candidate = CloneEntries();
-            Entry moving = candidate[fromIndex];
-            candidate.RemoveAt(fromIndex);
-            candidate.Insert(toIndex, moving);
-            return TryCommit(candidate, out conflict);
+            Entry moving = entries[fromIndex];
+            entries.RemoveAt(fromIndex);
+            entries.Insert(toIndex, moving);
+            RefreshMirrorIndexes(Math.Min(fromIndex, toIndex), Math.Max(fromIndex, toIndex));
+            CompleteIncrementalMutation();
+            conflict = Conflict.None;
+            return true;
         }
 
         public bool Remove(TEnum enumKey)
@@ -465,20 +491,15 @@ namespace ES
             if (!EnsureReady() || !TryGetEnumEntryIndex(enumKey, out int entryIndex))
                 return false;
 
-            List<Entry> candidate = CloneEntriesWithAdditionalCapacity();
-            Entry entry = candidate[entryIndex];
+            Entry entry = entries[entryIndex];
             if (entry.HasStringKey)
             {
                 entry.hasEnumKey = false;
                 entry.enumKey = default;
-                candidate[entryIndex] = entry;
-            }
-            else
-            {
-                candidate.RemoveAt(entryIndex);
+                return TryReplaceEntryAtInternal(entryIndex, entry, out _);
             }
 
-            return TryCommit(candidate, out _);
+            return RemoveAt(entryIndex, out _, out _);
         }
 
         public bool Remove(string stringKey)
@@ -486,19 +507,14 @@ namespace ES
             if (!EnsureReady() || stringKey == null || !stringEntries.TryGetValue(stringKey, out int entryIndex))
                 return false;
 
-            List<Entry> candidate = CloneEntriesWithAdditionalCapacity();
-            Entry entry = candidate[entryIndex];
+            Entry entry = entries[entryIndex];
             if (entry.hasEnumKey)
             {
                 entry.stringKey = null;
-                candidate[entryIndex] = entry;
-            }
-            else
-            {
-                candidate.RemoveAt(entryIndex);
+                return TryReplaceEntryAtInternal(entryIndex, entry, out _);
             }
 
-            return TryCommit(candidate, out _);
+            return RemoveAt(entryIndex, out _, out _);
         }
 
         /// <summary>Removes only the enum alias. Removing the last alias requires TryRemoveEntry.</summary>
@@ -518,12 +534,10 @@ namespace ES
                 return false;
             }
 
-            List<Entry> candidate = CloneEntries();
-            Entry entry = candidate[entryIndex];
+            Entry entry = current;
             entry.hasEnumKey = false;
             entry.enumKey = default;
-            candidate[entryIndex] = entry;
-            return TryCommit(candidate, out conflict);
+            return TryReplaceEntryAtInternal(entryIndex, entry, out conflict);
         }
 
         /// <summary>Removes only the string alias. Removing the last alias requires TryRemoveEntry.</summary>
@@ -543,11 +557,9 @@ namespace ES
                 return false;
             }
 
-            List<Entry> candidate = CloneEntries();
-            Entry entry = candidate[entryIndex];
+            Entry entry = current;
             entry.stringKey = null;
-            candidate[entryIndex] = entry;
-            return TryCommit(candidate, out conflict);
+            return TryReplaceEntryAtInternal(entryIndex, entry, out conflict);
         }
 
         public bool TryRemoveEntry(TEnum enumKey, out TValue value, out Conflict conflict)
@@ -694,9 +706,13 @@ namespace ES
 
         private bool TryAddInternal(Entry entry, out Conflict conflict)
         {
-            List<Entry> candidate = CloneEntriesWithAdditionalCapacity();
-            candidate.Add(entry);
-            return TryCommit(candidate, out conflict);
+            if (!EnsureReady())
+            {
+                conflict = lastConflict;
+                return false;
+            }
+
+            return TryInsertEntryIncremental(entries.Count, entry, out conflict);
         }
 
         private bool TrySetInternal(bool hasEnumKey, TEnum enumKey, string stringKey, TValue value, out Conflict conflict)
@@ -728,32 +744,27 @@ namespace ES
             }
 
             int targetIndex = enumExists ? enumEntryIndex : stringExists ? stringEntryIndex : -1;
-            List<Entry> candidate = CloneEntriesWithAdditionalCapacity();
             if (targetIndex < 0)
             {
-                candidate.Add(new Entry
+                return TryInsertEntryIncremental(entries.Count, new Entry
                 {
                     hasEnumKey = hasEnumKey,
                     enumKey = enumKey,
                     stringKey = hasStringKey ? stringKey : null,
                     value = value
-                });
-            }
-            else
-            {
-                Entry target = candidate[targetIndex];
-                if (hasEnumKey)
-                {
-                    target.hasEnumKey = true;
-                    target.enumKey = enumKey;
-                }
-                if (hasStringKey)
-                    target.stringKey = stringKey;
-                target.value = value;
-                candidate[targetIndex] = target;
+                }, out conflict);
             }
 
-            return TryCommit(candidate, out conflict);
+            Entry target = entries[targetIndex];
+            if (hasEnumKey)
+            {
+                target.hasEnumKey = true;
+                target.enumKey = enumKey;
+            }
+            if (hasStringKey)
+                target.stringKey = stringKey;
+            target.value = value;
+            return TryReplaceEntryAtInternal(targetIndex, target, out conflict);
         }
 
         private bool TrySetValueAt(int entryIndex, TValue value, out Conflict conflict)
@@ -761,18 +772,56 @@ namespace ES
             if (!ValidateValue(value, entryIndex, out conflict))
                 return false;
 
-            List<Entry> candidate = CloneEntries();
-            Entry entry = candidate[entryIndex];
+            Entry entry = entries[entryIndex];
+            if (EqualityComparer<TValue>.Default.Equals(entry.value, value))
+            {
+                conflict = Conflict.None;
+                return true;
+            }
+
             entry.value = value;
-            candidate[entryIndex] = entry;
-            return TryCommit(candidate, out conflict);
+            entries[entryIndex] = entry;
+            CompleteIncrementalMutation();
+            conflict = Conflict.None;
+            return true;
         }
 
         private bool TryReplaceEntryAtInternal(int entryIndex, Entry replacement, out Conflict conflict)
         {
-            List<Entry> candidate = CloneEntries();
-            candidate[entryIndex] = replacement;
-            return TryCommit(candidate, out conflict);
+            if (!ValidateEntry(replacement, entryIndex, entryIndex, out conflict))
+            {
+                lastConflict = conflict;
+                return false;
+            }
+
+            Entry current = entries[entryIndex];
+            bool enumChanged = current.hasEnumKey != replacement.hasEnumKey
+                || current.hasEnumKey && !EqualityComparer<TEnum>.Default.Equals(current.enumKey, replacement.enumKey);
+            bool stringChanged = !string.Equals(current.stringKey, replacement.stringKey, StringComparison.Ordinal);
+
+            int futureEnumCount = enumEntryCount;
+            if (current.hasEnumKey != replacement.hasEnumKey)
+                futureEnumCount += replacement.hasEnumKey ? 1 : -1;
+            if (replacement.hasEnumKey && enumChanged)
+                PrepareEnumMirrorForKey(replacement.enumKey, futureEnumCount);
+
+            if (enumChanged && current.hasEnumKey)
+                RemoveEnumMirrorEntry(current.enumKey);
+            if (stringChanged && current.HasStringKey)
+                stringEntries.Remove(current.stringKey);
+
+            entries[entryIndex] = replacement;
+            enumEntryCount = futureEnumCount;
+
+            if (enumChanged && replacement.hasEnumKey)
+                SetEnumMirrorEntry(replacement.enumKey, entryIndex);
+            if (stringChanged && replacement.HasStringKey)
+                stringEntries[replacement.stringKey] = entryIndex;
+
+            NormalizeEmptyEnumMirror();
+            CompleteIncrementalMutation();
+            conflict = Conflict.None;
+            return true;
         }
 
         private bool ValidateExistingIndex(int index, out Conflict conflict)
@@ -808,10 +857,22 @@ namespace ES
 
         private bool RemoveAt(int entryIndex, out TValue value, out Conflict conflict)
         {
-            List<Entry> candidate = CloneEntries();
-            value = candidate[entryIndex].value;
-            candidate.RemoveAt(entryIndex);
-            return TryCommit(candidate, out conflict);
+            Entry removed = entries[entryIndex];
+            value = removed.value;
+
+            if (removed.hasEnumKey)
+                RemoveEnumMirrorEntry(removed.enumKey);
+            if (removed.HasStringKey)
+                stringEntries.Remove(removed.stringKey);
+
+            entries.RemoveAt(entryIndex);
+            if (removed.hasEnumKey)
+                enumEntryCount--;
+            NormalizeEmptyEnumMirror();
+            RefreshMirrorIndexes(entryIndex, entries.Count - 1);
+            CompleteIncrementalMutation();
+            conflict = Conflict.None;
+            return true;
         }
 
         private bool TryFindEntryIndex(TEnum enumKey, out int entryIndex, out Conflict conflict)
@@ -918,6 +979,178 @@ namespace ES
             return true;
         }
 
+        private bool TryInsertEntryIncremental(int index, Entry entry, out Conflict conflict)
+        {
+            if (!ValidateEntry(entry, index, -1, out conflict))
+            {
+                lastConflict = conflict;
+                return false;
+            }
+
+            int futureEnumCount = enumEntryCount + (entry.hasEnumKey ? 1 : 0);
+            if (entry.hasEnumKey)
+                PrepareEnumMirrorForKey(entry.enumKey, futureEnumCount);
+
+            entries.Insert(index, entry);
+            enumEntryCount = futureEnumCount;
+            RefreshMirrorIndexes(index, entries.Count - 1);
+            CompleteIncrementalMutation();
+            conflict = Conflict.None;
+            return true;
+        }
+
+        private bool ValidateEntry(Entry entry, int entryIndex, int ignoredIndex, out Conflict conflict)
+        {
+            bool hasStringKey = entry.HasStringKey;
+            if (!entry.hasEnumKey && !hasStringKey)
+            {
+                conflict = NewConflict(
+                    ConflictKind.MissingKey,
+                    entryIndex,
+                    -1,
+                    "Entry " + entryIndex + " has neither an enum alias nor a string alias.");
+                return false;
+            }
+
+            if (!ValidateStringKey(entry.stringKey, hasStringKey, entryIndex, out conflict)
+                || !ValidateValue(entry.value, entryIndex, out conflict))
+            {
+                return false;
+            }
+
+            if (entry.hasEnumKey
+                && TryGetEnumEntryIndex(entry.enumKey, out int enumExistingIndex)
+                && enumExistingIndex != ignoredIndex)
+            {
+                conflict = NewConflict(
+                    ConflictKind.DuplicateEnumKey,
+                    entryIndex,
+                    enumExistingIndex,
+                    "Entry " + entryIndex + " duplicates enum alias from entry " + enumExistingIndex + ".");
+                return false;
+            }
+
+            if (hasStringKey
+                && stringEntries.TryGetValue(entry.stringKey, out int stringExistingIndex)
+                && stringExistingIndex != ignoredIndex)
+            {
+                conflict = NewConflict(
+                    ConflictKind.DuplicateStringKey,
+                    entryIndex,
+                    stringExistingIndex,
+                    "Entry " + entryIndex + " duplicates string alias from entry " + stringExistingIndex + ".");
+                return false;
+            }
+
+            conflict = Conflict.None;
+            return true;
+        }
+
+        private void PrepareEnumMirrorForKey(TEnum enumKey, int futureEnumCount)
+        {
+            if (enumMirrorKind == EnumMirrorKind.SparseDictionary)
+                return;
+
+            if (!TryGetDenseEnumIndex(enumKey, out int denseIndex) || !CanUseDenseEnumIndex(denseIndex, futureEnumCount))
+            {
+                ConvertEnumMirrorToSparse(futureEnumCount);
+                return;
+            }
+
+            if (enumMirrorKind == EnumMirrorKind.None)
+            {
+                denseEnumEntries = new int[denseIndex + 1];
+                enumMirrorKind = EnumMirrorKind.DenseArray;
+                return;
+            }
+
+            if (denseIndex >= denseEnumEntries.Length)
+                Array.Resize(ref denseEnumEntries, denseIndex + 1);
+        }
+
+        private bool CanUseDenseEnumIndex(int denseIndex, int futureEnumCount)
+        {
+            int limit = denseEnumLimit > 0 ? denseEnumLimit : DefaultDenseEnumLimit;
+            int ratio = denseEnumRatio > 0 ? denseEnumRatio : DefaultDenseEnumRatio;
+            int densityLimit = Math.Max(64, futureEnumCount * ratio);
+            return denseIndex <= limit && denseIndex <= densityLimit;
+        }
+
+        private void ConvertEnumMirrorToSparse(int capacity)
+        {
+            Dictionary<TEnum, int> sparse = new Dictionary<TEnum, int>(Math.Max(capacity, enumEntryCount));
+            for (int index = 0; index < entries.Count; index++)
+            {
+                Entry entry = entries[index];
+                if (entry.hasEnumKey)
+                    sparse.Add(entry.enumKey, index);
+            }
+
+            denseEnumEntries = Array.Empty<int>();
+            sparseEnumEntries = sparse;
+            enumMirrorKind = EnumMirrorKind.SparseDictionary;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SetEnumMirrorEntry(TEnum enumKey, int entryIndex)
+        {
+            if (enumMirrorKind == EnumMirrorKind.DenseArray)
+            {
+                TryGetDenseEnumIndex(enumKey, out int denseIndex);
+                denseEnumEntries[denseIndex] = entryIndex + 1;
+                return;
+            }
+
+            sparseEnumEntries[enumKey] = entryIndex;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void RemoveEnumMirrorEntry(TEnum enumKey)
+        {
+            if (enumMirrorKind == EnumMirrorKind.DenseArray)
+            {
+                if (TryGetDenseEnumIndex(enumKey, out int denseIndex)
+                    && (uint)denseIndex < (uint)denseEnumEntries.Length)
+                {
+                    denseEnumEntries[denseIndex] = 0;
+                }
+                return;
+            }
+
+            sparseEnumEntries?.Remove(enumKey);
+        }
+
+        private void RefreshMirrorIndexes(int firstIndex, int lastIndex)
+        {
+            for (int index = firstIndex; index <= lastIndex; index++)
+            {
+                Entry entry = entries[index];
+                if (entry.hasEnumKey)
+                    SetEnumMirrorEntry(entry.enumKey, index);
+                if (entry.HasStringKey)
+                    stringEntries[entry.stringKey] = index;
+            }
+        }
+
+        private void NormalizeEmptyEnumMirror()
+        {
+            if (enumEntryCount != 0)
+                return;
+
+            denseEnumEntries = Array.Empty<int>();
+            sparseEnumEntries = null;
+            enumMirrorKind = EnumMirrorKind.None;
+        }
+
+        private void CompleteIncrementalMutation()
+        {
+            lastConflict = Conflict.None;
+            isDirty = false;
+            isReady = true;
+            observedSerializedRevision = serializedRevision;
+            AdvanceGeneration();
+        }
+
         private bool EnsureReady()
         {
             if (observedSerializedRevision != serializedRevision)
@@ -1000,7 +1233,8 @@ namespace ES
 
             mirrors = new RuntimeMirrors
             {
-                stringEntries = strings
+                stringEntries = strings,
+                enumEntryCount = enumCount
             };
 
             if (enumCount == 0)
@@ -1154,6 +1388,7 @@ namespace ES
             sparseEnumEntries = mirrors.sparseEnumEntries;
             stringEntries = mirrors.stringEntries;
             enumMirrorKind = mirrors.enumMirrorKind;
+            enumEntryCount = mirrors.enumEntryCount;
             lastConflict = Conflict.None;
             isDirty = false;
             isReady = true;
@@ -1166,6 +1401,7 @@ namespace ES
             sparseEnumEntries = null;
             stringEntries = null;
             enumMirrorKind = EnumMirrorKind.None;
+            enumEntryCount = 0;
             isReady = false;
         }
 
@@ -1175,7 +1411,8 @@ namespace ES
             {
                 denseEnumEntries = Array.Empty<int>(),
                 stringEntries = new Dictionary<string, int>(StringComparer.Ordinal),
-                enumMirrorKind = EnumMirrorKind.None
+                enumMirrorKind = EnumMirrorKind.None,
+                enumEntryCount = 0
             };
         }
 

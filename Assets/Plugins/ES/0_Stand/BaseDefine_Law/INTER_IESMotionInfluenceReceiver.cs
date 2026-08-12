@@ -9,6 +9,12 @@ namespace ES
         Attraction = 1
     }
 
+    public enum ESMotionFieldBlendMode
+    {
+        Additive = 0,
+        OverrideLowerPriority = 1
+    }
+
     public enum ESMotionAttractionModel
     {
         TargetVelocity = 0,
@@ -19,6 +25,15 @@ namespace ES
     {
         RadialOnly = 0,
         FullVelocity = 1
+    }
+
+    public enum ESMotionSubmitResult
+    {
+        Accepted = 0,
+        InvalidValue = 1,
+        Locked = 2,
+        NotReady = 3,
+        UnsupportedTarget = 4
     }
 
     [Flags]
@@ -64,6 +79,7 @@ namespace ES
         public Vector3 anchorPosition;
         public ESMotionAttractionSettings attraction;
         public ESMotionInfluencePermissions permissions;
+        public ESMotionFieldBlendMode blendMode;
         [Tooltip("稳定来源身份。相同优先级的 Field 按此值稳定组合。")]
         public ulong sourceId;
         [Tooltip("较高优先级先参与组合。")]
@@ -77,6 +93,10 @@ namespace ES
 
     public interface IESMotionInfluenceReceiver
     {
+        ESMotionSubmitResult TryAddVelocity(
+            Vector3 velocity,
+            ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None);
+
         bool AddVelocity(
             Vector3 velocity,
             ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None);

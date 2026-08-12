@@ -1031,7 +1031,7 @@ namespace ES
                     $"  速度  posSpeed={posSpeed:F2}×{3f}  rotSpeed={rotSpeed:F2}×{1f}\n" +
                     $"  配置偏移  pos+={dbgPosOffsetStr}  rot+={dbgRotOffsetStr}");
 
-                // ── 提交到 Gizmos 绘制单例 ──────────────────────────────────────
+                // ── 更新 Gizmos 绘制单例的本帧数据 ───────────────────────────────
                 // 取当前帧骨骼实际位置（bone.position）用于 Gizmos 可视化
                 Vector3 gizmoBoneWorldPos = Vector3.zero;
                 if (mt.bodyPart != AvatarTarget.Root)
@@ -1041,7 +1041,7 @@ namespace ES
                     var bone2      = boneIdx2 < boneCache2.Length ? boneCache2[boneIdx2] : null;
                     if (bone2 != null) gizmoBoneWorldPos = bone2.position;
                 }
-                MatchTargetGizmosDrawer.Submit(
+                MatchTargetGizmosDrawer.SetFrameData(
                     $"{GetStateNameSafe()}_{GetStateIdSafe()}",
                     new MatchTargetGizmosDrawer.FrameData
                     {

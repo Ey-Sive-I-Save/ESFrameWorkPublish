@@ -13,7 +13,7 @@ using UnityEngine.Rendering;
 // 使用方式：
 //   Play Mode 下自动创建单例 GameObject，无需手动挂载。
 //   StateBase.ProcessMatchTarget 在 #if UNITY_EDITOR 块里调用
-//   MatchTargetGizmosDrawer.Submit(key, data) 即可。
+//   MatchTargetGizmosDrawer.SetFrameData(key, data) 即可。
 //
 // Gizmos 图例（简化版默认）：
 //   ■ 深蓝球    Root 的目标点（effectiveTargetPos）
@@ -162,12 +162,12 @@ namespace ES
         [Tooltip("显示 target/current/snapshot/liveOffset 等完整信息。")]
         public bool showVerboseLabels = false;
 
-        // ── 对外提交接口（由 StateBase.ProcessMatchTarget 调用）──────────────
+        // ── 帧数据写入接口（由 StateBase.ProcessMatchTarget 调用）────────────
         /// <summary>
-        /// 提交本帧 MatchTarget 数据。同一 key 每帧覆盖旧数据。<br/>
+        /// 更新本帧 MatchTarget 数据。同一 key 每帧覆盖旧数据。<br/>
         /// <paramref name="key"/> 建议使用 "状态名_stateId" 保证唯一。
         /// </summary>
-        public static void Submit(string key, FrameData data)
+        public static void SetFrameData(string key, FrameData data)
         {
             if (_instance == null) EnsureInstance();
             if (_instance == null) return;

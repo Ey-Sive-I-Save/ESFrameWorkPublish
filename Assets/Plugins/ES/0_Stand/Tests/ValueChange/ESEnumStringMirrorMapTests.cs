@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -99,6 +100,33 @@ namespace ES.Tests
 
             Assert.That(map.TryGetValue(DenseKey.Weapon, "weapon.main", out string value), Is.True);
             Assert.That(value, Is.EqualTo("sword"));
+            Assert.That(map.Generation, Is.GreaterThan(generation));
+        }
+
+        [Test]
+        public void SerializedRevisionChange_InvalidatesMirrorsWithoutDeserializeCallback()
+        {
+            ESEnumStringMirrorMap<DenseKey, string> map = new ESEnumStringMirrorMap<DenseKey, string>();
+            Assert.That(map.TryAdd(DenseKey.Hand, "hand.primary", "old", out _), Is.True);
+            int generation = map.Generation;
+
+            FieldInfo entriesField = typeof(ESEnumStringMirrorMap<DenseKey, string>).GetField(
+                "entries",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo revisionField = typeof(ESEnumStringMirrorMap<DenseKey, string>).GetField(
+                "serializedRevision",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(entriesField, Is.Not.Null);
+            Assert.That(revisionField, Is.Not.Null);
+
+            var entries = (List<ESEnumStringMirrorMap<DenseKey, string>.Entry>)entriesField.GetValue(map);
+            ESEnumStringMirrorMap<DenseKey, string>.Entry edited = entries[0];
+            edited.value = "new";
+            entries[0] = edited;
+            revisionField.SetValue(map, 1);
+
+            Assert.That(map.TryGetValue(DenseKey.Hand, "hand.primary", out string value), Is.True);
+            Assert.That(value, Is.EqualTo("new"));
             Assert.That(map.Generation, Is.GreaterThan(generation));
         }
 

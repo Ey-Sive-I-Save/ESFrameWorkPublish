@@ -31,7 +31,8 @@ namespace ES
             NullValue,
             DuplicateEnumKey,
             DuplicateStringKey,
-            AliasMismatch
+            AliasMismatch,
+            InvalidIndex
         }
 
         [Serializable]
@@ -115,6 +116,7 @@ namespace ES
         [SerializeField] private List<Entry> entries = new List<Entry>();
         [SerializeField, Min(1)] private int denseEnumLimit = DefaultDenseEnumLimit;
         [SerializeField, Min(1)] private int denseEnumRatio = DefaultDenseEnumRatio;
+        [SerializeField, HideInInspector] private int serializedRevision;
 
         [NonSerialized] private int[] denseEnumEntries;
         [NonSerialized] private Dictionary<TEnum, int> sparseEnumEntries;
@@ -124,6 +126,7 @@ namespace ES
         [NonSerialized] private bool isReady;
         [NonSerialized] private bool isDirty = true;
         [NonSerialized] private int generation;
+        [NonSerialized] private int observedSerializedRevision;
 
         public int Count => entries?.Count ?? 0;
         public int Generation => generation;
@@ -226,6 +229,61 @@ namespace ES
             return TryGetValue(stringKey, out _);
         }
 
+        public bool TryGetEntry(TEnum enumKey, out Entry entry)
+        {
+            if (EnsureReady() && TryGetEnumEntryIndex(enumKey, out int entryIndex))
+            {
+                entry = entries[entryIndex];
+                return true;
+            }
+
+            entry = default;
+            return false;
+        }
+
+        public bool TryGetEntry(string stringKey, out Entry entry)
+        {
+            if (EnsureReady()
+                && stringKey != null
+                && stringEntries.TryGetValue(stringKey, out int entryIndex))
+            {
+                entry = entries[entryIndex];
+                return true;
+            }
+
+            entry = default;
+            return false;
+        }
+
+        public bool TryGetEntry(TEnum enumKey, string stringKey, out Entry entry)
+        {
+            if (EnsureReady()
+                && stringKey != null
+                && TryGetEnumEntryIndex(enumKey, out int enumEntryIndex)
+                && stringEntries.TryGetValue(stringKey, out int stringEntryIndex)
+                && enumEntryIndex == stringEntryIndex)
+            {
+                entry = entries[enumEntryIndex];
+                return true;
+            }
+
+            entry = default;
+            return false;
+        }
+
+        /// <summary>Reads by current authoring order. The index is not a stable identity.</summary>
+        public bool TryGetEntryAt(int index, out Entry entry)
+        {
+            if (EnsureReady() && (uint)index < (uint)entries.Count)
+            {
+                entry = entries[index];
+                return true;
+            }
+
+            entry = default;
+            return false;
+        }
+
         public bool TryAdd(TEnum enumKey, TValue value, out Conflict conflict)
         {
             return TryAddInternal(new Entry(enumKey, value), out conflict);
@@ -255,6 +313,151 @@ namespace ES
         public bool TrySet(TEnum enumKey, string stringKey, TValue value, out Conflict conflict)
         {
             return TrySetInternal(true, enumKey, stringKey, value, out conflict);
+        }
+
+        /// <summary>Updates only the value of an existing enum entry. It never creates an entry or changes aliases.</summary>
+        public bool TrySetValue(TEnum enumKey, TValue value, out Conflict conflict)
+        {
+            if (!TryFindEntryIndex(enumKey, out int entryIndex, out conflict))
+                return false;
+            return TrySetValueAt(entryIndex, value, out conflict);
+        }
+
+        /// <summary>Updates only the value of an existing string entry. It never creates an entry or changes aliases.</summary>
+        public bool TrySetValue(string stringKey, TValue value, out Conflict conflict)
+        {
+            if (!TryFindEntryIndex(stringKey, out int entryIndex, out conflict))
+                return false;
+            return TrySetValueAt(entryIndex, value, out conflict);
+        }
+
+        /// <summary>Updates only the value when both aliases identify the same existing entry.</summary>
+        public bool TrySetValue(TEnum enumKey, string stringKey, TValue value, out Conflict conflict)
+        {
+            if (!TryFindEntryIndex(enumKey, stringKey, out int entryIndex, out conflict))
+                return false;
+            return TrySetValueAt(entryIndex, value, out conflict);
+        }
+
+        /// <summary>Adds or replaces the enum alias on the entry identified by its string alias.</summary>
+        public bool TrySetEnumAlias(string existingStringKey, TEnum enumKey, out Conflict conflict)
+        {
+            if (!TryFindEntryIndex(existingStringKey, out int entryIndex, out conflict))
+                return false;
+
+            List<Entry> candidate = CloneEntries();
+            Entry entry = candidate[entryIndex];
+            entry.hasEnumKey = true;
+            entry.enumKey = enumKey;
+            candidate[entryIndex] = entry;
+            return TryCommit(candidate, out conflict);
+        }
+
+        /// <summary>Adds or replaces the string alias on the entry identified by its enum alias.</summary>
+        public bool TrySetStringAlias(TEnum existingEnumKey, string stringKey, out Conflict conflict)
+        {
+            if (!ValidateRequiredStringKey(stringKey, out conflict)
+                || !TryFindEntryIndex(existingEnumKey, out int entryIndex, out conflict))
+            {
+                return false;
+            }
+
+            List<Entry> candidate = CloneEntries();
+            Entry entry = candidate[entryIndex];
+            entry.stringKey = stringKey;
+            candidate[entryIndex] = entry;
+            return TryCommit(candidate, out conflict);
+        }
+
+        public bool TryReplaceEnumKey(TEnum currentKey, TEnum replacementKey, out Conflict conflict)
+        {
+            if (!TryFindEntryIndex(currentKey, out int entryIndex, out conflict))
+                return false;
+
+            List<Entry> candidate = CloneEntries();
+            Entry entry = candidate[entryIndex];
+            entry.enumKey = replacementKey;
+            candidate[entryIndex] = entry;
+            return TryCommit(candidate, out conflict);
+        }
+
+        public bool TryReplaceStringKey(string currentKey, string replacementKey, out Conflict conflict)
+        {
+            if (!ValidateRequiredStringKey(replacementKey, out conflict)
+                || !TryFindEntryIndex(currentKey, out int entryIndex, out conflict))
+            {
+                return false;
+            }
+
+            List<Entry> candidate = CloneEntries();
+            Entry entry = candidate[entryIndex];
+            entry.stringKey = replacementKey;
+            candidate[entryIndex] = entry;
+            return TryCommit(candidate, out conflict);
+        }
+
+        public bool TryReplaceEntry(TEnum currentKey, Entry replacement, out Conflict conflict)
+        {
+            if (!TryFindEntryIndex(currentKey, out int entryIndex, out conflict))
+                return false;
+            return TryReplaceEntryAt(entryIndex, replacement, out conflict);
+        }
+
+        public bool TryReplaceEntry(string currentKey, Entry replacement, out Conflict conflict)
+        {
+            if (!TryFindEntryIndex(currentKey, out int entryIndex, out conflict))
+                return false;
+            return TryReplaceEntryAtInternal(entryIndex, replacement, out conflict);
+        }
+
+        /// <summary>Replaces by current authoring order. The index is not a stable identity.</summary>
+        public bool TryReplaceEntryAt(int index, Entry replacement, out Conflict conflict)
+        {
+            if (!ValidateExistingIndex(index, out conflict))
+                return false;
+            return TryReplaceEntryAtInternal(index, replacement, out conflict);
+        }
+
+        /// <summary>Inserts into the current authoring order after validating the whole result.</summary>
+        public bool TryInsertEntry(int index, Entry entry, out Conflict conflict)
+        {
+            int count = entries?.Count ?? 0;
+            if ((uint)index > (uint)count)
+            {
+                conflict = NewInvalidIndexConflict(index, count, true);
+                return false;
+            }
+
+            List<Entry> candidate = CloneEntriesWithAdditionalCapacity();
+            candidate.Insert(index, entry);
+            return TryCommit(candidate, out conflict);
+        }
+
+        /// <summary>Moves one entry in authoring order and rebuilds both mirrors atomically.</summary>
+        public bool TryMoveEntry(int fromIndex, int toIndex, out Conflict conflict)
+        {
+            int count = entries?.Count ?? 0;
+            if ((uint)fromIndex >= (uint)count)
+            {
+                conflict = NewInvalidIndexConflict(fromIndex, count, false);
+                return false;
+            }
+            if ((uint)toIndex >= (uint)count)
+            {
+                conflict = NewInvalidIndexConflict(toIndex, count, false);
+                return false;
+            }
+            if (fromIndex == toIndex)
+            {
+                conflict = Conflict.None;
+                return true;
+            }
+
+            List<Entry> candidate = CloneEntries();
+            Entry moving = candidate[fromIndex];
+            candidate.RemoveAt(fromIndex);
+            candidate.Insert(toIndex, moving);
+            return TryCommit(candidate, out conflict);
         }
 
         public bool Remove(TEnum enumKey)
@@ -298,32 +501,95 @@ namespace ES
             return TryCommit(candidate, out _);
         }
 
-        public bool TryRemove(TEnum enumKey, string stringKey, out TValue value, out Conflict conflict)
+        /// <summary>Removes only the enum alias. Removing the last alias requires TryRemoveEntry.</summary>
+        public bool TryRemoveEnumAlias(TEnum enumKey, out Conflict conflict)
+        {
+            if (!TryFindEntryIndex(enumKey, out int entryIndex, out conflict))
+                return false;
+
+            Entry current = entries[entryIndex];
+            if (!current.HasStringKey)
+            {
+                conflict = NewConflict(
+                    ConflictKind.MissingKey,
+                    entryIndex,
+                    -1,
+                    "The enum alias is the entry's last alias. Remove the whole entry instead.");
+                return false;
+            }
+
+            List<Entry> candidate = CloneEntries();
+            Entry entry = candidate[entryIndex];
+            entry.hasEnumKey = false;
+            entry.enumKey = default;
+            candidate[entryIndex] = entry;
+            return TryCommit(candidate, out conflict);
+        }
+
+        /// <summary>Removes only the string alias. Removing the last alias requires TryRemoveEntry.</summary>
+        public bool TryRemoveStringAlias(string stringKey, out Conflict conflict)
+        {
+            if (!TryFindEntryIndex(stringKey, out int entryIndex, out conflict))
+                return false;
+
+            Entry current = entries[entryIndex];
+            if (!current.hasEnumKey)
+            {
+                conflict = NewConflict(
+                    ConflictKind.MissingKey,
+                    entryIndex,
+                    -1,
+                    "The string alias is the entry's last alias. Remove the whole entry instead.");
+                return false;
+            }
+
+            List<Entry> candidate = CloneEntries();
+            Entry entry = candidate[entryIndex];
+            entry.stringKey = null;
+            candidate[entryIndex] = entry;
+            return TryCommit(candidate, out conflict);
+        }
+
+        public bool TryRemoveEntry(TEnum enumKey, out TValue value, out Conflict conflict)
         {
             value = default;
-            if (!EnsureReady())
-            {
-                conflict = lastConflict;
+            if (!TryFindEntryIndex(enumKey, out int entryIndex, out conflict))
                 return false;
-            }
+            return RemoveAt(entryIndex, out value, out conflict);
+        }
 
-            bool hasEnum = TryGetEnumEntryIndex(enumKey, out int enumEntryIndex);
-            int stringEntryIndex = -1;
-            bool hasString = stringKey != null && stringEntries.TryGetValue(stringKey, out stringEntryIndex);
-            if (!hasEnum || !hasString)
-            {
-                conflict = NewConflict(ConflictKind.MissingKey, -1, -1, "Both aliases must exist before an entry can be removed by alias pair.");
+        public bool TryRemoveEntry(string stringKey, out TValue value, out Conflict conflict)
+        {
+            value = default;
+            if (!TryFindEntryIndex(stringKey, out int entryIndex, out conflict))
                 return false;
-            }
+            return RemoveAt(entryIndex, out value, out conflict);
+        }
 
-            if (enumEntryIndex != stringEntryIndex)
-            {
-                conflict = NewConflict(ConflictKind.AliasMismatch, enumEntryIndex, stringEntryIndex, "Enum and string aliases resolve to different entries.");
+        public bool TryRemoveEntry(
+            TEnum enumKey,
+            string stringKey,
+            out TValue value,
+            out Conflict conflict)
+        {
+            value = default;
+            if (!TryFindEntryIndex(enumKey, stringKey, out int entryIndex, out conflict))
                 return false;
-            }
+            return RemoveAt(entryIndex, out value, out conflict);
+        }
 
-            conflict = Conflict.None;
-            return RemoveAt(enumEntryIndex, out value);
+        /// <summary>Removes by current authoring order. The index is not a stable identity.</summary>
+        public bool TryRemoveEntryAt(int index, out TValue value, out Conflict conflict)
+        {
+            value = default;
+            if (!ValidateExistingIndex(index, out conflict))
+                return false;
+            return RemoveAt(index, out value, out conflict);
+        }
+
+        public bool TryRemove(TEnum enumKey, string stringKey, out TValue value, out Conflict conflict)
+        {
+            return TryRemoveEntry(enumKey, stringKey, out value, out conflict);
         }
 
         public void Clear()
@@ -349,6 +615,27 @@ namespace ES
                 : new List<Entry>();
             candidate.AddRange(source);
             return TryCommit(candidate, out conflict);
+        }
+
+        /// <summary>Atomically appends a batch after validating it together with all existing entries.</summary>
+        public bool TryAddEntries(IEnumerable<Entry> source, out Conflict conflict)
+        {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source));
+
+            List<Entry> candidate = CloneEntries();
+            candidate.AddRange(source);
+            return TryCommit(candidate, out conflict);
+        }
+
+        /// <summary>Reserves runtime list capacity without changing content or Generation.</summary>
+        public void EnsureCapacity(int capacity)
+        {
+            if (capacity < 0)
+                throw new ArgumentOutOfRangeException(nameof(capacity));
+            entries ??= new List<Entry>(capacity);
+            if (entries.Capacity < capacity)
+                entries.Capacity = capacity;
         }
 
         public void CopyEntries(List<Entry> destination)
@@ -469,12 +756,151 @@ namespace ES
             return TryCommit(candidate, out conflict);
         }
 
-        private bool RemoveAt(int entryIndex, out TValue value)
+        private bool TrySetValueAt(int entryIndex, TValue value, out Conflict conflict)
         {
-            List<Entry> candidate = CloneEntriesWithAdditionalCapacity();
+            if (!ValidateValue(value, entryIndex, out conflict))
+                return false;
+
+            List<Entry> candidate = CloneEntries();
+            Entry entry = candidate[entryIndex];
+            entry.value = value;
+            candidate[entryIndex] = entry;
+            return TryCommit(candidate, out conflict);
+        }
+
+        private bool TryReplaceEntryAtInternal(int entryIndex, Entry replacement, out Conflict conflict)
+        {
+            List<Entry> candidate = CloneEntries();
+            candidate[entryIndex] = replacement;
+            return TryCommit(candidate, out conflict);
+        }
+
+        private bool ValidateExistingIndex(int index, out Conflict conflict)
+        {
+            if (!EnsureReady())
+            {
+                conflict = lastConflict;
+                return false;
+            }
+
+            int count = entries.Count;
+            if ((uint)index < (uint)count)
+            {
+                conflict = Conflict.None;
+                return true;
+            }
+
+            conflict = NewInvalidIndexConflict(index, count, false);
+            return false;
+        }
+
+        private static Conflict NewInvalidIndexConflict(int index, int count, bool allowEnd)
+        {
+            string validRange = allowEnd
+                ? "0 through " + count
+                : count > 0 ? "0 through " + (count - 1) : "an empty range";
+            return NewConflict(
+                ConflictKind.InvalidIndex,
+                index,
+                -1,
+                "Index " + index + " is outside the valid range " + validRange + ".");
+        }
+
+        private bool RemoveAt(int entryIndex, out TValue value, out Conflict conflict)
+        {
+            List<Entry> candidate = CloneEntries();
             value = candidate[entryIndex].value;
             candidate.RemoveAt(entryIndex);
-            return TryCommit(candidate, out _);
+            return TryCommit(candidate, out conflict);
+        }
+
+        private bool TryFindEntryIndex(TEnum enumKey, out int entryIndex, out Conflict conflict)
+        {
+            if (!EnsureReady())
+            {
+                entryIndex = -1;
+                conflict = lastConflict;
+                return false;
+            }
+
+            if (TryGetEnumEntryIndex(enumKey, out entryIndex))
+            {
+                conflict = Conflict.None;
+                return true;
+            }
+
+            conflict = NewConflict(ConflictKind.MissingKey, -1, -1, "Enum key was not found: " + enumKey + ".");
+            return false;
+        }
+
+        private bool TryFindEntryIndex(string stringKey, out int entryIndex, out Conflict conflict)
+        {
+            if (!EnsureReady())
+            {
+                entryIndex = -1;
+                conflict = lastConflict;
+                return false;
+            }
+
+            if (stringKey != null && stringEntries.TryGetValue(stringKey, out entryIndex))
+            {
+                conflict = Conflict.None;
+                return true;
+            }
+
+            entryIndex = -1;
+            conflict = NewConflict(ConflictKind.MissingKey, -1, -1, "String key was not found: " + (stringKey ?? "<null>") + ".");
+            return false;
+        }
+
+        private bool TryFindEntryIndex(
+            TEnum enumKey,
+            string stringKey,
+            out int entryIndex,
+            out Conflict conflict)
+        {
+            entryIndex = -1;
+            if (!EnsureReady())
+            {
+                conflict = lastConflict;
+                return false;
+            }
+
+            bool hasEnum = TryGetEnumEntryIndex(enumKey, out int enumEntryIndex);
+            int stringEntryIndex = -1;
+            bool hasString = stringKey != null && stringEntries.TryGetValue(stringKey, out stringEntryIndex);
+            if (!hasEnum || !hasString)
+            {
+                conflict = NewConflict(
+                    ConflictKind.MissingKey,
+                    -1,
+                    -1,
+                    "Both aliases must exist and identify one entry.");
+                return false;
+            }
+
+            if (enumEntryIndex != stringEntryIndex)
+            {
+                conflict = NewConflict(
+                    ConflictKind.AliasMismatch,
+                    enumEntryIndex,
+                    stringEntryIndex,
+                    "Enum and string aliases resolve to different entries.");
+                return false;
+            }
+
+            entryIndex = enumEntryIndex;
+            conflict = Conflict.None;
+            return true;
+        }
+
+        private static bool ValidateRequiredStringKey(string stringKey, out Conflict conflict)
+        {
+            if (!string.IsNullOrEmpty(stringKey))
+                return ValidateStringKey(stringKey, true, -1, out conflict);
+
+            conflict = NewConflict(ConflictKind.MissingKey, -1, -1, "A non-empty string alias is required.");
+            return false;
         }
 
         private bool TryCommit(List<Entry> candidate, out Conflict conflict)
@@ -494,6 +920,13 @@ namespace ES
 
         private bool EnsureReady()
         {
+            if (observedSerializedRevision != serializedRevision)
+            {
+                observedSerializedRevision = serializedRevision;
+                isDirty = true;
+                isReady = false;
+            }
+
             if (isReady)
                 return true;
             if (!isDirty)
@@ -710,6 +1143,11 @@ namespace ES
             return candidate;
         }
 
+        private List<Entry> CloneEntries()
+        {
+            return entries != null ? new List<Entry>(entries) : new List<Entry>();
+        }
+
         private void ApplyMirrors(RuntimeMirrors mirrors)
         {
             denseEnumEntries = mirrors.denseEnumEntries;
@@ -719,6 +1157,7 @@ namespace ES
             lastConflict = Conflict.None;
             isDirty = false;
             isReady = true;
+            observedSerializedRevision = serializedRevision;
         }
 
         private void ClearRuntimeMirrors()

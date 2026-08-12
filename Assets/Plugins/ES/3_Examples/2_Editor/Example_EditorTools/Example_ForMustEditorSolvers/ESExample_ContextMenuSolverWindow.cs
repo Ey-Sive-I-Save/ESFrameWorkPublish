@@ -6,24 +6,37 @@ using UnityEditor;
 
 namespace ES.Samples.Editor{
 #if UNITY_EDITOR
-    public class ESExample_ContextMenuSolverWindow : EditorWindow
+    public class ESExample_ContextMenuSolverWindow : ESSinglePageIMGUIWindow<ESExample_ContextMenuSolverWindow>
     {
         private UnityEngine.Object targetObject;
         private int commandCount;
         private string lastCommand = "尚未执行命令";
+        private GUIStyle centerBoldLabel;
 
-        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "编辑器 Solver/02 ContextMenuSolver 案例", false, 20)]
+        [MenuItem(MenuItemPathDefine.SAMPLE_TOOLS_PATH + "编辑器 Solver/02 ContextMenuSolver 案例", false, 20)]
         private static void Open()
         {
             GetWindow<ESExample_ContextMenuSolverWindow>("ContextMenuSolver案例");
         }
 
-        private void OnGUI()
+        public override GUIContent ESWindow_GetWindowGUIContent() =>
+            new GUIContent("ContextMenuSolver 案例", "结构化 IMGUI 右键菜单示例");
+        protected override string ESWindow_Subtitle => "上下文菜单、禁用状态与回调";
+        protected override Vector2 ESWindow_MinSize => new Vector2(500f, 380f);
+        protected override string ESWindow_PageStableId => "sample.solver.context-menu";
+        protected override string ESWindow_PageTitle => "ContextMenuSolver";
+
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             DrawHeader();
             DrawTarget();
             DrawRightClickAreas();
             DrawStatus();
+        }
+
+        protected override void ESWindow_OnHostDisable()
+        {
+            centerBoldLabel = null;
         }
 
         private void DrawHeader()
@@ -139,13 +152,17 @@ namespace ES.Samples.Editor{
             EditorGUIUtility.PingObject(asset);
         }
 
-        private static GUIStyle CenterBoldLabel()
+        private GUIStyle CenterBoldLabel()
         {
-            return new GUIStyle(EditorStyles.boldLabel)
+            if (centerBoldLabel != null)
+                return centerBoldLabel;
+
+            centerBoldLabel = new GUIStyle(EditorStyles.boldLabel)
             {
                 alignment = TextAnchor.MiddleCenter,
                 fontSize = 13
             };
+            return centerBoldLabel;
         }
 
     }

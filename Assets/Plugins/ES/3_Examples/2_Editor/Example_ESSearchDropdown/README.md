@@ -3,7 +3,7 @@
 打开菜单：
 
 ```text
-【ES】/示例与测试/编辑器组件/ESSearchDropdown 标准展示
+【ES】/自动化与开发/文档与示例/编辑器示例/ESSearchDropdown 标准展示
 ```
 
 展示内容：

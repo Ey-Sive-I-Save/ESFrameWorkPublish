@@ -7,20 +7,27 @@ using UnityEditor;
 
 namespace ES.Samples.Editor{
 #if UNITY_EDITOR
-    public class ESExample_TreeViewSolverWindow : EditorWindow
+    public class ESExample_TreeViewSolverWindow : ESSinglePageIMGUIWindow<ESExample_TreeViewSolverWindow>
     {
         private readonly ESTreeViewSolver tree = new ESTreeViewSolver();
         private readonly List<ESTreeViewNode> roots = new List<ESTreeViewNode>();
         private Vector2 scroll;
         private ESTreeViewNode selectedNode;
 
-        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "编辑器 Solver/03 TreeViewSolver 案例", false, 30)]
+        [MenuItem(MenuItemPathDefine.SAMPLE_TOOLS_PATH + "编辑器 Solver/03 TreeViewSolver 案例", false, 30)]
         private static void Open()
         {
             GetWindow<ESExample_TreeViewSolverWindow>("TreeViewSolver案例");
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent() =>
+            new GUIContent("TreeViewSolver 案例", "多层树、搜索、选择和上下文菜单示例");
+        protected override string ESWindow_Subtitle => "树结构、展开状态与节点操作";
+        protected override Vector2 ESWindow_MinSize => new Vector2(560f, 440f);
+        protected override string ESWindow_PageStableId => "sample.solver.tree-view";
+        protected override string ESWindow_PageTitle => "TreeViewSolver";
+
+        protected override void ESWindow_OnHostEnable()
         {
             BuildDemoTree();
             tree.InitSolver(
@@ -39,7 +46,7 @@ namespace ES.Samples.Editor{
                 rightAreaWidth: 132f);
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             DrawHeader();
             DrawToolbar();

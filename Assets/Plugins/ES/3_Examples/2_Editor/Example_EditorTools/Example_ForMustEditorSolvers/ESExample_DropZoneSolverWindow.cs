@@ -7,20 +7,28 @@ using UnityEditor;
 
 namespace ES.Samples.Editor{
 #if UNITY_EDITOR
-    public class ESExample_DropZoneSolverWindow : EditorWindow
+    public class ESExample_DropZoneSolverWindow : ESSinglePageIMGUIWindow<ESExample_DropZoneSolverWindow>
     {
         private readonly ESDropZoneSolver dropZone = new ESDropZoneSolver();
         private readonly List<UnityEngine.Object> acceptedObjects = new List<UnityEngine.Object>();
         private Vector2 scroll;
         private string lastMessage = "等待拖入资源";
+        private GUIStyle centerBoldLabel;
 
-        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "编辑器 Solver/01 DropZoneSolver 案例", false, 10)]
+        [MenuItem(MenuItemPathDefine.SAMPLE_TOOLS_PATH + "编辑器 Solver/01 DropZoneSolver 案例", false, 10)]
         private static void Open()
         {
             GetWindow<ESExample_DropZoneSolverWindow>("DropZoneSolver案例");
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent() =>
+            new GUIContent("DropZoneSolver 案例", "带过滤、文件夹展开和拒绝原因的投放区示例");
+        protected override string ESWindow_Subtitle => "资源投放、过滤与拒绝反馈";
+        protected override Vector2 ESWindow_MinSize => new Vector2(520f, 400f);
+        protected override string ESWindow_PageStableId => "sample.solver.drop-zone";
+        protected override string ESWindow_PageTitle => "DropZoneSolver";
+
+        protected override void ESWindow_OnHostEnable()
         {
             dropZone.InitSolver<UnityEngine.Object>(
                 allowFolderExpand: true,
@@ -28,11 +36,16 @@ namespace ES.Samples.Editor{
                 maxCount: 32);
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             DrawHeader();
             DrawDropArea();
             DrawResults();
+        }
+
+        protected override void ESWindow_OnHostDisable()
+        {
+            centerBoldLabel = null;
         }
 
         private void DrawHeader()
@@ -130,13 +143,17 @@ namespace ES.Samples.Editor{
                 "状态字段：LastAcceptedCount 用于显示即将接收数量；LastRejectReason 用于显示拒绝原因。");
         }
 
-        private static GUIStyle CenterBoldLabel()
+        private GUIStyle CenterBoldLabel()
         {
-            return new GUIStyle(EditorStyles.boldLabel)
+            if (centerBoldLabel != null)
+                return centerBoldLabel;
+
+            centerBoldLabel = new GUIStyle(EditorStyles.boldLabel)
             {
                 alignment = TextAnchor.MiddleCenter,
                 fontSize = 13
             };
+            return centerBoldLabel;
         }
 
         private static void Ping(UnityEngine.Object asset)

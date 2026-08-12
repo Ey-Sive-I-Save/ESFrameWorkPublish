@@ -36,7 +36,7 @@ namespace ES.Samples{
         }
     }
 
-    [CreateAssetMenu(fileName = "ExampleNativeSoListTableSource", menuName = "【ES】/示例与测试/数据表/SO 表格规则/普通SO-List行测试源")]
+    [CreateAssetMenu(fileName = "ExampleNativeSoListTableSource", menuName = "【ES】/示例/数据表/SO 表格规则/普通SO-List行测试源")]
     public sealed class ExampleNativeSoListTableSource : ScriptableObject, IString, IESRowBindingProvider
     {
         [LabelText("SO ID")]

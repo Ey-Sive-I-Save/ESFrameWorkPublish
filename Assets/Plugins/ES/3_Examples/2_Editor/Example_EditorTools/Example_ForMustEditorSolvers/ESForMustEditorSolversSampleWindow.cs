@@ -7,7 +7,7 @@ using UnityEditor;
 
 namespace ES.Samples.Editor{
 #if UNITY_EDITOR
-    public class ESForMustEditorSolversSampleWindow : EditorWindow
+    public class ESForMustEditorSolversSampleWindow : ESSinglePageIMGUIWindow<ESForMustEditorSolversSampleWindow>
     {
         private readonly ESDropZoneSolver dropZone = new ESDropZoneSolver();
         private readonly ESTreeViewSolver tree = new ESTreeViewSolver();
@@ -17,14 +17,22 @@ namespace ES.Samples.Editor{
         private UnityEngine.Object selected;
         private string renameTo = string.Empty;
         private string lastDropMessage = "等待拖入资源";
+        private GUIStyle centerBoldLabel;
 
-        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "编辑器 Solver/04 ForMustEditor Solver 综合案例", false, 40)]
+        [MenuItem(MenuItemPathDefine.SAMPLE_TOOLS_PATH + "编辑器 Solver/04 ForMustEditor Solver 综合案例", false, 40)]
         private static void Open()
         {
             GetWindow<ESForMustEditorSolversSampleWindow>("ES编辑器Solver案例");
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent() =>
+            new GUIContent("ES 编辑器 Solver 综合案例", "DropZone、TreeView 与 ContextMenu 协作示例");
+        protected override string ESWindow_Subtitle => "常用 Editor Solver 综合工作流";
+        protected override Vector2 ESWindow_MinSize => new Vector2(620f, 520f);
+        protected override string ESWindow_PageStableId => "sample.solver.complete";
+        protected override string ESWindow_PageTitle => "Solver 综合案例";
+
+        protected override void ESWindow_OnHostEnable()
         {
             dropZone.InitSolver<UnityEngine.Object>(
                 allowFolderExpand: true,
@@ -49,13 +57,18 @@ namespace ES.Samples.Editor{
                 });
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             DrawHeader();
             DrawToolbar();
             DrawDropZone();
             DrawTree();
             DrawSelectionPanel();
+        }
+
+        protected override void ESWindow_OnHostDisable()
+        {
+            centerBoldLabel = null;
         }
 
         private void DrawHeader()
@@ -286,13 +299,17 @@ namespace ES.Samples.Editor{
                 "预期验证：拖入文件夹后，应看到 Assets/子目录/资源 的多层结构；文件夹节点只作为分组，资源节点可选中、双击定位、右键操作。");
         }
 
-        private static GUIStyle CenterBoldLabel()
+        private GUIStyle CenterBoldLabel()
         {
-            return new GUIStyle(EditorStyles.boldLabel)
+            if (centerBoldLabel != null)
+                return centerBoldLabel;
+
+            centerBoldLabel = new GUIStyle(EditorStyles.boldLabel)
             {
                 alignment = TextAnchor.MiddleCenter,
                 fontSize = 13
             };
+            return centerBoldLabel;
         }
 
         private static string GetAssetPath(UnityEngine.Object asset)

@@ -8,7 +8,7 @@ using UnityEditor;
 
 namespace ES.Samples.Editor{
 #if UNITY_EDITOR
-    public class ESExample_RecordListSolverWindow : EditorWindow
+    public class ESExample_RecordListSolverWindow : ESSinglePageIMGUIWindow<ESExample_RecordListSolverWindow>
     {
         [Serializable]
         private class RecordItem
@@ -24,13 +24,20 @@ namespace ES.Samples.Editor{
         private int createIndex = 1;
         private string lastMessage = "等待操作";
 
-        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "编辑器 Solver/05 RecordListSolver 案例", false, 50)]
+        [MenuItem(MenuItemPathDefine.SAMPLE_TOOLS_PATH + "编辑器 Solver/05 RecordListSolver 案例", false, 50)]
         private static void Open()
         {
             GetWindow<ESExample_RecordListSolverWindow>("RecordListSolver案例");
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent() =>
+            new GUIContent("RecordListSolver 案例", "可编辑记录列表、选择与 Undo 示例");
+        protected override string ESWindow_Subtitle => "记录列表、编辑状态与持久化反馈";
+        protected override Vector2 ESWindow_MinSize => new Vector2(560f, 440f);
+        protected override string ESWindow_PageStableId => "sample.solver.record-list";
+        protected override string ESWindow_PageTitle => "RecordListSolver";
+
+        protected override void ESWindow_OnHostEnable()
         {
             if (records.Count == 0)
                 BuildDemoRecords();
@@ -51,7 +58,7 @@ namespace ES.Samples.Editor{
                 onChanged: _ => Repaint());
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             DrawHeader();
             recordList.Draw();

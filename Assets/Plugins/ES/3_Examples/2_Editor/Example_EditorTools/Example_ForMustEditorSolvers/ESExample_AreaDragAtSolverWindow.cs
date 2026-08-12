@@ -7,7 +7,7 @@ using UnityEditor;
 
 namespace ES.Samples.Editor{
 #if UNITY_EDITOR
-    public class ESExample_AreaDragAtSolverWindow : EditorWindow
+    public class ESExample_AreaDragAtSolverWindow : ESSinglePageIMGUIWindow<ESExample_AreaDragAtSolverWindow>
     {
         private readonly ESAreaSolver area = new ESAreaSolver();
         private readonly ESDragAtSolver dragAt = new ESDragAtSolver();
@@ -16,13 +16,20 @@ namespace ES.Samples.Editor{
         private Vector2 scroll;
         private string lastMessage = "等待拖入对象";
 
-        [MenuItem(MenuItemPathDefine.TEST_TOOLS_PATH + "编辑器 Solver/00 AreaDragAtSolver 案例", false, 0)]
+        [MenuItem(MenuItemPathDefine.SAMPLE_TOOLS_PATH + "编辑器 Solver/00 AreaDragAtSolver 案例", false, 0)]
         private static void Open()
         {
             GetWindow<ESExample_AreaDragAtSolverWindow>("AreaDragAtSolver案例");
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent() =>
+            new GUIContent("AreaDragAtSolver 案例", "整块 IMGUI 区域拖拽接收示例");
+        protected override string ESWindow_Subtitle => "Area 捕获与 DragAt 拖拽检测";
+        protected override Vector2 ESWindow_MinSize => new Vector2(520f, 420f);
+        protected override string ESWindow_PageStableId => "sample.solver.area-drag";
+        protected override string ESWindow_PageTitle => "AreaDragAtSolver";
+
+        protected override void ESWindow_OnHostEnable()
         {
             area.InitSolver(
                 drawBackground: true,
@@ -32,7 +39,7 @@ namespace ES.Samples.Editor{
             dragAt.InitSolver();
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             DrawHeader();
             DrawCapturedToolBlock();

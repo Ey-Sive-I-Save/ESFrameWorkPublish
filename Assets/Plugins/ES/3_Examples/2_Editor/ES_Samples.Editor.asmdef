@@ -2,7 +2,8 @@
     "name": "ES_Samples.Editor",
     "rootNamespace": "",
     "references": [
-        "ES_Logic"
+        "ES_Logic",
+        "ES_Editor"
     ],
     "includePlatforms": [
         "Editor"

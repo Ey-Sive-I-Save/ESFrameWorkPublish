@@ -7,7 +7,7 @@ using UnityEngine;
 namespace ES.Examples.Editor
 {
     /// <summary>ESSearchDropdown 标准展示窗口，兼顾快速上手、功能验证和视频录制。</summary>
-    public sealed class ExampleESSearchDropdownWindow : EditorWindow
+    public sealed class ExampleESSearchDropdownWindow : ESSinglePageIMGUIWindow<ExampleESSearchDropdownWindow>
     {
         private sealed class DemoCommand
         {
@@ -39,16 +39,49 @@ namespace ES.Examples.Editor
         private string selectedAsset = "尚未选择";
         private int providerBuildCount;
         private Vector2 scroll;
+        private GUIStyle titleStyle;
 
-        [MenuItem(MenuItemPathDefine.SAMPLES_TESTS_PATH + "编辑器组件/ESSearchDropdown 标准展示", false, 100)]
-        public static void OpenWindow()
+        [MenuItem(MenuItemPathDefine.SAMPLE_TOOLS_PATH + "ESSearchDropdown 标准展示", false, 100)]
+        private static void OpenSampleWindow()
         {
             var window = GetWindow<ExampleESSearchDropdownWindow>(false, "ESSearchDropdown Sample", true);
             window.minSize = new Vector2(720f, 620f);
             window.Show();
         }
 
-        private void OnGUI()
+        public override GUIContent ESWindow_GetWindowGUIContent()
+        {
+            return new GUIContent("ESSearchDropdown Sample", "搜索下拉的标准能力、延迟 Provider 与异常隔离示例");
+        }
+
+        protected override string ESWindow_Subtitle => "统一搜索、分组、状态与安全回调";
+        protected override Vector2 ESWindow_MinSize => new Vector2(720f, 620f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(920f, 760f);
+        protected override string ESWindow_PageStableId => "sample.search-dropdown";
+        protected override string ESWindow_PageTitle => "ESSearchDropdown 标准展示";
+        protected override string ESWindow_PageKeywords => "示例 Search Dropdown Provider 资源 命令";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "search-sample.reset",
+                    "重置示例",
+                    "重置当前选择和 Provider 构建计数。",
+                    context =>
+                    {
+                        selectedValue = "尚未选择";
+                        selectedCommand = "尚未选择";
+                        selectedAsset = "尚未选择";
+                        providerBuildCount = 0;
+                        context.SetStatus("搜索下拉示例已重置");
+                        Repaint();
+                    })
+                .WithUnityIcon("Refresh")
+                .WithPriority(100));
+        }
+
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             DrawHeader();
             scroll = EditorGUILayout.BeginScrollView(scroll);
@@ -60,7 +93,12 @@ namespace ES.Examples.Editor
             EditorGUILayout.EndScrollView();
         }
 
-        private static void DrawHeader()
+        protected override void ESWindow_OnHostDisable()
+        {
+            titleStyle = null;
+        }
+
+        private void DrawHeader()
         {
             Rect rect = EditorGUILayout.GetControlRect(false, 72f);
             EditorGUI.DrawRect(rect, EditorGUIUtility.isProSkin
@@ -68,7 +106,9 @@ namespace ES.Examples.Editor
                 : new Color(0.72f, 0.84f, 0.96f));
             Rect title = new Rect(rect.x + 18f, rect.y + 10f, rect.width - 36f, 28f);
             Rect subtitle = new Rect(rect.x + 18f, rect.y + 40f, rect.width - 36f, 22f);
-            EditorGUI.LabelField(title, "ESSearchDropdown 标准展示", new GUIStyle(EditorStyles.boldLabel) { fontSize = 19 });
+            if (titleStyle == null)
+                titleStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 19 };
+            EditorGUI.LabelField(title, "ESSearchDropdown 标准展示", titleStyle);
             EditorGUI.LabelField(subtitle, "统一搜索、分组、图标、状态与回调，同时保持简单 API。", EditorStyles.miniLabel);
             EditorGUILayout.Space(6f);
         }

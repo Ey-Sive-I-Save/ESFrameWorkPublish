@@ -1,19 +1,20 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using GraphAsset = global::ES.ESGraphAssetBase;
 
 namespace ES.EditorInternal
 {
-    [CustomEditor(typeof(ESGraphAsset))]
+    [CustomEditor(typeof(GraphAsset), true)]
     internal sealed class ESStableGraphAssetEditor : UnityEditor.Editor
     {
-        private ESGraphAsset validatedGraph;
+        private GraphAsset validatedGraph;
         private int validatedDirtyCount = int.MinValue;
         private List<ESGraphValidationIssue> cachedIssues;
 
         public override void OnInspectorGUI()
         {
-            ESGraphAsset graph = (ESGraphAsset)target;
+            GraphAsset graph = (GraphAsset)target;
             EditorGUILayout.HelpBox(
                 "图资产是节点、端口和连线的唯一保存权威。请通过稳定图编辑器进行修改。",
                 MessageType.Info);
@@ -22,7 +23,7 @@ namespace ES.EditorInternal
             {
                 EditorGUILayout.IntField("数据版本（内部）", graph.schemaVersion);
                 EditorGUILayout.TextField("图领域标识（内部）", graph.DomainId);
-                EditorGUILayout.TextField("图用途", ESGraphChinesePresentation.GetDomainKindName(graph.DomainKind));
+                EditorGUILayout.TextField("图用途", ESGraphChinesePresentation.GetDomainName(graph.DomainId));
                 EditorGUILayout.IntField("节点", graph.Nodes.Count);
                 EditorGUILayout.IntField("连线", graph.Edges.Count);
             }
@@ -52,7 +53,7 @@ namespace ES.EditorInternal
                 errors == 0 ? MessageType.None : MessageType.Error);
         }
 
-        private void RefreshValidation(ESGraphAsset graph, int dirtyCount)
+        private void RefreshValidation(GraphAsset graph, int dirtyCount)
         {
             validatedGraph = graph;
             validatedDirtyCount = dirtyCount;

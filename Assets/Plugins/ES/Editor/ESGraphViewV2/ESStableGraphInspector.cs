@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using Newtonsoft.Json.Linq;
 using Sirenix.OdinInspector;
 using Sirenix.OdinInspector.Editor;
 using UnityEditor;
@@ -8,6 +10,7 @@ using UnityEditor.Experimental.GraphView;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
+using GraphAsset = global::ES.ESGraphAssetBase;
 
 namespace ES.EditorInternal
 {
@@ -299,9 +302,6 @@ namespace ES.EditorInternal
             ESGraphPortValueKind.Number,
             ESGraphPortValueKind.Text,
             ESGraphPortValueKind.Object,
-            ESGraphPortValueKind.AgentContext,
-            ESGraphPortValueKind.AgentRequirement,
-            ESGraphPortValueKind.AgentArtifact,
             ESGraphPortValueKind.Custom
         };
         private readonly Action rebuildGraph;
@@ -321,13 +321,20 @@ namespace ES.EditorInternal
         private readonly Label issueMeta;
         private readonly Button issueToggle;
         private IVisualElementScheduledItem validationSchedule;
-        private ESGraphAsset asset;
+        private GraphAsset asset;
         private InspectorTargetKind currentTarget;
         private string currentElementId;
         private int selectedNodeCount;
         private int selectedEdgeCount;
         private int validationRevision;
         private int validatedRevision = -1;
+        private GraphAsset evaluatedAsset;
+        private int evaluatedRevision = -1;
+        private bool evaluatedBakeSucceeded;
+        private bool evaluatedActionBakeSucceeded;
+        private ESBakedGraphSnapshot evaluatedSnapshot;
+        private IESBakedGraphPlan evaluatedPlan;
+        private List<ESGraphValidationIssue> evaluatedIssues = new List<ESGraphValidationIssue>();
         private bool issueListExpanded;
         private bool issueExpansionInitialized;
         private ESGraphOdinPayloadSession odinPayloadSession;
@@ -446,14 +453,24 @@ namespace ES.EditorInternal
             Add(validationPanel);
             // 质量结论必须出现在首屏，业务详情随后展开；避免用户先滚到底部才知道图能否继续。
             Add(details);
+            ESAgentArtifactGenerationWorkspace.StateChanged += OnAgentArtifactStateChanged;
             RegisterCallback<DetachFromPanelEvent>(_ =>
             {
+                ESAgentArtifactGenerationWorkspace.StateChanged -= OnAgentArtifactStateChanged;
                 CancelScheduledValidation();
                 ClearOdinPayloadSession();
             });
         }
 
-        public void SetAsset(ESGraphAsset value)
+        private void OnAgentArtifactStateChanged()
+        {
+            if (asset != null && string.Equals(asset.DomainId, ESAgentGraphStableIds.DomainId,
+                    StringComparison.Ordinal)
+                && currentTarget == InspectorTargetKind.Graph)
+                ShowGraphInspector();
+        }
+
+        public void SetAsset(GraphAsset value)
         {
             asset = value;
             validationRevision++;
@@ -548,6 +565,7 @@ namespace ES.EditorInternal
             }
 
             int errorCount = 0;
+            int forceableErrorCount = 0;
             int warningCount = 0;
             int infoCount = 0;
             for (int i = 0; i < issues.Count; i++)
@@ -556,7 +574,11 @@ namespace ES.EditorInternal
                 if (issue == null)
                     continue;
                 if (issue.severity == ESGraphValidationSeverity.Error)
+                {
                     errorCount++;
+                    if (issue.canForceContinue)
+                        forceableErrorCount++;
+                }
                 else if (issue.severity == ESGraphValidationSeverity.Warning)
                     warningCount++;
                 else
@@ -566,9 +588,12 @@ namespace ES.EditorInternal
             Color statusColor = errorCount > 0
                 ? ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Error)
                 : ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Warning);
-            issueSummary.text = errorCount > 0 ? "存在阻断问题" : "存在改进建议";
+            issueSummary.text = errorCount > 0
+                ? forceableErrorCount == errorCount ? "存在可确认风险" : "存在阻断问题"
+                : "存在改进建议";
             issueSummary.style.color = statusColor;
             issueMeta.text = errorCount + " 错误 · " + warningCount + " 提醒"
+                + (forceableErrorCount > 0 ? " · " + forceableErrorCount + " 可强制" : string.Empty)
                 + (infoCount > 0 ? " · " + infoCount + " 信息" : string.Empty);
             validationPanel.style.borderLeftColor = statusColor;
             issueToggle.SetEnabled(true);
@@ -608,7 +633,8 @@ namespace ES.EditorInternal
                 message.style.color = ESEditorPresentation.SectionTextColor;
                 message.style.fontSize = 10f;
                 button.Add(message);
-                var code = new Label((issue.severity == ESGraphValidationSeverity.Error ? "错误" :
+                var code = new Label((issue.severity == ESGraphValidationSeverity.Error
+                    ? issue.canForceContinue ? "错误 · 可强制" : "错误 · 必须修复" :
                     issue.severity == ESGraphValidationSeverity.Warning ? "提醒" : "信息")
                     + " · " + (issue.code ?? "未分类"));
                 code.style.fontSize = 9f;
@@ -665,7 +691,7 @@ namespace ES.EditorInternal
             IESGraphAuthoringProfile currentProfile = profiles.FirstOrDefault(profile =>
                 profile.Domain.Equals(asset.DomainKey));
             string domainName = currentProfile?.DisplayName
-                ?? ESGraphChinesePresentation.GetDomainKindName(asset.DomainKind);
+                ?? ESGraphChinesePresentation.GetDomainName(asset.DomainId);
             SetHeader("图资产", asset.name,
                 domainName + " · " + asset.Nodes.Count + " 个节点 · " + asset.Edges.Count + " 条关系",
                 ESEditorPresentation.GetDepthAccent(0));
@@ -680,69 +706,87 @@ namespace ES.EditorInternal
             details.Add(overview);
 
             VisualElement settings = CreateSection("业务设置", "领域方案决定可用节点、端口语义和校验规则。", 1);
-            if (profiles.Count > 0)
-            {
-                VisualElement profileField = CreateSearchPickerField(
-                    "领域方案",
-                    currentProfile?.DisplayName ?? ESGraphChinesePresentation.GetDomainKindName(asset.DomainKind),
-                    "领域方案决定可以添加哪些节点，以及这些节点的端口规则。普通使用保持默认即可。",
-                    out Button profileButton);
-                profileButton.clicked += () =>
-                {
-                    ESSearchDropdown.Open(
-                        profileButton,
-                        hostWindow,
-                        "选择图领域方案",
-                        () => profiles.Select(profile =>
-                        {
-                            IESGraphAuthoringProfile selected = profile;
-                            bool isCurrent = asset.DomainKey.Equals(selected.Domain);
-                            return ESSearchDropdown.Entry.Item(
-                                selected.DisplayName,
-                                () => SelectProfile(selected),
-                                subtitle: selected.Description,
-                                badge: isCurrent ? "当前" : null,
-                                selected: isCurrent);
-                        }),
-                        minimumWindowSize: new Vector2(520f, 320f));
-                };
-                settings.Add(profileField);
-                if (currentProfile != null)
-                    settings.Add(ESGraphInspectorVisuals.CreateNotice(currentProfile.Description,
-                        HelpBoxMessageType.Info));
-                else
-                    settings.Add(ESGraphInspectorVisuals.CreateNotice(
-                        "当前领域没有注册方案，但已注册的独立节点定义仍可正常使用。",
-                        HelpBoxMessageType.Warning));
-            }
+            AddKeyValue(settings, "领域方案", domainName);
+            if (currentProfile != null)
+                settings.Add(ESGraphInspectorVisuals.CreateNotice(currentProfile.Description,
+                    HelpBoxMessageType.Info));
+            else
+                settings.Add(ESGraphInspectorVisuals.CreateNotice(
+                    "当前领域没有注册方案，但已注册的独立节点定义仍可正常使用。",
+                    HelpBoxMessageType.Warning));
             details.Add(settings);
 
             Foldout advanced = CreateAdvancedFoldout("高级图结构与身份");
             AddReadOnlyText(advanced, "资产路径", AssetDatabase.GetAssetPath(asset));
             AddReadOnlyText(advanced, "数据版本", asset.schemaVersion.ToString());
             AddReadOnlyText(advanced, "领域标识", asset.DomainId);
-            Toggle cycles = new Toggle("允许循环（高级）") { value = asset.allowCycles };
-            cycles.tooltip = "允许节点关系形成闭环。Agent 产物编排和行为树通常不应开启。";
+            Toggle cycles = new Toggle("允许循环（高级）") { value = asset.AllowsCycles };
+            cycles.tooltip = asset.CanEnableCycles
+                ? "允许节点关系形成闭环。"
+                : "当前领域禁止循环；该策略由领域合同固定，不能在普通入口修改。";
             ESGraphInspectorVisuals.StyleField(cycles);
+            cycles.SetEnabled(asset.CanEnableCycles);
             cycles.RegisterValueChangedCallback(evt =>
             {
+                if (!asset.CanEnableCycles)
+                    return;
                 Undo.RecordObject(asset, "修改图循环规则");
                 asset.allowCycles = evt.newValue;
                 MarkChanged("已修改循环规则");
             });
             advanced.Add(cycles);
+            if (!asset.CanEnableCycles)
+                advanced.Add(ESGraphInspectorVisuals.CreateNotice(
+                    "当前领域固定禁止循环，拖线、重连、校验与快照使用同一策略。",
+                    HelpBoxMessageType.Info));
             details.Add(advanced);
 
             VisualElement workflow = CreateSection("检查、执行与产物",
-                "先消除阻断问题，再选择即时使用或永久化。", 1, "业务出口");
+                "质量错误会在操作前提示；结构与授权错误仍必须先修复。", 1, "业务出口");
+            EvaluateCurrentGraph();
+            ESBakedGraphSnapshot currentSnapshot = evaluatedActionBakeSucceeded ? evaluatedSnapshot : null;
+            ESAgentArtifactGenerationSpec currentAgentSpec = evaluatedActionBakeSucceeded
+                ? evaluatedPlan as ESAgentArtifactGenerationSpec
+                : null;
+            ESAISkillExecutionSpec currentExecutionSpec = evaluatedActionBakeSucceeded
+                ? evaluatedPlan as ESAISkillExecutionSpec
+                : null;
+            string deliveryBlockReason = GetDeliveryBlockReason();
+            if (string.Equals(asset.DomainId, ESAgentGraphStableIds.DomainId, StringComparison.Ordinal))
+                AddAgentNextAction(workflow);
             VisualElement checkActions = ESGraphInspectorVisuals.CreateActionRow();
             checkActions.Add(ESGraphInspectorVisuals.CreateButton("立即检查", "检查图的完整性、连线和领域规则。",
                 ForceValidation, true));
-            checkActions.Add(ESGraphInspectorVisuals.CreateButton("生成检查快照",
-                "生成只读检查结果，供后续流程使用，不会直接运行图。", BakeSnapshot));
+            Button snapshotButton = ESGraphInspectorVisuals.CreateButton("生成并保存检查快照",
+                "生成严格 UTF-8 JSON 快照并保存到 ES/Automation/Artifacts；不会直接运行图。", BakeSnapshot);
+            checkActions.Add(snapshotButton);
             workflow.Add(checkActions);
-            if (asset.DomainKind == ESGraphDomainKind.AgentAuthoring)
+            AddSnapshotStatus(workflow, currentSnapshot);
+            if (string.Equals(asset.DomainId, ESAgentGraphStableIds.DomainId, StringComparison.Ordinal))
             {
+                if (currentExecutionSpec != null || ESAISkillExecutionGraphValidator.IsExecutionGraph(asset))
+                {
+                    AddAISkillExecutionWorkflow(workflow, currentExecutionSpec, deliveryBlockReason);
+                    details.Add(workflow);
+                    details.Remove(workflow);
+                    details.Insert(1, workflow);
+                    return;
+                }
+                if (currentAgentSpec == null)
+                {
+                    workflow.Add(ESGraphInspectorVisuals.CreateNotice(
+                        "交付准备未通过：" + deliveryBlockReason
+                        + "\n影响：当前数据无法构造稳定执行合同；按钮仍可点击查看具体门禁。"
+                        + "\n下一步：展开上方质量检查，定位并修复必须修复项。",
+                        HelpBoxMessageType.Error));
+                }
+                else if (!evaluatedBakeSucceeded)
+                {
+                    workflow.Add(ESGraphInspectorVisuals.CreateNotice(
+                        "当前存在可强制继续的质量错误。操作入口保持可用；点击执行或生成时会再次说明风险，"
+                        + "由你选择返回修复或仍然继续。",
+                        HelpBoxMessageType.Warning));
+                }
                 if (ESAgentAuthoringGraphValidator.TryGetFinalPurpose(asset,
                         out string finalPurpose, out string successCriteria))
                 {
@@ -756,33 +800,46 @@ namespace ES.EditorInternal
                         "请先填写唯一的“最终目的”和“成功标准”。未明确最终目的时，即时执行、复制和永久产物生成都会被阻断。",
                         HelpBoxMessageType.Error));
                 }
+                if (currentAgentSpec?.skillBundle != null)
+                {
+                    ESAgentSkillBundleContract bundle = currentAgentSpec.skillBundle;
+                    workflow.Add(ESGraphInspectorVisuals.CreateNotice(
+                        "Skill 能力包：" + bundle.displayName + "（" + bundle.kind + "）"
+                        + "\nBundleId：" + bundle.bundleId
+                        + "\nAICommand=" + (bundle.commandOutputNodeIds?.Length ?? 0)
+                        + "，AISkill=" + (bundle.aiSkillOutputNodeIds?.Length ?? 0)
+                        + "；共享 Goal、约束、验证和人工批准边界。",
+                        HelpBoxMessageType.Info));
+                }
                 VisualElement immediate = CreateSection("即时使用",
-                    "同类 Output 唯一时可从这里使用；多个 Output 请直接使用目标节点卡片。", 2, "本次任务");
+                    "首屏保留常用动作；会话类型、直接执行和纯复制方式统一放在“高级交付”中选择。", 2, "本次任务");
                 int commandOutputCount = asset.Nodes.Count(node => node != null
-                    && node.BuiltInKind == ESGraphBuiltInNodeKind.AgentAICommandOutput);
+                    && string.Equals(node.typeId, ESAgentGraphStableIds.AICommandOutputNode,
+                        StringComparison.Ordinal));
                 int skillOutputCount = asset.Nodes.Count(node => node != null
-                    && node.BuiltInKind == ESGraphBuiltInNodeKind.AgentSkillOutput);
+                    && string.Equals(node.typeId, ESAgentGraphStableIds.AISkillOutputNode,
+                        StringComparison.Ordinal));
                 bool hasCommandOutput = commandOutputCount > 0;
                 bool hasSkillOutput = skillOutputCount > 0;
                 VisualElement immediateActions = ESGraphInspectorVisuals.CreateActionRow();
-                Button useAsCommand = ESGraphInspectorVisuals.CreateButton("作为单次 Command",
-                    "只使用 AICommand Output 关联的整图分支执行一次；不生成或安装永久产物。",
+                Button useAsCommand = ESGraphInspectorVisuals.CreateButton("执行单次 Command",
+                    "按默认受控会话执行 AICommand Output 关联分支；不生成或安装永久产物。",
                     () => SendSingleUseAgentArtifact(ESAgentArtifactKind.AICommand), true);
                 useAsCommand.SetEnabled(commandOutputCount == 1);
                 immediateActions.Add(useAsCommand);
-                Button useAsSkill = ESGraphInspectorVisuals.CreateButton("作为临时 Skill",
-                    "只在本次任务中使用 Agent Skill Output 关联的整图分支；不会写入 .agents/skills。",
+                Button useAsSkill = ESGraphInspectorVisuals.CreateButton("执行临时 AISkill",
+                    "按默认受控会话执行 AISkill Output 关联分支；不会写入 .agents/skills。",
                     () => SendSingleUseAgentArtifact(ESAgentArtifactKind.AgentSkill));
                 useAsSkill.SetEnabled(skillOutputCount == 1);
                 immediateActions.Add(useAsSkill);
-                Button copyGraph = null;
-                copyGraph = new Button(() => OpenAgentCopyMenu(copyGraph))
+                Button advancedDelivery = null;
+                advancedDelivery = new Button(() => OpenAgentDeliveryMenu(advancedDelivery))
                 {
-                    text = "复制整图…",
-                    tooltip = "复制即时执行提示、生成/更新请求 JSON，或包含 Mermaid 的完整中文图说明。"
+                    text = "高级交付…",
+                    tooltip = "选择受控工作台草稿、直接命令会话、候选生成、独立实现会话或纯复制。"
                 };
-                ESGraphInspectorVisuals.StyleButton(copyGraph);
-                immediateActions.Add(copyGraph);
+                ESGraphInspectorVisuals.StyleButton(advancedDelivery);
+                immediateActions.Add(advancedDelivery);
                 immediate.Add(immediateActions);
                 if (commandOutputCount > 1 || skillOutputCount > 1)
                 {
@@ -795,35 +852,69 @@ namespace ES.EditorInternal
                 VisualElement permanent = CreateSection("永久化流程",
                     "候选隔离 → Diff 审查 → 人工批准 → 独立窗口实现。", 2, "可持续更新");
                 VisualElement saveActions = ESGraphInspectorVisuals.CreateActionRow();
-                Button saveCommand = ESGraphInspectorVisuals.CreateButton("保存为 AICommand 候选",
-                    "只保留 AICommand Output 关联分支，写入隔离候选目录。",
+                Button saveCommand = ESGraphInspectorVisuals.CreateButton("生成 AICommand 候选",
+                    "按默认受控方式创建并提交隔离候选请求；只保留 AICommand Output 关联分支。",
                     () => SendAgentGenerationRequest(ESAgentArtifactKind.AICommand), true);
                 saveCommand.SetEnabled(hasCommandOutput);
                 saveActions.Add(saveCommand);
-                Button saveSkill = ESGraphInspectorVisuals.CreateButton("保存为 Agent Skill 候选",
-                    "只保留 Agent Skill Output 关联分支，写入隔离候选目录。",
+                Button saveSkill = ESGraphInspectorVisuals.CreateButton("生成 AISkill 候选",
+                    "按默认受控方式创建并提交隔离候选请求；只保留 AISkill Output 关联分支。",
                     () => SendAgentGenerationRequest(ESAgentArtifactKind.AgentSkill));
                 saveSkill.SetEnabled(hasSkillOutput);
                 saveActions.Add(saveSkill);
-                Button saveAll = ESGraphInspectorVisuals.CreateButton("同时保存",
-                    "把整图声明的全部 AICommand 与 Agent Skill Output 放入同一候选请求。",
+                Button saveAll = ESGraphInspectorVisuals.CreateButton(
+                    hasCommandOutput && hasSkillOutput ? "生成 Skill 能力包候选" : "生成全部候选",
+                    hasCommandOutput && hasSkillOutput
+                        ? "按默认受控方式把 AICommand + AISkill 作为同一 Skill 能力包放入隔离候选请求。"
+                        : "按默认受控方式把全部 Output 放入同一隔离候选请求。",
                     SendAgentGenerationRequest);
                 saveAll.SetEnabled(hasCommandOutput && hasSkillOutput);
                 saveActions.Add(saveAll);
                 permanent.Add(saveActions);
+                ESAgentArtifactRequestStatus requestStatus = currentAgentSpec != null
+                    ? ESAgentArtifactGenerationWorkspace.GetRequestStatus(currentAgentSpec)
+                    : new ESAgentArtifactRequestStatus
+                    {
+                        State = ESAgentArtifactRequestState.Invalid,
+                        Message = "当前 Graph 尚未形成可交付的领域计划：" + deliveryBlockReason,
+                        NextAction = "展开质量检查并修复首个阻断项；通过后按钮会自动恢复。"
+                    };
+                HelpBoxMessageType requestMessageType = requestStatus.State == ESAgentArtifactRequestState.Approved
+                    ? HelpBoxMessageType.Info
+                    : requestStatus.State == ESAgentArtifactRequestState.AwaitingCandidate
+                        || requestStatus.State == ESAgentArtifactRequestState.AwaitingApproval
+                        ? HelpBoxMessageType.Warning : HelpBoxMessageType.Error;
+                permanent.Add(ESGraphInspectorVisuals.CreateNotice(
+                    "候选状态：" + requestStatus.Message + "\n下一步：" + requestStatus.NextAction,
+                    requestMessageType));
+                if (!string.IsNullOrWhiteSpace(requestStatus.RequestDirectory))
+                    AddReadOnlyText(permanent, "当前请求", requestStatus.RequestDirectory);
+                Button reviewCandidate = ESGraphInspectorVisuals.CreateButton("查看候选差异",
+                    "只打开与当前 GraphId 和内容签名精确匹配的候选。",
+                    () => ESAgentArtifactCandidateReviewWindow.OpenForGraph(currentAgentSpec));
+                reviewCandidate.SetEnabled(currentAgentSpec != null && requestStatus.CanReview);
                 permanent.Add(CreateWorkflowStep("2", "审查并批准",
                     "查看新增、删除与修改差异，确认后才允许导入正式位置。",
-                    ESGraphInspectorVisuals.CreateButton("查看候选差异",
-                        "打开候选 Diff 审查窗口。", ESAgentArtifactCandidateReviewWindow.OpenLatest)));
+                    reviewCandidate));
                 if (hasCommandOutput)
                 {
+                    string launchBlockReason = "当前 Graph 尚未建立可启动的批准上下文。";
+                    bool launchReady = currentAgentSpec != null
+                        && requestStatus.State == ESAgentArtifactRequestState.Approved
+                        && ESAgentImplementationSessionLauncher.CanLaunchApprovedImplementation(
+                            currentAgentSpec, out launchBlockReason);
+                    if (requestStatus.State == ESAgentArtifactRequestState.Approved && !launchReady)
+                        permanent.Add(ESGraphInspectorVisuals.CreateNotice(
+                            "批准状态已失效：" + launchBlockReason + "\n下一步：重新进行 Diff Review 与人工批准。",
+                            HelpBoxMessageType.Error));
                     Button launchImplementation = null;
                     launchImplementation = new Button(() => LaunchApprovedAgentImplementation(launchImplementation))
                     {
                         text = "打开新窗口执行实现",
                         tooltip = "验证批准清单与正式 AICommand 的 SHA-256 后，使用项目权威启动器打开独立 Codex 窗口。"
                     };
-                    launchImplementation.SetEnabled(!ESAgentImplementationSessionLauncher.IsLaunching);
+                    launchImplementation.SetEnabled(launchReady
+                        && !ESAgentImplementationSessionLauncher.IsLaunching);
                     ESGraphInspectorVisuals.StyleButton(launchImplementation);
                     permanent.Add(CreateWorkflowStep("3", "执行正式实现",
                         "仅对已批准且哈希未变化的 AICommand 开启独立实现窗口。", launchImplementation));
@@ -853,6 +944,171 @@ namespace ES.EditorInternal
             details.Insert(1, workflow);
         }
 
+        private void AddAgentNextAction(VisualElement workflow)
+        {
+            ESGraphValidationIssue firstBlocking = evaluatedIssues?.FirstOrDefault(item =>
+                item != null && item.severity == ESGraphValidationSeverity.Error && !item.canForceContinue)
+                ?? evaluatedIssues?.FirstOrDefault(item =>
+                    item != null && item.severity == ESGraphValidationSeverity.Error);
+            if (firstBlocking == null)
+            {
+                workflow.Add(ESGraphInspectorVisuals.CreateNotice(
+                    "当前下一步：结构与业务合同已通过检查。可以先保存检查快照，再选择即时执行或生成隔离候选。",
+                    HelpBoxMessageType.Info));
+                return;
+            }
+
+            VisualElement next = CreateSection("当前下一步",
+                firstBlocking.canForceContinue
+                    ? "建议先修复；如确认承担后果，可在执行时通过风险确认继续。"
+                    : "该问题会阻断执行和候选生成，必须先修复。",
+                2, firstBlocking.canForceContinue ? "可确认风险" : "必须修复");
+            next.Add(ESGraphInspectorVisuals.CreateNotice(firstBlocking.message,
+                firstBlocking.canForceContinue ? HelpBoxMessageType.Warning : HelpBoxMessageType.Error));
+            if (!string.IsNullOrWhiteSpace(firstBlocking.elementId))
+            {
+                next.Add(ESGraphInspectorVisuals.CreateButton("定位需要修改的节点",
+                    "选中问题所属节点，并在右侧显示其字段。",
+                    () => locate?.Invoke(firstBlocking.elementId), true));
+            }
+            workflow.Add(next);
+        }
+
+        private void AddAISkillExecutionWorkflow(VisualElement workflow,
+            ESAISkillExecutionSpec spec, string blockReason)
+        {
+            if (spec == null)
+            {
+                workflow.Add(ESGraphInspectorVisuals.CreateNotice(
+                    "AISkill 执行合同未通过：" + blockReason
+                    + "\n请修复节点字段、TaskContract 或控制/数据连线后再次检查。",
+                    HelpBoxMessageType.Error));
+                return;
+            }
+
+            workflow.Add(ESGraphInspectorVisuals.CreateNotice(
+                "可执行 AISkill：" + spec.displayName + "\nSkillId：" + spec.skillId
+                + "\n步骤：" + (spec.steps?.Length ?? 0) + "，参数："
+                + (spec.parameters?.Length ?? 0)
+                + "。任务只通过已注册 Automation TaskContract 执行。",
+                HelpBoxMessageType.Info));
+
+            VisualElement actions = ESGraphInspectorVisuals.CreateActionRow();
+            actions.Add(ESGraphInspectorVisuals.CreateButton("填写参数并运行",
+                "在 ES 高级弹窗中填写强类型参数，随后创建可恢复 RunRecord。",
+                () => OpenAISkillRunDialog(spec), true));
+            actions.Add(ESGraphInspectorVisuals.CreateButton("打开运行目录",
+                "查看 AISkillGraph 的 workflow-run.json、步骤状态和结构化产物记录。",
+                () =>
+                {
+                    Directory.CreateDirectory(ESAISkillExecutionCoordinator.RunsRoot);
+                    EditorUtility.RevealInFinder(ESAISkillExecutionCoordinator.RunsRoot);
+                }));
+            workflow.Add(actions);
+
+            string latestRunId = SessionState.GetString(AISkillLatestRunKey(spec.sourceGraphId), string.Empty);
+            if (!ESAISkillExecutionCoordinator.TryGet(latestRunId, out ESAISkillWorkflowRun run))
+            {
+                workflow.Add(ESGraphInspectorVisuals.CreateNotice(
+                    "当前 Graph 尚无运行记录。运行后可在 Domain Reload 之后继续查询同一 Run。",
+                    HelpBoxMessageType.None));
+                return;
+            }
+            bool sameContract = string.Equals(run.graphId, spec.sourceGraphId, StringComparison.Ordinal)
+                && string.Equals(run.contentSignature, spec.sourceContentSignature, StringComparison.Ordinal);
+            HelpBoxMessageType tone = run.status == "Completed" ? HelpBoxMessageType.Info
+                : run.status == "Failed" || run.status == "Cancelled" || !sameContract
+                    ? HelpBoxMessageType.Error : HelpBoxMessageType.Warning;
+            workflow.Add(ESGraphInspectorVisuals.CreateNotice(
+                "最近运行：" + run.status + "\nRunId：" + run.runId + "\n" + run.message
+                + (sameContract ? string.Empty
+                    : "\n当前 Graph 内容签名已变化；旧 Run 只能查看，禁止继续。"), tone));
+
+            VisualElement runActions = ESGraphInspectorVisuals.CreateActionRow();
+            if (sameContract && run.status == "WaitingApproval")
+            {
+                runActions.Add(ESGraphInspectorVisuals.CreateButton("审查并决定",
+                    "提交绑定当前 approvalGeneration 的批准或拒绝，不接受过期窗口回执。",
+                    () => OpenAISkillApprovalDialog(run), true));
+            }
+            if (sameContract && run.status != "Completed" && run.status != "Failed"
+                && run.status != "Cancelled")
+            {
+                runActions.Add(ESGraphInspectorVisuals.CreateButton("取消运行",
+                    "取消当前子 Automation Run，并把工作流写入 Cancelled 终态。", () =>
+                    {
+                        if (!ESAISkillExecutionCoordinator.TryCancel(run.runId,
+                                Environment.UserName, out string error))
+                            report?.Invoke(error);
+                        else
+                            report?.Invoke("已取消 AISkill 工作流：" + run.runId);
+                        ForceValidation();
+                    }));
+            }
+            runActions.Add(ESGraphInspectorVisuals.CreateButton("查看本次记录",
+                "在文件管理器中定位当前 RunRecord。",
+                () => EditorUtility.RevealInFinder(Path.Combine(
+                    ESAISkillExecutionCoordinator.RunsRoot, run.runId, "workflow-run.json"))));
+            workflow.Add(runActions);
+        }
+
+        private void OpenAISkillRunDialog(ESAISkillExecutionSpec spec)
+        {
+            if (!ESAISkillExecutionLauncher.TryCollectInputs(spec, hostWindow,
+                    out JObject values, out string error))
+            {
+                if (!string.Equals(error, "用户取消运行。", StringComparison.Ordinal))
+                    report?.Invoke(error);
+                return;
+            }
+            if (!ESAISkillExecutionCoordinator.TryStart(spec, values, Environment.UserName,
+                    out ESAISkillWorkflowRun run, out error))
+            {
+                report?.Invoke(error);
+                return;
+            }
+            SessionState.SetString(AISkillLatestRunKey(spec.sourceGraphId), run.runId);
+            report?.Invoke("AISkill 工作流已启动：" + run.runId + "，当前状态：" + run.status);
+            ForceValidation();
+        }
+
+        private void OpenAISkillApprovalDialog(ESAISkillWorkflowRun run)
+        {
+            var request = new ESAdvancedDialogRequest
+            {
+                dialogId = "es.ai-skill.approval." + run.runId + "." + run.approvalGeneration,
+                title = "AISkill 人工确认",
+                subtitle = "Run " + run.runId,
+                message = run.message,
+                confirmText = "批准并继续",
+                cancelText = "返回",
+                preferredSize = new Vector2(560f, 400f),
+                tone = ESDialogTone.Warning
+            };
+            request.AddMultilineText("comment", "审查意见");
+            request.AddAuxiliaryAction("reject", "拒绝并走失败分支", values =>
+            {
+                if (!ESAISkillExecutionCoordinator.TryApprove(run.runId, run.approvalGeneration,
+                        false, values.GetString("comment"), out string error))
+                    report?.Invoke(error);
+                else
+                    report?.Invoke("已拒绝并继续执行拒绝分支。RunId：" + run.runId);
+                ForceValidation();
+            }, role: ESAdvancedDialogActionRole.Danger, closeDialogAfterExecution: true);
+            ESAdvancedDialogResult result = ESDialogService.ShowModal(request);
+            if (result == null || !result.accepted)
+                return;
+            if (!ESAISkillExecutionCoordinator.TryApprove(run.runId, run.approvalGeneration,
+                    true, result.values?.GetString("comment"), out string approvalError))
+                report?.Invoke(approvalError);
+            else
+                report?.Invoke("已批准并继续执行。RunId：" + run.runId);
+            ForceValidation();
+        }
+
+        private static string AISkillLatestRunKey(string graphId)
+            => "ES.AISkillGraph.LatestRun." + (graphId ?? string.Empty);
+
         private void ShowMultipleSelectionInspector()
         {
             ClearDetails();
@@ -869,29 +1125,6 @@ namespace ES.EditorInternal
                 "快捷键：Ctrl/Cmd+D 复制选中节点，F 聚焦选择，Delete 删除。批量操作只写入一次 Undo 事务。",
                 HelpBoxMessageType.None));
             details.Add(summary);
-        }
-
-        private void SelectProfile(IESGraphAuthoringProfile selected)
-        {
-            if (asset == null || selected == null
-                || asset.DomainKey.Equals(selected.Domain))
-                return;
-            if (asset.Nodes.Count > 0 || asset.Edges.Count > 0)
-            {
-                report?.Invoke("已有内容的图不能直接切换领域；请先迁移或创建新资产。");
-                return;
-            }
-
-            Undo.RecordObject(asset, "修改图领域");
-            if (!asset.TrySetDomain(selected.Domain, out string error))
-            {
-                report?.Invoke(error);
-                return;
-            }
-
-            MarkChanged("领域已切换：" + selected.DisplayName);
-            ShowGraphInspector();
-            rebuildGraph?.Invoke();
         }
 
         private static VisualElement CreateSearchPickerField(string labelText, string currentValue, string tooltip,
@@ -1339,19 +1572,28 @@ namespace ES.EditorInternal
         private Type ResolveOdinPayloadType(ESGraphNodeRecord node)
         {
             if (node == null || asset == null
-                || asset.DomainKind != ESGraphDomainKind.AgentAuthoring)
+                || !string.Equals(asset.DomainId, ESAgentGraphStableIds.DomainId,
+                    StringComparison.Ordinal))
             {
                 return null;
             }
 
-            switch (node.BuiltInKind)
+            switch (node.typeId)
             {
-                case ESGraphBuiltInNodeKind.AgentGoal: return typeof(ESAgentGoalPayload);
-                case ESGraphBuiltInNodeKind.AgentReference: return typeof(ESAgentReferencePayload);
-                case ESGraphBuiltInNodeKind.AgentConstraint: return typeof(ESAgentConstraintPayload);
-                case ESGraphBuiltInNodeKind.AgentAICommandOutput: return typeof(ESAgentAICommandOutputPayload);
-                case ESGraphBuiltInNodeKind.AgentSkillOutput: return typeof(ESAgentSkillOutputPayload);
-                case ESGraphBuiltInNodeKind.AgentValidation: return typeof(ESAgentValidationPayload);
+                case ESAgentGraphStableIds.GoalNode: return typeof(ESAgentGoalPayload);
+                case ESAgentGraphStableIds.ReferenceNode: return typeof(ESAgentReferencePayload);
+                case ESAgentGraphStableIds.ConstraintNode: return typeof(ESAgentConstraintPayload);
+                case ESAgentGraphStableIds.BranchNode: return typeof(ESAgentBranchPayload);
+                case ESAgentGraphStableIds.TraverseNode: return typeof(ESAgentTraversePayload);
+                case ESAgentGraphStableIds.AICommandOutputNode: return typeof(ESAgentAICommandOutputPayload);
+                case ESAgentGraphStableIds.AISkillOutputNode: return typeof(ESAgentSkillOutputPayload);
+                case ESAgentGraphStableIds.ValidationNode: return typeof(ESAgentValidationPayload);
+                case ESAgentGraphStableIds.SkillInputNode: return typeof(ESAISkillInputPayload);
+                case ESAgentGraphStableIds.SkillTaskNode: return typeof(ESAISkillTaskPayload);
+                case ESAgentGraphStableIds.SkillBranchNode: return typeof(ESAISkillBranchPayload);
+                case ESAgentGraphStableIds.SkillForEachNode: return typeof(ESAISkillForEachPayload);
+                case ESAgentGraphStableIds.SkillApprovalNode: return typeof(ESAISkillApprovalPayload);
+                case ESAgentGraphStableIds.SkillOutputNode: return typeof(ESAISkillOutputPayload);
                 default: return null;
             }
         }
@@ -1413,7 +1655,75 @@ namespace ES.EditorInternal
         private void RefreshValidation()
         {
             CancelScheduledValidation();
-            ShowIssues(asset != null ? ESGraphAuthoringRegistry.Validate(asset) : new List<ESGraphValidationIssue>());
+            EvaluateCurrentGraph();
+            ShowIssues(evaluatedIssues);
+            if (currentTarget == InspectorTargetKind.Graph)
+                ShowGraphInspector();
+        }
+
+        private void EvaluateCurrentGraph()
+        {
+            if (ReferenceEquals(evaluatedAsset, asset) && evaluatedRevision == validationRevision)
+                return;
+
+            evaluatedAsset = asset;
+            evaluatedRevision = validationRevision;
+            evaluatedBakeSucceeded = false;
+            evaluatedActionBakeSucceeded = false;
+            evaluatedSnapshot = null;
+            evaluatedPlan = null;
+            evaluatedIssues = new List<ESGraphValidationIssue>();
+            if (asset == null)
+                return;
+
+            evaluatedBakeSucceeded = ESGraphAuthoringRegistry.TryBake(asset,
+                out evaluatedSnapshot, out evaluatedPlan, out evaluatedIssues);
+            evaluatedActionBakeSucceeded = evaluatedBakeSucceeded;
+            if (evaluatedIssues == null)
+                evaluatedIssues = new List<ESGraphValidationIssue>();
+
+            if (!evaluatedBakeSucceeded && ESGraphAuthoringRegistry.CanForceContinue(evaluatedIssues))
+            {
+                List<ESGraphValidationIssue> strictIssues = evaluatedIssues;
+                evaluatedActionBakeSucceeded = ESGraphAuthoringRegistry.TryBake(asset, true,
+                    out evaluatedSnapshot, out evaluatedPlan,
+                    out List<ESGraphValidationIssue> actionIssues);
+                evaluatedIssues = strictIssues;
+                if (!evaluatedActionBakeSucceeded && actionIssues != null)
+                {
+                    for (int i = 0; i < actionIssues.Count; i++)
+                    {
+                        ESGraphValidationIssue issue = actionIssues[i];
+                        if (issue == null || evaluatedIssues.Any(existing => existing != null
+                                && string.Equals(existing.code, issue.code, StringComparison.Ordinal)
+                                && string.Equals(existing.elementId, issue.elementId, StringComparison.Ordinal)
+                                && string.Equals(existing.message, issue.message, StringComparison.Ordinal)))
+                            continue;
+                        evaluatedIssues.Add(issue);
+                    }
+                }
+            }
+
+            if (evaluatedActionBakeSucceeded
+                && string.Equals(asset.DomainId, ESAgentGraphStableIds.DomainId, StringComparison.Ordinal)
+                && !(evaluatedPlan is ESAgentArtifactGenerationSpec)
+                && !(evaluatedPlan is ESAISkillExecutionSpec))
+            {
+                evaluatedBakeSucceeded = false;
+                evaluatedActionBakeSucceeded = false;
+                evaluatedIssues.Add(ESGraphValidationIssue.Error("AgentAuthoring.PlanMissing",
+                    "质量检查未生成 Agent Authoring 领域计划，交付入口不能安全启用。"));
+            }
+        }
+
+        private string GetDeliveryBlockReason()
+        {
+            ESGraphValidationIssue issue = evaluatedIssues?.FirstOrDefault(item =>
+                item != null && item.severity == ESGraphValidationSeverity.Error
+                && !item.canForceContinue)
+                ?? evaluatedIssues?.FirstOrDefault(item => item != null
+                    && item.severity == ESGraphValidationSeverity.Error);
+            return issue?.message ?? "质量检查尚未生成可执行的领域计划。";
         }
 
         private void ForceValidation()
@@ -1451,16 +1761,59 @@ namespace ES.EditorInternal
         {
             if (asset == null)
                 return;
-            if (!ESGraphAuthoringRegistry.TryBake(asset, out ESBakedGraphSnapshot snapshot,
-                    out IESBakedGraphPlan domainPlan, out List<ESGraphValidationIssue> issues))
+            if (!TryBakeForUserAction("生成并保存检查快照", out ESBakedGraphSnapshot snapshot,
+                    out IESBakedGraphPlan domainPlan, out ESGraphRiskAcceptance riskAcceptance))
+                return;
+            string result = domainPlan == null ? "通用检查结果" : "领域检查结果";
+            if (!ESAgentArtifactGenerationWorkspace.TryWriteGraphSnapshot(snapshot, riskAcceptance,
+                    out string relativePath, out string error))
             {
-                ShowIssues(issues);
-                report?.Invoke("烘焙失败：请处理校验错误");
+                report?.Invoke(result + "已生成，但持久化失败：" + error);
                 return;
             }
-            ShowIssues(issues);
-            string result = domainPlan == null ? "通用检查结果" : "领域检查结果";
-            report?.Invoke(result + " 烘焙成功：" + snapshot.ContentSignature.Substring(0, 12));
+            report?.Invoke(result + "已保存：" + relativePath + "（签名 "
+                + snapshot.ContentSignature.Substring(0, 12) + "）");
+            ShowGraphInspector();
+        }
+
+        private void AddSnapshotStatus(VisualElement parent, ESBakedGraphSnapshot currentSnapshot)
+        {
+            if (parent == null || asset == null) return;
+            string snapshotPath = string.Empty;
+            bool currentExists = currentSnapshot != null
+                && ESAgentArtifactGenerationWorkspace.TryGetGraphSnapshot(currentSnapshot.GraphId,
+                    currentSnapshot.ContentSignature, out snapshotPath);
+            bool hasOlder = !currentExists
+                && ESAgentArtifactGenerationWorkspace.TryGetLatestGraphSnapshot(asset.GraphId,
+                    out snapshotPath);
+            if (!currentExists && !hasOlder)
+            {
+                parent.Add(ESGraphInspectorVisuals.CreateNotice(
+                    "尚未保存检查快照。生成后会得到可打开、可复制路径的严格 UTF-8 JSON 产物。",
+                    HelpBoxMessageType.Info));
+                return;
+            }
+
+            parent.Add(ESGraphInspectorVisuals.CreateNotice(currentExists
+                    ? "当前内容签名已有持久快照，可供后续工具精确复核。"
+                    : "检测到旧快照，但它与当前 Graph 内容不一致，已标记为 stale；请重新生成。",
+                currentExists ? HelpBoxMessageType.Info : HelpBoxMessageType.Warning));
+            AddReadOnlyText(parent, currentExists ? "当前快照" : "旧快照", snapshotPath);
+            VisualElement actions = ESGraphInspectorVisuals.CreateActionRow();
+            string capturedPath = snapshotPath;
+            actions.Add(ESGraphInspectorVisuals.CreateButton(currentExists ? "打开当前快照" : "打开旧快照",
+                "使用系统默认应用打开 JSON 快照。", () =>
+                {
+                    EditorUtility.OpenWithDefaultApp(
+                        ESAgentArtifactGenerationWorkspace.ResolveProjectPath(capturedPath));
+                }));
+            actions.Add(ESGraphInspectorVisuals.CreateButton("复制快照路径",
+                "复制稳定的项目相对路径。", () =>
+                {
+                    EditorGUIUtility.systemCopyBuffer = capturedPath;
+                    report?.Invoke("已复制快照路径：" + capturedPath);
+                }));
+            parent.Add(actions);
         }
 
         private void SendAgentGenerationRequest()
@@ -1492,7 +1845,7 @@ namespace ES.EditorInternal
                 report?.Invoke(error);
                 return;
             }
-            report?.Invoke(displayName + "候选请求已创建；Cmd Agent：" + dispatchMessage
+            report?.Invoke(displayName + "候选请求已创建；生成会话：" + dispatchMessage
                 + "；候选目录：" + requestDirectory);
         }
 
@@ -1522,8 +1875,8 @@ namespace ES.EditorInternal
 
             ESGraphAuthoringRegistry.TryGetNodeDefinition(asset.DomainKey, node.TypeKey,
                 out IESGraphNodeDefinition definition);
-            bool futureGraphSchema = asset.schemaVersion > ESGraphAsset.CurrentSchemaVersion;
-            bool unsupportedGraphSchema = asset.schemaVersion != ESGraphAsset.CurrentSchemaVersion;
+            bool futureGraphSchema = asset.schemaVersion > GraphAsset.CurrentSchemaVersion;
+            bool unsupportedGraphSchema = asset.schemaVersion != GraphAsset.CurrentSchemaVersion;
             bool futureNodeSchema = definition != null && node.version > definition.CurrentVersion;
             context = new ESGraphNodeCardActionContext(asset, node,
                 unsupportedGraphSchema || futureNodeSchema,
@@ -1545,42 +1898,206 @@ namespace ES.EditorInternal
             }
             string displayName = artifactKind == ESAgentArtifactKind.AICommand
                 ? "单次 Command" : "临时 Skill";
-            report?.Invoke(displayName + "请求 " + requestId + " 已提交至 Cmd Agent；状态："
-                + dispatchMessage + "。当前只确认发送或排队，不代表 AI 已确认接收或完成。");
+            report?.Invoke(displayName + "请求 " + requestId + " 的受控会话启动流程已创建；状态："
+                + dispatchMessage + "。只有出现 Codex 接收事件后才代表已接收，当前不代表开始执行或完成。");
         }
 
-        private void OpenAgentCopyMenu(Button anchor)
+        private void OpenAgentDeliveryMenu(Button anchor)
         {
-            if (anchor == null || !TryBakeAgentSpec("复制图信息", out ESAgentArtifactGenerationSpec spec))
+            if (anchor == null)
                 return;
-            ESSearchDropdown.Open(
-                anchor,
-                hostWindow,
-                "复制智能助手编排图",
-                new[]
-                {
-                    ESSearchDropdown.Entry.Item(
-                        "复制 AI 即时执行提示",
-                        () => CopyAgentGraph(spec, ESAgentGraphCopyFormat.ImmediateExecutionPrompt, "AI 即时执行提示"),
-                        subtitle: "可直接粘贴给 AI 执行当前最终目的；不生成永久产物。",
-                        keywords: "复制 AI 执行 提示"),
-                    ESSearchDropdown.Entry.Item(
-                        "复制生成 / 更新请求 JSON",
-                        () => CopyAgentGraph(spec, ESAgentGraphCopyFormat.ArtifactRequestJson, "生成 / 更新请求 JSON"),
-                        subtitle: "包含 GraphId、内容签名、稳定 ArtifactId、输出和校验门禁。",
-                        keywords: "复制 JSON 生成 更新"),
-                    ESSearchDropdown.Entry.Item(
-                        "复制完整图说明（Markdown + Mermaid）",
-                        () => CopyAgentGraph(spec, ESAgentGraphCopyFormat.GraphMarkdown, "完整图说明"),
-                        subtitle: "适合发送给外部 AI 或写入需求文档。",
-                        keywords: "复制 Markdown Mermaid 图说明")
-                },
-                minimumWindowSize: new Vector2(560f, 320f));
+            EvaluateCurrentGraph();
+            ESAgentArtifactGenerationSpec spec = evaluatedActionBakeSucceeded
+                ? evaluatedPlan as ESAgentArtifactGenerationSpec
+                : null;
+            if (spec == null)
+            {
+                ESGraphForceContinueDialog.Confirm("打开高级交付", evaluatedIssues);
+                report?.Invoke("高级交付未打开；当前 Graph 无法构造稳定执行合同。");
+                return;
+            }
+            bool hasSingleCommand = (spec.outputs ?? Array.Empty<ESAgentGenerationOutput>())
+                .Count(item => item != null && item.artifactKind == ESAgentArtifactKind.AICommand) == 1;
+            bool hasSingleSkill = (spec.outputs ?? Array.Empty<ESAgentGenerationOutput>())
+                .Count(item => item != null && item.artifactKind == ESAgentArtifactKind.AgentSkill) == 1;
+            bool canLaunchIndependent = ESAgentImplementationSessionLauncher.CanLaunchApprovedImplementation(
+                spec, out string launchReason);
+            var entries = new List<ESSearchDropdown.Entry>();
+
+            if (hasSingleCommand)
+            {
+                entries.Add(ESSearchDropdown.Entry.Item(
+                    "受控工作台草稿 · Command",
+                    () => StageSingleUseAgentArtifact(ESAgentArtifactKind.AICommand),
+                    groupPath: "会话执行",
+                    subtitle: "只填入输入框，人工确认后再发送",
+                    badge: "不自动发送"));
+                entries.Add(ESSearchDropdown.Entry.Item(
+                    "直接命令会话 · Command",
+                    () => SendSingleUseAgentArtifact(ESAgentArtifactKind.AICommand),
+                    groupPath: "会话执行",
+                    subtitle: "立即建立真实命令映射并执行",
+                    badge: "直接执行"));
+            }
+            else
+                entries.Add(ESSearchDropdown.Entry.Disabled("Command 需要唯一 Output",
+                    "会话执行", "多个同类 Output 请从目标节点卡片执行。"));
+
+            if (hasSingleSkill)
+            {
+                entries.Add(ESSearchDropdown.Entry.Item(
+                    "受控工作台草稿 · Skill",
+                    () => StageSingleUseAgentArtifact(ESAgentArtifactKind.AgentSkill),
+                    groupPath: "会话执行",
+                    subtitle: "只填入输入框，人工确认后再发送",
+                    badge: "不自动发送"));
+                entries.Add(ESSearchDropdown.Entry.Item(
+                    "直接命令会话 · Skill",
+                    () => SendSingleUseAgentArtifact(ESAgentArtifactKind.AgentSkill),
+                    groupPath: "会话执行",
+                    subtitle: "立即建立真实命令映射并执行",
+                    badge: "直接执行"));
+            }
+            else
+                entries.Add(ESSearchDropdown.Entry.Disabled("Skill 需要唯一 Output",
+                    "会话执行", "多个同类 Output 请从目标节点卡片执行。"));
+
+            if (canLaunchIndependent)
+                entries.Add(ESSearchDropdown.Entry.Item(
+                    "独立实现会话 · 已批准产物",
+                    () => LaunchApprovedAgentImplementation(null),
+                    groupPath: "会话执行",
+                    subtitle: "在独立窗口执行已批准且哈希匹配的正式实现",
+                    badge: "高级"));
+            else
+                entries.Add(ESSearchDropdown.Entry.Disabled("独立实现会话尚不可用",
+                    "会话执行", launchReason));
+
+            bool hasCommand = (spec.outputs ?? Array.Empty<ESAgentGenerationOutput>())
+                .Any(item => item != null && item.artifactKind == ESAgentArtifactKind.AICommand);
+            bool hasSkill = (spec.outputs ?? Array.Empty<ESAgentGenerationOutput>())
+                .Any(item => item != null && item.artifactKind == ESAgentArtifactKind.AgentSkill);
+            if (hasCommand)
+            {
+                entries.Add(ESSearchDropdown.Entry.Item("工作台草稿 · AICommand 候选",
+                    () => StageAgentGenerationRequest(ESAgentArtifactKind.AICommand),
+                    groupPath: "候选生成", subtitle: "创建隔离请求，只把生成指令放入输入框",
+                    badge: "不自动发送"));
+                entries.Add(ESSearchDropdown.Entry.Item("直接生成会话 · AICommand 候选",
+                    () => SendAgentGenerationRequest(ESAgentArtifactKind.AICommand),
+                    groupPath: "候选生成", subtitle: "创建隔离请求并立即提交生成",
+                    badge: "直接执行"));
+            }
+            if (hasSkill)
+            {
+                entries.Add(ESSearchDropdown.Entry.Item("工作台草稿 · Agent Skill 候选",
+                    () => StageAgentGenerationRequest(ESAgentArtifactKind.AgentSkill),
+                    groupPath: "候选生成", subtitle: "创建隔离请求，只把生成指令放入输入框",
+                    badge: "不自动发送"));
+                entries.Add(ESSearchDropdown.Entry.Item("直接生成会话 · Agent Skill 候选",
+                    () => SendAgentGenerationRequest(ESAgentArtifactKind.AgentSkill),
+                    groupPath: "候选生成", subtitle: "创建隔离请求并立即提交生成",
+                    badge: "直接执行"));
+            }
+            if (hasCommand && hasSkill)
+            {
+                entries.Add(ESSearchDropdown.Entry.Item("工作台草稿 · 全部候选",
+                    StageAgentGenerationRequest,
+                    groupPath: "候选生成", subtitle: "全部 Output 建立同一请求，等待人工发送",
+                    badge: "不自动发送"));
+                entries.Add(ESSearchDropdown.Entry.Item("直接生成会话 · 全部候选",
+                    SendAgentGenerationRequest,
+                    groupPath: "候选生成", subtitle: "全部 Output 使用同一候选请求并立即提交",
+                    badge: "直接执行"));
+            }
+
+            entries.Add(ESSearchDropdown.Entry.Item("复制即时执行文本",
+                () => CopyAgentGraph(ESAgentGraphCopyFormat.ImmediateExecutionPrompt, "即时执行文本"),
+                groupPath: "仅复制，不发送", subtitle: "适合粘贴到任意受信任会话"));
+            entries.Add(ESSearchDropdown.Entry.Item("复制候选请求 JSON",
+                () => CopyAgentGraph(ESAgentGraphCopyFormat.ArtifactRequestJson, "候选请求 JSON"),
+                groupPath: "仅复制，不发送", subtitle: "包含 GraphId、签名、输出和门禁"));
+            entries.Add(ESSearchDropdown.Entry.Item("复制完整图说明",
+                () => CopyAgentGraph(ESAgentGraphCopyFormat.GraphMarkdown, "完整图说明"),
+                groupPath: "仅复制，不发送", subtitle: "Markdown + Mermaid，不触发任何会话"));
+
+            ESSearchDropdown.Open(anchor, hostWindow, "高级交付与会话方式", entries,
+                minimumWindowSize: new Vector2(640f, 440f));
         }
 
-        private void CopyAgentGraph(ESAgentArtifactGenerationSpec spec, ESAgentGraphCopyFormat format,
-            string displayName)
+        private void StageSingleUseAgentArtifact(ESAgentArtifactKind artifactKind)
         {
+            if (!TryBakeAgentSpec("准备工作台草稿", out ESAgentArtifactGenerationSpec spec))
+                return;
+            if (!ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(spec, artifactKind,
+                    out ESAgentArtifactGenerationSpec artifactView, out string error)
+                || artifactView.outputs == null || artifactView.outputs.Length != 1)
+            {
+                report?.Invoke(string.IsNullOrWhiteSpace(error)
+                    ? "工作台草稿必须对应唯一 Output。" : error);
+                return;
+            }
+            ESAgentGenerationOutput output = artifactView.outputs[0];
+            if (!ESAgentGenerationContractValidator.TryValidate(output, out error))
+            {
+                report?.Invoke(error);
+                return;
+            }
+            string draftId = "draft_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_fff");
+            string prompt = artifactKind == ESAgentArtifactKind.AICommand
+                ? ESAgentArtifactGenerationWorkspace.BuildImmediateExecutionPrompt(artifactView, draftId)
+                : ESAgentArtifactGenerationWorkspace.BuildTemporarySkillExecutionPrompt(artifactView, draftId);
+            if (!ESCmdAgentWindow.OpenAndStagePrompt(prompt, out string message))
+            {
+                report?.Invoke("准备工作台草稿失败：" + message);
+                return;
+            }
+            report?.Invoke(message);
+        }
+
+        private void StageAgentGenerationRequest()
+        {
+            if (!TryBakeAgentSpec("准备候选生成草稿", out ESAgentArtifactGenerationSpec spec))
+                return;
+            StageAgentGenerationRequest(spec, "全部产物");
+        }
+
+        private void StageAgentGenerationRequest(ESAgentArtifactKind artifactKind)
+        {
+            if (!TryBakeAgentSpec("准备候选生成草稿", out ESAgentArtifactGenerationSpec spec))
+                return;
+            if (!ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(spec, artifactKind,
+                    out ESAgentArtifactGenerationSpec artifactView, out string filterError))
+            {
+                report?.Invoke(filterError);
+                return;
+            }
+            StageAgentGenerationRequest(artifactView,
+                artifactKind == ESAgentArtifactKind.AICommand ? "AICommand" : "Agent Skill");
+        }
+
+        private void StageAgentGenerationRequest(ESAgentArtifactGenerationSpec spec, string displayName)
+        {
+            if (!ESAgentArtifactGenerationWorkspace.TryCreateRequest(spec,
+                    out ESAgentArtifactGenerationRequest request, out string prompt, out string error))
+            {
+                report?.Invoke(error);
+                return;
+            }
+            if (!ESCmdAgentWindow.OpenAndStagePrompt(prompt, out string message))
+            {
+                report?.Invoke(displayName + "候选请求已创建，但工作台草稿准备失败：" + message
+                    + "；请求目录仍保留在 " + request.requestDirectory);
+                return;
+            }
+            report?.Invoke(displayName + "候选请求已创建；" + message
+                + "；尚未发送；候选目录：" + request.requestDirectory);
+        }
+
+        private void CopyAgentGraph(ESAgentGraphCopyFormat format, string displayName)
+        {
+            if (!TryBakeAgentSpec("复制" + displayName, out ESAgentArtifactGenerationSpec spec))
+                return;
             if (!ESAgentArtifactGenerationWorkspace.TryBuildCopyText(spec, format,
                     out string content, out string error)
                 || string.IsNullOrWhiteSpace(content))
@@ -1597,17 +2114,25 @@ namespace ES.EditorInternal
             spec = null;
             if (asset == null)
                 return false;
-            if (ESGraphAuthoringRegistry.TryBake(asset, out _, out IESBakedGraphPlan plan,
-                    out List<ESGraphValidationIssue> issues)
+            if (TryBakeForUserAction(actionName, out _, out IESBakedGraphPlan plan)
                 && plan is ESAgentArtifactGenerationSpec baked)
             {
-                ShowIssues(issues);
                 spec = baked;
                 return true;
             }
-            ShowIssues(issues);
-            report?.Invoke(actionName + "失败：请先修复智能助手编排图的校验错误，并明确最终目的与成功标准。");
+            report?.Invoke(actionName + "未执行；请查看质量检查中的具体原因。");
             return false;
+        }
+
+        private bool TryBakeForUserAction(string actionName, out ESBakedGraphSnapshot snapshot,
+            out IESBakedGraphPlan domainPlan)
+            => TryBakeForUserAction(actionName, out snapshot, out domainPlan, out _);
+
+        private bool TryBakeForUserAction(string actionName, out ESBakedGraphSnapshot snapshot,
+            out IESBakedGraphPlan domainPlan, out ESGraphRiskAcceptance riskAcceptance)
+        {
+            return ESGraphUserActionBaker.TryBake(asset, actionName, ShowIssues, report,
+                out snapshot, out domainPlan, out riskAcceptance);
         }
 
         private void LaunchApprovedAgentImplementation(Button launchButton)
@@ -1618,12 +2143,15 @@ namespace ES.EditorInternal
             launchButton?.SetEnabled(false);
             bool started = ESAgentImplementationSessionLauncher.TryLaunchApprovedImplementation(spec, message =>
             {
-                launchButton?.SetEnabled(true);
+                bool canEnable = !ESAgentImplementationSessionLauncher.IsLaunching
+                    && ESAgentImplementationSessionLauncher.CanLaunchApprovedImplementation(spec, out _);
+                launchButton?.SetEnabled(canEnable);
                 report?.Invoke(message);
             }, out string error);
             if (started)
                 return;
-            launchButton?.SetEnabled(true);
+            launchButton?.SetEnabled(ESAgentImplementationSessionLauncher.CanLaunchApprovedImplementation(
+                spec, out _));
             report?.Invoke(error);
         }
 

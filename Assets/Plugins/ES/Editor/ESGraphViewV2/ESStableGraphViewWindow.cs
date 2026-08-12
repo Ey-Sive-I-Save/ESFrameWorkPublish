@@ -10,6 +10,7 @@ using UnityEditor.UIElements;
 using UnityEngine;
 using Unity.Profiling;
 using UnityEngine.UIElements;
+using GraphAsset = global::ES.ESGraphAssetBase;
 
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("ES_Design.ConfigKey.Tests")]
 
@@ -89,11 +90,11 @@ namespace ES.EditorInternal
         private Label statusLabel;
         private IVisualElementScheduledItem searchSchedule;
         private ToolbarLayoutMode toolbarLayoutMode = (ToolbarLayoutMode)byte.MaxValue;
-        private ESGraphAsset autoSaveAsset;
+        private GraphAsset autoSaveAsset;
         private double autoSaveDueTime;
         private double lastAutoSaveTime = double.NegativeInfinity;
         private bool autoSavePending;
-        private ESGraphAsset observedAsset;
+        private GraphAsset observedAsset;
         private int observedAssetDirtyCount = int.MinValue;
         private Hash128 observedAssetDependencyHash;
         private double nextAssetRevisionPollTime;
@@ -101,7 +102,7 @@ namespace ES.EditorInternal
         private bool projectChangeCheckPending;
         [SerializeField] private string currentGraphAssetGuid = string.Empty;
 
-        [MenuItem(MenuItemPathDefine.CONTENT_CREATION_PATH + "图与流程/稳定图编辑器 V2", false, 31)]
+        [MenuItem(MenuItemPathDefine.STABLE_GRAPH_WINDOW_PATH, false, 31)]
         [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "稳定图编辑器 V2", false, -955)]
         public static ESStableGraphViewWindow ShowWindow()
         {
@@ -116,19 +117,19 @@ namespace ES.EditorInternal
             return window;
         }
 
-        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTEXT_PATH + MenuItemPathDefine.CONTENT_CREATION + "/图与流程/通用流程图", false, 181)]
+        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTENT_CONTEXT_PATH + "图与流程/通用流程图", false, 181)]
         private static void CreateGenericGraphFromAssetsMenu()
         {
             ShowWindow().CreateTemplate(ESStableGraphCreationTemplateKind.GenericFlow);
         }
 
-        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTEXT_PATH + MenuItemPathDefine.CONTENT_CREATION + "/图与流程/剧情任务与对话图", false, 182)]
+        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTENT_CONTEXT_PATH + "图与流程/剧情任务与对话图", false, 182)]
         private static void CreateStoryGraphFromAssetsMenu()
         {
             ShowWindow().CreateTemplate(ESStableGraphCreationTemplateKind.Story);
         }
 
-        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTEXT_PATH + MenuItemPathDefine.CONTENT_CREATION + "/图与流程/行为树调度图", false, 183)]
+        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTENT_CONTEXT_PATH + "图与流程/行为树调度图", false, 183)]
         private static void CreateBehaviorTreeFromAssetsMenu()
         {
             ShowWindow().CreateTemplate(ESStableGraphCreationTemplateKind.BehaviorTree);
@@ -169,7 +170,7 @@ namespace ES.EditorInternal
         [OnOpenAsset]
         private static bool OpenAsset(int instanceId, int line)
         {
-            ESGraphAsset asset = EditorUtility.InstanceIDToObject(instanceId) as ESGraphAsset;
+            GraphAsset asset = EditorUtility.InstanceIDToObject(instanceId) as GraphAsset;
             if (asset == null)
                 return false;
             ESStableGraphViewWindow window = ShowWindow();
@@ -190,12 +191,12 @@ namespace ES.EditorInternal
             toolbarContainer.Add(secondaryToolbar);
             assetField = new ObjectField("图资产（可拖入）")
             {
-                objectType = typeof(ESGraphAsset),
+                objectType = typeof(GraphAsset),
                 allowSceneObjects = false,
                 tooltip = "从 Project 窗口拖入一张图资产，或点击“新建图”开始。"
             };
             assetField.style.flexGrow = 1f;
-            assetField.RegisterValueChangedCallback(evt => SetAsset(evt.newValue as ESGraphAsset));
+            assetField.RegisterValueChangedCallback(evt => SetAsset(evt.newValue as GraphAsset));
             createButton = CreateToolbarButton("新建图", "选择领域模板后创建图资产。",
                 () => ShowCreationTemplateMenu(createButton));
             openButton = CreateToolbarButton("打开已有", "搜索并打开项目中的已有图资产。",
@@ -209,7 +210,7 @@ namespace ES.EditorInternal
                 () => graphView?.SmoothFrameAll());
             validateButton = CreateToolbarButton("检查图", "检查节点、连线和业务规则，定位需要修正的地方。",
                 ValidateCurrentAsset);
-            bakeButton = CreateToolbarButton("生成检查快照", "生成只读检查结果，不会运行图，也不会直接写正式文件。",
+            bakeButton = CreateToolbarButton("生成并保存检查快照", "生成严格 UTF-8 JSON 检查快照并保存到 ES/Automation/Artifacts，不会运行图。",
                 BakeCurrentAsset);
             saveButton = CreateToolbarButton("立即保存", "通常会自动保存；需要时可立即写入当前图资产。",
                 SaveCurrentAsset);
@@ -250,7 +251,7 @@ namespace ES.EditorInternal
             graphView.SetEdgeFlowEnabled(EditorPrefs.GetBool(EdgeFlowPreferenceKey, true));
             graphView.SetOnboardingVisible(!HasCompletedOnboarding());
             graphView.style.flexGrow = 1f;
-            graphView.style.backgroundColor = new Color(0.075f, 0.085f, 0.11f, 1f);
+            graphView.style.backgroundColor = ESEditorPresentation.CanvasSurfaceColor;
             inspector = new ESStableGraphInspector(this, () => graphView?.Rebuild(), UpdateStatus,
                 id => graphView?.FindAndFrame(id), () => RequestAutoSave(graphView?.Asset), editService);
             TwoPaneSplitView workspace = new TwoPaneSplitView(1, 360f, TwoPaneSplitViewOrientation.Horizontal);
@@ -260,7 +261,7 @@ namespace ES.EditorInternal
             rootVisualElement.Add(workspace);
             graphView.SelectionChanged += inspector.SetSelection;
 
-            if (!TryRestoreCurrentAsset() && Selection.activeObject is ESGraphAsset selected)
+            if (!TryRestoreCurrentAsset() && Selection.activeObject is GraphAsset selected)
                 SetAsset(selected);
         }
 
@@ -297,7 +298,7 @@ namespace ES.EditorInternal
                         : DropdownMenuAction.Status.Normal);
             menu.menu.AppendSeparator();
             menu.menu.AppendAction("检查图", _ => ValidateCurrentAsset());
-            menu.menu.AppendAction("生成检查快照", _ => BakeCurrentAsset());
+            menu.menu.AppendAction("生成并保存检查快照", _ => BakeCurrentAsset());
             menu.menu.AppendSeparator();
             menu.menu.AppendAction("使用引导", _ => OpenOnboarding());
             return menu;
@@ -443,7 +444,7 @@ namespace ES.EditorInternal
 
         private void OnDisable()
         {
-            ESEditorPresentation.UnbindWindow(this);
+            ESEditorPresentation.UnbindWindow(this, true);
             Undo.undoRedoPerformed -= OnUndoRedo;
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.projectChanged -= OnProjectChanged;
@@ -475,11 +476,11 @@ namespace ES.EditorInternal
 
         private void OnGlobalSelectionChanged()
         {
-            if (Selection.activeObject is ESGraphAsset selected && selected != graphView?.Asset)
+            if (Selection.activeObject is GraphAsset selected && selected != graphView?.Asset)
                 SetAsset(selected);
         }
 
-        private void SetAsset(ESGraphAsset asset)
+        private void SetAsset(GraphAsset asset)
         {
             if (graphView != null && !ReferenceEquals(graphView.Asset, asset))
                 FlushAutoSave();
@@ -508,7 +509,7 @@ namespace ES.EditorInternal
                 currentGraphAssetGuid = string.Empty;
                 return false;
             }
-            ESGraphAsset asset = AssetDatabase.LoadAssetAtPath<ESGraphAsset>(path);
+            GraphAsset asset = AssetDatabase.LoadAssetAtPath<GraphAsset>(path);
             if (asset == null)
             {
                 currentGraphAssetGuid = string.Empty;
@@ -518,7 +519,7 @@ namespace ES.EditorInternal
             return true;
         }
 
-        private static string GetAssetGuid(ESGraphAsset asset)
+        private static string GetAssetGuid(GraphAsset asset)
         {
             if (asset == null)
                 return string.Empty;
@@ -541,7 +542,7 @@ namespace ES.EditorInternal
             return guid + "|" + dependencyHash;
         }
 
-        internal void OpenGraph(ESGraphAsset asset)
+        internal void OpenGraph(GraphAsset asset)
         {
             SetAsset(asset);
             FocusAssetAfterOpen();
@@ -592,17 +593,17 @@ namespace ES.EditorInternal
                     subtitle: "以中文文本描述需求、权限、执行步骤和验收，交给 AI 生成可审查命令。",
                     badge: "推荐"),
                 ESSearchDropdown.Entry.Item(
-                    "Agent Skill 能力链",
+                    "AISkill 能力链",
                     () => CreateTemplate(ESStableGraphCreationTemplateKind.AgentSkill),
                     "AI 协作图/技能",
                     subtitle: "编排触发边界、工作流、非目标和验证步骤。"),
                 ESSearchDropdown.Entry.Item(
-                    "AICommand + Agent Skill",
+                    "AICommand + AISkill",
                     () => CreateTemplate(ESStableGraphCreationTemplateKind.AgentPaired),
                     "AI 协作图/配套产物",
                     subtitle: "一次需求同时产出命令合同与可复用技能。"),
                 ESSearchDropdown.Entry.Item(
-                    "完整需求思路图",
+                    "AI 实战调度图",
                     () => CreateTemplate(ESStableGraphCreationTemplateKind.AgentMindMap),
                     "AI 协作图/完整思路",
                     subtitle: "目标、权威资料、四类约束、双产物与人工批准。"),
@@ -618,7 +619,7 @@ namespace ES.EditorInternal
 
         private void OpenExistingAssetMenu(VisualElement anchor)
         {
-            string[] guids = AssetDatabase.FindAssets("t:ESGraphAsset");
+            string[] guids = AssetDatabase.FindAssets("t:ESGraphAssetBase");
             var entries = new List<ESSearchDropdown.Entry>();
             var paths = new List<string>(guids.Length);
             for (int i = 0; i < guids.Length; i++)
@@ -631,10 +632,10 @@ namespace ES.EditorInternal
             for (int i = 0; i < paths.Count; i++)
             {
                 string path = paths[i];
-                ESGraphAsset graph = AssetDatabase.LoadAssetAtPath<ESGraphAsset>(path);
+                GraphAsset graph = AssetDatabase.LoadAssetAtPath<GraphAsset>(path);
                 if (graph == null)
                     continue;
-                string domain = ESGraphChinesePresentation.GetDomainKindName(graph.DomainKind);
+                string domain = ESGraphChinesePresentation.GetDomainName(graph.DomainId);
                 if (graph.DomainKind == ESGraphDomainKind.Custom &&
                     ESGraphAuthoringRegistry.TryGetProfile(graph.DomainKey, out IESGraphAuthoringProfile profile))
                     domain = profile.DisplayName;
@@ -648,7 +649,7 @@ namespace ES.EditorInternal
             }
 
             if (entries.Count == 0)
-                entries.Add(ESSearchDropdown.Entry.Disabled("项目中尚无 ESGraphAsset 图资产"));
+                entries.Add(ESSearchDropdown.Entry.Disabled("项目中尚无稳定图资产"));
             ESSearchDropdown.Open(anchor, this, "打开已有图资产", entries,
                 minimumWindowSize: new Vector2(620f, 420f));
         }
@@ -698,12 +699,17 @@ namespace ES.EditorInternal
             if (string.IsNullOrEmpty(path))
                 return;
 
-            ESGraphAsset asset = CreateInstance<ESGraphAsset>();
+            GraphAsset asset = CreateDomainAsset(domainKind);
             try
             {
-                if (!asset.TrySetDomain(ESGraphDomainKey.FromKind(domainKind), out string domainError))
-                    throw new InvalidOperationException(domainError);
                 PopulateDomainTemplate(asset, kind);
+                List<ESGraphValidationIssue> templateIssues = ESGraphAuthoringRegistry.Validate(asset);
+                ESGraphValidationIssue[] templateErrors = templateIssues
+                    .Where(issue => issue != null && issue.severity == ESGraphValidationSeverity.Error)
+                    .Take(5).ToArray();
+                if (templateErrors.Length > 0)
+                    throw new InvalidOperationException("内置模板未通过统一 Graph 校验：\n"
+                        + string.Join("\n", templateErrors.Select(issue => issue.code + "：" + issue.message)));
                 AssetDatabase.CreateAsset(asset, path);
                 EditorUtility.SetDirty(asset);
                 AssetDatabase.SaveAssets();
@@ -719,8 +725,32 @@ namespace ES.EditorInternal
             }
         }
 
-        private static void PopulateDomainTemplate(ESGraphAsset asset, ESStableGraphCreationTemplateKind kind)
+        internal static void PopulateDomainTemplate(GraphAsset asset, ESStableGraphCreationTemplateKind kind)
         {
+            if (asset == null)
+                throw new ArgumentNullException(nameof(asset));
+
+            ESGraphDomainKind expectedDomain;
+            switch (kind)
+            {
+                case ESStableGraphCreationTemplateKind.Blank:
+                case ESStableGraphCreationTemplateKind.GenericFlow:
+                    expectedDomain = ESGraphDomainKind.Generic;
+                    break;
+                case ESStableGraphCreationTemplateKind.Story:
+                    expectedDomain = ESGraphDomainKind.Story;
+                    break;
+                case ESStableGraphCreationTemplateKind.BehaviorTree:
+                    expectedDomain = ESGraphDomainKind.BehaviorTree;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(kind), kind,
+                        "该模板不属于通用领域模板入口。");
+            }
+            if (asset.DomainKind != expectedDomain)
+                throw new InvalidOperationException("模板领域与图资产类型不一致：模板="
+                    + expectedDomain + "，资产=" + asset.DomainId);
+
             if (kind == ESStableGraphCreationTemplateKind.Blank)
                 return;
 
@@ -750,18 +780,24 @@ namespace ES.EditorInternal
                 return;
             }
 
-            ESGraphNodeRecord root = AddTemplateNode(asset, ESGraphBuiltInNodeKind.BehaviorRoot, new Vector2(0f, 0f));
-            ESGraphNodeRecord sequence = AddTemplateNode(asset, ESGraphBuiltInNodeKind.BehaviorSequence, new Vector2(320f, 0f));
-            ESGraphNodeRecord selector = AddTemplateNode(asset, ESGraphBuiltInNodeKind.BehaviorSelector, new Vector2(640f, 0f));
-            ESGraphNodeRecord condition = AddTemplateNode(asset, ESGraphBuiltInNodeKind.BehaviorCondition, new Vector2(960f, -100f));
-            ESGraphNodeRecord behaviorAction = AddTemplateNode(asset, ESGraphBuiltInNodeKind.BehaviorAction, new Vector2(960f, 120f));
-            ConnectTemplateNodes(asset, root, sequence);
-            ConnectTemplateNodes(asset, sequence, selector);
-            ConnectTemplateNodes(asset, selector, condition);
-            ConnectTemplateNodes(asset, selector, behaviorAction);
+            if (kind == ESStableGraphCreationTemplateKind.BehaviorTree)
+            {
+                ESGraphNodeRecord root = AddTemplateNode(asset, ESGraphBuiltInNodeKind.BehaviorRoot, new Vector2(0f, 0f));
+                ESGraphNodeRecord sequence = AddTemplateNode(asset, ESGraphBuiltInNodeKind.BehaviorSequence, new Vector2(320f, 0f));
+                ESGraphNodeRecord selector = AddTemplateNode(asset, ESGraphBuiltInNodeKind.BehaviorSelector, new Vector2(640f, 0f));
+                ESGraphNodeRecord condition = AddTemplateNode(asset, ESGraphBuiltInNodeKind.BehaviorCondition, new Vector2(960f, -100f));
+                ESGraphNodeRecord behaviorAction = AddTemplateNode(asset, ESGraphBuiltInNodeKind.BehaviorAction, new Vector2(960f, 120f));
+                ConnectTemplateNodes(asset, root, sequence);
+                ConnectTemplateNodes(asset, sequence, selector);
+                ConnectTemplateNodes(asset, selector, condition);
+                ConnectTemplateNodes(asset, selector, behaviorAction);
+                return;
+            }
+
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "未实现的图模板类型。");
         }
 
-        private static ESGraphNodeRecord AddTemplateNode(ESGraphAsset asset, ESGraphBuiltInNodeKind kind, Vector2 position)
+        private static ESGraphNodeRecord AddTemplateNode(GraphAsset asset, ESGraphBuiltInNodeKind kind, Vector2 position)
         {
             ESGraphNodeTypeKey type = ESGraphNodeTypeKey.FromKind(kind);
             if (!ESGraphAuthoringRegistry.TryGetNodeDefinition(asset.DomainKey, type, out IESGraphNodeDefinition definition))
@@ -772,7 +808,7 @@ namespace ES.EditorInternal
             return node;
         }
 
-        private static void ConnectTemplateNodes(ESGraphAsset asset, ESGraphNodeRecord from, ESGraphNodeRecord to)
+        private static void ConnectTemplateNodes(GraphAsset asset, ESGraphNodeRecord from, ESGraphNodeRecord to)
         {
             ESGraphPortRecord output = from.ports.First(port => port.direction == ESGraphPortDirection.Output);
             ESGraphPortRecord input = to.ports.First(port => port.direction == ESGraphPortDirection.Input);
@@ -791,6 +827,22 @@ namespace ES.EditorInternal
             }
         }
 
+        private static GraphAsset CreateDomainAsset(ESGraphDomainKind domainKind)
+        {
+            switch (domainKind)
+            {
+                case ESGraphDomainKind.Generic:
+                    return CreateInstance<ESGenericGraphAsset>();
+                case ESGraphDomainKind.Story:
+                    return CreateInstance<ESStoryGraphAsset>();
+                case ESGraphDomainKind.BehaviorTree:
+                    return CreateInstance<ESBehaviorTreeGraphAsset>();
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(domainKind), domainKind,
+                        "该领域没有可由通用模板创建的具体图资产类型。");
+            }
+        }
+
         private static string GetTemplateAssetName(ESStableGraphCreationTemplateKind kind)
         {
             switch (kind)
@@ -798,7 +850,7 @@ namespace ES.EditorInternal
                 case ESStableGraphCreationTemplateKind.Story: return "剧情任务图";
                 case ESStableGraphCreationTemplateKind.BehaviorTree: return "行为树图";
                 case ESStableGraphCreationTemplateKind.GenericFlow: return "通用流程图";
-                default: return "ESGraphAsset";
+                default: return "通用图";
             }
         }
 
@@ -846,10 +898,11 @@ namespace ES.EditorInternal
                     subtitle: "同时生成 AICommand 与 Agent Skill 候选",
                     badge: "推荐"),
                 ESSearchDropdown.Entry.Item(
-                    "完整需求思路图",
+                    "AI 实战调度图",
                     () => CreateAgentAuthoringPreset(ESAgentAuthoringPresetKind.MindMapPaired),
                     "常用模板",
-                    subtitle: "从目标、规则、验证到两类产物的完整编排"),
+                    subtitle: "三路分支、有界遍历、双产物与人工批准闭环",
+                    badge: "复杂实战"),
                 ESSearchDropdown.Entry.Item(
                     "AICommand 实现链",
                     () => CreateAgentAuthoringPreset(ESAgentAuthoringPresetKind.AICommandOnly),
@@ -867,23 +920,24 @@ namespace ES.EditorInternal
 
         private void CreateAgentAuthoringPreset(ESAgentAuthoringPresetKind kind)
         {
-            if (ESAgentAuthoringGraphPreset.TryCreateAsset(kind, out ESGraphAsset asset, out string error)) SetAsset(asset);
+            if (ESAgentAuthoringGraphPreset.TryCreateAsset(kind, out GraphAsset asset, out string error)) SetAsset(asset);
             else if (!string.IsNullOrEmpty(error)) UpdateStatus(error);
         }
 
         private void ValidateCurrentAsset()
         {
-            ESGraphAsset asset = graphView?.Asset;
+            GraphAsset asset = graphView?.Asset;
             if (asset == null)
                 return;
-            List<ESGraphValidationIssue> issues = ESGraphAuthoringRegistry.Validate(asset);
+            bool bakeReady = ESGraphAuthoringRegistry.TryBake(asset, out _, out _,
+                out List<ESGraphValidationIssue> issues);
             inspector?.ShowIssues(issues);
             int errors = issues.Count(issue => issue != null && issue.severity == ESGraphValidationSeverity.Error);
-            if (errors == 0)
+            if (bakeReady && errors == 0)
             {
                 UpdateStatus("检查通过");
                 ESEditorPresentation.PulseWindow(this, ESStatusKind.Ready);
-                EditorUtility.DisplayDialog("稳定图检查", "检查通过，可以继续生成检查快照。", "确定");
+                EditorUtility.DisplayDialog("稳定图检查", "检查通过，可以继续执行、生成候选或保存检查快照。", "确定");
                 return;
             }
 
@@ -898,25 +952,29 @@ namespace ES.EditorInternal
 
         private void BakeCurrentAsset()
         {
-            ESGraphAsset asset = graphView?.Asset;
+            GraphAsset asset = graphView?.Asset;
             if (asset == null)
                 return;
-            if (!ESGraphAuthoringRegistry.TryBake(asset, out ESBakedGraphSnapshot snapshot,
-                    out IESBakedGraphPlan domainPlan, out List<ESGraphValidationIssue> issues))
+            if (!ESGraphUserActionBaker.TryBake(asset, "生成并保存检查快照",
+                    issues => inspector?.ShowIssues(issues), UpdateStatus,
+                    out ESBakedGraphSnapshot snapshot, out IESBakedGraphPlan domainPlan,
+                    out ESGraphRiskAcceptance riskAcceptance))
+                return;
+            string result = domainPlan == null ? "通用检查结果" : "领域检查结果";
+            if (!ESAgentArtifactGenerationWorkspace.TryWriteGraphSnapshot(snapshot, riskAcceptance,
+                    out string relativePath, out string error))
             {
-                inspector?.ShowIssues(issues);
-                UpdateStatus("生成检查快照失败：请先处理图中问题");
+                UpdateStatus("检查结果已生成，但快照保存失败：" + error);
                 return;
             }
-            inspector?.ShowIssues(issues);
-            string result = domainPlan == null ? "通用检查结果" : "领域检查结果";
-            UpdateStatus("检查快照已生成 / " + result + " / 编号："
+            inspector?.RefreshFromAsset();
+            UpdateStatus("检查快照已保存 / " + result + " / " + relativePath + " / 编号："
                          + snapshot.ContentSignature.Substring(0, 12));
         }
 
         private void SaveCurrentAsset()
         {
-            ESGraphAsset asset = graphView?.Asset;
+            GraphAsset asset = graphView?.Asset;
             if (asset == null)
                 return;
             if (autoSaveAsset == asset)
@@ -934,7 +992,7 @@ namespace ES.EditorInternal
 
         private void SaveCurrentAssetAs()
         {
-            ESGraphAsset source = graphView?.Asset;
+            GraphAsset source = graphView?.Asset;
             if (source == null)
                 return;
             SaveCurrentAsset();
@@ -971,7 +1029,7 @@ namespace ES.EditorInternal
                 if (!AssetDatabase.CopyAsset(sourcePath, targetPath))
                     throw new InvalidOperationException("Unity 未能复制图资产。");
                 created = true;
-                ESGraphAsset copy = AssetDatabase.LoadAssetAtPath<ESGraphAsset>(targetPath);
+                GraphAsset copy = AssetDatabase.LoadAssetAtPath<GraphAsset>(targetPath);
                 if (copy == null)
                     throw new InvalidOperationException("复制完成后无法重新加载图资产。");
                 if (string.IsNullOrWhiteSpace(AssetDatabase.AssetPathToGUID(targetPath)))
@@ -1008,7 +1066,7 @@ namespace ES.EditorInternal
             }
         }
 
-        internal void RequestAutoSave(ESGraphAsset asset)
+        internal void RequestAutoSave(GraphAsset asset)
         {
             if (asset == null || string.IsNullOrEmpty(AssetDatabase.GetAssetPath(asset)))
                 return;
@@ -1057,7 +1115,7 @@ namespace ES.EditorInternal
         private void SynchronizeCurrentAssetIfChanged(bool includeDependencyHash)
         {
             using var marker = RevisionSyncMarker.Auto();
-            ESGraphAsset asset = graphView?.Asset;
+            GraphAsset asset = graphView?.Asset;
             if (asset == null)
             {
                 if (graphView != null && !ReferenceEquals(graphView.Asset, null))
@@ -1093,7 +1151,7 @@ namespace ES.EditorInternal
         {
             if (!autoSavePending)
                 return;
-            ESGraphAsset asset = autoSaveAsset;
+            GraphAsset asset = autoSaveAsset;
             autoSavePending = false;
             autoSaveAsset = null;
             if (asset == null)
@@ -1110,7 +1168,7 @@ namespace ES.EditorInternal
                 UpdateStatus("已自动保存：" + AssetDatabase.GetAssetPath(asset));
         }
 
-        private void CaptureAssetRevision(ESGraphAsset asset, bool includeDependencyHash)
+        private void CaptureAssetRevision(GraphAsset asset, bool includeDependencyHash)
         {
             bool assetChanged = !ReferenceEquals(observedAsset, asset);
             observedAsset = asset;
@@ -1121,7 +1179,7 @@ namespace ES.EditorInternal
                 observedAssetDependencyHash = GetAssetDependencyHash(asset);
         }
 
-        private static Hash128 GetAssetDependencyHash(ESGraphAsset asset)
+        private static Hash128 GetAssetDependencyHash(GraphAsset asset)
         {
             string path = asset == null ? string.Empty : AssetDatabase.GetAssetPath(asset);
             if (string.IsNullOrEmpty(path))
@@ -1139,7 +1197,7 @@ namespace ES.EditorInternal
             }
         }
 
-        private static string BuildAssetSummary(ESGraphAsset asset)
+        private static string BuildAssetSummary(GraphAsset asset)
         {
             if (asset == null)
                 return string.Empty;
@@ -1148,7 +1206,7 @@ namespace ES.EditorInternal
                 domain = profile.DisplayName;
             string identity = asset.GraphId.Length >= 8 ? asset.GraphId.Substring(0, 8) : asset.GraphId;
             string summary = domain + " · " + asset.Nodes.Count + " 个节点 · " + asset.Edges.Count + " 条连线 · 图 " + identity;
-            if (asset.DomainKind == ESGraphDomainKind.AgentAuthoring
+            if (string.Equals(asset.DomainId, ESAgentGraphStableIds.DomainId, StringComparison.Ordinal)
                 && ESAgentAuthoringGraphValidator.TryGetFinalPurpose(asset, out string purpose, out _))
                 summary += " · 目的：" + CompactStatusText(purpose, 42);
             return summary;
@@ -1179,6 +1237,8 @@ namespace ES.EditorInternal
         private const long EdgeAnimationIntervalMilliseconds = 50L;
         private const long EdgeReconnectLongPressMilliseconds = 460L;
         private const float EdgeReconnectMovementTolerance = 8f;
+        private const float EndpointHandleHalfSize = 6f;
+        private const float EndpointHandleEdgeOffset = 14f;
         private const float LayoutHorizontalSpacing = 310f;
         private const float LayoutVerticalSpacing = 180f;
         private const float PositionGridSize = 32f;
@@ -1227,9 +1287,13 @@ namespace ES.EditorInternal
         private readonly ESStableGraphNodeSearchProvider searchProvider;
         private readonly ESStableGraphEdgeConnectorListener edgeConnectorListener;
         private readonly VisualElement emptyState;
+        private readonly Label onboardingBody;
         private readonly MiniMap miniMap;
         private readonly VisualElement edgeFlowOverlay;
+        private readonly VisualElement edgeReconnectPreviewOverlay;
         private readonly VisualElement snapGuideOverlay;
+        private readonly ESStableGraphEndpointHandle outputReconnectHandle;
+        private readonly ESStableGraphEndpointHandle inputReconnectHandle;
         private readonly Dictionary<string, ESStableGraphNodeView> nodeViews = new Dictionary<string, ESStableGraphNodeView>(StringComparer.Ordinal);
         private readonly Dictionary<string, Edge> edgeViews = new Dictionary<string, Edge>(StringComparer.Ordinal);
         private readonly Dictionary<string, float> edgeFlowPhases = new Dictionary<string, float>(StringComparer.Ordinal);
@@ -1294,7 +1358,18 @@ namespace ES.EditorInternal
         private Edge pendingEdgeReconnect;
         private Vector2 pendingEdgeReconnectStart;
         private IVisualElementScheduledItem edgeReconnectSchedule;
+        private IVisualElementScheduledItem endpointHandleHideSchedule;
         private bool edgeReconnectTriggered;
+        private ESStableGraphEdgeView endpointReconnectEdge;
+        private ESStableGraphEdgeView hoveredEndpointHandleEdge;
+        private ESStableGraphEdgeView selectedEndpointHandleEdge;
+        private ESStableGraphEdgeView projectedEndpointHandleEdge;
+        private string endpointReconnectEdgeId;
+        private string endpointReconnectFixedPortId;
+        private string endpointReconnectOriginalPortId;
+        private string endpointReconnectCandidatePortId;
+        private Vector2 endpointReconnectPointerPosition;
+        private bool endpointReconnectMovingOutput;
         private const double ViewAnimationDurationSeconds = 0.18d;
         private const float WheelDeltaPerTick = 15f;
         private const string ClipboardSchema = "ESStableGraph.Clipboard.V1";
@@ -1315,7 +1390,7 @@ namespace ES.EditorInternal
             public List<ESGraphEdgeRecord> edges = new List<ESGraphEdgeRecord>();
         }
 
-        public ESGraphAsset Asset { get; private set; }
+        public GraphAsset Asset { get; private set; }
         public int SelectedNodeCount
         {
             get
@@ -1336,7 +1411,8 @@ namespace ES.EditorInternal
             || nudgeBatchActive
             || !string.IsNullOrEmpty(activeDragPortId)
             || pendingEdgeReconnect != null
-            || edgeReconnectTriggered;
+            || edgeReconnectTriggered
+            || endpointReconnectEdge != null;
         public event Action<IEnumerable<ISelectable>> SelectionChanged;
 
         public ESStableGraphView(ESStableGraphViewWindow ownerWindow, Action<string> report,
@@ -1375,6 +1451,19 @@ namespace ES.EditorInternal
             edgeFlowOverlay.style.overflow = Overflow.Hidden;
             edgeFlowOverlay.generateVisualContent += OnGenerateEdgeFlowVisualContent;
             Add(edgeFlowOverlay);
+            edgeReconnectPreviewOverlay = new VisualElement
+            {
+                name = "es-stable-graph-edge-reconnect-preview",
+                pickingMode = PickingMode.Ignore
+            };
+            edgeReconnectPreviewOverlay.style.position = Position.Absolute;
+            edgeReconnectPreviewOverlay.style.left = 0f;
+            edgeReconnectPreviewOverlay.style.top = 0f;
+            edgeReconnectPreviewOverlay.style.right = 0f;
+            edgeReconnectPreviewOverlay.style.bottom = 0f;
+            edgeReconnectPreviewOverlay.style.overflow = Overflow.Hidden;
+            edgeReconnectPreviewOverlay.generateVisualContent += OnGenerateEdgeReconnectPreview;
+            Add(edgeReconnectPreviewOverlay);
             snapGuideOverlay = new VisualElement
             {
                 name = "es-stable-graph-snap-guide-overlay",
@@ -1401,16 +1490,16 @@ namespace ES.EditorInternal
             emptyState.style.paddingRight = 18f;
             emptyState.style.paddingTop = 16f;
             emptyState.style.paddingBottom = 16f;
-            emptyState.style.color = new Color(0.84f, 0.88f, 0.95f, 1f);
-            emptyState.style.backgroundColor = new Color(0.11f, 0.13f, 0.18f, 0.96f);
+            emptyState.style.color = ESEditorPresentation.SectionTextColor;
+            emptyState.style.backgroundColor = ESEditorPresentation.WindowRaisedSurfaceColor;
             emptyState.style.borderTopWidth = 1f;
             emptyState.style.borderBottomWidth = 1f;
             emptyState.style.borderLeftWidth = 1f;
             emptyState.style.borderRightWidth = 1f;
-            emptyState.style.borderTopColor = new Color(0.28f, 0.38f, 0.55f, 0.9f);
-            emptyState.style.borderBottomColor = new Color(0.28f, 0.38f, 0.55f, 0.9f);
-            emptyState.style.borderLeftColor = new Color(0.28f, 0.38f, 0.55f, 0.9f);
-            emptyState.style.borderRightColor = new Color(0.28f, 0.38f, 0.55f, 0.9f);
+            emptyState.style.borderTopColor = ESEditorPresentation.NodeBorderColor;
+            emptyState.style.borderBottomColor = ESEditorPresentation.NodeBorderColor;
+            emptyState.style.borderLeftColor = ESEditorPresentation.NodeBorderColor;
+            emptyState.style.borderRightColor = ESEditorPresentation.NodeBorderColor;
             emptyState.style.borderTopLeftRadius = 8f;
             emptyState.style.borderTopRightRadius = 8f;
             emptyState.style.borderBottomLeftRadius = 8f;
@@ -1420,24 +1509,24 @@ namespace ES.EditorInternal
             guideTitle.style.fontSize = 14f;
             guideTitle.style.marginBottom = 8f;
             emptyState.Add(guideTitle);
-            Label guideBody = new Label(
-                "1. 点击“新建图”选择模板，或点击“打开已有”/从 Project 窗口拖入图资产\n" +
-                "2. 点击“添加节点”开始搭建思路\n" +
-                "3. 从输出端口拖到输入端口建立关系\n" +
-                "4. 在右侧填写标题和业务内容\n\n" +
-                "高效操作：拖动空白区域可框选，Shift / Ctrl 可增减选择；\n" +
-                "空格 快速创建节点；Ctrl/Cmd+A 全选，Ctrl/Cmd+D 复制，F 聚焦。\n" +
-                "拖线时兼容端口会高亮，拖动节点会自动出现对齐参考线。\n" +
-                "方向键微调节点，右键连线可在中间插入节点。\n\n" +
-                "图形编辑会自动保存；正式产物仍需检查和人工批准。\n" +
-                "以后可以点击顶部“使用引导”再次查看。");
-            guideBody.style.whiteSpace = WhiteSpace.Normal;
-            emptyState.Add(guideBody);
+            onboardingBody = new Label();
+            onboardingBody.style.whiteSpace = WhiteSpace.Normal;
+            emptyState.Add(onboardingBody);
             Button closeGuide = new Button(() => ownerWindow?.CompleteOnboarding()) { text = "知道了" };
             closeGuide.tooltip = "关闭首次使用引导；以后可从顶部“使用引导”再次打开。";
             closeGuide.style.marginTop = 10f;
             emptyState.Add(closeGuide);
             Add(emptyState);
+            outputReconnectHandle = new ESStableGraphEndpointHandle(true);
+            inputReconnectHandle = new ESStableGraphEndpointHandle(false);
+            outputReconnectHandle.RegisterCallback<MouseDownEvent>(OnEndpointHandleMouseDown);
+            inputReconnectHandle.RegisterCallback<MouseDownEvent>(OnEndpointHandleMouseDown);
+            outputReconnectHandle.RegisterCallback<MouseEnterEvent>(OnEndpointHandleMouseEnter);
+            inputReconnectHandle.RegisterCallback<MouseEnterEvent>(OnEndpointHandleMouseEnter);
+            outputReconnectHandle.RegisterCallback<MouseLeaveEvent>(OnEndpointHandleMouseLeave);
+            inputReconnectHandle.RegisterCallback<MouseLeaveEvent>(OnEndpointHandleMouseLeave);
+            hierarchy.Add(outputReconnectHandle);
+            hierarchy.Add(inputReconnectHandle);
             graphViewChanged = OnGraphViewChanged;
             nodeCreationRequest = context => OpenNodeSearch(context.screenMousePosition,
                 contentViewContainer.WorldToLocal(context.screenMousePosition - ownerWindow.position.position));
@@ -1474,13 +1563,23 @@ namespace ES.EditorInternal
             edgeAnimationSchedule = null;
             CancelViewAnimation();
             CancelEdgeReconnect();
+            CancelEndpointReconnect();
             CancelNudgeBatch();
             ClearSnapGrids();
             ClearSnapGridPool();
             if (edgeFlowOverlay != null)
                 edgeFlowOverlay.generateVisualContent -= OnGenerateEdgeFlowVisualContent;
+            if (edgeReconnectPreviewOverlay != null)
+                edgeReconnectPreviewOverlay.generateVisualContent -= OnGenerateEdgeReconnectPreview;
             if (snapGuideOverlay != null)
                 snapGuideOverlay.generateVisualContent -= OnGenerateSnapGuideVisualContent;
+            outputReconnectHandle?.UnregisterCallback<MouseDownEvent>(OnEndpointHandleMouseDown);
+            inputReconnectHandle?.UnregisterCallback<MouseDownEvent>(OnEndpointHandleMouseDown);
+            outputReconnectHandle?.UnregisterCallback<MouseEnterEvent>(OnEndpointHandleMouseEnter);
+            inputReconnectHandle?.UnregisterCallback<MouseEnterEvent>(OnEndpointHandleMouseEnter);
+            outputReconnectHandle?.UnregisterCallback<MouseLeaveEvent>(OnEndpointHandleMouseLeave);
+            inputReconnectHandle?.UnregisterCallback<MouseLeaveEvent>(OnEndpointHandleMouseLeave);
+            CancelEndpointHandleHide();
             ClearSnapGuides();
             UnregisterCallback<MouseDownEvent>(OnGraphMouseDown, TrickleDown.TrickleDown);
             UnregisterCallback<MouseMoveEvent>(OnGraphMouseMove, TrickleDown.TrickleDown);
@@ -1494,7 +1593,7 @@ namespace ES.EditorInternal
                 UnityEngine.Object.DestroyImmediate(searchProvider);
         }
 
-        public void SetAsset(ESGraphAsset asset)
+        public void SetAsset(GraphAsset asset)
         {
             if (ReferenceEquals(Asset, asset))
                 return;
@@ -1518,6 +1617,7 @@ namespace ES.EditorInternal
 
         public void Rebuild()
         {
+            CancelEndpointReconnect();
             FlushNudgeBatchBeforeStructuralChange();
             rebuildSelectedNodeIds.Clear();
             rebuildSelectedEdgeIds.Clear();
@@ -1566,6 +1666,7 @@ namespace ES.EditorInternal
                 {
                     Edge edge = pair.Value;
                     bool endpointsChanged = !rebuildDesiredEdges.TryGetValue(pair.Key, out ESGraphEdgeRecord desired)
+                        || !(edge is ESStableGraphEdgeView)
                         || !string.Equals(edge?.output?.userData as string, desired.outputPortId, StringComparison.Ordinal)
                         || !string.Equals(edge?.input?.userData as string, desired.inputPortId, StringComparison.Ordinal);
                     string outputNodeId = (edge?.output?.node as ESStableGraphNodeView)?.NodeId;
@@ -1618,8 +1719,7 @@ namespace ES.EditorInternal
                         || !portViews.TryGetValue(pair.Value.outputPortId, out Port output)
                         || !portViews.TryGetValue(pair.Value.inputPortId, out Port input))
                         continue;
-                    Edge edge = output.ConnectTo(input);
-                    edge.userData = pair.Key;
+                    Edge edge = CreateProjectedEdge(output, input, pair.Key);
                     edgeViews[pair.Key] = edge;
                     ConfigureEdgeReconnectGesture(edge);
                     RegisterEdgeFlowGeometry(edge);
@@ -1652,6 +1752,8 @@ namespace ES.EditorInternal
 
         private void ClearProjection()
         {
+            CancelEndpointReconnect();
+            ClearEndpointHandleProjection();
             bool wasRebuilding = rebuilding;
             rebuilding = true;
             try
@@ -1777,8 +1879,8 @@ namespace ES.EditorInternal
 
                 ESGraphAuthoringRegistry.TryGetNodeDefinition(Asset.DomainKey, node.TypeKey,
                     out IESGraphNodeDefinition definition);
-                bool futureGraphSchema = Asset.schemaVersion > ESGraphAsset.CurrentSchemaVersion;
-                bool unsupportedGraphSchema = Asset.schemaVersion != ESGraphAsset.CurrentSchemaVersion;
+                bool futureGraphSchema = Asset.schemaVersion > GraphAsset.CurrentSchemaVersion;
+                bool unsupportedGraphSchema = Asset.schemaVersion != GraphAsset.CurrentSchemaVersion;
                 bool futureNodeSchema = definition != null && node.version > definition.CurrentVersion;
                 string nodeId = node.nodeId;
                 ESStableGraphNodeView currentView = nodeView;
@@ -1927,6 +2029,19 @@ namespace ES.EditorInternal
             }
         }
 
+        private Edge CreateProjectedEdge(Port output, Port input, string edgeId)
+        {
+            var edge = new ESStableGraphEdgeView(this)
+            {
+                output = output,
+                input = input,
+                userData = edgeId
+            };
+            output.Connect(edge);
+            input.Connect(edge);
+            return edge;
+        }
+
         private void RemoveGraphElementSafe(GraphElement element)
         {
             if (element != null && element.parent != null)
@@ -1935,6 +2050,8 @@ namespace ES.EditorInternal
 
         private void UpdateOnboardingVisibility()
         {
+            if (onboardingBody != null)
+                onboardingBody.text = BuildOnboardingText();
             if (emptyState != null)
                 emptyState.style.display = onboardingVisible ? DisplayStyle.Flex : DisplayStyle.None;
             if (miniMap != null)
@@ -1942,10 +2059,36 @@ namespace ES.EditorInternal
             UpdateOverlayLayout(layout.width, layout.height);
         }
 
+        private string BuildOnboardingText()
+        {
+            if (Asset != null && string.Equals(Asset.DomainId, ESAgentGraphStableIds.DomainId,
+                    StringComparison.Ordinal))
+            {
+                return "1. 新建时优先选择 AICommand、AISkill 或 AI 实战调度模板，模板已带合法连接\n" +
+                    "2. 先选中“生成目标”，替换最终目的、使用场景和成功标准\n" +
+                    "3. 再填写引用资料与生成约束；约束必须明确作用到目标 Output\n" +
+                    "4. 选中 AICommand / AISkill Output，填写名称、正式路径、权限和验收合同\n" +
+                    "5. 保留 Output → 交付门禁，点击“立即检查”，按右侧“当前下一步”逐项修复\n" +
+                    "6. 检查通过后可即时执行，或生成候选并完成 Diff Review 与人工批准\n\n" +
+                    "拖线时只会高亮模型层真正允许的端口；AI 编排和行为树固定禁止循环。\n" +
+                    "图形编辑会自动保存，正式产物不会绕过候选与人工批准。";
+            }
+
+            return "1. 点击“新建图”选择模板，或点击“打开已有”/从 Project 窗口拖入图资产\n" +
+                "2. 点击“添加节点”开始搭建思路\n" +
+                "3. 从输出端口拖到输入端口建立关系\n" +
+                "4. 在右侧填写标题和业务内容并执行质量检查\n\n" +
+                "空格快速创建节点；Ctrl/Cmd+A 全选，Ctrl/Cmd+D 复制，F 聚焦。\n" +
+                "拖线时兼容端口会高亮，方向键可微调节点，右键连线可在中间插入节点。\n" +
+                "图形编辑会自动保存；以后可以点击顶部“使用引导”再次查看。";
+        }
+
         private void OnGraphGeometryChanged(GeometryChangedEvent evt)
         {
             UpdateOverlayLayout(evt.newRect.width, evt.newRect.height);
             edgeFlowOverlay?.MarkDirtyRepaint();
+            edgeReconnectPreviewOverlay?.MarkDirtyRepaint();
+            UpdateEndpointHandlePositions();
         }
 
         private void UpdateOverlayLayout(float width, float height)
@@ -2000,6 +2143,37 @@ namespace ES.EditorInternal
             if (animatedCount < animatedBudget || markerCount < markerBudget)
                 DrawEdgeFlowPass(painter, time, false, allowAmbientAnimation, animatedBudget, markerBudget,
                     ref animatedCount, ref markerCount);
+        }
+
+        private void OnGenerateEdgeReconnectPreview(MeshGenerationContext context)
+        {
+            if (endpointReconnectEdge == null
+                || string.IsNullOrEmpty(endpointReconnectFixedPortId)
+                || !portViews.TryGetValue(endpointReconnectFixedPortId, out Port fixedPort)
+                || fixedPort?.panel == null)
+                return;
+
+            Vector2 fixedPoint = edgeReconnectPreviewOverlay.WorldToLocal(fixedPort.worldBound.center);
+            Vector2 pointerPoint = edgeReconnectPreviewOverlay.WorldToLocal(endpointReconnectPointerPosition);
+            if (!string.IsNullOrEmpty(endpointReconnectCandidatePortId)
+                && portViews.TryGetValue(endpointReconnectCandidatePortId, out Port candidate)
+                && candidate?.panel != null)
+                pointerPoint = edgeReconnectPreviewOverlay.WorldToLocal(candidate.worldBound.center);
+
+            Vector2 outputPoint = endpointReconnectMovingOutput ? pointerPoint : fixedPoint;
+            Vector2 inputPoint = endpointReconnectMovingOutput ? fixedPoint : pointerPoint;
+            float controlDistance = Mathf.Max(48f, Mathf.Abs(inputPoint.x - outputPoint.x) * 0.5f);
+            Vector2 firstControl = outputPoint + Vector2.right * controlDistance;
+            Vector2 secondControl = inputPoint + Vector2.left * controlDistance;
+            Painter2D painter = context.painter2D;
+            Color color = ESEditorPresentation.ActiveColor;
+            color.a = 0.9f;
+            painter.strokeColor = color;
+            painter.lineWidth = 3f;
+            painter.BeginPath();
+            painter.MoveTo(outputPoint);
+            painter.BezierCurveTo(firstControl, secondControl, inputPoint);
+            painter.Stroke();
         }
 
         private void DrawEdgeFlowPass(Painter2D painter, double time, bool priorityOnly,
@@ -2575,16 +2749,8 @@ namespace ES.EditorInternal
                 return;
             }
 
-            edge.userData = result.createdEdgeId;
-            edgeViews[result.createdEdgeId] = edge;
-            ConfigureEdgeReconnectGesture(edge);
-            RegisterEdgeFlowGeometry(edge);
-            AddElement(edge);
-            edge.output.Connect(edge);
-            edge.input.Connect(edge);
-            BuildGraphIndexes();
-            RefreshPortRelationVisuals();
-            edgeFlowOverlay?.MarkDirtyRepaint();
+            RemoveGraphElementSafe(edge);
+            Rebuild();
             report?.Invoke("已建立关系：" + ESGraphChinesePresentation.GetPortName(
                 portRecords[outputPortId].name) + " → "
                 + ESGraphChinesePresentation.GetPortName(portRecords[inputPortId].name));
@@ -2592,7 +2758,20 @@ namespace ES.EditorInternal
 
         private void OnGraphKeyDown(KeyDownEvent evt)
         {
-            if (Asset == null || evt.altKey || IsInteractiveControlTarget(evt.target))
+            if (Asset == null || evt.altKey)
+                return;
+            if (evt.keyCode == KeyCode.Escape
+                && (pendingEdgeReconnect != null || edgeReconnectTriggered
+                    || endpointReconnectEdge != null))
+            {
+                CancelEdgeReconnect();
+                CancelEndpointReconnect();
+                EndPointerInteraction();
+                evt.PreventDefault();
+                evt.StopImmediatePropagation();
+                return;
+            }
+            if (IsInteractiveControlTarget(evt.target))
                 return;
             bool actionKey = evt.ctrlKey || evt.commandKey;
             bool handled = false;
@@ -2634,13 +2813,6 @@ namespace ES.EditorInternal
                     || pendingEdgeReconnect != null || edgeReconnectTriggered)
                     return;
                 OpenNodeSearchAtPointerOrCenter();
-                handled = true;
-            }
-            else if (!actionKey && evt.keyCode == KeyCode.Escape
-                && (pendingEdgeReconnect != null || edgeReconnectTriggered))
-            {
-                CancelEdgeReconnect();
-                EndPointerInteraction();
                 handled = true;
             }
             else
@@ -2685,10 +2857,17 @@ namespace ES.EditorInternal
                 : ownerWindow.position.position + evt.mousePosition;
             hasLastPointerPosition = true;
             lastPointerMoveTime = EditorApplication.timeSinceStartup;
+            UpdateEndpointHandlePositions();
             if (mouseButtonPressed
                 && (evt.mousePosition - mouseDownPosition).sqrMagnitude
                     > PointerDragThreshold * PointerDragThreshold)
                 pointerDragging = true;
+            if (endpointReconnectEdge != null)
+            {
+                UpdateEndpointReconnect(evt.mousePosition);
+                evt.StopImmediatePropagation();
+                return;
+            }
             if (pendingEdgeReconnect == null)
                 return;
             if ((evt.mousePosition - pendingEdgeReconnectStart).sqrMagnitude
@@ -2698,6 +2877,16 @@ namespace ES.EditorInternal
 
         private void OnGraphMouseUp(MouseUpEvent evt)
         {
+            if (evt.button == 0 && endpointReconnectEdge != null)
+            {
+                CompleteEndpointReconnect(evt.mousePosition);
+                pressedMouseButtons &= ~1;
+                mouseButtonPressed = pressedMouseButtons != 0;
+                pointerDragging = false;
+                evt.PreventDefault();
+                evt.StopImmediatePropagation();
+                return;
+            }
             if (evt.button >= 0 && evt.button < 32)
             {
                 pressedMouseButtons &= ~(1 << evt.button);
@@ -2738,18 +2927,307 @@ namespace ES.EditorInternal
             return false;
         }
 
+        private void OnEndpointHandleMouseDown(MouseDownEvent evt)
+        {
+            if (evt.button != 0 || !(evt.currentTarget is ESStableGraphEndpointHandle handle)
+                || projectedEndpointHandleEdge == null)
+                return;
+            if (!BeginEndpointReconnect(projectedEndpointHandleEdge, handle.MovingOutput,
+                    evt.mousePosition))
+                return;
+            handle.CaptureMouse();
+            evt.PreventDefault();
+            evt.StopImmediatePropagation();
+        }
+
+        private void OnEndpointHandleMouseEnter(MouseEnterEvent evt)
+        {
+            CancelEndpointHandleHide();
+            if (projectedEndpointHandleEdge != null)
+                hoveredEndpointHandleEdge = projectedEndpointHandleEdge;
+            RefreshEndpointHandleProjection();
+        }
+
+        private void OnEndpointHandleMouseLeave(MouseLeaveEvent evt)
+        {
+            if (endpointReconnectEdge == null && selectedEndpointHandleEdge == null)
+                ScheduleEndpointHandleHide(hoveredEndpointHandleEdge);
+        }
+
+        internal void SetEndpointHandleHover(ESStableGraphEdgeView edge, bool hovered)
+        {
+            if (hovered)
+            {
+                CancelEndpointHandleHide();
+                hoveredEndpointHandleEdge = edge;
+            }
+            else if (ReferenceEquals(hoveredEndpointHandleEdge, edge))
+            {
+                ScheduleEndpointHandleHide(edge);
+                return;
+            }
+            RefreshEndpointHandleProjection();
+        }
+
+        private void ScheduleEndpointHandleHide(ESStableGraphEdgeView edge)
+        {
+            CancelEndpointHandleHide();
+            if (edge == null || endpointReconnectEdge != null || selectedEndpointHandleEdge != null)
+                return;
+            endpointHandleHideSchedule = schedule.Execute(() =>
+            {
+                endpointHandleHideSchedule = null;
+                if (endpointReconnectEdge != null || selectedEndpointHandleEdge != null
+                    || !ReferenceEquals(hoveredEndpointHandleEdge, edge))
+                    return;
+                hoveredEndpointHandleEdge = null;
+                RefreshEndpointHandleProjection();
+            }).StartingIn(120L);
+        }
+
+        private void CancelEndpointHandleHide()
+        {
+            endpointHandleHideSchedule?.Pause();
+            endpointHandleHideSchedule = null;
+        }
+
+        internal void SetEndpointHandleSelection(ESStableGraphEdgeView edge, bool selected)
+        {
+            if (selected)
+            {
+                selectedEndpointHandleEdge = edge;
+            }
+            else if (ReferenceEquals(selectedEndpointHandleEdge, edge))
+            {
+                selectedEndpointHandleEdge = null;
+                foreach (KeyValuePair<string, Edge> pair in edgeViews)
+                {
+                    if (pair.Value is ESStableGraphEdgeView selectedEdge && selectedEdge.selected)
+                    {
+                        selectedEndpointHandleEdge = selectedEdge;
+                        break;
+                    }
+                }
+            }
+            RefreshEndpointHandleProjection();
+        }
+
+        internal void NotifyEndpointHandleGeometryChanged(ESStableGraphEdgeView edge)
+        {
+            if (ReferenceEquals(projectedEndpointHandleEdge, edge))
+                UpdateEndpointHandlePositions();
+        }
+
+        internal void RefreshEndpointHandleProjectionFor(ESStableGraphEdgeView edge)
+        {
+            RefreshEndpointHandleProjection();
+            NotifyEndpointHandleGeometryChanged(edge);
+        }
+
+        private void RefreshEndpointHandleProjection()
+        {
+            ESStableGraphEdgeView preferred = endpointReconnectEdge
+                ?? hoveredEndpointHandleEdge
+                ?? selectedEndpointHandleEdge;
+            projectedEndpointHandleEdge = preferred;
+            bool visible = preferred != null;
+            outputReconnectHandle.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            inputReconnectHandle.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            if (visible)
+                UpdateEndpointHandlePositions();
+        }
+
+        private void UpdateEndpointHandlePositions()
+        {
+            ESStableGraphEdgeView edge = projectedEndpointHandleEdge;
+            if (edge == null || panel == null || edge.output?.panel == null || edge.input?.panel == null)
+                return;
+            PositionEndpointHandle(outputReconnectHandle,
+                this.WorldToLocal(edge.output.worldBound.center) + Vector2.right * EndpointHandleEdgeOffset);
+            PositionEndpointHandle(inputReconnectHandle,
+                this.WorldToLocal(edge.input.worldBound.center) + Vector2.left * EndpointHandleEdgeOffset);
+        }
+
+        private static void PositionEndpointHandle(VisualElement handle, Vector2 localPosition)
+        {
+            handle.style.left = localPosition.x - EndpointHandleHalfSize;
+            handle.style.top = localPosition.y - EndpointHandleHalfSize;
+        }
+
+        private void ReleaseEndpointHandleCapture()
+        {
+            if (outputReconnectHandle.HasMouseCapture())
+                outputReconnectHandle.ReleaseMouse();
+            if (inputReconnectHandle.HasMouseCapture())
+                inputReconnectHandle.ReleaseMouse();
+        }
+
+        private void ClearEndpointHandleProjection()
+        {
+            CancelEndpointHandleHide();
+            hoveredEndpointHandleEdge = null;
+            selectedEndpointHandleEdge = null;
+            projectedEndpointHandleEdge = null;
+            outputReconnectHandle.style.display = DisplayStyle.None;
+            inputReconnectHandle.style.display = DisplayStyle.None;
+            ReleaseEndpointHandleCapture();
+        }
+
+        internal int EndpointHandleElementCount => this.Query<ESStableGraphEndpointHandle>().ToList().Count;
+        internal ESStableGraphEndpointHandle GetEndpointHandle(bool movingOutput)
+        {
+            return movingOutput ? outputReconnectHandle : inputReconnectHandle;
+        }
+        internal bool HasPendingEdgeReconnect => pendingEdgeReconnect != null || edgeReconnectTriggered;
+        internal bool HasCanvasPointerInteraction => mouseButtonPressed || pointerDragging;
+        internal bool HasPortDragPreview => !string.IsNullOrEmpty(previewDragPortId);
+
+        internal bool BeginEndpointReconnect(ESStableGraphEdgeView edge, bool movingOutput,
+            Vector2 pointerPosition)
+        {
+            if (Asset == null || edge == null || !(edge.userData is string edgeId)
+                || string.IsNullOrEmpty(edgeId))
+                return false;
+            ESGraphEdgeRecord record = Asset.FindEdge(edgeId);
+            if (record == null)
+                return false;
+
+            string fixedPortId = movingOutput ? record.inputPortId : record.outputPortId;
+            string originalPortId = movingOutput ? record.outputPortId : record.inputPortId;
+            if (!portViews.ContainsKey(fixedPortId) || !portViews.ContainsKey(originalPortId))
+                return false;
+
+            CancelEdgeReconnect();
+            CancelEndpointReconnect();
+            endpointReconnectEdge = edge;
+            endpointReconnectEdgeId = edgeId;
+            endpointReconnectFixedPortId = fixedPortId;
+            endpointReconnectOriginalPortId = originalPortId;
+            endpointReconnectMovingOutput = movingOutput;
+            endpointReconnectPointerPosition = pointerPosition;
+            edge.SetReconnectActive(true);
+            edge.style.opacity = 0.35f;
+
+            activeDragPortId = fixedPortId;
+            compatibleHighlightPortIds.Clear();
+            if (!Asset.TryBuildReconnectCompatibilityIndex(edgeId, fixedPortId,
+                    compatibleHighlightPortIds, out string compatibilityError))
+            {
+                CancelEndpointReconnect();
+                report?.Invoke("无法开始重连：" + compatibilityError);
+                return false;
+            }
+            ApplyPortCompatibilityHighlights();
+            UpdateEndpointReconnect(pointerPosition);
+            Focus();
+            report?.Invoke("正在重连关系端点；松开到高亮端口以提交，按 Esc 可取消。");
+            return true;
+        }
+
+        internal bool BeginEndpointReconnect(string edgeId, bool movingOutput,
+            Vector2 pointerPosition)
+        {
+            return !string.IsNullOrEmpty(edgeId)
+                && edgeViews.TryGetValue(edgeId, out Edge edge)
+                && edge is ESStableGraphEdgeView stableEdge
+                && BeginEndpointReconnect(stableEdge, movingOutput, pointerPosition);
+        }
+
+        internal bool IsEndpointReconnectActive => endpointReconnectEdge != null;
+
+        private void UpdateEndpointReconnect(Vector2 pointerPosition)
+        {
+            if (endpointReconnectEdge == null)
+                return;
+            endpointReconnectPointerPosition = pointerPosition;
+            endpointReconnectCandidatePortId = null;
+            VisualElement picked = panel?.Pick(pointerPosition);
+            if (TryGetAncestorPort(picked, out Port port)
+                && port.userData is string portId
+                && compatibleHighlightPortIds.Contains(portId))
+                endpointReconnectCandidatePortId = portId;
+            edgeReconnectPreviewOverlay?.MarkDirtyRepaint();
+        }
+
+        internal void CompleteEndpointReconnect(Vector2 pointerPosition)
+        {
+            if (endpointReconnectEdge == null || Asset == null)
+            {
+                CancelEndpointReconnect();
+                return;
+            }
+
+            UpdateEndpointReconnect(pointerPosition);
+            string edgeId = endpointReconnectEdgeId;
+            string fixedPortId = endpointReconnectFixedPortId;
+            string originalPortId = endpointReconnectOriginalPortId;
+            string candidatePortId = endpointReconnectCandidatePortId;
+            bool validTarget = !string.IsNullOrEmpty(candidatePortId)
+                && compatibleHighlightPortIds.Contains(candidatePortId);
+            CancelEndpointReconnect();
+            if (!validTarget)
+            {
+                report?.Invoke("已取消重连；目标端口不兼容或图状态已经变化，原关系保持不变。");
+                return;
+            }
+            if (string.Equals(candidatePortId, originalPortId, StringComparison.Ordinal))
+            {
+                report?.Invoke("连线端点未变化。");
+                return;
+            }
+
+            FlushNudgeBatchBeforeStructuralChange();
+            ESGraphEditResult result = editService.ReconnectEdge(
+                Asset, edgeId, fixedPortId, candidatePortId);
+            if (!result.changed)
+            {
+                report?.Invoke(string.IsNullOrEmpty(result.error)
+                    ? "连线端点未变化。"
+                    : "重连失败：" + result.error + " 原关系保持不变。");
+                return;
+            }
+
+            Rebuild();
+            report?.Invoke("已重连关系，关系编号保持不变："
+                + (edgeId.Length > 8 ? edgeId.Substring(0, 8) : edgeId));
+        }
+
+        internal void CancelEndpointReconnect()
+        {
+            ESStableGraphEdgeView edge = endpointReconnectEdge;
+            endpointReconnectEdge = null;
+            if (edge != null)
+            {
+                edge.style.opacity = 1f;
+                edge.SetReconnectActive(false);
+            }
+            RefreshEndpointHandleProjection();
+            ReleaseEndpointHandleCapture();
+            endpointReconnectEdgeId = null;
+            endpointReconnectFixedPortId = null;
+            endpointReconnectOriginalPortId = null;
+            endpointReconnectCandidatePortId = null;
+            endpointReconnectMovingOutput = false;
+            if (activeDragPortId != null)
+                ClearPortCompatibilityHighlight();
+            edgeReconnectPreviewOverlay?.MarkDirtyRepaint();
+        }
+
         private void ConfigureEdgeReconnectGesture(Edge edge)
         {
             if (edge == null)
                 return;
             edge.RegisterCallback<MouseDownEvent>(OnEdgeReconnectMouseDown, TrickleDown.TrickleDown);
             edge.RegisterCallback<MouseUpEvent>(OnEdgeReconnectMouseUp, TrickleDown.TrickleDown);
-            edge.RegisterCallback<MouseCaptureOutEvent>(_ => CancelEdgeReconnect(), TrickleDown.TrickleDown);
+            edge.RegisterCallback<MouseCaptureOutEvent>(OnEdgeReconnectMouseCaptureOut,
+                TrickleDown.TrickleDown);
         }
 
         private void OnEdgeReconnectMouseDown(MouseDownEvent evt)
         {
             if (evt.button != 0 || !(evt.currentTarget is Edge edge)
+                || evt.target is ESStableGraphEndpointHandle
+                || (evt.target as VisualElement)?.GetFirstAncestorOfType<ESStableGraphEndpointHandle>() != null
                 || edge.output == null || edge.input == null || !(edge.userData is string edgeId)
                 || string.IsNullOrEmpty(edgeId) || Asset == null)
                 return;
@@ -2782,6 +3260,12 @@ namespace ES.EditorInternal
                 CancelEdgeReconnect();
         }
 
+        private void OnEdgeReconnectMouseCaptureOut(MouseCaptureOutEvent evt)
+        {
+            CancelEdgeReconnect();
+            CancelEndpointReconnect();
+        }
+
         private void CancelEdgeReconnect()
         {
             edgeReconnectSchedule?.Pause();
@@ -2798,7 +3282,8 @@ namespace ES.EditorInternal
                 if (element is TextField
                     || element is Toggle
                     || element is PopupField<string>
-                    || element is Button)
+                    || element is Button
+                    || element is ESStableGraphEndpointHandle)
                     return true;
                 if (element is ESStableGraphView)
                     break;
@@ -3001,6 +3486,7 @@ namespace ES.EditorInternal
             UpdateViewTransform(
                 new Vector3(translation.x, translation.y, 0f),
                 new Vector3(scale.x, scale.y, 1f));
+            UpdateEndpointHandlePositions();
         }
 
         private void CancelViewAnimation()
@@ -3632,44 +4118,29 @@ namespace ES.EditorInternal
         public override List<Port> GetCompatiblePorts(Port startPort, NodeAdapter nodeAdapter)
         {
             List<Port> compatible = new List<Port>();
-            if (Asset == null || !(startPort.userData is string startPortId)
-                || !portRecords.TryGetValue(startPortId, out ESGraphPortRecord startRecord)
-                || !nodeIdsByPort.TryGetValue(startPortId, out string startNodeId))
+            if (Asset == null || !(startPort.userData is string startPortId))
                 return compatible;
 
-            HashSet<string> cycleBlockedNodes = null;
-            if (!Asset.allowCycles)
-                cycleBlockedNodes = CollectReachable(startNodeId,
-                    startRecord.direction == ESGraphPortDirection.Output ? incomingNodes : outgoingNodes);
-
+            compatibleHighlightPortIds.Clear();
+            if (!Asset.TryBuildConnectionCompatibilityIndex(startPortId,
+                    compatibleHighlightPortIds, out string compatibilityError))
+            {
+                report?.Invoke("无法计算兼容端口：" + compatibilityError);
+                ApplyPortCompatibilityHighlights();
+                return compatible;
+            }
             foreach (Port candidate in ports)
             {
-                if (candidate == startPort || !(candidate.userData is string candidateId))
-                    continue;
-                if (!portRecords.TryGetValue(candidateId, out ESGraphPortRecord candidateRecord))
-                    continue;
-                if (!nodeIdsByPort.TryGetValue(candidateId, out string candidateNodeId))
-                    continue;
-                if (startRecord.direction == candidateRecord.direction)
-                    continue;
-                if (!ArePortTypesCompatible(startRecord.direction == ESGraphPortDirection.Output
-                        ? startRecord.valueTypeId : candidateRecord.valueTypeId,
-                    startRecord.direction == ESGraphPortDirection.Output
-                        ? candidateRecord.valueTypeId : startRecord.valueTypeId))
-                    continue;
-                if (IsSingleAndConnected(startRecord, startPortId, connectionCounts)
-                    || IsSingleAndConnected(candidateRecord, candidateId, connectionCounts))
-                    continue;
-
-                string outputId = startRecord.direction == ESGraphPortDirection.Output ? startPortId : candidateId;
-                string inputId = startRecord.direction == ESGraphPortDirection.Input ? startPortId : candidateId;
-                if (edgeEndpointKeys.Contains(new EdgeEndpointKey(outputId, inputId)))
-                    continue;
-                if (cycleBlockedNodes != null && cycleBlockedNodes.Contains(candidateNodeId))
-                    continue;
-                compatible.Add(candidate);
+                if (candidate != null && candidate.userData is string candidateId
+                    && compatibleHighlightPortIds.Contains(candidateId))
+                    compatible.Add(candidate);
             }
-            UpdatePortCompatibilityHighlight(startPortId, compatible);
+            if (string.IsNullOrEmpty(previewDragPortId)
+                || string.Equals(previewDragPortId, startPortId, StringComparison.Ordinal))
+            {
+                activeDragPortId = startPortId;
+                ApplyPortCompatibilityHighlights();
+            }
             return compatible;
         }
 
@@ -3704,6 +4175,7 @@ namespace ES.EditorInternal
             moveUndoRecorded = false;
             previewDragPortId = null;
             CancelEdgeReconnect();
+            CancelEndpointReconnect();
             CancelNudgeBatch();
             ClearPortCompatibilityHighlight();
             ClearSnapGuides();
@@ -4055,7 +4527,9 @@ namespace ES.EditorInternal
                 return;
 
             Painter2D painter = context.painter2D;
-            painter.strokeColor = new Color(0.16f, 0.78f, 0.9f, 0.9f);
+            Color guideColor = ESEditorPresentation.SelectionColor;
+            guideColor.a = 0.9f;
+            painter.strokeColor = guideColor;
             painter.lineWidth = SnapGuideLineWidth;
             for (int i = 0; i < snapGuideLines.Count; i++)
             {
@@ -4096,6 +4570,8 @@ namespace ES.EditorInternal
                     {
                         if (ReferenceEquals(pendingEdgeReconnect, edge))
                             CancelEdgeReconnect();
+                        if (ReferenceEquals(endpointReconnectEdge, edge))
+                            CancelEndpointReconnect();
                         edgeIds.Add(edgeId);
                         edgeViews.Remove(edgeId);
                         edgeFlowPhases.Remove(edgeId);
@@ -4147,6 +4623,7 @@ namespace ES.EditorInternal
                     BuildGraphIndexes();
                     RefreshPortRelationVisuals();
                     edgeFlowOverlay?.MarkDirtyRepaint();
+                    schedule.Execute(Rebuild).StartingIn(1);
                 }
             }
 
@@ -4339,7 +4816,7 @@ namespace ES.EditorInternal
                 ESGraphClipboardPackage package = JsonUtility.FromJson<ESGraphClipboardPackage>(data);
                 return package != null
                     && string.Equals(package.schema, ClipboardSchema, StringComparison.Ordinal)
-                    && package.sourceSchemaVersion == ESGraphAsset.CurrentSchemaVersion
+                    && package.sourceSchemaVersion == GraphAsset.CurrentSchemaVersion
                     && string.Equals(package.sourceDomainId, Asset.DomainId, StringComparison.Ordinal)
                     && package.nodes != null
                     && package.nodes.Count > 0;
@@ -4354,9 +4831,12 @@ namespace ES.EditorInternal
         {
             if (Asset == null)
                 return;
-            List<ESGraphValidationIssue> issues = ESGraphAuthoringRegistry.Validate(Asset);
+            bool bakeReady = ESGraphAuthoringRegistry.TryBake(Asset, out _, out _,
+                out List<ESGraphValidationIssue> issues);
             int errors = issues.Count(issue => issue != null && issue.severity == ESGraphValidationSeverity.Error);
-            report?.Invoke(errors == 0 ? "校验通过" : "校验失败：" + errors + " 个错误");
+            report?.Invoke(bakeReady && errors == 0
+                ? "校验通过，可继续执行或生成"
+                : "校验失败：" + errors + " 个错误");
         }
 
         private void MarkAssetDirty(bool affectsValidation = true)
@@ -4406,6 +4886,9 @@ namespace ES.EditorInternal
         {
             foreach (KeyValuePair<string, ESStableGraphNodeView> pair in nodeViews)
                 pair.Value?.SetSelectedVisual(pair.Value.selected);
+            foreach (KeyValuePair<string, Edge> pair in edgeViews)
+                if (pair.Value is ESStableGraphEdgeView edgeView)
+                    edgeView.SetSelectedState(edgeView.selected);
         }
 
         private void OpenNodeDetails(ESStableGraphNodeView view)
@@ -4640,6 +5123,75 @@ namespace ES.EditorInternal
         }
     }
 
+    internal sealed class ESStableGraphEndpointHandle : VisualElement
+    {
+        public bool MovingOutput { get; }
+
+        public ESStableGraphEndpointHandle(bool movingOutput)
+        {
+            MovingOutput = movingOutput;
+            name = movingOutput ? "es-edge-output-reconnect-handle" : "es-edge-input-reconnect-handle";
+            tooltip = movingOutput ? "拖动以重连这条关系的输出端点。" : "拖动以重连这条关系的输入端点。";
+            pickingMode = PickingMode.Position;
+            style.position = Position.Absolute;
+            style.width = 12f;
+            style.height = 12f;
+            style.borderTopLeftRadius = 6f;
+            style.borderTopRightRadius = 6f;
+            style.borderBottomLeftRadius = 6f;
+            style.borderBottomRightRadius = 6f;
+            style.borderTopWidth = 2f;
+            style.borderBottomWidth = 2f;
+            style.borderLeftWidth = 2f;
+            style.borderRightWidth = 2f;
+            style.borderTopColor = Color.white;
+            style.borderBottomColor = Color.white;
+            style.borderLeftColor = Color.white;
+            style.borderRightColor = Color.white;
+            style.backgroundColor = ESEditorPresentation.ActiveColor;
+            style.display = DisplayStyle.None;
+        }
+    }
+
+    internal sealed class ESStableGraphEdgeView : Edge
+    {
+        private readonly ESStableGraphView graphView;
+
+        public ESStableGraphEdgeView(ESStableGraphView graphView)
+        {
+            this.graphView = graphView;
+            style.overflow = Overflow.Visible;
+            RegisterCallback<MouseEnterEvent>(OnMouseEnter);
+            RegisterCallback<MouseLeaveEvent>(OnMouseLeave);
+            RegisterCallback<GeometryChangedEvent>(OnGeometryChanged);
+        }
+
+        public void SetSelectedState(bool selected)
+        {
+            graphView.SetEndpointHandleSelection(this, selected);
+        }
+
+        public void SetReconnectActive(bool active)
+        {
+            graphView.RefreshEndpointHandleProjectionFor(this);
+        }
+
+        private void OnMouseEnter(MouseEnterEvent evt)
+        {
+            graphView.SetEndpointHandleHover(this, true);
+        }
+
+        private void OnMouseLeave(MouseLeaveEvent evt)
+        {
+            graphView.SetEndpointHandleHover(this, false);
+        }
+
+        private void OnGeometryChanged(GeometryChangedEvent evt)
+        {
+            graphView.NotifyEndpointHandleGeometryChanged(this);
+        }
+    }
+
     internal sealed class ESStableGraphEdgeConnectorListener : IEdgeConnectorListener
     {
         private readonly ESStableGraphView graphView;
@@ -4724,7 +5276,7 @@ namespace ES.EditorInternal
             compatibilityHighlight = active;
             if (active)
             {
-                Color highlight = new Color(0.16f, 0.78f, 0.9f, 1f);
+                Color highlight = ESEditorPresentation.ActiveColor;
                 style.borderTopWidth = 2f;
                 style.borderBottomWidth = 2f;
                 style.borderLeftWidth = 2f;
@@ -4733,7 +5285,9 @@ namespace ES.EditorInternal
                 style.borderBottomColor = highlight;
                 style.borderLeftColor = highlight;
                 style.borderRightColor = highlight;
-                style.backgroundColor = new Color(0.12f, 0.64f, 0.76f, 0.18f);
+                Color highlightSurface = highlight;
+                highlightSurface.a = 0.18f;
+                style.backgroundColor = highlightSurface;
                 style.opacity = 1f;
             }
             else
@@ -4844,15 +5398,16 @@ namespace ES.EditorInternal
                 tooltip += "\n说明：" + definition.Description;
             SetPosition(new Rect(record.position, new Vector2(NodeWidth, NodeHeight)));
             Color accent = ESGraphNodeThemePalette.GetAccentColor(definition);
-            Color surface = new Color(0.115f, 0.13f, 0.17f, 0.98f);
-            Color border = new Color(0.28f, 0.32f, 0.4f, 0.95f);
+            Color surface = ESEditorPresentation.WindowRaisedSurfaceColor;
+            Color border = ESEditorPresentation.NodeBorderColor;
             projectedAccent = accent;
             projectedBorder = border;
             titleContainer.style.height = 31f;
             titleContainer.style.overflow = Overflow.Hidden;
             titleContainer.style.paddingLeft = 8f;
             titleContainer.style.paddingRight = 6f;
-            titleContainer.style.backgroundColor = new Color(accent.r * 0.38f, accent.g * 0.38f, accent.b * 0.38f, 1f);
+            titleContainer.style.backgroundColor = Color.Lerp(
+                ESEditorPresentation.WindowInsetSurfaceColor, accent, 0.32f);
             Label titleLabel = titleContainer.Q<Label>();
             if (titleLabel != null)
             {
@@ -4888,8 +5443,10 @@ namespace ES.EditorInternal
                 : definition.BadgeText);
             typeBadge.style.fontSize = 9f;
             typeBadge.style.unityFontStyleAndWeight = FontStyle.Bold;
-            typeBadge.style.color = Color.white;
-            typeBadge.style.backgroundColor = new Color(accent.r * 0.82f, accent.g * 0.82f, accent.b * 0.82f, 0.92f);
+            typeBadge.style.color = ESEditorPresentation.SectionTextColor;
+            Color badgeSurface = Color.Lerp(ESEditorPresentation.ControlSurfaceColor, accent, 0.72f);
+            badgeSurface.a = 0.92f;
+            typeBadge.style.backgroundColor = badgeSurface;
             typeBadge.style.borderTopLeftRadius = 3f;
             typeBadge.style.borderTopRightRadius = 3f;
             typeBadge.style.borderBottomLeftRadius = 3f;
@@ -4913,7 +5470,7 @@ namespace ES.EditorInternal
                 "V" + record.version + " · " + ShortId(record.nodeId)
                 + " · " + ShortPayload(record));
             versionLabel.style.fontSize = 9f;
-            versionLabel.style.color = new Color(0.62f, 0.68f, 0.78f, 0.95f);
+            versionLabel.style.color = ESEditorPresentation.SectionMutedTextColor;
             versionLabel.style.flexGrow = 1f;
             versionLabel.style.flexShrink = 1f;
             versionLabel.style.minWidth = 0f;
@@ -4990,7 +5547,7 @@ namespace ES.EditorInternal
 
         public void SetSelectedVisual(bool selected)
         {
-            Color selectedColor = new Color(0.16f, 0.78f, 0.9f, 1f);
+            Color selectedColor = ESEditorPresentation.NodeSelectedBorderColor;
             if (selected)
             {
                 style.borderTopWidth = 3f;
@@ -5045,18 +5602,21 @@ namespace ES.EditorInternal
 
         private static Color GetPortColor(string valueTypeId)
         {
+            if (string.Equals(valueTypeId, ESAgentGraphStableIds.ContextPort, StringComparison.Ordinal))
+                return ESEditorPresentation.GetSemanticChannelColor(7);
+            if (string.Equals(valueTypeId, ESAgentGraphStableIds.RequirementPort, StringComparison.Ordinal))
+                return ESEditorPresentation.GetSemanticChannelColor(8);
+            if (string.Equals(valueTypeId, ESAgentGraphStableIds.ArtifactPort, StringComparison.Ordinal))
+                return ESEditorPresentation.GetSemanticChannelColor(9);
             switch (ESGraphPortValueCatalog.GetKind(valueTypeId))
             {
-                case ESGraphPortValueKind.Flow: return new Color(0.68f, 0.72f, 0.8f);
-                case ESGraphPortValueKind.Any: return new Color(0.72f, 0.72f, 0.76f);
-                case ESGraphPortValueKind.Boolean: return new Color(0.88f, 0.52f, 0.35f);
-                case ESGraphPortValueKind.Number: return new Color(0.42f, 0.76f, 0.54f);
-                case ESGraphPortValueKind.Text: return new Color(0.42f, 0.67f, 0.92f);
-                case ESGraphPortValueKind.Object: return new Color(0.74f, 0.58f, 0.88f);
-                case ESGraphPortValueKind.AgentContext: return new Color(0.28f, 0.72f, 0.95f);
-                case ESGraphPortValueKind.AgentRequirement: return new Color(0.96f, 0.64f, 0.24f);
-                case ESGraphPortValueKind.AgentArtifact: return new Color(0.75f, 0.43f, 0.92f);
-                default: return new Color(0.64f, 0.66f, 0.72f);
+                case ESGraphPortValueKind.Flow: return ESEditorPresentation.GetSemanticChannelColor(1);
+                case ESGraphPortValueKind.Any: return ESEditorPresentation.GetSemanticChannelColor(2);
+                case ESGraphPortValueKind.Boolean: return ESEditorPresentation.GetSemanticChannelColor(3);
+                case ESGraphPortValueKind.Number: return ESEditorPresentation.GetSemanticChannelColor(4);
+                case ESGraphPortValueKind.Text: return ESEditorPresentation.GetSemanticChannelColor(5);
+                case ESGraphPortValueKind.Object: return ESEditorPresentation.GetSemanticChannelColor(6);
+                default: return ESEditorPresentation.GetSemanticChannelColor(0);
             }
         }
 

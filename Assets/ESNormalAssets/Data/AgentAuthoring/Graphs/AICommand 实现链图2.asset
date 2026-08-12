@@ -1,0 +1,140 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a47f846c45f14ca6891fd215194e00d8, type: 3}
+  m_Name: "AICommand \u5B9E\u73B0\u94FE\u56FE2"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  schemaVersion: 2
+  graphId: ff90da935d11447180229faa01e25232
+  originGraphId: 
+  allowCycles: 0
+  nodes:
+  - nodeId: 9d42d333ac484076aeb86decfa5f3cde
+    typeId: es.agent-authoring.goal
+    version: 1
+    title: "\u751F\u6210\u76EE\u6807"
+    payloadJson: "{\"schemaVersion\":1,\"title\":\"\u5B8C\u6210Editor\u76EE\u524D\u9690\u60A3\u6392\u67E5\",\"objective\":\"\u6839\u636E\u9879\u76EE\u89C4\u5219\uFF0C\u628A\u6A21\u5757\u7F16\u6392\u9700\u6C42\u6574\u7406\u6210\u4E00\u6761\u53EF\u4EE5\u4EA4\u7ED9
+      AI \u771F\u6B63\u6267\u884C\u7684\u5B9E\u73B0\u94FE\uFF0C\u5E76\u751F\u6210\u53EF\u5BA1\u67E5\u7684
+      AICommand \u5019\u9009\u3002\",\"context\":\"\u628A\u4E2D\u6587\u9700\u6C42\u6574\u7406\u6210\u4E00\u6761\u53EF\u6267\u884C\u7684\u5B9E\u73B0\u94FE\uFF1A\u8BFB\u53D6\u6743\u5A01\u8D44\u6599\u3001\u6838\u5BF9\u73B0\u72B6\u3001\u6309\u6743\u9650\u4FEE\u6539\u76EE\u6807\u3001\u8FD0\u884C\u9A8C\u8BC1\u5E76\u4EA4\u4ED8\u771F\u5B9E\u8BC1\u636E\u3002\",\"targetUsers\":\"\u8BE5
+      AICommand / Agent Skill \u7684\u4F7F\u7528\u8005\u4E0E\u89E6\u53D1\u573A\u666F\u3002\",\"successCriteria\":\"\u6A21\u5757\u7F16\u6392
+      AICommand \u4E0E\u76EE\u6807\u4E00\u81F4\u3001\u6743\u9650\u660E\u786E\uFF0C\u5E76\u901A\u8FC7\u5019\u9009
+      Diff Review\u3002\"}"
+    position: {x: -66, y: 81.5}
+    ports:
+    - portId: 5a90b2e7d590473ea5fd19352c08361b
+      stableKey: agent.context.out
+      name: "\u9700\u6C42\u4E0A\u4E0B\u6587"
+      valueTypeId: es.agent-authoring.context
+      direction: 1
+      capacity: 1
+  - nodeId: 05f85e77ac644759862703f171efe62b
+    typeId: es.agent-authoring.reference
+    version: 1
+    title: "\u5F15\u7528\u8D44\u6599"
+    payloadJson: "{\"schemaVersion\":1,\"referenceKind\":0,\"projectPath\":\"Assets/Plugins/ES/AIWarnings/00_\u5F00\u59CB\u9605\u8BFB\uFF08Start\uFF09/\u89C4\u5219\u7D22\u5F15\uFF08RuleIndex\uFF09.md\",\"purpose\":\"\u4E3A\u771F\u5B9E\u5B9E\u73B0\u4EFB\u52A1\u9009\u62E9\u5FC5\u987B\u8BFB\u53D6\u7684
+      P0 \u4E0E\u9886\u57DF\u4E13\u9879\u89C4\u5219\u3002\",\"required\":true}"
+    position: {x: 220, y: 100}
+    ports:
+    - portId: f76dda784a53419ea75bbcb733729212
+      stableKey: flow.input
+      name: "\u4E0A\u6E38\u4E0A\u4E0B\u6587"
+      valueTypeId: es.agent-authoring.context
+      direction: 0
+      capacity: 1
+    - portId: 35a9234be4c346fca8cd64d97318f2dd
+      stableKey: agent.context.out
+      name: "\u8865\u5145\u4E0A\u4E0B\u6587"
+      valueTypeId: es.agent-authoring.context
+      direction: 1
+      capacity: 1
+  - nodeId: ee936748af7042898711b8e7234b542d
+    typeId: es.agent-authoring.constraint
+    version: 2
+    title: "\u751F\u6210\u7EA6\u675F"
+    payloadJson: "{\"schemaVersion\":2,\"kind\":2,\"scope\":0,\"combinationMode\":0,\"priority\":50,\"combinationGroup\":\"\",\"statement\":\"AI
+      \u5FC5\u987B\u6309\u5B9E\u73B0\u94FE\u771F\u6B63\u4FEE\u6539\u7528\u6237\u6388\u6743\u8303\u56F4\u5185\u7684\u76EE\u6807\u6587\u4EF6\uFF1B\u4E0D\u5F97\u53EA\u7ED9\u65B9\u6848\u3001\u4F2A\u9020\u5B8C\u6210\u6216\u8D8A\u8FC7\u5019\u9009\u4E0E\u9A8C\u8BC1\u8FB9\u754C\u3002\",\"rationale\":\"\u8BA9
+      AICommand \u4ECE\u6587\u672C\u63CF\u8FF0\u5347\u7EA7\u4E3A\u53EF\u6267\u884C\u7684\u5B9E\u73B0\u5408\u540C\u3002\",\"verification\":\"\u4EA4\u4ED8\u4E2D\u5FC5\u987B\u5217\u51FA\u5B9E\u9645\u6539\u52A8\u6587\u4EF6\u3001\u771F\u5B9E\u7F16\u8BD1/\u6D4B\u8BD5\u7ED3\u679C\u3001\u672A\u6267\u884C\u9A8C\u8BC1\u4E0E\u5269\u4F59\u98CE\u9669\u3002\"}"
+    position: {x: 440, y: 100}
+    ports:
+    - portId: 18fdfa1d330d49158545f9a8f6946adc
+      stableKey: flow.input
+      name: "\u9700\u6C42\u4E0A\u4E0B\u6587"
+      valueTypeId: es.agent-authoring.context
+      direction: 0
+      capacity: 1
+    - portId: 14392c45ed7740f6bb1b798e0e38aff0
+      stableKey: agent.requirement.out
+      name: "\u4EA7\u7269\u8981\u6C42"
+      valueTypeId: es.agent-authoring.requirement
+      direction: 1
+      capacity: 1
+  - nodeId: 01be0bca6b274501b33bc41febb1abf1
+    typeId: es.agent-authoring.output.ai-command
+    version: 2
+    title: "AICommand \u4EA7\u7269\u5408\u540C"
+    payloadJson: "{\"schemaVersion\":2,\"commandName\":\"\u751F\u6210_\u65B0\u6A21\u5757\u5DE5\u4F5C\u6D41_AI\u547D\u4EE4\",\"targetProjectPath\":\"Assets/Plugins/ES/AICommands/\u751F\u6210_\u65B0\u6A21\u5757\u5DE5\u4F5C\u6D41_AI\u547D\u4EE4.md\",\"operationMode\":0,\"commandIntent\":3,\"writeAuthorization\":2,\"riskLevel\":2,\"failurePolicy\":1,\"purpose\":\"\u628A\u6A21\u5757\u7F16\u6392\u9700\u6C42\u8F6C\u6362\u4E3A
+      AI \u53EF\u4EE5\u771F\u6B63\u6267\u884C\u7684 ESFramework \u5B9E\u73B0\u5408\u540C\u3002\",\"expectedInputs\":\"\u7528\u6237\u76EE\u6807\u3001\u5F53\u524D\u5B9E\u73B0\u4E8B\u5B9E\u3001\u5FC5\u8BFB\u89C4\u5219\u3001\u5141\u8BB8\u4FEE\u6539\u8DEF\u5F84\u3001\u9A8C\u6536\u6807\u51C6\u3002\",\"preconditions\":\"\u76EE\u6807\u8303\u56F4\u3001\u6743\u5A01\u89C4\u5219\u548C\u5141\u8BB8\u4FEE\u6539\u8DEF\u5F84\u5DF2\u660E\u786E\uFF1B\u5E76\u884C\u5DE5\u4F5C\u6811\u5DF2\u5B8C\u6210\u53EA\u8BFB\u6838\u5BF9\u3002\",\"allowedWriteScopes\":\"\u53EA\u5141\u8BB8\u4FEE\u6539\u7528\u6237\u76EE\u6807\u548C
+      Graph Constraint \u660E\u786E\u5217\u51FA\u7684\u9879\u76EE\u6587\u4EF6\u3002\",\"forbiddenOperations\":\"\u4E0D\u5F97\u6269\u5927\u7528\u6237\u6388\u6743\uFF1B\u4E0D\u5F97\u64C5\u81EA\u5220\u9664\u3001\u63D0\u4EA4
+      Git\u3001\u53D1\u5E03\u3001\u4E0A\u4F20\u6216\u4FEE\u6539\u65E0\u5173\u5E76\u884C\u5206\u652F\u3002\",\"executionOutline\":\"\u8BFB\u53D6\u6743\u5A01\u89C4\u5219\\n\u6838\u5BF9\u5206\u652F\u3001HEAD
+      \u4E0E\u5DE5\u4F5C\u6811\\n\u6309\u5B9E\u73B0\u94FE\u4FEE\u6539\u76EE\u6807\u6587\u4EF6\\n\u8FD0\u884C\u76F8\u5173\u7F16\u8BD1\u548C\u6D4B\u8BD5\\n\u4EA4\u4ED8\u771F\u5B9E\u8BC1\u636E\u4E0E\u5269\u4F59\u98CE\u9669\",\"acceptanceCriteria\":\"\u4E0D\u5F97\u53EA\u8F93\u51FA\u5EFA\u8BAE\uFF1B\u5FC5\u987B\u5B8C\u6210\u6388\u6743\u8303\u56F4\u5185\u7684\u771F\u5B9E\u5B9E\u73B0\uFF0C\u5E76\u9010\u9879\u62A5\u544A\u6539\u52A8\u3001\u9A8C\u8BC1\u548C\u672A\u5B8C\u6210\u9879\u3002\",\"requiredEvidence\":\"\u6E90\u7801\u5DEE\u5F02\u3001\u76EE\u6807\u5DE5\u7A0B\u7F16\u8BD1\u3001\u9002\u7528\u6D4B\u8BD5\u53CA\u672A\u6267\u884C\u7684
+      Unity \u8FD0\u884C\u9A8C\u8BC1\u5FC5\u987B\u5206\u5C42\u62A5\u544A\u3002\",\"blockedHandling\":\"\u9047\u5230\u8D8A\u6743\u3001\u4F9D\u8D56\u7F3A\u5931\u6216\u5E76\u884C\u51B2\u7A81\u65F6\u505C\u6B62\u76F8\u5173\u5199\u5165\uFF0C\u62A5\u544A\u963B\u65AD\u4E0E\u6240\u9700\u51B3\u7B56\u3002\",\"rollbackStrategy\":\"\u672C\u8F6E\u5199\u5165\u5931\u8D25\u65F6\u53EA\u56DE\u6EDA\u672C\u4E8B\u52A1\u4EA7\u751F\u7684\u6539\u52A8\uFF0C\u4E0D\u64A4\u9500\u7528\u6237\u6216\u5176\u4ED6
+      AI \u7684\u5E76\u884C\u4FEE\u6539\u3002\",\"requiredSections\":\"\u5FC5\u987B\u5148\u8BFB\\n\u6267\u884C\u8FB9\u754C\\n\u5B9E\u73B0\u6B65\u9AA4\\n\u9A8C\u8BC1\u7ED3\u679C\\n\u6539\u52A8\u6587\u4EF6\\n\u5269\u4F59\u98CE\u9669\"}"
+    position: {x: 680, y: 100}
+    ports:
+    - portId: 5bd3c6fd4a5d456c97d4f0487d7ced3a
+      stableKey: flow.input
+      name: "\u4EA7\u7269\u8981\u6C42"
+      valueTypeId: es.agent-authoring.requirement
+      direction: 0
+      capacity: 1
+    - portId: 84709ebdabca40f9a6ee48447a468a8f
+      stableKey: agent.artifact.out
+      name: "\u5019\u9009\u4EA7\u7269"
+      valueTypeId: es.agent-authoring.artifact
+      direction: 1
+      capacity: 0
+  - nodeId: 1e2259e95d104dd989945530bd7c2e86
+    typeId: es.agent-authoring.validation
+    version: 1
+    title: "\u4EA4\u4ED8\u95E8\u7981"
+    payloadJson: "{\"schemaVersion\":1,\"validateAICommand\":true,\"validateAgentSkill\":false,\"validateUtf8\":true,\"requireDiffReview\":true,\"requireHumanApproval\":true,\"additionalRequirements\":\"\u4E0D\u5F97\u5305\u542B
+      U+FFFD\uFF1B\u4E0D\u5F97\u8D8A\u8FC7\u5019\u9009\u76EE\u5F55\u3002\",\"reviewChecklist\":\"\u76EE\u6807\u8DEF\u5F84\u6B63\u786E\\n\u5185\u5BB9\u7B26\u5408
+      Graph\\n\u6CA1\u6709\u8D8A\u6743\u4FEE\u6539\\n\u9A8C\u8BC1\u8BC1\u636E\u771F\u5B9E\"}"
+    position: {x: 1056, y: 100}
+    ports:
+    - portId: 6699deb919a7467bb0e79bd6ece5cf4d
+      stableKey: flow.input
+      name: "\u5019\u9009\u4EA7\u7269"
+      valueTypeId: es.agent-authoring.artifact
+      direction: 0
+      capacity: 1
+  edges:
+  - edgeId: 54dc86ddfa0a458d97a17cd93e65a08e
+    outputPortId: 5a90b2e7d590473ea5fd19352c08361b
+    inputPortId: f76dda784a53419ea75bbcb733729212
+  - edgeId: 2c92b7706cb14b6e9fb263828230c74f
+    outputPortId: 35a9234be4c346fca8cd64d97318f2dd
+    inputPortId: 18fdfa1d330d49158545f9a8f6946adc
+  - edgeId: 44fe71c58b664b3eb4592bb594c4f3f7
+    outputPortId: 14392c45ed7740f6bb1b798e0e38aff0
+    inputPortId: 5bd3c6fd4a5d456c97d4f0487d7ced3a
+  - edgeId: b683fb6a7e97491a8fe11bdcb626beb9
+    outputPortId: 84709ebdabca40f9a6ee48447a468a8f
+    inputPortId: 6699deb919a7467bb0e79bd6ece5cf4d

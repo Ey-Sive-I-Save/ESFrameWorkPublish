@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using GraphAsset = global::ES.ESGraphAssetBase;
 
 namespace ES.EditorInternal
 {
@@ -18,12 +19,12 @@ namespace ES.EditorInternal
 
     internal sealed class ESGraphEditService
     {
-        private readonly Action<ESGraphAsset> markDirty;
+        private readonly Action<GraphAsset> markDirty;
         private readonly Action requestAutoSave;
         private readonly Action notifyModelChanged;
 
         public ESGraphEditService(
-            Action<ESGraphAsset> markDirty,
+            Action<GraphAsset> markDirty,
             Action requestAutoSave,
             Action notifyModelChanged)
         {
@@ -33,7 +34,7 @@ namespace ES.EditorInternal
         }
 
         public ESGraphEditResult CreateNode(
-            ESGraphAsset asset,
+            GraphAsset asset,
             IESGraphNodeDefinition definition,
             Vector2 position)
         {
@@ -56,7 +57,7 @@ namespace ES.EditorInternal
         }
 
         public ESGraphEditResult CreateNodeAndConnect(
-            ESGraphAsset asset,
+            GraphAsset asset,
             ESStableGraphNodeCreationChoice choice,
             Vector2 position)
         {
@@ -120,7 +121,7 @@ namespace ES.EditorInternal
         }
 
         public ESGraphEditResult InsertNodeOnEdge(
-            ESGraphAsset asset,
+            GraphAsset asset,
             IESGraphNodeDefinition definition,
             int inputPortIndex,
             int outputPortIndex,
@@ -184,7 +185,7 @@ namespace ES.EditorInternal
         }
 
         public ESGraphEditResult AddEdge(
-            ESGraphAsset asset,
+            GraphAsset asset,
             string outputPortId,
             string inputPortId)
         {
@@ -205,8 +206,50 @@ namespace ES.EditorInternal
             return result;
         }
 
+        public ESGraphEditResult ReconnectEdge(
+            GraphAsset asset,
+            string edgeId,
+            string firstPortId,
+            string secondPortId)
+        {
+            if (asset == null
+                || string.IsNullOrEmpty(edgeId)
+                || string.IsNullOrEmpty(firstPortId)
+                || string.IsNullOrEmpty(secondPortId))
+                return Fail("重连参数非法。");
+
+            ESGraphEdgeRecord edge = asset.FindEdge(edgeId);
+            if (edge == null)
+                return Fail("需要重连的关系不存在。");
+            bool sameEndpoints = (string.Equals(edge.outputPortId, firstPortId, StringComparison.Ordinal)
+                    && string.Equals(edge.inputPortId, secondPortId, StringComparison.Ordinal))
+                || (string.Equals(edge.outputPortId, secondPortId, StringComparison.Ordinal)
+                    && string.Equals(edge.inputPortId, firstPortId, StringComparison.Ordinal));
+            if (sameEndpoints)
+                return new ESGraphEditResult();
+
+            Undo.IncrementCurrentGroup();
+            int undoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName("重连图连线");
+            Undo.RegisterCompleteObjectUndo(asset, "重连图连线");
+            if (!asset.TryReconnectEdge(edgeId, firstPortId, secondPortId, out string error))
+            {
+                Undo.RevertAllDownToGroup(undoGroup);
+                return Fail(string.IsNullOrEmpty(error) ? "连线端点没有变化。" : error);
+            }
+
+            Undo.CollapseUndoOperations(undoGroup);
+            var result = new ESGraphEditResult
+            {
+                changed = true,
+                rebuildRequired = true
+            };
+            Commit(asset);
+            return result;
+        }
+
         public ESGraphEditResult AddEdges(
-            ESGraphAsset asset,
+            GraphAsset asset,
             IReadOnlyList<KeyValuePair<string, string>> endpoints)
         {
             if (asset == null || endpoints == null || endpoints.Count == 0)
@@ -241,7 +284,7 @@ namespace ES.EditorInternal
         }
 
         public ESGraphEditResult DuplicateNodes(
-            ESGraphAsset asset,
+            GraphAsset asset,
             IReadOnlyCollection<string> nodeIds,
             Vector2 offset)
         {
@@ -261,7 +304,7 @@ namespace ES.EditorInternal
         }
 
         public ESGraphEditResult PasteNodes(
-            ESGraphAsset asset,
+            GraphAsset asset,
             IReadOnlyList<ESGraphNodeRecord> sourceNodes,
             IReadOnlyList<ESGraphEdgeRecord> sourceEdges,
             Vector2 offset,
@@ -298,7 +341,7 @@ namespace ES.EditorInternal
         }
 
         public ESGraphEditResult SetNodePositions(
-            ESGraphAsset asset,
+            GraphAsset asset,
             IReadOnlyDictionary<string, Vector2> positions,
             string undoName)
         {
@@ -313,7 +356,7 @@ namespace ES.EditorInternal
         }
 
         public ESGraphEditResult SetNodeContent(
-            ESGraphAsset asset,
+            GraphAsset asset,
             string nodeId,
             string typeId,
             int version,
@@ -342,7 +385,7 @@ namespace ES.EditorInternal
         }
 
         public ESGraphEditResult DeleteElements(
-            ESGraphAsset asset,
+            GraphAsset asset,
             IReadOnlyCollection<string> nodeIds,
             IReadOnlyCollection<string> edgeIds)
         {
@@ -389,7 +432,7 @@ namespace ES.EditorInternal
             return new ESGraphEditResult { error = error ?? string.Empty };
         }
 
-        private void Commit(ESGraphAsset asset)
+        private void Commit(GraphAsset asset)
         {
             markDirty?.Invoke(asset);
             requestAutoSave?.Invoke();

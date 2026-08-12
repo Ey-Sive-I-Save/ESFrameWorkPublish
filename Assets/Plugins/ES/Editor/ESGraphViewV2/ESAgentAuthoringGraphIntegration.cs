@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
+using GraphAsset = global::ES.ESGraphAssetBase;
 
 namespace ES.EditorInternal
 {
@@ -39,17 +41,28 @@ namespace ES.EditorInternal
         AnyOf = 1
     }
 
-    public enum ESAgentRelationKind : byte
+    public enum ESAgentTraversalOrder : byte
     {
-        ProvidesContext = 0,
-        AppliesConstraint = 1,
-        RequiresValidation = 2
+        SourceOrder = 0,
+        DependencyFirst = 1,
+        PriorityFirst = 2
     }
 
     public enum ESAgentArtifactKind : byte
     {
         AICommand = 0,
         AgentSkill = 1
+    }
+
+    /// <summary>
+    /// Skill 能力包的组成方式。这里的 Skill 指 AICommand + AISkill 的统一能力，
+    /// 而不是只指某一个 SKILL.md 文件。
+    /// </summary>
+    public enum ESAgentSkillBundleKind : byte
+    {
+        CommandOnly = 0,
+        AISkillOnly = 1,
+        CommandAndAISkill = 2
     }
 
     internal static class ESAgentNodeCardActionKeys
@@ -64,8 +77,8 @@ namespace ES.EditorInternal
     {
         private static readonly ESGraphNodeTypeKey[] SupportedNodeTypes =
         {
-            ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.AgentAICommandOutput),
-            ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.AgentSkillOutput)
+            ESAgentGraphStableIds.Node(ESAgentGraphStableIds.AICommandOutputNode),
+            ESAgentGraphStableIds.Node(ESAgentGraphStableIds.AISkillOutputNode)
         };
 
         private static readonly ESGraphNodeCardActionKey[] SupportedActions =
@@ -74,7 +87,7 @@ namespace ES.EditorInternal
             ESAgentNodeCardActionKeys.SaveCandidate
         };
 
-        public ESGraphDomainKey Domain => ESGraphDomainKey.FromKind(ESGraphDomainKind.AgentAuthoring);
+        public ESGraphDomainKey Domain => ESAgentGraphStableIds.Domain;
         public IReadOnlyList<ESGraphNodeTypeKey> NodeTypes => SupportedNodeTypes;
         public IReadOnlyList<ESGraphNodeCardActionKey> Actions => SupportedActions;
         public int Priority => 0;
@@ -91,7 +104,7 @@ namespace ES.EditorInternal
                 unavailableReason = "节点局部动作上下文无效。";
                 return false;
             }
-            if (context.GraphSchemaVersion != ESGraphAsset.CurrentSchemaVersion || context.HasFutureSchema)
+            if (context.GraphSchemaVersion != GraphAsset.CurrentSchemaVersion || context.HasFutureSchema)
             {
                 unavailableReason = "当前图或节点版本不能安全执行 Agent 局部动作。";
                 return false;
@@ -102,10 +115,12 @@ namespace ES.EditorInternal
 
         public void Execute(ESGraphNodeCardActionContext context, ESGraphNodeCardActionKey action)
         {
-            if (!context.TryBake(out _, out IESBakedGraphPlan plan)
+            string actionName = action == ESAgentNodeCardActionKeys.SaveCandidate
+                ? "生成该节点候选" : "执行该节点内容";
+            if (!context.TryBakeForUserAction(actionName, out _, out IESBakedGraphPlan plan)
                 || !(plan is ESAgentArtifactGenerationSpec spec))
             {
-                context.Report("节点局部操作失败：请先修复智能助手编排图的校验错误，并明确最终目的与成功标准。");
+                context.Report("节点局部操作未执行；请查看质量检查中的具体原因。");
                 return;
             }
             if (!ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(spec, context.NodeId,
@@ -117,7 +132,7 @@ namespace ES.EditorInternal
 
             ESAgentGenerationOutput output = artifactView.outputs[0];
             string displayName = output.artifactKind == ESAgentArtifactKind.AICommand
-                ? "AICommand" : "Agent Skill";
+                ? "AICommand" : "AISkill";
             if (action == ESAgentNodeCardActionKeys.SaveCandidate)
             {
                 if (!ESAgentArtifactGenerationWorkspace.CreateAndSend(artifactView, out string requestDirectory,
@@ -126,7 +141,7 @@ namespace ES.EditorInternal
                     context.Report(error);
                     return;
                 }
-                context.Report("节点 " + displayName + "候选请求已创建；Cmd Agent：" + dispatchMessage
+                context.Report("节点 " + displayName + "候选请求已创建；受控生成会话：" + dispatchMessage
                     + "；候选目录：" + requestDirectory);
                 return;
             }
@@ -138,9 +153,9 @@ namespace ES.EditorInternal
                 return;
             }
             string useName = output.artifactKind == ESAgentArtifactKind.AICommand
-                ? "单次 Command" : "临时 Skill";
-            context.Report(useName + "节点请求 " + requestId + " 已提交至 Cmd Agent；状态："
-                + singleUseDispatchMessage + "。当前只确认发送或排队，不代表 AI 已确认接收或完成。");
+                ? "单次 AICommand" : "临时 AISkill";
+            context.Report(useName + "节点请求 " + requestId + " 的受控会话启动流程已创建；状态："
+                + singleUseDispatchMessage + "。只有出现 Codex 接收事件后才代表已接收，当前不代表开始执行或完成。");
         }
     }
 
@@ -296,6 +311,8 @@ namespace ES.EditorInternal
                 case ESAgentRelationKind.ProvidesContext: return "提供上下文";
                 case ESAgentRelationKind.AppliesConstraint: return "约束产物";
                 case ESAgentRelationKind.RequiresValidation: return "必须验证";
+                case ESAgentRelationKind.SelectsBranch: return "选择分支";
+                case ESAgentRelationKind.TraversesItems: return "遍历结果";
                 default: return "非法关系";
             }
         }
@@ -322,10 +339,15 @@ namespace ES.EditorInternal
     public sealed class ESAgentGoalPayload
     {
         public int schemaVersion = 1;
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "一句话说明这张图最终要完成什么。")]
         public string title = "生成新的 Agent Artifact";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "明确真实目标，所有产物内容都必须与它一致。")]
         [TextArea] public string objective = "描述希望 AICommand 或 Agent Skill 解决的问题。";
+        [ESField(ESFieldLevel.Important, Hint = "补充项目现场、已知事实和限制条件。")]
         [TextArea] public string context = "";
+        [ESField(ESFieldLevel.Important, Hint = "说明谁会使用以及在什么场景触发。")]
         [TextArea] public string targetUsers = "该 AICommand / Agent Skill 的使用者与触发场景。";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "用于判断最终结果是否真正完成。")]
         [TextArea] public string successCriteria = "生成结果可读、可验证、权限边界明确，并能通过人工 Diff Review。";
     }
 
@@ -356,28 +378,80 @@ namespace ES.EditorInternal
     }
 
     [Serializable]
+    public sealed class ESAgentBranchPayload
+    {
+        public int schemaVersion = 1;
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "用可核对的自然语言说明何时进入命中分支。")]
+        [TextArea] public string condition = "当目标包含多个可独立检查的范围时进入命中分支。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "条件成立时必须执行的路径语义。")]
+        [TextArea] public string matchedPath = "按声明范围逐项处理，并保留每项证据。";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "条件不成立时的确定性兜底路径，不允许省略。")]
+        [TextArea] public string defaultPath = "按单一目标执行，并继续保留验证门禁。";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "条件无法判断或读取失败时的停止与报告路径。")]
+        [TextArea] public string failurePath = "停止产生副作用，报告缺失上下文和恢复动作。";
+    }
+
+    [Serializable]
+    public sealed class ESAgentTraversePayload
+    {
+        public int schemaVersion = 1;
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "说明要遍历的输入集合，例如声明的文件、规则或候选项。")]
+        [TextArea] public string target = "Graph 声明且与当前 Output 相连的 References 与 Constraints。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "遍历中单个元素的可读名称。")]
+        public string itemAlias = "当前项";
+        public ESAgentTraversalOrder order = ESAgentTraversalOrder.SourceOrder;
+        [Range(1, 32)] public int maxDepth = 8;
+        [Range(1, 512)] public int maxItems = 128;
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "满足时立即结束遍历，防止无意义继续处理。")]
+        [TextArea] public string stopCondition = "达到数量或深度上限，或继续处理将越过授权边界。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "输入集合为空时的明确行为。")]
+        [TextArea] public string emptyResultAction = "记录空结果并进入完成出口，不猜测或补造输入。";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "单项失败或遍历异常时的恢复路径。")]
+        [TextArea] public string failureAction = "停止后续副作用，保留已完成证据并进入失败出口。";
+    }
+
+    [Serializable]
+    [ESAgentArtifact(ESAgentGraphStableIds.AICommandArtifact)]
     public sealed class ESAgentAICommandOutputPayload
     {
         public const int CurrentSchemaVersion = 2;
 
         public int schemaVersion = CurrentSchemaVersion;
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "AICommand 的稳定名称，同时决定建议文件名。")]
         public string commandName = "生成_新任务_AI命令";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "正式产物唯一目标位置，必须与命令名称一致。")]
         public string targetProjectPath = "Assets/Plugins/ES/AICommands/新_AI命令_AI命令.md";
+        [ESField(ESFieldLevel.Important, Hint = "决定创建、更新或自动选择的处理方式。")]
         public ESAgentArtifactOperationMode operationMode = ESAgentArtifactOperationMode.CreateOrUpdate;
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "说明该命令是检查、评审还是受控执行。")]
         public ESAgentCommandIntent commandIntent = ESAgentCommandIntent.ControlledExecution;
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "决定生成内容能够进行何种写入。")]
         public ESAgentWriteAuthorization writeAuthorization = ESAgentWriteAuthorization.ConfirmBeforeWrite;
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "用于选择匹配风险的验证和确认强度。")]
         public ESAgentRiskLevel riskLevel = ESAgentRiskLevel.L2;
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "失败时必须停止还是回滚本次事务。")]
         public ESAgentFailurePolicy failurePolicy = ESAgentFailurePolicy.RollbackAndReport;
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "说明该命令真正解决什么问题。")]
         [TextArea] public string purpose = "描述该 AICommand 要授权和约束的单次任务。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "列出命令成立所需的用户输入和上下文。")]
         [TextArea] public string expectedInputs = "用户目标、范围、权威规则和相关项目路径。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "条件不满足时必须停止，不能猜测执行。")]
         [TextArea] public string preconditions = "目标、范围和权威规则已明确；缺失时停止并请求补充。";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "这是命令最重要的权限边界。")]
         [TextArea] public string allowedWriteScopes = "只允许修改用户明确授权且由本节点列出的项目路径。";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "明确禁止越过的操作和外部副作用。")]
         [TextArea] public string forbiddenOperations = "不得扩大用户授权；不得执行未明确授权的 Git、删除、发布、上传或外部写入。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "给出可复核的执行顺序。")]
         [TextArea] public string executionOutline = "读取规则\n核对现状\n执行受控修改\n验证\n交付";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "定义什么结果才算真正完成。")]
         [TextArea] public string acceptanceCriteria = "输出必须包含已读规则、改动、验证和剩余风险。";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "要求报告可以被复核的真实证据。")]
         [TextArea] public string requiredEvidence = "按实际执行层级报告源码检查、编译、测试和运行证据；未执行项必须明确标记。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "遇到越界或缺少授权时如何停止并交接。")]
         [TextArea] public string blockedHandling = "停止越界操作，说明阻断事实、已完成工作和所需用户决策。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "写入失败后如何恢复本次可撤销修改。")]
         [TextArea] public string rollbackStrategy = "本次写入失败时回滚本次事务；无法安全回滚时立即停止并报告。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "正式 AICommand 必须具备的章节。")]
         [TextArea] public string requiredSections = "必须先读\n执行要求\n交付格式\n需求";
 
         public string SuggestedTargetProjectPath
@@ -405,32 +479,55 @@ namespace ES.EditorInternal
     }
 
     [Serializable]
+    [ESAgentArtifact(ESAgentGraphStableIds.AISkillArtifact)]
     public sealed class ESAgentSkillOutputPayload
     {
         public const int CurrentSchemaVersion = 2;
 
         public int schemaVersion = CurrentSchemaVersion;
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "Skill 的稳定英文名称和调用标记。")]
         public string skillName = "es-generated-workflow";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "正式 Skill 唯一目录，必须与名称一致。")]
         public string targetProjectPath = ".agents/skills/es-generated-workflow/";
+        [ESField(ESFieldLevel.Important, Hint = "决定创建、更新或自动选择的处理方式。")]
         public ESAgentArtifactOperationMode operationMode = ESAgentArtifactOperationMode.CreateOrUpdate;
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "说明 Skill 是否会读取或修改项目状态。")]
         public ESAgentSkillEffectKind effectKind = ESAgentSkillEffectKind.ControlledMutation;
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "说明重复执行时如何避免产生重复副作用。")]
         public ESAgentSkillIdempotency idempotency = ESAgentSkillIdempotency.BestEffort;
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "一句话说明这个 Skill 能解决什么问题。")]
         [TextArea] public string description = "描述该 Skill 的能力、触发场景和适用任务。";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "说明什么情况下必须使用该 Skill。")]
         [TextArea] public string triggerScenarios = "说明何时必须使用该 Skill。";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "防止 Skill 被错误触发或扩大适用范围。")]
         [TextArea] public string nonTriggerScenarios = "说明何时不应触发该 Skill。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "使用前必须具备的输入、规则和工具。")]
         [TextArea] public string preconditions = "所需项目规则、输入和工具可用；否则停止并报告缺口。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "必须读取的规则、工具和参考资料。")]
         [TextArea] public string requiredDependencies = "列出必须读取的规则、依赖工具和可选参考资料。";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "明确 Skill 接受哪些输入。")]
         [TextArea] public string inputContract = "用户目标、授权范围、目标路径和必要上下文。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "可重复执行且可验证的核心步骤。")]
         [TextArea] public string workflow = "读取权威规则\n执行受控步骤\n验证\n交付";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "明确 Skill 最终必须交付哪些内容。")]
         [TextArea] public string outputContract = "输出实际执行内容、改动文件、验证证据、未完成项和剩余风险。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "列出 Skill 允许产生的副作用。")]
         [TextArea] public string sideEffects = "仅产生当前用户或 AICommand 已授权范围内的副作用。";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "明确 Skill 不负责和绝对禁止的事项。")]
         [TextArea] public string nonGoals = "不得扩大用户授权，不得绕过 AICommand、候选目录或人工批准。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "失败时停止副作用并恢复可撤销修改。")]
         [TextArea] public string failureRecovery = "失败时停止后续副作用，恢复本次可安全撤销的修改并报告阻断。";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "用于证明 Skill 工作流真实有效。")]
         [TextArea] public string validationSteps = "严格 UTF-8\n目标路径白名单\n候选完整性\nDiff Review";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "Skill 不能扩大用户或 AICommand 的授权。")]
         [TextArea] public string permissionBoundary = "Skill 只提供可复用工作流，不扩大用户或 AICommand 的权限。";
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "生成 agents/openai.yaml 的正式入口配置。")]
         public bool includeAgentsMetadata = true;
+        [ESField(ESFieldLevel.Normal, Hint = "允许候选附带 references 参考资料目录。")]
         public bool includeReferences = true;
+        [ESField(ESFieldLevel.Normal, Hint = "允许候选附带 scripts 辅助脚本目录。")]
         public bool includeScripts;
+        [ESField(ESFieldLevel.Important, Required = true, Hint = "用户或 Agent 调用该 Skill 时的默认提示。")]
         public string defaultPrompt = "Use $es-generated-workflow to complete the requested ESFramework workflow.";
 
         public string SuggestedTargetProjectPath
@@ -511,6 +608,16 @@ namespace ES.EditorInternal
                     payload.blockedHandling, payload.rollbackStrategy, payload.requiredSections))
             {
                 error = "AICommand 必须完整声明名称、路径、输入、前置条件、授权边界、执行、验收、证据、阻断和恢复语义。";
+                return false;
+            }
+            string commandName = payload.commandName.Trim();
+            if (commandName.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+                commandName = commandName.Substring(0, commandName.Length - 3);
+            string expectedPath = "Assets/Plugins/ES/AICommands/" + commandName + ".md";
+            if (!string.Equals(payload.targetProjectPath.Replace('\\', '/'), expectedPath,
+                    StringComparison.Ordinal))
+            {
+                error = "AICommand 名称与目标路径不一致，期望：" + expectedPath;
                 return false;
             }
             error = string.Empty;
@@ -629,23 +736,23 @@ namespace ES.EditorInternal
         {
             payload = null;
             if (!ESAgentAuthoringGraphValidator.TryRead(payloadJson,
-                    out ESAgentConstraintPayloadV1 legacy, out error))
+                    out ESAgentConstraintPayloadV1 v1, out error))
                 return false;
-            if (legacy.schemaVersion != 1)
+            if (v1.schemaVersion != 1)
             {
-                error = "不支持的 Constraint Payload Schema：" + legacy.schemaVersion;
+                error = "不支持的 Constraint Payload Schema：" + v1.schemaVersion;
                 return false;
             }
             payload = new ESAgentConstraintPayload
             {
-                kind = legacy.kind,
+                kind = v1.kind,
                 scope = ESAgentConstraintScope.WholeArtifact,
                 combinationMode = ESAgentConstraintCombinationMode.AllOf,
                 priority = 50,
                 combinationGroup = string.Empty,
-                statement = legacy.statement,
-                rationale = legacy.rationale,
-                verification = legacy.verification
+                statement = v1.statement,
+                rationale = v1.rationale,
+                verification = v1.verification
             };
             return ESAgentConstraintContractValidator.TryValidate(payload, out error);
         }
@@ -711,26 +818,26 @@ namespace ES.EditorInternal
                 return false;
             }
 
-            ESAgentAICommandOutputPayloadV1 legacy = JsonUtility.FromJson<ESAgentAICommandOutputPayloadV1>(payloadJson);
+            ESAgentAICommandOutputPayloadV1 v1 = JsonUtility.FromJson<ESAgentAICommandOutputPayloadV1>(payloadJson);
             payload = new ESAgentAICommandOutputPayload
             {
-                commandName = legacy.commandName,
-                targetProjectPath = legacy.targetProjectPath,
-                operationMode = legacy.operationMode,
-                commandIntent = ParseCommandIntent(legacy.commandType),
-                writeAuthorization = ParseWriteAuthorization(legacy.defaultWrite),
-                riskLevel = ParseRiskLevel(legacy.riskLevel),
-                failurePolicy = ParseWriteAuthorization(legacy.defaultWrite) == ESAgentWriteAuthorization.ScopedWrites
+                commandName = v1.commandName,
+                targetProjectPath = v1.targetProjectPath,
+                operationMode = v1.operationMode,
+                commandIntent = ParseCommandIntent(v1.commandType),
+                writeAuthorization = ParseWriteAuthorization(v1.defaultWrite),
+                riskLevel = ParseRiskLevel(v1.riskLevel),
+                failurePolicy = ParseWriteAuthorization(v1.defaultWrite) == ESAgentWriteAuthorization.ScopedWrites
                     ? ESAgentFailurePolicy.RollbackAndReport
                     : ESAgentFailurePolicy.StopAndReport,
-                purpose = legacy.purpose,
-                expectedInputs = legacy.expectedInputs,
-                allowedWriteScopes = string.IsNullOrWhiteSpace(legacy.defaultWrite)
+                purpose = v1.purpose,
+                expectedInputs = v1.expectedInputs,
+                allowedWriteScopes = string.IsNullOrWhiteSpace(v1.defaultWrite)
                     ? "未授权写入；需要修改时必须重新取得用户确认。"
-                    : legacy.defaultWrite,
-                executionOutline = legacy.executionOutline,
-                acceptanceCriteria = legacy.acceptanceCriteria,
-                requiredSections = legacy.requiredSections
+                    : v1.defaultWrite,
+                executionOutline = v1.executionOutline,
+                acceptanceCriteria = v1.acceptanceCriteria,
+                requiredSections = v1.requiredSections
             };
             return ESAgentOutputContractValidator.TryValidate(payload, out error);
         }
@@ -752,21 +859,21 @@ namespace ES.EditorInternal
                 return false;
             }
 
-            ESAgentSkillOutputPayloadV1 legacy = JsonUtility.FromJson<ESAgentSkillOutputPayloadV1>(payloadJson);
+            ESAgentSkillOutputPayloadV1 v1 = JsonUtility.FromJson<ESAgentSkillOutputPayloadV1>(payloadJson);
             payload = new ESAgentSkillOutputPayload
             {
-                skillName = legacy.skillName,
-                targetProjectPath = legacy.targetProjectPath,
-                operationMode = legacy.operationMode,
-                description = legacy.description,
-                triggerScenarios = legacy.triggerScenarios,
-                workflow = legacy.workflow,
-                nonGoals = legacy.nonGoals,
-                validationSteps = legacy.validationSteps,
-                defaultPrompt = legacy.defaultPrompt,
+                skillName = v1.skillName,
+                targetProjectPath = v1.targetProjectPath,
+                operationMode = v1.operationMode,
+                description = v1.description,
+                triggerScenarios = v1.triggerScenarios,
+                workflow = v1.workflow,
+                nonGoals = v1.nonGoals,
+                validationSteps = v1.validationSteps,
+                defaultPrompt = v1.defaultPrompt,
                 includeAgentsMetadata = true,
-                includeReferences = legacy.includeReferences,
-                includeScripts = legacy.includeScripts
+                includeReferences = v1.includeReferences,
+                includeScripts = v1.includeScripts
             };
             return ESAgentOutputContractValidator.TryValidate(payload, out error);
         }
@@ -830,13 +937,13 @@ namespace ES.EditorInternal
 
     public sealed class ESAgentAICommandOutputV1ToV2Migrator : IESGraphNodeMigrator
     {
-        public ESGraphDomainKey Domain => ESGraphDomainKey.FromKind(ESGraphDomainKind.AgentAuthoring);
-        public ESGraphNodeTypeKey NodeType => ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.AgentAICommandOutput);
+        public ESGraphDomainKey Domain => ESAgentGraphStableIds.Domain;
+        public ESGraphNodeTypeKey NodeType => ESAgentGraphStableIds.Node(ESAgentGraphStableIds.AICommandOutputNode);
         public int FromVersion => 1;
         public int ToVersion => 2;
         public int Priority => 0;
 
-        public bool TryMigrate(ESGraphAsset asset, ESGraphNodeRecord node, out string error)
+        public bool TryMigrate(GraphAsset asset, ESGraphNodeRecord node, out string error)
         {
             if (asset == null || node == null)
             {
@@ -853,13 +960,13 @@ namespace ES.EditorInternal
 
     public sealed class ESAgentSkillOutputV1ToV2Migrator : IESGraphNodeMigrator
     {
-        public ESGraphDomainKey Domain => ESGraphDomainKey.FromKind(ESGraphDomainKind.AgentAuthoring);
-        public ESGraphNodeTypeKey NodeType => ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.AgentSkillOutput);
+        public ESGraphDomainKey Domain => ESAgentGraphStableIds.Domain;
+        public ESGraphNodeTypeKey NodeType => ESAgentGraphStableIds.Node(ESAgentGraphStableIds.AISkillOutputNode);
         public int FromVersion => 1;
         public int ToVersion => 2;
         public int Priority => 0;
 
-        public bool TryMigrate(ESGraphAsset asset, ESGraphNodeRecord node, out string error)
+        public bool TryMigrate(GraphAsset asset, ESGraphNodeRecord node, out string error)
         {
             if (asset == null || node == null)
             {
@@ -876,13 +983,13 @@ namespace ES.EditorInternal
 
     public sealed class ESAgentConstraintV1ToV2Migrator : IESGraphNodeMigrator
     {
-        public ESGraphDomainKey Domain => ESGraphDomainKey.FromKind(ESGraphDomainKind.AgentAuthoring);
-        public ESGraphNodeTypeKey NodeType => ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.AgentConstraint);
+        public ESGraphDomainKey Domain => ESAgentGraphStableIds.Domain;
+        public ESGraphNodeTypeKey NodeType => ESAgentGraphStableIds.Node(ESAgentGraphStableIds.ConstraintNode);
         public int FromVersion => 1;
         public int ToVersion => ESAgentConstraintPayload.CurrentSchemaVersion;
         public int Priority => 0;
 
-        public bool TryMigrate(ESGraphAsset asset, ESGraphNodeRecord node, out string error)
+        public bool TryMigrate(GraphAsset asset, ESGraphNodeRecord node, out string error)
         {
             if (asset == null || node == null)
             {
@@ -901,12 +1008,19 @@ namespace ES.EditorInternal
     public sealed class ESAgentValidationPayload
     {
         public int schemaVersion = 1;
+        [ESField(ESFieldLevel.Important, Hint = "校验 AICommand 候选结构和内容。")]
         public bool validateAICommand = true;
+        [ESField(ESFieldLevel.Important, Hint = "校验 Agent Skill 候选结构和内容。")]
         public bool validateAgentSkill = true;
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "所有文本产物必须通过严格 UTF-8 检查。")]
         public bool validateUtf8 = true;
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "正式写入前必须查看候选差异。")]
         public bool requireDiffReview = true;
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "候选必须经过人工批准才能进入正式位置。")]
         public bool requireHumanApproval = true;
+        [ESField(ESFieldLevel.Important, Hint = "补充本图特有的验证要求。")]
         [TextArea] public string additionalRequirements = "不得包含 U+FFFD；不得越过候选目录。";
+        [ESField(ESFieldLevel.Core, Required = true, Hint = "人工审查时逐项确认的检查清单。")]
         [TextArea] public string reviewChecklist = "目标路径正确\n内容符合 Graph\n没有越权修改\n验证证据真实";
     }
 
@@ -943,6 +1057,30 @@ namespace ES.EditorInternal
         public string statement;
         public string rationale;
         public string verification;
+    }
+
+    [Serializable]
+    public sealed class ESAgentGenerationBranch
+    {
+        public string nodeId;
+        public string condition;
+        public string matchedPath;
+        public string defaultPath;
+        public string failurePath;
+    }
+
+    [Serializable]
+    public sealed class ESAgentGenerationTraversal
+    {
+        public string nodeId;
+        public string target;
+        public string itemAlias;
+        public ESAgentTraversalOrder order;
+        public int maxDepth;
+        public int maxItems;
+        public string stopCondition;
+        public string emptyResultAction;
+        public string failureAction;
     }
 
     [Serializable]
@@ -1034,6 +1172,16 @@ namespace ES.EditorInternal
                     error = "AICommand Generation Output 的授权、执行、失败或验收语义不完整。";
                     return false;
                 }
+                string artifactName = output.artifactName.Trim();
+                if (artifactName.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+                    artifactName = artifactName.Substring(0, artifactName.Length - 3);
+                string expectedPath = "Assets/Plugins/ES/AICommands/" + artifactName + ".md";
+                if (!string.Equals(output.targetProjectPath.Replace('\\', '/'), expectedPath,
+                        StringComparison.Ordinal))
+                {
+                    error = "AICommand Generation Output 的名称与目标路径不一致，期望：" + expectedPath;
+                    return false;
+                }
             }
             else
             {
@@ -1060,6 +1208,13 @@ namespace ES.EditorInternal
                     error = "Agent Skill Generation Output 的触发、输入输出、副作用、恢复或权限语义不完整。";
                     return false;
                 }
+                string expectedPath = ".agents/skills/" + output.artifactName.Trim() + "/";
+                if (!string.Equals(output.targetProjectPath.Replace('\\', '/'), expectedPath,
+                        StringComparison.Ordinal))
+                {
+                    error = "Agent Skill Generation Output 的名称与目标路径不一致，期望：" + expectedPath;
+                    return false;
+                }
             }
             error = string.Empty;
             return true;
@@ -1071,6 +1226,136 @@ namespace ES.EditorInternal
                 if (string.IsNullOrWhiteSpace(values[i]))
                     return true;
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Deterministic semantic gate for generated artifacts.  Structural validity is not
+    /// sufficient: at least one domain-specific intent term from the Goal must survive
+    /// into every declared Output.  This deliberately rejects the stock template text.
+    /// </summary>
+    public static class ESAgentGenerationSemanticValidator
+    {
+        private static readonly string[] PlaceholderFragments =
+        {
+            "描述希望 AICommand 或 Agent Skill 解决的问题。",
+            "生成结果可读、可验证、权限边界明确，并能通过人工 Diff Review。",
+            "生成_新任务_AI命令",
+            "描述该 AICommand 要授权和约束的单次任务。",
+            "es-generated-workflow",
+            "描述该 Skill 的能力、触发场景和适用任务。"
+        };
+
+        private static readonly HashSet<string> StopTerms = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "生成", "任务", "模块", "工作流", "实现", "执行", "验证", "结果", "目标", "用户", "内容",
+            "规则", "项目", "文件", "修改", "命令", "技能", "智能", "助手", "候选", "产物", "流程",
+            "要求", "范围", "检查", "审查", "工作", "AI", "Agent", "Command", "Skill", "Graph",
+            "artifact", "workflow", "module", "task", "command", "skill", "agent", "graph", "ai"
+        };
+
+        public static bool TryValidate(ESAgentGenerationGoal goal,
+            IEnumerable<ESAgentGenerationOutput> outputs, out string error)
+        {
+            error = string.Empty;
+            if (goal == null)
+            {
+                error = "语义一致性校验失败：Goal 为空。";
+                return false;
+            }
+            string goalText = string.Join("\n", new[] { goal.title, goal.objective, goal.context,
+                goal.targetUsers, goal.successCriteria });
+            string placeholder = PlaceholderFragments.FirstOrDefault(item =>
+                ContainsText(goalText, item));
+            if (!string.IsNullOrEmpty(placeholder))
+            {
+                error = "语义一致性校验失败：Goal 仍使用模板/占位内容（" + placeholder
+                    + "），请先填写真实业务目标。";
+                return false;
+            }
+
+            HashSet<string> goalTerms = ExtractIntentTerms(goalText);
+            if (goalTerms.Count == 0)
+            {
+                error = "语义一致性校验失败：Goal 没有可用于关联 Output 的业务意图词。";
+                return false;
+            }
+            ESAgentGenerationOutput[] outputArray = (outputs ?? Array.Empty<ESAgentGenerationOutput>()).ToArray();
+            if (outputArray.Length == 0)
+            {
+                error = "语义一致性校验失败：没有可关联的 Output。";
+                return false;
+            }
+            foreach (ESAgentGenerationOutput output in outputArray)
+            {
+                if (output == null)
+                {
+                    error = "语义一致性校验失败：Output 为空。";
+                    return false;
+                }
+                string outputText = string.Join("\n", new[] { output.artifactName, output.requirements,
+                    output.acceptanceCriteria, output.executionOutline, output.skillDescription,
+                    output.skillTriggerScenarios, output.skillWorkflow, output.skillOutputContract });
+                string outputPlaceholder = PlaceholderFragments.FirstOrDefault(item =>
+                    ContainsText(outputText, item));
+                if (!string.IsNullOrEmpty(outputPlaceholder))
+                {
+                    error = "语义一致性校验失败：Output “" + output.artifactName
+                        + "” 仍使用模板/占位内容（" + outputPlaceholder + "）。";
+                    return false;
+                }
+                HashSet<string> outputTerms = ExtractIntentTerms(outputText);
+                HashSet<string> titleTerms = ExtractIntentTerms(goal.title);
+                if (titleTerms.Count > 0 && !titleTerms.Any(outputTerms.Contains))
+                {
+                    error = "语义一致性校验失败：Output “" + (output.artifactName ?? "")
+                        + "” 没有体现 Goal 标题“" + (goal.title ?? "")
+                        + "”的业务主题。请同步修改产物名称、用途或验收标准。";
+                    return false;
+                }
+                string matched = goalTerms.FirstOrDefault(outputTerms.Contains);
+                if (string.IsNullOrEmpty(matched))
+                {
+                    string examples = string.Join("、", goalTerms.Take(5));
+                    error = "语义一致性校验失败：Output “" + (output.artifactName ?? "")
+                        + "” 与 Goal 没有共享业务意图词。请在命令名称、用途或验收标准中明确引用 Goal 主题（例如："
+                        + examples + "）。";
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public static bool TryValidate(ESAgentArtifactGenerationSpec spec, out string error)
+        {
+            return TryValidate(spec?.goal, spec?.outputs, out error);
+        }
+
+        private static bool ContainsText(string text, string fragment)
+        {
+            return !string.IsNullOrEmpty(text) && text.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static HashSet<string> ExtractIntentTerms(string text)
+        {
+            var terms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(text)) return terms;
+            string normalized = text.Replace("_", " ").Replace("-", " ");
+            var latin = System.Text.RegularExpressions.Regex.Matches(normalized, "[A-Za-z][A-Za-z0-9]{2,}");
+            foreach (System.Text.RegularExpressions.Match match in latin)
+                if (!StopTerms.Contains(match.Value)) terms.Add(match.Value);
+            var chinese = System.Text.RegularExpressions.Regex.Matches(normalized, "[\\u4e00-\\u9fff]{2,}");
+            foreach (System.Text.RegularExpressions.Match match in chinese)
+            {
+                string value = match.Value;
+                for (int length = 2; length <= Math.Min(6, value.Length); length++)
+                    for (int start = 0; start + length <= value.Length; start++)
+                    {
+                        string term = value.Substring(start, length);
+                        if (!StopTerms.Contains(term)) terms.Add(term);
+                    }
+            }
+            return terms;
         }
     }
 
@@ -1103,11 +1388,78 @@ namespace ES.EditorInternal
         public string semanticType;
     }
 
+    /// <summary>
+    /// Graph 烘焙后的 Skill 能力包合同。AICommand 与 AISkill 仍然保留各自的产物字段，
+    /// 但通过这里共享一个稳定身份、Goal、约束、引用和 Validation 边界。
+    /// </summary>
+    [Serializable]
+    public sealed class ESAgentSkillBundleContract
+    {
+        public const int CurrentSchemaVersion = 2;
+
+        public int schemaVersion = CurrentSchemaVersion;
+        public string bundleId;
+        public string displayName;
+        public ESAgentSkillBundleKind kind;
+        public string goalNodeId;
+        public string[] referenceNodeIds = Array.Empty<string>();
+        public string[] constraintNodeIds = Array.Empty<string>();
+        public string[] branchNodeIds = Array.Empty<string>();
+        public string[] traversalNodeIds = Array.Empty<string>();
+        public string[] commandOutputNodeIds = Array.Empty<string>();
+        public string[] aiSkillOutputNodeIds = Array.Empty<string>();
+        public string[] validationNodeIds = Array.Empty<string>();
+
+        public bool IsPaired => kind == ESAgentSkillBundleKind.CommandAndAISkill;
+
+        public static ESAgentSkillBundleContract Create(string graphId, string displayName,
+            string goalNodeId, IEnumerable<ESAgentGenerationReference> references,
+            IEnumerable<ESAgentGenerationConstraint> constraints,
+            IEnumerable<ESAgentGenerationBranch> branches,
+            IEnumerable<ESAgentGenerationTraversal> traversals,
+            IEnumerable<ESAgentGenerationOutput> outputs,
+            IEnumerable<ESAgentGenerationValidation> validations)
+        {
+            string[] commandIds = (outputs ?? Array.Empty<ESAgentGenerationOutput>())
+                .Where(item => item != null && item.artifactKind == ESAgentArtifactKind.AICommand)
+                .Select(item => item.nodeId).Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal).ToArray();
+            string[] skillIds = (outputs ?? Array.Empty<ESAgentGenerationOutput>())
+                .Where(item => item != null && item.artifactKind == ESAgentArtifactKind.AgentSkill)
+                .Select(item => item.nodeId).Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal).ToArray();
+            var result = new ESAgentSkillBundleContract
+            {
+                bundleId = ESAgentArtifactIdentity.CreateBundle(graphId ?? string.Empty),
+                displayName = string.IsNullOrWhiteSpace(displayName) ? "ES Skill 能力包" : displayName.Trim(),
+                kind = commandIds.Length > 0 && skillIds.Length > 0
+                    ? ESAgentSkillBundleKind.CommandAndAISkill
+                    : commandIds.Length > 0 ? ESAgentSkillBundleKind.CommandOnly : ESAgentSkillBundleKind.AISkillOnly,
+                goalNodeId = goalNodeId ?? string.Empty,
+                referenceNodeIds = NodeIds(references?.Select(item => item?.nodeId)),
+                constraintNodeIds = NodeIds(constraints?.Select(item => item?.nodeId)),
+                branchNodeIds = NodeIds(branches?.Select(item => item?.nodeId)),
+                traversalNodeIds = NodeIds(traversals?.Select(item => item?.nodeId)),
+                commandOutputNodeIds = commandIds,
+                aiSkillOutputNodeIds = skillIds,
+                validationNodeIds = NodeIds(validations?.Select(item => item?.nodeId))
+            };
+            return result;
+        }
+
+        private static string[] NodeIds(IEnumerable<string> values)
+        {
+            return (values ?? Array.Empty<string>())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        }
+    }
+
     /// <summary>Graph V2 烘焙出的 Agent Artifact 生成规格；只用于编辑器生成与审查，不进入运行时。</summary>
     [Serializable]
     public sealed class ESAgentArtifactGenerationSpec : IESBakedGraphPlan
     {
-        public const int CurrentContractSchemaVersion = 3;
+        public const int CurrentContractSchemaVersion = 5;
 
         public int contractSchemaVersion = CurrentContractSchemaVersion;
         public string sourceGraphId;
@@ -1116,13 +1468,60 @@ namespace ES.EditorInternal
         public ESAgentGenerationGoal goal;
         public ESAgentGenerationReference[] references = Array.Empty<ESAgentGenerationReference>();
         public ESAgentGenerationConstraint[] constraints = Array.Empty<ESAgentGenerationConstraint>();
+        public ESAgentGenerationBranch[] branches = Array.Empty<ESAgentGenerationBranch>();
+        public ESAgentGenerationTraversal[] traversals = Array.Empty<ESAgentGenerationTraversal>();
         public ESAgentGenerationOutput[] outputs = Array.Empty<ESAgentGenerationOutput>();
         public ESAgentGenerationValidation[] validations = Array.Empty<ESAgentGenerationValidation>();
         public ESAgentGenerationRelation[] relations = Array.Empty<ESAgentGenerationRelation>();
+        /// <summary>AICommand + AISkill 的共享 Skill 能力包身份与边界；当前合同必须显式提供。</summary>
+        public ESAgentSkillBundleContract skillBundle;
+        /// <summary>仅在用户明确承担可恢复的质量风险后存在；绑定 Graph 签名、问题集合和操作者。</summary>
+        public ESGraphRiskAcceptance riskAcceptance;
 
-        public ESGraphDomainKey Domain => ESGraphDomainKey.FromKind(ESGraphDomainKind.AgentAuthoring);
+        public ESGraphDomainKey Domain => ESAgentGraphStableIds.Domain;
         public string DomainId => Domain.StableId;
         public string SourceContentSignature => sourceContentSignature ?? string.Empty;
+    }
+
+    public static class ESAgentGenerationRiskValidator
+    {
+        public static bool TryValidate(ESAgentArtifactGenerationSpec spec, out string error)
+        {
+            if (spec == null)
+            {
+                error = "GenerationSpec 不能为空。";
+                return false;
+            }
+            if (ESAgentGenerationSemanticValidator.TryValidate(spec, out string semanticError))
+            {
+                if (spec.riskAcceptance != null)
+                {
+                    error = "GenerationSpec 已无需要承担的语义风险，但仍携带旧风险确认；请重新烘焙。";
+                    return false;
+                }
+                error = string.Empty;
+                return true;
+            }
+
+            var issues = new List<ESGraphValidationIssue>
+            {
+                ESGraphValidationIssue.Error("AgentAuthoring.SemanticAlignment", semanticError,
+                    spec.goal?.nodeId, true)
+            };
+            if (spec.riskAcceptance == null)
+            {
+                error = "目标与输出语义不一致，且缺少绑定当前 Graph 的风险确认：" + semanticError;
+                return false;
+            }
+            if (!spec.riskAcceptance.TryValidate(spec.sourceGraphId, spec.SourceContentSignature,
+                    issues, out string acceptanceError))
+            {
+                error = "目标与输出语义不一致，风险确认无效：" + acceptanceError;
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
     }
 
     public static class ESAgentGenerationIntentValidator
@@ -1144,6 +1543,10 @@ namespace ES.EditorInternal
             if (references == null) return false;
             var constraints = IndexNodeIds(spec.constraints, item => item?.nodeId, "Constraint", out error);
             if (constraints == null) return false;
+            var branches = IndexNodeIds(spec.branches, item => item?.nodeId, "Branch", out error);
+            if (branches == null) return false;
+            var traversals = IndexNodeIds(spec.traversals, item => item?.nodeId, "Traversal", out error);
+            if (traversals == null) return false;
             var outputs = IndexNodeIds(spec.outputs, item => item?.nodeId, "Output", out error);
             if (outputs == null || outputs.Count == 0)
             {
@@ -1156,10 +1559,16 @@ namespace ES.EditorInternal
                 if (string.IsNullOrEmpty(error)) error = "GenerationSpec 至少需要一个 Validation。";
                 return false;
             }
+            if (!TryValidateSkillBundle(spec.skillBundle, spec.goal, spec.references,
+                    spec.constraints, spec.branches, spec.traversals, spec.outputs,
+                    spec.validations, out error))
+                return false;
 
             var allNodeIds = new HashSet<string>(StringComparer.Ordinal) { spec.goal.nodeId };
             if (!AddUniqueNodeIds(allNodeIds, references)
                 || !AddUniqueNodeIds(allNodeIds, constraints)
+                || !AddUniqueNodeIds(allNodeIds, branches)
+                || !AddUniqueNodeIds(allNodeIds, traversals)
                 || !AddUniqueNodeIds(allNodeIds, outputs)
                 || !AddUniqueNodeIds(allNodeIds, validations))
             {
@@ -1169,8 +1578,33 @@ namespace ES.EditorInternal
 
             foreach (ESAgentGenerationConstraint constraint in spec.constraints ?? Array.Empty<ESAgentGenerationConstraint>())
                 if (!TryValidateConstraint(constraint, out error)) return false;
+            foreach (ESAgentGenerationBranch branch in spec.branches ?? Array.Empty<ESAgentGenerationBranch>())
+                if (!TryValidateBranch(branch, out error)) return false;
+            foreach (ESAgentGenerationTraversal traversal in spec.traversals ?? Array.Empty<ESAgentGenerationTraversal>())
+                if (!TryValidateTraversal(traversal, out error)) return false;
+
+            var nodeTypes = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [spec.goal.nodeId] = ESAgentGraphStableIds.GoalNode
+            };
+            AddNodeTypes(nodeTypes, references, ESAgentGraphStableIds.ReferenceNode);
+            AddNodeTypes(nodeTypes, constraints, ESAgentGraphStableIds.ConstraintNode);
+            AddNodeTypes(nodeTypes, branches, ESAgentGraphStableIds.BranchNode);
+            AddNodeTypes(nodeTypes, traversals, ESAgentGraphStableIds.TraverseNode);
+            foreach (ESAgentGenerationOutput output in spec.outputs ?? Array.Empty<ESAgentGenerationOutput>())
+            {
+                if (!Enum.IsDefined(typeof(ESAgentArtifactKind), output.artifactKind))
+                {
+                    error = "GenerationSpec 包含非法 OutputArtifact 类型：" + output.nodeId;
+                    return false;
+                }
+                nodeTypes[output.nodeId] = output.artifactKind == ESAgentArtifactKind.AICommand
+                    ? ESAgentGraphStableIds.AICommandOutputNode : ESAgentGraphStableIds.AISkillOutputNode;
+            }
+            AddNodeTypes(nodeTypes, validations, ESAgentGraphStableIds.ValidationNode);
 
             var constraintTargets = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            var logicRoutes = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
             var outputConstraintCount = new Dictionary<string, int>(StringComparer.Ordinal);
             var outputValidationCount = new Dictionary<string, int>(StringComparer.Ordinal);
             var outgoing = new Dictionary<string, List<string>>(StringComparer.Ordinal);
@@ -1201,14 +1635,19 @@ namespace ES.EditorInternal
                     error = "GenerationSpec 包含无效关系。";
                     return false;
                 }
-                string relationKey = relation.fromNodeId + "\n" + relation.toNodeId + "\n" + relation.relationKind;
+                string relationKey = relation.fromNodeId + "\n" + relation.fromPortStableKey + "\n"
+                    + relation.toNodeId + "\n" + relation.relationKind;
                 if (!relationKeys.Add(relationKey))
                 {
                     error = "GenerationSpec 包含重复关系：" + relation.edgeId;
                     return false;
                 }
-                if (!TryResolveExpectedRelation(spec.goal.nodeId, references, constraints, outputs, validations,
-                        relation.fromNodeId, relation.toNodeId, out ESAgentRelationKind expected))
+                if (!nodeTypes.TryGetValue(relation.fromNodeId, out string expectedFromType)
+                    || !nodeTypes.TryGetValue(relation.toNodeId, out string expectedToType)
+                    || !string.Equals(relation.fromNodeTypeId, expectedFromType, StringComparison.Ordinal)
+                    || !string.Equals(relation.toNodeTypeId, expectedToType, StringComparison.Ordinal)
+                    || !ESAgentRelationSemantics.TryResolve(expectedFromType, expectedToType,
+                        relation.fromPortStableKey, out ESAgentRelationKind expected))
                 {
                     error = "GenerationSpec 包含跨阶段或未知节点关系："
                         + relation.fromNodeId + " -> " + relation.toNodeId;
@@ -1219,7 +1658,7 @@ namespace ES.EditorInternal
                     error = "GenerationSpec 关系语义与端点不一致：" + relation.edgeId;
                     return false;
                 }
-                string expectedSemanticType = ExpectedSemanticType(expected);
+                string expectedSemanticType = ESAgentRelationSemantics.ExpectedSemanticType(expected);
                 if (!string.Equals(relation.semanticType, expectedSemanticType, StringComparison.Ordinal))
                 {
                     error = "GenerationSpec 关系的数据语义与关系类型不一致：" + relation.edgeId;
@@ -1239,7 +1678,36 @@ namespace ES.EditorInternal
                 {
                     outputValidationCount[relation.fromNodeId]++;
                 }
+                else if (expected == ESAgentRelationKind.SelectsBranch
+                    || expected == ESAgentRelationKind.TraversesItems)
+                {
+                    if (!logicRoutes.TryGetValue(relation.fromNodeId, out HashSet<string> routes))
+                    {
+                        routes = new HashSet<string>(StringComparer.Ordinal);
+                        logicRoutes.Add(relation.fromNodeId, routes);
+                    }
+                    if (!routes.Add(relation.fromPortStableKey))
+                    {
+                        error = "逻辑节点的同一出口不能重复连接：" + relation.fromNodeId
+                            + "/" + relation.fromPortStableKey;
+                        return false;
+                    }
+                }
             }
+
+            if (!ValidateRouteCoverage(branches, logicRoutes, new[]
+                {
+                    ESAgentGraphStableIds.BranchMatchedPortKey,
+                    ESAgentGraphStableIds.BranchDefaultPortKey,
+                    ESAgentGraphStableIds.BranchFailurePortKey
+                }, "Branch", out error)
+                || !ValidateRouteCoverage(traversals, logicRoutes, new[]
+                {
+                    ESAgentGraphStableIds.TraverseItemPortKey,
+                    ESAgentGraphStableIds.TraverseCompletedPortKey,
+                    ESAgentGraphStableIds.TraverseFailurePortKey
+                }, "Traversal", out error))
+                return false;
 
             foreach (string constraintId in constraints)
             {
@@ -1308,6 +1776,40 @@ namespace ES.EditorInternal
             return true;
         }
 
+        private static bool TryValidateBranch(ESAgentGenerationBranch branch, out string error)
+        {
+            if (branch == null || string.IsNullOrWhiteSpace(branch.nodeId)
+                || string.IsNullOrWhiteSpace(branch.condition)
+                || string.IsNullOrWhiteSpace(branch.matchedPath)
+                || string.IsNullOrWhiteSpace(branch.defaultPath)
+                || string.IsNullOrWhiteSpace(branch.failurePath))
+            {
+                error = "GenerationSpec Branch 缺少条件、命中、默认或失败语义。";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool TryValidateTraversal(ESAgentGenerationTraversal traversal, out string error)
+        {
+            if (traversal == null || string.IsNullOrWhiteSpace(traversal.nodeId)
+                || !Enum.IsDefined(typeof(ESAgentTraversalOrder), traversal.order)
+                || traversal.maxDepth < 1 || traversal.maxDepth > 32
+                || traversal.maxItems < 1 || traversal.maxItems > 512
+                || string.IsNullOrWhiteSpace(traversal.target)
+                || string.IsNullOrWhiteSpace(traversal.itemAlias)
+                || string.IsNullOrWhiteSpace(traversal.stopCondition)
+                || string.IsNullOrWhiteSpace(traversal.emptyResultAction)
+                || string.IsNullOrWhiteSpace(traversal.failureAction))
+            {
+                error = "GenerationSpec Traversal 的目标、顺序、安全上限、停止或恢复语义无效。";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+
         private static bool ValidateAnyOfGroups(IEnumerable<ESAgentGenerationConstraint> source,
             Dictionary<string, HashSet<string>> constraintTargets, out string error)
         {
@@ -1335,39 +1837,29 @@ namespace ES.EditorInternal
             return true;
         }
 
-        private static bool TryResolveExpectedRelation(string goalId, HashSet<string> references,
-            HashSet<string> constraints, HashSet<string> outputs, HashSet<string> validations,
-            string fromId, string toId, out ESAgentRelationKind relationKind)
+        private static void AddNodeTypes(Dictionary<string, string> destination,
+            IEnumerable<string> nodeIds, string nodeTypeId)
         {
-            if ((string.Equals(fromId, goalId, StringComparison.Ordinal) || references.Contains(fromId))
-                && (references.Contains(toId) || constraints.Contains(toId)))
-            {
-                relationKind = ESAgentRelationKind.ProvidesContext;
-                return true;
-            }
-            if (constraints.Contains(fromId) && outputs.Contains(toId))
-            {
-                relationKind = ESAgentRelationKind.AppliesConstraint;
-                return true;
-            }
-            if (outputs.Contains(fromId) && validations.Contains(toId))
-            {
-                relationKind = ESAgentRelationKind.RequiresValidation;
-                return true;
-            }
-            relationKind = default;
-            return false;
+            foreach (string nodeId in nodeIds ?? Array.Empty<string>())
+                destination[nodeId] = nodeTypeId;
         }
 
-        private static string ExpectedSemanticType(ESAgentRelationKind relationKind)
+        private static bool ValidateRouteCoverage(IEnumerable<string> nodeIds,
+            Dictionary<string, HashSet<string>> actualRoutes, IEnumerable<string> requiredRoutes,
+            string label, out string error)
         {
-            switch (relationKind)
+            var required = new HashSet<string>(requiredRoutes, StringComparer.Ordinal);
+            foreach (string nodeId in nodeIds ?? Array.Empty<string>())
             {
-                case ESAgentRelationKind.ProvidesContext: return ESGraphPortValueIds.AgentContext;
-                case ESAgentRelationKind.AppliesConstraint: return ESGraphPortValueIds.AgentRequirement;
-                case ESAgentRelationKind.RequiresValidation: return ESGraphPortValueIds.AgentArtifact;
-                default: return string.Empty;
+                if (!actualRoutes.TryGetValue(nodeId, out HashSet<string> actual)
+                    || !actual.SetEquals(required))
+                {
+                    error = label + " 必须且只能连接每个声明出口：" + nodeId;
+                    return false;
+                }
             }
+            error = string.Empty;
+            return true;
         }
 
         private static bool AddUniqueNodeIds(HashSet<string> destination, IEnumerable<string> source)
@@ -1375,6 +1867,123 @@ namespace ES.EditorInternal
             foreach (string nodeId in source)
                 if (!destination.Add(nodeId)) return false;
             return true;
+        }
+
+        private static bool TryValidateSkillBundle(ESAgentSkillBundleContract bundle,
+            ESAgentGenerationGoal goal, IEnumerable<ESAgentGenerationReference> references,
+            IEnumerable<ESAgentGenerationConstraint> constraints,
+            IEnumerable<ESAgentGenerationBranch> branches,
+            IEnumerable<ESAgentGenerationTraversal> traversals,
+            IEnumerable<ESAgentGenerationOutput> outputs,
+            IEnumerable<ESAgentGenerationValidation> validations, out string error)
+        {
+            if (bundle == null)
+            {
+                error = "GenerationSpec 缺少 AICommand + AISkill 共享 Skill 能力包合同。";
+                return false;
+            }
+            if (bundle.schemaVersion != ESAgentSkillBundleContract.CurrentSchemaVersion
+                || string.IsNullOrWhiteSpace(bundle.bundleId)
+                || string.IsNullOrWhiteSpace(bundle.displayName)
+                || goal == null
+                || !string.Equals(bundle.goalNodeId, goal.nodeId, StringComparison.Ordinal))
+            {
+                error = "Skill 能力包缺少稳定身份，或没有绑定当前 Goal。";
+                return false;
+            }
+
+            var outputById = (outputs ?? Array.Empty<ESAgentGenerationOutput>())
+                .Where(item => item != null && !string.IsNullOrWhiteSpace(item.nodeId))
+                .ToDictionary(item => item.nodeId, StringComparer.Ordinal);
+            string[] commandIds = bundle.commandOutputNodeIds ?? Array.Empty<string>();
+            string[] skillIds = bundle.aiSkillOutputNodeIds ?? Array.Empty<string>();
+            if (commandIds.Length == 0 && skillIds.Length == 0)
+            {
+                error = "Skill 能力包至少需要一个 AICommand 或 AISkill Output。";
+                return false;
+            }
+            if (HasDuplicates(commandIds) || HasDuplicates(skillIds)
+                || HasDuplicates(bundle.referenceNodeIds)
+                || HasDuplicates(bundle.constraintNodeIds)
+                || HasDuplicates(bundle.branchNodeIds)
+                || HasDuplicates(bundle.traversalNodeIds)
+                || HasDuplicates(bundle.validationNodeIds))
+            {
+                error = "Skill 能力包的节点绑定不能重复。";
+                return false;
+            }
+            if (commandIds.Any(id => !outputById.TryGetValue(id, out ESAgentGenerationOutput output)
+                    || output.artifactKind != ESAgentArtifactKind.AICommand)
+                || skillIds.Any(id => !outputById.TryGetValue(id, out ESAgentGenerationOutput output)
+                    || output.artifactKind != ESAgentArtifactKind.AgentSkill))
+            {
+                error = "Skill 能力包引用了不存在或类型不匹配的 Output。";
+                return false;
+            }
+            ESAgentSkillBundleKind expectedKind = commandIds.Length > 0 && skillIds.Length > 0
+                ? ESAgentSkillBundleKind.CommandAndAISkill
+                : commandIds.Length > 0 ? ESAgentSkillBundleKind.CommandOnly : ESAgentSkillBundleKind.AISkillOnly;
+            if (bundle.kind != expectedKind)
+            {
+                error = "Skill 能力包类型与 AICommand/AISkill 组成不一致。";
+                return false;
+            }
+            if (!SetEquals(commandIds, outputById.Values
+                    .Where(item => item.artifactKind == ESAgentArtifactKind.AICommand)
+                    .Select(item => item.nodeId))
+                || !SetEquals(skillIds, outputById.Values
+                    .Where(item => item.artifactKind == ESAgentArtifactKind.AgentSkill)
+                    .Select(item => item.nodeId)))
+            {
+                error = "Skill 能力包没有完整绑定当前 Graph 的 AICommand/AISkill Output。";
+                return false;
+            }
+
+            if (!SetEquals(bundle.referenceNodeIds, NodeIds(references, item => item?.nodeId))
+                || !SetEquals(bundle.constraintNodeIds, NodeIds(constraints, item => item?.nodeId))
+                || !SetEquals(bundle.branchNodeIds, NodeIds(branches, item => item?.nodeId))
+                || !SetEquals(bundle.traversalNodeIds, NodeIds(traversals, item => item?.nodeId))
+                || !SetEquals(bundle.validationNodeIds, NodeIds(validations, item => item?.nodeId)))
+            {
+                error = "Skill 能力包必须完整绑定当前 Graph 的上下文、逻辑、约束和验证节点。";
+                return false;
+            }
+            if (bundle.IsPaired && !(validations ?? Array.Empty<ESAgentGenerationValidation>())
+                    .Any(item => item != null && item.validateAICommand && item.validateAgentSkill
+                        && item.requireDiffReview && item.requireHumanApproval))
+            {
+                error = "AICommand + AISkill 能力包必须共享至少一个 Diff Review 与人工批准门禁。";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool AllKnownNodeIds<T>(IEnumerable<string> ids, IEnumerable<T> items,
+            Func<T, string> getNodeId)
+        {
+            var known = new HashSet<string>((items ?? Enumerable.Empty<T>())
+                .Select(getNodeId).Where(id => !string.IsNullOrWhiteSpace(id)), StringComparer.Ordinal);
+            return (ids ?? Array.Empty<string>()).All(known.Contains);
+        }
+
+        private static IEnumerable<string> NodeIds<T>(IEnumerable<T> items, Func<T, string> getNodeId)
+        {
+            return (items ?? Enumerable.Empty<T>()).Select(getNodeId)
+                .Where(id => !string.IsNullOrWhiteSpace(id));
+        }
+
+        private static bool HasDuplicates(IEnumerable<string> values)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            return (values ?? Array.Empty<string>()).Any(value =>
+                !string.IsNullOrWhiteSpace(value) && !seen.Add(value));
+        }
+
+        private static bool SetEquals(IEnumerable<string> left, IEnumerable<string> right)
+        {
+            return new HashSet<string>(left ?? Array.Empty<string>(), StringComparer.Ordinal)
+                .SetEquals(right ?? Array.Empty<string>());
         }
 
         private static HashSet<string> IndexNodeIds<T>(IEnumerable<T> source, Func<T, string> getNodeId,
@@ -1403,11 +2012,16 @@ namespace ES.EditorInternal
                 return string.Empty;
             return "es." + graphId + "." + outputNodeId;
         }
+
+        public static string CreateBundle(string graphId)
+        {
+            return ESGraphIdentity.IsValid(graphId) ? "es." + graphId + ".skill-bundle" : string.Empty;
+        }
     }
 
     public static class ESAgentAuthoringGraphValidator
     {
-        public static void Validate(ESGraphAsset asset, List<ESGraphValidationIssue> issues)
+        public static void Validate(GraphAsset asset, List<ESGraphValidationIssue> issues)
         {
             if (asset == null || issues == null)
                 return;
@@ -1418,7 +2032,7 @@ namespace ES.EditorInternal
             int outputCount = 0;
             int validationCount = 0;
             var definitions = ESGraphAuthoringRegistry
-                .GetNodeDefinitions(ESGraphDomainKey.FromKind(ESGraphDomainKind.AgentAuthoring))
+                .GetNodeDefinitions(ESAgentGraphStableIds.Domain)
                 .ToDictionary(definition => definition.NodeType);
             for (int i = 0; i < asset.Nodes.Count; i++)
             {
@@ -1433,25 +2047,31 @@ namespace ES.EditorInternal
                     else if (definition.Category == ESGraphNodeCategory.Validation)
                         validationCount++;
                 }
-                switch (node.BuiltInKind)
+                switch (node.typeId)
                 {
-                    case ESGraphBuiltInNodeKind.AgentGoal:
+                    case ESAgentGraphStableIds.GoalNode:
                         goalCount++;
                         ValidateGoal(node, issues);
                         break;
-                    case ESGraphBuiltInNodeKind.AgentReference:
+                    case ESAgentGraphStableIds.ReferenceNode:
                         ValidateReference(node, issues);
                         break;
-                    case ESGraphBuiltInNodeKind.AgentConstraint:
+                    case ESAgentGraphStableIds.ConstraintNode:
                         ValidateConstraint(node, issues);
                         break;
-                    case ESGraphBuiltInNodeKind.AgentAICommandOutput:
+                    case ESAgentGraphStableIds.BranchNode:
+                        ValidateBranch(node, issues);
+                        break;
+                    case ESAgentGraphStableIds.TraverseNode:
+                        ValidateTraversal(node, issues);
+                        break;
+                    case ESAgentGraphStableIds.AICommandOutputNode:
                         ValidateAICommandOutput(node, issues);
                         break;
-                    case ESGraphBuiltInNodeKind.AgentSkillOutput:
+                    case ESAgentGraphStableIds.AISkillOutputNode:
                         ValidateAgentSkillOutput(node, issues);
                         break;
-                    case ESGraphBuiltInNodeKind.AgentValidation:
+                    case ESAgentGraphStableIds.ValidationNode:
                         ValidateValidation(node, issues);
                         break;
                 }
@@ -1464,11 +2084,12 @@ namespace ES.EditorInternal
             if (validationCount == 0)
                 issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.ValidationMissing", "至少需要一个 Validation 节点。"));
 
-            ESGraphNodeRecord goal = goalCount == 1 ? FindSingle(asset, ESGraphBuiltInNodeKind.AgentGoal) : null;
+            ESGraphNodeRecord goal = goalCount == 1 ? FindSingle(asset, ESAgentGraphStableIds.GoalNode) : null;
+            ValidateTransitions(asset, definitions, issues);
+            ValidateLogicRoutes(asset, issues);
             if (goal != null)
             {
-                ValidateReachability(asset, goal, issues);
-                ValidateTopology(asset, definitions, issues);
+                ValidateSemanticAlignment(asset, goal, issues);
             }
         }
 
@@ -1508,7 +2129,7 @@ namespace ES.EditorInternal
                     "成功标准必须明确最终结果如何被验收。", node.nodeId));
         }
 
-        public static bool TryGetFinalPurpose(ESGraphAsset asset, out string objective, out string successCriteria)
+        public static bool TryGetFinalPurpose(GraphAsset asset, out string objective, out string successCriteria)
         {
             objective = string.Empty;
             successCriteria = string.Empty;
@@ -1519,7 +2140,8 @@ namespace ES.EditorInternal
             for (int i = 0; i < asset.Nodes.Count; i++)
             {
                 ESGraphNodeRecord node = asset.Nodes[i];
-                if (node == null || node.BuiltInKind != ESGraphBuiltInNodeKind.AgentGoal)
+                if (node == null || !string.Equals(node.typeId, ESAgentGraphStableIds.GoalNode,
+                        StringComparison.Ordinal))
                     continue;
                 goal = node;
                 count++;
@@ -1586,6 +2208,33 @@ namespace ES.EditorInternal
                     ? contractError : error, node.nodeId));
         }
 
+        private static void ValidateBranch(ESGraphNodeRecord node, List<ESGraphValidationIssue> issues)
+        {
+            if (!TryRead(node.payloadJson, out ESAgentBranchPayload payload, out string error)
+                || payload.schemaVersion != 1 || string.IsNullOrWhiteSpace(payload.condition)
+                || string.IsNullOrWhiteSpace(payload.matchedPath)
+                || string.IsNullOrWhiteSpace(payload.defaultPath)
+                || string.IsNullOrWhiteSpace(payload.failurePath))
+                issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.Branch", string.IsNullOrEmpty(error)
+                    ? "分支节点必须完整声明条件、命中、默认和失败路径。" : error, node.nodeId));
+        }
+
+        private static void ValidateTraversal(ESGraphNodeRecord node, List<ESGraphValidationIssue> issues)
+        {
+            if (!TryRead(node.payloadJson, out ESAgentTraversePayload payload, out string error)
+                || payload.schemaVersion != 1
+                || !Enum.IsDefined(typeof(ESAgentTraversalOrder), payload.order)
+                || payload.maxDepth < 1 || payload.maxDepth > 32
+                || payload.maxItems < 1 || payload.maxItems > 512
+                || string.IsNullOrWhiteSpace(payload.target)
+                || string.IsNullOrWhiteSpace(payload.itemAlias)
+                || string.IsNullOrWhiteSpace(payload.stopCondition)
+                || string.IsNullOrWhiteSpace(payload.emptyResultAction)
+                || string.IsNullOrWhiteSpace(payload.failureAction))
+                issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.Traversal", string.IsNullOrEmpty(error)
+                    ? "遍历节点必须声明目标、顺序、硬上限、停止、空结果和失败行为。" : error, node.nodeId));
+        }
+
         private static void ValidateAICommandOutput(ESGraphNodeRecord node, List<ESGraphValidationIssue> issues)
         {
             string contractError = string.Empty;
@@ -1598,6 +2247,53 @@ namespace ES.EditorInternal
             }
             if (!ESAgentArtifactPathPolicy.IsAllowedTarget(ESAgentArtifactKind.AICommand, payload.targetProjectPath, out string pathError))
                 issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.OutputPath", pathError, node.nodeId));
+            string commandName = (payload.commandName ?? string.Empty).Trim();
+            if (commandName.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+                commandName = commandName.Substring(0, commandName.Length - 3);
+            string expectedPath = "Assets/Plugins/ES/AICommands/" + commandName + ".md";
+            if (!string.Equals(payload.targetProjectPath?.Replace('\\', '/'), expectedPath,
+                    StringComparison.Ordinal))
+                issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.CommandTarget",
+                    "AICommand 名称与目标路径必须一致：" + expectedPath, node.nodeId));
+        }
+
+        private static void ValidateSemanticAlignment(GraphAsset asset, ESGraphNodeRecord goalNode,
+            List<ESGraphValidationIssue> issues)
+        {
+            if (!TryRead(goalNode.payloadJson, out ESAgentGoalPayload goalPayload, out _)) return;
+            var goal = new ESAgentGenerationGoal
+            {
+                nodeId = goalNode.nodeId, title = goalPayload.title, objective = goalPayload.objective,
+                context = goalPayload.context, targetUsers = goalPayload.targetUsers,
+                successCriteria = goalPayload.successCriteria
+            };
+            var outputs = new List<ESAgentGenerationOutput>();
+            foreach (ESGraphNodeRecord node in asset.Nodes)
+            {
+                if (node == null) continue;
+                if (string.Equals(node.typeId, ESAgentGraphStableIds.AICommandOutputNode,
+                        StringComparison.Ordinal)
+                    && TryRead(node.payloadJson, out ESAgentAICommandOutputPayload command, out _))
+                    outputs.Add(new ESAgentGenerationOutput
+                    {
+                        nodeId = node.nodeId, artifactKind = ESAgentArtifactKind.AICommand,
+                        artifactName = command.commandName, requirements = command.purpose,
+                        acceptanceCriteria = command.acceptanceCriteria, executionOutline = command.executionOutline
+                    });
+                else if (string.Equals(node.typeId, ESAgentGraphStableIds.AISkillOutputNode,
+                             StringComparison.Ordinal)
+                    && TryRead(node.payloadJson, out ESAgentSkillOutputPayload skill, out _))
+                    outputs.Add(new ESAgentGenerationOutput
+                    {
+                        nodeId = node.nodeId, artifactKind = ESAgentArtifactKind.AgentSkill,
+                        artifactName = skill.skillName, requirements = skill.description,
+                        skillDescription = skill.description, skillTriggerScenarios = skill.triggerScenarios,
+                        skillWorkflow = skill.workflow, skillOutputContract = skill.outputContract
+                    });
+            }
+            if (!ESAgentGenerationSemanticValidator.TryValidate(goal, outputs, out string error))
+                issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.SemanticAlignment", error,
+                    goalNode.nodeId, true));
         }
 
         private static void ValidateAgentSkillOutput(ESGraphNodeRecord node, List<ESGraphValidationIssue> issues)
@@ -1633,128 +2329,87 @@ namespace ES.EditorInternal
                 issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.ApprovalPolicy", "Diff Review 与人工批准不得关闭。", node.nodeId));
         }
 
-        private static ESGraphNodeRecord FindSingle(ESGraphAsset asset, ESGraphBuiltInNodeKind nodeKind)
+        private static ESGraphNodeRecord FindSingle(GraphAsset asset, string nodeTypeId)
         {
             ESGraphNodeRecord result = null;
             for (int i = 0; i < asset.Nodes.Count; i++)
-                if (asset.Nodes[i] != null && asset.Nodes[i].BuiltInKind == nodeKind)
+                if (asset.Nodes[i] != null && string.Equals(asset.Nodes[i].typeId, nodeTypeId,
+                        StringComparison.Ordinal))
                     result = asset.Nodes[i];
             return result;
         }
 
-        private static void ValidateReachability(ESGraphAsset asset, ESGraphNodeRecord root,
-            List<ESGraphValidationIssue> issues)
-        {
-            var nodeByPort = new Dictionary<string, string>(StringComparer.Ordinal);
-            var outgoing = new Dictionary<string, List<string>>(StringComparer.Ordinal);
-            foreach (ESGraphNodeRecord node in asset.Nodes)
-            {
-                if (node == null) continue;
-                outgoing[node.nodeId] = new List<string>();
-                if (node.ports == null) continue;
-                foreach (ESGraphPortRecord port in node.ports)
-                    if (port != null) nodeByPort[port.portId] = node.nodeId;
-            }
-            foreach (ESGraphEdgeRecord edge in asset.Edges)
-                if (edge != null && nodeByPort.TryGetValue(edge.outputPortId, out string from)
-                    && nodeByPort.TryGetValue(edge.inputPortId, out string to)) outgoing[from].Add(to);
-            var visited = new HashSet<string>(StringComparer.Ordinal) { root.nodeId };
-            var queue = new Queue<string>();
-            queue.Enqueue(root.nodeId);
-            while (queue.Count > 0)
-                foreach (string next in outgoing[queue.Dequeue()]) if (visited.Add(next)) queue.Enqueue(next);
-            foreach (ESGraphNodeRecord node in asset.Nodes)
-                if (node != null && !visited.Contains(node.nodeId))
-                    issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.Unreachable", "节点必须从 Goal 可达。", node.nodeId));
-        }
-
-        private static void ValidateTopology(ESGraphAsset asset,
+        private static void ValidateTransitions(GraphAsset asset,
             Dictionary<ESGraphNodeTypeKey, IESGraphNodeDefinition> definitions,
             List<ESGraphValidationIssue> issues)
         {
             var nodeByPort = new Dictionary<string, ESGraphNodeRecord>(StringComparer.Ordinal);
-            var incoming = new Dictionary<string, int>(StringComparer.Ordinal);
-            var outgoing = new Dictionary<string, int>(StringComparer.Ordinal);
+            var portById = new Dictionary<string, ESGraphPortRecord>(StringComparer.Ordinal);
             foreach (ESGraphNodeRecord node in asset.Nodes)
             {
                 if (node == null) continue;
-                incoming[node.nodeId] = 0;
-                outgoing[node.nodeId] = 0;
                 foreach (ESGraphPortRecord port in node.ports ?? new List<ESGraphPortRecord>())
-                    if (port != null && !string.IsNullOrEmpty(port.portId)) nodeByPort[port.portId] = node;
+                    if (port != null && !string.IsNullOrEmpty(port.portId))
+                    {
+                        nodeByPort[port.portId] = node;
+                        portById[port.portId] = port;
+                    }
             }
 
             foreach (ESGraphEdgeRecord edge in asset.Edges)
             {
                 if (edge == null || !nodeByPort.TryGetValue(edge.outputPortId, out ESGraphNodeRecord from)
-                    || !nodeByPort.TryGetValue(edge.inputPortId, out ESGraphNodeRecord to)) continue;
-                outgoing[from.nodeId]++;
-                incoming[to.nodeId]++;
+                    || !nodeByPort.TryGetValue(edge.inputPortId, out ESGraphNodeRecord to)
+                    || !portById.TryGetValue(edge.outputPortId, out ESGraphPortRecord output)) continue;
                 if (!definitions.TryGetValue(from.TypeKey, out IESGraphNodeDefinition fromDefinition)
                     || !definitions.TryGetValue(to.TypeKey, out IESGraphNodeDefinition toDefinition))
                     continue;
-                if (!IsAllowedTransition(fromDefinition.Category, toDefinition.Category))
+                if (!ESAgentRelationSemantics.TryResolve(from.typeId, to.typeId, output.stableKey, out _))
                     issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.Transition",
                         "不允许的节点关系："
                         + ESGraphChinesePresentation.GetNodeCategoryName(fromDefinition.Category) + " → "
                         + ESGraphChinesePresentation.GetNodeCategoryName(toDefinition.Category), edge.edgeId));
             }
+        }
 
+        private static void ValidateLogicRoutes(GraphAsset asset, List<ESGraphValidationIssue> issues)
+        {
+            var edgeCountByOutput = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (ESGraphEdgeRecord edge in asset.Edges)
+            {
+                if (edge == null || string.IsNullOrEmpty(edge.outputPortId)) continue;
+                edgeCountByOutput.TryGetValue(edge.outputPortId, out int count);
+                edgeCountByOutput[edge.outputPortId] = count + 1;
+            }
             foreach (ESGraphNodeRecord node in asset.Nodes)
             {
                 if (node == null) continue;
-                if (!definitions.TryGetValue(node.TypeKey, out IESGraphNodeDefinition definition))
+                string[] requiredKeys;
+                if (string.Equals(node.typeId, ESAgentGraphStableIds.BranchNode, StringComparison.Ordinal))
+                    requiredKeys = new[] { ESAgentGraphStableIds.BranchMatchedPortKey,
+                        ESAgentGraphStableIds.BranchDefaultPortKey, ESAgentGraphStableIds.BranchFailurePortKey };
+                else if (string.Equals(node.typeId, ESAgentGraphStableIds.TraverseNode, StringComparison.Ordinal))
+                    requiredKeys = new[] { ESAgentGraphStableIds.TraverseItemPortKey,
+                        ESAgentGraphStableIds.TraverseCompletedPortKey, ESAgentGraphStableIds.TraverseFailurePortKey };
+                else
                     continue;
-                int inCount = incoming[node.nodeId];
-                int outCount = outgoing[node.nodeId];
-                switch (definition.Category)
-                {
-                    case ESGraphNodeCategory.Entry:
-                        if (inCount != 0 || outCount == 0)
-                            issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.Goal.Topology",
-                                "Goal 不能有输入，并且至少连接一个下游思路节点。", node.nodeId));
-                        break;
-                    case ESGraphNodeCategory.Reference:
-                    case ESGraphNodeCategory.Constraint:
-                        if (inCount == 0 || outCount == 0)
-                            issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.Thought.Topology",
-                                "Reference/Constraint 必须同时具备上游和下游关系。", node.nodeId));
-                        break;
-                    case ESGraphNodeCategory.Output:
-                        if (inCount == 0 || outCount == 0)
-                            issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.Output.Topology",
-                                "每个输出必须接收至少一条要求，并连接到 Validation。", node.nodeId));
-                        break;
-                    case ESGraphNodeCategory.Validation:
-                        if (inCount == 0 || outCount != 0)
-                            issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.Validation.Topology",
-                                "检查节点必须接收候选产物，并且不能再连接下游。", node.nodeId));
-                        break;
-                }
-            }
-        }
 
-        private static bool IsAllowedTransition(ESGraphNodeCategory from, ESGraphNodeCategory to)
-        {
-            switch (from)
-            {
-                case ESGraphNodeCategory.Entry:
-                case ESGraphNodeCategory.Reference:
-                    return to == ESGraphNodeCategory.Reference
-                        || to == ESGraphNodeCategory.Constraint;
-                case ESGraphNodeCategory.Constraint:
-                    return to == ESGraphNodeCategory.Output;
-                case ESGraphNodeCategory.Output:
-                    return to == ESGraphNodeCategory.Validation;
-                default:
-                    return false;
+                for (int i = 0; i < requiredKeys.Length; i++)
+                {
+                    ESGraphPortRecord port = (node.ports ?? new List<ESGraphPortRecord>()).FirstOrDefault(item =>
+                        item != null && string.Equals(item.stableKey, requiredKeys[i], StringComparison.Ordinal));
+                    int count = port != null && edgeCountByOutput.TryGetValue(port.portId, out int value) ? value : 0;
+                    if (count != 1)
+                        issues.Add(ESGraphValidationIssue.Error("AgentAuthoring.LogicRoute",
+                            "逻辑节点出口必须且只能连接一次：" + requiredKeys[i], node.nodeId));
+                }
             }
         }
     }
 
     public sealed class ESAgentArtifactGenerationBaker : IESGraphPlanBaker<ESAgentArtifactGenerationSpec>
     {
-        public ESGraphDomainKey Domain => ESGraphDomainKey.FromKind(ESGraphDomainKind.AgentAuthoring);
+        public ESGraphDomainKey Domain => ESAgentGraphStableIds.Domain;
 
         public bool TryBake(ESBakedGraphSnapshot source, out ESAgentArtifactGenerationSpec plan,
             out IReadOnlyList<ESGraphValidationIssue> issues)
@@ -1766,15 +2421,17 @@ namespace ES.EditorInternal
                 failures.Add(ESGraphValidationIssue.Error("AgentAuthoring.CyclePolicy", "智能助手编排图禁止循环。"));
             var references = new List<ESAgentGenerationReference>();
             var constraints = new List<ESAgentGenerationConstraint>();
+            var branches = new List<ESAgentGenerationBranch>();
+            var traversals = new List<ESAgentGenerationTraversal>();
             var outputs = new List<ESAgentGenerationOutput>();
             var validations = new List<ESAgentGenerationValidation>();
             var relations = new List<ESAgentGenerationRelation>();
             ESAgentGenerationGoal goal = null;
             foreach (ESGraphNodeSnapshot node in source.Nodes)
             {
-                switch (node.BuiltInKind)
+                switch (node.TypeId)
                 {
-                    case ESGraphBuiltInNodeKind.AgentGoal:
+                    case ESAgentGraphStableIds.GoalNode:
                         if (goal != null)
                         {
                             failures.Add(ESGraphValidationIssue.Error("AgentAuthoring.Goal.Bake", "只能烘焙一个 Goal。", node.NodeId));
@@ -1787,7 +2444,7 @@ namespace ES.EditorInternal
                         else goal = new ESAgentGenerationGoal { nodeId = node.NodeId, title = gp.title, objective = gp.objective,
                             context = gp.context, targetUsers = gp.targetUsers, successCriteria = gp.successCriteria };
                         break;
-                    case ESGraphBuiltInNodeKind.AgentReference:
+                    case ESAgentGraphStableIds.ReferenceNode:
                         if (!ESAgentAuthoringGraphValidator.TryRead(node.PayloadJson, out ESAgentReferencePayload rp, out string re)
                             || rp.schemaVersion != 1 || string.IsNullOrWhiteSpace(rp.projectPath)
                             || Path.IsPathRooted(rp.projectPath) || rp.projectPath.Contains(".."))
@@ -1801,7 +2458,7 @@ namespace ES.EditorInternal
                                 projectPath = rp.projectPath, purpose = rp.purpose, required = rp.required });
                         }
                         break;
-                    case ESGraphBuiltInNodeKind.AgentConstraint:
+                    case ESAgentGraphStableIds.ConstraintNode:
                         string constraintContractError = string.Empty;
                         if (!ESAgentAuthoringGraphValidator.TryRead(node.PayloadJson, out ESAgentConstraintPayload cp, out string ce)
                             || !ESAgentConstraintContractValidator.TryValidate(cp, out constraintContractError))
@@ -1812,7 +2469,43 @@ namespace ES.EditorInternal
                             combinationGroup = cp.combinationGroup, statement = cp.statement,
                             rationale = cp.rationale, verification = cp.verification });
                         break;
-                    case ESGraphBuiltInNodeKind.AgentAICommandOutput:
+                    case ESAgentGraphStableIds.BranchNode:
+                        if (!ESAgentAuthoringGraphValidator.TryRead(node.PayloadJson,
+                                out ESAgentBranchPayload branch, out string branchError)
+                            || branch.schemaVersion != 1 || string.IsNullOrWhiteSpace(branch.condition)
+                            || string.IsNullOrWhiteSpace(branch.matchedPath)
+                            || string.IsNullOrWhiteSpace(branch.defaultPath)
+                            || string.IsNullOrWhiteSpace(branch.failurePath))
+                            failures.Add(ESGraphValidationIssue.Error("AgentAuthoring.Branch.Bake",
+                                string.IsNullOrEmpty(branchError) ? "Branch 无法烘焙。" : branchError,
+                                node.NodeId));
+                        else branches.Add(new ESAgentGenerationBranch { nodeId = node.NodeId,
+                            condition = branch.condition, matchedPath = branch.matchedPath,
+                            defaultPath = branch.defaultPath, failurePath = branch.failurePath });
+                        break;
+                    case ESAgentGraphStableIds.TraverseNode:
+                        if (!ESAgentAuthoringGraphValidator.TryRead(node.PayloadJson,
+                                out ESAgentTraversePayload traversal, out string traversalError)
+                            || traversal.schemaVersion != 1
+                            || !Enum.IsDefined(typeof(ESAgentTraversalOrder), traversal.order)
+                            || traversal.maxDepth < 1 || traversal.maxDepth > 32
+                            || traversal.maxItems < 1 || traversal.maxItems > 512
+                            || string.IsNullOrWhiteSpace(traversal.target)
+                            || string.IsNullOrWhiteSpace(traversal.itemAlias)
+                            || string.IsNullOrWhiteSpace(traversal.stopCondition)
+                            || string.IsNullOrWhiteSpace(traversal.emptyResultAction)
+                            || string.IsNullOrWhiteSpace(traversal.failureAction))
+                            failures.Add(ESGraphValidationIssue.Error("AgentAuthoring.Traversal.Bake",
+                                string.IsNullOrEmpty(traversalError) ? "Traversal 无法烘焙。" : traversalError,
+                                node.NodeId));
+                        else traversals.Add(new ESAgentGenerationTraversal { nodeId = node.NodeId,
+                            target = traversal.target, itemAlias = traversal.itemAlias, order = traversal.order,
+                            maxDepth = traversal.maxDepth, maxItems = traversal.maxItems,
+                            stopCondition = traversal.stopCondition,
+                            emptyResultAction = traversal.emptyResultAction,
+                            failureAction = traversal.failureAction });
+                        break;
+                    case ESAgentGraphStableIds.AICommandOutputNode:
                         string commandContractError = string.Empty;
                         if (!ESAgentAuthoringGraphValidator.TryRead(node.PayloadJson, out ESAgentAICommandOutputPayload command, out string commandError)
                             || !ESAgentOutputContractValidator.TryValidate(command, out commandContractError))
@@ -1844,7 +2537,7 @@ namespace ES.EditorInternal
                             requiredEvidence = command.requiredEvidence, blockedHandling = command.blockedHandling,
                             rollbackStrategy = command.rollbackStrategy });
                         break;
-                    case ESGraphBuiltInNodeKind.AgentSkillOutput:
+                    case ESAgentGraphStableIds.AISkillOutputNode:
                         string skillContractError = string.Empty;
                         if (!ESAgentAuthoringGraphValidator.TryRead(node.PayloadJson, out ESAgentSkillOutputPayload skill, out string skillError)
                             || !ESAgentOutputContractValidator.TryValidate(skill, out skillContractError))
@@ -1884,7 +2577,7 @@ namespace ES.EditorInternal
                             defaultPrompt = skill.defaultPrompt, includeAgentsMetadata = skill.includeAgentsMetadata,
                             includeReferences = skill.includeReferences, includeScripts = skill.includeScripts });
                         break;
-                    case ESGraphBuiltInNodeKind.AgentValidation:
+                    case ESAgentGraphStableIds.ValidationNode:
                         if (!ESAgentAuthoringGraphValidator.TryRead(node.PayloadJson, out ESAgentValidationPayload vp, out string ve)
                             || vp.schemaVersion != 1 || !vp.requireDiffReview || !vp.requireHumanApproval)
                             failures.Add(ESGraphValidationIssue.Error("AgentAuthoring.Validation.Bake", string.IsNullOrEmpty(ve) ? "检查节点必须保留候选差异检查和人工批准。" : ve, node.NodeId));
@@ -1906,7 +2599,12 @@ namespace ES.EditorInternal
             var candidate = new ESAgentArtifactGenerationSpec { sourceGraphId = source.GraphId,
                 sourceOriginGraphId = source.OriginGraphId, sourceContentSignature = source.ContentSignature, goal = goal,
                 references = references.ToArray(), constraints = constraints.ToArray(), outputs = outputs.ToArray(),
+                branches = branches.ToArray(), traversals = traversals.ToArray(),
                 validations = validations.ToArray(), relations = relations.ToArray() };
+            candidate.skillBundle = ESAgentSkillBundleContract.Create(candidate.sourceGraphId,
+                goal.title, goal.nodeId, candidate.references, candidate.constraints,
+                candidate.branches, candidate.traversals,
+                candidate.outputs, candidate.validations);
             if (!ESAgentGenerationIntentValidator.TryValidate(candidate, out string intentError))
             {
                 failures.Add(ESGraphValidationIssue.Error("AgentAuthoring.Intent.Bake", intentError));
@@ -1937,7 +2635,7 @@ namespace ES.EditorInternal
                         "无法解析思路图关系。", edge.EdgeId));
                     continue;
                 }
-                if (!TryGetRelationKind(from.BuiltInKind, to.BuiltInKind,
+                if (!ESAgentRelationSemantics.TryResolve(from.TypeId, to.TypeId, output.StableKey,
                         out ESAgentRelationKind relationKind))
                 {
                     failures.Add(ESGraphValidationIssue.Error("AgentAuthoring.Relation.Semantics",
@@ -1961,32 +2659,6 @@ namespace ES.EditorInternal
             }
         }
 
-        private static bool TryGetRelationKind(ESGraphBuiltInNodeKind from, ESGraphBuiltInNodeKind to,
-            out ESAgentRelationKind relationKind)
-        {
-            if ((from == ESGraphBuiltInNodeKind.AgentGoal || from == ESGraphBuiltInNodeKind.AgentReference)
-                && (to == ESGraphBuiltInNodeKind.AgentReference || to == ESGraphBuiltInNodeKind.AgentConstraint))
-            {
-                relationKind = ESAgentRelationKind.ProvidesContext;
-                return true;
-            }
-            if (from == ESGraphBuiltInNodeKind.AgentConstraint
-                && (to == ESGraphBuiltInNodeKind.AgentAICommandOutput
-                    || to == ESGraphBuiltInNodeKind.AgentSkillOutput))
-            {
-                relationKind = ESAgentRelationKind.AppliesConstraint;
-                return true;
-            }
-            if ((from == ESGraphBuiltInNodeKind.AgentAICommandOutput
-                    || from == ESGraphBuiltInNodeKind.AgentSkillOutput)
-                && to == ESGraphBuiltInNodeKind.AgentValidation)
-            {
-                relationKind = ESAgentRelationKind.RequiresValidation;
-                return true;
-            }
-            relationKind = default;
-            return false;
-        }
     }
 
     public static class ESAgentArtifactPathPolicy
@@ -2135,9 +2807,10 @@ namespace ES.EditorInternal
 
     public static class ESAgentAuthoringGraphSchema
     {
-        public static bool TryRepairPorts(ESGraphAsset asset, out string error)
+        public static bool TryRepairPorts(GraphAsset asset, out string error)
         {
-            if (asset == null || asset.DomainKind != ESGraphDomainKind.AgentAuthoring)
+            if (asset == null || !string.Equals(asset.DomainId, ESAgentGraphStableIds.DomainId,
+                    StringComparison.Ordinal))
             {
                 error = "只能修复智能助手编排图。";
                 return false;
@@ -2182,7 +2855,7 @@ namespace ES.EditorInternal
             "仅更新"
         };
 
-        public ESGraphDomainKey Domain => ESGraphDomainKey.FromKind(ESGraphDomainKind.AgentAuthoring);
+        public ESGraphDomainKey Domain => ESAgentGraphStableIds.Domain;
         public abstract ESGraphNodeTypeKey NodeType { get; }
         public virtual int Priority => 0;
         public VisualElement Create(string payloadJson, Action<string> commitPayload)
@@ -2234,7 +2907,7 @@ namespace ES.EditorInternal
         }
 
         protected static TextField CardText(ESGraphNodeCardContext context, string name, string label,
-            string value, string tooltip, Action<string> set, Action commit)
+            string value, string tooltip, Action<string> set, Action commit, string fieldName = null)
         {
             var field = new TextField(label)
             {
@@ -2251,6 +2924,7 @@ namespace ES.EditorInternal
             field.labelElement.style.maxWidth = 64f;
             field.labelElement.style.fontSize = 9f;
             field.isReadOnly = !(context?.CanEditPayload ?? false);
+            StyleField(field, field.labelElement, fieldName, IsEmptyValue(value));
             field.RegisterValueChangedCallback(evt =>
             {
                 if (context?.CanEditPayload != true)
@@ -2262,7 +2936,8 @@ namespace ES.EditorInternal
             return field;
         }
 
-        protected static TextField CardReadOnlyText(string name, string label, string value, string tooltip)
+        protected static TextField CardReadOnlyText(string name, string label, string value, string tooltip,
+            string fieldName = null)
         {
             var field = new TextField(label)
             {
@@ -2278,11 +2953,12 @@ namespace ES.EditorInternal
             field.labelElement.style.minWidth = 48f;
             field.labelElement.style.maxWidth = 64f;
             field.labelElement.style.fontSize = 9f;
+            StyleField(field, field.labelElement, fieldName, IsEmptyValue(value));
             return field;
         }
 
         protected static PopupField<string> CardPopup(ESGraphNodeCardContext context, string name, string label,
-            List<string> choices, int selectedIndex, Action<int> set, Action commit)
+            List<string> choices, int selectedIndex, Action<int> set, Action commit, string fieldName = null)
         {
             var field = new PopupField<string>(label, choices,
                 Mathf.Clamp(selectedIndex, 0, Math.Max(0, choices.Count - 1)))
@@ -2297,6 +2973,7 @@ namespace ES.EditorInternal
             field.labelElement.style.maxWidth = 64f;
             field.labelElement.style.fontSize = 9f;
             field.SetEnabled(context?.CanEditPayload ?? false);
+            StyleField(field, field.labelElement, fieldName, false);
             field.RegisterValueChangedCallback(evt =>
             {
                 if (context?.CanEditPayload != true)
@@ -2308,7 +2985,7 @@ namespace ES.EditorInternal
         }
 
         protected static Toggle CardToggle(ESGraphNodeCardContext context, string name, string label, bool value,
-            Action<bool> set, Action commit)
+            Action<bool> set, Action commit, string fieldName = null)
         {
             var field = new Toggle(label) { name = name, value = value };
             field.style.minHeight = 20f;
@@ -2316,6 +2993,7 @@ namespace ES.EditorInternal
             field.style.marginTop = 1f;
             field.style.marginBottom = 1f;
             field.SetEnabled(context?.CanEditPayload ?? false);
+            StyleField(field, field.labelElement, fieldName, !value);
             field.RegisterValueChangedCallback(evt =>
             {
                 if (context?.CanEditPayload != true)
@@ -2327,7 +3005,7 @@ namespace ES.EditorInternal
         }
 
         protected static IntegerField CardInteger(ESGraphNodeCardContext context, string name, string label,
-            int value, int min, int max, Action<int> set, Action commit)
+            int value, int min, int max, Action<int> set, Action commit, string fieldName = null)
         {
             var field = new IntegerField(label) { name = name, value = value, isDelayed = true };
             field.style.minHeight = 22f;
@@ -2338,6 +3016,7 @@ namespace ES.EditorInternal
             field.labelElement.style.maxWidth = 64f;
             field.labelElement.style.fontSize = 9f;
             field.SetEnabled(context?.CanEditPayload ?? false);
+            StyleField(field, field.labelElement, fieldName, false);
             field.RegisterValueChangedCallback(evt =>
             {
                 if (context?.CanEditPayload != true)
@@ -2562,11 +3241,103 @@ namespace ES.EditorInternal
             button.style.fontSize = 10f;
             button.style.flexShrink = 0f;
         }
-        protected static TextField Text(string label, string value, bool multiline = false)
+        protected static TextField Text(string label, string value, bool multiline = false,
+            string fieldName = null)
         {
             var field = new TextField(label) { value = value ?? string.Empty, multiline = multiline };
             ESGraphInspectorVisuals.StyleTextField(field);
+            StyleField(field, field.labelElement, fieldName, IsEmptyValue(value));
             return field;
+        }
+
+        protected static VisualElement FieldSummary(T payload, string title = "关键字段")
+        {
+            int core = 0;
+            int coreReady = 0;
+            int important = 0;
+            int importantReady = 0;
+            IReadOnlyList<ESFieldPresentationMetadata> summaryFields
+                = ESFieldPresentationMetadataCache.GetSummaryFields(typeof(T));
+            for (int i = 0; i < summaryFields.Count; i++)
+            {
+                ESFieldPresentationMetadata metadata = summaryFields[i];
+                bool ready = IsReadyValue(metadata.Field.GetValue(payload), metadata.Required);
+                if (metadata.Level == ESFieldLevel.Core)
+                {
+                    core++;
+                    if (ready) coreReady++;
+                }
+                else
+                {
+                    important++;
+                    if (ready) importantReady++;
+                }
+            }
+
+            var box = new VisualElement { name = "es-field-summary" };
+            box.style.flexDirection = FlexDirection.Row;
+            box.style.alignItems = Align.Center;
+            box.style.marginTop = 2f;
+            box.style.marginBottom = 5f;
+            box.style.paddingLeft = 7f;
+            box.style.paddingRight = 7f;
+            box.style.paddingTop = 4f;
+            box.style.paddingBottom = 4f;
+            box.style.borderLeftWidth = 3f;
+            Color accent = coreReady == core
+                ? ESEditorPresentation.GetFieldLevelAccent(ESFieldLevel.Core)
+                : ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Error);
+            box.style.borderLeftColor = accent;
+            Color background = accent;
+            background.a = EditorGUIUtility.isProSkin ? 0.11f : 0.07f;
+            box.style.backgroundColor = background;
+            var caption = new Label(title + " " + coreReady + "/" + core)
+            {
+                tooltip = coreReady == core
+                    ? "核心字段已经完整。"
+                    : "还有 " + (core - coreReady) + " 个核心字段需要补充。"
+            };
+            caption.style.unityFontStyleAndWeight = FontStyle.Bold;
+            caption.style.fontSize = 10f;
+            caption.style.color = accent;
+            caption.style.flexGrow = 1f;
+            box.Add(caption);
+            if (important > 0)
+            {
+                var secondary = new Label("重点 " + importantReady + "/" + important);
+                secondary.style.fontSize = 9f;
+                secondary.style.color = new Color(0.64f, 0.7f, 0.8f, 0.95f);
+                box.Add(secondary);
+            }
+            return box;
+        }
+
+        protected static void StyleField(VisualElement field, Label label, string fieldName, bool isEmpty)
+        {
+            if (field == null
+                || !ESFieldPresentationMetadataCache.TryGet(
+                    typeof(T), fieldName, out ESFieldPresentationMetadata metadata))
+                return;
+            ESEditorPresentation.StyleField(field, label, metadata.Level,
+                metadata.Required, isEmpty, metadata.Hint);
+        }
+
+        private static bool IsEmptyValue(string value)
+        {
+            return string.IsNullOrWhiteSpace(value);
+        }
+
+        private static bool IsReadyValue(object value, bool required)
+        {
+            if (!required)
+                return true;
+            if (value == null)
+                return false;
+            if (value is string text)
+                return !string.IsNullOrWhiteSpace(text);
+            if (value is bool enabled)
+                return enabled;
+            return true;
         }
         protected static void CommitOnFocusOut(TextField field, Action<string> set, Action commit)
         {
@@ -2761,18 +3532,37 @@ namespace ES.EditorInternal
 
     public sealed class ESAgentGoalPayloadInspector : ESAgentPayloadInspector<ESAgentGoalPayload>
     {
-        public override ESGraphNodeTypeKey NodeType => ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.AgentGoal);
+        public override ESGraphNodeTypeKey NodeType => ESAgentGraphStableIds.Node(ESAgentGraphStableIds.GoalNode);
         protected override VisualElement Build(ESAgentGoalPayload p, Action commit)
-        { var r = new VisualElement(); r.Add(new HelpBox("最终目的和成功标准是发送、生成、更新与复制前的硬门禁。", HelpBoxMessageType.Info)); var a = Text("标题", p.title); var b = Text("最终目的", p.objective, true); var c = Text("背景与上下文", p.context, true); var d = Text("目标用户 / 触发场景", p.targetUsers, true); var e = Text("成功标准 / 最终结果", p.successCriteria, true); foreach (TextField field in new[] { a, b, c, d, e }) r.Add(field); CommitOnFocusOut(a, x => p.title=x, commit); CommitOnFocusOut(b, x => p.objective=x, commit); CommitOnFocusOut(c, x => p.context=x, commit); CommitOnFocusOut(d, x => p.targetUsers=x, commit); CommitOnFocusOut(e, x => p.successCriteria=x, commit); return r; }
+        {
+            var r = new VisualElement();
+            r.Add(new HelpBox("最终目的和成功标准是发送、生成、更新与复制前的硬门禁。",
+                HelpBoxMessageType.Info));
+            r.Add(FieldSummary(p, "目标核心字段"));
+            var a = Text("标题", p.title, fieldName: nameof(p.title));
+            var b = Text("最终目的", p.objective, true, nameof(p.objective));
+            var c = Text("背景与上下文", p.context, true, nameof(p.context));
+            var d = Text("目标用户 / 触发场景", p.targetUsers, true, nameof(p.targetUsers));
+            var e = Text("成功标准 / 最终结果", p.successCriteria, true, nameof(p.successCriteria));
+            foreach (TextField field in new[] { a, b, c, d, e }) r.Add(field);
+            CommitOnFocusOut(a, x => p.title = x, commit);
+            CommitOnFocusOut(b, x => p.objective = x, commit);
+            CommitOnFocusOut(c, x => p.context = x, commit);
+            CommitOnFocusOut(d, x => p.targetUsers = x, commit);
+            CommitOnFocusOut(e, x => p.successCriteria = x, commit);
+            return r;
+        }
 
         protected override VisualElement BuildCard(ESAgentGoalPayload p, ESGraphNodeCardContext context,
             Action commit)
         {
             var root = new VisualElement();
+            root.Add(FieldSummary(p, "目标"));
             root.Add(CardText(context, "es-node-card-goal-title", "目标", p.title,
-                "生成目标的短标题。按 Enter 或离开输入框后提交。", value => p.title = value, commit));
+                "生成目标的短标题。按 Enter 或离开输入框后提交。", value => p.title = value, commit,
+                nameof(p.title)));
             root.Add(CardText(context, "es-node-card-goal-objective", "目的", p.objective,
-                p.objective, value => p.objective = value, commit));
+                p.objective, value => p.objective = value, commit, nameof(p.objective)));
             root.Add(CardReadOnlyText("es-node-card-goal-relations", "关系",
                 context.IncomingConnectionCount + " 入 / " + context.OutgoingConnectionCount + " 出",
                 "只读连接摘要；完整关系仍以 Graph 连线为准。"));
@@ -2792,7 +3582,7 @@ namespace ES.EditorInternal
             "项目资产"
         };
 
-        public override ESGraphNodeTypeKey NodeType => ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.AgentReference);
+        public override ESGraphNodeTypeKey NodeType => ESAgentGraphStableIds.Node(ESAgentGraphStableIds.ReferenceNode);
         protected override VisualElement Build(ESAgentReferencePayload p, Action commit)
         {
             var root = new VisualElement();
@@ -2873,7 +3663,7 @@ namespace ES.EditorInternal
             "必须同时满足", "同组任一满足"
         };
 
-        public override ESGraphNodeTypeKey NodeType => ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.AgentConstraint);
+        public override ESGraphNodeTypeKey NodeType => ESAgentGraphStableIds.Node(ESAgentGraphStableIds.ConstraintNode);
         protected override VisualElement Build(ESAgentConstraintPayload p, Action commit)
         {
             var root = new VisualElement();
@@ -2964,6 +3754,111 @@ namespace ES.EditorInternal
         }
     }
 
+    public sealed class ESAgentBranchPayloadInspector : ESAgentPayloadInspector<ESAgentBranchPayload>
+    {
+        public override ESGraphNodeTypeKey NodeType => ESAgentGraphStableIds.Node(ESAgentGraphStableIds.BranchNode);
+
+        protected override VisualElement Build(ESAgentBranchPayload p, Action commit)
+        {
+            var root = new VisualElement();
+            root.Add(new HelpBox("三条路径都是执行合同的一部分，缺少任一接线时整图不能 Bake。",
+                HelpBoxMessageType.Info));
+            root.Add(FieldSummary(p, "分支合同"));
+            var condition = Text("判断条件", p.condition, true, nameof(p.condition));
+            var matched = Text("条件命中", p.matchedPath, true, nameof(p.matchedPath));
+            var fallback = Text("默认路径", p.defaultPath, true, nameof(p.defaultPath));
+            var failure = Text("判断失败", p.failurePath, true, nameof(p.failurePath));
+            root.Add(condition); root.Add(matched); root.Add(fallback); root.Add(failure);
+            CommitOnFocusOut(condition, value => p.condition = value, commit);
+            CommitOnFocusOut(matched, value => p.matchedPath = value, commit);
+            CommitOnFocusOut(fallback, value => p.defaultPath = value, commit);
+            CommitOnFocusOut(failure, value => p.failurePath = value, commit);
+            return root;
+        }
+
+        protected override VisualElement BuildCard(ESAgentBranchPayload p,
+            ESGraphNodeCardContext context, Action commit)
+        {
+            var root = new VisualElement();
+            root.Add(FieldSummary(p, "分支合同"));
+            root.Add(CardText(context, "es-node-card-branch-condition", "条件", p.condition,
+                p.condition, value => p.condition = value, commit, nameof(p.condition)));
+            root.Add(CardText(context, "es-node-card-branch-default", "默认", p.defaultPath,
+                p.defaultPath, value => p.defaultPath = value, commit, nameof(p.defaultPath)));
+            root.Add(CardText(context, "es-node-card-branch-failure", "失败", p.failurePath,
+                p.failurePath, value => p.failurePath = value, commit, nameof(p.failurePath)));
+            return root;
+        }
+    }
+
+    public sealed class ESAgentTraversePayloadInspector : ESAgentPayloadInspector<ESAgentTraversePayload>
+    {
+        private static readonly List<string> OrderLabels = new List<string>
+        {
+            "按输入顺序", "依赖优先", "优先级优先"
+        };
+
+        public override ESGraphNodeTypeKey NodeType => ESAgentGraphStableIds.Node(ESAgentGraphStableIds.TraverseNode);
+
+        protected override VisualElement Build(ESAgentTraversePayload p, Action commit)
+        {
+            var root = new VisualElement();
+            root.Add(new HelpBox("遍历不创建 Graph 循环；达到最大深度或最大数量后必须停止。",
+                HelpBoxMessageType.Info));
+            root.Add(FieldSummary(p, "有界遍历合同"));
+            var target = Text("遍历目标", p.target, true, nameof(p.target));
+            var alias = Text("单项名称", p.itemAlias, false, nameof(p.itemAlias));
+            var order = new PopupField<string>("处理顺序", OrderLabels,
+                Mathf.Clamp((int)p.order, 0, OrderLabels.Count - 1));
+            var maxDepth = new IntegerField("最大深度（1-32）") { value = p.maxDepth, isDelayed = true };
+            var maxItems = new IntegerField("最大数量（1-512）") { value = p.maxItems, isDelayed = true };
+            var stop = Text("停止条件", p.stopCondition, true, nameof(p.stopCondition));
+            var empty = Text("空结果行为", p.emptyResultAction, true, nameof(p.emptyResultAction));
+            var failure = Text("失败行为", p.failureAction, true, nameof(p.failureAction));
+            root.Add(target); root.Add(alias); root.Add(order); root.Add(maxDepth); root.Add(maxItems);
+            root.Add(stop); root.Add(empty); root.Add(failure);
+            CommitOnFocusOut(target, value => p.target = value, commit);
+            CommitOnFocusOut(alias, value => p.itemAlias = value, commit);
+            order.RegisterValueChangedCallback(evt =>
+            {
+                p.order = (ESAgentTraversalOrder)Math.Max(0, OrderLabels.IndexOf(evt.newValue));
+                commit();
+            });
+            maxDepth.RegisterValueChangedCallback(evt =>
+            {
+                p.maxDepth = Mathf.Clamp(evt.newValue, 1, 32);
+                maxDepth.SetValueWithoutNotify(p.maxDepth);
+                commit();
+            });
+            maxItems.RegisterValueChangedCallback(evt =>
+            {
+                p.maxItems = Mathf.Clamp(evt.newValue, 1, 512);
+                maxItems.SetValueWithoutNotify(p.maxItems);
+                commit();
+            });
+            CommitOnFocusOut(stop, value => p.stopCondition = value, commit);
+            CommitOnFocusOut(empty, value => p.emptyResultAction = value, commit);
+            CommitOnFocusOut(failure, value => p.failureAction = value, commit);
+            return root;
+        }
+
+        protected override VisualElement BuildCard(ESAgentTraversePayload p,
+            ESGraphNodeCardContext context, Action commit)
+        {
+            var root = new VisualElement();
+            root.Add(FieldSummary(p, "有界遍历"));
+            root.Add(CardText(context, "es-node-card-traverse-target", "目标", p.target,
+                p.target, value => p.target = value, commit, nameof(p.target)));
+            root.Add(CardPopup(context, "es-node-card-traverse-order", "顺序", OrderLabels,
+                (int)p.order, value => p.order = (ESAgentTraversalOrder)value, commit));
+            root.Add(CardInteger(context, "es-node-card-traverse-depth", "最大深度", p.maxDepth,
+                1, 32, value => p.maxDepth = value, commit));
+            root.Add(CardInteger(context, "es-node-card-traverse-count", "最大数量", p.maxItems,
+                1, 512, value => p.maxItems = value, commit));
+            return root;
+        }
+    }
+
     public sealed class ESAgentAICommandOutputInspector : ESAgentPayloadInspector<ESAgentAICommandOutputPayload>
     {
         private static readonly List<string> IntentLabels = new List<string>
@@ -2980,14 +3875,16 @@ namespace ES.EditorInternal
             "停止并报告", "回滚本次事务并报告"
         };
 
-        public override ESGraphNodeTypeKey NodeType => ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.AgentAICommandOutput);
+        public override ESGraphNodeTypeKey NodeType => ESAgentGraphStableIds.Node(ESAgentGraphStableIds.AICommandOutputNode);
         protected override VisualElement Build(ESAgentAICommandOutputPayload p, Action commit)
         {
             var r = new VisualElement();
             r.Add(new HelpBox("填写命令要解决的问题、允许修改的文件和验收方式。正式文件会在候选差异检查后才写入。",HelpBoxMessageType.Info));
-            var a = Text("命令名称", p.commandName);
-            var b = Text("正式文件路径（系统）", p.targetProjectPath);
-            b.tooltip = "正式 AICommand 文件的项目路径，优先从下拉列表选择。";
+            r.Add(FieldSummary(p, "AICommand 核心字段"));
+            var a = Text("命令名称", p.commandName, fieldName: nameof(p.commandName));
+            var b = Text("正式文件路径（系统）", p.targetProjectPath,
+                fieldName: nameof(p.targetProjectPath));
+            b.tooltip = b.tooltip + "\n正式 AICommand 文件的项目路径，优先从下拉列表选择。";
             VisualElement picker = SearchPicker(
                 "选择已有命令",
                 "搜索 AICommand",
@@ -3023,17 +3920,27 @@ namespace ES.EditorInternal
                 Mathf.Clamp((int)p.riskLevel - 1, 0, RiskLabels.Count - 1));
             var failurePolicy = new PopupField<string>("失败策略", FailurePolicyLabels,
                 Mathf.Clamp((int)p.failurePolicy, 0, FailurePolicyLabels.Count - 1));
-            var f = Text("用途", p.purpose, true);
-            var g = Text("预期输入", p.expectedInputs, true);
-            var preconditions = Text("执行前置条件", p.preconditions, true);
-            var allowedWriteScopes = Text("允许写入范围", p.allowedWriteScopes, true);
-            var forbiddenOperations = Text("禁止操作", p.forbiddenOperations, true);
-            var h = Text("执行步骤", p.executionOutline, true);
-            var i = Text("完成定义", p.acceptanceCriteria, true);
-            var requiredEvidence = Text("必须提供的证据", p.requiredEvidence, true);
-            var blockedHandling = Text("阻断 / 升级处理", p.blockedHandling, true);
-            var rollbackStrategy = Text("回滚 / 恢复要求", p.rollbackStrategy, true);
-            var j = Text("必须包含的章节", p.requiredSections, true);
+            StyleField(intent, intent.labelElement, nameof(p.commandIntent), false);
+            StyleField(writeAuthorization, writeAuthorization.labelElement,
+                nameof(p.writeAuthorization), false);
+            StyleField(risk, risk.labelElement, nameof(p.riskLevel), false);
+            StyleField(failurePolicy, failurePolicy.labelElement, nameof(p.failurePolicy), false);
+            var f = Text("用途", p.purpose, true, nameof(p.purpose));
+            var g = Text("预期输入", p.expectedInputs, true, nameof(p.expectedInputs));
+            var preconditions = Text("执行前置条件", p.preconditions, true, nameof(p.preconditions));
+            var allowedWriteScopes = Text("允许写入范围", p.allowedWriteScopes, true,
+                nameof(p.allowedWriteScopes));
+            var forbiddenOperations = Text("禁止操作", p.forbiddenOperations, true,
+                nameof(p.forbiddenOperations));
+            var h = Text("执行步骤", p.executionOutline, true, nameof(p.executionOutline));
+            var i = Text("完成定义", p.acceptanceCriteria, true, nameof(p.acceptanceCriteria));
+            var requiredEvidence = Text("必须提供的证据", p.requiredEvidence, true,
+                nameof(p.requiredEvidence));
+            var blockedHandling = Text("阻断 / 升级处理", p.blockedHandling, true,
+                nameof(p.blockedHandling));
+            var rollbackStrategy = Text("回滚 / 恢复要求", p.rollbackStrategy, true,
+                nameof(p.rollbackStrategy));
+            var j = Text("必须包含的章节", p.requiredSections, true, nameof(p.requiredSections));
             foreach (VisualElement v in new VisualElement[] { a, b, picker, operation, intent,
                          writeAuthorization, risk, failurePolicy, f, g, preconditions, allowedWriteScopes,
                          forbiddenOperations, h, i, requiredEvidence, blockedHandling, rollbackStrategy, j }) r.Add(v);
@@ -3053,21 +3960,32 @@ namespace ES.EditorInternal
             ESGraphNodeCardContext context, Action commit)
         {
             var root = new VisualElement();
+            root.Add(FieldSummary(p, "产物合同"));
             root.Add(CardText(context, "es-node-card-command-name", "命令", p.commandName,
-                p.commandName, value => p.commandName = value, commit));
+                p.commandName, value => p.commandName = value, commit, nameof(p.commandName)));
             root.Add(CardText(context, "es-node-card-command-path", "路径", p.targetProjectPath,
-                p.targetProjectPath, value => p.targetProjectPath = value, commit));
+                p.targetProjectPath, value => p.targetProjectPath = value, commit,
+                nameof(p.targetProjectPath)));
             root.Add(CardPopup(context, "es-node-card-command-mode", "方式", CardOperationLabels,
-                (int)p.operationMode, value => p.operationMode = (ESAgentArtifactOperationMode)value, commit));
+                (int)p.operationMode, value => p.operationMode = (ESAgentArtifactOperationMode)value, commit,
+                nameof(p.operationMode)));
             root.Add(CardPopup(context, "es-node-card-command-intent", "意图", IntentLabels,
-                (int)p.commandIntent, value => p.commandIntent = (ESAgentCommandIntent)value, commit));
+                (int)p.commandIntent, value => p.commandIntent = (ESAgentCommandIntent)value, commit,
+                nameof(p.commandIntent)));
             root.Add(CardPopup(context, "es-node-card-command-write", "写入", WriteAuthorizationLabels,
-                (int)p.writeAuthorization, value => p.writeAuthorization = (ESAgentWriteAuthorization)value, commit));
+                (int)p.writeAuthorization, value => p.writeAuthorization = (ESAgentWriteAuthorization)value,
+                commit, nameof(p.writeAuthorization)));
             root.Add(CardPopup(context, "es-node-card-command-risk", "风险", RiskLabels,
                 Mathf.Clamp((int)p.riskLevel - 1, 0, RiskLabels.Count - 1),
-                value => p.riskLevel = (ESAgentRiskLevel)(value + 1), commit));
+                value => p.riskLevel = (ESAgentRiskLevel)(value + 1), commit, nameof(p.riskLevel)));
+            root.Add(CardReadOnlyText("es-node-card-command-purpose", "用途", p.purpose,
+                p.purpose, nameof(p.purpose)));
             root.Add(CardReadOnlyText("es-node-card-command-boundary", "边界", p.allowedWriteScopes,
-                p.allowedWriteScopes));
+                p.allowedWriteScopes, nameof(p.allowedWriteScopes)));
+            root.Add(CardReadOnlyText("es-node-card-command-acceptance", "完成", p.acceptanceCriteria,
+                p.acceptanceCriteria, nameof(p.acceptanceCriteria)));
+            root.Add(CardReadOnlyText("es-node-card-command-evidence", "证据", p.requiredEvidence,
+                p.requiredEvidence, nameof(p.requiredEvidence)));
             root.Add(CardArtifactStatus("es-node-card-command-status", ESAgentArtifactKind.AICommand,
                 p.operationMode, p.targetProjectPath));
             root.Add(CardArtifactActions(context, "es-node-card-command-actions", ESAgentArtifactKind.AICommand,
@@ -3091,25 +4009,27 @@ namespace ES.EditorInternal
             "必须幂等", "尽力幂等", "不适用"
         };
 
-        public override ESGraphNodeTypeKey NodeType => ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.AgentSkillOutput);
+        public override ESGraphNodeTypeKey NodeType => ESAgentGraphStableIds.Node(ESAgentGraphStableIds.AISkillOutputNode);
         protected override VisualElement Build(ESAgentSkillOutputPayload p, Action commit)
         {
             var r = new VisualElement();
             r.Add(new HelpBox("填写技能要解决的工作，并说明什么时候使用、什么时候不要使用。技能目录和文件会在候选检查后才写入。",HelpBoxMessageType.Info));
-            var a = Text("技能名称（英文小写）", p.skillName);
-            var b = Text("正式目录（系统）", p.targetProjectPath);
-            b.tooltip = "正式技能目录，优先从下拉列表选择。";
+            r.Add(FieldSummary(p, "AISkill 核心字段"));
+            var a = Text("技能名称（英文小写）", p.skillName, fieldName: nameof(p.skillName));
+            var b = Text("正式目录（系统）", p.targetProjectPath,
+                fieldName: nameof(p.targetProjectPath));
+            b.tooltip = b.tooltip + "\n正式技能目录，优先从下拉列表选择。";
             VisualElement picker = SearchPicker(
                 "选择已有技能",
-                "搜索 Agent Skill",
-                "按技能目录名搜索已有 Agent Skill；选择后会同步目录和技能名称。",
+                "搜索 AISkill",
+                "按技能目录名搜索已有 AISkill；选择后会同步目录和技能名称。",
                 () => ESAgentAuthoringAssetCatalog.GetAgentSkillTargets(b.value, true),
                 out Button pickerButton);
             pickerButton.clicked += () =>
             {
                 ESSearchDropdown.Open(
                     pickerButton,
-                    "选择已有 Agent Skill 技能",
+                        "选择已有 AISkill",
                     () => PathEntries(
                         ESAgentAuthoringAssetCatalog.GetAgentSkillTargets(b.value),
                         b.value,
@@ -3133,26 +4053,34 @@ namespace ES.EditorInternal
                 Mathf.Clamp((int)p.effectKind, 0, EffectLabels.Count - 1));
             var idempotency = new PopupField<string>("幂等策略", IdempotencyLabels,
                 Mathf.Clamp((int)p.idempotency, 0, IdempotencyLabels.Count - 1));
-            var c = Text("能力说明", p.description, true);
-            var d = Text("触发场景", p.triggerScenarios, true);
-            var nonTrigger = Text("不触发场景", p.nonTriggerScenarios, true);
-            var preconditions = Text("使用前置条件", p.preconditions, true);
-            var dependencies = Text("必要依赖 / 工具", p.requiredDependencies, true);
-            var inputContract = Text("输入契约", p.inputContract, true);
-            var e = Text("核心工作流程", p.workflow, true);
-            var outputContract = Text("输出契约", p.outputContract, true);
-            var sideEffects = Text("允许的副作用", p.sideEffects, true);
-            var f = Text("不负责的事项 / 禁止事项", p.nonGoals, true);
-            var failureRecovery = Text("失败恢复", p.failureRecovery, true);
-            var g = Text("验证步骤", p.validationSteps, true);
-            var permissionBoundary = Text("权限边界", p.permissionBoundary, true);
-            var h = Text("默认使用提示", p.defaultPrompt, true);
+            StyleField(effect, effect.labelElement, nameof(p.effectKind), false);
+            StyleField(idempotency, idempotency.labelElement, nameof(p.idempotency), false);
+            var c = Text("能力说明", p.description, true, nameof(p.description));
+            var d = Text("触发场景", p.triggerScenarios, true, nameof(p.triggerScenarios));
+            var nonTrigger = Text("不触发场景", p.nonTriggerScenarios, true,
+                nameof(p.nonTriggerScenarios));
+            var preconditions = Text("使用前置条件", p.preconditions, true, nameof(p.preconditions));
+            var dependencies = Text("必要依赖 / 工具", p.requiredDependencies, true,
+                nameof(p.requiredDependencies));
+            var inputContract = Text("输入契约", p.inputContract, true, nameof(p.inputContract));
+            var e = Text("核心工作流程", p.workflow, true, nameof(p.workflow));
+            var outputContract = Text("输出契约", p.outputContract, true, nameof(p.outputContract));
+            var sideEffects = Text("允许的副作用", p.sideEffects, true, nameof(p.sideEffects));
+            var f = Text("不负责的事项 / 禁止事项", p.nonGoals, true, nameof(p.nonGoals));
+            var failureRecovery = Text("失败恢复", p.failureRecovery, true, nameof(p.failureRecovery));
+            var g = Text("验证步骤", p.validationSteps, true, nameof(p.validationSteps));
+            var permissionBoundary = Text("权限边界", p.permissionBoundary, true,
+                nameof(p.permissionBoundary));
+            var h = Text("默认使用提示", p.defaultPrompt, true, nameof(p.defaultPrompt));
             foreach (VisualElement v in new VisualElement[] { a, b, picker, operation, effect, idempotency,
                          c, d, nonTrigger, preconditions, dependencies, inputContract, e, outputContract,
                          sideEffects, f, failureRecovery, g, permissionBoundary, h }) r.Add(v);
-            AddToggle(r,"生成技能入口配置（agents/openai.yaml）",()=>p.includeAgentsMetadata,v=>p.includeAgentsMetadata=v,commit);
-            AddToggle(r,"允许附带参考资料目录（references/）",()=>p.includeReferences,v=>p.includeReferences=v,commit);
-            AddToggle(r,"允许附带脚本目录（scripts/）",()=>p.includeScripts,v=>p.includeScripts=v,commit);
+            AddToggle(r,"生成技能入口配置（agents/openai.yaml）",()=>p.includeAgentsMetadata,
+                v=>p.includeAgentsMetadata=v,commit, nameof(p.includeAgentsMetadata));
+            AddToggle(r,"允许附带参考资料目录（references/）",()=>p.includeReferences,
+                v=>p.includeReferences=v,commit, nameof(p.includeReferences));
+            AddToggle(r,"允许附带脚本目录（scripts/）",()=>p.includeScripts,
+                v=>p.includeScripts=v,commit, nameof(p.includeScripts));
             CommitOnFocusOut(a,x=>p.skillName=x,commit);CommitOnFocusOut(b,x=>p.targetProjectPath=x,commit);
             effect.RegisterValueChangedCallback(e=>{p.effectKind=(ESAgentSkillEffectKind)Math.Max(0,EffectLabels.IndexOf(e.newValue));commit();});
             idempotency.RegisterValueChangedCallback(e=>{p.idempotency=(ESAgentSkillIdempotency)Math.Max(0,IdempotencyLabels.IndexOf(e.newValue));commit();});
@@ -3168,26 +4096,39 @@ namespace ES.EditorInternal
             Action commit)
         {
             var root = new VisualElement();
+            root.Add(FieldSummary(p, "产物合同"));
             root.Add(CardText(context, "es-node-card-skill-name", "技能", p.skillName,
-                p.skillName, value => p.skillName = value, commit));
+                p.skillName, value => p.skillName = value, commit, nameof(p.skillName)));
             root.Add(CardText(context, "es-node-card-skill-path", "目录", p.targetProjectPath,
-                p.targetProjectPath, value => p.targetProjectPath = value, commit));
+                p.targetProjectPath, value => p.targetProjectPath = value, commit,
+                nameof(p.targetProjectPath)));
             root.Add(CardPopup(context, "es-node-card-skill-mode", "方式", CardOperationLabels,
-                (int)p.operationMode, value => p.operationMode = (ESAgentArtifactOperationMode)value, commit));
+                (int)p.operationMode, value => p.operationMode = (ESAgentArtifactOperationMode)value, commit,
+                nameof(p.operationMode)));
             root.Add(CardPopup(context, "es-node-card-skill-effect", "效果", EffectLabels,
-                (int)p.effectKind, value => p.effectKind = (ESAgentSkillEffectKind)value, commit));
+                (int)p.effectKind, value => p.effectKind = (ESAgentSkillEffectKind)value, commit,
+                nameof(p.effectKind)));
             root.Add(CardPopup(context, "es-node-card-skill-idempotency", "幂等", IdempotencyLabels,
-                (int)p.idempotency, value => p.idempotency = (ESAgentSkillIdempotency)value, commit));
+                (int)p.idempotency, value => p.idempotency = (ESAgentSkillIdempotency)value, commit,
+                nameof(p.idempotency)));
             root.Add(CardReadOnlyText("es-node-card-skill-summary", "能力", p.description,
-                string.IsNullOrWhiteSpace(p.description) ? "尚未填写能力说明。" : p.description));
+                string.IsNullOrWhiteSpace(p.description) ? "尚未填写能力说明。" : p.description,
+                nameof(p.description)));
+            root.Add(CardReadOnlyText("es-node-card-skill-trigger", "触发", p.triggerScenarios,
+                p.triggerScenarios, nameof(p.triggerScenarios)));
+            root.Add(CardReadOnlyText("es-node-card-skill-output", "输出", p.outputContract,
+                p.outputContract, nameof(p.outputContract)));
             root.Add(CardReadOnlyText("es-node-card-skill-boundary", "权限", p.permissionBoundary,
-                p.permissionBoundary));
+                p.permissionBoundary, nameof(p.permissionBoundary)));
             root.Add(CardToggle(context, "es-node-card-skill-agents-metadata", "入口配置",
-                p.includeAgentsMetadata, value => p.includeAgentsMetadata = value, commit));
+                p.includeAgentsMetadata, value => p.includeAgentsMetadata = value, commit,
+                nameof(p.includeAgentsMetadata)));
             root.Add(CardToggle(context, "es-node-card-skill-references", "参考资料",
-                p.includeReferences, value => p.includeReferences = value, commit));
+                p.includeReferences, value => p.includeReferences = value, commit,
+                nameof(p.includeReferences)));
             root.Add(CardToggle(context, "es-node-card-skill-scripts", "辅助脚本",
-                p.includeScripts, value => p.includeScripts = value, commit));
+                p.includeScripts, value => p.includeScripts = value, commit,
+                nameof(p.includeScripts)));
             root.Add(CardReadOnlyText("es-node-card-skill-structure", "结构", p.IncludedContentSummary,
                 p.IncludedContentSummary));
             root.Add(CardArtifactStatus("es-node-card-skill-status", ESAgentArtifactKind.AgentSkill,
@@ -3201,28 +4142,73 @@ namespace ES.EditorInternal
             return root;
         }
 
-        private static void AddToggle(VisualElement root,string label,Func<bool> get,Action<bool> set,Action commit){var t=new Toggle(label){value=get()};root.Add(t);t.tooltip="打开后会把这一部分内容纳入候选产物；正式写入仍需要人工批准。";t.RegisterValueChangedCallback(e=>{set(e.newValue);commit();});}
+        private static void AddToggle(VisualElement root,string label,Func<bool> get,Action<bool> set,
+            Action commit, string fieldName)
+        {
+            var t = new Toggle(label) { value = get() };
+            root.Add(t);
+            t.tooltip = "打开后会把这一部分内容纳入候选产物；正式写入仍需要人工批准。";
+            StyleField(t, t.labelElement, fieldName, !t.value);
+            t.RegisterValueChangedCallback(e => { set(e.newValue); commit(); });
+        }
     }
 
     public sealed class ESAgentValidationPayloadInspector : ESAgentPayloadInspector<ESAgentValidationPayload>
     {
-        public override ESGraphNodeTypeKey NodeType => ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.AgentValidation);
+        public override ESGraphNodeTypeKey NodeType => ESAgentGraphStableIds.Node(ESAgentGraphStableIds.ValidationNode);
         protected override VisualElement Build(ESAgentValidationPayload p, Action commit)
-        { var r=new VisualElement();r.Add(new HelpBox("这里决定候选文件需要经过哪些检查。候选差异查看和人工批准始终开启。",HelpBoxMessageType.Info)); AddToggle(r,"检查 AICommand 命令格式",()=>p.validateAICommand,v=>p.validateAICommand=v,commit); AddToggle(r,"检查 Agent Skill 技能结构",()=>p.validateAgentSkill,v=>p.validateAgentSkill=v,commit); AddToggle(r,"检查中文编码（严格 UTF-8）",()=>p.validateUtf8,v=>p.validateUtf8=v,commit); var t=Text("其他验收要求",p.additionalRequirements,true);var c=Text("人工检查清单",p.reviewChecklist,true);r.Add(t);r.Add(c);CommitOnFocusOut(t,x=>p.additionalRequirements=x,commit);CommitOnFocusOut(c,x=>p.reviewChecklist=x,commit);return r; }
+        {
+            var r = new VisualElement();
+            r.Add(new HelpBox("这里决定候选文件需要经过哪些检查。候选差异查看和人工批准始终开启。",
+                HelpBoxMessageType.Info));
+            r.Add(FieldSummary(p, "交付门禁"));
+            AddToggle(r, "检查 AICommand 命令格式", () => p.validateAICommand,
+                v => p.validateAICommand = v, commit, nameof(p.validateAICommand));
+            AddToggle(r, "检查 Agent Skill 技能结构", () => p.validateAgentSkill,
+                v => p.validateAgentSkill = v, commit, nameof(p.validateAgentSkill));
+            AddToggle(r, "检查中文编码（严格 UTF-8）", () => p.validateUtf8,
+                v => p.validateUtf8 = v, commit, nameof(p.validateUtf8));
+            AddToggle(r, "必须查看候选差异", () => p.requireDiffReview,
+                v => p.requireDiffReview = v, commit, nameof(p.requireDiffReview));
+            AddToggle(r, "必须人工批准", () => p.requireHumanApproval,
+                v => p.requireHumanApproval = v, commit, nameof(p.requireHumanApproval));
+            var t = Text("其他验收要求", p.additionalRequirements, true,
+                nameof(p.additionalRequirements));
+            var c = Text("人工检查清单", p.reviewChecklist, true, nameof(p.reviewChecklist));
+            r.Add(t);
+            r.Add(c);
+            CommitOnFocusOut(t, x => p.additionalRequirements = x, commit);
+            CommitOnFocusOut(c, x => p.reviewChecklist = x, commit);
+            return r;
+        }
 
         protected override VisualElement BuildCard(ESAgentValidationPayload p,
             ESGraphNodeCardContext context, Action commit)
         {
             var root = new VisualElement();
+            root.Add(FieldSummary(p, "交付门禁"));
             root.Add(CardToggle(context, "es-node-card-validation-command", "检查 AICommand", p.validateAICommand,
-                value => p.validateAICommand = value, commit));
+                value => p.validateAICommand = value, commit, nameof(p.validateAICommand)));
             root.Add(CardToggle(context, "es-node-card-validation-skill", "检查 Agent Skill", p.validateAgentSkill,
-                value => p.validateAgentSkill = value, commit));
+                value => p.validateAgentSkill = value, commit, nameof(p.validateAgentSkill)));
             root.Add(CardToggle(context, "es-node-card-validation-utf8", "严格 UTF-8", p.validateUtf8,
-                value => p.validateUtf8 = value, commit));
+                value => p.validateUtf8 = value, commit, nameof(p.validateUtf8)));
+            root.Add(CardToggle(context, "es-node-card-validation-diff", "查看差异", p.requireDiffReview,
+                value => p.requireDiffReview = value, commit, nameof(p.requireDiffReview)));
+            root.Add(CardToggle(context, "es-node-card-validation-approval", "人工批准", p.requireHumanApproval,
+                value => p.requireHumanApproval = value, commit, nameof(p.requireHumanApproval)));
+            root.Add(CardReadOnlyText("es-node-card-validation-checklist", "清单", p.reviewChecklist,
+                p.reviewChecklist, nameof(p.reviewChecklist)));
             return root;
         }
 
-        private static void AddToggle(VisualElement root,string label,Func<bool> get,Action<bool> set,Action commit){var t=new Toggle(label){value=get()};root.Add(t);t.RegisterValueChangedCallback(e=>{set(e.newValue);commit();});}
+        private static void AddToggle(VisualElement root, string label, Func<bool> get, Action<bool> set,
+            Action commit, string fieldName)
+        {
+            var t = new Toggle(label) { value = get() };
+            root.Add(t);
+            StyleField(t, t.labelElement, fieldName, !t.value);
+            t.RegisterValueChangedCallback(e => { set(e.newValue); commit(); });
+        }
     }
 }

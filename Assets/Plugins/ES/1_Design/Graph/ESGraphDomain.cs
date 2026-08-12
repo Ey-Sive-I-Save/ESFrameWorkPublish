@@ -5,41 +5,36 @@ namespace ES
 {
     public enum ESGraphDomainKind : byte
     {
-        Generic,
-        Story,
-        BehaviorTree,
-        AgentAuthoring,
+        Generic = 0,
+        Story = 1,
+        BehaviorTree = 2,
+        // Value 3 was used by the old Agent enum API. It remains intentionally unassigned.
         Custom = byte.MaxValue
     }
 
     public enum ESGraphBuiltInNodeKind : byte
     {
-        Custom,
-        GenericFlow,
-        GenericSource,
-        GenericSink,
-        GenericBranch,
-        GenericMerge,
-        StoryStart,
-        StoryDialogue,
-        StoryChoice,
-        StoryCondition,
-        StoryAction,
-        StoryComplete,
-        StoryFail,
-        BehaviorRoot,
-        BehaviorSequence,
-        BehaviorSelector,
-        BehaviorParallel,
-        BehaviorDecorator,
-        BehaviorCondition,
-        BehaviorAction,
-        AgentGoal,
-        AgentReference,
-        AgentConstraint,
-        AgentAICommandOutput,
-        AgentSkillOutput,
-        AgentValidation
+        Custom = 0,
+        GenericFlow = 1,
+        GenericSource = 2,
+        GenericSink = 3,
+        GenericBranch = 4,
+        GenericMerge = 5,
+        StoryStart = 6,
+        StoryDialogue = 7,
+        StoryChoice = 8,
+        StoryCondition = 9,
+        StoryAction = 10,
+        StoryComplete = 11,
+        StoryFail = 12,
+        BehaviorRoot = 13,
+        BehaviorSequence = 14,
+        BehaviorSelector = 15,
+        BehaviorParallel = 16,
+        BehaviorDecorator = 17,
+        BehaviorCondition = 18,
+        BehaviorAction = 19
+        // Values 20-25 were used by the old Agent enum API and remain intentionally unassigned.
     }
 
     public enum ESGraphNodeCategory : byte
@@ -65,36 +60,56 @@ namespace ES
 
     public enum ESGraphNodeTheme : byte
     {
-        Neutral,
-        Primary,
-        Entry,
-        Exit,
-        Success,
-        Failure,
-        Decision,
-        Merge,
-        Dialogue,
-        Composite,
-        Reference,
-        Constraint,
-        CommandOutput,
-        SkillOutput,
-        Validation,
+        Neutral = 0,
+        Primary = 1,
+        Entry = 2,
+        Exit = 3,
+        Success = 4,
+        Failure = 5,
+        Decision = 6,
+        Merge = 7,
+        Dialogue = 8,
+        Composite = 9,
+        Reference = 10,
+        Constraint = 11,
+#if UNITY_EDITOR
+        // Reserved serialized numeric identities. Player builds do not expose these members.
+        CommandOutput = 12,
+        SkillOutput = 13,
+#endif
+        Validation = 14,
         Custom = byte.MaxValue
     }
 
     public enum ESGraphPortValueKind : byte
     {
-        Custom,
-        Flow,
-        Any,
-        Boolean,
-        Number,
-        Text,
-        Object,
-        AgentContext,
-        AgentRequirement,
-        AgentArtifact
+        Custom = 0,
+        Flow = 1,
+        Any = 2,
+        Boolean = 3,
+        Number = 4,
+        Text = 5,
+        Object = 6
+        // Values 7-9 were used by the old Agent enum API and remain intentionally unassigned.
+    }
+
+    /// <summary>
+    /// Declares the immutable domain owned by a concrete Graph asset type. The attribute is metadata
+    /// only; platform compilation boundaries remain the responsibility of asmdef or conditional code.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
+    public sealed class ESGraphAssetDomainAttribute : Attribute
+    {
+        public string StableId { get; }
+        public bool EditorOnly { get; }
+
+        public ESGraphAssetDomainAttribute(string stableId, bool editorOnly = false)
+        {
+            if (!ESGraphStableIdUtility.IsValid(stableId))
+                throw new ArgumentException("Graph 资产类型的 DomainId 非法。", nameof(stableId));
+            StableId = stableId;
+            EditorOnly = editorOnly;
+        }
     }
 
     public static class ESGraphDomainIds
@@ -102,7 +117,6 @@ namespace ES
         public const string Generic = "es.graph.generic";
         public const string Story = "es.story";
         public const string BehaviorTree = "es.behavior-tree";
-        public const string AgentAuthoring = "es.agent-authoring";
     }
 
     public static class ESGraphNodeTypeIds
@@ -126,12 +140,6 @@ namespace ES
         public const string BehaviorDecorator = "es.behavior.decorator";
         public const string BehaviorCondition = "es.behavior.condition";
         public const string BehaviorAction = "es.behavior.action";
-        public const string AgentGoal = "es.agent-authoring.goal";
-        public const string AgentReference = "es.agent-authoring.reference";
-        public const string AgentConstraint = "es.agent-authoring.constraint";
-        public const string AgentAICommandOutput = "es.agent-authoring.output.ai-command";
-        public const string AgentSkillOutput = "es.agent-authoring.output.agent-skill";
-        public const string AgentValidation = "es.agent-authoring.validation";
     }
 
     public static class ESGraphPortValueIds
@@ -142,9 +150,6 @@ namespace ES
         public const string Number = "number";
         public const string Text = "text";
         public const string Object = "object";
-        public const string AgentContext = "es.agent-authoring.context";
-        public const string AgentRequirement = "es.agent-authoring.requirement";
-        public const string AgentArtifact = "es.agent-authoring.artifact";
     }
 
     public readonly struct ESGraphDomainKey : IEquatable<ESGraphDomainKey>
@@ -297,7 +302,6 @@ namespace ES
                 case ESGraphDomainKind.Generic: return ESGraphDomainIds.Generic;
                 case ESGraphDomainKind.Story: return ESGraphDomainIds.Story;
                 case ESGraphDomainKind.BehaviorTree: return ESGraphDomainIds.BehaviorTree;
-                case ESGraphDomainKind.AgentAuthoring: return ESGraphDomainIds.AgentAuthoring;
                 default: return string.Empty;
             }
         }
@@ -309,7 +313,6 @@ namespace ES
                 case ESGraphDomainIds.Generic: return ESGraphDomainKind.Generic;
                 case ESGraphDomainIds.Story: return ESGraphDomainKind.Story;
                 case ESGraphDomainIds.BehaviorTree: return ESGraphDomainKind.BehaviorTree;
-                case ESGraphDomainIds.AgentAuthoring: return ESGraphDomainKind.AgentAuthoring;
                 default: return ESGraphDomainKind.Custom;
             }
         }
@@ -340,12 +343,6 @@ namespace ES
                 case ESGraphBuiltInNodeKind.BehaviorDecorator: return ESGraphNodeTypeIds.BehaviorDecorator;
                 case ESGraphBuiltInNodeKind.BehaviorCondition: return ESGraphNodeTypeIds.BehaviorCondition;
                 case ESGraphBuiltInNodeKind.BehaviorAction: return ESGraphNodeTypeIds.BehaviorAction;
-                case ESGraphBuiltInNodeKind.AgentGoal: return ESGraphNodeTypeIds.AgentGoal;
-                case ESGraphBuiltInNodeKind.AgentReference: return ESGraphNodeTypeIds.AgentReference;
-                case ESGraphBuiltInNodeKind.AgentConstraint: return ESGraphNodeTypeIds.AgentConstraint;
-                case ESGraphBuiltInNodeKind.AgentAICommandOutput: return ESGraphNodeTypeIds.AgentAICommandOutput;
-                case ESGraphBuiltInNodeKind.AgentSkillOutput: return ESGraphNodeTypeIds.AgentSkillOutput;
-                case ESGraphBuiltInNodeKind.AgentValidation: return ESGraphNodeTypeIds.AgentValidation;
                 default: return string.Empty;
             }
         }
@@ -373,12 +370,6 @@ namespace ES
                 case ESGraphNodeTypeIds.BehaviorDecorator: return ESGraphBuiltInNodeKind.BehaviorDecorator;
                 case ESGraphNodeTypeIds.BehaviorCondition: return ESGraphBuiltInNodeKind.BehaviorCondition;
                 case ESGraphNodeTypeIds.BehaviorAction: return ESGraphBuiltInNodeKind.BehaviorAction;
-                case ESGraphNodeTypeIds.AgentGoal: return ESGraphBuiltInNodeKind.AgentGoal;
-                case ESGraphNodeTypeIds.AgentReference: return ESGraphBuiltInNodeKind.AgentReference;
-                case ESGraphNodeTypeIds.AgentConstraint: return ESGraphBuiltInNodeKind.AgentConstraint;
-                case ESGraphNodeTypeIds.AgentAICommandOutput: return ESGraphBuiltInNodeKind.AgentAICommandOutput;
-                case ESGraphNodeTypeIds.AgentSkillOutput: return ESGraphBuiltInNodeKind.AgentSkillOutput;
-                case ESGraphNodeTypeIds.AgentValidation: return ESGraphBuiltInNodeKind.AgentValidation;
                 default: return ESGraphBuiltInNodeKind.Custom;
             }
         }
@@ -396,9 +387,6 @@ namespace ES
                 case ESGraphPortValueKind.Number: return ESGraphPortValueIds.Number;
                 case ESGraphPortValueKind.Text: return ESGraphPortValueIds.Text;
                 case ESGraphPortValueKind.Object: return ESGraphPortValueIds.Object;
-                case ESGraphPortValueKind.AgentContext: return ESGraphPortValueIds.AgentContext;
-                case ESGraphPortValueKind.AgentRequirement: return ESGraphPortValueIds.AgentRequirement;
-                case ESGraphPortValueKind.AgentArtifact: return ESGraphPortValueIds.AgentArtifact;
                 default: return customStableId?.Trim() ?? string.Empty;
             }
         }
@@ -413,9 +401,6 @@ namespace ES
                 case ESGraphPortValueIds.Number: return ESGraphPortValueKind.Number;
                 case ESGraphPortValueIds.Text: return ESGraphPortValueKind.Text;
                 case ESGraphPortValueIds.Object: return ESGraphPortValueKind.Object;
-                case ESGraphPortValueIds.AgentContext: return ESGraphPortValueKind.AgentContext;
-                case ESGraphPortValueIds.AgentRequirement: return ESGraphPortValueKind.AgentRequirement;
-                case ESGraphPortValueIds.AgentArtifact: return ESGraphPortValueKind.AgentArtifact;
                 default: return ESGraphPortValueKind.Custom;
             }
         }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using GraphAsset = global::ES.ESGraphAssetBase;
 
 namespace ES
 {
@@ -90,14 +91,14 @@ namespace ES
         public IReadOnlyList<ESGraphNodeSnapshot> Nodes => nodes;
         public IReadOnlyList<ESGraphEdgeSnapshot> Edges => edges;
 
-        internal ESBakedGraphSnapshot(ESGraphAsset asset, List<ESGraphNodeRecord> orderedNodes,
+        internal ESBakedGraphSnapshot(GraphAsset asset, List<ESGraphNodeRecord> orderedNodes,
             List<ESGraphEdgeRecord> orderedEdges, string signature)
         {
             SchemaVersion = asset.schemaVersion;
             GraphId = asset.GraphId;
             OriginGraphId = asset.OriginGraphId;
             DomainId = asset.DomainId;
-            AllowCycles = asset.allowCycles;
+            AllowCycles = asset.AllowsCycles;
             ContentSignature = signature;
             nodes = new ESGraphNodeSnapshot[orderedNodes.Count];
             edges = new ESGraphEdgeSnapshot[orderedEdges.Count];
@@ -139,7 +140,7 @@ namespace ES
 
     public static class ESGraphSnapshotBaker
     {
-        public static bool TryBake(ESGraphAsset asset, out ESBakedGraphSnapshot snapshot,
+        public static bool TryBake(GraphAsset asset, out ESBakedGraphSnapshot snapshot,
             out List<ESGraphValidationIssue> issues)
         {
             snapshot = null;
@@ -155,7 +156,8 @@ namespace ES
             issues = asset.ValidateGraph();
             for (int i = 0; i < issues.Count; i++)
             {
-                if (issues[i] != null && issues[i].severity == ESGraphValidationSeverity.Error)
+                ESGraphValidationIssue issue = issues[i];
+                if (issue != null && issue.severity == ESGraphValidationSeverity.Error)
                     return false;
             }
 
@@ -166,7 +168,7 @@ namespace ES
             for (int i = 0; i < asset.Edges.Count; i++) orderedEdges.Add(asset.Edges[i]);
             orderedEdges.Sort((left, right) => string.CompareOrdinal(left.edgeId, right.edgeId));
 
-            string signature = CalculateSignature(asset.schemaVersion, asset.DomainId, asset.allowCycles, orderedNodes, orderedEdges);
+            string signature = CalculateSignature(asset.schemaVersion, asset.DomainId, asset.AllowsCycles, orderedNodes, orderedEdges);
             snapshot = new ESBakedGraphSnapshot(asset, orderedNodes, orderedEdges, signature);
             return true;
         }

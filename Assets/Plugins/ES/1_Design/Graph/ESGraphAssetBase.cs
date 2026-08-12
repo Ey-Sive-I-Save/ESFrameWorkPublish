@@ -30,15 +30,22 @@ namespace ES
         public string code;
         public string message;
         public string elementId;
+        /// <summary>
+        /// True only when the issue describes a quality risk that still leaves a complete,
+        /// structurally valid execution contract. Authorization and identity failures must remain false.
+        /// </summary>
+        public bool canForceContinue { get; private set; }
 
-        public static ESGraphValidationIssue Error(string code, string message, string elementId = null)
+        public static ESGraphValidationIssue Error(string code, string message, string elementId = null,
+            bool canForceContinue = false)
         {
             return new ESGraphValidationIssue
             {
                 severity = ESGraphValidationSeverity.Error,
                 code = code,
                 message = message,
-                elementId = elementId
+                elementId = elementId,
+                canForceContinue = canForceContinue
             };
         }
 
@@ -191,28 +198,80 @@ namespace ES
     }
 
     /// <summary>
-    /// Stable serialized graph authority. GraphView is only an editor projection of this asset.
-    /// Runtime systems must bake a validated immutable snapshot instead of executing this asset.
+    /// Stable serialized Graph authority shared by concrete domain assets. GraphView is only an
+    /// Editor projection; runtime consumers must use validated snapshots and domain-owned plans.
     /// </summary>
-    [CreateAssetMenu(fileName = "ESGraphAsset", menuName = "【ES】/内容制作/图与流程/稳定图资产 V2")]
-    public sealed class ESGraphAsset : ESSO
+    public abstract class ESGraphAssetBase : ESSO
     {
+        private readonly struct ConnectionEndpointKey : IEquatable<ConnectionEndpointKey>
+        {
+            private readonly string outputPortId;
+            private readonly string inputPortId;
+
+            public ConnectionEndpointKey(string outputPortId, string inputPortId)
+            {
+                this.outputPortId = outputPortId ?? string.Empty;
+                this.inputPortId = inputPortId ?? string.Empty;
+            }
+
+            public bool Equals(ConnectionEndpointKey other)
+            {
+                return string.Equals(outputPortId, other.outputPortId, StringComparison.Ordinal)
+                    && string.Equals(inputPortId, other.inputPortId, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is ConnectionEndpointKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return ((outputPortId != null ? outputPortId.GetHashCode() : 0) * 397)
+                        ^ (inputPortId != null ? inputPortId.GetHashCode() : 0);
+                }
+            }
+        }
+
+        private sealed class ConnectionValidationIndex
+        {
+            public readonly Dictionary<string, ESGraphNodeRecord> NodesById =
+                new Dictionary<string, ESGraphNodeRecord>(StringComparer.Ordinal);
+            public readonly Dictionary<string, ESGraphPortRecord> PortsById =
+                new Dictionary<string, ESGraphPortRecord>(StringComparer.Ordinal);
+            public readonly Dictionary<string, string> NodeIdsByPort =
+                new Dictionary<string, string>(StringComparer.Ordinal);
+            public readonly Dictionary<string, int> ConnectionCounts =
+                new Dictionary<string, int>(StringComparer.Ordinal);
+            public readonly HashSet<ConnectionEndpointKey> Endpoints =
+                new HashSet<ConnectionEndpointKey>();
+            public readonly Dictionary<string, List<string>> Outgoing =
+                new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            public readonly Dictionary<string, List<string>> Incoming =
+                new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        }
+
         public const int CurrentSchemaVersion = 2;
         public const int MinimumSupportedSchemaVersion = 1;
 
         [Min(1)] public int schemaVersion = CurrentSchemaVersion;
         [SerializeField] private string graphId = ESGraphIdentity.NewId();
         [SerializeField] private string originGraphId = string.Empty;
-        [SerializeField] private string domainId = ESGraphDomainIds.Generic;
         public bool allowCycles;
         [SerializeField] private List<ESGraphNodeRecord> nodes = new List<ESGraphNodeRecord>();
         [SerializeField] private List<ESGraphEdgeRecord> edges = new List<ESGraphEdgeRecord>();
 
         public string GraphId => graphId ?? string.Empty;
         public string OriginGraphId => originGraphId ?? string.Empty;
-        public string DomainId => string.IsNullOrWhiteSpace(domainId) ? ESGraphDomainIds.Generic : domainId;
+        public abstract ESGraphDomainKey DomainKey { get; }
+        public string DomainId => DomainKey.StableId;
         public ESGraphDomainKind DomainKind => ESGraphDomainCatalog.GetKind(DomainId);
-        public ESGraphDomainKey DomainKey => ESGraphDomainKey.Parse(DomainId);
+        /// <summary>当前领域是否允许作者开启循环。领域禁止时，序列化字段即使残留为 true 也不会生效。</summary>
+        public virtual bool CanEnableCycles => true;
+        /// <summary>供连接、校验、快照和编辑器共同使用的最终循环策略。</summary>
+        public bool AllowsCycles => CanEnableCycles && allowCycles;
         public IReadOnlyList<ESGraphNodeRecord> Nodes => nodes;
         public IReadOnlyList<ESGraphEdgeRecord> Edges => edges;
 
@@ -237,36 +296,6 @@ namespace ES
         {
             graphId = ESGraphIdentity.NewId();
             originGraphId = ESGraphIdentity.IsValid(sourceGraphId) ? sourceGraphId : string.Empty;
-        }
-
-        public bool TrySetDomain(ESGraphDomainKey value, out string error)
-        {
-            return TrySetDomainId(value.StableId, out error);
-        }
-
-        public bool TrySetDomainId(string value, out string error)
-        {
-            EnsureCollections();
-            value = value?.Trim();
-            if (!ESGraphStableIdUtility.IsValid(value))
-            {
-                error = "DomainId 必须以小写英文字母开头，且只能包含小写字母、数字、点、横线和下划线。";
-                return false;
-            }
-            if (string.Equals(DomainId, value, StringComparison.Ordinal))
-            {
-                error = null;
-                return true;
-            }
-            if (nodes.Count > 0 || edges.Count > 0)
-            {
-                error = "已有内容的 Graph 不能直接切换 DomainId；必须通过领域迁移器处理。";
-                return false;
-            }
-            domainId = value;
-            schemaVersion = CurrentSchemaVersion;
-            error = null;
-            return true;
         }
 
         public ESGraphNodeRecord AddNode(string typeId, string title, Vector2 position,
@@ -564,35 +593,177 @@ namespace ES
             edges.Add(edge);
             return true;
         }
-#endif
 
-        public bool CanConnect(string firstPortId, string secondPortId, string ignoredEdgeId, out string error)
+        public bool TryReconnectEdge(string edgeId, string firstPortId, string secondPortId,
+            out string error)
         {
-            EnsureCollections();
             error = null;
-            if (!TryFindPort(firstPortId, out ESGraphNodeRecord firstNode, out ESGraphPortRecord firstPort)
-                || !TryFindPort(secondPortId, out ESGraphNodeRecord secondNode, out ESGraphPortRecord secondPort))
+            ESGraphEdgeRecord edge = FindEdge(edgeId);
+            if (edge == null)
+            {
+                error = "需要重连的关系不存在。";
+                return false;
+            }
+
+            if (!TryFindPort(firstPortId, out _, out ESGraphPortRecord firstPort)
+                || !TryFindPort(secondPortId, out _, out ESGraphPortRecord secondPort))
             {
                 error = "连接端口不存在。";
                 return false;
             }
 
-            ESGraphNodeRecord outputNode;
-            ESGraphNodeRecord inputNode;
+            string outputPortId;
+            string inputPortId;
+            if (firstPort.direction == ESGraphPortDirection.Output
+                && secondPort.direction == ESGraphPortDirection.Input)
+            {
+                outputPortId = firstPort.portId;
+                inputPortId = secondPort.portId;
+            }
+            else if (secondPort.direction == ESGraphPortDirection.Output
+                && firstPort.direction == ESGraphPortDirection.Input)
+            {
+                outputPortId = secondPort.portId;
+                inputPortId = firstPort.portId;
+            }
+            else
+            {
+                error = "连接必须从 Output 指向 Input。";
+                return false;
+            }
+
+            if (string.Equals(edge.outputPortId, outputPortId, StringComparison.Ordinal)
+                && string.Equals(edge.inputPortId, inputPortId, StringComparison.Ordinal))
+                return false;
+
+            if (!CanConnect(outputPortId, inputPortId, edgeId, out error))
+                return false;
+
+            edge.outputPortId = outputPortId;
+            edge.inputPortId = inputPortId;
+            return true;
+        }
+
+        /// <summary>
+        /// 一次性计算从指定端口新建关系时可用的端口集合。移动鼠标期间只读取结果；
+        /// 松开鼠标后的最终提交仍由 <see cref="TryAddEdge"/> 执行权威终审。
+        /// </summary>
+        public bool TryBuildConnectionCompatibilityIndex(string startPortId,
+            ISet<string> compatiblePortIds, out string error)
+        {
+            return TryBuildConnectionCompatibilityIndex(startPortId, null,
+                compatiblePortIds, out error);
+        }
+
+        /// <summary>
+        /// 一次性计算重连期间可用的端口集合。计算会忽略正在编辑的关系，且不会修改图模型；
+        /// 松开鼠标后的最终提交仍由 <see cref="TryReconnectEdge"/> 执行权威终审。
+        /// </summary>
+        public bool TryBuildReconnectCompatibilityIndex(string edgeId, string fixedPortId,
+            ISet<string> compatiblePortIds, out string error)
+        {
+            error = null;
+            if (compatiblePortIds == null)
+            {
+                error = "兼容端口集合不能为空。";
+                return false;
+            }
+            compatiblePortIds.Clear();
+            ESGraphEdgeRecord edge = FindEdge(edgeId);
+            if (edge == null)
+            {
+                error = "需要重连的关系不存在。";
+                return false;
+            }
+            if (!string.Equals(edge.outputPortId, fixedPortId, StringComparison.Ordinal)
+                && !string.Equals(edge.inputPortId, fixedPortId, StringComparison.Ordinal))
+            {
+                error = "固定端口不属于需要重连的关系。";
+                return false;
+            }
+
+            return TryBuildConnectionCompatibilityIndex(fixedPortId, edgeId,
+                compatiblePortIds, out error);
+        }
+
+        private bool TryBuildConnectionCompatibilityIndex(string fixedPortId, string ignoredEdgeId,
+            ISet<string> compatiblePortIds, out string error)
+        {
+            error = null;
+            if (compatiblePortIds == null)
+            {
+                error = "兼容端口集合不能为空。";
+                return false;
+            }
+            compatiblePortIds.Clear();
+            ConnectionValidationIndex index = BuildConnectionValidationIndex(ignoredEdgeId);
+            if (!index.PortsById.TryGetValue(fixedPortId ?? string.Empty, out ESGraphPortRecord fixedPort)
+                || !index.NodeIdsByPort.TryGetValue(fixedPortId ?? string.Empty, out string fixedNodeId))
+            {
+                error = "起始端口不存在。";
+                return false;
+            }
+
+            HashSet<string> cycleBlockedNodeIds = null;
+            if (!AllowsCycles)
+            {
+                cycleBlockedNodeIds = new HashSet<string>(StringComparer.Ordinal);
+                Dictionary<string, List<string>> traversalIndex =
+                    fixedPort.direction == ESGraphPortDirection.Output ? index.Incoming : index.Outgoing;
+                CollectReachableNodes(traversalIndex, fixedNodeId, cycleBlockedNodeIds);
+            }
+
+            foreach (KeyValuePair<string, ESGraphPortRecord> pair in index.PortsById)
+            {
+                if (string.Equals(pair.Key, fixedPortId, StringComparison.Ordinal)
+                    || !ValidateIndexedConnection(index, fixedPortId, pair.Key, false, out _))
+                    continue;
+                if (cycleBlockedNodeIds != null
+                    && index.NodeIdsByPort.TryGetValue(pair.Key, out string candidateNodeId)
+                    && cycleBlockedNodeIds.Contains(candidateNodeId))
+                    continue;
+                compatiblePortIds.Add(pair.Key);
+            }
+            return true;
+        }
+#endif
+
+        public bool CanConnect(string firstPortId, string secondPortId, string ignoredEdgeId, out string error)
+        {
+            EnsureCollections();
+            ConnectionValidationIndex index = BuildConnectionValidationIndex(ignoredEdgeId);
+            return ValidateIndexedConnection(index, firstPortId, secondPortId, true, out error);
+        }
+
+        private bool ValidateIndexedConnection(ConnectionValidationIndex index, string firstPortId,
+            string secondPortId, bool validateCycle, out string error)
+        {
+            error = null;
+            if (!index.PortsById.TryGetValue(firstPortId ?? string.Empty, out ESGraphPortRecord firstPort)
+                || !index.PortsById.TryGetValue(secondPortId ?? string.Empty, out ESGraphPortRecord secondPort)
+                || !index.NodeIdsByPort.TryGetValue(firstPortId ?? string.Empty, out string firstNodeId)
+                || !index.NodeIdsByPort.TryGetValue(secondPortId ?? string.Empty, out string secondNodeId))
+            {
+                error = "连接端口不存在。";
+                return false;
+            }
+
+            string outputNodeId;
+            string inputNodeId;
             ESGraphPortRecord output;
             ESGraphPortRecord input;
             if (firstPort.direction == ESGraphPortDirection.Output && secondPort.direction == ESGraphPortDirection.Input)
             {
-                outputNode = firstNode;
+                outputNodeId = firstNodeId;
                 output = firstPort;
-                inputNode = secondNode;
+                inputNodeId = secondNodeId;
                 input = secondPort;
             }
             else if (secondPort.direction == ESGraphPortDirection.Output && firstPort.direction == ESGraphPortDirection.Input)
             {
-                outputNode = secondNode;
+                outputNodeId = secondNodeId;
                 output = secondPort;
-                inputNode = firstNode;
+                inputNodeId = firstNodeId;
                 input = firstPort;
             }
             else
@@ -606,23 +777,22 @@ namespace ES
                 error = "端口类型不兼容：" + output.valueTypeId + " → " + input.valueTypeId;
                 return false;
             }
-
-            int outputConnections = 0;
-            int inputConnections = 0;
-            for (int i = 0; i < edges.Count; i++)
+            if (!index.NodesById.TryGetValue(outputNodeId, out ESGraphNodeRecord outputNode)
+                || !index.NodesById.TryGetValue(inputNodeId, out ESGraphNodeRecord inputNode))
             {
-                ESGraphEdgeRecord existing = edges[i];
-                if (existing == null || string.Equals(existing.edgeId, ignoredEdgeId, StringComparison.Ordinal))
-                    continue;
-                if (string.Equals(existing.outputPortId, output.portId, StringComparison.Ordinal)
-                    && string.Equals(existing.inputPortId, input.portId, StringComparison.Ordinal))
-                {
-                    error = "不允许创建重复连线。";
-                    return false;
-                }
-                if (string.Equals(existing.outputPortId, output.portId, StringComparison.Ordinal)) outputConnections++;
-                if (string.Equals(existing.inputPortId, input.portId, StringComparison.Ordinal)) inputConnections++;
+                error = "连接端口所属节点不存在。";
+                return false;
             }
+            if (!ValidateDomainConnection(outputNode, output, inputNode, input, out error))
+                return false;
+
+            if (index.Endpoints.Contains(new ConnectionEndpointKey(output.portId, input.portId)))
+            {
+                error = "不允许创建重复连线。";
+                return false;
+            }
+            index.ConnectionCounts.TryGetValue(output.portId, out int outputConnections);
+            index.ConnectionCounts.TryGetValue(input.portId, out int inputConnections);
 
             if (output.capacity == ESGraphPortCapacity.Single && outputConnections > 0)
             {
@@ -635,13 +805,104 @@ namespace ES
                 return false;
             }
 
-            if (!allowCycles && WouldIntroduceCycle(outputNode.nodeId, inputNode.nodeId, ignoredEdgeId))
+            if (validateCycle && !AllowsCycles
+                && CanReach(index.Outgoing, inputNodeId, outputNodeId))
             {
                 error = "当前图禁止循环。";
                 return false;
             }
 
             return true;
+        }
+
+        private ConnectionValidationIndex BuildConnectionValidationIndex(string ignoredEdgeId)
+        {
+            var index = new ConnectionValidationIndex();
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                ESGraphNodeRecord node = nodes[i];
+                if (node == null || string.IsNullOrEmpty(node.nodeId))
+                    continue;
+                if (!index.NodesById.ContainsKey(node.nodeId))
+                    index.NodesById.Add(node.nodeId, node);
+                index.Outgoing[node.nodeId] = new List<string>();
+                index.Incoming[node.nodeId] = new List<string>();
+                if (node.ports == null)
+                    continue;
+                for (int p = 0; p < node.ports.Count; p++)
+                {
+                    ESGraphPortRecord port = node.ports[p];
+                    if (port == null || string.IsNullOrEmpty(port.portId)
+                        || index.PortsById.ContainsKey(port.portId))
+                        continue;
+                    index.PortsById.Add(port.portId, port);
+                    index.NodeIdsByPort.Add(port.portId, node.nodeId);
+                }
+            }
+
+            for (int i = 0; i < edges.Count; i++)
+            {
+                ESGraphEdgeRecord edge = edges[i];
+                if (edge == null || string.Equals(edge.edgeId, ignoredEdgeId, StringComparison.Ordinal))
+                    continue;
+                index.Endpoints.Add(new ConnectionEndpointKey(edge.outputPortId, edge.inputPortId));
+                Increment(index.ConnectionCounts, edge.outputPortId);
+                Increment(index.ConnectionCounts, edge.inputPortId);
+                if (!index.NodeIdsByPort.TryGetValue(edge.outputPortId ?? string.Empty, out string outputNodeId)
+                    || !index.NodeIdsByPort.TryGetValue(edge.inputPortId ?? string.Empty, out string inputNodeId))
+                    continue;
+                index.Outgoing[outputNodeId].Add(inputNodeId);
+                index.Incoming[inputNodeId].Add(outputNodeId);
+            }
+            return index;
+        }
+
+        /// <summary>
+        /// 领域可在类型、容量、重复和循环规则之外收紧合法节点关系。
+        /// 批量兼容索引与最终提交均调用此门禁，实现必须只读且不得分配全图索引。
+        /// </summary>
+        protected virtual bool ValidateDomainConnection(ESGraphNodeRecord outputNode,
+            ESGraphPortRecord outputPort, ESGraphNodeRecord inputNode,
+            ESGraphPortRecord inputPort, out string error)
+        {
+            error = null;
+            return true;
+        }
+
+        private static bool CanReach(Dictionary<string, List<string>> adjacency, string startNodeId,
+            string targetNodeId)
+        {
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            var stack = new Stack<string>();
+            stack.Push(startNodeId);
+            while (stack.Count > 0)
+            {
+                string current = stack.Pop();
+                if (!visited.Add(current))
+                    continue;
+                if (string.Equals(current, targetNodeId, StringComparison.Ordinal))
+                    return true;
+                if (!adjacency.TryGetValue(current, out List<string> next))
+                    continue;
+                for (int i = 0; i < next.Count; i++)
+                    stack.Push(next[i]);
+            }
+            return false;
+        }
+
+        private static void CollectReachableNodes(Dictionary<string, List<string>> adjacency,
+            string startNodeId, ISet<string> result)
+        {
+            var stack = new Stack<string>();
+            stack.Push(startNodeId);
+            while (stack.Count > 0)
+            {
+                string current = stack.Pop();
+                if (!result.Add(current) || !adjacency.TryGetValue(current, out List<string> next))
+                    continue;
+                for (int i = 0; i < next.Count; i++)
+                    stack.Push(next[i]);
+            }
         }
 
 #if UNITY_EDITOR
@@ -1025,34 +1286,9 @@ namespace ES
                     issues.Add(ESGraphValidationIssue.Error("Graph.Port.Capacity", "Single 端口存在多条连线。", pair.Key));
             }
 
-            if (!allowCycles && ContainsCycle(nodeByPort))
+            if (!AllowsCycles && ContainsCycle(nodeByPort))
                 issues.Add(ESGraphValidationIssue.Error("Graph.Cycle.Forbidden", "当前图禁止循环，但检测到循环。"));
             return issues;
-        }
-
-        private bool WouldIntroduceCycle(string outputNodeId, string inputNodeId, string ignoredEdgeId)
-        {
-            if (string.Equals(outputNodeId, inputNodeId, StringComparison.Ordinal))
-                return true;
-            Dictionary<string, List<string>> adjacency = BuildAdjacency(ignoredEdgeId);
-            if (!adjacency.TryGetValue(inputNodeId, out List<string> _))
-                adjacency[inputNodeId] = new List<string>();
-            HashSet<string> visited = new HashSet<string>(StringComparer.Ordinal);
-            Stack<string> stack = new Stack<string>();
-            stack.Push(inputNodeId);
-            while (stack.Count > 0)
-            {
-                string current = stack.Pop();
-                if (!visited.Add(current))
-                    continue;
-                if (string.Equals(current, outputNodeId, StringComparison.Ordinal))
-                    return true;
-                if (!adjacency.TryGetValue(current, out List<string> next))
-                    continue;
-                for (int i = 0; i < next.Count; i++)
-                    stack.Push(next[i]);
-            }
-            return false;
         }
 
         private bool ContainsCycle(Dictionary<string, string> nodeByPort)
@@ -1075,37 +1311,6 @@ namespace ES
                 list.Add(to);
             }
             return HasCycle(adjacency);
-        }
-
-        private Dictionary<string, List<string>> BuildAdjacency(string ignoredEdgeId)
-        {
-            Dictionary<string, string> nodeByPort = new Dictionary<string, string>(StringComparer.Ordinal);
-            Dictionary<string, List<string>> adjacency = new Dictionary<string, List<string>>(StringComparer.Ordinal);
-            for (int i = 0; i < nodes.Count; i++)
-            {
-                ESGraphNodeRecord node = nodes[i];
-                if (node == null || string.IsNullOrEmpty(node.nodeId))
-                    continue;
-                adjacency[node.nodeId] = new List<string>();
-                if (node.ports == null)
-                    continue;
-                for (int p = 0; p < node.ports.Count; p++)
-                {
-                    ESGraphPortRecord port = node.ports[p];
-                    if (port != null && !string.IsNullOrEmpty(port.portId))
-                        nodeByPort[port.portId] = node.nodeId;
-                }
-            }
-            for (int i = 0; i < edges.Count; i++)
-            {
-                ESGraphEdgeRecord edge = edges[i];
-                if (edge == null || string.Equals(edge.edgeId, ignoredEdgeId, StringComparison.Ordinal)
-                    || !nodeByPort.TryGetValue(edge.outputPortId ?? string.Empty, out string from)
-                    || !nodeByPort.TryGetValue(edge.inputPortId ?? string.Empty, out string to))
-                    continue;
-                adjacency[from].Add(to);
-            }
-            return adjacency;
         }
 
         private static bool HasCycle(Dictionary<string, List<string>> adjacency)
@@ -1169,12 +1374,328 @@ namespace ES
             if (edges == null) edges = new List<ESGraphEdgeRecord>();
         }
 
-        private void OnValidate()
+        protected virtual void OnValidate()
         {
             EnsureCollections();
+#if UNITY_EDITOR
             EnsureGraphIdentity();
+#endif
             if (schemaVersion < 1)
                 schemaVersion = CurrentSchemaVersion;
         }
     }
+
+    /// <summary>General-purpose runtime-capable graph authoring asset.</summary>
+    [ESGraphAssetDomain(ESGraphDomainIds.Generic)]
+    public sealed partial class ESGenericGraphAsset : ESGraphAssetBase
+    {
+        public override ESGraphDomainKey DomainKey => ESGraphDomainKey.FromKind(ESGraphDomainKind.Generic);
+    }
+
+    /// <summary>Story, quest, and dialogue graph authoring asset.</summary>
+    [ESGraphAssetDomain(ESGraphDomainIds.Story)]
+    public sealed partial class ESStoryGraphAsset : ESGraphAssetBase
+    {
+        public override ESGraphDomainKey DomainKey => ESGraphDomainKey.FromKind(ESGraphDomainKind.Story);
+    }
+
+    /// <summary>Behavior-tree graph authoring asset.</summary>
+    [ESGraphAssetDomain(ESGraphDomainIds.BehaviorTree)]
+    public sealed partial class ESBehaviorTreeGraphAsset : ESGraphAssetBase
+    {
+        public override ESGraphDomainKey DomainKey => ESGraphDomainKey.FromKind(ESGraphDomainKind.BehaviorTree);
+        public override bool CanEnableCycles => false;
+    }
+
+#if UNITY_EDITOR
+    public enum ESAgentRelationKind : byte
+    {
+        ProvidesContext = 0,
+        AppliesConstraint = 1,
+        RequiresValidation = 2,
+        SelectsBranch = 3,
+        TraversesItems = 4,
+        ExecutesNext = 5,
+        BindsValue = 6
+    }
+
+    /// <summary>Stable string identities owned exclusively by Agent authoring in the Unity Editor.</summary>
+    public static class ESAgentGraphStableIds
+    {
+        public const string DomainId = "es.agent-authoring";
+        public const string GoalNode = "es.agent-authoring.goal";
+        public const string ReferenceNode = "es.agent-authoring.reference";
+        public const string ConstraintNode = "es.agent-authoring.constraint";
+        public const string BranchNode = "es.agent-authoring.branch";
+        public const string TraverseNode = "es.agent-authoring.traverse";
+        public const string AICommandOutputNode = "es.agent-authoring.output.ai-command";
+        public const string AISkillOutputNode = "es.agent-authoring.output.agent-skill";
+        public const string ValidationNode = "es.agent-authoring.validation";
+        public const string ContextPort = "es.agent-authoring.context";
+        public const string RequirementPort = "es.agent-authoring.requirement";
+        public const string ArtifactPort = "es.agent-authoring.artifact";
+        public const string BranchMatchedPortKey = "agent.branch.matched";
+        public const string BranchDefaultPortKey = "agent.branch.default";
+        public const string BranchFailurePortKey = "agent.branch.failure";
+        public const string TraverseItemPortKey = "agent.traverse.item";
+        public const string TraverseCompletedPortKey = "agent.traverse.completed";
+        public const string TraverseFailurePortKey = "agent.traverse.failure";
+        public const string AICommandArtifact = "es.agent.ai-command";
+        public const string AISkillArtifact = "es.agent.ai-skill";
+
+        // AISkill execution authoring. These remain Editor-only even though the owning file is in Design.
+        public const string SkillInputNode = "es.agent.ai-skill.input";
+        public const string SkillTaskNode = "es.agent.ai-skill.task";
+        public const string SkillBranchNode = "es.agent.ai-skill.branch";
+        public const string SkillForEachNode = "es.agent.ai-skill.for-each";
+        public const string SkillApprovalNode = "es.agent.ai-skill.approval";
+        public const string SkillOutputNode = "es.agent.ai-skill.output";
+        public const string SkillControlPort = "es.agent.ai-skill.control";
+        public const string SkillTextListPort = "es.agent.ai-skill.text-list";
+        public const string SkillProjectPathPort = "es.agent.ai-skill.project-path";
+        public const string SkillProjectPathListPort = "es.agent.ai-skill.project-path-list";
+        public const string SkillRunResultPort = "es.agent.ai-skill.run-result";
+        public const string SkillArtifactListPort = "es.agent.ai-skill.artifact-list";
+        public const string SkillControlInputKey = "skill.control.input";
+        public const string SkillNextPortKey = "skill.control.next";
+        public const string SkillSuccessPortKey = "skill.control.success";
+        public const string SkillFailurePortKey = "skill.control.failure";
+        public const string SkillTimeoutPortKey = "skill.control.timeout";
+        public const string SkillCancelledPortKey = "skill.control.cancelled";
+        public const string SkillMatchedPortKey = "skill.control.matched";
+        public const string SkillDefaultPortKey = "skill.control.default";
+        public const string SkillItemPortKey = "skill.control.item";
+        public const string SkillCompletedPortKey = "skill.control.completed";
+        public const string SkillEmptyPortKey = "skill.control.empty";
+        public const string SkillApprovedPortKey = "skill.control.approved";
+        public const string SkillRejectedPortKey = "skill.control.rejected";
+
+        public static ESGraphDomainKey Domain => ESGraphDomainKey.Parse(DomainId);
+        public static ESGraphNodeTypeKey Node(string stableId) => ESGraphNodeTypeKey.Parse(stableId);
+    }
+
+    /// <summary>AI 节点关系的唯一语义表，供连接门禁、Graph 校验与 Bake 共同使用。</summary>
+    public static class ESAgentRelationSemantics
+    {
+        public static bool TryResolve(string fromTypeId, string toTypeId, string fromPortStableKey,
+            out ESAgentRelationKind relationKind)
+        {
+            if (IsSkillExecutionNode(fromTypeId) && IsSkillExecutionNode(toTypeId))
+            {
+                relationKind = IsSkillControlPort(fromPortStableKey)
+                    ? ESAgentRelationKind.ExecutesNext
+                    : ESAgentRelationKind.BindsValue;
+                return true;
+            }
+            if ((Is(fromTypeId, ESAgentGraphStableIds.GoalNode)
+                    || Is(fromTypeId, ESAgentGraphStableIds.ReferenceNode))
+                && IsContextDestination(toTypeId))
+            {
+                relationKind = ESAgentRelationKind.ProvidesContext;
+                return true;
+            }
+            if (Is(fromTypeId, ESAgentGraphStableIds.BranchNode)
+                && IsBranchRoute(fromPortStableKey) && IsContextDestination(toTypeId))
+            {
+                relationKind = ESAgentRelationKind.SelectsBranch;
+                return true;
+            }
+            if (Is(fromTypeId, ESAgentGraphStableIds.TraverseNode)
+                && IsTraversalRoute(fromPortStableKey) && IsContextDestination(toTypeId))
+            {
+                relationKind = ESAgentRelationKind.TraversesItems;
+                return true;
+            }
+            if (Is(fromTypeId, ESAgentGraphStableIds.ConstraintNode)
+                && (Is(toTypeId, ESAgentGraphStableIds.AICommandOutputNode)
+                    || Is(toTypeId, ESAgentGraphStableIds.AISkillOutputNode)))
+            {
+                relationKind = ESAgentRelationKind.AppliesConstraint;
+                return true;
+            }
+            if ((Is(fromTypeId, ESAgentGraphStableIds.AICommandOutputNode)
+                    || Is(fromTypeId, ESAgentGraphStableIds.AISkillOutputNode))
+                && Is(toTypeId, ESAgentGraphStableIds.ValidationNode))
+            {
+                relationKind = ESAgentRelationKind.RequiresValidation;
+                return true;
+            }
+            relationKind = default;
+            return false;
+        }
+
+        public static string ExpectedSemanticType(ESAgentRelationKind relationKind)
+        {
+            switch (relationKind)
+            {
+                case ESAgentRelationKind.ProvidesContext:
+                case ESAgentRelationKind.SelectsBranch:
+                case ESAgentRelationKind.TraversesItems:
+                    return ESAgentGraphStableIds.ContextPort;
+                case ESAgentRelationKind.AppliesConstraint:
+                    return ESAgentGraphStableIds.RequirementPort;
+                case ESAgentRelationKind.RequiresValidation:
+                    return ESAgentGraphStableIds.ArtifactPort;
+                case ESAgentRelationKind.ExecutesNext:
+                    return ESAgentGraphStableIds.SkillControlPort;
+                default:
+                    return string.Empty;
+            }
+        }
+
+        public static bool IsSkillExecutionNode(string typeId)
+        {
+            return Is(typeId, ESAgentGraphStableIds.SkillInputNode)
+                || Is(typeId, ESAgentGraphStableIds.SkillTaskNode)
+                || Is(typeId, ESAgentGraphStableIds.SkillBranchNode)
+                || Is(typeId, ESAgentGraphStableIds.SkillForEachNode)
+                || Is(typeId, ESAgentGraphStableIds.SkillApprovalNode)
+                || Is(typeId, ESAgentGraphStableIds.SkillOutputNode);
+        }
+
+        public static bool IsSkillControlPort(string stableKey)
+        {
+            return Is(stableKey, ESAgentGraphStableIds.SkillNextPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.SkillSuccessPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.SkillFailurePortKey)
+                || Is(stableKey, ESAgentGraphStableIds.SkillTimeoutPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.SkillCancelledPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.SkillMatchedPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.SkillDefaultPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.SkillItemPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.SkillCompletedPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.SkillEmptyPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.SkillApprovedPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.SkillRejectedPortKey);
+        }
+
+        public static bool IsBranchRoute(string stableKey)
+        {
+            return Is(stableKey, ESAgentGraphStableIds.BranchMatchedPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.BranchDefaultPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.BranchFailurePortKey);
+        }
+
+        public static bool IsTraversalRoute(string stableKey)
+        {
+            return Is(stableKey, ESAgentGraphStableIds.TraverseItemPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.TraverseCompletedPortKey)
+                || Is(stableKey, ESAgentGraphStableIds.TraverseFailurePortKey);
+        }
+
+        private static bool IsContextDestination(string typeId)
+        {
+            return Is(typeId, ESAgentGraphStableIds.ReferenceNode)
+                || Is(typeId, ESAgentGraphStableIds.ConstraintNode)
+                || Is(typeId, ESAgentGraphStableIds.BranchNode)
+                || Is(typeId, ESAgentGraphStableIds.TraverseNode);
+        }
+
+        private static bool Is(string left, string right)
+        {
+            return string.Equals(left, right, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>Marks an Editor-only handler for one generated Agent artifact kind.</summary>
+    [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
+    public sealed class ESAgentArtifactAttribute : Attribute
+    {
+        public string StableId { get; }
+
+        public ESAgentArtifactAttribute(string stableId)
+        {
+            if (!ESGraphStableIdUtility.IsValid(stableId))
+                throw new ArgumentException("Agent 产物稳定标识非法。", nameof(stableId));
+            StableId = stableId;
+        }
+    }
+
+    /// <summary>Domain-reload-safe metadata registry populated by ES AssemblyStream.</summary>
+    public static class ESAgentArtifactTypeRegistry
+    {
+        private static readonly Dictionary<string, Type> Types =
+            new Dictionary<string, Type>(StringComparer.Ordinal);
+
+        public static bool TryGet(string stableId, out Type type)
+        {
+            return Types.TryGetValue(stableId ?? string.Empty, out type);
+        }
+
+        public static IReadOnlyList<KeyValuePair<string, Type>> CopyEntries()
+        {
+            var result = new List<KeyValuePair<string, Type>>(Types);
+            result.Sort((left, right) => StringComparer.Ordinal.Compare(left.Key, right.Key));
+            return result;
+        }
+
+        internal static void Register(ESAgentArtifactAttribute attribute, Type type)
+        {
+            if (attribute == null || type == null || type.IsAbstract || type.IsInterface)
+                return;
+            if (Types.TryGetValue(attribute.StableId, out Type existing))
+            {
+                if (existing == type)
+                    return;
+                throw new InvalidOperationException("Agent 产物稳定标识重复：" + attribute.StableId
+                    + "，类型 " + existing.FullName + " 与 " + type.FullName + " 冲突。");
+            }
+            Types.Add(attribute.StableId, type);
+        }
+    }
+
+    /// <summary>Lightweight, idempotent Agent artifact metadata registration.</summary>
+    public sealed class ESAgentArtifactAttributeRegister
+        : EditorRegister_FOR_ClassAttribute<ESAgentArtifactAttribute>
+    {
+        public override void Handle(ESAgentArtifactAttribute attribute, Type type)
+        {
+            ESAgentArtifactTypeRegistry.Register(attribute, type);
+        }
+    }
+
+    /// <summary>
+    /// Unified Editor-only authoring graph. AICommand and AISkill are output capabilities of the
+    /// same requirement graph, not separate ScriptableObject lifecycles.
+    /// </summary>
+    [ESGraphAssetDomain(ESAgentGraphStableIds.DomainId, editorOnly: true)]
+    public sealed partial class ESAgentAuthoringGraphAsset : ESGraphAssetBase
+    {
+        public override ESGraphDomainKey DomainKey => ESAgentGraphStableIds.Domain;
+        public override bool CanEnableCycles => false;
+
+        protected override bool ValidateDomainConnection(ESGraphNodeRecord outputNode,
+            ESGraphPortRecord outputPort, ESGraphNodeRecord inputNode,
+            ESGraphPortRecord inputPort, out string error)
+        {
+            if (ESAgentRelationSemantics.TryResolve(outputNode?.typeId, inputNode?.typeId,
+                    outputPort?.stableKey, out ESAgentRelationKind relationKind))
+            {
+                if (relationKind == ESAgentRelationKind.ExecutesNext
+                    && (!string.Equals(outputPort.valueTypeId, ESAgentGraphStableIds.SkillControlPort,
+                            StringComparison.Ordinal)
+                        || !string.Equals(inputPort.valueTypeId, ESAgentGraphStableIds.SkillControlPort,
+                            StringComparison.Ordinal)))
+                {
+                    error = "AISkill 控制流只能连接到控制输入。";
+                    return false;
+                }
+                if (relationKind == ESAgentRelationKind.BindsValue
+                    && (string.Equals(outputPort.valueTypeId, ESAgentGraphStableIds.SkillControlPort,
+                            StringComparison.Ordinal)
+                        || string.Equals(inputPort.valueTypeId, ESAgentGraphStableIds.SkillControlPort,
+                            StringComparison.Ordinal)))
+                {
+                    error = "AISkill 值流不能连接到控制端口。";
+                    return false;
+                }
+                error = null;
+                return true;
+            }
+            error = "当前 AI 节点阶段不允许该关系：" + (outputNode?.title ?? "输出节点")
+                + " → " + (inputNode?.title ?? "输入节点");
+            return false;
+        }
+    }
+#endif
 }

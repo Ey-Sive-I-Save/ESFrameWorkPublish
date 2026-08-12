@@ -8,6 +8,7 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
+using GraphAsset = global::ES.ESGraphAssetBase;
 
 namespace ES.EditorInternal
 {
@@ -21,23 +22,23 @@ namespace ES.EditorInternal
 
     public static class ESAgentAuthoringGraphPreset
     {
-        public const string DefaultGraphFolder = "Assets/ESNormalAssets/Data/AgentAuthoring/Graphs";
+        public const string DefaultGraphFolder = "Assets/ESNormalAssets/Editor/AgentAuthoring/Graphs";
 
-        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTEXT_PATH + MenuItemPathDefine.CONTENT_CREATION + "/图与流程/智能助手编排/配套命令 + 技能", false, 201)]
+        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTENT_CONTEXT_PATH + "图与流程/智能助手编排/Skill 能力包（AICommand + AISkill）", false, 201)]
         public static void CreatePairedFromAssetsMenu() { TryCreateAsset(ESAgentAuthoringPresetKind.Paired, out _, out _); }
-        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTEXT_PATH + MenuItemPathDefine.CONTENT_CREATION + "/图与流程/智能助手编排/AICommand 实现链", false, 202)]
+        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTENT_CONTEXT_PATH + "图与流程/智能助手编排/AICommand 实现链", false, 202)]
         public static void CreateAICommandFromAssetsMenu() { TryCreateAsset(ESAgentAuthoringPresetKind.AICommandOnly, out _, out _); }
-        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTEXT_PATH + MenuItemPathDefine.CONTENT_CREATION + "/图与流程/智能助手编排/Agent Skill 能力链", false, 203)]
+        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTENT_CONTEXT_PATH + "图与流程/智能助手编排/AISkill 能力链", false, 203)]
         public static void CreateAgentSkillFromAssetsMenu() { TryCreateAsset(ESAgentAuthoringPresetKind.AgentSkillOnly, out _, out _); }
-        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTEXT_PATH + MenuItemPathDefine.CONTENT_CREATION + "/图与流程/智能助手编排/完整需求思路图", false, 204)]
+        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTENT_CONTEXT_PATH + "图与流程/智能助手编排/AI 实战调度图（分支与遍历）", false, 204)]
         public static void CreateMindMapFromAssetsMenu() { TryCreateAsset(ESAgentAuthoringPresetKind.MindMapPaired, out _, out _); }
 
-        public static bool TryCreateAsset(out ESGraphAsset asset, out string error)
+        public static bool TryCreateAsset(out GraphAsset asset, out string error)
         {
             return TryCreateAsset(ESAgentAuthoringPresetKind.Paired, out asset, out error);
         }
 
-        public static bool TryCreateAsset(ESAgentAuthoringPresetKind kind, out ESGraphAsset asset, out string error)
+        public static bool TryCreateAsset(ESAgentAuthoringPresetKind kind, out GraphAsset asset, out string error)
         {
             asset = null;
             error = string.Empty;
@@ -48,14 +49,15 @@ namespace ES.EditorInternal
                 return false;
             try
             {
-                asset = ScriptableObject.CreateInstance<ESGraphAsset>();
-                if (!asset.TrySetDomain(ESGraphDomainKey.FromKind(ESGraphDomainKind.AgentAuthoring), out error))
-                {
-                    UnityEngine.Object.DestroyImmediate(asset);
-                    asset = null;
-                    return false;
-                }
+                asset = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
                 Populate(asset, kind);
+                List<ESGraphValidationIssue> templateIssues = ESGraphAuthoringRegistry.Validate(asset);
+                ESGraphValidationIssue[] templateErrors = templateIssues
+                    .Where(issue => issue != null && issue.severity == ESGraphValidationSeverity.Error)
+                    .Take(5).ToArray();
+                if (templateErrors.Length > 0)
+                    throw new InvalidOperationException("内置 AI 协作模板未通过统一 Graph 校验：\n"
+                        + string.Join("\n", templateErrors.Select(issue => issue.code + "：" + issue.message)));
                 AssetDatabase.CreateAsset(asset, path);
                 EditorUtility.SetDirty(asset);
                 AssetDatabase.SaveAssets();
@@ -74,14 +76,15 @@ namespace ES.EditorInternal
             }
         }
 
-        public static void Populate(ESGraphAsset asset)
+        public static void Populate(GraphAsset asset)
         {
             Populate(asset, ESAgentAuthoringPresetKind.Paired);
         }
 
-        public static void Populate(ESGraphAsset asset, ESAgentAuthoringPresetKind kind)
+        public static void Populate(GraphAsset asset, ESAgentAuthoringPresetKind kind)
         {
-            if (asset == null || asset.DomainKind != ESGraphDomainKind.AgentAuthoring)
+            if (asset == null || !string.Equals(asset.DomainId, ESAgentGraphStableIds.DomainId,
+                    StringComparison.Ordinal))
                 throw new ArgumentException("必须提供空的 Agent Authoring Graph。", nameof(asset));
             if (asset.Nodes.Count > 0 || asset.Edges.Count > 0)
                 throw new InvalidOperationException("Agent Authoring 预设只能填充空 Graph。");
@@ -90,18 +93,19 @@ namespace ES.EditorInternal
                 PopulateMindMap(asset);
                 return;
             }
-            ESGraphNodeRecord goal = Add(asset, ESGraphBuiltInNodeKind.AgentGoal, new Vector2(0f, 100f));
-            ESGraphNodeRecord reference = Add(asset, ESGraphBuiltInNodeKind.AgentReference, new Vector2(220f, 100f));
-            ESGraphNodeRecord constraint = Add(asset, ESGraphBuiltInNodeKind.AgentConstraint, new Vector2(440f, 100f));
+            ESGraphNodeRecord goal = Add(asset, ESAgentGraphStableIds.GoalNode, new Vector2(0f, 100f));
+            ESGraphNodeRecord reference = Add(asset, ESAgentGraphStableIds.ReferenceNode, new Vector2(220f, 100f));
+            ESGraphNodeRecord constraint = Add(asset, ESAgentGraphStableIds.ConstraintNode, new Vector2(440f, 100f));
             ESGraphNodeRecord command = kind != ESAgentAuthoringPresetKind.AgentSkillOnly
-                ? Add(asset, ESGraphBuiltInNodeKind.AgentAICommandOutput, new Vector2(680f, kind == ESAgentAuthoringPresetKind.Paired ? 0f : 100f)) : null;
+                ? Add(asset, ESAgentGraphStableIds.AICommandOutputNode, new Vector2(680f, kind == ESAgentAuthoringPresetKind.Paired ? 0f : 100f)) : null;
             ESGraphNodeRecord skill = kind != ESAgentAuthoringPresetKind.AICommandOnly
-                ? Add(asset, ESGraphBuiltInNodeKind.AgentSkillOutput, new Vector2(680f, kind == ESAgentAuthoringPresetKind.Paired ? 220f : 100f)) : null;
-            ESGraphNodeRecord validation = Add(asset, ESGraphBuiltInNodeKind.AgentValidation, new Vector2(940f, 100f));
+                ? Add(asset, ESAgentGraphStableIds.AISkillOutputNode, new Vector2(680f, kind == ESAgentAuthoringPresetKind.Paired ? 220f : 100f)) : null;
+            ESGraphNodeRecord validation = Add(asset, ESAgentGraphStableIds.ValidationNode, new Vector2(940f, 100f));
             asset.UpdateNode(goal.nodeId, goal.typeId, goal.version, goal.title, JsonUtility.ToJson(new ESAgentGoalPayload
             {
                 title = GetGoalTitle(kind),
                 objective = GetGoalObjective(kind),
+                successCriteria = GetGoalSuccessCriteria(kind),
                 context = kind == ESAgentAuthoringPresetKind.AICommandOnly
                     ? "把中文需求整理成一条可执行的实现链：读取权威资料、核对现状、按权限修改目标、运行验证并交付真实证据。"
                     : "先产出隔离候选，通过 Diff Review 后再导入正式目录。"
@@ -134,8 +138,8 @@ namespace ES.EditorInternal
                 riskLevel = ESAgentRiskLevel.L2,
                 failurePolicy = ESAgentFailurePolicy.RollbackAndReport,
                 purpose = kind == ESAgentAuthoringPresetKind.AICommandOnly
-                    ? "把文本需求转换为 AI 可以真正执行的 ESFramework 实现合同。"
-                    : "生成一个有明确权限、必读规则、执行步骤和交付格式的任务合同。",
+                    ? "把模块编排需求转换为 AI 可以真正执行的 ESFramework 实现合同。"
+                    : "为模块编排生成一个有明确权限、必读规则、执行步骤和交付格式的任务合同。",
                 expectedInputs = "用户目标、当前实现事实、必读规则、允许修改路径、验收标准。",
                 preconditions = "目标范围、权威规则和允许修改路径已明确；并行工作树已完成只读核对。",
                 allowedWriteScopes = "只允许修改用户目标和 Graph Constraint 明确列出的项目文件。",
@@ -153,7 +157,7 @@ namespace ES.EditorInternal
                 description = "Execute a repeatable ESFramework module workflow with live rule reading, scoped writes, validation, and evidence-backed delivery.",
                 effectKind = ESAgentSkillEffectKind.ControlledMutation,
                 idempotency = ESAgentSkillIdempotency.BestEffort,
-                triggerScenarios = "需要按 ESFramework 项目规则实现或修改一个边界明确的模块任务时使用。",
+                triggerScenarios = "需要按 ESFramework 项目规则执行边界明确的模块编排任务时使用。",
                 nonTriggerScenarios = "纯解释、无项目上下文或用户未授权写入时不自动执行修改阶段。",
                 preconditions = "项目规则可读取，用户目标和授权范围明确，目标工作树可安全核对。",
                 requiredDependencies = "项目 AIWarnings、适用的项目 Skill、工作树审计和目标模块源码。",
@@ -180,9 +184,9 @@ namespace ES.EditorInternal
             if (skill != null) { Connect(asset, constraint, skill); Connect(asset, skill, validation); }
         }
 
-        private static ESGraphNodeRecord Add(ESGraphAsset graph, ESGraphBuiltInNodeKind nodeKind, Vector2 position)
+        private static ESGraphNodeRecord Add(GraphAsset graph, string nodeTypeId, Vector2 position)
         {
-            ESGraphNodeTypeKey nodeType = ESGraphNodeTypeKey.FromKind(nodeKind);
+            ESGraphNodeTypeKey nodeType = ESAgentGraphStableIds.Node(nodeTypeId);
             if (!ESGraphAuthoringRegistry.TryGetNodeDefinition(graph.DomainKey, nodeType,
                     out IESGraphNodeDefinition definition))
                 throw new InvalidOperationException("未注册预设节点定义：" + nodeType.StableId);
@@ -192,7 +196,7 @@ namespace ES.EditorInternal
             return node;
         }
 
-        private static void Connect(ESGraphAsset graph, ESGraphNodeRecord from, ESGraphNodeRecord to)
+        private static void Connect(GraphAsset graph, ESGraphNodeRecord from, ESGraphNodeRecord to)
         {
             ESGraphPortRecord output = from.ports.First(port => port.direction == ESGraphPortDirection.Output);
             ESGraphPortRecord input = to.ports.First(port => port.direction == ESGraphPortDirection.Input);
@@ -200,18 +204,30 @@ namespace ES.EditorInternal
                 throw new InvalidOperationException(error);
         }
 
-        private static void PopulateMindMap(ESGraphAsset asset)
+        private static void ConnectFromPort(GraphAsset graph, ESGraphNodeRecord from,
+            string outputStableKey, ESGraphNodeRecord to)
         {
-            ESGraphNodeRecord goal = Add(asset, ESGraphBuiltInNodeKind.AgentGoal, new Vector2(0f, 240f));
-            ESGraphNodeRecord rules = Add(asset, ESGraphBuiltInNodeKind.AgentReference, new Vector2(240f, 160f));
-            ESGraphNodeRecord contract = Add(asset, ESGraphBuiltInNodeKind.AgentReference, new Vector2(480f, 160f));
-            ESGraphNodeRecord required = Add(asset, ESGraphBuiltInNodeKind.AgentConstraint, new Vector2(720f, 0f));
-            ESGraphNodeRecord forbidden = Add(asset, ESGraphBuiltInNodeKind.AgentConstraint, new Vector2(720f, 160f));
-            ESGraphNodeRecord permission = Add(asset, ESGraphBuiltInNodeKind.AgentConstraint, new Vector2(720f, 320f));
-            ESGraphNodeRecord quality = Add(asset, ESGraphBuiltInNodeKind.AgentConstraint, new Vector2(720f, 480f));
-            ESGraphNodeRecord command = Add(asset, ESGraphBuiltInNodeKind.AgentAICommandOutput, new Vector2(1020f, 120f));
-            ESGraphNodeRecord skill = Add(asset, ESGraphBuiltInNodeKind.AgentSkillOutput, new Vector2(1020f, 360f));
-            ESGraphNodeRecord validation = Add(asset, ESGraphBuiltInNodeKind.AgentValidation, new Vector2(1320f, 240f));
+            ESGraphPortRecord output = from.ports.First(port => port.direction == ESGraphPortDirection.Output
+                && string.Equals(port.stableKey, outputStableKey, StringComparison.Ordinal));
+            ESGraphPortRecord input = to.ports.First(port => port.direction == ESGraphPortDirection.Input);
+            if (!graph.TryAddEdge(output.portId, input.portId, out _, out string error))
+                throw new InvalidOperationException(error);
+        }
+
+        private static void PopulateMindMap(GraphAsset asset)
+        {
+            ESGraphNodeRecord goal = Add(asset, ESAgentGraphStableIds.GoalNode, new Vector2(0f, 240f));
+            ESGraphNodeRecord rules = Add(asset, ESAgentGraphStableIds.ReferenceNode, new Vector2(240f, 160f));
+            ESGraphNodeRecord contract = Add(asset, ESAgentGraphStableIds.ReferenceNode, new Vector2(480f, 160f));
+            ESGraphNodeRecord branch = Add(asset, ESAgentGraphStableIds.BranchNode, new Vector2(720f, 180f));
+            ESGraphNodeRecord traversal = Add(asset, ESAgentGraphStableIds.TraverseNode, new Vector2(940f, 0f));
+            ESGraphNodeRecord required = Add(asset, ESAgentGraphStableIds.ConstraintNode, new Vector2(1200f, 0f));
+            ESGraphNodeRecord forbidden = Add(asset, ESAgentGraphStableIds.ConstraintNode, new Vector2(1200f, 160f));
+            ESGraphNodeRecord permission = Add(asset, ESAgentGraphStableIds.ConstraintNode, new Vector2(1200f, 320f));
+            ESGraphNodeRecord quality = Add(asset, ESAgentGraphStableIds.ConstraintNode, new Vector2(1200f, 480f));
+            ESGraphNodeRecord command = Add(asset, ESAgentGraphStableIds.AICommandOutputNode, new Vector2(1500f, 120f));
+            ESGraphNodeRecord skill = Add(asset, ESAgentGraphStableIds.AISkillOutputNode, new Vector2(1500f, 360f));
+            ESGraphNodeRecord validation = Add(asset, ESAgentGraphStableIds.ValidationNode, new Vector2(1800f, 240f));
 
             asset.UpdateNode(goal.nodeId, goal.typeId, goal.version, goal.title, JsonUtility.ToJson(new ESAgentGoalPayload
             {
@@ -221,6 +237,26 @@ namespace ES.EditorInternal
                 targetUsers = "需要通过 Graph 编排复杂 AI 协作任务的 ESFramework 开发者。",
                 successCriteria = "AI 能按关系图理解需求归属，生成结构清晰且可通过 Diff Review 的配套候选。"
             }), out _);
+            asset.UpdateNode(branch.nodeId, branch.typeId, branch.version, branch.title,
+                JsonUtility.ToJson(new ESAgentBranchPayload
+                {
+                    condition = "当 Graph 声明了多个 References 或 Constraints 时，必须进入逐项检查分支。",
+                    matchedPath = "进入有界遍历，逐项读取并记录对产物的影响。",
+                    defaultPath = "按单一上下文继续执行，但仍保留授权和批准门禁。",
+                    failurePath = "停止生成，报告无法判断分支所缺少的 Graph 上下文。"
+                }), out _);
+            asset.UpdateNode(traversal.nodeId, traversal.typeId, traversal.version, traversal.title,
+                JsonUtility.ToJson(new ESAgentTraversePayload
+                {
+                    target = "与当前 Output 相连的 References 和 Constraints",
+                    itemAlias = "需求项",
+                    order = ESAgentTraversalOrder.DependencyFirst,
+                    maxDepth = 8,
+                    maxItems = 128,
+                    stopCondition = "达到硬上限、发现越权路径或继续处理会形成循环。",
+                    emptyResultAction = "记录没有可处理需求项并进入完成出口。",
+                    failureAction = "停止后续写入，保留已检查项并进入失败出口。"
+                }), out _);
             asset.UpdateNode(rules.nodeId, rules.typeId, rules.version, "项目规则入口", JsonUtility.ToJson(new ESAgentReferencePayload
             {
                 referenceKind = ESAgentReferenceKind.AIWarning,
@@ -249,17 +285,38 @@ namespace ES.EditorInternal
                 "让候选可以被人和后续 AI 可靠复核。", "UTF-8 Guard、结构验证、Diff Review 清单全部可见。");
 
             asset.UpdateNode(command.nodeId, command.typeId, command.version, command.title,
-                JsonUtility.ToJson(new ESAgentAICommandOutputPayload()), out _);
+                JsonUtility.ToJson(new ESAgentAICommandOutputPayload
+                {
+                    commandName = "生成_需求思路图_AI命令",
+                    targetProjectPath = "Assets/Plugins/ES/AICommands/生成_需求思路图_AI命令.md",
+                    purpose = "把完整需求思路图转换为权限、执行与验收边界明确的 AICommand。",
+                    acceptanceCriteria = "AICommand 必须覆盖需求思路图中的目标、约束、引用和验证关系。"
+                }), out _);
             asset.UpdateNode(skill.nodeId, skill.typeId, skill.version, skill.title,
-                JsonUtility.ToJson(new ESAgentSkillOutputPayload()), out _);
+                JsonUtility.ToJson(new ESAgentSkillOutputPayload
+                {
+                    skillName = "es-requirement-mind-map-workflow",
+                    targetProjectPath = ".agents/skills/es-requirement-mind-map-workflow/",
+                    description = "Use the complete 需求思路图 to execute a repeatable ESFramework artifact workflow.",
+                    triggerScenarios = "需要按需求思路图复用复杂 Agent Artifact 编排流程时使用。",
+                    workflow = "读取需求思路图关系\n执行受控步骤\n验证\n交付",
+                    outputContract = "输出必须逐项映射需求思路图中的目标、约束、引用和验证关系。",
+                    defaultPrompt = "Use $es-requirement-mind-map-workflow to execute the approved requirement mind map."
+                }), out _);
             asset.UpdateNode(validation.nodeId, validation.typeId, validation.version, validation.title,
                 JsonUtility.ToJson(new ESAgentValidationPayload()), out _);
 
             Connect(asset, goal, rules);
             Connect(asset, rules, contract);
+            Connect(asset, contract, branch);
+            ConnectFromPort(asset, branch, ESAgentGraphStableIds.BranchMatchedPortKey, traversal);
+            ConnectFromPort(asset, branch, ESAgentGraphStableIds.BranchDefaultPortKey, permission);
+            ConnectFromPort(asset, branch, ESAgentGraphStableIds.BranchFailurePortKey, forbidden);
+            ConnectFromPort(asset, traversal, ESAgentGraphStableIds.TraverseItemPortKey, required);
+            ConnectFromPort(asset, traversal, ESAgentGraphStableIds.TraverseCompletedPortKey, quality);
+            ConnectFromPort(asset, traversal, ESAgentGraphStableIds.TraverseFailurePortKey, forbidden);
             foreach (ESGraphNodeRecord constraint in new[] { required, forbidden, permission, quality })
             {
-                Connect(asset, contract, constraint);
                 Connect(asset, constraint, command);
                 Connect(asset, constraint, skill);
             }
@@ -267,7 +324,7 @@ namespace ES.EditorInternal
             Connect(asset, skill, validation);
         }
 
-        private static void ConfigureConstraint(ESGraphAsset asset, ESGraphNodeRecord node,
+        private static void ConfigureConstraint(GraphAsset asset, ESGraphNodeRecord node,
             ESAgentConstraintKind kind, string statement, string rationale, string verification)
         {
             asset.UpdateNode(node.nodeId, node.typeId, node.version, node.title,
@@ -285,9 +342,9 @@ namespace ES.EditorInternal
             switch (kind)
             {
                 case ESAgentAuthoringPresetKind.AICommandOnly: return "AICommand 实现链图";
-                case ESAgentAuthoringPresetKind.AgentSkillOnly: return "智能助手技能编排图";
-                case ESAgentAuthoringPresetKind.MindMapPaired: return "智能助手完整思路图";
-                default: return "智能助手产物编排图";
+                case ESAgentAuthoringPresetKind.AgentSkillOnly: return "AISkill 能力编排图";
+                case ESAgentAuthoringPresetKind.MindMapPaired: return "AI 实战调度图";
+                default: return "Skill 能力包编排图";
             }
         }
 
@@ -296,9 +353,9 @@ namespace ES.EditorInternal
             switch (kind)
             {
                 case ESAgentAuthoringPresetKind.AICommandOnly: return "创建以文本需求驱动真实实现的 AICommand 链图";
-                case ESAgentAuthoringPresetKind.AgentSkillOnly: return "创建只生成技能候选文件的预设图";
-                case ESAgentAuthoringPresetKind.MindMapPaired: return "创建包含完整需求分支和配套产物的思路图";
-                default: return "创建配套生成命令与技能候选文件的预设图";
+                case ESAgentAuthoringPresetKind.AgentSkillOnly: return "创建只生成 AISkill 候选文件的预设图";
+                case ESAgentAuthoringPresetKind.MindMapPaired: return "创建带三路分支、有界遍历和双产物门禁的 AI 实战调度图";
+                default: return "创建由 AICommand 与 AISkill 共同组成的 Skill 能力包预设图";
             }
         }
 
@@ -306,9 +363,9 @@ namespace ES.EditorInternal
         {
             switch (kind)
             {
-                case ESAgentAuthoringPresetKind.AICommandOnly: return "实现目标";
-                case ESAgentAuthoringPresetKind.AgentSkillOnly: return "生成技能";
-                default: return "生成配套命令 + 技能";
+                case ESAgentAuthoringPresetKind.AICommandOnly: return "模块编排 AICommand 实现链";
+                case ESAgentAuthoringPresetKind.AgentSkillOnly: return "模块编排 AISkill";
+                default: return "模块编排 Skill 能力包";
             }
         }
 
@@ -317,11 +374,24 @@ namespace ES.EditorInternal
             switch (kind)
             {
                 case ESAgentAuthoringPresetKind.AICommandOnly:
-                    return "根据项目规则，把中文需求整理成一条可以交给 AI 真正执行的实现链，并生成可审查的 AICommand 候选。";
+                    return "根据项目规则，把模块编排需求整理成一条可以交给 AI 真正执行的实现链，并生成可审查的 AICommand 候选。";
                 case ESAgentAuthoringPresetKind.AgentSkillOnly:
-                    return "根据项目规则生成一个可复用、触发边界明确并带验证步骤的 Agent Skill 候选。";
+                    return "根据项目规则生成一个面向模块编排、可复用、触发边界明确并带验证步骤的 AISkill 候选。";
                 default:
-                    return "根据项目规则生成一条单次任务权限合同和一个可复用执行 Skill 候选。";
+                    return "根据项目规则为模块编排生成由 AICommand 与 AISkill 共同组成的可复用 Skill 能力包。";
+            }
+        }
+
+        private static string GetGoalSuccessCriteria(ESAgentAuthoringPresetKind kind)
+        {
+            switch (kind)
+            {
+                case ESAgentAuthoringPresetKind.AICommandOnly:
+                    return "模块编排 AICommand 与目标一致、权限明确，并通过候选 Diff Review。";
+                case ESAgentAuthoringPresetKind.AgentSkillOnly:
+                    return "模块编排 AISkill 的触发、非目标、工作流和验证步骤均可审查。";
+                default:
+                    return "模块编排 AICommand 与 AISkill 保持同一业务主题、输入和权限边界，并通过候选检查和人工批准。";
             }
         }
 
@@ -343,7 +413,7 @@ namespace ES.EditorInternal
     [Serializable]
     public sealed class ESAgentArtifactGenerationRequest
     {
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 4;
 
         public int schemaVersion = CurrentSchemaVersion;
         public string requestId;
@@ -386,11 +456,14 @@ namespace ES.EditorInternal
     [Serializable]
     public sealed class ESAgentArtifactApprovalManifest
     {
-        public int schemaVersion = 2;
+        public const int CurrentSchemaVersion = 3;
+
+        public int schemaVersion = CurrentSchemaVersion;
         public string requestId;
         public string approvedAtUtc;
         public string sourceGraphId;
         public string sourceContentSignature;
+        public ESGraphRiskAcceptance riskAcceptance;
         public ESAgentArtifactApprovedFile[] files = Array.Empty<ESAgentArtifactApprovedFile>();
     }
 
@@ -405,11 +478,84 @@ namespace ES.EditorInternal
         public string sha256;
     }
 
+    [Serializable]
+    public sealed class ESGraphSnapshotArtifact
+    {
+        public const int CurrentSchemaVersion = 2;
+
+        public int schemaVersion = CurrentSchemaVersion;
+        public string createdAtUtc;
+        public int graphSchemaVersion;
+        public string graphId;
+        public string originGraphId;
+        public string domainId;
+        public bool allowCycles;
+        public string contentSignature;
+        public ESGraphRiskAcceptance riskAcceptance;
+        public ESGraphSnapshotNodeArtifact[] nodes = Array.Empty<ESGraphSnapshotNodeArtifact>();
+        public ESGraphSnapshotEdgeArtifact[] edges = Array.Empty<ESGraphSnapshotEdgeArtifact>();
+    }
+
+    [Serializable]
+    public sealed class ESGraphSnapshotNodeArtifact
+    {
+        public string nodeId;
+        public string typeId;
+        public int version;
+        public string title;
+        public string payloadJson;
+        public ESGraphSnapshotPortArtifact[] ports = Array.Empty<ESGraphSnapshotPortArtifact>();
+    }
+
+    [Serializable]
+    public sealed class ESGraphSnapshotPortArtifact
+    {
+        public string portId;
+        public string stableKey;
+        public string name;
+        public string valueTypeId;
+        public ESGraphPortDirection direction;
+        public ESGraphPortCapacity capacity;
+    }
+
+    [Serializable]
+    public sealed class ESGraphSnapshotEdgeArtifact
+    {
+        public string edgeId;
+        public string outputPortId;
+        public string inputPortId;
+    }
+
+    public enum ESAgentArtifactRequestState : byte
+    {
+        None = 0,
+        AwaitingCandidate = 1,
+        AwaitingApproval = 2,
+        Approved = 3,
+        Stale = 4,
+        Invalid = 5
+    }
+
+    public sealed class ESAgentArtifactRequestStatus
+    {
+        public ESAgentArtifactRequestState State { get; internal set; }
+        public string RequestDirectory { get; internal set; }
+        public string Message { get; internal set; }
+        public string NextAction { get; internal set; }
+        public bool CanReview => State == ESAgentArtifactRequestState.AwaitingCandidate
+            || State == ESAgentArtifactRequestState.AwaitingApproval
+            || State == ESAgentArtifactRequestState.Approved;
+    }
+
     public static class ESAgentArtifactGenerationWorkspace
     {
         public const string CandidateRoot = "ES/Automation/Candidates/AgentAuthoring";
+        public const string SnapshotRoot = "ES/Automation/Artifacts/GraphSnapshots";
         private const string LatestRequestEditorPref = "ES.AgentAuthoring.LatestRequest";
+        private const string RequestByGraphEditorPrefPrefix = "ES.AgentAuthoring.RequestByGraph.";
         private const string ArtifactIdentityMarkerLabel = "ES-AGENT-ARTIFACT-ID:";
+
+        public static event Action StateChanged;
 
         public static bool TryCreateArtifactView(ESAgentArtifactGenerationSpec source,
             ESAgentArtifactKind artifactKind, out ESAgentArtifactGenerationSpec artifactView,
@@ -571,11 +717,26 @@ namespace ES.EditorInternal
                     .Where(item => item != null && retainedNodeIds.Contains(item.nodeId)).ToArray(),
                 constraints = (cloned.constraints ?? Array.Empty<ESAgentGenerationConstraint>())
                     .Where(item => item != null && retainedNodeIds.Contains(item.nodeId)).ToArray(),
+                branches = (cloned.branches ?? Array.Empty<ESAgentGenerationBranch>())
+                    .Where(item => item != null && retainedNodeIds.Contains(item.nodeId)).ToArray(),
+                traversals = (cloned.traversals ?? Array.Empty<ESAgentGenerationTraversal>())
+                    .Where(item => item != null && retainedNodeIds.Contains(item.nodeId)).ToArray(),
                 outputs = selectedOutputs,
                 validations = selectedValidations,
-                relations = retainedRelations
+                relations = retainedRelations,
+                riskAcceptance = cloned.riskAcceptance
             };
+            artifactView.skillBundle = ESAgentSkillBundleContract.Create(
+                artifactView.sourceGraphId, artifactView.goal.title, artifactView.goal.nodeId,
+                artifactView.references, artifactView.constraints, artifactView.branches,
+                artifactView.traversals, artifactView.outputs,
+                artifactView.validations);
             if (!ESAgentGenerationIntentValidator.TryValidate(artifactView, out error))
+            {
+                artifactView = null;
+                return false;
+            }
+            if (!ESAgentGenerationRiskValidator.TryValidate(artifactView, out error))
             {
                 artifactView = null;
                 return false;
@@ -628,21 +789,14 @@ namespace ES.EditorInternal
             if (!TryCreateRequest(spec, out ESAgentArtifactGenerationRequest request, out string prompt, out error))
                 return false;
             requestDirectory = request.requestDirectory;
-            ESCmdAgentPromptDispatchResult dispatch = ESCmdAgentWindow.OpenAndSendPromptWithReceipt(prompt);
-            dispatchMessage = dispatch.Message;
-            if (dispatch.State == ESCmdAgentPromptDispatchState.HeldForUser)
+            ESAutomationTaskInvocationResult run = ESAgentGraphAutomation.Dispatch(
+                ESAgentGraphAutomation.GenerateTaskId, request.requestId, request.requestDirectory,
+                spec.sourceGraphId, spec.SourceContentSignature, "candidate", prompt,
+                request.spec.riskAcceptance, ESGraphRiskAcceptance.CurrentOperatorId);
+            dispatchMessage = run.message;
+            if (run.status != "Accepted" && run.status != "Starting" && run.status != "Running")
             {
-                error = "候选请求已创建，但提示仅保留在 Cmd Agent 输入框，尚未发送：" + dispatch.Message;
-                return false;
-            }
-            if (dispatch.State == ESCmdAgentPromptDispatchState.Rejected)
-            {
-                error = "候选请求已创建，但 Cmd Agent 未能接收提示（同步启动/配置失败）：" + dispatch.Message;
-                return false;
-            }
-            if (!dispatch.IsDispatched)
-            {
-                error = "候选请求已创建，但 Cmd Agent 未返回可确认的发送状态：" + dispatch.Message;
+                error = "候选请求已创建，但 Automation 未确认发送：" + run.message;
                 return false;
             }
             ESAgentArtifactCandidateReviewWindow.Open(requestDirectory);
@@ -686,6 +840,8 @@ namespace ES.EditorInternal
                     throw new IOException("请求目录已存在：" + relativeDirectory);
                 Directory.Move(stagingDirectory, fullDirectory);
                 EditorPrefs.SetString(LatestRequestEditorPref, relativeDirectory);
+                RememberRequest(spec, relativeDirectory);
+                NotifyStateChanged();
                 error = string.Empty;
                 return true;
             }
@@ -714,6 +870,11 @@ namespace ES.EditorInternal
                 error = "即时执行失败：" + error;
                 return false;
             }
+            if (!ESAgentGenerationRiskValidator.TryValidate(spec, out error))
+            {
+                error = "即时执行失败：" + error;
+                return false;
+            }
             foreach (ESAgentGenerationOutput output in spec.outputs ?? Array.Empty<ESAgentGenerationOutput>())
             {
                 if (!ESAgentGenerationContractValidator.TryValidate(output, out error))
@@ -724,16 +885,14 @@ namespace ES.EditorInternal
             }
             requestId = CreateRequestId("run");
             string prompt = BuildImmediateExecutionPrompt(spec, requestId);
-            ESCmdAgentPromptDispatchResult dispatch = ESCmdAgentWindow.OpenAndSendPromptWithReceipt(prompt);
-            dispatchMessage = dispatch.Message;
-            if (dispatch.State == ESCmdAgentPromptDispatchState.HeldForUser)
+            ESAutomationTaskInvocationResult run = ESAgentGraphAutomation.Dispatch(
+                ESAgentGraphAutomation.UseTaskId, requestId, string.Empty, spec.sourceGraphId,
+                spec.SourceContentSignature, "immediate", prompt, spec.riskAcceptance,
+                ESGraphRiskAcceptance.CurrentOperatorId);
+            dispatchMessage = run.message;
+            if (run.status != "Accepted" && run.status != "Starting" && run.status != "Running")
             {
-                error = "即时执行尚未发送：" + dispatch.Message;
-                return false;
-            }
-            if (!dispatch.IsDispatched)
-            {
-                error = "即时执行未能发送（同步启动/配置失败）：" + dispatch.Message;
+                error = "即时执行未能由 Automation 确认发送：" + run.message;
                 return false;
             }
             error = string.Empty;
@@ -796,22 +955,22 @@ namespace ES.EditorInternal
             {
                 return false;
             }
+            if (!ESAgentGenerationRiskValidator.TryValidate(artifactView, out error))
+                return false;
 
             requestId = CreateRequestId(output.artifactKind == ESAgentArtifactKind.AICommand
                 ? "command" : "skill");
             string prompt = output.artifactKind == ESAgentArtifactKind.AICommand
                 ? BuildImmediateExecutionPrompt(artifactView, requestId)
                 : BuildTemporarySkillExecutionPrompt(artifactView, requestId);
-            ESCmdAgentPromptDispatchResult dispatch = ESCmdAgentWindow.OpenAndSendPromptWithReceipt(prompt);
-            dispatchMessage = dispatch.Message;
-            if (dispatch.State == ESCmdAgentPromptDispatchState.HeldForUser)
+            ESAutomationTaskInvocationResult run = ESAgentGraphAutomation.Dispatch(
+                ESAgentGraphAutomation.UseTaskId, requestId, string.Empty, artifactView.sourceGraphId,
+                artifactView.SourceContentSignature, "single-use", prompt, artifactView.riskAcceptance,
+                ESGraphRiskAcceptance.CurrentOperatorId);
+            dispatchMessage = run.message;
+            if (run.status != "Accepted" && run.status != "Starting" && run.status != "Running")
             {
-                error = "单次使用请求尚未发送：" + dispatch.Message;
-                return false;
-            }
-            if (!dispatch.IsDispatched)
-            {
-                error = "单次使用请求未能发送（同步启动/配置失败）：" + dispatch.Message;
+                error = "单次使用请求未能由 Automation 确认发送：" + run.message;
                 return false;
             }
             error = string.Empty;
@@ -836,6 +995,8 @@ namespace ES.EditorInternal
             {
                 return false;
             }
+            if (!ESAgentGenerationRiskValidator.TryValidate(spec, out error))
+                return false;
             if (spec.outputs == null || spec.outputs.Length == 0)
             {
                 error = "GenerationSpec 没有可复制的 Output。";
@@ -881,6 +1042,7 @@ namespace ES.EditorInternal
             builder.AppendLine("请求编号：`" + (requestId ?? string.Empty) + "`");
             builder.AppendLine("GraphId：`" + (spec?.sourceGraphId ?? string.Empty) + "`");
             builder.AppendLine("内容签名：`" + (spec?.SourceContentSignature ?? string.Empty) + "`");
+            AppendRiskAcceptance(builder, spec);
             builder.AppendLine();
             builder.AppendLine("## 最终目的");
             builder.AppendLine();
@@ -912,6 +1074,7 @@ namespace ES.EditorInternal
             builder.AppendLine("请求编号：`" + (requestId ?? string.Empty) + "`");
             builder.AppendLine("GraphId：`" + (spec?.sourceGraphId ?? string.Empty) + "`");
             builder.AppendLine("内容签名：`" + (spec?.SourceContentSignature ?? string.Empty) + "`");
+            AppendRiskAcceptance(builder, spec);
             builder.AppendLine();
             builder.AppendLine("## 本次 Skill");
             builder.AppendLine();
@@ -965,12 +1128,25 @@ namespace ES.EditorInternal
             builder.AppendLine("- GraphId：`" + (spec?.sourceGraphId ?? string.Empty) + "`");
             builder.AppendLine("- 来源 GraphId：`" + (spec?.sourceOriginGraphId ?? string.Empty) + "`");
             builder.AppendLine("- 内容签名：`" + (spec?.SourceContentSignature ?? string.Empty) + "`");
+            AppendRiskAcceptance(builder, spec);
             builder.AppendLine();
             builder.AppendLine("## 最终目的");
             builder.AppendLine();
             builder.AppendLine(spec?.goal?.objective ?? string.Empty);
             builder.AppendLine();
             builder.AppendLine("成功标准：" + (spec?.goal?.successCriteria ?? string.Empty));
+            if (spec?.skillBundle != null)
+            {
+                ESAgentSkillBundleContract bundle = spec.skillBundle;
+                builder.AppendLine();
+                builder.AppendLine("## Skill 能力包");
+                builder.AppendLine();
+                builder.AppendLine("- BundleId：`" + bundle.bundleId + "`");
+                builder.AppendLine("- 组成：" + bundle.kind + "（AICommand + AISkill）");
+                builder.AppendLine("- AICommand Output：" + string.Join(", ", bundle.commandOutputNodeIds ?? Array.Empty<string>()));
+                builder.AppendLine("- AISkill Output：" + string.Join(", ", bundle.aiSkillOutputNodeIds ?? Array.Empty<string>()));
+                builder.AppendLine("- 共享边界：Goal、References、Constraints、Validation 和人工批准状态必须一致。");
+            }
             AppendExecutionPlan(builder, spec);
             AppendMindMap(builder, spec);
             return builder.ToString();
@@ -979,6 +1155,15 @@ namespace ES.EditorInternal
         public static string BuildArtifactIdentityMarker(string artifactId)
         {
             return "<!-- " + ArtifactIdentityMarkerLabel + " " + (artifactId ?? string.Empty) + " -->";
+        }
+
+        private static void AppendRiskAcceptance(StringBuilder builder, ESAgentArtifactGenerationSpec spec)
+        {
+            ESGraphRiskAcceptance acceptance = spec?.riskAcceptance;
+            if (acceptance == null) return;
+            builder.AppendLine("- 风险确认：`" + acceptance.acceptanceHash + "`");
+            builder.AppendLine("- 已确认问题：" + string.Join(", ", acceptance.issueCodes ?? Array.Empty<string>()));
+            builder.AppendLine("- 确认者 / 时间：" + acceptance.acceptedBy + " / " + acceptance.acceptedAtUtc);
         }
 
         private static void AppendExecutionPlan(StringBuilder builder, ESAgentArtifactGenerationSpec spec)
@@ -1067,6 +1252,8 @@ namespace ES.EditorInternal
             {
                 return false;
             }
+            if (!ESAgentGenerationRiskValidator.TryValidate(spec, out error))
+                return false;
             if (!ESGraphIdentity.IsValid(spec.sourceGraphId))
             {
                 error = "GenerationSpec 缺少有效 GraphId。";
@@ -1221,6 +1408,435 @@ namespace ES.EditorInternal
             return latest == null ? string.Empty : CandidateRoot + "/" + latest.Name;
         }
 
+        public static bool TryGetRequestDirectory(ESAgentArtifactGenerationSpec spec,
+            out string requestDirectory)
+        {
+            requestDirectory = string.Empty;
+            if (spec == null || !ESGraphIdentity.IsValid(spec.sourceGraphId)
+                || string.IsNullOrWhiteSpace(spec.SourceContentSignature))
+                return false;
+            string saved = EditorPrefs.GetString(BuildRequestEditorPrefKey(spec.sourceGraphId,
+                spec.SourceContentSignature), string.Empty);
+            if (RequestMatches(saved, spec.sourceGraphId, spec.SourceContentSignature))
+            {
+                requestDirectory = saved;
+                return true;
+            }
+            if (TryFindLatestRequest(spec.sourceGraphId, spec.SourceContentSignature,
+                    out requestDirectory, out _))
+            {
+                RememberRequest(spec, requestDirectory);
+                return true;
+            }
+            return false;
+        }
+
+        public static bool TryReadRequest(string requestDirectory,
+            out ESAgentArtifactGenerationRequest request, out string error)
+        {
+            request = null;
+            error = string.Empty;
+            if (string.IsNullOrWhiteSpace(requestDirectory))
+            {
+                error = "候选请求目录不能为空。";
+                return false;
+            }
+            try
+            {
+                if (!TryResolveProjectPath(requestDirectory, out string fullDirectory, out error))
+                    return false;
+                string candidateRoot = ResolveProjectPath(CandidateRoot);
+                string normalizedRoot = candidateRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+                if (!fullDirectory.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    error = "候选请求目录必须位于 AgentAuthoring 候选根目录内。";
+                    return false;
+                }
+                string requestPath = Path.Combine(fullDirectory, "generation-request.json");
+                if (!File.Exists(requestPath))
+                {
+                    error = "候选请求缺少 generation-request.json。";
+                    return false;
+                }
+                request = JsonUtility.FromJson<ESAgentArtifactGenerationRequest>(ReadUtf8(requestPath));
+                if (request?.spec == null || request.schemaVersion != ESAgentArtifactGenerationRequest.CurrentSchemaVersion)
+                {
+                    request = null;
+                    error = "候选请求结构或版本无效。";
+                    return false;
+                }
+                if (request.spec.contractSchemaVersion != ESAgentArtifactGenerationSpec.CurrentContractSchemaVersion)
+                {
+                    request = null;
+                    error = "候选请求使用旧版 Graph 语义合同，请从当前 Graph 重新生成。";
+                    return false;
+                }
+                string normalizedDirectory = NormalizeProjectRelativePath(requestDirectory);
+                if (string.IsNullOrWhiteSpace(request.requestId)
+                    || !string.Equals(NormalizeProjectRelativePath(request.requestDirectory),
+                        normalizedDirectory, StringComparison.Ordinal)
+                    || !string.Equals(NormalizeProjectRelativePath(request.candidateDirectory),
+                        normalizedDirectory + "/candidate", StringComparison.Ordinal))
+                {
+                    request = null;
+                    error = "候选请求的 RequestId 或目录身份与当前位置不一致。";
+                    return false;
+                }
+                if (!ESAgentGenerationIntentValidator.TryValidate(request.spec, out error))
+                {
+                    request = null;
+                    error = "候选请求的开发意图合同无效：" + error;
+                    return false;
+                }
+                if (!ESAgentGenerationRiskValidator.TryValidate(request.spec, out error))
+                {
+                    request = null;
+                    error = "候选请求的目标、输出或风险确认无效：" + error;
+                    return false;
+                }
+                return true;
+            }
+            catch (Exception exception)
+            {
+                request = null;
+                error = "读取候选请求失败：" + exception.Message;
+                return false;
+            }
+        }
+
+        public static ESAgentArtifactRequestStatus GetRequestStatus(ESAgentArtifactGenerationSpec spec)
+        {
+            if (spec == null || !ESGraphIdentity.IsValid(spec.sourceGraphId)
+                || string.IsNullOrWhiteSpace(spec.SourceContentSignature))
+                return Status(ESAgentArtifactRequestState.Invalid, string.Empty,
+                    "当前 Graph 没有可核对的稳定身份或内容签名。", "先修复图并重新检查。");
+            if (!TryGetRequestDirectory(spec, out string requestDirectory))
+            {
+                if (TryFindLatestRequest(spec.sourceGraphId, null, out string staleDirectory,
+                        out ESAgentArtifactGenerationRequest staleRequest)
+                    && staleRequest?.spec != null
+                    && !string.Equals(staleRequest.spec.SourceContentSignature,
+                        spec.SourceContentSignature, StringComparison.Ordinal))
+                    return Status(ESAgentArtifactRequestState.Stale, staleDirectory,
+                        "当前 Graph 内容已变化，旧候选不能用于本图。", "重新生成候选并再次人工批准。");
+                return Status(ESAgentArtifactRequestState.None, string.Empty,
+                    "当前 Graph 尚无匹配候选。", "先生成 AICommand / Agent Skill 候选。");
+            }
+            string full = ResolveProjectPath(requestDirectory);
+            if (!TryGetCandidateManifestPath(full, out string manifestPath))
+                return Status(ESAgentArtifactRequestState.AwaitingCandidate, requestDirectory,
+                    "请求已绑定当前 Graph，正在等待候选文件与清单。", "等待生成完成后查看候选差异。");
+            ESAgentArtifactGenerationRequest request;
+            ESAgentArtifactCandidateManifest manifest;
+            try
+            {
+                if (!TryReadRequest(requestDirectory, out request, out string requestError))
+                    return Status(ESAgentArtifactRequestState.Invalid, requestDirectory,
+                        requestError, "从当前 Graph 重新生成候选。");
+                manifest = JsonUtility.FromJson<ESAgentArtifactCandidateManifest>(
+                    ReadUtf8(manifestPath));
+                List<string> candidateErrors = ESAgentArtifactCandidateValidator.Validate(
+                    requestDirectory, request, manifest);
+                if (candidateErrors.Count > 0)
+                    return Status(ESAgentArtifactRequestState.Invalid, requestDirectory,
+                        "候选未通过当前 Graph 合同：" + candidateErrors[0],
+                        "修复候选或从当前 Graph 重新生成；无效候选不能批准。" );
+            }
+            catch (Exception exception)
+            {
+                return Status(ESAgentArtifactRequestState.Invalid, requestDirectory,
+                    "候选状态读取失败：" + exception.Message,
+                    "检查候选文件完整性，或从当前 Graph 重新生成。" );
+            }
+            if (!File.Exists(Path.Combine(full, "approval-manifest.json")))
+                return Status(ESAgentArtifactRequestState.AwaitingApproval, requestDirectory,
+                    "候选已生成，但尚未经过人工 Diff Review 与批准。", "查看候选差异并人工批准。");
+            try
+            {
+                ESAgentArtifactApprovalManifest approval = JsonUtility.FromJson<ESAgentArtifactApprovalManifest>(
+                    ReadUtf8(Path.Combine(full, "approval-manifest.json")));
+                if (approval == null
+                    || approval.schemaVersion != ESAgentArtifactApprovalManifest.CurrentSchemaVersion
+                    || !string.Equals(approval.requestId, request.requestId, StringComparison.Ordinal)
+                    || !string.Equals(approval.sourceGraphId, spec.sourceGraphId, StringComparison.Ordinal)
+                    || !string.Equals(approval.sourceContentSignature, spec.SourceContentSignature,
+                        StringComparison.Ordinal)
+                    || approval.files == null || approval.files.Length == 0)
+                    return Status(ESAgentArtifactRequestState.Invalid, requestDirectory,
+                        "批准清单不完整或未绑定当前 Graph、请求与内容签名。",
+                        "重新查看候选差异并执行人工批准。" );
+                if ((request.spec.riskAcceptance == null) != (approval.riskAcceptance == null)
+                    || request.spec.riskAcceptance != null
+                    && !request.spec.riskAcceptance.SameAs(approval.riskAcceptance))
+                    return Status(ESAgentArtifactRequestState.Invalid, requestDirectory,
+                        "批准清单未绑定当前请求的风险确认。",
+                        "重新查看候选差异并执行人工批准。" );
+                ESAgentArtifactCandidateFile[] candidateFiles = manifest.files
+                    ?? Array.Empty<ESAgentArtifactCandidateFile>();
+                if (approval.files.Length != candidateFiles.Length)
+                    return Status(ESAgentArtifactRequestState.Invalid, requestDirectory,
+                        "批准清单没有完整覆盖候选文件。",
+                        "重新查看全部候选差异并执行人工批准。" );
+                foreach (ESAgentArtifactApprovedFile approved in approval.files)
+                {
+                    ESAgentArtifactCandidateFile candidateFile = approved == null ? null
+                        : candidateFiles.FirstOrDefault(file => file != null
+                            && file.artifactKind == approved.artifactKind
+                            && string.Equals(NormalizeProjectRelativePath(file.targetProjectPath),
+                                NormalizeProjectRelativePath(approved.targetProjectPath),
+                                StringComparison.Ordinal));
+                    if (approved == null || string.IsNullOrWhiteSpace(approved.sha256)
+                        || approved.sha256.Length != 64 || candidateFile == null)
+                        return Status(ESAgentArtifactRequestState.Invalid, requestDirectory,
+                            "批准清单包含未核验、无哈希或不属于候选的文件。",
+                            "重新查看全部候选差异并执行人工批准。" );
+                    if (!ESAgentArtifactCandidateValidator.TryGetDeclaredOutput(request.spec,
+                            candidateFile, out ESAgentGenerationOutput output, out string outputError))
+                        return Status(ESAgentArtifactRequestState.Invalid, requestDirectory,
+                            outputError, "从当前 Graph 重新生成候选并批准。" );
+                    if (!string.Equals(approved.sourceGraphId, spec.sourceGraphId,
+                            StringComparison.Ordinal)
+                        || !string.Equals(approved.outputNodeId, output.nodeId,
+                            StringComparison.Ordinal)
+                        || !string.Equals(approved.artifactId, output.artifactId,
+                            StringComparison.Ordinal))
+                        return Status(ESAgentArtifactRequestState.Invalid, requestDirectory,
+                            "批准文件的 GraphId、Output NodeId 或 ArtifactId 已失配。",
+                            "从当前 Graph 重新生成候选并批准。" );
+                    if (!ESAgentArtifactCandidateValidator.TryResolveFormalTarget(request,
+                            candidateFile, out string targetPath, out string targetError)
+                        || !File.Exists(targetPath))
+                        return Status(ESAgentArtifactRequestState.Invalid, requestDirectory,
+                            string.IsNullOrWhiteSpace(targetError)
+                                ? "已批准的正式文件不存在：" + approved.targetProjectPath
+                                : targetError,
+                            "重新执行 Diff Review 与人工批准导入。" );
+                    if (!string.Equals(ComputeSha256(targetPath), approved.sha256,
+                            StringComparison.OrdinalIgnoreCase))
+                        return Status(ESAgentArtifactRequestState.Invalid, requestDirectory,
+                            "正式文件在批准后已经变化：" + approved.targetProjectPath,
+                            "重新执行 Diff Review 与人工批准。" );
+                    if (ESAgentArtifactCandidateValidator.RequiresIdentityMarker(candidateFile)
+                        && (!TryReadArtifactIdentity(targetPath, out string formalArtifactId)
+                            || !string.Equals(formalArtifactId, output.artifactId,
+                                StringComparison.Ordinal)))
+                        return Status(ESAgentArtifactRequestState.Invalid, requestDirectory,
+                            "正式产物的稳定 ArtifactId 缺失或已变化：" + approved.targetProjectPath,
+                            "重新生成候选并批准导入。" );
+                }
+            }
+            catch (Exception exception)
+            {
+                return Status(ESAgentArtifactRequestState.Invalid, requestDirectory,
+                    "批准清单读取失败：" + exception.Message,
+                    "重新查看候选差异并执行人工批准。" );
+            }
+            return Status(ESAgentArtifactRequestState.Approved, requestDirectory,
+                "候选已批准；启动前仍会复核 Graph 身份、签名和正式文件哈希。", "可以打开独立窗口执行实现。");
+        }
+
+        private static string NormalizeProjectRelativePath(string path)
+        {
+            return (path ?? string.Empty).Replace('\\', '/').TrimStart('/');
+        }
+
+        public static bool TryWriteGraphSnapshot(ESBakedGraphSnapshot snapshot,
+            out string relativePath, out string error)
+            => TryWriteGraphSnapshot(snapshot, null, out relativePath, out error);
+
+        public static bool TryWriteGraphSnapshot(ESBakedGraphSnapshot snapshot,
+            ESGraphRiskAcceptance riskAcceptance, out string relativePath, out string error)
+        {
+            relativePath = string.Empty;
+            if (snapshot == null || !ESGraphIdentity.IsValid(snapshot.GraphId)
+                || !IsContentSignature(snapshot.ContentSignature))
+            {
+                error = "快照缺少有效的 GraphId 或内容签名。";
+                return false;
+            }
+            if (riskAcceptance != null
+                && !riskAcceptance.TryValidateStored(snapshot.GraphId, snapshot.ContentSignature, out error))
+                return false;
+            try
+            {
+                var artifact = new ESGraphSnapshotArtifact
+                {
+                    createdAtUtc = DateTime.UtcNow.ToString("O"),
+                    graphSchemaVersion = snapshot.SchemaVersion,
+                    graphId = snapshot.GraphId,
+                    originGraphId = snapshot.OriginGraphId,
+                    domainId = snapshot.DomainId,
+                    allowCycles = snapshot.AllowCycles,
+                    contentSignature = snapshot.ContentSignature,
+                    riskAcceptance = riskAcceptance,
+                    nodes = snapshot.Nodes.Select(node => new ESGraphSnapshotNodeArtifact
+                    {
+                        nodeId = node.NodeId,
+                        typeId = node.TypeId,
+                        version = node.Version,
+                        title = node.Title,
+                        payloadJson = node.PayloadJson,
+                        ports = node.Ports.Select(port => new ESGraphSnapshotPortArtifact
+                        {
+                            portId = port.PortId,
+                            stableKey = port.StableKey,
+                            name = port.Name,
+                            valueTypeId = port.ValueTypeId,
+                            direction = port.Direction,
+                            capacity = port.Capacity
+                        }).ToArray()
+                    }).ToArray(),
+                    edges = snapshot.Edges.Select(edge => new ESGraphSnapshotEdgeArtifact
+                    {
+                        edgeId = edge.EdgeId,
+                        outputPortId = edge.OutputPortId,
+                        inputPortId = edge.InputPortId
+                    }).ToArray()
+                };
+                relativePath = BuildSnapshotRelativePath(snapshot.GraphId, snapshot.ContentSignature);
+                WriteUtf8(ResolveProjectPath(relativePath), JsonUtility.ToJson(artifact, true));
+                error = string.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                relativePath = string.Empty;
+                error = "保存 Graph 检查快照失败：" + exception.Message;
+                return false;
+            }
+        }
+
+        public static bool TryGetGraphSnapshot(string graphId, string contentSignature,
+            out string relativePath)
+        {
+            relativePath = string.Empty;
+            if (!ESGraphIdentity.IsValid(graphId) || !IsContentSignature(contentSignature)) return false;
+            string candidate = BuildSnapshotRelativePath(graphId, contentSignature);
+            if (!File.Exists(ResolveProjectPath(candidate))) return false;
+            relativePath = candidate;
+            return true;
+        }
+
+        public static bool TryGetLatestGraphSnapshot(string graphId, out string relativePath)
+        {
+            relativePath = string.Empty;
+            if (!ESGraphIdentity.IsValid(graphId)) return false;
+            string directory = ResolveProjectPath(SnapshotRoot + "/" + graphId);
+            if (!Directory.Exists(directory)) return false;
+            FileInfo latest = new DirectoryInfo(directory).GetFiles("*.json")
+                .OrderByDescending(item => item.LastWriteTimeUtc).FirstOrDefault();
+            if (latest == null) return false;
+            relativePath = SnapshotRoot + "/" + graphId + "/" + latest.Name;
+            return true;
+        }
+
+        internal static bool TryGetCandidateManifestPath(string requestFullPath, out string manifestPath)
+        {
+            manifestPath = Path.Combine(requestFullPath ?? string.Empty, "candidate-manifest.json");
+            if (File.Exists(manifestPath)) return true;
+            manifestPath = Path.Combine(requestFullPath ?? string.Empty, "candidate", "candidate-manifest.json");
+            return File.Exists(manifestPath);
+        }
+
+        internal static void NotifyStateChanged()
+        {
+            try { StateChanged?.Invoke(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+        }
+
+        private static ESAgentArtifactRequestStatus Status(ESAgentArtifactRequestState state,
+            string directory, string message, string nextAction)
+        {
+            return new ESAgentArtifactRequestStatus
+            {
+                State = state, RequestDirectory = directory ?? string.Empty,
+                Message = message ?? string.Empty, NextAction = nextAction ?? string.Empty
+            };
+        }
+
+        private static void RememberRequest(ESAgentArtifactGenerationSpec spec, string requestDirectory)
+        {
+            if (spec == null || !ESGraphIdentity.IsValid(spec.sourceGraphId)
+                || string.IsNullOrWhiteSpace(spec.SourceContentSignature)) return;
+            EditorPrefs.SetString(BuildRequestEditorPrefKey(spec.sourceGraphId,
+                spec.SourceContentSignature), requestDirectory ?? string.Empty);
+        }
+
+        private static string BuildRequestEditorPrefKey(string graphId, string signature)
+        {
+            return RequestByGraphEditorPrefPrefix + graphId + "." + signature;
+        }
+
+        private static bool RequestMatches(string requestDirectory, string graphId, string signature)
+        {
+            if (string.IsNullOrWhiteSpace(requestDirectory)) return false;
+            string requestPath;
+            try { requestPath = Path.Combine(ResolveProjectPath(requestDirectory), "generation-request.json"); }
+            catch { return false; }
+            if (!File.Exists(requestPath)) return false;
+            try
+            {
+                string relativeDirectory = NormalizeProjectRelativeDirectory(
+                    Path.GetDirectoryName(requestPath));
+                return TryReadRequest(relativeDirectory, out ESAgentArtifactGenerationRequest request, out _)
+                    && string.Equals(request.spec.sourceGraphId, graphId, StringComparison.Ordinal)
+                    && string.Equals(request.spec.SourceContentSignature, signature, StringComparison.Ordinal);
+            }
+            catch { return false; }
+        }
+
+        private static bool TryFindLatestRequest(string graphId, string contentSignature,
+            out string requestDirectory, out ESAgentArtifactGenerationRequest request)
+        {
+            requestDirectory = string.Empty;
+            request = null;
+            string root = ResolveProjectPath(CandidateRoot);
+            if (!Directory.Exists(root)) return false;
+            foreach (DirectoryInfo directory in new DirectoryInfo(root).GetDirectories()
+                .OrderByDescending(item => item.Name))
+            {
+                string requestPath = Path.Combine(directory.FullName, "generation-request.json");
+                if (!File.Exists(requestPath)) continue;
+                try
+                {
+                    string relativeDirectory = CandidateRoot + "/" + directory.Name;
+                    if (!TryReadRequest(relativeDirectory, out ESAgentArtifactGenerationRequest candidate, out _)
+                        || !string.Equals(candidate.spec.sourceGraphId, graphId, StringComparison.Ordinal)
+                        || (contentSignature != null && !string.Equals(candidate.spec.SourceContentSignature,
+                            contentSignature, StringComparison.Ordinal))) continue;
+                    request = candidate;
+                    requestDirectory = CandidateRoot + "/" + directory.Name;
+                    return true;
+                }
+                catch { }
+            }
+            return false;
+        }
+
+        private static string NormalizeProjectRelativeDirectory(string fullPath)
+        {
+            string projectRoot = GetProjectRoot().TrimEnd(Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            string normalized = Path.GetFullPath(fullPath ?? string.Empty);
+            return normalized.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase)
+                ? normalized.Substring(projectRoot.Length).Replace('\\', '/')
+                : string.Empty;
+        }
+
+        private static string BuildSnapshotRelativePath(string graphId, string signature)
+        {
+            return SnapshotRoot + "/" + graphId + "/" + signature + ".json";
+        }
+
+        private static bool IsContentSignature(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value) && value.Length == 64
+                && value.All(character => (character >= '0' && character <= '9')
+                    || (character >= 'a' && character <= 'f')
+                    || (character >= 'A' && character <= 'F'));
+        }
+
         public static string ResolveProjectPath(string relativePath)
         {
             if (!TryResolveProjectPath(relativePath, out string fullPath, out string error))
@@ -1326,6 +1942,7 @@ namespace ES.EditorInternal
             builder.AppendLine("3. 禁止修改 Unity 运行时、生成的 .csproj、Git staging 或提交状态。");
             builder.AppendLine("4. 输出必须严格 UTF-8，先生成候选，等待用户在 Unity Diff/Review 窗口批准。");
             builder.AppendLine("5. 中文标题、描述、规则、路径和验收文本必须原样保留，不得转写、丢失或替换为 U+FFFD；允许使用中文文件名和中文目录名。");
+            builder.AppendLine("6. AICommand 正文或 AISkill 的 SKILL.md 必须原样覆盖其 Graph 分支中的 Goal、Reference、Constraint、Branch、Traversal 与 Validation 语义；候选校验会逐项核对。" );
             builder.AppendLine();
             builder.AppendLine("必须使用项目专用生成合同：");
             builder.AppendLine("- AICommand: Assets/Plugins/ES/AICommands/生成_AgentArtifact候选_AI命令.md");
@@ -1337,11 +1954,13 @@ namespace ES.EditorInternal
             builder.AppendLine("Source GraphId：" + request.spec.sourceGraphId);
             builder.AppendLine("Source OriginGraphId：" + request.spec.sourceOriginGraphId);
             builder.AppendLine("Source ContentSignature：" + request.spec.SourceContentSignature);
+            AppendRiskAcceptance(builder, request.spec);
             builder.AppendLine("Goal：" + request.spec.goal.objective);
             if (!string.IsNullOrWhiteSpace(request.spec.goal.context)) builder.AppendLine("Context：" + request.spec.goal.context);
             if (!string.IsNullOrWhiteSpace(request.spec.goal.targetUsers)) builder.AppendLine("Target users / triggers：" + request.spec.goal.targetUsers);
             if (!string.IsNullOrWhiteSpace(request.spec.goal.successCriteria)) builder.AppendLine("Success criteria：" + request.spec.goal.successCriteria);
             AppendMindMap(builder, request.spec);
+            AppendControlFlow(builder, request.spec);
             builder.AppendLine();
             builder.AppendLine("必须读取的 References：");
             foreach (ESAgentGenerationReference item in request.spec.references ?? Array.Empty<ESAgentGenerationReference>())
@@ -1360,6 +1979,21 @@ namespace ES.EditorInternal
                 if (!string.IsNullOrWhiteSpace(item.verification)) builder.AppendLine("  验证：" + item.verification);
             }
             builder.AppendLine();
+            ESAgentSkillBundleContract bundle = request.spec.skillBundle;
+            if (bundle != null)
+            {
+                builder.AppendLine("Skill 能力包（AICommand + AISkill 统一合同）：");
+                builder.AppendLine("- bundleId: " + bundle.bundleId);
+                builder.AppendLine("- 名称：" + bundle.displayName);
+                builder.AppendLine("- 组成：" + bundle.kind);
+                builder.AppendLine("- Goal NodeId：" + bundle.goalNodeId);
+                builder.AppendLine("- AICommand Output：" + string.Join(", ", bundle.commandOutputNodeIds ?? Array.Empty<string>()));
+                builder.AppendLine("- AISkill Output：" + string.Join(", ", bundle.aiSkillOutputNodeIds ?? Array.Empty<string>()));
+                builder.AppendLine("- Branch：" + string.Join(", ", bundle.branchNodeIds ?? Array.Empty<string>()));
+                builder.AppendLine("- Traversal：" + string.Join(", ", bundle.traversalNodeIds ?? Array.Empty<string>()));
+                builder.AppendLine("- 同一能力包中的 AICommand 与 AISkill 必须共享目标、约束、输入语义、验证门禁和批准边界，不得漂移成无关产物。");
+                builder.AppendLine();
+            }
             builder.AppendLine("Outputs：");
             foreach (ESAgentGenerationOutput item in request.spec.outputs)
             {
@@ -1477,7 +2111,7 @@ namespace ES.EditorInternal
                 builder.AppendLine("- " + SafeTitle(relation.fromNodeTitle, relation.fromNodeTypeId) + " → "
                     + SafeTitle(relation.toNodeTitle, relation.toNodeTypeId) + " ["
                     + ESAgentSemanticPresentation.RelationKind(relation.relationKind)
-                    + " / " + relation.semanticType + "]");
+                    + " / " + relation.fromPortStableKey + " / " + relation.semanticType + "]");
             }
             builder.AppendLine();
             builder.AppendLine("```mermaid");
@@ -1492,9 +2126,41 @@ namespace ES.EditorInternal
                 builder.AppendLine("    " + fromAlias + "[\"" + EscapeMermaid(SafeTitle(relation.fromNodeTitle, relation.fromNodeTypeId)) + "\"]");
                 builder.AppendLine("    " + toAlias + "[\"" + EscapeMermaid(SafeTitle(relation.toNodeTitle, relation.toNodeTypeId)) + "\"]");
                 builder.AppendLine("    " + fromAlias + " -->|"
-                    + EscapeMermaid(ESAgentSemanticPresentation.RelationKind(relation.relationKind)) + "| " + toAlias);
+                    + EscapeMermaid(ESAgentSemanticPresentation.RelationKind(relation.relationKind)
+                        + ":" + relation.fromPortStableKey) + "| " + toAlias);
             }
             builder.AppendLine("```");
+        }
+
+        private static void AppendControlFlow(StringBuilder builder, ESAgentArtifactGenerationSpec spec)
+        {
+            ESAgentGenerationBranch[] branches = spec.branches ?? Array.Empty<ESAgentGenerationBranch>();
+            ESAgentGenerationTraversal[] traversals = spec.traversals
+                ?? Array.Empty<ESAgentGenerationTraversal>();
+            if (branches.Length == 0 && traversals.Length == 0)
+                return;
+
+            builder.AppendLine();
+            builder.AppendLine("结构化分支与有界遍历（必须按 Relations 的出口执行，不得扁平化或猜测）：");
+            for (int i = 0; i < branches.Length; i++)
+            {
+                ESAgentGenerationBranch branch = branches[i];
+                builder.AppendLine("- Branch " + branch.nodeId + " | 条件：" + branch.condition);
+                builder.AppendLine("  " + ESAgentGraphStableIds.BranchMatchedPortKey + "：" + branch.matchedPath);
+                builder.AppendLine("  " + ESAgentGraphStableIds.BranchDefaultPortKey + "：" + branch.defaultPath);
+                builder.AppendLine("  " + ESAgentGraphStableIds.BranchFailurePortKey + "：" + branch.failurePath);
+            }
+            for (int i = 0; i < traversals.Length; i++)
+            {
+                ESAgentGenerationTraversal traversal = traversals[i];
+                builder.AppendLine("- Traversal " + traversal.nodeId + " | 目标：" + traversal.target
+                    + " | item=" + traversal.itemAlias + " | order=" + traversal.order
+                    + " | maxDepth=" + traversal.maxDepth + " | maxItems=" + traversal.maxItems);
+                builder.AppendLine("  停止条件：" + traversal.stopCondition);
+                builder.AppendLine("  空结果：" + traversal.emptyResultAction);
+                builder.AppendLine("  失败：" + traversal.failureAction);
+            }
+            builder.AppendLine("遍历不得创建 Graph 循环；达到任一硬上限必须停止并沿完成或失败出口交付证据。");
         }
 
         private static string GetAlias(Dictionary<string, string> aliases, string nodeId, ref int nextAlias)
@@ -1808,6 +2474,12 @@ namespace ES.EditorInternal
 
         public static bool IsLaunching => activeProcess != null;
 
+        public static bool CanLaunchApprovedImplementation(ESAgentArtifactGenerationSpec currentSpec,
+            out string error)
+        {
+            return TryPrepareApprovedImplementation(currentSpec, out _, out _, out _, out _, out error);
+        }
+
         public static bool TryLaunchApprovedImplementation(ESAgentArtifactGenerationSpec currentSpec,
             Action<string> report, out string error)
         {
@@ -1868,7 +2540,26 @@ namespace ES.EditorInternal
             builder.AppendLine("批准时间：`" + (approval?.approvedAtUtc ?? string.Empty) + "`");
             builder.AppendLine("GraphId：`" + (approval?.sourceGraphId ?? string.Empty) + "`");
             builder.AppendLine("Graph 签名：`" + (approval?.sourceContentSignature ?? string.Empty) + "`");
+            if (approval?.riskAcceptance != null)
+            {
+                builder.AppendLine("风险确认：`" + approval.riskAcceptance.acceptanceHash + "`");
+                builder.AppendLine("已确认问题："
+                    + string.Join(", ", approval.riskAcceptance.issueCodes ?? Array.Empty<string>()));
+                builder.AppendLine("确认者 / 时间：" + approval.riskAcceptance.acceptedBy
+                    + " / " + approval.riskAcceptance.acceptedAtUtc);
+            }
             builder.AppendLine();
+            if (request?.spec?.skillBundle != null)
+            {
+                ESAgentSkillBundleContract bundle = request.spec.skillBundle;
+                builder.AppendLine("## Skill 能力包身份");
+                builder.AppendLine();
+                builder.AppendLine("- bundleId：`" + bundle.bundleId + "`");
+                builder.AppendLine("- 组成：" + bundle.kind + "（AICommand + AISkill 共享同一目标与批准边界）");
+                builder.AppendLine("- AICommand Output：" + string.Join(", ", bundle.commandOutputNodeIds ?? Array.Empty<string>()));
+                builder.AppendLine("- AISkill Output：" + string.Join(", ", bundle.aiSkillOutputNodeIds ?? Array.Empty<string>()));
+                builder.AppendLine();
+            }
             builder.AppendLine("## 当前用户授权");
             builder.AppendLine();
             builder.AppendLine("- 用户已在 Unity 中显式点击“打开新窗口执行实现”。");
@@ -1966,7 +2657,7 @@ namespace ES.EditorInternal
             out string requestDirectory, out ESAgentArtifactGenerationRequest request,
             out ESAgentArtifactApprovalManifest approval, out string[] approvedCommands, out string error)
         {
-            requestDirectory = ESAgentArtifactGenerationWorkspace.GetLatestRequestDirectory();
+            requestDirectory = string.Empty;
             request = null;
             approval = null;
             approvedCommands = Array.Empty<string>();
@@ -1975,17 +2666,18 @@ namespace ES.EditorInternal
                 error = "当前 Graph 没有可核对的内容签名，请先修复并重新烘焙。";
                 return false;
             }
-            if (string.IsNullOrEmpty(requestDirectory))
+            if (!ESAgentArtifactGenerationWorkspace.TryGetRequestDirectory(currentSpec, out requestDirectory))
             {
-                error = "尚无候选请求。请先点击“交给 AI 生成候选”。";
+                error = "当前 Graph 没有匹配其 GraphId 与内容签名的候选请求。请重新生成候选。";
                 return false;
             }
 
             string requestFull = ESAgentArtifactGenerationWorkspace.ResolveProjectPath(requestDirectory);
             string requestPath = Path.Combine(requestFull, "generation-request.json");
             string candidateManifestPath = Path.Combine(requestFull, "candidate-manifest.json");
-            if (!File.Exists(candidateManifestPath))
-                candidateManifestPath = Path.Combine(requestFull, "candidate", "candidate-manifest.json");
+            if (!ESAgentArtifactGenerationWorkspace.TryGetCandidateManifestPath(requestFull,
+                    out candidateManifestPath))
+                candidateManifestPath = Path.Combine(requestFull, "candidate-manifest.json");
             string approvalPath = Path.Combine(requestFull, ApprovalManifestFileName);
             if (!File.Exists(requestPath) || !File.Exists(candidateManifestPath) || !File.Exists(approvalPath))
             {
@@ -2003,7 +2695,8 @@ namespace ES.EditorInternal
                     ESAgentArtifactGenerationWorkspace.ReadUtf8(approvalPath));
                 if (request?.spec == null || request.schemaVersion != ESAgentArtifactGenerationRequest.CurrentSchemaVersion
                     || request.spec.contractSchemaVersion != ESAgentArtifactGenerationSpec.CurrentContractSchemaVersion
-                    || candidate == null || approval == null || approval.schemaVersion != 2
+                    || candidate == null || approval == null
+                    || approval.schemaVersion != ESAgentArtifactApprovalManifest.CurrentSchemaVersion
                     || !string.Equals(request.requestId, candidate.requestId, StringComparison.Ordinal)
                     || !string.Equals(request.requestId, approval.requestId, StringComparison.Ordinal))
                 {
@@ -2013,6 +2706,18 @@ namespace ES.EditorInternal
                 if (!ESAgentGenerationIntentValidator.TryValidate(request.spec, out string intentError))
                 {
                     error = "请求的开发意图合同无效：" + intentError;
+                    return false;
+                }
+                if (!ESAgentGenerationRiskValidator.TryValidate(request.spec, out string semanticError))
+                {
+                    error = "请求的目标、输出或风险确认无效：" + semanticError;
+                    return false;
+                }
+                if ((request.spec.riskAcceptance == null) != (approval.riskAcceptance == null)
+                    || request.spec.riskAcceptance != null
+                    && !request.spec.riskAcceptance.SameAs(approval.riskAcceptance))
+                {
+                    error = "批准清单没有绑定请求中的风险确认，必须重新进行 Diff Review 与人工批准。";
                     return false;
                 }
                 if (!string.Equals(currentSpec.sourceGraphId, request.spec.sourceGraphId, StringComparison.Ordinal)
@@ -2321,9 +3026,28 @@ namespace ES.EditorInternal
                 errors.Add("generation-request.json 的语义契约版本不受支持，请从当前 Graph 重新生成请求。");
             else if (!ESAgentGenerationIntentValidator.TryValidate(request.spec, out string intentError))
                 errors.Add("generation-request.json 的开发意图合同无效：" + intentError);
+            else if (!ESAgentGenerationRiskValidator.TryValidate(request.spec, out string semanticError))
+                errors.Add("generation-request.json 的目标、输出或风险确认无效：" + semanticError);
             if (manifest.schemaVersion != 1 || !string.Equals(manifest.requestId, request.requestId, StringComparison.Ordinal))
                 errors.Add("candidate-manifest.json 与请求身份不匹配。");
             if (manifest.files == null || manifest.files.Length == 0) errors.Add("候选 Manifest 没有文件。\n");
+            try
+            {
+                string reportPath = Path.Combine(ESAgentArtifactGenerationWorkspace.ResolveProjectPath(requestDirectory),
+                    "validation-report.md");
+                if (!File.Exists(reportPath))
+                    errors.Add("候选缺少 validation-report.md。");
+                else
+                {
+                    string report = StrictUtf8.GetString(File.ReadAllBytes(reportPath));
+                    if (report.IndexOf('\uFFFD') >= 0)
+                        errors.Add("validation-report.md 包含 U+FFFD。");
+                }
+            }
+            catch (Exception exception)
+            {
+                errors.Add("validation-report.md 严格 UTF-8 检查失败：" + exception.Message);
+            }
             var candidatePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var targetPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (ESAgentArtifactCandidateFile file in manifest.files ?? Array.Empty<ESAgentArtifactCandidateFile>())
@@ -2349,15 +3073,142 @@ namespace ES.EditorInternal
                     string text = StrictUtf8.GetString(File.ReadAllBytes(candidate));
                     if (text.IndexOf('\uFFFD') >= 0) errors.Add("包含 U+FFFD：" + file.candidateRelativePath);
                     if (file.artifactKind == ESAgentArtifactKind.AICommand)
+                    {
                         ValidateAICommand(text, file, output, errors);
+                        ValidateGraphSemanticCoverage(text, request.spec, output, file.targetProjectPath, errors);
+                    }
                     else
+                    {
                         ValidateAgentSkillFile(text, file, output, errors);
+                        if (Normalize(file.targetProjectPath).EndsWith("/SKILL.md", StringComparison.Ordinal))
+                            ValidateGraphSemanticCoverage(text, request.spec, output, file.targetProjectPath, errors);
+                    }
                     ValidateArtifactIdentity(text, file, output, errors);
                 }
                 catch (Exception exception) { errors.Add("严格 UTF-8 失败 " + file.candidateRelativePath + "：" + exception.Message); }
             }
+            ValidateDeclaredOutputCoverage(request.spec, manifest, errors);
             ValidateSkillBundles(manifest, errors);
             return errors;
+        }
+
+        private static void ValidateDeclaredOutputCoverage(ESAgentArtifactGenerationSpec spec,
+            ESAgentArtifactCandidateManifest manifest, List<string> errors)
+        {
+            ESAgentArtifactCandidateFile[] files = manifest?.files
+                ?? Array.Empty<ESAgentArtifactCandidateFile>();
+            foreach (ESAgentGenerationOutput output in spec?.outputs
+                ?? Array.Empty<ESAgentGenerationOutput>())
+            {
+                if (output == null)
+                    continue;
+                string declared = Normalize(output.targetProjectPath);
+                bool found = files.Any(file => file != null && file.artifactKind == output.artifactKind
+                    && (output.artifactKind == ESAgentArtifactKind.AICommand
+                        ? Normalize(file.targetProjectPath) == declared
+                        : Normalize(file.targetProjectPath) == declared.TrimEnd('/') + "/SKILL.md"));
+                if (!found)
+                    errors.Add("候选 Manifest 未覆盖 Graph 声明的主产物：" + output.artifactName
+                        + "（" + output.nodeId + "）");
+            }
+        }
+
+        private static void ValidateGraphSemanticCoverage(string text,
+            ESAgentArtifactGenerationSpec spec, ESAgentGenerationOutput output,
+            string path, List<string> errors)
+        {
+            if (spec?.goal == null || output == null)
+                return;
+
+            RequireContractText(text, spec.goal.title, "Goal 标题", path, errors);
+            RequireContractText(text, spec.goal.objective, "Goal 最终目的", path, errors);
+            RequireContractText(text, spec.goal.successCriteria, "Goal 成功标准", path, errors);
+            if (!string.IsNullOrWhiteSpace(spec.goal.context))
+                RequireContractText(text, spec.goal.context, "Goal 上下文", path, errors);
+            if (!string.IsNullOrWhiteSpace(spec.goal.targetUsers))
+                RequireContractText(text, spec.goal.targetUsers, "Goal 使用者或触发场景", path, errors);
+
+            HashSet<string> relevantNodeIds = CollectUpstreamNodeIds(spec, output.nodeId);
+            foreach (ESAgentGenerationReference reference in spec.references
+                ?? Array.Empty<ESAgentGenerationReference>())
+            {
+                if (reference == null || !relevantNodeIds.Contains(reference.nodeId)) continue;
+                RequireContractText(text, reference.projectPath, "Reference 路径", path, errors);
+                RequireContractText(text, reference.purpose, "Reference 用途", path, errors);
+            }
+            foreach (ESAgentGenerationConstraint constraint in spec.constraints
+                ?? Array.Empty<ESAgentGenerationConstraint>())
+            {
+                if (constraint == null || !relevantNodeIds.Contains(constraint.nodeId)) continue;
+                RequireContractText(text, constraint.statement, "Constraint 规则", path, errors);
+                RequireContractText(text, constraint.rationale, "Constraint 原因", path, errors);
+                RequireContractText(text, constraint.verification, "Constraint 验证", path, errors);
+            }
+            foreach (ESAgentGenerationBranch branch in spec.branches
+                ?? Array.Empty<ESAgentGenerationBranch>())
+            {
+                if (branch == null || !relevantNodeIds.Contains(branch.nodeId)) continue;
+                RequireContractText(text, branch.condition, "Branch 条件", path, errors);
+                RequireContractText(text, branch.matchedPath, "Branch 命中路径", path, errors);
+                RequireContractText(text, branch.defaultPath, "Branch 默认路径", path, errors);
+                RequireContractText(text, branch.failurePath, "Branch 失败路径", path, errors);
+            }
+            foreach (ESAgentGenerationTraversal traversal in spec.traversals
+                ?? Array.Empty<ESAgentGenerationTraversal>())
+            {
+                if (traversal == null || !relevantNodeIds.Contains(traversal.nodeId)) continue;
+                RequireContractText(text, traversal.target, "Traversal 目标", path, errors);
+                RequireContractText(text, traversal.itemAlias, "Traversal 元素名称", path, errors);
+                RequireContractText(text, "maxDepth=" + traversal.maxDepth, "Traversal 最大深度", path, errors);
+                RequireContractText(text, "maxItems=" + traversal.maxItems, "Traversal 最大数量", path, errors);
+                RequireContractText(text, traversal.stopCondition, "Traversal 停止条件", path, errors);
+                RequireContractText(text, traversal.emptyResultAction, "Traversal 空结果", path, errors);
+                RequireContractText(text, traversal.failureAction, "Traversal 失败行为", path, errors);
+            }
+            foreach (ESAgentGenerationValidation validation in spec.validations
+                ?? Array.Empty<ESAgentGenerationValidation>())
+            {
+                if (validation == null || !IsValidationForOutput(spec, output.nodeId, validation.nodeId))
+                    continue;
+                if (!string.IsNullOrWhiteSpace(validation.additionalRequirements))
+                    RequireContractText(text, validation.additionalRequirements,
+                        "Validation 附加要求", path, errors);
+                if (!string.IsNullOrWhiteSpace(validation.reviewChecklist))
+                    RequireContractText(text, validation.reviewChecklist,
+                        "Validation 审查清单", path, errors);
+            }
+        }
+
+        private static HashSet<string> CollectUpstreamNodeIds(ESAgentArtifactGenerationSpec spec,
+            string outputNodeId)
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            var queue = new Queue<string>();
+            if (!string.IsNullOrWhiteSpace(outputNodeId) && result.Add(outputNodeId))
+                queue.Enqueue(outputNodeId);
+            ESAgentGenerationRelation[] relations = spec?.relations
+                ?? Array.Empty<ESAgentGenerationRelation>();
+            while (queue.Count > 0)
+            {
+                string current = queue.Dequeue();
+                for (int i = 0; i < relations.Length; i++)
+                {
+                    ESAgentGenerationRelation relation = relations[i];
+                    if (relation != null && string.Equals(relation.toNodeId, current, StringComparison.Ordinal)
+                        && result.Add(relation.fromNodeId))
+                        queue.Enqueue(relation.fromNodeId);
+                }
+            }
+            return result;
+        }
+
+        private static bool IsValidationForOutput(ESAgentArtifactGenerationSpec spec,
+            string outputNodeId, string validationNodeId)
+        {
+            return (spec?.relations ?? Array.Empty<ESAgentGenerationRelation>()).Any(relation =>
+                relation != null && relation.relationKind == ESAgentRelationKind.RequiresValidation
+                && string.Equals(relation.fromNodeId, outputNodeId, StringComparison.Ordinal)
+                && string.Equals(relation.toNodeId, validationNodeId, StringComparison.Ordinal));
         }
 
         public static bool TryResolveCandidate(string requestDirectory, string candidateRelativePath,
@@ -2676,6 +3527,17 @@ namespace ES.EditorInternal
             else Open(latest);
         }
 
+        public static void OpenForGraph(ESAgentArtifactGenerationSpec spec)
+        {
+            if (ESAgentArtifactGenerationWorkspace.TryGetRequestDirectory(spec, out string requestDirectory))
+            {
+                Open(requestDirectory);
+                return;
+            }
+            EditorUtility.DisplayDialog("智能助手候选审查",
+                "当前 Graph 没有匹配其 GraphId 与内容签名的候选。请先生成或重新生成候选。", "确定");
+        }
+
         private void OnGUI()
         {
             EditorGUILayout.LabelField("候选请求", EditorStyles.boldLabel);
@@ -2902,7 +3764,13 @@ namespace ES.EditorInternal
                     string report = RunExistingValidators(manifest.files.Select(file => file.targetProjectPath).ToArray());
                     string approvedAtUtc = DateTime.UtcNow.ToString("O");
                     ESAgentArtifactGenerationWorkspace.WriteUtf8(Path.Combine(requestFull, "approval-report.md"),
-                        "# Approval Report\n\nApproved at: " + approvedAtUtc + "\n\n" + report);
+                        "# Approval Report\n\nApproved at: " + approvedAtUtc
+                        + (request.spec.riskAcceptance == null ? string.Empty
+                            : "\nRisk acceptance: " + request.spec.riskAcceptance.acceptanceHash
+                                + "\nAccepted by: " + request.spec.riskAcceptance.acceptedBy
+                                + "\nAccepted issues: " + string.Join(", ",
+                                    request.spec.riskAcceptance.issueCodes ?? Array.Empty<string>()))
+                        + "\n\n" + report);
                     var approvedFiles = new List<ESAgentArtifactApprovedFile>();
                     foreach (ESAgentArtifactCandidateFile file in manifest.files)
                     {
@@ -2926,6 +3794,7 @@ namespace ES.EditorInternal
                         approvedAtUtc = approvedAtUtc,
                         sourceGraphId = request.spec.sourceGraphId,
                         sourceContentSignature = request.spec.SourceContentSignature,
+                        riskAcceptance = request.spec.riskAcceptance,
                         files = approvedFiles.ToArray()
                     };
                     ESAgentArtifactGenerationWorkspace.WriteUtf8(Path.Combine(requestFull, "approval-manifest.json"),
@@ -2936,6 +3805,7 @@ namespace ES.EditorInternal
                 AssetDatabase.Refresh();
                 if (importResult.Succeeded)
                 {
+                    ESAgentArtifactGenerationWorkspace.NotifyStateChanged();
                     string reportPath = Path.Combine(requestFull, "approval-report.md");
                     string report = File.Exists(reportPath)
                         ? ESAgentArtifactGenerationWorkspace.ReadUtf8(reportPath)

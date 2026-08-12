@@ -218,6 +218,27 @@ namespace ES
                 if (invocation == null) return ESAutomationTaskInvocationResult.Rejected("缺少场景扫描调用参数。");
                 if (EditorApplication.isPlayingOrWillChangePlaymode)
                     return ESAutomationTaskInvocationResult.Blocked("场景扫描只能在非 PlayMode 下运行。");
+                if (!TryResolveFacadeOptions(invocation, out JObject options, out bool interactive, out string optionError))
+                    return ESAutomationTaskInvocationResult.Rejected(optionError);
+                Scene scene = SceneManager.GetActiveScene();
+                if (!scene.IsValid() || !scene.isLoaded)
+                    return ESAutomationTaskInvocationResult.Blocked("当前没有可扫描的已加载 Active Scene。");
+
+                string runId = string.IsNullOrWhiteSpace(invocation.invocationId)
+                    ? Guid.NewGuid().ToString("N") : invocation.invocationId;
+                string invocationHash = ComputeFacadeInvocationHash(invocation, scene.path);
+                string sessionPath = GetSessionPath(runId);
+                if (File.Exists(sessionPath))
+                {
+                    ESAutomationSceneScanSession existing = ReadSession(runId);
+                    if (!HashEquals(existing.invocationHash, invocationHash))
+                        return ESAutomationTaskInvocationResult.Rejected(
+                            "InvocationId 已绑定其他场景或输入，拒绝重复执行。");
+                    return GetRunFromFacade(runId);
+                }
+                if (Directory.Exists(GetRunDirectory(runId)))
+                    return ESAutomationTaskInvocationResult.Rejected(
+                        "InvocationId 对应目录已存在但缺少有效 Session，拒绝猜测恢复。");
                 if (!ESAutomationSceneScanPythonAdapter.TryPrepareRuntime(out _, out string pythonReason))
                     return ESAutomationTaskInvocationResult.Blocked(pythonReason, data: new JObject
                     {
@@ -229,13 +250,7 @@ namespace ES
                 if (runningOperations.Count > 0)
                     return ESAutomationTaskInvocationResult.Blocked("已有场景扫描 Worker 正在运行；请先查询其 RunId。\n");
 
-                if (!TryResolveFacadeOptions(invocation, out JObject options, out bool interactive, out string optionError))
-                    return ESAutomationTaskInvocationResult.Rejected(optionError);
-                Scene scene = SceneManager.GetActiveScene();
-                if (!scene.IsValid() || !scene.isLoaded)
-                    return ESAutomationTaskInvocationResult.Blocked("当前没有可扫描的已加载 Active Scene。");
-
-                ESAutomationSceneScanSession session = CreateSession(scene);
+                ESAutomationSceneScanSession session = CreateSession(scene, runId, invocationHash);
                 session.dryRun = invocation.dryRun;
                 if (interactive)
                 {
@@ -477,8 +492,11 @@ namespace ES
         }
 
         private static ESAutomationSceneScanSession CreateSession(Scene scene)
+            => CreateSession(scene, Guid.NewGuid().ToString("N"), string.Empty);
+
+        private static ESAutomationSceneScanSession CreateSession(Scene scene, string runId,
+            string invocationHash)
         {
-            string runId = Guid.NewGuid().ToString("N");
             string runDirectory = GetRunDirectory(runId);
             ESAutomationPathPolicy.EnsureWorkerWriteAllowed(runDirectory, new[] { ESAutomationPathPolicy.TempRoot });
             Directory.CreateDirectory(runDirectory);
@@ -492,6 +510,7 @@ namespace ES
             {
                 protocolVersion = ProtocolVersion,
                 runId = runId,
+                invocationHash = invocationHash ?? string.Empty,
                 taskId = TaskId,
                 taskVersion = TaskVersion,
                 workerType = WorkerType,
@@ -900,7 +919,7 @@ namespace ES
             string path = GetSessionPath(runId);
             JObject root = ReadStrictObject(path, new[]
             {
-                "protocolVersion", "runId", "taskId", "taskVersion", "workerType", "workerId", "workerVersion", "entrypointHash",
+                "protocolVersion", "runId", "invocationHash", "taskId", "taskVersion", "workerType", "workerId", "workerVersion", "entrypointHash",
                 "optionsSchemaHash", "dryRun", "expectedGeneration", "phase", "snapshotPath", "stageInputPath", "stageResultPath", "inputResponsePath",
                 "workerOutputDirectory", "createdAtUtc", "updatedAtUtc",
             }, "场景扫描会话");
@@ -932,6 +951,9 @@ namespace ES
             if (session.protocolVersion != ProtocolVersion || session.taskId != TaskId || session.taskVersion != TaskVersion)
                 throw new InvalidOperationException("场景扫描会话协议或任务身份不匹配。");
             if (!Guid.TryParseExact(session.runId, "N", out _)) throw new InvalidOperationException("场景扫描会话 RunId 无效。");
+            if (!string.IsNullOrWhiteSpace(session.invocationHash)
+                && !ESAutomationWorkerRegistration.IsSha256(session.invocationHash))
+                throw new InvalidOperationException("场景扫描会话 InvocationHash 无效。");
             if (session.workerType != WorkerType || session.workerId != WorkerId || session.workerVersion != WorkerVersion || !HashEquals(session.entrypointHash, WorkerEntrypointHash))
                 throw new InvalidOperationException("场景扫描会话 Worker 身份不匹配。");
             if (!HashEquals(session.optionsSchemaHash, OptionsSchemaHash)) throw new InvalidOperationException("场景扫描会话表单 SchemaHash 不匹配。");
@@ -1086,6 +1108,24 @@ namespace ES
                 foreach (byte value in hash) builder.Append(value.ToString("x2"));
                 return builder.ToString();
             }
+        }
+
+        private static string ComputeFacadeInvocationHash(ESAutomationTaskInvocation invocation,
+            string scenePath)
+        {
+            var identity = new JObject
+            {
+                ["taskId"] = invocation.taskId ?? string.Empty,
+                ["taskVersion"] = invocation.taskVersion,
+                ["preset"] = invocation.preset ?? string.Empty,
+                ["dryRun"] = invocation.dryRun,
+                ["scenePath"] = scenePath ?? string.Empty,
+                ["input"] = invocation.input?.DeepClone() ?? new JObject(),
+            };
+            byte[] bytes = Encoding.UTF8.GetBytes(identity.ToString(Formatting.None));
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", string.Empty)
+                    .ToLowerInvariant();
         }
 
         private static bool HashEquals(string left, string right)
@@ -1279,6 +1319,7 @@ namespace ES
     {
         public int protocolVersion;
         public string runId = string.Empty;
+        public string invocationHash = string.Empty;
         public string taskId = string.Empty;
         public int taskVersion;
         public string workerType = string.Empty;

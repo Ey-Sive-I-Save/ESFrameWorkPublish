@@ -1,8 +1,8 @@
 # ESFramework API 命名复核报告
 
-状态：候选复核中，不构成改名授权。
+状态：前四批低风险源码迁移已经形成，候选复核继续；不构成机械批量改名授权。
 
-最后验证：2026-08-13，源码只读检查。
+最后验证：2026-08-13，第二批源码迁移前已完成声明、实现、调用方、测试、资产文本与现行文档引用扫描；验证结果见下文。
 
 适用源码入口：`Assets/Plugins/ES`、`Assets/Scripts/ESLogic` 中的公开业务 API、可见工具入口及其直接调用链。
 
@@ -11,7 +11,7 @@
 本报告承载会随源码变化的复杂用词候选、实现事实和迁移建议。长期命名原则以 `Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md` 为准。
 
 - 候选不等于违规；任何结论都必须同时回看声明、实现和调用点。
-- 本轮没有授权批量改名、兼容包装、序列化迁移或源码修改。
+- 本轮只授权按 A/B/C/D 分级，在完整引用扫描后推进命名迁移；不授权机械批量改名、兼容包装或序列化迁移。
 - UTF-8 与 `git diff --check` 只证明文档质量，不证明候选判断正确。
 - 静态编译只能证明相应程序集源码可编译，不证明 Unity 资产迁移、ReloadDomain 或运行行为。
 - `ValidatedNow` / `AcceptedContext` 只描述会话上下文，不属于命名治理验收证据。
@@ -19,7 +19,61 @@
 
 ## 当前结论
 
-方向为“有条件通过”：项目级动词语义边界有价值，`Submit` 不应机械禁用。当前只有确认合理项和待复核候选，尚未形成新的“已确认问题”，也没有命名治理完成或发布结论。
+方向为“有条件通过”：项目级动词语义边界有价值，`Submit`、`Resolve`、`Process` 与 `Execute` 均不应机械禁用。前四批十个已确认问题已经完成源码与现行文本迁移，但尚无 Unity Editor、ReloadDomain 或运行证据；其余条目继续按调用链复核，不得宣称命名治理完成或可发布。
+
+## 分级口径
+
+| 等级 | 情况 | 处理 |
+|---|---|---|
+| A | 策划字段、Inspector、菜单、业务高频 API 明显难懂 | 优先整改 |
+| B | 公共协议名与真实职责不符，可能误导后续架构 | 按完整调用链迁移 |
+| C | 内部或低频名称不够好，但职责尚可理解 | 登记，相关修改中顺带处理 |
+| D | 私有实现、第三方回调、生成代码、历史代码 | 默认不动 |
+
+## 第一批已处理
+
+| 原名称 | 分级与判定 | 当前名称 | 修改范围 | 剩余证据 |
+|---|---|---|---|---|
+| `VehicleController.SubmitDriverInput(...)` + `EntityMountable.SubmitDriverInput(...)` | A + B；每帧业务入口，校验驾驶权后设置输入，且属于成对协议 | 两层统一为 `TrySetDriverInput(...)` | Controller、Mountable、AI Domain 调用链、载具现行规则与合同 | Unity 编译、相关 EditMode/PlayMode 驾驶输入验证 |
+| `Entity.SubmitCameraLook(...)` | A；本地控制权与 Lease 可能拒绝，效果是设置 Look 输入 | `TrySetCameraLook(...)` | Entity 与 AI Domain 调用链、载具合同 | Unity 编译、Camera Director/Lease 运行验证 |
+| `ItemMotionModule.SubmitShotResult(...)` | B/C；模块间结果交接，但实现仅写 Pending 状态且没有提交裁决 | `SetPendingShotResult(...)` | Item Motion 声明与 Shot 调用点 | Unity 编译、Item/Shot EditMode 与 PlayMode 验证 |
+
+本批没有保留旧名转发包装，也没有修改序列化字段、类型名、`.meta`、Prefab、Scene 或资产 YAML。
+
+## 第二批已处理
+
+| 原名称 | 分级与判定 | 当前名称 | 修改范围 | 剩余证据 |
+|---|---|---|---|---|
+| Track Editor Preview `SubmitClipState(...)` | B/C；每次 Clip 采样更新当前预览帧的请求状态并立即计算 `SetActive`，没有身份、版本、拒绝或事务提交边界 | `UpdateClipPreviewState(...)` | Track Sampler 声明与唯一 Clip Sampler 调用点 | Unity 编译、重叠 Clip 编辑器预览验证 |
+| `ESPhysicsLayers.ResolveShotHitMask(...)` | A/C；单步返回显式配置或项目默认 Shot Mask，不存在多来源消歧 | `GetShotHitMask(...)` | Physics Layers 声明与 Item Shot 两个调用点 | Unity 编译、Shot 命中层 EditMode/PlayMode 验证 |
+| Texture/Sprite Tool `ProcessSelectedTextures()` | A；可见按钮实际应用 TextureImporter 设置，来源同时包含 Project 选区和配置文件夹，旧名既抽象又错误限定来源 | `ApplyTextureImportSettings()` | 编辑器按钮调用与同页方法声明 | Unity 编译、工具页人工验证（会修改资产，未在本轮执行） |
+
+本批同样没有保留旧名转发包装；没有修改序列化字段、类型名、`.meta`、Prefab、Scene 或资产 YAML。静态 HTML 受 `DOCUMENT_SYNC` 管理，未机械改写。
+
+## 第三批已处理
+
+| 原名称 | 分级与判定 | 当前名称 | 修改范围 | 剩余证据 |
+|---|---|---|---|---|
+| `StateMachine.ExecuteStateActivation(...)` | B；只由同一 StateMachine 的 `TryActivateState` 调用，把预检结果应用到状态机，并会因 Tag、Layer 或运行异常返回失败；不是 Runner 的通用执行入口 | `TryApplyStateActivation(...)` | StateMachine 声明、两个内部调用点、异常诊断文本与状态成本现行指南 | Unity 编译、状态激活/中断/回滚 EditMode 与 PlayMode 验证 |
+
+本批没有保留旧名转发包装；没有修改序列化字段、类型名、`.meta`、Prefab、Scene 或资产 YAML。静态 HTML继续按 `DOCUMENT_SYNC` 边界保留当前快照。
+
+## 第四批已处理
+
+| 原名称 | 分级与判定 | 当前名称 | 修改范围 | 剩余证据 |
+|---|---|---|---|---|
+| `ESAudioDirectClipConfig.ResolveCategory(...)` | C；只返回当前覆盖值或调用方默认值，没有查表、消歧或失败分支 | `GetEffectiveCategory(...)` | Audio Runtime 声明、唯一业务调用点与四个测试断言中的两个 | Unity 编译、Audio EditMode 测试 |
+| `ESAudioDirectClipConfig.ResolveSpatialMode(...)` | C；只返回当前覆盖值或调用方默认值，没有解析协议 | `GetEffectiveSpatialMode(...)` | Audio Runtime 声明、唯一业务调用点与四个测试断言中的两个 | Unity 编译、Audio EditMode 测试 |
+| Shot Inspector `HitResolver Tag 条件` | A；策划字段暴露内部 Resolver 架构词 | `命中 Tag 条件`，并将 Tooltip 改为“命中判定” | Inspector 可见 Label 与 Tooltip；序列化字段名保持不变 | Unity Inspector 人工验证 |
+
+本批没有保留旧名转发包装；没有修改序列化字段名、类型名、`.meta`、Prefab、Scene 或资产 YAML。
+
+验证现状：
+
+- 活跃 C# 源码已无前四批十项旧名称引用；旧名只保留在本报告的迁移记录、历史协作记录和尚未按同步台账刷新的静态 HTML 快照中。
+- `ES_Logic.csproj` 与 `ES_Design.ConfigKey.Tests.csproj` 的 `dotnet-build` 均被当前共享工作树的 49 个既有缺失类型错误阻断，主要涉及未被生成工程收录的 Motion Influence、VFX 和 Enum/String Mirror Map 类型；未取得静态编译通过证据。
+- 当前环境没有可调用的 UnityMCP，未取得 Unity Editor Console、ReloadDomain、EditMode 或 PlayMode 证据。
+- 项目内活跃调用已经同步，但这些方法原本是 `public`；若存在仓外程序集或尚未导入的包直接调用旧名，会在升级后产生源码兼容断点。本批按“不保留无职责永久兼容包装”的项目规则处理，尚无仓外消费者清单证据。
 
 ## 确认合理
 
@@ -42,11 +96,18 @@
 
 | 候选 | 已确认实现事实 | 尚缺检查 | 可评估方向 |
 |---|---|---|---|
-| `VehicleController.SubmitDriverInput(...)` + `EntityMountable.SubmitDriverInput(...)` | 两层都会校验当前驾驶者；底层最终调用 `inputState.Set(...)`，属于每帧输入链 | 全部调用方、公开合同、测试、文档与兼容影响；必须成对评估 | `TrySetDriverInput(...)` 或保留 `Submit`，取决于调用方是否需要理解权威拒绝语义 |
-| `Entity.SubmitCameraLook(...)` | 检查本地控制权后调用 `ESCameraLease.TrySetLook(...)` | 输入链全部调用方、Camera 契约和测试；确认是否属于仲裁请求而非普通设置 | `TrySetCameraLook(...)` 或保留 `SubmitCameraLook(...)` |
-| `ItemMotionModule.SubmitShotResult(...)` | 只写 `_pendingResult` 并设置 `_hasPendingResult` | Pending Result 消费时序、模块边界和是否会扩展拒绝语义 | `SetPendingShotResult(...)` 或 `ApplyShotResult(...)` |
-| Track Editor Preview `SubmitClipState(...)` | 缓存原始 Active，合并同一采样帧多个 Clip 请求并写最终状态 | 多 Clip 冲突规则、调用频率和编辑器可见性 | `SetClipActiveRequest(...)`，或保留并补充仲裁职责说明 |
 | `MatchTargetGizmosDrawer.Submit(...)` | 同一 Key 每帧覆盖开发诊断数据 | 无高优先级缺口；属于私有诊断路径 | 低优先级评估 `SetFrameData(...)`，也可维持现状 |
+
+## 本轮复核后保留
+
+| 名称 | 源码事实 | 结论 |
+|---|---|---|
+| `EntityWeaponBinding.ResolveHandMount(...)` | 根据 Hand Mount Policy 在武器挂点、角色稳定 Socket、默认枚举挂点和 Combat Fallback 间按顺序选择 | 真实跨来源策略解析，保留 |
+| `ESInteractable.ResolveInteractionPoint(...)` | 在显式交互点、Collider ClosestPoint 和组件 Transform 三种来源间选择 | `Resolve` 能表达多来源回退，保留 |
+| Odin `ProcessSelfAttributes(...)` / `ProcessChildMemberAttributes(...)` | Odin Attribute Processor 固定扩展回调 | 第三方协议名，D 级默认不动 |
+| KCC `ProcessHitStabilityReport(...)` | KCC 固定控制器回调 | 第三方协议名，D 级默认不动 |
+| `ESAutomationTaskContract.ResolveCapabilities()` | 把字符串协议集合解析为 Flags，拒绝重复项与未知项 | 存在协议解析与校验，保留 |
+| SoTable `ExecuteAllEnabledBatches()` / `ExecuteUseBatch(...)` | 用户确认风险后执行导入、导出或组合批次，并包含计划预览分支 | `Execute` 对应真实工具命令，保留 |
 
 ## 既有语义债务候选
 

@@ -2,12 +2,22 @@
 
 最后核对：2026-08-10。
 
+## 2026-08-13 API 命名治理
+
+- 高频 API 的稳定动词语义、`Submit` 允许边界和动态审查流程已经写入命名 P0；动态候选不再保存在 P0 正文。
+- 既有名称按 A/B/C/D 分级：A 为高频可见入口优先整改，B 为公共协议按完整调用链迁移，C 为低频内部名称登记后顺带处理，D 为私有实现、第三方回调、生成代码和历史代码默认不动。
+- 前四批低风险源码迁移已经形成：第一批将驾驶输入成对协议统一为 `TrySetDriverInput`、Entity 镜头输入改为 `TrySetCameraLook`、Item Motion 的 Pending Shot Result 入口改为 `SetPendingShotResult`；第二批将 Track 预览采样入口改为 `UpdateClipPreviewState`、Shot 命中层读取改为 `GetShotHitMask`、纹理工具入口改为 `ApplyTextureImportSettings`；第三批将状态机预检结果落地入口改为 `TryApplyStateActivation`；第四批将 Audio 覆盖值读取改为 `GetEffectiveCategory` / `GetEffectiveSpatialMode`，并把 Shot Inspector 的内部 `HitResolver` 文案改为“命中判定”。均未保留旧名转发包装，也未修改序列化字段或资产 YAML；受 `DOCUMENT_SYNC` 管理的静态 HTML 未机械改写。
+- 当前候选、源码事实、已处理项、证据缺口和潜在迁移门禁见 `ES/Documentation/Status/API_NAMING_REVIEW_20260813.md`。`ES_Logic` 与依赖它的测试生成工程被当前工作树中 49 个既有 Motion Influence、VFX、Enum/String Mirror Map 缺失类型错误阻断；当前也无 Unity Editor、ReloadDomain、EditMode 或 PlayMode 证据，尚未形成后续批量改名授权、命名治理完成或发布结论。
+- UTF-8、`git diff --check`、静态编译与会话上下文验收只证明各自范围，不作为候选正确性或命名治理验收证据。
+
 ## 2026-08-13 ES Unity 菜单信息架构迁移
 
 - 现行架构决策已定为六个可见顶部一级入口：`常用窗口`、`内容制作`、`项目配置`、`资源与发布`、`验证与诊断`、`自动化与开发`；其中“常用窗口”只是打开正式窗口的快捷投影。
 - `Assets/Create/【ES】` 按资产类型使用“内容、配置、资源管线、示例”；`Add Component/【ES】` 按组件能力使用“基础设施、角色与交互、相机与表现、UI、资源、开发与验证”。三棵菜单不得共用一级分类。
-- 公共路径常量、正式 C# 菜单入口、启动器/命令面板索引、现行 AIWarnings、AICommands、Agent Skill、操作文档和测试断言已完成静态迁移；历史复盘保留当时路径事实。
-- 当前状态是“现行架构决策，六域菜单静态迁移已完成，Unity 实机验收待完成”。UTF-8 与三棵菜单白名单扫描已通过；`ES_Stand` 生成工程编译通过，较高层生成工程被工作树中与菜单无关的 `ES_Logic` 缺失类型错误阻断。上述证据仍不等于 Unity 菜单、分隔线、快捷键或 ReloadDomain 已实机验收。
+- 公共路径常量、正式 C# 菜单入口、启动器/命令面板索引、现行 AIWarnings、AICommands、Agent Skill、普通操作文档和测试断言已完成主体迁移；历史复盘保留当时路径事实。
+- 当前状态仍是“现行架构决策，六域菜单迁移实施中”。按项目级门禁在当前基线逐个字面量计数，正式静态技术文档 `ES/Documentation/StaticSite/ESFrameworkPublish_技术文档.html` 尚有 18 处旧菜单路径；该 HTML 受 `DOCUMENT_SYNC` 与本地更新台账约束，必须按批次整合，禁止脱离同步记录机械改写。
+- 可复现只读门禁为 `ES/Tools/Validation/Test-ESMenuArchitecture.ps1`，它明确区分 ES 自有活跃源码、条件启用的 `Obsolete` 兼容源码、Attribute 字面量/符号参数和正式文档范围；活跃范围包含 ES 自有测试与示例，不计算条件编译结果，也不对 Attribute 出现次数去重。此前 `80/36/84` 只代表一次未固化筛选的字面量统计，不再作为权威全仓计数。
+- `ES_Stand` 生成工程编译通过；较高层生成工程被工作树中与菜单无关的 `ES_Logic` 缺失类型错误阻断。Unity 菜单、分隔线、快捷键和 ReloadDomain 仍无实机验收证据。
 
 ## 2026-08-11 Stable Graph V2 收口
 

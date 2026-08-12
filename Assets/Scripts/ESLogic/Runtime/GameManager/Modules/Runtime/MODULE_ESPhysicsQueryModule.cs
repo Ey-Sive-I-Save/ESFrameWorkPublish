@@ -60,7 +60,7 @@ namespace ES
         /// 兼容历史数据中的 ~0：飞行物绝不能因为“全层”默认值扫描到自身、交互盒或纯表现 Collider。
         /// 需要更窄命中范围时可在具体 Shot 数据中填写明确 LayerMask。
         /// </summary>
-        public static LayerMask ResolveShotHitMask(LayerMask configuredMask)
+        public static LayerMask GetShotHitMask(LayerMask configuredMask)
         {
             return configuredMask.value == ~0 ? ShotHitMask : configuredMask;
         }

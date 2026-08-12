@@ -54,7 +54,7 @@ namespace ES
             if (distance <= 0.0001f)
                 return 0;
 
-            LayerMask hitLayers = ESPhysicsLayers.ResolveShotHitMask(query.hitLayers);
+            LayerMask hitLayers = ESPhysicsLayers.GetShotHitMask(query.hitLayers);
             ESPhysicsQueryModule physicsQuery = ESGameManager.PhysicsQueryModule;
             int count = physicsQuery != null
                 ? physicsQuery.ShotCast(query.from, query.to, query.radius, hitLayers, _hitBuffer, query.triggerInteraction)

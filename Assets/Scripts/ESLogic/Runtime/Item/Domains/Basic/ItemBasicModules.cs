@@ -15,6 +15,14 @@ namespace ES
         public float maxCombinedInfluenceAcceleration = 80f;
         [MinValue(0f), LabelText("单步速度增量上限")]
         public float maxCombinedInfluenceVelocityDelta = 30f;
+        [LabelText("Transform 运动启用碰撞 Sweep")]
+        public bool sweepTransformInfluences = true;
+        [MinValue(0.001f), LabelText("Transform Sweep 半径")]
+        public float transformSweepRadius = 0.1f;
+        [MinValue(0f), LabelText("Transform Sweep 皮肤宽度")]
+        public float transformSweepSkin = 0.01f;
+        [LabelText("Transform Sweep 碰撞层")]
+        public LayerMask transformSweepMask = Physics.DefaultRaycastLayers;
 
         [Title("运行监控")]
         [ShowInInspector, ReadOnly] public Vector3 currentPosition;
@@ -25,6 +33,7 @@ namespace ES
         [NonSerialized] private bool _hasPendingResult;
         [NonSerialized] private ShotMotionResult _pendingResult;
         [NonSerialized] private ESMotionInfluenceAccumulator _motionInfluences;
+        private static readonly RaycastHit[] TransformSweepHits = new RaycastHit[8];
 
         public override void Start()
         {
@@ -37,7 +46,7 @@ namespace ES
             }
         }
 
-        public void SubmitShotResult(in ShotMotionResult result)
+        public void SetPendingShotResult(in ShotMotionResult result)
         {
             _pendingResult = result;
             _hasPendingResult = true;
@@ -47,10 +56,17 @@ namespace ES
             Vector3 velocity,
             ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
         {
+            return TryAddVelocity(velocity, permissions) == ESMotionSubmitResult.Accepted;
+        }
+
+        public ESMotionSubmitResult TryAddVelocity(
+            Vector3 velocity,
+            ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
+        {
             if (!IsFinite(velocity))
-                return false;
+                return ESMotionSubmitResult.InvalidValue;
             EnsureMotionInfluences().AddVelocity(velocity, permissions);
-            return true;
+            return ESMotionSubmitResult.Accepted;
         }
 
         public bool TryAcquireField(
@@ -166,9 +182,59 @@ namespace ES
                 body.velocity = velocity;
             else
             {
-                currentPosition = position + velocity * deltaTime;
+                currentPosition = ResolveTransformInfluencePosition(
+                    position,
+                    ref velocity,
+                    deltaTime);
                 MyCore.transform.position = currentPosition;
             }
+        }
+
+        private Vector3 ResolveTransformInfluencePosition(
+            Vector3 position,
+            ref Vector3 velocity,
+            float deltaTime)
+        {
+            Vector3 displacement = velocity * deltaTime;
+            float distance = displacement.magnitude;
+            if (!sweepTransformInfluences || distance <= Mathf.Epsilon)
+                return position + displacement;
+
+            Vector3 direction = displacement / distance;
+            int hitCount = Physics.SphereCastNonAlloc(
+                position,
+                Mathf.Max(0.001f, transformSweepRadius),
+                direction,
+                TransformSweepHits,
+                distance,
+                transformSweepMask,
+                QueryTriggerInteraction.Ignore);
+
+            float nearestDistance = float.PositiveInfinity;
+            Vector3 nearestNormal = Vector3.zero;
+            Transform ownerTransform = MyCore.transform;
+            for (int i = 0; i < hitCount; i++)
+            {
+                RaycastHit hit = TransformSweepHits[i];
+                Transform hitTransform = hit.collider != null ? hit.collider.transform : null;
+                if (hitTransform == null || hitTransform == ownerTransform
+                    || hitTransform.IsChildOf(ownerTransform))
+                    continue;
+                if (hit.distance >= nearestDistance)
+                    continue;
+
+                nearestDistance = hit.distance;
+                nearestNormal = hit.normal;
+            }
+
+            if (float.IsPositiveInfinity(nearestDistance))
+                return position + displacement;
+
+            float inwardSpeed = Vector3.Dot(velocity, nearestNormal);
+            if (inwardSpeed < 0f)
+                velocity -= nearestNormal * inwardSpeed;
+            float travel = Mathf.Max(0f, nearestDistance - Mathf.Max(0f, transformSweepSkin));
+            return position + direction * travel;
         }
 
         private ESMotionInfluenceAccumulator EnsureMotionInfluences()
@@ -333,7 +399,7 @@ namespace ES
                 aimMode = ShotAimMode.MustHit;
 
             blockMode = shared.blockMode;
-            hitLayers = ESPhysicsLayers.ResolveShotHitMask(shared.hitLayers);
+            hitLayers = ESPhysicsLayers.GetShotHitMask(shared.hitLayers);
             castRadius = Mathf.Max(0f, shared.radius * variableData.radiusMultiplier);
             config = shared.ToShotMotionConfig(variableData);
         }
@@ -385,7 +451,7 @@ namespace ES
             TryBuildHitCandidate(ref latestResult);
             TryBuildMustHitCandidate(ref latestResult);
 
-            motionModule?.SubmitShotResult(latestResult);
+            motionModule?.SetPendingShotResult(latestResult);
             _hasSubmittedMotionResult = motionModule != null;
 
             if (latestResult.kind == ShotMotionKind.Arrived || latestResult.kind == ShotMotionKind.Expired)

@@ -108,9 +108,17 @@ namespace ES
             Vector3 velocity,
             ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
         {
+            return TryAddVelocity(velocity, permissions) == ESMotionSubmitResult.Accepted;
+        }
+
+        public ESMotionSubmitResult TryAddVelocity(
+            Vector3 velocity,
+            ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
+        {
             ItemMotionModule motion = basicDomain?.FindMyModule<ItemMotionModule>();
             return motion != null
-                && motion.AddVelocity(velocity, permissions);
+                ? motion.TryAddVelocity(velocity, permissions)
+                : ESMotionSubmitResult.NotReady;
         }
 
         public bool TryAcquireField(

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -81,6 +83,18 @@ namespace ES.EditorInternal
     }
 
     [Serializable]
+    public sealed class ESAISkillCallPayload
+    {
+        public int schemaVersion = 1;
+        public string sourceAssetGuid = string.Empty;
+        public string targetGraphId = string.Empty;
+        public string targetContentSignature = string.Empty;
+        [TextArea(3, 12)] public string staticInputJson = "{}";
+        public ESAISkillTaskInputBinding[] inputBindings = Array.Empty<ESAISkillTaskInputBinding>();
+        [Range(1, ES.ESAutomationTaskContract.MaximumTimeoutSeconds)] public int timeoutSeconds = 600;
+    }
+
+    [Serializable]
     public sealed class ESAISkillBranchPayload
     {
         public int schemaVersion = 1;
@@ -123,6 +137,7 @@ namespace ES.EditorInternal
         public string title = string.Empty;
         public ESAISkillInputPayload input;
         public ESAISkillTaskPayload task;
+        public ESAISkillCallPayload skillCall;
         public ESAISkillBranchPayload branch;
         public ESAISkillForEachPayload forEach;
         public ESAISkillApprovalPayload approval;
@@ -277,6 +292,9 @@ namespace ES.EditorInternal
                     case ESAgentGraphStableIds.SkillTaskNode:
                         step.task = JsonUtility.FromJson<ESAISkillTaskPayload>(node.PayloadJson);
                         break;
+                    case ESAgentGraphStableIds.SkillCallNode:
+                        step.skillCall = JsonUtility.FromJson<ESAISkillCallPayload>(node.PayloadJson);
+                        break;
                     case ESAgentGraphStableIds.SkillBranchNode:
                         step.branch = JsonUtility.FromJson<ESAISkillBranchPayload>(node.PayloadJson);
                         break;
@@ -299,7 +317,8 @@ namespace ES.EditorInternal
                 error = "Payload JSON 无法解析：" + exception.Message;
                 return false;
             }
-            if (step.input == null && step.task == null && step.branch == null && step.forEach == null
+            if (step.input == null && step.task == null && step.skillCall == null
+                && step.branch == null && step.forEach == null
                 && step.approval == null && step.output == null)
             {
                 error = "节点缺少可用执行 Payload。";
@@ -334,6 +353,7 @@ namespace ES.EditorInternal
             {
                 if (step.input != null) ValidateInput(step, failures);
                 if (step.task != null) ValidateTask(step, failures);
+                if (step.skillCall != null) ValidateSkillCall(step, failures);
                 if (step.input == null && !controls.Any(edge => edge.targetNodeId == step.nodeId))
                     failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.ControlInput",
                         "执行节点缺少控制输入，数据连线不能代替执行顺序。", step.nodeId));
@@ -341,7 +361,7 @@ namespace ES.EditorInternal
                     && !bindings.Any(edge => edge.targetNodeId == step.nodeId))
                     failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.ValueInput",
                         "该节点缺少必需值输入。", step.nodeId));
-                bool isForEachBody = step.task != null && controls.Any(edge =>
+                bool isForEachBody = (step.task != null || step.skillCall != null) && controls.Any(edge =>
                     edge.targetNodeId == step.nodeId
                     && edge.sourcePortKey == ESAgentGraphStableIds.SkillItemPortKey
                     && steps.Any(owner => owner.nodeId == edge.sourceNodeId && owner.forEach != null));
@@ -360,9 +380,9 @@ namespace ES.EditorInternal
                     ESAISkillControlEdge item = controls.FirstOrDefault(edge => edge.sourceNodeId == step.nodeId
                         && edge.sourcePortKey == ESAgentGraphStableIds.SkillItemPortKey);
                     ESAISkillExecutionStep body = item == null ? null : steps.FirstOrDefault(value => value.nodeId == item.targetNodeId);
-                    if (body?.task == null)
+                    if (body?.task == null && body?.skillCall == null)
                         failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.ForEachBody",
-                            "ForEach 的逐项出口必须直接连接一个 Task；循环由协调器内部管理。", step.nodeId));
+                            "ForEach 的逐项出口必须直接连接一个 Task 或调用 AISkill；循环由协调器内部管理。", step.nodeId));
                 }
             }
 
@@ -380,6 +400,9 @@ namespace ES.EditorInternal
         {
             if (step.input != null) return new[] { ESAgentGraphStableIds.SkillNextPortKey };
             if (step.task != null) return isForEachBody ? Array.Empty<string>() : new[] { ESAgentGraphStableIds.SkillSuccessPortKey,
+                ESAgentGraphStableIds.SkillFailurePortKey, ESAgentGraphStableIds.SkillTimeoutPortKey,
+                ESAgentGraphStableIds.SkillCancelledPortKey };
+            if (step.skillCall != null) return isForEachBody ? Array.Empty<string>() : new[] { ESAgentGraphStableIds.SkillSuccessPortKey,
                 ESAgentGraphStableIds.SkillFailurePortKey, ESAgentGraphStableIds.SkillTimeoutPortKey,
                 ESAgentGraphStableIds.SkillCancelledPortKey };
             if (step.branch != null) return new[] { ESAgentGraphStableIds.SkillMatchedPortKey,
@@ -465,6 +488,78 @@ namespace ES.EditorInternal
                     && !ESGraphStableIdUtility.IsValid(binding.sourceId))
                     failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.TaskBinding",
                         "工作流参数映射必须填写稳定 SourceId。", step.nodeId));
+            }
+        }
+
+        private static void ValidateSkillCall(ESAISkillExecutionStep step,
+            List<ESGraphValidationIssue> failures)
+        {
+            ESAISkillCallPayload call = step.skillCall;
+            if (call.schemaVersion != 1 || string.IsNullOrWhiteSpace(call.sourceAssetGuid)
+                || !ESGraphIdentity.IsValid(call.targetGraphId)
+                || !ES.ESAutomationWorkerRegistration.IsSha256(call.targetContentSignature))
+            {
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.SkillCallIdentity",
+                    "调用 AISkill 必须固定 Asset GUID、GraphId 和内容签名。", step.nodeId));
+                return;
+            }
+            if (call.timeoutSeconds < 1
+                || call.timeoutSeconds > ES.ESAutomationTaskContract.MaximumTimeoutSeconds)
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.SkillCallTimeout",
+                    "子 AISkill 超时必须位于 1-7200 秒。", step.nodeId));
+            try { JObject.Parse(string.IsNullOrWhiteSpace(call.staticInputJson) ? "{}" : call.staticInputJson); }
+            catch (Exception exception)
+            {
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.SkillCallInput",
+                    "子 AISkill 静态输入必须是 JSON Object：" + exception.Message, step.nodeId));
+            }
+            ValidateBindings(call.inputBindings, step.nodeId, failures);
+            string assetPath = AssetDatabase.GUIDToAssetPath(call.sourceAssetGuid);
+            ESGraphAssetBase target = string.IsNullOrWhiteSpace(assetPath) ? null
+                : AssetDatabase.LoadAssetAtPath<ESGraphAssetBase>(assetPath);
+            if (target == null)
+            {
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.SkillCallTarget",
+                    "调用 AISkill 的目标资产不存在。", step.nodeId));
+                return;
+            }
+            if (!string.Equals(target.GraphId, call.targetGraphId, StringComparison.Ordinal))
+            {
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.SkillCallGraphId",
+                    "调用 AISkill 的目标 GraphId 已漂移。", step.nodeId));
+                return;
+            }
+            if (!ESGraphSnapshotBaker.TryBake(target, out ESBakedGraphSnapshot snapshot,
+                    out List<ESGraphValidationIssue> targetIssues))
+            {
+                ESGraphValidationIssue first = targetIssues?.FirstOrDefault(issue => issue != null
+                    && issue.severity == ESGraphValidationSeverity.Error);
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.SkillCallTarget",
+                    "调用 AISkill 的目标图无法生成验证快照：" + (first?.message ?? "未知错误"), step.nodeId));
+                return;
+            }
+            if (!string.Equals(snapshot.ContentSignature, call.targetContentSignature,
+                    StringComparison.Ordinal))
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.SkillCallSignature",
+                    "调用 AISkill 的目标内容签名已漂移，请重新绑定。", step.nodeId));
+        }
+
+        private static void ValidateBindings(IEnumerable<ESAISkillTaskInputBinding> bindings,
+            string nodeId, List<ESGraphValidationIssue> failures)
+        {
+            var targetFields = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ESAISkillTaskInputBinding binding in bindings
+                         ?? Array.Empty<ESAISkillTaskInputBinding>())
+            {
+                if (binding == null || !Regex.IsMatch(binding.targetField ?? string.Empty,
+                        "^[A-Za-z][A-Za-z0-9_]*$") || !targetFields.Add(binding.targetField)
+                    || !Enum.IsDefined(typeof(ESAISkillTaskInputSource), binding.source))
+                    failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.SkillCallBinding",
+                        "子 AISkill 输入映射必须有唯一目标字段和有效来源。", nodeId));
+                if (binding?.source == ESAISkillTaskInputSource.WorkflowParameter
+                    && !ESGraphStableIdUtility.IsValid(binding.sourceId))
+                    failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.SkillCallBinding",
+                        "子 AISkill 参数映射必须填写稳定 SourceId。", nodeId));
             }
         }
     }
@@ -649,6 +744,21 @@ namespace ES.EditorInternal
     }
 
     [Serializable]
+    public sealed class ESAISkillIterationRunRecord
+    {
+        public int index;
+        public string inputHash = string.Empty;
+        public string invocationId = string.Empty;
+        public string childRunId = string.Empty;
+        public string status = "Pending";
+        public string startedAtUtc = string.Empty;
+        public string finishedAtUtc = string.Empty;
+        public string message = string.Empty;
+        public string[] artifacts = Array.Empty<string>();
+        public string[] outputHashes = Array.Empty<string>();
+    }
+
+    [Serializable]
     public sealed class ESAISkillStepRunRecord
     {
         public string nodeId = string.Empty;
@@ -659,12 +769,16 @@ namespace ES.EditorInternal
         public int currentAttemptCount;
         public string currentAttemptStartedAtUtc = string.Empty;
         public string retryAvailableAtUtc = string.Empty;
+        public string invocationId = string.Empty;
         public string childRunId = string.Empty;
+        public int childApprovalGeneration;
         public int exitCode = -1;
         public string message = string.Empty;
         public string[] diagnostics = Array.Empty<string>();
         public string[] artifacts = Array.Empty<string>();
         public string[] outputHashes = Array.Empty<string>();
+        public List<ESAISkillIterationRunRecord> iterations =
+            new List<ESAISkillIterationRunRecord>();
     }
 
     [Serializable]
@@ -675,8 +789,13 @@ namespace ES.EditorInternal
         public string graphId = string.Empty;
         public string sourceAssetGuid = string.Empty;
         public string contentSignature = string.Empty;
+        public string executionSpecHash = string.Empty;
+        public string runStateHash = string.Empty;
         public string skillId = string.Empty;
         public string operatorId = string.Empty;
+        public string parentRunId = string.Empty;
+        public int callDepth;
+        public string[] ancestorGraphIds = Array.Empty<string>();
         public string status = "Running";
         public string currentNodeId = string.Empty;
         public string startedAtUtc = string.Empty;
@@ -685,6 +804,9 @@ namespace ES.EditorInternal
         public string message = string.Empty;
         public int exitCode = -1;
         public int approvalGeneration;
+        public string cancellationRequestedAtUtc = string.Empty;
+        public string cancellationOutcome = string.Empty;
+        public string cancellationMessage = string.Empty;
         public string iterationNodeId = string.Empty;
         public string iterationTaskNodeId = string.Empty;
         public int iterationIndex = -1;
@@ -697,6 +819,7 @@ namespace ES.EditorInternal
 
     public static class ESAISkillExecutionCoordinator
     {
+        internal const int MaximumSkillCallDepth = 8;
         private const string ActiveRunsSessionKey = "ES.AISkillGraph.ActiveRuns.v1";
         private static readonly Dictionary<string, ESAISkillWorkflowRun> Active =
             new Dictionary<string, ESAISkillWorkflowRun>(StringComparer.Ordinal);
@@ -714,6 +837,12 @@ namespace ES.EditorInternal
 
         public static bool TryStart(ESAISkillExecutionSpec spec, JObject inputs, string operatorId,
             string sourceAssetGuid, out ESAISkillWorkflowRun run, out string error)
+            => TryStartCore(spec, inputs, operatorId, sourceAssetGuid, string.Empty, 0,
+                new[] { spec?.sourceGraphId }, string.Empty, out run, out error);
+
+        private static bool TryStartCore(ESAISkillExecutionSpec spec, JObject inputs, string operatorId,
+            string sourceAssetGuid, string parentRunId, int callDepth, string[] ancestorGraphIds,
+            string stableRunId, out ESAISkillWorkflowRun run, out string error)
         {
             run = null;
             if (!TryValidateInputs(spec, inputs, out JObject normalized, out error))
@@ -725,14 +854,63 @@ namespace ES.EditorInternal
                 error = "AISkill 执行必须绑定已保存源 Graph 的精确 Asset GUID。";
                 return false;
             }
+            if (!string.IsNullOrWhiteSpace(stableRunId))
+            {
+                if (!Guid.TryParseExact(stableRunId, "N", out _))
+                {
+                    error = "稳定子 AISkill RunId 必须是 N 格式 GUID。";
+                    return false;
+                }
+                if (File.Exists(RunPath(stableRunId)))
+                {
+                    if (!TryLoad(stableRunId, out ESAISkillWorkflowRun existing,
+                            out string loadError))
+                    {
+                        error = "稳定子 AISkill RunRecord 无效：" + loadError;
+                        return false;
+                    }
+                    if (!string.Equals(existing.executionSpecHash,
+                            ComputeExecutionSpecHash(spec), StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(existing.sourceAssetGuid, sourceAssetGuid,
+                            StringComparison.Ordinal)
+                        || !string.Equals(existing.parentRunId, parentRunId,
+                            StringComparison.Ordinal)
+                        || existing.callDepth != callDepth
+                        || !JToken.DeepEquals(existing.inputs, normalized))
+                    {
+                        error = "稳定子 AISkill RunId 已绑定其他执行合同或输入。";
+                        return false;
+                    }
+                    run = existing;
+                    if (!IsTerminal(existing.status) && !Active.ContainsKey(existing.runId))
+                    {
+                        Active.Add(existing.runId, existing);
+                        TrySaveActiveRunIds();
+                        EnsureUpdateHook();
+                    }
+                    error = string.Empty;
+                    return true;
+                }
+                if (Directory.Exists(RunDirectory(stableRunId)))
+                {
+                    error = "稳定子 AISkill RunId 目录存在但缺少有效 RunRecord。";
+                    return false;
+                }
+            }
             string now = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
             run = new ESAISkillWorkflowRun
             {
+                runId = string.IsNullOrWhiteSpace(stableRunId)
+                    ? Guid.NewGuid().ToString("N") : stableRunId,
                 graphId = spec.sourceGraphId,
                 sourceAssetGuid = sourceAssetGuid ?? string.Empty,
                 contentSignature = spec.sourceContentSignature,
+                executionSpecHash = ComputeExecutionSpecHash(spec),
                 skillId = spec.skillId,
                 operatorId = string.IsNullOrWhiteSpace(operatorId) ? Environment.UserName : operatorId.Trim(),
+                parentRunId = parentRunId ?? string.Empty,
+                callDepth = callDepth,
+                ancestorGraphIds = ancestorGraphIds ?? Array.Empty<string>(),
                 currentNodeId = spec.entryNodeId,
                 startedAtUtc = now,
                 updatedAtUtc = now,
@@ -754,6 +932,18 @@ namespace ES.EditorInternal
             {
                 Active.Remove(run.runId);
                 TrySaveActiveRunIds();
+                try
+                {
+                    run.status = "Failed";
+                    run.message = "AISkill 启动失败：" + exception.Message;
+                    run.exitCode = -1;
+                    run.finishedAtUtc = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+                    Save(run);
+                }
+                catch (Exception persistException)
+                {
+                    Debug.LogError("[ES AISkillGraph] 启动失败记录无法持久化：" + persistException.Message);
+                }
                 error = "无法启动 AISkill 工作流：" + exception.Message;
                 return false;
             }
@@ -780,6 +970,30 @@ namespace ES.EditorInternal
                 return false;
             }
             ESAISkillExecutionStep step = FindStep(run, run.currentNodeId);
+            if (step?.skillCall != null)
+            {
+                ESAISkillStepRunRecord callRecord = FindStepRecord(run, step.nodeId);
+                if (!TryGet(callRecord?.childRunId, out ESAISkillWorkflowRun child)
+                    || child.status != "WaitingApproval")
+                {
+                    error = "子 AISkill 不存在或当前未等待人工确认。";
+                    return false;
+                }
+                if (!IsProjectedChildApprovalCurrent(callRecord, child))
+                {
+                    error = "子 AISkill 的人工确认代际已变化，请刷新后重试。";
+                    return false;
+                }
+                if (!TryApprove(child.runId, callRecord.childApprovalGeneration,
+                        approved, comment, out error))
+                    return false;
+                run.status = "Running";
+                run.message = "子 AISkill 的人工确认已提交。";
+                Save(run);
+                Tick(run);
+                error = string.Empty;
+                return true;
+            }
             if (!approved && step?.approval?.requireCommentOnReject == true
                 && string.IsNullOrWhiteSpace(comment))
             {
@@ -808,7 +1022,54 @@ namespace ES.EditorInternal
             }
             ESAISkillStepRunRecord step = FindStepRecord(run, run.currentNodeId);
             if (!string.IsNullOrWhiteSpace(step?.childRunId))
-                ES.ESAutomationFacade.CancelRun(step.childRunId, actorId ?? string.Empty, false);
+            {
+                ESAISkillExecutionStep current = FindStep(run, run.currentNodeId);
+                if (current?.skillCall != null)
+                {
+                    if (!TryCancel(step.childRunId, actorId, out string childError))
+                    {
+                        MarkCancellationFailed(run, childError);
+                        error = childError;
+                        return false;
+                    }
+                    if (TryGet(step.childRunId, out ESAISkillWorkflowRun child)
+                        && !IsTerminal(child.status))
+                    {
+                        run.status = "Cancelling";
+                        run.cancellationRequestedAtUtc = DateTimeOffset.UtcNow.ToString("O",
+                            CultureInfo.InvariantCulture);
+                        run.cancellationOutcome = "Pending";
+                        run.cancellationMessage = "等待子 AISkill 确认取消。";
+                        run.message = run.cancellationMessage;
+                        Save(run);
+                        error = string.Empty;
+                        return true;
+                    }
+                }
+                else
+                {
+                    ES.ESAutomationTaskInvocationResult result = ES.ESAutomationFacade.CancelRun(
+                        step.childRunId, actorId ?? string.Empty, false);
+                    if (result.status == "Accepted" || IsTaskInProgress(result.status))
+                    {
+                        run.status = "Cancelling";
+                        run.cancellationRequestedAtUtc = DateTimeOffset.UtcNow.ToString("O",
+                            CultureInfo.InvariantCulture);
+                        run.cancellationOutcome = "Pending";
+                        run.cancellationMessage = result.message ?? string.Empty;
+                        run.message = "已请求取消子 Automation，等待终态确认。";
+                        Save(run);
+                        error = string.Empty;
+                        return true;
+                    }
+                    if (result.status != "Cancelled" && result.status != "Completed")
+                    {
+                        MarkCancellationFailed(run, result.message ?? "子 Automation 拒绝取消。");
+                        error = run.cancellationMessage;
+                        return false;
+                    }
+                }
+            }
             Finish(run, "Cancelled", "用户取消工作流。", -1);
             error = string.Empty;
             return true;
@@ -838,6 +1099,11 @@ namespace ES.EditorInternal
         {
             if (run == null || IsTerminal(run.status) || run.status == "WaitingApproval")
                 return;
+            if (run.status == "Cancelling")
+            {
+                PollCancellation(run);
+                return;
+            }
             for (int guard = 0; guard < 128 && run.status == "Running"; guard++)
             {
                 ESAISkillExecutionStep step = FindStep(run, run.currentNodeId);
@@ -852,6 +1118,11 @@ namespace ES.EditorInternal
                 if (step.task != null)
                 {
                     if (PollOrStartTask(run, step)) return;
+                    continue;
+                }
+                if (step.skillCall != null)
+                {
+                    if (PollOrStartSkillCall(run, step)) return;
                     continue;
                 }
                 if (step.branch != null)
@@ -904,13 +1175,21 @@ namespace ES.EditorInternal
                         out DateTimeOffset retryAt) && DateTimeOffset.UtcNow < retryAt)
                     return true;
                 BeginStep(run, step.nodeId);
+                if (string.IsNullOrWhiteSpace(record.invocationId))
+                {
+                    record.invocationId = Guid.NewGuid().ToString("N");
+                    SyncCurrentIterationIdentity(run, record);
+                    Save(run);
+                }
                 JObject input = JObject.Parse(string.IsNullOrWhiteSpace(step.task.staticInputJson)
                     ? "{}" : step.task.staticInputJson);
-                if (!TryApplyTaskInputBindings(run, step, input, out string bindingError))
+                if (!TryApplyInputBindings(run, step.nodeId, step.task.inputBindings,
+                        input, out string bindingError))
                     return HandleTaskFailure(run, step, "Failed", bindingError);
                 ES.ESAutomationTaskInvocationResult result = ES.ESAutomationFacade.RunTask(
                     new ES.ESAutomationTaskInvocation
                     {
+                        invocationId = record.invocationId,
                         taskId = step.task.taskId,
                         taskVersion = step.task.taskVersion,
                         preset = step.task.preset,
@@ -921,6 +1200,7 @@ namespace ES.EditorInternal
                     });
                 record.childRunId = result.runId ?? string.Empty;
                 record.message = result.message ?? string.Empty;
+                SyncCurrentIterationIdentity(run, record);
                 Save(run);
                 if (IsSuccessfulTaskStatus(result.status))
                     return HandleTaskTerminal(run, step, result);
@@ -940,7 +1220,31 @@ namespace ES.EditorInternal
                 if (DateTimeOffset.TryParse(record.currentAttemptStartedAtUtc, out DateTimeOffset started)
                     && DateTimeOffset.UtcNow - started > TimeSpan.FromSeconds(step.task.timeoutSeconds))
                 {
-                    ES.ESAutomationFacade.CancelRun(record.childRunId, run.operatorId, false);
+                    ES.ESAutomationTaskInvocationResult cancellation = ES.ESAutomationFacade.CancelRun(
+                        record.childRunId, run.operatorId, false);
+                    if (cancellation.status == "Accepted" || IsTaskInProgress(cancellation.status))
+                    {
+                        run.status = "Cancelling";
+                        run.cancellationRequestedAtUtc = DateTimeOffset.UtcNow.ToString("O",
+                            CultureInfo.InvariantCulture);
+                        run.cancellationOutcome = "PendingAfterTimeout";
+                        run.cancellationMessage = cancellation.message ?? string.Empty;
+                        Save(run);
+                        return true;
+                    }
+                    if (cancellation.status != "Cancelled" && cancellation.status != "Completed")
+                    {
+                        MarkCancellationFailed(run, "步骤超时，但子 Automation 取消失败："
+                            + (cancellation.message ?? cancellation.status));
+                        return true;
+                    }
+                    if (cancellation.status == "Completed")
+                    {
+                        ES.ESAutomationTaskInvocationResult completed = ES.ESAutomationFacade.GetRun(
+                            record.childRunId, false);
+                        if (IsSuccessfulTaskStatus(completed.status))
+                            return HandleTaskTerminal(run, step, completed);
+                    }
                     return HandleTaskFailure(run, step, "TimedOut", "工作流步骤超过声明超时。" );
                 }
                 return true;
@@ -950,10 +1254,194 @@ namespace ES.EditorInternal
             return HandleTaskFailure(run, step, current.status, current.message);
         }
 
-        private static bool TryApplyTaskInputBindings(ESAISkillWorkflowRun run,
-            ESAISkillExecutionStep step, JObject input, out string error)
+        private static bool PollOrStartSkillCall(ESAISkillWorkflowRun run,
+            ESAISkillExecutionStep step)
         {
-            foreach (ESAISkillTaskInputBinding binding in step.task.inputBindings
+            ESAISkillStepRunRecord record = FindStepRecord(run, step.nodeId);
+            if (string.IsNullOrWhiteSpace(record.childRunId))
+            {
+                if (!CanEnterSkillCall(run.callDepth))
+                    return HandleSkillCallFailure(run, step, "Blocked",
+                        "AISkill 调用深度超过上限 " + MaximumSkillCallDepth + "。" );
+                string assetPath = AssetDatabase.GUIDToAssetPath(step.skillCall.sourceAssetGuid);
+                ESGraphAssetBase asset = string.IsNullOrWhiteSpace(assetPath) ? null
+                    : AssetDatabase.LoadAssetAtPath<ESGraphAssetBase>(assetPath);
+                if (asset == null)
+                    return HandleSkillCallFailure(run, step, "NotFound", "子 AISkill 资产不存在。" );
+                if (!ESAISkillExecutionLauncher.TryBake(asset, out ESAISkillExecutionSpec childSpec,
+                        out string bakeError))
+                    return HandleSkillCallFailure(run, step, "Blocked", "子 AISkill 无法 Bake：" + bakeError);
+                if (!string.Equals(childSpec.sourceGraphId, step.skillCall.targetGraphId,
+                        StringComparison.Ordinal)
+                    || !string.Equals(childSpec.sourceContentSignature,
+                        step.skillCall.targetContentSignature, StringComparison.Ordinal))
+                    return HandleSkillCallFailure(run, step, "Blocked",
+                        "子 AISkill 的 GraphId 或内容签名已漂移。" );
+                if (ContainsAncestorGraph(run.ancestorGraphIds, childSpec.sourceGraphId))
+                    return HandleSkillCallFailure(run, step, "Blocked", "检测到 AISkill 递归调用。" );
+
+                JObject childInput = JObject.Parse(string.IsNullOrWhiteSpace(step.skillCall.staticInputJson)
+                    ? "{}" : step.skillCall.staticInputJson);
+                if (!TryApplyInputBindings(run, step.nodeId, step.skillCall.inputBindings,
+                        childInput, out string bindingError))
+                    return HandleSkillCallFailure(run, step, "Failed", bindingError);
+                if (string.IsNullOrWhiteSpace(record.invocationId))
+                {
+                    record.invocationId = Guid.NewGuid().ToString("N");
+                    SyncCurrentIterationIdentity(run, record);
+                    Save(run);
+                }
+                BeginStep(run, step.nodeId);
+                string[] ancestors = (run.ancestorGraphIds ?? Array.Empty<string>())
+                    .Concat(new[] { childSpec.sourceGraphId }).ToArray();
+                if (!TryStartCore(childSpec, childInput, run.operatorId,
+                        step.skillCall.sourceAssetGuid, run.runId, run.callDepth + 1, ancestors,
+                        record.invocationId, out ESAISkillWorkflowRun child, out string startError))
+                    return HandleSkillCallFailure(run, step, "Failed", startError);
+                record.childRunId = child.runId;
+                SyncCurrentIterationIdentity(run, record);
+                Save(run);
+            }
+
+            if (!TryGet(record.childRunId, out ESAISkillWorkflowRun current))
+                return HandleSkillCallFailure(run, step, "NotFound", "子 AISkill RunRecord 不存在。" );
+            if (current.status == "WaitingApproval")
+            {
+                ProjectChildApproval(run, record, current);
+                Save(run);
+                return true;
+            }
+            if (current.status == "Running")
+            {
+                if (DateTimeOffset.TryParse(record.currentAttemptStartedAtUtc,
+                        CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind,
+                        out DateTimeOffset started)
+                    && DateTimeOffset.UtcNow - started
+                        > TimeSpan.FromSeconds(step.skillCall.timeoutSeconds))
+                {
+                    if (!TryCancel(current.runId, run.operatorId, out string cancelError))
+                    {
+                        if (TryGet(current.runId, out ESAISkillWorkflowRun racedChild)
+                            && racedChild.status == "Completed")
+                        {
+                            JObject result = BuildChildRunResult(racedChild);
+                            run.values[step.nodeId] = result;
+                            CompleteStep(run, step.nodeId, "Completed",
+                                "子 AISkill 在取消调用前已完成。", result);
+                            Move(run, step.nodeId, ESAgentGraphStableIds.SkillSuccessPortKey);
+                            return false;
+                        }
+                        MarkCancellationFailed(run, "子 AISkill 超时且取消失败：" + cancelError);
+                        return true;
+                    }
+                    if (TryGet(current.runId, out ESAISkillWorkflowRun cancellingChild)
+                        && !IsTerminal(cancellingChild.status))
+                    {
+                        run.status = "Cancelling";
+                        run.cancellationRequestedAtUtc = DateTimeOffset.UtcNow.ToString("O",
+                            CultureInfo.InvariantCulture);
+                        run.cancellationOutcome = "PendingAfterTimeout";
+                        run.cancellationMessage = "等待超时子 AISkill 确认取消。";
+                        Save(run);
+                        return true;
+                    }
+                    return HandleSkillCallFailure(run, step, "TimedOut", "子 AISkill 超过声明超时。" );
+                }
+                return true;
+            }
+            if (current.status == "Completed")
+            {
+                JObject result = BuildChildRunResult(current);
+                run.values[step.nodeId] = result;
+                CompleteStep(run, step.nodeId, "Completed", "子 AISkill 执行完成。", result);
+                if (string.Equals(run.iterationTaskNodeId, step.nodeId, StringComparison.Ordinal))
+                {
+                    run.iterationIndex++;
+                    run.currentNodeId = run.iterationNodeId;
+                    ResetStepForNextAttempt(run, step.nodeId);
+                    Save(run);
+                    return false;
+                }
+                Move(run, step.nodeId, ESAgentGraphStableIds.SkillSuccessPortKey);
+                return false;
+            }
+            return HandleSkillCallFailure(run, step, current.status, current.message);
+        }
+
+        private static JObject BuildChildRunResult(ESAISkillWorkflowRun child)
+        {
+            return new JObject
+            {
+                ["runId"] = child.runId,
+                ["graphId"] = child.graphId,
+                ["contentSignature"] = child.contentSignature,
+                ["status"] = child.status,
+                ["exitCode"] = child.exitCode,
+                ["runRecordPath"] = RunPath(child.runId),
+                ["values"] = child.values?.DeepClone() ?? new JObject(),
+                ["outputs"] = new JArray((child.steps ?? new List<ESAISkillStepRunRecord>())
+                    .Where(item => item != null).SelectMany(item => item.artifacts ?? Array.Empty<string>())),
+                ["outputHashes"] = new JArray((child.steps ?? new List<ESAISkillStepRunRecord>())
+                    .Where(item => item != null).SelectMany(item => item.outputHashes ?? Array.Empty<string>()))
+            };
+        }
+
+        internal static bool CanEnterSkillCall(int currentDepth)
+            => currentDepth >= 0 && currentDepth < MaximumSkillCallDepth;
+
+        internal static bool ContainsAncestorGraph(IEnumerable<string> ancestorGraphIds,
+            string targetGraphId)
+            => !string.IsNullOrWhiteSpace(targetGraphId)
+                && (ancestorGraphIds ?? Array.Empty<string>()).Contains(
+                    targetGraphId, StringComparer.Ordinal);
+
+        internal static void ProjectChildApproval(ESAISkillWorkflowRun parent,
+            ESAISkillStepRunRecord callRecord, ESAISkillWorkflowRun child)
+        {
+            if (parent == null) throw new ArgumentNullException(nameof(parent));
+            if (callRecord == null) throw new ArgumentNullException(nameof(callRecord));
+            if (child == null || child.status != "WaitingApproval"
+                || child.approvalGeneration <= 0)
+                throw new ArgumentException("子 Run 当前没有可投影的人工确认。", nameof(child));
+
+            if (callRecord.childApprovalGeneration != child.approvalGeneration)
+            {
+                checked { parent.approvalGeneration++; }
+                callRecord.childApprovalGeneration = child.approvalGeneration;
+            }
+            parent.status = "WaitingApproval";
+            parent.message = "子 AISkill 等待人工确认：" + child.message;
+        }
+
+        internal static bool IsProjectedChildApprovalCurrent(ESAISkillStepRunRecord callRecord,
+            ESAISkillWorkflowRun child)
+            => callRecord != null && child != null && child.status == "WaitingApproval"
+                && callRecord.childApprovalGeneration > 0
+                && callRecord.childApprovalGeneration == child.approvalGeneration;
+
+        private static bool HandleSkillCallFailure(ESAISkillWorkflowRun run,
+            ESAISkillExecutionStep step, string status, string message)
+        {
+            status = NormalizeTaskFailureStatus(status);
+            CompleteStep(run, step.nodeId, status, message);
+            if (string.Equals(run.iterationTaskNodeId, step.nodeId, StringComparison.Ordinal))
+            {
+                string owner = run.iterationNodeId;
+                ClearIteration(run);
+                Move(run, owner, ESAgentGraphStableIds.SkillFailurePortKey);
+                return false;
+            }
+            string route = status == "TimedOut" ? ESAgentGraphStableIds.SkillTimeoutPortKey
+                : status == "Cancelled" ? ESAgentGraphStableIds.SkillCancelledPortKey
+                : ESAgentGraphStableIds.SkillFailurePortKey;
+            Move(run, step.nodeId, route);
+            return false;
+        }
+
+        private static bool TryApplyInputBindings(ESAISkillWorkflowRun run, string targetNodeId,
+            IEnumerable<ESAISkillTaskInputBinding> bindings, JObject input, out string error)
+        {
+            foreach (ESAISkillTaskInputBinding binding in bindings
                          ?? Array.Empty<ESAISkillTaskInputBinding>())
             {
                 JToken value;
@@ -969,7 +1457,7 @@ namespace ES.EditorInternal
                                 : null;
                         break;
                     default:
-                        value = ResolveBoundValue(run, step.nodeId);
+                        value = ResolveBoundValue(run, targetNodeId);
                         break;
                 }
                 if (value != null && !string.IsNullOrWhiteSpace(binding.sourcePath))
@@ -1013,6 +1501,7 @@ namespace ES.EditorInternal
             if (mayRetry && record.currentAttemptCount <= step.task.retryCount)
             {
                 record.childRunId = string.Empty;
+                record.invocationId = string.Empty;
                 record.status = "Retrying";
                 record.message = message ?? status;
                 record.currentAttemptStartedAtUtc = string.Empty;
@@ -1069,13 +1558,19 @@ namespace ES.EditorInternal
                 JArray items = source as JArray;
                 if (items == null)
                 {
+                    BeginStep(run, step.nodeId);
+                    CompleteStep(run, step.nodeId, "Failed", "ForEach 输入必须是 JSON Array。",
+                        source);
                     Move(run, step.nodeId, ESAgentGraphStableIds.SkillFailurePortKey);
                     return true;
                 }
                 if (items.Count > step.forEach.maxItems)
                 {
-                    Fail(run, "ForEach 输入数量 " + items.Count + " 超过上限 " + step.forEach.maxItems + "。" );
-                    return false;
+                    BeginStep(run, step.nodeId);
+                    CompleteStep(run, step.nodeId, "Failed", "ForEach 输入数量 " + items.Count
+                        + " 超过上限 " + step.forEach.maxItems + "。", items);
+                    Move(run, step.nodeId, ESAgentGraphStableIds.SkillFailurePortKey);
+                    return true;
                 }
                 if (items.Count == 0)
                 {
@@ -1149,6 +1644,13 @@ namespace ES.EditorInternal
             record.retryAvailableAtUtc = string.Empty;
             if (string.IsNullOrWhiteSpace(record.startedAtUtc))
                 record.startedAtUtc = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+            ESAISkillIterationRunRecord iteration = GetOrCreateCurrentIteration(run, nodeId);
+            if (iteration != null)
+            {
+                iteration.status = "Running";
+                iteration.startedAtUtc = record.currentAttemptStartedAtUtc;
+                iteration.invocationId = record.invocationId;
+            }
             Save(run);
         }
 
@@ -1165,6 +1667,17 @@ namespace ES.EditorInternal
                 record.artifacts = obj["outputs"]?.Values<string>().ToArray() ?? Array.Empty<string>();
                 record.outputHashes = obj["outputHashes"]?.Values<string>().ToArray() ?? Array.Empty<string>();
             }
+            ESAISkillIterationRunRecord iteration = GetOrCreateCurrentIteration(run, nodeId);
+            if (iteration != null)
+            {
+                iteration.status = record.status;
+                iteration.finishedAtUtc = record.finishedAtUtc;
+                iteration.message = record.message;
+                iteration.invocationId = record.invocationId;
+                iteration.childRunId = record.childRunId;
+                iteration.artifacts = record.artifacts?.ToArray() ?? Array.Empty<string>();
+                iteration.outputHashes = record.outputHashes?.ToArray() ?? Array.Empty<string>();
+            }
             Save(run);
         }
 
@@ -1172,12 +1685,44 @@ namespace ES.EditorInternal
         {
             ESAISkillStepRunRecord record = FindStepRecord(run, nodeId);
             record.status = "Pending";
+            record.invocationId = string.Empty;
             record.childRunId = string.Empty;
+            record.childApprovalGeneration = 0;
             record.currentAttemptCount = 0;
             record.currentAttemptStartedAtUtc = string.Empty;
             record.retryAvailableAtUtc = string.Empty;
             record.startedAtUtc = string.Empty;
             record.finishedAtUtc = string.Empty;
+        }
+
+        private static ESAISkillIterationRunRecord GetOrCreateCurrentIteration(
+            ESAISkillWorkflowRun run, string nodeId)
+        {
+            if (run == null || !string.Equals(run.iterationTaskNodeId, nodeId,
+                    StringComparison.Ordinal) || run.iterationIndex < 0
+                || run.iterationIndex >= (run.iterationItems?.Count ?? 0)) return null;
+            ESAISkillStepRunRecord step = FindStepRecord(run, nodeId);
+            if (step == null) return null;
+            step.iterations ??= new List<ESAISkillIterationRunRecord>();
+            ESAISkillIterationRunRecord item = step.iterations.FirstOrDefault(value =>
+                value != null && value.index == run.iterationIndex);
+            if (item != null) return item;
+            item = new ESAISkillIterationRunRecord
+            {
+                index = run.iterationIndex,
+                inputHash = ComputeTokenHash(run.iterationItems[run.iterationIndex]),
+            };
+            step.iterations.Add(item);
+            return item;
+        }
+
+        private static void SyncCurrentIterationIdentity(ESAISkillWorkflowRun run,
+            ESAISkillStepRunRecord record)
+        {
+            ESAISkillIterationRunRecord item = GetOrCreateCurrentIteration(run, record?.nodeId);
+            if (item == null || record == null) return;
+            item.invocationId = record.invocationId;
+            item.childRunId = record.childRunId;
         }
 
         private static void ClearIteration(ESAISkillWorkflowRun run)
@@ -1190,6 +1735,81 @@ namespace ES.EditorInternal
 
         private static void Fail(ESAISkillWorkflowRun run, string message)
             => Finish(run, "Failed", message, -1);
+
+        private static void MarkCancellationFailed(ESAISkillWorkflowRun run, string message)
+        {
+            run.cancellationOutcome = "Failed";
+            run.cancellationMessage = message ?? "取消未被确认。";
+            Finish(run, "Blocked", "取消未能形成终态确认：" + run.cancellationMessage, -1);
+        }
+
+        private static void PollCancellation(ESAISkillWorkflowRun run)
+        {
+            ESAISkillStepRunRecord record = FindStepRecord(run, run.currentNodeId);
+            ESAISkillExecutionStep step = FindStep(run, run.currentNodeId);
+            if (record == null || step == null || string.IsNullOrWhiteSpace(record.childRunId))
+            {
+                MarkCancellationFailed(run, "取消中的 Run 缺少当前子运行身份。");
+                return;
+            }
+            string status;
+            string message;
+            ESAISkillWorkflowRun childRun = null;
+            ES.ESAutomationTaskInvocationResult automationResult = null;
+            if (step.skillCall != null)
+            {
+                if (!TryGet(record.childRunId, out childRun))
+                {
+                    MarkCancellationFailed(run, "取消中的子 AISkill RunRecord 不存在。");
+                    return;
+                }
+                status = childRun.status;
+                message = childRun.message;
+            }
+            else
+            {
+                automationResult = ES.ESAutomationFacade.GetRun(
+                    record.childRunId, false);
+                status = automationResult.status;
+                message = automationResult.message;
+            }
+            if (IsTaskInProgress(status) || status == "Cancelling") return;
+            if (status != "Cancelled" && status != "Completed")
+            {
+                MarkCancellationFailed(run, message ?? ("子运行终态为 " + status));
+                return;
+            }
+            bool timedOut = string.Equals(run.cancellationOutcome, "PendingAfterTimeout",
+                StringComparison.Ordinal);
+            run.cancellationOutcome = "Confirmed";
+            run.cancellationMessage = message ?? string.Empty;
+            if (timedOut)
+            {
+                run.status = "Running";
+                if (status == "Completed")
+                {
+                    if (step.skillCall != null)
+                    {
+                        JObject result = BuildChildRunResult(childRun);
+                        run.values[step.nodeId] = result;
+                        CompleteStep(run, step.nodeId, "Completed",
+                            "子 AISkill 在取消生效前已完成。", result);
+                        Move(run, step.nodeId, ESAgentGraphStableIds.SkillSuccessPortKey);
+                    }
+                    else
+                    {
+                        HandleTaskTerminal(run, step, automationResult);
+                    }
+                    return;
+                }
+                if (step.skillCall != null)
+                    HandleSkillCallFailure(run, step, "TimedOut", "子 AISkill 超时且已确认停止。");
+                else
+                    HandleTaskFailure(run, step, "TimedOut", "Automation 步骤超时且已确认停止。");
+                return;
+            }
+            Finish(run, "Cancelled", "子运行已确认停止，工作流取消完成。", -1);
+        }
 
         private static void Finish(ESAISkillWorkflowRun run, string status, string message, int exitCode)
         {
@@ -1314,6 +1934,7 @@ namespace ES.EditorInternal
         private static void Save(ESAISkillWorkflowRun run)
         {
             run.updatedAtUtc = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+            run.runStateHash = ComputeRunStateHash(run);
             ES.ESAutomationPathPolicy.WriteWorkerTextAtomic(RunPath(run.runId),
                 JsonConvert.SerializeObject(run, Formatting.Indented), new[] { RunsRoot });
             ES.ESAutomationPathPolicy.WriteWorkerTextAtomic(
@@ -1340,7 +1961,17 @@ namespace ES.EditorInternal
                             ["path"] = path,
                             ["sha256"] = index < (step.outputHashes?.Length ?? 0)
                                 ? step.outputHashes[index] : string.Empty
-                        })))
+                        }).Concat((step.iterations ?? new List<ESAISkillIterationRunRecord>())
+                            .Where(item => item != null)
+                            .SelectMany(item => (item.artifacts ?? Array.Empty<string>())
+                                .Select((path, index) => new JObject
+                                {
+                                    ["nodeId"] = step.nodeId,
+                                    ["iterationIndex"] = item.index,
+                                    ["path"] = path,
+                                    ["sha256"] = index < (item.outputHashes?.Length ?? 0)
+                                        ? item.outputHashes[index] : string.Empty
+                                })))))
             };
             ES.ESAutomationPathPolicy.WriteWorkerTextAtomic(
                 Path.Combine(RunDirectory(run.runId), "artifacts", "artifact-manifest.json"),
@@ -1361,6 +1992,16 @@ namespace ES.EditorInternal
                     || !string.Equals(run.graphId, run.spec.sourceGraphId, StringComparison.Ordinal)
                     || !string.Equals(run.contentSignature, run.spec.sourceContentSignature, StringComparison.Ordinal))
                     throw new InvalidDataException("RunRecord 与内嵌执行合同不一致。");
+                if (!ES.ESAutomationWorkerRegistration.IsSha256(run.executionSpecHash)
+                    || !string.Equals(run.executionSpecHash, ComputeExecutionSpecHash(run.spec),
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("RunRecord 的执行合同 Hash 与内嵌 Spec 不一致。");
+                if (!ES.ESAutomationWorkerRegistration.IsSha256(run.runStateHash)
+                    || !string.Equals(run.runStateHash, ComputeRunStateHash(run),
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("RunRecord 可变状态摘要不一致。");
+                if (!TryValidateRunState(run, out string stateError))
+                    throw new InvalidDataException("RunRecord 状态不变量无效：" + stateError);
                 error = string.Empty;
                 return true;
             }
@@ -1369,6 +2010,8 @@ namespace ES.EditorInternal
 
         private static void RestoreActiveRuns()
         {
+            EditorApplication.update -= Update;
+            Active.Clear();
             var ids = new HashSet<string>(SessionState.GetString(ActiveRunsSessionKey, string.Empty)
                 .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal);
             string indexPath = Path.Combine(RunsRoot, "active-runs.json");
@@ -1385,27 +2028,61 @@ namespace ES.EditorInternal
                     Debug.LogWarning("[ES AISkillGraph] 活跃运行索引无效，拒绝猜测恢复：" + exception.Message);
                 }
             }
+            var candidates = new Dictionary<string, ESAISkillWorkflowRun>(StringComparer.Ordinal);
+            var blocked = new HashSet<string>(StringComparer.Ordinal);
             foreach (string id in ids.Distinct(StringComparer.Ordinal))
             {
                 if (!TryLoad(id, out ESAISkillWorkflowRun run, out _) || IsTerminal(run.status))
                     continue;
+                candidates[id] = run;
                 if (!TryValidateCurrentSource(run, out string sourceError))
                 {
-                    run.status = "Blocked";
-                    run.message = "恢复已阻断：" + sourceError;
-                    run.exitCode = -1;
-                    run.finishedAtUtc = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
-                    try { Save(run); }
-                    catch (Exception exception)
-                    {
-                        Debug.LogError("[ES AISkillGraph] 无法持久化 stale Graph 阻断状态：" + exception.Message);
-                    }
-                    continue;
+                    BlockRestoredRun(run, sourceError);
+                    blocked.Add(id);
                 }
-                Active[id] = run;
             }
+
+            bool changed;
+            do
+            {
+                changed = false;
+                foreach (ESAISkillWorkflowRun run in candidates.Values)
+                {
+                    if (blocked.Contains(run.runId) || string.IsNullOrWhiteSpace(run.parentRunId))
+                        continue;
+                    if (!candidates.TryGetValue(run.parentRunId, out ESAISkillWorkflowRun parent)
+                        || blocked.Contains(run.parentRunId)
+                        || !(parent.steps ?? new List<ESAISkillStepRunRecord>()).Any(step =>
+                            step != null && (string.Equals(step.childRunId, run.runId,
+                                StringComparison.Ordinal) || string.Equals(step.invocationId,
+                                run.runId, StringComparison.Ordinal))))
+                    {
+                        BlockRestoredRun(run,
+                            "父 AISkill Run 未处于同一份有效活动集合或缺少反向子运行引用，拒绝孤立恢复。" );
+                        blocked.Add(run.runId);
+                        changed = true;
+                    }
+                }
+            }
+            while (changed);
+
+            foreach (KeyValuePair<string, ESAISkillWorkflowRun> pair in candidates)
+                if (!blocked.Contains(pair.Key)) Active[pair.Key] = pair.Value;
             TrySaveActiveRunIds();
             EnsureUpdateHook();
+        }
+
+        private static void BlockRestoredRun(ESAISkillWorkflowRun run, string reason)
+        {
+            run.status = "Blocked";
+            run.message = "恢复已阻断：" + reason;
+            run.exitCode = -1;
+            run.finishedAtUtc = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+            try { Save(run); }
+            catch (Exception exception)
+            {
+                Debug.LogError("[ES AISkillGraph] 无法持久化恢复阻断状态：" + exception.Message);
+            }
         }
 
         private static bool TryValidateCurrentSource(ESAISkillWorkflowRun run, out string error)
@@ -1441,6 +2118,124 @@ namespace ES.EditorInternal
             {
                 error = "源 Graph 内容签名已变化；旧 Run 保留审计记录，但不得继续执行。";
                 return false;
+            }
+            if (!ESAISkillExecutionLauncher.TryBake(asset, out ESAISkillExecutionSpec currentSpec,
+                    out string bakeError))
+            {
+                error = "源 Graph 当前无法重建 AISkill 执行合同：" + bakeError;
+                return false;
+            }
+            string currentSpecHash = ComputeExecutionSpecHash(currentSpec);
+            if (!string.Equals(currentSpecHash, run.executionSpecHash,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                error = "当前重新 Bake 的执行合同与持久化合同 Hash 不一致。";
+                return false;
+            }
+            run.spec = currentSpec;
+            error = string.Empty;
+            return true;
+        }
+
+        internal static string ComputeExecutionSpecHash(ESAISkillExecutionSpec spec)
+        {
+            string json = JsonConvert.SerializeObject(spec, Formatting.None,
+                new JsonSerializerSettings { NullValueHandling = NullValueHandling.Include });
+            return ComputeUtf8Hash(json);
+        }
+
+        private static string ComputeTokenHash(JToken value)
+            => ComputeUtf8Hash((value ?? JValue.CreateNull()).ToString(Formatting.None));
+
+        internal static string ComputeRunStateHash(ESAISkillWorkflowRun run)
+        {
+            JObject state = JObject.FromObject(run ?? throw new ArgumentNullException(nameof(run)));
+            state["runStateHash"] = string.Empty;
+            return ComputeUtf8Hash(state.ToString(Formatting.None));
+        }
+
+        private static string ComputeUtf8Hash(string value)
+        {
+            using (SHA256 sha = SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value
+                    ?? string.Empty))).Replace("-", string.Empty).ToLowerInvariant();
+        }
+
+        internal static bool TryValidateRunState(ESAISkillWorkflowRun run, out string error)
+        {
+            if (run == null || !Guid.TryParseExact(run.runId, "N", out _)
+                || run.spec?.steps == null)
+            {
+                error = "缺少有效 RunId 或执行步骤。";
+                return false;
+            }
+            string[] allowedStatuses = { "Running", "WaitingApproval", "Cancelling",
+                "Completed", "Failed", "Cancelled", "Blocked" };
+            if (!allowedStatuses.Contains(run.status, StringComparer.Ordinal))
+            {
+                error = "Run 状态不在允许状态机中。";
+                return false;
+            }
+            var specNodeIds = new HashSet<string>(run.spec.steps.Where(step => step != null)
+                .Select(step => step.nodeId), StringComparer.Ordinal);
+            if (specNodeIds.Count != run.spec.steps.Length
+                || run.steps == null || run.steps.Count != specNodeIds.Count
+                || run.steps.Any(step => step == null || !specNodeIds.Contains(step.nodeId))
+                || run.steps.Select(step => step.nodeId).Distinct(StringComparer.Ordinal).Count()
+                    != run.steps.Count)
+            {
+                error = "StepRecord 集合与执行合同节点不一致。";
+                return false;
+            }
+            if (!IsTerminal(run.status) && !specNodeIds.Contains(run.currentNodeId))
+            {
+                error = "活动 Run 的 currentNodeId 不在执行合同中。";
+                return false;
+            }
+            if (run.callDepth < 0 || run.callDepth > MaximumSkillCallDepth
+                || !string.IsNullOrWhiteSpace(run.parentRunId)
+                && !Guid.TryParseExact(run.parentRunId, "N", out _))
+            {
+                error = "父子调用深度或父 RunId 无效。";
+                return false;
+            }
+            bool iterating = !string.IsNullOrWhiteSpace(run.iterationNodeId);
+            if (iterating != !string.IsNullOrWhiteSpace(run.iterationTaskNodeId)
+                || iterating && (!specNodeIds.Contains(run.iterationNodeId)
+                    || !specNodeIds.Contains(run.iterationTaskNodeId)
+                    || run.iterationItems == null || run.iterationIndex < 0
+                    || run.iterationIndex > run.iterationItems.Count)
+                || !iterating && (run.iterationIndex != -1
+                    || (run.iterationItems?.Count ?? 0) != 0))
+            {
+                error = "ForEach 游标与节点身份不一致。";
+                return false;
+            }
+            foreach (ESAISkillStepRunRecord step in run.steps)
+            {
+                if (!string.IsNullOrWhiteSpace(step.invocationId)
+                    && !Guid.TryParseExact(step.invocationId, "N", out _)
+                    || !string.IsNullOrWhiteSpace(step.childRunId)
+                    && !Guid.TryParseExact(step.childRunId, "N", out _))
+                {
+                    error = "步骤包含无效 InvocationId 或 ChildRunId。";
+                    return false;
+                }
+                var indices = new HashSet<int>();
+                foreach (ESAISkillIterationRunRecord item in step.iterations
+                             ?? new List<ESAISkillIterationRunRecord>())
+                {
+                    if (item == null || item.index < 0 || !indices.Add(item.index)
+                        || !ES.ESAutomationWorkerRegistration.IsSha256(item.inputHash)
+                        || !string.IsNullOrWhiteSpace(item.invocationId)
+                        && !Guid.TryParseExact(item.invocationId, "N", out _)
+                        || !string.IsNullOrWhiteSpace(item.childRunId)
+                        && !Guid.TryParseExact(item.childRunId, "N", out _))
+                    {
+                        error = "ForEach 逐项记录身份或输入 Hash 无效。";
+                        return false;
+                    }
+                }
             }
             error = string.Empty;
             return true;

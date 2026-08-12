@@ -1240,6 +1240,9 @@ namespace ES.EditorInternal
                     business.Add(payload);
                 }
             }
+            if (string.Equals(node.typeId, ESAgentGraphStableIds.SkillCallNode,
+                    StringComparison.Ordinal))
+                AddAISkillCallBindingTools(business, node);
 
             TextField typeId = new TextField("节点类型") { value = node.typeId ?? string.Empty };
             typeId.tooltip = "系统识别节点用途的稳定类型。领域节点通常保持不变。";
@@ -1393,6 +1396,77 @@ namespace ES.EditorInternal
             if (!schemaLocked)
                 AddPortCreator(advanced, node);
             details.Add(advanced);
+        }
+
+        private void AddAISkillCallBindingTools(VisualElement business, ESGraphNodeRecord node)
+        {
+            ESAISkillCallPayload call;
+            try { call = JsonUtility.FromJson<ESAISkillCallPayload>(node.payloadJson); }
+            catch { call = null; }
+            string binding = call == null || string.IsNullOrWhiteSpace(call.targetGraphId)
+                ? "尚未绑定目标图"
+                : call.targetGraphId + " · "
+                    + (call.targetContentSignature?.Substring(0,
+                        Math.Min(12, call.targetContentSignature.Length)) ?? string.Empty);
+            business.Add(ESGraphInspectorVisuals.CreateNotice(binding, HelpBoxMessageType.Info));
+            Button bind = new Button(() => BindSelectedAISkillGraph(node.nodeId))
+            {
+                text = "绑定当前选中的 AISkill 图",
+                tooltip = "从 Project 当前明确选中的另一张已保存 AISkill 执行图写入 Asset GUID、GraphId 和内容签名。"
+            };
+            ESGraphInspectorVisuals.StyleButton(bind, false);
+            business.Add(bind);
+        }
+
+        private void BindSelectedAISkillGraph(string nodeId)
+        {
+            ESGraphAssetBase target = Selection.activeObject as ESGraphAssetBase;
+            if (target == null || ReferenceEquals(target, asset))
+            {
+                report?.Invoke("请先在 Project 中选中另一张已保存的 AISkill 执行图。");
+                return;
+            }
+            if (!ESAISkillExecutionLauncher.TryBake(target, out ESAISkillExecutionSpec targetSpec,
+                    out string bakeError))
+            {
+                report?.Invoke("目标图不可绑定：" + bakeError);
+                return;
+            }
+            ESGraphNodeRecord node = asset?.FindNode(nodeId);
+            if (node == null)
+                return;
+            ESAISkillCallPayload payload;
+            try { payload = JsonUtility.FromJson<ESAISkillCallPayload>(node.payloadJson); }
+            catch { payload = null; }
+            payload = payload ?? new ESAISkillCallPayload();
+            payload.sourceAssetGuid = targetSpec.sourceAssetGuid;
+            payload.targetGraphId = targetSpec.sourceGraphId;
+            payload.targetContentSignature = targetSpec.sourceContentSignature;
+            string json = JsonUtility.ToJson(payload);
+            ESGraphEditResult result = editService != null
+                ? editService.SetNodeContent(asset, node.nodeId, node.typeId, node.version,
+                    node.title, json)
+                : new ESGraphEditResult();
+            if (editService == null)
+            {
+                Undo.RecordObject(asset, "绑定子 AISkill 图");
+                if (asset.UpdateNode(node.nodeId, node.typeId, node.version, node.title, json,
+                        out string error))
+                {
+                    EditorUtility.SetDirty(asset);
+                    requestAutoSave?.Invoke();
+                    result.changed = true;
+                }
+                else
+                    result.error = error;
+            }
+            if (!result.changed)
+            {
+                report?.Invoke(string.IsNullOrWhiteSpace(result.error) ? "绑定子 AISkill 失败。" : result.error);
+                return;
+            }
+            MarkChanged("已绑定子 AISkill：" + targetSpec.displayName);
+            ShowNodeInspector(nodeId);
         }
 
         private void AddPortEditor(VisualElement parent, ESGraphNodeRecord node, ESGraphPortRecord port)
@@ -1591,6 +1665,7 @@ namespace ES.EditorInternal
                 case ESAgentGraphStableIds.ValidationNode: return typeof(ESAgentValidationPayload);
                 case ESAgentGraphStableIds.SkillInputNode: return typeof(ESAISkillInputPayload);
                 case ESAgentGraphStableIds.SkillTaskNode: return typeof(ESAISkillTaskPayload);
+                case ESAgentGraphStableIds.SkillCallNode: return typeof(ESAISkillCallPayload);
                 case ESAgentGraphStableIds.SkillBranchNode: return typeof(ESAISkillBranchPayload);
                 case ESAgentGraphStableIds.SkillForEachNode: return typeof(ESAISkillForEachPayload);
                 case ESAgentGraphStableIds.SkillApprovalNode: return typeof(ESAISkillApprovalPayload);

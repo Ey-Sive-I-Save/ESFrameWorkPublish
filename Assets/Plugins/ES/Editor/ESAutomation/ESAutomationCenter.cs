@@ -182,6 +182,7 @@ namespace ES
         public string workerVersion = string.Empty;
         public string entrypointHash = string.Empty;
         public string inputManifestHash = string.Empty;
+        public string invocationHash = string.Empty;
         public int riskPolicyVersion;
         public string riskAcceptanceHash = string.Empty;
         public string riskAcceptedAtUtc = string.Empty;

@@ -205,16 +205,69 @@ namespace ES.Tests
         [Test]
         public void PathPolicy_AcceptsExistingStrictUtf8AICommand()
         {
-            string root = Path.Combine(
-                ESCommandPalettePathPolicy.ProjectRoot,
-                ESCommandPalettePathPolicy.AICommandRoot.Replace('/', Path.DirectorySeparatorChar));
-            string[] files = Directory.GetFiles(root, "*.md", SearchOption.TopDirectoryOnly);
-            Assert.That(files.Length, Is.GreaterThan(0));
-            string relative = files[0].Substring(ESCommandPalettePathPolicy.ProjectRoot.Length + 1).Replace('\\', '/');
+            Assert.That(ESCommandPalettePathPolicy.TryReadAICommandCatalog(
+                out List<ESAICommandCatalogEntry> commands, out _, out string catalogReason), Is.True, catalogReason);
+            Assert.That(commands.Count, Is.GreaterThan(0));
+            string relative = commands[0].path;
 
             Assert.That(ESCommandPalettePathPolicy.TryValidateAICommandFile(relative, out string normalized, out string reason),
                 Is.True, reason);
             Assert.That(normalized, Is.EqualTo(relative));
+        }
+
+        [Test]
+        public void AICommandCatalog_CoversEveryContractAndExcludesNavigationDocuments()
+        {
+            Assert.That(ESCommandPalettePathPolicy.TryReadAICommandCatalog(
+                out List<ESAICommandCatalogEntry> commands, out _, out string reason), Is.True, reason);
+            string root = Path.Combine(
+                ESCommandPalettePathPolicy.ProjectRoot,
+                ESCommandPalettePathPolicy.AICommandRoot.Replace('/', Path.DirectorySeparatorChar));
+            string[] files = Directory.GetFiles(root, "*.md", SearchOption.TopDirectoryOnly);
+            var catalogPaths = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < commands.Count; index++)
+            {
+                ESAICommandCatalogEntry entry = commands[index];
+                Assert.That(catalogPaths.Add(entry.path), Is.True, "Duplicate catalog path: " + entry.path);
+                Assert.That(entry.id, Is.Not.Empty);
+                Assert.That(entry.title, Is.Not.Empty);
+                Assert.That(entry.summary, Is.Not.Empty);
+            }
+
+            for (int index = 0; index < files.Length; index++)
+            {
+                string name = Path.GetFileName(files[index]);
+                string path = files[index].Substring(ESCommandPalettePathPolicy.ProjectRoot.Length + 1).Replace('\\', '/');
+                if (string.Equals(name, "README.md", StringComparison.Ordinal)
+                    || string.Equals(name, "命令合集索引_AI命令.md", StringComparison.Ordinal))
+                {
+                    Assert.That(catalogPaths, Does.Not.Contain(path));
+                }
+                else
+                {
+                    Assert.That(catalogPaths, Does.Contain(path));
+                }
+            }
+        }
+
+        [Test]
+        public void AICommandCatalog_ProducesOnePaletteItemPerTaskContract()
+        {
+            Assert.That(ESCommandPalettePathPolicy.TryReadAICommandCatalog(
+                out List<ESAICommandCatalogEntry> commands, out _, out string reason), Is.True, reason);
+            ESCommandPaletteRegistry.ResetForTests(true);
+            var paths = new HashSet<string>(StringComparer.Ordinal);
+            IReadOnlyList<ESCommandPaletteItem> all = ESCommandPaletteRegistry.AllItems;
+            for (int index = 0; index < all.Count; index++)
+            {
+                ESCommandPaletteItem item = all[index];
+                if (string.Equals(item.Category, "AICommand", StringComparison.Ordinal))
+                {
+                    Assert.That(item.ActionKind, Is.EqualTo(ESCommandPaletteActionKind.OpenFile));
+                    Assert.That(paths.Add(item.TargetId), Is.True, "AICommand should not expose duplicate action rows.");
+                }
+            }
+            Assert.That(paths.Count, Is.EqualTo(commands.Count));
         }
 
         [Test]

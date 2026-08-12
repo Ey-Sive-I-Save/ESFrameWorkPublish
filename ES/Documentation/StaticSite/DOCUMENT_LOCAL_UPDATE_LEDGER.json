@@ -1070,7 +1070,9 @@
                                             "Assets/Plugins/ES/1_Design/Tests/ESGraphAssetTests.cs",
                                             "Assets/Plugins/ES/1_Design/Tests/ESGraphAssetTests.cs.meta",
                                             "Assets/Plugins/ES/Editor/ESGraphViewV2",
-                                            "Assets/Plugins/ES/Editor/ESGraphViewV2.meta"
+                                            "Assets/Plugins/ES/Editor/ESGraphViewV2.meta",
+                                            "Assets/Plugins/ES/1_Design/Define/0Define-NodeRunner",
+                                            "Assets/Plugins/ES/1_Design/Define/0Define-NodeRunner.meta"
                                         ],
                         "evidencePaths":  [
                                               "Assets/Plugins/ES/1_Design/Graph/ESGraphAsset.cs",
@@ -1339,13 +1341,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-13T04:53:17+08:00",
-                       "head":  "094b7ac898dbb2a07b36d09a2cdc4d512a3bace5",
-                       "stagedSourcePatchSha256":  "bb8ce47693e81e684f594cdc4646bb77ff795301555c43db23cba85bf43e9126",
-                       "stagedSourceManifestSha256":  "551764a1a7d607c0c6e1a83bea4d3372013a845c3f1672d1f2e0256bfdcc7c6d",
-                       "stagedSourceFileCount":  3,
+                       "preparedAt":  "2026-08-13T04:54:46+08:00",
+                       "head":  "2fb97e825acb1790c02f3b1083fc513982ce751c",
+                       "stagedSourcePatchSha256":  "589ebf392524f7f6d40067a345743e520bf9d25822235edfd553a1d4bcaa8408",
+                       "stagedSourceManifestSha256":  "fa2d6b9673c926e42c6de9f4cc5df94101bc24f269c58f3ff14259cc464c001c",
+                       "stagedSourceFileCount":  41,
                        "entryIds":  [
-                                        "LOCAL-20260803-013"
+                                        "LOCAL-20260808-004"
                                     ]
                    }
 }

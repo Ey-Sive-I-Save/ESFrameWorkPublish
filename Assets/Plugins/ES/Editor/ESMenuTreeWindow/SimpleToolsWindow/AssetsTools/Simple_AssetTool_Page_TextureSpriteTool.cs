@@ -115,7 +115,7 @@ namespace ES
                 {
                     GUI.enabled = textureCount > 0;
                     if (SimpleToolsPanelUtility.DrawActionButton("应用导入设置", SimpleToolsActionTone.Primary, 34, GUILayout.MinWidth(140)))
-                        ProcessSelectedTextures();
+                        ApplyTextureImportSettings();
 
                     GUI.enabled = spriteCount > 0;
                     if (SimpleToolsPanelUtility.DrawActionButton("从 Sprite 生成纹理", SimpleToolsActionTone.Warning, 34, GUILayout.MinWidth(150)))
@@ -335,7 +335,7 @@ namespace ES
         }
 
 
-        public void ProcessSelectedTextures()
+        public void ApplyTextureImportSettings()
         {
             var texturePaths = CollectTextureImporterPaths().ToArray();
             if (texturePaths.Length == 0)

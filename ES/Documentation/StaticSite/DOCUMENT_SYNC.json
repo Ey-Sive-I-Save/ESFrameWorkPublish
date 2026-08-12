@@ -2,8 +2,8 @@
     "schemaVersion":  2,
     "document":  {
                      "path":  "ES/Documentation/StaticSite/ESFrameworkPublish_技术文档.html",
-                     "sha256":  "e3f8c35d3e5c743ef2c92707f55dc4c171fa3f2a6ca8a4bd512767d5485997e8",
-                     "sizeBytes":  3467066
+                     "sha256":  "61f8be88052f2ccdc8cc7165e3782bbbb2d945d547c2d459c8c2c6d7e6043111",
+                     "sizeBytes":  3466448
                  },
     "policy":  {
                    "branchModel":  "single-current-branch",
@@ -28,9 +28,9 @@
     "localUpdateLedger":  {
                               "manifestPath":  "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.json",
                               "summaryPath":  "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.md",
-                              "manifestSha256":  "a0df293f66a8d159338d06d2e9a44dd83350d2fe248b86fff27908ff60d5a042",
+                              "manifestSha256":  "f28c1ef3291ab06b3e21d9b3c0600400660c0edd3747873d15826acdf2596500",
                               "batchId":  "LOCAL-2026-08-02-OPEN",
-                              "status":  "collecting",
+                              "status":  "ready-for-html",
                               "htmlWritePolicy":  "batch-only-after-ready-for-html"
                           },
     "baseline":  {
@@ -64,7 +64,7 @@
                                          "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源工具链_四阶段严格隔离_AI协作警告.md",
                                          "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/P2_编辑器菜单根必须使用【ES】_AI协作警告.md",
                                          "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/预览与生命周期（PreviewLifecycle）/编辑器预览系统生命周期_AI协作警告.md",
-                                         "Assets/Plugins/ES/Editor/ESGraphView/Graphview-Define/ESGraphViewWindow.cs",
+                                         "Assets/Plugins/ES/Editor/ESGraphViewV2/ESStableGraphViewWindow.cs",
                                          "Assets/Plugins/ES/Editor/ESPresentation/ESEditorHealthWindow.cs",
                                          "Assets/Plugins/ES/Editor/ESPresentation/Reference/ESTypeCatalog.cs",
                                          "Assets/Plugins/ES/Editor/ESResPipeline/ESResourceCollectionWorkflowWindow.cs",

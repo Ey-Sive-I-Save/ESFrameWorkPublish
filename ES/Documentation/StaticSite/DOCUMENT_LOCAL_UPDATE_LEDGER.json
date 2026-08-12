@@ -2,19 +2,19 @@
     "schemaVersion":  1,
     "batch":  {
                   "id":  "LOCAL-2026-08-02-OPEN",
-                  "status":  "collecting",
+                  "status":  "ready-for-html",
                   "startedAt":  "2026-08-02",
-                  "updatedAt":  "2026-08-03",
+                  "updatedAt":  "2026-08-13",
                   "documentBeforeIntegration":  {
-                                                    "sha256":  "e3f8c35d3e5c743ef2c92707f55dc4c171fa3f2a6ca8a4bd512767d5485997e8",
-                                                    "sizeBytes":  3467066
+                                                    "sha256":  "61f8be88052f2ccdc8cc7165e3782bbbb2d945d547c2d459c8c2c6d7e6043111",
+                                                    "sizeBytes":  3466448
                                                 },
                   "sourceSnapshot":  {
-                                         "head":  "33a2862571d3fd2a18562f51034524a00846c29e",
-                                         "trackedWorktreePatchSha256":  "2723387558cbc1ba1aae4ca6472d0e886b70626da762367ed5549e1778d6f090",
-                                         "stagedSourcePatchSha256":  "740640cfd10c89a859c11af365a242ecb881d62af3009d865adcabeb6ad0af01",
-                                         "untrackedSourceManifestSha256":  "e37d1b88a6322ee32a25b4b1ef4009e9fa2008850d1c2d35149111f3b3f62a78",
-                                         "untrackedSourceFileCount":  1,
+                                         "head":  "94bc7941b20744bc65301362c4b89bed3a61c30c",
+                                         "trackedWorktreePatchSha256":  "b70a5a9619ca61d9e481c7b1de11a756f35a7d1238a293b6ca525f4da3d82d13",
+                                         "stagedSourcePatchSha256":  "5c07360ec9f34ab416965d6860c00e1753cefd25a791610add4f28e65329ce43",
+                                         "untrackedSourceManifestSha256":  "9db071240bac41758dc8fbafe6d5f4a6d53c509ebee0088cdd0593d7c621cb40",
+                                         "untrackedSourceFileCount":  302,
                                          "basis":  {
                                                        "comparison":  "document-baseline-to-current-worktree",
                                                        "baselineHead":  "775cfdb57dd49ac96075fb6f4c49039ee11996be"
@@ -1063,14 +1063,12 @@
                         "summary":  "提交 Graph V2、Agent Authoring、旧 NodeRunner 隔离与图形资产的稳定身份、保存回滚和编辑器创作入口。",
                         "sourcePaths":  [
                                             "Assets/ESNormalAssets/Data/AgentAuthoring",
-                                            "Assets/Plugins/ES/1_Design/Define/0Define-NodeRunner",
                                             "Assets/Plugins/ES/1_Design/Design_Tools/ESDesignUtility",
                                             "Assets/Plugins/ES/1_Design/Graph",
                                             "Assets/Plugins/ES/1_Design/Tests/ESAgentAuthoringGraphTests.cs",
                                             "Assets/Plugins/ES/1_Design/Tests/ESAgentAuthoringGraphTests.cs.meta",
                                             "Assets/Plugins/ES/1_Design/Tests/ESGraphAssetTests.cs",
                                             "Assets/Plugins/ES/1_Design/Tests/ESGraphAssetTests.cs.meta",
-                                            "Assets/Plugins/ES/Editor/ESGraphView",
                                             "Assets/Plugins/ES/Editor/ESGraphViewV2",
                                             "Assets/Plugins/ES/Editor/ESGraphViewV2.meta"
                                         ],
@@ -1341,13 +1339,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-08T19:06:53+08:00",
-                       "head":  "672c0e6bbea9e7e8f0cd0762791ec7fb6871a76c",
-                       "stagedSourcePatchSha256":  "18ae657e4fff3db34d1f20bfe468007ceed62fa28813207f8bc314d288334804",
-                       "stagedSourceManifestSha256":  "0c0a51427edf122a7e45be5dd7998d1ab3861ad9bf7047308e24744c16ed21d0",
-                       "stagedSourceFileCount":  44,
+                       "preparedAt":  "2026-08-13T03:12:36+08:00",
+                       "head":  "94bc7941b20744bc65301362c4b89bed3a61c30c",
+                       "stagedSourcePatchSha256":  "769771b2fd530ded196e518834950a32425ff5221a1d8fe050b83df82fa3a6a8",
+                       "stagedSourceManifestSha256":  "65be999d3c009f0a5e69634fde35f27b04957ce8d37319015879813679ee012e",
+                       "stagedSourceFileCount":  50,
                        "entryIds":  [
-                                        "LOCAL-20260808-008"
+                                        "LOCAL-20260808-001"
                                     ]
                    }
 }

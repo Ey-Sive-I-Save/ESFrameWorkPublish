@@ -562,10 +562,19 @@ namespace ES
             Vector3 velocity,
             ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
         {
-            if (!IsReady || !IsFinite(velocity))
-                return false;
+            return TryAddVelocity(velocity, permissions) == ESMotionSubmitResult.Accepted;
+        }
+
+        public ESMotionSubmitResult TryAddVelocity(
+            Vector3 velocity,
+            ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
+        {
+            if (!IsFinite(velocity))
+                return ESMotionSubmitResult.InvalidValue;
+            if (!IsReady)
+                return ESMotionSubmitResult.NotReady;
             EnsureMotionInfluences().AddVelocity(velocity, permissions);
-            return true;
+            return ESMotionSubmitResult.Accepted;
         }
 
         public bool TryAcquireField(

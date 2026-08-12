@@ -9,8 +9,8 @@
 ```text
 玩家/AI/网络控制权
   -> Entity 输入与骑乘状态
-  -> EntityMountable.SubmitDriverInput
-  -> VehicleController.SubmitDriverInput(seat, driver, ...)
+  -> EntityMountable.TrySetDriverInput
+  -> VehicleController.TrySetDriverInput(seat, driver, ...)
   -> 载具运动调度
   -> Rigidbody FixedUpdate 或 KCC 回调
 
@@ -31,7 +31,7 @@ Entity KCC
 - 车辆调度接口只传 `VehicleController` 和候选值。能力可修改候选旋转/速度，但只有 Controller 提交最终结果。
 - Rigidbody 载具在 `FixedUpdate` 写 `Rigidbody.MoveRotation` 与 `Rigidbody.velocity`；KCC 载具只在 `ICharacterController` 回调内写 `ref currentRotation` / `ref currentVelocity`。
 - 禁止座位、镜头、武器、动画事件、AI 或网络补丁直接写载具 `Transform`、`Rigidbody`、`KinematicCharacterMotor`。
-- 每个物理步只能有一个已仲裁的输入来源。座位输入只能经 `SubmitDriverInput(seat, driver, ...)` 进入 Controller；无来源 `SetDriverInput` 不能覆盖当前驾驶座。
+- 每个物理步只能有一个已仲裁的输入来源。座位输入只能经 `TrySetDriverInput(seat, driver, ...)` 进入 Controller；无来源 `SetDriverInput` 不能覆盖当前驾驶座。
 - 输入路由被禁用、Tag 条件失效或快照超过一帧未刷新时必须清空驾驶意图，禁止继续消费最后一帧方向。
 - KCC 后端在 Controller 禁用时解绑，在启用时重绑；四个 KCC 运动回调和 Rigidbody 固定步均以 `IsReady` 为前提。
 - 调度器遍历必须使用 `TryGetAlive`；单个车辆能力异常只能记录并跳过，不能阻断后续能力和本帧物理提交。

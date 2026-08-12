@@ -242,8 +242,16 @@ namespace ES
             Vector3 velocity,
             ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
         {
+            return TryAddVelocity(velocity, permissions) == ESMotionSubmitResult.Accepted;
+        }
+
+        public ESMotionSubmitResult TryAddVelocity(
+            Vector3 velocity,
+            ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
+        {
             return kcc != null
-                && kcc.AddVelocity(velocity, permissions);
+                ? kcc.TryAddVelocity(velocity, permissions)
+                : ESMotionSubmitResult.NotReady;
         }
 
         public bool TryAcquireField(
@@ -2811,16 +2819,24 @@ namespace ES
             Vector3 velocity,
             ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
         {
+            return TryAddVelocity(velocity, permissions) == ESMotionSubmitResult.Accepted;
+        }
+
+        public ESMotionSubmitResult TryAddVelocity(
+            Vector3 velocity,
+            ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
+        {
+            if (!IsFinite(velocity))
+                return ESMotionSubmitResult.InvalidValue;
             ESMotionReceiverLockState lockState = ResolveMotionInfluenceLockState();
-            if (!ESMotionInfluenceSolver.IsAllowed(permissions, lockState)
-                || !IsFinite(velocity))
-                return false;
+            if (!ESMotionInfluenceSolver.IsAllowed(permissions, lockState))
+                return ESMotionSubmitResult.Locked;
 
             EnsureMotionInfluences().AddVelocity(velocity, permissions);
             if (motor != null
                 && Vector3.Dot(velocity, motor.CharacterUp) > influenceUngroundThreshold)
                 motor.ForceUnground(0.1f);
-            return true;
+            return ESMotionSubmitResult.Accepted;
         }
 
         public bool TryAcquireField(

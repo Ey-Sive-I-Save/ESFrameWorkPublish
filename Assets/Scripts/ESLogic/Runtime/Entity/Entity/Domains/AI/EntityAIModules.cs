@@ -257,7 +257,7 @@ namespace ES
                 && ESGameManager.LocalControl != null
                 && ESGameManager.LocalControl.IsLocallyControlled(MyCore))
             {
-                MyCore.SubmitCameraLook(input.motion.look);
+                MyCore.TrySetCameraLook(input.motion.look);
             }
 
             // Aim 是角色骨骼/IK 意图，保留在角色域；它不拥有或驱动相机实例。
@@ -303,7 +303,7 @@ namespace ES
             EntityMountable mountable = mountModule.currentMount;
             if (mountable != null)
             {
-                mountable.SubmitDriverInput(
+                mountable.TrySetDriverInput(
                     MyCore,
                     MyCore.kcc.moveInput,
                     MyCore.kcc.lookInput,
@@ -385,7 +385,7 @@ namespace ES
             // 这样起步、松手和反向不会经过两套串联低通，响应由 KCC 的速度模型统一决定。
             MyCore.SetMoveInput(moveWorld);
 
-            // 相机 Look 只通过 SubmitCameraLook 驱动镜头。角色本体朝向严格由 turnMode
+            // 相机 Look 只通过 TrySetCameraLook 驱动镜头。角色本体朝向严格由 turnMode
             // 解析，避免拥有 AimTransform 的第三人称角色在转动视角时被强制转身。
             Vector3 targetLook = GetLookWorld(input.motion.look, cam, moveWorld, turnMode);
             // KCC 是唯一的角色转身响应层；Domain 不再对朝向做第二次 Slerp。

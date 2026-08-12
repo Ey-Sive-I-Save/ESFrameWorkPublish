@@ -10,7 +10,7 @@ namespace ES
         /// 输入模块唯一可用的相机入口。Entity 只把 Look 意图交给 Director；它不能取得
         /// VCam，也不能修改 Priority、Follow、LookAt 或 Axis。
         /// </summary>
-        public bool SubmitCameraLook(Vector2 lookInput)
+        public bool TrySetCameraLook(Vector2 lookInput)
         {
             return ESGameManager.LocalControl != null
                    && ESGameManager.LocalControl.IsLocallyControlled(this)

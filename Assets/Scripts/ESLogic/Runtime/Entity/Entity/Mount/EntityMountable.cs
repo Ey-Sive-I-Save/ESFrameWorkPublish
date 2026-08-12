@@ -126,12 +126,12 @@ namespace ES
         /// 将骑手的世界空间驾驶意图交给载具。座位不再直接写载具 Transform；
         /// VehicleController 在自身 Rigidbody/KCC 阶段统一提交最终物理结果。
         /// </summary>
-        public bool SubmitDriverInput(Entity target, Vector3 moveInput, Vector3 lookInput, float verticalInput = 0f)
+        public bool TrySetDriverInput(Entity target, Vector3 moveInput, Vector3 lookInput, float verticalInput = 0f)
         {
             if (rider != target || !CanDrive)
                 return false;
 
-            return vehicleController.SubmitDriverInput(this, target, moveInput, lookInput, verticalInput);
+            return vehicleController.TrySetDriverInput(this, target, moveInput, lookInput, verticalInput);
         }
 
         /// <summary>输入路由被禁用时只允许当前骑手清空自己座位的驾驶意图。</summary>

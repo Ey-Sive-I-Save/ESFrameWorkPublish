@@ -11,7 +11,7 @@ namespace ES
     /// 专门验证 RuntimeWatch 的诊断视图。高成本和异常行为均需主动开启，
     /// 日常打开窗口不会制造额外噪音。
     /// </summary>
-    [AddComponentMenu("ES Samples/Runtime Watch Case 5 - Diagnostics")]
+    [AddComponentMenu("【ES】/开发与验证/示例/Runtime Watch Case 5 - Diagnostics")]
     public class RuntimeWatchCase_5_Diagnostics : MonoBehaviour
     {
         [Title("诊断控制")]

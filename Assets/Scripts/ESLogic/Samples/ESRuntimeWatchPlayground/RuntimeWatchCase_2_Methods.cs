@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace ES
 {
-    [AddComponentMenu("ES Samples/Runtime Watch Case 2 - Methods")]
+    [AddComponentMenu("【ES】/开发与验证/示例/Runtime Watch Case 2 - Methods")]
     public class RuntimeWatchCase_2_Methods : MonoBehaviour
     {
         [Title("方法调用状态")]

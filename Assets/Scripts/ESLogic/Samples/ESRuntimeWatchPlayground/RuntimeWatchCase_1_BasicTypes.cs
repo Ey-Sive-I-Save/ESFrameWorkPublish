@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace ES
 {
-    [AddComponentMenu("ES Samples/Runtime Watch Case 1 - Basic Types")]
+    [AddComponentMenu("【ES】/开发与验证/示例/Runtime Watch Case 1 - Basic Types")]
     public class RuntimeWatchCase_1_BasicTypes : MonoBehaviour
     {
         [Title("ShowIf 与实时写入")]

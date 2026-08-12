@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace ES
 {
-    [AddComponentMenu("ES Samples/Runtime Watch Case 3 - Filter And Nested")]
+    [AddComponentMenu("【ES】/开发与验证/示例/Runtime Watch Case 3 - Filter And Nested")]
     public class RuntimeWatchCase_3_FilterAndNested : MonoBehaviour
     {
         [Title("筛选控制")]

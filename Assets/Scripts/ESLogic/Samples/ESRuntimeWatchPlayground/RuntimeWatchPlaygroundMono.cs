@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace ES
 {
-    [AddComponentMenu("ES Samples/Runtime Watch Playground")]
+    [AddComponentMenu("【ES】/开发与验证/示例/Runtime Watch Playground")]
     public class RuntimeWatchPlaygroundMono : MonoBehaviour
     {
         [Header("RuntimeWatch Sample")]

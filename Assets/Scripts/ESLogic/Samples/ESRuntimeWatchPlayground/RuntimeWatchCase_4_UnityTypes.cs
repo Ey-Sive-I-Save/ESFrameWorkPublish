@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace ES
 {
-    [AddComponentMenu("ES Samples/Runtime Watch Case 4 - Unity Types")]
+    [AddComponentMenu("【ES】/开发与验证/示例/Runtime Watch Case 4 - Unity Types")]
     public class RuntimeWatchCase_4_UnityTypes : MonoBehaviour
     {
         [Title("Unity 类型演示")]

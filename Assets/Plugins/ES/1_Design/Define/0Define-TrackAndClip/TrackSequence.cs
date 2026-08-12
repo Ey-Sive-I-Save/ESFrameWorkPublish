@@ -21,7 +21,18 @@ namespace ES
     float CachedMaxTime { get; set; }
   }
 
-  public abstract class TrackSequenceBase<ItemType> : ITrackSequence, ITrackSequenceDurationCache where ItemType : class, ITrackItem
+  /// <summary>
+  /// 轨道顺序的正式可变协议。编辑器必须通过本协议调整顺序，
+  /// 不得反射或直接猜测具体序列实现中的列表字段。
+  /// </summary>
+  public interface ITrackSequenceMutableOrder
+  {
+    int TrackItemCount { get; }
+    int IndexOfTrackItem(ITrackItem item);
+    bool TryMoveTrackItem(ITrackItem item, int targetFinalIndex);
+  }
+
+  public abstract class TrackSequenceBase<ItemType> : ITrackSequence, ITrackSequenceDurationCache, ITrackSequenceMutableOrder where ItemType : class, ITrackItem
   {
     [TitleGroup("轨道序列", "保存时间轴中所有轨道项目。刷新轨道窗口时会自动更新缓存时长。")]
     [LabelText("轨道列表")]
@@ -38,6 +49,7 @@ namespace ES
 
     public IEnumerable<ITrackItem> Tracks => tracks_;
     public float CachedMaxTime { get => cachedMaxTime; set => cachedMaxTime = Mathf.Max(0f, value); }
+    public int TrackItemCount => tracks_.Count;
 
         public abstract string Name { get; }
 
@@ -66,6 +78,25 @@ namespace ES
         }
       }
       return false;
+    }
+
+    public int IndexOfTrackItem(ITrackItem item)
+    {
+      return item is ItemType typedItem ? tracks_.IndexOf(typedItem) : -1;
+    }
+
+    public bool TryMoveTrackItem(ITrackItem item, int targetFinalIndex)
+    {
+      if (!(item is ItemType typedItem))
+        return false;
+
+      int oldIndex = tracks_.IndexOf(typedItem);
+      if (oldIndex < 0 || targetFinalIndex < 0 || targetFinalIndex >= tracks_.Count || targetFinalIndex == oldIndex)
+        return false;
+
+      tracks_.RemoveAt(oldIndex);
+      tracks_.Insert(targetFinalIndex, typedItem);
+      return true;
     }
 
     public abstract void InitByEditor();

@@ -128,6 +128,9 @@ namespace ES.Tests
             var intent = new ESActionIntent(info.actionKey, runtime.LifecycleGeneration, 1, null);
 
             Assert.That(runtime.TrySubmit(intent, out string submitError), Is.True, submitError);
+            Assert.That(
+                eventsSeen.Exists(evt => evt.kind == ESActionEventKind.ActionStarted && evt.sourcePulseId == 1),
+                Is.True);
             ESActionRuntimeHandle handle = runtime.CurrentHandle;
             Assert.That(handle.IsValid, Is.True);
             Assert.That(runtime.TryResolveHit(handle, null, out _), Is.False);
@@ -187,11 +190,66 @@ namespace ES.Tests
         }
 
         [Test]
+        public void Runtime_ReplacingBufferedIntentReportsOldPulseAndStartsNewestPulse()
+        {
+            ActionTemplateDataInfo info = CreateInfo(
+                "buffer.replace.attack",
+                Phase(ESActionPhaseKind.Startup, 0.1f, 0.08f),
+                Phase(ESActionPhaseKind.Active, 0.1f),
+                Phase(ESActionPhaseKind.Recovery, 0.1f));
+            InjectLocal(info);
+
+            var events = new ESActionEventHub();
+            var eventsSeen = new List<ESActionEvent>();
+            events.Published += eventsSeen.Add;
+            var runtime = new ESActionRuntime(localTable, events);
+
+            Assert.That(
+                runtime.TrySubmit(
+                    new ESActionIntent(info.actionKey, runtime.LifecycleGeneration, 41, null),
+                    out _,
+                    out int firstReplacedPulse),
+                Is.True);
+            Assert.That(firstReplacedPulse, Is.Zero);
+
+            runtime.Tick(0.03f);
+            Assert.That(
+                runtime.TrySubmit(
+                    new ESActionIntent(info.actionKey, runtime.LifecycleGeneration, 42, null),
+                    out _,
+                    out int secondReplacedPulse),
+                Is.True);
+            Assert.That(secondReplacedPulse, Is.Zero);
+
+            Assert.That(
+                runtime.TrySubmit(
+                    new ESActionIntent(info.actionKey, runtime.LifecycleGeneration, 43, null),
+                    out _,
+                    out int thirdReplacedPulse),
+                Is.True);
+            Assert.That(thirdReplacedPulse, Is.EqualTo(42));
+
+            runtime.Tick(0.2f);
+            runtime.Tick(0.2f);
+            runtime.Tick(0.2f);
+
+            Assert.That(
+                eventsSeen.Exists(evt => evt.kind == ESActionEventKind.ActionStarted && evt.sourcePulseId == 41),
+                Is.True);
+            Assert.That(
+                eventsSeen.Exists(evt => evt.kind == ESActionEventKind.ActionStarted && evt.sourcePulseId == 43),
+                Is.True);
+            Assert.That(
+                eventsSeen.Exists(evt => evt.kind == ESActionEventKind.ActionStarted && evt.sourcePulseId == 42),
+                Is.False);
+        }
+
+        [Test]
         public void Runtime_CancelRuleAllowsCancelInsideWindow()
         {
             ActionTemplateDataInfo info = CreateInfo(
                 "cancel.attack",
-                Phase(ESActionPhaseKind.Startup, 0.1f),
+                Phase(ESActionPhaseKind.Startup, 0.1f, 0.1f),
                 Phase(ESActionPhaseKind.Active, 0.15f),
                 Phase(ESActionPhaseKind.Recovery, 0.2f));
             info.cancelRules.Add(new ESActionCancelRuleData
@@ -207,8 +265,19 @@ namespace ES.Tests
             Assert.That(runtime.TrySubmit(intent, out _), Is.True);
 
             runtime.Tick(0.03f);
+            Assert.That(
+                runtime.TrySubmit(
+                    new ESActionIntent(info.actionKey, runtime.LifecycleGeneration, 2, null),
+                    out string submitError),
+                Is.True,
+                submitError);
+            Assert.That(runtime.HasBufferedIntent, Is.True);
+            Assert.That(runtime.BufferedSourcePulseId, Is.EqualTo(2));
+
             Assert.That(runtime.TryCancel(ESActionCategory.Dodge, null, out string error), Is.True, error);
             Assert.That(runtime.IsRunning, Is.False);
+            Assert.That(runtime.HasBufferedIntent, Is.False);
+            Assert.That(runtime.BufferedSourcePulseId, Is.Zero);
         }
 
         [Test]

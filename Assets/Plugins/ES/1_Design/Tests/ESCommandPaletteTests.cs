@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEditor.ShortcutManagement;
 using UnityEngine;
 
@@ -271,6 +272,49 @@ namespace ES.Tests
         }
 
         [Test]
+        public void AssetQuickAccess_ListsEveryRegisteredGlobalDataItem()
+        {
+            ESCommandPaletteRegistry.ResetForTests(true);
+
+            var expectedPaths = new HashSet<string>(StringComparer.Ordinal);
+            IReadOnlyList<ESCommandPaletteItem> all = ESCommandPaletteRegistry.AllItems;
+            for (int i = 0; i < all.Count; i++)
+            {
+                ESCommandPaletteItem item = all[i];
+                if (item.ActionKind == ESCommandPaletteActionKind.OpenAsset
+                    && string.Equals(item.Category, "GlobalData", StringComparison.Ordinal))
+                {
+                    expectedPaths.Add(item.TargetId);
+                }
+            }
+
+            IReadOnlyList<ESCommandPaletteItem> quickAccessItems =
+                ESEditorToolBar.CustomToolbarMenu.GetGlobalDataQuickAccessItems();
+            var actualPaths = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < quickAccessItems.Count; i++)
+            {
+                actualPaths.Add(quickAccessItems[i].TargetId);
+            }
+
+            Assert.That(expectedPaths.Count, Is.GreaterThanOrEqualTo(2));
+            Assert.That(actualPaths, Is.EquivalentTo(expectedPaths));
+        }
+
+        [Test]
+        public void GlobalDataProvider_PrefersChineseNamesDeclaredByAttributes()
+        {
+            ESCommandPaletteRegistry.ResetForTests(true);
+
+            ESCommandPaletteItem gameCore = FindGlobalDataItem("GameCoreEditorGlobalData.asset");
+            Assert.That(gameCore, Is.Not.Null);
+            Assert.That(gameCore.Title, Is.EqualTo("GameCore编辑器全局数据"));
+
+            ESCommandPaletteItem projectGuide = FindGlobalDataItem("ESGlobalProjectAssetGuideData.asset");
+            Assert.That(projectGuide, Is.Not.Null);
+            Assert.That(projectGuide.Title, Is.EqualTo("项目资产职责提示数据"));
+        }
+
+        [Test]
         public void ItemContract_DoesNotExposeDelegatesOrUnityObjects()
         {
             PropertyInfo[] properties = typeof(ESCommandPaletteItem).GetProperties(
@@ -313,6 +357,120 @@ namespace ES.Tests
                 Is.Not.EqualTo(ShortcutBinding.empty));
         }
 
+        [Test]
+        public void IndependentInspector_ManagedReferenceAssetsAreIsolatedAndNotPersisted()
+        {
+            var firstData = new IndependentInspectorProbeData { value = 1 };
+            var secondData = new IndependentInspectorProbeData { value = 2 };
+            VisualGUIDrawerSO first = null;
+            VisualGUIDrawerSO second = null;
+            try
+            {
+                first = ESIndependentInspectorAsset.CreateManagedReferenceAsset(firstData, "测试桥接 A");
+                second = ESIndependentInspectorAsset.CreateManagedReferenceAsset(secondData, "测试桥接 B");
+
+                Assert.That(first, Is.Not.Null);
+                Assert.That(second, Is.Not.Null);
+                Assert.That(first, Is.Not.SameAs(second));
+                Assert.That(first.drawerData, Is.SameAs(firstData));
+                Assert.That(second.drawerData, Is.SameAs(secondData));
+                Assert.That(first.hideFlags, Is.EqualTo(HideFlags.HideAndDontSave));
+                Assert.That(second.hideFlags, Is.EqualTo(HideFlags.HideAndDontSave));
+                Assert.That(AssetDatabase.GetAssetPath(first), Is.Empty);
+                Assert.That(AssetDatabase.GetAssetPath(second), Is.Empty);
+
+                first.drawerData = new IndependentInspectorProbeData { value = 3 };
+                Assert.That(second.drawerData, Is.SameAs(secondData), "一个弹窗重新绑定时不能改写另一个弹窗的目标。");
+            }
+            finally
+            {
+                ESIndependentInspectorAsset.DestroyManagedReferenceAsset(first);
+                ESIndependentInspectorAsset.DestroyManagedReferenceAsset(second);
+            }
+        }
+
+        [Test]
+        public void IndependentInspector_AssetIdentityResolvesAndLegacyBridgeStaysEmpty()
+        {
+            const string assetPath =
+                "Assets/ESNormalAssets/Data/Normal/VisualGUIDrawerSO/虚拟编辑器绘制_多轨专用_TrackClip的.asset";
+            VisualGUIDrawerSO asset = AssetDatabase.LoadAssetAtPath<VisualGUIDrawerSO>(assetPath);
+
+            Assert.That(asset, Is.Not.Null, "测试依赖的 ES 编辑器桥接资产不存在。");
+            Assert.That(asset.drawerData, Is.Null, "临时 Track/Clip 数据不得继续写入项目持久资产。");
+            Assert.That(ESEditorAssetIdentity.TryCapture(asset, out ESEditorAssetIdentity identity), Is.True);
+            Assert.That(identity.IsValid, Is.True);
+            Assert.That(identity.TryResolve(out UnityEngine.Object resolved), Is.True);
+            Assert.That(resolved, Is.SameAs(asset));
+        }
+
+        [Test]
+        public void IndependentInspector_TrackAndClipResolveByStableKeyAfterObjectRecreation()
+        {
+            SkillTrackProcessInfo source = ScriptableObject.CreateInstance<SkillTrackProcessInfo>();
+            try
+            {
+                var originalClip = new SkillTrackClip_Audio();
+                var originalTrack = new SkillTrackItem_Audio();
+                originalTrack.clips.Add(originalClip);
+                originalTrack.EnsureStableTrackIdentity();
+                string trackId = originalTrack.TrackId;
+                string clipId = originalClip.ClipId;
+                source.sequence.tracks_.Add(originalTrack);
+
+                Assert.That(
+                    ESTrackInspectorTargetResolver.TryResolveTrack(source, trackId, out ITrackItem firstTrack),
+                    Is.True);
+                Assert.That(firstTrack, Is.SameAs(originalTrack));
+                Assert.That(
+                    ESTrackInspectorTargetResolver.TryResolveClip(source, clipId, out ITrackClip firstClip),
+                    Is.True);
+                Assert.That(firstClip, Is.SameAs(originalClip));
+
+                var recreatedClip = new SkillTrackClip_Audio { ClipId = clipId };
+                var recreatedTrack = new SkillTrackItem_Audio { TrackId = trackId };
+                recreatedTrack.clips.Add(recreatedClip);
+                source.sequence.tracks_.Clear();
+                source.sequence.tracks_.Add(recreatedTrack);
+
+                Assert.That(
+                    ESTrackInspectorTargetResolver.TryResolveTrack(source, trackId, out ITrackItem restoredTrack),
+                    Is.True);
+                Assert.That(restoredTrack, Is.SameAs(recreatedTrack));
+                Assert.That(
+                    ESTrackInspectorTargetResolver.TryResolveClip(source, clipId, out ITrackClip restoredClip),
+                    Is.True);
+                Assert.That(restoredClip, Is.SameAs(recreatedClip));
+
+                var duplicateClip = new SkillTrackClip_Audio { ClipId = clipId };
+                var duplicateTrack = new SkillTrackItem_Audio { TrackId = trackId };
+                duplicateTrack.clips.Add(duplicateClip);
+                source.sequence.tracks_.Add(duplicateTrack);
+                Assert.That(
+                    ESTrackInspectorTargetResolver.TryResolveTrack(source, trackId, out _),
+                    Is.False,
+                    "重复轨道稳定 ID 不得错误绑定到任意一个目标。");
+                Assert.That(
+                    ESTrackInspectorTargetResolver.TryResolveClip(source, clipId, out _),
+                    Is.False,
+                    "重复片段稳定 ID 不得错误绑定到任意一个目标。");
+
+                source.sequence.tracks_.Clear();
+                Assert.That(
+                    ESTrackInspectorTargetResolver.TryResolveTrack(source, trackId, out _),
+                    Is.False,
+                    "轨道目标丢失后必须解析失败，以触发弹窗自动关闭。");
+                Assert.That(
+                    ESTrackInspectorTargetResolver.TryResolveClip(source, clipId, out _),
+                    Is.False,
+                    "片段目标丢失后必须解析失败，以触发弹窗自动关闭。");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(source);
+            }
+        }
+
         private static ESCommandPaletteItem WindowItem(string itemId, string windowId, string title = "Window")
         {
             return new ESCommandPaletteItem(
@@ -324,6 +482,23 @@ namespace ES.Tests
                 "@",
                 windowId,
                 ESCommandPaletteActionKind.OpenWindow);
+        }
+
+        private static ESCommandPaletteItem FindGlobalDataItem(string fileName)
+        {
+            IReadOnlyList<ESCommandPaletteItem> all = ESCommandPaletteRegistry.AllItems;
+            for (int i = 0; i < all.Count; i++)
+            {
+                ESCommandPaletteItem item = all[i];
+                if (item.ActionKind == ESCommandPaletteActionKind.OpenAsset
+                    && string.Equals(item.Category, "GlobalData", StringComparison.Ordinal)
+                    && item.TargetId.EndsWith("/" + fileName, StringComparison.Ordinal))
+                {
+                    return item;
+                }
+            }
+
+            return null;
         }
 
         private static void AssertDiagnostic(
@@ -421,6 +596,12 @@ namespace ES.Tests
             {
                 return GetEnumerator();
             }
+        }
+
+        [Serializable]
+        private sealed class IndependentInspectorProbeData
+        {
+            public int value;
         }
     }
 }

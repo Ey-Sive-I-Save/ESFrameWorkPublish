@@ -39,6 +39,20 @@ namespace ES.Tests
             }
         }
 
+        [SetUp]
+        public void ResetStoryCatalogBeforeTest()
+        {
+            ESStoryDefinitionCatalog.AbortBuild();
+            ESStoryDefinitionCatalog.Clear();
+        }
+
+        [TearDown]
+        public void ResetStoryCatalogAfterTest()
+        {
+            ESStoryDefinitionCatalog.AbortBuild();
+            ESStoryDefinitionCatalog.Clear();
+        }
+
         [Test]
         public void RuntimeModeLease_OldGenerationCannotReleaseNewRequest()
         {
@@ -183,6 +197,18 @@ namespace ES.Tests
         }
 
         [Test]
+        public void ContentSignature_ChangesWhenOptionDisplayOrderChanges()
+        {
+            ESStoryDefinitionDataInfo definition = CreateChoiceDefinition();
+            string before = definition.ContentSignature;
+            definition.nodes[1].options.Reverse();
+            string after = definition.ContentSignature;
+
+            Assert.That(after, Is.Not.EqualTo(before));
+            Object.DestroyImmediate(definition);
+        }
+
+        [Test]
         public void ContentSignature_UsesUnambiguousFieldEncoding()
         {
             ESStoryDefinitionDataInfo first = CreateDialogueDefinition();
@@ -194,6 +220,102 @@ namespace ES.Tests
             Assert.That(first.ContentSignature, Is.Not.EqualTo(second.ContentSignature));
             Object.DestroyImmediate(first);
             Object.DestroyImmediate(second);
+        }
+
+        [Test]
+        public void StoryCatalog_FailedReplacementKeepsPublishedGeneration()
+        {
+            ESStoryDefinitionDataInfo original = CreateDialogueDefinition();
+            original.storyKind = ESStoryKind.Dialogue;
+            ESStoryDefinitionCatalog.Inject(original);
+            Assert.That(ESStoryDefinitionCatalog.TryResolve(original.definitionId, out ESStoryDefinitionSnapshot published), Is.True);
+
+            ESStoryDefinitionDataInfo invalidReplacement = CreateDialogueDefinition();
+            invalidReplacement.storyKind = ESStoryKind.Dialogue;
+            invalidReplacement.contentVersion = 2;
+            invalidReplacement.nodes[0].nextNodeId = "missing";
+            ESStoryDefinitionCatalog.BeginBuild(true);
+            Assert.Throws<System.InvalidOperationException>(() => ESStoryDefinitionCatalog.Inject(invalidReplacement));
+            ESStoryDefinitionCatalog.AbortBuild();
+
+            Assert.That(ESStoryDefinitionCatalog.TryResolve(original.definitionId, out ESStoryDefinitionSnapshot afterFailure), Is.True);
+            Assert.That(afterFailure, Is.SameAs(published));
+            Object.DestroyImmediate(invalidReplacement);
+            Object.DestroyImmediate(original);
+        }
+
+        [Test]
+        public void StoryCatalog_PublishesReplacementOnlyWhenBuildCommits()
+        {
+            ESStoryDefinitionDataInfo original = CreateDialogueDefinition();
+            original.storyKind = ESStoryKind.Dialogue;
+            ESStoryDefinitionCatalog.Inject(original);
+            Assert.That(ESStoryDefinitionCatalog.TryResolve(original.definitionId, out ESStoryDefinitionSnapshot first), Is.True);
+
+            ESStoryDefinitionDataInfo replacement = CreateDialogueDefinition();
+            replacement.storyKind = ESStoryKind.Dialogue;
+            replacement.contentVersion = 2;
+            replacement.nodes[1].text = "replacement";
+            ESStoryDefinitionCatalog.BeginBuild(true);
+            ESStoryDefinitionCatalog.Inject(replacement);
+            Assert.That(ESStoryDefinitionCatalog.TryResolve(original.definitionId, out ESStoryDefinitionSnapshot duringBuild), Is.True);
+            Assert.That(duringBuild, Is.SameAs(first));
+            ESStoryDefinitionCatalog.EndBuild();
+
+            Assert.That(ESStoryDefinitionCatalog.TryResolve(replacement.definitionId, out ESStoryDefinitionSnapshot committed), Is.True);
+            Assert.That(committed.ContentVersion, Is.EqualTo(2));
+            Assert.That(committed.TryGetNode("line", out ESStoryNodeSnapshot line), Is.True);
+            Assert.That(line.Text, Is.EqualTo("replacement"));
+            Object.DestroyImmediate(replacement);
+            Object.DestroyImmediate(original);
+        }
+
+        [Test]
+        public void StoryCatalog_RepeatedEquivalentInjectionIsIdempotent()
+        {
+            ESStoryDefinitionDataInfo definition = CreateDialogueDefinition();
+            definition.storyKind = ESStoryKind.Dialogue;
+            ESStoryDefinitionCatalog.Inject(definition);
+            Assert.That(ESStoryDefinitionCatalog.TryResolve(definition.definitionId, out ESStoryDefinitionSnapshot first), Is.True);
+
+            ESStoryDefinitionCatalog.Inject(definition);
+
+            Assert.That(ESStoryDefinitionCatalog.IsBuilding, Is.False);
+            Assert.That(ESStoryDefinitionCatalog.Count, Is.EqualTo(1));
+            Assert.That(ESStoryDefinitionCatalog.TryResolve(definition.definitionId, out ESStoryDefinitionSnapshot second), Is.True);
+            Assert.That(second, Is.SameAs(first));
+            Object.DestroyImmediate(definition);
+        }
+
+        [Test]
+        public void StoryStart_RequiresPublishedCatalogAndNeverRebakesAuthoringData()
+        {
+            ESStoryDefinitionDataInfo definition = CreateDialogueDefinition();
+            definition.storyKind = ESStoryKind.Dialogue;
+            ESStoryModule story = new ESStoryModule();
+            CapturingPresenter presenter = new CapturingPresenter();
+            story.BindPresenter(presenter);
+            GameObject actorObject = new GameObject("story-catalog-actor");
+            Entity actor = actorObject.AddComponent<Entity>();
+            GameObject targetObject = new GameObject("story-catalog-target");
+            ESInteractable target = targetObject.AddComponent<ESInteractable>();
+            ESInteractionBinding binding = new ESInteractionBinding(23, 4, actor, target);
+
+            Assert.That(story.TryStartFromInteraction(definition.definitionId, actor, binding, out _, out string missingError), Is.False);
+            Assert.That(missingError, Does.Contain("尚未完成验证并注入"));
+
+            ESStoryDefinitionCatalog.Inject(definition);
+            definition.nodes[0].nextNodeId = "missing-after-publish";
+            definition.nodes[1].text = "mutable-authoring-change";
+            Assert.That(story.TryStartFromInteraction(definition.definitionId, actor, binding, out string instanceId, out string error), Is.True, error);
+            Assert.That(instanceId, Is.Not.Empty);
+            Assert.That(presenter.LastView, Is.Not.Null);
+            Assert.That(presenter.LastView.text, Is.EqualTo("hello"));
+
+            story.OnDestroy();
+            Object.DestroyImmediate(targetObject);
+            Object.DestroyImmediate(actorObject);
+            Object.DestroyImmediate(definition);
         }
 
         [Test]
@@ -563,6 +685,7 @@ namespace ES.Tests
             ESStoryDefinitionDataInfo definition = CreateDialogueDefinition();
             definition.storyKind = ESStoryKind.Quest;
             Assert.That(ESStoryDefinitionSnapshot.TryBake(definition, out ESStoryDefinitionSnapshot snapshot, out string error), Is.True, error);
+            ESStoryDefinitionCatalog.Inject(definition);
             ESStorySaveSection section = CreateStorySection(snapshot.DefinitionId, ESStorySaveSection.CurrentSchemaVersion);
             section.questRecords[0].contentVersion = snapshot.ContentVersion;
             section.questRecords[0].contentSignature = snapshot.ContentSignature;
@@ -582,7 +705,7 @@ namespace ES.Tests
             GameObject targetObject = new GameObject("story-test-target");
             ESInteractable target = targetObject.AddComponent<ESInteractable>();
             ESInteractionBinding binding = new ESInteractionBinding(11, 3, actor, target);
-            Assert.That(story.TryStartFromInteraction(definition, actor, binding, out string instanceId, out error), Is.True, error);
+            Assert.That(story.TryStartFromInteraction(definition.definitionId, actor, binding, out string instanceId, out error), Is.True, error);
             Assert.That(instanceId, Is.Not.Empty.And.Not.EqualTo("old-instance"));
             Assert.That(presenter.LastView, Is.Not.Null);
             Assert.That(presenter.LastView.text, Is.EqualTo("hello"));
@@ -637,6 +760,31 @@ namespace ES.Tests
                 new ESStoryNodeDefinition { nodeId = "start", nodeKind = ESStoryNodeKind.Start, nextNodeId = "line" },
                 new ESStoryNodeDefinition { nodeId = "line", nodeKind = ESStoryNodeKind.Dialogue, text = "hello", nextNodeId = "done" },
                 new ESStoryNodeDefinition { nodeId = "done", nodeKind = ESStoryNodeKind.Complete }
+            };
+            return definition;
+        }
+
+        private static ESStoryDefinitionDataInfo CreateChoiceDefinition()
+        {
+            ESStoryDefinitionDataInfo definition = ScriptableObject.CreateInstance<ESStoryDefinitionDataInfo>();
+            definition.definitionId.stringKey = "dialogue.choice-order";
+            definition.storyKind = ESStoryKind.Dialogue;
+            definition.entryNodeId = "start";
+            definition.nodes = new List<ESStoryNodeDefinition>
+            {
+                new ESStoryNodeDefinition { nodeId = "start", nodeKind = ESStoryNodeKind.Start, nextNodeId = "choice" },
+                new ESStoryNodeDefinition
+                {
+                    nodeId = "choice",
+                    nodeKind = ESStoryNodeKind.Choice,
+                    options = new List<ESStoryOptionDefinition>
+                    {
+                        new ESStoryOptionDefinition { optionId = "first", text = "First", nextNodeId = "first-end" },
+                        new ESStoryOptionDefinition { optionId = "second", text = "Second", nextNodeId = "second-end" }
+                    }
+                },
+                new ESStoryNodeDefinition { nodeId = "first-end", nodeKind = ESStoryNodeKind.Complete },
+                new ESStoryNodeDefinition { nodeId = "second-end", nodeKind = ESStoryNodeKind.Complete }
             };
             return definition;
         }

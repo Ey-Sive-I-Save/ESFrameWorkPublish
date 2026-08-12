@@ -43,50 +43,59 @@ namespace ES
     [Serializable]
     public class TrackClipBase : ITrackClip, IStableTrackClip
     {
-        public static float defaultEndTime = 10f;
-
         [SerializeField, HideInInspector]
         private string clipId = string.Empty;
 
         [SerializeField, HideInInspector]
         private int clipSchema = ESTrackIdentity.CurrentClipSchema;
 
-        [TitleGroup("片段基础", "片段名称会显示在轨道时间轴中。")]
-        [HorizontalGroup("片段基础/基础", Width = 70)]
-        [LabelText("启用")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.OverviewOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.ClipOverview, "片段首先展示启用状态和中文名称，再展示时间、内容、目标与行为参数。")]
+        [HorizontalGroup(ESTrackInspectorFieldStandard.ClipOverviewBasic, Width = 0.24f)]
+        [LabelText("启用片段")]
         public bool enabled = true;
 
-        [HorizontalGroup("片段基础/基础")]
-        [LabelText("名称")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.OverviewOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.ClipOverview)]
+        [HorizontalGroup(ESTrackInspectorFieldStandard.ClipOverviewBasic)]
+        [LabelText("片段名称")]
         public string name = "轨道片段";
 
-        [TitleGroup("时间范围", "单位：秒。时间轴窗口会根据所有片段结束时间自动扩展最大长度。")]
-        [HorizontalGroup("时间范围/时间信息", 0.5f)]
-        [LabelText("开始")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TimelineOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Timeline, "单位：秒。时间轴窗口会根据所有片段结束时间自动扩展最大长度。")]
+        [HorizontalGroup(ESTrackInspectorFieldStandard.TimelineValues, 0.5f)]
+        [LabelText("开始时间")]
         [MinValue(0f)]
         [SuffixLabel("秒", true)]
         public float startTime = 0;
 
-        [HorizontalGroup("时间范围/时间信息", 0.5f)]
-        [LabelText("持续")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TimelineOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Timeline)]
+        [HorizontalGroup(ESTrackInspectorFieldStandard.TimelineValues, 0.5f)]
+        [LabelText("持续时间")]
         [MinValue(0f)]
         [SuffixLabel("秒", true)]
         public float durationTime = 1;
 
-        [TitleGroup("时间范围")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TimelineOrder + 2)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Timeline)]
         [ShowInInspector]
         [ReadOnly]
         [LabelText("结束时间")]
         [SuffixLabel("秒", true)]
         public float EndTimePreview => startTime + Mathf.Max(0f, durationTime);
 
-        [TitleGroup("时间范围")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TimelineOrder + 3)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Timeline)]
         [OnInspectorGUI]
         public void EditorTime()
         {
 #if UNITY_EDITOR
+            EditorGUILayout.LabelField(
+                new GUIContent("时间范围拖拽", "拖动左右控制点调整开始时间和结束时间。"),
+                EditorStyles.miniBoldLabel);
             float end = startTime + durationTime;
-            DrawESGraphTimeRangeSlider(ref startTime, ref end, 0f, Mathf.Max(defaultEndTime, end, 0.01f));
+            DrawESGraphTimeRangeSlider(ref startTime, ref end, 0f, Mathf.Max(10f, end));
             durationTime = Mathf.Max(0, end - startTime);
 #endif
         }

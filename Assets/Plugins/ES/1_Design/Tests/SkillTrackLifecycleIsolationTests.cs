@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
+using Sirenix.OdinInspector;
+using UnityEngine;
 using UnityEngine.TestTools;
 
 namespace ES.Tests
@@ -310,6 +312,116 @@ namespace ES.Tests
         }
 
         [Test]
+        public void InspectorDeclarations_AllTrackAndClipFieldsFollowStandardLayout()
+        {
+            var declarationTypes = new HashSet<Type>
+            {
+                typeof(TrackItemBase<>),
+                typeof(TrackClipBase),
+                typeof(SkillTrackItem<>),
+            };
+
+            AddTrackDeclarationTypes(typeof(SkillTrackItem_Audio).Assembly, declarationTypes);
+            AddTrackDeclarationTypes(typeof(TrackClipBase).Assembly, declarationTypes);
+
+            foreach (Type type in declarationTypes)
+            {
+                FieldInfo[] fields = type.GetFields(
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                for (int i = 0; i < fields.Length; i++)
+                {
+                    FieldInfo field = fields[i];
+                    if (!IsUnitySerializedField(field)
+                        || field.IsDefined(typeof(HideInInspector), true))
+                    {
+                        continue;
+                    }
+
+                    string fieldPath = type.FullName + "." + field.Name;
+                    LabelTextAttribute label = field.GetCustomAttribute<LabelTextAttribute>(true);
+                    bool hideLabel = field.IsDefined(typeof(HideLabelAttribute), true);
+                    bool hasVisibleLabel = hideLabel || label != null && ContainsChinese(label.Text);
+                    Assert.That(
+                        hasVisibleLabel,
+                        Is.True,
+                        fieldPath + " 必须声明中文 LabelText；仅嵌入式对象允许使用 HideLabel。");
+                    Assert.That(
+                        field.IsDefined(typeof(PropertyOrderAttribute), true),
+                        Is.True,
+                        fieldPath + " 必须声明 PropertyOrder，保证继承层级下的排版顺序稳定。");
+                    Assert.That(
+                        UsesStandardInspectorGroup(field),
+                        Is.True,
+                        fieldPath + " 必须使用 ESTrackInspectorFieldStandard 对应的标准分组。");
+                }
+            }
+        }
+
+        private static void AddTrackDeclarationTypes(Assembly assembly, HashSet<Type> output)
+        {
+            Type[] types = assembly.GetTypes();
+            for (int i = 0; i < types.Length; i++)
+            {
+                Type type = types[i];
+                if (!type.IsClass || type.IsNestedPrivate)
+                    continue;
+                if (typeof(ITrackItem).IsAssignableFrom(type)
+                    || typeof(ITrackClip).IsAssignableFrom(type))
+                {
+                    output.Add(type);
+                }
+            }
+        }
+
+        private static bool IsUnitySerializedField(FieldInfo field)
+        {
+            if (field.IsStatic || field.IsNotSerialized)
+                return false;
+            return field.IsPublic
+                   || field.IsDefined(typeof(SerializeField), true)
+                   || field.IsDefined(typeof(SerializeReference), true);
+        }
+
+        private static bool UsesStandardInspectorGroup(FieldInfo field)
+        {
+            object[] attributes = field.GetCustomAttributes(typeof(PropertyGroupAttribute), true);
+            for (int i = 0; i < attributes.Length; i++)
+            {
+                string groupId = ((PropertyGroupAttribute)attributes[i]).GroupID;
+                if (IsStandardGroupRoot(groupId, ESTrackInspectorFieldStandard.TrackOverview)
+                    || IsStandardGroupRoot(groupId, ESTrackInspectorFieldStandard.TrackArrangement)
+                    || IsStandardGroupRoot(groupId, ESTrackInspectorFieldStandard.ClipOverview)
+                    || IsStandardGroupRoot(groupId, ESTrackInspectorFieldStandard.Timeline)
+                    || IsStandardGroupRoot(groupId, ESTrackInspectorFieldStandard.Content)
+                    || IsStandardGroupRoot(groupId, ESTrackInspectorFieldStandard.Target)
+                    || IsStandardGroupRoot(groupId, ESTrackInspectorFieldStandard.Behavior)
+                    || IsStandardGroupRoot(groupId, ESTrackInspectorFieldStandard.Advanced)
+                    || IsStandardGroupRoot(groupId, ESTrackInspectorFieldStandard.Preview))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsStandardGroupRoot(string groupId, string standardRoot)
+        {
+            return string.Equals(groupId, standardRoot, StringComparison.Ordinal)
+                   || groupId != null && groupId.StartsWith(standardRoot + "/", StringComparison.Ordinal);
+        }
+
+        private static bool ContainsChinese(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+            for (int i = 0; i < text.Length; i++)
+                if (text[i] >= '\u4e00' && text[i] <= '\u9fff')
+                    return true;
+            return false;
+        }
+
+        [Test]
         public void StableIdentity_AssignsOnceForTrackAndClips()
         {
             var clip = new ProbeClip(new ProbeClipPlayer(), 0f, 1f);
@@ -501,6 +613,28 @@ namespace ES.Tests
                 Is.False);
             Assert.That(unsupportedTrackCount, Is.EqualTo(1));
             Assert.That(unsupportedClipCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TrackSequenceMutableOrder_MovesThroughProtocolWithoutChangingIdentity()
+        {
+            var first = new ProbeTrack(new ProbeTrackPlayer()) { TrackId = "track-first" };
+            var second = new ProbeTrack(new ProbeTrackPlayer()) { TrackId = "track-second" };
+            var third = new ProbeTrack(new ProbeTrackPlayer()) { TrackId = "track-third" };
+            SkillProcessTrackSequence sequence = CreateSequence(first, second, third);
+            var mutableOrder = (ITrackSequenceMutableOrder)sequence;
+
+            Assert.That(mutableOrder.TrackItemCount, Is.EqualTo(3));
+            Assert.That(mutableOrder.IndexOfTrackItem(second), Is.EqualTo(1));
+            Assert.That(mutableOrder.TryMoveTrackItem(second, 2), Is.True);
+            Assert.That(sequence.tracks_[0], Is.SameAs(first));
+            Assert.That(sequence.tracks_[1], Is.SameAs(third));
+            Assert.That(sequence.tracks_[2], Is.SameAs(second));
+            Assert.That(first.TrackId, Is.EqualTo("track-first"));
+            Assert.That(second.TrackId, Is.EqualTo("track-second"));
+            Assert.That(third.TrackId, Is.EqualTo("track-third"));
+            Assert.That(mutableOrder.TryMoveTrackItem(second, 2), Is.False);
+            Assert.That(mutableOrder.TryMoveTrackItem(second, -1), Is.False);
         }
 
         private static EntityState_Skill PrepareState(SkillProcessTrackSequence sequence)

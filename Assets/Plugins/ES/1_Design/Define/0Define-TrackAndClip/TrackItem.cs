@@ -297,12 +297,44 @@ namespace ES
         }
     }
 
+    /// <summary>
+    /// Track/Clip Inspector 字段声明标准。
+    /// 可见序列化字段必须使用本类分组、中文 LabelText 和明确 PropertyOrder；
+    /// 稳定身份、Schema 与仅用于迁移的兼容字段必须保持隐藏，不得混入业务编辑区；
+    /// 仍允许用户编辑的兼容入口必须使用标准分组，并在中文标签中明确标注“兼容”。
+    /// </summary>
+    public static class ESTrackInspectorFieldStandard
+    {
+        public const string TrackOverview = "轨道概览";
+        public const string TrackOverviewBasic = TrackOverview + "/基础信息";
+        public const string TrackArrangement = "片段编排";
+        public const string ClipOverview = "片段概览";
+        public const string ClipOverviewBasic = ClipOverview + "/基础信息";
+        public const string Timeline = "时间范围";
+        public const string TimelineValues = Timeline + "/时间参数";
+        public const string Content = "内容与资源";
+        public const string Target = "目标与上下文";
+        public const string Behavior = "行为参数";
+        public const string Advanced = "高级设置";
+        public const string Preview = "编辑器预览";
+
+        public const int OverviewOrder = -1000;
+        public const int TimelineOrder = -900;
+        public const int ContentOrder = 0;
+        public const int TargetOrder = 100;
+        public const int BehaviorOrder = 200;
+        public const int AdvancedOrder = 700;
+        public const int PreviewOrder = 800;
+        public const int ArrangementOrder = 900;
+    }
+
     [Serializable]
     public abstract class TrackItemBase<TClip> : ITrackItem, IStableTrackItem where TClip : class, ITrackClip
     {
-        [TitleGroup("轨道设置", "控制当前轨道是否参与预览/运行，以及轨道在编辑器中的显示名称。")]
-        [HorizontalGroup("轨道设置/基础", Width = 70)]
-        [LabelText("启用")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.OverviewOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.TrackOverview, "轨道首先展示启用状态和中文名称，其后依次展示业务内容、目标、行为与预览设置。")]
+        [HorizontalGroup(ESTrackInspectorFieldStandard.TrackOverviewBasic, Width = 0.24f)]
+        [LabelText("启用轨道")]
         public bool enabled = true;
 
         [SerializeField, HideInInspector]
@@ -311,9 +343,10 @@ namespace ES
         [SerializeField, HideInInspector]
         private int trackSchema = ESTrackIdentity.CurrentTrackSchema;
 
-        [TitleGroup("轨道设置")]
-        [LabelText("片段列表")]
-        [ListDrawerSettings(DefaultExpandedState = true, DraggableItems = true, ShowFoldout = true, ShowIndexLabels = true)]
+        [PropertyOrder(ESTrackInspectorFieldStandard.ArrangementOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.TrackArrangement, "片段属于轨道编排内容，默认收起，避免遮挡轨道自身设置。")]
+        [LabelText("轨道片段")]
+        [ListDrawerSettings(DefaultExpandedState = false, DraggableItems = true, ShowFoldout = true, ShowIndexLabels = true)]
         public List<TClip> clips = new List<TClip>();
         public bool Enabled { get => enabled; set => enabled = value; }
         public IEnumerable<ITrackClip> Clips => clips;
@@ -355,8 +388,10 @@ namespace ES
             get { if (displayName == "") { return this.GetType()._GetTypeDisplayName(); } return displayName; }
             set { displayName = value; }
         }
-        [TitleGroup("轨道设置")]
-        [LabelText("显示名称")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.OverviewOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.TrackOverview)]
+        [HorizontalGroup(ESTrackInspectorFieldStandard.TrackOverviewBasic)]
+        [LabelText("轨道名称")]
         public string displayName = "";
         public bool TryAddTrackClip(ITrackClip item)
         {

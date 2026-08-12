@@ -96,7 +96,7 @@ namespace ES
             }
         }
 
-        [MenuItem(MenuItemPathDefine.AUTOMATION_PATH + "扫描当前场景（Python 原型）", false, 210)]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_CENTER_PATH + "扫描当前场景（Python 原型）", false, 210)]
         internal static void StartSceneScan()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
@@ -133,7 +133,7 @@ namespace ES
             }
         }
 
-        [MenuItem(MenuItemPathDefine.AUTOMATION_PATH + "继续待输入的场景扫描", false, 211)]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_CENTER_PATH + "继续待输入的场景扫描", false, 211)]
         internal static void ResumePendingSceneScan()
         {
             try
@@ -194,6 +194,7 @@ namespace ES
                     capabilities = new List<string> { "ReadArtifacts", "WriteTemp" },
                     timeoutSeconds = WorkerTimeoutSeconds,
                     supportsDryRun = true,
+                    supportsRetry = false,
                     outputs = new List<string> { "scene-scan.json", "scene-scan.md", "result.json" },
                 });
             }
@@ -235,6 +236,7 @@ namespace ES
                     return ESAutomationTaskInvocationResult.Blocked("当前没有可扫描的已加载 Active Scene。");
 
                 ESAutomationSceneScanSession session = CreateSession(scene);
+                session.dryRun = invocation.dryRun;
                 if (interactive)
                 {
                     // 阶段 0 会由 Python 请求输入；C# 随后显示高级对话框，AI 也可通过同一 RunId 提交。
@@ -283,7 +285,7 @@ namespace ES
                 {
                     case "Completed":
                     case "DryRunCompleted":
-                        return ESAutomationTaskInvocationResult.Completed("场景扫描已完成。", runId, data);
+                        return BuildCompletedFacadeResult(session, data);
                     case "Failed":
                         return ESAutomationTaskInvocationResult.Failed("场景扫描 Worker 或协议处理失败；请查看临时记录和 Unity Console。", runId);
                     case "Cancelled":
@@ -299,6 +301,30 @@ namespace ES
             {
                 return ESAutomationTaskInvocationResult.Failed(exception.Message, runId);
             }
+        }
+
+        private static ESAutomationTaskInvocationResult BuildCompletedFacadeResult(
+            ESAutomationSceneScanSession session, JObject data)
+        {
+            string reportDirectory = Path.Combine(ESAutomationPathPolicy.ReportsRoot, session.runId);
+            string resultPath = Path.Combine(reportDirectory, "result.json");
+            JObject root = ReadStrictObject(resultPath, new[]
+            {
+                "protocolVersion", "taskId", "taskVersion", "runId", "workerType", "workerId",
+                "workerVersion", "entrypointHash", "status", "exitCode", "startedAtUtc",
+                "finishedAtUtc", "inputManifestHash", "outputs", "outputHashes", "findings", "errors",
+            }, "场景扫描最终结果");
+            ESAutomationRunResult result = root.ToObject<ESAutomationRunResult>();
+            result.Validate();
+            VerifyPromotedReportDirectory(reportDirectory, result);
+            data["exitCode"] = result.exitCode;
+            data["outputs"] = new JArray(result.outputs.Select(name => Path.Combine(reportDirectory, name)));
+            data["outputHashes"] = new JArray(result.outputHashes);
+            data["findings"] = new JArray(result.findings);
+            data["dryRun"] = string.Equals(result.status, "DryRun", StringComparison.Ordinal);
+            return ESAutomationTaskInvocationResult.Completed(
+                result.status == "DryRun" ? "场景扫描 DryRun 已完成。" : "场景扫描已完成。",
+                session.runId, data);
         }
 
         private static ESAutomationTaskInvocationResult SubmitInputFromFacade(ESAutomationTaskInputSubmission submission)
@@ -1121,7 +1147,7 @@ namespace ES
             Debug.Log("[ESAutomation] " + message);
         }
 
-        private sealed class SceneScanFacadeEndpoint : IESAutomationTaskEndpoint
+        private sealed class SceneScanFacadeEndpoint : IESAutomationTaskEndpoint, IESAutomationContractBoundEndpoint
         {
             private static readonly ESAutomationTaskDescriptor descriptor = new ESAutomationTaskDescriptor
             {
@@ -1158,6 +1184,20 @@ namespace ES
             };
 
             public ESAutomationTaskDescriptor Descriptor => descriptor;
+            public ESAutomationInvocationRequirements DescribeInvocation(ESAutomationTaskInvocation invocation)
+                => new ESAutomationInvocationRequirements
+                {
+                    worker = new ESAutomationWorkerRegistration
+                    {
+                        type = WorkerType,
+                        workerId = WorkerId,
+                        version = WorkerVersion,
+                        entrypointHash = WorkerEntrypointHash,
+                        enabled = true,
+                    },
+                    requiredCapabilities = ESAutomationCapability.ReadArtifacts | ESAutomationCapability.WriteTemp,
+                    dryRun = invocation != null && invocation.dryRun,
+                };
             public ESAutomationTaskInvocationResult Run(ESAutomationTaskInvocation invocation) => RunFromFacade(invocation);
             public ESAutomationTaskInvocationResult GetRun(string runId) => GetRunFromFacade(runId);
             public ESAutomationTaskInvocationResult SubmitInput(ESAutomationTaskInputSubmission submission) => SubmitInputFromFacade(submission);

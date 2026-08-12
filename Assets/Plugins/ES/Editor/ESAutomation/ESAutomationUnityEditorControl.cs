@@ -150,13 +150,13 @@ namespace ES
             };
         }
 
-        [MenuItem(MenuItemPathDefine.AUTOMATION_PATH + "AI 控制/开启自动 Unity 编译")]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_AI_CONTROL_PATH + "开启自动 Unity 编译")]
         private static void EnableAutoCompilationFromMenu() => SetAutoCompilation(true);
 
-        [MenuItem(MenuItemPathDefine.AUTOMATION_PATH + "AI 控制/关闭自动 Unity 编译")]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_AI_CONTROL_PATH + "关闭自动 Unity 编译")]
         private static void DisableAutoCompilationFromMenu() => SetAutoCompilation(false);
 
-        [MenuItem(MenuItemPathDefine.AUTOMATION_PATH + "AI 控制/触发 Unity 编译")]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_AI_CONTROL_PATH + "触发 Unity 编译")]
         private static void TriggerCompilationFromMenu() => TriggerCompilation(true);
 
         private static void RestoreCompilationPolicy()

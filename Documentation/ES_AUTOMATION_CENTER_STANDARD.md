@@ -55,8 +55,11 @@ writeRoots: [ES/Automation/Reports]
 capabilities: [ReadArtifacts, WriteReports]
 timeoutSeconds: 600
 supportsDryRun: true
+supportsRetry: false
 outputs: [result.json, audit.md]
 ```
+
+`supportsRetry` 在协议 v1 中是向后兼容的可选字段，缺省值固定为 `false`。只有 Worker 对相同输入具备幂等执行或稳定去重键，并且失败后不会扩大写入、副作用或发布动作时，注册方才允许显式设为 `true`；AISkillGraph 不得自行推断或绕过该声明。
 
 ## 不可绕过的安全边界
 
@@ -65,7 +68,7 @@ outputs: [result.json, audit.md]
 3. Python、PowerShell 或其他 Worker 不得写入 `Assets/`；Unity 资产变更只能由 C# Editor 入口执行。
 4. 所有路径先规范化，再检查是否位于允许根目录内；拒绝 `..`、junction、symlink 和大小写绕过。
 5. 所有真实任务必须支持 `DryRun`、超时、取消、退出码和落盘报告；取消必须终止完整进程树。当前 `es.scene.scan@1` 已有源码级实现，但 Unity/故障注入运行级证据仍待补齐。
-6. 运行记录必须保存任务、操作者、RunId、Git commit、Unity 版本、Worker 环境版本、输入 Manifest Hash、输出 Hash 和结果。当前 `RunRecord` 仅有数据模型，持久化与受信关联将在 WorkerAdapter 阶段实现。
+6. 运行记录必须保存任务、操作者、RunId、Git commit、Unity 版本、Worker 环境版本、输入 Manifest Hash、输出 Hash 和结果。Graph AI Endpoint 已持久化 `run-record.json` 与受控会话回执，并使用状态机区分启动、接收、运行、完成、失败、取消和超时；真实 Unity/Worker 闭环仍需单独验收。
 7. 报告先写入 RunId 临时目录，验证完成后原子移动；失败或取消不得留下可误发布的半发布目录。
 8. CI 消费结构化报告和 ReleaseGate，不依赖 Unity 弹窗；弹窗只是本机展示。
 9. 凭据只能通过受控环境注入，禁止出现在命令行、输入 JSON、报告或普通日志中。
@@ -93,7 +96,7 @@ Worker 阶段 N
 
 ## `es.scene.scan@1` 原型
 
-入口：`【ES】/自动化/扫描当前场景（Python 原型）`，管理窗口为 `【ES】/自动化/自动化中心`。
+入口：`【ES】/自动化与开发/自动化中心/扫描当前场景（Python 原型）`，管理窗口为 `【ES】/自动化与开发/自动化中心/打开自动化中心`。
 
 1. C# 从当前已加载 Active Scene 导出层级路径、激活状态、Layer、Tag、Static、深度和组件类型名到 `ES/Automation/Temp/<RunId>/scene-snapshot.json`。
 2. Python 阶段 0 只请求三项固定报告选项：`includeInactive`、`detailMode`、`topComponentCount`。
@@ -110,7 +113,7 @@ Python 环境解析顺序固定为：本机显式 `ES_AUTOMATION_PYTHON`，再�
 
 任务若需要分阶段输入，必须在 Descriptor 中预注册 `ESAutomationInputSchemaDescriptor`：稳定 `StepId + SchemaHash`、字段 ID、受限类型、默认值、Choice 和数值范围。Python 到达 `NeedsInput` 后退出；Endpoint 仅接受该检查点的精确代次。`ESAdvancedDialog` 与 AI 的 `submitInput` 使用同一份 Session、Generation、StepId、SchemaHash 与字段校验，最先成功提交者继续新 Python 阶段，迟到提交不得重复驱动 Worker。AI 可通过 `listTasks` 获取类型化字段描述，或在 `getRun` 的 `data.inputRequest` 获取当前检查点描述；它不能指定脚本、解释器、命令行、文件路径或未注册字段。
 
-`ESAutomationAiBridge` 默认关闭。用户在 `【ES】/自动化/自动化中心` 显式授权本机收件箱后，AI 可通过 `ES/Automation/AI/Inbox/<RequestId>.request.json` 请求：
+`ESAutomationAiBridge` 默认关闭。用户在 `【ES】/自动化与开发/自动化中心/打开自动化中心` 显式授权本机收件箱后，AI 可通过 `ES/Automation/AI/Inbox/<RequestId>.request.json` 请求：
 
 - `listTasks`
 - `runTask`
@@ -126,7 +129,7 @@ Unity 只在 Editor 主线程处理最终 `.request.json`，把结构化响应�
 
 该策略只暂停**新的 Inbox 检测与分发**，不擅自终止进入 Play 前已经启动的只读 Worker；每个长任务须自行声明、实现并验收其取消/暂停语义，不能把收件箱暂停误当作进程取消。
 
-若项目另行接入了**已由宿主鉴权**的 UnityMCP（或等价的 Unity 主线程桥接器），该桥接器可以调用 `ESAutomationAiBridge.TrySetTrustedPlayModeListening(true, out reason)`，只为**本次已进入的 PlayMode**临时恢复监听。仅支持菜单调用的 UnityMCP 可执行 `【ES】/自动化/AI 控制/PlayMode 临时恢复收件箱监听`；对应暂停菜单同路径提供。它不能开启首次用户授权，不能通过 Inbox 自举，也不会在退出 Play 后保留覆盖状态。
+若项目另行接入了**已由宿主鉴权**的 UnityMCP（或等价的 Unity 主线程桥接器），该桥接器可以调用 `ESAutomationAiBridge.TrySetTrustedPlayModeListening(true, out reason)`，只为**本次已进入的 PlayMode**临时恢复监听。仅支持菜单调用的 UnityMCP 可执行 `【ES】/自动化与开发/AI 控制/PlayMode 临时恢复收件箱监听`；对应暂停菜单同路径提供。它不能开启首次用户授权，不能通过 Inbox 自举，也不会在退出 Play 后保留覆盖状态。
 
 恢复监听不等于允许全部自动化：每个 Task 必须显式声明 `allowInPlayMode = true`，否则 Facade 仍返回 `Blocked`。当前 `es.scene.scan@1` 明确禁止在 PlayMode 运行；未来测试任务应单独注册、声明运行时边界并完成 PlayMode 验收。内容提案与资产写入不得在 PlayMode 通过此机制执行。
 

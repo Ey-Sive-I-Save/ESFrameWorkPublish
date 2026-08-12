@@ -116,7 +116,7 @@ namespace ES
             InitializeForEditor();
             if (!IsEnabled)
             {
-                reason = "本机 AI 收件箱尚未获得用户授权；请先在【ES】/自动化/自动化中心启用。";
+                reason = "本机 AI 收件箱尚未获得用户授权；请先在【ES】/自动化与开发/自动化中心启用。";
                 return false;
             }
             if (!EditorApplication.isPlaying)
@@ -144,25 +144,25 @@ namespace ES
         public static string GetRequestExamplePath() => Path.Combine(RootDirectory, "README.md");
 
         // UnityMCP 若只支持 ExecuteMenuItem，可使用这两个固定菜单；它们与公开 API 共用同一门禁。
-        [MenuItem(MenuItemPathDefine.AUTOMATION_PATH + "AI 控制/PlayMode 临时恢复收件箱监听")]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_AI_CONTROL_PATH + "PlayMode 临时恢复收件箱监听")]
         private static void ResumePlayModeListeningFromMenu()
         {
             if (!TrySetTrustedPlayModeListening(true, out string reason)) Debug.LogWarning("[ESAutomation] " + reason);
             else Debug.Log("[ESAutomation] " + reason);
         }
 
-        [MenuItem(MenuItemPathDefine.AUTOMATION_PATH + "AI 控制/PlayMode 临时恢复收件箱监听", true)]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_AI_CONTROL_PATH + "PlayMode 临时恢复收件箱监听", true)]
         private static bool ValidateResumePlayModeListeningFromMenu()
             => IsEnabled && EditorApplication.isPlaying && IsAutoSuspendedForPlayMode;
 
-        [MenuItem(MenuItemPathDefine.AUTOMATION_PATH + "AI 控制/PlayMode 暂停收件箱监听")]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_AI_CONTROL_PATH + "PlayMode 暂停收件箱监听")]
         private static void PausePlayModeListeningFromMenu()
         {
             if (!TrySetTrustedPlayModeListening(false, out string reason)) Debug.LogWarning("[ESAutomation] " + reason);
             else Debug.Log("[ESAutomation] " + reason);
         }
 
-        [MenuItem(MenuItemPathDefine.AUTOMATION_PATH + "AI 控制/PlayMode 暂停收件箱监听", true)]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_AI_CONTROL_PATH + "PlayMode 暂停收件箱监听", true)]
         private static bool ValidatePausePlayModeListeningFromMenu()
             => IsEnabled && EditorApplication.isPlaying && trustedPlayModeListeningOverride;
 
@@ -389,6 +389,8 @@ namespace ES
                         return HandleRunTask(requestId, action, actorId, payload);
                     case "getRun":
                         return HandleGetRun(requestId, action, payload);
+                    case "cancelRun":
+                        return HandleCancelRun(requestId, action, actorId, payload);
                     case "submitInput":
                         return HandleSubmitInput(requestId, action, actorId, payload);
                     case "submitContentProposal":
@@ -432,6 +434,15 @@ namespace ES
         {
             RequireExactProperties(payload, new[] { "runId" }, "getRun payload");
             ESAutomationTaskInvocationResult result = ESAutomationFacade.GetRun(ReadRequestId(payload, "runId"), true);
+            return FromTaskResult(requestId, action, result);
+        }
+
+        private static ESAutomationAiResponse HandleCancelRun(string requestId, string action,
+            string actorId, JObject payload)
+        {
+            RequireExactProperties(payload, new[] { "runId" }, "cancelRun payload");
+            ESAutomationTaskInvocationResult result = ESAutomationFacade.CancelRun(
+                ReadRequestId(payload, "runId"), actorId, true);
             return FromTaskResult(requestId, action, result);
         }
 

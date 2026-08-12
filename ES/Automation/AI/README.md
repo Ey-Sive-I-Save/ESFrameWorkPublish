@@ -4,7 +4,7 @@
 
 ## 启用
 
-在 Unity 中打开 `【ES】/自动化/中心`，勾选“授权本机 AI 请求收件箱”。默认关闭。它不是网络服务；只监视当前项目内的收件箱。
+在 Unity 中打开 `【ES】/自动化与开发/自动化中心/打开自动化中心`，勾选“授权本机 AI 请求收件箱”。默认关闭。它不是网络服务；只监视当前项目内的收件箱。
 
 ```text
 ES/Automation/AI/
@@ -26,7 +26,7 @@ AI 必须先写同目录 `.tmp` 文件，再原子重命名为 `<32位GUID>.requ
 ESAutomationAiBridge.TrySetTrustedPlayModeListening(true, out string reason);
 ```
 
-如果 UnityMCP 只支持 `ExecuteMenuItem`，可执行 `【ES】/自动化/AI 控制/PlayMode 临时恢复收件箱监听`；暂停菜单位于同一路径。这个 API 和菜单都不能开启首次用户授权、不能由 Inbox 请求调用，并会在退出 PlayMode 后自动失效。即使监听恢复，只有注册描述中明确 `allowInPlayMode = true` 的任务可启动；当前场景扫描不允许在 PlayMode 执行。
+如果 UnityMCP 只支持 `ExecuteMenuItem`，可执行 `【ES】/自动化与开发/AI 控制/PlayMode 临时恢复收件箱监听`；暂停菜单位于同一路径。这个 API 和菜单都不能开启首次用户授权、不能由 Inbox 请求调用，并会在退出 PlayMode 后自动失效。即使监听恢复，只有注册描述中明确 `allowInPlayMode = true` 的任务可启动；当前场景扫描不允许在 PlayMode 执行。
 
 ## 直接调用场景扫描
 

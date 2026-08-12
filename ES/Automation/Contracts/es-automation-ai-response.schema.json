@@ -9,7 +9,7 @@
     "protocolVersion": { "type": "integer", "const": 1 },
     "requestId": { "type": "string", "pattern": "^[a-fA-F0-9]{32}$" },
     "action": { "type": "string" },
-    "status": { "type": "string", "enum": ["Accepted", "Completed", "Blocked", "Cancelled", "Rejected", "Failed", "NotFound"] },
+    "status": { "type": "string", "enum": ["Starting", "Accepted", "Running", "Completed", "Blocked", "Cancelled", "TimedOut", "Rejected", "Failed", "NotFound"] },
     "message": { "type": "string" },
     "runId": { "type": "string" },
     "receiptId": { "type": "string" },

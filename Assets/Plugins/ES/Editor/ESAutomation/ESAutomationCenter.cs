@@ -28,6 +28,52 @@ namespace ES
         WriteTemp = 1 << 6,
     }
 
+    /// <summary>
+    /// Automation 运行记录的稳定状态机。Starting 只代表宿主进程已创建，
+    /// Accepted 必须由受控会话事件确认，终态才允许写入 finishedAtUtc。
+    /// </summary>
+    public static class ESAutomationRunStatus
+    {
+        public const string Created = "Created";
+        public const string Starting = "Starting";
+        public const string Accepted = "Accepted";
+        public const string Running = "Running";
+        public const string Completed = "Completed";
+        public const string Failed = "Failed";
+        public const string Cancelled = "Cancelled";
+        public const string TimedOut = "TimedOut";
+        public const string Blocked = "Blocked";
+        public const string DryRun = "DryRun";
+
+        public static bool IsTerminal(string status)
+            => status == Completed || status == Failed || status == Cancelled
+                || status == TimedOut || status == Blocked || status == DryRun;
+
+        public static bool TryTransition(string from, string to)
+        {
+            if (string.Equals(from, to, StringComparison.Ordinal)) return true;
+            if (from == Created) return to == Starting || to == Failed || to == Blocked || to == DryRun;
+            if (from == Starting) return to == Accepted || to == Running || to == Failed
+                || to == Cancelled || to == TimedOut || to == Blocked;
+            if (from == Accepted) return to == Running || to == Completed || to == Failed
+                || to == Cancelled || to == TimedOut;
+            if (from == Running) return to == Completed || to == Failed || to == Cancelled || to == TimedOut;
+            return false;
+        }
+
+        public static void Transition(ESAutomationRunRecord record, string next)
+        {
+            if (record == null) throw new ArgumentNullException(nameof(record));
+            if (!TryTransition(record.status, next))
+                throw new InvalidOperationException("Automation RunRecord 非法状态迁移："
+                    + record.status + " -> " + next);
+            record.status = next;
+            record.lastUpdatedAtUtc = DateTimeOffset.UtcNow.ToString("O");
+            if (IsTerminal(next) && string.IsNullOrWhiteSpace(record.finishedAtUtc))
+                record.finishedAtUtc = record.lastUpdatedAtUtc;
+        }
+    }
+
     [Serializable]
     public sealed class ESAutomationWorkerRegistration
     {
@@ -70,6 +116,10 @@ namespace ES
         public List<string> capabilities = new List<string>();
         public int timeoutSeconds = 600;
         public bool supportsDryRun = true;
+        /// <summary>
+        /// 仅当同一输入重复调用不会扩大副作用时开启。AISkill 工作流据此决定能否自动重试；默认关闭。
+        /// </summary>
+        public bool supportsRetry;
         public List<string> outputs = new List<string>();
 
         public void Validate()
@@ -132,10 +182,23 @@ namespace ES
         public string workerVersion = string.Empty;
         public string entrypointHash = string.Empty;
         public string inputManifestHash = string.Empty;
-        public string status = "Created";
+        public int riskPolicyVersion;
+        public string riskAcceptanceHash = string.Empty;
+        public string riskAcceptedAtUtc = string.Empty;
+        public string riskAcceptedBy = string.Empty;
+        public List<string> acceptedRiskCodes = new List<string>();
+        public string status = ESAutomationRunStatus.Created;
         public int exitCode = -1;
         public string startedAtUtc = string.Empty;
         public string finishedAtUtc = string.Empty;
+        public string lastUpdatedAtUtc = string.Empty;
+        public string sessionId = string.Empty;
+        public string messageId = string.Empty;
+        public string operationDirectory = string.Empty;
+        public int processId;
+        public int codexProcessId;
+        public string threadId = string.Empty;
+        public List<string> outputs = new List<string>();
         public List<string> outputHashes = new List<string>();
         public List<string> findings = new List<string>();
         public List<string> errors = new List<string>();
@@ -563,6 +626,51 @@ namespace ES
             => tasks.TryGetValue(taskId + "@" + version, out contract);
     }
 
+    internal static class ESAutomationSourceState
+    {
+        private static readonly Regex CommitPattern = new Regex("^[a-fA-F0-9]{40}$", RegexOptions.Compiled);
+
+        public static string GetCurrentGitCommit()
+        {
+            string projectRoot = ESAutomationPathPolicy.ProjectRoot;
+            string gitPath = Path.Combine(projectRoot, ".git");
+            if (File.Exists(gitPath))
+            {
+                string gitDirectory = File.ReadAllText(gitPath, new UTF8Encoding(false, true)).Trim();
+                const string prefix = "gitdir:";
+                if (gitDirectory.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    gitDirectory = gitDirectory.Substring(prefix.Length).Trim();
+                if (!Path.IsPathRooted(gitDirectory))
+                    gitDirectory = Path.GetFullPath(Path.Combine(projectRoot, gitDirectory));
+                gitPath = gitDirectory;
+            }
+
+            string headPath = Path.Combine(gitPath, "HEAD");
+            if (!File.Exists(headPath)) return string.Empty;
+            string head = File.ReadAllText(headPath, new UTF8Encoding(false, true)).Trim();
+            if (CommitPattern.IsMatch(head)) return head.ToLowerInvariant();
+            const string refPrefix = "ref:";
+            if (!head.StartsWith(refPrefix, StringComparison.Ordinal)) return string.Empty;
+            string referencePath = Path.Combine(gitPath, head.Substring(refPrefix.Length).Trim().Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(referencePath))
+            {
+                string commit = File.ReadAllText(referencePath, new UTF8Encoding(false, true)).Trim();
+                return CommitPattern.IsMatch(commit) ? commit.ToLowerInvariant() : string.Empty;
+            }
+
+            string packedRefsPath = Path.Combine(gitPath, "packed-refs");
+            if (!File.Exists(packedRefsPath)) return string.Empty;
+            foreach (string line in File.ReadAllLines(packedRefsPath, new UTF8Encoding(false, true)))
+            {
+                string[] parts = line.Trim().Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 2 && string.Equals(parts[1], head.Substring(refPrefix.Length).Trim(), StringComparison.Ordinal)
+                    && CommitPattern.IsMatch(parts[0]))
+                    return parts[0].ToLowerInvariant();
+            }
+            return string.Empty;
+        }
+    }
+
     public sealed class ESAutomationProcessRequest
     {
         public string taskId = string.Empty;
@@ -848,6 +956,7 @@ namespace ES
         public static string ProjectRoot => Directory.GetParent(Application.dataPath).FullName;
         public static string ReportsRoot => Path.Combine(ProjectRoot, "ES", "Automation", "Reports");
         public static string TempRoot => Path.Combine(ProjectRoot, "ES", "Automation", "Temp");
+        public static string RunsRoot => Path.Combine(ProjectRoot, "ES", "Automation", "Runs");
 
         public static string Normalize(string path)
         {
@@ -947,8 +1056,8 @@ namespace ES
         public static void EnsureDeclaredWriteRoot(string root)
         {
             string normalized = Normalize(root);
-            if (!IsWithin(normalized, new[] { ReportsRoot, TempRoot }))
-                throw new UnauthorizedAccessException("管理骨架阶段的 WriteRoots 只能位于 ES/Automation/Reports 或 ES/Automation/Temp：" + normalized);
+            if (!IsWithin(normalized, new[] { ReportsRoot, TempRoot, RunsRoot }))
+                throw new UnauthorizedAccessException("管理骨架阶段的 WriteRoots 只能位于 ES/Automation/Reports、Temp 或 Runs：" + normalized);
         }
 
         private static IEnumerable<string> ProtectedWriteRoots
@@ -1078,13 +1187,73 @@ namespace ES
         }
     }
 
-    public sealed class ESAutomationCenterWindow : EditorWindow
+    public sealed class ESAutomationCenterWindow : ESSinglePageIMGUIWindow<ESAutomationCenterWindow>
     {
-        [MenuItem(MenuItemPathDefine.AUTOMATION_PATH + "自动化中心")]
-        private static void Open() => GetWindow<ESAutomationCenterWindow>("ES 自动化中心");
+        private Vector2 scrollPosition;
 
-        private void OnGUI()
+        [MenuItem(MenuItemPathDefine.AUTOMATION_CENTER_PATH + "打开自动化中心")]
+        private static void Open() => OpenWindow();
+
+        public override GUIContent ESWindow_GetWindowGUIContent()
         {
+            return new GUIContent("ES 自动化中心", "管理受信自动化任务、Worker、运行记录与 AI 调用授权");
+        }
+
+        protected override string ESWindow_Subtitle => "受信任务、Worker 与 AI 调用门禁";
+        protected override Vector2 ESWindow_MinSize => new Vector2(640f, 520f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(880f, 720f);
+        protected override string ESWindow_PageStableId => "automation.center";
+        protected override string ESWindow_PageTitle => "自动化中心";
+        protected override string ESWindow_PageKeywords => "Automation Worker Task Run AI Bridge 自动化 任务";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "automation.validate-python",
+                    "验证 Python",
+                    "验证受管 Python 3 环境与运行时指纹。",
+                    context =>
+                    {
+                        if (ESAutomationSceneScanPythonAdapter.TryPrepareRuntime(
+                                out ESAutomationPythonRuntime runtime,
+                                out string reason))
+                        {
+                            EditorUtility.DisplayDialog(
+                                "Python 环境可用",
+                                "来源：" + runtime.source
+                                + "\n运行时：" + runtime.runtimeId
+                                + "\n版本：" + runtime.detectedPythonVersion
+                                + "\n指纹：" + runtime.environmentFingerprint,
+                                "关闭");
+                            context.SetStatus("Python 环境验证通过");
+                        }
+                        else
+                        {
+                            EditorUtility.DisplayDialog("Python 环境不可用", reason, "关闭");
+                            context.SetStatus("Python 环境验证失败", ESMenuTreePageStatus.Warning);
+                        }
+                    })
+                .WithUnityIcon("TestPassed")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "automation.copy-ai-example",
+                    "复制 AI 样例",
+                    "复制受管 AI Inbox 请求样例。",
+                    context =>
+                    {
+                        CopyAiRequestExample();
+                        context.Notify("AI 调用样例已复制");
+                    })
+                .WithUnityIcon("Clipboard")
+                .WithPriority(30));
+        }
+
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
+        {
+            scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
+            try
+            {
             EditorGUILayout.LabelField("ES 自动化中心", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox("C# Editor 是任务权限、路径策略、运行记录和发布门禁的权威入口。仅已注册、入口指纹固定且有受信 Adapter 的 Worker 可执行。", MessageType.Info);
             EditorGUILayout.LabelField("已注册任务", ESAutomationTaskRegistry.Tasks.Count.ToString());
@@ -1137,6 +1306,11 @@ namespace ES
             EditorGUILayout.LabelField("监听状态", ESAutomationAiBridge.IsListening ? "监听中" : "未监听", EditorStyles.wordWrappedMiniLabel);
             EditorGUILayout.LabelField("AI 收件箱", ESAutomationAiBridge.InboxDirectory, EditorStyles.wordWrappedMiniLabel);
             if (GUILayout.Button("复制 AI 调用样例", GUILayout.Height(22f))) CopyAiRequestExample();
+            }
+            finally
+            {
+                EditorGUILayout.EndScrollView();
+            }
         }
 
         private static void OpenQuickTaskDropdown(Rect anchorRect)

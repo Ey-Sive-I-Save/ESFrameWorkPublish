@@ -48,12 +48,51 @@ namespace ES
             if (invocation == null) return ESAutomationTaskInvocationResult.Rejected("缺少 Automation 调用请求。");
             if (!endpoints.TryGetValue(Key(invocation.taskId, invocation.taskVersion), out IESAutomationTaskEndpoint endpoint))
                 return ESAutomationTaskInvocationResult.Rejected("未注册或不支持的任务：" + invocation.taskId + "@" + invocation.taskVersion);
+            if (!ESAutomationTaskRegistry.TryGet(invocation.taskId, invocation.taskVersion,
+                    out ESAutomationTaskContract contract))
+                return ESAutomationTaskInvocationResult.Rejected("任务缺少受信 TaskContract：" + invocation.taskId + "@" + invocation.taskVersion);
+            try
+            {
+                contract.Validate();
+                if (contract.worker == null || !contract.worker.enabled)
+                    return ESAutomationTaskInvocationResult.Blocked("TaskContract 的 Worker 未被 C# Editor 启用。");
+                if (!(endpoint is IESAutomationContractBoundEndpoint bound))
+                    return ESAutomationTaskInvocationResult.Rejected("Endpoint 未绑定 TaskContract 执行门禁。");
+                ESAutomationInvocationRequirements requirements = bound.DescribeInvocation(invocation);
+                if (requirements == null || requirements.worker == null)
+                    return ESAutomationTaskInvocationResult.Rejected("Endpoint 未声明本次调用的受信 Worker 身份。");
+                if (!SameWorker(contract.worker, requirements.worker))
+                    return ESAutomationTaskInvocationResult.Rejected("调用要求的 Worker 身份与 TaskContract 不一致。");
+                ESAutomationCapability declared = contract.ResolveCapabilities();
+                if ((requirements.requiredCapabilities & ~declared) != ESAutomationCapability.None)
+                    return ESAutomationTaskInvocationResult.Rejected("调用要求的能力超出 TaskContract：" + requirements.requiredCapabilities);
+                if (requirements.dryRun && !contract.supportsDryRun)
+                    return ESAutomationTaskInvocationResult.Blocked("该 TaskContract 未声明支持 DryRun。");
+                if (!string.IsNullOrWhiteSpace(requirements.inputManifestHash)
+                    && !ESAutomationWorkerRegistration.IsSha256(requirements.inputManifestHash))
+                    return ESAutomationTaskInvocationResult.Rejected("调用输入 Manifest Hash 无效。");
+                foreach (string path in requirements.readPaths ?? new List<string>())
+                    ESAutomationPathPolicy.EnsureWorkerReadAllowed(path, contract.readRoots);
+                foreach (string path in requirements.writePaths ?? new List<string>())
+                    ESAutomationPathPolicy.EnsureWorkerWriteAllowed(path, contract.writeRoots);
+            }
+            catch (Exception exception)
+            {
+                return ESAutomationTaskInvocationResult.Rejected("Automation Contract 门禁拒绝调用：" + exception.Message);
+            }
             if (invocation.fromAi && !endpoint.Descriptor.allowAiInvoke)
                 return ESAutomationTaskInvocationResult.Rejected("该任务未授权 AI 直接调用：" + endpoint.Descriptor.taskId);
             if (EditorApplication.isPlayingOrWillChangePlaymode && !endpoint.Descriptor.allowInPlayMode)
                 return ESAutomationTaskInvocationResult.Blocked("该任务未声明允许在 PlayMode 运行：" + endpoint.Descriptor.taskId);
             return endpoint.Run(invocation);
         }
+
+        private static bool SameWorker(ESAutomationWorkerRegistration left, ESAutomationWorkerRegistration right)
+            => left != null && right != null
+                && string.Equals(left.type, right.type, StringComparison.Ordinal)
+                && string.Equals(left.workerId, right.workerId, StringComparison.Ordinal)
+                && string.Equals(left.version, right.version, StringComparison.Ordinal)
+                && string.Equals(left.entrypointHash, right.entrypointHash, StringComparison.OrdinalIgnoreCase);
 
         public static ESAutomationTaskInvocationResult GetRun(string runId, bool fromAi)
         {
@@ -84,6 +123,20 @@ namespace ES
             return ESAutomationTaskInvocationResult.NotFound("未找到该 RunId 的待输入任务。");
         }
 
+        public static ESAutomationTaskInvocationResult CancelRun(string runId, string actorId, bool fromAi)
+        {
+            if (!Guid.TryParseExact(runId, "N", out _))
+                return ESAutomationTaskInvocationResult.Rejected("RunId 必须是 N 格式 GUID。");
+            foreach (IESAutomationTaskEndpoint endpoint in endpoints.Values)
+            {
+                if (!(endpoint is IESAutomationCancellableTaskEndpoint cancellable)) continue;
+                if (fromAi && !endpoint.Descriptor.allowAiInvoke) continue;
+                ESAutomationTaskInvocationResult result = cancellable.CancelRun(runId, actorId ?? string.Empty);
+                if (!string.Equals(result.status, "NotFound", StringComparison.Ordinal)) return result;
+            }
+            return ESAutomationTaskInvocationResult.NotFound("未找到支持取消的 Automation Run。");
+        }
+
         private static string Key(string taskId, int taskVersion) => (taskId ?? string.Empty) + "@" + taskVersion;
     }
 
@@ -93,6 +146,29 @@ namespace ES
         ESAutomationTaskInvocationResult Run(ESAutomationTaskInvocation invocation);
         ESAutomationTaskInvocationResult GetRun(string runId);
         ESAutomationTaskInvocationResult SubmitInput(ESAutomationTaskInputSubmission submission);
+    }
+
+    /// <summary>
+    /// Endpoint 对本次调用声明实际资源要求，供 Facade 与注册 TaskContract 做执行前核对。
+    /// </summary>
+    public sealed class ESAutomationInvocationRequirements
+    {
+        public ESAutomationWorkerRegistration worker = new ESAutomationWorkerRegistration();
+        public ESAutomationCapability requiredCapabilities;
+        public bool dryRun;
+        public List<string> readPaths = new List<string>();
+        public List<string> writePaths = new List<string>();
+        public string inputManifestHash = string.Empty;
+    }
+
+    public interface IESAutomationContractBoundEndpoint
+    {
+        ESAutomationInvocationRequirements DescribeInvocation(ESAutomationTaskInvocation invocation);
+    }
+
+    public interface IESAutomationCancellableTaskEndpoint
+    {
+        ESAutomationTaskInvocationResult CancelRun(string runId, string actorId);
     }
 
     [Serializable]
@@ -258,6 +334,7 @@ namespace ES
         public string preset = string.Empty;
         public JObject input = new JObject();
         public bool fromAi;
+        public bool dryRun;
         public string actorId = string.Empty;
     }
 
@@ -282,6 +359,9 @@ namespace ES
 
         public static ESAutomationTaskInvocationResult Accepted(string message, string runId, JObject data = null)
             => new ESAutomationTaskInvocationResult { status = "Accepted", message = message ?? string.Empty, runId = runId ?? string.Empty, data = data ?? new JObject() };
+
+        public static ESAutomationTaskInvocationResult Starting(string message, string runId, JObject data = null)
+            => new ESAutomationTaskInvocationResult { status = "Starting", message = message ?? string.Empty, runId = runId ?? string.Empty, data = data ?? new JObject() };
 
         public static ESAutomationTaskInvocationResult Completed(string message, string runId, JObject data = null)
             => new ESAutomationTaskInvocationResult { status = "Completed", message = message ?? string.Empty, runId = runId ?? string.Empty, data = data ?? new JObject() };

@@ -30,6 +30,7 @@
     },
     "timeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 7200 },
     "supportsDryRun": { "type": "boolean" },
+    "supportsRetry": { "type": "boolean", "default": false },
     "outputs": { "type": "array", "items": { "type": "string", "minLength": 1 } }
   }
 }

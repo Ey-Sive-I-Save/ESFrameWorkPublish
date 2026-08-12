@@ -1,0 +1,21 @@
+{
+    "name": "ES.CmdAgent.Editor.Tests",
+    "rootNamespace": "ES.Tests",
+    "references": [
+        "ES_Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}

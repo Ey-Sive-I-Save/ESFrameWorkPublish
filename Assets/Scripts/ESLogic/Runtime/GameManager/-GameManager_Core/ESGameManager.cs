@@ -36,6 +36,10 @@ namespace ES
         public bool autoCreateAudioModule = true;
 
         [TabGroup("配置")]
+        [LabelText("自动创建 VFX 模块")]
+        public bool autoCreateVfxModule = true;
+
+        [TabGroup("配置")]
         [LabelText("自动创建相机模块")]
         public bool autoCreateCameraModule = true;
 
@@ -96,6 +100,9 @@ namespace ES
 
             if (autoCreateAudioModule)
                 GetMoudle<ESAudioModule>();
+
+            if (autoCreateVfxModule)
+                GetMoudle<ESVfxModule>();
 
             if (autoCreateCameraModule)
                 GetMoudle<ESCameraModule>();

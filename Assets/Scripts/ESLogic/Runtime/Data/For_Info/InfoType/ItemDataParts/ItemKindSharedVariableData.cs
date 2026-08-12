@@ -118,6 +118,10 @@ namespace ES
         [LabelText("武器类型")]
         public ItemWeaponKind weaponKind;
 
+        [LabelText("普攻 Action")]
+        [Tooltip("近战武器的默认普攻 Action。为空时可由角色或当前装配槽位提供回退；远程 WeaponFire 不读取该字段。")]
+        public ESActionConfigKey primaryAttackAction = new ESActionConfigKey();
+
         [LabelText("默认飞行物 Key")]
         public ESShotConfigKey defaultShot = new ESShotConfigKey();
 
@@ -141,6 +145,7 @@ namespace ES
         public static ItemWeaponSharedData Default => new ItemWeaponSharedData
         {
             weaponKind = ItemWeaponKind.None,
+            primaryAttackAction = new ESActionConfigKey(),
             defaultShot = new ESShotConfigKey(),
             hitRadius = 0.2f,
             cooldown = 0.2f,
@@ -153,6 +158,7 @@ namespace ES
         internal void ResetToDefaults()
         {
             weaponKind = ItemWeaponKind.None;
+            primaryAttackAction = new ESActionConfigKey();
             defaultShot = new ESShotConfigKey();
             hitRadius = 0.2f;
             cooldown = 0.2f;
@@ -458,6 +464,7 @@ namespace ES
     {
         public override ItemKind Kind => ItemKind.Shot;
         [HideLabel] public ItemShotSharedData sharedData = ItemShotSharedData.Default;
+        [ESConfigKeyUsage(ESConfigKeyUsage.Declaration)]
         [HideLabel, InlineProperty] public ESShotConfigKey key = new ESShotConfigKey();
         [HideLabel] public ItemShotVariableData initialState = ItemShotVariableData.Default;
 
@@ -489,6 +496,7 @@ namespace ES
     {
         public override ItemKind Kind => ItemKind.Weapon;
         [HideLabel] public ItemWeaponSharedData sharedData = ItemWeaponSharedData.Default;
+        [ESConfigKeyUsage(ESConfigKeyUsage.Declaration)]
         [HideLabel, InlineProperty] public ESWeaponConfigKey key = new ESWeaponConfigKey();
         [HideLabel] public ItemWeaponVariableData initialState = ItemWeaponVariableData.Default;
 

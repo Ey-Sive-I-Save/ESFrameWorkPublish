@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace ES {
-    [AddComponentMenu("<ES>ESM支持/输入/选择中-可接收列表")]
+    [AddComponentMenu("【ES】/UI/输入事件/选择中-可接收列表")]
     public class EMS_UpdateSelected_LinkList : EMS_InputBaseEvent_LinkList_Abstract, IUpdateSelectedHandler
     {
         public void OnUpdateSelected(BaseEventData eventData)

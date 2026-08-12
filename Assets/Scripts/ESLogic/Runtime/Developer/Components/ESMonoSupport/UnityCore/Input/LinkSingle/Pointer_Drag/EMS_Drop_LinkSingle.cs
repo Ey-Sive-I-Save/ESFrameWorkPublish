@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace ES {
-    [AddComponentMenu("<ES>ESM支持/输入/可拖动落入此处-指定接收目标")]
+    [AddComponentMenu("【ES】/UI/输入事件/可拖动落入此处-指定接收目标")]
     public class EMS_Drop_LinkSingle : EMS_InputPointerEvent_LinkSingle_Abstract, IDropHandler
     {
         public void OnDrop(PointerEventData eventData)

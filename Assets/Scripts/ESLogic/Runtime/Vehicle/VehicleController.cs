@@ -135,7 +135,7 @@ namespace ES
     /// 并用独立的 ESWorkScheduler 阶段承载车辆能力，绝不复用 Entity 专用运动接口。
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class VehicleController : MonoBehaviour, ICharacterController
+    public sealed class VehicleController : MonoBehaviour, ICharacterController, IESMotionInfluenceReceiver
     {
         [Title("运动后端")]
         [LabelText("后端")]
@@ -168,6 +168,12 @@ namespace ES
 
         [ShowIf(nameof(useKinematicGravity)), LabelText("KCC 重力向量")]
         public Vector3 kinematicGravity = new Vector3(0f, -9.81f, 0f);
+
+        [Title("外部运动影响")]
+        [MinValue(0f), LabelText("合并加速度上限")]
+        public float maxCombinedInfluenceAcceleration = 80f;
+        [MinValue(0f), LabelText("单步速度增量上限")]
+        public float maxCombinedInfluenceVelocityDelta = 30f;
 
         [Title("驾驶镜头", "可选。只在驾驶权授予期间提交一个 Shot；角色、座位和载具能力不持有 VCam。")]
         [LabelText("Definition")]
@@ -227,6 +233,7 @@ namespace ES
         [NonSerialized] private Entity currentDriver;
         [NonSerialized] private EntityMountable currentDriverSeat;
         [NonSerialized] private ESCameraLease driverCameraLease;
+        [NonSerialized] private ESMotionInfluenceAccumulator motionInfluences;
 
         private bool UsesRigidbody => motionBackend == VehicleMotionBackend.Rigidbody;
         private bool UsesKinematicMotor => motionBackend == VehicleMotionBackend.KinematicCharacterMotor;
@@ -246,6 +253,7 @@ namespace ES
 
         private void OnDisable()
         {
+            motionInfluences?.ClearPendingVelocityDelta();
             // 单独禁用控制器也必须撤销座位占用；不能只清输入而留下 Mounted 骑手。
             EntityMountable driverSeat = currentDriverSeat;
             if (driverSeat != null)
@@ -263,6 +271,7 @@ namespace ES
             // KCC 不保存弱引用；销毁载具时清掉自己登记的控制器，避免 Motor 保留已销毁的 owner。
             ReleaseDriverCameraRequest();
             UnbindKinematicMotor();
+            motionInfluences?.Reset();
         }
 
         private void OnValidate()
@@ -507,6 +516,7 @@ namespace ES
             Vector3 velocity = physicsBody.velocity;
             if (!DispatchVelocity(ref velocity, deltaTime))
                 ApplyDefaultVelocity(ref velocity, physicsBody.transform.up, stableOnGround: true, deltaTime);
+            ApplyMotionInfluences(ref velocity, physicsBody.position, deltaTime);
 
             physicsBody.MoveRotation(rotation);
             physicsBody.velocity = velocity;
@@ -545,6 +555,52 @@ namespace ES
                 if (!stableOnGround && useKinematicGravity)
                     currentVelocity += kinematicGravity * deltaTime;
             }
+            ApplyMotionInfluences(ref currentVelocity, kinematicMotor.TransientPosition, deltaTime);
+        }
+
+        public bool AddVelocity(
+            Vector3 velocity,
+            ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
+        {
+            if (!IsReady || !IsFinite(velocity))
+                return false;
+            EnsureMotionInfluences().AddVelocity(velocity, permissions);
+            return true;
+        }
+
+        public bool TryAcquireField(
+            in ESMotionFieldRequest request,
+            out ESMotionFieldLease lease)
+        {
+            if (!IsReady)
+            {
+                lease = default;
+                return false;
+            }
+            return EnsureMotionInfluences().TryAcquireField(request, out lease);
+        }
+
+        private void ApplyMotionInfluences(ref Vector3 velocity, Vector3 position, float deltaTime)
+        {
+            motionInfluences?.Apply(
+                ref velocity,
+                position,
+                deltaTime,
+                ESMotionReceiverLockState.None,
+                maxCombinedInfluenceAcceleration,
+                maxCombinedInfluenceVelocityDelta);
+        }
+
+        private ESMotionInfluenceAccumulator EnsureMotionInfluences()
+        {
+            return motionInfluences ??= new ESMotionInfluenceAccumulator();
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return !float.IsNaN(value.x) && !float.IsInfinity(value.x)
+                && !float.IsNaN(value.y) && !float.IsInfinity(value.y)
+                && !float.IsNaN(value.z) && !float.IsInfinity(value.z);
         }
 
         public void PostGroundingUpdate(float deltaTime)

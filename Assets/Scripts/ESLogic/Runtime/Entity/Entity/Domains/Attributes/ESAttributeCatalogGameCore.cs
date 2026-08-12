@@ -7,7 +7,7 @@ namespace ES
     /// Consumer-loaded GameCore root for the Character and Item attribute schemas.
     /// GameCore editor data never crosses this boundary into runtime.
     /// </summary>
-    [CreateAssetMenu(menuName = "【ES】/项目设置/GameCore/属性目录", fileName = "ESAttributeCatalogGameCore")]
+    [CreateAssetMenu(menuName = "【ES】/配置/GameCore/属性目录", fileName = "ESAttributeCatalogGameCore")]
     public sealed class ESAttributeCatalogGameCore : ScriptableObject, IGameCoreSO
     {
         [SerializeField] private ESAttributeBakeTable attributeCatalog;

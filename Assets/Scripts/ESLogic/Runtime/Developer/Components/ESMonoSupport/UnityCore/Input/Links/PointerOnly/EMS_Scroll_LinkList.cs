@@ -7,7 +7,7 @@ using UnityEngine.EventSystems;
 
 namespace ES
 {
-    [AddComponentMenu("<ES>ESM支持/输入/滚轮滚动-可接收列表")]
+    [AddComponentMenu("【ES】/UI/输入事件/滚轮滚动-可接收列表")]
     public class EMS_Scroll
         : EMS_Abstract_ChannelLinkList<Channel_InputBaseEvent,Link_InputAxisEvent>, IScrollHandler
     {

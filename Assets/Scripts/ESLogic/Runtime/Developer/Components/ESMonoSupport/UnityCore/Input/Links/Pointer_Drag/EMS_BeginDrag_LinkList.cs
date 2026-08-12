@@ -7,7 +7,7 @@ using UnityEngine.EventSystems;
 
 namespace ES
 {
-    [AddComponentMenu("<ES>ESM支持/输入/开始拖动-可接收列表")]
+    [AddComponentMenu("【ES】/UI/输入事件/开始拖动-可接收列表")]
     public class EMS_BeginDrag_LinkList : EMS_InputPointerEvent_LinkList_Abstract, IBeginDragHandler
     {
         public void OnBeginDrag(PointerEventData eventData)

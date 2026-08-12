@@ -1,12 +1,86 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace ES
 {
     public static class ESStoryDefinitionCatalog
     {
-        private static readonly ESStoryConfigKeyTable table = new ESStoryConfigKeyTable();
-        public static ESStoryConfigKeyTable Table => table;
+        private sealed class CatalogEntry
+        {
+            public readonly ESStoryDefinitionSnapshot Snapshot;
+            public readonly string DebugName;
+
+            public CatalogEntry(ESStoryDefinitionSnapshot snapshot, string debugName)
+            {
+                Snapshot = snapshot;
+                DebugName = debugName ?? string.Empty;
+            }
+        }
+
+        private sealed class CatalogGeneration
+        {
+            public readonly ESStoryConfigKeyTable Table;
+            public readonly Dictionary<string, CatalogEntry> Entries;
+
+            public CatalogGeneration(ESStoryConfigKeyTable table, Dictionary<string, CatalogEntry> entries)
+            {
+                Table = table;
+                Entries = entries;
+            }
+        }
+
+        private static CatalogGeneration current = CreateEmptyGeneration();
+        private static Dictionary<string, CatalogEntry> pending;
+
+        public static bool IsBuilding => pending != null;
+        public static int Count => current.Entries.Count;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStaticState()
+        {
+            pending = null;
+            current = CreateEmptyGeneration();
+        }
+
+        public static void BeginBuild(bool clear = false)
+        {
+            if (pending != null)
+                throw new InvalidOperationException("Story Definition Catalog 已处于构建事务中。");
+
+            pending = clear
+                ? new Dictionary<string, CatalogEntry>(StringComparer.Ordinal)
+                : new Dictionary<string, CatalogEntry>(current.Entries, StringComparer.Ordinal);
+        }
+
+        public static void EndBuild()
+        {
+            if (pending == null)
+                throw new InvalidOperationException("Story Definition Catalog 尚未开始构建事务。");
+
+            Dictionary<string, CatalogEntry> candidate = pending;
+            try
+            {
+                CatalogGeneration next = BuildGeneration(candidate);
+                current = next;
+            }
+            finally
+            {
+                pending = null;
+            }
+        }
+
+        public static void AbortBuild()
+        {
+            pending = null;
+        }
+
+        public static void Clear()
+        {
+            if (pending != null)
+                throw new InvalidOperationException("Story Definition Catalog 构建期间不能清空当前代。");
+            current = CreateEmptyGeneration();
+        }
 
         public static void Inject(ESStoryDefinitionDataInfo info)
         {
@@ -14,50 +88,91 @@ namespace ES
             if (!ESStoryDefinitionSnapshot.TryBake(info, out ESStoryDefinitionSnapshot snapshot, out string error))
                 throw new InvalidOperationException("Story 定义无效：" + info.name + "，" + error);
 
-            bool ownsBuild = !table.IsBuilding;
-            if (ownsBuild) table.BeginBuild();
+            bool ownsBuild = pending == null;
+            if (ownsBuild) BeginBuild();
             try
             {
-                if (table.TryGet(info.definitionId, out ESStoryDefinitionRuntimeData existing))
+                if (pending.TryGetValue(snapshot.DefinitionId, out CatalogEntry existing))
                 {
-                    if (existing.contentVersion == snapshot.ContentVersion
-                        && string.Equals(existing.contentSignature, snapshot.ContentSignature, StringComparison.Ordinal))
+                    if (existing.Snapshot.ContentVersion == snapshot.ContentVersion
+                        && string.Equals(existing.Snapshot.ContentSignature, snapshot.ContentSignature, StringComparison.Ordinal))
+                    {
+                        if (ownsBuild) AbortBuild();
                         return;
+                    }
                     throw new InvalidOperationException("同一 DefinitionId 注入了不同版本或签名：" + snapshot.DefinitionId);
                 }
 
-                ESStoryDefinitionRuntimeData data = table.AcquireRetained(info.definitionId);
-                try
-                {
-                    data.definitionId = snapshot.DefinitionId;
-                    data.contentVersion = snapshot.ContentVersion;
-                    data.contentSignature = snapshot.ContentSignature;
-                    data.snapshot = snapshot;
-                    if (table.CommitRetained(info.definitionId, data, info.name) == 0)
-                        throw new InvalidOperationException("Story Definition Catalog 注入失败：" + snapshot.DefinitionId);
-                }
-                catch
-                {
-                    table.AbandonRetained(data);
-                    throw;
-                }
+                pending.Add(snapshot.DefinitionId, new CatalogEntry(snapshot, info.name));
+                if (ownsBuild) EndBuild();
             }
-            finally
+            catch
             {
-                if (ownsBuild) table.EndBuild();
+                if (ownsBuild) AbortBuild();
+                throw;
             }
+        }
+
+        public static bool TryResolve(ESStoryConfigKey key, out ESStoryDefinitionSnapshot snapshot)
+        {
+            snapshot = null;
+            CatalogGeneration generation = current;
+            if (key == null || !generation.Table.TryGet(key, out ESStoryDefinitionRuntimeData data) || data?.snapshot == null)
+                return false;
+            snapshot = data.snapshot;
+            return true;
         }
 
         public static bool TryResolve(ESStoryConfigKey key, int contentVersion, string contentSignature, out ESStoryDefinitionSnapshot snapshot)
         {
             snapshot = null;
-            if (key == null || !table.TryGet(key, out ESStoryDefinitionRuntimeData data) || data?.snapshot == null)
+            CatalogGeneration generation = current;
+            if (key == null || !generation.Table.TryGet(key, out ESStoryDefinitionRuntimeData data) || data?.snapshot == null)
                 return false;
             if (data.contentVersion != contentVersion
                 || !string.Equals(data.contentSignature, contentSignature, StringComparison.Ordinal))
                 return false;
             snapshot = data.snapshot;
             return true;
+        }
+
+        private static CatalogGeneration CreateEmptyGeneration()
+        {
+            return new CatalogGeneration(
+                new ESStoryConfigKeyTable(),
+                new Dictionary<string, CatalogEntry>(StringComparer.Ordinal));
+        }
+
+        private static CatalogGeneration BuildGeneration(Dictionary<string, CatalogEntry> source)
+        {
+            var table = new ESStoryConfigKeyTable(Math.Max(128, source.Count));
+            var entries = new Dictionary<string, CatalogEntry>(source, StringComparer.Ordinal);
+            var orderedIds = new List<string>(entries.Keys);
+            orderedIds.Sort(StringComparer.Ordinal);
+            table.BeginBuild(true);
+            try
+            {
+                for (int i = 0; i < orderedIds.Count; i++)
+                {
+                    CatalogEntry entry = entries[orderedIds[i]];
+                    ESStoryDefinitionSnapshot snapshot = entry.Snapshot;
+                    ESStoryConfigKey key = snapshot.DefinitionId;
+                    ESStoryDefinitionRuntimeData data = table.AcquireRetained(key);
+                    data.definitionId = snapshot.DefinitionId;
+                    data.contentVersion = snapshot.ContentVersion;
+                    data.contentSignature = snapshot.ContentSignature;
+                    data.snapshot = snapshot;
+                    if (table.CommitRetained(key, data, entry.DebugName) == 0)
+                        throw new InvalidOperationException("Story Definition Catalog 候选代构建失败：" + snapshot.DefinitionId);
+                }
+                table.EndBuild();
+                return new CatalogGeneration(table, entries);
+            }
+            catch
+            {
+                if (table.IsBuilding) table.EndBuild();
+                throw;
+            }
         }
     }
 

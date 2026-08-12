@@ -13,7 +13,7 @@ namespace ES
     [RequireComponent(typeof(Entity))]
     [RequireComponent(typeof(EntityTransformMapping))]
     [UnityEngine.Scripting.APIUpdating.MovedFrom(true, sourceNamespace: "ES", sourceAssembly: "ES_Logic", sourceClassName: "EntityCharacterProfile")]
-    [AddComponentMenu("【ES】/场景与对象/角色身份")]
+    [AddComponentMenu("【ES】/角色与交互/角色身份")]
     public sealed class EntityCharacterIdentity : MonoBehaviour
     {
         [Title("角色身份")]

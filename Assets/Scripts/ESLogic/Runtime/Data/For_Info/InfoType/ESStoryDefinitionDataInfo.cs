@@ -74,6 +74,7 @@ namespace ES
     [ESCreatePath("数据信息/GameCore", "任务与剧情定义")]
     public sealed class ESStoryDefinitionDataInfo : SoDataInfo, IGameCoreSO
     {
+        [ESConfigKeyUsage(ESConfigKeyUsage.Declaration)]
         [TitleGroup("任务与剧情"), LabelText("Definition ID"), InlineProperty]
         public ESStoryConfigKey definitionId = new ESStoryConfigKey();
         [TitleGroup("任务与剧情"), LabelText("类型")]
@@ -248,14 +249,11 @@ namespace ES
                     WriteString(writer, n.speakerName);
                     WriteString(writer, n.text);
                     WriteCondition(writer, n.tagCondition);
-                    List<ESStoryOptionDefinition> orderedOptions = n.options != null
-                        ? new List<ESStoryOptionDefinition>(n.options)
-                        : new List<ESStoryOptionDefinition>();
-                    orderedOptions.Sort((left, right) => string.CompareOrdinal(left?.optionId, right?.optionId));
-                    writer.Write(orderedOptions.Count);
-                    for (int j = 0; j < orderedOptions.Count; j++)
+                    int optionCount = n.options != null ? n.options.Count : 0;
+                    writer.Write(optionCount);
+                    for (int j = 0; j < optionCount; j++)
                     {
-                        ESStoryOptionDefinition o = orderedOptions[j];
+                        ESStoryOptionDefinition o = n.options[j];
                         writer.Write(o != null);
                         if (o == null) continue;
                         WriteString(writer, o.optionId);

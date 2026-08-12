@@ -25,9 +25,29 @@ MonoBehaviour:
   tags: []
   baseConfig:
     kind: 4
-    prefab: {fileID: 0}
+    prefabKey:
+      enumKey: 0
+      stringKey:
+      guid:
+      localFileId: 0
+      assetTypeName:
+      address:
+      groupName:
+      editorPath:
+      editorOnly: 0
+      alwaysLoaded: 0
     displayName: 
-    icon: {fileID: 0}
+    iconKey:
+      enumKey: 0
+      stringKey:
+      guid:
+      localFileId: 0
+      assetTypeName:
+      address:
+      groupName:
+      editorPath:
+      editorOnly: 0
+      alwaysLoaded: 0
   interactConfig:
     canInteract: 0
     useMode: 1
@@ -88,7 +108,7 @@ MonoBehaviour:
           allowMustHit: 1
         key:
           enumKey: 0
-          stringKey:
+          stringKey: shot.test.data_key_2
           definitionGuid:
           definitionLocalFileId: 0
           definitionTypeName:
@@ -129,9 +149,29 @@ MonoBehaviour:
   tags: []
   baseConfig:
     kind: 4
-    prefab: {fileID: 0}
+    prefabKey:
+      enumKey: 0
+      stringKey:
+      guid:
+      localFileId: 0
+      assetTypeName:
+      address:
+      groupName:
+      editorPath:
+      editorOnly: 0
+      alwaysLoaded: 0
     displayName: 
-    icon: {fileID: 0}
+    iconKey:
+      enumKey: 0
+      stringKey:
+      guid:
+      localFileId: 0
+      assetTypeName:
+      address:
+      groupName:
+      editorPath:
+      editorOnly: 0
+      alwaysLoaded: 0
   interactConfig:
     canInteract: 0
     useMode: 1

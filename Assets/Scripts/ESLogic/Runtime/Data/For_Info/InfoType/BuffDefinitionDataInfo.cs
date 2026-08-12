@@ -108,6 +108,7 @@ namespace ES
         public const int DefaultMaxCatchUpTicksPerFrame = 4;
 
         [Title("Key")]
+        [ESConfigKeyUsage(ESConfigKeyUsage.Declaration)]
         [HideLabel, InlineProperty]
         public ESBuffConfigKey key = new ESBuffConfigKey();
 

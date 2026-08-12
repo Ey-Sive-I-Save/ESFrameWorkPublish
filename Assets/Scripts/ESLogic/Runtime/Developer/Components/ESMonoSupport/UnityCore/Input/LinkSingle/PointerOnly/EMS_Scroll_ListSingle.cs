@@ -7,7 +7,7 @@ using UnityEngine.EventSystems;
 
 namespace ES
 {
-    [AddComponentMenu("<ES>ESM支持/输入/滚轮滚动-指定接收目标")]
+    [AddComponentMenu("【ES】/UI/输入事件/滚轮滚动-指定接收目标")]
     public class EMS_Scroll_LinkList : EMS_Abstract_ChannelLinkSingle<Channel_InputBaseEvent, Link_InputAxisEvent>, IScrollHandler
     {
         public void OnScroll(PointerEventData eventData)

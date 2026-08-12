@@ -7,7 +7,7 @@ namespace ES
 {
     [DisallowMultipleComponent]
     [RequireComponent(typeof(ESSceneValidationGuide))]
-    [AddComponentMenu("ES/Diagnostics/ESAITest Scene Validation Provider")]
+    [AddComponentMenu("【ES】/开发与验证/诊断/ESAITest Scene Validation Provider")]
     public sealed class ESAITestSceneValidationProvider : MonoBehaviour, ESAITestCapabilityProvider
     {
         [SerializeField] private ESSceneValidationGuide guide;

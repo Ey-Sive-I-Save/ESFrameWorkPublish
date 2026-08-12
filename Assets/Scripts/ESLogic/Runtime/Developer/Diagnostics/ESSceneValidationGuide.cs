@@ -16,7 +16,7 @@ namespace ES
     /// 每个测试场景只拥有自己的 Guide、Canvas、步骤和诊断结果。
     /// </summary>
     [DisallowMultipleComponent]
-    [AddComponentMenu("ES/Diagnostics/Scene Validation Guide")]
+    [AddComponentMenu("【ES】/开发与验证/诊断/Scene Validation Guide")]
     public sealed class ESSceneValidationGuide : MonoBehaviour
     {
         [Header("场景说明")]

@@ -10,18 +10,21 @@ namespace ES
     // Entity：直接接入 KCC 的角色核心（不走模块，超高频）
     [Serializable, TypeRegistryItem("实体核心")]
     [RequireComponent(typeof(KinematicCharacterMotor))]
-    public partial class Entity : Core, ICharacterController, IESEffectLeaseOwner, IESGameObjectPoolLifecycle
+    public partial class Entity : Core, ICharacterController, IESEffectLeaseOwner, IESGameObjectPoolLifecycle,
+        IESMotionInfluenceReceiver
     {
         [ESEditorSection("core", "核心配置", -100f)]
         [LabelText("主 Animator")]
         public Animator animator;
 
         [NonSerialized] private EntityTransformMapping _transformMapping;
+        [NonSerialized] private int lifecycleGeneration = 1;
 
         /// <summary>
         /// 角色稳定挂点的运行时入口。首次绑定后只读取缓存，不允许业务代码在热路径重新 Find 层级。
         /// </summary>
         public EntityTransformMapping TransformMapping => EnsureTransformMapping();
+        public int LifecycleGeneration => lifecycleGeneration;
 
         internal void BindTransformMapping(EntityTransformMapping mapping)
         {
@@ -186,6 +189,8 @@ namespace ES
         /// </summary>
         public void OnPoolDespawned()
         {
+            AdvanceLifecycleGeneration();
+            kcc?.ResetMotionInfluences();
             ESActionPoolLifecycleDiagnostics.RecordDespawn();
             basicDomain?.NotifyPoolDespawned();
             ESActionPoolLifecycleDiagnostics.Record("Entity.CameraRelease");
@@ -210,6 +215,7 @@ namespace ES
         /// <summary>Called by the pool while inactive, before the next activation.</summary>
         public void OnPoolSpawned()
         {
+            AdvanceLifecycleGeneration();
             ESActionPoolLifecycleDiagnostics.RecordSpawn();
             EnsureEntityStructure();
             basicDomain?.NotifyPoolSpawned();
@@ -222,8 +228,38 @@ namespace ES
             RefreshDefaultCameraRequest();
         }
 
+        private void AdvanceLifecycleGeneration()
+        {
+            unchecked
+            {
+                lifecycleGeneration++;
+                if (lifecycleGeneration <= 0)
+                    lifecycleGeneration = 1;
+            }
+        }
+
+        public bool AddVelocity(
+            Vector3 velocity,
+            ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
+        {
+            return kcc != null
+                && kcc.AddVelocity(velocity, permissions);
+        }
+
+        public bool TryAcquireField(
+            in ESMotionFieldRequest request,
+            out ESMotionFieldLease lease)
+        {
+            if (kcc != null)
+                return kcc.TryAcquireField(request, out lease);
+
+            lease = default;
+            return false;
+        }
+
         protected override void OnDestroy()
         {
+            kcc?.ResetMotionInfluences();
             ESGameManager.Camera?.ReleaseOwnedBy(this);
             ReleaseDefaultCameraRequest();
             UnsubscribeFromTagCatalog();
@@ -2683,6 +2719,14 @@ namespace ES
         [LabelText("防止静止上漂")]
         public bool preventUpwardDriftWhenIdle = true;
 
+        [Title("外部运动影响")]
+        [MinValue(0f), LabelText("合并加速度上限")]
+        public float maxCombinedInfluenceAcceleration = 80f;
+        [MinValue(0f), LabelText("单步速度增量上限")]
+        public float maxCombinedInfluenceVelocityDelta = 30f;
+        [MinValue(0f), LabelText("向上冲量离地阈值")]
+        public float influenceUngroundThreshold = 0.1f;
+
         [LabelText("上漂阈值(米/帧)")]
         public float upwardDriftThreshold = 0.005f;
 
@@ -2733,6 +2777,7 @@ namespace ES
         [NonSerialized] private StateMachine _stateMachine;
         [NonSerialized] private StateSupportFlags _currentSupportFlags;
         [NonSerialized] private bool _motionSchedulersReady;
+        [NonSerialized] private ESMotionInfluenceAccumulator _motionInfluences;
 
         [NonSerialized] public int workSelf;
         [NonSerialized] public int workWorld;
@@ -2761,6 +2806,42 @@ namespace ES
         /// </summary>
         [ShowInInspector, ReadOnly, LabelText("MatchTarget 运动锁定")]
         public bool IsMatchTargetMotionLocked => _matchTargetPoseActive || _matchTargetAppliedThisTick;
+
+        public bool AddVelocity(
+            Vector3 velocity,
+            ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
+        {
+            ESMotionReceiverLockState lockState = ResolveMotionInfluenceLockState();
+            if (!ESMotionInfluenceSolver.IsAllowed(permissions, lockState)
+                || !IsFinite(velocity))
+                return false;
+
+            EnsureMotionInfluences().AddVelocity(velocity, permissions);
+            if (motor != null
+                && Vector3.Dot(velocity, motor.CharacterUp) > influenceUngroundThreshold)
+                motor.ForceUnground(0.1f);
+            return true;
+        }
+
+        public bool TryAcquireField(
+            in ESMotionFieldRequest request,
+            out ESMotionFieldLease lease)
+        {
+            if ((request.kind == ESMotionFieldKind.Acceleration && !IsFinite(request.acceleration))
+                || (request.kind == ESMotionFieldKind.Attraction
+                    && !IsFinite(request.ResolveAnchorPosition())))
+            {
+                lease = default;
+                return false;
+            }
+
+            return EnsureMotionInfluences().TryAcquireField(request, out lease);
+        }
+
+        public void ResetMotionInfluences()
+        {
+            _motionInfluences?.Reset();
+        }
 
         public bool HasWork => workSelf > 0 || workWorld > 0 || workOther > 0;
 
@@ -3085,6 +3166,13 @@ namespace ES
             if (IsMatchTargetMotionLocked)
             {
                 currentVelocity = Vector3.zero;
+                _motionInfluences?.Apply(
+                    ref currentVelocity,
+                    motor.TransientPosition,
+                    deltaTime,
+                    ResolveMotionInfluenceLockState(),
+                    maxCombinedInfluenceAcceleration,
+                    maxCombinedInfluenceVelocityDelta);
                 _lastVelocity = currentVelocity;
                 return;
             }
@@ -3203,7 +3291,39 @@ namespace ES
                 }
             }
 
+            _motionInfluences?.Apply(
+                ref currentVelocity,
+                motor.TransientPosition,
+                deltaTime,
+                ResolveMotionInfluenceLockState(),
+                maxCombinedInfluenceAcceleration,
+                maxCombinedInfluenceVelocityDelta);
+
             _lastVelocity = currentVelocity;
+        }
+
+        private ESMotionInfluenceAccumulator EnsureMotionInfluences()
+        {
+            return _motionInfluences ??= new ESMotionInfluenceAccumulator();
+        }
+
+        private ESMotionReceiverLockState ResolveMotionInfluenceLockState()
+        {
+            ESMotionReceiverLockState state = IsMatchTargetMotionLocked
+                ? ESMotionReceiverLockState.MatchTarget
+                : ESMotionReceiverLockState.None;
+            if ((_currentSupportFlags & StateSupportFlags.Mounted) != 0)
+                state |= ESMotionReceiverLockState.Mounted;
+            if ((_currentSupportFlags & StateSupportFlags.Climbing) != 0)
+                state |= ESMotionReceiverLockState.Climbing;
+            return state;
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return !float.IsNaN(value.x) && !float.IsInfinity(value.x)
+                && !float.IsNaN(value.y) && !float.IsInfinity(value.y)
+                && !float.IsNaN(value.z) && !float.IsInfinity(value.z);
         }
 
         /// <summary>

@@ -20,6 +20,7 @@ namespace ES
         [Tooltip("Monster 出生后持续持有的事实。Entity Prefab 不重复保存此列表。")]
         public List<ESTagStableReference> tags = new List<ESTagStableReference>();
 
+        [ESConfigKeyUsage(ESConfigKeyUsage.Declaration)]
         [HideLabel, InlineProperty]
         public ESMonsterConfigKey monsterKey = new ESMonsterConfigKey();
 
@@ -51,6 +52,7 @@ namespace ES
         [Tooltip("NPC 出生后持续持有的事实。Entity Prefab 不重复保存此列表。")]
         public List<ESTagStableReference> tags = new List<ESTagStableReference>();
 
+        [ESConfigKeyUsage(ESConfigKeyUsage.Declaration)]
         [HideLabel, InlineProperty]
         public ESNpcConfigKey npcKey = new ESNpcConfigKey();
 

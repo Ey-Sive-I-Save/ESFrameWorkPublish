@@ -1,0 +1,167 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52758267bd164f04b97a1e68d0fb0bb3, type: 3}
+  m_Name: "\u5927\u957F\u6761_ItemDataInfo"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: weapon.melee.long_bar
+  tags: []
+  floatValues: []
+  permitValues: []
+  baseConfig:
+    kind: 5
+    prefabKey:
+      enumKey: 0
+      stringKey: prefab.weapon.melee.long_bar
+      guid: bf2dc9bca456f2848b25fc58ea478f1f
+      localFileId: 0
+      assetTypeName: UnityEngine.GameObject
+      address:
+      groupName:
+      editorPath: "Assets/ESNormalAssets/WeaponPrototypes/\u5927\u957F\u6761.prefab"
+      editorOnly: 0
+      alwaysLoaded: 0
+    displayName: "\u5927\u957F\u6761"
+    iconKey:
+      enumKey: 0
+      stringKey:
+      guid:
+      localFileId: 0
+      assetTypeName:
+      address:
+      groupName:
+      editorPath:
+      editorOnly: 0
+      alwaysLoaded: 0
+  interactConfig:
+    canInteract: 0
+    useMode: 1
+    prompt: 
+    distance: 1.5
+    requireFacing: 1
+    condition:
+      rid: -2
+  logicConfig:
+    onSpawn:
+      rid: -2
+    onUse:
+      rid: -2
+    onHit:
+      rid: -2
+    onExpire:
+      rid: -2
+    onDestroy:
+      rid: -2
+  moveConfig:
+    mode: 0
+    speed: 1
+    rotateSpeed: 90
+    amount: 1
+    points: []
+    loop: 1
+    backAndForth: 1
+    useGravity: 1
+  kindData:
+    rid: 5312547957432123392
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 5312547957432123392
+      type: {class: ItemWeaponDataBlock, ns: ES, asm: ES_Logic}
+      data:
+        sharedData:
+          weaponKind: 1
+          primaryAttackAction:
+            enumKey: 0
+            stringKey: melee.attack
+            definitionGuid: 
+            definitionLocalFileId: 0
+            definitionTypeName: 
+          defaultShot:
+            enumKey: 0
+            stringKey: 
+            definitionGuid: 
+            definitionLocalFileId: 0
+            definitionTypeName: 
+          hitRadius: 0.65
+          cooldown: 0.35
+          socketName: WeaponSocket
+          fire:
+            enabled: 0
+            interval: 0.12
+            distance: 120
+            hitMask:
+              serializedVersion: 2
+              m_Bits: 4294967291
+            triggerInteraction: 1
+            requiresAiming: 1
+          recoil:
+            enabled: 0
+            baseMagnitude: 1
+            onlyWhenAiming: 1
+            burstWindow: 0.22
+            maxBurstShots: 8
+            randomJitter: 0.06
+            recoilCurve:
+              serializedVersion: 2
+              m_Curve:
+              - serializedVersion: 3
+                time: 0
+                value: 1
+                inSlope: 0
+                outSlope: 0
+                tangentMode: 0
+                weightedMode: 0
+                inWeight: 0
+                outWeight: 0
+              - serializedVersion: 3
+                time: 0.35
+                value: 1.15
+                inSlope: 0
+                outSlope: 0
+                tangentMode: 0
+                weightedMode: 0
+                inWeight: 0
+                outWeight: 0
+              - serializedVersion: 3
+                time: 1
+                value: 1.35
+                inSlope: 0
+                outSlope: 0
+                tangentMode: 0
+                weightedMode: 0
+                inWeight: 0
+                outWeight: 0
+              m_PreInfinity: 2
+              m_PostInfinity: 2
+              m_RotationOrder: 4
+        key:
+          enumKey: 0
+          stringKey: weapon.melee.long_bar
+          definitionGuid: 
+          definitionLocalFileId: 0
+          definitionTypeName: 
+        initialState:
+          durability: 1
+          cooldownLeft: 0
+          ammo: 0
+          logicSeed: 0

@@ -53,7 +53,7 @@ namespace ES
     /// 状态机全局调试设置 - 一键控制所有Debug日志输出
     /// 支持编辑器配置：在Project面板右键 Create → ES → 状态机调试设置
     /// </summary>
-    [CreateAssetMenu(fileName = "StateMachineDebugSettings", menuName = "【ES】/项目设置/状态机/调试设置", order = 100)]
+    [CreateAssetMenu(fileName = "StateMachineDebugSettings", menuName = "【ES】/配置/状态机/调试设置", order = 100)]
     public class StateMachineDebugSettings : ESEditorGlobalSo<StateMachineDebugSettings>
     {
         private static StateMachineDebugSettings _runtimeFallbackInstance;

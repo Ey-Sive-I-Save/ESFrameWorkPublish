@@ -2106,7 +2106,7 @@ namespace ES
         }
     }
 
-    [CreateAssetMenu(menuName = "【ES】/项目设置/Tag/Tag 烘焙表", fileName = "ESTagBakeTable")]
+    [CreateAssetMenu(menuName = "【ES】/配置/Tag/Tag 烘焙表", fileName = "ESTagBakeTable")]
     public sealed partial class ESTagBakeTable : ScriptableObject
     {
         [Serializable]

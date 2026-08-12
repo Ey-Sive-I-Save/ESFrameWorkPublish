@@ -6,7 +6,7 @@ using UnityEngine;
 
 
 namespace ES {
-    [AddComponentMenu("<ES>ESM支持/物理/2D触发入-可接收列表")]
+    [AddComponentMenu("【ES】/基础设施/物理事件/2D触发入-可接收列表")]
     public class EMS_Trigger2DEnter_LinkList : EMS_ColEvent_2D_LinkList_Abstract
     {
         private void OnTriggerEnter2D(Collider2D collider)

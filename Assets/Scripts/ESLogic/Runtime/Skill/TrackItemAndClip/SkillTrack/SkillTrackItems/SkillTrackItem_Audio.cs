@@ -25,12 +25,16 @@ namespace ES
             name = "音频片段";
         }
 
-        [TitleGroup("音频片段", "在片段开始时间播放指定 Cue。")]
-        [LabelText("Cue"), InlineProperty]
+        [PropertyOrder(ESTrackInspectorFieldStandard.ContentOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Content, "优先使用音频 Cue；直接音频资源仅作为旧数据兼容入口。")]
+        [LabelText("音频 Cue"), InlineProperty]
         public ESAudioCueKey cue = new ESAudioCueKey();
 
         [FormerlySerializedAs("audioClip")]
-        [SerializeField, LabelText("直接 Clip（可选）")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.ContentOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Content)]
+        [SerializeField, LabelText("直接音频（兼容）")]
+        [Tooltip("旧资产兼容字段。新内容优先使用音频 Cue。")]
         private AudioClip legacyAudioClip;
 
         public AudioClip audioClip
@@ -41,8 +45,10 @@ namespace ES
 
         public AudioClip LegacyAudioClip => legacyAudioClip;
 
-        [TitleGroup("音频片段")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.BehaviorOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Behavior, "控制播放音量和片段退出时的停止策略。")]
         [LabelText("音量"), OnValueChanged(nameof(ClampVolume))]
+        [MinValue(0f), MaxValue(1f)]
         [SuffixLabel("0–1", true)]
         public float volume = 1f;
 
@@ -55,7 +61,8 @@ namespace ES
         [HideInInspector]
         public bool addAudioSourceIfMissing = true;
 
-        [TitleGroup("音频片段")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.BehaviorOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Behavior)]
         [LabelText("离开片段时停止音效")]
         [Tooltip("关闭时音效自然播放完毕；开启时片段退出或技能退出会立即停止该音效。")]
         public bool stopOnClipExit = false;

@@ -23,6 +23,10 @@ namespace ES
         private const string ModelRootPath = "03_模型表现_Presentation/ModelOffset/ModelRoot";
         private const string HurtBoxRootPath = "05_检测碰撞_Detection/HurtBoxes";
         private const string WeaponSocketPath = "06_装备_Equipment/WeaponSlots/WeaponSocket";
+        private const string EquipmentSocketRootPath = "06_装备_Equipment/WeaponSlots/";
+        private const string EquipmentVisualsPath = "06_装备_Equipment/EquipmentVisuals";
+        private const string LongBarWeaponPrefabPath = ESLongBarMeleeWeaponBuilder.WeaponPrefabPath;
+        private const string LongBarWeaponKey = ESLongBarMeleeWeaponBuilder.WeaponKey;
         private const string CameraTargetPath = "08_相机参考_CameraReferences/CameraTarget";
         private const string HeadAnchorPath = "04_动画辅助_AnimationSupport/Anchors/HeadAnchor";
         private const string ChestAnchorPath = "04_动画辅助_AnimationSupport/Anchors/ChestAnchor";
@@ -33,6 +37,13 @@ namespace ES
             "Assets/ESNormalAssets/VehiclePrototypes/BlockCar.prefab",
             "Assets/ESNormalAssets/VehiclePrototypes/BlockBicycle.prefab",
             "Assets/ESNormalAssets/VehiclePrototypes/BlockHelicopter.prefab",
+        };
+
+        private static readonly string[] LegacyPreviewPlaceholderCubeNames =
+        {
+            "Cube1",
+            "Cube1 (1)",
+            "Cube1 (2)",
         };
 
         [MenuItem("【ES】/内容制作/角色模板/重建正式玩家 Variant/大黑塔（新版通用模板）", false, 120)]
@@ -62,6 +73,7 @@ namespace ES
 
         public static GameObject RebuildHertaPlayerVariant()
         {
+            EnsureVariantAuthoringIsSafe();
             EnsureAssetFolder(VariantFolder);
             EnsureAssetFolder(DataFolder);
             ESCameraDefaultContentBuilder.EnsureDefaultPlayerCameraContent();
@@ -109,6 +121,14 @@ namespace ES
             }
         }
 
+        private static void EnsureVariantAuthoringIsSafe()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Unity 正在 PlayMode 或准备切换 PlayMode，禁止重建正式玩家 Variant。");
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                throw new InvalidOperationException("Unity 正在编译、域重载或导入资产，禁止重建正式玩家 Variant。");
+        }
+
         private static ActorDataInfo EnsureHertaDefinition()
         {
             ActorDataInfo definition = AssetDatabase.LoadAssetAtPath<ActorDataInfo>(DefinitionPath);
@@ -150,6 +170,7 @@ namespace ES
             // 旧的运行时底盘，不能把旧 Entity、KCC 或模块带入正式 Variant。
             GameObject visual = UnityEngine.Object.Instantiate(legacyAnimator.gameObject);
             StripLegacyNonPresentationComponents(visual);
+            DisableLegacyPreviewPlaceholderCubes(visual);
             if (visual.GetComponentInChildren<Entity>(true) != null)
             {
                 UnityEngine.Object.DestroyImmediate(visual);
@@ -202,6 +223,27 @@ namespace ES
             Entity entity = variant.GetComponent<Entity>();
             entity.animator = animator;
             return animator;
+        }
+
+        private static void DisableLegacyPreviewPlaceholderCubes(GameObject visual)
+        {
+            if (visual == null)
+                throw new ArgumentNullException(nameof(visual));
+
+            for (int i = 0; i < LegacyPreviewPlaceholderCubeNames.Length; i++)
+            {
+                Transform placeholder = visual.transform.Find(LegacyPreviewPlaceholderCubeNames[i]);
+                if (placeholder == null)
+                    continue;
+
+                if (placeholder.GetComponent<MeshFilter>() == null || placeholder.GetComponent<MeshRenderer>() == null)
+                {
+                    throw new InvalidOperationException(
+                        "旧预览占位对象名称与真实模型冲突，拒绝自动禁用：" + placeholder.name);
+                }
+
+                placeholder.gameObject.SetActive(false);
+            }
         }
 
         /// <summary>
@@ -360,6 +402,13 @@ namespace ES
             climb.VaultHigh_StateName = string.Empty;
             climb.ClimbJump_StateName = "攀爬跳跃";
 
+            EntityBasicCombatModule combat = GetOrAddBasicModule(entity, () => new EntityBasicCombatModule());
+            EntityEquipmentAttachmentModule attachment = GetOrAddBasicModule(
+                entity,
+                () => new EntityEquipmentAttachmentModule());
+            attachment.allowEntityRootFallback = false;
+            ConfigureLongBarMeleeWeapon(combat, mapping);
+
             entity.basicDomain.MyModules.ApplyBuffers(true);
             entity.aiDomain.MyModules.ApplyBuffers(true);
         }
@@ -374,6 +423,92 @@ namespace ES
             entity.kcc.orientationSharpness = PlayerOrientationSharpness;
             entity.kcc.debugMonitor = false;
 
+        }
+
+        private static void ConfigureLongBarMeleeWeapon(EntityBasicCombatModule combat, EntityTransformMapping mapping)
+        {
+            if (combat == null || mapping == null)
+                throw new InvalidOperationException("大长条近战切片缺少 Combat Module 或 TransformMapping。");
+
+            GameObject weaponPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(LongBarWeaponPrefabPath);
+            if (weaponPrefab == null)
+                throw new InvalidOperationException("缺少大长条武器 Prefab：" + LongBarWeaponPrefabPath);
+            ESLongBarMeleeWeaponBuilder.ValidateLongBarPrefabForAuthoring(weaponPrefab);
+
+            Transform equipmentVisuals = mapping.Resolve(EquipmentVisualsPath.Substring(EquipmentVisualsPath.LastIndexOf('/') + 1));
+            if (equipmentVisuals == null)
+                equipmentVisuals = FindRequired(mapping.transform, EquipmentVisualsPath);
+
+            combat.weaponSlots ??= new System.Collections.Generic.List<EntityBasicCombatModule.WeaponSlot>();
+            int longBarSlotIndex = -1;
+            for (int i = 0; i < combat.weaponSlots.Count; i++)
+            {
+                EntityBasicCombatModule.WeaponSlot candidate = combat.weaponSlots[i];
+                if (candidate == null
+                    || candidate.weaponKey == null
+                    || !string.Equals(candidate.weaponKey.StringKey, LongBarWeaponKey, StringComparison.Ordinal))
+                    continue;
+
+                if (longBarSlotIndex >= 0)
+                    throw new InvalidOperationException("正式玩家 Variant 中出现重复的大长条 Weapon Key：" + LongBarWeaponKey);
+
+                longBarSlotIndex = i;
+            }
+
+            Transform old = longBarSlotIndex >= 0 ? combat.weaponSlots[longBarSlotIndex].weaponRoot : null;
+            if (old != null)
+            {
+                if (old.parent != equipmentVisuals)
+                    throw new InvalidOperationException("大长条槽位指向 EquipmentVisuals 之外的对象，拒绝跨层级删除：" + old.name);
+
+                for (int i = 0; i < combat.weaponSlots.Count; i++)
+                {
+                    if (i != longBarSlotIndex && combat.weaponSlots[i] != null && combat.weaponSlots[i].weaponRoot == old)
+                        throw new InvalidOperationException("大长条与其他 Weapon Slot 共享同一个 weaponRoot，拒绝删除共享对象：" + old.name);
+                }
+
+                UnityEngine.Object.DestroyImmediate(old.gameObject);
+            }
+            else
+            {
+                Transform nameCollision = equipmentVisuals.Find("大长条_WeaponSlot");
+                if (nameCollision != null)
+                    throw new InvalidOperationException("EquipmentVisuals 已有同名对象但没有稳定 Weapon Key 所有权，拒绝覆盖：" + nameCollision.name);
+            }
+
+            GameObject instance = PrefabUtility.InstantiatePrefab(weaponPrefab, equipmentVisuals) as GameObject;
+            if (instance == null)
+                throw new InvalidOperationException("实例化大长条武器 Prefab 失败：" + LongBarWeaponPrefabPath);
+
+            instance.name = "大长条_WeaponSlot";
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+            instance.transform.localScale = Vector3.one;
+
+            combat.enableWeaponFusion = true;
+            // Combat 保留通用武器能力；具体是否射击由当前 WeaponDefinition.fire.enabled 决定。
+            // 大长条自身关闭 fire，因此不会走 Hitscan，同时未来枪械槽位无需改角色结构。
+            combat.enableGunFire = true;
+            combat.fireOnAttackInput = true;
+            combat.autoAddWeaponBindingIfMissing = false;
+            combat.startWithWeaponInHand = false;
+
+            var longBarSlot = new EntityBasicCombatModule.WeaponSlot
+            {
+                displayName = "大长条",
+                weaponKey = new ESWeaponConfigKey { stringKey = LongBarWeaponKey },
+                weaponRoot = instance.transform
+            };
+
+            if (longBarSlotIndex >= 0)
+                combat.weaponSlots[longBarSlotIndex] = longBarSlot;
+            else
+            {
+                longBarSlotIndex = combat.weaponSlots.Count;
+                combat.weaponSlots.Add(longBarSlot);
+            }
+
+            combat.startWeaponIndex = longBarSlotIndex;
         }
 
         private static void ConfigureFormalHurtBox(Transform root)
@@ -415,10 +550,30 @@ namespace ES
             mapping.Set(DefaultTransformKey.RightHand, GetHumanBone(animator, HumanBodyBones.RightHand));
             mapping.Set(DefaultTransformKey.LeftFoot, GetHumanBone(animator, HumanBodyBones.LeftFoot));
             mapping.Set(DefaultTransformKey.RightFoot, GetHumanBone(animator, HumanBodyBones.RightFoot));
-            mapping.Set(DefaultTransformKey.Weapon, weaponSocket);
-            mapping.Set(DefaultTransformKey.Camera, FindRequired(root, CameraTargetPath));
-            mapping.Set("WeaponSocket", weaponSocket);
+            if (!mapping.Set(DefaultTransformKey.Weapon, EntityEquipmentSocketKeys.WeaponSocket, weaponSocket, out EntityTransformMap.Conflict weaponConflict))
+                throw new InvalidOperationException("正式角色武器挂点映射失败：" + weaponConflict.Message);
+            SetRequiredStringMapping(mapping, root, EntityEquipmentSocketKeys.MainHandSocket);
+            SetRequiredStringMapping(mapping, root, EntityEquipmentSocketKeys.OffHandSocket);
+            SetRequiredStringMapping(mapping, root, EntityEquipmentSocketKeys.PrimaryBackSocket);
+            SetRequiredStringMapping(mapping, root, EntityEquipmentSocketKeys.SecondaryBackSocket);
+            SetRequiredStringMapping(mapping, root, EntityEquipmentSocketKeys.HipSocket);
+            SetRequiredStringMapping(mapping, root, EntityEquipmentSocketKeys.TemporaryHandSocket);
+
+            Transform cameraTarget = FindRequired(root, CameraTargetPath);
+            if (!mapping.Set(DefaultTransformKey.Camera, "CameraTarget", cameraTarget, out EntityTransformMap.Conflict cameraConflict))
+                throw new InvalidOperationException("正式角色相机挂点映射失败：" + cameraConflict.Message);
+
             mapping.RebuildRuntimeCache();
+        }
+
+        private static void SetRequiredStringMapping(
+            EntityTransformMapping mapping,
+            Transform root,
+            string key)
+        {
+            Transform socket = FindRequired(root, EquipmentSocketRootPath + key);
+            if (!mapping.Set(key, socket, out EntityTransformMap.Conflict conflict))
+                throw new InvalidOperationException("正式角色装备挂点映射失败（" + key + "）：" + conflict.Message);
         }
 
         private static T GetOrAddBasicModule<T>(Entity entity, Func<T> create) where T : EntityBasicModuleBase

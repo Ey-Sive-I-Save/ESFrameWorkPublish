@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace ES {
-    [AddComponentMenu("<ES>ESM支持/输入/选择中-指定接收目标")]
+    [AddComponentMenu("【ES】/UI/输入事件/选择中-指定接收目标")]
     public class EMS_UpdateSelected_LinkSingle : EMS_InputBaseEvent_LinkSingle_Abstract, IUpdateSelectedHandler
     {
    

@@ -69,4 +69,28 @@ namespace ES
                 body.AddForce(force != null ? force.Evaluate(target, support) : Vector3.zero, forceMode);
         }
     }
+
+    [Serializable, TypeRegistryItem("增加速度", OperationTypeRegistryNames.Physics)]
+    public sealed class OpMotion_AddVelocity : ESOutputOp
+    {
+        public GameObjectExpressionSource targetObject = new GameObjectExpressionSource();
+        public Vector3ExpressionSource deltaVelocity = new Vector3ExpressionSource
+        {
+            directVector3 = Vector3.forward
+        };
+        public ESMotionInfluencePermissions permissions;
+
+        protected override void StartOperation(
+            ESRuntimeTargetPack target,
+            ESOpSupport scopeSupport,
+            ESOpSupport hostSupport)
+        {
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            GameObject obj = targetObject != null ? targetObject.Evaluate(target, support) : null;
+            Vector3 value = deltaVelocity != null
+                ? deltaVelocity.Evaluate(target, support)
+                : Vector3.zero;
+            ESMotion.AddVelocity(obj, value, permissions);
+        }
+    }
 }

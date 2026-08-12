@@ -30,7 +30,7 @@ namespace ES
 
             ESStoryModule module = ESGameManager.GetOrCreateModule<ESStoryModule>();
             string error = module == null ? "无法创建 ESStoryModule。" : null;
-            if (module == null || !module.TryStartFromInteraction(definition, entity, activeBinding, out activeInstanceId, out error))
+            if (module == null || !module.TryStartFromInteraction(definition?.definitionId, entity, activeBinding, out activeInstanceId, out error))
             {
                 Debug.LogError("[Story] 启动失败：" + error, this);
                 interaction.TryEndExternalInteraction(activeBinding, false, ESInteractionEndReason.BeginRejected);

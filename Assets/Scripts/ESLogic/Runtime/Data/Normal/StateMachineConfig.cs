@@ -5,7 +5,7 @@ using Sirenix.OdinInspector;
 using UnityEngine;
 namespace ES
 {
-    [CreateAssetMenu(fileName = "StateMachineConfig", menuName = "【ES】/项目设置/状态机/状态机配置")]
+    [CreateAssetMenu(fileName = "StateMachineConfig", menuName = "【ES】/配置/状态机/状态机配置")]
     public class StateMachineConfig : ESEditorGlobalSo<StateMachineConfig> 
     {
         [TabGroup("层级遮罩")]

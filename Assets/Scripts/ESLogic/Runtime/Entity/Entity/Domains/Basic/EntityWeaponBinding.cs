@@ -103,7 +103,7 @@ namespace ES
 
             if (owner != null)
             {
-                if (owner.TryResolveTransform("WeaponSocket", out Transform weaponSocket))
+                if (owner.TryResolveTransform(EntityEquipmentSocketKeys.WeaponSocket, out Transform weaponSocket))
                     return weaponSocket;
                 if (owner.TryResolveTransform(DefaultTransformKey.Weapon, out Transform weaponFallback))
                     return weaponFallback;

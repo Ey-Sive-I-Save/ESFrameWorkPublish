@@ -10,7 +10,7 @@ namespace ES
     /// It stores stable definitions only. Dense RuntimeKey values are rebuilt per process by
     /// <see cref="ESSuperAttributeCatalog"/> and never enter this asset.
     /// </summary>
-    [CreateAssetMenu(menuName = "【ES】/项目设置/GameCore/属性烘焙表", fileName = "ESAttributeBakeTable")]
+    [CreateAssetMenu(menuName = "【ES】/配置/GameCore/属性烘焙表", fileName = "ESAttributeBakeTable")]
     public sealed class ESAttributeBakeTable : ScriptableObject
     {
         public const string CharacterScope = "Attribute.Character";

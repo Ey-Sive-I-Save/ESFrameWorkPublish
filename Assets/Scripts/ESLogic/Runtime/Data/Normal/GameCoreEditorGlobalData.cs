@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace ES
 {
-    [CreateAssetMenu(fileName = "GameCoreEditorGlobalData", menuName = "【ES】/项目设置/GameCore/编辑器全局数据")]
+    [CreateAssetMenu(fileName = "GameCoreEditorGlobalData", menuName = "【ES】/配置/GameCore/编辑器全局数据")]
     [ESCreatePath("全局数据", "GameCore编辑器全局数据")]
     public class GameCoreEditorGlobalData : ESEditorGlobalSo<GameCoreEditorGlobalData>
     {

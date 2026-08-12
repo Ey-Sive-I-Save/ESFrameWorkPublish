@@ -22,7 +22,7 @@ namespace ES
         private const string BicyclePrefabPath = "Assets/ESNormalAssets/VehiclePrototypes/BlockBicycle.prefab";
         private const string HelicopterPrefabPath = "Assets/ESNormalAssets/VehiclePrototypes/BlockHelicopter.prefab";
 
-        [MenuItem("【ES】/示例与测试/角色/一键准备正式资产并创建 玩家控制器测试场景", false, 99)]
+        [MenuItem("【ES】/验证与诊断/验证环境/角色/一键准备正式资产并创建 玩家控制器测试场景", false, 99)]
         public static void PrepareAssetsAndCreateOrRefreshMenu()
         {
             SceneAsset scene = PrepareAssetsAndCreateOrRefresh();
@@ -33,7 +33,7 @@ namespace ES
             EditorGUIUtility.PingObject(scene);
         }
 
-        [MenuItem("【ES】/示例与测试/角色/创建或刷新 玩家控制器测试场景", false, 100)]
+        [MenuItem("【ES】/验证与诊断/验证环境/角色/创建或刷新 玩家控制器测试场景", false, 100)]
         public static void CreateOrRefreshMenu()
         {
             SceneAsset scene = CreateOrRefresh();

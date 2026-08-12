@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace ES {
-    [AddComponentMenu("<ES>ESM支持/输入/鼠标按下-可接收列表")]
+    [AddComponentMenu("【ES】/UI/输入事件/鼠标按下-可接收列表")]
     public class EMS_PointerDown_LinkList : EMS_InputPointerEvent_LinkList_Abstract, IPointerDownHandler
     {
         public void OnPointerDown(PointerEventData eventData)

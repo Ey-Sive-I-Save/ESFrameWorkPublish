@@ -114,6 +114,7 @@ MonoBehaviour:
   driverCameraDefinition:
     enumKey: 2
     stringKey: vehicle.chase
+  legacyDriverCameraDefinitionKey: 
   driverCameraViewKey: MainView
   driverCameraPriority: 10
   driverCameraFollow: {fileID: 1001}

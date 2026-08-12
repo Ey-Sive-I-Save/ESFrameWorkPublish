@@ -30,7 +30,7 @@ namespace ES
     /// 5. 支持双面攀爬（自动检测角色接近方向）
     /// 6. 攀爬速度乘数、粗糙度影响
     /// </summary>
-    [AddComponentMenu("【ES】/场景与对象/角色交互/攀爬表面")]
+    [AddComponentMenu("【ES】/角色与交互/攀爬表面")]
     public class ClimbableSurface : MonoBehaviour
     {
         // ===== 基础配置 =====

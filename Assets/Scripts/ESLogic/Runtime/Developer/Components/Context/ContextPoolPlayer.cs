@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace ES
 {
-    [AddComponentMenu("【ES】/场景与对象/上下文/Context Pool Player")]
+    [AddComponentMenu("【ES】/基础设施/上下文/Context Pool Player")]
     public class ContextPoolPlayer : MonoBehaviour
     {
         [TabGroup("上下文池"), HideLabel]

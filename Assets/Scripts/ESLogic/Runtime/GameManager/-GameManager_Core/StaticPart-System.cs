@@ -5,7 +5,11 @@ namespace ES
 {
     public partial class ESGameManager
     {
-        public static EnumCollect.Envir_LanguageType Envir_Language = EnumCollect.Envir_LanguageType.Chinese;
+        public static EnumCollect.Envir_LanguageType Envir_Language
+        {
+            get => ESLocalizationRuntime.CurrentLanguage;
+            set => ESLocalizationRuntime.SetCurrentLanguageOrThrow(value);
+        }
         #region 全局事件-GameCenterAwakeBefore
         protected override void OnBeforeAwakeRegister()
         {

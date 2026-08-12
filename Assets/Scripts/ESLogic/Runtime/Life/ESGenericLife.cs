@@ -34,7 +34,7 @@ namespace ES
     /// the first capability: one root receiver plus optional, type-unique injected receivers.
     /// </summary>
     [DisallowMultipleComponent]
-    [AddComponentMenu("【ES】/场景与对象/生命周期/ES 通用生命周期")]
+    [AddComponentMenu("【ES】/基础设施/生命周期/ES 通用生命周期")]
     public sealed class ESGenericLife : MonoBehaviour
     {
         [SerializeField, Tooltip("对象池主生命周期接收者；必须与 ESGenericLife 位于同一根 GameObject。扩展接收者通过注册注入，不写入这里。")]

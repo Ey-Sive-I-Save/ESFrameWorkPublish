@@ -11,6 +11,10 @@ namespace ES
         public ItemMotionDriverKind driverKind = ItemMotionDriverKind.Transform;
         [LabelText("刚体写回走 FixedUpdate")]
         public bool fixedUpdateForRigidbody = true;
+        [MinValue(0f), LabelText("合并加速度上限")]
+        public float maxCombinedInfluenceAcceleration = 80f;
+        [MinValue(0f), LabelText("单步速度增量上限")]
+        public float maxCombinedInfluenceVelocityDelta = 30f;
 
         [Title("运行监控")]
         [ShowInInspector, ReadOnly] public Vector3 currentPosition;
@@ -20,6 +24,7 @@ namespace ES
         [NonSerialized] private Rigidbody _rigidbody;
         [NonSerialized] private bool _hasPendingResult;
         [NonSerialized] private ShotMotionResult _pendingResult;
+        [NonSerialized] private ESMotionInfluenceAccumulator _motionInfluences;
 
         public override void Start()
         {
@@ -36,6 +41,62 @@ namespace ES
         {
             _pendingResult = result;
             _hasPendingResult = true;
+        }
+
+        public bool AddVelocity(
+            Vector3 velocity,
+            ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
+        {
+            if (!IsFinite(velocity))
+                return false;
+            EnsureMotionInfluences().AddVelocity(velocity, permissions);
+            return true;
+        }
+
+        public bool TryAcquireField(
+            in ESMotionFieldRequest request,
+            out ESMotionFieldLease lease)
+        {
+            return EnsureMotionInfluences().TryAcquireField(request, out lease);
+        }
+
+        public void ApplyMotionInfluences(
+            ref Vector3 velocity,
+            Vector3 position,
+            float deltaTime)
+        {
+            if (_motionInfluences == null || !_motionInfluences.HasInfluences)
+                return;
+
+            _motionInfluences.Apply(
+                ref velocity,
+                position,
+                deltaTime,
+                ESMotionReceiverLockState.None,
+                maxCombinedInfluenceAcceleration,
+                maxCombinedInfluenceVelocityDelta);
+        }
+
+        public bool TryReadDynamicVelocity(out Vector3 velocity)
+        {
+            Rigidbody body = driverKind == ItemMotionDriverKind.Rigidbody
+                ? ResolveRigidbody()
+                : null;
+            if (body != null && !body.isKinematic && !_hasPendingResult)
+            {
+                velocity = body.velocity;
+                currentVelocity = velocity;
+                return true;
+            }
+
+            velocity = default;
+            return false;
+        }
+
+        public void ResetMotionInfluences()
+        {
+            _motionInfluences?.Reset();
+            _hasPendingResult = false;
         }
 
         protected override void Update()
@@ -56,8 +117,14 @@ namespace ES
 
         private void ApplyPendingResult()
         {
-            if (!_hasPendingResult || MyCore == null)
+            if (MyCore == null)
                 return;
+
+            if (!_hasPendingResult)
+            {
+                ApplyStandaloneInfluences();
+                return;
+            }
 
             _hasPendingResult = false;
             currentPosition = _pendingResult.currentPosition;
@@ -76,6 +143,44 @@ namespace ES
             {
                 MyCore.transform.SetPositionAndRotation(currentPosition, currentRotation);
             }
+        }
+
+        private void ApplyStandaloneInfluences()
+        {
+            if (_motionInfluences == null || !_motionInfluences.HasInfluences)
+                return;
+
+            float deltaTime = ShouldApplyInFixedUpdate() ? Time.fixedDeltaTime : Time.deltaTime;
+            Rigidbody body = driverKind == ItemMotionDriverKind.Rigidbody ? ResolveRigidbody() : null;
+            Vector3 velocity = body != null && !body.isKinematic ? body.velocity : currentVelocity;
+            Vector3 position = body != null ? body.position : MyCore.transform.position;
+            _motionInfluences.Apply(
+                ref velocity,
+                position,
+                deltaTime,
+                ESMotionReceiverLockState.None,
+                maxCombinedInfluenceAcceleration,
+                maxCombinedInfluenceVelocityDelta);
+            currentVelocity = velocity;
+            if (body != null && !body.isKinematic)
+                body.velocity = velocity;
+            else
+            {
+                currentPosition = position + velocity * deltaTime;
+                MyCore.transform.position = currentPosition;
+            }
+        }
+
+        private ESMotionInfluenceAccumulator EnsureMotionInfluences()
+        {
+            return _motionInfluences ??= new ESMotionInfluenceAccumulator();
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return !float.IsNaN(value.x) && !float.IsInfinity(value.x)
+                && !float.IsNaN(value.y) && !float.IsInfinity(value.y)
+                && !float.IsNaN(value.z) && !float.IsInfinity(value.z);
         }
 
         private bool ShouldApplyInFixedUpdate()
@@ -128,9 +233,11 @@ namespace ES
 
         [NonSerialized] private ShotHitCandidate[] _hitResults;
         [NonSerialized] private IItemShotHitSolver _hitSolver;
-        [NonSerialized] private IItemShotTickScheduler _tickScheduler;
+        [NonSerialized] private IItemShotTickPolicy _tickPolicy;
         [NonSerialized] private ItemMotionModule _motionModule;
         [NonSerialized] private Transform _targetTransform;
+        [NonSerialized] private Vector3 _externalMotionVelocity;
+        [NonSerialized] private bool _hasSubmittedMotionResult;
 
         public override void Start()
         {
@@ -149,6 +256,8 @@ namespace ES
             Vector3 dir = direction.sqrMagnitude > 0.0001f ? direction.normalized : MyCore.transform.forward;
             dir = ApplySpread(dir);
             _targetTransform = null;
+            _externalMotionVelocity = Vector3.zero;
+            _hasSubmittedMotionResult = false;
             state = new ShotMotionState
             {
                 previousPosition = MyCore.transform.position,
@@ -169,6 +278,8 @@ namespace ES
                 return;
 
             _targetTransform = null;
+            _externalMotionVelocity = Vector3.zero;
+            _hasSubmittedMotionResult = false;
             Vector3 resolvedTargetPosition = targetPosition + variableData.targetOffset;
             Vector3 toTarget = resolvedTargetPosition - MyCore.transform.position;
             Vector3 dir = toTarget.sqrMagnitude > 0.0001f ? toTarget.normalized : MyCore.transform.forward;
@@ -249,9 +360,9 @@ namespace ES
             _hitSolver = solver;
         }
 
-        public void SetTickScheduler(IItemShotTickScheduler scheduler)
+        public void SetTickPolicy(IItemShotTickPolicy policy)
         {
-            _tickScheduler = scheduler;
+            _tickPolicy = policy;
         }
 
         private void Tick(float deltaTime)
@@ -260,18 +371,45 @@ namespace ES
             if (!state.launched)
                 return;
 
-            if (!_tickScheduler.ShouldTick(state, Time.frameCount))
+            if (!_tickPolicy.ShouldTick(state, Time.frameCount))
                 return;
 
             RefreshTargetPosition();
+            ItemMotionModule motionModule = ResolveMotionModule();
+            if (_hasSubmittedMotionResult
+                && motionModule != null
+                && motionModule.TryReadDynamicVelocity(out Vector3 bodyVelocity))
+                _externalMotionVelocity = bodyVelocity - state.velocity;
             latestResult = ShotMotionSolver.Step(ref state, config, deltaTime);
+            ApplyExternalMotion(ref state, ref latestResult, motionModule, deltaTime);
             TryBuildHitCandidate(ref latestResult);
             TryBuildMustHitCandidate(ref latestResult);
 
-            ResolveMotionModule()?.SubmitShotResult(latestResult);
+            motionModule?.SubmitShotResult(latestResult);
+            _hasSubmittedMotionResult = motionModule != null;
 
             if (latestResult.kind == ShotMotionKind.Arrived || latestResult.kind == ShotMotionKind.Expired)
                 state.launched = false;
+        }
+
+        private void ApplyExternalMotion(
+            ref ShotMotionState motionState,
+            ref ShotMotionResult result,
+            ItemMotionModule motionModule,
+            float deltaTime)
+        {
+            Vector3 baseVelocity = result.velocity;
+            Vector3 influencedVelocity = baseVelocity + _externalMotionVelocity;
+            motionModule?.ApplyMotionInfluences(
+                ref influencedVelocity,
+                result.currentPosition,
+                deltaTime);
+
+            _externalMotionVelocity = influencedVelocity - baseVelocity;
+            result.velocity = influencedVelocity;
+            result.currentPosition += _externalMotionVelocity * Mathf.Max(0f, deltaTime);
+            motionState.currentPosition = result.currentPosition;
+            motionState.velocity = baseVelocity;
         }
 
         private void TryBuildHitCandidate(ref ShotMotionResult result)
@@ -391,8 +529,8 @@ namespace ES
             if (_hitSolver == null)
                 _hitSolver = new ItemShotPhysicsHitSolver(capacity);
 
-            if (_tickScheduler == null)
-                _tickScheduler = new ItemShotAlwaysTickScheduler();
+            if (_tickPolicy == null)
+                _tickPolicy = new ItemShotAlwaysTickPolicy();
         }
     }
 }

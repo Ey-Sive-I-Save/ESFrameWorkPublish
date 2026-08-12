@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace ES {
-    [AddComponentMenu("<ES>ESM支持/输入/光标点击-指定接收目标")]
+    [AddComponentMenu("【ES】/UI/输入事件/光标点击-指定接收目标")]
     public class EMS_PointerClick_LinkSingle : EMS_InputPointerEvent_LinkSingle_Abstract, IPointerClickHandler
     {
         public void OnPointerClick(PointerEventData eventData)

@@ -18,6 +18,7 @@ namespace ES
         public static ESRuntimeDataModule RuntimeData { get; private set; }
         public static ESGameObjectPoolModule PoolModule { get; private set; }
         public static ESAudioModule Audio { get; private set; }
+        public static ESVfxModule Vfx { get; private set; }
         /// <summary>
         /// Raised only when the cached audio module instance changes. It is an initialization
         /// edge, not a frame callback: authored emitters use it to retry one pending OnEnable
@@ -51,6 +52,7 @@ namespace ES
         public static ESAssetConfigTableReader<ESAssetReferSpriteConfigData, UnityEngine.Sprite> RuntimeSpriteAssets => ESRuntimeDataAsset.Sprites;
         public static ESAssetConfigTableReader<ESAssetReferAudioClipConfigData, UnityEngine.AudioClip> RuntimeAudioClipAssets => ESRuntimeDataAsset.AudioClips;
         public static ESAudioCueConfigKeyTable RuntimeAudioCueData => ESRuntimeDataGameCore.AudioCues;
+        public static ESVfxConfigKeyTable RuntimeVfxData => ESRuntimeDataGameCore.Vfx;
         public static ESAssetConfigTableReader<ESAssetReferAnimationClipConfigData, UnityEngine.AnimationClip> RuntimeAnimationClipAssets => ESRuntimeDataAsset.AnimationClips;
         public static ESRuntimeInstanceIndex<ESActiveBuffRuntime> BuffRuntimeInstances => ESRuntimeDataModule.BuffInstanceIndex;
         public static ESRuntimeInstanceIndex<Item> ShotRuntimeInstances => ESRuntimeDataModule.ShotInstanceIndex;
@@ -141,6 +143,11 @@ namespace ES
             else
                 SetAudioModule(null);
 
+            if (ModuleTables != null && ModuleTables.TryGetValue(typeof(ESVfxModule), out IModule vfxModule))
+                Vfx = vfxModule as ESVfxModule;
+            else
+                Vfx = null;
+
             if (ModuleTables != null && ModuleTables.TryGetValue(typeof(ESCameraModule), out IModule cameraModule))
                 Camera = cameraModule as ESCameraModule;
             else
@@ -190,6 +197,7 @@ namespace ES
             RuntimeData = null;
             PoolModule = null;
             SetAudioModule(null);
+            Vfx = null;
             PhysicsQueryModule = null;
             LODModule = null;
             DynamicAtlas = null;

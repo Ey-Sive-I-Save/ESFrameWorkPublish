@@ -1,4 +1,4 @@
-﻿using ES;
+using ES;
 using Sirenix.OdinInspector;
 using System;
 using System.Collections.Generic;
@@ -148,13 +148,15 @@ namespace ES
     [Serializable]
     public class SkillTrackItem<SkillTrackClipT> : TrackItemBase<SkillTrackClipT>, ISkillTrackItem where SkillTrackClipT : SkillTrackClip
     {
-        [TitleGroup("编辑器预览上下文", "仅影响编辑器轨道预览时的目标解析，不直接改变运行时技能目标。")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.PreviewOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Preview, "仅影响编辑器轨道预览时的目标解析，不直接改变运行时技能目标。")]
         [LabelText("覆盖轨道目标")]
         public bool overrideTrackPreviewTarget;
 
-        [TitleGroup("编辑器预览上下文")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.PreviewOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Preview)]
         [ShowIf(nameof(overrideTrackPreviewTarget))]
-        [LabelText("轨道目标表达式")]
+        [LabelText("预览目标表达式")]
         [InfoBox("开启后，本轨道预览会优先使用该表达式解析出的 GameObject/Entity。", InfoMessageType.None)]
         [SerializeReference]
         public ESGetGameObjectExpression trackTargetExpression;

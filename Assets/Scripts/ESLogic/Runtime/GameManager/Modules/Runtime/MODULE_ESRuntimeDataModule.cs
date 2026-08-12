@@ -20,6 +20,7 @@ namespace ES
         public static readonly ESWeaponConfigKeyTable Weapons = new ESWeaponConfigKeyTable(64);
         public static readonly ESSkillConfigKeyTable Skills = new ESSkillConfigKeyTable(128);
         public static readonly ESAudioCueConfigKeyTable AudioCues = new ESAudioCueConfigKeyTable(128);
+        public static readonly ESVfxConfigKeyTable Vfx = new ESVfxConfigKeyTable(128);
         public static readonly ESActionConfigKeyTable Actions = new ESActionConfigKeyTable(64);
         public static readonly ESSkillTrackConfigKeyTable SkillTracks = new ESSkillTrackConfigKeyTable(128);
 
@@ -33,6 +34,7 @@ namespace ES
             Weapons.BeginBuild(clear);
             Skills.BeginBuild(clear);
             AudioCues.BeginBuild(clear);
+            Vfx.BeginBuild(clear);
             Actions.BeginBuild(clear);
             SkillTracks.BeginBuild(clear);
             ESActionPresentationMappingTable.BeginBuild(clear);
@@ -52,6 +54,7 @@ namespace ES
             Weapons.EndBuild();
             Skills.EndBuild();
             AudioCues.EndBuild();
+            Vfx.EndBuild();
             Actions.EndBuild();
             SkillTracks.EndBuild();
             ESActionPresentationMappingTable.EndBuild();
@@ -68,7 +71,7 @@ namespace ES
         public static void ResetForResourceTransition()
         {
             if (Buffs.IsBuilding || Shots.IsBuilding || Monsters.IsBuilding || Npcs.IsBuilding
-                || Weapons.IsBuilding || Skills.IsBuilding || AudioCues.IsBuilding
+                || Weapons.IsBuilding || Skills.IsBuilding || AudioCues.IsBuilding || Vfx.IsBuilding
                 || Actions.IsBuilding || SkillTracks.IsBuilding
                 || ESActionPresentationMappingTable.IsBuilding)
                 throw new InvalidOperationException("[ESGameCore] 正在构建 GameCore 表，不能执行资源生命周期切换。");
@@ -103,8 +106,11 @@ namespace ES
 
     public struct ESAssetCatalogBuildValidation
     {
+        public int sourceBusinessEntries;
         public int expectedBusinessEntries;
         public int candidateEntries;
+        public int equivalentDuplicateCount;
+        public string equivalentDuplicateReport;
         public int conflictCount;
         public string conflictReport;
 
@@ -446,6 +452,46 @@ namespace ES
 
     public static class ESRuntimeDataAsset
     {
+        private readonly struct AssetBusinessRegistrationKey : IEquatable<AssetBusinessRegistrationKey>
+        {
+            private readonly ESAssetReferKind kind;
+            private readonly int enumKey;
+            private readonly string stringKey;
+
+            internal AssetBusinessRegistrationKey(
+                ESAssetReferKind kind,
+                int enumKey,
+                string stringKey)
+            {
+                this.kind = kind;
+                this.enumKey = enumKey;
+                this.stringKey = stringKey ?? string.Empty;
+            }
+
+            public bool Equals(AssetBusinessRegistrationKey other)
+            {
+                return kind == other.kind
+                       && enumKey == other.enumKey
+                       && string.Equals(stringKey, other.stringKey, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is AssetBusinessRegistrationKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hash = (int)kind;
+                    hash = (hash * 397) ^ enumKey;
+                    hash = (hash * 397) ^ StringComparer.Ordinal.GetHashCode(stringKey ?? string.Empty);
+                    return hash;
+                }
+            }
+        }
+
         private static readonly object commitSync = new object();
         private static readonly List<ESAssetConfigTableGenerationState> retiredStates = new List<ESAssetConfigTableGenerationState>(4);
         private static long editorCatalogCommitGeneration;
@@ -894,6 +940,7 @@ namespace ES
                     + " 项。\n" + validation.conflictReport);
             }
             CommitOrStageCandidate(candidate, string.Empty);
+            LogEquivalentDuplicateWarnings("AssetPage", validation);
             return validation.candidateEntries;
         }
 
@@ -926,6 +973,7 @@ namespace ES
                     + " 项。\n" + validation.conflictReport);
             }
             CommitOrStageCandidate(candidate, string.Empty);
+            LogEquivalentDuplicateWarnings("Catalog", validation);
             return validation.candidateEntries;
         }
 
@@ -986,8 +1034,10 @@ namespace ES
                     out ESAssetCatalogBuildValidation commitValidation);
                 injectedEntries = commitValidation.candidateEntries;
                 if (!commitValidation.IsValid
+                    || commitValidation.sourceBusinessEntries != validation.sourceBusinessEntries
                     || commitValidation.expectedBusinessEntries != validation.expectedBusinessEntries
-                    || commitValidation.candidateEntries != validation.candidateEntries)
+                    || commitValidation.candidateEntries != validation.candidateEntries
+                    || commitValidation.equivalentDuplicateCount != validation.equivalentDuplicateCount)
                 {
                     candidate.Retire();
                     error = "ConfigKey/ConfigData 候选提交结果不完整：期望 " + validation.expectedBusinessEntries
@@ -997,6 +1047,7 @@ namespace ES
                 }
 
                 CommitOrStageCandidate(candidate, catalogSetFingerprint);
+                LogEquivalentDuplicateWarnings("Catalog", commitValidation);
                 return true;
             }
             catch (Exception exception)
@@ -1044,7 +1095,11 @@ namespace ES
             out ESAssetCatalogBuildValidation validation)
         {
             var candidate = new ESAssetConfigTableGenerationState(baseGeneration, OnGenerationReclaimed);
-            var accepted = new List<ESAssetConfigGenerationRecord>(source?.Count ?? 0);
+            int sourceCount = source?.Count ?? 0;
+            var accepted = new List<ESAssetConfigGenerationRecord>(sourceCount);
+            var canonical = new List<ESAssetConfigGenerationRecord>(sourceCount);
+            var registrationOwners = new Dictionary<AssetBusinessRegistrationKey, ESAssetConfigGenerationRecord>(sourceCount);
+            var equivalentDuplicates = new List<string>();
             try
             {
                 candidate.BeginBuild();
@@ -1053,6 +1108,15 @@ namespace ES
                     for (int i = 0; i < source.Count; i++)
                     {
                         ESAssetConfigGenerationRecord item = source[i];
+                        if (TryConsumeEquivalentDuplicate(
+                            registrationOwners,
+                            in item,
+                            equivalentDuplicates))
+                        {
+                            continue;
+                        }
+
+                        canonical.Add(item);
                         if (RegisterGenerationRecord(candidate, item.Kind, in item.Record))
                             accepted.Add(item);
                     }
@@ -1060,8 +1124,11 @@ namespace ES
                 candidate.CompleteBuild(accepted);
                 validation = new ESAssetCatalogBuildValidation
                 {
-                    expectedBusinessEntries = source?.Count ?? 0,
+                    sourceBusinessEntries = sourceCount,
+                    expectedBusinessEntries = canonical.Count,
                     candidateEntries = candidate.RegisteredCount,
+                    equivalentDuplicateCount = equivalentDuplicates.Count,
+                    equivalentDuplicateReport = string.Join("\n", equivalentDuplicates),
                     conflictCount = candidate.ConflictCount,
                     conflictReport = candidate.GetConflictReport()
                 };
@@ -1072,6 +1139,67 @@ namespace ES
                 candidate.Retire();
                 throw;
             }
+        }
+
+        private static bool TryConsumeEquivalentDuplicate(
+            Dictionary<AssetBusinessRegistrationKey, ESAssetConfigGenerationRecord> owners,
+            in ESAssetConfigGenerationRecord incoming,
+            List<string> report)
+        {
+            ESAssetConfigRecord record = incoming.Record;
+            if (!ESConfigKeyMatch.IsConfigured(record.enumKey, record.stringKey))
+                return false;
+
+            var key = new AssetBusinessRegistrationKey(incoming.Kind, record.enumKey, record.stringKey);
+            if (!owners.TryGetValue(key, out ESAssetConfigGenerationRecord existing))
+            {
+                owners.Add(key, incoming);
+                return false;
+            }
+
+            if (!AreEquivalentAssetRegistrations(in existing.Record, in record))
+                return false;
+
+            report.Add(
+                "Kind=" + incoming.Kind
+                + ", EnumKey=" + record.enumKey
+                + ", StringKey=" + (record.stringKey ?? string.Empty)
+                + ", Identity=" + record.assetGuid + ":" + record.assetLocalFileId
+                + ", Sources=" + DescribeAssetRegistration(existing.Record)
+                + " / " + DescribeAssetRegistration(record));
+            return true;
+        }
+
+        private static bool AreEquivalentAssetRegistrations(
+            in ESAssetConfigRecord left,
+            in ESAssetConfigRecord right)
+        {
+            return !string.IsNullOrEmpty(left.assetGuid)
+                   && !string.IsNullOrEmpty(right.assetGuid)
+                   && left.assetLocalFileId >= 0
+                   && right.assetLocalFileId >= 0
+                   && string.Equals(left.assetGuid, right.assetGuid, StringComparison.Ordinal)
+                   && left.assetLocalFileId == right.assetLocalFileId
+                   && string.Equals(left.assetTypeName, right.assetTypeName, StringComparison.Ordinal);
+        }
+
+        private static string DescribeAssetRegistration(in ESAssetConfigRecord record)
+        {
+            return (record.sourceLibrary ?? string.Empty) + "/" + (record.displayName ?? string.Empty);
+        }
+
+        private static void LogEquivalentDuplicateWarnings(
+            string sourceName,
+            in ESAssetCatalogBuildValidation validation)
+        {
+            if (validation.equivalentDuplicateCount == 0)
+                return;
+
+            Debug.LogWarning(
+                "[ESRes][" + sourceName + "] 合并 " + validation.equivalentDuplicateCount
+                + " 条同键同身份的等价重复注册。源记录 " + validation.sourceBusinessEntries
+                + " 条，唯一记录 " + validation.expectedBusinessEntries + " 条。\n"
+                + validation.equivalentDuplicateReport);
         }
 
         private static bool RegisterGenerationRecord(
@@ -1196,6 +1324,7 @@ namespace ES
         public static readonly ESWeaponConfigKeyTable WeaponTable = ESRuntimeDataGameCore.Weapons;
         public static readonly ESSkillConfigKeyTable SkillTable = ESRuntimeDataGameCore.Skills;
         public static readonly ESAudioCueConfigKeyTable AudioCueTable = ESRuntimeDataGameCore.AudioCues;
+        public static readonly ESVfxConfigKeyTable VfxTable = ESRuntimeDataGameCore.Vfx;
         public static readonly ESActionConfigKeyTable ActionTable = ESRuntimeDataGameCore.Actions;
         public static readonly ESSkillTrackConfigKeyTable SkillTrackTable = ESRuntimeDataGameCore.SkillTracks;
         public static readonly ESRuntimeInstanceIndex<ESActiveBuffRuntime> BuffInstanceIndex = new ESRuntimeInstanceIndex<ESActiveBuffRuntime>(128);
@@ -1216,6 +1345,8 @@ namespace ES
         public readonly ESWeaponConfigKeyTable Weapons = WeaponTable;
         [ShowInInspector, ReadOnly, LabelText("Audio Cue Table")]
         public readonly ESAudioCueConfigKeyTable AudioCues = AudioCueTable;
+        [ShowInInspector, ReadOnly, LabelText("VFX Table")]
+        public readonly ESVfxConfigKeyTable Vfx = VfxTable;
         [ShowInInspector, ReadOnly, LabelText("\u6280\u80fd\u8868")]
         public readonly ESSkillConfigKeyTable Skills = SkillTable;
         [ShowInInspector, ReadOnly, LabelText("Action Table")]
@@ -1608,7 +1739,7 @@ namespace ES
                 // its own InjectGameCoreTables implementation. In particular, audio emitters
                 // must not see the first Cue as a ready catalog while later Cues are still being
                 // asynchronously loaded and injected.
-                BeginBuildStatic();
+                BeginBuildStatic(true);
                 gameCoreBuildOpen = true;
                 foreach (ESRuntimeConsumerGameCoreReference entry in OrderGameCoreAssets(assets))
                 {
@@ -1700,6 +1831,8 @@ namespace ES
         public override void OnDestroy()
         {
             DisposeAssetLoading();
+            ESStoryDefinitionCatalog.AbortBuild();
+            ESStoryDefinitionCatalog.Clear();
             base.OnDestroy();
         }
 
@@ -1724,7 +1857,17 @@ namespace ES
             }
 
             isBuilding = true;
-            ESRuntimeDataGameCore.BeginBuild(clear);
+            try
+            {
+                ESStoryDefinitionCatalog.BeginBuild(clear);
+                ESRuntimeDataGameCore.BeginBuild(clear);
+            }
+            catch
+            {
+                ESStoryDefinitionCatalog.AbortBuild();
+                isBuilding = false;
+                throw;
+            }
         }
 
         public static void EndBuildStatic()
@@ -1744,6 +1887,13 @@ namespace ES
                 // The callback may immediately start a Cue load, so it must never observe the
                 // enclosing RuntimeData transaction half-built.
                 ESRuntimeDataGameCore.EndBuild(false);
+                if (audioCueCatalogReady) ESStoryDefinitionCatalog.EndBuild();
+                else ESStoryDefinitionCatalog.AbortBuild();
+            }
+            catch
+            {
+                ESStoryDefinitionCatalog.AbortBuild();
+                throw;
             }
             finally
             {

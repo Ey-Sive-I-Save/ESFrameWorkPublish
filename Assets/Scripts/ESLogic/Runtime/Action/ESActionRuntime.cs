@@ -109,6 +109,7 @@ namespace ES
         public readonly ESActionEventKind kind;
         public readonly ESActionConfigKey actionKey;
         public readonly ESActionRuntimeHandle handle;
+        public readonly int sourcePulseId;
         public readonly ESActionPhaseKind phase;
         public readonly int comboIndex;
         public readonly int emissionId;
@@ -119,6 +120,7 @@ namespace ES
             ESActionEventKind kind,
             ESActionConfigKey actionKey,
             ESActionRuntimeHandle handle,
+            int sourcePulseId,
             ESActionPhaseKind phase,
             int comboIndex,
             int emissionId,
@@ -128,6 +130,7 @@ namespace ES
             this.kind = kind;
             this.actionKey = actionKey;
             this.handle = handle;
+            this.sourcePulseId = sourcePulseId;
             this.phase = phase;
             this.comboIndex = comboIndex;
             this.emissionId = emissionId;
@@ -161,6 +164,7 @@ namespace ES
         private readonly int catalogVersion = ++nextCatalogVersion;
 
         private ESActionRuntimeData current;
+        private ESActionIntent currentIntent;
         private ESActionRuntimeHandle currentHandle;
         private int lifecycleGeneration = 1;
         private int phaseIndex;
@@ -188,10 +192,24 @@ namespace ES
         public ESActionPhaseKind CurrentPhase => isRunning ? GetCurrentPhaseKind() : ESActionPhaseKind.None;
         public int ComboIndex => comboIndex;
         public bool HasBufferedIntent => hasBufferedIntent;
+        public int BufferedSourcePulseId => hasBufferedIntent ? bufferedIntent.sourcePulseId : 0;
 
         public bool TrySubmit(in ESActionIntent intent, out string error)
         {
+            return TrySubmit(intent, out error, out _);
+        }
+
+        /// <summary>
+        /// 提交 Action，并在覆盖尚未启动的缓冲 Intent 时返回旧 sourcePulseId。
+        /// 调用方可据此释放与旧输入脉冲关联的外部上下文。
+        /// </summary>
+        public bool TrySubmit(
+            in ESActionIntent intent,
+            out string error,
+            out int replacedBufferedSourcePulseId)
+        {
             error = null;
+            replacedBufferedSourcePulseId = 0;
             if (owner != null && intent.owner != null && !ReferenceEquals(owner, intent.owner))
             {
                 error = "ActionIntent Owner 不属于当前 ActionRuntime。";
@@ -231,6 +249,9 @@ namespace ES
                     error = "当前 Phase 已过输入缓冲窗口。";
                     return false;
                 }
+
+                if (hasBufferedIntent)
+                    replacedBufferedSourcePulseId = bufferedIntent.sourcePulseId;
 
                 bufferedIntent = intent;
                 hasBufferedIntent = true;
@@ -327,6 +348,7 @@ namespace ES
                         continue;
 
                     Publish(ESActionEventKind.ActionCancelled, default);
+                    ClearBufferedIntent();
                     ResetActionState();
                     return true;
                 }
@@ -342,6 +364,7 @@ namespace ES
                 return;
 
             Publish(ESActionEventKind.ActionInterrupted, default);
+            ClearBufferedIntent();
             ResetActionState();
         }
 
@@ -349,8 +372,7 @@ namespace ES
         {
             lifecycleGeneration++;
             ResetActionState();
-            bufferedIntent = default;
-            hasBufferedIntent = false;
+            ClearBufferedIntent();
             events?.Reset();
         }
 
@@ -358,6 +380,7 @@ namespace ES
         {
             lifecycleGeneration++;
             current = runtimeData;
+            currentIntent = intent;
             isRunning = true;
             phaseIndex = 0;
             phaseElapsed = 0f;
@@ -386,8 +409,7 @@ namespace ES
                 return;
             }
 
-            bufferedIntent = default;
-            hasBufferedIntent = false;
+            ClearBufferedIntent();
             ResetActionState();
         }
 
@@ -451,12 +473,19 @@ namespace ES
         private void ResetActionState()
         {
             current = null;
+            currentIntent = default;
             currentHandle = default;
             isRunning = false;
             phaseIndex = 0;
             phaseElapsed = 0f;
             hitWindowOpened = false;
             comboIndex = 0;
+        }
+
+        private void ClearBufferedIntent()
+        {
+            bufferedIntent = default;
+            hasBufferedIntent = false;
         }
 
         private void Publish(ESActionEventKind kind, in ESActionHitResult hitResult)
@@ -470,6 +499,7 @@ namespace ES
                 kind,
                 key,
                 currentHandle,
+                currentIntent.sourcePulseId,
                 GetCurrentPhaseKind(),
                 comboIndex,
                 nextEmissionId,

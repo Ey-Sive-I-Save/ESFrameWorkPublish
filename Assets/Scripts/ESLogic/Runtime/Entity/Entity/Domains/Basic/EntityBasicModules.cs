@@ -417,7 +417,15 @@ namespace ES
         public int startWeaponIndex;
 
         [LabelText("默认普攻 Action")]
-        public ESActionConfigKey defaultMeleeAttackAction = "melee.attack";
+        [FormerlySerializedAs("defaultMeleeAttackAction")]
+        public ESActionConfigKey defaultPrimaryAttackAction = "melee.attack";
+
+        [LabelText("允许徒手普攻")]
+        [Tooltip("没有活动武器槽位时，允许角色使用独立的徒手 Action。活动槽位缺 Key 属于配置错误，不会回退徒手。")]
+        public bool allowUnarmedPrimaryAttack = true;
+
+        [LabelText("徒手普攻 Action")]
+        public ESActionConfigKey unarmedPrimaryAttackAction = "melee.attack";
 
         [LabelText("默认重击 Action")]
         public ESActionConfigKey defaultHeavyAttackAction = "melee.heavy_attack";
@@ -460,7 +468,7 @@ namespace ES
 
         [LabelText("武器槽位")]
         [Tooltip("仅用于武器顺序管理；每个 weaponRoot 必须挂 EntityWeaponBinding。")]
-        public System.Collections.Generic.List<GunWeaponSlot> weaponSlots = new System.Collections.Generic.List<GunWeaponSlot>();
+        public System.Collections.Generic.List<WeaponSlot> weaponSlots = new System.Collections.Generic.List<WeaponSlot>();
 
         [LabelText("缺失绑定时自动补齐")]
         [Tooltip("当 weaponRoot 未挂 EntityWeaponBinding 时，运行时自动添加，避免槽位失效导致挂点不生效。")]
@@ -481,6 +489,18 @@ namespace ES
         [NonSerialized]
         private ESActionPresentationBridge actionPresentationBridge;
 
+        [field: NonSerialized]
+        public event Action<EntityPrimaryAttackEvent> PrimaryAttackEvent;
+
+        [NonSerialized]
+        private Dictionary<int, PendingPrimaryAttack> _pendingPrimaryAttacks;
+
+        [NonSerialized]
+        private int _nextPrimaryAttackId;
+
+        [NonSerialized]
+        private int _nextPrimaryAttackPulseId;
+
         internal ESActionPresentationBridge ActionPresentationBridge => actionPresentationBridge;
         internal bool HasActionRuntime => actionRuntime != null;
         [NonSerialized] private int poolSpawnCount;
@@ -491,16 +511,20 @@ namespace ES
         public void OnPoolSpawned()
         {
             poolSpawnCount++;
+            ResolveAttachmentModule()?.NotifySlotsChanged();
         }
 
         public void OnPoolDespawned()
         {
             poolDespawnCount++;
+            _attachmentModule?.NotifySlotsChanged();
             ESActionPoolLifecycleDiagnostics.Record("Combat.BridgeDispose");
             actionPresentationBridge?.Dispose();
             actionPresentationBridge = null;
+            FinishPendingPrimaryAttacks();
             actionRuntime?.ResetForLifecycle();
             actionRuntime = null;
+            PrimaryAttackEvent = null;
         }
 
         [LabelText("阻止收枪挂到手臂链")]
@@ -625,10 +649,12 @@ namespace ES
         [NonSerialized] private StateLifecycleTracker _aimLifecycle = new StateLifecycleTracker();
         [NonSerialized] private StateLifecycleTracker _peekLifecycle = new StateLifecycleTracker();
         [NonSerialized] private bool _isInAttachmentConsistencyPass;
+        [NonSerialized] private EntityEquipmentAttachmentModule _attachmentModule;
 
         public override void Start()
         {
             base.Start();
+            ResolveAttachmentModule();
             CacheStateMachine();
             ValidateAndRepairMountConfiguration();
             ResolveAimState();
@@ -725,17 +751,227 @@ namespace ES
         [NonSerialized] private Transform _switchAssistRightTarget;
         [NonSerialized] private float _lastEquipOrSwitchTime = -999f;
 
+        private readonly struct PendingPrimaryAttack
+        {
+            public readonly int attackId;
+            public readonly EntityPrimaryAttackSelection selection;
+            public readonly ESActionConfigKey actionKey;
+            public readonly ESWeaponConfigKey primaryWeaponKey;
+            public readonly ESWeaponConfigKey secondaryWeaponKey;
+            public readonly bool started;
+
+            public PendingPrimaryAttack(
+                int attackId,
+                EntityPrimaryAttackSelection selection,
+                ESActionConfigKey actionKey,
+                ESWeaponConfigKey primaryWeaponKey,
+                ESWeaponConfigKey secondaryWeaponKey,
+                bool started = false)
+            {
+                this.attackId = attackId;
+                this.selection = selection;
+                this.actionKey = actionKey;
+                this.primaryWeaponKey = primaryWeaponKey;
+                this.secondaryWeaponKey = secondaryWeaponKey;
+                this.started = started;
+            }
+
+            public PendingPrimaryAttack MarkStarted()
+                => new PendingPrimaryAttack(
+                    attackId,
+                    selection,
+                    actionKey,
+                    primaryWeaponKey,
+                    secondaryWeaponKey,
+                    true);
+        }
+
         [ShowInInspector, ReadOnly, LabelText("最近应用后坐力")]
         public float lastAppliedRecoilMagnitude;
+
+        [ShowInInspector, ReadOnly, NonSerialized, LabelText("最近主攻击选择")]
+        public EntityPrimaryAttackRoute lastPrimaryAttackRoute;
+
+        [ShowInInspector, ReadOnly, NonSerialized, LabelText("最近主攻击来源")]
+        public EntityPrimaryAttackSource lastPrimaryAttackSource;
+
+        [ShowInInspector, ReadOnly, NonSerialized, LabelText("最近主攻击 ID")]
+        public int lastPrimaryAttackId;
+
+        [ShowInInspector, ReadOnly, NonSerialized, LabelText("最近主攻击失败原因")]
+        public string lastPrimaryAttackFailureReason;
 
         private const float RecoilWarnInterval = 2f;
 
         public void TriggerAttack()
         {
-            lastAttackTime = Time.time;
+            TryExecutePrimaryAttack();
+        }
 
-            if (fireOnAttackInput)
-                TryFireWeapon();
+        /// <summary>
+        /// 主攻击唯一执行入口。AI/Input 只提交一次 Attack；近战 Action 与武器射击的
+        /// 仲裁由当前 WeaponDefinition 决定，禁止在输入层按注册状态互相回退。
+        /// </summary>
+        public bool TryExecutePrimaryAttack()
+        {
+            lastAttackTime = Time.time;
+            lastPrimaryAttackRoute = EntityPrimaryAttackRoute.None;
+            lastPrimaryAttackSource = EntityPrimaryAttackSource.None;
+            lastPrimaryAttackId = 0;
+            lastPrimaryAttackFailureReason = string.Empty;
+
+            bool hasActiveSlotIndex = weaponSlots != null
+                                      && _activeWeaponSlot >= 0
+                                      && _activeWeaponSlot < weaponSlots.Count;
+            if (!hasActiveSlotIndex)
+            {
+                if (!allowUnarmedPrimaryAttack)
+                {
+                    lastPrimaryAttackFailureReason = "当前没有活动武器，且角色未启用徒手普攻。";
+                    return false;
+                }
+
+                EntityPrimaryAttackSelection unarmedSelection =
+                    EntityPrimaryAttackSelector.SelectUnarmed(unarmedPrimaryAttackAction);
+                if (!unarmedSelection.IsValid)
+                {
+                    lastPrimaryAttackFailureReason = "角色允许徒手普攻，但没有配置有效的徒手普攻 Action。";
+                    return false;
+                }
+
+                return TrySubmitPrimaryAttackAction(
+                    unarmedSelection,
+                    unarmedPrimaryAttackAction,
+                    null,
+                    null,
+                    "当前没有活动武器，执行徒手普攻");
+            }
+
+            if (!TryGetWeaponSlot(_activeWeaponSlot, out WeaponSlot currentSlot))
+            {
+                lastPrimaryAttackFailureReason = "当前活动 WeaponSlot 无效；这是装配错误，不允许回退徒手攻击。";
+                return false;
+            }
+
+            ESWeaponConfigKey currentWeaponKey = currentSlot.weaponKey;
+            if (currentWeaponKey == null || !currentWeaponKey.IsConfigured)
+            {
+                lastPrimaryAttackFailureReason = "当前活动 WeaponSlot 缺少 Weapon Key；这是装配错误，不允许回退徒手攻击。";
+                return false;
+            }
+
+            if (enableWeaponFusion && !_weaponInHand)
+            {
+                lastPrimaryAttackFailureReason = "当前武器尚未装备到手，拒绝执行武器攻击。";
+                return false;
+            }
+
+            if (!TryResolveCurrentWeaponDefinition(out ItemWeaponSharedData definition))
+            {
+                lastPrimaryAttackFailureReason = "当前 Weapon Key 未解析到有效 WeaponDefinition。";
+                return false;
+            }
+
+            ESActionConfigKey actionKey = ResolvePrimaryAttackAction(currentSlot, definition);
+            EntityPrimaryAttackSelection selection = EntityPrimaryAttackSelector.Select(
+                definition,
+                actionKey,
+                EntityPrimaryAttackSource.PrimaryWeapon);
+            lastPrimaryAttackRoute = selection.route;
+            lastPrimaryAttackSource = selection.source;
+            switch (lastPrimaryAttackRoute)
+            {
+                case EntityPrimaryAttackRoute.Action:
+                    return TrySubmitPrimaryAttackAction(
+                        selection,
+                        actionKey,
+                        currentWeaponKey,
+                        null,
+                        "当前武器定义选择 Action 普攻");
+
+                case EntityPrimaryAttackRoute.WeaponFire:
+                    if (!fireOnAttackInput)
+                    {
+                        lastPrimaryAttackFailureReason = "Combat 已关闭 Attack 输入触发射击。";
+                        return false;
+                    }
+
+                    int attackId = NextPrimaryAttackId();
+                    if (TryFireWeapon(
+                            attackId,
+                            selection,
+                            currentWeaponKey,
+                            definition))
+                    {
+                        lastPrimaryAttackId = attackId;
+                        return true;
+                    }
+
+                    lastPrimaryAttackFailureReason = "WeaponFire 已选中，但射击运行时拒绝本次请求。";
+                    return false;
+
+                default:
+                    lastPrimaryAttackFailureReason = "当前 WeaponDefinition 没有可执行的主攻击类型。";
+                    return false;
+            }
+        }
+
+        private bool TrySubmitPrimaryAttackAction(
+            EntityPrimaryAttackSelection selection,
+            ESActionConfigKey actionKey,
+            ESWeaponConfigKey primaryWeaponKey,
+            ESWeaponConfigKey secondaryWeaponKey,
+            string context)
+        {
+            lastPrimaryAttackRoute = selection.route;
+            lastPrimaryAttackSource = selection.source;
+
+            EnsureActionRuntime();
+            bool actionRegistered = actionKey != null
+                                    && actionKey.IsConfigured
+                                    && ESActionGameCoreTable.Table.TryGet(actionKey, out _);
+            if (actionRuntime == null || !actionRegistered)
+            {
+                lastPrimaryAttackFailureReason = actionRegistered
+                    ? context + "，但 ActionRuntime 尚未初始化。"
+                    : context + "，但普攻 Action 尚未注册到 Action GameCore Table。";
+                return false;
+            }
+
+            int attackId = NextPrimaryAttackId();
+            int actionPulseId = NextPrimaryAttackPulseId();
+            _pendingPrimaryAttacks ??= new Dictionary<int, PendingPrimaryAttack>(4);
+            _pendingPrimaryAttacks[actionPulseId] = new PendingPrimaryAttack(
+                attackId,
+                selection,
+                actionKey,
+                primaryWeaponKey,
+                secondaryWeaponKey);
+
+            bool submitted = actionRuntime.TrySubmit(
+                new ESActionIntent(
+                    actionKey,
+                    actionRuntime.LifecycleGeneration,
+                    actionPulseId,
+                    MyCore),
+                out _,
+                out int replacedBufferedPulseId);
+
+            if (replacedBufferedPulseId != 0)
+                _pendingPrimaryAttacks.Remove(replacedBufferedPulseId);
+
+            if (submitted)
+            {
+                lastPrimaryAttackId = attackId;
+                return true;
+            }
+
+            _pendingPrimaryAttacks.Remove(actionPulseId);
+
+            lastPrimaryAttackFailureReason = actionRegistered
+                ? context + "，但 ActionRuntime 拒绝了本次普攻 Action。"
+                : context + "，但普攻 Action 尚未注册到 Action GameCore Table。";
+            return false;
         }
 
         public void TriggerHeavyAttack()
@@ -902,6 +1138,7 @@ namespace ES
             if (_activeWeaponSlot == index && _weaponInHand)
                 return true;
 
+            NotifyEquipmentSlotsChanged();
             SetActionPhase(3);
             StartSwitchAssistIK(currentSlot, currentWeaponBinding, nextSlot, nextWeaponBinding);
             bool switchTransitionActivated = TryActivateTransitionState(
@@ -984,13 +1221,45 @@ namespace ES
 
         public bool TryFireWeapon()
         {
+            if (!TryGetWeaponSlot(_activeWeaponSlot, out WeaponSlot slot)
+                || slot.weaponKey == null
+                || !slot.weaponKey.IsConfigured
+                || !TryResolveCurrentWeaponDefinition(out ItemWeaponSharedData definition))
+                return false;
+
+            EntityPrimaryAttackSelection selection = EntityPrimaryAttackSelector.Select(
+                definition,
+                ResolvePrimaryAttackAction(slot, definition),
+                EntityPrimaryAttackSource.PrimaryWeapon);
+            if (selection.route != EntityPrimaryAttackRoute.WeaponFire)
+                return false;
+
+            int attackId = NextPrimaryAttackId();
+            bool fired = TryFireWeapon(attackId, selection, slot.weaponKey, definition);
+            if (fired)
+            {
+                lastPrimaryAttackRoute = selection.route;
+                lastPrimaryAttackSource = selection.source;
+                lastPrimaryAttackId = attackId;
+            }
+            return fired;
+        }
+
+        private bool TryFireWeapon(
+            int attackId,
+            EntityPrimaryAttackSelection selection,
+            ESWeaponConfigKey primaryWeaponKey,
+            ItemWeaponSharedData weaponDefinition)
+        {
             if (!enableGunFire || MyCore == null)
                 return false;
 
             if (enableWeaponFusion && !_weaponInHand)
                 return false;
 
-            if (!TryResolveCurrentWeaponDefinition(out ItemWeaponSharedData weaponDefinition))
+            if (!selection.IsValid
+                || selection.route != EntityPrimaryAttackRoute.WeaponFire
+                || weaponDefinition == null)
                 return false;
 
             WeaponFireDefinitionData fireDefinition = weaponDefinition.fire;
@@ -1057,13 +1326,42 @@ namespace ES
                     MyCore);
             }
 
+            PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
+                EntityPrimaryAttackEventKind.Started,
+                attackId,
+                selection,
+                null,
+                primaryWeaponKey,
+                null));
+
+            if (hasHit)
+            {
+                PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
+                    EntityPrimaryAttackEventKind.HitResolved,
+                    attackId,
+                    selection,
+                    null,
+                    primaryWeaponKey,
+                    null,
+                    hit.collider,
+                    hit.point,
+                    true));
+            }
+
+            PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
+                EntityPrimaryAttackEventKind.Finished,
+                attackId,
+                selection,
+                null,
+                primaryWeaponKey,
+                null));
+
             return true;
         }
 
         public bool TrySubmitAction(ESActionIntent intent)
         {
-            EnsureActionRuntime();
-            return actionRuntime != null && actionRuntime.TrySubmit(intent, out _);
+            return TrySubmitAction(intent, out _);
         }
 
         public bool TrySubmitAction(ESActionIntent intent, out string error)
@@ -1075,7 +1373,12 @@ namespace ES
                 return false;
             }
 
-            return actionRuntime.TrySubmit(intent, out error);
+            bool submitted = actionRuntime.TrySubmit(
+                intent,
+                out error,
+                out int replacedBufferedPulseId);
+            RemovePendingPrimaryAttack(replacedBufferedPulseId);
+            return submitted;
         }
 
         public bool TrySubmitMeleeAttack()
@@ -1084,24 +1387,25 @@ namespace ES
         }
 
         /// <summary>
-        /// 提交近战 Action。actionRegistered 只表示当前 Catalog 已有该定义；调用方可据此
-        /// 区分迁移期的“未接入 Action 内容”与“已接入但本次 Intent 被运行时拒绝”。
+        /// 低层兼容入口：只提交角色默认 Action，不读取 WeaponDefinition，也不产生
+        /// EntityPrimaryAttackEvent。正式玩家普攻及其后续扩展必须走 TryExecutePrimaryAttack。
+        /// actionRegistered 只表示当前 Catalog 已有该定义。
         /// </summary>
         public bool TrySubmitMeleeAttack(out bool actionRegistered)
         {
             EnsureActionRuntime();
-            actionRegistered = defaultMeleeAttackAction != null
-                && defaultMeleeAttackAction.IsConfigured
-                && ESActionGameCoreTable.Table.TryGet(defaultMeleeAttackAction, out _);
+            actionRegistered = defaultPrimaryAttackAction != null
+                && defaultPrimaryAttackAction.IsConfigured
+                && ESActionGameCoreTable.Table.TryGet(defaultPrimaryAttackAction, out _);
             if (actionRuntime == null)
                 return false;
 
             if (!actionRegistered)
                 return false;
 
-            return actionRuntime.TrySubmit(
+            return TrySubmitAction(
                 new ESActionIntent(
-                    defaultMeleeAttackAction,
+                    defaultPrimaryAttackAction,
                     actionRuntime.LifecycleGeneration,
                     Time.frameCount,
                     MyCore),
@@ -1125,7 +1429,7 @@ namespace ES
             if (!actionRegistered)
                 return false;
 
-            return actionRuntime.TrySubmit(
+            return TrySubmitAction(
                 new ESActionIntent(
                     defaultHeavyAttackAction,
                     actionRuntime.LifecycleGeneration,
@@ -1156,17 +1460,26 @@ namespace ES
                 return false;
             }
 
-            return actionRuntime.TryCancel(category, targetActionKey, out error);
+            int bufferedPulseId = actionRuntime.BufferedSourcePulseId;
+            bool cancelled = actionRuntime.TryCancel(category, targetActionKey, out error);
+            if (cancelled)
+                RemovePendingPrimaryAttack(bufferedPulseId);
+            return cancelled;
         }
 
         public void InterruptAction()
         {
-            actionRuntime?.Interrupt();
+            if (actionRuntime == null)
+                return;
+
+            int bufferedPulseId = actionRuntime.BufferedSourcePulseId;
+            actionRuntime.Interrupt();
+            RemovePendingPrimaryAttack(bufferedPulseId);
         }
 
         private Transform ResolveCurrentWeaponMount()
         {
-            if (!TryGetWeaponSlot(_activeWeaponSlot, out GunWeaponSlot slot) || slot.weaponRoot == null)
+            if (!TryGetWeaponSlot(_activeWeaponSlot, out WeaponSlot slot) || slot.weaponRoot == null)
                 return null;
 
             EntityWeaponBinding binding = GetWeaponBinding(slot);
@@ -1178,11 +1491,28 @@ namespace ES
 
         private ESWeaponConfigKey ResolveCurrentWeaponKey()
         {
-            return TryGetWeaponSlot(_activeWeaponSlot, out GunWeaponSlot slot)
+            return TryGetWeaponSlot(_activeWeaponSlot, out WeaponSlot slot)
                 && slot.weaponKey != null
                 && slot.weaponKey.IsConfigured
                 ? slot.weaponKey
                 : null;
+        }
+
+        private ESActionConfigKey ResolvePrimaryAttackAction(
+            WeaponSlot slot,
+            ItemWeaponSharedData definition)
+        {
+            if (slot != null
+                && slot.primaryAttackActionOverride != null
+                && slot.primaryAttackActionOverride.IsConfigured)
+                return slot.primaryAttackActionOverride;
+
+            if (definition != null
+                && definition.primaryAttackAction != null
+                && definition.primaryAttackAction.IsConfigured)
+                return definition.primaryAttackAction;
+
+            return defaultPrimaryAttackAction;
         }
 
         private bool TryResolveCurrentWeaponDefinition(out ItemWeaponSharedData definition)
@@ -1192,7 +1522,7 @@ namespace ES
             ESWeaponConfigKey key = ResolveCurrentWeaponKey();
             if (key == null)
             {
-                TryWarnWeaponDefinition("枪械开火必须配置当前 GunWeaponSlot 的 Weapon Key。");
+                TryWarnWeaponDefinition("武器攻击必须配置当前 Weapon Slot 的 Weapon Key。");
                 return false;
             }
 
@@ -1230,6 +1560,8 @@ namespace ES
                 return;
 
             actionEventHub ??= new ESActionEventHub();
+            actionEventHub.Published -= HandlePrimaryAttackActionEvent;
+            actionEventHub.Published += HandlePrimaryAttackActionEvent;
             actionRuntime = new ESActionRuntime(ESActionGameCoreTable.Table, actionEventHub, MyCore);
             if (actionPresentationBridge == null)
             {
@@ -1240,6 +1572,121 @@ namespace ES
                     null,
                     ResolveCurrentWeaponMount,
                     ResolveCurrentWeaponKey);
+            }
+        }
+
+        private int NextPrimaryAttackId()
+        {
+            _nextPrimaryAttackId++;
+            if (_nextPrimaryAttackId <= 0)
+                _nextPrimaryAttackId = 1;
+            return _nextPrimaryAttackId;
+        }
+
+        private int NextPrimaryAttackPulseId()
+        {
+            // 正数 sourcePulseId 保留给普通输入/Action。Combat 使用负数命名空间，
+            // 避免其他 Action 与尚在缓冲区的普攻误关联。
+            _nextPrimaryAttackPulseId--;
+            if (_nextPrimaryAttackPulseId >= 0)
+                _nextPrimaryAttackPulseId = -1;
+            return _nextPrimaryAttackPulseId;
+        }
+
+        private void HandlePrimaryAttackActionEvent(ESActionEvent evt)
+        {
+            if (evt.sourcePulseId >= 0
+                || _pendingPrimaryAttacks == null
+                || !_pendingPrimaryAttacks.TryGetValue(evt.sourcePulseId, out PendingPrimaryAttack pending))
+                return;
+
+            switch (evt.kind)
+            {
+                case ESActionEventKind.ActionStarted:
+                    pending = pending.MarkStarted();
+                    _pendingPrimaryAttacks[evt.sourcePulseId] = pending;
+                    PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
+                        EntityPrimaryAttackEventKind.Started,
+                        pending.attackId,
+                        pending.selection,
+                        pending.actionKey,
+                        pending.primaryWeaponKey,
+                        pending.secondaryWeaponKey));
+                    break;
+
+                case ESActionEventKind.HitResolved:
+                    PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
+                        EntityPrimaryAttackEventKind.HitResolved,
+                        pending.attackId,
+                        pending.selection,
+                        pending.actionKey,
+                        pending.primaryWeaponKey,
+                        pending.secondaryWeaponKey,
+                        evt.hitResult.target,
+                        actionHitResult: evt.hitResult));
+                    break;
+
+                case ESActionEventKind.ActionCancelled:
+                case ESActionEventKind.ActionInterrupted:
+                case ESActionEventKind.ActionFinished:
+                    PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
+                        EntityPrimaryAttackEventKind.Finished,
+                        pending.attackId,
+                        pending.selection,
+                        pending.actionKey,
+                        pending.primaryWeaponKey,
+                        pending.secondaryWeaponKey));
+                    _pendingPrimaryAttacks.Remove(evt.sourcePulseId);
+                    break;
+            }
+        }
+
+        private void RemovePendingPrimaryAttack(int sourcePulseId)
+        {
+            if (sourcePulseId != 0)
+                _pendingPrimaryAttacks?.Remove(sourcePulseId);
+        }
+
+        private void FinishPendingPrimaryAttacks()
+        {
+            if (_pendingPrimaryAttacks == null || _pendingPrimaryAttacks.Count == 0)
+                return;
+
+            var pendingAttacks = new List<PendingPrimaryAttack>(_pendingPrimaryAttacks.Values);
+            _pendingPrimaryAttacks.Clear();
+            for (int i = 0; i < pendingAttacks.Count; i++)
+            {
+                PendingPrimaryAttack pending = pendingAttacks[i];
+                if (!pending.started)
+                    continue;
+
+                PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
+                    EntityPrimaryAttackEventKind.Finished,
+                    pending.attackId,
+                    pending.selection,
+                    pending.actionKey,
+                    pending.primaryWeaponKey,
+                    pending.secondaryWeaponKey));
+            }
+        }
+
+        private void PublishPrimaryAttackEvent(in EntityPrimaryAttackEvent evt)
+        {
+            Action<EntityPrimaryAttackEvent> handlers = PrimaryAttackEvent;
+            if (handlers == null)
+                return;
+
+            Delegate[] invocationList = handlers.GetInvocationList();
+            for (int i = 0; i < invocationList.Length; i++)
+            {
+                try
+                {
+                    ((Action<EntityPrimaryAttackEvent>)invocationList[i]).Invoke(evt);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception, MyCore);
+                }
             }
         }
 
@@ -1455,6 +1902,7 @@ namespace ES
         {
             actionPresentationBridge?.Dispose();
             actionPresentationBridge = null;
+            FinishPendingPrimaryAttacks();
             actionRuntime?.ResetForLifecycle();
             actionRuntime = null;
             base.OnDisable();
@@ -1464,6 +1912,7 @@ namespace ES
         {
             actionPresentationBridge?.Dispose();
             actionPresentationBridge = null;
+            FinishPendingPrimaryAttacks();
             actionRuntime?.ResetForLifecycle();
             actionRuntime = null;
             UnbindSwitchAssistIKPostProcess();
@@ -1536,6 +1985,7 @@ namespace ES
 
         private void InitializeWeaponFusionRuntime()
         {
+            NotifyEquipmentSlotsChanged();
             _upperBodyLayerWeightCurrent = 0f;
             _equipBlendCurrent = 0f;
             _firePulseCurrent = 0f;
@@ -1709,11 +2159,25 @@ namespace ES
             return string.Equals(GetTransformPath(currentParent), GetTransformPath(mount), StringComparison.Ordinal);
         }
 
-        private Transform ResolveHandMount(GunWeaponSlot slot, EntityWeaponBinding weaponBinding)
+        private Transform ResolveHandMount(WeaponSlot slot, EntityWeaponBinding weaponBinding)
         {
-            Transform mount = weaponBinding != null
-                ? weaponBinding.ResolveHandMount(MyCore, defaultHandMount)
-                : ResolveCharacterWeaponSocket(defaultHandMount);
+            Transform explicitMount = weaponBinding != null
+                && weaponBinding.handMountPolicy != EntityWeaponHandMountPolicy.CharacterSocketOnly
+                ? weaponBinding.handMount
+                : null;
+            Transform mount = null;
+            EntityEquipmentAttachmentModule attachment = ResolveAttachmentModule();
+            attachment?.TryResolveTarget(
+                EntityEquipmentAttachmentTarget.MainHand,
+                explicitMount,
+                defaultHandMount,
+                out mount,
+                out _);
+
+            if (mount == null && attachment == null)
+                mount = weaponBinding != null
+                    ? weaponBinding.ResolveHandMount(MyCore, defaultHandMount)
+                    : ResolveCharacterWeaponSocket(defaultHandMount);
 
             if (IsHandMountConflictingWithHolster(slot, weaponBinding, mount))
             {
@@ -1745,7 +2209,7 @@ namespace ES
             return mount;
         }
 
-        private Transform ResolveFallbackHandMount(GunWeaponSlot slot, EntityWeaponBinding weaponBinding)
+        private Transform ResolveFallbackHandMount(WeaponSlot slot, EntityWeaponBinding weaponBinding)
         {
             Transform candidate = ResolveCharacterWeaponSocket(defaultHandMount);
             if (candidate != null && !IsHandMountConflictingWithHolster(slot, weaponBinding, candidate))
@@ -1760,7 +2224,7 @@ namespace ES
 
         private Transform ResolveCharacterWeaponSocket(Transform fallback)
         {
-            if (MyCore != null && MyCore.TryResolveTransform("WeaponSocket", out Transform weaponSocket))
+            if (MyCore != null && MyCore.TryResolveTransform(EntityEquipmentSocketKeys.WeaponSocket, out Transform weaponSocket))
                 return weaponSocket;
 
             if (MyCore != null && MyCore.TryResolveTransform(DefaultTransformKey.Weapon, out Transform mappedWeapon))
@@ -1769,7 +2233,7 @@ namespace ES
             return fallback;
         }
 
-        private bool IsHandMountConflictingWithHolster(GunWeaponSlot slot, EntityWeaponBinding weaponBinding, Transform handMount)
+        private bool IsHandMountConflictingWithHolster(WeaponSlot slot, EntityWeaponBinding weaponBinding, Transform handMount)
         {
             if (handMount == null)
                 return false;
@@ -1794,6 +2258,10 @@ namespace ES
 
         private void ValidateAndRepairMountConfiguration()
         {
+            EntityEquipmentAttachmentModule attachment = ResolveAttachmentModule();
+            if (attachment != null && !attachment.allowEntityRootFallback)
+                return;
+
             if (defaultHandMount == null)
             {
                 defaultHandMount = EnsureAutoRightHandMount();
@@ -1830,12 +2298,22 @@ namespace ES
             return IsSameOrChildOf(a, b) || IsSameOrChildOf(b, a);
         }
 
-        private Transform ResolveHolsterMount(GunWeaponSlot slot, EntityWeaponBinding weaponBinding, Transform root)
+        private Transform ResolveHolsterMount(WeaponSlot slot, EntityWeaponBinding weaponBinding, Transform root)
         {
             int holsterIndex = ResolveHolsterMountIndex(slot, weaponBinding);
-            Transform mount = weaponBinding != null && weaponBinding.holsterMount != null
-                ? weaponBinding.holsterMount
-                : ResolveDefaultHolsterMount(holsterIndex, root);
+            Transform explicitMount = weaponBinding != null ? weaponBinding.holsterMount : null;
+            Transform legacyFallback = ResolveDefaultHolsterMount(holsterIndex, root);
+            Transform mount = null;
+            EntityEquipmentAttachmentModule attachment = ResolveAttachmentModule();
+            attachment?.TryResolveTarget(
+                ResolveHolsterAttachmentTarget(holsterIndex),
+                explicitMount,
+                legacyFallback,
+                out mount,
+                out _);
+
+            if (mount == null && attachment == null)
+                mount = explicitMount != null ? explicitMount : legacyFallback;
 
             if (preventHolsterOnArmChain && IsTransformOnArmChain(mount))
             {
@@ -1914,6 +2392,35 @@ namespace ES
                 return;
 
             var weaponBinding = GetWeaponBinding(slot);
+            EntityEquipmentAttachmentModule attachment = ResolveAttachmentModule();
+            if (attachment != null)
+            {
+                Transform explicitMount = weaponBinding != null
+                    && weaponBinding.handMountPolicy != EntityWeaponHandMountPolicy.CharacterSocketOnly
+                    ? weaponBinding.handMount
+                    : null;
+                if (IsHandMountConflictingWithHolster(slot, weaponBinding, explicitMount))
+                    explicitMount = null;
+
+                if (!attachment.TryAttach(
+                        EntityEquipmentAttachmentTarget.MainHand,
+                        root,
+                        explicitMount,
+                        defaultHandMount,
+                        true,
+                        out _,
+                        out string attachmentError))
+                {
+                    if (logWeaponMountWarnings)
+                        Debug.LogWarning("[EntityBasicCombatModule] 手持挂载事务失败：" + attachmentError, MyCore);
+                    return;
+                }
+
+                weaponBinding?.ApplyHandMountLocalPose(root);
+                if (logWeaponMountSuccess && !_isInAttachmentConsistencyPass)
+                    Debug.Log($"[EntityBasicCombatModule] 手持挂载成功 | Slot={slotIndex} | Weapon={root.name} | Mount={root.parent.name} | ParentPath={GetTransformPath(root.parent)}", MyCore);
+                return;
+            }
 
             Transform mount = ResolveHandMount(slot, weaponBinding);
 
@@ -1951,6 +2458,32 @@ namespace ES
 
             var weaponBinding = GetWeaponBinding(slot);
             int holsterIndex = ResolveHolsterMountIndex(slot, weaponBinding);
+
+            EntityEquipmentAttachmentModule attachment = ResolveAttachmentModule();
+            if (attachment != null)
+            {
+                Transform explicitMount = weaponBinding != null ? weaponBinding.holsterMount : null;
+                if (preventHolsterOnArmChain && IsTransformOnArmChain(explicitMount))
+                    explicitMount = null;
+
+                if (!attachment.TryAttach(
+                        ResolveHolsterAttachmentTarget(holsterIndex),
+                        root,
+                        explicitMount,
+                        ResolveDefaultHolsterMount(holsterIndex, root),
+                        true,
+                        out _,
+                        out string attachmentError))
+                {
+                    if (logWeaponMountWarnings)
+                        Debug.LogWarning("[EntityBasicCombatModule] 收纳挂载事务失败：" + attachmentError, MyCore);
+                    return;
+                }
+
+                if (logWeaponMountSuccess && !_isInAttachmentConsistencyPass)
+                    Debug.Log($"[EntityBasicCombatModule] 收枪挂载成功 | Slot={slotIndex} | Weapon={root.name} | Mount={root.parent.name} | HolsterIndex={holsterIndex} | ParentPath={GetTransformPath(root.parent)}", MyCore);
+                return;
+            }
 
             Transform mount = weaponBinding != null && weaponBinding.holsterMount != null
                 ? weaponBinding.holsterMount
@@ -2210,7 +2743,7 @@ namespace ES
             return _autoRightHandMount;
         }
 
-        private int ResolveHolsterMountIndex(GunWeaponSlot slot, EntityWeaponBinding weaponBinding)
+        private int ResolveHolsterMountIndex(WeaponSlot slot, EntityWeaponBinding weaponBinding)
         {
             if (weaponBinding != null && weaponBinding.holsterMountIndex >= 0)
                 return weaponBinding.holsterMountIndex;
@@ -2225,7 +2758,7 @@ namespace ES
             return -1;
         }
 
-        private EntityWeaponBinding GetWeaponBinding(GunWeaponSlot slot)
+        private EntityWeaponBinding GetWeaponBinding(WeaponSlot slot)
         {
             if (slot == null || slot.weaponRoot == null)
                 return null;
@@ -2233,7 +2766,7 @@ namespace ES
             return slot.weaponRoot.GetComponent<EntityWeaponBinding>();
         }
 
-        private EntityWeaponBinding EnsureWeaponBinding(GunWeaponSlot slot)
+        private EntityWeaponBinding EnsureWeaponBinding(WeaponSlot slot)
         {
             if (slot == null || slot.weaponRoot == null)
                 return null;
@@ -2251,7 +2784,7 @@ namespace ES
             return binding;
         }
 
-        private bool TryGetWeaponSlot(int index, out GunWeaponSlot slot)
+        private bool TryGetWeaponSlot(int index, out WeaponSlot slot)
         {
             if (weaponSlots == null || index < 0 || index >= weaponSlots.Count)
             {
@@ -2399,7 +2932,7 @@ namespace ES
             return defaultAimTarget;
         }
 
-        private void StartSwitchAssistIK(GunWeaponSlot currentSlot, EntityWeaponBinding currentBinding, GunWeaponSlot nextSlot, EntityWeaponBinding nextBinding)
+        private void StartSwitchAssistIK(WeaponSlot currentSlot, EntityWeaponBinding currentBinding, WeaponSlot nextSlot, EntityWeaponBinding nextBinding)
         {
             if (!enableSwitchAssistIK || _sm == null)
                 return;
@@ -2415,7 +2948,7 @@ namespace ES
             BindSwitchAssistIKPostProcess();
         }
 
-        private Transform ResolveSwitchAssistLeftTarget(GunWeaponSlot currentSlot, EntityWeaponBinding currentBinding, GunWeaponSlot nextSlot, EntityWeaponBinding nextBinding)
+        private Transform ResolveSwitchAssistLeftTarget(WeaponSlot currentSlot, EntityWeaponBinding currentBinding, WeaponSlot nextSlot, EntityWeaponBinding nextBinding)
         {
             if (nextBinding != null && nextBinding.switchAssistLeftHandTarget != null)
                 return nextBinding.switchAssistLeftHandTarget;
@@ -2434,7 +2967,7 @@ namespace ES
             return defaultSwitchAssistLeftHandTarget;
         }
 
-        private Transform ResolveSwitchAssistRightTarget(GunWeaponSlot currentSlot, EntityWeaponBinding currentBinding, GunWeaponSlot nextSlot, EntityWeaponBinding nextBinding)
+        private Transform ResolveSwitchAssistRightTarget(WeaponSlot currentSlot, EntityWeaponBinding currentBinding, WeaponSlot nextSlot, EntityWeaponBinding nextBinding)
         {
             if (nextBinding != null && nextBinding.switchAssistRightHandTarget != null)
                 return nextBinding.switchAssistRightHandTarget;
@@ -2761,8 +3294,40 @@ namespace ES
             _recoilBurstLastShotTime = -999f;
         }
 
+        public void NotifyEquipmentSlotsChanged()
+        {
+            ResolveAttachmentModule()?.NotifySlotsChanged();
+        }
+
+        private EntityEquipmentAttachmentModule ResolveAttachmentModule()
+        {
+            if (_attachmentModule != null && ReferenceEquals(_attachmentModule.MyCore, MyCore))
+                return _attachmentModule;
+            if (MyCore == null)
+                return null;
+
+            if (MyCore.ModuleTables.TryGetValue(
+                    typeof(EntityEquipmentAttachmentModule),
+                    out IModule registered))
+            {
+                _attachmentModule = registered as EntityEquipmentAttachmentModule;
+            }
+
+            _attachmentModule ??= MyCore.basicDomain?.FindMyModule<EntityEquipmentAttachmentModule>();
+            return _attachmentModule;
+        }
+
+        private static EntityEquipmentAttachmentTarget ResolveHolsterAttachmentTarget(int holsterIndex)
+        {
+            if (holsterIndex == 1)
+                return EntityEquipmentAttachmentTarget.SecondaryBack;
+            if (holsterIndex >= 2)
+                return EntityEquipmentAttachmentTarget.Hip;
+            return EntityEquipmentAttachmentTarget.PrimaryBack;
+        }
+
         [Serializable]
-        public class GunWeaponSlot
+        public class WeaponSlot
         {
             [LabelText("显示名")]
             public string displayName;
@@ -2773,6 +3338,10 @@ namespace ES
 
             [LabelText("武器根节点")]
             public Transform weaponRoot;
+
+            [LabelText("普攻 Action 覆盖")]
+            [Tooltip("仅覆盖当前角色/装配槽位的 Action 型普攻；为空时读取 WeaponDefinition，再回退角色默认普攻。双持组合技应由成对装配提供独立 Action，不得执行两次单手普攻代替。")]
+            public ESActionConfigKey primaryAttackActionOverride = new ESActionConfigKey();
         }
 
     }

@@ -181,4 +181,43 @@ namespace ES
             }
         }
     }
+
+    [Serializable, TypeRegistryItem("播放 VFX 定义", OperationTypeRegistryNames.Vfx)]
+    public sealed class OpVfx_PlayDefinition : ESOutputOp
+    {
+        public ESVfxKey vfxKey = new ESVfxKey();
+        public GameObjectExpressionSource ownerObject = new GameObjectExpressionSource();
+        public Vector3ExpressionSource position = new Vector3ExpressionSource { directVector3 = Vector3.zero };
+        public Vector3ExpressionSource euler = new Vector3ExpressionSource { directVector3 = Vector3.zero };
+        public bool followOwner;
+
+        [NonSerialized] private ESVfxHandle handle;
+
+        public override bool NeedsStop => true;
+
+        protected override void StartOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+        {
+            if (ESGameManager.Vfx == null)
+                return;
+
+            ESOpSupport support = RuntimeSupport(scopeSupport, hostSupport);
+            GameObject owner = ownerObject != null ? ownerObject.Evaluate(target, support) : null;
+            Vector3 pos = position != null ? position.Evaluate(target, support) : Vector3.zero;
+            Vector3 eulerAngles = euler != null ? euler.Evaluate(target, support) : Vector3.zero;
+            handle = ESGameManager.Vfx.Play(vfxKey, new ESVfxPlayRequest
+            {
+                owner = owner != null ? owner.transform : null,
+                position = pos,
+                rotation = Quaternion.Euler(eulerAngles),
+                followOwner = followOwner
+            });
+        }
+
+        protected override void StopOperation(ESRuntimeTargetPack target, ESOpSupport scopeSupport, ESOpSupport hostSupport)
+        {
+            if (handle.IsValid)
+                ESGameManager.Vfx?.Stop(handle);
+            handle = default;
+        }
+    }
 }

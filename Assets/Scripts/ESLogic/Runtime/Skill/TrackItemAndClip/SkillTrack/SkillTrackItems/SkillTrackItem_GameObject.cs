@@ -1,4 +1,4 @@
-﻿using Sirenix.OdinInspector;
+using Sirenix.OdinInspector;
 using UnityEngine;
 
 namespace ES
@@ -105,20 +105,23 @@ namespace ES
             name = "对象片段";
         }
 
-        [TitleGroup("对象片段", "在片段时间内控制目标 GameObject 的激活状态。")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TargetOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Target, "选择继承轨道目标，或由片段表达式覆盖目标。")]
         [LabelText("目标来源")]
         [EnumToggleButtons]
         public TrackClipEditorTargetMode targetMode = TrackClipEditorTargetMode.InheritTrackTarget;
 
-        [TitleGroup("对象片段")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TargetOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Target)]
         [LabelText("片段覆盖目标")]
         [ShowIf(nameof(UseOverrideClipTarget))]
-        [InfoBox("只有目标来源为 OverrideClipTarget 时生效。", InfoMessageType.None)]
+        [InfoBox("只有目标来源为“片段覆盖目标”时生效。", InfoMessageType.None)]
         [SerializeReference]
         public ESGetGameObjectExpression targetExpression;
 
-        [TitleGroup("对象片段")]
-        [LabelText("激活状态")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.BehaviorOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Behavior, "在片段生效期间设置目标 GameObject 的激活状态。")]
+        [LabelText("激活目标")]
         public bool Activate = true;
 
         private bool UseOverrideClipTarget => targetMode == TrackClipEditorTargetMode.OverrideClipTarget;

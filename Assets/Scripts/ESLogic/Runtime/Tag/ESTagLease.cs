@@ -85,6 +85,15 @@ namespace ES
         private bool isApplying;
         private bool isReleasing;
 
+        public ESTagLeaseSet()
+        {
+        }
+
+        public ESTagLeaseSet(int initialCapacity)
+        {
+            EnsureCapacity(initialCapacity);
+        }
+
         /// <summary>Optional lifecycle source retained by this LeaseSet while it owns Tags.</summary>
         public object Source => activeSource;
 
@@ -104,6 +113,16 @@ namespace ES
 
                 return activeCount;
             }
+        }
+
+        public void EnsureCapacity(int capacity)
+        {
+            if (capacity <= 0)
+                return;
+
+            EnsureListCapacity(ref leases, capacity);
+            EnsureListCapacity(ref releaseBuffer, capacity);
+            EnsureListCapacity(ref applyBuffer, capacity);
         }
 
         /// <summary>Validates a direct authored Tag list without creating a configuration wrapper.</summary>
@@ -430,6 +449,20 @@ namespace ES
         private List<ESTagLeaseToken> GetOrCreateApplyBuffer()
         {
             return applyBuffer ??= new List<ESTagLeaseToken>(4);
+        }
+
+        private static void EnsureListCapacity(
+            ref List<ESTagLeaseToken> buffer,
+            int capacity)
+        {
+            if (buffer == null)
+            {
+                buffer = new List<ESTagLeaseToken>(capacity);
+            }
+            else if (buffer.Capacity < capacity)
+            {
+                buffer.Capacity = capacity;
+            }
         }
     }
 

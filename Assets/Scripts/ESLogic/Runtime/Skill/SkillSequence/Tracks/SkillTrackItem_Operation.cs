@@ -13,19 +13,22 @@ namespace ES
             displayName = "操作轨道";
         }
 
-        [TitleGroup("轨道目标包", "运行时为本操作轨道准备 RuntimeTarget。")]
-        [LabelText("轨道目标包来源")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TargetOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Target, "运行时为本操作轨道准备 RuntimeTarget。")]
+        [LabelText("轨道目标来源")]
         [EnumToggleButtons]
         public TrackRuntimeTargetSourceMode trackTargetSourceMode = TrackRuntimeTargetSourceMode.CopySkill;
 
-        [TitleGroup("轨道目标包")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TargetOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Target)]
         [ShowIf(nameof(UsesRuntimeTargetExpression))]
         [LabelText("轨道主目标表达式")]
         [InfoBox("仅在目标包来源需要表达式覆盖主目标时使用。")]
         [SerializeReference]
         public ESGetGameObjectExpression trackRuntimeTargetExpression;
 
-        [TitleGroup("轨道目标包")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TargetOrder + 2)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Target)]
         [LabelText("表达式结果加入目标列表")]
         public bool addExpressionResultToTargets = true;
 
@@ -49,49 +52,58 @@ namespace ES
             name = "操作片段";
         }
 
-        [TitleGroup("操作内容", "片段命中时执行的具体 Operation。")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.ContentOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Content, "片段命中时执行的具体 Operation。")]
         [LabelText("操作描述")]
         [TextArea(2, 4)]
         public string OperationDescription;
 
-        [TitleGroup("操作内容")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.ContentOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Content)]
         [SerializeReference]
         [HideLabel]
-        [BoxGroup("操作内容/操作实例")]
+        [BoxGroup(ESTrackInspectorFieldStandard.Content + "/操作实例")]
         public ESOutputOp op;
 
-        [TitleGroup("片段目标包", "Clip 可以继承、拷贝或创建自己的 RuntimeTarget，并按需写回。")]
-        [LabelText("片段目标包来源")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TargetOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Target, "片段可以继承、拷贝或创建自己的 RuntimeTarget，并按需写回。")]
+        [LabelText("片段目标来源")]
         [EnumToggleButtons]
         public ClipRuntimeTargetSourceMode clipTargetSourceMode = ClipRuntimeTargetSourceMode.ReferenceTrack;
 
-        [TitleGroup("片段目标包")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TargetOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Target)]
         [ShowIf(nameof(UsesClipTargetExpression))]
         [LabelText("片段主目标表达式")]
         [InfoBox("仅在片段目标包来源需要表达式覆盖主目标时使用。")]
         [SerializeReference]
         public ESGetGameObjectExpression clipTargetExpression;
 
-        [TitleGroup("片段目标包")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TargetOrder + 2)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Target)]
         [LabelText("表达式结果加入目标列表")]
         public bool addExpressionResultToTargets = true;
 
-        [TitleGroup("片段目标包")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TargetOrder + 3)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Target)]
         [LabelText("写回目标")]
         public RuntimeTargetWriteBackTarget writeBackTarget = RuntimeTargetWriteBackTarget.None;
 
-        [TitleGroup("片段目标包")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TargetOrder + 4)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Target)]
         [ShowIf(nameof(UsesWriteBack))]
         [LabelText("写回时机")]
         [InfoBox("写回会把本片段运行中的 RuntimeTarget 内容同步回技能级或轨道级目标包。")]
         public RuntimeTargetWriteBackTiming writeBackTiming = RuntimeTargetWriteBackTiming.OnExit;
 
-        [TitleGroup("执行参数", "高频运行字段优先使用固定值，只有需要动态计算时才切换表达式。")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.BehaviorOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Behavior, "高频运行字段优先使用固定值，只有需要动态计算时才切换表达式。")]
         [LabelText("启用条件")]
         public bool conditionValue = true;
 
-        [TitleGroup("执行参数")]
-        [LabelText("运行Float")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.BehaviorOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Behavior)]
+        [LabelText("运行浮点值")]
         public FloatExpressionSource runtimeFloat = new FloatExpressionSource { directFloat = 1f };
 
         [HideInInspector]

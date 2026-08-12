@@ -253,11 +253,27 @@ namespace ES
             }
 
             int moveCount = CountBasicModule<EntityBasicMoveRotateModule>(entity);
+            int attachmentCount = CountBasicModule<EntityEquipmentAttachmentModule>(entity);
             int playerWriterCount = CountAiModule<EntityPlayerInputWriteModule>(entity);
             if (moveCount != 1 || entity.aiDomain == null)
             {
                 error = "必须有唯一的 EntityBasicMoveRotateModule，且 EntityAIDomain 必须提供输入执行器"
                         + "（当前 Move=" + moveCount + "，AIDomain=" + (entity.aiDomain != null ? "有效" : "缺失") + "）。";
+                return false;
+            }
+
+            if (attachmentCount != 1)
+            {
+                error = "正式角色必须有唯一的 EntityEquipmentAttachmentModule（当前=" + attachmentCount + "）。";
+                return false;
+            }
+
+            EntityEquipmentAttachmentModule attachment = GetBasicModule<EntityEquipmentAttachmentModule>(entity);
+            if (profile.prefabRole == EntityCharacterPrefabRole.CharacterVariant
+                && attachment != null
+                && attachment.allowEntityRootFallback)
+            {
+                error = "正式角色的 EntityEquipmentAttachmentModule 不得允许根节点挂点降级。";
                 return false;
             }
 
@@ -441,13 +457,39 @@ namespace ES
             }
 
             EntityTransformMapping mapping = entity.GetComponent<EntityTransformMapping>();
+            if (mapping == null || mapping.HasLegacyOdinMappings)
+            {
+                error = "EntityTransformMapping 仍包含未迁移的旧 Odin 挂点数据，禁止发布。";
+                return false;
+            }
             Transform weaponSocket = mapping != null ? mapping.Resolve(DefaultTransformKey.Weapon) : null;
-            Transform namedWeaponSocket = mapping != null ? mapping.Resolve("WeaponSocket") : null;
+            Transform namedWeaponSocket = mapping != null
+                ? mapping.Resolve(EntityEquipmentSocketKeys.WeaponSocket)
+                : null;
             if (weaponSocket == null || namedWeaponSocket == null || weaponSocket != namedWeaponSocket
                 || !weaponSocket.IsChildOf(entity.transform))
             {
                 error = "必须在 EntityTransformMapping 中以 Weapon 和 WeaponSocket 指向同一角色内挂点。";
                 return false;
+            }
+
+            string[] requiredAttachmentKeys =
+            {
+                EntityEquipmentSocketKeys.MainHandSocket,
+                EntityEquipmentSocketKeys.OffHandSocket,
+                EntityEquipmentSocketKeys.PrimaryBackSocket,
+                EntityEquipmentSocketKeys.SecondaryBackSocket,
+                EntityEquipmentSocketKeys.HipSocket,
+                EntityEquipmentSocketKeys.TemporaryHandSocket
+            };
+            for (int i = 0; i < requiredAttachmentKeys.Length; i++)
+            {
+                Transform socket = mapping.Resolve(requiredAttachmentKeys[i]);
+                if (socket == null || (socket != entity.transform && !socket.IsChildOf(entity.transform)))
+                {
+                    error = "正式角色缺少角色侧装备挂点映射：" + requiredAttachmentKeys[i];
+                    return false;
+                }
             }
 
             bool hasHurtBox = false;
@@ -493,6 +535,11 @@ namespace ES
             }
 
             EntityTransformMapping mapping = entity.GetComponent<EntityTransformMapping>();
+            if (mapping == null || mapping.HasLegacyOdinMappings)
+            {
+                error = "EntityTransformMapping 仍包含未迁移的旧 Odin 挂点数据，禁止发布。";
+                return false;
+            }
             Transform cameraTarget = mapping != null ? mapping.Resolve("CameraTarget") : null;
             if (cameraTarget == null && mapping != null)
                 cameraTarget = mapping.Resolve(DefaultTransformKey.Camera);

@@ -17,12 +17,12 @@ namespace ES
         bool IsOverflow { get; }
     }
 
-    public interface IItemShotTickScheduler
+    public interface IItemShotTickPolicy
     {
         bool ShouldTick(in ShotMotionState state, int frameCount);
     }
 
-    public sealed class ItemShotAlwaysTickScheduler : IItemShotTickScheduler
+    public sealed class ItemShotAlwaysTickPolicy : IItemShotTickPolicy
     {
         public bool ShouldTick(in ShotMotionState state, int frameCount)
         {

@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace ES {
-    [AddComponentMenu("<ES>ESM支持/输入/光标退出-可接收列表")]
+    [AddComponentMenu("【ES】/UI/输入事件/光标退出-可接收列表")]
     public class EMS_PointerExit_LinkList : EMS_InputPointerEvent_LinkList_Abstract, IPointerExitHandler
     {
         public void OnPointerExit(PointerEventData eventData)

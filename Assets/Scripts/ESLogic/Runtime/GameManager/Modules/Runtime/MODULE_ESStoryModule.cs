@@ -65,21 +65,19 @@ namespace ES
 
         public void BindPresenter(IESStoryDialoguePresenter value) => presenter = value;
 
-        public bool TryStartFromInteraction(ESStoryDefinitionDataInfo definition, Entity actor, ESInteractionBinding binding, out string instanceId, out string error)
+        public bool TryStartFromInteraction(ESStoryConfigKey definitionKey, Entity actor, ESInteractionBinding binding, out string instanceId, out string error)
         {
             instanceId = null;
             error = null;
-            if (definition == null || actor == null || !binding.IsValid || binding.Owner != actor)
+            if (definitionKey == null || string.IsNullOrWhiteSpace(definitionKey.StringKey)
+                || actor == null || !binding.IsValid || binding.Owner != actor)
             {
                 error = "Story 启动参数无效。";
                 return false;
             }
-            try { ESStoryDefinitionCatalog.Inject(definition); }
-            catch (Exception exception) { error = exception.Message; return false; }
-            string contentSignature = definition.ContentSignature;
-            if (!ESStoryDefinitionCatalog.TryResolve(definition.definitionId, definition.contentVersion, contentSignature, out ESStoryDefinitionSnapshot snapshot))
+            if (!ESStoryDefinitionCatalog.TryResolve(definitionKey, out ESStoryDefinitionSnapshot snapshot))
             {
-                error = "无法从运行时 Catalog 精确解析 DefinitionId + ContentVersion + ContentSignature。";
+                error = "Story 定义尚未完成验证并注入运行时 Catalog：" + definitionKey.StringKey;
                 return false;
             }
             if (snapshot.StoryKind == ESStoryKind.Quest && ESStoryRuntimeGuard.HasActiveQuest(instances.Values, snapshot.DefinitionId))

@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace ES {
-    [AddComponentMenu("<ES>ESM支持/输入/拖动中-指定接收目标")]
+    [AddComponentMenu("【ES】/UI/输入事件/拖动中-指定接收目标")]
     [HideMonoScript]
     public class EMS_Drag_LinkSingle : EMS_InputPointerEvent_LinkSingle_Abstract, IDragHandler
     {

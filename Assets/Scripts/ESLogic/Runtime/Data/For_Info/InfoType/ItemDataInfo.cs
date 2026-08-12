@@ -88,6 +88,16 @@ namespace ES
                 baseConfig = new ItemBaseConfig();
                 changed = true;
             }
+            if (baseConfig.prefabKey == null)
+            {
+                baseConfig.prefabKey = new ESAssetReferPrefabConfigKey();
+                changed = true;
+            }
+            if (baseConfig.iconKey == null)
+            {
+                baseConfig.iconKey = new ESAssetReferSpriteConfigKey();
+                changed = true;
+            }
             if (interactConfig == null)
             {
                 interactConfig = new ItemInteractConfig();
@@ -522,7 +532,7 @@ namespace ES
                     data.soSource = info;
                     data.sharedData = block.sharedData;
                     data.defaultVariableData = block.initialState;
-                    data.prefab = info.baseConfig.prefab;
+                    data.prefabKey = info.baseConfig.prefabKey;
                     int runtimeKey = Table.CommitRetained(block.key, data, debugName: info.name);
                     if (runtimeKey == 0)
                         throw new System.InvalidOperationException("Shot GameCore 注入失败：" + info.name);
@@ -574,7 +584,7 @@ namespace ES
                     data.soSource = info;
                     data.sharedData = block.sharedData;
                     data.defaultVariableData = block.initialState;
-                    data.prefab = info.baseConfig.prefab;
+                    data.prefabKey = info.baseConfig.prefabKey;
                     int runtimeKey = Table.CommitRetained(block.key, data, debugName: info.name);
                     if (runtimeKey == 0)
                         throw new System.InvalidOperationException("Weapon GameCore 注入失败：" + info.name);

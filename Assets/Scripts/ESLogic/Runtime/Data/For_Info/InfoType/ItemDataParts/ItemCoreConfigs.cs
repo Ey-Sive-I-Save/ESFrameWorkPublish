@@ -11,14 +11,14 @@ namespace ES
         [LabelText("物品类型")]
         public ItemKind kind = ItemKind.Prop;
 
-        [LabelText("运行预制体")]
-        public GameObject prefab;
+        [LabelText("运行预制体资源键"), InlineProperty]
+        public ESAssetReferPrefabConfigKey prefabKey = new ESAssetReferPrefabConfigKey();
 
         [LabelText("显示名称")]
         public string displayName;
 
-        [LabelText("图标")]
-        public Sprite icon;
+        [LabelText("图标资源键"), InlineProperty]
+        public ESAssetReferSpriteConfigKey iconKey = new ESAssetReferSpriteConfigKey();
 
     }
 

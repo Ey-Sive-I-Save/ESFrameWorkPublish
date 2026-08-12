@@ -98,7 +98,13 @@ namespace ES
             "TemporaryEffectsRoot",
             "RuntimeAttachmentsRoot",
             "RuntimeGeneratedRoot",
-            "WeaponSocket",
+            EntityEquipmentSocketKeys.WeaponSocket,
+            EntityEquipmentSocketKeys.MainHandSocket,
+            EntityEquipmentSocketKeys.OffHandSocket,
+            EntityEquipmentSocketKeys.PrimaryBackSocket,
+            EntityEquipmentSocketKeys.SecondaryBackSocket,
+            EntityEquipmentSocketKeys.HipSocket,
+            EntityEquipmentSocketKeys.TemporaryHandSocket,
         };
 
         private static readonly string[] SharedRequiredPaths =
@@ -128,6 +134,12 @@ namespace ES
             "05_检测碰撞_Detection/HurtBoxes",
             "05_检测碰撞_Detection/InteractionProbes/InteractionProbe",
             "06_装备_Equipment/WeaponSlots",
+            "06_装备_Equipment/WeaponSlots/MainHandSocket",
+            "06_装备_Equipment/WeaponSlots/OffHandSocket",
+            "06_装备_Equipment/WeaponSlots/PrimaryBackSocket",
+            "06_装备_Equipment/WeaponSlots/SecondaryBackSocket",
+            "06_装备_Equipment/WeaponSlots/HipSocket",
+            "06_装备_Equipment/WeaponSlots/TemporaryHandSocket",
             "06_装备_Equipment/ArmorSlots",
             "06_装备_Equipment/EquipmentVisuals",
             "07_特效音频_Effects/VFX",
@@ -341,7 +353,13 @@ namespace ES
 
             Transform equipmentRoot = CreateNode(root.transform, "06_装备_Equipment");
             Transform weaponSlots = CreateNode(equipmentRoot, "WeaponSlots");
-            Transform weaponSocket = CreateNode(weaponSlots, "WeaponSocket", new Vector3(0.25f, 1.15f, 0.2f));
+            Transform weaponSocket = CreateNode(weaponSlots, EntityEquipmentSocketKeys.WeaponSocket, new Vector3(0.25f, 1.15f, 0.2f));
+            Transform mainHandSocket = CreateNode(weaponSlots, EntityEquipmentSocketKeys.MainHandSocket, new Vector3(0.25f, 1.15f, 0.2f));
+            Transform offHandSocket = CreateNode(weaponSlots, EntityEquipmentSocketKeys.OffHandSocket, new Vector3(-0.25f, 1.15f, 0.2f));
+            Transform primaryBackSocket = CreateNode(weaponSlots, EntityEquipmentSocketKeys.PrimaryBackSocket, new Vector3(0.22f, 1.35f, -0.18f));
+            Transform secondaryBackSocket = CreateNode(weaponSlots, EntityEquipmentSocketKeys.SecondaryBackSocket, new Vector3(-0.22f, 1.35f, -0.18f));
+            Transform hipSocket = CreateNode(weaponSlots, EntityEquipmentSocketKeys.HipSocket, new Vector3(0.32f, 0.9f, 0f));
+            Transform temporaryHandSocket = CreateNode(weaponSlots, EntityEquipmentSocketKeys.TemporaryHandSocket, new Vector3(0f, 1.2f, 0.35f));
             CreateNode(equipmentRoot, "ArmorSlots");
             Transform equipmentVisuals = CreateNode(equipmentRoot, "EquipmentVisuals");
 
@@ -391,6 +409,12 @@ namespace ES
                 chestAnchor,
                 hipAnchor,
                 weaponSocket,
+                mainHandSocket,
+                offHandSocket,
+                primaryBackSocket,
+                secondaryBackSocket,
+                hipSocket,
+                temporaryHandSocket,
                 cameraTarget,
                 cameraAimTarget,
                 cameraLookTarget,
@@ -496,6 +520,7 @@ namespace ES
         private static void ConfigureDomains(Entity entity, Transform aimTarget)
         {
             entity.basicDomain.MyModules.Add(new EntityBasicMoveRotateModule());
+            entity.basicDomain.MyModules.Add(new EntityEquipmentAttachmentModule());
             entity.basicDomain.MyModules.ApplyBuffers(true);
 
             entity.aiDomain.turnMode = TurnMode.MoveDirection;
@@ -521,6 +546,12 @@ namespace ES
             Transform chestFallback,
             Transform hipFallback,
             Transform weaponSocket,
+            Transform mainHandSocket,
+            Transform offHandSocket,
+            Transform primaryBackSocket,
+            Transform secondaryBackSocket,
+            Transform hipSocket,
+            Transform temporaryHandSocket,
             Transform cameraTarget,
             Transform cameraAimTarget,
             Transform cameraLookTarget,
@@ -561,10 +592,16 @@ namespace ES
             mapping.Set(DefaultTransformKey.RightFoot, GetHumanBone(animator, HumanBodyBones.RightFoot) ?? rightFootTarget);
             // Weapon 是制作好的挂载 Socket；RightHand 则始终保留为骨骼语义。
             // 这样每个角色可在 Socket 上处理手型、偏移和双手武器辅助，而不会把业务挂载混入 Humanoid 骨骼。
-            mapping.Set(DefaultTransformKey.Weapon, weaponSocket ?? GetHumanBone(animator, HumanBodyBones.RightHand));
-            mapping.Set(DefaultTransformKey.Camera, cameraTarget);
+            Transform resolvedWeaponSocket = weaponSocket ?? GetHumanBone(animator, HumanBodyBones.RightHand);
+            SetRequiredMapping(mapping, DefaultTransformKey.Weapon, EntityEquipmentSocketKeys.WeaponSocket, resolvedWeaponSocket);
+            mapping.Set(EntityEquipmentSocketKeys.MainHandSocket, mainHandSocket);
+            mapping.Set(EntityEquipmentSocketKeys.OffHandSocket, offHandSocket);
+            mapping.Set(EntityEquipmentSocketKeys.PrimaryBackSocket, primaryBackSocket);
+            mapping.Set(EntityEquipmentSocketKeys.SecondaryBackSocket, secondaryBackSocket);
+            mapping.Set(EntityEquipmentSocketKeys.HipSocket, hipSocket);
+            mapping.Set(EntityEquipmentSocketKeys.TemporaryHandSocket, temporaryHandSocket);
+            SetRequiredMapping(mapping, DefaultTransformKey.Camera, "CameraTarget", cameraTarget);
 
-            mapping.Set("CameraTarget", cameraTarget);
             mapping.Set("CameraAimTarget", cameraAimTarget);
             mapping.Set("CameraLookTarget", cameraLookTarget);
             mapping.Set("LockOnTarget", lockOnTarget);
@@ -592,9 +629,18 @@ namespace ES
             mapping.Set("TemporaryEffectsRoot", temporaryEffects);
             mapping.Set("RuntimeAttachmentsRoot", runtimeAttachments);
             mapping.Set("RuntimeGeneratedRoot", generatedRoot);
-            mapping.Set("WeaponSocket", weaponSocket);
             if (debugRoot != null)
                 mapping.Set("DebugRoot", debugRoot);
+        }
+
+        private static void SetRequiredMapping(
+            EntityTransformMapping mapping,
+            DefaultTransformKey defaultKey,
+            string stringKey,
+            Transform value)
+        {
+            if (!mapping.Set(defaultKey, stringKey, value, out EntityTransformMap.Conflict conflict))
+                throw new InvalidOperationException("角色挂点映射失败：" + conflict.Message);
         }
 
         /// <summary>
@@ -742,9 +788,11 @@ namespace ES
                 expectDebugRoot ? AuthoringTopLevelOrder : CompleteTopLevelOrder);
 
             int moveCount = CountBasicModule<EntityBasicMoveRotateModule>(entity);
+            int attachmentCount = CountBasicModule<EntityEquipmentAttachmentModule>(entity);
             int playerWriterCount = CountAiModule<EntityPlayerInputWriteModule>(entity);
             int optionalMotionCount = CountOptionalMotionModules(entity);
             bool modulesValid = moveCount == 1
+                && attachmentCount == 1
                 && playerWriterCount == 0
                 && optionalMotionCount == 0
                 && entity != null
@@ -776,7 +824,7 @@ namespace ES
                 ? $"[{stage}检查] 通过：底盘组件唯一性、无武器内容组件、KCC胶囊契约、Entity四域、Playable动画、轻量禁用IK、全量Mapping、十区顺序、递归Missing Script、Rigidbody和运行时剥离规则完整。"
                 : $"[{stage}检查] 未通过 | Root={rootAuthorityValid} | Animation={animationValid} | "
                   + $"Components={componentCountValid} | Hierarchy={hierarchyValid} | Mapping={mappingValid} | Profile={profileValid}({profileError}) | Strip={stripValid} | MissingScripts={missingScripts} | "
-                  + $"Move={moveCount}, DomainExecutor={(entity != null && entity.aiDomain != null ? "有效" : "缺失")}, PlayerWriter={playerWriterCount}, OptionalMotion={optionalMotionCount}";
+                  + $"Move={moveCount}, Attachment={attachmentCount}, DomainExecutor={(entity != null && entity.aiDomain != null ? "有效" : "缺失")}, PlayerWriter={playerWriterCount}, OptionalMotion={optionalMotionCount}";
             return valid;
         }
 
@@ -912,7 +960,10 @@ namespace ES
             Transform hierarchyRoot,
             bool expectDebugRoot)
         {
-            if (mapping == null || mapping.defaultMap == null || mapping.dynamicMap == null)
+            if (mapping == null
+                || mapping.HasLegacyOdinMappings
+                || mapping.TransformMappings == null
+                || !mapping.TransformMappings.IsValid)
                 return false;
 
             for (int i = 0; i < RequiredDefaultMappings.Length; i++)
@@ -929,22 +980,23 @@ namespace ES
                     return false;
             }
 
-            foreach (KeyValuePair<DefaultTransformKey, Transform> pair in mapping.defaultMap)
+            List<EntityTransformMap.Entry> mappingEntries = new List<EntityTransformMap.Entry>(mapping.TransformMappings.Count);
+            mapping.TransformMappings.CopyEntries(mappingEntries);
+            for (int i = 0; i < mappingEntries.Count; i++)
             {
-                if (pair.Value == null)
+                EntityTransformMap.Entry entry = mappingEntries[i];
+                if (entry.value == null
+                    || (!entry.hasEnumKey && !entry.HasStringKey)
+                    || (entry.HasStringKey && string.IsNullOrWhiteSpace(entry.stringKey)))
+                {
                     return false;
-            }
-
-            foreach (KeyValuePair<string, Transform> pair in mapping.dynamicMap)
-            {
-                if (string.IsNullOrEmpty(pair.Key) || pair.Value == null)
-                    return false;
+                }
             }
 
             Transform debugRoot = mapping.Resolve("DebugRoot");
             return expectDebugRoot
                 ? debugRoot != null && debugRoot == hierarchyRoot.Find(DebugRootPath)
-                : debugRoot == null && !mapping.dynamicMap.ContainsKey("DebugRoot");
+                : debugRoot == null && !mapping.TransformMappings.ContainsKey("DebugRoot");
         }
 
         private static bool ValidateTopLevelOrder(Transform root, string[] expectedOrder)

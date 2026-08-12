@@ -13,6 +13,7 @@ namespace ES
         public List<string> tags = new List<string>();
 
         [Title("Runtime Key")]
+        [ESConfigKeyUsage(ESConfigKeyUsage.Declaration)]
         [HideLabel, InlineProperty]
         public ESSkillConfigKey skillKey = new ESSkillConfigKey();
 

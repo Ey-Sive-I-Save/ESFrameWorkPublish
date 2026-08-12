@@ -32,6 +32,7 @@ namespace ES
 
         public void NotifyPoolSpawned()
         {
+            FindMyModule<EntityEquipmentAttachmentModule>()?.OnPoolSpawned();
             FindMyModule<EntityBasicCombatModule>()?.OnPoolSpawned();
             FindMyModule<EntityBasicInteractionModule>()?.OnPoolSpawned();
         }
@@ -39,6 +40,7 @@ namespace ES
         public void NotifyPoolDespawned()
         {
             FindMyModule<EntityBasicCombatModule>()?.OnPoolDespawned();
+            FindMyModule<EntityEquipmentAttachmentModule>()?.OnPoolDespawned();
             FindMyModule<EntityBasicInteractionModule>()?.OnPoolDespawned();
         }
 

@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace ES {
-    [AddComponentMenu("<ES>ESM支持/输入/结束拖动-指定接收目标")]
+    [AddComponentMenu("【ES】/UI/输入事件/结束拖动-指定接收目标")]
     public class EMS_EndDrag_LinkSingle : EMS_InputPointerEvent_LinkSingle_Abstract, IEndDragHandler
     {
         public void OnEndDrag(PointerEventData eventData)

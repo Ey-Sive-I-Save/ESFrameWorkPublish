@@ -6,8 +6,9 @@ using UnityEngine;
 namespace ES
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("【ES】/内容制作/道具/Item")]
-    public partial class Item : Core, IESGameObjectPoolLifecycle, IESEffectLeaseOwner
+    [AddComponentMenu("【ES】/角色与交互/道具/Item")]
+    public partial class Item : Core, IESGameObjectPoolLifecycle, IESEffectLeaseOwner,
+        IESMotionInfluenceReceiver
     {
         [Title("物品定义")]
         [LabelText("Prefab 物品定义")]
@@ -69,6 +70,7 @@ namespace ES
 
         protected override void OnDestroy()
         {
+            basicDomain?.FindMyModule<ItemMotionModule>()?.ResetMotionInfluences();
             ResetItemAttributesForLifecycleEnd();
             UnsubscribeFromAttributeCatalog();
             UnsubscribeFromTagCatalog();
@@ -89,6 +91,7 @@ namespace ES
         /// <summary>Called before the pooled Item is deactivated; ends the current Tag lifetime.</summary>
         public void OnPoolDespawned()
         {
+            basicDomain?.FindMyModule<ItemMotionModule>()?.ResetMotionInfluences();
             ResetItemAttributesForLifecycleEnd();
             UnsubscribeFromAttributeCatalog();
             itemAttributeDefinition = null;
@@ -99,6 +102,27 @@ namespace ES
             intrinsicTagError = null;
             intrinsicTagState = ESTagDefinitionState.Empty;
             tags?.ResetForReuse();
+        }
+
+        public bool AddVelocity(
+            Vector3 velocity,
+            ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
+        {
+            ItemMotionModule motion = basicDomain?.FindMyModule<ItemMotionModule>();
+            return motion != null
+                && motion.AddVelocity(velocity, permissions);
+        }
+
+        public bool TryAcquireField(
+            in ESMotionFieldRequest request,
+            out ESMotionFieldLease lease)
+        {
+            ItemMotionModule motion = basicDomain?.FindMyModule<ItemMotionModule>();
+            if (motion != null)
+                return motion.TryAcquireField(request, out lease);
+
+            lease = default;
+            return false;
         }
 
         /// <summary>Called while inactive before the pooled Item is activated again.</summary>

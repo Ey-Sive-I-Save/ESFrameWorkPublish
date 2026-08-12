@@ -32,7 +32,7 @@ namespace ES
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(AudioSource))]
-    [AddComponentMenu("【ES】/场景与对象/音频/VFX 音频发射器（受管）")]
+    [AddComponentMenu("【ES】/相机与表现/音频与特效/VFX 音频发射器（受管）")]
     public sealed class ESVfxAudioEmitter : MonoBehaviour
     {
         [Title("新手使用")]
@@ -453,7 +453,7 @@ namespace ES
     /// one concrete type. This Set owns the one pool extension and never scans child hierarchies.
     /// </summary>
     [DisallowMultipleComponent]
-    [AddComponentMenu("【ES】/场景与对象/音频/VFX 音频发射器集合")]
+    [AddComponentMenu("【ES】/相机与表现/音频与特效/VFX 音频发射器集合")]
     public sealed class ESVfxAudioEmitterSet : MonoBehaviour, IESGameObjectPoolLifecycle
     {
         [Title("使用说明")]

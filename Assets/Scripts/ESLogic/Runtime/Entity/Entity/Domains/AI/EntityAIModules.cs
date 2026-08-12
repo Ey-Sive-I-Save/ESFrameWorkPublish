@@ -330,10 +330,8 @@ namespace ES
             if (!TryGetModule(out EntityBasicCombatModule combatModule))
                 return;
 
-            if (input.action.ConsumeAttack()
-                && !combatModule.TrySubmitMeleeAttack(out bool meleeActionRegistered)
-                && !meleeActionRegistered)
-                combatModule.TriggerAttack();
+            if (input.action.ConsumeAttack())
+                combatModule.TryExecutePrimaryAttack();
             if (input.action.ConsumeHeavyAttack()
                 && !combatModule.TrySubmitHeavyAttack(out bool heavyActionRegistered)
                 && !heavyActionRegistered)

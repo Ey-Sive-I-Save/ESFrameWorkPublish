@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace ES {
-    [AddComponentMenu("<ES>ESM支持/输入/轴输入移动-可接收列表")] 
+    [AddComponentMenu("【ES】/UI/输入事件/轴输入移动-可接收列表")] 
     public class EMS_Move_LinkList : EMS_InputBaseEvent_LinkList_Abstract, IMoveHandler
     {
         

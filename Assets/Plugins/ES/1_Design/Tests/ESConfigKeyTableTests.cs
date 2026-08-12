@@ -507,6 +507,173 @@ namespace ES.Tests
         }
 
         [Test]
+        public void AssetCatalog_EquivalentDuplicate_IsMergedWithWarning()
+        {
+            const string businessKey = "characters.equivalent-duplicate";
+            var firstCatalog = new ESRuntimeCatalog();
+            firstCatalog.assets.Add(CreatePrefabCatalogEntry(
+                businessKey,
+                "guid-equivalent-duplicate",
+                "Equivalent First",
+                "a-library"));
+            var secondCatalog = new ESRuntimeCatalog();
+            secondCatalog.assets.Add(CreatePrefabCatalogEntry(
+                businessKey,
+                "guid-equivalent-duplicate",
+                "Equivalent Second",
+                "b-library"));
+
+            try
+            {
+                Assert.That(ESRuntimeDataAsset.TryValidateAssetConfigTablesFromCatalogs(
+                    new[] { firstCatalog, secondCatalog },
+                    out ESAssetCatalogBuildValidation validation,
+                    out string validationError), Is.True, validationError);
+                Assert.That(validation.sourceBusinessEntries, Is.EqualTo(2));
+                Assert.That(validation.expectedBusinessEntries, Is.EqualTo(1));
+                Assert.That(validation.candidateEntries, Is.EqualTo(1));
+                Assert.That(validation.equivalentDuplicateCount, Is.EqualTo(1));
+                Assert.That(validation.equivalentDuplicateReport, Does.Contain("a-library/Equivalent First"));
+                Assert.That(validation.equivalentDuplicateReport, Does.Contain("b-library/Equivalent Second"));
+                Assert.That(validation.conflictCount, Is.Zero);
+
+                LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex(
+                    "合并 1 条同键同身份的等价重复注册"));
+                Assert.That(ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(
+                    new[] { firstCatalog, secondCatalog }), Is.EqualTo(1));
+                Assert.That(ESRuntimeDataAsset.Prefabs.TryResolveAssetIdentity(
+                    0,
+                    businessKey,
+                    out ESAssetIdentity identity), Is.True);
+                Assert.That(identity.Guid, Is.EqualTo("guid-equivalent-duplicate"));
+            }
+            finally
+            {
+                ESRuntimeDataAsset.ClearAssetConfigTables();
+            }
+        }
+
+        [Test]
+        public void AssetCatalog_SameIdentityWithDifferentAliasSet_RemainsConflict()
+        {
+            const string businessKey = "characters.alias-conflict";
+            ESRuntimeCatalogEntry first = CreatePrefabCatalogEntry(
+                businessKey,
+                "guid-alias-conflict",
+                "Alias First",
+                "a-library");
+            first.enumKey = 7;
+            ESRuntimeCatalogEntry second = CreatePrefabCatalogEntry(
+                businessKey,
+                "guid-alias-conflict",
+                "Alias Second",
+                "b-library");
+            second.enumKey = 8;
+            var catalog = new ESRuntimeCatalog();
+            catalog.assets.Add(first);
+            catalog.assets.Add(second);
+
+            Assert.That(ESRuntimeDataAsset.TryValidateAssetConfigTablesFromCatalogs(
+                new[] { catalog },
+                out ESAssetCatalogBuildValidation validation,
+                out string validationError), Is.False);
+            Assert.That(validation.equivalentDuplicateCount, Is.Zero);
+            Assert.That(validation.conflictCount, Is.EqualTo(1));
+            Assert.That(validationError, Does.Contain("冲突"));
+        }
+
+        [Test]
+        [Parallelizable(ParallelScope.None)]
+        public void EditorDirectCatalog_EmptyOutput_RemainsARecoveryFailure()
+        {
+            string emptyOutputRoot = System.IO.Path.Combine(
+                Application.temporaryCachePath,
+                nameof(EditorDirectCatalog_EmptyOutput_RemainsARecoveryFailure),
+                System.Guid.NewGuid().ToString("N"));
+            System.IO.Directory.CreateDirectory(emptyOutputRoot);
+            try
+            {
+                ESEditorCatalogRecoveryReport report =
+                    ESEditorResourceSessionBootstrap.DiscoverEditorRuntimeCatalogs(
+                        emptyOutputRoot,
+                        string.Empty);
+
+                Assert.That(report.HasFailures, Is.True);
+                Assert.That(report.HasBlockingFailures, Is.False);
+                Assert.That(report.CanContinueDegraded, Is.True);
+                Assert.That(report.discoveredFileCount, Is.Zero);
+                Assert.That(report.failures, Has.Some.Contains("未找到 ESAssetLibraryCatalog.json"));
+                Assert.That(report.BuildMessage(), Does.Contain("未发现可用的 Editor Catalog"));
+            }
+            finally
+            {
+                if (System.IO.Directory.Exists(emptyOutputRoot))
+                    System.IO.Directory.Delete(emptyOutputRoot, true);
+            }
+        }
+
+        [Test]
+        public void EditorDirectCatalog_ReportClassification_DefaultsToFailClosed()
+        {
+            var blocking = new ESEditorCatalogRecoveryReport();
+            blocking.AddFailure("Catalog/ReferenceGraph 身份不一致。");
+
+            Assert.That(blocking.HasFailures, Is.True);
+            Assert.That(blocking.HasBlockingFailures, Is.True);
+            Assert.That(blocking.CanContinueDegraded, Is.False);
+
+            var degradable = new ESEditorCatalogRecoveryReport();
+            degradable.AddDegradableFailure("未生成 Catalog。");
+
+            Assert.That(degradable.HasFailures, Is.True);
+            Assert.That(degradable.HasBlockingFailures, Is.False);
+            Assert.That(degradable.CanContinueDegraded, Is.True);
+        }
+
+        [Test]
+        [Parallelizable(ParallelScope.None)]
+        public void EditorDirectCatalog_MissingReferenceGraph_IsBlocking()
+        {
+            string outputRoot = System.IO.Path.Combine(
+                Application.temporaryCachePath,
+                nameof(EditorDirectCatalog_MissingReferenceGraph_IsBlocking),
+                System.Guid.NewGuid().ToString("N"));
+            string libraryRoot = System.IO.Path.Combine(outputRoot, "library-tests");
+            System.IO.Directory.CreateDirectory(libraryRoot);
+            try
+            {
+                string catalogJson = JsonUtility.ToJson(
+                    new ESRuntimeCatalog
+                    {
+                        formatVersion = ESRuntimeCatalog.CurrentFormatVersion,
+                        libraryName = "Tests",
+                        libraryFolder = "library-tests",
+                        generatedUtc = "test-generation"
+                    },
+                    true);
+                System.IO.File.WriteAllText(
+                    System.IO.Path.Combine(libraryRoot, ESAssetPipelineIO.CatalogFileName),
+                    catalogJson,
+                    new System.Text.UTF8Encoding(false));
+
+                ESEditorCatalogRecoveryReport report =
+                    ESEditorResourceSessionBootstrap.DiscoverEditorRuntimeCatalogs(
+                        outputRoot,
+                        string.Empty);
+
+                Assert.That(report.HasFailures, Is.True);
+                Assert.That(report.HasBlockingFailures, Is.True);
+                Assert.That(report.CanContinueDegraded, Is.False);
+                Assert.That(report.failures, Has.Some.Contains("缺少同次烘焙的 ReferenceGraph"));
+            }
+            finally
+            {
+                if (System.IO.Directory.Exists(outputRoot))
+                    System.IO.Directory.Delete(outputRoot, true);
+            }
+        }
+
+        [Test]
         public void AssetCatalog_StaleCandidate_CannotOverwriteNewerGeneration()
         {
             const string staleKey = "characters.stale-candidate";
@@ -1303,6 +1470,24 @@ namespace ES.Tests
             Assert.That(data.sharedData, Is.SameAs(shared));
             Assert.That(data.sharedData.fire.interval, Is.EqualTo(0.2f));
             Assert.That(data.sharedData.recoil.baseMagnitude, Is.EqualTo(0.8f));
+        }
+
+        [Test]
+        public void WeaponDefaults_PreservePrimaryAttackActionAsFormalDefinitionData()
+        {
+            var table = new ESWeaponConfigKeyTable(4);
+            var key = new ESWeaponConfigKey { stringKey = "tests.weapon.action" };
+            var actionKey = new ESActionConfigKey { stringKey = "tests.weapon.action.primary" };
+
+            int runtimeKey = table.InjectWithDefaults(
+                key,
+                weaponKind: ItemWeaponKind.Melee,
+                primaryAttackAction: actionKey);
+
+            Assert.That(runtimeKey, Is.Not.Zero);
+            Assert.That(table.TryGet(key, out ESWeaponRuntimeData data), Is.True);
+            Assert.That(data.sharedData.weaponKind, Is.EqualTo(ItemWeaponKind.Melee));
+            Assert.That(data.sharedData.primaryAttackAction, Is.SameAs(actionKey));
         }
 
         private static ESKeyCatalog CreateTestCatalog(bool reverse)

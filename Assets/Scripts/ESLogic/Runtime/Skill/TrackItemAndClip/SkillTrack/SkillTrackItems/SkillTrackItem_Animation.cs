@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
@@ -17,13 +17,15 @@ namespace ES
             displayName = "动画轨道";
         }
 
-        [TitleGroup("编辑器预览", "只影响轨道窗口预览表现，不改变运行时数据。")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.PreviewOrder + 10)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Preview, "只影响轨道窗口预览表现，不改变运行时数据。")]
         [LabelText("使用高级过渡预览")]
         public bool useAdvancedPreviewTransition = true;
 
-        [TitleGroup("编辑器预览")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.PreviewOrder + 11)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Preview)]
         [ShowIf(nameof(useAdvancedPreviewTransition))]
-        [LabelText("过渡时长")]
+        [LabelText("预览过渡时长")]
         [MinValue(0f)]
         [SuffixLabel("秒", true)]
         public float previewTransitionDuration = 0.15f;
@@ -155,47 +157,57 @@ namespace ES
             name = "动画片段";
         }
 
-        [TitleGroup("动画片段", "未指定目标表达式时，会尝试使用预览目标 Entity 上的 Animator。")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.TargetOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Target, "未指定目标表达式时，会尝试使用预览目标 Entity 上的 Animator。")]
         [LabelText("目标表达式")]
         [InfoBox("可选。指定后会覆盖默认动画采样目标。", InfoMessageType.None)]
         [SerializeReference]
         public ESGetGameObjectExpression targetExpression;
 
-        [TitleGroup("动画片段")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.ContentOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Content, "指定动画资源和运行时替换标记。")]
         [LabelText("动画剪辑")]
         [Required("动画片段需要指定 AnimationClip，否则不会进入采样器。")]
         [OnValueChanged(nameof(OnAnimationClipChanged))]
         public AnimationClip AnimationClipName;
 
-        [TitleGroup("动画片段")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.ContentOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Content)]
         [LabelText("动画标记")]
         [Tooltip("用于运行时按标记替换动画。留空时使用动画资源名；资源名也为空时使用 Clip0/Clip1。")]
         public string clipMarker;
 
-        [TitleGroup("动画采样", "控制该片段在动画资源内部从哪里开始采样，以及片段时长内如何推进。")]
-        [HorizontalGroup("动画采样/采样参数", Width = 0.34f)]
+        [PropertyOrder(ESTrackInspectorFieldStandard.BehaviorOrder)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Behavior, "控制该片段在动画资源内部从哪里开始采样，以及片段时长内如何推进。")]
+        [HorizontalGroup(ESTrackInspectorFieldStandard.Behavior + "/采样参数", Width = 0.34f)]
         [LabelText("裁剪起点")]
         [MinValue(0f)]
         [SuffixLabel("秒", true)]
         public float clipStartOffset;
 
-        [HorizontalGroup("动画采样/采样参数", Width = 0.33f)]
+        [PropertyOrder(ESTrackInspectorFieldStandard.BehaviorOrder + 1)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Behavior)]
+        [HorizontalGroup(ESTrackInspectorFieldStandard.Behavior + "/采样参数", Width = 0.33f)]
         [LabelText("播放速度")]
         [MinValue(0.01f)]
         public float playbackSpeed = 1f;
 
-        [HorizontalGroup("动画采样/采样参数", Width = 0.33f)]
+        [PropertyOrder(ESTrackInspectorFieldStandard.BehaviorOrder + 2)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Behavior)]
+        [HorizontalGroup(ESTrackInspectorFieldStandard.Behavior + "/采样参数", Width = 0.33f)]
         [LabelText("循环采样")]
         public bool loopClip;
 
-        [TitleGroup("动画采样")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.BehaviorOrder + 3)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Behavior)]
         [ShowInInspector]
         [ReadOnly]
         [LabelText("可用长度")]
         [SuffixLabel("秒", true)]
         private float AvailableClipLengthPreview => GetAvailableClipLength();
 
-        [TitleGroup("动画采样")]
+        [PropertyOrder(ESTrackInspectorFieldStandard.BehaviorOrder + 4)]
+        [TitleGroup(ESTrackInspectorFieldStandard.Behavior)]
         [Button("同步持续时间到动画长度", ButtonSizes.Small)]
         [GUIColor(0.48f, 0.82f, 1f)]
         public void SyncDurationToAnimationLength()

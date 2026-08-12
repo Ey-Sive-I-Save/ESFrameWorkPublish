@@ -4,7 +4,7 @@ using UnityEngine;
 namespace ES
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("【ES】/示例与测试/道具/飞行物模板预览")]
+    [AddComponentMenu("【ES】/开发与验证/示例/道具/飞行物模板预览")]
     public sealed class ItemShotTemplatePreview : MonoBehaviour
     {
         [Title("通用 Item 模板")]

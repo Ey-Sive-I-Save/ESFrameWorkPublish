@@ -23,6 +23,7 @@ if (-not (Test-Path -LiteralPath $commandRoot -PathType Container)) {
 $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)
 $catalogRelativePath = 'Assets/Plugins/ES/AICommands/AICommandCatalog.json'
 $catalogPath = Join-Path $ProjectRoot ($catalogRelativePath.Replace('/', [IO.Path]::DirectorySeparatorChar))
+$findScriptPath = Join-Path $PSScriptRoot 'Find-ESAICommands.ps1'
 $navigationFileNames = @(
     'README.md',
     ([string]::Concat(([int[]](21629,20196,21512,38598,32034,24341,95,65,73,21629,20196,46,109,100) | ForEach-Object { [char]$_ })))
@@ -34,6 +35,16 @@ $metadataPatterns = @(
     @{ name = 'default-write'; pattern = '(?m)^\u9ED8\u8BA4\u6539\u6587\u4EF6\uFF1A\s*\S+' },
     @{ name = 'risk-level'; pattern = '(?m)^\u98CE\u9669\u7B49\u7EA7\uFF1A\s*L[123](?:[/\s\u3002\uFF0C,]|$)' }
 )
+
+if (-not (Test-Path -LiteralPath $findScriptPath -PathType Leaf)) {
+    throw "AICommand discovery script does not exist: $findScriptPath"
+}
+$parserTokens = $null
+$parserErrors = $null
+[System.Management.Automation.Language.Parser]::ParseFile($findScriptPath, [ref]$parserTokens, [ref]$parserErrors) | Out-Null
+if ($parserErrors.Count -gt 0) {
+    throw "AICommand discovery script syntax is invalid: $($parserErrors[0])"
+}
 
 function Add-UniqueError {
     param(
@@ -196,6 +207,26 @@ $actualContractPaths = @($results | Where-Object { $_.role -eq 'contract' } | Fo
 foreach ($catalogPathEntry in $catalogPaths) {
     if ($actualContractPaths -notcontains $catalogPathEntry) {
         $catalogErrors.Add("Catalog references a missing executable contract: $catalogPathEntry")
+    }
+}
+
+if ($catalogErrors.Count -eq 0 -and $catalogEntries.Count -gt 0) {
+    try {
+        $discoveryOutput = & $findScriptPath -ProjectRoot $ProjectRoot -Query ([string]$catalogEntries[0].id) -MaxResults 1 -Json
+        $discovery = $discoveryOutput | ConvertFrom-Json
+        if (
+            $null -eq $discovery -or $discovery.totalContracts -ne $catalogEntries.Count -or
+            $discovery.returnedCount -ne 1 -or $discovery.matchedCount -lt $discovery.returnedCount -or
+            @($discovery.candidates).Count -ne $discovery.returnedCount
+        ) {
+            $catalogErrors.Add('AICommand discovery output is malformed or not bounded.')
+        }
+        elseif ([string]$discovery.candidates[0].id -ne [string]$catalogEntries[0].id) {
+            $catalogErrors.Add('AICommand discovery did not resolve the requested exact command id.')
+        }
+    }
+    catch {
+        $catalogErrors.Add("AICommand discovery script execution failed: $($_.Exception.Message)")
     }
 }
 

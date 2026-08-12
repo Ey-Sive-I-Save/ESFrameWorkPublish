@@ -158,11 +158,29 @@ namespace ES.EditorInternal
 
             public ESAutomationTaskInvocationResult Run(ESAutomationTaskInvocation invocation)
             {
-                string runId = Guid.NewGuid().ToString("N");
+                string runId = string.IsNullOrWhiteSpace(invocation?.invocationId)
+                    ? Guid.NewGuid().ToString("N") : invocation.invocationId;
                 try
                 {
                     JObject input = invocation?.input;
                     if (input == null) return ESAutomationTaskInvocationResult.Rejected("缺少 Graph AI 输入。");
+                    string invocationHash = ComputeInvocationHash(input);
+                    string existingRecordPath = Path.Combine(ESAutomationPathPolicy.TempRoot,
+                        runId, RunRecordFileName);
+                    if (File.Exists(existingRecordPath))
+                    {
+                        ESAutomationRunRecord existing = ReadRecord(existingRecordPath);
+                        if (!string.Equals(existing.taskId, Descriptor.taskId, StringComparison.Ordinal)
+                            || existing.taskVersion != Descriptor.taskVersion
+                            || !string.Equals(existing.inputManifestHash, invocationHash,
+                                StringComparison.OrdinalIgnoreCase))
+                            return ESAutomationTaskInvocationResult.Rejected(
+                                "InvocationId 已绑定其他任务或输入，拒绝重复派发。");
+                        return GetRun(runId);
+                    }
+                    if (Directory.Exists(Path.Combine(ESAutomationPathPolicy.TempRoot, runId)))
+                        return ESAutomationTaskInvocationResult.Rejected(
+                            "InvocationId 对应目录已存在但缺少有效 RunRecord，拒绝猜测恢复。");
                     string prompt = input.Value<string>("prompt") ?? string.Empty;
                     string graphId = input.Value<string>("graphId") ?? string.Empty;
                     string signature = input.Value<string>("contentSignature") ?? string.Empty;
@@ -252,7 +270,7 @@ namespace ES.EditorInternal
                         workerVersion = WorkerVersion,
                         entrypointHash = EntrypointHash,
                         gitCommit = ESAutomationSourceState.GetCurrentGitCommit(),
-                        inputManifestHash = ComputeInvocationHash(input),
+                        inputManifestHash = invocationHash,
                         riskPolicyVersion = riskAcceptance?.policyVersion ?? 0,
                         riskAcceptanceHash = riskAcceptance?.acceptanceHash ?? string.Empty,
                         riskAcceptedAtUtc = riskAcceptance?.acceptedAtUtc ?? string.Empty,
@@ -328,10 +346,7 @@ namespace ES.EditorInternal
                 if (!File.Exists(path)) return ESAutomationTaskInvocationResult.NotFound("未找到 Graph AI RunRecord。");
                 try
                 {
-                    ESAutomationRunRecord record = JsonConvert.DeserializeObject<ESAutomationRunRecord>(
-                        File.ReadAllText(path, new UTF8Encoding(false, true)));
-                    if (record == null) return ESAutomationTaskInvocationResult.Failed("Graph AI RunRecord 为空。", runId);
-                    NormalizeRecordCollections(record);
+                    ESAutomationRunRecord record = ReadRecord(path);
                     string status = ToInvocationStatus(record.status);
                     return new ESAutomationTaskInvocationResult
                     {
@@ -688,6 +703,20 @@ namespace ES.EditorInternal
         private static void WriteRecord(string path, ESAutomationRunRecord record)
         {
             ESAutomationPathPolicy.WriteWorkerTextAtomic(path, JsonConvert.SerializeObject(record, Formatting.Indented), new[] { ESAutomationPathPolicy.TempRoot });
+        }
+
+        private static ESAutomationRunRecord ReadRecord(string path)
+        {
+            ESAutomationRunRecord record = JsonConvert.DeserializeObject<ESAutomationRunRecord>(
+                File.ReadAllText(path, new UTF8Encoding(false, true)));
+            if (record == null) throw new InvalidDataException("Graph AI RunRecord 为空。");
+            NormalizeRecordCollections(record);
+            if (!Guid.TryParseExact(record.runId, "N", out _)
+                || !string.Equals(Path.GetFileName(Path.GetDirectoryName(path)), record.runId,
+                    StringComparison.Ordinal)
+                || !IsSha256(record.inputManifestHash))
+                throw new InvalidDataException("Graph AI RunRecord 身份或输入 Hash 无效。");
+            return record;
         }
 
         private static string ToProjectRelative(string path)

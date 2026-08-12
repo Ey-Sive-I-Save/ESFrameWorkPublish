@@ -12,6 +12,27 @@
 
 `AICommandCatalog.json` 是唯一机器可读发现目录；`README.md` 与 `命令合集索引_AI命令.md` 只是导航文档，不属于可选择的任务合同。Markdown 正文仍是唯一授权文本：目录只提供短摘要、角色、风险和写入模式，不能扩大用户当前授权。
 
+## 低上下文检索
+
+常规 AI 不需要把 53 条目录和所有 Markdown 一次读入上下文。优先从项目根执行：
+
+```powershell
+& .agents/skills/es-use-ai-command/scripts/Find-ESAICommands.ps1 `
+  -ProjectRoot (Get-Location).Path -Query "资源 发布" -Json
+```
+
+该查询器只读取 `AICommandCatalog.json`，硬性最多返回 6 条短候选；它不读取任何合同正文。选定一条后，才读取那一份 Markdown 全文并重新计算 SHA-256。目录、候选摘要和 Skill 均不能代替该正文授权。
+
+已知合同路径时可用精确校验，不必让 AI 读取完整目录：
+
+```powershell
+& .agents/skills/es-use-ai-command/scripts/Find-ESAICommands.ps1 `
+  -ProjectRoot (Get-Location).Path `
+  -CommandPath "Assets/Plugins/ES/AICommands/执行_修复单个编译错误_AI命令.md" -Json
+```
+
+`Test-ESAICommands.ps1` 是命令库维护与 CI 的全量门禁，会读取全部合同正文，验证正文权限语义、目录字段、UTF-8 与引用一致性；普通任务选择不运行它。因此“低上下文”只描述 AI 的发现输入，不表示整条维护/CI 链路只有一次 18KB 磁盘读取。
+
 命令文件必须声明 `命令类型`、`默认改文件`、`风险等级`，其中列出的项目内路径必须真实存在。Unity 面板只负责发现、校验、组合和发送任务，不会绕过命令自身的权限边界。
 
 ## 与 Agent Skills 协同

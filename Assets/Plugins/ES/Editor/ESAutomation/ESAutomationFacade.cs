@@ -46,6 +46,9 @@ namespace ES
         public static ESAutomationTaskInvocationResult RunTask(ESAutomationTaskInvocation invocation)
         {
             if (invocation == null) return ESAutomationTaskInvocationResult.Rejected("缺少 Automation 调用请求。");
+            if (!string.IsNullOrWhiteSpace(invocation.invocationId)
+                && !Guid.TryParseExact(invocation.invocationId, "N", out _))
+                return ESAutomationTaskInvocationResult.Rejected("InvocationId 必须为空或为 N 格式 GUID。");
             if (!endpoints.TryGetValue(Key(invocation.taskId, invocation.taskVersion), out IESAutomationTaskEndpoint endpoint))
                 return ESAutomationTaskInvocationResult.Rejected("未注册或不支持的任务：" + invocation.taskId + "@" + invocation.taskVersion);
             if (!ESAutomationTaskRegistry.TryGet(invocation.taskId, invocation.taskVersion,
@@ -329,6 +332,11 @@ namespace ES
 
     public sealed class ESAutomationTaskInvocation
     {
+        /// <summary>
+        /// 调用方可在首次派发前持久化的稳定调用身份。Endpoint 必须以它去重同一调用，
+        /// 并拒绝同一身份对应不同输入；为空时保持普通交互入口的原有行为。
+        /// </summary>
+        public string invocationId = string.Empty;
         public string taskId = string.Empty;
         public int taskVersion;
         public string preset = string.Empty;

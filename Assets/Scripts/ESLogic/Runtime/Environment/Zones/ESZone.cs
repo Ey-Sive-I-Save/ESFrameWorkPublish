@@ -153,6 +153,17 @@ namespace ES
             profile = GetComponent<ESZoneProfile>();
         }
 
+        private void OnEnable()
+        {
+            // SubsystemRegistration clears the static queue even when domain/scene reload
+            // is disabled. Reconcile the instance flag with the actual registry.
+            if (trackedColliders != null && trackedColliders.Count > 0)
+            {
+                maintenanceRegistered = false;
+                RegisterMaintenance();
+            }
+        }
+
         internal void RegisterProfile(ESZoneProfile candidate)
         {
             if (candidate == null || candidate.gameObject != gameObject)
@@ -186,9 +197,8 @@ namespace ES
             if (other == null)
                 return;
 
-            EnsureTrackingCollections();
-
-            if (colliderOverlaps.TryGetValue(other, out ColliderOverlap colliderOverlap))
+            if (colliderOverlaps != null
+                && colliderOverlaps.TryGetValue(other, out ColliderOverlap colliderOverlap))
             {
                 colliderOverlap.overlapCount++;
                 colliderOverlaps[other] = colliderOverlap;
@@ -204,6 +214,7 @@ namespace ES
                 || !member.IsActive)
                 return;
 
+            EnsureTrackingCollections();
             colliderOverlaps.Add(other, new ColliderOverlap
             {
                 memberKey = key,
@@ -211,6 +222,7 @@ namespace ES
                 cleanupIndex = trackedColliders.Count
             });
             trackedColliders.Add(other);
+            RegisterMaintenance();
 
             if (occupants.TryGetValue(key, out Occupant occupant))
             {
@@ -230,7 +242,8 @@ namespace ES
 
         private void OnTriggerExit(Collider other)
         {
-            if (other == null || !colliderOverlaps.TryGetValue(other, out ColliderOverlap overlap))
+            if (other == null || colliderOverlaps == null
+                || !colliderOverlaps.TryGetValue(other, out ColliderOverlap overlap))
                 return;
 
             RemoveColliderOverlap(other, overlap, false);
@@ -299,6 +312,7 @@ namespace ES
 
             occupants.Remove(overlap.memberKey);
             NotifyMemberExited(occupant.member);
+            ReleaseTrackingCollectionsIfEmpty();
         }
 
         private void ClearMembers()
@@ -415,6 +429,23 @@ namespace ES
             occupants ??= new Dictionary<UnityEngine.Object, Occupant>(InitialMemberCapacity);
             colliderOverlaps ??= new Dictionary<Collider, ColliderOverlap>(InitialColliderCapacity);
             trackedColliders ??= new List<Collider>(InitialColliderCapacity);
+        }
+
+        private void ReleaseTrackingCollectionsIfEmpty()
+        {
+            if (occupants == null || occupants.Count != 0
+                || colliderOverlaps == null || colliderOverlaps.Count != 0
+                || trackedColliders == null || trackedColliders.Count != 0)
+                return;
+
+            cleanupCursor = 0;
+            occupants = null;
+            colliderOverlaps = null;
+            trackedColliders = null;
+        }
+
+        private void RegisterMaintenance()
+        {
             if (!maintenanceRegistered)
             {
                 ESZoneMaintenance.Register(this);
@@ -435,18 +466,24 @@ namespace ES
     {
         private const int ZoneBudgetPerFrame = 64;
         private static readonly List<ESZone> Zones = new List<ESZone>(32);
+        private static readonly ESZone[] TickBuffer = new ESZone[ZoneBudgetPerFrame];
         private static int cursor;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void Reset()
         {
-            Zones.Clear();
+            for (int i = Zones.Count - 1; i >= 0; i--)
+            {
+                if (Zones[i] == null)
+                    Zones.RemoveAt(i);
+            }
+            Array.Clear(TickBuffer, 0, TickBuffer.Length);
             cursor = 0;
         }
 
         internal static void Register(ESZone zone)
         {
-            if (zone != null)
+            if (zone != null && !Zones.Contains(zone))
                 Zones.Add(zone);
         }
 
@@ -456,9 +493,9 @@ namespace ES
             if (index < 0)
                 return;
 
-            int last = Zones.Count - 1;
-            Zones[index] = Zones[last];
-            Zones.RemoveAt(last);
+            // Registration churn is rare. Ordered removal keeps the round-robin cursor
+            // deterministic even when one zone disables another during maintenance.
+            Zones.RemoveAt(index);
             if (cursor > index)
                 cursor--;
             if (cursor >= Zones.Count)
@@ -467,13 +504,19 @@ namespace ES
 
         internal static void Tick()
         {
-            int budget = Mathf.Min(ZoneBudgetPerFrame, Zones.Count);
-            while (budget-- > 0 && Zones.Count > 0)
+            int scheduledCount = Mathf.Min(ZoneBudgetPerFrame, Zones.Count);
+            for (int i = 0; i < scheduledCount; i++)
             {
                 if (cursor >= Zones.Count)
                     cursor = 0;
 
-                ESZone zone = Zones[cursor++];
+                TickBuffer[i] = Zones[cursor++];
+            }
+
+            for (int i = 0; i < scheduledCount; i++)
+            {
+                ESZone zone = TickBuffer[i];
+                TickBuffer[i] = null;
                 if (zone != null && zone.isActiveAndEnabled)
                     zone.RunMaintenance();
             }

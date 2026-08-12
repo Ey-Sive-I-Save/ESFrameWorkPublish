@@ -2832,7 +2832,8 @@ namespace ES
             if (!ESMotionInfluenceSolver.IsAllowed(permissions, lockState))
                 return ESMotionSubmitResult.Locked;
 
-            EnsureMotionInfluences().AddVelocity(velocity, permissions);
+            if (!EnsureMotionInfluences().TryAddVelocity(velocity))
+                return ESMotionSubmitResult.InvalidValue;
             if (motor != null
                 && Vector3.Dot(velocity, motor.CharacterUp) > influenceUngroundThreshold)
                 motor.ForceUnground(0.1f);

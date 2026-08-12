@@ -121,7 +121,7 @@ namespace ES.Tests
             for (int i = 0; i < leases.Length; i++)
                 leases[i].Dispose();
             Assert.That(accumulator.ActiveFieldCount, Is.Zero);
-            Assert.That(accumulator.FieldCapacity, Is.Zero);
+            Assert.That(accumulator.FieldCapacity, Is.GreaterThanOrEqualTo(leases.Length));
         }
 
         [Test]
@@ -131,9 +131,30 @@ namespace ES.Tests
 
             accumulator.AddVelocity(Vector3.right);
 
-            Assert.That(accumulator.FieldCapacity, Is.Zero);
+            Assert.That(accumulator.FieldCapacity, Is.EqualTo(ESMotionInfluenceAccumulator.MaxFieldCapacity));
             Assert.That(accumulator.ActiveFieldCount, Is.Zero);
             Assert.That(accumulator.HasPendingVelocityDelta, Is.True);
+        }
+
+        [Test]
+        public void VelocityDelta_RejectsAccumulationOverflowWithoutCorruptingPendingValue()
+        {
+            var accumulator = new ESMotionInfluenceAccumulator();
+
+            Assert.That(accumulator.TryAddVelocity(Vector3.right * float.MaxValue), Is.True);
+            Assert.That(accumulator.TryAddVelocity(Vector3.right * float.MaxValue), Is.False);
+            Vector3 velocity = Vector3.zero;
+            accumulator.Apply(
+                ref velocity,
+                Vector3.zero,
+                0.02f,
+                ESMotionReceiverLockState.None,
+                100f,
+                0f);
+
+            Assert.That(float.IsInfinity(velocity.x), Is.False);
+            Assert.That(float.IsNaN(velocity.x), Is.False);
+            Assert.That(velocity.x, Is.EqualTo(float.MaxValue));
         }
 
         [Test]
@@ -163,6 +184,100 @@ namespace ES.Tests
             for (int i = 0; i < leases.Length; i++)
                 leases[i].Dispose();
             Assert.That(accumulator.FieldCapacity, Is.Zero);
+        }
+
+        [Test]
+        public void OverrideField_SuppressesLowerPriorityFields()
+        {
+            var accumulator = new ESMotionInfluenceAccumulator();
+            accumulator.TryAcquireField(new ESMotionFieldRequest
+            {
+                kind = ESMotionFieldKind.Acceleration,
+                acceleration = Vector3.right * 10f,
+                priority = 1,
+                sourceId = 1UL
+            }, out _);
+            accumulator.TryAcquireField(new ESMotionFieldRequest
+            {
+                kind = ESMotionFieldKind.Acceleration,
+                acceleration = Vector3.up * 3f,
+                priority = 10,
+                sourceId = 2UL,
+                blendMode = ESMotionFieldBlendMode.OverrideLowerPriority
+            }, out _);
+            Vector3 velocity = Vector3.zero;
+
+            accumulator.Apply(
+                ref velocity,
+                Vector3.zero,
+                1f,
+                ESMotionReceiverLockState.None,
+                100f,
+                100f);
+
+            Assert.That(velocity, Is.EqualTo(Vector3.up * 3f));
+        }
+
+        [Test]
+        public void LockedOverrideField_DoesNotSuppressAllowedLowerPriorityField()
+        {
+            var accumulator = new ESMotionInfluenceAccumulator();
+            accumulator.TryAcquireField(new ESMotionFieldRequest
+            {
+                kind = ESMotionFieldKind.Acceleration,
+                acceleration = Vector3.right * 2f,
+                priority = 1,
+                sourceId = 1UL
+            }, out _);
+            accumulator.TryAcquireField(new ESMotionFieldRequest
+            {
+                kind = ESMotionFieldKind.Acceleration,
+                acceleration = Vector3.up * 3f,
+                priority = 10,
+                sourceId = 2UL,
+                blendMode = ESMotionFieldBlendMode.OverrideLowerPriority
+            }, out _);
+            Vector3 velocity = Vector3.zero;
+
+            accumulator.Apply(
+                ref velocity,
+                Vector3.zero,
+                1f,
+                ESMotionReceiverLockState.Mounted,
+                100f,
+                100f);
+
+            Assert.That(velocity, Is.EqualTo(Vector3.right * 2f));
+        }
+
+        [Test]
+        public void FiniteFieldSum_CannotOverflowMotionVelocity()
+        {
+            var accumulator = new ESMotionInfluenceAccumulator();
+            accumulator.TryAcquireField(new ESMotionFieldRequest
+            {
+                kind = ESMotionFieldKind.Acceleration,
+                acceleration = Vector3.right * float.MaxValue,
+                sourceId = 1UL
+            }, out _);
+            accumulator.TryAcquireField(new ESMotionFieldRequest
+            {
+                kind = ESMotionFieldKind.Acceleration,
+                acceleration = Vector3.right * float.MaxValue,
+                sourceId = 2UL
+            }, out _);
+            Vector3 velocity = Vector3.zero;
+
+            accumulator.Apply(
+                ref velocity,
+                Vector3.zero,
+                1f,
+                ESMotionReceiverLockState.None,
+                80f,
+                100f);
+
+            Assert.That(velocity, Is.EqualTo(Vector3.right * 80f));
+            Assert.That(accumulator.InvalidSolveCount, Is.Zero);
         }
 
         [Test]

@@ -34,8 +34,7 @@ namespace ES
         public ItemDataInfo soSource;
         public ItemWeaponSharedData sharedData;
         public ItemWeaponVariableData defaultVariableData;
-        public GameObject prefab;
-        public UnityEngine.Object extraAsset;
+        public ESAssetReferPrefabConfigKey prefabKey;
 
         internal ItemWeaponSharedData PrepareDefaultSharedData()
         {
@@ -51,8 +50,7 @@ namespace ES
             soSource = null;
             sharedData = null;
             defaultVariableData = default;
-            prefab = null;
-            extraAsset = null;
+            prefabKey = null;
             ownedDefaultSharedData.ResetToDefaults();
         }
 
@@ -79,8 +77,7 @@ namespace ES
             ItemWeaponSharedData sharedData,
             ItemWeaponVariableData defaultVariableData,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null)
         {
@@ -93,7 +90,7 @@ namespace ES
             {
                 CreateRuntimeData(
                     runtimeData, key, sharedData, defaultVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return CommitRetained(key, runtimeData, runtimeData.displayName);
             }
             catch
@@ -109,8 +106,7 @@ namespace ES
             ItemWeaponVariableData defaultVariableData,
             out int runtimeKey,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null)
         {
@@ -124,7 +120,7 @@ namespace ES
             {
                 CreateRuntimeData(
                     runtimeData, key, sharedData, defaultVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return TryCommitRetained(key, runtimeData, out runtimeKey, runtimeData.displayName);
             }
             catch
@@ -138,8 +134,7 @@ namespace ES
         public int InjectWithDefaults(
             ESWeaponConfigKey key,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null,
             ItemWeaponKind? weaponKind = null,
@@ -152,7 +147,8 @@ namespace ES
             int? ammo = null,
             int? logicSeed = null,
             ESDataFiller<ItemWeaponSharedData> fillShared = null,
-            ESDataFiller<ItemWeaponVariableData> fillVariable = null)
+            ESDataFiller<ItemWeaponVariableData> fillVariable = null,
+            ESActionConfigKey primaryAttackAction = null)
         {
             ValidateKey(key, nameof(InjectWithDefaults));
             ESWeaponRuntimeData runtimeData = AcquireRetained(key);
@@ -161,7 +157,7 @@ namespace ES
                 ItemWeaponSharedData ownedShared = runtimeData.PrepareDefaultSharedData();
                 ResolveDefaults(
                     ownedShared, null,
-                    weaponKind, defaultShot, hitRadius, cooldown, socketName,
+                    weaponKind, primaryAttackAction, defaultShot, hitRadius, cooldown, socketName,
                     durability, cooldownLeft, ammo, logicSeed,
                     fillShared, fillVariable,
                     out ItemWeaponSharedData sharedData, out ItemWeaponVariableData resolvedVariableData);
@@ -169,7 +165,7 @@ namespace ES
                     throw new InvalidOperationException("Weapon InjectWithDefaults 的 fillShared 不得替换 Table 自有 SharedData 实例。");
                 CreateRuntimeData(
                     runtimeData, key, sharedData, resolvedVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return CommitRetained(key, runtimeData, runtimeData.displayName);
             }
             catch
@@ -183,8 +179,7 @@ namespace ES
             ESWeaponConfigKey key,
             out int runtimeKey,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null,
             ItemWeaponKind? weaponKind = null,
@@ -197,7 +192,8 @@ namespace ES
             int? ammo = null,
             int? logicSeed = null,
             ESDataFiller<ItemWeaponSharedData> fillShared = null,
-            ESDataFiller<ItemWeaponVariableData> fillVariable = null)
+            ESDataFiller<ItemWeaponVariableData> fillVariable = null,
+            ESActionConfigKey primaryAttackAction = null)
         {
             runtimeKey = 0;
             if (key == null || !key.IsConfigured)
@@ -210,7 +206,7 @@ namespace ES
                 ItemWeaponSharedData ownedShared = runtimeData.PrepareDefaultSharedData();
                 ResolveDefaults(
                     ownedShared, null,
-                    weaponKind, defaultShot, hitRadius, cooldown, socketName,
+                    weaponKind, primaryAttackAction, defaultShot, hitRadius, cooldown, socketName,
                     durability, cooldownLeft, ammo, logicSeed,
                     fillShared, fillVariable,
                     out ItemWeaponSharedData sharedData, out ItemWeaponVariableData resolvedVariableData);
@@ -222,7 +218,7 @@ namespace ES
 
                 CreateRuntimeData(
                     runtimeData, key, sharedData, resolvedVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return TryCommitRetained(key, runtimeData, out runtimeKey, runtimeData.displayName);
             }
             catch
@@ -238,8 +234,7 @@ namespace ES
             ItemWeaponSharedData sharedData,
             ItemWeaponVariableData defaultVariableData,
             string displayName,
-            GameObject prefab,
-            UnityEngine.Object extraAsset,
+            ESAssetReferPrefabConfigKey prefabKey,
             string sourcePackage,
             string version)
         {
@@ -253,8 +248,7 @@ namespace ES
             runtimeData.version = version ?? string.Empty;
             runtimeData.sharedData = sharedData;
             runtimeData.defaultVariableData = defaultVariableData;
-            runtimeData.prefab = prefab;
-            runtimeData.extraAsset = extraAsset;
+            runtimeData.prefabKey = prefabKey;
             return runtimeData;
         }
 
@@ -262,6 +256,7 @@ namespace ES
             ItemWeaponSharedData sharedData,
             ItemWeaponVariableData? variableData,
             ItemWeaponKind? weaponKind,
+            ESActionConfigKey primaryAttackAction,
             ESShotConfigKey defaultShot,
             float? hitRadius,
             float? cooldown,
@@ -279,6 +274,7 @@ namespace ES
             resolvedVariable = variableData ?? ItemWeaponVariableData.Default;
 
             if (weaponKind.HasValue) resolvedShared.weaponKind = weaponKind.Value;
+            if (primaryAttackAction != null) resolvedShared.primaryAttackAction = primaryAttackAction;
             if (defaultShot != null) resolvedShared.defaultShot = defaultShot;
             if (hitRadius.HasValue) resolvedShared.hitRadius = hitRadius.Value;
             if (cooldown.HasValue) resolvedShared.cooldown = cooldown.Value;

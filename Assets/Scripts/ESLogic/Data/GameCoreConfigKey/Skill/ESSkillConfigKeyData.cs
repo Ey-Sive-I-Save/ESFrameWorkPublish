@@ -32,16 +32,14 @@ namespace ES
         public SkillDefinitionDataInfo soSource;
         public SkillTrackProcessInfo trackProcess;
         public StateAniDataInfo baseStateInfo;
-        public GameObject prefab;
-        public UnityEngine.Object extraAsset;
+        public ESAssetReferPrefabConfigKey prefabKey;
 
         protected override void ReleaseRuntimePayload()
         {
             soSource = null;
             trackProcess = null;
             baseStateInfo = null;
-            prefab = null;
-            extraAsset = null;
+            prefabKey = null;
         }
 
     }
@@ -66,8 +64,7 @@ namespace ES
             SkillTrackProcessInfo trackProcess = null,
             StateAniDataInfo baseStateInfo = null,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null)
         {
@@ -77,7 +74,7 @@ namespace ES
             {
                 CreateRuntimeData(
                     runtimeData, key, trackProcess, baseStateInfo,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return CommitRetained(key, runtimeData, runtimeData.displayName);
             }
             catch
@@ -93,8 +90,7 @@ namespace ES
             SkillTrackProcessInfo trackProcess = null,
             StateAniDataInfo baseStateInfo = null,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null)
         {
@@ -108,7 +104,7 @@ namespace ES
             {
                 CreateRuntimeData(
                     runtimeData, key, trackProcess, baseStateInfo,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return TryCommitRetained(key, runtimeData, out runtimeKey, runtimeData.displayName);
             }
             catch
@@ -124,8 +120,7 @@ namespace ES
             SkillTrackProcessInfo trackProcess,
             StateAniDataInfo baseStateInfo,
             string displayName,
-            GameObject prefab,
-            UnityEngine.Object extraAsset,
+            ESAssetReferPrefabConfigKey prefabKey,
             string sourcePackage,
             string version)
         {
@@ -136,8 +131,7 @@ namespace ES
             runtimeData.version = version ?? string.Empty;
             runtimeData.trackProcess = trackProcess;
             runtimeData.baseStateInfo = baseStateInfo;
-            runtimeData.prefab = prefab;
-            runtimeData.extraAsset = extraAsset;
+            runtimeData.prefabKey = prefabKey;
             return runtimeData;
         }
 

@@ -34,8 +34,7 @@ namespace ES
         public ItemDataInfo soSource;
         public ItemShotSharedData sharedData;
         public ItemShotVariableData defaultVariableData;
-        public GameObject prefab;
-        public UnityEngine.Object extraAsset;
+        public ESAssetReferPrefabConfigKey prefabKey;
 
         internal ItemShotSharedData PrepareDefaultSharedData()
         {
@@ -51,8 +50,7 @@ namespace ES
             soSource = null;
             sharedData = null;
             defaultVariableData = default;
-            prefab = null;
-            extraAsset = null;
+            prefabKey = null;
             ownedDefaultSharedData.ResetToDefaults();
         }
 
@@ -79,8 +77,7 @@ namespace ES
             ItemShotSharedData sharedData,
             ItemShotVariableData defaultVariableData,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null)
         {
@@ -93,7 +90,7 @@ namespace ES
             {
                 CreateRuntimeData(
                     runtimeData, key, sharedData, defaultVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return CommitRetained(key, runtimeData, runtimeData.displayName);
             }
             catch
@@ -109,8 +106,7 @@ namespace ES
             ItemShotVariableData defaultVariableData,
             out int runtimeKey,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null)
         {
@@ -124,7 +120,7 @@ namespace ES
             {
                 CreateRuntimeData(
                     runtimeData, key, sharedData, defaultVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return TryCommitRetained(key, runtimeData, out runtimeKey, runtimeData.displayName);
             }
             catch
@@ -138,8 +134,7 @@ namespace ES
         public int InjectWithDefaults(
             ESShotConfigKey key,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null,
             bool? enabled = null,
@@ -191,7 +186,7 @@ namespace ES
                     throw new InvalidOperationException("Shot InjectWithDefaults 的 fillShared 不得替换 Table 自有 SharedData 实例。");
                 CreateRuntimeData(
                     runtimeData, key, sharedData, resolvedVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return CommitRetained(key, runtimeData, runtimeData.displayName);
             }
             catch
@@ -205,8 +200,7 @@ namespace ES
             ESShotConfigKey key,
             out int runtimeKey,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null,
             bool? enabled = null,
@@ -266,7 +260,7 @@ namespace ES
 
                 CreateRuntimeData(
                     runtimeData, key, sharedData, resolvedVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return TryCommitRetained(key, runtimeData, out runtimeKey, runtimeData.displayName);
             }
             catch
@@ -282,8 +276,7 @@ namespace ES
             ItemShotSharedData sharedData,
             ItemShotVariableData defaultVariableData,
             string displayName,
-            GameObject prefab,
-            UnityEngine.Object extraAsset,
+            ESAssetReferPrefabConfigKey prefabKey,
             string sourcePackage,
             string version)
         {
@@ -294,8 +287,7 @@ namespace ES
             runtimeData.version = version ?? string.Empty;
             runtimeData.sharedData = sharedData;
             runtimeData.defaultVariableData = defaultVariableData;
-            runtimeData.prefab = prefab;
-            runtimeData.extraAsset = extraAsset;
+            runtimeData.prefabKey = prefabKey;
             return runtimeData;
         }
 

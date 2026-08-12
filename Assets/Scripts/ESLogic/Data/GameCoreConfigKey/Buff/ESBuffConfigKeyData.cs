@@ -59,8 +59,7 @@ namespace ES
         public BuffDefinitionDataInfo soSource;
         public BuffSharedData sharedData;
         public BuffVariableData defaultVariableData;
-        public GameObject prefab;
-        public UnityEngine.Object extraAsset;
+        public ESAssetReferPrefabConfigKey prefabKey;
 
         internal BuffSharedData PrepareDefaultSharedData()
         {
@@ -104,8 +103,7 @@ namespace ES
             soSource = null;
             sharedData = null;
             defaultVariableData = null;
-            prefab = null;
-            extraAsset = null;
+            prefabKey = null;
             RestoreDefaultOwnership();
             ownedDefaultSharedData.ResetToDefaults();
             ownedDefaultVariableData.ResetToDefaults();
@@ -151,8 +149,7 @@ namespace ES
             BuffSharedData sharedData,
             BuffVariableData defaultVariableData,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null)
         {
@@ -163,7 +160,7 @@ namespace ES
             {
                 CreateRuntimeData(
                     runtimeData, key, sharedData, defaultVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return CommitRetained(key, runtimeData, runtimeData.displayName);
             }
             catch
@@ -179,8 +176,7 @@ namespace ES
             BuffVariableData defaultVariableData,
             out int runtimeKey,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null)
         {
@@ -194,7 +190,7 @@ namespace ES
             {
                 CreateRuntimeData(
                     runtimeData, key, sharedData, defaultVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return TryCommitRetained(key, runtimeData, out runtimeKey, runtimeData.displayName);
             }
             catch
@@ -211,8 +207,7 @@ namespace ES
         public int InjectWithDefaults(
             ESBuffConfigKey key,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null,
             float? duration = null,
@@ -248,7 +243,7 @@ namespace ES
                 ValidateAuthoritativeData(key, sharedData, defaultVariableData, nameof(InjectWithDefaults));
                 CreateRuntimeData(
                     runtimeData, key, sharedData, defaultVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return CommitRetained(key, runtimeData, runtimeData.displayName);
             }
             catch
@@ -262,8 +257,7 @@ namespace ES
             ESBuffConfigKey key,
             out int runtimeKey,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null,
             float? duration = null,
@@ -308,7 +302,7 @@ namespace ES
 
                 CreateRuntimeData(
                     runtimeData, key, sharedData, defaultVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return TryCommitRetained(key, runtimeData, out runtimeKey, runtimeData.displayName);
             }
             catch
@@ -324,8 +318,7 @@ namespace ES
             BuffSharedData sharedData,
             BuffVariableData defaultVariableData,
             string displayName,
-            GameObject prefab,
-            UnityEngine.Object extraAsset,
+            ESAssetReferPrefabConfigKey prefabKey,
             string sourcePackage,
             string version)
         {
@@ -336,8 +329,7 @@ namespace ES
             runtimeData.version = version ?? string.Empty;
             runtimeData.sharedData = sharedData;
             runtimeData.defaultVariableData = defaultVariableData;
-            runtimeData.prefab = prefab;
-            runtimeData.extraAsset = extraAsset;
+            runtimeData.prefabKey = prefabKey;
             return runtimeData;
         }
 

@@ -55,8 +55,7 @@ namespace ES
         public EntityMotionSharedData sharedData;
         public EntityMotionVariableData defaultVariableData;
         public List<ESTagStableReference> tags;
-        public GameObject prefab;
-        public UnityEngine.Object extraAsset;
+        public ESAssetReferPrefabConfigKey prefabKey;
 
         internal EntityMotionSharedData PrepareDefaultSharedData()
         {
@@ -73,8 +72,7 @@ namespace ES
             sharedData = null;
             defaultVariableData = default;
             tags = null;
-            prefab = null;
-            extraAsset = null;
+            prefabKey = null;
             ownedDefaultSharedData.ResetToDefaults();
         }
 
@@ -93,8 +91,7 @@ namespace ES
         public EntityMotionSharedData sharedData;
         public EntityMotionVariableData defaultVariableData;
         public List<ESTagStableReference> tags;
-        public GameObject prefab;
-        public UnityEngine.Object extraAsset;
+        public ESAssetReferPrefabConfigKey prefabKey;
 
         internal EntityMotionSharedData PrepareDefaultSharedData()
         {
@@ -111,8 +108,7 @@ namespace ES
             sharedData = null;
             defaultVariableData = default;
             tags = null;
-            prefab = null;
-            extraAsset = null;
+            prefabKey = null;
             ownedDefaultSharedData.ResetToDefaults();
         }
 
@@ -139,8 +135,7 @@ namespace ES
             EntityMotionSharedData sharedData,
             EntityMotionVariableData defaultVariableData,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null)
         {
@@ -153,7 +148,7 @@ namespace ES
             {
                 CreateRuntimeData(
                     runtimeData, key, sharedData, defaultVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return CommitRetained(key, runtimeData, runtimeData.displayName);
             }
             catch
@@ -169,8 +164,7 @@ namespace ES
             EntityMotionVariableData defaultVariableData,
             out int runtimeKey,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null)
         {
@@ -184,7 +178,7 @@ namespace ES
             {
                 CreateRuntimeData(
                     runtimeData, key, sharedData, defaultVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return TryCommitRetained(key, runtimeData, out runtimeKey, runtimeData.displayName);
             }
             catch
@@ -198,8 +192,7 @@ namespace ES
         public int InjectWithDefaults(
             ESMonsterConfigKey key,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null,
             bool? enableGroundMove = null,
@@ -250,7 +243,7 @@ namespace ES
                     throw new InvalidOperationException("Monster InjectWithDefaults 的 fillShared 不得替换 Table 自有 SharedData 实例。");
                 CreateRuntimeData(
                     runtimeData, key, sharedData, resolvedVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return CommitRetained(key, runtimeData, runtimeData.displayName);
             }
             catch
@@ -264,8 +257,7 @@ namespace ES
             ESMonsterConfigKey key,
             out int runtimeKey,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null,
             bool? enableGroundMove = null,
@@ -324,7 +316,7 @@ namespace ES
 
                 CreateRuntimeData(
                     runtimeData, key, sharedData, resolvedVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return TryCommitRetained(key, runtimeData, out runtimeKey, runtimeData.displayName);
             }
             catch
@@ -340,8 +332,7 @@ namespace ES
             EntityMotionSharedData sharedData,
             EntityMotionVariableData defaultVariableData,
             string displayName,
-            GameObject prefab,
-            UnityEngine.Object extraAsset,
+            ESAssetReferPrefabConfigKey prefabKey,
             string sourcePackage,
             string version)
         {
@@ -352,8 +343,7 @@ namespace ES
             runtimeData.version = version ?? string.Empty;
             runtimeData.sharedData = sharedData;
             runtimeData.defaultVariableData = defaultVariableData;
-            runtimeData.prefab = prefab;
-            runtimeData.extraAsset = extraAsset;
+            runtimeData.prefabKey = prefabKey;
             return runtimeData;
         }
 
@@ -385,8 +375,7 @@ namespace ES
             EntityMotionSharedData sharedData,
             EntityMotionVariableData defaultVariableData,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null)
         {
@@ -399,7 +388,7 @@ namespace ES
             {
                 CreateRuntimeData(
                     runtimeData, key, sharedData, defaultVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return CommitRetained(key, runtimeData, runtimeData.displayName);
             }
             catch
@@ -415,8 +404,7 @@ namespace ES
             EntityMotionVariableData defaultVariableData,
             out int runtimeKey,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null)
         {
@@ -430,7 +418,7 @@ namespace ES
             {
                 CreateRuntimeData(
                     runtimeData, key, sharedData, defaultVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return TryCommitRetained(key, runtimeData, out runtimeKey, runtimeData.displayName);
             }
             catch
@@ -444,8 +432,7 @@ namespace ES
         public int InjectWithDefaults(
             ESNpcConfigKey key,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null,
             bool? enableGroundMove = null,
@@ -496,7 +483,7 @@ namespace ES
                     throw new InvalidOperationException("NPC InjectWithDefaults 的 fillShared 不得替换 Table 自有 SharedData 实例。");
                 CreateRuntimeData(
                     runtimeData, key, sharedData, resolvedVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return CommitRetained(key, runtimeData, runtimeData.displayName);
             }
             catch
@@ -510,8 +497,7 @@ namespace ES
             ESNpcConfigKey key,
             out int runtimeKey,
             string displayName = null,
-            GameObject prefab = null,
-            UnityEngine.Object extraAsset = null,
+            ESAssetReferPrefabConfigKey prefabKey = null,
             string sourcePackage = null,
             string version = null,
             bool? enableGroundMove = null,
@@ -570,7 +556,7 @@ namespace ES
 
                 CreateRuntimeData(
                     runtimeData, key, sharedData, resolvedVariableData,
-                    displayName, prefab, extraAsset, sourcePackage, version);
+                    displayName, prefabKey, sourcePackage, version);
                 return TryCommitRetained(key, runtimeData, out runtimeKey, runtimeData.displayName);
             }
             catch
@@ -586,8 +572,7 @@ namespace ES
             EntityMotionSharedData sharedData,
             EntityMotionVariableData defaultVariableData,
             string displayName,
-            GameObject prefab,
-            UnityEngine.Object extraAsset,
+            ESAssetReferPrefabConfigKey prefabKey,
             string sourcePackage,
             string version)
         {
@@ -598,8 +583,7 @@ namespace ES
             runtimeData.version = version ?? string.Empty;
             runtimeData.sharedData = sharedData;
             runtimeData.defaultVariableData = defaultVariableData;
-            runtimeData.prefab = prefab;
-            runtimeData.extraAsset = extraAsset;
+            runtimeData.prefabKey = prefabKey;
             return runtimeData;
         }
 

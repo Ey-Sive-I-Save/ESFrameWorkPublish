@@ -48,30 +48,24 @@ if ($records.Count -gt 1 -and -not $AllMatches) {
     throw "The selector matched multiple registry records. Pass an exact SessionId or explicitly use -AllMatches:`n$candidates"
 }
 
-$titles = @($records | ForEach-Object { [string]$_.tabTitle } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
-$allTabs = @(Get-ESCodexVisibleTerminalTabs)
-$uiMatches = @($allTabs | Where-Object { $_.title -in $titles })
-$ambiguousTitles = @($uiMatches | Group-Object title | Where-Object Count -gt 1)
-if ($ambiguousTitles.Count -gt 0 -and -not $AllMatches) {
-    $details = @($ambiguousTitles | ForEach-Object { "$($_.Name) x$($_.Count)" }) -join "`n"
-    throw "Visible tab identity is ambiguous. Title-only fallback will not close automatically:`n$details"
-}
-if (-not [string]::IsNullOrWhiteSpace($SessionId) -and $uiMatches.Count -gt 1) {
-    throw 'An exact SessionId resolved to multiple visible title matches; refusing to guess which tab belongs to the session.'
-}
-foreach ($group in @($uiMatches | Group-Object title)) {
-    $registeredTitleCount = @($records | Where-Object { [string]$_.tabTitle -eq [string]$group.Name }).Count
-    if ($group.Count -gt $registeredTitleCount) {
-        throw "Visible tabs outnumber authoritative records for title '$($group.Name)'; refusing to close potentially unrelated tabs."
-    }
-}
-
 $status = & (Join-Path $PSScriptRoot 'Get-ESCodexSessionStatus.ps1') -IncludeClosed -StateRoot $localStateRoot
 $selectedStatus = @($status.sessions | Where-Object { [string]$_.recordId -in @($records.recordId) })
+$titles = @($records | ForEach-Object { [string]$_.tabTitle } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+$allTabs = @(Get-ESCodexVisibleTerminalTabs)
+$uiMatches = @()
 foreach ($observation in $selectedStatus) {
-    if ([string]$observation.terminalMode -ne 'PlainCmd' -and $observation.processAlive -and [int]$observation.visibleTabCount -eq 0) {
-        throw "The registered process is alive but its visual tab cannot be located safely: $($observation.sessionId)"
+    if ([string]$observation.terminalMode -eq 'PlainCmd' -or -not [bool]$observation.processAlive) { continue }
+    $terminalWindowProcessId = [int]$observation.terminalWindowProcessId
+    if ($terminalWindowProcessId -le 0) {
+        throw "The exact session has no captured Windows Terminal host process; refusing title-only close: $($observation.sessionId)"
     }
+    $sessionTabs = @($allTabs | Where-Object {
+            $_.windowProcessId -eq $terminalWindowProcessId -and $_.title -eq ([string]$observation.tabTitle)
+        })
+    if ($sessionTabs.Count -ne 1) {
+        throw "Expected one visible tab in the exact terminal host for $($observation.sessionId), observed $($sessionTabs.Count). Refusing to guess."
+    }
+    $uiMatches += $sessionTabs
 }
 
 $plainCmdRecords = @($selectedStatus | Where-Object { $_.terminalMode -eq 'PlainCmd' -and $_.processAlive })
@@ -82,7 +76,7 @@ $result = [ordered]@{
     matchedTitles = $titles
     visibleTabCount = $uiMatches.Count
     plainCmdCount = $plainCmdRecords.Count
-    identityBasis = 'authoritative-registry + unique-visible-title'
+    identityBasis = 'authoritative-registry + exact-terminal-host-process + unique-tab-title'
     closedVisibleTabs = 0
     closedPlainCmdWindows = 0
     alreadyClosed = $false
@@ -109,7 +103,13 @@ foreach ($record in $plainCmdRecords) {
 }
 
 Start-Sleep -Milliseconds 500
-$remainingTabs = @(Get-ESCodexVisibleTerminalTabs | Where-Object { $_.title -in $titles })
+$remainingTabs = @()
+$remainingVisibleTabs = @(Get-ESCodexVisibleTerminalTabs)
+foreach ($tab in $uiMatches) {
+    $remainingTabs += @($remainingVisibleTabs | Where-Object {
+            $_.windowHandle -eq $tab.windowHandle -and $_.title -eq $tab.title
+        })
+}
 $remainingPlain = @($plainCmdRecords | Where-Object { Test-ESCodexProcessAlive ([int]$_.processId) })
 $result.alreadyClosed = $uiMatches.Count -eq 0 -and $plainCmdRecords.Count -eq 0
 $result.success = $remainingTabs.Count -eq 0 -and $remainingPlain.Count -eq 0

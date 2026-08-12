@@ -47,7 +47,7 @@ Already migrated:
 - `ES.EditorInternal.Installer.ESInstaller`
 - `ES.EditorInternal.Installer.MenuItemPathDefine`
 - Concrete drawer implementations under `Assets/Plugins/ES/Editor/ESDrawer`
-- GraphView editor implementation types under `Assets/Plugins/ES/Editor/ESGraphView`, except `NodeRunner.cs` which is effectively only a placeholder/comment file.
+- Stable Graph V2 editor implementation under `Assets/Plugins/ES/Editor/ESGraphViewV2`; Legacy GraphView/NodeRunner 已删除，不得恢复旧路径。
 
 Do not blindly migrate these yet:
 

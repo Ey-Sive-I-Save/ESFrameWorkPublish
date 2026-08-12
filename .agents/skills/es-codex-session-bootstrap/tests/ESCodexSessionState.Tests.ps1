@@ -16,21 +16,46 @@ Describe 'ES Codex authoritative session registry' {
         $first.identityVersion | Should Be 1
     }
 
+    It 'preserves an external CMD binding without fabricating a Codex SessionId' {
+        $registry = [pscustomobject]@{ schemaVersion = 2; revision = 0; updatedUtc = ''; sessions = @() }
+        $bindingId = '12121212-1212-1212-1212-121212121212'
+        $record = AddOrUpdate-ESCodexSessionRecord $registry ([pscustomobject]@{
+                taskKey = 'external-claim:' + $bindingId
+                tabTitle = '已有 CMD'
+                terminalMode = 'ExternalClaim'
+                lifecycleStatus = 'ClaimedExternal'
+                externalClaimId = '13131313-1313-1313-1313-131313131313'
+                externalClaimBindingId = $bindingId
+                externalClaimState = 'ClaimedExternal'
+                externalClaimProcessId = 4321
+                externalClaimProcessStartedAtUtc = '2026-08-12T00:00:00.0000000Z'
+                externalClaimExpectedCmdProcessId = 4321
+                externalClaimExpectedCmdProcessStartedAtUtc = '2026-08-12T00:00:00.0000000Z'
+            })
+        $record.sessionId | Should Be ''
+        $record.lifecycleStatus | Should Be 'ClaimedExternal'
+        $record.externalClaimBindingId | Should Be $bindingId
+        $record.externalClaimExpectedCmdProcessId | Should Be 4321
+        @($registry.sessions).Count | Should Be 1
+    }
+
     It 'upserts a pending launch by launch token and later resolves its session ID' {
         $registry = [pscustomobject]@{ schemaVersion = 2; revision = 0; updatedUtc = ''; sessions = @() }
-        AddOrUpdate-ESCodexSessionRecord $registry ([pscustomobject]@{
+        $pending = AddOrUpdate-ESCodexSessionRecord $registry ([pscustomobject]@{
                 launchToken = 'CodexLaunch:test-token'
                 taskKey = 'task-a'
                 lifecycleStatus = 'PendingRegistration'
-            }) | Out-Null
-        AddOrUpdate-ESCodexSessionRecord $registry ([pscustomobject]@{
+            })
+        $registered = AddOrUpdate-ESCodexSessionRecord $registry ([pscustomobject]@{
                 launchToken = 'CodexLaunch:test-token'
                 sessionId = '22222222-2222-2222-2222-222222222222'
                 taskKey = 'task-a'
                 lifecycleStatus = 'Registered'
-            }) | Out-Null
+            })
         @($registry.sessions).Count | Should Be 1
         $registry.sessions[0].sessionId | Should Be '22222222-2222-2222-2222-222222222222'
+        $registered.recordId | Should Be $pending.recordId
+        $registry.sessions[0].recordId | Should Be $registered.recordId
     }
 
     It 'merges a pending launch-token record with an older exact-session record' {
@@ -73,6 +98,48 @@ Describe 'ES Codex authoritative session registry' {
         $restored.schemaVersion | Should Be 2
         $restored.revision | Should Be 1
         @($restored.sessions).Count | Should Be 1
+    }
+
+    It 'retries a short external registry file lock without losing the current record' {
+        $path = Join-Path $TestDrive 'short-lock-sessions.json'
+        $readyPath = Join-Path $TestDrive 'short-lock-ready.txt'
+        $registry = [pscustomobject]@{ schemaVersion = 2; revision = 0; updatedUtc = ''; sessions = @() }
+        AddOrUpdate-ESCodexSessionRecord $registry ([pscustomobject]@{
+                sessionId = '34343434-3434-3434-3434-343434343434'
+                taskKey = 'before-lock'
+                lifecycleStatus = 'Registered'
+            }) | Out-Null
+        Save-ESCodexSessionRegistry $path $registry
+        $job = Start-Job -ScriptBlock {
+            param($registryPath, $signalPath)
+            $stream = [IO.File]::Open($registryPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+            try {
+                [IO.File]::WriteAllText($signalPath, 'locked', [Text.UTF8Encoding]::new($false))
+                Start-Sleep -Milliseconds 350
+            }
+            finally { $stream.Dispose() }
+        } -ArgumentList $path, $readyPath
+        try {
+            for ($attempt = 0; $attempt -lt 20 -and -not (Test-Path -LiteralPath $readyPath -PathType Leaf); $attempt++) {
+                Start-Sleep -Milliseconds 50
+            }
+            Test-Path -LiteralPath $readyPath -PathType Leaf | Should Be $true
+            Invoke-ESCodexRegistryUpdate -Path $path -Update {
+                param($currentRegistry, $unused)
+                AddOrUpdate-ESCodexSessionRecord $currentRegistry ([pscustomobject]@{
+                        sessionId = '35353535-3535-3535-3535-353535353535'
+                        taskKey = 'after-lock'
+                        lifecycleStatus = 'Registered'
+                    })
+            } | Out-Null
+            Wait-Job $job -Timeout 5 | Out-Null
+            @($job.ChildJobs[0].JobStateInfo.State) -contains 'Completed' | Should Be $true
+            $restored = Read-ESCodexSessionRegistry $path
+            $restored.revision | Should Be 2
+            @($restored.sessions).Count | Should Be 2
+            @($restored.sessions | Where-Object sessionId -eq '34343434-3434-3434-3434-343434343434').Count | Should Be 1
+        }
+        finally { Remove-Job $job -Force -ErrorAction SilentlyContinue }
     }
 
     It 'rejects duplicate launch tokens instead of guessing ownership' {
@@ -202,6 +269,29 @@ Describe 'ES Codex launch delivery evidence' {
         $source = Get-Content -LiteralPath $launcher -Raw -Encoding UTF8
         $source | Should Match '\[int\]\$StartupWaitSeconds = 60'
         $source | Should Match 'official picker cannot append the mandatory launch-envelope prompt'
+    }
+
+    It 'uses create-only flushed command wrappers rather than overwrite writes' {
+        $launcher = Join-Path $scriptsRoot 'Start-ESCodexSession.ps1'
+        $source = Get-Content -LiteralPath $launcher -Raw -Encoding UTF8
+        $source | Should Match 'function Write-CreateOnlyUtf8File'
+        $source | Should Match '\[IO\.FileMode\]::CreateNew'
+        $source | Should Match '\$stream\.Flush\(\$true\)'
+        $source | Should Match 'Write-CreateOnlyUtf8File \$commandWrapperPath \$commandWrapperContent'
+        $source | Should Not Match '\[IO\.File\]::WriteAllText\(\$commandWrapperPath'
+    }
+
+    It 'creates an exit marker exactly once and rejects a collision' {
+        $writer = Join-Path $scriptsRoot 'Write-ESCodexLaunchExitMarker.ps1'
+        $root = Join-Path $TestDrive 'exit-marker-root'
+        [void][IO.Directory]::CreateDirectory($root)
+        $marker = Join-Path $root 'launch.exit.json'
+        & $writer -Path $marker -ExpectedRoot $root -LaunchToken 'CodexLaunch:exit-marker-test' -ExitCode 7
+        $first = Get-Content -LiteralPath $marker -Raw -Encoding UTF8 | ConvertFrom-Json
+        $first.launchToken | Should Be 'CodexLaunch:exit-marker-test'
+        $first.exitCode | Should Be 7
+        { & $writer -Path $marker -ExpectedRoot $root -LaunchToken 'CodexLaunch:exit-marker-test' -ExitCode 0 } | Should Throw
+        ($first | ConvertTo-Json -Compress) | Should Be ((Get-Content -LiteralPath $marker -Raw -Encoding UTF8 | ConvertFrom-Json) | ConvertTo-Json -Compress)
     }
 }
 

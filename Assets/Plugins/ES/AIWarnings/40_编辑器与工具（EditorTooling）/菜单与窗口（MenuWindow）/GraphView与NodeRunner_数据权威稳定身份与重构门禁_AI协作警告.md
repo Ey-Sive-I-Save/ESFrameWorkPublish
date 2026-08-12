@@ -1,50 +1,166 @@
-# GraphView 与 NodeRunner：数据权威、稳定身份与重构门禁 AI 协作警告
+# Stable Graph V2：数据权威、稳定身份与正式接入门禁
 
-**状态：阻断性现状。** 当前 `ESGraphView` / `NodeRunner` 是历史实验性实现，GraphView 目前不具备可作为正式玩法、任务、技能或流程编辑器依赖的生产可用性。禁止新增业务依赖它。
+> 状态：现行约束 + Legacy 已删除事实 + V2 联调中。
+> 最后核对：2026-08-12。
 
-最后核对：2026-08-02。
+## 当前结论
 
-## 当前事实，不得粉饰
+历史实验实现 `Assets/Plugins/ES/Editor/ESGraphView` 与
+`Assets/Plugins/ES/1_Design/Define/0Define-NodeRunner` 已删除，不再保留兼容入口、菜单、
+运行接口或序列化类型。禁止恢复 `ESGraphViewWindow`、`NodeRunnerSO`、`NodeContainerSO`
+或以新名称复制同一套可变 ScriptableObject Runner 方案。
 
-- `ESGraphViewWindow` 使用静态 Window / Container 关联；`ESGraphView_Part_FlowChart` 在 UI 变更中直接写 `Runner.Flows`、节点位置和 Container。
-- `NodeContainerSO` 同时以 `[SerializeReference] List<NodeRunnerSO>` 保存列表，并把新节点作为 `ScriptableObject` 子资产加入 Asset；创建、复制、删除直接调用 `AssetDatabase.Refresh/SaveAssets`。
-- 当前没有正式 NodeId、PortId、EdgeId、图 SchemaVersion、迁移协议、端口类型/容量语义、循环规则或运行时编译快照。
-- `GetCompatiblePorts` 只排除同方向和同节点，不构成语义连线校验。
-- 当前图文件中没有完整的 `Undo/RegisterCompleteObjectUndo` 事务链；Graph UI 回调、直接资产写入、LINQ/日志和静态状态也不适合作为正式编辑器基础。
-- `NodeRunner` 当前只有最小 `Execute -> OnEnter` 和 `None/Running/Exit` 状态，不是完整调度、取消、异常隔离或可复现执行协议。
-
-因此不得以“已有窗口、节点、搜索、Inspector、Runner”为由称它已可用。
-
-## 禁止的补丁方式
-
-- 禁止继续在当前静态 Window/Container、`graphViewChanged` 回调和直接 AssetDatabase 写入上叠加业务功能。
-- 禁止让 GraphView 元素、`NodeRunnerSO` 可变对象或 UnityEditor API 进入 Player 执行链。
-- 禁止把节点列表下标、对象引用或显示名称当成稳定身份；删除、复制、重排、重开资产与域重载后都不可靠。
-- 禁止为补 UI 先添加更多按钮、搜索项或端口特效。数据模型、Undo、稳定身份和迁移未收口前，UI 增量只会放大不可恢复数据风险。
-
-## 重新启用前的目标模型
+正式图基础统一使用：
 
 ```text
-Graph Asset（唯一权威序列化模型）
-  NodeRecord: NodeId + TypeId + Version + Payload + Position
-  PortRecord: PortId + 定向 + 类型 + 容量
-  EdgeRecord: EdgeId + OutputPortId + InputPortId
-  SchemaVersion + 明确迁移记录
-        |
-        +-> GraphView：仅编辑投影，所有变更通过原子命令和 Undo 写回 Asset
-        |
-        +-> Runtime Snapshot / Compiled Plan：脱离 UnityEditor 与可变 SO 的执行数据
+ESGraphAssetBase + 具体 Graph 资产类型（唯一作者权威）
+  -> Stable NodeId / PortId / EdgeId
+  -> SchemaVersion + 显式迁移
+  -> ESGraphEditService 原子编辑与 Undo
+  -> ESBakedGraphSnapshot（验证快照 / 编译输入）
+  -> 消费者专属不可变产物
+  -> 受控执行或产物工作流
 ```
 
-重建不要求造“万能图框架”，但每个正式图领域都必须具备上述最小身份、合法性、迁移、Undo 与运行时分离边界。
+GraphView 只是具体 Graph 资产的 Editor 投影，不拥有业务数据。运行或交付链只能消费已验证的
+Snapshot 或消费者专属产物，不得依赖 GraphView 元素、窗口静态状态、SerializedObject 或
+UnityEditor API。不得预设所有 Graph 都必须生成 `Plan`、`Program` 或共用同一种运行产物。
 
-## 必须先通过的重构门禁
+## V2 已实现基础
 
-1. 图数据只能由明确的 Graph Asset 模型权威保存；创建、复制、删除、连线、断线、移动必须是可回滚的原子变更。
-2. 节点、端口、边必须有稳定、序列化、不可依赖列表下标的身份；端口类型、方向、容量、重复边与循环策略必须由模型校验。
-3. GraphView 重开、重选、域重载、窗口销毁、缺失节点类型和资产子对象清理必须可恢复，不得残留孤儿子资产或静态引用。
-4. Undo/Redo 必须覆盖节点、边、位置、类型替换和复制；多选与深图操作不得按单个 UI 回调部分提交。
-5. 运行时只能执行已验证的 snapshot/compiled plan；禁止运行时修改 Asset、`ScriptableObject` 图节点或依赖 `UnityEditor`。
-6. 必测：创建、复制、删除、Undo/Redo、重开、域重载、缺失类型、深图、循环/容量规则、多选、资产子对象回收与运行时隔离。
+- `ESGraphAssetBase` 保存稳定 Graph、Node、Port、Edge 身份和 SchemaVersion；具体资产类型固定 Domain。
+- 创建、连接、插入、复制、粘贴、删除与节点编辑统一通过受控编辑服务和 Undo。
+- 端口方向、类型、容量、重复边、循环和跨领域关系在模型层校验。
+- Snapshot 与作者资产分离，并使用内容签名绑定候选、批准和后续执行。
+- Agent Authoring 领域可烘焙 AICommand + AISkill 的 Skill 能力包合同。
+- 候选必须经过隔离生成、Diff Review、人工批准和哈希复核。
+- Graph AI 候选生成和单次执行统一进入 `es.agent.generate@1`、`es.agent.use@1`；
+  `ESAutomationFacade` 负责 RunId、输入 Hash、RunRecord 与发送回执，Graph 不得绕过该入口直连会话窗口。
 
-在上述模型和测试完成前，唯一允许的工作是受控重构、数据导出和归档审计；不得把当前 GraphView 接入任何正式系统。
+这些是源码与静态结构事实，不自动等于商业级验收完成。
+
+## `Program` 后缀唯一语义与 BehaviorTree 保留合同
+
+`Program` 是 ESFramework 的保留后缀，当前且唯一归属 BehaviorTree。它不是 Graph 通用产物名，
+不得被 Story、Agent、Generic、Command 或其他领域重新解释、复用或建立泛型包装。
+
+正式定义：
+
+> `Program` 表示由行为树作者数据经过完整校验、解析、链接和编译后生成的不可变运行产物。
+> 它可由多个行为树运行实例共享，并可被指定 Runner 直接推进；执行时不得再解释作者 Graph、
+> 解析 JSON、按稳定字符串查找处理器或为每个节点构造运行对象。
+
+唯一合法根类型名为 `ESBehaviorTreeProgram`。该名称落地后必须同时满足：
+
+- 只由 `ESBehaviorTreeGraphAsset` 的受控编译流程生成，只允许 BehaviorTree Runner 消费。
+- 保存紧凑指令、稳定子节点顺序、整数索引、强类型 Payload、Blackboard 布局、实例状态布局、
+  格式版本、源内容哈希和 Program 哈希。
+- Bake 成功后逻辑不可变；内容更新必须生成新版本并在完整验证后原子替换。
+- 多个实例共享同一 Program；当前节点、活动栈、等待、取消和 Blackboard 值必须保存在独立实例状态中。
+- 热路径禁止 Graph 遍历、JSON、反射、LINQ、字符串注册、Dictionary 查找和临时集合分配。
+- `Sequence`、`Selector` 等有序组合节点必须在作者模型中保存显式稳定顺序；禁止用画布位置、列表偶然顺序
+  或 `EdgeId` 推断执行顺序。
+
+`Program` 明确不是作者 Graph、验证 Snapshot、Bake 中间态、Definition、配置、Plan、运行实例、
+Blackboard、调度器、Command 或一次性任务。禁止建立 `ESGraphProgram`、`IESProgram`、
+`IESGraphProgram`、`Program<T>`、通用 Program Registry，以及 `ESBehaviorTreeProgramAsset`、
+`ESBehaviorTreeProgramData`、`ESBehaviorTreeProgramPlan` 等重复包装。
+
+BehaviorTree 配套名称固定为：
+
+```text
+ESBehaviorTreeGraphAsset       作者权威
+ESBehaviorTreeCompiler         验证快照 / 编译输入 -> Program
+ESBehaviorTreeProgram          共享不可变执行产物
+ESBehaviorTreeInstance         一次独立运行及其可变状态
+ESBehaviorTreeRunner           推进一个实例
+```
+
+`Bake` 是生成流程，`Compiler` 是生成者，`Program` 是最终执行产物。当前源码尚未实现
+`ESBehaviorTreeProgram`、Compiler 或 Runner；本节是后续实现必须遵守的命名与语义合同，
+不得据此宣称 BehaviorTree 运行链已经完成。
+
+实例状态默认直接归 `ESBehaviorTreeInstance` 所有。只有出现可独立池化、序列化、版本迁移或内存布局校验的
+真实边界，才允许增加独立 State 类型，禁止只为包一组数组创建 `ESBehaviorTreeInstanceState`。
+行为树的多实例 Tick 应跟随实际 AI 消费者进入现有运行程序集；禁止预建 `ESBehaviorTreeScheduler`。
+只有实现注册/注销、稳定顺序、遍历期间增删保护、预算和明确宿主执行，并符合项目 Scheduler P0 时，
+才可重新评审是否使用 Scheduler 后缀。
+
+## Story Definition Snapshot 唯一语义与商业门禁
+
+Story 不生成 `Program` 或 `Plan`。现行运行语义继续使用 `ESStoryDefinitionSnapshot`：
+
+> `ESStoryDefinitionSnapshot` 是一份 Story Definition 在确定 `DefinitionId + ContentVersion +
+> ContentSignature` 下生成、与作者可变数据脱离、可被多个 Story 实例共享的不可变剧情定义快照。
+> 它由事件驱动的 Story Module 按稳定节点关系推进，不是每帧解释的指令程序。
+
+配套名称与职责固定为：
+
+```text
+ESStoryDefinitionDataInfo      DefinitionId、版本、目录注册和非图元数据
+ESStoryGraphAsset              完成迁移后，节点、连接和节点 Payload 的唯一作者权威
+ESStoryDefinitionSnapshot      共享不可变剧情定义
+ESStoryDefinitionCatalog       稳定身份到已验证 Snapshot 的查询目录
+ESStoryInstance                一次活动剧情运行及其临时状态
+ESQuestRecord                  存档所需的最小稳定任务进度
+MODULE_ESStoryModule           实例、前台/UI、推进、取消和存档接入权威
+```
+
+当前源码事实必须与目标合同分开：`ESStoryDefinitionDataInfo` 目前仍直接保存入口、节点和跳转，
+并由 `ESStoryDefinitionSnapshot.TryBake(...)` 生成现行运行快照；`ESStoryGraphAsset` 尚未接入该链。
+在显式迁移完成前，DataInfo 仍是现行 Story 作者权威，Graph 不得保存或发布同一份正式 Story 的第二套节点数据。
+迁移完成后，DataInfo 只保留身份、版本、Catalog 和非图元数据，Graph 独占拓扑与节点 Payload；禁止两边可编辑同一字段。
+
+Story 达到商业级定义必须同时满足：
+
+1. 唯一权威：迁移器保留 DefinitionId、ContentVersion、NodeId、OptionId 和引用关系；迁移、回滚与重复执行可验证，
+   不允许 DataInfo 与 Graph 双写或运行时猜测哪个较新。
+2. 稳定身份：Snapshot 与存档精确绑定 `DefinitionId + ContentVersion + ContentSignature`；内容缺失、签名漂移、
+   重复 Key 和未知节点必须硬失败，不得回退到显示名、列表下标或另一份 Graph。
+3. 完整签名：哈希必须覆盖全部可观察运行语义，包括入口、节点种类、跳转、Action、Tag 条件、文本、选项内容
+   及选项显示/执行顺序。当前实现保留选项作者顺序却按 `OptionId` 排序计算签名，重排选项可能不改变签名；
+   修复并补迁移/回归证据前不得宣称签名合同商业级完成。
+4. 受控生成：Graph 接入后的适配与 Bake 位于能够同时引用 `ES_Design`、`ES_Logic` 和 Editor 工具的现有
+   Editor 程序集；Player 只消费已验证 Story Snapshot/Catalog，不依赖 GraphView、UnityEditor 或 Payload JSON。
+5. 原子发布：先在隔离候选中完成结构、语义、引用、签名和存档兼容验证，再整体替换 Catalog 版本；失败保留上一份
+   有效定义，不得部分更新节点或让活动实例观察到半成品。
+6. 存档兼容：`ESQuestRecord` 只保存稳定身份、版本、签名、当前 NodeId、运行状态和 Revision。内容升级若需要继续旧存档，
+   必须提供显式、逐版本、可审计的 NodeId/状态迁移；没有迁移时应拒绝加载，不得静默重置或跳到入口。
+7. 事务推进：UI 提交、Action 回执、前台切换和迟到结果必须继续绑定 InstanceId、Revision、Session Generation、
+   ViewRevision 和 NodeVisitSequence；失败、取消、场景切换、Presenter 异常和 Interaction 结束必须释放 Lease 并形成确定终态。
+8. 运行性能：Story 保持事件驱动，禁止每帧从入口遍历或重新 Bake。Catalog 在初始化/内容切换阶段完成验证和注入，
+   `TryStart` 只能解析已注入 Snapshot；当前每次启动先 `Inject` 并重新构造 Snapshot/计算 SHA-256 的路径必须收口。
+   同步无等待推进必须有步数上限；节点查询为 O(1)，正常推进不得使用反射、LINQ 或无界临时集合。
+9. 验收证据：必须覆盖 Graph/DataInfo 迁移、签名顺序、重复身份、不可达/循环、迟到 UI/Action、取消、存档跨版本、
+   原子失败恢复、多实例前台队列、Domain Reload、Player/IL2CPP，以及深图和批量实例 Profiler/GC。静态编译或测试源码存在
+   不能替代 Unity Test Runner、PlayMode 和 Profiler 证据。
+
+当前 Story 已有 DataInfo、Snapshot、Catalog、Instance、QuestRecord 和 Module 运行骨架，但 Graph 接入、签名顺序修复、
+启动期重复 Bake 收口、迁移和上述 Unity/Player/性能证据仍未完成；准确成熟度仍为 `Verifying`，不得标记商业级或 Stable。
+
+## 正式业务接入门禁
+
+1. V2 相关 Unity 程序集成功编译并完成 Domain Reload。
+2. Graph 核心与 Agent Authoring 测试必须由 Unity Test Runner 实际执行，不得只以测试源码存在签收。
+3. 至少完成一次真实的
+   `Graph -> Bake -> 受控执行 -> RunRecord -> Candidate -> Diff -> Approval -> 再执行` 闭环。
+4. 多 Graph、内容签名 stale、取消、失败注入、Domain Reload 和跨窗口恢复必须有可复现证据。
+5. Graph 窗口关闭时不得保留扫描、更新或重绘负担；深图验证不得递归爆栈。
+6. 旧 Graph/NodeRunner 类型和路径不得重新进入源码、link.xml、资产指南或正式文档。
+7. 缺少完整运行证据时成熟度最高为 `Verifying`，不得称为 `Stable` 或商业级已验收。
+
+## AI 能力工作流边界
+
+Graph 负责生产和烘焙能力，不直接拥有执行器、运行记录、分发或业务反馈权威：
+
+```text
+Stable Graph V2
+  -> SkillBundleContract
+  -> ESAutomationFacade / 注册任务
+  -> 受控会话或受管执行器
+  -> ESAutomationRunRecord / ReportCenter
+  -> Candidate Review / Human Approval
+```
+
+Graph Inspector 只能按 GraphId、ContentSignature、BundleId、ArtifactId 和 RunId 投影只读证据。
+运行结果不得自动修改 Graph；任何改进必须由用户确认后重新编辑、Bake 和批准。

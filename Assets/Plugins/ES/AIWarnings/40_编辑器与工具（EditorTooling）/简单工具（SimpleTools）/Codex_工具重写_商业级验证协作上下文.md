@@ -42,7 +42,7 @@
   - `Editor/ESMenuTreeWindow/ResWindow/ESResWindow.cs`: `【资源管理】窗口`.
   - `Editor/ESMenuTreeWindow/SODataInfoWindow/ESSODataInfoWindow.cs`: `【SO】数据窗口`.
   - `Editor/ESMenuTreeWindow/SimpleToolsWindow/SimpleToolsWindow.cs`: `简单工具集成`.
-  - `Editor/ESGraphView/Graphview-Define/ESGraphViewWindow.cs`: `【图】编辑器`.
+  - `Editor/ESGraphViewV2/ESStableGraphViewWindow.cs`: Stable Graph V2 图编辑器。
   - `Editor/Installer/ESInstaller.cs`: dependency/install manager and dependency check menu items.
 - Shared Odin menu-window base is `Editor/ESMenuTreeWindow/-Templates/-ESMenuTreeWindow.cs`.
 
@@ -743,7 +743,7 @@ RuntimeWatch 保持“前台才采集”的性能边界：`SimpleToolsWindow` �
 批量接入入口：
 
 ```text
-【ES】/示例与测试/编辑器案例/接入或更新常见案例 ReadMe
+【ES】/自动化与开发/文档与示例/编辑器案例/接入或更新常见案例 ReadMe
 ```
 
 该命令只在用户确认后更新下列指定资产：SimpleTools 基础场景、RuntimeWatch 场景、ItemMotion 场景、Asset + GameCore 热更新场景、资源引用 Prefab，并创建或更新 `ES_EditorExtension_Demo.unity`。最后一个场景为 ESEditorSection、双配置目录、ESPolymorphicReference 和多目标边界验证提供正式可打开的案例入口；四个实际案例对象各自挂有 ReadMe。

@@ -45,6 +45,7 @@ Editor 管制作体验，不改变运行时语义。
 AI域：管控制来源和控制请求。
 Basic域：管身体能力和执行。
 State域：管状态、动画、IK表现。
+Equipment域：正式第五域目标，管背包、装备槽、饰品、挂载过渡和装备效果来源；当前尚未接线，不能冒充源码事实。
 Buff域：未来管效果、限制、叠层、来源、驱散。
 ```
 
@@ -162,7 +163,7 @@ Runtime Instance：存 token、计时、叠层、目标、临时状态。
 ```text
 Entity：
   只放自身总览、关系链、KCC 等自己的东西。
-  四个 Domain 只提供清晰入口，不接管 Domain 内部排版。
+  当前四个 Domain、未来接入的第五个 Equipment Domain 都只提供清晰入口，不接管 Domain 内部排版。
 
 Domain：
   自己负责完整 Inspector。
@@ -176,7 +177,7 @@ Domain：
 - 用 `InlineProperty` 把 Domain 摊平成 Entity 的子字段。
 - 为了“整齐”让 Entity 接管 Domain 的标题和折叠结构。
 
-这条原则适用于 `EntityBasicDomain`、`EntityAIDomain`、`EntityBuffDomain`、`EntityStateDomain`。
+这条原则适用于现有 `EntityBasicDomain`、`EntityAIDomain`、`EntityBuffDomain`、`EntityStateDomain`，也适用于已批准但尚未接线的 `EntityEquipmentDomain`。
 
 ## 对未来 Buff 系统的一般判断
 

@@ -172,13 +172,41 @@ if ($valid) {
                 })
         }
         $receiptJson = $receipt | ConvertTo-Json -Depth 8
-        $stream = [IO.File]::Open($receiptPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
         try {
-            $bytes = [Text.UTF8Encoding]::new($false).GetBytes($receiptJson)
-            $stream.Write($bytes, 0, $bytes.Length)
+            $stream = [IO.File]::Open($receiptPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+            try {
+                $bytes = [Text.UTF8Encoding]::new($false).GetBytes($receiptJson)
+                $stream.Write($bytes, 0, $bytes.Length)
+                $stream.Flush($true)
+            }
+            finally {
+                $stream.Dispose()
+            }
         }
-        finally {
-            $stream.Dispose()
+        catch [IO.IOException] {
+            if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) { throw }
+            $receiptAccepted = $false
+            $lastReceiptError = $null
+            for ($attempt = 0; $attempt -lt 8; $attempt++) {
+                try {
+                    $receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                    if ([string]$receipt.launchToken -ne $effectiveLaunchToken -or
+                        [string]$receipt.envelopePath -ne $resolvedEnvelopePath -or
+                        [string]$receipt.envelopeSha256 -ne $envelopeHash) {
+                        throw "Acceptance receipt conflicts with the validated envelope: $receiptPath"
+                    }
+                    $receiptAccepted = $true
+                    break
+                }
+                catch {
+                    $lastReceiptError = $_
+                    Start-Sleep -Milliseconds 25
+                }
+            }
+            if (-not $receiptAccepted) {
+                throw "Acceptance receipt could not be verified after a concurrent write: $($lastReceiptError.Exception.Message)"
+            }
+            $acceptedPreviously = $true
         }
     }
 }

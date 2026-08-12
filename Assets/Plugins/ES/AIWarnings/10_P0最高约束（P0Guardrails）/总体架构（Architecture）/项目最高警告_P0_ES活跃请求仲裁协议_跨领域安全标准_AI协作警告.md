@@ -93,6 +93,7 @@ CameraRequest
 - `CameraLease` 必须绑定取得时的 View、Slot/Token、Generation 和 Scene Epoch。释放只撤销该请求，不执行“恢复上一镜头”命令。
 - Cinemachine 是 Executor，只执行 Follow、LookAt、Blend、避障和输出；不承担业务仲裁。
 - `ESCameraDirector` 已按 Active Set 重算 Base/Shot，并对 FOV、距离、肩偏和震动 Modifier 做显式合成；`ESCameraSceneBinding` 持有每 View 的 Scene Epoch，CM2 Adapter 是唯一 VCam 写入点。
+- 玩家自由观察镜头不得使用会持续继承角色 yaw 的 BindingMode。`CameraTarget` 只提供位置与激活时的初始朝向参考，玩家 FreeLook 必须使用 `LockToTargetOnAssign`；载具追逐镜头可按明确设计使用 `LockToTargetWithWorldUp` 跟随车头。
 - 当前已有 Director 核心编辑器测试源码与运行时 Skill Camera Clip（池化 UserData 释放 Lease），但尚无 Unity Test Runner、PlayMode、Profiler 或 Player/IL2CPP 证据；TrackView 独立 Preview、Timeline 与载具镜头仍待实现。禁止宣称“ES 相机系统已交付或冻结”。
 
 ## 验收矩阵

@@ -29,7 +29,7 @@
 - Transform 目标：`LaunchTo(Transform target)` / `LaunchTo(Transform target, bool mustHit)`。
 - 必中模式：`ShotAimMode.MustHit` 到达目标点时生成命中候选，即使没有真实物理碰撞。
 - 内部命中查询预留：`IItemShotHitSolver`，默认使用 `Physics.SphereCastNonAlloc`。
-- 内部 Tick 预留：`IItemShotTickScheduler`，后续可替换为空间哈希、分组 Tick、距离预算等。
+- 内部 Tick 规则：`IItemShotTickPolicy`，当前只回答本帧是否 Tick；空间哈希、分组额度、排序与更新期保护若真正落地，应接入 ES 调度能力，不能把单个 `ShouldTick` 策略称为调度器。
 
 ## 必中不是碰撞特例
 
@@ -85,7 +85,7 @@ Shot 内置的应该是高频、通用、可预测的运动参数：
 当前设计已经预留两处可替换点：
 
 - `IItemShotHitSolver`：默认物理 SphereCastNonAlloc，后续可替换为空间哈希、圆/球简化碰撞、Job 批处理。
-- `IItemShotTickScheduler`：默认每帧 Tick，后续可替换为分组 Tick、预算 Tick、远距离降频、重要性排序。
+- `IItemShotTickPolicy`：默认每帧 Tick，可替换为远距离降频等单项规则；若需要分组 Tick、额度与重要性排序，应另行复用 `ESWorkScheduler<TTask>`，不得扩张 Policy 的职责。
 
 不要提前把所有飞行物锁死在 Unity Physics 单发查询上，也不要把所有飞行物锁死为每帧全量 Tick。第一版可以用默认实现跑通，但接口必须保留。
 

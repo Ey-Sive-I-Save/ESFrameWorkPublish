@@ -2,6 +2,37 @@
 
 最后核对：2026-08-10。
 
+## 2026-08-13 ES Unity 菜单信息架构迁移
+
+- 现行架构决策已定为六个可见顶部一级入口：`常用窗口`、`内容制作`、`项目配置`、`资源与发布`、`验证与诊断`、`自动化与开发`；其中“常用窗口”只是打开正式窗口的快捷投影。
+- `Assets/Create/【ES】` 按资产类型使用“内容、配置、资源管线、示例”；`Add Component/【ES】` 按组件能力使用“基础设施、角色与交互、相机与表现、UI、资源、开发与验证”。三棵菜单不得共用一级分类。
+- 公共路径常量、正式 C# 菜单入口、启动器/命令面板索引、现行 AIWarnings、AICommands、Agent Skill、操作文档和测试断言正在同步迁移；历史复盘保留当时路径事实。
+- 当前状态是“现行架构决策，六域菜单迁移实施中”。完成 UTF-8、静态扫描和生成工程编译仍不等于 Unity 菜单、分隔线、快捷键或 ReloadDomain 已实机验收。
+
+## 2026-08-11 Stable Graph V2 收口
+
+- 历史实验 `ESGraphView / NodeRunner` 源码、菜单、运行接口、link.xml 保留项和资产指南条目已删除，不再提供兼容入口。
+- 正式图基础统一为 `ESGraphAssetBase + 具体 Graph 资产类型 -> ESBakedGraphSnapshot（验证快照 / 编译输入）-> 消费者专属不可变产物`；不得预设所有 Graph 共用 Domain Plan 或 Program。`Program` 后缀当前且唯一保留给尚未实施的 `ESBehaviorTreeProgram`，其正式定义与禁止包装见 Stable Graph V2 专项规则。Agent Authoring 已具备 AICommand + AISkill 的 Skill 能力包合同、候选隔离、Diff Review、人工批准与哈希绑定。
+- Story 现有 `ESStoryDefinitionDataInfo -> ESStoryDefinitionSnapshot -> Catalog -> Instance/QuestRecord -> MODULE_ESStoryModule` 运行骨架，但 `ESStoryGraphAsset` 尚未接入。当前选项作者顺序未完整进入内容签名，启动入口仍会重复 Inject/Bake；唯一权威迁移、签名修复、原子发布、存档版本迁移和 Unity/Player/Profiler 证据完成前，Story Graph 保持 `Verifying`。
+- Graph AI 的候选生成与单次执行已注册为 `es.agent.generate@1`、`es.agent.use@1`，并由 `ESAutomationFacade` 生成 RunId、输入 Hash、RunRecord 和发送回执；仍需 Unity Test Runner 实跑、至少一次真实端到端 Run、失败恢复和性能证据，不能标记为 `Stable` 或商业级完成。
+
+## 2026-08-10 玩家控制器场景刷新
+
+- `ESPlayerControllerTest.unity` 已按官方场景构建器刷新为“ES 玩家控制器 · 24 区综合验收场”，玩家出生点为 `(-24, 0.02, -2)`；旧 5 阶段布局不再作为当前场景基线。
+- 已移除玩家 `ModelOffset` 上非构建器生成的 `AreaEffector2D` 场景覆盖。MCP 静态场景诊断结果为 `totalIssues: 0`。
+- 重建前基线已归档到 `ES/Bak/Reviewed/20260810_PlayerControllerRefresh/`，机器本地回滚副本位于被忽略的 `ES/Bak/Local/20260810_PlayerControllerRefresh/`；项目外 `C:\Users\asus` 不再作为正式备份位置。
+- 以上只证明场景生成与静态门禁；玩家移动、跳跃、翻越、攀爬、骑乘、载具驾驶和镜头链路仍需 PlayMode/Profiler 证据，状态保持 `Verifying`。
+- 已补充场景/控制器 AI 高频误操作预防表、PlayMode 生命周期安全门禁与交付前检查表，覆盖构建器权威、Prefab override、KCC/VehicleController 写入边界、输入链路、运行证据分层、UTF-8、备份、dirty changes 和“未退出 PlayMode 不得进行高危写入”规则。
+
+## 装备推进基线
+
+- Weapon 定义链已有 `ItemDataInfo -> ItemWeaponDataBlock -> ESWeaponGameCoreTable -> ESWeaponRuntimeData`，角色侧已有 `WeaponSocket`、`EntityTransformMapping`、`WeaponSlot` 与 `EntityWeaponBinding` 接口；当前整体状态为 `Verifying`。
+- 首把样板“大长条”已生成：Key 为 `weapon.melee.long_bar`，作者 Prefab 显式包含 `EntityWeaponBinding`，且没有 Collider、Rigidbody、2D 物理组件或第二运动后端；正式大黑塔 Variant 已由构建器装配唯一 Combat Module 与 Weapon Slot。以上仅为资产、Prefab 与生成工程静态证据。
+- 大长条生成器已增加路径/类型/稳定 Key/Prefab 所有权冲突门禁；重复运行菜单后的 Prefab、ItemDataInfo、DataGroup SHA-256 均保持不变。正式 Variant 构建改为按稳定 Weapon Key 定向 upsert，保留其他槽位，不再 `weaponSlots.Clear()`；Combat 通用射击入口保持开启，是否射击由每把 WeaponDefinition 决定，避免近战样板封死后续枪械扩展。
+- 既有测试资产 `新建物品数据组1566.asset/信息数据键2` 的无显式 Shot Key 问题已补为唯一 `shot.test.data_key_2`；但官方 Item GameCore 全量重建尚未取得 Unity 回执，因此尚无“大长条已注入正式 Weapon Table”的证据；不得删除该项或复用已占用的 `数据键2`。
+- Unity 当前既有 TrackView 编译错误阻断有效 PlayMode 冒烟；只确认已经退出 PlayMode，Equip/Holster/Attack、Tag、IK、近战命中与伤害尚未运行验收。大长条必须继续走现有输入、EntityAIDomain、Combat 与 Action 链路，禁止另建输入/物理/控制器后端。
+- 详细推进顺序、缺口与门禁见 `20_架构现状（Architecture）/Entity与世界（EntityWorld）/装备定义与装配推进路线_AI协作说明.md`。
+
 ## 已确认基线
 
 - AIWarnings 采用按任务分层加载：`README -> CurrentStatus -> RuleIndex -> 命中的 P0 -> 当前领域专项 -> 必要的交接/复盘或提案`。普通任务禁止递归读取全目录；P0、现行状态和任务专项必须读取原文，分批摘要只能导航，不能替代规则权威。

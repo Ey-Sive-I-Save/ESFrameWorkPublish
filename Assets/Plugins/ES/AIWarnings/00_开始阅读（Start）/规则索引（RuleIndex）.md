@@ -14,14 +14,19 @@
 | 任务 | 必读目录或文档 |
 |---|---|
 | 修改 GameCore、ConfigKey、RuntimeData | `10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）`、`配置与稳定身份（IdentityConfig）` |
+| 新增或重命名 Program、Compiler、Runner、Snapshot、Scheduler、Dispatcher、Router、Selector、Policy、Definition、Template、Binding、Table、Registry、Catalog 等架构类型 | `10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md`；`Program` 当前且唯一保留给 `ESBehaviorTreeProgram`，`Scheduler/调度器` 语义由 ES 调度框架独占，普通分支选择或 `ShouldTick` 判断不得占用 |
+| ES 自定义泛型容器进入 Unity/Odin 长期序列化字段，或成为成熟大系统长期持有的权威表、稳定公共 API、跨模块缓存或核心生命周期合同 | `10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_长期序列化与成熟核心泛型容器具体类型边界_AI协作警告.md`、`项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md`；保留并复用通用泛型底座，仅长期合同先取得 `sealed` 具体类型；不得误读为删除、禁用或全局替换泛型容器，也不得扩大到局部变量、短期缓存、普通非序列化字段或所有泛型 |
 | AI 生成或迁移 GameCore 内容定义、Action、Weapon、Skill、SkillTrack 或跨定义稳定引用 | `10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_稳定Key_Catalog烘焙与RuntimeKey进程边界_AI协作警告.md`、`10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）`、`20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AI自动化内容身份与GameCoreKey迁移_AI协作警告.md`；涉及资源时再读资源运行时 P0，涉及 Tag 时再读 Buff/Tag 领域规则 |
+| 注册普通资产、修改 AssetKey、注册 GameCore、同步 Consumer，或接入 Inspector、资源窗口、MCP、C# 自动化注册入口 | `10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_统一内容注册唯一入口与事务边界_AI协作警告.md`、`10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）`；GameCore 同时读取 GameCore 边界规则 |
 | 新增或修改 SoDataInfo、SoDataGroup、SoDataPack、内容库或 Consumer 聚合 | `10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_P0_Info必须对应Group_Pack非默认聚合_AI协作警告.md`、`项目最高警告_GameCore根SO注入边界_禁止Key与嵌套数据伪装核心_AI协作警告.md`；涉及 SO 表格时再读 `40_编辑器与工具（EditorTooling）/SO表格（SOTable）` |
 | 修改资源加载、Manifest、AssetBundle、ResourcePlan、Scope Registry 或 `ESAssetDomain` | `10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）`、`50_验证与发布（ValidationRelease）`；默认枚举 Scope 的唯一权威定义位于资源运行时 P0 的“ESAssetDomain 权威语义”章节 |
 | 修改 UI 图标、SpriteAtlas、`ESDynamicAtlasGraphic` 或运行时纹理分流 | `30_运行时专项（RuntimeOperations）/UI与图集（UIAtlas）/P2_UI图标_SpriteAtlas与运行时动态图集分流_AI协作警告.md`；涉及资源加载、Provider、ResourcePlan 或发布时再读资源运行时 P0 与 `50_验证与发布（ValidationRelease）` |
 | 修改编辑器初始化、扫描、预览、窗口或任何用户交付入口 | `10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）`、`40_编辑器与工具（EditorTooling）`；生成报告、日志、配置、快照、审计或交接产物时必读 `40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/生成产物快速打开入口_AI协作警告.md` |
-| 新增或修改 EditorWindow、EditorGUI、GUIStyle、工具栏、菜单、命令面板或编辑器扩展 UI | `10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）`、`40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md`（Project Authority / P0，优先于普通 UI 建议和未验收历史方案） |
+| 新增或修改 EditorWindow、EditorGUI、GUIStyle、工具栏、菜单、命令面板或编辑器扩展 UI | `10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）`、`40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md`（Project Authority / P0，优先于普通 UI 建议和未验收历史方案）；涉及 Unity 菜单路径、分类、快捷投影或菜单引用迁移时同时读取 `P2_编辑器菜单根必须使用【ES】_AI协作警告.md` |
+| 修改 `ESEditorPresentation`、全局 Editor 皮肤、`EditorStyles` 染色、全局 USS 或 ES 品牌字体 | `40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md` 第 12 节；同时读取 `10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）`，保持增量刷新、可逆恢复、纹理预算、中文字体范围和 Editor-only 分发边界 |
 | Developer Cockpit、Developer Trace、Observation Run、开发时间线、因果链诊断、工作区恢复、实验运行或证据导出 | `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESDeveloperCockpit_ArchitectureContract.md`；该文件是现行设计契约，不是已实现事实。涉及 Runtime 公共协议时再读公共协议分层 P0，涉及 Editor 生命周期或证据产物时再读对应 EditorLifecycle 与生成产物规则 |
 | 修改 Entity、角色、输入、控制或世界系统 | `20_架构现状（Architecture）/Entity与世界（EntityWorld）`、`输入与交互（InputInteraction）`、`通用架构（GeneralArchitecture）`；涉及角色 Prefab、DataInfo、挂点、武器或模板时必须先读 `角色Prefab职责与DataInfo入口_AI协作警告.md` 与 `Documentation/CHARACTER_PREFAB_CONTRACT.md` |
+| 推进装备定义、武器 ItemDataInfo、武器槽位、Weapon Prefab、挂点装配或装备运行时消费 | `10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_CombatModule武器定义迁移边界与验收门禁_AI协作警告.md`、`20_架构现状（Architecture）/Entity与世界（EntityWorld）/装备定义与装配推进路线_AI协作说明.md`、`角色Prefab职责与DataInfo入口_AI协作警告.md`；涉及 Shot/资源/输入时再读对应专项 |
 | 修改 ContextPool、ContextValue 或 ContextOperation | `20_架构现状（Architecture）/通用架构（GeneralArchitecture）/Contextitecture上下文系统_所有权生命周期与类型边界_AI协作警告.md` |
 | 修改 ESCommandPlayer、Runner、虚拟输入命令或 RuntimeMode 命令 | `30_运行时专项（RuntimeOperations）/技能与Operation（SkillOperation）/ESCommand运行时_PlayerRunner执行帧与服务边界_AI协作警告.md`、`Operation默认无Stop_AI协作警告.md` |
 | 修改 ESInteractable、Entity 交互模块、IK 交互写入或 Tag Zone | `20_架构现状（Architecture）/输入与交互（InputInteraction）/交互运行时_Interactable占用生命周期与结束原因_AI协作警告.md`、`输入与交互入口_AI协作警告.md` |
@@ -37,15 +42,17 @@
 | 修改 SO 表格、资产包窗口或 SimpleTools | `40_编辑器与工具（EditorTooling）` |
 | 修改 ESEditorSection、多态引用 Drawer、类型目录、PropertyTree 或序列化迁移 | `40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/ES编辑器绘制与序列化套件_PropertyTree多目标与迁移边界_AI协作警告.md` |
 | 新增、迁移或评审 public interface、公共协议、Attribute、Drawer 共用契约 | `10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_公共协议与元数据声明分层_AI协作警告.md`；涉及 Drawer 或序列化展示时再读上一行编辑器专项 |
-| 修改 ESGraphView、NodeRunner 或图资产 | `40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/GraphView与NodeRunner_数据权威稳定身份与重构门禁_AI协作警告.md` |
+| 新增、迁移或调用 ESDialog、跨宿主对话框、Editor/Runtime Presenter 或对话框 Host 注册 | `10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_ESDialog跨宿主唯一合同与Presenter注册边界_AI协作警告.md`；Editor 初始化同时读取 EditorLifecycle 的 AssemblyStream P0，Runtime 注册禁止恢复 Runtime AssemblyStream |
+| 修改 Stable Graph V2、图资产、消费者专属产物、BehaviorTree Program、Story Definition Snapshot，或评估恢复 Legacy Graph/NodeRunner | `40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/GraphView与NodeRunner_数据权威稳定身份与重构门禁_AI协作警告.md`、`10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md`；Legacy 已删除，禁止恢复旧可变 SO Runner 方案 |
 | 新建或改造测试场景的操作引导、验收路线、运行态诊断、键位说明或区域导视 | `50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/测试场景导视与诊断复用_AI协作警告.md`、`Documentation/ES_SCENE_VALIDATION_GUIDE_STANDARD.md`；优先复用 `ESSceneValidationGuide`，不得新建一次性 OnGUI 或污染正式 Prefab |
+| 刷新测试场景、核查 Prefab override、处理构建器与场景不一致或归档变更前备份 | `50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/场景构建器权威_覆盖审计与项目内备份分层_AI协作警告.md`；构建器是场景布局权威，备份统一归档到 `ES/Bak/Local` 或 `ES/Bak/Reviewed` |
 | 进行发布、IL2CPP、性能或资源生命周期验收 | `50_验证与发布（ValidationRelease）`、`10_P0最高约束（P0Guardrails）/构建与IL2CPP（BuildIL2CPP）` |
 | 用户说“审计”“审计并记录”或“继续审计”；判断模块未开始、开发中、待集成、待验收、稳定、废弃或归档；审计半成品渗透 | `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md`、`Assets/Plugins/ES/AICommands/检查_模块成熟度与半成品影响_AI命令.md`、`ES/Documentation/Status/MODULE_AUDIT_STATE.md`；再按目标模块读取对应 P0、领域专项和当前源码 |
 | 选择、执行或维护 AICommand；新增、修改或调用 Agent Skill | `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md`、`Assets/Plugins/ES/AICommands/README.md`；修改 Skill 时同时读取 UTF-8 P0，涉及 Unity 验收时再读 `50_验证与发布（ValidationRelease）` |
 | 根据 Agent Authoring Graph 生成 AICommand 或 Agent Skill 候选包 | `$es-generate-agent-artifacts`；产物只能写入隔离候选目录，仍须人工 Diff Review 与明确批准 |
 | 启动、监控或中断 ESTEST / ESAITest | `$es-start-estest` |
 | 向运行中的测试 AI 投递一次性提示 | `$es-publish-aitest-prompt` |
-| 定位 Codex session、恢复失联窗口、维护 AI 协作历程、完成模块审计工作流、评估治理商业可行性或生成跨 AI 交接文案 | `10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_AI协作历程与本地Session兜底恢复_AI协作警告.md`、`50_验证与发布（ValidationRelease）/AI协作治理验收（AICollaborationAcceptance）/AI协作历程与模块审计_商业可行性验收标准.md`、`ES/AI协作历程（Codex）/README.md` |
+| 用户说“交接一下”“直接交接”“准备交接”“生成交接文案”“交给新窗口”“让新 AI 接手”“交接后关闭当前窗口”；或定位 Codex session、恢复失联窗口、维护 AI 协作历程、完成模块审计工作流、评估治理商业可行性 | `10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_AI协作历程与本地Session兜底恢复_AI协作警告.md` 第 3.1 节、`50_验证与发布（ValidationRelease）/AI协作治理验收（AICollaborationAcceptance）/AI协作历程与模块审计_商业可行性验收标准.md`、`ES/AI协作历程（Codex）/README.md`；真实交接必须优先调用 `ES/AI协作历程（Codex）/Tools/Complete-ESCodexHandoff.ps1`，禁止用普通聊天总结静默替代 |
 | 打开新 Codex、开启新对话、恢复/分叉会话、初始化 Codex 或接手项目 | `$es-codex-session-bootstrap`；恢复历史时再读取上一行的 session 恢复 P0，普通新会话只加载开始链与任务命中规则 |
 | 新建自动化任务、Python/PowerShell Worker、发布物审计、上传、清理或发布门禁 | `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md`、`Documentation/ES_AUTOMATION_CENTER_STANDARD.md`；先检查 C# Editor 注册和任务合同，禁止先写散落脚本 |
 

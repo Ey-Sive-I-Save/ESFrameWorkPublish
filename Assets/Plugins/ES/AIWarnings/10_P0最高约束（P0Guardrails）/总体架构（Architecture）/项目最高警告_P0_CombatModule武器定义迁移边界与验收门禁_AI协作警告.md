@@ -26,14 +26,14 @@ EntityBasicCombatModule
 
 ## 强制规则
 
-开火、命中查询和后坐力只读取 `ItemWeaponSharedData.fire/recoil`。所有 GunWeaponSlot 必须配置可由 `ESRuntimeDataGameCore.Weapons` 解析的 Weapon Key；缺失 Key、未注入定义或非法 Schema 必须拒绝执行，禁止回退到 CombatModule 参数。
+开火、命中查询和后坐力只读取 `ItemWeaponSharedData.fire/recoil`。所有 WeaponSlot 必须配置可由 `ESRuntimeDataGameCore.Weapons` 解析的 Weapon Key；缺失 Key、未注入定义或非法 Schema 必须拒绝执行，禁止回退到 CombatModule 参数。
 
 资源 Schema 可以在作者层保留对象选择体验，但 Bake/注入后 Player 只能消费 Stable Key、编译快照或 Provider Handle；不得让 Prefab、AudioClip、SO 裸引用成为 Player 运行时武器协议。
 
 ## 验收门禁
 
 1. `ESWeaponGameCoreTable` 和 `ESWeaponConfigKeyTable` 注入正式 `WeaponDefinition` 时必须调用 `ValidateDefinition`；不合法 interval、distance、recoil 数据必须硬失败。
-2. 任何设置了 `GunWeaponSlot.weaponKey` 的正式武器，在正式模式下必须能由 `ESRuntimeDataGameCore.Weapons` 解析。
+2. 任何设置了 `WeaponSlot.weaponKey` 的正式武器，在正式模式下必须能由 `ESRuntimeDataGameCore.Weapons` 解析。
 3. 新增武器参数的 Code Review 必须归入 `ItemWeaponSharedData` 或 `ItemWeaponVariableData`，不得落入 `EntityBasicCombatModule`。
 4. 每轮迁移至少覆盖：Definition 注入、Weapon Key 解析、开火参数来源、回池后的实例状态复位。静态编译不替代 Unity EditMode/PlayMode 证据。
 5. 旧资产切换到 `WeaponDefinition` 前，必须在 Unity 中验证射击间隔、距离、LayerMask、TriggerInteraction、瞄准门禁与连发后坐力均来自新 Schema。

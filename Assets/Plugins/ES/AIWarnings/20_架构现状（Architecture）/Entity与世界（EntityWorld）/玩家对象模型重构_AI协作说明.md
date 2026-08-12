@@ -2,6 +2,8 @@
 
 This note is for AI agents working on the player-object/model architecture rebuild. Keep it factual and update it when the code changes.
 
+> 2026-08-12 target correction: the four serialized domains below remain the current source fact. `EntityEquipmentDomain` has been approved as the formal fifth-domain target for inventory, equipment, accessories, attachment transitions, and equipment-effect source handles, but it is not wired into runtime yet. Use `装备定义与装配推进路线_AI协作说明.md` as the current migration contract; do not deny the target or report it as implemented.
+
 ## Responsibility
 
 当前职责：协助重构玩家对象的整体模型与运行架构，使其从“功能堆叠型 Entity 模块集合”逐步演进为商业项目可维护的玩家模型。

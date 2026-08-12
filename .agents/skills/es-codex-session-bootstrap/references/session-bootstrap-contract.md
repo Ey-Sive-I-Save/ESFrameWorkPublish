@@ -61,9 +61,23 @@ Non-zero exit is a hard failure. The agent must report the mismatch and continue
 
 The launcher may receive one bounded `-TaskPrompt` or a task that points to a handoff file. It is appended after the read-only initialization instructions and does not authorize history writes, audit-state writes, Git operations, publishing, deletion, or Unity execution unless the task prompt explicitly grants the corresponding scope. The default visible shell is `cmd.exe` using the npm `codex.cmd` entry. The new session must report the initialization result before acting on the delivered task.
 
+### Prompt payload discipline
+
+The immutable envelope carries a concise task packet, not a second copy of the project knowledge base. A managed Editor sender may include the responsibility, current user task, a de-duplicated project/scene/selection summary, and the required AIWarnings entry list. Each AIWarnings entry must carry its project-relative path, absolute path, SHA-256, and `Required Read` marker, but must not embed the full README, CurrentStatus, RuleIndex, P0, or domain-rule body. The sender captures every entry through bounded double-read verification, then rechecks the complete chain before it creates the task packet; a file that keeps changing exhausts the bounded retry budget and rejects the send. The receiving session validates the envelope, then reads those current source files in UTF-8 and recomputes their SHA-256 before claiming that it has read them. A later source mismatch is `sourceDrift`: report it and route from the current authority, never claim the send-time reference was freshly verified.
+
+Explicit material that the user deliberately attaches remains an attachment and is budgeted separately. Automatic context must avoid duplicate project roots, active-selection/page identity, and large MCP tool catalogs; it is a navigation summary, not a substitute for UnityMCP observation or source verification.
+
 Repeated `New` calls with the same `TaskKey` (or the same derived task fingerprint) are idempotent: if the marker's process is alive, the launcher returns `alreadyRunning` and does not open another window. `-ForceNew` is an explicit override and must not be used for ordinary parameter repair. `terminalStarted` proves only visible terminal creation. A launch token in history upgrades evidence to `promptObserved`; only a valid exact acceptance receipt upgrades it to `contextAccepted`. `sessionId=pending`, a visible process, or a timeout is an evidence gap, not permission to claim delivery or start another duplicate.
 
 Managed `Resume` and `Fork` require an exact SessionId before any envelope or terminal is created. If responsibility resolution does not produce exactly one ID, the launcher fails and directs the caller to Status/Query/Find. The official picker remains a CLI capability for manual use, but it is outside the managed handoff contract because it cannot receive the ES initialization prompt after selection.
+
+### Existing external CMD connection
+
+The Agent workbench may discover candidates only below the currently or most-recently foreground `cmd.exe` / Windows Terminal host. Discovery is asynchronous and observational: title, PID and ancestry help a user choose a shell but never prove a Codex conversation identity. The UI must not ask a user to type `SessionId`, `RecordId` or PID.
+
+Choosing a candidate creates a unique external-binding identity and one short-lived command. The workbench may show the command for manual execution, or after one explicit confirmation write that fixed command into the selected CMD's console input buffer. Automatic submission revalidates the claim, candidate PID, UTC process-start identity and a zero-active-child Shell state immediately before writing; it refuses a CMD that is running Codex or any other child process and never falls back to title matching, window keystrokes or a different PID. It then waits only for the matching one-time response and finalizes through the same Claim mutex.
+
+The responder verifies both the selected CMD PID and its process start time before the registry accepts a `ClaimedExternal` record. A response from another CMD, an expired candidate or a reused PID is rejected. A connected external CMD remains process/liveness observation only after onboarding. It has no Codex `SessionId`, and cannot be advertised as resumable, focusable, closable, messageable or continuously input-injectable. Existing schema-v1 SessionId claims remain recoverable only to finish or cancel claims that were already created.
 
 ## Immutable launch envelope
 
@@ -80,6 +94,10 @@ Schema v2 is the only accepted schema. Each launch first creates a unique direct
 Legacy v1 envelopes are never rewritten. `Convert-ESCodexStateToV2.ps1` moves them into a recoverable local `legacy-v1` quarantine, updates registry and launch-state references, and marks affected records `requiresV2Resume`. Such a live process is not accepted as an idempotent running task. The exact session must be closed and resumed to generate a new v2 envelope and private snapshot.
 
 Snapshot creation, envelope creation, launch-state registration, and process launch remain inside the per-task mutex. A source that changes while being copied fails snapshot creation instead of producing a mixed handoff. The receiving session consumes the snapshot path recorded in its envelope, never the mutable source path.
+
+### Creation and collision rule
+
+Every newly created local artifact in the managed delivery chain, including operation directories, command wrappers, envelopes, snapshots, receipts, registry/message records, and editor workspace state, must have a unique stable identity before it is exposed to a reader. Creation uses create-only semantics; an existing target is a collision or a separately owned artifact, never permission to overwrite it. Mutable authoritative state additionally uses a bounded cross-process mutex and revision compare-and-swap: a stale writer rejects its update, reloads the persisted authority, and tells the user that its local change was not committed. A writer stages bytes to a unique temporary path, flushes to disk, commits atomically where replacement is intended, then re-reads the committed artifact to verify identity/version or hash. On any failure, the final target is not reported as created; temporary data is cleaned only when its ownership is proven, while ambiguous or transaction evidence is retained for diagnosis.
 
 The initial prompt points to that envelope and to `scripts/Test-ESCodexLaunchEnvelope.ps1`. The receiving session must run the validator before consuming the handoff. Branch or HEAD drift is always reported and becomes a hard failure when `-StrictGit` is requested. Envelopes and the local session registry are navigation evidence, not source acceptance or new authority.
 
@@ -123,12 +141,12 @@ Launch-state files, visible Windows Terminal tabs, process liveness, envelopes, 
 
 ### Close identity
 
-The preferred composite identity is `sessionId + processId + WT_SESSION + windowKey + tabTitle`. SessionId and the authoritative registry select ownership; the remaining fields cross-check process and presentation identity. Until Windows Terminal exposes a durable public Tab/Pane ID, title matching is only a degraded UI locator:
+The preferred composite identity is `sessionId + processId + terminalWindowProcessId + WT_SESSION + windowKey + tabTitle`. SessionId and the authoritative registry select ownership; the shell's Windows Terminal host process narrows the UI window before the tab title is considered. Until Windows Terminal exposes a durable public Tab/Pane ID, title matching remains a degraded locator within one proven terminal host:
 
-- one authoritative record plus one visible title match may close;
+- one authoritative record plus one visible title match inside its recorded terminal host may focus or close;
 - multiple registry records require an exact selector or explicit bounded `-AllMatches`;
-- multiple visible matches never close automatically;
-- an exact SessionId with multiple visible title matches always fails rather than guessing.
+- a missing terminal host identity or multiple visible matches inside that host never focus or close automatically;
+- an exact SessionId with a missing host identity or non-unique host-local title match always fails rather than guessing.
 
 ### Routing query, responsibility binding, and presence
 

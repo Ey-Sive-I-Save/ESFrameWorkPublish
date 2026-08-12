@@ -71,7 +71,7 @@ AI 生成、选择或迁移 GameCore 内容时，只能把强类型稳定 Key �
 - Tag：`ESTagBakeTable`
 - 属性：`ESSuperAttributeCatalog` / `ESSuperAttributeTable`
 - 输入：`ESInputSchemeCatalog`、`ESInputActionCatalog`、`ESInputConfigSchemaHandshake`、`ESInputBindingProfile`
-- 编辑器审计：`【ES】/项目设置/GameCore/审计项目稳定Key治理`，输出 `Documentation/KEY_AUDIT_REPORT.md`
+- 编辑器审计：`【ES】/项目配置/GameCore/审计项目稳定Key治理`，输出 `Documentation/KEY_AUDIT_REPORT.md`
 - 总体规则：`Documentation/KEY_GOVERNANCE.md`
 
 ## 输入档案的 P0 例子

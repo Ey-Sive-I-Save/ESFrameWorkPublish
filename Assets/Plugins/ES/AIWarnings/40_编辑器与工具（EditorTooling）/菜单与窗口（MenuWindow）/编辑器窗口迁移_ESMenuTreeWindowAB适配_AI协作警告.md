@@ -52,9 +52,9 @@ ESTrackTemporaryInspectorWindow<TWindow> : ESMenuTreeWindowAB<TWindow>
 - `ESTrackViewWindow`
   - 强 UIElements / 时间轴交互 / 多状态缓存窗口。
   - 主窗口迁移会影响播放、选择、拖拽、焦点片段、临时预览状态，不应在窗口适配小任务里硬改。
-- `ESGraphViewWindow`
-  - GraphView/UIElements 主体窗口。
-  - 这类窗口的核心不是菜单树页面，强迁可能破坏 GraphView 生命周期。
+- `ESStableGraphViewWindow`
+  - Stable Graph V2/UIElements 主体窗口。
+  - 这类窗口的核心不是菜单树页面，强迁可能破坏 Graph 生命周期。
 - `ESTreeMenuShower`
   - 弹出式快捷菜单。
   - 它的正确形态更接近弹出菜单，不是常驻工具窗口。

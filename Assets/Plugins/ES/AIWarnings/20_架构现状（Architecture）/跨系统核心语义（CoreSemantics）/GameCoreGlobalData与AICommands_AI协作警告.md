@@ -18,7 +18,7 @@ Assets/Plugins/ES/AICommands
 `GameCoreEditorGlobalData` 是编辑器语义入口 SO：
 
 ```text
-CreateAssetMenu: 【ES】/项目设置/GameCore/编辑器全局数据
+CreateAssetMenu: 【ES】/配置/GameCore/编辑器全局数据
 Base: ESEditorGlobalSo<GameCoreEditorGlobalData>
 ```
 
@@ -37,18 +37,18 @@ Assets/ESNormalAssets/Data/GlobalData/GameCore/GameCoreEditorGlobalData.asset
 【ES】菜单入口：
 
 ```text
-【ES】/项目设置/GameCore/打开或创建GameCore编辑器全局数据
-【ES】/项目设置/GameCore/重置GameCore编辑器推荐规则
-【ES】/项目设置/GameCore/补齐缺失的GameTag规则
-【ES】/项目设置/GameCore/验证GameTag规则
-【ES】/项目设置/GameCore/补齐角色与物品属性表
-【ES】/项目设置/GameCore/验证角色与物品属性表
-【ES】/项目设置/GameCore/生成角色固定属性代码
-【ES】/项目设置/GameCore/Bake并应用GameCore Catalog
-【ES】/项目设置/GameCore/运行GameTag核心自检
-【ES】/项目设置/GameCore/验证全部Buff的Tag与属性配置
-【ES】/项目设置/GameCore/验证运行时Key Catalog Schema
-【ES】/项目设置/GameCore/审计项目稳定Key治理
+【ES】/项目配置/GameCore/打开或创建GameCore编辑器全局数据
+【ES】/项目配置/GameCore/重置GameCore编辑器推荐规则
+【ES】/项目配置/GameCore/补齐缺失的GameTag规则
+【ES】/项目配置/GameCore/验证GameTag规则
+【ES】/项目配置/GameCore/补齐角色与物品属性表
+【ES】/项目配置/GameCore/验证角色与物品属性表
+【ES】/项目配置/GameCore/生成角色固定属性代码
+【ES】/项目配置/GameCore/Bake并应用GameCore Catalog
+【ES】/项目配置/GameCore/运行GameTag核心自检
+【ES】/项目配置/GameCore/验证全部Buff的Tag与属性配置
+【ES】/项目配置/GameCore/验证运行时Key Catalog Schema
+【ES】/项目配置/GameCore/审计项目稳定Key治理
 ```
 
 后续 AI 不要只新增 C# 类型却忘记资产、菜单、Bake 和审计入口。编辑器全局数据必须能被开发者直接找到，但运行时不得依赖该编辑器 SO。

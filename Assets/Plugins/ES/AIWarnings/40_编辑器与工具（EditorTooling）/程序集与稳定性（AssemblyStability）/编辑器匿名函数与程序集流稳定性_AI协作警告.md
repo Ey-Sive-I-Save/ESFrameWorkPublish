@@ -29,8 +29,8 @@
 
 ## 本轮已修正点
 
-- `ESGraphViewWindow`：
-  - 窗口自己的 `Selection.selectionChanged` 改为命名方法，`OnDisable` 退订。
+- Legacy Graph 窗口已删除；上述生命周期规则继续适用于 Stable Graph V2。
+  - Stable Graph V2 的窗口事件必须使用命名方法并在 `OnDisable` 退订。
   - 全局 `ERS` 注册改为先 `-=` 再 `+=`。
 - `ER_ESEditorInspectorUser`：
   - `Editor.finishedDefaultHeaderGUI` 从匿名函数改为命名静态方法。
@@ -70,4 +70,3 @@
 3. 它是否可能在程序集流、ReloadDomain、窗口重建中重复注册？
 
 如果答案有一个是“是”，优先改成命名方法，并做到注册前先退订。
-

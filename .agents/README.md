@@ -134,8 +134,8 @@ ESFrameWorkPublish/
 
 ## 当前边界
 
-- 当前 17 个 Skill 已建立项目级结构、会话启动、Agent Artifact 候选生成、ESTEST 快速提示、跨系统治理和领域导航。
-- 原有 13 个 Skill 已通过官方验证；`$es-module-lifecycle` 已补充“审计”“审计并记录”“继续审计”、固定状态入口与一层续接状态契约，仍需按当前环境能力补跑官方 `quick_validate.py`。
+- 项目级 Skill 的存在性和数量以 `.agents/skills/*/SKILL.md` 的实际目录为准；本文件只维护分类和职责，禁止声明固定总数。
+- Skill 的验证状态以各自的官方验证记录为准。`$es-module-lifecycle` 已补充“审计”“审计并记录”“继续审计”、固定状态入口与一层续接状态契约，仍需按当前环境能力补跑官方 `quick_validate.py`。
 - `$es-publish-aitest-prompt` 的确定性投递脚本已完成 PowerShell 语法、原子 JSON 和严格 UTF-8 代表性实跑；其他领域 Skill 目前以工作流和真实项目路径导航为主。
 - 新 Skill 通常需要从项目根重启或新开 Codex 窗口后才会进入技能选择器。
 - Skill 存在不代表 Unity、PlayMode、Profiler、IL2CPP 或真实发布已经通过。

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Validate', 'New', 'Resume', 'Fork', 'Close', 'RestoreRecent', 'List', 'Status', 'Repair', 'Reconcile', 'Query', 'Resolve', 'BindResponsibility', 'BindAcceptance', 'SetPresence', 'Wait', 'SendMessage', 'QueueMessage', 'MessageStatus', 'UpdateMessageStatus', 'MessageRepair', 'BrokerStatus', 'Doctor', 'SmokeTest', 'RequestAcceptance', 'ReplyAcceptance', 'AcceptanceStatus', 'SelfTest')]
+    [ValidateSet('Validate', 'New', 'Resume', 'Fork', 'Close', 'RestoreRecent', 'List', 'Status', 'Focus', 'Repair', 'Reconcile', 'Query', 'Resolve', 'BindResponsibility', 'BindAcceptance', 'SetPresence', 'Wait', 'SendMessage', 'QueueMessage', 'MessageStatus', 'UpdateMessageStatus', 'MessageRepair', 'BrokerStatus', 'Doctor', 'SmokeTest', 'RequestAcceptance', 'ReplyAcceptance', 'AcceptanceStatus', 'SelfTest', 'PrepareExternalClaim', 'SubmitExternalClaimInput', 'FinalizeExternalClaim', 'CancelExternalClaim')]
     [string]$Mode = 'New',
 
     [string]$SessionId = '',
@@ -99,6 +99,21 @@ param(
 
     [string]$RequesterLaunchToken = '',
 
+    [string]$ExternalClaimId = '',
+
+    [string]$ExternalClaimBindingId = '',
+
+    [int]$ExternalClaimExpectedCmdProcessId = 0,
+
+    [string]$ExternalClaimExpectedCmdProcessStartedAtUtc = '',
+
+    [ValidateRange(60, 600)]
+    [int]$ExternalClaimTtlSeconds = 300,
+
+    # Isolated test seam. The Agent workbench never supplies this value; its
+    # external-CMD claims always use the authoritative local session root.
+    [string]$ExternalClaimStateRoot = '',
+
     [string]$ResponderRecordId = '',
 
     [string]$ResponderSessionId = '',
@@ -145,6 +160,19 @@ function Get-FileSha256([string]$Path) {
     }
     finally {
         $sha.Dispose()
+        $stream.Dispose()
+    }
+}
+
+function Write-CreateOnlyUtf8File([string]$Path, [string]$Content) {
+    [void][IO.Directory]::CreateDirectory((Split-Path -Parent $Path))
+    $bytes = [Text.UTF8Encoding]::new($false).GetBytes($Content)
+    $stream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try {
+        $stream.Write($bytes, 0, $bytes.Length)
+        $stream.Flush($true)
+    }
+    finally {
         $stream.Dispose()
     }
 }
@@ -307,6 +335,13 @@ function New-HandoffSnapshots([object[]]$Sources, [string]$SnapshotDirectory) {
         throw "Handoff snapshot directory already exists: $SnapshotDirectory"
     }
     [void][IO.Directory]::CreateDirectory($SnapshotDirectory)
+    $snapshotOwnerPath = Join-Path $SnapshotDirectory '.snapshot-owner.json'
+    $snapshotOwner = [ordered]@{
+        schemaVersion = 1
+        createdUtc = [DateTime]::UtcNow.ToString('o')
+        processId = $PID
+    } | ConvertTo-Json -Compress
+    Write-CreateOnlyUtf8File $snapshotOwnerPath $snapshotOwner
     $snapshotRoot = [IO.Path]::GetFullPath($SnapshotDirectory).TrimEnd('\')
     $snapshots = @()
     foreach ($source in @($Sources)) {
@@ -318,7 +353,7 @@ function New-HandoffSnapshots([object[]]$Sources, [string]$SnapshotDirectory) {
         [void][IO.Directory]::CreateDirectory((Split-Path -Parent $snapshotPath))
         $sourceStream = [IO.File]::Open([string]$source.absolutePath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
         try {
-            $snapshotStream = [IO.File]::Open($snapshotPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+            $snapshotStream = [IO.File]::Open($snapshotPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
             try {
                 $sourceStream.CopyTo($snapshotStream)
                 $snapshotStream.Flush($true)
@@ -420,6 +455,14 @@ if ($Mode -in @('List', 'Status')) {
         -TaskKey $TaskKey `
         -ResponsibilityKey $ResponsibilityKey `
         -TabTitle $TabTitle
+    return
+}
+
+if ($Mode -eq 'Focus') {
+    & (Join-Path $PSScriptRoot 'Focus-ESCodexSessionTerminal.ps1') `
+        -SessionId $SessionId `
+        -RecordId $RecordId `
+        -LaunchToken $LaunchToken
     return
 }
 
@@ -614,6 +657,82 @@ if ($Mode -in @('Repair', 'Reconcile')) {
     return
 }
 
+if ($Mode -in @('PrepareExternalClaim', 'SubmitExternalClaimInput', 'FinalizeExternalClaim', 'CancelExternalClaim')) {
+    $externalClaimScriptPath = Join-Path $PSScriptRoot 'Invoke-ESCodexExternalClaim.ps1'
+    if (-not (Test-Path -LiteralPath $externalClaimScriptPath -PathType Leaf)) {
+        throw "External CMD claim script was not found: $externalClaimScriptPath"
+    }
+    $externalClaimStateParameters = @{}
+    if (-not [string]::IsNullOrWhiteSpace($ExternalClaimStateRoot)) {
+        $externalClaimStateParameters.StateRoot = $ExternalClaimStateRoot
+    }
+    if ($Mode -eq 'PrepareExternalClaim') {
+        if ([string]::IsNullOrWhiteSpace($SessionId) -and [string]::IsNullOrWhiteSpace($ExternalClaimBindingId)) {
+            throw 'PrepareExternalClaim requires an exact SessionId or an external CMD binding identity.'
+        }
+        & $externalClaimScriptPath `
+            -Action Prepare `
+            -SessionId $SessionId `
+            -ExternalBindingId $ExternalClaimBindingId `
+            -ExpectedCmdProcessId $ExternalClaimExpectedCmdProcessId `
+            -ExpectedCmdProcessStartedAtUtc $ExternalClaimExpectedCmdProcessStartedAtUtc `
+            -TaskKey $TaskKey `
+            -ResponsibilityKey $ResponsibilityKey `
+            -TabTitle $TabTitle `
+            -ClaimId $ExternalClaimId `
+            -TtlSeconds $ExternalClaimTtlSeconds `
+            @externalClaimStateParameters
+    }
+    elseif ($Mode -eq 'SubmitExternalClaimInput') {
+        if ([string]::IsNullOrWhiteSpace($ExternalClaimId)) { throw 'SubmitExternalClaimInput requires -ExternalClaimId.' }
+        $externalInputScriptPath = Join-Path $PSScriptRoot 'Invoke-ESCodexExternalConsoleInput.ps1'
+        if (-not (Test-Path -LiteralPath $externalInputScriptPath -PathType Leaf)) {
+            throw "External CMD console input script was not found: $externalInputScriptPath"
+        }
+        if ($ExternalClaimExpectedCmdProcessId -le 0 -or
+            [string]::IsNullOrWhiteSpace($ExternalClaimExpectedCmdProcessStartedAtUtc)) {
+            throw 'SubmitExternalClaimInput requires the exact selected CMD PID and process start time.'
+        }
+        $submissionOutput = & $externalInputScriptPath `
+            -ClaimId $ExternalClaimId `
+            -ExpectedCmdProcessId $ExternalClaimExpectedCmdProcessId `
+            -ExpectedCmdProcessStartedAtUtc $ExternalClaimExpectedCmdProcessStartedAtUtc `
+            @externalClaimStateParameters
+
+        # A PowerShell child script may return a native PSCustomObject or a JSON
+        # string depending on the host/pipeline. Do not stringify objects and
+        # feed their display representation back into ConvertFrom-Json.
+        $submission = $submissionOutput
+        if ($submissionOutput -is [string]) {
+            $submissionText = $submissionOutput.Trim()
+            if ([string]::IsNullOrWhiteSpace($submissionText)) {
+                throw 'External CMD console input script returned an empty submission receipt.'
+            }
+            try { $submission = $submissionText | ConvertFrom-Json }
+            catch { throw "External CMD console input script returned invalid JSON: $($_.Exception.Message)" }
+        }
+        if ($submission -is [System.Array]) {
+            if ($submission.Count -ne 1) { throw 'External CMD console input script returned an ambiguous submission receipt.' }
+            $submission = $submission[0]
+        }
+        if ($null -eq $submission -or -not [bool]$submission.success -or
+            [string]::IsNullOrWhiteSpace([string]$submission.claimId) -or
+            -not ([string]$submission.claimId).Equals($ExternalClaimId, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'External CMD console input script did not return a successful submission receipt.'
+        }
+        $submission
+    }
+    elseif ($Mode -eq 'FinalizeExternalClaim') {
+        if ([string]::IsNullOrWhiteSpace($ExternalClaimId)) { throw 'FinalizeExternalClaim requires -ExternalClaimId.' }
+        & $externalClaimScriptPath -Action Finalize -ClaimId $ExternalClaimId @externalClaimStateParameters
+    }
+    else {
+        if ([string]::IsNullOrWhiteSpace($ExternalClaimId)) { throw 'CancelExternalClaim requires -ExternalClaimId.' }
+        & $externalClaimScriptPath -Action Cancel -ClaimId $ExternalClaimId @externalClaimStateParameters
+    }
+    return
+}
+
 $requiredPatterns = @(
     'Assets/Plugins/ES/AIWarnings/00_*/README.md',
     'Assets/Plugins/ES/AIWarnings/00_*/*CurrentStatus*.md',
@@ -661,6 +780,10 @@ $sessionBootstrapSkillPath = Join-Path $projectSkillsRoot 'es-codex-session-boot
 $envelopeValidatorPath = Join-Path $PSScriptRoot 'Test-ESCodexLaunchEnvelope.ps1'
 if (-not (Test-Path -LiteralPath $envelopeValidatorPath -PathType Leaf)) {
     throw "Launch envelope validator was not found: $envelopeValidatorPath"
+}
+$exitMarkerWriterPath = Join-Path $PSScriptRoot 'Write-ESCodexLaunchExitMarker.ps1'
+if (-not (Test-Path -LiteralPath $exitMarkerWriterPath -PathType Leaf)) {
+    throw "Launch exit-marker writer was not found: $exitMarkerWriterPath"
 }
 if (-not (Test-Path -LiteralPath $sessionBootstrapSkillPath -PathType Leaf)) {
     throw "Project session bootstrap Skill was not found: $sessionBootstrapSkillPath"
@@ -766,7 +889,9 @@ $result = [ordered]@{
     alreadyRunning = $false
     processId = 0
     terminalLauncherProcessId = 0
+    terminalWindowProcessId = 0
     sessionId = if ($Mode -eq 'Resume' -and -not [string]::IsNullOrWhiteSpace($SessionId)) { $SessionId } else { '' }
+    recordId = ''
     launched = $false
     terminalStarted = $false
     promptObserved = $false
@@ -852,6 +977,20 @@ try {
                 $result.processId = $existingProcessId
                 $result.terminalLauncherProcessId = [int]$existing.terminalLauncherProcessId
                 $result.sessionId = [string]$existing.sessionId
+                $existingLaunchToken = [string]$existing.launchToken
+                $existingSessionId = [string]$existing.sessionId
+                $existingRecord = @($registry.sessions | Where-Object {
+                        if ((-not [string]::IsNullOrWhiteSpace($existingLaunchToken)) -and ([string]$_.launchToken -eq $existingLaunchToken)) {
+                            return $true
+                        }
+                        if ((-not [string]::IsNullOrWhiteSpace($existingSessionId)) -and ([string]$_.sessionId -eq $existingSessionId)) {
+                            return $true
+                        }
+                        return $false
+                    } | Select-Object -First 1)[0]
+                if ($null -ne $existingRecord) {
+                    $result.recordId = [string]$existingRecord.recordId
+                }
                 $result.envelopePath = [string]$existing.envelopePath
                 $result.launchToken = [string]$existing.launchToken
                 $result.terminalStarted = $true
@@ -915,10 +1054,11 @@ try {
         authorizationBoundary = 'Read initialization context first. Do not write history, audit state, Git, release, or delete without current explicit authorization.'
     }
     $envelopeJson = $envelope | ConvertTo-Json -Depth 8
-    $envelopeStream = [IO.File]::Open($envelopePath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+    $envelopeStream = [IO.File]::Open($envelopePath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
     try {
         $envelopeBytes = [Text.UTF8Encoding]::new($false).GetBytes($envelopeJson)
         $envelopeStream.Write($envelopeBytes, 0, $envelopeBytes.Length)
+        $envelopeStream.Flush($true)
     }
     finally {
         $envelopeStream.Dispose()
@@ -966,9 +1106,18 @@ try {
     $commandBaseName = $taskFingerprint + '-' + $launchToken.Substring($launchToken.Length - 8)
     $commandWrapperPath = Join-Path $commandRoot ($commandBaseName + '.cmd')
     $exitMarkerPath = Join-Path $commandRoot ($commandBaseName + '.exit.json')
-    $exitMarkerTempPath = $exitMarkerPath + '.tmp'
-    $commandWrapperContent = "@echo off`r`nchcp 65001 >nul`r`nset `"ES_CODEX_LAUNCH_TOKEN=$launchToken`"`r`ncall " + ($cmdParts -join ' ') + "`r`nset `"ES_CODEX_EXIT_CODE=%ERRORLEVEL%`"`r`n> `"$exitMarkerTempPath`" echo {`"schemaVersion`":1,`"launchToken`":`"$launchToken`",`"exitCode`":%ES_CODEX_EXIT_CODE%}`r`nmove /Y `"$exitMarkerTempPath`" `"$exitMarkerPath`" >nul`r`n"
-    [IO.File]::WriteAllText($commandWrapperPath, $commandWrapperContent, [Text.UTF8Encoding]::new($false))
+    $exitMarkerWriterArguments = @(
+        '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+        '-File', $exitMarkerWriterPath,
+        '-Path', $exitMarkerPath,
+        '-ExpectedRoot', $commandRoot,
+        '-LaunchToken', $launchToken,
+        '-ExitCode', '%ES_CODEX_EXIT_CODE%'
+    )
+    $exitMarkerWriterCommand = 'powershell.exe ' + (@($exitMarkerWriterArguments |
+            ForEach-Object { ConvertTo-WindowsArgument ([string]$_) }) -join ' ')
+    $commandWrapperContent = "@echo off`r`nchcp 65001 >nul`r`nset `"ES_CODEX_LAUNCH_TOKEN=$launchToken`"`r`ncall " + ($cmdParts -join ' ') + "`r`nset `"ES_CODEX_EXIT_CODE=%ERRORLEVEL%`"`r`n" + $exitMarkerWriterCommand + "`r`n"
+    Write-CreateOnlyUtf8File $commandWrapperPath $commandWrapperContent
     $startedAtUnix = [DateTimeOffset]::Now.ToUnixTimeSeconds()
     $terminalLauncherProcess = $null
     $shellProcessId = 0
@@ -1011,6 +1160,11 @@ try {
     $result.startupFailureReason = if ($result.terminalStarted) { '' } else { 'The terminal launcher returned without an observable shell process for this launch token.' }
     $result.processId = $shellProcessId
     $result.terminalLauncherProcessId = $terminalLauncherProcess.Id
+    $terminalWindowProcessId = if ($result.terminalStarted -and $effectiveTerminalMode -ne 'PlainCmd') {
+        Get-ESCodexTerminalHostProcessId $shellProcessId
+    }
+    else { 0 }
+    $result.terminalWindowProcessId = $terminalWindowProcessId
     $result.startupDiagnosticPath = if ($result.terminalStarted) { $exitMarkerPath } else { '' }
     $state = [ordered]@{
         taskKey = $effectiveTaskKey
@@ -1023,7 +1177,9 @@ try {
         wtSession = $launchWtSession
         processId = $shellProcessId
         terminalLauncherProcessId = $terminalLauncherProcess.Id
+        terminalWindowProcessId = $terminalWindowProcessId
         sessionId = $result.sessionId
+        recordId = ''
         startedAtUnix = $startedAtUnix
         launchToken = $launchToken
         envelopePath = $envelopePath
@@ -1055,6 +1211,7 @@ try {
         wtSession = $launchWtSession
         processId = $shellProcessId
         terminalLauncherProcessId = $terminalLauncherProcess.Id
+        terminalWindowProcessId = $terminalWindowProcessId
         launchToken = $launchToken
         handoffFiles = $handoffFiles
         envelopePath = $envelopePath
@@ -1074,10 +1231,12 @@ try {
         lastSeenUtc = [DateTime]::UtcNow.ToString('o')
     }
     $registryUpdateContext = [pscustomobject]@{ entry = [pscustomobject]$registryEntry }
-    Invoke-ESCodexRegistryUpdate -Path $registryPath -Update {
+    $registeredEntry = Invoke-ESCodexRegistryUpdate -Path $registryPath -Update {
         param($currentRegistry, $context)
         AddOrUpdate-ESCodexSessionRecord $currentRegistry $context.entry
-    } -Argument $registryUpdateContext | Out-Null
+    } -Argument $registryUpdateContext
+    $result.recordId = [string]$registeredEntry.recordId
+    $state.recordId = $result.recordId
 
     $receiptRoot = Join-Path $localStateBase 'acceptance-receipts'
     $startupDeadline = [DateTime]::UtcNow.AddSeconds($StartupWaitSeconds)
@@ -1130,10 +1289,13 @@ try {
     $registryEntry.lifecycleStatus = $lifecycleStatus
     $registryEntry.lastSeenUtc = [DateTime]::UtcNow.ToString('o')
     $registryUpdateContext = [pscustomobject]@{ entry = [pscustomobject]$registryEntry }
-    Invoke-ESCodexRegistryUpdate -Path $registryPath -Update {
+    $registeredEntry = Invoke-ESCodexRegistryUpdate -Path $registryPath -Update {
         param($currentRegistry, $context)
         AddOrUpdate-ESCodexSessionRecord $currentRegistry $context.entry
-    } -Argument $registryUpdateContext | Out-Null
+    } -Argument $registryUpdateContext
+    $result.recordId = [string]$registeredEntry.recordId
+    $state.recordId = $result.recordId
+    [IO.File]::WriteAllText($statePath, ($state | ConvertTo-Json -Depth 6), [Text.UTF8Encoding]::new($false))
 
     [pscustomobject]$result
 }

@@ -7,6 +7,8 @@
 > 2026-07-31 现行纠偏：角色 Prefab 不新增 `CharacterActor`、`EntityCharacterComposition`、`EntityCharacterDefinitionBinding` 或同义桥接组件。当前有效入口是 `Entity + 同根 EntityCharacterIdentity -> Entity.BindDefinition(DataInfo)`；正式契约见 `Documentation/CHARACTER_PREFAB_CONTRACT.md` 与同目录 `角色Prefab职责与DataInfo入口_AI协作警告.md`。本文中建议另建 `CharacterActor` 的“必须补”“推荐迁移”段仅保留为历史问题记录，不得据此实施。
 >
 > 2026-08-01 模块契约补充：角色基础能力不靠运行时自动补齐，自动补玩家输入模块的入口已删除。三种 `EntityCharacterIdentity` 身份的 Prefab 都必须显式保存唯一 `EntityBasicMoveRotateModule`，并由 `EntityAIDomain` 持有输入执行配置和统一执行入口；只有阵营为 `Player` 的正式 `CharacterVariant` 才可且必须保存唯一 `EntityPlayerInputWriteModule`、`EntityBasicMountModule`、`EntityBasicClimbModule`。玩家的骑乘状态必须满足 `Mounted` 契约，攀爬、攀上和翻越状态必须满足 `Climbing` 契约；攀爬跳跃离墙后进入空中 KCC 分支，必须满足 `Grounded` 契约。使用 `【ES】/内容制作/角色模板/审计项目角色基础模块` 做全项目制作期检查，发布门禁会复验实际进入内容的正式 Variant。此规则不授权向模板增加战斗、相机、武器或高级运动组件。
+>
+> 2026-08-12 装备域纠偏：本文的 Basic/AI/Buff/State 四域仍是当前源码事实；`EntityEquipmentDomain` 已批准为背包、装备、饰品、挂载过渡和装备效果来源句柄的正式第五域目标，但尚未接线。后续实现与迁移以同目录 `装备定义与装配推进路线_AI协作说明.md` 为现行合同，不得据本文否定第五域，也不得提前宣称已实现。
 
 ## 验证目标
 

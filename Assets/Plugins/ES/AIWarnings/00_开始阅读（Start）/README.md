@@ -61,16 +61,17 @@ README
 - 普通编辑器初始化优先 AssemblyStream；禁止在域重载路径中做全盘扫描和重资源操作。
 - 核心热路径在初始化阶段验证依赖，运行时避免重复判空、字符串、LINQ、反射和临时集合。
 - 测试场景的操作引导、验收路线、运行态诊断、键位说明和区域导视，优先复用 `ESSceneValidationGuide`；它只属于测试场景，禁止以一次性 OnGUI 或测试 MonoBehaviour 污染正式角色、载具、相机与技能 Prefab。具体路由见 `50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/测试场景导视与诊断复用_AI协作警告.md`。
+- 测试场景布局以官方构建器为唯一权威；刷新前必须审计 Prefab override，并将变更前基线归档到项目内 `ES/Bak/Local`（机器回滚、忽略）或 `ES/Bak/Reviewed`（可审阅、默认跟踪），禁止把 `C:\Users\asus` 等项目外目录作为正式备份。具体门禁见 `50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/场景构建器权威_覆盖审计与项目内备份分层_AI协作警告.md`。
 - 多来源申请、集中决策、单点执行的领域必须遵守 `ES 活跃请求仲裁协议`：`Request -> Lease -> Active Set -> Arbitration -> Commit -> Executor`。统一协议不等于建立万能管理器；Camera 的 Director 首切片已存在，但仍待 Unity/PlayMode/Profiler 验收，不能按已交付使用。
 - `ESGenericLife` 是根对象的通用生命周期组织器；Pool 仅是当前已实现分部。Pool 回调必须遵守 `IESGameObjectPoolLifecycle`，不得恢复全子树 Reset 广播。修改 Pool 前必须阅读 `30_运行时专项（RuntimeOperations）/对象池（Pool）` 与 `Documentation/ES_GENERIC_LIFE.md`。
 - `ContextPool` 是明确宿主拥有的局部可变上下文；宿主结束必须 `ClearAllRuntimeValues()`。它不得替代 Tag、Stat、Permit、Resource Scope 或跨对象 Lease。
 - `ESCommandPlayerRunner.TickAll()` 只能由 `MODULE_ESCommandModule` 驱动；ESCommand 运行时、交互运行时、编辑器序列化与 GraphView 均有独立专项规则，不能用输入文档、AI Command 模板或 SimpleTools 文档替代。
 - AI 协作历程只有在用户明确要求时才能创建、更新或恢复；普通任务禁止自动落账。连续约 10 轮后 AI 只能询问一次，用户确认前不得写入或催促。获准维护时仍严格一窗口一文件；失联窗口先从本机 `history.jsonl` 模糊定位 session 候选，再人工确认归属并从 `rollout-*.jsonl` 逐轮恢复。候选分数不得直接授权合并或覆盖已有档案。
-- 当前 GraphView / NodeRunner 是阻断性历史实验实现，禁止新增任何正式业务依赖，直至数据模型、稳定身份、Undo、迁移与运行时快照完成重构验收。
+- Legacy GraphView / NodeRunner 已删除；正式图基础统一使用 Stable Graph V2。V2 已具备稳定身份、Undo、迁移与烘焙快照，当前处于 `Verifying`，正式业务接入仍须通过 Unity Test Runner、真实执行闭环、失败恢复与性能门禁。
 - 模块成熟度统一使用 `Proposed -> Scaffolded -> Experimental/Implementing -> Integrating -> Verifying -> Stable -> Deprecated -> Archived`；`Blocked` 只能作为附加结论。目录、接口或源码存在不等于完成，半成品不得默认注册、渗透稳定模块或进入正式发布链路。说“审计”默认只读并最多询问一次是否记录；说“审计并记录”更新 `ES/Documentation/Status/MODULE_AUDIT_STATE.md` 的目标模块块；说“继续审计”从该固定入口恢复并复核事实。检查点只用于导航，不授权下次实现。具体路由见 `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md`。
 - `Documentation/DOCUMENTATION_CATALOG.md` 是文档分类唯一入口。历史归档、未来方案、生成报告和待源码复验资料不得替代现行规范或 AIWarnings。
 - 不恢复 `EntityAIInputSystemModule`、`EntityInputStateModule` 等旧输入兼容类型；应清理序列化坏引用。
-- ES 自有 Unity 菜单根统一为 `【ES】/`。
+- ES 自有 Unity 菜单根统一为 `【ES】/`；顶部菜单采用五个正式业务域加“常用窗口”快捷投影，`Assets/Create` 与 `Add Component` 必须按各自用户心智分别建模，详见菜单 P2 专项。
 - 项目级 Agent Skills 位于 `.agents/skills`。可用 Skill 的唯一事实来源是 `.agents/skills/*/SKILL.md` 的实际目录；Skill 不进入 Unity `Assets`，不生成 `.meta`，不属于运行时或发布内容。
 - 项目级 AI 文件夹归属、Skill 内部结构和分类简介统一见 `.agents/README.md`；不得在其他目录另建重复 Skill 清单或维护易漂移的固定数量。
 

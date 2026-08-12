@@ -80,6 +80,7 @@ function ConvertTo-ESCodexSessionRecord([object]$Record) {
         wtSession = [string](Get-ESCodexPropertyValue $Record 'wtSession' '')
         processId = [int](Get-ESCodexPropertyValue $Record 'processId' 0)
         terminalLauncherProcessId = [int](Get-ESCodexPropertyValue $Record 'terminalLauncherProcessId' 0)
+        terminalWindowProcessId = [int](Get-ESCodexPropertyValue $Record 'terminalWindowProcessId' 0)
         launchToken = [string](Get-ESCodexPropertyValue $Record 'launchToken' '')
         envelopePath = [string](Get-ESCodexPropertyValue $Record 'envelopePath' '')
         handoffSnapshotDirectory = [string](Get-ESCodexPropertyValue $Record 'handoffSnapshotDirectory' '')
@@ -92,6 +93,17 @@ function ConvertTo-ESCodexSessionRecord([object]$Record) {
         startupFailureReason = [string](Get-ESCodexPropertyValue $Record 'startupFailureReason' '')
         acceptanceReceiptPath = [string](Get-ESCodexPropertyValue $Record 'acceptanceReceiptPath' '')
         startupDiagnosticPath = [string](Get-ESCodexPropertyValue $Record 'startupDiagnosticPath' '')
+        externalClaimId = [string](Get-ESCodexPropertyValue $Record 'externalClaimId' '')
+        externalClaimBindingId = [string](Get-ESCodexPropertyValue $Record 'externalClaimBindingId' '')
+        externalClaimState = [string](Get-ESCodexPropertyValue $Record 'externalClaimState' '')
+        externalClaimDirectory = [string](Get-ESCodexPropertyValue $Record 'externalClaimDirectory' '')
+        externalClaimRequestSha256 = [string](Get-ESCodexPropertyValue $Record 'externalClaimRequestSha256' '')
+        externalClaimResponseSha256 = [string](Get-ESCodexPropertyValue $Record 'externalClaimResponseSha256' '')
+        externalClaimProcessId = [int](Get-ESCodexPropertyValue $Record 'externalClaimProcessId' 0)
+        externalClaimProcessStartedAtUtc = [string](Get-ESCodexPropertyValue $Record 'externalClaimProcessStartedAtUtc' '')
+        externalClaimExpectedCmdProcessId = [int](Get-ESCodexPropertyValue $Record 'externalClaimExpectedCmdProcessId' 0)
+        externalClaimExpectedCmdProcessStartedAtUtc = [string](Get-ESCodexPropertyValue $Record 'externalClaimExpectedCmdProcessStartedAtUtc' '')
+        externalClaimAcceptedAtUtc = [string](Get-ESCodexPropertyValue $Record 'externalClaimAcceptedAtUtc' '')
         requiresV2Resume = [bool](Get-ESCodexPropertyValue $Record 'requiresV2Resume' $false)
         legacyEnvelopePath = [string](Get-ESCodexPropertyValue $Record 'legacyEnvelopePath' '')
         handoffFiles = @(Get-ESCodexPropertyValue $Record 'handoffFiles' @())
@@ -178,15 +190,49 @@ function Save-ESCodexSessionRegistry([string]$Path, [object]$Registry) {
         updatedUtc = $updatedUtc
         sessions = @($Registry.sessions)
     }
-    $temporary = $Path + '.tmp-' + [Guid]::NewGuid().ToString('N')
-    [IO.File]::WriteAllText($temporary, ($payload | ConvertTo-Json -Depth 12), [Text.UTF8Encoding]::new($false))
-    if (Test-Path -LiteralPath $Path -PathType Leaf) {
-        $backup = $Path + '.bak-' + [Guid]::NewGuid().ToString('N')
-        [IO.File]::Replace($temporary, $Path, $backup)
-        if (Test-Path -LiteralPath $backup -PathType Leaf) { Remove-Item -LiteralPath $backup -Force }
+    $retryCount = 5
+    $lastCommitError = $null
+    $committed = $false
+    for ($attempt = 0; $attempt -lt $retryCount; $attempt++) {
+        $temporary = $Path + '.tmp-' + [Guid]::NewGuid().ToString('N')
+        try {
+            [IO.File]::WriteAllText($temporary, ($payload | ConvertTo-Json -Depth 12), [Text.UTF8Encoding]::new($false))
+            if (Test-Path -LiteralPath $Path -PathType Leaf) {
+                $backup = $Path + '.bak-' + [Guid]::NewGuid().ToString('N')
+                try {
+                    [IO.File]::Replace($temporary, $Path, $backup)
+                }
+                finally {
+                    if (Test-Path -LiteralPath $backup -PathType Leaf) {
+                        try { Remove-Item -LiteralPath $backup -Force -ErrorAction Stop }
+                        catch { }
+                    }
+                }
+            }
+            else {
+                # Another writer may create the file after this test. The next bounded retry
+                # will take the replace path and never overwrite an unverified registry.
+                [IO.File]::Move($temporary, $Path)
+            }
+            $committed = $true
+            break
+        }
+        catch [IO.IOException] {
+            $lastCommitError = $_.Exception
+            if ($attempt -lt ($retryCount - 1)) {
+                Start-Sleep -Milliseconds (60 * ($attempt + 1))
+            }
+        }
+        finally {
+            if (Test-Path -LiteralPath $temporary -PathType Leaf) {
+                try { Remove-Item -LiteralPath $temporary -Force -ErrorAction Stop }
+                catch { }
+            }
+        }
     }
-    else {
-        [IO.File]::Move($temporary, $Path)
+    if (-not $committed) {
+        $detail = if ($null -eq $lastCommitError) { 'unknown file commit failure' } else { $lastCommitError.Message }
+        throw "Codex Session Registry 正在被其他会话提交，已重试 $retryCount 次但未取得文件提交权。原有登记保持不变；请稍后重试。原因：$detail"
     }
     Set-ESCodexPropertyValue $Registry 'schemaVersion' 2
     Set-ESCodexPropertyValue $Registry 'sourceSchemaVersion' 2
@@ -244,6 +290,27 @@ function Test-ESCodexProcessAlive([int]$ProcessId) {
     if ($ProcessId -le 0) { return $false }
     $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
     return $null -ne $process -and -not $process.HasExited
+}
+
+function Get-ESCodexTerminalHostProcessId([int]$ShellProcessId) {
+    if ($ShellProcessId -le 0) { return 0 }
+    $currentProcessId = $ShellProcessId
+    for ($depth = 0; $depth -lt 8 -and $currentProcessId -gt 0; $depth++) {
+        try {
+            $process = Get-CimInstance Win32_Process -Filter "ProcessId=$currentProcessId" -OperationTimeoutSec 1 -ErrorAction Stop
+            if ($null -eq $process) { break }
+            $parentProcessId = [int]$process.ParentProcessId
+            if ($parentProcessId -le 0 -or $parentProcessId -eq $currentProcessId) { break }
+            $parent = Get-Process -Id $parentProcessId -ErrorAction Stop
+            $processName = [string]$parent.ProcessName
+            if ($processName -eq 'wt' -or $processName.StartsWith('WindowsTerminal', [StringComparison]::OrdinalIgnoreCase)) {
+                return $parentProcessId
+            }
+            $currentProcessId = $parentProcessId
+        }
+        catch { break }
+    }
+    return 0
 }
 
 function Get-ESCodexCurrentProcessContext(

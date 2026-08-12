@@ -12,12 +12,12 @@ Use the existing ESAITest Runner. Do not create another runner, input source, re
 1. Read `Assets/Plugins/ES/AICommands/ESAITest_直接启动ESTEST_AI命令.md` as the authorization contract.
 2. Confirm the repository root, branch, HEAD, worktree, Unity version, and intended Unity project instance.
 3. Choose one execution surface:
-   - Unity Editor: invoke `【ES】/自动化/ESAITest/直接启动 ESTEST` through UnityMCP.
+   - Unity Editor: invoke `【ES】/自动化与开发/自动化中心/ESAITest/直接启动 ESTEST` through UnityMCP.
    - Player/CI: launch the explicitly supplied Player executable with `-esTest`; add `-esAITestQuit` only when requested.
    - Runtime C#: call `ESAITestPlayerBootstrap.TryStartESTEST(...)` when the host already provides an authorized code-execution bridge.
 4. Do not start a second Run when `ESAITestPlayerBootstrap.ActiveRunner` is non-null. Report the existing Run as busy.
 5. Observe the Runtime Dashboard and collect the Run report from `Application.persistentDataPath/ESAITest/<runId>/`.
-6. For cancellation, invoke `【ES】/自动化/ESAITest/中断当前 ESTEST` or call `ESAITestPlayerBootstrap.RequestCancel()` through the same authorized bridge.
+6. For cancellation, invoke `【ES】/自动化与开发/自动化中心/ESAITest/中断当前 ESTEST` or call `ESAITestPlayerBootstrap.RequestCancel()` through the same authorized bridge.
 7. Report the exact execution surface, RunId, status, report paths, and evidence level.
 
 ## Boundaries

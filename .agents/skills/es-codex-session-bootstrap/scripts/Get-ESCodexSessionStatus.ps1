@@ -82,10 +82,69 @@ $observations = foreach ($record in $records) {
     $effectiveLaunchToken = if (-not [string]::IsNullOrWhiteSpace([string]$record.launchToken)) { [string]$record.launchToken } elseif ($null -ne $launchState) { [string](Get-ESCodexPropertyValue $launchState 'launchToken' '') } else { '' }
     $effectiveSnapshotDirectory = if (-not [string]::IsNullOrWhiteSpace([string]$record.handoffSnapshotDirectory)) { [string]$record.handoffSnapshotDirectory } elseif ($null -ne $launchState) { [string](Get-ESCodexPropertyValue $launchState 'handoffSnapshotDirectory' '') } else { '' }
     $effectiveTerminalMode = if (-not [string]::IsNullOrWhiteSpace([string]$record.terminalMode)) { [string]$record.terminalMode } elseif ($null -ne $launchState) { [string](Get-ESCodexPropertyValue $launchState 'terminalMode' '') } else { '' }
+    $effectiveTerminalWindowName = if (-not [string]::IsNullOrWhiteSpace([string]$record.terminalWindowName)) { [string]$record.terminalWindowName } elseif ($null -ne $launchState) { [string](Get-ESCodexPropertyValue $launchState 'terminalWindowName' '') } else { '' }
     $effectiveWindowKey = if (-not [string]::IsNullOrWhiteSpace([string]$record.windowKey)) { [string]$record.windowKey } elseif ($null -ne $launchState) { [string](Get-ESCodexPropertyValue $launchState 'windowKey' '') } else { '' }
     $effectiveWtSession = if (-not [string]::IsNullOrWhiteSpace([string]$record.wtSession)) { [string]$record.wtSession } elseif ($null -ne $launchState) { [string](Get-ESCodexPropertyValue $launchState 'wtSession' '') } else { '' }
-    $processAlive = Test-ESCodexProcessAlive $effectiveProcessId
-    $matchingTabs = @(if ([string]::IsNullOrWhiteSpace([string]$record.tabTitle)) { @() } else { @($visibleTabs | Where-Object title -eq ([string]$record.tabTitle)) })
+    $isClaimedExternal = [string]$record.lifecycleStatus -eq 'ClaimedExternal'
+    $externalClaimProcessIdentityValid = $true
+    if ($isClaimedExternal) {
+        $externalClaimProcessId = [int](Get-ESCodexPropertyValue $record 'externalClaimProcessId' 0)
+        $externalClaimStartedText = [string](Get-ESCodexPropertyValue $record 'externalClaimProcessStartedAtUtc' '')
+        $externalClaimStartedAt = [DateTime]::MinValue
+        if ($externalClaimProcessId -le 0 -or -not [DateTime]::TryParse($externalClaimStartedText, [ref]$externalClaimStartedAt)) {
+            $externalClaimProcessIdentityValid = $false
+        }
+        else {
+            try {
+                $externalClaimProcess = Get-Process -Id $externalClaimProcessId -ErrorAction Stop
+                $externalClaimProcessIdentityValid = -not $externalClaimProcess.HasExited -and
+                    $externalClaimProcess.ProcessName.Equals('cmd', [StringComparison]::OrdinalIgnoreCase) -and
+                    $externalClaimProcess.StartTime.ToUniversalTime().Ticks -eq $externalClaimStartedAt.ToUniversalTime().Ticks
+            }
+            catch { $externalClaimProcessIdentityValid = $false }
+        }
+        $effectiveProcessId = $externalClaimProcessId
+    }
+    $processAlive = if ($isClaimedExternal) { $externalClaimProcessIdentityValid } else { Test-ESCodexProcessAlive $effectiveProcessId }
+    $recordedTerminalWindowProcessId = [int]$record.terminalWindowProcessId
+    $launchStateTerminalWindowProcessId = if ($null -ne $launchState) {
+        [int](Get-ESCodexPropertyValue $launchState 'terminalWindowProcessId' 0)
+    }
+    else { 0 }
+    $effectiveTerminalWindowProcessId = if ($recordedTerminalWindowProcessId -gt 0) {
+        $recordedTerminalWindowProcessId
+    }
+    elseif ($launchStateTerminalWindowProcessId -gt 0) {
+        $launchStateTerminalWindowProcessId
+    }
+    else { 0 }
+    $terminalWindowProcessIdentitySource = if ($recordedTerminalWindowProcessId -gt 0) {
+        'Registry'
+    }
+    elseif ($launchStateTerminalWindowProcessId -gt 0) {
+        'LaunchState'
+    }
+    else {
+        'Unavailable'
+    }
+    if (-not $isClaimedExternal -and $effectiveTerminalWindowProcessId -le 0 -and $processAlive -and
+        $effectiveTerminalMode -ne 'PlainCmd') {
+        $observedTerminalWindowProcessId = Get-ESCodexTerminalHostProcessId $effectiveProcessId
+        if ($observedTerminalWindowProcessId -gt 0) {
+            $effectiveTerminalWindowProcessId = $observedTerminalWindowProcessId
+            $terminalWindowProcessIdentitySource = 'ProcessAncestryObservation'
+        }
+    }
+    $matchingTabs = @(if ($isClaimedExternal -or $effectiveTerminalMode -eq 'PlainCmd' -or
+            [string]::IsNullOrWhiteSpace([string]$record.tabTitle) -or $effectiveTerminalWindowProcessId -le 0) {
+            @()
+        }
+        else {
+            @($visibleTabs | Where-Object {
+                    $_.windowProcessId -eq $effectiveTerminalWindowProcessId -and
+                    $_.title -eq ([string]$record.tabTitle)
+                })
+        })
     $envelopeExists = -not [string]::IsNullOrWhiteSpace([string]$record.envelopePath) -and (Test-Path -LiteralPath ([string]$record.envelopePath) -PathType Leaf)
     $snapshotExists = -not [string]::IsNullOrWhiteSpace($effectiveSnapshotDirectory) -and (Test-Path -LiteralPath $effectiveSnapshotDirectory -PathType Container)
     $launchPhase = [string](Get-ESCodexPropertyValue $record 'launchPhase' '')
@@ -126,8 +185,34 @@ $observations = foreach ($record in $records) {
     if ([string]::IsNullOrWhiteSpace([string]$record.launchToken) -and -not [string]::IsNullOrWhiteSpace($effectiveLaunchToken)) { $authorityGaps += 'launchToken' }
     if ([string]::IsNullOrWhiteSpace([string]$record.handoffSnapshotDirectory) -and -not [string]::IsNullOrWhiteSpace($effectiveSnapshotDirectory)) { $authorityGaps += 'handoffSnapshotDirectory' }
     if ([string]::IsNullOrWhiteSpace([string]$record.terminalMode) -and $null -ne $launchState) { $authorityGaps += 'terminalIdentity' }
+    if (-not $isClaimedExternal -and $effectiveTerminalMode -ne 'PlainCmd' -and $effectiveTerminalWindowProcessId -le 0) { $authorityGaps += 'terminalWindowProcessId' }
+    elseif ($terminalWindowProcessIdentitySource -eq 'ProcessAncestryObservation') { $authorityGaps += 'terminalWindowProcessIdObserved' }
+    $terminalMappingStatus = if ($isClaimedExternal) {
+        if ($processAlive) { 'ClaimedExternalCmd' } else { 'ClaimedExternalCmdMissingOrReused' }
+    }
+    elseif ($effectiveTerminalMode -eq 'PlainCmd') {
+        if ($processAlive) { 'ExactCmdProcess' } else { 'ProcessMissing' }
+    }
+    elseif (-not $uiAvailable) {
+        'TerminalUiUnobserved'
+    }
+    elseif ($effectiveTerminalWindowProcessId -le 0) {
+        'TerminalHostUnresolved'
+    }
+    elseif ($matchingTabs.Count -eq 1) {
+        'UniqueTabInExactTerminalHost'
+    }
+    elseif ($matchingTabs.Count -eq 0) {
+        'TabMissingInExactTerminalHost'
+    }
+    else {
+        'AmbiguousTabInExactTerminalHost'
+    }
     $status = if ([string]$record.lifecycleStatus -eq 'Closed') {
         'Closed'
+    }
+    elseif ($isClaimedExternal) {
+        if ($processAlive) { 'ClaimedExternal' } else { 'ClaimedExternalProcessMissing' }
     }
     elseif ($startupFailed -or $launchPhase -eq 'Failed' -or [string]$record.lifecycleStatus -eq 'LaunchFailed') {
         'LaunchFailed'
@@ -137,7 +222,7 @@ $observations = foreach ($record in $records) {
         elseif ($promptObserved -or $launchPhase -eq 'PromptObserved') { 'PendingAcceptance' }
         else { 'PendingPrompt' }
     }
-    elseif ($uiAvailable -and $matchingTabs.Count -gt 1) {
+    elseif ($uiAvailable -and $effectiveTerminalWindowProcessId -gt 0 -and $matchingTabs.Count -gt 1) {
         'AmbiguousTab'
     }
     elseif (-not $processAlive -and $uiAvailable -and $matchingTabs.Count -eq 0) {
@@ -146,7 +231,7 @@ $observations = foreach ($record in $records) {
     elseif (-not $processAlive) {
         'ProcessMissing'
     }
-    elseif ($uiAvailable -and $effectiveTerminalMode -ne 'PlainCmd' -and $matchingTabs.Count -eq 0) {
+    elseif ($uiAvailable -and $effectiveTerminalMode -ne 'PlainCmd' -and $effectiveTerminalWindowProcessId -gt 0 -and $matchingTabs.Count -eq 0) {
         'TabMissing'
     }
     else {
@@ -163,7 +248,11 @@ $observations = foreach ($record in $records) {
         registeredProcessId = [int]$record.processId
         processAlive = $processAlive
         terminalMode = $effectiveTerminalMode
+        terminalWindowName = $effectiveTerminalWindowName
         windowKey = $effectiveWindowKey
+        terminalWindowProcessId = $effectiveTerminalWindowProcessId
+        terminalWindowProcessIdentitySource = $terminalWindowProcessIdentitySource
+        terminalMappingStatus = $terminalMappingStatus
         wtSession = $effectiveWtSession
         visibleTabCount = $matchingTabs.Count
         visibleWindows = @($matchingTabs | ForEach-Object { [pscustomobject]@{ windowProcessId = $_.windowProcessId; windowHandle = $_.windowHandle; windowTitle = $_.windowTitle } })
@@ -183,6 +272,13 @@ $observations = foreach ($record in $records) {
         startupFailureReason = $startupFailureReason
         acceptanceReceiptPath = $acceptanceReceiptPath
         startupDiagnosticPath = $startupDiagnosticPath
+        externalClaimId = [string](Get-ESCodexPropertyValue $record 'externalClaimId' '')
+        externalClaimState = [string](Get-ESCodexPropertyValue $record 'externalClaimState' '')
+        externalClaimDirectory = [string](Get-ESCodexPropertyValue $record 'externalClaimDirectory' '')
+        externalClaimProcessId = [int](Get-ESCodexPropertyValue $record 'externalClaimProcessId' 0)
+        externalClaimProcessStartedAtUtc = [string](Get-ESCodexPropertyValue $record 'externalClaimProcessStartedAtUtc' '')
+        externalClaimAcceptedAtUtc = [string](Get-ESCodexPropertyValue $record 'externalClaimAcceptedAtUtc' '')
+        externalClaimProcessIdentityValid = $externalClaimProcessIdentityValid
         lastSeenUtc = [string]$record.lastSeenUtc
         closedAtUtc = [string]$record.closedAtUtc
         availability = [string]$record.availability

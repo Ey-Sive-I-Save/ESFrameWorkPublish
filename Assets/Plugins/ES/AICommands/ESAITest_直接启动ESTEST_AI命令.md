@@ -32,10 +32,10 @@ Packages/com.esframework.aitest/README.md
 
 ```text
 Unity Editor 启动菜单：
-【ES】/自动化/ESAITest/直接启动 ESTEST
+【ES】/自动化与开发/自动化中心/ESAITest/直接启动 ESTEST
 
 Unity Editor 安全取消菜单：
-【ES】/自动化/ESAITest/中断当前 ESTEST
+【ES】/自动化与开发/自动化中心/ESAITest/中断当前 ESTEST
 
 Player / CI：
 <明确的 Player 路径> -esTest [-esAITestQuit]

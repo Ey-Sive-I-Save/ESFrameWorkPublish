@@ -39,7 +39,7 @@
 - EnumKey-only、StringKey-only、Enum+String 同一声明均可接受；双别名冲突必须拒绝 Bake/绑定。
 - `displayName` 只用于 Picker、Inspector 和调试，不可作为身份或运行时查找键。
 - `ESFloatStatSnapshot` 与 `CopyDebugModifiersTo` 是冷路径。调试仅显示 OwnerId/SourceId 等数值诊断，不让集合常驻保存 Buff、Item、GameObject 等业务对象引用。
-- 运行时数值面板必须使用 `MenuItemPathDefine.STAT_RUNTIME_PANEL_PATH`，入口是 `【ES】/运行时诊断/属性系统/运行时面板`。禁止新增 `ES/...`、`Tools/...` 或硬编码根菜单；该窗口只读，不得变成直接修改战斗状态的入口。
+- 运行时数值面板必须使用 `MenuItemPathDefine.STAT_RUNTIME_PANEL_PATH`，入口是 `【ES】/验证与诊断/运行时监视/属性系统/打开运行时面板`。禁止新增 `ES/...`、`Tools/...` 或硬编码根菜单；该窗口只读，不得变成直接修改战斗状态的入口。
 - Snapshot 或调试 List 如需稳定 0 GC，调用方必须复用并预热自己的 List 容量；不得把调试 API 放进普通 Tick。
 
 ## P1：池化与热身性能

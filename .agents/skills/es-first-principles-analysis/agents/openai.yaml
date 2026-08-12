@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES 第一性原理分析"
+  short_description: "从事实、约束和机制重审 ES 设计与根因"
+  default_prompt: "Use $es-first-principles-analysis to reassess this ESFramework decision from facts, constraints, mechanisms, failure conditions, and minimal verification."

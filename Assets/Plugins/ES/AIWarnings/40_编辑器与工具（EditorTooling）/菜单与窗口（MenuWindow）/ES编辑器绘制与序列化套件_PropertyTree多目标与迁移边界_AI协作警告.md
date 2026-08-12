@@ -8,6 +8,8 @@
 
 - 资产的 Unity 序列化字段和 `SerializeReference` 数据是唯一权威；Drawer、PropertyTree、VisualElement、类型目录和 SessionState 都只是编辑投影或 UI 状态。
 - 禁止以窗口静态字段、折叠状态、选择缓存或 PropertyTree 缓存作为第二份真源，更不得在重选/域重载后把缓存反写覆盖资产。
+- 同一业务对象可以被多个窗口查看，但每个窗口必须独立拥有自己的 OdinEditor、PropertyTree、SerializedObject 和临时桥接对象；这些实例不得跨窗口复用，也不得复制出第二份业务数据。
+- 临时桥接对象只负责把权威数据暴露给绘制层，解绑、重选、窗口销毁和 Domain Reload 时必须释放；重建后只能从当前资产与稳定身份重新解析。
 - `ESEditorSectionAttributeProcessor` 基于 Odin Attribute Processor 解析 Begin/continue/End Section 并重写 GroupID 维持嵌套。Section 语义由声明和 Processor 解析决定，禁止依赖偶然的绘制顺序或手工拼 GroupID。
 - `ESEditorSectionNavigatorIMGUI` 使用 `SessionState` 保存导航选择；该状态只服务当前编辑器会话，不能写入业务配置或迁移数据。
 

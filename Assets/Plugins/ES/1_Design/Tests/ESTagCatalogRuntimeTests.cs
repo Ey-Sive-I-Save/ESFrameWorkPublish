@@ -1558,6 +1558,604 @@ namespace ES.Tests
             }
         }
 
+        [Test]
+        public void ZoneProfile_TracksEntityItemAndPlainColliderMembers()
+        {
+            GameObject zoneObject = new GameObject("ESTagCatalogRuntimeTests_GenericZone");
+            GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_ZoneEntity");
+            GameObject itemObject = new GameObject("ESTagCatalogRuntimeTests_ZoneItem");
+            GameObject markerObject = new GameObject("ESTagCatalogRuntimeTests_ZoneMarker");
+            try
+            {
+                zoneObject.SetActive(false);
+                zoneObject.layer = ESPhysicsLayers.TriggerZone;
+                BoxCollider zoneCollider = zoneObject.AddComponent<BoxCollider>();
+                zoneCollider.isTrigger = true;
+                ESZone zone = zoneObject.AddComponent<ESZone>();
+                ESZoneProfile profile = zoneObject.AddComponent<ESZoneProfile>();
+                zoneObject.SetActive(true);
+
+                Entity entity = entityObject.AddComponent<Entity>();
+                GameObject firstEntityColliderObject = new GameObject("FirstEntityCollider");
+                firstEntityColliderObject.transform.SetParent(entityObject.transform);
+                BoxCollider firstEntityCollider = firstEntityColliderObject.AddComponent<BoxCollider>();
+                GameObject secondEntityColliderObject = new GameObject("SecondEntityCollider");
+                secondEntityColliderObject.transform.SetParent(entityObject.transform);
+                BoxCollider secondEntityCollider = secondEntityColliderObject.AddComponent<BoxCollider>();
+
+                Item item = itemObject.AddComponent<Item>();
+                BoxCollider itemCollider = itemObject.AddComponent<BoxCollider>();
+                BoxCollider markerCollider = markerObject.AddComponent<BoxCollider>();
+
+                MethodInfo enter = typeof(ESZone).GetMethod("OnTriggerEnter", BindingFlags.Instance | BindingFlags.NonPublic);
+                MethodInfo exit = typeof(ESZone).GetMethod("OnTriggerExit", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(enter, Is.Not.Null);
+                Assert.That(exit, Is.Not.Null);
+
+                enter.Invoke(zone, new object[] { firstEntityCollider });
+                enter.Invoke(zone, new object[] { secondEntityCollider });
+                enter.Invoke(zone, new object[] { itemCollider });
+                enter.Invoke(zone, new object[] { markerCollider });
+
+                Assert.That(zone.ActiveMemberCount, Is.EqualTo(3));
+                Assert.That(profile.RuntimeContext.ActiveMemberCount, Is.Zero,
+                    "A marker-only Profile must not allocate a redundant member ledger.");
+                Assert.That(zone.Contains(entity), Is.True);
+                Assert.That(zone.Contains(item), Is.True);
+                Assert.That(zone.Contains(markerCollider), Is.True);
+
+                var members = new List<ESZoneMember>();
+                zone.CopyMembersTo(members);
+                Assert.That(members.Count, Is.EqualTo(3));
+
+                exit.Invoke(zone, new object[] { firstEntityCollider });
+                Assert.That(zone.ActiveMemberCount, Is.EqualTo(3),
+                    "One Entity remains inside until all of its colliders leave.");
+
+                exit.Invoke(zone, new object[] { secondEntityCollider });
+                Assert.That(zone.ActiveMemberCount, Is.EqualTo(2));
+                Assert.That(zone.Contains(entity), Is.False);
+
+                zoneObject.SetActive(false);
+                Assert.That(zone.ActiveMemberCount, Is.Zero);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(markerObject);
+                UnityEngine.Object.DestroyImmediate(itemObject);
+                UnityEngine.Object.DestroyImmediate(entityObject);
+                UnityEngine.Object.DestroyImmediate(zoneObject);
+            }
+        }
+
+        [Test]
+        public void ZoneProfileSettings_ProvideMarkerTagsPriorityAndRejectDuplicates()
+        {
+            GameObject zoneObject = new GameObject("ESTagCatalogRuntimeTests_MarkerZone");
+            try
+            {
+                BoxCollider collider = zoneObject.AddComponent<BoxCollider>();
+                collider.isTrigger = true;
+                ESZone zone = zoneObject.AddComponent<ESZone>();
+                ESZoneProfile profile = zoneObject.AddComponent<ESZoneProfile>();
+                ESTagStableReference markerTag = ESTagStableReference.FromString("tests.zone.marker");
+                GetZoneSemanticTags(profile.Settings).Add(markerTag);
+                SetPrivateField(profile.Settings, "priority", 7);
+
+                var issues = new List<string>();
+                Assert.That(profile.ValidateProfile(issues), Is.True, string.Join("\n", issues));
+                Assert.That(zone.HasSemanticTag(markerTag), Is.True);
+                Assert.That(zone.Priority, Is.EqualTo(7));
+
+                GetZoneSemanticTags(profile.Settings).Add(markerTag);
+                issues.Clear();
+                Assert.That(profile.ValidateProfile(issues), Is.False);
+                Assert.That(string.Join("\n", issues), Does.Contain("重复"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(zoneObject);
+            }
+        }
+
+        [Test]
+        public void ZoneProfileEntityEffect_MultiColliderExitAndDisable_ReleaseOnlyOwnedEffects()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.zone.effect", 4096, ESTagAvailability.Runtime);
+            BuffDefinitionDataInfo buffDefinition = ScriptableObject.CreateInstance<BuffDefinitionDataInfo>();
+            GameObject zoneObject = new GameObject("ESTagCatalogRuntimeTests_EffectZone");
+            GameObject entityObject = new GameObject("ESTagCatalogRuntimeTests_ZoneEntity");
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+
+                zoneObject.SetActive(false);
+                zoneObject.layer = ESPhysicsLayers.TriggerZone;
+                BoxCollider zoneCollider = zoneObject.AddComponent<BoxCollider>();
+                zoneCollider.isTrigger = true;
+                ESZone zone = zoneObject.AddComponent<ESZone>();
+                ESZoneProfile profile = zoneObject.AddComponent<ESZoneProfile>();
+                var entityEffects = new ESZoneProfileEntityEffectExtensionSettings();
+                GetZoneExtensions(profile.Settings).Add(entityEffects);
+                GetEntityEffectTags(entityEffects).Add(
+                    ESTagStableReference.FromString("tests.zone.effect"));
+
+                buffDefinition.name = "ZoneEffectBuff";
+                buffDefinition.sharedData.key.enumKey = ESBuffEnumKey.Custom;
+                buffDefinition.sharedData.duration = -1f;
+                buffDefinition.sharedData.sourceIsolationMode = ESBuffSourceIsolationMode.ByCustomSourceId;
+                buffDefinition.sharedData.stackMode = ESBuffStackMode.StackSameBuff;
+                GetEntityEffectBuffs(entityEffects).Add(buffDefinition);
+                zoneObject.SetActive(true);
+
+                Entity entity = entityObject.AddComponent<Entity>();
+                GameObject firstColliderObject = new GameObject("FirstCollider");
+                firstColliderObject.transform.SetParent(entityObject.transform);
+                BoxCollider firstCollider = firstColliderObject.AddComponent<BoxCollider>();
+                GameObject secondColliderObject = new GameObject("SecondCollider");
+                secondColliderObject.transform.SetParent(entityObject.transform);
+                BoxCollider secondCollider = secondColliderObject.AddComponent<BoxCollider>();
+
+                Assert.That(zone.TryValidateConfiguration(out string zoneValidationError), Is.True, zoneValidationError);
+                var issues = new List<string>();
+                Assert.That(profile.ValidateProfile(issues), Is.True, string.Join("\n", issues));
+                MethodInfo enter = typeof(ESZone).GetMethod("OnTriggerEnter", BindingFlags.Instance | BindingFlags.NonPublic);
+                MethodInfo exit = typeof(ESZone).GetMethod("OnTriggerExit", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(enter, Is.Not.Null);
+                Assert.That(exit, Is.Not.Null);
+
+                enter.Invoke(zone, new object[] { firstCollider });
+                enter.Invoke(zone, new object[] { secondCollider });
+
+                Assert.That(zone.ActiveMemberCount, Is.EqualTo(1));
+                Assert.That(profile.GetExtensionRuntime<ESZoneProfileEntityEffectExtensionRuntime>().ActiveEntityCount, Is.EqualTo(1));
+                Assert.That(entity.Tags.GetCount(ESTagId.FromInt32(4096)), Is.EqualTo(1),
+                    "Multiple colliders from one Entity must share one zone Tag lease set.");
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.EqualTo(1),
+                    "Multiple colliders from one Entity must share one zone Buff instance.");
+
+                exit.Invoke(zone, new object[] { firstCollider });
+                Assert.That(zone.ActiveMemberCount, Is.EqualTo(1));
+                Assert.That(profile.GetExtensionRuntime<ESZoneProfileEntityEffectExtensionRuntime>().ActiveEntityCount, Is.EqualTo(1));
+                Assert.That(entity.Tags.GetCount(ESTagId.FromInt32(4096)), Is.EqualTo(1));
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.EqualTo(1));
+
+                exit.Invoke(zone, new object[] { secondCollider });
+                Assert.That(zone.ActiveMemberCount, Is.Zero);
+                Assert.That(profile.GetExtensionRuntime<ESZoneProfileEntityEffectExtensionRuntime>().ActiveEntityCount, Is.Zero);
+                Assert.That(entity.Tags.GetCount(ESTagId.FromInt32(4096)), Is.Zero);
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.Zero);
+
+                enter.Invoke(zone, new object[] { firstCollider });
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.EqualTo(1));
+
+                profile.enabled = false;
+                Assert.That(zone.ActiveMemberCount, Is.EqualTo(1),
+                    "Disabling the Profile must not remove the Zone's spatial member fact.");
+                Assert.That(profile.GetExtensionRuntime<ESZoneProfileEntityEffectExtensionRuntime>().ActiveEntityCount, Is.Zero);
+                Assert.That(entity.Tags.GetCount(ESTagId.FromInt32(4096)), Is.Zero);
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.Zero);
+
+                profile.enabled = true;
+                Assert.That(profile.GetExtensionRuntime<ESZoneProfileEntityEffectExtensionRuntime>().ActiveEntityCount, Is.EqualTo(1),
+                    "Re-enabling a Profile must apply it to members already inside the Zone.");
+                Assert.That(entity.Tags.GetCount(ESTagId.FromInt32(4096)), Is.EqualTo(1));
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.EqualTo(1));
+
+                zoneObject.SetActive(false);
+                Assert.That(zone.ActiveMemberCount, Is.Zero);
+                Assert.That(profile.GetExtensionRuntime<ESZoneProfileEntityEffectExtensionRuntime>().ActiveEntityCount, Is.Zero);
+                Assert.That(entity.Tags.GetCount(ESTagId.FromInt32(4096)), Is.Zero);
+                Assert.That(entity.buffDomain.ActiveBuffCount, Is.Zero);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(entityObject);
+                UnityEngine.Object.DestroyImmediate(zoneObject);
+                UnityEngine.Object.DestroyImmediate(buffDefinition);
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void Zone_DestroyedCollider_IsRemovedByBudgetedCleanup()
+        {
+            GameObject zoneObject = new GameObject("ESTagCatalogRuntimeTests_DestroyedColliderZone");
+            GameObject memberObject = new GameObject("ESTagCatalogRuntimeTests_DestroyedColliderMember");
+            try
+            {
+                BoxCollider zoneCollider = zoneObject.AddComponent<BoxCollider>();
+                zoneCollider.isTrigger = true;
+                ESZone zone = zoneObject.AddComponent<ESZone>();
+                BoxCollider memberCollider = memberObject.AddComponent<BoxCollider>();
+
+                MethodInfo enter = typeof(ESZone).GetMethod(
+                    "OnTriggerEnter",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                MethodInfo cleanup = typeof(ESZone).GetMethod(
+                    "CleanupStaleColliders",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(enter, Is.Not.Null);
+                Assert.That(cleanup, Is.Not.Null);
+
+                enter.Invoke(zone, new object[] { memberCollider });
+                Assert.That(zone.ActiveMemberCount, Is.EqualTo(1));
+
+                UnityEngine.Object.DestroyImmediate(memberCollider);
+                cleanup.Invoke(zone, null);
+
+                Assert.That(zone.ActiveMemberCount, Is.Zero,
+                    "A destroyed Collider must not leave a permanent Zone occupant when Unity omits Exit.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(memberObject);
+                UnityEngine.Object.DestroyImmediate(zoneObject);
+            }
+        }
+
+        [Test]
+        public void Zone_MultiColliderSwapBack_PreservesRemainingOverlapIndex()
+        {
+            GameObject zoneObject = new GameObject("ESTagCatalogRuntimeTests_SwapBackZone");
+            GameObject memberObject = new GameObject("ESTagCatalogRuntimeTests_SwapBackMember");
+            try
+            {
+                BoxCollider zoneCollider = zoneObject.AddComponent<BoxCollider>();
+                zoneCollider.isTrigger = true;
+                ESZone zone = zoneObject.AddComponent<ESZone>();
+                BoxCollider first = memberObject.AddComponent<BoxCollider>();
+                BoxCollider second = memberObject.AddComponent<BoxCollider>();
+
+                MethodInfo enter = typeof(ESZone).GetMethod(
+                    "OnTriggerEnter",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                MethodInfo exit = typeof(ESZone).GetMethod(
+                    "OnTriggerExit",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(enter, Is.Not.Null);
+                Assert.That(exit, Is.Not.Null);
+
+                enter.Invoke(zone, new object[] { first });
+                enter.Invoke(zone, new object[] { second });
+                exit.Invoke(zone, new object[] { first });
+                Assert.That(zone.ActiveMemberCount, Is.EqualTo(1));
+
+                exit.Invoke(zone, new object[] { second });
+                Assert.That(zone.ActiveMemberCount, Is.Zero,
+                    "The collider moved by swap-back must retain its updated cleanup index.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(memberObject);
+                UnityEngine.Object.DestroyImmediate(zoneObject);
+            }
+        }
+
+        [Test]
+        public void ZoneProfileEntityEffect_NonEntityMember_DoesNotCreateProfileLedger()
+        {
+            ESTagBakeTable catalog = CreateCatalog("tests.zone.entity-only", 4097, ESTagAvailability.Runtime);
+            GameObject zoneObject = new GameObject("ESTagCatalogRuntimeTests_EntityOnlyZone");
+            GameObject markerObject = new GameObject("ESTagCatalogRuntimeTests_EntityOnlyMarker");
+            try
+            {
+                ESTagRuntimeCatalog.Bind(catalog, catalog.SchemaHash);
+                zoneObject.SetActive(false);
+                BoxCollider zoneCollider = zoneObject.AddComponent<BoxCollider>();
+                zoneCollider.isTrigger = true;
+                ESZone zone = zoneObject.AddComponent<ESZone>();
+                ESZoneProfile profile = zoneObject.AddComponent<ESZoneProfile>();
+                var entityEffects = new ESZoneProfileEntityEffectExtensionSettings();
+                GetZoneExtensions(profile.Settings).Add(entityEffects);
+                GetEntityEffectTags(entityEffects).Add(
+                    ESTagStableReference.FromString("tests.zone.entity-only"));
+                zoneObject.SetActive(true);
+
+                BoxCollider markerCollider = markerObject.AddComponent<BoxCollider>();
+                MethodInfo enter = typeof(ESZone).GetMethod(
+                    "OnTriggerEnter",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(enter, Is.Not.Null);
+                enter.Invoke(zone, new object[] { markerCollider });
+
+                Assert.That(zone.ActiveMemberCount, Is.EqualTo(1));
+                Assert.That(profile.RuntimeContext.ActiveMemberCount, Is.Zero,
+                    "An Entity-only Extension must ignore Item and marker members without allocating Profile state.");
+                Assert.That(
+                    profile.GetExtensionRuntime<ESZoneProfileEntityEffectExtensionRuntime>().ActiveEntityCount,
+                    Is.Zero);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(markerObject);
+                UnityEngine.Object.DestroyImmediate(zoneObject);
+                UnityEngine.Object.DestroyImmediate(catalog);
+            }
+        }
+
+        [Test]
+        public void ZoneProfileEntityEffect_RejectsSharedFiniteBuffConfiguration()
+        {
+            BuffDefinitionDataInfo buffDefinition = ScriptableObject.CreateInstance<BuffDefinitionDataInfo>();
+            GameObject zoneObject = new GameObject("ESTagCatalogRuntimeTests_InvalidEffectZone");
+            try
+            {
+                zoneObject.SetActive(false);
+                zoneObject.layer = ESPhysicsLayers.TriggerZone;
+                BoxCollider zoneCollider = zoneObject.AddComponent<BoxCollider>();
+                zoneCollider.isTrigger = true;
+                zoneObject.AddComponent<ESZone>();
+                ESZoneProfile profile = zoneObject.AddComponent<ESZoneProfile>();
+                var entityEffects = new ESZoneProfileEntityEffectExtensionSettings();
+                GetZoneExtensions(profile.Settings).Add(entityEffects);
+
+                buffDefinition.name = "UnsafeZoneBuff";
+                buffDefinition.sharedData.key.enumKey = ESBuffEnumKey.Custom;
+                buffDefinition.sharedData.duration = 5f;
+                buffDefinition.sharedData.sourceIsolationMode = ESBuffSourceIsolationMode.IgnoreSource;
+                buffDefinition.sharedData.stackMode = ESBuffStackMode.StackSameBuff;
+                GetEntityEffectBuffs(entityEffects).Add(buffDefinition);
+
+                var issues = new List<string>();
+                Assert.That(profile.ValidateProfile(issues), Is.False);
+                Assert.That(string.Join("\n", issues), Does.Contain("无限持续"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(zoneObject);
+                UnityEngine.Object.DestroyImmediate(buffDefinition);
+            }
+        }
+
+        [Test]
+        public void ZoneProfile_MemberFailureRollsBackCurrentAndPriorExtensionsInReverseOrder()
+        {
+            GameObject zoneObject = new GameObject("ESTagCatalogRuntimeTests_ZoneRollback");
+            GameObject memberObject = new GameObject("ESTagCatalogRuntimeTests_ZoneRollbackMember");
+            var events = new List<string>();
+            try
+            {
+                zoneObject.SetActive(false);
+                BoxCollider zoneCollider = zoneObject.AddComponent<BoxCollider>();
+                zoneCollider.isTrigger = true;
+                ESZone zone = zoneObject.AddComponent<ESZone>();
+                ESZoneProfile profile = zoneObject.AddComponent<ESZoneProfile>();
+                GetZoneExtensions(profile.Settings).Add(
+                    new ZoneProfileProbeSettings("a", 0, false, events));
+                GetZoneExtensions(profile.Settings).Add(
+                    new ZoneProfileProbeSettings("b", 10, true, events));
+                zoneObject.SetActive(true);
+
+                BoxCollider memberCollider = memberObject.AddComponent<BoxCollider>();
+                MethodInfo enter = typeof(ESZone).GetMethod(
+                    "OnTriggerEnter",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                enter.Invoke(zone, new object[] { memberCollider });
+
+                CollectionAssert.AreEqual(
+                    new[] { "enter:a", "enter:b", "exit:a" },
+                    events.FindAll(value => value.StartsWith("enter:") || value.StartsWith("exit:")));
+                Assert.That(profile.RuntimeContext.ActiveMemberCount, Is.Zero);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(memberObject);
+                UnityEngine.Object.DestroyImmediate(zoneObject);
+            }
+        }
+
+        [Test]
+        public void ZoneProfile_RejectsDuplicateTypeIdAndInvalidExtensionSchema()
+        {
+            GameObject zoneObject = new GameObject("ESTagCatalogRuntimeTests_ZoneValidation");
+            try
+            {
+                BoxCollider zoneCollider = zoneObject.AddComponent<BoxCollider>();
+                zoneCollider.isTrigger = true;
+                zoneObject.AddComponent<ESZone>();
+                ESZoneProfile profile = zoneObject.AddComponent<ESZoneProfile>();
+                GetZoneExtensions(profile.Settings).Add(
+                    new ZoneProfileProbeSettings("duplicate", 0, false, new List<string>()));
+                GetZoneExtensions(profile.Settings).Add(
+                    new ZoneProfileProbeSettings("duplicate", 10, false, new List<string>()));
+
+                var issues = new List<string>();
+                Assert.That(profile.ValidateProfile(issues), Is.False);
+                Assert.That(string.Join("\n", issues), Does.Contain("不能重复添加"));
+
+                GetZoneExtensions(profile.Settings).Clear();
+                GetZoneExtensions(profile.Settings).Add(
+                    new ZoneProfileProbeSettings("future", 0, false, new List<string>(), 2));
+                issues.Clear();
+                Assert.That(profile.ValidateProfile(issues), Is.False);
+                Assert.That(string.Join("\n", issues), Does.Contain("SchemaVersion"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(zoneObject);
+            }
+        }
+
+        [Test]
+        public void ZoneProfile_RejectsMoreExtensionsThanMemberMaskCapacity()
+        {
+            GameObject zoneObject = new GameObject("ESTagCatalogRuntimeTests_ZoneExtensionCapacity");
+            var events = new List<string>();
+            try
+            {
+                BoxCollider zoneCollider = zoneObject.AddComponent<BoxCollider>();
+                zoneCollider.isTrigger = true;
+                zoneObject.AddComponent<ESZone>();
+                ESZoneProfile profile = zoneObject.AddComponent<ESZoneProfile>();
+                List<ESZoneProfileExtensionSettings> extensions = GetZoneExtensions(profile.Settings);
+                for (int i = 0; i <= ESZoneProfileRuntimeContext.MaxExtensionCount; i++)
+                    extensions.Add(new ZoneProfileProbeSettings("capacity-" + i, i, false, events));
+
+                var issues = new List<string>();
+                Assert.That(profile.ValidateProfile(issues), Is.False);
+                Assert.That(string.Join("\n", issues), Does.Contain("最多支持 64"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(zoneObject);
+            }
+        }
+
+        [Test]
+        public void ZoneProfile_PoolGenerationDoesNotRetainMemberRuntimeState()
+        {
+            GameObject zoneObject = new GameObject("ESTagCatalogRuntimeTests_ZonePool");
+            GameObject memberObject = new GameObject("ESTagCatalogRuntimeTests_ZonePoolMember");
+            try
+            {
+                zoneObject.SetActive(false);
+                BoxCollider zoneCollider = zoneObject.AddComponent<BoxCollider>();
+                zoneCollider.isTrigger = true;
+                ESZone zone = zoneObject.AddComponent<ESZone>();
+                ESZoneProfile profile = zoneObject.AddComponent<ESZoneProfile>();
+                zoneObject.SetActive(true);
+
+                profile.OnPoolSpawned();
+                int firstGeneration = profile.RuntimeContext.PoolGeneration;
+                BoxCollider memberCollider = memberObject.AddComponent<BoxCollider>();
+                MethodInfo enter = typeof(ESZone).GetMethod(
+                    "OnTriggerEnter",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                enter.Invoke(zone, new object[] { memberCollider });
+                Assert.That(profile.RuntimeContext.ActiveMemberCount, Is.EqualTo(1));
+
+                profile.OnPoolDespawned();
+                Assert.That(profile.RuntimeContext.ActiveMemberCount, Is.Zero);
+                Assert.That(profile.RuntimeContext.IsPoolSpawned, Is.False);
+
+                profile.OnPoolSpawned();
+                Assert.That(profile.RuntimeContext.PoolGeneration, Is.GreaterThan(firstGeneration));
+                Assert.That(profile.RuntimeContext.ActiveMemberCount, Is.Zero);
+                profile.OnPoolDespawned();
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(memberObject);
+                UnityEngine.Object.DestroyImmediate(zoneObject);
+            }
+        }
+
+        private static List<ESTagStableReference> GetZoneSemanticTags(ESZoneProfileSettings settings)
+        {
+            return GetPrivateField<List<ESTagStableReference>>(settings, "semanticTags");
+        }
+
+        private static List<ESZoneProfileExtensionSettings> GetZoneExtensions(
+            ESZoneProfileSettings settings)
+        {
+            return GetPrivateField<List<ESZoneProfileExtensionSettings>>(settings, "extensions");
+        }
+
+        private static List<ESTagStableReference> GetEntityEffectTags(
+            ESZoneProfileEntityEffectExtensionSettings settings)
+        {
+            return GetPrivateField<List<ESTagStableReference>>(settings, "tags");
+        }
+
+        private static List<BuffDefinitionDataInfo> GetEntityEffectBuffs(
+            ESZoneProfileEntityEffectExtensionSettings settings)
+        {
+            return GetPrivateField<List<BuffDefinitionDataInfo>>(settings, "buffs");
+        }
+
+        private static T GetPrivateField<T>(object target, string fieldName)
+        {
+            FieldInfo field = target.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            return (T)field.GetValue(target);
+        }
+
+        private static void SetPrivateField(object target, string fieldName, object value)
+        {
+            FieldInfo field = target.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            field.SetValue(target, value);
+        }
+
+        [Serializable]
+        private sealed class ZoneProfileProbeSettings : ESZoneProfileExtensionSettings
+        {
+            private readonly string id;
+            private readonly int order;
+            private readonly bool failMemberEnter;
+            private readonly List<string> events;
+            private readonly int schemaVersion;
+
+            public ZoneProfileProbeSettings(
+                string id,
+                int order,
+                bool failMemberEnter,
+                List<string> events,
+                int schemaVersion = 1)
+            {
+                this.id = id;
+                this.order = order;
+                this.failMemberEnter = failMemberEnter;
+                this.events = events;
+                this.schemaVersion = schemaVersion;
+            }
+
+            public override string TypeId => "tests.zone.probe." + id;
+            public override int SchemaVersion => schemaVersion;
+            public override int SupportedSchemaVersion => 1;
+            public override int DefaultOrder => order;
+            public override string NameTitleDefault => id;
+            public override bool Enabled => true;
+
+            public override ESZoneProfileExtensionRuntime CreateRuntime()
+            {
+                return new ZoneProfileProbeRuntime(id, failMemberEnter, events);
+            }
+        }
+
+        private sealed class ZoneProfileProbeRuntime : ESZoneProfileExtensionRuntime
+        {
+            private readonly string id;
+            private readonly bool failMemberEnter;
+            private readonly List<string> events;
+
+            public ZoneProfileProbeRuntime(
+                string id,
+                bool failMemberEnter,
+                List<string> events)
+            {
+                this.id = id;
+                this.failMemberEnter = failMemberEnter;
+                this.events = events;
+            }
+
+            public override ESZoneMemberEnterResult TryEnterMember(
+                ESZoneProfile profile,
+                ESZoneProfileRuntimeContext context,
+                ESZoneMember member,
+                out string error)
+            {
+                events.Add("enter:" + id);
+                error = failMemberEnter ? "expected" : null;
+                return failMemberEnter
+                    ? ESZoneMemberEnterResult.Failed
+                    : ESZoneMemberEnterResult.Entered;
+            }
+
+            public override void ExitMember(
+                ESZoneProfile profile,
+                ESZoneProfileRuntimeContext context,
+                ESZoneMember member)
+            {
+                events.Add("exit:" + id);
+            }
+        }
+
         private sealed class TagCountReceiver : IReceiveLink<ESTagCountChangedLink>
         {
             private readonly Action<ESTagCountChangedLink> callback;

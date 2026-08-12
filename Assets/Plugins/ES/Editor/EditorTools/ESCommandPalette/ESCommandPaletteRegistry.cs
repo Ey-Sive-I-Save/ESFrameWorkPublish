@@ -646,8 +646,6 @@ namespace ES
 
         private sealed class AICommandProvider : IESCommandPaletteProvider
         {
-            private const int MaximumIndexedFiles = 200;
-
             public string ProviderId => "es.aicommands";
             public string DisplayName => "AI 命令";
             public string Prefix => "$";
@@ -655,51 +653,33 @@ namespace ES
             public IReadOnlyList<ESCommandPaletteItem> BuildItems()
             {
                 var result = new List<ESCommandPaletteItem>();
-                string root = Path.Combine(
-                    ESCommandPalettePathPolicy.ProjectRoot,
-                    ESCommandPalettePathPolicy.AICommandRoot.Replace('/', Path.DirectorySeparatorChar));
-                if (!Directory.Exists(root))
+                if (!ESCommandPalettePathPolicy.TryReadAICommandCatalog(
+                        out List<ESAICommandCatalogEntry> entries, out _, out _))
                 {
                     return result;
                 }
 
-                string[] files = Directory.GetFiles(root, "*.md", SearchOption.TopDirectoryOnly);
-                Array.Sort(files, StringComparer.OrdinalIgnoreCase);
-                int count = Math.Min(files.Length, MaximumIndexedFiles);
-                for (int i = 0; i < count; i++)
+                for (int index = 0; index < entries.Count; index++)
                 {
-                    string relativePath = ToProjectRelativePath(files[i]);
-                    string title = Path.GetFileNameWithoutExtension(files[i]);
-                    result.Add(CreateFileItem(relativePath, title, "open", "打开 AICommand 文件", ESCommandPaletteActionKind.OpenFile));
-                    result.Add(CreateFileItem(relativePath, title + "（复制文本）", "copy-text", "复制 AICommand 文本", ESCommandPaletteActionKind.CopyText));
-                    result.Add(CreateFileItem(relativePath, title + "（复制路径）", "copy-path", "复制 AICommand 项目路径", ESCommandPaletteActionKind.CopyPath));
+                    ESAICommandCatalogEntry entry = entries[index];
+                    result.Add(new ESCommandPaletteItem(
+                        entry.id,
+                        entry.title,
+                        BuildDescription(entry),
+                        "AICommand",
+                        entry.keywords + " " + entry.role + " " + entry.riskLevel + " " + entry.writeMode
+                            + " " + entry.path,
+                        "$",
+                        entry.path,
+                        ESCommandPaletteActionKind.OpenFile));
                 }
 
                 return result;
             }
 
-            private static ESCommandPaletteItem CreateFileItem(
-                string relativePath,
-                string title,
-                string operation,
-                string description,
-                ESCommandPaletteActionKind actionKind)
+            private static string BuildDescription(ESAICommandCatalogEntry entry)
             {
-                return new ESCommandPaletteItem(
-                    relativePath + ":" + operation,
-                    title,
-                    description,
-                    "AICommand",
-                    relativePath,
-                    "$",
-                    relativePath,
-                    actionKind);
-            }
-
-            private static string ToProjectRelativePath(string fullPath)
-            {
-                string projectRoot = ESCommandPalettePathPolicy.ProjectRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                return fullPath.Substring(projectRoot.Length + 1).Replace('\\', '/');
+                return entry.summary + " · " + entry.riskLevel + " · " + entry.writeMode;
             }
         }
 

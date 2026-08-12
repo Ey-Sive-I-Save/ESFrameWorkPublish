@@ -1,12 +1,35 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
 
 namespace ES
 {
+    [System.Serializable]
+    public sealed class ESAICommandCatalogEntry
+    {
+        public string id = string.Empty;
+        public string path = string.Empty;
+        public string title = string.Empty;
+        public string summary = string.Empty;
+        public string role = string.Empty;
+        public string riskLevel = string.Empty;
+        public string writeMode = string.Empty;
+        public string keywords = string.Empty;
+    }
+
+    [System.Serializable]
+    internal sealed class ESAICommandCatalogDocument
+    {
+        public int schemaVersion;
+        public string catalogTitle = string.Empty;
+        public string catalogPurpose = string.Empty;
+        public ESAICommandCatalogEntry[] commands = System.Array.Empty<ESAICommandCatalogEntry>();
+    }
+
     public sealed class ESWindowDescriptor
     {
         public ESWindowDescriptor(string windowId, string menuPath, string title, string category, string keywords)
@@ -138,8 +161,18 @@ namespace ES
     {
         public const int MaximumFileBytes = 1024 * 1024;
         public const string AICommandRoot = "Assets/Plugins/ES/AICommands";
+        public const string AICommandCatalogPath = AICommandRoot + "/AICommandCatalog.json";
         public const string GlobalDataRoot = "Assets/ESNormalAssets/Data/GlobalData";
+        private const int StableReadAttempts = 2;
         private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
+        private static readonly HashSet<string> AllowedAICommandRoles = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "information", "review", "controlled-execution", "candidate-generation", "handover"
+        };
+        private static readonly HashSet<string> AllowedAICommandWriteModes = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "read-only", "scoped-write", "candidate-only", "documentation-write", "external-run"
+        };
 
         public static string ProjectRoot
         {
@@ -152,73 +185,311 @@ namespace ES
 
         public static bool TryValidateAICommandFile(string projectRelativePath, out string normalizedPath, out string reason)
         {
-            normalizedPath = string.Empty;
-            reason = string.Empty;
+            return TryResolveAICommandFile(projectRelativePath, ".md", true, out normalizedPath,
+                out _, out reason);
+        }
 
+        /// <summary>
+        /// Loads the small discovery catalog only. It validates paths and catalog metadata, but it
+        /// deliberately does not read every Markdown contract. The selected contract is read and
+        /// hashed later, immediately before it is handed to an AI session.
+        /// </summary>
+        public static bool TryReadAICommandCatalog(out List<ESAICommandCatalogEntry> entries,
+            out string catalogHash, out string reason)
+        {
+            entries = new List<ESAICommandCatalogEntry>();
+            catalogHash = string.Empty;
+            reason = string.Empty;
+            if (!TryResolveAICommandFile(AICommandCatalogPath, ".json", true, out _, out string fullPath,
+                    out reason))
+            {
+                return false;
+            }
+
+            if (!TryReadStableUtf8File(fullPath, out string text, out catalogHash, out reason))
+            {
+                return false;
+            }
+
+            ESAICommandCatalogDocument document;
+            try
+            {
+                document = JsonUtility.FromJson<ESAICommandCatalogDocument>(text);
+            }
+            catch (Exception exception)
+            {
+                reason = "AICommand 目录 JSON 解析失败：" + exception.Message;
+                return false;
+            }
+
+            if (document == null || document.schemaVersion != 1 || document.commands == null)
+            {
+                reason = "AICommand 目录 schemaVersion 必须为 1 且包含 commands";
+                return false;
+            }
+
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            var paths = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < document.commands.Length; index++)
+            {
+                ESAICommandCatalogEntry entry = document.commands[index];
+                if (!TryValidateAICommandCatalogEntry(entry, ids, paths, out reason))
+                {
+                    reason = "AICommand 目录第 " + (index + 1) + " 项无效：" + reason;
+                    return false;
+                }
+                if (!TryResolveAICommandFile(entry.path, ".md", false, out string normalizedPath,
+                        out _, out reason))
+                {
+                    reason = "AICommand 目录项 " + entry.id + " 指向无效合同：" + reason;
+                    return false;
+                }
+                entry.path = normalizedPath;
+                entries.Add(entry);
+            }
+
+            if (entries.Count == 0)
+            {
+                reason = "AICommand 目录没有可选择的任务合同";
+                return false;
+            }
+            return true;
+        }
+
+        public static bool TryCreateAICommandReference(string commandId, string expectedPath,
+            string expectedCatalogHash, string expectedCommandHash, out ESAICommandCatalogEntry entry,
+            out string reference, out string reason)
+        {
+            entry = null;
+            reference = string.Empty;
+            reason = string.Empty;
+            if (!TryReadAICommandCatalog(out List<ESAICommandCatalogEntry> entries, out string catalogHash,
+                    out reason))
+            {
+                return false;
+            }
+            if (!string.Equals(catalogHash, expectedCatalogHash, StringComparison.Ordinal))
+            {
+                reason = "AICommand 目录已变化；请重新选择任务合同后再发送";
+                return false;
+            }
+
+            for (int index = 0; index < entries.Count; index++)
+            {
+                ESAICommandCatalogEntry candidate = entries[index];
+                if (string.Equals(candidate.id, commandId, StringComparison.Ordinal)
+                    && string.Equals(candidate.path, expectedPath, StringComparison.Ordinal))
+                {
+                    entry = candidate;
+                    break;
+                }
+            }
+            if (entry == null)
+            {
+                reason = "已选 AICommand 不再位于当前目录；请重新选择";
+                return false;
+            }
+
+            if (!TryReadAICommandContract(entry.path, out _, out string commandHash, out reason))
+            {
+                return false;
+            }
+            if (!string.Equals(commandHash, expectedCommandHash, StringComparison.Ordinal))
+            {
+                reason = "AICommand 正文已变化；请重新选择并确认当前合同后再发送";
+                return false;
+            }
+
+            reference = "合同版本：1\n"
+                + "合同 ID：" + entry.id + "\n"
+                + "合同角色：" + entry.role + "\n"
+                + "风险等级：" + entry.riskLevel + "\n"
+                + "写入模式：" + entry.writeMode + "\n"
+                + "合同路径（项目相对路径）：" + entry.path + "\n"
+                + "合同 SHA-256：" + commandHash + "\n"
+                + "目录 SHA-256：" + catalogHash + "\n"
+                + "摘要：" + entry.summary + "\n"
+                + "执行门禁：必须先用 UTF-8 读取该 Markdown 全文并重新计算 SHA-256；"
+                + "若与上述 Hash 不同，停止执行并报告合同漂移。该目录摘要不替代正文，也不扩大用户当前授权。";
+            return true;
+        }
+
+        public static bool TryReadAICommandContract(string projectRelativePath, out string text,
+            out string sha256, out string reason)
+        {
+            text = string.Empty;
+            sha256 = string.Empty;
+            if (!TryResolveAICommandFile(projectRelativePath, ".md", true, out _, out string fullPath,
+                    out reason))
+            {
+                return false;
+            }
+            return TryReadStableUtf8File(fullPath, out text, out sha256, out reason);
+        }
+
+        private static bool TryValidateAICommandCatalogEntry(ESAICommandCatalogEntry entry,
+            ISet<string> ids, ISet<string> paths, out string reason)
+        {
+            reason = string.Empty;
+            if (entry == null)
+            {
+                reason = "目录项为空";
+                return false;
+            }
+            if (!IsSafeCatalogId(entry.id) || !ids.Add(entry.id))
+            {
+                reason = "id 必须唯一且只使用小写字母、数字、点和连字符：" + (entry.id ?? string.Empty);
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(entry.title) || entry.title.Trim().Length > 80
+                || string.IsNullOrWhiteSpace(entry.summary) || entry.summary.Trim().Length > 240)
+            {
+                reason = "title 或 summary 缺失或超过目录展示上限";
+                return false;
+            }
+            if (!AllowedAICommandRoles.Contains(entry.role ?? string.Empty)
+                || !AllowedAICommandWriteModes.Contains(entry.writeMode ?? string.Empty)
+                || !(entry.riskLevel == "L1" || entry.riskLevel == "L2" || entry.riskLevel == "L3"))
+            {
+                reason = "role、writeMode 或 riskLevel 不在允许枚举内";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(entry.keywords) || entry.keywords.Trim().Length > 320)
+            {
+                reason = "keywords 缺失或超过目录展示上限";
+                return false;
+            }
+            if (!paths.Add(entry.path ?? string.Empty))
+            {
+                reason = "path 重复：" + (entry.path ?? string.Empty);
+                return false;
+            }
+            return true;
+        }
+
+        private static bool IsSafeCatalogId(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length < 3 || value.Length > 80)
+                return false;
+            for (int index = 0; index < value.Length; index++)
+            {
+                char character = value[index];
+                bool allowed = character >= 'a' && character <= 'z'
+                    || character >= '0' && character <= '9'
+                    || character == '.' || character == '-';
+                if (!allowed)
+                    return false;
+            }
+            return value[0] != '.' && value[0] != '-';
+        }
+
+        private static bool TryResolveAICommandFile(string projectRelativePath, string requiredExtension,
+            bool validateUtf8, out string normalizedPath, out string fullPath, out string reason)
+        {
+            normalizedPath = string.Empty;
+            fullPath = string.Empty;
+            reason = string.Empty;
             if (string.IsNullOrWhiteSpace(projectRelativePath))
             {
                 reason = "文件路径为空";
                 return false;
             }
-
             if (Path.IsPathRooted(projectRelativePath))
             {
                 reason = "拒绝绝对路径";
                 return false;
             }
-
             string candidate = projectRelativePath.Replace('\\', '/').Trim();
             string[] segments = candidate.Split('/');
-            for (int i = 0; i < segments.Length; i++)
+            for (int index = 0; index < segments.Length; index++)
             {
-                if (segments[i] == ".." || segments[i] == "." || segments[i].Length == 0)
+                if (segments[index] == ".." || segments[index] == "." || segments[index].Length == 0)
                 {
                     reason = "路径包含空段或目录穿越";
                     return false;
                 }
             }
-
             if (!candidate.StartsWith(AICommandRoot + "/", StringComparison.Ordinal)
-                || !candidate.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+                || !candidate.EndsWith(requiredExtension, StringComparison.OrdinalIgnoreCase))
             {
                 reason = "文件不在 AICommand 受管根或扩展名不允许";
                 return false;
             }
 
             string projectRoot = ProjectRoot;
-            string managedRoot = Path.GetFullPath(Path.Combine(projectRoot, AICommandRoot.Replace('/', Path.DirectorySeparatorChar)));
-            string fullPath = Path.GetFullPath(Path.Combine(projectRoot, candidate.Replace('/', Path.DirectorySeparatorChar)));
-            if (!IsSameOrChildPath(managedRoot, fullPath) || !File.Exists(fullPath))
+            string managedRoot = Path.GetFullPath(Path.Combine(projectRoot,
+                AICommandRoot.Replace('/', Path.DirectorySeparatorChar)));
+            string candidateFullPath = Path.GetFullPath(Path.Combine(projectRoot,
+                candidate.Replace('/', Path.DirectorySeparatorChar)));
+            if (!IsSameOrChildPath(managedRoot, candidateFullPath) || !File.Exists(candidateFullPath))
             {
                 reason = "文件不存在或越出 AICommand 受管根";
                 return false;
             }
-
-            if (ContainsReparsePoint(projectRoot, fullPath))
+            if (ContainsReparsePoint(projectRoot, candidateFullPath))
             {
                 reason = "路径穿过 junction 或 symlink";
                 return false;
             }
-
             try
             {
-                var fileInfo = new FileInfo(fullPath);
+                var fileInfo = new FileInfo(candidateFullPath);
                 if (fileInfo.Length > MaximumFileBytes)
                 {
                     reason = "文件超过 1 MiB 上限";
                     return false;
                 }
-
-                StrictUtf8.GetString(File.ReadAllBytes(fullPath));
+                if (validateUtf8)
+                    StrictUtf8.GetString(File.ReadAllBytes(candidateFullPath));
             }
             catch (Exception exception)
             {
                 reason = "文件不是严格 UTF-8 或无法读取：" + exception.Message;
                 return false;
             }
-
             normalizedPath = candidate;
+            fullPath = candidateFullPath;
             return true;
+        }
+
+        private static bool TryReadStableUtf8File(string fullPath, out string text, out string sha256,
+            out string reason)
+        {
+            text = string.Empty;
+            sha256 = string.Empty;
+            reason = string.Empty;
+            for (int attempt = 0; attempt < StableReadAttempts; attempt++)
+            {
+                try
+                {
+                    byte[] first = File.ReadAllBytes(fullPath);
+                    string firstHash = ComputeSha256(first);
+                    string decoded = StrictUtf8.GetString(first);
+                    byte[] second = File.ReadAllBytes(fullPath);
+                    if (string.Equals(firstHash, ComputeSha256(second), StringComparison.Ordinal))
+                    {
+                        text = decoded;
+                        sha256 = firstHash;
+                        return true;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    reason = "AICommand 读取失败：" + exception.Message;
+                    return false;
+                }
+            }
+            reason = "AICommand 在读取期间发生变化；请等待写入完成后重试";
+            return false;
+        }
+
+        private static string ComputeSha256(byte[] bytes)
+        {
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] hash = sha.ComputeHash(bytes ?? System.Array.Empty<byte>());
+                return BitConverter.ToString(hash).Replace("-", string.Empty);
+            }
         }
 
         public static bool IsRegisteredScene(string projectRelativePath)

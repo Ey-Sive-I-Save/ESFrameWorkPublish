@@ -109,5 +109,25 @@ namespace ES.Tests
             Assert.That(ESCmdAgentWindow.DoesPersistedOperationMatchLocalSessionForTests(
                 "local-a", "local-a", "session-b", "session-a", "record-a", "record-a"), Is.False);
         }
+
+        [Test]
+        public void AICommandReference_RequiresTheCurrentCatalogAndContractHashes()
+        {
+            Assert.That(ESCommandPalettePathPolicy.TryReadAICommandCatalog(
+                out System.Collections.Generic.List<ESAICommandCatalogEntry> commands,
+                out string catalogHash, out string reason), Is.True, reason);
+            ESAICommandCatalogEntry command = commands[0];
+            Assert.That(ESCommandPalettePathPolicy.TryReadAICommandContract(command.path,
+                out _, out string commandHash, out reason), Is.True, reason);
+
+            Assert.That(ESCmdAgentWindow.TryCreateAICommandReferenceForTests(command.id, command.path,
+                catalogHash, commandHash, out string reference, out string error), Is.True, error);
+            StringAssert.Contains(command.path, reference);
+            StringAssert.Contains(commandHash, reference);
+
+            Assert.That(ESCmdAgentWindow.TryCreateAICommandReferenceForTests(command.id, command.path,
+                catalogHash, "stale-hash", out _, out error), Is.False);
+            StringAssert.Contains("变化", error);
+        }
     }
 }

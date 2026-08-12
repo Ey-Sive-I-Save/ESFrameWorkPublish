@@ -303,6 +303,13 @@ namespace ES
         public bool contextAccepted;
         public string aiWarningsAttachedAtUtc = string.Empty;
         public string aiWarningsChainFingerprint = string.Empty;
+        // A selected command is a reference to the source-of-truth Markdown contract, never an
+        // embedded copy. All four values must still match immediately before dispatch.
+        public string aiCommandId = string.Empty;
+        public string aiCommandPath = string.Empty;
+        public string aiCommandCatalogSha256 = string.Empty;
+        public string aiCommandSha256 = string.Empty;
+        public string aiCommandSelectedAtUtc = string.Empty;
         public int visibleTerminalTabCount;
         // Legacy persisted fields are migration-only. They are zeroed during normalization and
         // never participate in current session discovery, control, or delivery semantics.
@@ -350,7 +357,7 @@ namespace ES
     [Serializable]
     internal sealed class ESCmdAgentWorkspaceState
     {
-        public int version = 11;
+        public int version = 12;
         public int revision;
         public string selectedSessionId = string.Empty;
         public List<ESCmdAgentSession> sessions = new List<ESCmdAgentSession>();
@@ -358,7 +365,7 @@ namespace ES
 
     internal static class ESCmdAgentStateStore
     {
-        internal const int CurrentSchemaVersion = 11;
+        internal const int CurrentSchemaVersion = 12;
         private const string StateFileName = "workspace-state.json";
         private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
         private static readonly Mutex WorkspaceStateWriteMutex = new Mutex(false,
@@ -1908,8 +1915,10 @@ namespace ES
         private TextField composer;
         private VisualElement responsibilityPanel;
         private Button responsibilityPresetButton;
+        private Button aiCommandPickerButton;
         private TextField responsibilityField;
         private Label responsibilityCounter;
+        private Label aiCommandSelectionLabel;
         private Button sendButton;
         private Button stopButton;
         private Button contextToggleButton;
@@ -2153,6 +2162,13 @@ namespace ES
             labels = entries.Select(entry => entry.label).ToArray();
             values = entries.Select(entry => entry.value).ToArray();
             return loaded;
+        }
+
+        internal static bool TryCreateAICommandReferenceForTests(string commandId, string commandPath,
+            string catalogHash, string commandHash, out string reference, out string error)
+        {
+            return ESCommandPalettePathPolicy.TryCreateAICommandReference(commandId, commandPath,
+                catalogHash, commandHash, out _, out reference, out error);
         }
 
         public static bool TrySelectManagedStatusRecordForTests(string json, string sessionId,
@@ -3350,6 +3366,10 @@ namespace ES
             aiWarnings.AddToClassList("es-agent-secondary-button");
             aiWarnings.AddToClassList("es-agent-aiwarnings-button");
             actions.Add(aiWarnings);
+            aiCommandPickerButton = new Button(ShowAICommandPicker) { text = "选择 AICommand" };
+            aiCommandPickerButton.tooltip = "选择一份任务合同。只发送路径、摘要和实时 Hash；AI 必须自行读取原文。";
+            aiCommandPickerButton.AddToClassList("es-agent-secondary-button");
+            actions.Add(aiCommandPickerButton);
             Button bindResponsibility = new Button(RequestResponsibilityBinding) { text = "设为职责会话" };
             bindResponsibility.tooltip = "把当前受管会话绑定为唯一职责入口，用于精确恢复、消息路由和跨会话协作。";
             bindResponsibility.AddToClassList("es-agent-secondary-button");
@@ -3361,6 +3381,10 @@ namespace ES
             sendButton.AddToClassList("es-agent-primary-button");
             actions.Add(sendButton);
             panel.Add(actions);
+            aiCommandSelectionLabel = new Label();
+            aiCommandSelectionLabel.AddToClassList("es-agent-shortcut-hint");
+            panel.Add(aiCommandSelectionLabel);
+            UpdateAICommandSelectionPresentation();
             return panel;
         }
 
@@ -5890,13 +5914,36 @@ namespace ES
                 return Reject("发送前必须附加 AIWarnings 固定加载链：" + selectedSession.status);
             }
 
+            if (!TryBuildSelectedAICommandContext(out ESCmdAgentContextEntry aiCommandContext,
+                    out string aiCommandError))
+            {
+                selectedSession.draft = visiblePrompt;
+                SaveState();
+                return Reject(aiCommandError);
+            }
+
+            var dispatchContext = new List<ESCmdAgentContextEntry>(selectedSession.pendingContext ??
+                new List<ESCmdAgentContextEntry>());
+            if (aiCommandContext != null)
+            {
+                int commandCost = BuildContextPrefix(aiCommandContext.kind, aiCommandContext.label).Length
+                    + aiCommandContext.value.Length + PromptContextSuffix.Length;
+                if (PendingContextCharacters(dispatchContext) + commandCost > MaxExplicitContextChars)
+                {
+                    selectedSession.draft = visiblePrompt;
+                    SaveState();
+                    return Reject("已选 AICommand 合同引用无法放入当前 48K 上下文预算；请移除部分待发送内容后重试。");
+                }
+                dispatchContext.Add(aiCommandContext);
+            }
+
             List<ESCmdAgentContextEntry> ambientContext = CollectAmbientContext();
             selectedSession.responsibility = LimitResponsibility(selectedSession.responsibility, true);
-            string contextSummary = BuildContextSummary(selectedSession.pendingContext, ambientContext);
+            string contextSummary = BuildContextSummary(dispatchContext, ambientContext);
             contextSummary = "职责：" + selectedSession.responsibility
                 + (string.IsNullOrWhiteSpace(contextSummary) ? string.Empty : " · " + contextSummary);
             string promptForCodex = BuildPrompt(visiblePrompt, selectedSession.responsibility,
-                selectedSession.pendingContext, ambientContext);
+                dispatchContext, ambientContext);
             EmphasizeResponsibility();
             ESCmdAgentManagedOperationKind kind;
             ESCmdAgentBootstrapRequest request;
@@ -6414,6 +6461,7 @@ namespace ES
             if (composer != null)
                 composer.SetValueWithoutNotify(selectedSession?.draft ?? string.Empty);
             SyncResponsibilityFromSession();
+            UpdateAICommandSelectionPresentation();
         }
 
         private void SyncResponsibilityFromSession()
@@ -7690,6 +7738,206 @@ namespace ES
             RefreshContextPanel();
             UpdateSessionPresentation(selectedSession, false);
             composer?.Focus();
+        }
+
+        private void ShowAICommandPicker()
+        {
+            if (selectedSession == null)
+                return;
+            if (!ESCommandPalettePathPolicy.TryReadAICommandCatalog(out List<ESAICommandCatalogEntry> entries,
+                    out string catalogHash, out string error))
+            {
+                Reject("AICommand 目录不可用：" + error);
+                return;
+            }
+
+            CloseOverlay();
+            VisualElement overlay = new VisualElement { name = "es-agent-overlay" };
+            overlay.AddToClassList("es-agent-overlay");
+            VisualElement dialog = new VisualElement();
+            dialog.AddToClassList("es-agent-dialog");
+            Label title = new Label("选择 AICommand 任务合同");
+            title.AddToClassList("es-agent-dialog-title");
+            dialog.Add(title);
+            dialog.Add(new Label("目录只用于发现。发送前会重新读取所选 Markdown 并核对 SHA-256；"
+                + "合同变化时必须重新选择。未选择时按普通需求发送，不会自动扩大授权。"));
+
+            TextField filter = new TextField("筛选") { value = string.Empty };
+            filter.AddToClassList("es-agent-dialog-input");
+            dialog.Add(filter);
+            var content = new ScrollView(ScrollViewMode.Vertical);
+            content.AddToClassList("es-agent-claim-candidate-list");
+            dialog.Add(content);
+
+            void Rebuild(string query)
+            {
+                content.Clear();
+                string needle = (query ?? string.Empty).Trim();
+                int visible = 0;
+                for (int index = 0; index < entries.Count; index++)
+                {
+                    ESAICommandCatalogEntry entry = entries[index];
+                    string searchable = entry.title + " " + entry.summary + " " + entry.keywords + " "
+                        + entry.role + " " + entry.riskLevel + " " + entry.writeMode;
+                    if (!string.IsNullOrWhiteSpace(needle)
+                        && searchable.IndexOf(needle, StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        continue;
+                    }
+                    visible++;
+                    bool current = string.Equals(selectedSession.aiCommandId, entry.id, StringComparison.Ordinal)
+                        && string.Equals(selectedSession.aiCommandPath, entry.path, StringComparison.Ordinal);
+                    Button option = new Button(() => SelectAICommand(entry, catalogHash))
+                    {
+                        text = entry.title + " · " + entry.riskLevel + " · " + WriteModeDisplayName(entry.writeMode)
+                    };
+                    option.tooltip = entry.summary + "\n" + entry.path;
+                    option.AddToClassList("es-agent-resume-item");
+                    option.EnableInClassList("selected", current);
+                    content.Add(option);
+                }
+                if (visible == 0)
+                    content.Add(new Label("没有匹配的 AICommand。可改用更短的关键词，或清除筛选。"));
+            }
+
+            filter.RegisterValueChangedCallback(evt => Rebuild(evt.newValue));
+            Rebuild(string.Empty);
+            VisualElement actions = new VisualElement();
+            actions.AddToClassList("es-agent-inline-actions");
+            Button clear = new Button(ClearSelectedAICommand) { text = "不使用合同" };
+            clear.tooltip = "清除当前页签已选的 AICommand；不会修改命令文件。";
+            clear.AddToClassList("es-agent-secondary-button");
+            actions.Add(clear);
+            Button cancel = new Button(CloseOverlay) { text = "取消" };
+            cancel.AddToClassList("es-agent-secondary-button");
+            actions.Add(cancel);
+            dialog.Add(actions);
+            overlay.Add(dialog);
+            rootVisualElement.Add(overlay);
+            filter.schedule.Execute(filter.Focus).ExecuteLater(50);
+        }
+
+        private void SelectAICommand(ESAICommandCatalogEntry entry, string catalogHash)
+        {
+            if (selectedSession == null || entry == null)
+                return;
+            if (!ESCommandPalettePathPolicy.TryReadAICommandContract(entry.path, out _, out string commandHash,
+                    out string error))
+            {
+                Reject("AICommand 正文不可用：" + error);
+                return;
+            }
+            selectedSession.aiCommandId = entry.id;
+            selectedSession.aiCommandPath = entry.path;
+            selectedSession.aiCommandCatalogSha256 = catalogHash;
+            selectedSession.aiCommandSha256 = commandHash;
+            selectedSession.aiCommandSelectedAtUtc = DateTime.UtcNow.ToString("O");
+            selectedSession.status = "已选择 AICommand：" + entry.title + " · " + entry.riskLevel;
+            AppendProgress(selectedSession, "AICommand 已选择",
+                entry.title + " · " + entry.role + " · " + entry.writeMode
+                + "。发送前会重新核对目录和 Markdown 正文的 SHA-256。");
+            if (SaveState())
+            {
+                UpdateAICommandSelectionPresentation();
+                UpdateSessionPresentation(selectedSession, false);
+                CloseOverlay();
+                ShowNotification(new GUIContent("已选择 AICommand；发送前将再次验签。"));
+                PlayFeedback(ESEditorFeedbackSoundKind.Success);
+                composer?.Focus();
+            }
+        }
+
+        private void ClearSelectedAICommand()
+        {
+            if (selectedSession == null)
+                return;
+            bool hadSelection = !string.IsNullOrWhiteSpace(selectedSession.aiCommandId)
+                || !string.IsNullOrWhiteSpace(selectedSession.aiCommandPath);
+            selectedSession.aiCommandId = string.Empty;
+            selectedSession.aiCommandPath = string.Empty;
+            selectedSession.aiCommandCatalogSha256 = string.Empty;
+            selectedSession.aiCommandSha256 = string.Empty;
+            selectedSession.aiCommandSelectedAtUtc = string.Empty;
+            if (hadSelection)
+            {
+                selectedSession.status = "已清除 AICommand；下一次按普通需求发送。";
+                AppendProgress(selectedSession, "AICommand 已清除", "没有任务合同会随下一次发送附加。");
+            }
+            SaveState();
+            UpdateAICommandSelectionPresentation();
+            UpdateSessionPresentation(selectedSession, false);
+            CloseOverlay();
+            composer?.Focus();
+        }
+
+        private bool TryBuildSelectedAICommandContext(out ESCmdAgentContextEntry entry, out string error)
+        {
+            entry = null;
+            error = string.Empty;
+            if (selectedSession == null || string.IsNullOrWhiteSpace(selectedSession.aiCommandId)
+                && string.IsNullOrWhiteSpace(selectedSession.aiCommandPath)
+                && string.IsNullOrWhiteSpace(selectedSession.aiCommandCatalogSha256)
+                && string.IsNullOrWhiteSpace(selectedSession.aiCommandSha256))
+            {
+                return true;
+            }
+            if (selectedSession == null || string.IsNullOrWhiteSpace(selectedSession.aiCommandId)
+                || string.IsNullOrWhiteSpace(selectedSession.aiCommandPath)
+                || string.IsNullOrWhiteSpace(selectedSession.aiCommandCatalogSha256)
+                || string.IsNullOrWhiteSpace(selectedSession.aiCommandSha256))
+            {
+                error = "AICommand 选择状态不完整，已拒绝发送。请重新选择任务合同或清除该选择。";
+                return false;
+            }
+            if (!ESCommandPalettePathPolicy.TryCreateAICommandReference(selectedSession.aiCommandId,
+                    selectedSession.aiCommandPath, selectedSession.aiCommandCatalogSha256,
+                    selectedSession.aiCommandSha256, out ESAICommandCatalogEntry command, out string reference,
+                    out error))
+            {
+                selectedSession.status = "AICommand 验签失败：" + error;
+                AppendProgress(selectedSession, "AICommand 验签失败", error);
+                UpdateAICommandSelectionPresentation();
+                return false;
+            }
+            entry = new ESCmdAgentContextEntry
+            {
+                kind = "AICommand",
+                label = command.title,
+                value = reference
+            };
+            return true;
+        }
+
+        private void UpdateAICommandSelectionPresentation()
+        {
+            if (aiCommandSelectionLabel == null)
+                return;
+            if (selectedSession == null || string.IsNullOrWhiteSpace(selectedSession.aiCommandId)
+                || string.IsNullOrWhiteSpace(selectedSession.aiCommandPath))
+            {
+                aiCommandSelectionLabel.text = "AICommand：未选择 · 将按普通需求发送";
+                aiCommandPickerButton?.SetEnabled(true);
+                return;
+            }
+            string state = string.IsNullOrWhiteSpace(selectedSession.aiCommandSha256)
+                || string.IsNullOrWhiteSpace(selectedSession.aiCommandCatalogSha256)
+                ? "状态不完整，发送会阻止"
+                : "发送前重新验签";
+            aiCommandSelectionLabel.text = "AICommand：" + selectedSession.aiCommandId + " · " + state;
+            aiCommandPickerButton?.SetEnabled(true);
+        }
+
+        private static string WriteModeDisplayName(string writeMode)
+        {
+            switch (writeMode)
+            {
+                case "read-only": return "只读";
+                case "scoped-write": return "受限写入";
+                case "candidate-only": return "仅候选目录";
+                case "documentation-write": return "仅文档";
+                case "external-run": return "受控运行";
+                default: return "未知模式";
+            }
         }
 
         private bool AttachAIWarningsContext()

@@ -103,14 +103,13 @@ namespace ES
 
         internal void SetExtensions(List<ExtensionBinding> bindings)
         {
-            extensions ??= new List<ExtensionBinding>(bindings?.Count ?? 0);
-            extensions.Clear();
-            if (bindings != null)
-                extensions.AddRange(bindings);
+            extensions = bindings;
         }
 
         internal bool HasAnyState(ESZoneProfileExtensionLifecycleState state)
         {
+            if (extensions == null)
+                return false;
             for (int i = 0; i < extensions.Count; i++)
             {
                 if ((extensions[i].State & state) != 0)

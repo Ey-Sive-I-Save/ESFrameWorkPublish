@@ -489,7 +489,7 @@ namespace ES
         {
             if (enteredMask != 0UL)
                 runtimeContext.SetMember(member.Key,
-                    ESZoneProfileRuntimeContext.CreateMemberState(member, enteredMask);
+                    ESZoneProfileRuntimeContext.CreateMemberState(member, enteredMask));
         }
 
         private bool CreateRuntimeBindings(ESZoneProfileRuntimeContext context)

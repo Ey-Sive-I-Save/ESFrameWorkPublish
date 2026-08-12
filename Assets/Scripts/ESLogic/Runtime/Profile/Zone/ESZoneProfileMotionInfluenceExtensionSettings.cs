@@ -20,6 +20,7 @@ namespace ES
         public const int CurrentSchemaVersion = 1;
         public const int DefaultOrderValue = 100;
         public const string DefaultNameTitle = "运动影响";
+        public const int MaxPrewarmMemberCapacity = 256;
 
         [SerializeField, ReadOnly, LabelText("Schema 版本")]
         private int schemaVersion = CurrentSchemaVersion;
@@ -50,6 +51,8 @@ namespace ES
         };
         [SerializeField, LabelText("运动锁定许可")]
         private ESMotionInfluencePermissions permissions;
+        [SerializeField, LabelText("重叠组合")]
+        private ESMotionFieldBlendMode blendMode = ESMotionFieldBlendMode.Additive;
 
         [SerializeField, LabelText("影响 Entity")]
         private bool affectEntity = true;
@@ -64,7 +67,10 @@ namespace ES
         public override int DefaultOrder => DefaultOrderValue;
         public override string NameTitleDefault => DefaultNameTitle;
         public override bool Enabled => enabled;
-        public int PrewarmMemberCapacity => Mathf.Max(0, prewarmMemberCapacity);
+        public int PrewarmMemberCapacity => Mathf.Clamp(
+            prewarmMemberCapacity,
+            0,
+            MaxPrewarmMemberCapacity);
         public ESZoneMotionInfluenceMode Mode => mode;
         public ESMotionInfluencePermissions Permissions => permissions;
 
@@ -103,6 +109,7 @@ namespace ES
                 anchorPosition = zoneTransform != null ? zoneTransform.position : Vector3.zero,
                 attraction = attraction,
                 permissions = permissions,
+                blendMode = blendMode,
                 sourceId = sourceId,
                 priority = priority
             };
@@ -127,6 +134,36 @@ namespace ES
                 issues?.Add("Motion Influence Extension 至少需要启用一种接收目标。");
                 return false;
             }
+            if (prewarmMemberCapacity < 0
+                || prewarmMemberCapacity > MaxPrewarmMemberCapacity)
+            {
+                issues?.Add("Motion Influence 预热成员容量必须在 0 到 "
+                    + MaxPrewarmMemberCapacity + " 之间。");
+                return false;
+            }
+            if (mode == ESZoneMotionInfluenceMode.VelocityDelta
+                && !IsFinite(velocityDelta))
+            {
+                issues?.Add("Velocity Delta 必须是有限数。");
+                return false;
+            }
+            if (mode == ESZoneMotionInfluenceMode.Acceleration
+                && !IsFinite(acceleration))
+            {
+                issues?.Add("Acceleration 必须是有限数。");
+                return false;
+            }
+            if (mode == ESZoneMotionInfluenceMode.Attraction
+                && (!IsFinite(attraction.stopRadius)
+                    || !IsFinite(attraction.maxSpeed)
+                    || !IsFinite(attraction.maxAcceleration)
+                    || !IsFinite(attraction.response)
+                    || !IsFinite(attraction.stiffness)
+                    || !IsFinite(attraction.damping)))
+            {
+                issues?.Add("Attraction 参数必须全部是有限数。");
+                return false;
+            }
             if (mode == ESZoneMotionInfluenceMode.Attraction && attraction.maxAcceleration <= 0f)
             {
                 issues?.Add("Attraction 的 Max Acceleration 必须大于 0。");
@@ -147,6 +184,16 @@ namespace ES
                 return false;
             }
             return true;
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 
@@ -214,7 +261,15 @@ namespace ES
                 return ESZoneMemberEnterResult.Failed;
             }
 
-            leases.Add(member.Key, lease);
+            try
+            {
+                leases.Add(member.Key, lease);
+            }
+            catch
+            {
+                lease.Dispose();
+                throw;
+            }
             error = null;
             return ESZoneMemberEnterResult.Entered;
         }

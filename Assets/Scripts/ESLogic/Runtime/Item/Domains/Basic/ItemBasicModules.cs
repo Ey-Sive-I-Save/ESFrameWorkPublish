@@ -33,7 +33,10 @@ namespace ES
         [NonSerialized] private bool _hasPendingResult;
         [NonSerialized] private ShotMotionResult _pendingResult;
         [NonSerialized] private ESMotionInfluenceAccumulator _motionInfluences;
-        private static readonly RaycastHit[] TransformSweepHits = new RaycastHit[8];
+        [NonSerialized] private RaycastHit[] _transformSweepHits;
+
+        private const int InitialTransformSweepCapacity = 8;
+        private const int MaxTransformSweepCapacity = 64;
 
         public override void Start()
         {
@@ -65,8 +68,9 @@ namespace ES
         {
             if (!IsFinite(velocity))
                 return ESMotionSubmitResult.InvalidValue;
-            EnsureMotionInfluences().AddVelocity(velocity, permissions);
-            return ESMotionSubmitResult.Accepted;
+            return EnsureMotionInfluences().TryAddVelocity(velocity)
+                ? ESMotionSubmitResult.Accepted
+                : ESMotionSubmitResult.InvalidValue;
         }
 
         public bool TryAcquireField(
@@ -201,21 +205,33 @@ namespace ES
                 return position + displacement;
 
             Vector3 direction = displacement / distance;
-            int hitCount = Physics.SphereCastNonAlloc(
-                position,
-                Mathf.Max(0.001f, transformSweepRadius),
-                direction,
-                TransformSweepHits,
-                distance,
-                transformSweepMask,
-                QueryTriggerInteraction.Ignore);
+            RaycastHit[] sweepHits = EnsureTransformSweepBuffer();
+            int hitCount;
+            while (true)
+            {
+                hitCount = Physics.SphereCastNonAlloc(
+                    position,
+                    Mathf.Max(0.001f, transformSweepRadius),
+                    direction,
+                    sweepHits,
+                    distance,
+                    transformSweepMask,
+                    QueryTriggerInteraction.Ignore);
+                if (hitCount < sweepHits.Length
+                    || sweepHits.Length >= MaxTransformSweepCapacity)
+                    break;
+
+                int nextCapacity = Mathf.Min(MaxTransformSweepCapacity, sweepHits.Length * 2);
+                Array.Resize(ref _transformSweepHits, nextCapacity);
+                sweepHits = _transformSweepHits;
+            }
 
             float nearestDistance = float.PositiveInfinity;
             Vector3 nearestNormal = Vector3.zero;
             Transform ownerTransform = MyCore.transform;
             for (int i = 0; i < hitCount; i++)
             {
-                RaycastHit hit = TransformSweepHits[i];
+                RaycastHit hit = sweepHits[i];
                 Transform hitTransform = hit.collider != null ? hit.collider.transform : null;
                 if (hitTransform == null || hitTransform == ownerTransform
                     || hitTransform.IsChildOf(ownerTransform))
@@ -235,6 +251,11 @@ namespace ES
                 velocity -= nearestNormal * inwardSpeed;
             float travel = Mathf.Max(0f, nearestDistance - Mathf.Max(0f, transformSweepSkin));
             return position + direction * travel;
+        }
+
+        private RaycastHit[] EnsureTransformSweepBuffer()
+        {
+            return _transformSweepHits ??= new RaycastHit[InitialTransformSweepCapacity];
         }
 
         private ESMotionInfluenceAccumulator EnsureMotionInfluences()

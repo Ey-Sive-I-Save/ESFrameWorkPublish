@@ -888,7 +888,7 @@ namespace ES
             }
         }
 
-        public void SubmitClipState(string clipName, GameObject target, bool activate, bool isInside, float time)
+        public void UpdateClipPreviewState(string clipName, GameObject target, bool activate, bool isInside, float time)
         {
             if (target == null)
                 return;
@@ -1051,7 +1051,7 @@ namespace ES
 
             if (_trackSampler != null)
             {
-                _trackSampler.SubmitClipState(_debugName, _target, _activate, isInside, time);
+                _trackSampler.UpdateClipPreviewState(_debugName, _target, _activate, isInside, time);
                 return;
             }
 

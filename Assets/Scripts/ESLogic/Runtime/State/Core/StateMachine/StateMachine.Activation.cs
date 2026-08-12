@@ -333,7 +333,7 @@ namespace ES
             if (targetState == null) return false;
             layer = ResolveLayerForState(targetState, layer);
             var result = TestStateActivation(targetState, layer, ignoreInteractionWithState);
-            return ExecuteStateActivation(targetState, layer, result);
+            return TryApplyStateActivation(targetState, layer, result);
         }
 
         public bool TryActivateState(StateBase targetState, StateLayerType layer = StateLayerType.NotClear)
@@ -351,7 +351,7 @@ namespace ES
             if (targetState == null) return false;
             layer = ResolveLayerForState(targetState, layer);
             var result = TestStateActivation(targetState, layer);
-            return ExecuteStateActivation(targetState, layer, result);
+            return TryApplyStateActivation(targetState, layer, result);
         }
 
         public bool TryActivateState(string stateKey, StateLayerType layer = StateLayerType.NotClear)
@@ -414,12 +414,12 @@ namespace ES
             return hostEntity.Tags.Matches(condition);
         }
 
-        public bool ExecuteStateActivation(StateBase targetState, StateLayerType layer, in StateActivationResult result)
+        public bool TryApplyStateActivation(StateBase targetState, StateLayerType layer, in StateActivationResult result)
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (targetState == null) throw new ArgumentNullException(nameof(targetState));
-            if (targetState.stateSharedData == null) throw new InvalidOperationException("ExecuteStateActivation: targetState.stateSharedData 不能为空（状态必须先完成注册/初始化）");
-            if (targetState.stateSharedData.basicConfig == null) throw new InvalidOperationException("ExecuteStateActivation: targetState.stateSharedData.basicConfig 不能为空（状态必须先完成注册/初始化）");
+            if (targetState.stateSharedData == null) throw new InvalidOperationException("TryApplyStateActivation: targetState.stateSharedData 不能为空（状态必须先完成注册/初始化）");
+            if (targetState.stateSharedData.basicConfig == null) throw new InvalidOperationException("TryApplyStateActivation: targetState.stateSharedData.basicConfig 不能为空（状态必须先完成注册/初始化）");
 #else
             if (targetState == null || targetState.stateSharedData == null || targetState.stateSharedData.basicConfig == null) return false;
 #endif

@@ -32,7 +32,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void LockedVelocityDelta_RequiresMatchingPermission()
+        public void AcceptedVelocityDelta_IsNotLostWhenLockChangesBeforeConsumption()
         {
             var accumulator = new ESMotionInfluenceAccumulator();
             accumulator.AddVelocity(Vector3.right * 5f);
@@ -49,7 +49,7 @@ namespace ES.Tests
                 100f,
                 100f);
 
-            Assert.That(velocity, Is.EqualTo(Vector3.up * 2f));
+            Assert.That(velocity, Is.EqualTo(new Vector3(5f, 2f, 0f)));
         }
 
         [Test]
@@ -121,6 +121,48 @@ namespace ES.Tests
             for (int i = 0; i < leases.Length; i++)
                 leases[i].Dispose();
             Assert.That(accumulator.ActiveFieldCount, Is.Zero);
+            Assert.That(accumulator.FieldCapacity, Is.Zero);
+        }
+
+        [Test]
+        public void ImpulseOnly_DoesNotAllocateFieldStorage()
+        {
+            var accumulator = new ESMotionInfluenceAccumulator();
+
+            accumulator.AddVelocity(Vector3.right);
+
+            Assert.That(accumulator.FieldCapacity, Is.Zero);
+            Assert.That(accumulator.ActiveFieldCount, Is.Zero);
+            Assert.That(accumulator.HasPendingVelocityDelta, Is.True);
+        }
+
+        [Test]
+        public void FieldCapacity_IsBoundedAndReportsRejection()
+        {
+            var accumulator = new ESMotionInfluenceAccumulator(1);
+            var leases = new ESMotionFieldLease[ESMotionInfluenceAccumulator.MaxFieldCapacity];
+            for (int i = 0; i < leases.Length; i++)
+            {
+                Assert.That(accumulator.TryAcquireField(new ESMotionFieldRequest
+                {
+                    kind = ESMotionFieldKind.Acceleration,
+                    acceleration = Vector3.right,
+                    sourceId = (ulong)(i + 1)
+                }, out leases[i]), Is.True);
+            }
+
+            Assert.That(accumulator.TryAcquireField(new ESMotionFieldRequest
+            {
+                kind = ESMotionFieldKind.Acceleration,
+                acceleration = Vector3.up,
+                sourceId = 1000UL
+            }, out _), Is.False);
+            Assert.That(accumulator.FieldCapacity, Is.EqualTo(ESMotionInfluenceAccumulator.MaxFieldCapacity));
+            Assert.That(accumulator.RejectedFieldCount, Is.EqualTo(1));
+
+            for (int i = 0; i < leases.Length; i++)
+                leases[i].Dispose();
+            Assert.That(accumulator.FieldCapacity, Is.Zero);
         }
 
         [Test]
@@ -160,6 +202,29 @@ namespace ES.Tests
             Vector3 acceleration = ESMotionInfluenceSolver.EvaluateAttractionAcceleration(
                 Vector3.zero,
                 Vector3.right * 3f,
+                Vector3.right * 0.5f,
+                settings,
+                0.5f);
+
+            Assert.That(acceleration, Is.EqualTo(Vector3.left * 4f));
+        }
+
+        [Test]
+        public void RadialTargetVelocity_PreservesTangentialVelocity()
+        {
+            var settings = new ESMotionAttractionSettings
+            {
+                model = ESMotionAttractionModel.TargetVelocity,
+                velocityMode = ESMotionAttractionVelocityMode.RadialOnly,
+                stopRadius = 1f,
+                maxSpeed = 10f,
+                maxAcceleration = 4f,
+                response = 2f
+            };
+
+            Vector3 acceleration = ESMotionInfluenceSolver.EvaluateAttractionAcceleration(
+                Vector3.zero,
+                new Vector3(3f, 7f, 0f),
                 Vector3.right * 0.5f,
                 settings,
                 0.5f);

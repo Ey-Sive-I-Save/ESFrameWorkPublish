@@ -164,7 +164,7 @@ buffState.stateSharedData = new StateSharedData
 ### 性能优化
 
 ```csharp
-// 在ExecuteStateActivation中自动判断
+// 在 TryApplyStateActivation 中自动判断
 if (targetState.stateSharedData?.hasAnimation == true)
 {
     HotPlugStateToPlayable(targetState, pipeline);  // 只插入有动画的状态
@@ -245,7 +245,7 @@ private void HotUnplugStateFromPlayable(StateBase state, StatePipelineRuntime pi
 ### 调用时机
 
 ```csharp
-// 状态激活时 - ExecuteStateActivation()
+// 状态激活时 - TryApplyStateActivation()
 targetState.OnStateEnter();
 runningStates.Add(targetState);
 pipeline.runningStates.Add(targetState);

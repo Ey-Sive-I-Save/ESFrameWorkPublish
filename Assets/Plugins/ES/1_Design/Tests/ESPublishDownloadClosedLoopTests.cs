@@ -64,7 +64,7 @@ namespace ES.Tests
                 };
                 var catalog = new ESRuntimeCatalog
                 {
-                    formatVersion = 3,
+                    formatVersion = ESRuntimeCatalog.CurrentFormatVersion,
                     libraryName = "Self Test Library",
                     libraryFolder = libraryFolder,
                     libraryBundleCode = "self",

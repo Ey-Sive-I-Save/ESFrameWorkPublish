@@ -2853,6 +2853,97 @@ namespace ES.EditorInternal.Tests
             }
         }
 
+        [Test]
+        public void AISkillExecution_SceneScanReviewTemplateBakesCompleteWorkflow()
+        {
+            ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
+            try
+            {
+                ESAgentAuthoringGraphPreset.PopulateSceneScanReview(graph);
+                Assert.That(graph.Nodes.Count, Is.EqualTo(8));
+                Assert.That(graph.Edges.Count, Is.EqualTo(13));
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot snapshot,
+                    out List<ESGraphValidationIssue> graphIssues), Is.True, Describe(graphIssues));
+                Assert.That(new ESAISkillExecutionBaker().TryBake(snapshot,
+                    out ESAISkillExecutionSpec spec,
+                    out IReadOnlyList<ESGraphValidationIssue> executionIssues), Is.True,
+                    Describe(executionIssues));
+                Assert.That(spec.skillId, Is.EqualTo("es.skill.scene-scan-review"));
+                Assert.That(spec.steps.Count(step => step.output != null), Is.EqualTo(5));
+                Assert.That(spec.controlEdges.Any(edge =>
+                    edge.sourcePortKey == ESAgentGraphStableIds.SkillApprovedPortKey), Is.True);
+                Assert.That(spec.controlEdges.Any(edge =>
+                    edge.sourcePortKey == ESAgentGraphStableIds.SkillRejectedPortKey), Is.True);
+                Assert.That(spec.controlEdges.Any(edge =>
+                    edge.sourcePortKey == ESAgentGraphStableIds.SkillTimeoutPortKey), Is.True);
+                Assert.That(spec.controlEdges.Any(edge =>
+                    edge.sourcePortKey == ESAgentGraphStableIds.SkillCancelledPortKey), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void AISkillExecution_NonRetryableTaskRejectsAutomaticRetry()
+        {
+            ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
+            try
+            {
+                ESAgentAuthoringGraphPreset.PopulateSceneScanReview(graph);
+                ESGraphNodeRecord task = graph.Nodes.Single(node =>
+                    node.typeId == ESAgentGraphStableIds.SkillTaskNode);
+                ESAISkillTaskPayload payload = JsonUtility.FromJson<ESAISkillTaskPayload>(task.payloadJson);
+                payload.retryCount = 1;
+                graph.UpdateNode(task.nodeId, task.typeId, task.version, task.title,
+                    JsonUtility.ToJson(payload), out _);
+
+                List<ESGraphValidationIssue> issues = ESGraphAuthoringRegistry.Validate(graph);
+                Assert.That(issues.Any(issue => issue != null
+                    && issue.code == "AISkill.Execution.Retry"
+                    && issue.severity == ESGraphValidationSeverity.Error), Is.True, Describe(issues));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void AISkillExecution_InvalidParameterPatternIsRejectedAtBakeBoundary()
+        {
+            ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
+            try
+            {
+                ESAgentAuthoringGraphPreset.PopulateSceneScanReview(graph);
+                ESGraphNodeRecord input = graph.Nodes.Single(node =>
+                    node.typeId == ESAgentGraphStableIds.SkillInputNode);
+                ESAISkillInputPayload payload = JsonUtility.FromJson<ESAISkillInputPayload>(input.payloadJson);
+                payload.parameters[0].validationPattern = "[";
+                graph.UpdateNode(input.nodeId, input.typeId, input.version, input.title,
+                    JsonUtility.ToJson(payload), out _);
+
+                List<ESGraphValidationIssue> issues = ESGraphAuthoringRegistry.Validate(graph);
+                Assert.That(issues.Any(issue => issue != null
+                    && issue.code == "AISkill.Execution.ParameterPattern"
+                    && issue.severity == ESGraphValidationSeverity.Error), Is.True, Describe(issues));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [TestCase("Blocked", "Blocked")]
+        [TestCase("Rejected", "Rejected")]
+        [TestCase("NotFound", "NotFound")]
+        [TestCase("Unexpected", "Failed")]
+        public void AISkillExecution_TaskFailureStatusIsClosedAndDeterministic(string input, string expected)
+        {
+            Assert.That(ESAISkillExecutionCoordinator.NormalizeTaskFailureStatus(input), Is.EqualTo(expected));
+        }
+
         private static bool IsError(ESGraphValidationIssue issue) => issue != null && issue.severity == ESGraphValidationSeverity.Error;
         private static string Describe(IEnumerable<ESGraphValidationIssue> issues) => string.Join("\n", issues.Where(issue => issue != null).Select(issue => issue.code + ": " + issue.message));
     }

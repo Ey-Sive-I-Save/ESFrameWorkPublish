@@ -1446,6 +1446,7 @@ namespace ES
         // AISkill execution authoring. These remain Editor-only even though the owning file is in Design.
         public const string SkillInputNode = "es.agent.ai-skill.input";
         public const string SkillTaskNode = "es.agent.ai-skill.task";
+        public const string SkillCallNode = "es.agent.ai-skill.call";
         public const string SkillBranchNode = "es.agent.ai-skill.branch";
         public const string SkillForEachNode = "es.agent.ai-skill.for-each";
         public const string SkillApprovalNode = "es.agent.ai-skill.approval";
@@ -1547,6 +1548,7 @@ namespace ES
         {
             return Is(typeId, ESAgentGraphStableIds.SkillInputNode)
                 || Is(typeId, ESAgentGraphStableIds.SkillTaskNode)
+                || Is(typeId, ESAgentGraphStableIds.SkillCallNode)
                 || Is(typeId, ESAgentGraphStableIds.SkillBranchNode)
                 || Is(typeId, ESAgentGraphStableIds.SkillForEachNode)
                 || Is(typeId, ESAgentGraphStableIds.SkillApprovalNode)

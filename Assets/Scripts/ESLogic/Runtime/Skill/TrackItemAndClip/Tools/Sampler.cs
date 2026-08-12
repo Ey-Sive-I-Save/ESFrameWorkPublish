@@ -908,7 +908,7 @@ namespace ES
             {
                 targetState.RequestedActive = activate;
                 targetState.LastRequestFrame = _sampleFrame;
-                LogDebug($"Submit | Clip={clipName} | Time={time:F3} | Target={GetTargetName(target)} | Active={activate}");
+                LogDebug($"Update | Clip={clipName} | Time={time:F3} | Target={GetTargetName(target)} | Active={activate}");
             }
 
             bool hasRequest = targetState.LastRequestFrame == _sampleFrame;

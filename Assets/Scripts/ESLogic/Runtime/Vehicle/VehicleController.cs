@@ -573,8 +573,9 @@ namespace ES
                 return ESMotionSubmitResult.InvalidValue;
             if (!IsReady)
                 return ESMotionSubmitResult.NotReady;
-            EnsureMotionInfluences().AddVelocity(velocity, permissions);
-            return ESMotionSubmitResult.Accepted;
+            return EnsureMotionInfluences().TryAddVelocity(velocity)
+                ? ESMotionSubmitResult.Accepted
+                : ESMotionSubmitResult.InvalidValue;
         }
 
         public bool TryAcquireField(

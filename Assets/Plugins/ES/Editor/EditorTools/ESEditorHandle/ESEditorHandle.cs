@@ -26,6 +26,7 @@ namespace ES
         private static readonly List<ESEditorLongTask> LongTasks = new List<ESEditorLongTask>(8);
         private static readonly Dictionary<string, ESEditorLongTask> LongTaskById = new Dictionary<string, ESEditorLongTask>(8);
         private static readonly Stopwatch LongTaskStopwatch = new Stopwatch();
+        private static readonly string LongTaskSessionId = Guid.NewGuid().ToString("N").Substring(0, 8);
 
         /// <summary>单个长任务一次 Update 可占用的主线程预算，单位毫秒。</summary>
         public static double LongTaskFrameBudgetMilliseconds = 4d;
@@ -121,7 +122,7 @@ namespace ES
             if (!task.Key.IsNullOrWhitespace() && HasRunningLongTaskKey(task.Key))
                 return GetLongTaskByKey(task.Key);
 
-            task.InternalPrepareForQueue("editor-long-" + (++nextLongTaskId));
+            task.InternalPrepareForQueue("editor-long-" + LongTaskSessionId + "-" + (++nextLongTaskId));
             InsertLongTaskByPriority(task);
             LongTaskById[task.Id] = task;
             RegisterUpdate();
@@ -132,6 +133,17 @@ namespace ES
         {
             task = null;
             return !id.IsNullOrWhitespace() && LongTaskById.TryGetValue(id, out task);
+        }
+
+        /// <summary>按互斥 Key 查询当前活动长任务；调用方仍需核验任务的具体类型与业务身份。</summary>
+        public static bool TryGetActiveLongTaskByKey(string key, out ESEditorLongTask task)
+        {
+            task = null;
+            if (key.IsNullOrWhitespace())
+                return false;
+
+            task = GetLongTaskByKey(key);
+            return task != null;
         }
 
         public static bool CancelLongTask(string id)
@@ -395,6 +407,8 @@ namespace ES
     /// </summary>
     public abstract class ESEditorLongTask
     {
+        private readonly List<Action<ESEditorLongTask>> finishedCallbacks = new List<Action<ESEditorLongTask>>(2);
+
         public string Id { get; private set; }
         public string Name { get; protected set; }
         public string Key { get; protected set; }
@@ -422,6 +436,21 @@ namespace ES
         {
             if (!IsFinished)
                 IsCancellationRequested = true;
+        }
+
+        /// <summary>追加终态订阅。同一物理任务可安全服务多个请求方，不会复制任务。</summary>
+        public void AddFinishedCallback(Action<ESEditorLongTask> callback)
+        {
+            if (callback == null)
+                return;
+
+            if (IsFinished)
+            {
+                InvokeFinishedCallback(callback);
+                return;
+            }
+
+            finishedCallbacks.Add(callback);
         }
 
         protected void SetProgress(int current, int total, string message)
@@ -472,6 +501,23 @@ namespace ES
                 if (Status == ESEditorLongTaskStatus.Succeeded)
                     Status = ESEditorLongTaskStatus.Failed;
                 Debug.LogException(finishException);
+            }
+
+            Action<ESEditorLongTask>[] callbacks = finishedCallbacks.ToArray();
+            finishedCallbacks.Clear();
+            for (int i = 0; i < callbacks.Length; i++)
+                InvokeFinishedCallback(callbacks[i]);
+        }
+
+        private void InvokeFinishedCallback(Action<ESEditorLongTask> callback)
+        {
+            try
+            {
+                callback?.Invoke(this);
+            }
+            catch (Exception callbackException)
+            {
+                Debug.LogException(callbackException);
             }
         }
     }

@@ -12,15 +12,14 @@ namespace ES.EditorInternal
     /// Refreshing this window never scans assets, creates GlobalData, or changes the scene.
     /// Any mutation is exposed as a separately labelled user action.
     /// </summary>
-    public sealed class ESEditorHealthWindow : EditorWindow
+    public sealed class ESEditorHealthWindow : ESSinglePageIMGUIWindow<ESEditorHealthWindow>
     {
         private const string WindowMenuPath
-            = MenuItemPathDefine.DEBUG_PATH + "ES 编辑器健康检查";
+            = MenuItemPathDefine.VALIDATION_EDITOR_HEALTH_PATH + "打开 ES 编辑器健康检查";
         private const string BoundaryRootName = "ES 边界测试层级";
 
         private readonly List<HealthCheck> checks = new List<HealthCheck>(6);
         private Vector2 scrollPosition;
-        private GUIContent refreshContent;
         private double lastRefreshTime;
 
         [MenuItem(WindowMenuPath, false, 20)]
@@ -32,20 +31,37 @@ namespace ES.EditorInternal
             window.Show();
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent()
         {
-            ESEditorPresentation.BindWindow(this);
+            return new GUIContent("ES 健康检查", "只读检查编辑器主题、缓存与绘制基础状态");
+        }
+
+        protected override string ESWindow_Subtitle => "编辑器 Presentation 与工具链健康状态";
+        protected override Vector2 ESWindow_MinSize => new Vector2(500f, 420f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(760f, 620f);
+        protected override string ESWindow_PageStableId => "editor.health";
+        protected override string ESWindow_PageTitle => "编辑器健康检查";
+        protected override string ESWindow_PageKeywords => "编辑器 健康 主题 缓存 多态 Drawer Presentation";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "health.refresh",
+                    "刷新检查",
+                    "重新读取当前编辑器状态；不会扫描资产或写入项目。",
+                    context =>
+                    {
+                        RefreshChecks();
+                        context.SetStatus("编辑器健康状态已刷新");
+                    })
+                .WithUnityIcon("Refresh")
+                .WithPriority(100));
+        }
+
+        protected override void ESWindow_OnHostEnable()
+        {
             RefreshChecks();
-        }
-
-        private void OnDestroy()
-        {
-            ESEditorPresentation.UnbindWindow(this);
-        }
-
-        private void OnDisable()
-        {
-            ESEditorPresentation.UnbindWindow(this);
         }
 
         private void OnFocus()
@@ -53,10 +69,12 @@ namespace ES.EditorInternal
             RefreshChecks();
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             DrawTitle();
-            DrawToolbar();
+            GUILayout.Label(
+                "上次检查 " + FormatElapsedTime(EditorApplication.timeSinceStartup - lastRefreshTime),
+                EditorStyles.miniLabel);
 
             if (checks.Count == 0)
                 RefreshChecks();
@@ -94,28 +112,6 @@ namespace ES.EditorInternal
                 new Rect(titleRect.x + 12f, titleRect.y + 30f, titleRect.width - 24f, 17f),
                 "只读诊断 · 不会扫描后写入资产、修改场景或改变绘制方案",
                 ESEditorPresentation.MetaStyle);
-        }
-
-        private void DrawToolbar()
-        {
-            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
-            try
-            {
-                if (refreshContent == null)
-                    refreshContent = new GUIContent("刷新检查", "重新读取当前编辑器状态；不会触发类型扫描或项目写入。");
-
-                if (GUILayout.Button(refreshContent, EditorStyles.toolbarButton, GUILayout.Width(74f)))
-                    RefreshChecks();
-
-                GUILayout.FlexibleSpace();
-                GUILayout.Label(
-                    "上次检查 " + FormatElapsedTime(EditorApplication.timeSinceStartup - lastRefreshTime),
-                    EditorStyles.miniLabel);
-            }
-            finally
-            {
-                EditorGUILayout.EndHorizontal();
-            }
         }
 
         private void DrawSummary()
@@ -365,7 +361,7 @@ namespace ES.EditorInternal
                 return;
 
             if (!EditorApplication.ExecuteMenuItem(
-                    MenuItemPathDefine.TEST_TOOLS_PATH + "ES 编辑器扩展/创建多态边界测试层级"))
+                    MenuItemPathDefine.VALIDATION_EDITOR_EXTENSION_TESTS_PATH + "ES 编辑器扩展/创建多态边界测试层级"))
             {
                 Debug.LogWarning("[ES] 无法执行“创建多态边界测试层级”菜单。请检查 ES 编辑器程序集是否已完成编译。");
             }

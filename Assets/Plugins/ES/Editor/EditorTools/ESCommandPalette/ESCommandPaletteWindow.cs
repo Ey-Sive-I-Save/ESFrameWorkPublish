@@ -431,6 +431,7 @@ namespace ES
             }
         }
 
+        [MenuItem(MenuItemPathDefine.COMMAND_PALETTE_WINDOW_PATH, false, 0)]
         [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "ES 命令面板", false, -1200)]
         public static void OpenMenuWindow()
         {
@@ -446,28 +447,28 @@ namespace ES
             }
         }
 
-        [MenuItem(MenuItemPathDefine.PROJECT_SETTINGS_PATH + "编辑器/ES 命令面板/启用快捷键", false, 100)]
+        [MenuItem(MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/ES 命令面板/启用快捷键", false, 100)]
         private static void ToggleShortcut()
         {
             ESCommandPaletteShortcutSettings.SetEnabled(!ESCommandPaletteShortcutSettings.Enabled);
         }
 
-        [MenuItem(MenuItemPathDefine.PROJECT_SETTINGS_PATH + "编辑器/ES 命令面板/启用快捷键", true)]
+        [MenuItem(MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/ES 命令面板/启用快捷键", true)]
         private static bool ValidateToggleShortcut()
         {
             Menu.SetChecked(
-                MenuItemPathDefine.PROJECT_SETTINGS_PATH + "编辑器/ES 命令面板/启用快捷键",
+                MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/ES 命令面板/启用快捷键",
                 ESCommandPaletteShortcutSettings.Enabled);
             return true;
         }
 
-        [MenuItem(MenuItemPathDefine.PROJECT_SETTINGS_PATH + "编辑器/ES 命令面板/恢复默认快捷键", false, 101)]
+        [MenuItem(MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/ES 命令面板/恢复默认快捷键", false, 101)]
         private static void RestoreDefaultShortcut()
         {
             ESCommandPaletteShortcutSettings.RestoreDefaultBinding();
         }
 
-        [MenuItem(MenuItemPathDefine.PROJECT_SETTINGS_PATH + "编辑器/ES 命令面板/检查快捷键冲突", false, 102)]
+        [MenuItem(MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/ES 命令面板/检查快捷键冲突", false, 102)]
         private static void CheckShortcutConflict()
         {
             ShortcutConflictCheck check = RunShortcutConflictCheck();
@@ -564,7 +565,7 @@ namespace ES
 
         private void OnEnable()
         {
-            ES.EditorInternal.ESEditorPresentation.BindWindow(this);
+            ES.EditorInternal.ESEditorPresentation.BindWindow(this, allowSemiSleep: false);
             if (!stylesAcquired)
             {
                 AcquireStyles();
@@ -578,7 +579,7 @@ namespace ES
         private void OnDisable()
         {
             SessionState.SetString(LastTabKey, activeTab);
-            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this);
+            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
             UnregisterSearchTick();
             UnregisterShortcutCheckTick();
             if (stylesAcquired)
@@ -593,7 +594,7 @@ namespace ES
 
         private void OnDestroy()
         {
-            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this);
+            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
             UnregisterSearchTick();
             UnregisterShortcutCheckTick();
             if (stylesAcquired)
@@ -991,7 +992,7 @@ namespace ES
             else if (shortcutConflictState == ShortcutConflictState.Conflict)
             {
                 EditorGUILayout.HelpBox(
-                    "快捷键冲突：" + shortcutConflictMessage + "。可在【ES】/项目设置/编辑器/ES 命令面板/恢复默认快捷键。",
+                    "快捷键冲突：" + shortcutConflictMessage + "。可在【ES】/项目配置/编辑器体验/ES 命令面板/恢复默认快捷键。",
                     MessageType.Warning);
             }
 

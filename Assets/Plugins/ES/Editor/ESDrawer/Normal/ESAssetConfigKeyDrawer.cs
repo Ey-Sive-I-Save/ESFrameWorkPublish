@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using ES;
 using UnityEditor;
 using UnityEngine;
+
+[assembly: InternalsVisibleTo("ES.ContentRegistration.Editor.Tests")]
 
 namespace ES.EditorInternal
 {
@@ -121,10 +124,10 @@ namespace ES.EditorInternal
                     ESAssetCatalogKeyPicker.ApplyCandidate(property, selectedCandidate);
                 else if (selectedCandidate != null && ESAssetCatalogKeyPicker.HasLibraryKeyConflict(selectedCandidate))
                     Debug.LogError("[ESRes][ConfigKey] 无法同步 ConfigKey：资产在多个 Library 中配置了不同 Key，请先消除 Library 冲突。", selectedAsset);
-                else if (ESAssetCatalogKeyPicker.TryCollectToActiveLibrary(ResolveKind(), selectedAsset, out selectedCandidate, out string collectError))
-                    ESAssetCatalogKeyPicker.ApplyCandidate(property, selectedCandidate);
+                else if (ESAssetCatalogKeyPicker.TryOpenRegistrationWorkflow(ResolveKind(), selectedAsset, out string registrationError))
+                    Debug.Log("[ESRes][ConfigKey] 已打开统一内容注册入口。提交成功后重新选择该资产以绑定 ConfigKey。", selectedAsset);
                 else
-                    Debug.LogWarning("[ESRes][ConfigKey] 无法同步 ConfigKey：" + selectedAsset.name + "。" + collectError, selectedAsset);
+                    Debug.LogWarning("[ESRes][ConfigKey] 无法打开注册入口：" + selectedAsset.name + "。" + registrationError, selectedAsset);
             }
 
             if (isBoundSourceMissing || hasLibraryKeyConflict)
@@ -336,21 +339,51 @@ namespace ES.EditorInternal
             public string pageName;
             public string assetName;
             public string menuLabel;
+            public UnityEngine.Object asset;
             public bool isBaked;
             public bool isLibrarySource;
             public bool hasLibraryKeyConflict;
         }
 
-        private static readonly Dictionary<ESAssetReferKind, List<Candidate>> CandidatesByKind = new Dictionary<ESAssetReferKind, List<Candidate>>();
-        private static bool loaded;
-        private static int loadedRegistryVersion = -1;
-
-        static ESAssetCatalogKeyPicker()
+        private sealed class CandidateSource
         {
-            // Page 的 Key 在 Inspector 中改动时，Registry 的版本不一定变化。项目资产刷新
-            // 是更可靠的失效信号，避免引用抽屉继续展示旧的源 Key 快照。
-            EditorApplication.projectChanged += Invalidate;
+            private readonly Dictionary<ESAssetReferKind, List<Candidate>> candidatesByKind = new Dictionary<ESAssetReferKind, List<Candidate>>();
+
+            public IEnumerable<ESAssetReferKind> Kinds => candidatesByKind.Keys;
+
+            public void Add(Candidate candidate)
+            {
+                if (candidate == null)
+                    return;
+                if (!candidatesByKind.TryGetValue(candidate.kind, out List<Candidate> candidates))
+                    candidatesByKind.Add(candidate.kind, candidates = new List<Candidate>());
+                candidates.Add(candidate);
+            }
+
+            public IReadOnlyList<Candidate> Get(ESAssetReferKind kind)
+                => candidatesByKind.TryGetValue(kind, out List<Candidate> candidates)
+                    ? candidates
+                    : Array.Empty<Candidate>();
         }
+
+        private static readonly Dictionary<ESAssetReferKind, List<Candidate>> CandidatesByKind = new Dictionary<ESAssetReferKind, List<Candidate>>();
+        private static readonly Dictionary<string, CandidateSource> LibraryCandidatesByPath = new Dictionary<string, CandidateSource>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, CandidateSource> CatalogCandidatesByPath = new Dictionary<string, CandidateSource>(StringComparer.Ordinal);
+        private static readonly Dictionary<ESAssetReferKind, Dictionary<string, Candidate>> CandidatesByIdentity = new Dictionary<ESAssetReferKind, Dictionary<string, Candidate>>();
+        private static readonly Dictionary<ESAssetReferKind, Dictionary<int, List<Candidate>>> CandidatesByEnumKey = new Dictionary<ESAssetReferKind, Dictionary<int, List<Candidate>>>();
+        private static readonly Dictionary<ESAssetReferKind, Dictionary<string, List<Candidate>>> CandidatesByStringKey = new Dictionary<ESAssetReferKind, Dictionary<string, List<Candidate>>>();
+        private static readonly Dictionary<string, Hash128> LibraryDependencyHashes = new Dictionary<string, Hash128>(StringComparer.Ordinal);
+        private static readonly HashSet<string> PendingLibraryPaths = new HashSet<string>(StringComparer.Ordinal);
+        private static bool loaded;
+        private static bool libraryRefreshScheduled;
+        private static int loadedRegistryVersion = -1;
+        private static int fullReloadCount;
+        private static int incrementalLibraryReloadCount;
+        private static int catalogReloadCount;
+
+        internal static int FullReloadCount => fullReloadCount;
+        internal static int IncrementalLibraryReloadCount => incrementalLibraryReloadCount;
+        internal static int CatalogReloadCount => catalogReloadCount;
 
         public static Candidate FindCurrent(ESAssetReferKind kind, SerializedProperty property)
         {
@@ -365,12 +398,14 @@ namespace ES.EditorInternal
             string stringKey = property.FindPropertyRelative("stringKey").stringValue;
             if (!string.IsNullOrEmpty(guid))
             {
-                Candidate identityMatch = candidates.FirstOrDefault(item => item.guid == guid && item.localFileId == localFileId);
+                Candidate identityMatch = null;
+                if (CandidatesByIdentity.TryGetValue(kind, out Dictionary<string, Candidate> identities))
+                    identities.TryGetValue(BuildIdentityKey(guid, localFileId), out identityMatch);
                 // 已绑定源身份时绝不能再按 Key 猜测别的资产；源资产移除/未注册必须
                 // 明确暴露为失效引用，不能静默换绑。
                 return identityMatch;
             }
-            return candidates.FirstOrDefault(item => ESConfigKeyMatch.Matches(enumKey, stringKey, item.enumKey, item.stringKey));
+            return FindByKey(kind, enumKey, stringKey);
         }
 
         public static bool HasBoundIdentity(SerializedProperty property)
@@ -403,11 +438,10 @@ namespace ES.EditorInternal
         {
             candidate = null;
             if (asset == null) return false;
-            // 拖入是显式同步动作，必须读取项目内全部 Library 的最新 Key，不能复用旧候选快照。
-            Reload();
+            EnsureLoaded();
             if (!ESAssetPage.TryGetAssetIdentityEditor(asset, out string guid, out long localFileId)
-                || !CandidatesByKind.TryGetValue(kind, out List<Candidate> candidates)) return false;
-            candidate = candidates.FirstOrDefault(item => item.guid == guid && item.localFileId == localFileId);
+                || !CandidatesByIdentity.TryGetValue(kind, out Dictionary<string, Candidate> identities)) return false;
+            identities.TryGetValue(BuildIdentityKey(guid, localFileId), out candidate);
             return candidate != null;
         }
 
@@ -415,27 +449,31 @@ namespace ES.EditorInternal
         {
             EnsureLoaded();
             candidate = null;
-            if (!CandidatesByKind.TryGetValue(kind, out List<Candidate> candidates))
-                return false;
-            candidate = candidates.FirstOrDefault(item => ESConfigKeyMatch.Matches(enumKey, stringKey, item.enumKey, item.stringKey));
+            candidate = FindByKey(kind, enumKey, stringKey);
             return candidate != null;
         }
 
         public static int CountKeyMatches(ESAssetReferKind kind, int enumKey, string stringKey)
         {
             EnsureLoaded();
-            if (!CandidatesByKind.TryGetValue(kind, out List<Candidate> candidates))
-                return 0;
-            return candidates.Count(item => ESConfigKeyMatch.Matches(enumKey, stringKey, item.enumKey, item.stringKey));
+            int count = 0;
+            List<Candidate> enumCandidates = GetEnumCandidates(kind, enumKey);
+            List<Candidate> stringCandidates = GetStringCandidates(kind, stringKey);
+            if (enumCandidates != null)
+                for (int i = 0; i < enumCandidates.Count; i++)
+                    if (ESConfigKeyMatch.Matches(enumKey, stringKey, enumCandidates[i].enumKey, enumCandidates[i].stringKey)) count++;
+            if (stringCandidates != null)
+                for (int i = 0; i < stringCandidates.Count; i++)
+                    if ((enumCandidates == null || !enumCandidates.Contains(stringCandidates[i]))
+                        && ESConfigKeyMatch.Matches(enumKey, stringKey, stringCandidates[i].enumKey, stringCandidates[i].stringKey)) count++;
+            return count;
         }
 
-        public static bool TryCollectToActiveLibrary(
+        public static bool TryOpenRegistrationWorkflow(
             ESAssetReferKind expectedKind,
             UnityEngine.Object asset,
-            out Candidate candidate,
             out string error)
         {
-            candidate = null;
             error = string.Empty;
             if (asset == null)
             {
@@ -456,28 +494,8 @@ namespace ES.EditorInternal
                 return false;
             }
 
-            ESGlobalResToolsSupportConfig config = ESGlobalResToolsSupportConfig.Instance;
-            if (config != null && config.showConfirmDialog
-                && !EditorUtility.DisplayDialog(
-                    "收集并配置资源",
-                    "资产【" + asset.name + "】尚未收集。是否加入当前 Library【" + library.Name + "】并立即写入 ConfigKey？",
-                    "收集并配置",
-                    "取消"))
-            {
-                error = "用户取消收集。";
-                return false;
-            }
-
-            Undo.RecordObject(library, "Collect Asset From ConfigKey");
-            library.EditorOnly_DragAssetsToBooks(new[] { asset });
-            EditorUtility.SetDirty(library);
-            AssetDatabase.SaveAssets();
-            Invalidate();
-            if (TryFindByAsset(expectedKind, asset, out candidate))
-                return true;
-
-            error = "资产已提交到 Library，但注册表仍无法解析；请打开资源窗口检查目标 Book。";
-            return false;
+            ESResourceCollectionWorkflowWindow.OpenForAssetRegistration(asset, library);
+            return true;
         }
 
         public static Type ResolveAssetType(ESAssetReferKind kind)
@@ -508,8 +526,7 @@ namespace ES.EditorInternal
 
         public static void ShowMenu(Rect position, ESAssetReferKind kind, SerializedProperty property)
         {
-            // 每次主动打开选择器都重读注册表与 Catalog，刚收集或刚烘焙后无需重载 Inspector。
-            Reload();
+            EnsureLoaded();
             var entries = new List<ESSearchDropdown.Entry>();
             string currentGuid = property.FindPropertyRelative("guid")?.stringValue ?? string.Empty;
             long currentLocalFileId = NormalizeStoredLocalFileId(
@@ -524,7 +541,6 @@ namespace ES.EditorInternal
                 foreach (Candidate candidate in candidates)
                 {
                     Candidate captured = candidate;
-                    UnityEngine.Object asset = LoadAsset(candidate);
                     string groupPath = string.Join("/", new[] { candidate.libraryName, candidate.pageName }
                         .Where(value => !string.IsNullOrWhiteSpace(value)));
                     string key = string.IsNullOrWhiteSpace(candidate.stringKey)
@@ -542,7 +558,7 @@ namespace ES.EditorInternal
                         string.IsNullOrWhiteSpace(candidate.assetName) ? "<未命名资产>" : candidate.assetName,
                         () => ApplyCandidate(property, captured),
                         groupPath,
-                        asset != null ? AssetPreview.GetMiniThumbnail(asset) : null,
+                        null,
                         subtitle: candidate.typeDisplayName + " · " + key,
                         tooltip: candidate.assetPath,
                         badge: candidate.isBaked ? "已烘焙" : "已收集",
@@ -571,6 +587,97 @@ namespace ES.EditorInternal
         {
             loaded = false;
             loadedRegistryVersion = -1;
+            PendingLibraryPaths.Clear();
+            if (libraryRefreshScheduled)
+                EditorApplication.delayCall -= FlushQueuedLibraryChanges;
+            libraryRefreshScheduled = false;
+        }
+
+        internal static void NotifyLibraryChanged(string libraryPath)
+        {
+            if (!loaded || string.IsNullOrEmpty(libraryPath))
+                return;
+
+            // A synchronous registration refresh supersedes an OnValidate/import notification
+            // already queued for the same Library path.
+            PendingLibraryPaths.Remove(libraryPath);
+            HashSet<ESAssetReferKind> affectedKinds = RefreshLibrarySource(libraryPath);
+            RefreshRegistrySource();
+            RebuildKinds(affectedKinds);
+            incrementalLibraryReloadCount++;
+        }
+
+        internal static void QueueLibraryChanged(string libraryPath)
+        {
+            if (!loaded || string.IsNullOrEmpty(libraryPath))
+                return;
+            PendingLibraryPaths.Add(libraryPath);
+            if (libraryRefreshScheduled)
+                return;
+            libraryRefreshScheduled = true;
+            EditorApplication.delayCall += FlushQueuedLibraryChanges;
+        }
+
+        private static void FlushQueuedLibraryChanges()
+        {
+            EditorApplication.delayCall -= FlushQueuedLibraryChanges;
+            libraryRefreshScheduled = false;
+            if (!loaded || PendingLibraryPaths.Count == 0)
+            {
+                PendingLibraryPaths.Clear();
+                return;
+            }
+
+            var affectedKinds = new HashSet<ESAssetReferKind>();
+            bool refreshedAny = false;
+            foreach (string path in PendingLibraryPaths)
+            {
+                if (!ShouldRefreshQueuedLibrary(path))
+                    continue;
+                affectedKinds.UnionWith(RefreshLibrarySource(path));
+                refreshedAny = true;
+            }
+            PendingLibraryPaths.Clear();
+            if (!refreshedAny)
+                return;
+            RefreshRegistrySource();
+            RebuildKinds(affectedKinds);
+            incrementalLibraryReloadCount++;
+        }
+
+        private static bool ShouldRefreshQueuedLibrary(string libraryPath)
+        {
+            if (!LibraryCandidatesByPath.ContainsKey(libraryPath))
+                return true;
+            ESAssetLibrary library = AssetDatabase.LoadAssetAtPath<ESAssetLibrary>(libraryPath);
+            if (library == null || EditorUtility.IsDirty(library))
+                return true;
+            return !LibraryDependencyHashes.TryGetValue(libraryPath, out Hash128 indexedHash)
+                   || indexedHash != AssetDatabase.GetAssetDependencyHash(libraryPath);
+        }
+
+        internal static void NotifyAssetPathChanged(string assetPath)
+        {
+            if (!loaded || string.IsNullOrEmpty(assetPath))
+                return;
+            if (!LibraryCandidatesByPath.ContainsKey(assetPath)
+                && AssetDatabase.GetMainAssetTypeAtPath(assetPath) != typeof(ESAssetLibrary))
+                return;
+            Hash128 currentHash = AssetDatabase.GetAssetDependencyHash(assetPath);
+            if (LibraryDependencyHashes.TryGetValue(assetPath, out Hash128 indexedHash)
+                && indexedHash == currentHash)
+                return;
+            QueueLibraryChanged(assetPath);
+        }
+
+        internal static void NotifyCatalogsChanged()
+        {
+            if (!loaded)
+                return;
+
+            RefreshCatalogSources();
+            RebuildAllIndexes();
+            catalogReloadCount++;
         }
 
         public static void RefreshForValidation()
@@ -581,22 +688,46 @@ namespace ES.EditorInternal
 
         private static void EnsureLoaded()
         {
-            if (!loaded || loadedRegistryVersion != ESAssetRegistry.Version)
+            if (!loaded)
+            {
                 Reload();
+                return;
+            }
+            if (loadedRegistryVersion != ESAssetRegistry.Version)
+            {
+                RefreshRegistrySource();
+                RebuildAllIndexes();
+            }
         }
 
         private static void Reload()
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            LibraryCandidatesByPath.Clear();
+            LibraryDependencyHashes.Clear();
+            CatalogCandidatesByPath.Clear();
+            foreach (string libraryPath in AssetDatabase.FindAssets("t:ESAssetLibrary")
+                         .Select(AssetDatabase.GUIDToAssetPath)
+                         .Where(path => !string.IsNullOrEmpty(path))
+                         .OrderBy(path => path, StringComparer.Ordinal))
+                RefreshLibrarySource(libraryPath);
+            RefreshRegistrySource();
+            RefreshCatalogSources();
+            RebuildAllIndexes();
             loaded = true;
             loadedRegistryVersion = ESAssetRegistry.Version;
-            CandidatesByKind.Clear();
+            fullReloadCount++;
+            stopwatch.Stop();
+            if (stopwatch.ElapsedMilliseconds >= 200)
+                Debug.LogWarning("[ESRes][ConfigKey] 编辑器候选索引冷建耗时 " + stopwatch.ElapsedMilliseconds + "ms；日常查询将复用缓存。Library=" + LibraryCandidatesByPath.Count + "，Catalog=" + CatalogCandidatesByPath.Count + "，候选=" + CandidatesByKind.Values.Sum(items => items.Count));
+            else if (stopwatch.ElapsedMilliseconds >= 50)
+                Debug.Log("[ESRes][ConfigKey] 编辑器候选索引冷建耗时 " + stopwatch.ElapsedMilliseconds + "ms；后续按注册/Bake 结果增量更新。", null);
+        }
 
-            // AssetLibrary 是编辑器侧 Key 的唯一真源。必须扫全项目 Library，不能只依赖
-            // 当前已加载的 Registry；否则跨 Library 的已注册资产会被误判为未注册。
-            AddAllAssetLibraryCandidates();
-
-            // Registry 只补充尚未落盘或暂未被 AssetDatabase 枚举到的编辑器候选，
-            // 不允许覆盖上面从真实 Library 读取的 Key。
+        private static void RefreshRegistrySource()
+        {
+            const string registrySource = "<registry>";
+            var registryCandidates = new CandidateSource();
             foreach (ESAssetPage page in ESAssetRegistry.Pages)
             {
                 if (page == null || page.Kind == ESAssetReferKind.None || page.Kind == ESAssetReferKind.Other)
@@ -606,7 +737,7 @@ namespace ES.EditorInternal
                 string assetPath = !string.IsNullOrWhiteSpace(page.AssetPath)
                     ? page.AssetPath
                     : AssetDatabase.GetAssetPath(page.OB);
-                AddOrReplaceCandidate(page.Kind, new Candidate
+                registryCandidates.Add(new Candidate
                 {
                     kind = page.Kind,
                     enumKey = page.EnumKey,
@@ -620,22 +751,37 @@ namespace ES.EditorInternal
                     pageName = string.IsNullOrWhiteSpace(page.SourceBook) ? "未分组" : page.SourceBook,
                     assetName = page.OB != null ? page.OB.name : page.Name,
                     isBaked = false,
-                    isLibrarySource = true
-                }, false);
+                    isLibrarySource = true,
+                    asset = page.OB
+                });
             }
+            LibraryCandidatesByPath[registrySource] = registryCandidates;
+            loadedRegistryVersion = ESAssetRegistry.Version;
+        }
 
-            if (Directory.Exists(ESAssetPipelineIO.BakeRoot))
-            foreach (string path in ESManagedFileIO.EnumerateFilesSafely(ESAssetPipelineIO.BakeRoot, ESAssetPipelineIO.CatalogFileName))
+        private static void RefreshCatalogSources()
+        {
+            CatalogCandidatesByPath.Clear();
+            if (!Directory.Exists(ESAssetPipelineIO.BakeRoot))
+                return;
+
+            foreach (string folder in Directory.EnumerateDirectories(ESAssetPipelineIO.BakeRoot).OrderBy(path => path, StringComparer.Ordinal))
             {
+                if (IsRecoveryCatalogDirectory(folder))
+                    continue;
+                string path = Path.Combine(folder, ESAssetPipelineIO.CatalogFileName);
+                if (!File.Exists(path))
+                    continue;
                 ESAssetLibraryCatalog catalog;
                 try { catalog = ESAssetPipelineIO.ReadJson<ESAssetLibraryCatalog>(path); }
                 catch { continue; }
                 if (catalog == null || catalog.errors.Count > 0) continue;
+                var catalogCandidates = new CandidateSource();
                 foreach (ESAssetCatalogEntry entry in catalog.assets.Where(item => item != null && item.isBusinessAsset))
                 {
                     if (!Enum.TryParse(entry.kind, out ESAssetReferKind kind) || kind == ESAssetReferKind.None) continue;
                     if (entry.enumKey == 0 && string.IsNullOrEmpty(entry.stringKey)) continue;
-                    AddOrReplaceCandidate(kind, new Candidate
+                    catalogCandidates.Add(new Candidate
                     {
                         kind = kind,
                         enumKey = entry.enumKey,
@@ -649,44 +795,99 @@ namespace ES.EditorInternal
                         pageName = entry.pageName,
                         assetName = ResolveAssetName(entry),
                         isBaked = true
-                    }, true);
+                    });
                 }
+                CatalogCandidatesByPath[path] = catalogCandidates;
             }
-            foreach (List<Candidate> candidates in CandidatesByKind.Values)
+        }
+
+        private static void RebuildAllIndexes()
+        {
+            var kinds = new HashSet<ESAssetReferKind>(CandidatesByKind.Keys);
+            foreach (CandidateSource source in LibraryCandidatesByPath.Values) kinds.UnionWith(source.Kinds);
+            foreach (CandidateSource source in CatalogCandidatesByPath.Values) kinds.UnionWith(source.Kinds);
+            RebuildKinds(kinds);
+        }
+
+        private static void RebuildKinds(IEnumerable<ESAssetReferKind> kinds)
+        {
+            if (kinds == null)
+                return;
+            foreach (ESAssetReferKind kind in kinds.Distinct())
             {
+                CandidatesByKind.Remove(kind);
+                CandidatesByIdentity.Remove(kind);
+                CandidatesByEnumKey.Remove(kind);
+                CandidatesByStringKey.Remove(kind);
+                var mergeIndexes = new Dictionary<ESAssetReferKind, Dictionary<string, Candidate>>();
+
+                foreach (KeyValuePair<string, CandidateSource> source in LibraryCandidatesByPath
+                             .Where(pair => !string.Equals(pair.Key, "<registry>", StringComparison.Ordinal))
+                             .OrderBy(pair => pair.Key, StringComparer.Ordinal))
+                    foreach (Candidate candidate in source.Value.Get(kind))
+                        AddOrReplaceCandidate(kind, candidate, false, mergeIndexes);
+                if (LibraryCandidatesByPath.TryGetValue("<registry>", out CandidateSource registryCandidates))
+                    foreach (Candidate candidate in registryCandidates.Get(kind))
+                        AddRegistrySupplement(candidate, mergeIndexes);
+                foreach (KeyValuePair<string, CandidateSource> source in CatalogCandidatesByPath.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+                    foreach (Candidate candidate in source.Value.Get(kind))
+                        AddOrReplaceCandidate(kind, candidate, true, mergeIndexes);
+
+                if (!CandidatesByKind.TryGetValue(kind, out List<Candidate> candidates))
+                    continue;
                 foreach (Candidate candidate in candidates)
                     candidate.menuLabel = BuildMenuLabel(candidate);
                 candidates.Sort((left, right) => string.CompareOrdinal(left.menuLabel, right.menuLabel));
-            }
-        }
 
-        private static void AddAllAssetLibraryCandidates()
-        {
-            IEnumerable<string> libraryPaths = AssetDatabase.FindAssets("t:ESAssetLibrary")
-                .Select(AssetDatabase.GUIDToAssetPath)
-                .Where(path => !string.IsNullOrEmpty(path))
-                .OrderBy(path => path, StringComparer.Ordinal);
-            foreach (string libraryPath in libraryPaths)
-            {
-                ESAssetLibrary library = AssetDatabase.LoadAssetAtPath<ESAssetLibrary>(libraryPath);
-                if (library == null)
-                    continue;
-
-                string libraryName = string.IsNullOrWhiteSpace(library.Name)
-                    ? Path.GetFileNameWithoutExtension(libraryPath)
-                    : library.Name;
-                foreach (ESAssetBook book in library.GetAllUseableBooks())
+                var identities = new Dictionary<string, Candidate>(StringComparer.Ordinal);
+                var enumKeys = new Dictionary<int, List<Candidate>>();
+                var stringKeys = new Dictionary<string, List<Candidate>>(StringComparer.Ordinal);
+                foreach (Candidate candidate in candidates)
                 {
-                    if (book?.pages == null)
-                        continue;
-
-                    foreach (ESAssetPage page in book.pages)
-                        AddLibraryPageCandidate(libraryName, book.Name, page);
+                    if (!string.IsNullOrEmpty(candidate.guid))
+                        identities[BuildIdentityKey(candidate.guid, candidate.localFileId)] = candidate;
+                    if (candidate.enumKey != 0)
+                        AddLookup(enumKeys, candidate.enumKey, candidate);
+                    if (!string.IsNullOrEmpty(candidate.stringKey))
+                        AddLookup(stringKeys, candidate.stringKey, candidate);
                 }
+                CandidatesByIdentity[kind] = identities;
+                CandidatesByEnumKey[kind] = enumKeys;
+                CandidatesByStringKey[kind] = stringKeys;
             }
         }
 
-        private static void AddLibraryPageCandidate(string libraryName, string bookName, ESAssetPage page)
+        private static HashSet<ESAssetReferKind> RefreshLibrarySource(string libraryPath)
+        {
+            var affectedKinds = LibraryCandidatesByPath.TryGetValue(libraryPath, out CandidateSource previous)
+                ? new HashSet<ESAssetReferKind>(previous.Kinds)
+                : new HashSet<ESAssetReferKind>();
+            ESAssetLibrary library = AssetDatabase.LoadAssetAtPath<ESAssetLibrary>(libraryPath);
+            if (library == null)
+            {
+                LibraryCandidatesByPath.Remove(libraryPath);
+                LibraryDependencyHashes.Remove(libraryPath);
+                return affectedKinds;
+            }
+
+            string libraryName = string.IsNullOrWhiteSpace(library.Name)
+                ? Path.GetFileNameWithoutExtension(libraryPath)
+                : library.Name;
+            var sourceCandidates = new CandidateSource();
+            foreach (ESAssetBook book in library.GetAllUseableBooks())
+            {
+                if (book?.pages == null)
+                    continue;
+                foreach (ESAssetPage page in book.pages)
+                    AddLibraryPageCandidate(sourceCandidates, libraryName, book.Name, page);
+            }
+            LibraryCandidatesByPath[libraryPath] = sourceCandidates;
+            LibraryDependencyHashes[libraryPath] = AssetDatabase.GetAssetDependencyHash(libraryPath);
+            affectedKinds.UnionWith(sourceCandidates.Kinds);
+            return affectedKinds;
+        }
+
+        private static void AddLibraryPageCandidate(CandidateSource destination, string libraryName, string bookName, ESAssetPage page)
         {
             if (page?.OB == null)
                 return;
@@ -701,7 +902,7 @@ namespace ES.EditorInternal
 
             ESAssetPage.TryGetAssetIdentityEditor(page.OB, out string guid, out long localFileId);
             string assetPath = AssetDatabase.GetAssetPath(page.OB);
-            AddOrReplaceCandidate(kind, new Candidate
+            destination.Add(new Candidate
             {
                 kind = kind,
                 enumKey = page.EnumKey,
@@ -715,8 +916,9 @@ namespace ES.EditorInternal
                 pageName = string.IsNullOrWhiteSpace(bookName) ? "未分组" : bookName,
                 assetName = page.OB.name,
                 isBaked = false,
-                isLibrarySource = true
-            }, false);
+                isLibrarySource = true,
+                asset = page.OB
+            });
         }
 
         private static long NormalizeStoredLocalFileId(string guid, long localFileId, string assetPath)
@@ -741,8 +943,14 @@ namespace ES.EditorInternal
 
         private static void NormalizeCandidateMainAssetIdentity(Candidate candidate)
         {
-            if (candidate == null)
+            if (candidate?.asset == null)
                 return;
+
+            if (!AssetDatabase.IsSubAsset(candidate.asset))
+            {
+                candidate.localFileId = 0;
+                return;
+            }
 
             candidate.localFileId = NormalizeStoredLocalFileId(
                 candidate.guid,
@@ -750,24 +958,27 @@ namespace ES.EditorInternal
                 candidate.assetPath);
         }
 
-        private static void AddOrReplaceCandidate(ESAssetReferKind kind, Candidate candidate, bool preferNew)
+        private static void AddOrReplaceCandidate(
+            ESAssetReferKind kind,
+            Candidate sourceCandidate,
+            bool preferNew,
+            Dictionary<ESAssetReferKind, Dictionary<string, Candidate>> mergeIndexes)
         {
-            if (candidate == null)
+            if (sourceCandidate == null)
                 return;
+            Candidate candidate = CloneForProjection(sourceCandidate);
             NormalizeCandidateMainAssetIdentity(candidate);
             if (!CandidatesByKind.TryGetValue(kind, out List<Candidate> candidates))
                 CandidatesByKind.Add(kind, candidates = new List<Candidate>());
-
-            int index = candidates.FindIndex(item =>
-                !string.IsNullOrEmpty(candidate.guid)
-                && item.guid == candidate.guid
-                && item.localFileId == candidate.localFileId);
-            if (index < 0)
+            if (!mergeIndexes.TryGetValue(kind, out Dictionary<string, Candidate> identities))
+                mergeIndexes.Add(kind, identities = new Dictionary<string, Candidate>(StringComparer.Ordinal));
+            string identity = BuildIdentityKey(candidate.guid, candidate.localFileId);
+            if (string.IsNullOrEmpty(candidate.guid) || !identities.TryGetValue(identity, out Candidate existing))
             {
                 candidates.Add(candidate);
+                if (!string.IsNullOrEmpty(candidate.guid)) identities[identity] = candidate;
                 return;
             }
-            Candidate existing = candidates[index];
             if (candidate.isLibrarySource && existing.isLibrarySource
                 && !ESConfigKeyMatch.Matches(existing.enumKey, existing.stringKey, candidate.enumKey, candidate.stringKey))
             {
@@ -776,9 +987,105 @@ namespace ES.EditorInternal
             }
 
             if (preferNew && !existing.isLibrarySource)
-                candidates[index] = candidate;
+            {
+                int index = candidates.IndexOf(existing);
+                if (index >= 0) candidates[index] = candidate;
+                identities[identity] = candidate;
+            }
             else if (preferNew)
                 existing.isBaked |= candidate.isBaked;
+        }
+
+        private static void AddRegistrySupplement(
+            Candidate candidate,
+            Dictionary<ESAssetReferKind, Dictionary<string, Candidate>> mergeIndexes)
+        {
+            if (candidate == null)
+                return;
+            Candidate projection = CloneForProjection(candidate);
+            NormalizeCandidateMainAssetIdentity(projection);
+            if (mergeIndexes.TryGetValue(projection.kind, out Dictionary<string, Candidate> identities)
+                && !string.IsNullOrEmpty(projection.guid)
+                && identities.ContainsKey(BuildIdentityKey(projection.guid, projection.localFileId)))
+                return;
+            AddOrReplaceCandidate(projection.kind, projection, false, mergeIndexes);
+        }
+
+        private static Candidate CloneForProjection(Candidate source)
+        {
+            return new Candidate
+            {
+                kind = source.kind,
+                enumKey = source.enumKey,
+                stringKey = source.stringKey,
+                guid = source.guid,
+                localFileId = source.localFileId,
+                assetPath = source.assetPath,
+                assetTypeName = source.assetTypeName,
+                typeDisplayName = source.typeDisplayName,
+                libraryName = source.libraryName,
+                pageName = source.pageName,
+                assetName = source.assetName,
+                menuLabel = source.menuLabel,
+                asset = source.asset,
+                isBaked = source.isBaked,
+                isLibrarySource = source.isLibrarySource,
+                hasLibraryKeyConflict = false
+            };
+        }
+
+        private static bool IsRecoveryCatalogDirectory(string folder)
+        {
+            if (string.IsNullOrWhiteSpace(folder))
+                return false;
+            string fullPath;
+            try { fullPath = Path.GetFullPath(folder); }
+            catch { return true; }
+            string recoveryRoot = Path.GetFullPath(Path.Combine(ESAssetPipelineIO.BakeRoot, ".Recovery"))
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return fullPath.Equals(recoveryRoot, StringComparison.OrdinalIgnoreCase)
+                   || fullPath.StartsWith(recoveryRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                   || fullPath.StartsWith(recoveryRoot + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static Candidate FindByKey(ESAssetReferKind kind, int enumKey, string stringKey)
+        {
+            List<Candidate> enumCandidates = GetEnumCandidates(kind, enumKey);
+            if (enumCandidates != null)
+                for (int i = 0; i < enumCandidates.Count; i++)
+                    if (ESConfigKeyMatch.Matches(enumKey, stringKey, enumCandidates[i].enumKey, enumCandidates[i].stringKey)) return enumCandidates[i];
+            List<Candidate> stringCandidates = GetStringCandidates(kind, stringKey);
+            if (stringCandidates != null)
+                for (int i = 0; i < stringCandidates.Count; i++)
+                    if (ESConfigKeyMatch.Matches(enumKey, stringKey, stringCandidates[i].enumKey, stringCandidates[i].stringKey)) return stringCandidates[i];
+            return null;
+        }
+
+        private static List<Candidate> GetEnumCandidates(ESAssetReferKind kind, int enumKey)
+        {
+            if (enumKey != 0 && CandidatesByEnumKey.TryGetValue(kind, out Dictionary<int, List<Candidate>> enums)
+                             && enums.TryGetValue(enumKey, out List<Candidate> enumMatches))
+                return enumMatches;
+            return null;
+        }
+
+        private static List<Candidate> GetStringCandidates(ESAssetReferKind kind, string stringKey)
+        {
+            if (!string.IsNullOrEmpty(stringKey)
+                && CandidatesByStringKey.TryGetValue(kind, out Dictionary<string, List<Candidate>> strings)
+                && strings.TryGetValue(stringKey, out List<Candidate> stringMatches))
+                return stringMatches;
+            return null;
+        }
+
+        private static string BuildIdentityKey(string guid, long localFileId)
+            => string.IsNullOrEmpty(guid) ? string.Empty : guid + ":" + localFileId;
+
+        private static void AddLookup<TKey>(Dictionary<TKey, List<Candidate>> lookup, TKey key, Candidate candidate)
+        {
+            if (!lookup.TryGetValue(key, out List<Candidate> values))
+                lookup.Add(key, values = new List<Candidate>(1));
+            values.Add(candidate);
         }
 
         private static string ResolveAssetName(ESAssetCatalogEntry entry)
@@ -809,9 +1116,12 @@ namespace ES.EditorInternal
 
         private static UnityEngine.Object LoadAsset(Candidate candidate)
         {
-            if (candidate.localFileId == 0) return AssetDatabase.LoadMainAssetAtPath(candidate.assetPath);
+            if (candidate.asset != null) return candidate.asset;
+            if (candidate.localFileId == 0)
+                return candidate.asset = AssetDatabase.LoadMainAssetAtPath(candidate.assetPath);
             foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(candidate.assetPath))
-                if (asset != null && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out _, out long fileId) && fileId == candidate.localFileId) return asset;
+                if (asset != null && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out _, out long fileId) && fileId == candidate.localFileId)
+                    return candidate.asset = asset;
             return null;
         }
 
@@ -859,6 +1169,45 @@ namespace ES.EditorInternal
             property.FindPropertyRelative("editorOnly").boolValue = false;
             property.FindPropertyRelative("alwaysLoaded").boolValue = false;
             ESAssetConfigKeyDrawerBase.Apply(property);
+        }
+    }
+
+    internal sealed class ESAssetCatalogKeyPickerPostprocessor : AssetPostprocessor
+    {
+        private static void OnPostprocessAllAssets(
+            string[] importedAssets,
+            string[] deletedAssets,
+            string[] movedAssets,
+            string[] movedFromAssetPaths)
+        {
+            NotifyPotentialLibraryChanges(importedAssets);
+            NotifyPotentialLibraryChanges(deletedAssets);
+            NotifyPotentialLibraryChanges(movedAssets);
+            NotifyPotentialLibraryChanges(movedFromAssetPaths);
+        }
+
+        private static void NotifyPotentialLibraryChanges(IEnumerable<string> paths)
+        {
+            if (paths == null)
+                return;
+            foreach (string path in paths)
+            {
+                if (string.IsNullOrEmpty(path) || !path.EndsWith(".asset", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                ESAssetCatalogKeyPicker.NotifyAssetPathChanged(path);
+            }
+        }
+    }
+
+    internal sealed class ESAssetCatalogKeyPickerInitializer : EditorInvoker_Level2
+    {
+        public override void InitInvoke()
+        {
+            ESAssetReferEditorBridge.NotifyAssetLibraryChanged = library =>
+            {
+                string path = library != null ? AssetDatabase.GetAssetPath(library) : string.Empty;
+                ESAssetCatalogKeyPicker.QueueLibraryChanged(path);
+            };
         }
     }
 

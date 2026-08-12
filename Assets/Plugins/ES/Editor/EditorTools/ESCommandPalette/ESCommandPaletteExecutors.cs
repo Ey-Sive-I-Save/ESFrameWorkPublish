@@ -37,14 +37,14 @@ namespace ES
 
         static ESWindowRegistry()
         {
-            RegisterBuiltIn("asset_window", MenuItemPathDefine.QUICK_WINDOWS_PATH + "资产管理窗口", "资产管理窗口", "资源与发布", "Library Catalog 资源");
-            RegisterBuiltIn("so_data_window", MenuItemPathDefine.QUICK_WINDOWS_PATH + "SO 数据窗口", "SO 数据窗口", "内容制作", "ScriptableObject 配置");
-            RegisterBuiltIn("simple_tools", MenuItemPathDefine.QUICK_WINDOWS_PATH + "简单工具集", "简单工具集", "开发与维护", "工具 批处理");
-            RegisterBuiltIn("runtime_watch", MenuItemPathDefine.QUICK_WINDOWS_PATH + "RuntimeWatch", "RuntimeWatch", "运行时诊断", "运行时 观察 监控");
-            RegisterBuiltIn("track_editor", MenuItemPathDefine.QUICK_WINDOWS_PATH + "轨道编辑器", "轨道编辑器", "内容制作", "技能 Timeline Clip");
-            RegisterBuiltIn("stable_graph_v2", MenuItemPathDefine.QUICK_WINDOWS_PATH + "稳定图编辑器 V2", "稳定图编辑器 V2", "内容制作", "Graph 流程 行为树");
-            RegisterBuiltIn("font_workbench", MenuItemPathDefine.QUICK_WINDOWS_PATH + "字体资产工作台", "字体资产工作台", "内容制作", "TMP 字符集 Fallback");
-            RegisterBuiltIn("cmd_agent", MenuItemPathDefine.QUICK_WINDOWS_PATH + "Cmd Agent", "Cmd Agent", "自动化", "Codex 命令 AI");
+            RegisterBuiltIn("asset_window", MenuItemPathDefine.RESOURCE_WINDOW_PATH, "资产管理窗口", "资源与发布", "Library Catalog 资源");
+            RegisterBuiltIn("so_data_window", MenuItemPathDefine.SO_DATA_WINDOW_PATH, "SO 数据窗口", "内容制作", "ScriptableObject 配置");
+            RegisterBuiltIn("simple_tools", MenuItemPathDefine.SIMPLE_TOOLS_WINDOW_PATH, "简单工具集", "自动化与开发", "工具 批处理");
+            RegisterBuiltIn("runtime_watch", MenuItemPathDefine.RUNTIME_WATCH_WINDOW_PATH, "RuntimeWatch", "验证与诊断", "运行时 观察 监控");
+            RegisterBuiltIn("track_editor", MenuItemPathDefine.TRACK_EDITOR_WINDOW_PATH, "轨道编辑器", "内容制作", "技能 Timeline Clip");
+            RegisterBuiltIn("stable_graph_v2", MenuItemPathDefine.STABLE_GRAPH_WINDOW_PATH, "稳定图编辑器 V2", "内容制作", "Graph 流程 行为树");
+            RegisterBuiltIn("font_workbench", MenuItemPathDefine.FONT_WORKBENCH_WINDOW_PATH, "字体资产工作台", "内容制作", "TMP 字符集 Fallback");
+            RegisterBuiltIn("cmd_agent", MenuItemPathDefine.AGENT_WORKBENCH_WINDOW_PATH, "Agent 工作台", "自动化与开发", "Codex 命令 AI Agent");
         }
 
         public static IReadOnlyList<ESWindowDescriptor> All => OrderedDescriptors;

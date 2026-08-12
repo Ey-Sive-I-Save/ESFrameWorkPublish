@@ -1,0 +1,92 @@
+.es-compact-choice-root {
+    padding: 8px;
+    background-color: rgb(18, 23, 30);
+}
+
+.es-compact-choice-header {
+    min-height: 40px;
+    padding-left: 8px;
+    padding-right: 6px;
+    margin-bottom: 5px;
+    flex-direction: row;
+    align-items: center;
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(40, 53, 66);
+}
+
+.es-compact-choice-title {
+    flex-grow: 1;
+    color: rgb(216, 230, 240);
+    -unity-font-style: bold;
+    font-size: 12px;
+}
+
+.es-compact-choice-hint {
+    color: rgb(91, 115, 135);
+    font-size: 9px;
+}
+
+.es-compact-choice-list {
+    flex-grow: 1;
+}
+
+.es-compact-choice-option {
+    min-height: 39px;
+    margin-top: 2px;
+    margin-bottom: 2px;
+    padding-left: 10px;
+    padding-right: 8px;
+    flex-direction: row;
+    align-items: center;
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0);
+    border-radius: 5px;
+    background-color: rgb(24, 31, 40);
+}
+
+.es-compact-choice-option:hover,
+.es-compact-choice-option:focus {
+    border-color: rgb(48, 116, 134);
+    background-color: rgb(28, 43, 52);
+}
+
+.es-compact-choice-option.selected {
+    border-left-width: 3px;
+    border-left-color: rgb(47, 194, 220);
+    background-color: rgb(25, 42, 51);
+}
+
+.es-compact-choice-copy {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.es-compact-choice-label {
+    color: rgb(188, 211, 226);
+    -unity-font-style: bold;
+    font-size: 10px;
+}
+
+.es-compact-choice-subtitle {
+    margin-top: 2px;
+    color: rgb(103, 128, 148);
+    font-size: 9px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.es-compact-choice-badge {
+    min-width: 34px;
+    height: 19px;
+    margin-left: 8px;
+    padding-left: 6px;
+    padding-right: 6px;
+    border-width: 1px;
+    border-color: rgb(43, 130, 147);
+    border-radius: 9px;
+    background-color: rgb(24, 66, 75);
+    color: rgb(126, 222, 235);
+    font-size: 9px;
+    -unity-text-align: middle-center;
+}

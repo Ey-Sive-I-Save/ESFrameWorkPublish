@@ -5,7 +5,8 @@
         "ES_Logic.Editor",
         "ES_Logic",
         "ES_Stand",
-        "ES_Design"
+        "ES_Design",
+        "KCC"
     ],
     "includePlatforms": [
         "Editor"

@@ -16,13 +16,13 @@ public class RuntimeWatchCaseSceneInstaller : EditorInvoker_Level2
         InstallOrUpdate(onlyKnownShowcaseScene: true);
     }
 
-    [MenuItem("【ES】/示例与测试/RuntimeWatch/安装或修复标准展示组", priority = 2100)]
+    [MenuItem("【ES】/验证与诊断/验证环境/RuntimeWatch/安装或修复标准展示组", priority = 2100)]
     private static void InstallFromMenu()
     {
         InstallOrUpdate(onlyKnownShowcaseScene: false);
     }
 
-    [MenuItem("【ES】/示例与测试/RuntimeWatch/选中标准展示组", priority = 2101)]
+    [MenuItem("【ES】/验证与诊断/验证环境/RuntimeWatch/选中标准展示组", priority = 2101)]
     private static void SelectShowcaseRoot()
     {
         GameObject parent = GameObject.Find(ParentName) ?? GameObject.Find(LegacyParentName);

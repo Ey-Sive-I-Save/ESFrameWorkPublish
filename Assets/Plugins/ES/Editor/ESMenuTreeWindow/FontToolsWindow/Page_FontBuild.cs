@@ -39,7 +39,7 @@ namespace ES
                     if (GUILayout.Button("Create Profile", GUILayout.Height(30), GUILayout.Width(120))) CreateProfile();
                     using (new EditorGUI.DisabledScope(profile == null))
                     {
-                        if (GUILayout.Button("Preview", GUILayout.Height(30), GUILayout.Width(100))) profile.lastBuildReport = ESFontBuildProfileEditor.Preview(profile);
+                        if (GUILayout.Button("Preview", GUILayout.Height(30), GUILayout.Width(100))) PreviewCurrentProfile();
                         if (GUILayout.Button("Update Current Profile", GUILayout.Height(30), GUILayout.Width(160))) ExecuteBuild();
                     }
                     if (GUILayout.Button("Update All Profiles", GUILayout.Height(30), GUILayout.Width(145))) ExecuteUpdateAll();
@@ -86,6 +86,15 @@ namespace ES
         {
             try { ESFontBuildProfileEditor.Build(profile); }
             catch (Exception exception) { Debug.LogException(exception); EditorUtility.DisplayDialog("ES Font Build", exception.Message, "OK"); }
+        }
+
+        private void PreviewCurrentProfile()
+        {
+            if (profile == null)
+                return;
+            Undo.RecordObject(profile, "预览字体构建配置");
+            profile.lastBuildReport = ESFontBuildProfileEditor.Preview(profile);
+            EditorUtility.SetDirty(profile);
         }
 
         private void ExecuteUpdateAll()

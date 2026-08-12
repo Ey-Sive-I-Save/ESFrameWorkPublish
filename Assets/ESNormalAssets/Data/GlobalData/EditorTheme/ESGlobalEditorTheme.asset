@@ -28,6 +28,7 @@ MonoBehaviour:
   useCustomPalette: 1
   enableGlobalEditorShell: 1
   enableDeepEditorSkin: 0
+  enableBrandTypography: 1
   enableMotion: 1
   motionIntensity: 0.78
   darkAccentStart: {r: 0.48, g: 0.78, b: 1, a: 0.92}

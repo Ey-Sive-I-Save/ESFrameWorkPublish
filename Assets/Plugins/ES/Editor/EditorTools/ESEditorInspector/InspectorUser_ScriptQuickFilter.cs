@@ -26,7 +26,7 @@ namespace ES
         private const int MaxGameObjectCaches = 256;
         private const int CacheCleanupAccessInterval = 128;
         private const string NavigatorSessionKeyPrefix = "ES.EditorSectionNavigator.Window.";
-        private const string MenuRoot = MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "检查器/组件筛选/";
+        private const string MenuRoot = MenuItemPathDefine.AUTOMATION_EDITOR_EXTENSIONS_PATH + "检查器/组件筛选/";
 
         private static readonly Color DisabledLabelColor = new Color(0.62f, 0.62f, 0.62f, 0.9f);
         private static readonly Color MissingScriptColor = new Color(0.92f, 0.36f, 0.32f, 1f);

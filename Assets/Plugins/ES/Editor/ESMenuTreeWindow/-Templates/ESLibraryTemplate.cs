@@ -299,9 +299,14 @@ namespace ES
                 {
                     if (booksAssets != null && booksAssets.Length > 0)
                     {
-                        Undo.RecordObject(library, "Drag Assets to Library Books");
-                        library.EditorOnly_DragAssetsToBooks(booksAssets);
-                        SaveAssetsImmediate();  // 拖拽资源需立即保存
+                        if (library is ESAssetLibrary targetAssetLibrary)
+                            OpenDraggedAssetsInRegistration(booksAssets, targetAssetLibrary);
+                        else
+                        {
+                            Undo.RecordObject(library, "Drag Assets to Library Books");
+                            library.EditorOnly_DragAssetsToBooks(booksAssets);
+                            SaveAssetsImmediate();
+                        }
                     }
                 }
                 area.UpdateAtLast();
@@ -375,9 +380,9 @@ namespace ES
                 {
                     REForPages = new ReorderableList(book.pages, typeof(TPage))
                     {
-                        draggable = true,
-                        displayAdd = true,
-                        displayRemove = true,
+                        draggable = library is not ESAssetLibrary,
+                        displayAdd = library is not ESAssetLibrary,
+                        displayRemove = library is not ESAssetLibrary,
                     };
                     SetupPagesCallBack();
                 }
@@ -421,9 +426,14 @@ namespace ES
                 {
                     if (gs != null)
                     {
-                        Undo.RecordObject(library, "Drag Assets to Book");
-                        book.EditorOnly_DragAtArea(gs);
-                        SaveAssetsImmediate();  // 拖拽资源需立即保存
+                        if (library is ESAssetLibrary targetAssetLibrary)
+                            OpenDraggedAssetsInRegistration(gs, targetAssetLibrary);
+                        else
+                        {
+                            Undo.RecordObject(library, "Drag Assets to Book");
+                            book.EditorOnly_DragAtArea(gs);
+                            SaveAssetsImmediate();
+                        }
                     }
                 }
                 area.UpdateAtLast();
@@ -651,9 +661,9 @@ namespace ES
                 createText = $"--编辑库【{library.GetSTR()}】--";
                 REForBooks_SelfDefine = new ReorderableList(library.Books, typeof(TBook))
                 {
-                    draggable = true,      // 允许拖拽排序
-                    displayAdd = true, // 显示添加按钮
-                    displayRemove = true, // 显示移除按钮
+                    draggable = library is not ESAssetLibrary,
+                    displayAdd = library is not ESAssetLibrary,
+                    displayRemove = library is not ESAssetLibrary,
                 };
                 SetupBooksCallBack();
                 return base.ES_Refresh();
@@ -1136,6 +1146,7 @@ namespace ES
 
             private void PasteCopiedBookToLibrary(TLib targetLibrary, int insertIndex)
             {
+                if (RejectAssetLibraryStructureMutation()) return;
                 if (copiedBook == null || targetLibrary?.Books == null)
                 {
                     Debug.LogWarning("[PasteCopiedBook] 复制板或目标Library为空。");
@@ -1157,6 +1168,7 @@ namespace ES
 
             private void PasteCopiedPageToBook(TBook targetBook, int insertIndex)
             {
+                if (RejectAssetLibraryStructureMutation()) return;
                 if (copiedPage == null || targetBook?.pages == null)
                 {
                     Debug.LogWarning("[PasteCopiedPage] 复制板或目标Book为空。");
@@ -1235,6 +1247,7 @@ namespace ES
             // 封装Book粘贴逻辑
             private void PasteBookToLibrary(TLib targetLibrary, int insertIndex)
             {
+                if (RejectAssetLibraryStructureMutation()) return;
                 if (cutBook == null || cutBookSourceLibrary == null || targetLibrary?.Books == null)
                 {
                     Debug.LogWarning("[PasteBook] 无效的粘贴操作：剪切板或目标为空");
@@ -1262,6 +1275,7 @@ namespace ES
             // 封装Page粘贴逻辑
             private void PastePageToBook(TBook targetBook, int insertIndex)
             {
+                if (RejectAssetLibraryStructureMutation()) return;
                 if (cutPage == null || cutPageSourceBook == null || targetBook?.pages == null)
                 {
                     Debug.LogWarning("[PastePage] 无效的粘贴操作：剪切板或目标为空");
@@ -1290,6 +1304,7 @@ namespace ES
             // 将Book的所有Pages移动到目标Book
             private void MoveAllPagesToBook(TBook sourceBook, TBook targetBook)
             {
+                if (RejectAssetLibraryStructureMutation()) return;
                 if (sourceBook?.pages == null || targetBook?.pages == null)
                 {
                     Debug.LogWarning("[MoveAllPages] 无效的移动操作：源或目标为空");
@@ -1324,6 +1339,7 @@ namespace ES
             // 将单个Page移动到目标Book
             private void MovePageToBook(TPage page, TBook sourceBook, TBook targetBook)
             {
+                if (RejectAssetLibraryStructureMutation()) return;
                 if (page == null || sourceBook?.pages == null || targetBook?.pages == null)
                 {
                     Debug.LogWarning("[MovePage] 无效的移动操作：页面或Book为空");
@@ -1654,6 +1670,7 @@ namespace ES
             /// </summary>
             private void MergeDuplicatePages(List<(TBook book, TPage page)> duplicates, TLib lib)
             {
+                if (RejectAssetLibraryStructureMutation()) return;
                 if (duplicates.Count <= 1) return;
 
                 // 保留第一个，删除其他
@@ -1755,6 +1772,7 @@ namespace ES
             /// </summary>
             private void RemoveEmptyPages(TBook book)
             {
+                if (RejectAssetLibraryStructureMutation()) return;
                 if (book?.pages == null) return;
 
                 Undo.RecordObject(library, "Remove Empty Pages");
@@ -1782,6 +1800,32 @@ namespace ES
             }
 
             #endregion
+
+            private void OpenDraggedAssetsInRegistration(UnityEngine.Object[] assets, ESAssetLibrary targetLibrary)
+            {
+                UnityEngine.Object[] valid = assets?.Where(item => item != null).ToArray() ?? Array.Empty<UnityEngine.Object>();
+                if (valid.Length == 0)
+                    return;
+                if (valid.Length > 1)
+                {
+                    EditorUtility.DisplayDialog(
+                        "统一内容注册",
+                        "一次拖入了 " + valid.Length + " 个资产。当前事务面板一次只提交一个资产，将先打开第一个；其余资产请逐项拖入，确保每项都有独立预检、revision 和 requestId。",
+                        "打开第一个");
+                }
+                ESResourceCollectionWorkflowWindow.OpenForAssetRegistration(valid[0], targetLibrary);
+            }
+
+            private bool RejectAssetLibraryStructureMutation()
+            {
+                if (library is not ESAssetLibrary)
+                    return false;
+                EditorUtility.DisplayDialog(
+                    "操作已禁用",
+                    "ESAssetLibrary 的新增与改 Key 必须走统一内容注册事务；移除、移动、复制和合并尚未定义对应事务，当前禁止直接改写。",
+                    "确定");
+                return true;
+            }
 
             #region 工具方法
 
@@ -2031,27 +2075,12 @@ namespace ES
                 EditorGUILayout.LabelField("GameCore 启动核心", EditorStyles.boldLabel);
                 EditorGUILayout.LabelField("已收集", (consumer.GameCoreAssets?.Count ?? 0) + " 个");
                 EditorGUILayout.LabelField("手动补充", (consumer.ManualGameCoreAssets?.Count ?? 0) + " 个");
-                EditorGUILayout.HelpBox("必需 Library 中的文件夹会在同步时递归扫描 IGameCoreSO；可将额外的 IGameCoreSO 直接拖到下方。", MessageType.Info);
+                EditorGUILayout.HelpBox("同步和手动补充都通过统一内容注册事务执行。", MessageType.Info);
                 EditorGUILayout.BeginHorizontal();
                 if (GUILayout.Button("同步并检查"))
-                {
-                    try
-                    {
-                        Undo.RecordObject(consumer, "Sync Consumer GameCore Assets");
-                        ESAssetConsumerReferenceAuthoring.SyncConsumerGameCoreAssets(consumer);
-                        MarkPackageDirty();
-                    }
-                    catch (Exception exception)
-                    {
-                        EditorUtility.DisplayDialog("GameCore 依赖检查未通过", exception.Message, "确定");
-                    }
-                }
-                if (GUILayout.Button("清空手动补充"))
-                {
-                    Undo.RecordObject(consumer, "Clear Manual GameCore Assets");
-                    consumer.ManualGameCoreAssets?.Clear();
-                    MarkPackageDirty();
-                }
+                    ESResourceCollectionWorkflowWindow.OpenForConsumerSynchronization(consumer);
+                using (new EditorGUI.DisabledScope(true))
+                    GUILayout.Button(new GUIContent("清空手动补充", "尚未定义带 revision/CAS/回滚的批量移除事务。"));
                 EditorGUILayout.EndHorizontal();
 
                 Rect dropArea = GUILayoutUtility.GetRect(0, 40, GUILayout.ExpandWidth(true));
@@ -2065,11 +2094,15 @@ namespace ES
                 else if (dropArea.Contains(current.mousePosition) && current.type == EventType.DragPerform)
                 {
                     DragAndDrop.AcceptDrag();
-                    Undo.RecordObject(consumer, "Add Manual GameCore Assets");
-                    foreach (UnityEngine.Object asset in DragAndDrop.objectReferences)
-                        if (!ESAssetConsumerReferenceAuthoring.TryAddManualGameCoreAsset(consumer, asset))
-                            Debug.LogWarning("[ESRes] 仅允许拖入实现 IGameCoreSO 的 ScriptableObject：" + asset.name);
-                    MarkPackageDirty();
+                    ScriptableObject[] sources = DragAndDrop.objectReferences.OfType<ScriptableObject>().ToArray();
+                    if (sources.Length == 0)
+                        Debug.LogWarning("[ESRes][Register] 仅允许选择 ScriptableObject GameCore 根资产。");
+                    else
+                    {
+                        if (sources.Length > 1)
+                            Debug.LogWarning("[ESRes][Register] GameCore Root 事务一次只接收一个资产，本次先打开第一个。其余资产请逐项提交。");
+                        ESResourceCollectionWorkflowWindow.OpenForGameCoreRootRegistration(sources[0], consumer);
+                    }
                     current.Use();
                 }
 
@@ -2079,12 +2112,8 @@ namespace ES
                     ESAssetReferBase refer = consumer.ManualGameCoreAssets[index];
                     EditorGUILayout.BeginHorizontal();
                     EditorGUILayout.LabelField(refer == null ? "<Missing>" : refer.GUID, EditorStyles.miniLabel);
-                    if (GUILayout.Button("移除", GUILayout.Width(55)))
-                    {
-                        Undo.RecordObject(consumer, "Remove Manual GameCore Asset");
-                        consumer.ManualGameCoreAssets.RemoveAt(index--);
-                        MarkPackageDirty();
-                    }
+                    using (new EditorGUI.DisabledScope(true))
+                        GUILayout.Button(new GUIContent("移除", "尚未定义带 revision/CAS/回滚的 GameCore 移除事务。"), GUILayout.Width(55));
                     EditorGUILayout.EndHorizontal();
                 }
                 if (consumer.GameCoreValidationErrors != null && consumer.GameCoreValidationErrors.Count > 0)
@@ -2601,8 +2630,8 @@ namespace ES
         }
 
 
-        public void ApplyTemplateToMenuTree<T>(ESMenuTreeWindowAB<T> from, OdinMenuTree tree, string menuName)
-        where T : ESMenuTreeWindowAB<T>
+        public void ApplyTemplateToMenuTree<T>(ESOdinMenuTreeWindow<T> from, OdinMenuTree tree, string menuName)
+        where T : ESOdinMenuTreeWindow<T>
         {
             from.QuickBuildRootMenu(tree, menuName, ref page_root_Library, Sirenix.OdinInspector.SdfIconType.KeyboardFill);
             from.QuickBuildRootMenu(tree, "Consumer", ref page_root_Consumer, SdfIconType.Box);

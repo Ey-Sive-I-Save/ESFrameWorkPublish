@@ -521,7 +521,7 @@ namespace ES.EditorInternal
             EditorUtility.SetDirty(serializedObject.targetObject);
         }
 
-        private sealed class ESInputActionBindingImportWindow : EditorWindow
+        private sealed class ESInputActionBindingImportWindow : ESSinglePageIMGUIWindow<ESInputActionBindingImportWindow>
         {
             private SerializedObject targetObject;
             private string bindingPropertyPath;
@@ -547,7 +547,19 @@ namespace ES.EditorInternal
                 window.ShowUtility();
             }
 
-            private void OnDisable()
+            public override GUIContent ESWindow_GetWindowGUIContent()
+            {
+                return new GUIContent("导入 InputAction 绑定", "从临时 InputAction 选择一条 Binding 导入当前 ES 绑定");
+            }
+
+            protected override string ESWindow_Subtitle => "Unity InputAction 到单条 ES Binding";
+            protected override Vector2 ESWindow_MinSize => new Vector2(560f, 380f);
+            protected override Vector2 ESWindow_DefaultSize => new Vector2(700f, 560f);
+            protected override string ESWindow_PageStableId => "input.binding-import";
+            protected override string ESWindow_PageTitle => "InputAction Binding 导入";
+            protected override string ESWindow_PageKeywords => "InputAction Binding 输入 导入 Composite";
+
+            protected override void ESWindow_OnHostDisable()
             {
                 if (holder != null)
                 {
@@ -559,9 +571,10 @@ namespace ES.EditorInternal
                     DestroyImmediate(holder);
                     holder = null;
                 }
+                holderObject = null;
             }
 
-            private void OnGUI()
+            protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
             {
                 if (holder == null || holderObject == null)
                 {

@@ -836,11 +836,9 @@ namespace ES
                         }
 
                         string rawTitle = Path.GetFileNameWithoutExtension(path);
-                        string title = ChineseTitles.TryGetValue(rawTitle, out string chineseTitle)
-                            ? chineseTitle
-                            : rawTitle;
+                        string title = ResolveTitle(type, rawTitle);
                         string folderName = Path.GetFileName(Path.GetDirectoryName(path));
-                        string keywords = rawTitle + " " + title + " " + folderName + " " + path;
+                        string keywords = type.Name + " " + rawTitle + " " + title + " " + folderName + " " + path;
                         result.Add(new ESCommandPaletteItem(
                             path,
                             title,
@@ -859,6 +857,68 @@ namespace ES
                 }
 
                 return result;
+            }
+
+            private static string ResolveTitle(Type type, string rawTitle)
+            {
+                ESCreatePathAttribute createPath = Attribute.GetCustomAttribute(
+                    type,
+                    typeof(ESCreatePathAttribute),
+                    true) as ESCreatePathAttribute;
+                if (createPath != null && !string.IsNullOrWhiteSpace(createPath.MyName))
+                {
+                    return createPath.MyName.Trim();
+                }
+
+                CreateAssetMenuAttribute createMenu = Attribute.GetCustomAttribute(
+                    type,
+                    typeof(CreateAssetMenuAttribute),
+                    true) as CreateAssetMenuAttribute;
+                string menuTitle = GetLastMenuSegment(createMenu?.menuName);
+                if (ContainsChinese(menuTitle))
+                {
+                    return menuTitle;
+                }
+
+                if (ChineseTitles.TryGetValue(rawTitle, out string chineseTitle))
+                {
+                    return chineseTitle;
+                }
+
+                return !string.IsNullOrWhiteSpace(menuTitle) ? menuTitle : rawTitle;
+            }
+
+            private static string GetLastMenuSegment(string menuName)
+            {
+                if (string.IsNullOrWhiteSpace(menuName))
+                {
+                    return string.Empty;
+                }
+
+                string normalized = menuName.Trim().Trim('/');
+                int separatorIndex = normalized.LastIndexOf('/');
+                return separatorIndex >= 0
+                    ? normalized.Substring(separatorIndex + 1).Trim()
+                    : normalized;
+            }
+
+            private static bool ContainsChinese(string value)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    return false;
+                }
+
+                for (int i = 0; i < value.Length; i++)
+                {
+                    char character = value[i];
+                    if (character >= '\u3400' && character <= '\u9fff')
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
             }
         }
     }

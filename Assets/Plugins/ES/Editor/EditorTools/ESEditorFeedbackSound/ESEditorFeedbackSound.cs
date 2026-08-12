@@ -47,7 +47,7 @@ namespace ES
         private const string SchemeKey = "ES.EditorFeedbackSound.Scheme";
         private const string DefaultScheme = "Default";
         private const string FeedbackMenuRoot =
-            MenuItemPathDefine.PROJECT_SETTINGS_PATH + "编辑器/反馈音效/";
+            MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/反馈音效/";
         private const string EnabledMenuPath = FeedbackMenuRoot + "启用全局编辑器音效";
         private const string EnhancedMenuPath = FeedbackMenuRoot + "启用增强反馈";
         private const string PlayModeMenuPath = FeedbackMenuRoot + "启用 PlayMode 进出反馈";
@@ -104,6 +104,7 @@ namespace ES
         private static int previewKindIndex;
         private static double nextSchemePreviewAt;
         private static bool schemePreviewScheduled;
+        internal static event Action SchemePreviewStateChanged;
         private static readonly Dictionary<string, AudioClip> ExternalClipCache =
             new Dictionary<string, AudioClip>(StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> WarnedDiagnostics =
@@ -464,6 +465,7 @@ namespace ES
             schemePreviewScheduled = true;
             EditorApplication.update -= TickSchemePreview;
             EditorApplication.update += TickSchemePreview;
+            SchemePreviewStateChanged?.Invoke();
         }
 
         public static void PreviewSchemeKind(
@@ -492,6 +494,7 @@ namespace ES
             previewKindIndex = 0;
             nextSchemePreviewAt = 0d;
             EditorApplication.update -= TickSchemePreview;
+            SchemePreviewStateChanged?.Invoke();
         }
 
         private static void TickSchemePreview()
@@ -1551,7 +1554,7 @@ namespace ES
         }
     }
 
-    public sealed class ESEditorFeedbackSoundSchemeWindow : EditorWindow
+    public sealed class ESEditorFeedbackSoundSchemeWindow : ESSinglePageIMGUIWindow<ESEditorFeedbackSoundSchemeWindow>
     {
         private string newSchemeName = "MyScheme";
         private string auditionSchemeId;
@@ -1560,6 +1563,7 @@ namespace ES
         private bool showVolumeSettings;
         private Vector2 volumeScroll;
         private Vector2 scroll;
+        private string[] schemeLabels = Array.Empty<string>();
 
         public static void Open()
         {
@@ -1571,7 +1575,66 @@ namespace ES
             window.ShowUtility();
         }
 
-        private void OnGUI()
+        public override GUIContent ESWindow_GetWindowGUIContent()
+        {
+            return new GUIContent("ES 编辑器音效方案", "配置、试听并管理编辑器交互反馈音效");
+        }
+
+        protected override string ESWindow_Subtitle => "编辑器反馈音效与分类型音量";
+        protected override Vector2 ESWindow_MinSize => new Vector2(420f, 300f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(600f, 470f);
+        protected override string ESWindow_PageStableId => "editor.feedback-sound";
+        protected override string ESWindow_PageTitle => "反馈音效方案";
+        protected override string ESWindow_PageKeywords => "编辑器 音效 反馈 试听 方案 音量";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "feedback-sound.preview",
+                    "试听方案",
+                    "按顺序试听当前反馈音效方案。",
+                    context =>
+                    {
+                        ESEditorFeedbackSound.PreviewScheme(ESEditorFeedbackSound.Scheme);
+                        context.SetStatus("正在试听当前音效方案");
+                    })
+                .WhenVisible(() => !ESEditorFeedbackSound.IsSchemePreviewing)
+                .WithUnityIcon("PlayButton")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "feedback-sound.stop",
+                    "停止试听",
+                    "停止当前方案试听。",
+                    context =>
+                    {
+                        ESEditorFeedbackSound.StopSchemePreview();
+                        context.SetStatus("音效方案试听已停止");
+                    })
+                .WhenVisible(() => ESEditorFeedbackSound.IsSchemePreviewing)
+                .WithUnityIcon("PauseButton")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "feedback-sound.open-folder",
+                    "打开目录",
+                    "打开反馈音效方案目录。",
+                    _ => EditorUtility.RevealInFinder(ESEditorFeedbackSound.GetSchemeRootPath()))
+                .WithUnityIcon("Folder Icon")
+                .WithPriority(80));
+            actions.Add(new ESMenuTreePageAction(
+                    "feedback-sound.refresh-cache",
+                    "刷新缓存",
+                    "清除反馈音效 Clip 缓存，后续播放会按需重载。",
+                    context =>
+                    {
+                        ESEditorFeedbackSound.ClearClipCache();
+                        context.SetStatus("反馈音效缓存已刷新");
+                    })
+                .WithUnityIcon("Refresh")
+                .WithPriority(70));
+        }
+
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             using (new EditorGUILayout.VerticalScope())
             {
@@ -1773,7 +1836,8 @@ namespace ES
                     auditionSchemeId = ESEditorFeedbackSound.Scheme;
                 }
 
-                var schemeLabels = new string[schemes.Count];
+                if (schemeLabels.Length != schemes.Count)
+                    schemeLabels = new string[schemes.Count];
                 int auditionSchemeIndex = 0;
                 for (int i = 0; i < schemes.Count; i++)
                 {
@@ -1837,53 +1901,25 @@ namespace ES
                     }
                 }
 
-                EditorGUILayout.Space(6f);
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    if (GUILayout.Button(
-                        ESEditorFeedbackSound.IsSchemePreviewing
-                            ? "试听中..."
-                            : "试听当前方案（整套）",
-                        EditorStyles.miniButton,
-                        GUILayout.Height(26f)))
-                    {
-                        ESEditorFeedbackSound.PreviewScheme(
-                            ESEditorFeedbackSound.Scheme);
-                    }
-
-                    if (GUILayout.Button(
-                        "停止试听",
-                        EditorStyles.miniButton,
-                        GUILayout.Height(26f)))
-                    {
-                        ESEditorFeedbackSound.StopSchemePreview();
-                    }
-
-                    if (GUILayout.Button(
-                        "打开方案目录",
-                        EditorStyles.miniButton,
-                        GUILayout.Height(26f)))
-                    {
-                        ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Click);
-                        EditorUtility.RevealInFinder(
-                            ESEditorFeedbackSound.GetSchemeRootPath());
-                    }
-
-                    if (GUILayout.Button(
-                        "刷新音效缓存",
-                        EditorStyles.miniButton,
-                        GUILayout.Height(26f)))
-                    {
-                        ESEditorFeedbackSound.ClearClipCache();
-                        ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Click);
-                    }
-                }
             }
         }
 
-        private void OnDisable()
+        protected override void ESWindow_OnHostEnable()
         {
+            ESEditorFeedbackSound.SchemePreviewStateChanged -= OnSchemePreviewStateChanged;
+            ESEditorFeedbackSound.SchemePreviewStateChanged += OnSchemePreviewStateChanged;
+        }
+
+        protected override void ESWindow_OnHostDisable()
+        {
+            ESEditorFeedbackSound.SchemePreviewStateChanged -= OnSchemePreviewStateChanged;
             ESEditorFeedbackSound.StopSchemePreview();
+        }
+
+        private void OnSchemePreviewStateChanged()
+        {
+            ESWindow_CurrentPageContext?.RefreshPageActions();
+            Repaint();
         }
     }
 

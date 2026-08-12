@@ -260,10 +260,10 @@ namespace ES
 
                 if (!registered)
                 {
-                    EditorGUILayout.HelpBox("当前资产尚未进入资源注册表。点击后会使用现有资源收集规则生成对应 Page 并刷新注册表。", MessageType.Info);
+                    EditorGUILayout.HelpBox("当前资产尚未进入资源注册表。点击后进入统一预检，确认稳定 Key 后才能提交。", MessageType.Info);
                     if (GUILayout.Button("注册当前资产", ESEditorInspectorControls.Button, GUILayout.Height(22)))
                     {
-                        RegisterCurrentAsset(asset, path, guid);
+                        RegisterCurrentAsset(asset);
                         GUIUtility.ExitGUI();
                     }
                     return;
@@ -286,16 +286,13 @@ namespace ES
             EditorGUILayout.EndHorizontal();
             if (!string.Equals(nextStringKey, page.StringKey, StringComparison.Ordinal))
             {
-                nextStringKey = nextStringKey?.Trim();
                 if (string.IsNullOrEmpty(nextStringKey))
                 {
                     Debug.LogWarning("[资源注册键] String Key 不能为空。", asset);
                 }
                 else
                 {
-                    RecordSourceLibraryUndo(page, "修改资源 String Key");
-                    if (ESAssetRegistry.RenameStringKey(page, nextStringKey))
-                        AssetDatabase.SaveAssets();
+                    ESResourceCollectionWorkflowWindow.OpenForAssetKeyUpdate(page, page.EnumKey, nextStringKey);
                 }
             }
 
@@ -315,12 +312,7 @@ namespace ES
                 int nextEnumKey = Convert.ToInt32(selected);
                 if (nextEnumKey != page.EnumKey)
                 {
-                    RecordSourceLibraryUndo(page, "修改资源 Enum Key");
-                    if (ESAssetRegistry.RenameEnumKey(page, nextEnumKey))
-                    {
-                        ESEditorFeedbackSound.NotifyEnumChanged();
-                        AssetDatabase.SaveAssets();
-                    }
+                    ESResourceCollectionWorkflowWindow.OpenForAssetKeyUpdate(page, nextEnumKey, page.EffectiveStringKey);
                 }
             }
 
@@ -340,40 +332,9 @@ namespace ES
             EditorGUILayout.EndHorizontal();
         }
 
-        private static void RegisterCurrentAsset(UnityEngine.Object asset, string path, string guid)
+        private static void RegisterCurrentAsset(UnityEngine.Object asset)
         {
-            ESAssetLibrary library = ESGlobalResToolsSupportConfig.CollectAssetToRecommendedLibrary(
-                asset,
-                showConfirmDialog: false,
-                silent: false);
-
-            if (library == null)
-            {
-                Debug.LogWarning("[资源注册键] 注册失败：没有可用的资源库或收集规则未启用。", asset);
-                return;
-            }
-
-            library.InjectToAssetRegistryEditor();
-            if (!string.IsNullOrEmpty(guid) && ESAssetRegistry.TryGetByGuid(guid, out _))
-            {
-                Debug.Log($"[资源注册键] 已注册资产：{path}", asset);
-                return;
-            }
-
-            Debug.LogWarning($"[资源注册键] 已执行收集，但注册表中仍未找到资产：{path}", asset);
-        }
-
-        private static void RecordSourceLibraryUndo(ESAssetPage page, string actionName)
-        {
-            if (page == null || string.IsNullOrEmpty(page.SourceLibrary))
-                return;
-
-            string libraryPath = AssetDatabase.GUIDToAssetPath(page.SourceLibrary);
-            ESAssetLibrary library = string.IsNullOrEmpty(libraryPath)
-                ? null
-                : AssetDatabase.LoadAssetAtPath<ESAssetLibrary>(libraryPath);
-            if (library != null)
-                Undo.RecordObject(library, actionName);
+            ESResourceCollectionWorkflowWindow.OpenForAssetRegistration(asset);
         }
 
         private static Type GetAssetEnumType(ESAssetReferKind kind)

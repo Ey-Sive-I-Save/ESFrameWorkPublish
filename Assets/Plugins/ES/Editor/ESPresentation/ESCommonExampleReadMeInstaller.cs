@@ -16,7 +16,7 @@ namespace ES.EditorInternal
     /// </summary>
     internal static class ESCommonExampleReadMeInstaller
     {
-        private const string MenuPath = "【ES】/示例与测试/编辑器案例/接入或更新常见案例 ReadMe";
+        private const string MenuPath = "【ES】/自动化与开发/文档与示例/编辑器案例/接入或更新常见案例 ReadMe";
         private const string ReadMeRootPrefix = "【ES】ReadMe · ";
 
         private const string SimpleToolsScenePath =
@@ -67,7 +67,7 @@ namespace ES.EditorInternal
                         "简单工具集的空白、低风险入口；先从菜单打开工具，再按任务选择范围并手动执行。",
                         "使用步骤：\n"
                         + "1. 打开本场景，确认当前项目没有需要保留的临时测试对象。\n"
-                        + "2. 从【ES】/开发与维护/综合工具/简单工具集打开工作台。\n"
+                        + "2. 从【ES】/自动化与开发/编辑器扩展/打开简单工具集打开工作台。\n"
                         + "3. 先确认范围、规则和预览，再点击页面唯一的主操作。\n"
                         + "4. 需要写入、清理、迁移或重建时，阅读风险说明并在结果区核对反馈。\n\n"
                         + "这个场景不承载自动扫描任务；工具打开、切页和重绘不会自动改动项目资产。",
@@ -92,7 +92,7 @@ namespace ES.EditorInternal
                         "在 Play Mode 中观察带有 ESRuntimeWatch 标记的对象；数据采集只在 RuntimeWatch 前台当前页时发生。",
                         "使用步骤：\n"
                         + "1. 打开本场景并进入 Play Mode。\n"
-                        + "2. 从【ES】/运行时诊断/RuntimeWatch/打开运行时观察打开观察页。\n"
+                        + "2. 从【ES】/验证与诊断/运行时监视/RuntimeWatch/打开运行时观察打开观察页。\n"
                         + "3. 选择目标或分类；重新回到前台时会请求一次刷新，自动刷新仍受开关控制。\n"
                         + "4. 观察“分类 → 对象 → 条目”层级；需要留证时再开始录制。\n\n"
                         + "离开 RuntimeWatch、切换其他工具页或让 SimpleTools 失焦时，自动采集会暂停；录制只在用户明确开始后持续采样。",
@@ -352,7 +352,7 @@ namespace ES.EditorInternal
                         "使用步骤：\n"
                         + "1. 先选择单个对象，确认基础多态和集合绘制。\n"
                         + "2. 在 Hierarchy 中多选 2～10 个同类案例对象，观察共同字段编辑。\n"
-                        + "3. 使用【ES】/示例与测试/编辑器案例/ES 编辑器扩展中的多目标边界测试命令创建 11 个独立对象，验证上限保护。\n\n"
+                        + "3. 使用【ES】/验证与诊断/测试与验收/编辑器扩展/ES 编辑器扩展中的多目标边界测试命令创建 11 个独立对象，验证上限保护。\n\n"
                         + "超过 10 个目标不是普通编辑场景；ES 应明确提示并拒绝高风险批量写入，而不是悄悄产生不一致结果。",
                         new[] { "ESPresentationBoundaryCase 组件。" },
                         new[]

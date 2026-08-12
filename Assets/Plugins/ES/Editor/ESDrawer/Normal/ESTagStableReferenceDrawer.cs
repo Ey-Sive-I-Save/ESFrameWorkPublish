@@ -61,7 +61,7 @@ namespace ES
 
             if (source.Count == 0)
                 entries.Add(ESSearchDropdown.Entry.Disabled("未找到唯一有效的 ESTagBakeTable", "状态",
-                    "请执行【ES】/项目设置/GameCore/Bake并应用GameCore Catalog。"));
+                    "请执行【ES】/项目配置/GameCore/Bake并应用GameCore Catalog。"));
 
             ESSearchDropdown.Open(anchorRect, "选择 GameTag", entries, minimumWindowSize: new Vector2(500f, 360f));
         }

@@ -17,17 +17,17 @@ namespace ES.EditorInternal
         private const int MultiTargetCaseCount = 11;
 
         private const string CreateMenuPath
-            = MenuItemPathDefine.TEST_TOOLS_PATH + "ES 编辑器扩展/创建多态边界测试层级";
+            = MenuItemPathDefine.VALIDATION_EDITOR_EXTENSION_TESTS_PATH + "ES 编辑器扩展/创建多态边界测试层级";
         private const string SelectMenuPath
-            = MenuItemPathDefine.TEST_TOOLS_PATH + "ES 编辑器扩展/定位多态边界测试层级";
+            = MenuItemPathDefine.VALIDATION_EDITOR_EXTENSION_TESTS_PATH + "ES 编辑器扩展/定位多态边界测试层级";
         private const string SelectMixedPairMenuPath
-            = MenuItemPathDefine.TEST_TOOLS_PATH + "ES 编辑器扩展/选择 2 个不一致对象";
+            = MenuItemPathDefine.VALIDATION_EDITOR_EXTENSION_TESTS_PATH + "ES 编辑器扩展/选择 2 个不一致对象";
         private const string SelectAllMenuPath
-            = MenuItemPathDefine.TEST_TOOLS_PATH + "ES 编辑器扩展/选择全部多目标对象（11 个）";
+            = MenuItemPathDefine.VALIDATION_EDITOR_EXTENSION_TESTS_PATH + "ES 编辑器扩展/选择全部多目标对象（11 个）";
         private const string SelectTenMenuPath
-            = MenuItemPathDefine.TEST_TOOLS_PATH + "ES 编辑器扩展/选择 10 个多目标对象";
+            = MenuItemPathDefine.VALIDATION_EDITOR_EXTENSION_TESTS_PATH + "ES 编辑器扩展/选择 10 个多目标对象";
         private const string ClearMenuPath
-            = MenuItemPathDefine.TEST_TOOLS_PATH + "ES 编辑器扩展/删除多态边界测试层级";
+            = MenuItemPathDefine.VALIDATION_EDITOR_EXTENSION_TESTS_PATH + "ES 编辑器扩展/删除多态边界测试层级";
 
         [MenuItem(CreateMenuPath, false, 40)]
         private static void CreateBoundaryHierarchy()
@@ -66,7 +66,7 @@ namespace ES.EditorInternal
                 "承载 1 个基准对象和 11 个独立对象，用于验证多目标编辑上限、类型不一致、空值与深层嵌套。",
                 "职责：这是边界测试的组织根，不是业务对象。\n\n"
                 + "先选择 2～10 个子对象验证共同编辑；再选择全部 11 个子对象，确认 ES 明确进入保护而不是静默批量写入。\n\n"
-                + "本层级只由【ES】/示例与测试/编辑器案例/ES 编辑器扩展中的专用菜单创建或删除。",
+                + "本层级只由【ES】/验证与诊断/测试与验收/编辑器扩展/ES 编辑器扩展中的专用菜单创建或删除。",
                 "ES Editor / Presentation Boundary");
 
             CreateCaseObject(root.transform, "01 基准案例", false, false);

@@ -12,11 +12,83 @@ namespace ES.EditorInternal
         private const string ThemeFolder = "Assets/ESNormalAssets/Data/GlobalData/EditorTheme";
         private const string ThemeAssetPath = ThemeFolder + "/ESGlobalEditorTheme.asset";
         private const string CreateMenuPath
-            = MenuItemPathDefine.PROJECT_SETTINGS_PATH + "全局配置/创建 ES 默认编辑器主题";
+            = MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/主题/创建 ES 默认编辑器主题";
         private const string SelectMenuPath
-            = MenuItemPathDefine.PROJECT_SETTINGS_PATH + "全局配置/定位 ES 编辑器主题";
+            = MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/主题/定位 ES 编辑器主题";
         private const string RestoreMenuPath
-            = MenuItemPathDefine.PROJECT_SETTINGS_PATH + "全局配置/恢复 ES 默认编辑器主题";
+            = MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/主题/恢复 ES 默认编辑器主题";
+        private const string SemiSleepMenuPath
+            = MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/窗口半休眠";
+        private const string FocusModeMenuPath
+            = MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/聚焦当前 ES 窗口";
+        private const string SaveWorkspaceMenuPath
+            = MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/工作区/保存当前工作区";
+        private const string RestoreWorkspaceMenuPath
+            = MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/工作区/恢复当前工作区";
+
+        [MenuItem(SemiSleepMenuPath, false, 40)]
+        private static void ToggleWindowSemiSleep()
+        {
+            ESEditorPresentation.SetSemiSleepEnabled(!ESEditorPresentation.SemiSleepEnabled);
+            Menu.SetChecked(SemiSleepMenuPath, ESEditorPresentation.SemiSleepEnabled);
+        }
+
+        [MenuItem(SemiSleepMenuPath, true)]
+        private static bool ValidateWindowSemiSleep()
+        {
+            Menu.SetChecked(SemiSleepMenuPath, ESEditorPresentation.SemiSleepEnabled);
+            return !EditorApplication.isPlayingOrWillChangePlaymode;
+        }
+
+        [MenuItem(FocusModeMenuPath, false, 41)]
+        private static void ToggleFocusMode()
+        {
+            EditorWindow focused = EditorWindow.focusedWindow;
+            if (focused == null)
+                return;
+            bool enabled = !ESEditorPresentation.IsFocusMode(focused);
+            ESEditorPresentation.SetFocusMode(focused, enabled);
+            Menu.SetChecked(FocusModeMenuPath, enabled);
+        }
+
+        [MenuItem(FocusModeMenuPath, true)]
+        private static bool ValidateFocusMode()
+        {
+            EditorWindow focused = EditorWindow.focusedWindow;
+            bool valid = ESEditorPresentation.IsWindowBound(focused);
+            Menu.SetChecked(FocusModeMenuPath, valid && ESEditorPresentation.IsFocusMode(focused));
+            return valid && !EditorApplication.isPlayingOrWillChangePlaymode;
+        }
+
+        [MenuItem(SaveWorkspaceMenuPath, false, 50)]
+        private static void SaveWorkspace()
+        {
+            ESEditorPresentation.SaveWorkspaceSnapshot("default");
+            Debug.Log("[ES] 已保存当前工作区快照（当前 Editor 会话）。");
+        }
+
+        [MenuItem(SaveWorkspaceMenuPath, true)]
+        private static bool ValidateSaveWorkspace()
+        {
+            return !EditorApplication.isPlayingOrWillChangePlaymode;
+        }
+
+        [MenuItem(RestoreWorkspaceMenuPath, false, 51)]
+        private static void RestoreWorkspace()
+        {
+            int restored = ESEditorPresentation.RestoreWorkspaceSnapshot("default");
+            if (restored == 0)
+                Debug.Log("[ES] 当前会话没有可恢复的 ES 工作区快照。");
+            else
+                Debug.Log("[ES] 已恢复 " + restored + " 个仍打开的 ES 窗口状态。");
+        }
+
+        [MenuItem(RestoreWorkspaceMenuPath, true)]
+        private static bool ValidateRestoreWorkspace()
+        {
+            return ESEditorPresentation.HasWorkspaceSnapshot("default")
+                && !EditorApplication.isPlayingOrWillChangePlaymode;
+        }
 
         [MenuItem(CreateMenuPath, false, 30)]
         private static void CreateDefaultTheme()

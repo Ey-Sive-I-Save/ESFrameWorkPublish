@@ -1,0 +1,27 @@
+{
+    "name": "ES.ContentRegistration.Editor.Tests",
+    "rootNamespace": "ES.Tests",
+    "references": [
+        "ES_Editor",
+        "ES_Logic",
+        "ES_Stand",
+        "ES_Design"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [
+        "Sirenix.OdinInspector.Attributes.dll",
+        "Sirenix.Serialization.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

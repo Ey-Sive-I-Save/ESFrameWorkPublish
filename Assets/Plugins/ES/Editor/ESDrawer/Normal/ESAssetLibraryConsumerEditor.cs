@@ -28,7 +28,7 @@ namespace ES.EditorInternal
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.LabelField("启动 GameCore", EditorStyles.boldLabel);
                 if (GUILayout.Button("重新同步", GUILayout.Width(76f)))
-                    Sync(consumer);
+                    ESResourceCollectionWorkflowWindow.OpenForConsumerSynchronization(consumer);
                 EditorGUILayout.EndHorizontal();
 
                 List<ESAssetReferBase> collected = (consumer.GameCoreAssets ?? new List<ESAssetReferBase>())
@@ -71,14 +71,8 @@ namespace ES.EditorInternal
                 {
                     if (GUILayout.Button("添加", GUILayout.Width(48f)))
                     {
-                        Undo.RecordObject(consumer, "Add Manual GameCore");
-                        if (!ESAssetConsumerReferenceAuthoring.TryAddManualGameCoreAsset(consumer, pendingManualGameCore))
-                            Debug.LogWarning("[ESRes][Consumer] 只能添加有效的 IGameCoreSO 资产。", pendingManualGameCore);
-                        else
-                        {
-                            pendingManualGameCore = null;
-                            Sync(consumer);
-                        }
+                        ESResourceCollectionWorkflowWindow.OpenForGameCoreRootRegistration(pendingManualGameCore, consumer);
+                        pendingManualGameCore = null;
                     }
                 }
                 EditorGUILayout.EndHorizontal();
@@ -92,14 +86,8 @@ namespace ES.EditorInternal
                         ESAssetReferBase refer = manual[i];
                         EditorGUILayout.BeginHorizontal();
                         DrawCompactIdentity(refer);
-                        if (GUILayout.Button("移除", EditorStyles.miniButton, GUILayout.Width(42f)))
-                        {
-                            Undo.RecordObject(consumer, "Remove Manual GameCore");
-                            manual.RemoveAt(i);
-                            EditorUtility.SetDirty(consumer);
-                            Sync(consumer);
-                            GUIUtility.ExitGUI();
-                        }
+                        using (new EditorGUI.DisabledScope(true))
+                            GUILayout.Button(new GUIContent("移除", "尚未定义带 revision/CAS/回滚的 GameCore 移除事务。"), EditorStyles.miniButton, GUILayout.Width(42f));
                         EditorGUILayout.EndHorizontal();
                     }
             }
@@ -138,21 +126,6 @@ namespace ES.EditorInternal
                 ? asset.name + " · " + ResolveGameCoreType(asset) + " · " + path
                 : "缺失资产 · " + (refer?.GUID ?? "<null>");
             EditorGUILayout.LabelField(text, EditorStyles.miniLabel);
-        }
-
-        private static void Sync(ESAssetLibraryConsumer consumer)
-        {
-            try
-            {
-                Undo.RecordObject(consumer, "Sync Consumer GameCore");
-                ESAssetConsumerReferenceAuthoring.SyncConsumerGameCoreAssets(consumer);
-                EditorUtility.SetDirty(consumer);
-                Debug.Log("[ESRes][Consumer] GameCore 已重新同步：" + consumer.Name, consumer);
-            }
-            catch (Exception exception)
-            {
-                Debug.LogException(exception, consumer);
-            }
         }
 
         private static ScriptableObject ResolveExact(ESAssetReferBase refer)

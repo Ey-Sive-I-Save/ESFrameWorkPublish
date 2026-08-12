@@ -14,7 +14,7 @@ namespace ES
         private const string DataPath = "Assets/ESNormalAssets/Data/GlobalData/GameCore/GameCoreEditorGlobalData.asset";
         private const string TagManagerPath = "ProjectSettings/TagManager.asset";
 
-        [MenuItem("【ES】/项目设置/GameCore/Physics Layer/同步 Unity Layer 与碰撞矩阵", priority = 30)]
+        [MenuItem("【ES】/项目配置/GameCore/Physics Layer/同步 Unity Layer 与碰撞矩阵", priority = 30)]
         public static void SynchronizeProjectSettings()
         {
             if (!TryGetRules(out GameCoreEditorGlobalData data, out Dictionary<string, GameCorePhysicsLayerRule> rulesByName, out List<string> errors))
@@ -37,7 +37,7 @@ namespace ES
             Debug.Log($"[GameCorePhysicsLayer] 已同步 {data.physicsLayers.Count} 条 Layer 规则和对应碰撞矩阵。", data);
         }
 
-        [MenuItem("【ES】/项目设置/GameCore/Physics Layer/验证 Unity Layer 与碰撞矩阵", priority = 31)]
+        [MenuItem("【ES】/项目配置/GameCore/Physics Layer/验证 Unity Layer 与碰撞矩阵", priority = 31)]
         public static void ValidateProjectSettingsMenu()
         {
             if (!TryGetRules(out GameCoreEditorGlobalData data, out Dictionary<string, GameCorePhysicsLayerRule> rulesByName, out List<string> errors))
@@ -53,7 +53,7 @@ namespace ES
                 LogErrors("GameCore Physics Layer 项目设置不符合规则", errors);
         }
 
-        [MenuItem("【ES】/项目设置/GameCore/Physics Layer/验证已加载场景 Collider Trigger 规则", priority = 32)]
+        [MenuItem("【ES】/项目配置/GameCore/Physics Layer/验证已加载场景 Collider Trigger 规则", priority = 32)]
         public static void ValidateLoadedSceneColliderTriggers()
         {
             if (!TryGetRules(out GameCoreEditorGlobalData data, out Dictionary<string, GameCorePhysicsLayerRule> rulesByName, out List<string> errors))

@@ -1,0 +1,21 @@
+fileFormatVersion: 2
+guid: b75c2e13a5ce795439cce84f726c9e54
+TrueTypeFontImporter:
+  externalObjects: {}
+  serializedVersion: 4
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontNames:
+  - Chill Round Gothic Medium
+  fallbackFontReferences: []
+  customCharacters: 
+  fontRenderingMode: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  shouldRoundAdvanceValue: 1
+  userData: ESBrandRoundedSC-v1
+  assetBundleName: 
+  assetBundleVariant: 

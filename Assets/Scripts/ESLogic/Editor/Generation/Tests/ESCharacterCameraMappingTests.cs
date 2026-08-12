@@ -1,11 +1,19 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 
 namespace ES.Tests
 {
     public sealed class ESCharacterCameraMappingTests
     {
+        private const int LockToTargetOnAssign = 0;
+        private const int LockToTargetWithWorldUp = 1;
+        private const string PlayerThirdPersonRigPath =
+            "Assets/ESNormalAssets/Camera/Rigs/PlayerThirdPersonRig.prefab";
+        private const string VehicleChaseRigPath =
+            "Assets/ESNormalAssets/Camera/Rigs/VehicleChaseRig.prefab";
+
         private readonly List<GameObject> created = new List<GameObject>();
 
         [TearDown]
@@ -66,6 +74,34 @@ namespace ES.Tests
                     out string error),
                 Is.True,
                 error);
+        }
+
+        [TestCase(PlayerThirdPersonRigPath, LockToTargetOnAssign)]
+        [TestCase(VehicleChaseRigPath, LockToTargetWithWorldUp)]
+        public void DefaultFreeLookRig_UsesExpectedTargetOrientationBinding(
+            string prefabPath,
+            int expectedBindingMode)
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            Assert.That(prefab, Is.Not.Null, "Missing camera rig prefab: " + prefabPath);
+
+            int bindingCount = 0;
+            Component[] components = prefab.GetComponentsInChildren<Component>(true);
+            for (int i = 0; i < components.Length; i++)
+            {
+                if (components[i] == null)
+                    continue;
+
+                SerializedProperty bindingMode =
+                    new SerializedObject(components[i]).FindProperty("m_BindingMode");
+                if (bindingMode == null)
+                    continue;
+
+                Assert.That(bindingMode.intValue, Is.EqualTo(expectedBindingMode));
+                bindingCount++;
+            }
+
+            Assert.That(bindingCount, Is.EqualTo(4), "Expected FreeLook plus three orbital bindings.");
         }
 
         private GameObject CreateObject(string name)

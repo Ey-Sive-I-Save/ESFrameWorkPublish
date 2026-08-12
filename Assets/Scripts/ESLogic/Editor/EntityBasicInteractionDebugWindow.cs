@@ -1,18 +1,20 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
 namespace ES
 {
-    public sealed class EntityBasicInteractionDebugWindow : EditorWindow
+    public sealed class EntityBasicInteractionDebugWindow : ESSinglePageIMGUIWindow<EntityBasicInteractionDebugWindow>
     {
         private Entity _boundEntity;
         private EntityBasicInteractionModule _boundModule;
         private bool _expanded;
         private Vector2 _scroll;
+        private double _nextRepaintTime;
 
         [MenuItem(MenuItemPathDefine.INTERACTION_RUNTIME_PANEL_PATH, false, 0)]
         public static void Open()
@@ -22,22 +24,86 @@ namespace ES
             window.Show();
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent()
         {
+            return new GUIContent("交互运行时面板", "观察当前 Entity 的基础交互与 IK 写入状态");
+        }
+
+        protected override string ESWindow_Subtitle => "Entity 交互诊断";
+        protected override Vector2 ESWindow_MinSize => new Vector2(420f, 300f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(720f, 560f);
+        protected override string ESWindow_PageStableId => "entity.basic-interaction";
+        protected override string ESWindow_PageTitle => "基础交互";
+        protected override string ESWindow_PageKeywords => "Entity 交互 IK 运行时 诊断";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "interaction.live",
+                    "实时面板",
+                    "启用或暂停实时交互数据绘制。",
+                    context =>
+                    {
+                        _expanded = !_expanded;
+                        _nextRepaintTime = 0d;
+                        context.RefreshPageActions();
+                        Repaint();
+                    })
+                .WithCheckedState(() => _expanded)
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "interaction.bind-selection",
+                    "绑定选中",
+                    "绑定 Hierarchy 当前选中的 Entity。",
+                    context =>
+                    {
+                        TryBindFromSelection(forceRebind: true);
+                        context.SetStatus(_boundModule != null ? "已绑定交互模块" : "当前选择没有交互模块",
+                            _boundModule != null ? ESMenuTreePageStatus.Info : ESMenuTreePageStatus.Warning);
+                        Repaint();
+                    })
+                .WithUnityIcon("Linked")
+                .WithPriority(90));
+            actions.Add(new ESMenuTreePageAction(
+                    "interaction.clear",
+                    "清除",
+                    "清除当前 Entity 与交互模块绑定。",
+                    context =>
+                    {
+                        _boundEntity = null;
+                        _boundModule = null;
+                        context.SetStatus("已清除交互模块绑定");
+                        Repaint();
+                    })
+                .When(() => _boundEntity != null || _boundModule != null)
+                .WithUnityIcon("TreeEditor.Trash")
+                .WithPriority(20));
+        }
+
+        protected override void ESWindow_OnHostEnable()
+        {
+            EditorApplication.update -= OnEditorUpdate;
             EditorApplication.update += OnEditorUpdate;
         }
 
-        private void OnDisable()
+        protected override void ESWindow_OnHostDisable()
         {
             EditorApplication.update -= OnEditorUpdate;
+            _nextRepaintTime = 0d;
         }
 
         private void OnEditorUpdate()
         {
-            if (_expanded)
-            {
-                Repaint();
-            }
+            if (!_expanded)
+                return;
+
+            double now = EditorApplication.timeSinceStartup;
+            double interval = hasFocus ? 0.1d : 0.25d;
+            if (now < _nextRepaintTime)
+                return;
+            _nextRepaintTime = now + interval;
+            Repaint();
         }
 
         private void OnSelectionChange()
@@ -45,13 +111,13 @@ namespace ES
             if (_boundEntity == null)
             {
                 TryBindFromSelection();
+                ESWindow_CurrentPageContext?.RefreshPageActions();
+                Repaint();
             }
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
-            DrawToolbar();
-
             if (!_expanded)
             {
                 EditorGUILayout.HelpBox("点击“展开实时面板”后开始持续显示交互运行数据。", MessageType.Info);
@@ -64,31 +130,6 @@ namespace ES
             EditorGUILayout.EndScrollView();
         }
 
-        private void DrawToolbar()
-        {
-            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
-
-            string expandText = _expanded ? "收起实时面板" : "展开实时面板";
-            if (GUILayout.Button(expandText, EditorStyles.toolbarButton, GUILayout.Width(120f)))
-            {
-                _expanded = !_expanded;
-            }
-
-            if (GUILayout.Button("绑定当前选中", EditorStyles.toolbarButton, GUILayout.Width(100f)))
-            {
-                TryBindFromSelection(forceRebind: true);
-            }
-
-            if (GUILayout.Button("清除绑定", EditorStyles.toolbarButton, GUILayout.Width(80f)))
-            {
-                _boundEntity = null;
-                _boundModule = null;
-            }
-
-            GUILayout.FlexibleSpace();
-            EditorGUILayout.EndHorizontal();
-        }
-
         private void DrawBindingInfo()
         {
             EditorGUILayout.Space(6f);
@@ -97,7 +138,9 @@ namespace ES
             using (new EditorGUI.DisabledScope(true))
             {
                 EditorGUILayout.ObjectField("Entity", _boundEntity, typeof(Entity), true);
-                EditorGUILayout.ObjectField("InteractionModule", null, typeof(EntityBasicInteractionModule), false);
+                EditorGUILayout.TextField(
+                    "InteractionModule",
+                    _boundModule != null ? _boundModule.GetType().Name : "<未绑定>");
             }
 
             if (_boundEntity == null || _boundModule == null)

@@ -11,7 +11,7 @@ namespace ES
         private const string AssetPath = AssetFolder + "/GameCoreEditorGlobalData.asset";
         private const string AttributeBakeTablePath = AssetFolder + "/ESAttributeBakeTable.asset";
         private const string AttributeCatalogRootPath = AssetFolder + "/ESAttributeCatalogGameCore.asset";
-        [MenuItem("【ES】/项目设置/GameCore/打开或创建GameCore编辑器全局数据", priority = 20)]
+        [MenuItem("【ES】/项目配置/GameCore/打开或创建GameCore编辑器全局数据", priority = 20)]
         public static void OpenOrCreateGameCoreEditorGlobalData()
         {
             GameCoreEditorGlobalData data = AssetDatabase.LoadAssetAtPath<GameCoreEditorGlobalData>(AssetPath);
@@ -25,7 +25,7 @@ namespace ES
             EditorGUIUtility.PingObject(data);
         }
 
-        [MenuItem("【ES】/项目设置/GameCore/重置GameCore编辑器推荐规则", priority = 21)]
+        [MenuItem("【ES】/项目配置/GameCore/重置GameCore编辑器推荐规则", priority = 21)]
         public static void ResetGameCoreEditorDefaultRules()
         {
             GameCoreEditorGlobalData data = AssetDatabase.LoadAssetAtPath<GameCoreEditorGlobalData>(AssetPath);
@@ -42,7 +42,7 @@ namespace ES
             EditorGUIUtility.PingObject(data);
         }
 
-        [MenuItem("【ES】/项目设置/GameCore/补齐缺失的GameTag规则", priority = 22)]
+        [MenuItem("【ES】/项目配置/GameCore/补齐缺失的GameTag规则", priority = 22)]
         public static void EnsureGameTagRules()
         {
             GameCoreEditorGlobalData data = AssetDatabase.LoadAssetAtPath<GameCoreEditorGlobalData>(AssetPath);
@@ -59,7 +59,7 @@ namespace ES
             EditorGUIUtility.PingObject(data);
         }
 
-        [MenuItem("【ES】/项目设置/GameCore/验证GameTag规则", priority = 23)]
+        [MenuItem("【ES】/项目配置/GameCore/验证GameTag规则", priority = 23)]
         public static void ValidateGameTagRules()
         {
             GameCoreEditorGlobalData data = AssetDatabase.LoadAssetAtPath<GameCoreEditorGlobalData>(AssetPath);
@@ -159,7 +159,7 @@ namespace ES
             Debug.LogError(builder.ToString(), data);
         }
 
-        [MenuItem("【ES】/项目设置/GameCore/补齐角色与物品属性表", priority = 24)]
+        [MenuItem("【ES】/项目配置/GameCore/补齐角色与物品属性表", priority = 24)]
         public static void EnsureAttributeSchemas()
         {
             GameCoreEditorGlobalData data = AssetDatabase.LoadAssetAtPath<GameCoreEditorGlobalData>(AssetPath);
@@ -175,7 +175,7 @@ namespace ES
             EditorGUIUtility.PingObject(data);
         }
 
-        [MenuItem("【ES】/项目设置/GameCore/验证角色与物品属性表", priority = 25)]
+        [MenuItem("【ES】/项目配置/GameCore/验证角色与物品属性表", priority = 25)]
         public static void ValidateAttributeSchemas()
         {
             GameCoreEditorGlobalData data = AssetDatabase.LoadAssetAtPath<GameCoreEditorGlobalData>(AssetPath);
@@ -204,7 +204,7 @@ namespace ES
                       + "，物品 Permit=" + data.itemAttributes.permitAttributes.Count + "。", data);
         }
 
-        [MenuItem("【ES】/项目设置/GameCore/生成角色固定属性代码", priority = 26)]
+        [MenuItem("【ES】/项目配置/GameCore/生成角色固定属性代码", priority = 26)]
         public static void GenerateCharacterFixedAttributeCode()
         {
             GameCoreEditorGlobalData data = AssetDatabase.LoadAssetAtPath<GameCoreEditorGlobalData>(AssetPath);
@@ -237,7 +237,7 @@ namespace ES
                 : "[GameCoreAttribute] 固定角色属性代码已是最新，可直接执行 GameCore Bake。", data);
         }
 
-        [MenuItem("【ES】/项目设置/GameCore/Bake并应用GameCore Catalog", priority = 27)]
+        [MenuItem("【ES】/项目配置/GameCore/Bake并应用GameCore Catalog", priority = 27)]
         public static void BakeAndApplyGameCoreCatalogs()
         {
             GameCoreEditorGlobalData data = AssetDatabase.LoadAssetAtPath<GameCoreEditorGlobalData>(AssetPath);
@@ -370,7 +370,7 @@ namespace ES
             return true;
         }
 
-        [MenuItem("【ES】/项目设置/GameCore/运行GameTag核心自检", priority = 27)]
+        [MenuItem("【ES】/项目配置/GameCore/运行GameTag核心自检", priority = 27)]
         public static void RunGameTagSelfTest()
         {
             try
@@ -385,7 +385,7 @@ namespace ES
             }
         }
 
-        [MenuItem("【ES】/项目设置/GameCore/验证全部Buff的Tag与属性配置", priority = 28)]
+        [MenuItem("【ES】/项目配置/GameCore/验证全部Buff的Tag与属性配置", priority = 28)]
         public static void ValidateAllBuffGameTagConfigurations()
         {
             GameCoreEditorGlobalData data = AssetDatabase.LoadAssetAtPath<GameCoreEditorGlobalData>(AssetPath);
@@ -467,7 +467,7 @@ namespace ES
             return false;
         }
 
-        [MenuItem("【ES】/项目设置/GameCore/验证运行时Key Catalog Schema", priority = 28)]
+        [MenuItem("【ES】/项目配置/GameCore/验证运行时Key Catalog Schema", priority = 28)]
         public static void ValidateRuntimeKeyCatalogSchemas()
         {
             List<string> errors = new List<string>();
@@ -518,7 +518,7 @@ namespace ES
             Debug.LogError(report.ToString());
         }
 
-        [MenuItem("【ES】/项目设置/GameCore/审计项目稳定Key治理", priority = 29)]
+        [MenuItem("【ES】/项目配置/GameCore/审计项目稳定Key治理", priority = 29)]
         public static void AuditProjectStableKeyGovernance()
         {
             ESKeyGovernanceAudit.RunAndLog();

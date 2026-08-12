@@ -86,7 +86,7 @@ MonoBehaviour:
   - sceneGuid: b4b75588872fe9740ab90f542b86ce3e
     scenePath: Assets/Plugins/ES/3_Examples/1_Runtime/Example_SimpleTools/New Scene
       1.unity
-    savedUtcTicks: 639218906216643444
+    savedUtcTicks: 639219621633339247
     expandedTransformPaths: []
   - sceneGuid: abe9eb92e1fa8cb4a9ae52b3a515e684
     scenePath: Assets/Scenes/NullScene.unity
@@ -95,16 +95,9 @@ MonoBehaviour:
     - '%E2%98%85%20ESRuntimeWatch%20%C2%B7%20%E4%BA%A7%E5%93%81%E5%B1%95%E7%A4%BA#0@14'
   - sceneGuid: f2b890ffbb8c33a4d8e67502c4c7a63a
     scenePath: Assets/Scenes/Tests/ESPlayerControllerTest.unity
-    savedUtcTicks: 639219019029106708
+    savedUtcTicks: 639221414063558242
     expandedTransformPaths:
     - ES%20Player%20Controller%20Test#0@0
-    - ES%20Player%20Controller%20Test#0@0/Player_%E5%A4%A7%E9%BB%91%E5%A1%94#0@3
-    - ES%20Player%20Controller%20Test#0@0/Player_%E5%A4%A7%E9%BB%91%E5%A1%94#0@3/01_%E8%BF%90%E8%A1%8C%E6%97%B6%E9%80%BB%E8%BE%91_Runtime#0@0
-    - ES%20Player%20Controller%20Test#0@0/Player_%E5%A4%A7%E9%BB%91%E5%A1%94#0@3/02_%E8%BF%90%E5%8A%A8%E7%89%A9%E7%90%86%E6%89%A9%E5%B1%95_MotionPhysics#0@1
-    - ES%20Player%20Controller%20Test#0@0/Player_%E5%A4%A7%E9%BB%91%E5%A1%94#0@3/03_%E6%A8%A1%E5%9E%8B%E8%A1%A8%E7%8E%B0_Presentation#0@2
-    - ES%20Player%20Controller%20Test#0@0/Player_%E5%A4%A7%E9%BB%91%E5%A1%94#0@3/03_%E6%A8%A1%E5%9E%8B%E8%A1%A8%E7%8E%B0_Presentation#0@2/ModelOffset2#0@0
-    - ES%20Player%20Controller%20Test#0@0/Player_%E5%A4%A7%E9%BB%91%E5%A1%94#0@3/03_%E6%A8%A1%E5%9E%8B%E8%A1%A8%E7%8E%B0_Presentation#0@2/ModelOffset2#0@0/ModelRoot#0@0
-    - ES%20Player%20Controller%20Test#0@0/Player_%E5%A4%A7%E9%BB%91%E5%A1%94#0@3/04_%E5%8A%A8%E7%94%BB%E8%BE%85%E5%8A%A9_AnimationSupport#0@3
   - sceneGuid: 2b30ed531afa9e64187c177b148988bd
     scenePath: Assets/InitTestScene639217618548923744.unity
     savedUtcTicks: 639217330562292188

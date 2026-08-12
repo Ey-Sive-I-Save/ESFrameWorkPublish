@@ -18,16 +18,16 @@ namespace ES
             Debug.Log("[测试] 开始测试ESMenuWindow OnPageDisable功能");
             Debug.Log("=================================================");
             Debug.Log("[测试] 测试步骤:");
-            Debug.Log("  1. 打开任意包含Library的ESMenuWindow窗口");
+            Debug.Log("  1. 打开任意包含 Library 的 ESOdinMenuTreeWindow 窗口");
             Debug.Log("  2. 修改Library的名称或描述（触发延迟保存）");
             Debug.Log("  3. 直接关闭窗口（不要手动保存）");
             Debug.Log("  4. 在Console中查看以下关键日志：");
-            Debug.Log("     - [ESMenuTreeWindow] 注册页面: Page_Index_Library - 库名");
-            Debug.Log("     - [ESMenuTreeWindow] 窗口销毁，开始调用 N 个页面的OnPageDisable");
+            Debug.Log("     - [ESOdinMenuTreeWindow] 注册页面: Page_Index_Library - 库名");
+            Debug.Log("     - [ESOdinMenuTreeWindow] 窗口销毁，开始调用 N 个页面的OnPageDisable");
             Debug.Log("     - [Page_Index_Library] OnPageDisable调用 - Library: XXX, pendingSave: True");
             Debug.Log("     - [Page_Index_Library] 检测到未保存的修改，执行立即保存");
             Debug.Log("     - [Page_Index_Library] 保存完成");
-            Debug.Log("     - [ESMenuTreeWindow] OnPageDisable调用完成");
+            Debug.Log("     - [ESOdinMenuTreeWindow] OnPageDisable调用完成");
             Debug.Log("  5. 重新打开窗口，验证修改是否已保存");
             Debug.Log("=================================================");
             Debug.Log("[重要] 修复了动态创建页面未注册的问题：");
@@ -53,7 +53,7 @@ namespace ES
         }
         
         /// <summary>
-        /// 显示当前已注册的页面数量（需要修改ESMenuTreeWindowAB使registeredPages可访问）
+        /// 显示当前已注册的页面数量（由 ESOdinMenuTreeWindow 提供调试计数）
         /// </summary>
         [MenuItem(MenuItemPathDefine.DEBUG_PATH + "菜单窗口/显示调试信息", false, 9020)]
         public static void ShowDebugInfo()

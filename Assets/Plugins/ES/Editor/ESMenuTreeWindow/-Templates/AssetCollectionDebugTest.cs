@@ -122,22 +122,11 @@ namespace ES.Editor
                 return;
             }
 
-            // 单个资产直接收集
-            if (assets.Length == 1)
-            {
-                var library = ESGlobalResToolsSupportConfig.CollectAssetToRecommendedLibrary(assets[0]);
-                if (library != null)
-                {
-                    EditorUtility.DisplayDialog("收集成功", 
-                        $"已将资产 [{assets[0].name}] 收集到 Library [{library.Name}]", 
-                        "确定");
-                }
-            }
-            else
-            {
-                // 多个资产批量收集
-                ESGlobalResToolsSupportConfig.CollectAssetsToRecommendedLibraries(assets);
-            }
+            ESResourceCollectionWorkflowWindow.OpenForAssetRegistration(
+                assets[0],
+                ESGlobalResToolsSupportConfig.ActiveCollectLibrary);
+            if (assets.Length > 1)
+                Debug.LogWarning("[ESRes][Register] 统一事务当前逐项提交，已打开第一个资产；其余资产请逐项预检和提交。");
         }
     }
 }

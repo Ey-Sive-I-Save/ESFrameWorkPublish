@@ -8,9 +8,9 @@ namespace ES.EditorInternal
     /// Project theme workbench. It edits the shared ESGlobalEditorTheme asset directly and keeps
     /// a small live preview beside the real configuration fields.
     /// </summary>
-    public sealed class ESEditorThemeWindow : EditorWindow
+    public sealed class ESEditorThemeWindow : ESSinglePageIMGUIWindow<ESEditorThemeWindow>
     {
-        private const string WindowMenuPath = MenuItemPathDefine.PROJECT_SETTINGS_PATH + "编辑器主题/主题工作台";
+        private const string WindowMenuPath = MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/打开主题工作台";
         private static readonly Dictionary<string, GUIContent> PropertyLabels =
             new Dictionary<string, GUIContent>
             {
@@ -20,6 +20,7 @@ namespace ES.EditorInternal
                 { "useCustomPalette", new GUIContent("启用自定义色板", "关闭时使用 ES 内置安全色板。") },
                 { "enableGlobalEditorShell", new GUIContent("启用 ES 全局外观", "覆盖 Unity 公开回调允许安全接入的主要 Editor Shell 表面。") },
                 { "enableDeepEditorSkin", new GUIContent("Unity 全局深度皮肤（实验）", "为安全内容容器应用 ES 纯色表面，并染色已有控件背景；不填充窗口根节点，不遮挡原生内容，进入 PlayMode 自动停用。") },
+                { "enableBrandTypography", new GUIContent("启用品牌标题字体", "仅用于 ES 标题、数字和徽章；正文、输入框、日志和路径保持 Unity 默认字体。") },
                 { "enableMotion", new GUIContent("启用编辑器动效", "启用局部反馈动画，不影响编辑数据。") },
                 { "motionIntensity", new GUIContent("动效强度", "建议保持 0.65～0.85。") },
                 { "darkAccentStart", new GUIContent("深色强调起始色") },
@@ -49,24 +50,60 @@ namespace ES.EditorInternal
             window.Show();
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent()
         {
-            ESEditorPresentation.BindWindow(this);
+            return new GUIContent("ES 编辑器主题", "编辑项目共享色板、密度、字体边界与动效配置");
+        }
+
+        protected override string ESWindow_Subtitle => "项目共享 Presentation 与全局皮肤配置";
+        protected override Vector2 ESWindow_MinSize => new Vector2(440f, 520f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(720f, 760f);
+        protected override string ESWindow_PageStableId => "editor.theme";
+        protected override string ESWindow_PageTitle => "编辑器主题";
+        protected override string ESWindow_PageKeywords => "编辑器 主题 色板 字体 动效 深度皮肤 Presentation";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "theme.locate",
+                    "定位主题",
+                    "在 Project 中定位项目共享主题资产。",
+                    context =>
+                    {
+                        Selection.activeObject = theme;
+                        EditorGUIUtility.PingObject(theme);
+                        context.SetStatus("已定位编辑器主题资产");
+                    })
+                .When(() => theme != null)
+                .WithUnityIcon("Project")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "theme.restore-default",
+                    "恢复默认",
+                    "恢复 ES 默认主题；可使用 Ctrl+Z 撤销。",
+                    context =>
+                    {
+                        if (!RestoreDefaultTheme())
+                            return;
+                        context.SetStatus("已恢复 ES 默认编辑器主题", ESMenuTreePageStatus.Modified);
+                    })
+                .When(() => theme != null)
+                .WithUnityIcon("Refresh")
+                .WithPriority(20));
+        }
+
+        protected override void ESWindow_OnHostEnable()
+        {
             previewFeedbackStartedAt = EditorApplication.timeSinceStartup;
             RefreshTheme();
             RefreshDeepSkinStatus();
         }
 
-        private void OnDestroy()
+        protected override void ESWindow_OnHostDisable()
         {
             EditorApplication.delayCall -= CompleteDeepSkinAction;
-            ESEditorPresentation.UnbindWindow(this);
-        }
-
-        private void OnDisable()
-        {
-            EditorApplication.delayCall -= CompleteDeepSkinAction;
-            ESEditorPresentation.UnbindWindow(this);
+            serializedTheme = null;
         }
 
         private void OnFocus()
@@ -75,7 +112,7 @@ namespace ES.EditorInternal
                 RefreshTheme();
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             DrawTitle();
             if (theme == null)
@@ -92,8 +129,6 @@ namespace ES.EditorInternal
                 DrawDeepSkinControls();
                 EditorGUILayout.Space(8f);
                 DrawConfiguration();
-                EditorGUILayout.Space(8f);
-                DrawActions();
             }
             finally
             {
@@ -199,6 +234,7 @@ namespace ES.EditorInternal
                 DrawProperty("useCustomPalette");
                 DrawProperty("enableGlobalEditorShell");
                 DrawProperty("enableDeepEditorSkin");
+                DrawProperty("enableBrandTypography");
                 DrawProperty("enableMotion");
                 DrawProperty("motionIntensity");
 
@@ -245,39 +281,22 @@ namespace ES.EditorInternal
             }
         }
 
-        private void DrawActions()
+        private bool RestoreDefaultTheme()
         {
-            EditorGUILayout.BeginHorizontal();
-            try
-            {
-                if (GUILayout.Button("定位主题资产", GUILayout.Height(26f)))
-                {
-                    Selection.activeObject = theme;
-                    EditorGUIUtility.PingObject(theme);
-                }
+            if (!EditorUtility.DisplayDialog(
+                    "恢复 ES 默认编辑器主题",
+                    "将覆盖当前主题色板和密度。可使用 Ctrl+Z 撤销。",
+                    "恢复默认",
+                    "取消"))
+                return false;
 
-                if (GUILayout.Button("恢复 ES 默认", GUILayout.Height(26f)))
-                {
-                    if (!EditorUtility.DisplayDialog(
-                            "恢复 ES 默认编辑器主题",
-                            "将覆盖当前主题色板和密度。可使用 Ctrl+Z 撤销。",
-                            "恢复默认",
-                            "取消"))
-                        return;
-
-                    Undo.RecordObject(theme, "恢复 ES 默认编辑器主题");
-                    theme.RestoreDefault();
-                    EditorUtility.SetDirty(theme);
-                    ESEditorPresentation.PulseWindow(this, ESStatusKind.Modified);
-                    ESEditorPresentation.InvalidateTheme();
-                    RepaintAllESViews();
-                }
-            }
-            finally
-            {
-                EditorGUILayout.EndHorizontal();
-            }
-
+            Undo.RecordObject(theme, "恢复 ES 默认编辑器主题");
+            theme.RestoreDefault();
+            EditorUtility.SetDirty(theme);
+            ESEditorPresentation.PulseWindow(this, ESStatusKind.Modified);
+            ESEditorPresentation.InvalidateTheme();
+            RepaintAllESViews();
+            return true;
         }
 
         private void DrawDeepSkinControls()
@@ -415,6 +434,7 @@ namespace ES.EditorInternal
         {
             theme = ESGlobalEditorThemeMenu.LoadTheme();
             serializedTheme = theme == null ? null : new SerializedObject(theme);
+            ESWindow_CurrentPageContext?.RefreshPageActions();
         }
 
         private void RepaintAllESViews()

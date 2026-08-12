@@ -1,0 +1,22 @@
+{
+    "name": "ES.ContentRegistration.MCP.Editor",
+    "rootNamespace": "",
+    "references": [
+        "ES_Stand",
+        "ES_Editor",
+        "MCPForUnity.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Newtonsoft.Json.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

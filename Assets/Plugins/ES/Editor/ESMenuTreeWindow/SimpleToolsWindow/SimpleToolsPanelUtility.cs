@@ -113,24 +113,8 @@ namespace ES
         private static GUIStyle toolSubtitleStyle;
         private static bool stylesInitialized;
         private static bool stylesProSkin;
-        private static int nestedToolHeaderSuppressionDepth;
-
-        /// <summary>
-        /// SimpleToolsWindow owns the first-screen page header. Legacy page methods
-        /// may still call DrawToolHeader after their Odin fields; suppress those
-        /// nested calls while the host is drawing so a page has one title only.
-        /// </summary>
-        public static IDisposable SuppressNestedToolHeaders()
-        {
-            nestedToolHeaderSuppressionDepth++;
-            return new ToolHeaderSuppressionScope();
-        }
-
         public static void DrawToolHeader(string title, string purpose, SimpleToolsMaturity maturity, string risk = null)
         {
-            if (nestedToolHeaderSuppressionDepth > 0)
-                return;
-
             EnsureStyles();
             EditorGUILayout.Space(8f);
             EditorGUILayout.LabelField(title ?? "未命名工具", toolTitleStyle);
@@ -647,13 +631,6 @@ namespace ES
             return text.Substring(0, Mathf.Max(1, maximumCharacters)) + "...";
         }
 
-        private readonly struct ToolHeaderSuppressionScope : IDisposable
-        {
-            public void Dispose()
-            {
-                nestedToolHeaderSuppressionDepth = Mathf.Max(0, nestedToolHeaderSuppressionDepth - 1);
-            }
-        }
     }
 
     /// <summary>

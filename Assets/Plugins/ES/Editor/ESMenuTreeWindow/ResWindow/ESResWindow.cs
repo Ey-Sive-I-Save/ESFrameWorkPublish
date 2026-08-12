@@ -1,4 +1,5 @@
 using ES;
+using Sirenix.OdinInspector;
 using Sirenix.OdinInspector.Editor;
 using Sirenix.Utilities.Editor;
 using System;
@@ -18,9 +19,10 @@ namespace ES
         }
     }
 
-    public class ESResWindow : ESMenuTreeWindowAB<ESResWindow> //OdinMenuEditorWindow
+    public class ESResWindow : ESOdinMenuTreeWindow<ESResWindow> //OdinMenuEditorWindow
     {
         public override bool UseScrollView => true;
+        protected override string ESWindow_MigrationId => "resource.window";
 
         internal static void SetRemotePlanPreflightStatus(string status, string detail)
         {
@@ -32,6 +34,16 @@ namespace ES
         internal static void RegisterEditorBridge()
         {
             ESAssetReferEditorBridge.OpenRegistryPage = OpenAndSelectAssetPage;
+            ESAssetReferEditorBridge.OpenAssetRegistration = asset =>
+                ESResourceCollectionWorkflowWindow.OpenForAssetRegistration(asset);
+            ESAssetReferEditorBridge.OpenAssetKeyUpdate = (page, enumKey, stringKey) =>
+                ESResourceCollectionWorkflowWindow.OpenForAssetKeyUpdate(page, enumKey, stringKey);
+            ESAssetReferEditorBridge.OpenGameCoreRootRegistration = (source, consumer) =>
+                ESResourceCollectionWorkflowWindow.OpenForGameCoreRootRegistration(source, consumer);
+            ESAssetReferEditorBridge.OpenConsumerSynchronization = consumer =>
+                ESResourceCollectionWorkflowWindow.OpenForConsumerSynchronization(consumer);
+            ESAssetReferEditorBridge.IsAuthoringWriteLocked = () =>
+                ESContentRegistrationAuthoring.TryGetAuthoringWriteBlockReason(out _);
         }
 
         private static void OpenAndSelectAssetPage(ESAssetPage page)
@@ -196,7 +208,13 @@ namespace ES
 
         void PartPage_Setting(OdinMenuTree tree)
         {
-            QuickBuildRootMenu(tree, "设置与构建", ref page_root_GlobalSettings, EditorIcons.SettingsCog);
+            QuickBuildMigrationRootMenu(
+                tree,
+                "resource.window",
+                "resource.settings-build",
+                "设置与构建",
+                ref page_root_GlobalSettings,
+                SdfIconType.GearFill);
         }
 
         void PartPage_Build(OdinMenuTree tree)

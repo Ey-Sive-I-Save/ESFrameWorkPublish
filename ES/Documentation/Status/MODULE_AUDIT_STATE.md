@@ -53,7 +53,7 @@
 - Updated at: `2026-08-05 12:29:01 +08:00` (`Asia/Shanghai`)
 - Module and committed scope: `es-graph-authoring-bake`；Graph V2 的稳定图资产、稳定 Node/Port/Edge 身份、端口与连线校验、Undo/Redo 编辑器投影、通用 Baked Snapshot、DomainId 与领域 Bake Guard。范围不包含任何领域 Runtime。
 - Maturity state: `Implementing`
-- Blocked reason: Unity Editor 域重载、Test Runner、真实窗口交互、Profiler、Player、IL2CPP 和发布证据缺失；旧 `ESGraphViewWindow` 及硬编码工具责任登记尚未完成迁移清理。本窗口已重跑 Design、Editor、Tests 隔离静态编译，均为 0 warning / 0 error，但该证据不能替代 Unity 验收。
+- Blocked reason: Unity Editor 域重载、Test Runner、真实窗口交互、Profiler、Player、IL2CPP 和发布证据缺失；Stable Graph V2 仍处于正式接入验收阶段。本窗口已重跑 Design、Editor、Tests 隔离静态编译，均为 0 warning / 0 error，但该证据不能替代 Unity 验收。
 - Authority entry: `Assets/Plugins/ES/1_Design/Graph/ESGraphAsset.cs`、`ESGraphDomain.cs`、`ESGraphSnapshot.cs`；编辑器入口为 `Assets/Plugins/ES/Editor/ESGraphViewV2/ESStableGraphViewWindow.cs`、`ESStableGraphAssetEditor.cs`、`ESStableGraphInspector.cs`、`ESGraphAuthoringProfiles.cs`。
 - Activation mode: 编辑器显式打开/资产编辑入口；未发现 Player 运行时自动初始化或领域 Runtime 注册。旧 GraphView 仍存在历史入口，已加 Obsolete 但尚未证明无消费者。
 - Upstream dependencies: UnityEditor/GraphView 编辑器 API、现有 ESSO/Unity 序列化、ES 设计程序集、GraphView 领域规则；不应让运行时 Story/BehaviorTree/Command 反向依赖 Editor。
@@ -62,7 +62,7 @@
 - Evidence present: 源码与 `.meta` 存在；Graph 和 Agent Authoring 测试源码存在；本窗口已重跑包含 Design、Editor、Tests 的隔离静态编译，均为 0 warning / 0 error；UTF-8 Guard 已通过核心源码与记录文件。
 - Evidence missing: Unity Editor/域重载、真实 GraphView 交互、Test Runner、PlayMode、Profiler、Player、IL2CPP、资源发布均未验证。已有 Test Runner 无法运行的无关错误为 `ESAssetGameCoreFlowTestDataInfo.cs:199` 调用不存在的 `ESAssetReferScene.Release()`。
 - Branch / HEAD: `main` / `bc4d755e248b0e6106e2c9313bc559da88a70c28`
-- Relevant worktree state: Graph V2 目录、Graph Tests、V2 Editor 目录为未跟踪新增；旧 `ESGraphViewWindow.cs` 已修改；工作树还有大量其他窗口改动，不能据此判断本模块独占差异。
+- Relevant worktree state: Graph V2 目录、Graph Tests、V2 Editor 目录包含本轮相关改动；工作树还有大量其他窗口改动，不能据此判断本模块独占差异。
 - Last completed action: 完成 Agent Authoring 领域的类型化端口、Schema 锁定/修复、DAG 拓扑规则、完整思路图预设、关系烘焙、自动布局、节点主题和按需资产扫描；Design、Editor、Tests 隔离静态编译均通过。
 - Smallest next action: 在 Unity Editor 中执行域重载、打开完整需求思路图预设，实测拖线拒绝、Undo/Redo、自动布局、Inspector 资产选择和大图交互，再运行 EditMode Test Runner。
 - Resume read list: Start README、CurrentStatus、RuleIndex、模块成熟度规则、AICommand 审计命令、AgentSkills/AICommands 边界、GraphView 现行规则、`ESGraphAsset.cs`、`ESGraphDomain.cs`、`ESGraphSnapshot.cs`、V2 Editor 文件、Graph Tests、当前 branch/HEAD 与工作树。

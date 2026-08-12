@@ -6,7 +6,7 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>Runtime-only inspector for the Entity float-stat surface.</summary>
-    public sealed class EntityStatDebugWindow : EditorWindow
+    public sealed class EntityStatDebugWindow : ESSinglePageIMGUIWindow<EntityStatDebugWindow>
     {
         private readonly List<ESFloatStatDebugEntry> entries = new List<ESFloatStatDebugEntry>(24);
         private readonly List<ESFloatStatModifierSnapshot> modifiers = new List<ESFloatStatModifierSnapshot>(8);
@@ -28,20 +28,93 @@ namespace ES
             window.Show();
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent()
         {
+            return new GUIContent("Entity 属性监视器", "观察运行时属性、最终值与 Modifier 明细");
+        }
+
+        protected override string ESWindow_Subtitle => "运行时属性与 Modifier 诊断";
+        protected override Vector2 ESWindow_MinSize => new Vector2(620f, 380f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(920f, 680f);
+        protected override string ESWindow_PageStableId => "entity.stat-monitor";
+        protected override string ESWindow_PageTitle => "Entity 属性";
+        protected override string ESWindow_PageKeywords => "Entity Stat 属性 Modifier 运行时 监视";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "stat.bind-selection",
+                    "绑定选中",
+                    "绑定 Hierarchy 当前选中的 Entity。",
+                    context =>
+                    {
+                        TryBindSelection(force: true);
+                        context.SetStatus(boundEntity != null ? "已绑定 Entity" : "当前选择没有 Entity",
+                            boundEntity != null ? ESMenuTreePageStatus.Info : ESMenuTreePageStatus.Warning);
+                        Repaint();
+                    })
+                .WithUnityIcon("Linked")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "stat.refresh",
+                    "刷新",
+                    "立即刷新当前属性视图。",
+                    context =>
+                    {
+                        Repaint();
+                        context.SetStatus("属性视图已刷新");
+                    })
+                .WithUnityIcon("Refresh")
+                .WithPriority(90));
+            actions.Add(new ESMenuTreePageAction(
+                    "stat.auto-refresh",
+                    "实时刷新",
+                    "在 Play Mode 中按节流频率刷新绑定 Entity。",
+                    context =>
+                    {
+                        autoRefresh = !autoRefresh;
+                        nextRefreshTime = 0d;
+                        context.RefreshPageActions();
+                        context.SetStatus(autoRefresh ? "已启用实时刷新" : "已暂停实时刷新");
+                    })
+                .WithCheckedState(() => autoRefresh)
+                .WithPriority(80));
+            actions.Add(new ESMenuTreePageAction(
+                    "stat.clear",
+                    "清除",
+                    "清除当前 Entity 和属性明细。",
+                    context =>
+                    {
+                        ClearBinding();
+                        context.SetStatus("已清除 Entity 绑定");
+                        Repaint();
+                    })
+                .When(() => boundEntity != null)
+                .WithUnityIcon("TreeEditor.Trash")
+                .WithPriority(20));
+        }
+
+        protected override void ESWindow_OnHostEnable()
+        {
+            EditorApplication.update -= OnEditorUpdate;
             EditorApplication.update += OnEditorUpdate;
         }
 
-        private void OnDisable()
+        protected override void ESWindow_OnHostDisable()
         {
             EditorApplication.update -= OnEditorUpdate;
+            nextRefreshTime = 0d;
         }
 
         private void OnSelectionChange()
         {
             if (boundEntity == null)
+            {
                 TryBindSelection(force: false);
+                ESWindow_CurrentPageContext?.RefreshPageActions();
+                Repaint();
+            }
         }
 
         private void OnEditorUpdate()
@@ -53,13 +126,12 @@ namespace ES
             if (now < nextRefreshTime)
                 return;
 
-            nextRefreshTime = now + 0.1d;
+            nextRefreshTime = now + (hasFocus ? 0.1d : 0.25d);
             Repaint();
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
-            DrawToolbar();
             if (boundEntity == null)
             {
                 EditorGUILayout.HelpBox("请选择运行中的 Entity，然后点击“绑定当前选中”。", MessageType.Info);
@@ -76,30 +148,6 @@ namespace ES
             for (int i = 0; i < entries.Count; i++)
                 DrawEntry(entries[i]);
             EditorGUILayout.EndScrollView();
-        }
-
-        private void DrawToolbar()
-        {
-            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
-            if (GUILayout.Button("绑定当前选中", EditorStyles.toolbarButton, GUILayout.Width(100f)))
-                TryBindSelection(force: true);
-
-            if (GUILayout.Button("清除绑定", EditorStyles.toolbarButton, GUILayout.Width(80f)))
-            {
-                boundEntity = null;
-                entries.Clear();
-                modifiers.Clear();
-                expandedEnumKey = 0;
-                expandedStringKey = null;
-                hasExpandedEntry = false;
-            }
-
-            if (GUILayout.Button("刷新", EditorStyles.toolbarButton, GUILayout.Width(50f)))
-                Repaint();
-
-            GUILayout.FlexibleSpace();
-            autoRefresh = GUILayout.Toggle(autoRefresh, "实时刷新", EditorStyles.toolbarButton, GUILayout.Width(70f));
-            EditorGUILayout.EndHorizontal();
         }
 
         private void DrawCatalogState()
@@ -232,6 +280,16 @@ namespace ES
                 boundEntity = selected.GetComponentInParent<Entity>();
             if (boundEntity == null)
                 boundEntity = selected.GetComponentInChildren<Entity>(true);
+        }
+
+        private void ClearBinding()
+        {
+            boundEntity = null;
+            entries.Clear();
+            modifiers.Clear();
+            expandedEnumKey = 0;
+            expandedStringKey = null;
+            hasExpandedEntry = false;
         }
     }
 }

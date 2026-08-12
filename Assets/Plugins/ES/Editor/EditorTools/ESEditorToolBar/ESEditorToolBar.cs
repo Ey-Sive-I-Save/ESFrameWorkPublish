@@ -448,12 +448,23 @@ namespace ES
             private static void ShowAssetQuickAccessMenu(Rect anchorRect)
             {
                 var entries = new List<ESSearchDropdown.Entry>();
+                int globalDataCount = AddGlobalDataEntries(entries);
+                if (globalDataCount == 0)
+                {
+                    entries.Add(ESSearchDropdown.Entry.Disabled(
+                        "未发现可访问的 GlobalData",
+                        "GlobalData",
+                        "可刷新命令面板索引后重试"));
+                }
+
                 entries.Add(ESSearchDropdown.Entry.Item(
-                    "GlobalData（命令面板）",
+                    "在命令面板中查看全部 GlobalData",
                     () => ESCommandPaletteWindow.OpenWithQuery("G"),
-                    "GlobalData",
-                    EditorGUIUtility.IconContent("ScriptableObject Icon").image as Texture2D,
-                    badge: "GlobalData"));
+                    "GlobalData/操作",
+                    EditorGUIUtility.IconContent("Search Icon").image as Texture2D,
+                    subtitle: globalDataCount + " 个可访问资产",
+                    badge: "查看全部"));
+                entries.Add(ESSearchDropdown.Entry.Separator());
 
                 int recentCount = AddRecentAssetEntries(entries, "最近资产");
                 if (recentCount > 0)
@@ -507,6 +518,89 @@ namespace ES
                 }
 
                 ESSearchDropdown.Open(anchorRect, "快速访问资产", entries);
+            }
+
+            private static int AddGlobalDataEntries(List<ESSearchDropdown.Entry> entries)
+            {
+                IReadOnlyList<ESCommandPaletteItem> globalDataItems = GetGlobalDataQuickAccessItems();
+                string selectedPath = AssetDatabase.GetAssetPath(Selection.activeObject);
+                Texture2D icon = EditorGUIUtility.IconContent("ScriptableObject Icon").image as Texture2D;
+
+                for (int i = 0; i < globalDataItems.Count; i++)
+                {
+                    ESCommandPaletteItem item = globalDataItems[i];
+                    string folderName = Path.GetFileName(Path.GetDirectoryName(item.TargetId));
+                    string groupPath = string.IsNullOrWhiteSpace(folderName)
+                        ? "GlobalData"
+                        : "GlobalData/" + folderName;
+
+                    entries.Add(ESSearchDropdown.Entry.Item(
+                        item.Title,
+                        () => ExecuteGlobalDataItem(item),
+                        groupPath,
+                        icon,
+                        subtitle: item.TargetId,
+                        tooltip: item.Description,
+                        keywords: item.Keywords,
+                        badge: "GlobalData",
+                        selected: string.Equals(selectedPath, item.TargetId, StringComparison.Ordinal)));
+                }
+
+                return globalDataItems.Count;
+            }
+
+            internal static IReadOnlyList<ESCommandPaletteItem> GetGlobalDataQuickAccessItems()
+            {
+                IReadOnlyList<ESCommandPaletteItem> allItems = ESCommandPaletteRegistry.AllItems;
+                var result = new List<ESCommandPaletteItem>();
+                for (int i = 0; i < allItems.Count; i++)
+                {
+                    ESCommandPaletteItem item = allItems[i];
+                    if (item == null
+                        || item.ActionKind != ESCommandPaletteActionKind.OpenAsset
+                        || !string.Equals(item.Category, "GlobalData", StringComparison.Ordinal)
+                        || !ESCommandPalettePathPolicy.IsRegisteredGlobalData(item.TargetId))
+                    {
+                        continue;
+                    }
+
+                    result.Add(item);
+                }
+
+                result.Sort((left, right) =>
+                {
+                    int titleOrder = string.Compare(left.Title, right.Title, StringComparison.OrdinalIgnoreCase);
+                    return titleOrder != 0
+                        ? titleOrder
+                        : string.Compare(left.TargetId, right.TargetId, StringComparison.Ordinal);
+                });
+                return result;
+            }
+
+            private static void ExecuteGlobalDataItem(ESCommandPaletteItem item)
+            {
+                if (item == null)
+                    return;
+
+                ESEditorFeedbackSound.SuppressSelectionSound();
+                ESCommandPaletteResult result = ESCommandPaletteExecutors.Execute(item);
+                if (result.Success)
+                {
+                    ESCommandPaletteRegistry.RecordRecent(item.StableId);
+                    RecordRecentAsset(item.TargetId);
+                    ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Open);
+                    return;
+                }
+
+                ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Error);
+                string recovery = string.IsNullOrWhiteSpace(result.RecoveryAction)
+                    ? string.Empty
+                    : "\n\n恢复建议：" + result.RecoveryAction;
+                Debug.LogWarning("[ESEditorToolBar] GlobalData 打开失败：" + result.Message + recovery);
+                EditorUtility.DisplayDialog(
+                    "GlobalData 打开失败",
+                    result.Message + recovery,
+                    "确定");
             }
 
             private static void AddCurrentSelectionEntry(List<ESSearchDropdown.Entry> entries)
@@ -985,29 +1079,13 @@ namespace ES
             {
                 try
                 {
-                    // 使用GetWindow方法获取或创建SimpleToolsWindow实例
-                    SimpleToolsWindow simpleToolsWindow = SimpleToolsWindow.GetWindow<SimpleToolsWindow>();
-                    simpleToolsWindow.Focus();
-                    SimpleToolsWindow.UsingWindow = simpleToolsWindow;
-
-                    // 延迟执行，确保窗口和菜单树完全初始化
-                    QueueSelectTopToolbarPage();
-                    ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Open);
+                    SimpleToolsWindow.OpenWindow(SimpleToolsWindow.PageId_TopToolbar);
                 }
                 catch (Exception ex)
                 {
                     ESEditorFeedbackSound.Play(ESEditorFeedbackSoundKind.Error);
                     Debug.LogError($"打开顶级工具栏管理面板失败: {ex.Message}");
                 }
-            }
-
-            /// <summary>
-            /// 选择顶部工具栏页面
-            /// </summary>
-            private static void QueueSelectTopToolbarPage()
-            {
-                EditorApplication.delayCall -= SelectTopToolbarPage;
-                EditorApplication.delayCall += SelectTopToolbarPage;
             }
 
             private static IReadOnlyList<string> GetRecentScenePaths()
@@ -1059,68 +1137,6 @@ namespace ES
                 EditorPrefs.SetString(
                     RecentAssetsPrefsKey,
                     string.Join("\n", recent.Take(MaxRecentAssetCount)));
-            }
-
-            private static void SelectTopToolbarPage()
-            {
-                try
-                {
-                    if (SimpleToolsWindow.UsingWindow == null)
-                    {
-                        return;
-                    }
-
-                    // 如果MenuTree为null，尝试强制重建
-                    if (SimpleToolsWindow.UsingWindow.MenuTree == null)
-                    {
-                        SimpleToolsWindow.UsingWindow.ForceMenuTreeRebuild();
-
-                        // 再次延迟检查
-                        QueueSelectTopToolbarPage();
-                        return;
-                    }
-
-                    if (SimpleToolsWindow.MenuItems == null || SimpleToolsWindow.MenuItems.Count == 0)
-                    {
-                        // 再次延迟重试
-                        QueueSelectTopToolbarPage();
-                        return;
-                    }
-
-                    string menuPath = "【ES集成工具集】/顶部工具栏";
-
-                    if (SimpleToolsWindow.MenuItems.TryGetValue(menuPath, out var menuItem))
-                    {
-                        SimpleToolsWindow.UsingWindow.MenuTree.Selection.Clear();
-                        SimpleToolsWindow.UsingWindow.MenuTree.Selection.Add(menuItem);
-                        SimpleToolsWindow.UsingWindow.Repaint();
-                    }
-                    else
-                    {
-                        // 最后一次尝试：强制刷新窗口
-                        SimpleToolsWindow.UsingWindow.ESWindow_RefreshWindow();
-                        EditorApplication.delayCall -= SelectTopToolbarPageAfterRefresh;
-                        EditorApplication.delayCall += SelectTopToolbarPageAfterRefresh;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogError($"选择顶部工具栏页面失败: {ex.Message}");
-                }
-            }
-
-            private static void SelectTopToolbarPageAfterRefresh()
-            {
-                const string menuPath = "【ES集成工具集】/顶部工具栏";
-                if (SimpleToolsWindow.UsingWindow == null || SimpleToolsWindow.UsingWindow.MenuTree == null || SimpleToolsWindow.MenuItems == null)
-                    return;
-
-                if (!SimpleToolsWindow.MenuItems.TryGetValue(menuPath, out var item))
-                    return;
-
-                SimpleToolsWindow.UsingWindow.MenuTree.Selection.Clear();
-                SimpleToolsWindow.UsingWindow.MenuTree.Selection.Add(item);
-                SimpleToolsWindow.UsingWindow.Repaint();
             }
 
             #endregion

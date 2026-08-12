@@ -1062,6 +1062,7 @@ namespace ES.EditorInternal
                 return;
             }
             if (!ESAISkillExecutionCoordinator.TryStart(spec, values, Environment.UserName,
+                    ESAISkillExecutionLauncher.ResolveAssetGuid(asset),
                     out ESAISkillWorkflowRun run, out error))
             {
                 report?.Invoke(error);

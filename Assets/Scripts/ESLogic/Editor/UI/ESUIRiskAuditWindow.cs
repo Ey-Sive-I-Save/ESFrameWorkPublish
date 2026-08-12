@@ -7,7 +7,7 @@ using UnityEngine.UI;
 
 namespace ES.Editor
 {
-    public sealed class ESUIRiskAuditWindow : EditorWindow
+    public sealed class ESUIRiskAuditWindow : ESSinglePageIMGUIWindow<ESUIRiskAuditWindow>
     {
         private enum RiskLevel : byte
         {
@@ -33,28 +33,96 @@ namespace ES.Editor
         private int canvasCount;
         private int layoutCount;
 
-        [MenuItem("【ES】/开发与维护/审计/UI 风险体检")]
+        [MenuItem("【ES】/验证与诊断/静态审计/打开 UI 风险体检")]
         private static void Open()
         {
             GetWindow<ESUIRiskAuditWindow>("ES UI 风险体检");
         }
 
-        private void OnGUI()
+        public override GUIContent ESWindow_GetWindowGUIContent()
+        {
+            return new GUIContent("ES UI 风险体检", "显式扫描指定 UI Root 的结构与性能风险");
+        }
+
+        protected override string ESWindow_Subtitle => "指定 UI Root 的只读风险审计";
+        protected override Vector2 ESWindow_MinSize => new Vector2(560f, 400f);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(900f, 680f);
+        protected override string ESWindow_PageStableId => "ui.risk-audit";
+        protected override string ESWindow_PageTitle => "UI 风险体检";
+        protected override string ESWindow_PageKeywords => "UI UGUI Canvas Layout Mask Raycast 性能 风险 审计";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "ui-risk.use-selection",
+                    "使用当前选择",
+                    "把 Hierarchy 当前选择设为 UI Root。",
+                    context =>
+                    {
+                        uiRoot = Selection.activeGameObject;
+                        ClearResults();
+                        context.RefreshPageActions();
+                        context.SetStatus(uiRoot != null ? "已更新 UI Root" : "当前没有选中 GameObject",
+                            uiRoot != null ? ESMenuTreePageStatus.Info : ESMenuTreePageStatus.Warning);
+                        Repaint();
+                    })
+                .WithUnityIcon("Linked")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "ui-risk.scan",
+                    "扫描",
+                    "只扫描当前指定 UI Root 的对象层级。",
+                    context =>
+                    {
+                        Scan();
+                        context.RefreshPageActions();
+                        context.Notify(
+                            risks.Count == 0 ? "UI Root 扫描完成，未发现已知风险" : $"UI Root 扫描完成：{risks.Count} 项",
+                            risks.Exists(item => item.level == RiskLevel.Error)
+                                ? ESMenuTreePageStatus.Error
+                                : risks.Count > 0
+                                    ? ESMenuTreePageStatus.Warning
+                                    : ESMenuTreePageStatus.Info);
+                    })
+                .When(() => uiRoot != null)
+                .WithUnityIcon("Search Icon")
+                .WithPriority(90));
+            actions.Add(new ESMenuTreePageAction(
+                    "ui-risk.clear",
+                    "清空结果",
+                    "清除当前扫描结果，保留 UI Root。",
+                    context =>
+                    {
+                        ClearResults();
+                        context.RefreshPageActions();
+                        context.SetStatus("已清空 UI 风险结果");
+                        Repaint();
+                    })
+                .When(() => risks.Count > 0)
+                .WithUnityIcon("TreeEditor.Trash")
+                .WithPriority(20));
+        }
+
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             EditorGUILayout.LabelField("UI 风险体检", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
                 "只检查当前指定的 UI Root，不会扫描场景外资产，也不会在窗口打开、OnGUI 或 ReloadDomain 时自动执行。",
                 MessageType.Info);
 
-            uiRoot = (GameObject)EditorGUILayout.ObjectField("UI Root", uiRoot, typeof(GameObject), true);
-            using (new EditorGUILayout.HorizontalScope())
+            EditorGUI.BeginChangeCheck();
+            GameObject nextRoot = (GameObject)EditorGUILayout.ObjectField(
+                "UI Root",
+                uiRoot,
+                typeof(GameObject),
+                true);
+            if (EditorGUI.EndChangeCheck())
             {
-                if (GUILayout.Button("使用当前选择"))
-                    uiRoot = Selection.activeGameObject;
-                if (GUILayout.Button("扫描当前 UI Root"))
-                    Scan();
-                if (GUILayout.Button("清空", GUILayout.Width(64f)))
-                    ClearResults();
+                uiRoot = nextRoot;
+                ClearResults();
+                context.RefreshPageActions();
+                context.SetStatus(uiRoot != null ? "已更新 UI Root" : "已清除 UI Root");
             }
 
             EditorGUILayout.Space();

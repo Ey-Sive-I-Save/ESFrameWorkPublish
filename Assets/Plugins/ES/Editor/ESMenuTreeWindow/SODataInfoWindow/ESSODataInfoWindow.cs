@@ -13,9 +13,11 @@ namespace ES
     using Sirenix.Utilities;
 
     //窗口总览
-    public partial class ESSODataInfoWindow : ESMenuTreeWindowAB<ESSODataInfoWindow> //OdinMenuEditorWindow
+    public partial class ESSODataInfoWindow : ESOdinMenuTreeWindow<ESSODataInfoWindow> //OdinMenuEditorWindow
         {
-            [MenuItem(MenuItemPathDefine.CONTENT_CREATION_PATH + "数据与配置/SO 数据窗口", false, 10)]
+            protected override string ESWindow_MigrationId => "so-data.window";
+
+            [MenuItem(MenuItemPathDefine.SO_DATA_WINDOW_PATH, false, 10)]
             [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "SO 数据窗口", false, -970)]
             public static void TryOpenWindow()
             {
@@ -138,19 +140,19 @@ namespace ES
             #region 页面构建方法
             private void Part_BuildStartPage(OdinMenuTree tree)
             {
-                QuickBuildRootMenu(tree, "开始使用", ref pageForStartUsePage, SdfIconType.SunFill);
+                QuickBuildMigrationRootMenu(tree, "so-data.window", "so-data.start", "开始使用", ref pageForStartUsePage, SdfIconType.SunFill);
             }
 
 
             private void Part_BuildDataScriptCodePage(OdinMenuTree tree)
             {
-                QuickBuildRootMenu(tree, PageName_DataMake, ref pageRootForCodeGen, SdfIconType.Braces);
+                QuickBuildMigrationRootMenu(tree, "so-data.window", "so-data.codegen", PageName_DataMake, ref pageRootForCodeGen, SdfIconType.Braces);
 
-                QuickBuildRootMenu(tree, PageName_DataMake + "/常规", ref pagePartForNormalCodeGen, SdfIconType.VectorPen);
+                QuickBuildMigrationRootMenu(tree, "so-data.window", "so-data.codegen.normal", PageName_DataMake + "/常规", ref pagePartForNormalCodeGen, SdfIconType.VectorPen);
             }
             private void Part_BuildSoPackPage(OdinMenuTree tree)
             {
-                QuickBuildRootMenu(tree, PageName_DataPackCreate, ref pageForSodataPack, SdfIconType.CartXFill);
+                QuickBuildMigrationRootMenu(tree, "so-data.window", "so-data.pack", PageName_DataPackCreate, ref pageForSodataPack, SdfIconType.CartXFill);
                 var TypeSelect = ESSODataWindowHelper.GetPackType(pageForSodataPack.createPackType_);
                 var allPacks = ESDesignUtility.SafeEditor.FindAllSOAssets<ISoDataPack>(TypeSelect);
                 foreach (var i in allPacks)
@@ -163,7 +165,7 @@ namespace ES
             }
             private void Part_BuildSoDataGroupPage(OdinMenuTree tree)
             {
-                QuickBuildRootMenu(tree, PageName_DataGroupCreate, ref pageForSodataGroup, SdfIconType.BagXFill);
+                QuickBuildMigrationRootMenu(tree, "so-data.window", "so-data.group", PageName_DataGroupCreate, ref pageForSodataGroup, SdfIconType.BagXFill);
                 var TypeSelect = ESSODataWindowHelper.GetGroupType(pageForSodataGroup.createGroup_);
                 var allGroups = ESDesignUtility.SafeEditor.FindAllSOAssets<ISoDataGroup>(TypeSelect);
 
@@ -179,7 +181,7 @@ namespace ES
 
             public void Part_BuildSoDataGroupOnChooseAndInfos(OdinMenuTree tree)
             {
-                QuickBuildRootMenu(tree, PageName_DataGroupOnChooseEditInfo, ref pageForGroupOnChoose, SdfIconType.PinAngleFill);
+                QuickBuildMigrationRootMenu(tree, "so-data.window", "so-data.group-editor", PageName_DataGroupOnChooseEditInfo, ref pageForGroupOnChoose, SdfIconType.PinAngleFill);
                 RestoreLastEditingGroupPage();
 
                 if (Selection.activeObject is ISoDataGroup group_)
@@ -805,9 +807,14 @@ namespace ES
                     {
                         info.SetKey(DataKey);
                         PrepareInfoForSave(info);
-                        group._TryAddInfoToDic(DataKey, @object);
-                        AssetDatabase.AddObjectToAsset(@object, groupAssetPath);
-                        MarkGroupAssetDirtyAndSave(group, groupAssetPath, "新建单元信息");
+                        if (IsGameCoreGroup(group))
+                            PersistGameCoreCandidate(@object, group, DataKey, groupAssetPath);
+                        else
+                        {
+                            group._TryAddInfoToDic(DataKey, @object);
+                            AssetDatabase.AddObjectToAsset(@object, groupAssetPath);
+                            MarkGroupAssetDirtyAndSave(group, groupAssetPath, "新建单元信息");
+                        }
                     }
                     else
                     {
@@ -844,9 +851,14 @@ namespace ES
                         ifno.SetKey(DataKey);
                         PrepareInfoForSave(ifno);
 
-                        group._TryAddInfoToDic(DataKey, copy);
-                        AssetDatabase.AddObjectToAsset(copy, groupAssetPath);
-                        MarkGroupAssetDirtyAndSave(group, groupAssetPath, "拷贝选定信息");
+                        if (IsGameCoreGroup(group))
+                            PersistGameCoreCandidate(copy, group, DataKey, groupAssetPath);
+                        else
+                        {
+                            group._TryAddInfoToDic(DataKey, copy);
+                            AssetDatabase.AddObjectToAsset(copy, groupAssetPath);
+                            MarkGroupAssetDirtyAndSave(group, groupAssetPath, "拷贝选定信息");
+                        }
                     }
                     else
                     {
@@ -899,9 +911,14 @@ namespace ES
                         {
                             info.SetKey(DataKey);
                             PrepareInfoForSave(info);
-                            group._TryAddInfoToDic(DataKey, copy);
-                            AssetDatabase.AddObjectToAsset(copy, groupAssetPath);
-                            MarkGroupAssetDirtyAndSave(group, groupAssetPath, "持久粘贴");
+                            if (IsGameCoreGroup(group))
+                                PersistGameCoreCandidate(copy, group, DataKey, groupAssetPath);
+                            else
+                            {
+                                group._TryAddInfoToDic(DataKey, copy);
+                                AssetDatabase.AddObjectToAsset(copy, groupAssetPath);
+                                MarkGroupAssetDirtyAndSave(group, groupAssetPath, "持久粘贴");
+                            }
                         }
                         else
                         {
@@ -937,6 +954,32 @@ namespace ES
             {
                 if (info is ItemDataInfo item)
                     item.EnsureActiveKindData();
+            }
+
+            private static bool IsGameCoreGroup(ISoDataGroup targetGroup)
+            {
+                return targetGroup is ScriptableObject groupAsset
+                       && ESScriptableObjectClassification.GetClass(groupAsset) == ESScriptableObjectClass.GameCore;
+            }
+
+            private static void PersistGameCoreCandidate(
+                ScriptableObject candidate,
+                ISoDataGroup targetGroup,
+                string key,
+                string groupAssetPath)
+            {
+                string folder = Path.GetDirectoryName(groupAssetPath)?.Replace('\\', '/');
+                if (string.IsNullOrEmpty(folder))
+                    throw new InvalidOperationException("GameCore Group 没有有效目录，无法创建独立 DataInfo 资产。");
+                string safeName = string.Join("_", candidate.name.Split(Path.GetInvalidFileNameChars()));
+                string candidatePath = AssetDatabase.GenerateUniqueAssetPath(folder + "/" + safeName + ".asset");
+                AssetDatabase.CreateAsset(candidate, candidatePath);
+                AssetDatabase.SaveAssetIfDirty(candidate);
+                ESResourceCollectionWorkflowWindow.OpenForGameCoreRegistration(
+                    candidate,
+                    targetGroup as ScriptableObject,
+                    null,
+                    key);
             }
 
             private static void TryRemoveReadOnly(string assetPath)
@@ -1008,6 +1051,8 @@ namespace ES
             [Button("校验并刷新", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void Check()
             {
+                if (IsGameCoreGroup(group))
+                    return;
                 List<string> ToRemove = new List<string>();
                 bool hasChange = false;
                 if (group != null)
@@ -1050,6 +1095,14 @@ namespace ES
             [Button("重建索引", ButtonHeight = 30), GUIColor("@ESDesignUtility.ColorSelector.Color_03")]
             public void Collect()
             {
+                if (IsGameCoreGroup(group))
+                {
+                    EditorUtility.DisplayDialog(
+                        "GameCore 重建索引已禁用",
+                        "GameCore Group 不允许直接重建字典。请选择独立 DataInfo，通过统一内容注册事务逐项预检并提交。",
+                        "确定");
+                    return;
+                }
                 UnityEngine.Object ob = group as ScriptableObject;
                 string groupPath = AssetDatabase.GetAssetPath(ob);
 
@@ -1850,6 +1903,11 @@ namespace ES
             /// 添加 Info 到 Group（原子撤销）
             public static void AddInfoToGroup(ISoDataGroup group, ISoDataInfo info, ScriptableObject infoAsset, string groupAssetPath)
             {
+                if (group is ScriptableObject groupAsset
+                    && ESScriptableObjectClassification.GetClass(groupAsset) == ESScriptableObjectClass.GameCore)
+                {
+                    throw new InvalidOperationException("GameCore Group 禁止通过 EditorUndoService 直接写入；请使用统一内容注册事务。");
+                }
                 int groupIdx = Undo.GetCurrentGroup();
                 Undo.SetCurrentGroupName("Add Info to Group");
                 RecordGroupModification(group, "Before Add Info");

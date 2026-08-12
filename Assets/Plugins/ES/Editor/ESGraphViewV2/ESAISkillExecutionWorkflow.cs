@@ -154,6 +154,7 @@ namespace ES.EditorInternal
     {
         public int schemaVersion = 1;
         public string sourceGraphId = string.Empty;
+        [JsonIgnore] public string sourceAssetGuid = string.Empty;
         public string sourceContentSignature = string.Empty;
         public string skillId = string.Empty;
         public string displayName = string.Empty;
@@ -409,6 +410,15 @@ namespace ES.EditorInternal
                     && (parameter.choices == null || parameter.choices.Length == 0))
                     failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.ParameterChoice",
                         "Choice 参数至少需要一个选项。", step.nodeId));
+                if (!string.IsNullOrWhiteSpace(parameter?.validationPattern))
+                {
+                    try { _ = new Regex(parameter.validationPattern); }
+                    catch (ArgumentException exception)
+                    {
+                        failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.ParameterPattern",
+                            "参数正则约束无效：" + exception.Message, step.nodeId));
+                    }
+                }
             }
         }
 
@@ -496,6 +506,7 @@ namespace ES.EditorInternal
                 return false;
             }
             spec = baked;
+            spec.sourceAssetGuid = ResolveAssetGuid(asset);
             error = string.Empty;
             return true;
         }
@@ -538,7 +549,7 @@ namespace ES.EditorInternal
                     case ESAISkillValueType.ProjectPath:
                         ESAdvancedDialogField pathField = request.AddText(parameter.parameterId,
                             label, parameter.defaultValue, parameter.required);
-                        pathField.tooltip = "填写项目相对路径；禁止绝对路径和 ..。允许根："
+                        pathField.help = "填写项目相对路径；禁止绝对路径和 ..。允许根："
                             + string.Join("、", parameter.allowedRoots ?? Array.Empty<string>());
                         break;
                     case ESAISkillValueType.TextList:
@@ -571,7 +582,13 @@ namespace ES.EditorInternal
                 || !TryCollectInputs(spec, owner, out JObject values, out error))
                 return false;
             return ESAISkillExecutionCoordinator.TryStart(spec, values, Environment.UserName,
-                out run, out error);
+                ResolveAssetGuid(asset), out run, out error);
+        }
+
+        internal static string ResolveAssetGuid(ESGraphAssetBase asset)
+        {
+            string path = asset == null ? string.Empty : AssetDatabase.GetAssetPath(asset);
+            return string.IsNullOrWhiteSpace(path) ? string.Empty : AssetDatabase.AssetPathToGUID(path);
         }
 
         private static JObject BuildInputObject(IEnumerable<ESAISkillParameter> parameters,
@@ -656,6 +673,7 @@ namespace ES.EditorInternal
         public int schemaVersion = 1;
         public string runId = Guid.NewGuid().ToString("N");
         public string graphId = string.Empty;
+        public string sourceAssetGuid = string.Empty;
         public string contentSignature = string.Empty;
         public string skillId = string.Empty;
         public string operatorId = string.Empty;
@@ -692,14 +710,26 @@ namespace ES.EditorInternal
 
         public static bool TryStart(ESAISkillExecutionSpec spec, JObject inputs, string operatorId,
             out ESAISkillWorkflowRun run, out string error)
+            => TryStart(spec, inputs, operatorId, spec?.sourceAssetGuid, out run, out error);
+
+        public static bool TryStart(ESAISkillExecutionSpec spec, JObject inputs, string operatorId,
+            string sourceAssetGuid, out ESAISkillWorkflowRun run, out string error)
         {
             run = null;
             if (!TryValidateInputs(spec, inputs, out JObject normalized, out error))
                 return false;
+            string assetPath = string.IsNullOrWhiteSpace(sourceAssetGuid)
+                ? string.Empty : AssetDatabase.GUIDToAssetPath(sourceAssetGuid);
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                error = "AISkill 执行必须绑定已保存源 Graph 的精确 Asset GUID。";
+                return false;
+            }
             string now = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
             run = new ESAISkillWorkflowRun
             {
                 graphId = spec.sourceGraphId,
+                sourceAssetGuid = sourceAssetGuid ?? string.Empty,
                 contentSignature = spec.sourceContentSignature,
                 skillId = spec.skillId,
                 operatorId = string.IsNullOrWhiteSpace(operatorId) ? Environment.UserName : operatorId.Trim(),
@@ -714,7 +744,7 @@ namespace ES.EditorInternal
             {
                 Save(run);
                 Active.Add(run.runId, run);
-                SaveActiveRunIds();
+                TrySaveActiveRunIds();
                 EnsureUpdateHook();
                 Tick(run);
                 error = string.Empty;
@@ -723,6 +753,7 @@ namespace ES.EditorInternal
             catch (Exception exception)
             {
                 Active.Remove(run.runId);
+                TrySaveActiveRunIds();
                 error = "无法启动 AISkill 工作流：" + exception.Message;
                 return false;
             }
@@ -788,7 +819,16 @@ namespace ES.EditorInternal
             foreach (ESAISkillWorkflowRun run in Active.Values.ToArray())
             {
                 try { Tick(run); }
-                catch (Exception exception) { Fail(run, "协调器异常：" + exception.Message); }
+                catch (Exception exception)
+                {
+                    try { Fail(run, "协调器异常：" + exception.Message); }
+                    catch (Exception persistException)
+                    {
+                        Active.Remove(run.runId);
+                        TrySaveActiveRunIds();
+                        Debug.LogError("[ES AISkillGraph] Run 失败状态无法持久化：" + persistException.Message);
+                    }
+                }
             }
             if (Active.Count == 0)
                 EditorApplication.update -= Update;
@@ -882,9 +922,9 @@ namespace ES.EditorInternal
                 record.childRunId = result.runId ?? string.Empty;
                 record.message = result.message ?? string.Empty;
                 Save(run);
-                if (result.status == "Completed")
+                if (IsSuccessfulTaskStatus(result.status))
                     return HandleTaskTerminal(run, step, result);
-                if (result.status == "Starting" || result.status == "Accepted" || result.status == "Running")
+                if (IsTaskInProgress(result.status))
                 {
                     if (!Guid.TryParseExact(record.childRunId, "N", out _))
                         return HandleTaskFailure(run, step, "Failed",
@@ -895,7 +935,7 @@ namespace ES.EditorInternal
             }
 
             ES.ESAutomationTaskInvocationResult current = ES.ESAutomationFacade.GetRun(record.childRunId, false);
-            if (current.status == "Starting" || current.status == "Accepted" || current.status == "Running")
+            if (IsTaskInProgress(current.status))
             {
                 if (DateTimeOffset.TryParse(record.currentAttemptStartedAtUtc, out DateTimeOffset started)
                     && DateTimeOffset.UtcNow - started > TimeSpan.FromSeconds(step.task.timeoutSeconds))
@@ -905,7 +945,7 @@ namespace ES.EditorInternal
                 }
                 return true;
             }
-            if (current.status == "Completed")
+            if (IsSuccessfulTaskStatus(current.status))
                 return HandleTaskTerminal(run, step, current);
             return HandleTaskFailure(run, step, current.status, current.message);
         }
@@ -967,6 +1007,7 @@ namespace ES.EditorInternal
         private static bool HandleTaskFailure(ESAISkillWorkflowRun run, ESAISkillExecutionStep step,
             string status, string message)
         {
+            status = NormalizeTaskFailureStatus(status);
             ESAISkillStepRunRecord record = FindStepRecord(run, step.nodeId);
             bool mayRetry = status == "Failed" || status == "TimedOut";
             if (mayRetry && record.currentAttemptCount <= step.task.retryCount)
@@ -994,6 +1035,28 @@ namespace ES.EditorInternal
                 : ESAgentGraphStableIds.SkillFailurePortKey;
             Move(run, step.nodeId, route);
             return false;
+        }
+
+        private static bool IsTaskInProgress(string status)
+            => status == "Starting" || status == "Accepted" || status == "Running";
+
+        private static bool IsSuccessfulTaskStatus(string status)
+            => status == "Completed" || status == "DryRun";
+
+        internal static string NormalizeTaskFailureStatus(string status)
+        {
+            switch (status)
+            {
+                case "Failed":
+                case "TimedOut":
+                case "Cancelled":
+                case "Blocked":
+                case "Rejected":
+                case "NotFound":
+                    return status;
+                default:
+                    return "Failed";
+            }
         }
 
         private static bool EnterOrContinueForEach(ESAISkillWorkflowRun run, ESAISkillExecutionStep step)
@@ -1136,7 +1199,7 @@ namespace ES.EditorInternal
             run.finishedAtUtc = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
             Save(run);
             Active.Remove(run.runId);
-            SaveActiveRunIds();
+            TrySaveActiveRunIds();
         }
 
         private static bool IsTerminal(string status)
@@ -1214,6 +1277,12 @@ namespace ES.EditorInternal
             {
                 foreach (JToken item in (JArray)value)
                     if (!ValidateProjectPath(parameter, item.ToString(), out error)) return false;
+            }
+            if (!string.IsNullOrWhiteSpace(parameter.validationPattern)
+                && !Regex.IsMatch(value.ToString(), parameter.validationPattern))
+            {
+                error = "参数不符合格式约束：" + parameter.parameterId;
+                return false;
             }
             error = string.Empty;
             return true;
@@ -1317,18 +1386,81 @@ namespace ES.EditorInternal
                 }
             }
             foreach (string id in ids.Distinct(StringComparer.Ordinal))
-                if (TryLoad(id, out ESAISkillWorkflowRun run, out _) && !IsTerminal(run.status))
-                    Active[id] = run;
+            {
+                if (!TryLoad(id, out ESAISkillWorkflowRun run, out _) || IsTerminal(run.status))
+                    continue;
+                if (!TryValidateCurrentSource(run, out string sourceError))
+                {
+                    run.status = "Blocked";
+                    run.message = "恢复已阻断：" + sourceError;
+                    run.exitCode = -1;
+                    run.finishedAtUtc = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+                    try { Save(run); }
+                    catch (Exception exception)
+                    {
+                        Debug.LogError("[ES AISkillGraph] 无法持久化 stale Graph 阻断状态：" + exception.Message);
+                    }
+                    continue;
+                }
+                Active[id] = run;
+            }
+            TrySaveActiveRunIds();
             EnsureUpdateHook();
         }
 
-        private static void SaveActiveRunIds()
+        private static bool TryValidateCurrentSource(ESAISkillWorkflowRun run, out string error)
         {
-            string[] ids = Active.Keys.OrderBy(value => value, StringComparer.Ordinal).ToArray();
-            SessionState.SetString(ActiveRunsSessionKey, string.Join(";", ids));
-            ES.ESAutomationPathPolicy.WriteWorkerTextAtomic(
-                Path.Combine(RunsRoot, "active-runs.json"),
-                JsonConvert.SerializeObject(ids, Formatting.Indented), new[] { RunsRoot });
+            if (run == null || string.IsNullOrWhiteSpace(run.sourceAssetGuid))
+            {
+                error = "旧 RunRecord 缺少私有源资产 GUID，只允许查看，不能自动续跑。";
+                return false;
+            }
+            string assetPath = AssetDatabase.GUIDToAssetPath(run.sourceAssetGuid);
+            ESGraphAssetBase asset = string.IsNullOrWhiteSpace(assetPath)
+                ? null : AssetDatabase.LoadAssetAtPath<ESGraphAssetBase>(assetPath);
+            if (asset == null)
+            {
+                error = "源 Graph 资产已移动到不可解析位置或已不存在。";
+                return false;
+            }
+            if (!string.Equals(asset.GraphId, run.graphId, StringComparison.Ordinal))
+            {
+                error = "源资产 GraphId 与 RunRecord 不一致。";
+                return false;
+            }
+            if (!ESGraphSnapshotBaker.TryBake(asset, out ESBakedGraphSnapshot current,
+                    out List<ESGraphValidationIssue> issues))
+            {
+                ESGraphValidationIssue first = issues?.FirstOrDefault(issue => issue != null
+                    && issue.severity == ESGraphValidationSeverity.Error);
+                error = "源 Graph 当前无法生成验证快照：" + (first?.message ?? "未知错误");
+                return false;
+            }
+            if (!string.Equals(current.ContentSignature, run.contentSignature,
+                    StringComparison.Ordinal))
+            {
+                error = "源 Graph 内容签名已变化；旧 Run 保留审计记录，但不得继续执行。";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+
+        private static void TrySaveActiveRunIds()
+        {
+            try
+            {
+                string[] ids = Active.Keys.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+                SessionState.SetString(ActiveRunsSessionKey, string.Join(";", ids));
+                ES.ESAutomationPathPolicy.WriteWorkerTextAtomic(
+                    Path.Combine(RunsRoot, "active-runs.json"),
+                    JsonConvert.SerializeObject(ids, Formatting.Indented), new[] { RunsRoot });
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[ES AISkillGraph] 活跃运行索引写入失败；各 RunRecord 仍保留，可从运行目录查看："
+                    + exception.Message);
+            }
         }
 
         private static void EnsureUpdateHook()

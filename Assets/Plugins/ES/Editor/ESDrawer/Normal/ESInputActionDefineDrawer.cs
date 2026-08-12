@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using ES;
 using UnityEditor;
@@ -271,7 +272,7 @@ namespace ES.EditorInternal
             }
         }
 
-        private sealed class ESInputActionImportWindow : EditorWindow
+        private sealed class ESInputActionImportWindow : ESSinglePageIMGUIWindow<ESInputActionImportWindow>
         {
             private SerializedObject targetObject;
             private string actionPropertyPath;
@@ -296,7 +297,66 @@ namespace ES.EditorInternal
                 window.ShowUtility();
             }
 
-            private void OnDisable()
+            public override GUIContent ESWindow_GetWindowGUIContent()
+            {
+                return new GUIContent("InputAction 绑定辅助", "用 Unity 原生 InputAction 绘制器生成 ES 输入绑定");
+            }
+
+            protected override string ESWindow_Subtitle => "临时 InputAction 到 ES 绑定列表";
+            protected override Vector2 ESWindow_MinSize => new Vector2(640f, 440f);
+            protected override Vector2 ESWindow_DefaultSize => new Vector2(760f, 620f);
+            protected override string ESWindow_PageStableId => "input.action-import";
+            protected override string ESWindow_PageTitle => "InputAction 绑定辅助";
+            protected override string ESWindow_PageKeywords => "InputAction 输入 Binding 导入 覆盖 追加";
+
+            protected override void ESWindow_BuildPageActions(
+                ICollection<ESMenuTreePageAction> actions)
+            {
+                actions.Add(new ESMenuTreePageAction(
+                        "input-action.rebuild",
+                        "从 ES 重建",
+                        "从当前 ES 输入动作配置重新生成临时 InputAction。",
+                        context =>
+                        {
+                            holder.action?.Dispose();
+                            holder.action = BuildActionFromCurrentConfig();
+                            holderObject = new SerializedObject(holder);
+                            context.RefreshPageActions();
+                            context.SetStatus("已从 ES 配置重建临时 InputAction");
+                            Repaint();
+                        })
+                    .When(() => holder != null && targetObject != null)
+                    .WithUnityIcon("Refresh")
+                    .WithPriority(100));
+                actions.Add(new ESMenuTreePageAction(
+                        "input-action.overwrite",
+                        "覆盖绑定",
+                        "清空当前 ES 绑定列表，并用临时 InputAction 全部重建。",
+                        _ =>
+                        {
+                            if (EditorUtility.DisplayDialog(
+                                    "确认覆盖绑定列表",
+                                    "这会清空当前动作的 ES 绑定列表，并用上方 InputAction 的全部 Binding 重建。\n\n继续吗？",
+                                    "覆盖",
+                                    "取消"))
+                            {
+                                ImportAllBindings(clearOld: true);
+                            }
+                        })
+                    .When(CanImportBindings)
+                    .WithUnityIcon("SaveAs")
+                    .WithPriority(90));
+                actions.Add(new ESMenuTreePageAction(
+                        "input-action.append",
+                        "追加绑定",
+                        "把临时 InputAction 的全部 Binding 追加到当前 ES 动作。",
+                        _ => ImportAllBindings(clearOld: false))
+                    .When(CanImportBindings)
+                    .WithUnityIcon("Toolbar Plus")
+                    .WithPriority(80));
+            }
+
+            protected override void ESWindow_OnHostDisable()
             {
                 if (holder != null)
                 {
@@ -304,9 +364,10 @@ namespace ES.EditorInternal
                     DestroyImmediate(holder);
                     holder = null;
                 }
+                holderObject = null;
             }
 
-            private void OnGUI()
+            protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
             {
                 if (holder == null || holderObject == null)
                 {
@@ -322,41 +383,14 @@ namespace ES.EditorInternal
                 holderObject.ApplyModifiedProperties();
 
                 EditorGUILayout.Space(4f);
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    importSchemeId = EditorGUILayout.TextField("导入方案", importSchemeId);
-                    if (GUILayout.Button("从 ES 重建", GUILayout.Width(92f)))
-                    {
-                        holder.action?.Dispose();
-                        holder.action = BuildActionFromCurrentConfig();
-                        holderObject = new SerializedObject(holder);
-                    }
-                }
-
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    using (new EditorGUI.DisabledScope(holder.action == null || holder.action.bindings.Count == 0))
-                    {
-                        if (GUILayout.Button("覆盖 ES 绑定列表", GUILayout.Height(24f)))
-                        {
-                            if (EditorUtility.DisplayDialog(
-                                    "确认覆盖绑定列表",
-                                    "这会清空当前动作的 ES 绑定列表，并用上方 InputAction 的全部 Binding 重建。\n\n继续吗？",
-                                    "覆盖",
-                                    "取消"))
-                            {
-                                ImportAllBindings(clearOld: true);
-                            }
-                        }
-
-                        if (GUILayout.Button("追加到 ES 绑定列表", GUILayout.Height(24f)))
-                        {
-                            ImportAllBindings(clearOld: false);
-                        }
-                    }
-                }
+                importSchemeId = EditorGUILayout.TextField("导入方案", importSchemeId);
 
                 DrawPreview();
+            }
+
+            private bool CanImportBindings()
+            {
+                return holder?.action != null && holder.action.bindings.Count > 0;
             }
 
             private InputAction BuildActionFromCurrentConfig()

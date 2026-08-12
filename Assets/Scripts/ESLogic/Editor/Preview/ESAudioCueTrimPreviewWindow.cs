@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using ES.EditorInternal;
 using UnityEditor;
@@ -7,7 +8,7 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>Editor-only trimmed-Cue preview using Unity's native preview audio service.</summary>
-    public sealed class ESAudioCueTrimPreviewWindow : EditorWindow
+    public sealed class ESAudioCueTrimPreviewWindow : ESSinglePageIMGUIWindow<ESAudioCueTrimPreviewWindow>
     {
         private const float MinimumWidth = 420f;
         private const float MinimumHeight = 340f;
@@ -37,7 +38,7 @@ namespace ES
         private string status;
 
         [MenuItem("【ES】/内容制作/音频/Cue 播放窗口预览")]
-        private static void OpenWindow()
+        private static new void OpenWindow()
         {
             var window = GetWindow<ESAudioCueTrimPreviewWindow>("音频 Cue 预览");
             window.TryUseSelectedCue();
@@ -56,22 +57,80 @@ namespace ES
             OpenWindow();
         }
 
-        private void OnEnable()
+        public override GUIContent ESWindow_GetWindowGUIContent()
+        {
+            return new GUIContent("音频 Cue 预览", "试听 Cue 变体及其裁剪播放窗口");
+        }
+
+        protected override string ESWindow_Subtitle => "播放窗口与变体试听";
+        protected override Vector2 ESWindow_MinSize => new Vector2(MinimumWidth, MinimumHeight);
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(760f, 620f);
+        protected override string ESWindow_PageStableId => "audio.cue-trim-preview";
+        protected override string ESWindow_PageTitle => "Cue 播放预览";
+        protected override string ESWindow_PageKeywords => "音频 Audio Cue 变体 裁剪 播放 预览";
+
+        protected override void ESWindow_BuildPageActions(
+            ICollection<ESMenuTreePageAction> actions)
+        {
+            actions.Add(new ESMenuTreePageAction(
+                    "audio.use-selection",
+                    "使用选中 Cue",
+                    "使用 Project 当前选中的 ESAudioCueInfo。",
+                    context =>
+                    {
+                        TryUseSelectedCue();
+                        context.RefreshPageActions();
+                        context.SetStatus(cue != null ? "已使用当前选中 Cue" : "当前选择不是音频 Cue",
+                            cue != null ? ESMenuTreePageStatus.Info : ESMenuTreePageStatus.Warning);
+                    })
+                .WithUnityIcon("Linked")
+                .WithPriority(100));
+            actions.Add(new ESMenuTreePageAction(
+                    "audio.play",
+                    "播放",
+                    "试听当前 Cue 变体的有效播放窗口。",
+                    context =>
+                    {
+                        StartPreview();
+                        context.RefreshPageActions();
+                        context.SetStatus(previewing ? "正在预览音频 Cue" : status,
+                            previewing ? ESMenuTreePageStatus.Info : ESMenuTreePageStatus.Warning);
+                    })
+                .WhenVisible(() => cue != null && !previewing)
+                .WithUnityIcon("PlayButton")
+                .WithPriority(90));
+            actions.Add(new ESMenuTreePageAction(
+                    "audio.stop",
+                    "停止",
+                    "停止当前音频预览。",
+                    context =>
+                    {
+                        StopPreview();
+                        context.RefreshPageActions();
+                        context.SetStatus("音频预览已停止");
+                    })
+                .WhenVisible(() => previewing)
+                .WithUnityIcon("PauseButton")
+                .WithPriority(90));
+        }
+
+        protected override void ESWindow_OnHostEnable()
         {
             minSize = new Vector2(MinimumWidth, MinimumHeight);
             titleContent = new GUIContent("音频 Cue 预览");
             TryUseSelectedCue();
         }
 
-        private void OnDisable()
+        protected override void ESWindow_OnHostDisable()
         {
-            StopPreview();
+            StopPreview(repaint: false);
         }
 
         private void OnSelectionChange()
         {
             if (cue == null)
                 TryUseSelectedCue();
+            ESWindow_CurrentPageContext?.RefreshPageActions();
             Repaint();
         }
 
@@ -79,9 +138,10 @@ namespace ES
         {
             StopPreview();
             InvalidateResolvedPreview();
+            ESWindow_CurrentPageContext?.RefreshPageActions();
         }
 
-        private void OnGUI()
+        protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             DrawHeader();
             GUILayout.Space(8f);
@@ -281,6 +341,7 @@ namespace ES
             nextPreviewStopAt = previewStartedAt + (endSample - startSample) / (double)clip.frequency;
             status = "正在预览";
             EditorApplication.update += UpdatePreview;
+            ESWindow_CurrentPageContext?.RefreshPageActions();
         }
 
         private void UpdatePreview()
@@ -304,7 +365,7 @@ namespace ES
             nextPreviewStopAt = now + (playingEndSample - playingStartSample) / (double)playingClip.frequency;
         }
 
-        private void StopPreview()
+        private void StopPreview(bool repaint = true)
         {
             EditorApplication.update -= UpdatePreview;
             if (previewing)
@@ -316,7 +377,11 @@ namespace ES
             nextPreviewStopAt = 0d;
             if (string.IsNullOrEmpty(status) || status == "正在预览")
                 status = string.Empty;
-            Repaint();
+            if (repaint)
+            {
+                ESWindow_CurrentPageContext?.RefreshPageActions();
+                Repaint();
+            }
         }
 
         private void SetCue(ESAudioCueInfo selectedCue)

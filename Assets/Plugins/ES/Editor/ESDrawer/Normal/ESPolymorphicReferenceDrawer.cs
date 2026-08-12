@@ -86,6 +86,10 @@ namespace ES.EditorInternal
         private bool titleSuppressValueType;
         private string presentationTitleText;
         private string presentationMultiTargetNotice;
+        private bool fieldSemanticInitialized;
+        private ESFieldPolicyAttribute cachedFieldPolicy;
+        private ESFieldAttribute cachedField;
+        private string cachedFieldHint;
 
         protected override bool CanDrawValueProperty(InspectorProperty property)
         {
@@ -371,12 +375,21 @@ namespace ES.EditorInternal
             if (value != null)
                 return ESStatusKind.Ready;
 
-            ESFieldPolicyAttribute policy = Property?.GetAttribute<ESFieldPolicyAttribute>();
-            if (policy != null)
+            EnsureFieldSemanticCache();
+            if (cachedFieldPolicy != null)
             {
-                if (policy.Requirement == ESFieldRequirement.Required)
+                if (cachedFieldPolicy.Requirement == ESFieldRequirement.Required)
                     return ESStatusKind.Error;
-                if (policy.Requirement == ESFieldRequirement.Recommended)
+                if (cachedFieldPolicy.Requirement == ESFieldRequirement.Recommended)
+                    return ESStatusKind.Warning;
+            }
+
+            if (cachedField != null)
+            {
+                if (cachedField.Required)
+                    return ESStatusKind.Error;
+                if (cachedField.Level == ESFieldLevel.Core
+                    || cachedField.Level == ESFieldLevel.Important)
                     return ESStatusKind.Warning;
             }
 
@@ -1175,17 +1188,17 @@ namespace ES.EditorInternal
             {
                 presentationSelectorText = "选择类型";
                 presentationSelectorTooltip = "从配置目录中创建一个具体的多态配置";
-                ESFieldPolicyAttribute policy = Property?.GetAttribute<ESFieldPolicyAttribute>();
-                presentationSelectorStyle = policy != null
-                    && policy.Requirement != ESFieldRequirement.Optional
-                    ? WarningSelectorStyle
-                    : EmptySelectorStyle;
-                presentationMetaText = policy != null
-                    && policy.Requirement == ESFieldRequirement.Required
+                EnsureFieldSemanticCache();
+                bool required = cachedFieldPolicy?.Requirement == ESFieldRequirement.Required
+                                || cachedField?.Required == true;
+                bool recommended = cachedFieldPolicy?.Requirement == ESFieldRequirement.Recommended
+                    || cachedField?.Level == ESFieldLevel.Important
+                    || cachedField?.Level == ESFieldLevel.Core;
+                presentationSelectorStyle = required || recommended ? WarningSelectorStyle : EmptySelectorStyle;
+                presentationMetaText = required
                     ? "必填 · 请选择一个具体类型"
-                    : policy != null
-                        && policy.Requirement == ESFieldRequirement.Recommended
-                        ? "建议配置 · 从目录选择一个具体类型"
+                    : recommended
+                        ? "重点字段 · 建议配置一个具体类型"
                         : "未配置 · 从目录选择一个具体类型";
                 presentationMissingNotice = null;
                 presentationMultiTargetNotice = null;
@@ -1213,7 +1226,21 @@ namespace ES.EditorInternal
 
         private string GetFieldHint()
         {
-            return Property?.GetAttribute<ESFieldHintAttribute>()?.Text;
+            EnsureFieldSemanticCache();
+            return cachedFieldHint;
+        }
+
+        private void EnsureFieldSemanticCache()
+        {
+            if (fieldSemanticInitialized)
+                return;
+
+            fieldSemanticInitialized = true;
+            cachedFieldPolicy = Property?.GetAttribute<ESFieldPolicyAttribute>();
+            cachedField = Property?.GetAttribute<ESFieldAttribute>();
+            string hint = cachedField?.Hint
+                          ?? Property?.GetAttribute<ESFieldHintAttribute>()?.Text;
+            cachedFieldHint = string.IsNullOrWhiteSpace(hint) ? null : hint.Trim();
         }
 
         private static Rect ApplyNestingInset(Rect rect, int nestingDepth)
@@ -2091,31 +2118,31 @@ namespace ES.EditorInternal
             menu.ShowAsContext();
         }
 
-        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "多态引用/绘制方案/【ES】自定义渲染")]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_EDITOR_EXTENSIONS_PATH + "多态引用/绘制方案/【ES】自定义渲染")]
         private static void SelectESRenderer()
         {
             DrawMode = ESPolymorphicReferenceDrawMode.ES;
         }
 
-        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "多态引用/绘制方案/Odin 默认动态渲染")]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_EDITOR_EXTENSIONS_PATH + "多态引用/绘制方案/Odin 默认动态渲染")]
         private static void SelectOdinRenderer()
         {
             DrawMode = ESPolymorphicReferenceDrawMode.Odin;
         }
 
-        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "多态引用/项目默认集合绘制/【ES】标准集合卡片")]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_EDITOR_EXTENSIONS_PATH + "多态引用/项目默认集合绘制/【ES】标准集合卡片")]
         private static void SelectESCollectionRenderer()
         {
             SelectCollectionDrawMode(ESPolymorphicReferenceCollectionDrawMode.ES);
         }
 
-        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "多态引用/项目默认集合绘制/【ES】Feel 风格卡片")]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_EDITOR_EXTENSIONS_PATH + "多态引用/项目默认集合绘制/【ES】Feel 风格卡片")]
         private static void SelectFeelCollectionRenderer()
         {
             SelectCollectionDrawMode(ESPolymorphicReferenceCollectionDrawMode.Feel);
         }
 
-        [MenuItem(MenuItemPathDefine.DEVELOPMENT_MAINTENANCE_PATH + "多态引用/项目默认集合绘制/Odin 默认集合元素绘制")]
+        [MenuItem(MenuItemPathDefine.AUTOMATION_EDITOR_EXTENSIONS_PATH + "多态引用/项目默认集合绘制/Odin 默认集合元素绘制")]
         private static void SelectOdinCollectionRenderer()
         {
             SelectCollectionDrawMode(ESPolymorphicReferenceCollectionDrawMode.Odin);

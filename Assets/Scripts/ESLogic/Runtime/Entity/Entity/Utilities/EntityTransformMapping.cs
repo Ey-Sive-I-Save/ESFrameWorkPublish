@@ -179,6 +179,11 @@ namespace ES
     {
         [Header("Transform Mappings")]
         [Tooltip("Enum 用于固定高频挂点，String 用于低频扩展；双键可作为同一挂点的两个别名。")]
+        [ESEnumStringTable(
+            EnumColumn = "固定挂点",
+            StringColumn = "稳定 String Key",
+            ValueColumn = "Transform",
+            NewEntryMode = ESEnumStringTableNewEntryMode.EnumAndString)]
         [SerializeField] private EntityTransformMap transformMappings = new EntityTransformMap();
 
 #if UNITY_EDITOR

@@ -9,25 +9,30 @@ namespace ES
     [CustomPropertyDrawer(typeof(ESEnumStringTableAttribute))]
     public sealed class ESEnumStringTableAttributeDrawer : PropertyDrawer
     {
-        private const float RowGap = 2f;
         private const float CellGap = 4f;
         private const float ActionWidth = 22f;
         private const float ToggleWidth = 18f;
         private const float MinWideWidth = 510f;
 
-        private static readonly Dictionary<string, string> SearchByProperty =
-            new Dictionary<string, string>(StringComparer.Ordinal);
-
         private static GUIStyle headerStyle;
         private static GUIStyle statusStyle;
         private static GUIStyle centeredMiniStyle;
         private static bool stylesProSkin;
+        private string searchText = string.Empty;
+        private string searchPropertyKey;
+        private readonly HashSet<long> enumKeys = new HashSet<long>();
+        private readonly HashSet<long> duplicateEnumKeys = new HashSet<long>();
+        private readonly HashSet<string> stringKeys = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> duplicateStringKeys = new HashSet<string>(StringComparer.Ordinal);
+        private readonly List<EntryValidation> validation = new List<EntryValidation>();
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
             float line = EditorGUIUtility.singleLineHeight;
             if (!property.isExpanded)
                 return line + 6f;
+            if (property.serializedObject.isEditingMultipleObjects)
+                return line * 3f + EditorGUIUtility.standardVerticalSpacing + 6f;
 
             SerializedProperty entries = property.FindPropertyRelative("entries");
             SerializedProperty denseLimit = property.FindPropertyRelative("denseEnumLimit");
@@ -113,6 +118,7 @@ namespace ES
                 Rect headerRect = NextLine(ref content, line);
                 bool wide = position.width >= MinWideWidth;
                 DrawColumnHeader(headerRect, settings, wide);
+                RebuildValidation(entries);
 
                 int visibleCount = 0;
                 for (int index = 0; index < entries.arraySize; index++)
@@ -130,7 +136,7 @@ namespace ES
                         ? Mathf.Max(line, valueHeight)
                         : line + EditorGUIUtility.standardVerticalSpacing + valueHeight;
                     Rect rowRect = NextLine(ref content, rowHeight);
-                    DrawEntryRow(rowRect, entries, entry, index, settings, wide);
+                    DrawEntryRow(rowRect, entries, entry, index, settings, wide, validation[index]);
                 }
 
                 if (visibleCount == 0)
@@ -143,7 +149,7 @@ namespace ES
                 }
 
                 Rect footerRect = NextLine(ref content, line);
-                DrawFooter(footerRect, property, entries, settings);
+                DrawFooter(footerRect, property, entries, settings, CountInvalidEntries());
 
                 if (settings.ShowAdvancedSettings)
                     DrawAdvanced(ref content, property, line);
@@ -177,7 +183,7 @@ namespace ES
                 return;
             }
 
-            GetWideColumns(rect, out Rect enumRect, out Rect stringRect, out Rect valueRect, out _);
+            GetWideColumns(rect, settings.AllowReorder, out Rect enumRect, out Rect stringRect, out Rect valueRect, out _);
             EditorGUI.LabelField(enumRect, settings.EnumColumn, EditorStyles.miniBoldLabel);
             EditorGUI.LabelField(stringRect, settings.StringColumn, EditorStyles.miniBoldLabel);
             EditorGUI.LabelField(valueRect, settings.ValueColumn, EditorStyles.miniBoldLabel);
@@ -189,7 +195,8 @@ namespace ES
             SerializedProperty entry,
             int index,
             ESEnumStringTableAttribute settings,
-            bool wide)
+            bool wide,
+            EntryValidation entryValidation)
         {
             SerializedProperty hasEnum = entry.FindPropertyRelative("hasEnumKey");
             SerializedProperty enumKey = entry.FindPropertyRelative("enumKey");
@@ -201,14 +208,7 @@ namespace ES
                 return;
             }
 
-            bool hasString = !string.IsNullOrEmpty(stringKey.stringValue);
-            bool missingAlias = !hasEnum.boolValue && !hasString;
-            bool invalidString = hasString
-                                 && !string.Equals(stringKey.stringValue, stringKey.stringValue.Trim(), StringComparison.Ordinal);
-            bool nullValue = IsNullObjectReference(value);
-            bool duplicateEnum = hasEnum.boolValue && HasDuplicateEnum(entries, enumKey, index);
-            bool duplicateString = hasString && HasDuplicateString(entries, stringKey.stringValue, index);
-            bool invalid = missingAlias || invalidString || nullValue || duplicateEnum || duplicateString;
+            bool invalid = entryValidation.IsInvalid;
 
             if (Event.current.type == EventType.Repaint)
             {
@@ -221,7 +221,7 @@ namespace ES
             Rect actionsRect;
             if (wide)
             {
-                GetWideColumns(rect, out Rect enumRect, out Rect stringRect, out Rect valueRect, out actionsRect);
+                GetWideColumns(rect, settings.AllowReorder, out Rect enumRect, out Rect stringRect, out Rect valueRect, out actionsRect);
                 DrawEnumCell(enumRect, hasEnum, enumKey);
                 EditorGUI.PropertyField(stringRect, stringKey, GUIContent.none, false);
                 EditorGUI.PropertyField(valueRect, value, GUIContent.none, true);
@@ -239,7 +239,11 @@ namespace ES
                 DrawEnumCell(enumRect, hasEnum, enumKey);
                 EditorGUI.PropertyField(stringRect, stringKey, GUIContent.none, false);
 
-                Rect valueRect = new Rect(rect.x, rect.y + line + EditorGUIUtility.standardVerticalSpacing, rect.width, line);
+                Rect valueRect = new Rect(
+                    rect.x,
+                    rect.y + line + EditorGUIUtility.standardVerticalSpacing,
+                    rect.width,
+                    rect.height - line - EditorGUIUtility.standardVerticalSpacing);
                 EditorGUI.PropertyField(valueRect, value, GUIContent.none, true);
             }
 
@@ -247,7 +251,7 @@ namespace ES
 
             if (invalid && Event.current.type == EventType.Repaint)
             {
-                string tooltip = BuildProblemTooltip(missingAlias, invalidString, nullValue, duplicateEnum, duplicateString);
+                string tooltip = BuildProblemTooltip(entryValidation);
                 EditorGUI.LabelField(rect, new GUIContent(string.Empty, tooltip));
             }
         }
@@ -271,19 +275,23 @@ namespace ES
             bool allowReorder)
         {
             float x = rect.x;
-            using (new EditorGUI.DisabledScope(!allowReorder || index <= 0))
+            if (allowReorder)
             {
-                if (GUI.Button(new Rect(x, rect.y, ActionWidth, EditorGUIUtility.singleLineHeight), "↑", EditorStyles.miniButtonLeft))
-                    MoveEntry(entries, index, index - 1);
+                using (new EditorGUI.DisabledScope(index <= 0))
+                {
+                    if (GUI.Button(new Rect(x, rect.y, ActionWidth, EditorGUIUtility.singleLineHeight), "↑", EditorStyles.miniButtonLeft))
+                        MoveEntry(entries, index, index - 1);
+                }
+                x += ActionWidth;
+                using (new EditorGUI.DisabledScope(index >= entries.arraySize - 1))
+                {
+                    if (GUI.Button(new Rect(x, rect.y, ActionWidth, EditorGUIUtility.singleLineHeight), "↓", EditorStyles.miniButtonMid))
+                        MoveEntry(entries, index, index + 1);
+                }
+                x += ActionWidth;
             }
-            x += ActionWidth;
-            using (new EditorGUI.DisabledScope(!allowReorder || index >= entries.arraySize - 1))
-            {
-                if (GUI.Button(new Rect(x, rect.y, ActionWidth, EditorGUIUtility.singleLineHeight), "↓", EditorStyles.miniButtonMid))
-                    MoveEntry(entries, index, index + 1);
-            }
-            x += ActionWidth;
-            if (GUI.Button(new Rect(x, rect.y, ActionWidth, EditorGUIUtility.singleLineHeight), "×", EditorStyles.miniButtonRight))
+            GUIStyle removeStyle = allowReorder ? EditorStyles.miniButtonRight : EditorStyles.miniButton;
+            if (GUI.Button(new Rect(x, rect.y, ActionWidth, EditorGUIUtility.singleLineHeight), "×", removeStyle))
                 DeleteEntry(entries, index);
         }
 
@@ -291,11 +299,11 @@ namespace ES
             Rect rect,
             SerializedProperty property,
             SerializedProperty entries,
-            ESEnumStringTableAttribute settings)
+            ESEnumStringTableAttribute settings,
+            int invalidCount)
         {
             Rect statusRect = rect;
             statusRect.width -= 128f;
-            int invalidCount = CountInvalidEntries(entries);
             EditorGUI.LabelField(
                 statusRect,
                 invalidCount == 0 ? "映射结构有效" : invalidCount + " 个条目需要修复",
@@ -331,12 +339,15 @@ namespace ES
             SerializedProperty stringKey = entry.FindPropertyRelative("stringKey");
             SerializedProperty value = entry.FindPropertyRelative("value");
 
-            hasEnum.boolValue = mode != ESEnumStringTableNewEntryMode.StringOnly;
-            if (enumKey.propertyType == SerializedPropertyType.Enum)
-                enumKey.enumValueIndex = 0;
-            stringKey.stringValue = mode == ESEnumStringTableNewEntryMode.EnumOnly ? string.Empty : CreateUniqueStringKey(entries, index);
-            ResetValue(value);
+            bool wantsEnum = mode != ESEnumStringTableNewEntryMode.StringOnly;
+            bool hasAvailableEnum = wantsEnum && TryAssignFirstUnusedEnum(entries, enumKey, index);
+            hasEnum.boolValue = hasAvailableEnum;
+            bool needsString = mode != ESEnumStringTableNewEntryMode.EnumOnly || !hasAvailableEnum;
+            stringKey.stringValue = needsString ? CreateUniqueStringKey(entries, index) : string.Empty;
+            ClearProperty(value);
             entries.serializedObject.ApplyModifiedProperties();
+            GUI.changed = true;
+            GUIUtility.ExitGUI();
         }
 
         private static void DeleteEntry(SerializedProperty entries, int index)
@@ -344,6 +355,7 @@ namespace ES
             entries.DeleteArrayElementAtIndex(index);
             entries.serializedObject.ApplyModifiedProperties();
             GUI.changed = true;
+            GUIUtility.ExitGUI();
         }
 
         private static void MoveEntry(SerializedProperty entries, int from, int to)
@@ -351,27 +363,73 @@ namespace ES
             entries.MoveArrayElement(from, to);
             entries.serializedObject.ApplyModifiedProperties();
             GUI.changed = true;
+            GUIUtility.ExitGUI();
         }
 
-        private static void ResetValue(SerializedProperty value)
+        private static void ClearProperty(SerializedProperty property)
         {
-            switch (value.propertyType)
+            if (property == null)
+                return;
+
+            switch (property.propertyType)
             {
                 case SerializedPropertyType.ObjectReference:
-                    value.objectReferenceValue = null;
+                    property.objectReferenceValue = null;
                     break;
                 case SerializedPropertyType.String:
-                    value.stringValue = string.Empty;
+                    property.stringValue = string.Empty;
                     break;
                 case SerializedPropertyType.Boolean:
-                    value.boolValue = false;
+                    property.boolValue = false;
                     break;
                 case SerializedPropertyType.Integer:
                 case SerializedPropertyType.Enum:
-                    value.intValue = 0;
+                    property.intValue = 0;
                     break;
                 case SerializedPropertyType.Float:
-                    value.floatValue = 0f;
+                    property.floatValue = 0f;
+                    break;
+                case SerializedPropertyType.Color:
+                    property.colorValue = default;
+                    break;
+                case SerializedPropertyType.Vector2:
+                    property.vector2Value = default;
+                    break;
+                case SerializedPropertyType.Vector3:
+                    property.vector3Value = default;
+                    break;
+                case SerializedPropertyType.Vector4:
+                    property.vector4Value = default;
+                    break;
+                case SerializedPropertyType.Rect:
+                    property.rectValue = default;
+                    break;
+                case SerializedPropertyType.Bounds:
+                    property.boundsValue = default;
+                    break;
+                case SerializedPropertyType.Quaternion:
+                    property.quaternionValue = Quaternion.identity;
+                    break;
+                case SerializedPropertyType.AnimationCurve:
+                    property.animationCurveValue = new AnimationCurve();
+                    break;
+                case SerializedPropertyType.ManagedReference:
+                    property.managedReferenceValue = null;
+                    break;
+                case SerializedPropertyType.Generic:
+                    if (property.isArray && property.propertyType != SerializedPropertyType.String)
+                    {
+                        property.arraySize = 0;
+                        break;
+                    }
+                    SerializedProperty iterator = property.Copy();
+                    SerializedProperty end = iterator.GetEndProperty();
+                    bool enterChildren = true;
+                    while (iterator.NextVisible(enterChildren) && !SerializedProperty.EqualContents(iterator, end))
+                    {
+                        enterChildren = false;
+                        ClearProperty(iterator);
+                    }
                     break;
             }
         }
@@ -384,6 +442,41 @@ namespace ES
             while (HasString(entries, candidate, ignoredIndex))
                 candidate = baseKey + "." + suffix++;
             return candidate;
+        }
+
+        private static bool TryAssignFirstUnusedEnum(
+            SerializedProperty entries,
+            SerializedProperty enumKey,
+            int ignoredIndex)
+        {
+            if (enumKey == null || enumKey.propertyType != SerializedPropertyType.Enum)
+                return false;
+
+            int optionCount = enumKey.enumNames.Length;
+            for (int option = 0; option < optionCount; option++)
+            {
+                bool used = false;
+                for (int index = 0; index < entries.arraySize; index++)
+                {
+                    if (index == ignoredIndex)
+                        continue;
+                    SerializedProperty entry = entries.GetArrayElementAtIndex(index);
+                    SerializedProperty otherHasEnum = entry.FindPropertyRelative("hasEnumKey");
+                    SerializedProperty otherEnum = entry.FindPropertyRelative("enumKey");
+                    if (otherHasEnum.boolValue && otherEnum.enumValueIndex == option)
+                    {
+                        used = true;
+                        break;
+                    }
+                }
+
+                if (used)
+                    continue;
+                enumKey.enumValueIndex = option;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool MatchesSearch(SerializedProperty entry, string search)
@@ -438,9 +531,26 @@ namespace ES
             return count;
         }
 
-        private static int CountInvalidEntries(SerializedProperty entries)
+        private void RebuildValidation(SerializedProperty entries)
         {
-            int count = 0;
+            enumKeys.Clear();
+            duplicateEnumKeys.Clear();
+            stringKeys.Clear();
+            duplicateStringKeys.Clear();
+            validation.Clear();
+
+            for (int index = 0; index < entries.arraySize; index++)
+            {
+                SerializedProperty entry = entries.GetArrayElementAtIndex(index);
+                SerializedProperty hasEnum = entry.FindPropertyRelative("hasEnumKey");
+                SerializedProperty enumKey = entry.FindPropertyRelative("enumKey");
+                SerializedProperty stringKey = entry.FindPropertyRelative("stringKey");
+                if (hasEnum.boolValue && !enumKeys.Add(enumKey.longValue))
+                    duplicateEnumKeys.Add(enumKey.longValue);
+                if (!string.IsNullOrEmpty(stringKey.stringValue) && !stringKeys.Add(stringKey.stringValue))
+                    duplicateStringKeys.Add(stringKey.stringValue);
+            }
+
             for (int index = 0; index < entries.arraySize; index++)
             {
                 SerializedProperty entry = entries.GetArrayElementAtIndex(index);
@@ -449,36 +559,26 @@ namespace ES
                 SerializedProperty stringKey = entry.FindPropertyRelative("stringKey");
                 SerializedProperty value = entry.FindPropertyRelative("value");
                 bool hasString = !string.IsNullOrEmpty(stringKey.stringValue);
-                if ((!hasEnum.boolValue && !hasString)
-                    || (hasString && stringKey.stringValue != stringKey.stringValue.Trim())
-                    || IsNullObjectReference(value)
-                    || (hasEnum.boolValue && HasDuplicateEnum(entries, enumKey, index))
-                    || (hasString && HasDuplicateString(entries, stringKey.stringValue, index)))
+                validation.Add(new EntryValidation(
+                    !hasEnum.boolValue && !hasString,
+                    hasString && !string.Equals(stringKey.stringValue, stringKey.stringValue.Trim(), StringComparison.Ordinal),
+                    IsNullObjectReference(value),
+                    hasEnum.boolValue && duplicateEnumKeys.Contains(enumKey.longValue),
+                    hasString && duplicateStringKeys.Contains(stringKey.stringValue)));
+            }
+        }
+
+        private int CountInvalidEntries()
+        {
+            int count = 0;
+            for (int index = 0; index < validation.Count; index++)
+            {
+                if (validation[index].IsInvalid)
                 {
                     count++;
                 }
             }
             return count;
-        }
-
-        private static bool HasDuplicateEnum(SerializedProperty entries, SerializedProperty enumKey, int ignoredIndex)
-        {
-            for (int index = 0; index < entries.arraySize; index++)
-            {
-                if (index == ignoredIndex)
-                    continue;
-                SerializedProperty entry = entries.GetArrayElementAtIndex(index);
-                SerializedProperty otherHasEnum = entry.FindPropertyRelative("hasEnumKey");
-                SerializedProperty otherEnum = entry.FindPropertyRelative("enumKey");
-                if (otherHasEnum.boolValue && otherEnum.intValue == enumKey.intValue)
-                    return true;
-            }
-            return false;
-        }
-
-        private static bool HasDuplicateString(SerializedProperty entries, string key, int ignoredIndex)
-        {
-            return HasString(entries, key, ignoredIndex);
         }
 
         private static bool HasString(SerializedProperty entries, string key, int ignoredIndex)
@@ -502,30 +602,26 @@ namespace ES
                    && value.objectReferenceValue == null;
         }
 
-        private static string BuildProblemTooltip(
-            bool missingAlias,
-            bool invalidString,
-            bool nullValue,
-            bool duplicateEnum,
-            bool duplicateString)
+        private static string BuildProblemTooltip(EntryValidation entryValidation)
         {
             var problems = new List<string>(5);
-            if (missingAlias) problems.Add("至少需要一个 Key");
-            if (invalidString) problems.Add("String Key 前后不能有空白");
-            if (nullValue) problems.Add("Value 不能为空");
-            if (duplicateEnum) problems.Add("Enum Key 重复");
-            if (duplicateString) problems.Add("String Key 重复");
+            if (entryValidation.MissingAlias) problems.Add("至少需要一个 Key");
+            if (entryValidation.InvalidString) problems.Add("String Key 前后不能有空白");
+            if (entryValidation.NullValue) problems.Add("Value 不能为空");
+            if (entryValidation.DuplicateEnum) problems.Add("Enum Key 重复");
+            if (entryValidation.DuplicateString) problems.Add("String Key 重复");
             return string.Join("；", problems);
         }
 
         private static void GetWideColumns(
             Rect rect,
+            bool allowReorder,
             out Rect enumRect,
             out Rect stringRect,
             out Rect valueRect,
             out Rect actionsRect)
         {
-            float actionsWidth = GetActionsWidth(true);
+            float actionsWidth = GetActionsWidth(allowReorder);
             float usable = rect.width - actionsWidth - CellGap * 3f;
             float enumWidth = usable * 0.27f;
             float stringWidth = usable * 0.31f;
@@ -552,21 +648,23 @@ namespace ES
             return attribute as ESEnumStringTableAttribute ?? new ESEnumStringTableAttribute();
         }
 
-        private static string GetSearch(SerializedProperty property, ESEnumStringTableAttribute settings)
+        private string GetSearch(SerializedProperty property, ESEnumStringTableAttribute settings)
         {
             if (!settings.Searchable)
                 return string.Empty;
             string key = BuildSearchKey(property);
-            return SearchByProperty.TryGetValue(key, out string search) ? search : string.Empty;
+            if (!string.Equals(searchPropertyKey, key, StringComparison.Ordinal))
+            {
+                searchPropertyKey = key;
+                searchText = string.Empty;
+            }
+            return searchText;
         }
 
-        private static void SetSearch(SerializedProperty property, string search)
+        private void SetSearch(SerializedProperty property, string search)
         {
-            string key = BuildSearchKey(property);
-            if (string.IsNullOrEmpty(search))
-                SearchByProperty.Remove(key);
-            else
-                SearchByProperty[key] = search;
+            searchPropertyKey = BuildSearchKey(property);
+            searchText = search ?? string.Empty;
         }
 
         private static string BuildSearchKey(SerializedProperty property)
@@ -595,6 +693,35 @@ namespace ES
             {
                 alignment = TextAnchor.MiddleCenter
             };
+        }
+
+        private readonly struct EntryValidation
+        {
+            public readonly bool MissingAlias;
+            public readonly bool InvalidString;
+            public readonly bool NullValue;
+            public readonly bool DuplicateEnum;
+            public readonly bool DuplicateString;
+
+            public bool IsInvalid => MissingAlias
+                                     || InvalidString
+                                     || NullValue
+                                     || DuplicateEnum
+                                     || DuplicateString;
+
+            public EntryValidation(
+                bool missingAlias,
+                bool invalidString,
+                bool nullValue,
+                bool duplicateEnum,
+                bool duplicateString)
+            {
+                MissingAlias = missingAlias;
+                InvalidString = invalidString;
+                NullValue = nullValue;
+                DuplicateEnum = duplicateEnum;
+                DuplicateString = duplicateString;
+            }
         }
     }
 }

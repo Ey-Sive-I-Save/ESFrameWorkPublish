@@ -148,6 +148,13 @@ namespace ES.Tests
             Assert.That(field.FieldType, Is.EqualTo(typeof(EntityTransformMap)));
             Assert.That(field.IsDefined(typeof(SerializeField), false), Is.True);
 
+            ESEnumStringTableAttribute table = field.GetCustomAttribute<ESEnumStringTableAttribute>();
+            Assert.That(table, Is.Not.Null);
+            Assert.That(table.EnumColumn, Is.EqualTo("固定挂点"));
+            Assert.That(table.StringColumn, Is.EqualTo("稳定 String Key"));
+            Assert.That(table.ValueColumn, Is.EqualTo("Transform"));
+            Assert.That(table.NewEntryMode, Is.EqualTo(ESEnumStringTableNewEntryMode.EnumAndString));
+
             object[] attributes = field.GetCustomAttributes(false);
             for (int i = 0; i < attributes.Length; i++)
             {
@@ -155,6 +162,29 @@ namespace ES.Tests
                     attributes[i].GetType().FullName,
                     Is.Not.EqualTo("Sirenix.Serialization.OdinSerializeAttribute"));
             }
+        }
+
+        [Test]
+        public void TableDrawerContract_UsesTheExistingUnityEntryAuthority()
+        {
+            GameObject root = CreateObject("EntityTransformTableContract");
+            root.AddComponent<Entity>();
+            root.AddComponent<EntityTransformMapping>();
+
+            var serializedObject = new SerializedObject(root.GetComponent<EntityTransformMapping>());
+            SerializedProperty table = serializedObject.FindProperty("transformMappings");
+            SerializedProperty entries = table?.FindPropertyRelative("entries");
+
+            Assert.That(table, Is.Not.Null);
+            Assert.That(entries, Is.Not.Null);
+            Assert.That(entries.isArray, Is.True);
+
+            entries.InsertArrayElementAtIndex(0);
+            SerializedProperty entry = entries.GetArrayElementAtIndex(0);
+            Assert.That(entry.FindPropertyRelative("hasEnumKey"), Is.Not.Null);
+            Assert.That(entry.FindPropertyRelative("enumKey"), Is.Not.Null);
+            Assert.That(entry.FindPropertyRelative("stringKey"), Is.Not.Null);
+            Assert.That(entry.FindPropertyRelative("value"), Is.Not.Null);
         }
 
         [Test]

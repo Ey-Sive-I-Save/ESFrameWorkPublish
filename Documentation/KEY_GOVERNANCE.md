@@ -57,7 +57,7 @@
 - `ESInputSchemeCatalog` validates built-in scheme Enum/String aliases and registered extension schemes. Scheme RuntimeKeys are process-local only; player profiles keep the stable scheme StringKey.
 - `ESInputActionCatalog` validates input action aliases, declared scheme references, and globally unique rebind binding ids. The existing zero-based `ESInputActionId` remains a HotSlot index; Catalog uses a reversible non-zero stable EnumKey, so `Move(0)` cannot be confused with an absent key.
 - `ESInputBindingProfile` persists its `Input.Config` StringKey plus Scheme/Action SchemaHash. A profile from another config or schema is rejected. A legacy profile without those fields is upgraded only when every enabled override still resolves to the exact current binding/action/scheme; it never receives a guessed remap.
-- `【ES】/项目设置/GameCore/审计项目稳定Key治理` writes `Documentation/KEY_AUDIT_REPORT.md`. It lists loaded GameCore, Attribute, and Tag catalogs structurally, then reports direct source literals and project-owned string dictionaries as either known local containers or review candidates.
+- `【ES】/项目配置/GameCore/审计项目稳定Key治理` writes `Documentation/KEY_AUDIT_REPORT.md`. It lists loaded GameCore, Attribute, and Tag catalogs structurally, then reports direct source literals and project-owned string dictionaries as either known local containers or review candidates.
 
 ## Explicit Local-Key Boundaries
 

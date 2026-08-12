@@ -30,7 +30,7 @@ GameCoreEditorGlobalData（角色属性 / 物品属性）
 
 ## 配置
 
-策划只打开 `【ES】/项目设置/GameCore/编辑器全局数据`，在“角色属性”或“物品属性”分区直接配置 `ESSuperFloatAttributeDefinition`：
+策划只打开 `【ES】/项目配置/GameCore/打开或创建GameCore编辑器全局数据`，在“角色属性”或“物品属性”分区直接配置 `ESSuperFloatAttributeDefinition`：
 
 | 字段 | 含义 |
 | --- | --- |
@@ -44,7 +44,7 @@ GameCoreEditorGlobalData（角色属性 / 物品属性）
 
 公式字段当前必须为空。需要动态数值时，由 Buff、装备、区域或业务系统在运行时写入 ValueChange；禁止把不可审计的公式字符串塞进定义。
 
-普通属性直接执行 `【ES】/项目设置/GameCore/Bake并应用GameCore Catalog`。固定角色属性仅在结构变化时才需要先执行 `【ES】/项目设置/GameCore/生成角色固定属性代码`：新增、删除或重命名 `fixedApiName`，修改其 Float/Permit 类型、稳定 EnumKey/StringKey，或改变实际固定槽位顺序。基础值、范围、显示名、公式、迁移键和 Buff 绑定仍是纯 GameCore 配置，直接 Bake，不触发 C# 生成或 Unity 编译。Bake 会完整比较确定性生成源码；该源码只投影固定 API 结构，因此普通配置不会造成过期，任何枚举、数组或映射代码篡改都会被拒绝并保留旧产物。随后系统验证 Tag、角色属性、物品属性和所有 Buff 的 Tag/属性绑定，再同时更新只读 Bake 产物与两个 Consumer 根。运行时加载的是 `ESAttributeCatalogGameCore`，绝不读取 `GameCoreEditorGlobalData`。
+普通属性直接执行 `【ES】/项目配置/GameCore/Bake并应用GameCore Catalog`。固定角色属性仅在结构变化时才需要先执行 `【ES】/项目配置/GameCore/生成角色固定属性代码`：新增、删除或重命名 `fixedApiName`，修改其 Float/Permit 类型、稳定 EnumKey/StringKey，或改变实际固定槽位顺序。基础值、范围、显示名、公式、迁移键和 Buff 绑定仍是纯 GameCore 配置，直接 Bake，不触发 C# 生成或 Unity 编译。Bake 会完整比较确定性生成源码；该源码只投影固定 API 结构，因此普通配置不会造成过期，任何枚举、数组或映射代码篡改都会被拒绝并保留旧产物。随后系统验证 Tag、角色属性、物品属性和所有 Buff 的 Tag/属性绑定，再同时更新只读 Bake 产物与两个 Consumer 根。运行时加载的是 `ESAttributeCatalogGameCore`，绝不读取 `GameCoreEditorGlobalData`。
 
 框架升级新增内建固定角色属性时，执行“补齐角色与物品属性表”会把编译投影中的缺失稳定身份添加进旧 GameCore 资产，并可为已识别旧内建行补齐空的 `fixedApiName`。它不改写已有策划值、范围、公式、显示名、Storage 或非空访问名；补入固定 API 结构后才需要生成代码并 Bake。它服务代码版本兼容，不是第二份策划 Schema，更不能用代码覆盖基础值、范围、显示名或 Storage。
 
@@ -134,7 +134,7 @@ entity.TryGetFloatStatDebugSnapshot(enumKey, stringKey, fallbackBase, out snapsh
 entity.CopyFloatStatDebugEntriesTo(entries);
 ```
 
-它们不会为了显示面板实例化未受修正的 Hot/Sparse Stat。Unity 编辑器入口为 `【ES】/运行时诊断/属性系统/运行时面板`：选中运行中的 Entity 后显示稳定 Key、诊断 RuntimeKey、存储策略、Base/Final、阶段数值、上下界和所有活动修正明细。该窗口只读，不允许反向修改游戏状态。
+它们不会为了显示面板实例化未受修正的 Hot/Sparse Stat。Unity 编辑器入口为 `【ES】/验证与诊断/运行时监视/属性系统/打开运行时面板`：选中运行中的 Entity 后显示稳定 Key、诊断 RuntimeKey、存储策略、Base/Final、阶段数值、上下界和所有活动修正明细。该窗口只读，不允许反向修改游戏状态。
 
 ## 性能边界
 

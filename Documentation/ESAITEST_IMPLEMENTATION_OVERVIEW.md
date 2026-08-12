@@ -276,10 +276,10 @@ Application.persistentDataPath/ESAITest/<runId>/
 ### 方式一：Unity 菜单
 
 ```text
-【ES】/自动化/ESAITest/控制中心
-【ES】/自动化/ESAITest/直接启动 ESTEST
-【ES】/自动化/ESAITest/中断当前 ESTEST
-【ES】/自动化/ESAITest/收集 Player 报告
+【ES】/自动化与开发/自动化中心/ESAITest/控制中心
+【ES】/自动化与开发/自动化中心/ESAITest/直接启动 ESTEST
+【ES】/自动化与开发/自动化中心/ESAITest/中断当前 ESTEST
+【ES】/自动化与开发/自动化中心/ESAITest/收集 Player 报告
 ```
 
 控制中心可以选择 Plan JSON、进入 PlayMode 并启动、查看当前 Run、取消运行，以及查看 Editor 作者侧 Capability 清单。
@@ -397,4 +397,3 @@ attention.snapshot
 在这些证据完成前，最准确的表述仍是：
 
 > ESAITest 已形成受控 AI 游戏测试的完整源码纵向切片，具备确定性执行、证据关联、注意力观察、正式输入接入、自然语言治理和外部 Agent 桥；当前仍处于运行与发布验收阶段，不能宣称 Stable。
-

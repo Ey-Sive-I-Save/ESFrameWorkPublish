@@ -897,6 +897,98 @@ namespace ES.Tests
         }
 
         [Test]
+        public void SemiSleepTileOnlyCollapsesWhenItTouchesAWorkAreaEdge()
+        {
+            var workArea = new Rect(-1600f, 40f, 1600f, 900f);
+            Assert.IsFalse(ESEditorPresentation.TryEvaluateEdgeTab(
+                new Rect(-900f, 400f, 100f, 100f),
+                workArea,
+                out _,
+                out _,
+                out _));
+
+            Assert.IsTrue(ESEditorPresentation.TryEvaluateEdgeTab(
+                new Rect(-100f, 360f, 100f, 100f),
+                workArea,
+                out ESEditorPresentation.ESWindowEdge edge,
+                out float offset,
+                out Rect collapsed));
+            Assert.AreEqual(ESEditorPresentation.ESWindowEdge.Right, edge);
+            Assert.GreaterOrEqual(offset, 0f);
+            Assert.AreEqual(workArea.xMax, collapsed.xMax, 0.001f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabCollapsedLength, collapsed.width, 0.001f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabThickness, collapsed.height, 0.001f);
+        }
+
+        [Test]
+        public void EdgeTabHoverExtendsInwardWithoutChangingItsScreenEdge()
+        {
+            var workArea = new Rect(100f, 80f, 1200f, 800f);
+            const float offset = 240f;
+            Rect collapsed = ESEditorPresentation.EvaluateEdgeTabBounds(
+                workArea,
+                ESEditorPresentation.ESWindowEdge.Left,
+                offset,
+                0f);
+            Rect expanded = ESEditorPresentation.EvaluateEdgeTabBounds(
+                workArea,
+                ESEditorPresentation.ESWindowEdge.Left,
+                offset,
+                1f);
+
+            Assert.AreEqual(workArea.xMin, collapsed.xMin, 0.001f);
+            Assert.AreEqual(workArea.xMin, expanded.xMin, 0.001f);
+            Assert.AreEqual(collapsed.y, expanded.y, 0.001f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabCollapsedLength, collapsed.width, 0.001f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabExpandedLength, expanded.width, 0.001f);
+
+            Rect bottom = ESEditorPresentation.EvaluateEdgeTabBounds(
+                workArea,
+                ESEditorPresentation.ESWindowEdge.Bottom,
+                offset,
+                1f);
+            Assert.AreEqual(workArea.yMax, bottom.yMax, 0.001f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabExpandedLength, bottom.width, 0.001f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabThickness, bottom.height, 0.001f);
+        }
+
+        [Test]
+        public void SemiSleepStateMachineExposesInteractionHoldAndExplicitVisualStates()
+        {
+            CollectionAssert.AreEquivalent(
+                new[] { "ActivePanel", "SleepTile", "EdgeTab", "EdgeTabHover" },
+                Enum.GetNames(typeof(ESWindowVisualState)));
+            Assert.AreEqual(0.5f, ESEditorPresentation.EdgeTabHoverCommitDelay, 0.001f);
+            Assert.IsFalse(ESEditorPresentation.ShouldRestoreEdgeTabToTile(10d, 10.49d, true));
+            Assert.IsTrue(ESEditorPresentation.ShouldRestoreEdgeTabToTile(10d, 10.5d, true));
+            Assert.IsFalse(ESEditorPresentation.ShouldRestoreEdgeTabToTile(10d, 11d, false));
+            Assert.IsTrue(ESEditorPresentation.ShouldPauseAutomaticCollection(
+                false, false, 0, false, false, true, false));
+            Assert.IsTrue(ESEditorPresentation.ShouldPauseAutomaticCollection(
+                true, false, 0, false, false, false, false));
+            Assert.IsFalse(ESEditorPresentation.ShouldPauseAutomaticCollection(
+                false, false, 0, false, false, false, false));
+            Assert.IsNotNull(typeof(ESEditorPresentation).GetMethod(
+                "BeginWindowInteractionHold",
+                BindingFlags.Static | BindingFlags.Public));
+            Assert.AreEqual(
+                typeof(ESWindowVisualState),
+                typeof(ESEditorPresentation).GetMethod(
+                    "GetWindowVisualState",
+                    BindingFlags.Static | BindingFlags.Public)?.ReturnType);
+            Assert.AreEqual(
+                typeof(IDisposable),
+                typeof(ESWindowFoundation).GetMethod(
+                    "HoldInteraction",
+                    BindingFlags.Static | BindingFlags.Public)?.ReturnType);
+            Assert.AreEqual(
+                typeof(ESWindowVisualState),
+                typeof(ESWindowFoundation).GetMethod(
+                    "GetVisualState",
+                    BindingFlags.Static | BindingFlags.Public)?.ReturnType);
+        }
+
+        [Test]
         public void SemiSleepPublicCommandsExposeIndependentControlSurface()
         {
             Type presentation = typeof(ESEditorPresentation);

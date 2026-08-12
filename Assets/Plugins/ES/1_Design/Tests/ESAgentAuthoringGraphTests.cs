@@ -2944,6 +2944,147 @@ namespace ES.EditorInternal.Tests
             Assert.That(ESAISkillExecutionCoordinator.NormalizeTaskFailureStatus(input), Is.EqualTo(expected));
         }
 
+        [TestCase(0, true)]
+        [TestCase(7, true)]
+        [TestCase(8, false)]
+        [TestCase(-1, false)]
+        public void AISkillExecution_SkillCallDepthHasClosedMaximumBoundary(int depth, bool expected)
+        {
+            Assert.That(ESAISkillExecutionCoordinator.CanEnterSkillCall(depth), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void AISkillExecution_AncestorGraphDetectionRejectsSelfAndIndirectRecursion()
+        {
+            string graphA = ESGraphIdentity.NewId();
+            string graphB = ESGraphIdentity.NewId();
+            string graphC = ESGraphIdentity.NewId();
+            string[] ancestors = { graphA, graphB };
+
+            Assert.That(ESAISkillExecutionCoordinator.ContainsAncestorGraph(ancestors, graphA), Is.True);
+            Assert.That(ESAISkillExecutionCoordinator.ContainsAncestorGraph(ancestors, graphB), Is.True);
+            Assert.That(ESAISkillExecutionCoordinator.ContainsAncestorGraph(ancestors, graphC), Is.False);
+            Assert.That(ESAISkillExecutionCoordinator.ContainsAncestorGraph(null, graphA), Is.False);
+        }
+
+        [Test]
+        public void AISkillExecution_ChildApprovalProjectionIsMonotonicAndRejectsStaleGeneration()
+        {
+            var parent = new ESAISkillWorkflowRun { approvalGeneration = 4, status = "Running" };
+            var callRecord = new ESAISkillStepRunRecord();
+            var child = new ESAISkillWorkflowRun
+            {
+                status = "WaitingApproval",
+                approvalGeneration = 2,
+                message = "第一处确认"
+            };
+
+            ESAISkillExecutionCoordinator.ProjectChildApproval(parent, callRecord, child);
+            Assert.That(parent.status, Is.EqualTo("WaitingApproval"));
+            Assert.That(parent.approvalGeneration, Is.EqualTo(5));
+            Assert.That(callRecord.childApprovalGeneration, Is.EqualTo(2));
+            Assert.That(ESAISkillExecutionCoordinator.IsProjectedChildApprovalCurrent(callRecord, child),
+                Is.True);
+
+            ESAISkillExecutionCoordinator.ProjectChildApproval(parent, callRecord, child);
+            Assert.That(parent.approvalGeneration, Is.EqualTo(5), "重复轮询不得生成新父代际。");
+
+            child.approvalGeneration = 3;
+            Assert.That(ESAISkillExecutionCoordinator.IsProjectedChildApprovalCurrent(callRecord, child),
+                Is.False, "旧父界面不得批准子图的新一代确认。");
+            ESAISkillExecutionCoordinator.ProjectChildApproval(parent, callRecord, child);
+            Assert.That(parent.approvalGeneration, Is.EqualTo(6));
+            Assert.That(callRecord.childApprovalGeneration, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void AISkillExecution_ExecutionSpecHashRejectsPersistedStepMutation()
+        {
+            ESAISkillExecutionSpec spec = CreateIntegritySpec();
+            string original = ESAISkillExecutionCoordinator.ComputeExecutionSpecHash(spec);
+
+            spec.steps[0].title = "被改写的持久化步骤";
+
+            Assert.That(ESAISkillExecutionCoordinator.ComputeExecutionSpecHash(spec),
+                Is.Not.EqualTo(original));
+        }
+
+        [Test]
+        public void AISkillExecution_RunStateHashRejectsCursorMutation()
+        {
+            ESAISkillExecutionSpec spec = CreateIntegritySpec();
+            var run = new ESAISkillWorkflowRun
+            {
+                runId = Guid.NewGuid().ToString("N"),
+                graphId = spec.sourceGraphId,
+                contentSignature = spec.sourceContentSignature,
+                executionSpecHash = ESAISkillExecutionCoordinator.ComputeExecutionSpecHash(spec),
+                currentNodeId = spec.steps[0].nodeId,
+                spec = spec,
+                steps = spec.steps.Select(step => new ESAISkillStepRunRecord
+                    { nodeId = step.nodeId }).ToList(),
+            };
+            string original = ESAISkillExecutionCoordinator.ComputeRunStateHash(run);
+
+            run.currentNodeId = ESGraphIdentity.NewId();
+
+            Assert.That(ESAISkillExecutionCoordinator.ComputeRunStateHash(run),
+                Is.Not.EqualTo(original));
+            Assert.That(ESAISkillExecutionCoordinator.TryValidateRunState(run, out string error),
+                Is.False);
+            Assert.That(error, Does.Contain("currentNodeId"));
+        }
+
+        [Test]
+        public void AISkillExecution_RunStateValidationRejectsForgedForEachCursorAndDuplicateItems()
+        {
+            ESAISkillExecutionSpec spec = CreateIntegritySpec();
+            var run = new ESAISkillWorkflowRun
+            {
+                runId = Guid.NewGuid().ToString("N"),
+                graphId = spec.sourceGraphId,
+                contentSignature = spec.sourceContentSignature,
+                currentNodeId = spec.steps[0].nodeId,
+                iterationNodeId = spec.steps[0].nodeId,
+                iterationTaskNodeId = spec.steps[1].nodeId,
+                iterationIndex = 1,
+                spec = spec,
+                steps = spec.steps.Select(step => new ESAISkillStepRunRecord
+                    { nodeId = step.nodeId }).ToList(),
+            };
+
+            Assert.That(ESAISkillExecutionCoordinator.TryValidateRunState(run, out string error),
+                Is.False);
+            Assert.That(error, Does.Contain("ForEach"));
+        }
+
+        private static ESAISkillExecutionSpec CreateIntegritySpec()
+        {
+            string entry = ESGraphIdentity.NewId();
+            string output = ESGraphIdentity.NewId();
+            return new ESAISkillExecutionSpec
+            {
+                sourceGraphId = ESGraphIdentity.NewId(),
+                sourceContentSignature = new string('a', 64),
+                entryNodeId = entry,
+                steps = new[]
+                {
+                    new ESAISkillExecutionStep
+                    {
+                        nodeId = entry,
+                        title = "输入",
+                        input = new ESAISkillInputPayload(),
+                    },
+                    new ESAISkillExecutionStep
+                    {
+                        nodeId = output,
+                        title = "输出",
+                        output = new ESAISkillOutputPayload(),
+                    },
+                },
+            };
+        }
+
         private static bool IsError(ESGraphValidationIssue issue) => issue != null && issue.severity == ESGraphValidationSeverity.Error;
         private static string Describe(IEnumerable<ESGraphValidationIssue> issues) => string.Join("\n", issues.Where(issue => issue != null).Select(issue => issue.code + ": " + issue.message));
     }

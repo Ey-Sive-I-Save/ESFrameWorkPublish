@@ -164,7 +164,7 @@ namespace ES.EditorInternal
                 {
                     JObject input = invocation?.input;
                     if (input == null) return ESAutomationTaskInvocationResult.Rejected("缺少 Graph AI 输入。");
-                    string invocationHash = ComputeInvocationHash(input);
+                    string invocationHash = ComputeStableInvocationHash(invocation);
                     string existingRecordPath = Path.Combine(ESAutomationPathPolicy.TempRoot,
                         runId, RunRecordFileName);
                     if (File.Exists(existingRecordPath))
@@ -172,7 +172,7 @@ namespace ES.EditorInternal
                         ESAutomationRunRecord existing = ReadRecord(existingRecordPath);
                         if (!string.Equals(existing.taskId, Descriptor.taskId, StringComparison.Ordinal)
                             || existing.taskVersion != Descriptor.taskVersion
-                            || !string.Equals(existing.inputManifestHash, invocationHash,
+                            || !string.Equals(existing.invocationHash, invocationHash,
                                 StringComparison.OrdinalIgnoreCase))
                             return ESAutomationTaskInvocationResult.Rejected(
                                 "InvocationId 已绑定其他任务或输入，拒绝重复派发。");
@@ -270,7 +270,8 @@ namespace ES.EditorInternal
                         workerVersion = WorkerVersion,
                         entrypointHash = EntrypointHash,
                         gitCommit = ESAutomationSourceState.GetCurrentGitCommit(),
-                        inputManifestHash = invocationHash,
+                        inputManifestHash = ComputeInvocationHash(input),
+                        invocationHash = invocationHash,
                         riskPolicyVersion = riskAcceptance?.policyVersion ?? 0,
                         riskAcceptanceHash = riskAcceptance?.acceptanceHash ?? string.Empty,
                         riskAcceptedAtUtc = riskAcceptance?.acceptedAtUtc ?? string.Empty,
@@ -373,8 +374,7 @@ namespace ES.EditorInternal
                     if (record == null) return ESAutomationTaskInvocationResult.Failed("Graph AI RunRecord 为空。", runId);
                     NormalizeRecordCollections(record);
                     if (ESAutomationRunStatus.IsTerminal(record.status))
-                        return ESAutomationTaskInvocationResult.Completed("Graph AI Run 已经结束：" + record.status, runId,
-                            JObject.FromObject(record));
+                        return GetRun(runId);
                     if (!ESCmdAgentWindow.TryCancelAutomationRun(runId, out string message))
                         return ESAutomationTaskInvocationResult.Failed("Graph AI 取消失败：" + message, runId);
                     record.findings.Add("取消请求者=" + (string.IsNullOrWhiteSpace(actorId) ? "editor.user" : actorId));
@@ -648,6 +648,19 @@ namespace ES.EditorInternal
 
         private static string ComputeInvocationHash(JObject input)
             => ComputeSha256(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(input ?? new JObject(), Formatting.None)));
+
+        private static string ComputeStableInvocationHash(ESAutomationTaskInvocation invocation)
+        {
+            var identity = new JObject
+            {
+                ["taskId"] = invocation?.taskId ?? string.Empty,
+                ["taskVersion"] = invocation?.taskVersion ?? 0,
+                ["preset"] = invocation?.preset ?? string.Empty,
+                ["dryRun"] = invocation?.dryRun ?? false,
+                ["input"] = invocation?.input?.DeepClone() ?? new JObject(),
+            };
+            return ComputeSha256(Encoding.UTF8.GetBytes(identity.ToString(Formatting.None)));
+        }
 
         private static string ToInvocationStatus(string status)
         {

@@ -39,7 +39,7 @@ namespace ES
             SerializedProperty denseRatio = property.FindPropertyRelative("denseEnumRatio");
             ESEnumStringTableAttribute settings = GetSettings();
             int visibleCount = CountVisibleEntries(entries, GetSearch(property, settings));
-            bool wide = EditorGUIUtility.currentViewWidth >= MinWideWidth;
+            bool wide = IsWideLayout();
 
             float height = line;
             if (settings.Searchable)
@@ -116,9 +116,10 @@ namespace ES
                 }
 
                 Rect headerRect = NextLine(ref content, line);
-                bool wide = position.width >= MinWideWidth;
+                bool wide = IsWideLayout();
                 DrawColumnHeader(headerRect, settings, wide);
                 RebuildValidation(entries);
+                bool valueChanged = false;
 
                 int visibleCount = 0;
                 for (int index = 0; index < entries.arraySize; index++)
@@ -136,7 +137,15 @@ namespace ES
                         ? Mathf.Max(line, valueHeight)
                         : line + EditorGUIUtility.standardVerticalSpacing + valueHeight;
                     Rect rowRect = NextLine(ref content, rowHeight);
-                    DrawEntryRow(rowRect, entries, entry, index, settings, wide, validation[index]);
+                    valueChanged |= DrawEntryRow(
+                        rowRect,
+                        property,
+                        entries,
+                        entry,
+                        index,
+                        settings,
+                        wide,
+                        validation[index]);
                 }
 
                 if (visibleCount == 0)
@@ -152,7 +161,14 @@ namespace ES
                 DrawFooter(footerRect, property, entries, settings, CountInvalidEntries());
 
                 if (settings.ShowAdvancedSettings)
+                {
+                    EditorGUI.BeginChangeCheck();
                     DrawAdvanced(ref content, property, line);
+                    valueChanged |= EditorGUI.EndChangeCheck();
+                }
+
+                if (valueChanged)
+                    CommitValueChange(property);
             }
         }
 
@@ -189,8 +205,9 @@ namespace ES
             EditorGUI.LabelField(valueRect, settings.ValueColumn, EditorStyles.miniBoldLabel);
         }
 
-        private static void DrawEntryRow(
+        private static bool DrawEntryRow(
             Rect rect,
+            SerializedProperty table,
             SerializedProperty entries,
             SerializedProperty entry,
             int index,
@@ -205,7 +222,7 @@ namespace ES
             if (hasEnum == null || enumKey == null || stringKey == null || value == null)
             {
                 EditorGUI.HelpBox(rect, "条目序列化结构不兼容。", MessageType.Error);
-                return;
+                return false;
             }
 
             bool invalid = entryValidation.IsInvalid;
@@ -219,6 +236,7 @@ namespace ES
             }
 
             Rect actionsRect;
+            EditorGUI.BeginChangeCheck();
             if (wide)
             {
                 GetWideColumns(rect, settings.AllowReorder, out Rect enumRect, out Rect stringRect, out Rect valueRect, out actionsRect);
@@ -246,14 +264,17 @@ namespace ES
                     rect.height - line - EditorGUIUtility.standardVerticalSpacing);
                 EditorGUI.PropertyField(valueRect, value, GUIContent.none, true);
             }
+            bool valueChanged = EditorGUI.EndChangeCheck();
 
-            DrawActions(actionsRect, entries, index, settings.AllowReorder);
+            DrawActions(actionsRect, table, entries, index, settings.AllowReorder);
 
             if (invalid && Event.current.type == EventType.Repaint)
             {
                 string tooltip = BuildProblemTooltip(entryValidation);
                 EditorGUI.LabelField(rect, new GUIContent(string.Empty, tooltip));
             }
+
+            return valueChanged;
         }
 
         private static void DrawEnumCell(Rect rect, SerializedProperty hasEnum, SerializedProperty enumKey)
@@ -270,6 +291,7 @@ namespace ES
 
         private static void DrawActions(
             Rect rect,
+            SerializedProperty table,
             SerializedProperty entries,
             int index,
             bool allowReorder)
@@ -280,19 +302,19 @@ namespace ES
                 using (new EditorGUI.DisabledScope(index <= 0))
                 {
                     if (GUI.Button(new Rect(x, rect.y, ActionWidth, EditorGUIUtility.singleLineHeight), "↑", EditorStyles.miniButtonLeft))
-                        MoveEntry(entries, index, index - 1);
+                        MoveEntry(table, entries, index, index - 1);
                 }
                 x += ActionWidth;
                 using (new EditorGUI.DisabledScope(index >= entries.arraySize - 1))
                 {
                     if (GUI.Button(new Rect(x, rect.y, ActionWidth, EditorGUIUtility.singleLineHeight), "↓", EditorStyles.miniButtonMid))
-                        MoveEntry(entries, index, index + 1);
+                        MoveEntry(table, entries, index, index + 1);
                 }
                 x += ActionWidth;
             }
             GUIStyle removeStyle = allowReorder ? EditorStyles.miniButtonRight : EditorStyles.miniButton;
             if (GUI.Button(new Rect(x, rect.y, ActionWidth, EditorGUIUtility.singleLineHeight), "×", removeStyle))
-                DeleteEntry(entries, index);
+                DeleteEntry(table, entries, index);
         }
 
         private static void DrawFooter(
@@ -313,7 +335,7 @@ namespace ES
             addRect.xMin = addRect.xMax - 124f;
             if (GUI.Button(addRect, "添加条目", EditorStyles.miniButton))
             {
-                AddEntry(entries, settings.NewEntryMode);
+                AddEntry(property, entries, settings.NewEntryMode);
                 property.isExpanded = true;
             }
         }
@@ -329,7 +351,10 @@ namespace ES
             EditorGUI.PropertyField(NextLine(ref content, line), denseRatio, new GUIContent("Dense Enum Ratio"));
         }
 
-        private static void AddEntry(SerializedProperty entries, ESEnumStringTableNewEntryMode mode)
+        private static void AddEntry(
+            SerializedProperty table,
+            SerializedProperty entries,
+            ESEnumStringTableNewEntryMode mode)
         {
             int index = entries.arraySize;
             entries.InsertArrayElementAtIndex(index);
@@ -345,25 +370,53 @@ namespace ES
             bool needsString = mode != ESEnumStringTableNewEntryMode.EnumOnly || !hasAvailableEnum;
             stringKey.stringValue = needsString ? CreateUniqueStringKey(entries, index) : string.Empty;
             ClearProperty(value);
-            entries.serializedObject.ApplyModifiedProperties();
-            GUI.changed = true;
-            GUIUtility.ExitGUI();
+            CommitStructuralChange(table);
         }
 
-        private static void DeleteEntry(SerializedProperty entries, int index)
+        private static void DeleteEntry(
+            SerializedProperty table,
+            SerializedProperty entries,
+            int index)
         {
             entries.DeleteArrayElementAtIndex(index);
-            entries.serializedObject.ApplyModifiedProperties();
+            CommitStructuralChange(table);
+        }
+
+        private static void MoveEntry(
+            SerializedProperty table,
+            SerializedProperty entries,
+            int from,
+            int to)
+        {
+            entries.MoveArrayElement(from, to);
+            CommitStructuralChange(table);
+        }
+
+        private static void CommitStructuralChange(SerializedProperty table)
+        {
+            IncrementSerializedRevision(table);
+            table.serializedObject.ApplyModifiedProperties();
             GUI.changed = true;
             GUIUtility.ExitGUI();
         }
 
-        private static void MoveEntry(SerializedProperty entries, int from, int to)
+        private static void CommitValueChange(SerializedProperty table)
         {
-            entries.MoveArrayElement(from, to);
-            entries.serializedObject.ApplyModifiedProperties();
+            IncrementSerializedRevision(table);
+            table.serializedObject.ApplyModifiedProperties();
             GUI.changed = true;
-            GUIUtility.ExitGUI();
+        }
+
+        private static void IncrementSerializedRevision(SerializedProperty table)
+        {
+            SerializedProperty revision = table.FindPropertyRelative("serializedRevision");
+            if (revision == null)
+                return;
+
+            unchecked
+            {
+                revision.intValue++;
+            }
         }
 
         private static void ClearProperty(SerializedProperty property)
@@ -384,6 +437,8 @@ namespace ES
                     break;
                 case SerializedPropertyType.Integer:
                 case SerializedPropertyType.Enum:
+                case SerializedPropertyType.LayerMask:
+                case SerializedPropertyType.Character:
                     property.intValue = 0;
                     break;
                 case SerializedPropertyType.Float:
@@ -401,17 +456,38 @@ namespace ES
                 case SerializedPropertyType.Vector4:
                     property.vector4Value = default;
                     break;
+                case SerializedPropertyType.Vector2Int:
+                    property.vector2IntValue = default;
+                    break;
+                case SerializedPropertyType.Vector3Int:
+                    property.vector3IntValue = default;
+                    break;
                 case SerializedPropertyType.Rect:
                     property.rectValue = default;
                     break;
+                case SerializedPropertyType.RectInt:
+                    property.rectIntValue = default;
+                    break;
                 case SerializedPropertyType.Bounds:
                     property.boundsValue = default;
+                    break;
+                case SerializedPropertyType.BoundsInt:
+                    property.boundsIntValue = default;
                     break;
                 case SerializedPropertyType.Quaternion:
                     property.quaternionValue = Quaternion.identity;
                     break;
                 case SerializedPropertyType.AnimationCurve:
                     property.animationCurveValue = new AnimationCurve();
+                    break;
+                case SerializedPropertyType.Gradient:
+                    property.gradientValue = new Gradient();
+                    break;
+                case SerializedPropertyType.ExposedReference:
+                    property.exposedReferenceValue = null;
+                    break;
+                case SerializedPropertyType.Hash128:
+                    property.hash128Value = default;
                     break;
                 case SerializedPropertyType.ManagedReference:
                     property.managedReferenceValue = null;
@@ -634,6 +710,11 @@ namespace ES
         private static float GetActionsWidth(bool allowReorder)
         {
             return allowReorder ? ActionWidth * 3f : ActionWidth;
+        }
+
+        private static bool IsWideLayout()
+        {
+            return EditorGUIUtility.currentViewWidth >= MinWideWidth;
         }
 
         private static Rect NextLine(ref Rect content, float height)

@@ -968,6 +968,22 @@ namespace ES.EditorInternal
     /// </summary>
     internal static class ESEditorPresentation
     {
+        internal enum ESWindowVisualState : byte
+        {
+            ActivePanel,
+            SleepTile,
+            EdgeTab,
+            EdgeTabHover
+        }
+
+        internal enum ESWindowEdge : byte
+        {
+            Left,
+            Right,
+            Top,
+            Bottom
+        }
+
         private static bool skinInitialized;
         private static bool cachedProSkin;
         private static int skinGeneration;
@@ -1003,6 +1019,8 @@ namespace ES.EditorInternal
             public VisualElement accentLine;
             public VisualElement sweep;
             public VisualElement semiSleepOverlay;
+            public Label semiSleepMonogram;
+            public Label semiSleepTitleLabel;
             public VisualElement semiSleepControls;
             public ES.ESWindowActionHosts actionHosts;
             public Button semiSleepToggleButton;
@@ -1016,11 +1034,18 @@ namespace ES.EditorInternal
             public float pulseDuration;
             public bool allowSemiSleep;
             public bool supportsSemiSleep;
+            public ESWindowVisualState visualState;
+            public ESWindowVisualState transitionTargetState;
             public bool semiSleeping;
             public bool semiSleepTarget;
             public bool semiSleepAnimating;
             public double focusLostAt = -1d;
             public double semiSleepStartedAt;
+            public double semiSleepTransitionDuration;
+            public double sleepTileIdleStartedAt = -1d;
+            public double edgeTabFullyExpandedAt = -1d;
+            public double lastInteractionAt;
+            public double transientInteractionGraceUntil;
             public Rect awakeBounds;
             public Rect semiSleepFromBounds;
             public Rect semiSleepToBounds;
@@ -1034,6 +1059,10 @@ namespace ES.EditorInternal
             public Rect semiSleepDragWindowStart;
             public bool semiSleepDragging;
             public bool semiSleepManualHold;
+            public bool pointerInside;
+            public int interactionHoldCount;
+            public ESWindowEdge edge;
+            public float edgeOffset;
             public bool pinned;
             public int busyCount;
             public ESWindowActivityState activityState;
@@ -1048,6 +1077,15 @@ namespace ES.EditorInternal
         internal const float SemiSleepSize = 100f;
         internal const float SemiSleepDelay = 1.6f;
         internal const float SemiSleepDuration = 0.56f;
+        internal const float SleepTileToEdgeTabDelay = 6f;
+        internal const float EdgeTabHoverCommitDelay = 0.5f;
+        internal const float EdgeTabCollapsedLength = 56f;
+        internal const float EdgeTabExpandedLength = 196f;
+        internal const float EdgeTabThickness = 44f;
+        internal const float EdgeTabSnapDistance = 24f;
+        private const float EdgeTabTransitionDuration = 0.30f;
+        private const float EdgeTabHoverDuration = 0.18f;
+        private const float TransientInteractionGrace = 0.75f;
         private const float SemiSleepTrayGap = 8f;
         private const float SemiSleepTrayMargin = 12f;
         private const float SemiSleepDragThreshold = 4f;
@@ -1113,6 +1151,29 @@ namespace ES.EditorInternal
                     binding.activityPageId = null;
                     PulseWindow(current, ESStatusKind.Ready);
                 }
+                RefreshSemiSleepUpdateSubscription();
+            }
+        }
+
+        private sealed class WindowInteractionLease : IDisposable
+        {
+            private EditorWindow window;
+
+            internal WindowInteractionLease(EditorWindow window)
+            {
+                this.window = window;
+            }
+
+            public void Dispose()
+            {
+                EditorWindow current = window;
+                window = null;
+                if (current == null
+                    || !windowBindings.TryGetValue(current.GetInstanceID(), out WindowBinding binding)
+                    || binding == null)
+                    return;
+                binding.interactionHoldCount = Mathf.Max(0, binding.interactionHoldCount - 1);
+                RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
                 RefreshSemiSleepUpdateSubscription();
             }
         }
@@ -1248,6 +1309,10 @@ namespace ES.EditorInternal
 
             binding.root.UnregisterCallback<FocusInEvent>(OnWindowFocusIn, TrickleDown.TrickleDown);
             binding.root.UnregisterCallback<PointerDownEvent>(OnWindowPointerDown, TrickleDown.TrickleDown);
+            binding.root.UnregisterCallback<PointerEnterEvent>(OnWindowPointerEnter, TrickleDown.TrickleDown);
+            binding.root.UnregisterCallback<PointerLeaveEvent>(OnWindowPointerLeave, TrickleDown.TrickleDown);
+            binding.root.UnregisterCallback<WheelEvent>(OnWindowWheel, TrickleDown.TrickleDown);
+            binding.root.UnregisterCallback<KeyDownEvent>(OnWindowKeyDown, TrickleDown.TrickleDown);
             binding.root.UnregisterCallback<GeometryChangedEvent>(OnWindowGeometryChanged);
             binding.root.UnregisterCallback<DetachFromPanelEvent>(OnWindowRootDetached);
             binding.semiSleepOverlay?.UnregisterCallback<PointerDownEvent>(OnSemiSleepOverlayPointerDown);
@@ -1617,6 +1682,9 @@ namespace ES.EditorInternal
                     window = window,
                     allowSemiSleep = allowSemiSleep,
                     supportsSemiSleep = allowSemiSleep,
+                    visualState = ESWindowVisualState.ActivePanel,
+                    transitionTargetState = ESWindowVisualState.ActivePanel,
+                    lastInteractionAt = EditorApplication.timeSinceStartup,
                     activationPending = true,
                     pulseStatus = ESStatusKind.None,
                     pulseDuration = GlobalSweepDuration
@@ -1791,6 +1859,27 @@ namespace ES.EditorInternal
             PulseWindow(window, ESStatusKind.Info);
             RefreshSemiSleepUpdateSubscription();
             return new WindowBusyLease(window);
+        }
+
+        /// <summary>
+        /// 暂停窗口自动收纳。菜单、Popup、拖动和子交互应在其真实生命周期内持有此 Lease；
+        /// Dispose 后只恢复计时，不改变 Unity 焦点或强制唤醒窗口。
+        /// </summary>
+        public static IDisposable BeginWindowInteractionHold(EditorWindow window, string reason = null)
+        {
+            if (window == null)
+                return EmptyWindowLease.Instance;
+            if (!windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding) || binding == null)
+            {
+                BindWindow(window);
+                windowBindings.TryGetValue(window.GetInstanceID(), out binding);
+            }
+            if (binding == null)
+                return EmptyWindowLease.Instance;
+            binding.interactionHoldCount++;
+            RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
+            RefreshSemiSleepUpdateSubscription();
+            return new WindowInteractionLease(window);
         }
 
         /// <summary>向窗口和可选页面上下文发送一次结果提示，并唤醒目标窗口。</summary>
@@ -2122,6 +2211,10 @@ namespace ES.EditorInternal
 
             root.RegisterCallback<FocusInEvent>(OnWindowFocusIn, TrickleDown.TrickleDown);
             root.RegisterCallback<PointerDownEvent>(OnWindowPointerDown, TrickleDown.TrickleDown);
+            root.RegisterCallback<PointerEnterEvent>(OnWindowPointerEnter, TrickleDown.TrickleDown);
+            root.RegisterCallback<PointerLeaveEvent>(OnWindowPointerLeave, TrickleDown.TrickleDown);
+            root.RegisterCallback<WheelEvent>(OnWindowWheel, TrickleDown.TrickleDown);
+            root.RegisterCallback<KeyDownEvent>(OnWindowKeyDown, TrickleDown.TrickleDown);
             root.RegisterCallback<GeometryChangedEvent>(OnWindowGeometryChanged);
             root.RegisterCallback<DetachFromPanelEvent>(OnWindowRootDetached);
             root.Add(binding.host);
@@ -2185,8 +2278,48 @@ namespace ES.EditorInternal
         private static void OnWindowPointerDown(PointerDownEvent evt)
         {
             WindowBinding binding = FindBindingByRoot(evt.currentTarget as VisualElement);
-            if (binding != null && evt.button == 0)
+            if (binding == null)
+                return;
+            RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
+            if (evt.button == 0)
                 PulseWindow(binding.window, ESStatusKind.Modified);
+            else if (evt.button == 1)
+                binding.transientInteractionGraceUntil = EditorApplication.timeSinceStartup
+                    + TransientInteractionGrace;
+        }
+
+        private static void OnWindowPointerEnter(PointerEnterEvent evt)
+        {
+            WindowBinding binding = FindBindingByRoot(evt.currentTarget as VisualElement);
+            if (binding == null)
+                return;
+            binding.pointerInside = true;
+            RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
+        }
+
+        private static void OnWindowPointerLeave(PointerLeaveEvent evt)
+        {
+            WindowBinding binding = FindBindingByRoot(evt.currentTarget as VisualElement);
+            if (binding == null)
+                return;
+            binding.pointerInside = false;
+            if (binding.visualState == ESWindowVisualState.EdgeTabHover
+                && !binding.semiSleepAnimating)
+                BeginVisualStateTransition(binding, ESWindowVisualState.EdgeTab);
+        }
+
+        private static void OnWindowWheel(WheelEvent evt)
+        {
+            WindowBinding binding = FindBindingByRoot(evt.currentTarget as VisualElement);
+            if (binding != null)
+                RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
+        }
+
+        private static void OnWindowKeyDown(KeyDownEvent evt)
+        {
+            WindowBinding binding = FindBindingByRoot(evt.currentTarget as VisualElement);
+            if (binding != null)
+                RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
         }
 
         private static void OnWindowRootDetached(DetachFromPanelEvent evt)
@@ -2252,22 +2385,25 @@ namespace ES.EditorInternal
             overlay.style.borderTopColor = ActiveColor;
             overlay.style.borderBottomColor = ActiveColor;
 
-            var monogram = new Label("ES");
-            monogram.style.fontSize = 20f;
-            monogram.style.unityFontStyleAndWeight = FontStyle.Bold;
-            monogram.style.color = SelectedTextColor;
-            overlay.Add(monogram);
+            binding.semiSleepMonogram = new Label("ES");
+            binding.semiSleepMonogram.style.fontSize = 20f;
+            binding.semiSleepMonogram.style.unityFontStyleAndWeight = FontStyle.Bold;
+            binding.semiSleepMonogram.style.color = SelectedTextColor;
+            overlay.Add(binding.semiSleepMonogram);
 
             string title = binding.window?.titleContent?.text;
-            var titleLabel = new Label(string.IsNullOrWhiteSpace(title) ? "工具窗口" : title.Trim());
-            titleLabel.style.maxWidth = 82f;
-            titleLabel.style.marginTop = 3f;
-            titleLabel.style.fontSize = 9f;
-            titleLabel.style.color = SectionMutedTextColor;
-            titleLabel.style.whiteSpace = WhiteSpace.NoWrap;
-            titleLabel.style.overflow = Overflow.Hidden;
-            titleLabel.style.textOverflow = TextOverflow.Ellipsis;
-            overlay.Add(titleLabel);
+            binding.semiSleepTitleLabel = new Label(
+                string.IsNullOrWhiteSpace(title) ? "工具窗口" : title.Trim());
+            binding.semiSleepTitleLabel.style.maxWidth = 172f;
+            binding.semiSleepTitleLabel.style.marginTop = 3f;
+            binding.semiSleepTitleLabel.style.fontSize = 9f;
+            binding.semiSleepTitleLabel.style.color = SectionMutedTextColor;
+            binding.semiSleepTitleLabel.style.whiteSpace = WhiteSpace.NoWrap;
+            binding.semiSleepTitleLabel.style.overflow = Overflow.Hidden;
+            binding.semiSleepTitleLabel.style.textOverflow = TextOverflow.Ellipsis;
+            overlay.Add(binding.semiSleepTitleLabel);
+            overlay.RegisterCallback<PointerEnterEvent>(OnSemiSleepOverlayPointerEnter);
+            overlay.RegisterCallback<PointerLeaveEvent>(OnSemiSleepOverlayPointerLeave);
             overlay.RegisterCallback<PointerDownEvent>(OnSemiSleepOverlayPointerDown);
             overlay.RegisterCallback<PointerMoveEvent>(OnSemiSleepOverlayPointerMove);
             overlay.RegisterCallback<PointerUpEvent>(OnSemiSleepOverlayPointerUp);
@@ -2282,6 +2418,7 @@ namespace ES.EditorInternal
             VisualElement overlay = evt.currentTarget as VisualElement;
             if (binding?.window == null || overlay == null || evt.button != 0)
                 return;
+            RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
             binding.semiSleepDragPointerId = evt.pointerId;
             binding.semiSleepDragLastPointerPosition = new Vector2(evt.position.x, evt.position.y)
                 + binding.window.position.position;
@@ -2296,6 +2433,8 @@ namespace ES.EditorInternal
             WindowBinding binding = (evt.currentTarget as VisualElement)?.userData as WindowBinding;
             if (binding?.window == null || binding.semiSleepDragPointerId != evt.pointerId)
                 return;
+
+            RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
 
             Vector2 pointerScreenPosition = new Vector2(evt.position.x, evt.position.y)
                 + binding.window.position.position;
@@ -2340,7 +2479,11 @@ namespace ES.EditorInternal
                 binding.semiSleepToBounds = dockBounds;
                 binding.semiSleepDockBounds = dockBounds;
                 binding.hasSemiSleepDockBounds = true;
+                binding.visualState = ESWindowVisualState.SleepTile;
+                binding.transitionTargetState = ESWindowVisualState.SleepTile;
+                binding.sleepTileIdleStartedAt = EditorApplication.timeSinceStartup;
                 ShowSemiSleepOverlay(binding, true, 1f);
+                ApplySemiSleepOverlayState(binding);
                 RefreshSemiSleepControls(binding);
             }
             else
@@ -2350,6 +2493,30 @@ namespace ES.EditorInternal
                 BeginSemiSleepTransition(binding, false);
             }
             evt.StopImmediatePropagation();
+        }
+
+        private static void OnSemiSleepOverlayPointerEnter(PointerEnterEvent evt)
+        {
+            WindowBinding binding = (evt.currentTarget as VisualElement)?.userData as WindowBinding;
+            if (binding == null)
+                return;
+            binding.pointerInside = true;
+            RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
+            if (binding.visualState == ESWindowVisualState.EdgeTab
+                && !binding.semiSleepAnimating)
+                BeginVisualStateTransition(binding, ESWindowVisualState.EdgeTabHover);
+        }
+
+        private static void OnSemiSleepOverlayPointerLeave(PointerLeaveEvent evt)
+        {
+            WindowBinding binding = (evt.currentTarget as VisualElement)?.userData as WindowBinding;
+            if (binding == null)
+                return;
+            binding.pointerInside = false;
+            binding.edgeTabFullyExpandedAt = -1d;
+            if (binding.visualState == ESWindowVisualState.EdgeTabHover
+                && !binding.semiSleepAnimating)
+                BeginVisualStateTransition(binding, ESWindowVisualState.EdgeTab);
         }
 
         private static void OnSemiSleepOverlayPointerCancel(PointerCancelEvent evt)

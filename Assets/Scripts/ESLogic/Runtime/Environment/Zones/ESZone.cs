@@ -7,16 +7,22 @@ namespace ES
     /// <summary>One logical member currently overlapping an ESZone.</summary>
     public readonly struct ESZoneMember
     {
-        internal ESZoneMember(UnityEngine.Object key, GameObject rootObject, Core core)
+        internal ESZoneMember(
+            UnityEngine.Object key,
+            GameObject rootObject,
+            Core core,
+            IESMotionInfluenceReceiver motionReceiver)
         {
             Key = key;
             RootObject = rootObject;
             Core = core;
+            MotionReceiver = motionReceiver;
         }
 
         internal UnityEngine.Object Key { get; }
         public GameObject RootObject { get; }
         public Core Core { get; }
+        public IESMotionInfluenceReceiver MotionReceiver { get; }
 
         public bool IsActive
         {
@@ -63,19 +69,15 @@ namespace ES
         private const int InitialMemberCapacity = 4;
         private const int InitialColliderCapacity = 8;
 
-        private readonly Dictionary<UnityEngine.Object, Occupant> occupants =
-            new Dictionary<UnityEngine.Object, Occupant>(InitialMemberCapacity);
-        private readonly Dictionary<Collider, ColliderOverlap> colliderOverlaps =
-            new Dictionary<Collider, ColliderOverlap>(InitialColliderCapacity);
-        private readonly List<Collider> trackedColliders =
-            new List<Collider>(InitialColliderCapacity);
+        private Dictionary<UnityEngine.Object, Occupant> occupants;
+        private Dictionary<Collider, ColliderOverlap> colliderOverlaps;
+        private List<Collider> trackedColliders;
         private ESZoneProfile profile;
-        private int cleanupFrameOffset;
         private int cleanupCursor;
 
         public ESZoneProfile Profile => profile;
         public int Priority => Profile != null ? Profile.Settings.Priority : 0;
-        public int ActiveMemberCount => occupants.Count;
+        public int ActiveMemberCount => occupants?.Count ?? 0;
 
         public bool HasSemanticTag(ESTagStableReference tag)
         {
@@ -84,13 +86,14 @@ namespace ES
 
         public bool Contains(Core core)
         {
-            return core != null && occupants.ContainsKey(core);
+            return core != null && occupants != null && occupants.ContainsKey(core);
         }
 
         public bool Contains(Collider collider)
         {
             return collider != null
                    && TryResolveMember(collider, out UnityEngine.Object key, out _)
+                   && occupants != null
                    && occupants.ContainsKey(key);
         }
 
@@ -100,6 +103,8 @@ namespace ES
                 throw new ArgumentNullException(nameof(destination));
 
             destination.Clear();
+            if (occupants == null)
+                return;
             foreach (Occupant occupant in occupants.Values)
                 destination.Add(occupant.member);
         }
@@ -146,7 +151,6 @@ namespace ES
         private void Awake()
         {
             profile = GetComponent<ESZoneProfile>();
-            cleanupFrameOffset = (GetInstanceID() & int.MaxValue) % CleanupIntervalFrames;
         }
 
         internal void RegisterProfile(ESZoneProfile candidate)
@@ -155,6 +159,8 @@ namespace ES
                 return;
 
             profile = candidate;
+            if (occupants == null)
+                return;
             foreach (Occupant occupant in occupants.Values)
             {
                 if (occupant.member.IsActive)
@@ -167,8 +173,11 @@ namespace ES
             if (!ReferenceEquals(profile, candidate))
                 return;
 
-            foreach (Occupant occupant in occupants.Values)
-                candidate.ExitMember(occupant.member);
+            if (occupants != null)
+            {
+                foreach (Occupant occupant in occupants.Values)
+                    candidate.ExitMember(occupant.member);
+            }
             profile = null;
         }
 
@@ -176,6 +185,8 @@ namespace ES
         {
             if (other == null)
                 return;
+
+            EnsureTrackingCollections();
 
             if (colliderOverlaps.TryGetValue(other, out ColliderOverlap colliderOverlap))
             {
@@ -225,17 +236,12 @@ namespace ES
             RemoveColliderOverlap(other, overlap, false);
         }
 
-        private void LateUpdate()
+        internal void RunMaintenance(int frameCount)
         {
-            if (trackedColliders.Count == 0
-                || (Time.frameCount + cleanupFrameOffset) % CleanupIntervalFrames != 0)
+            if (trackedColliders == null
+                || trackedColliders.Count == 0)
                 return;
 
-            CleanupStaleColliders();
-        }
-
-        private void CleanupStaleColliders()
-        {
             int remainingBudget = Mathf.Min(CleanupBudgetPerPass, trackedColliders.Count);
             while (remainingBudget-- > 0 && trackedColliders.Count > 0)
             {
@@ -263,7 +269,13 @@ namespace ES
 
         private void OnDisable()
         {
+            ESZoneMaintenance.Unregister(this);
             ClearMembers();
+        }
+
+        private void OnEnable()
+        {
+            ESZoneMaintenance.Register(this);
         }
 
         private void RemoveColliderOverlap(Collider collider, ColliderOverlap overlap, bool removeAll)
@@ -296,6 +308,9 @@ namespace ES
 
         private void ClearMembers()
         {
+            if (occupants == null)
+                return;
+
             foreach (Occupant occupant in occupants.Values)
                 NotifyMemberExited(occupant.member);
 
@@ -303,10 +318,15 @@ namespace ES
             colliderOverlaps.Clear();
             trackedColliders.Clear();
             cleanupCursor = 0;
+            occupants = null;
+            colliderOverlaps = null;
+            trackedColliders = null;
         }
 
         private void RemoveTrackedColliderAt(int index)
         {
+            if (trackedColliders == null)
+                return;
             int lastIndex = trackedColliders.Count - 1;
             if (index < 0 || index > lastIndex)
                 return;
@@ -369,22 +389,84 @@ namespace ES
             if (core != null)
             {
                 key = core;
-                member = new ESZoneMember(core, core.gameObject, core);
+                member = new ESZoneMember(
+                    core,
+                    core.gameObject,
+                    core,
+                    core as IESMotionInfluenceReceiver);
                 return true;
             }
 
             Rigidbody attachedBody = collider.attachedRigidbody;
             if (attachedBody != null)
             {
+                VehicleController vehicle = attachedBody.GetComponentInParent<VehicleController>();
                 key = attachedBody;
-                member = new ESZoneMember(attachedBody, attachedBody.gameObject, null);
+                member = new ESZoneMember(attachedBody, attachedBody.gameObject, null, vehicle);
                 return true;
             }
 
             GameObject colliderObject = collider.gameObject;
+            VehicleController fallbackVehicle = collider.GetComponentInParent<VehicleController>();
             key = colliderObject;
-            member = new ESZoneMember(colliderObject, colliderObject, null);
+            member = new ESZoneMember(colliderObject, colliderObject, null, fallbackVehicle);
             return true;
+        }
+
+        private void EnsureTrackingCollections()
+        {
+            occupants ??= new Dictionary<UnityEngine.Object, Occupant>(InitialMemberCapacity);
+            colliderOverlaps ??= new Dictionary<Collider, ColliderOverlap>(InitialColliderCapacity);
+            trackedColliders ??= new List<Collider>(InitialColliderCapacity);
+        }
+    }
+
+    internal static class ESZoneMaintenance
+    {
+        private const int ZoneBudgetPerFrame = 64;
+        private static readonly List<ESZone> Zones = new List<ESZone>(32);
+        private static int cursor;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void Reset()
+        {
+            Zones.Clear();
+            cursor = 0;
+        }
+
+        internal static void Register(ESZone zone)
+        {
+            if (zone != null)
+                Zones.Add(zone);
+        }
+
+        internal static void Unregister(ESZone zone)
+        {
+            int index = Zones.IndexOf(zone);
+            if (index < 0)
+                return;
+
+            int last = Zones.Count - 1;
+            Zones[index] = Zones[last];
+            Zones.RemoveAt(last);
+            if (cursor > index)
+                cursor--;
+            if (cursor >= Zones.Count)
+                cursor = 0;
+        }
+
+        internal static void Tick(int frameCount)
+        {
+            int budget = Mathf.Min(ZoneBudgetPerFrame, Zones.Count);
+            while (budget-- > 0 && Zones.Count > 0)
+            {
+                if (cursor >= Zones.Count)
+                    cursor = 0;
+
+                ESZone zone = Zones[cursor++];
+                if (zone != null && zone.isActiveAndEnabled)
+                    zone.RunMaintenance(frameCount);
+            }
         }
     }
 }

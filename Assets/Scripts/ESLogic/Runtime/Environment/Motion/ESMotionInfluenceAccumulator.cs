@@ -65,7 +65,7 @@ namespace ES
             Vector3 offset = anchor - position;
             float distance = offset.magnitude;
             float stopRadius = Mathf.Max(0f, settings.stopRadius);
-            Vector3 direction = distance > stopRadius && distance > Mathf.Epsilon
+            Vector3 direction = distance > Mathf.Epsilon
                 ? offset / distance
                 : Vector3.zero;
             float maxAcceleration = Mathf.Max(0f, settings.maxAcceleration);
@@ -83,9 +83,19 @@ namespace ES
 
             float targetSpeed = Mathf.Min(
                 Mathf.Max(0f, settings.maxSpeed),
-                (distance - stopRadius) * Mathf.Max(0f, settings.response));
-            Vector3 desiredVelocity = direction * targetSpeed;
+                Mathf.Max(0f, distance - stopRadius) * Mathf.Max(0f, settings.response));
             float safeDeltaTime = Mathf.Max(MinDeltaTime, deltaTime);
+            if (settings.velocityMode == ESMotionAttractionVelocityMode.RadialOnly)
+            {
+                float currentRadialSpeed = Vector3.Dot(velocity, direction);
+                float nextRadialSpeed = Mathf.MoveTowards(
+                    currentRadialSpeed,
+                    targetSpeed,
+                    maxAcceleration * safeDeltaTime);
+                return direction * ((nextRadialSpeed - currentRadialSpeed) / safeDeltaTime);
+            }
+
+            Vector3 desiredVelocity = direction * targetSpeed;
             Vector3 nextVelocity = Vector3.MoveTowards(
                 velocity,
                 desiredVelocity,
@@ -112,60 +122,147 @@ namespace ES
 
     public sealed class ESMotionInfluenceAccumulator : IESMotionFieldLeaseOwner
     {
-        private struct FieldSlot
+        public const int DefaultFieldCapacity = 4;
+        public const int MaxFieldCapacity = 32;
+
+        private sealed class FieldStore
         {
-            public ESMotionFieldRequest request;
-            public int generation;
-            public bool active;
+            internal struct Slot
+            {
+                public ESMotionFieldRequest request;
+                public int generation;
+                public int activeOrderIndex;
+                public bool active;
+            }
+
+            public Slot[] slots;
+            public int[] activeIndices;
+            public int activeCount;
+
+            public FieldStore(int capacity)
+            {
+                int safeCapacity = Mathf.Clamp(capacity, 1, MaxFieldCapacity);
+                slots = new Slot[safeCapacity];
+                activeIndices = new int[safeCapacity];
+            }
+
+            public int Capacity => slots.Length;
+
+            public bool TryAcquire(in ESMotionFieldRequest request, out int slotIndex, out int generation)
+            {
+                slotIndex = FindFreeSlot();
+                if (slotIndex < 0 && !TryGrow())
+                {
+                    generation = 0;
+                    return false;
+                }
+                if (slotIndex < 0)
+                    slotIndex = FindFreeSlot();
+
+                ref Slot slot = ref slots[slotIndex];
+                slot.generation = NextGeneration(slot.generation);
+                slot.request = request;
+                slot.active = true;
+
+                int insertionIndex = FindInsertionIndex(request);
+                for (int i = activeCount; i > insertionIndex; i--)
+                {
+                    int movedSlot = activeIndices[i - 1];
+                    activeIndices[i] = movedSlot;
+                    slots[movedSlot].activeOrderIndex = i;
+                }
+                activeIndices[insertionIndex] = slotIndex;
+                slot.activeOrderIndex = insertionIndex;
+                activeCount++;
+                generation = slot.generation;
+                return true;
+            }
+
+            public bool Release(int slotIndex, int generation)
+            {
+                if ((uint)slotIndex >= (uint)slots.Length)
+                    return false;
+
+                ref Slot slot = ref slots[slotIndex];
+                if (!slot.active || slot.generation != generation)
+                    return false;
+
+                int removeIndex = slot.activeOrderIndex;
+                for (int i = removeIndex; i < activeCount - 1; i++)
+                {
+                    int movedSlot = activeIndices[i + 1];
+                    activeIndices[i] = movedSlot;
+                    slots[movedSlot].activeOrderIndex = i;
+                }
+                activeCount--;
+                activeIndices[activeCount] = 0;
+                slot.active = false;
+                slot.activeOrderIndex = 0;
+                slot.request = default;
+                return true;
+            }
+
+            private int FindInsertionIndex(in ESMotionFieldRequest request)
+            {
+                int index = 0;
+                while (index < activeCount)
+                {
+                    ref Slot current = ref slots[activeIndices[index]];
+                    if (request.priority > current.request.priority
+                        || (request.priority == current.request.priority
+                            && request.sourceId < current.request.sourceId))
+                        break;
+                    index++;
+                }
+                return index;
+            }
+
+            private int FindFreeSlot()
+            {
+                for (int i = 0; i < slots.Length; i++)
+                {
+                    if (!slots[i].active)
+                        return i;
+                }
+                return -1;
+            }
+
+            private bool TryGrow()
+            {
+                if (slots.Length >= MaxFieldCapacity)
+                    return false;
+
+                int nextCapacity = Mathf.Min(MaxFieldCapacity, slots.Length * 2);
+                Array.Resize(ref slots, nextCapacity);
+                Array.Resize(ref activeIndices, nextCapacity);
+                return true;
+            }
         }
 
-        private const int InlineCapacity = 4;
-        private FieldSlot slot0;
-        private FieldSlot slot1;
-        private FieldSlot slot2;
-        private FieldSlot slot3;
-        private FieldSlot[] overflowSlots;
-        private Vector3 pendingVelocityDelta0;
-        private Vector3 pendingVelocityDelta1;
-        private Vector3 pendingVelocityDelta2;
-        private Vector3 pendingVelocityDelta3;
-        private Vector3 pendingVelocityDelta4;
-        private Vector3 pendingVelocityDelta5;
-        private Vector3 pendingVelocityDelta6;
-        private Vector3 pendingVelocityDelta7;
+        private readonly int initialFieldCapacity;
+        private Vector3 pendingVelocityDelta;
+        private FieldStore fieldStore;
         private bool hasPendingVelocityDelta;
         private int ownerGeneration = 1;
-        private int activeFieldCount;
+        private int rejectedFieldCount;
 
-        public ESMotionInfluenceAccumulator(int capacity = InlineCapacity)
+        public ESMotionInfluenceAccumulator(int capacity = DefaultFieldCapacity)
         {
-            int overflowCapacity = Mathf.Max(0, capacity - InlineCapacity);
-            overflowSlots = overflowCapacity > 0
-                ? new FieldSlot[overflowCapacity]
-                : Array.Empty<FieldSlot>();
+            initialFieldCapacity = Mathf.Clamp(capacity, 1, MaxFieldCapacity);
         }
 
-        public int ActiveFieldCount => activeFieldCount;
+        public int ActiveFieldCount => fieldStore?.activeCount ?? 0;
+        public int FieldCapacity => fieldStore?.Capacity ?? 0;
+        public int RejectedFieldCount => rejectedFieldCount;
         public int OwnerGeneration => ownerGeneration;
         public bool HasPendingVelocityDelta => hasPendingVelocityDelta;
-        public bool HasInfluences => activeFieldCount > 0 || HasPendingVelocityDelta;
+        public bool HasInfluences => ActiveFieldCount > 0 || HasPendingVelocityDelta;
 
         public void AddVelocity(
             Vector3 velocity,
             ESMotionInfluencePermissions permissions = ESMotionInfluencePermissions.None)
         {
-            int permissionIndex = (int)permissions & 0x7;
-            switch (permissionIndex)
-            {
-                case 0: pendingVelocityDelta0 += velocity; break;
-                case 1: pendingVelocityDelta1 += velocity; break;
-                case 2: pendingVelocityDelta2 += velocity; break;
-                case 3: pendingVelocityDelta3 += velocity; break;
-                case 4: pendingVelocityDelta4 += velocity; break;
-                case 5: pendingVelocityDelta5 += velocity; break;
-                case 6: pendingVelocityDelta6 += velocity; break;
-                default: pendingVelocityDelta7 += velocity; break;
-            }
+            pendingVelocityDelta += velocity;
             hasPendingVelocityDelta = true;
         }
 
@@ -179,21 +276,15 @@ namespace ES
                 return false;
             }
 
-            int slotIndex = FindFreeSlot();
-            if (slotIndex < 0)
+            fieldStore ??= new FieldStore(initialFieldCapacity);
+            if (!fieldStore.TryAcquire(request, out int slotIndex, out int slotGeneration))
             {
-                int previousLength = overflowSlots.Length;
-                int nextLength = Mathf.Max(InlineCapacity, previousLength * 2);
-                Array.Resize(ref overflowSlots, nextLength);
-                slotIndex = InlineCapacity + previousLength;
+                rejectedFieldCount++;
+                lease = default;
+                return false;
             }
 
-            ref FieldSlot slot = ref GetSlot(slotIndex);
-            slot.generation = NextGeneration(slot.generation);
-            slot.request = request;
-            slot.active = true;
-            activeFieldCount++;
-            lease = new ESMotionFieldLease(this, slotIndex, slot.generation, ownerGeneration);
+            lease = new ESMotionFieldLease(this, slotIndex, slotGeneration, ownerGeneration);
             return true;
         }
 
@@ -207,29 +298,27 @@ namespace ES
         {
             float safeDeltaTime = Mathf.Max(0f, deltaTime);
             Vector3 combinedAcceleration = Vector3.zero;
-            int remainingFields = activeFieldCount;
-            int slotCount = InlineCapacity + overflowSlots.Length;
-            for (int i = 0; i < slotCount && remainingFields > 0; i++)
+            if (fieldStore != null)
             {
-                ref FieldSlot slot = ref GetSlot(i);
-                if (!slot.active)
-                    continue;
-                remainingFields--;
-                if (!ESMotionInfluenceSolver.IsAllowed(slot.request.permissions, lockState))
-                    continue;
+                for (int i = 0; i < fieldStore.activeCount; i++)
+                {
+                    ref FieldStore.Slot slot = ref fieldStore.slots[fieldStore.activeIndices[i]];
+                    if (!ESMotionInfluenceSolver.IsAllowed(slot.request.permissions, lockState))
+                        continue;
 
-                if (slot.request.kind == ESMotionFieldKind.Acceleration)
-                {
-                    combinedAcceleration += slot.request.acceleration;
-                }
-                else
-                {
-                    combinedAcceleration += ESMotionInfluenceSolver.EvaluateAttractionAcceleration(
-                        position,
-                        velocity,
-                        slot.request.ResolveAnchorPosition(),
-                        slot.request.attraction,
-                        safeDeltaTime);
+                    if (slot.request.kind == ESMotionFieldKind.Acceleration)
+                    {
+                        combinedAcceleration += slot.request.acceleration;
+                    }
+                    else
+                    {
+                        combinedAcceleration += ESMotionInfluenceSolver.EvaluateAttractionAcceleration(
+                            position,
+                            velocity,
+                            slot.request.ResolveAnchorPosition(),
+                            slot.request.attraction,
+                            safeDeltaTime);
+                    }
                 }
             }
 
@@ -240,7 +329,8 @@ namespace ES
             Vector3 velocityDelta = Vector3.zero;
             if (hasPendingVelocityDelta)
             {
-                ConsumePendingVelocityDeltas(ref velocityDelta, lockState);
+                velocityDelta = pendingVelocityDelta;
+                ClearPendingVelocityDelta();
             }
             if (maxCombinedVelocityDelta > 0f)
                 velocityDelta = Vector3.ClampMagnitude(velocityDelta, maxCombinedVelocityDelta);
@@ -250,100 +340,30 @@ namespace ES
         public void Reset()
         {
             ClearPendingVelocityDelta();
-            activeFieldCount = 0;
             ownerGeneration = NextGeneration(ownerGeneration);
-            slot0.active = false;
-            slot0.request = default;
-            slot1.active = false;
-            slot1.request = default;
-            slot2.active = false;
-            slot2.request = default;
-            slot3.active = false;
-            slot3.request = default;
-            for (int i = 0; i < overflowSlots.Length; i++)
-            {
-                overflowSlots[i].active = false;
-                overflowSlots[i].request = default;
-            }
+            fieldStore = null;
         }
 
         public void ClearPendingVelocityDelta()
         {
-            pendingVelocityDelta0 = Vector3.zero;
-            pendingVelocityDelta1 = Vector3.zero;
-            pendingVelocityDelta2 = Vector3.zero;
-            pendingVelocityDelta3 = Vector3.zero;
-            pendingVelocityDelta4 = Vector3.zero;
-            pendingVelocityDelta5 = Vector3.zero;
-            pendingVelocityDelta6 = Vector3.zero;
-            pendingVelocityDelta7 = Vector3.zero;
+            pendingVelocityDelta = Vector3.zero;
             hasPendingVelocityDelta = false;
-        }
-
-        private void ConsumePendingVelocityDeltas(
-            ref Vector3 combined,
-            ESMotionReceiverLockState lockState)
-        {
-            AddIfAllowed(ref combined, pendingVelocityDelta0, ESMotionInfluencePermissions.None, lockState);
-            AddIfAllowed(ref combined, pendingVelocityDelta1, (ESMotionInfluencePermissions)1, lockState);
-            AddIfAllowed(ref combined, pendingVelocityDelta2, (ESMotionInfluencePermissions)2, lockState);
-            AddIfAllowed(ref combined, pendingVelocityDelta3, (ESMotionInfluencePermissions)3, lockState);
-            AddIfAllowed(ref combined, pendingVelocityDelta4, (ESMotionInfluencePermissions)4, lockState);
-            AddIfAllowed(ref combined, pendingVelocityDelta5, (ESMotionInfluencePermissions)5, lockState);
-            AddIfAllowed(ref combined, pendingVelocityDelta6, (ESMotionInfluencePermissions)6, lockState);
-            AddIfAllowed(ref combined, pendingVelocityDelta7, (ESMotionInfluencePermissions)7, lockState);
-            ClearPendingVelocityDelta();
-        }
-
-        private static void AddIfAllowed(
-            ref Vector3 combined,
-            Vector3 pending,
-            ESMotionInfluencePermissions permissions,
-            ESMotionReceiverLockState lockState)
-        {
-            if (pending != Vector3.zero
-                && ESMotionInfluenceSolver.IsAllowed(permissions, lockState))
-                combined += pending;
         }
 
         public bool ReleaseMotionField(int slotIndex, int slotGeneration, int expectedOwnerGeneration)
         {
-            if (expectedOwnerGeneration != ownerGeneration
-                || slotIndex < 0
-                || slotIndex >= InlineCapacity + overflowSlots.Length)
+            if (expectedOwnerGeneration != ownerGeneration || fieldStore == null)
                 return false;
 
-            ref FieldSlot slot = ref GetSlot(slotIndex);
-            if (!slot.active || slot.generation != slotGeneration)
+            if (!fieldStore.Release(slotIndex, slotGeneration))
                 return false;
 
-            slot.active = false;
-            slot.request = default;
-            activeFieldCount--;
+            if (fieldStore.activeCount == 0)
+            {
+                fieldStore = null;
+                ownerGeneration = NextGeneration(ownerGeneration);
+            }
             return true;
-        }
-
-        private int FindFreeSlot()
-        {
-            int slotCount = InlineCapacity + overflowSlots.Length;
-            for (int i = 0; i < slotCount; i++)
-            {
-                if (!GetSlot(i).active)
-                    return i;
-            }
-            return -1;
-        }
-
-        private ref FieldSlot GetSlot(int index)
-        {
-            switch (index)
-            {
-                case 0: return ref slot0;
-                case 1: return ref slot1;
-                case 2: return ref slot2;
-                case 3: return ref slot3;
-                default: return ref overflowSlots[index - InlineCapacity];
-            }
         }
 
         private static int NextGeneration(int generation)

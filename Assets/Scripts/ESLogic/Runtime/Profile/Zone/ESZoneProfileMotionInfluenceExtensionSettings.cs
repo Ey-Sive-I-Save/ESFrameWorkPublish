@@ -45,7 +45,8 @@ namespace ES
             maxAcceleration = 20f,
             response = 2f,
             stiffness = 10f,
-            damping = 4f
+            damping = 4f,
+            velocityMode = ESMotionAttractionVelocityMode.RadialOnly
         };
         [SerializeField, LabelText("运动锁定许可")]
         private ESMotionInfluencePermissions permissions;
@@ -84,7 +85,10 @@ namespace ES
             return value;
         }
 
-        internal ESMotionFieldRequest BuildFieldRequest(Transform zoneTransform)
+        internal ESMotionFieldRequest BuildFieldRequest(
+            Transform zoneTransform,
+            ulong sourceId,
+            int priority)
         {
             Vector3 resolvedAcceleration = useLocalDirection && zoneTransform != null
                 ? zoneTransform.TransformDirection(acceleration)
@@ -98,7 +102,9 @@ namespace ES
                 anchorTransform = mode == ESZoneMotionInfluenceMode.Attraction ? zoneTransform : null,
                 anchorPosition = zoneTransform != null ? zoneTransform.position : Vector3.zero,
                 attraction = attraction,
-                permissions = permissions
+                permissions = permissions,
+                sourceId = sourceId,
+                priority = priority
             };
         }
 
@@ -147,23 +153,28 @@ namespace ES
     public sealed class ESZoneProfileMotionInfluenceExtensionRuntime : ESZoneProfileExtensionRuntime
     {
         private readonly ESZoneProfileMotionInfluenceExtensionSettings settings;
-        private readonly Dictionary<UnityEngine.Object, ESMotionFieldLease> leases;
+        private Dictionary<UnityEngine.Object, ESMotionFieldLease> leases;
+        private ulong sourceId;
 
         public ESZoneProfileMotionInfluenceExtensionRuntime(
             ESZoneProfileMotionInfluenceExtensionSettings settings)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            int capacity = settings.PrewarmMemberCapacity;
-            leases = new Dictionary<UnityEngine.Object, ESMotionFieldLease>(capacity);
         }
 
-        public int ActiveLeaseCount => leases.Count;
+        public int ActiveLeaseCount => leases?.Count ?? 0;
 
         public override void OnProfileAwake(
             ESZoneProfile profile,
             ESZoneProfileRuntimeContext context)
         {
-            context.EnsureMemberCapacity(settings.PrewarmMemberCapacity);
+            sourceId = ComputeStableSourceId(profile.Header.DefinitionKey);
+            if (settings.Mode != ESZoneMotionInfluenceMode.VelocityDelta)
+            {
+                int capacity = settings.PrewarmMemberCapacity;
+                leases = new Dictionary<UnityEngine.Object, ESMotionFieldLease>(capacity);
+                context.EnsureMemberCapacity(capacity);
+            }
         }
 
         public override ESZoneMemberEnterResult TryEnterMember(
@@ -172,7 +183,9 @@ namespace ES
             ESZoneMember member,
             out string error)
         {
-            if (!ESMotionInfluenceReceiverResolver.TryResolve(member.RootObject, out var receiver)
+            IESMotionInfluenceReceiver receiver = member.MotionReceiver;
+            if ((receiver == null
+                    && !ESMotionInfluenceReceiverResolver.TryResolve(member.RootObject, out receiver))
                 || !settings.Allows(receiver))
             {
                 error = null;
@@ -186,7 +199,7 @@ namespace ES
                         settings.Permissions))
                 {
                     error = null;
-                    return ESZoneMemberEnterResult.Entered;
+                    return ESZoneMemberEnterResult.AppliedTransiently;
                 }
 
                 error = null;
@@ -194,14 +207,14 @@ namespace ES
             }
 
             if (!receiver.TryAcquireField(
-                    settings.BuildFieldRequest(profile.transform),
+                    settings.BuildFieldRequest(profile.transform, sourceId, profile.Settings.Priority),
                     out ESMotionFieldLease lease))
             {
                 error = "目标拒绝运动 Field Lease。";
                 return ESZoneMemberEnterResult.Failed;
             }
 
-            leases[member.Key] = lease;
+            leases.Add(member.Key, lease);
             error = null;
             return ESZoneMemberEnterResult.Entered;
         }
@@ -212,6 +225,7 @@ namespace ES
             ESZoneMember member)
         {
             if (ReferenceEquals(member.Key, null)
+                || leases == null
                 || !leases.TryGetValue(member.Key, out ESMotionFieldLease lease))
                 return;
             lease.Dispose();
@@ -241,9 +255,28 @@ namespace ES
 
         private void DisposeAllLeases()
         {
+            if (leases == null || leases.Count == 0)
+                return;
+
             foreach (ESMotionFieldLease lease in leases.Values)
                 lease.Dispose();
             leases.Clear();
+        }
+
+        private static ulong ComputeStableSourceId(string value)
+        {
+            const ulong offset = 14695981039346656037UL;
+            const ulong prime = 1099511628211UL;
+            ulong hash = offset;
+            if (!string.IsNullOrEmpty(value))
+            {
+                for (int i = 0; i < value.Length; i++)
+                {
+                    hash ^= value[i];
+                    hash *= prime;
+                }
+            }
+            return hash != 0UL ? hash : 1UL;
         }
     }
 }

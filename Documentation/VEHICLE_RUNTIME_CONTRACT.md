@@ -14,8 +14,8 @@
 
 ```text
 已仲裁的驾驶输入
-  -> EntityMountable.SubmitDriverInput
-  -> VehicleController.SubmitDriverInput(seat, driver, ...)
+  -> EntityMountable.TrySetDriverInput
+  -> VehicleController.TrySetDriverInput(seat, driver, ...)
   -> 车辆 ESWorkScheduler 阶段
   -> Rigidbody FixedUpdate / KCC ICharacterController 回调
 ```
@@ -37,12 +37,12 @@
 驾驶权授予 (seat, driver)
   -> VehicleController Push(vehicle.chase Shot，Owner=driver)
   -> ESCameraDirector 活跃集合仲裁
-  -> driver 的既有 SubmitCameraLook 输入继续驱动获胜镜头
+  -> driver 的既有 TrySetCameraLook 输入继续驱动获胜镜头
   -> 驾驶权释放 / Controller 禁用 / 销毁：Release Lease
 ```
 
 - `driverCameraDefinitionKey` 为空时，载具不申请镜头；它是对静态骑乘点、AI 车辆和无镜头载具的正常配置，不需要空组件。
-- 请求 Owner 必须是当前 `driver`，而不是 Controller。这样不增加输入转发 if，现有 `Entity.SubmitCameraLook` 仅在该请求获胜时自然被 Director 接受。
+- 请求 Owner 必须是当前 `driver`，而不是 Controller。这样不增加输入转发 if，现有 `Entity.TrySetCameraLook` 仅在该请求获胜时自然被 Director 接受。
 - 驾驶镜头的 `Follow` 默认是载具根；正式载具可显式配置专用相机锚点。它只保存 Transform 与 DefinitionKey，不保存 Brain、VCam 或 Rig。
 - 默认内容工具生成 `vehicle.chase` Profile/Rig。方块汽车、自行车与直升机在“升级方块载具骑乘探针”时会显式写入该 Profile；项目内容可以替换为专属稳定 Key。
 
@@ -57,7 +57,7 @@
 
 车辆能力不得复用 `IEntityKCCBeforeMotion`、`IEntityKCCRotationMotion`、`IEntityKCCVelocityMotion`。这些接口包含 Entity、角色状态旗标和角色工作额度语义；它们只适用于生命体自身运动。
 
-一个物理步只能送入一个已仲裁的驾驶来源。座位输入必须经 `SubmitDriverInput(seat, driver, ...)`，Controller 只接受当前驾驶权对应的 `(seat, driver)`；无来源 `SetDriverInput` 不能覆盖已占用座位。输入路由失效会立即清空座位输入，Controller 也会清除超过一帧未刷新的快照。
+一个物理步只能送入一个已仲裁的驾驶来源。座位输入必须经 `TrySetDriverInput(seat, driver, ...)`，Controller 只接受当前驾驶权对应的 `(seat, driver)`；无来源 `SetDriverInput` 不能覆盖已占用座位。输入路由失效会立即清空座位输入，Controller 也会清除超过一帧未刷新的快照。
 
 禁用 Controller 会撤销当前驾驶座占用、解绑 KCC Controller，并通过座位事件使骑手同步退出 Mounted；重新启用 KCC 后端时重新绑定。车辆能力允许在调度中动态注销，单个能力异常仅记录，不会截断后续能力和本帧物理提交。
 

@@ -9,7 +9,8 @@ namespace ES
     {
         Ignored = 0,
         Entered = 1,
-        Failed = 2
+        Failed = 2,
+        AppliedTransiently = 3
     }
 
     [Serializable]

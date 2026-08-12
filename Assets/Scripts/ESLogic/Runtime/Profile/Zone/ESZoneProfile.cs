@@ -369,6 +369,8 @@ namespace ES
                         binding.Runtime.TryEnterMember(this, context, member, out error);
                     if (result == ESZoneMemberEnterResult.Ignored)
                         continue;
+                    if (result == ESZoneMemberEnterResult.AppliedTransiently)
+                        continue;
 
                     if (result == ESZoneMemberEnterResult.Failed)
                     {

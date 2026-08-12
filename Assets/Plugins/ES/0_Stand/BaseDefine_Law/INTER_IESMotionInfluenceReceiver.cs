@@ -15,6 +15,12 @@ namespace ES
         SpringDamper = 1
     }
 
+    public enum ESMotionAttractionVelocityMode
+    {
+        RadialOnly = 0,
+        FullVelocity = 1
+    }
+
     [Flags]
     public enum ESMotionInfluencePermissions
     {
@@ -43,6 +49,8 @@ namespace ES
         [Min(0f)] public float response;
         [Min(0f)] public float stiffness;
         [Min(0f)] public float damping;
+        [Tooltip("Radial Only 只改变朝向锚点的径向速度；Full Velocity 会同时制动切向速度。")]
+        public ESMotionAttractionVelocityMode velocityMode;
     }
 
     [Serializable]
@@ -56,6 +64,10 @@ namespace ES
         public Vector3 anchorPosition;
         public ESMotionAttractionSettings attraction;
         public ESMotionInfluencePermissions permissions;
+        [Tooltip("稳定来源身份。相同优先级的 Field 按此值稳定组合。")]
+        public ulong sourceId;
+        [Tooltip("较高优先级先参与组合。")]
+        public int priority;
 
         public Vector3 ResolveAnchorPosition()
         {

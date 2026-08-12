@@ -406,8 +406,8 @@ namespace ES
                    && ((currentDriver == null && currentDriverSeat == null) || IsCurrentDriver(seat, driver));
         }
 
-        /// <summary>仅当前座位驾驶者可以提交意图，杜绝多个座位或角色相互覆盖。</summary>
-        public bool SubmitDriverInput(
+        /// <summary>仅当前座位驾驶者可以设置意图，杜绝多个座位或角色相互覆盖。</summary>
+        public bool TrySetDriverInput(
             EntityMountable seat,
             Entity driver,
             Vector3 moveWorld,

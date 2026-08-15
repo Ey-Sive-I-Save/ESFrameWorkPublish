@@ -4,7 +4,7 @@
                   "id":  "LOCAL-2026-08-02-OPEN",
                   "status":  "ready-for-html",
                   "startedAt":  "2026-08-02",
-                  "updatedAt":  "2026-08-13",
+                  "updatedAt":  "2026-08-15",
                   "documentBeforeIntegration":  {
                                                     "sha256":  "61f8be88052f2ccdc8cc7165e3782bbbb2d945d547c2d459c8c2c6d7e6043111",
                                                     "sizeBytes":  3466448
@@ -1329,6 +1329,55 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260815-001",
+                        "status":  "documented",
+                        "summary":  "新增仅面向 URP 的 ES Composite Shader 切片，分离 2D、3D Lit、3D VFX 与 UI 职责，提供 PropertyBlock 强类型参数、案例材质和目的明确的卡片化材质 Inspector。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem.meta",
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem",
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets.meta",
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets/ShaderExamples.meta",
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets/ShaderExamples",
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets/Shaders.meta",
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets/Shaders",
+                                            "Assets/Plugins/ES/Editor/ESShader.meta",
+                                            "Assets/Plugins/ES/Editor/ESShader"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESCompositeShaderParameters.cs",
+                                              "Assets/Plugins/ES/0_Stand/InternalAssets/Shaders/ES3DLitCompositeURPCommon.hlsl",
+                                              "Assets/Plugins/ES/0_Stand/InternalAssets/ShaderExamples/Materials/ES3D_Lit_标准_边缘光.mat",
+                                              "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderGUI.cs",
+                                              "Assets/Plugins/ES/Editor/ESShader/ESCompositeCodingHelper.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "四类 Shader、共享 Lit HLSL、运行时强类型参数、案例材质和自定义 Inspector 共同构成可使用切片；按职责同批提交可避免材质丢失 Shader、PropertyBlock 属性名漂移或 CustomEditor 类型缺失。Inspector 使用分类卡片与功能卡片两级组织，标题直接表达噪声、溶解、全息、边缘光等目的，不复制第三方实现源码。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Stand.csproj 静态构建为 0 警告、0 错误",
+                                                            "ES_Editor.csproj 静态构建为 0 错误；仅保留两个与 Shader 无关的既有警告",
+                                                            "Unity 2022.3.45f1 启动当前工程后，本次 Editor.log 区段未检出 Shader error、error CS、Compilation failed 或 Failed to compile",
+                                                            "目标文本通过严格 UTF-8、乱码扫描和范围化 git diff --check"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "材质 Inspector 的窄窗口、高 DPI、混合多选和实际点击布局仍需 Unity 实机人工验收",
+                                                             "案例材质的真实渲染表现、PlayMode、Profiler、Player 与 IL2CPP 尚未验收",
+                                                             "静态编译和 Editor.log 无错误不能替代各 Shader Variant 的完整平台编译"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1341,13 +1390,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-13T04:56:44+08:00",
-                       "head":  "f946b297ec2a8cf15c146b98dd7807bbf59ab4c7",
-                       "stagedSourcePatchSha256":  "498278adc724ada4cb1d484c2b261451004b7e6e9b5e6d3641c53061bac369e3",
-                       "stagedSourceManifestSha256":  "bc1c93d17f407c41866d19d5eba44caffe26694c5f282edaeddc0db9568fde06",
-                       "stagedSourceFileCount":  2,
+                       "preparedAt":  "2026-08-15T17:25:05+08:00",
+                       "head":  "98cad6b78288872db6f80916b8dce729d122c030",
+                       "stagedSourcePatchSha256":  "38c68ce4ef47626b5264eaa3329243df88b23845210b7d81f81e5d3f4ff0dd23",
+                       "stagedSourceManifestSha256":  "d1df5e907d3309361d75262caae3baaf28b7c6ebf737f95bf7c647b4be919b62",
+                       "stagedSourceFileCount":  34,
                        "entryIds":  [
-                                        "LOCAL-20260803-013"
+                                        "LOCAL-20260815-001"
                                     ]
                    }
 }

@@ -1,0 +1,140 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: "ES2D_\u9AD8\u8D28\u91CF_\u5168\u606F\u6EB6\u89E3"
+  m_Shader: {fileID: 4800000, guid: 7d8a4d6e0b8f4c5b9a2e1f3d6c7b8a90, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords:
+  - _ENABLEBURN_ON
+  - _ENABLEDISTORTION_ON
+  - _ENABLEGLITCH_ON
+  - _ENABLEHOLOGRAM_ON
+  - _ENABLESHINE_ON
+  m_LightmapFlags: 0
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties:
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _FadeMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NoiseTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AddColorFade: 1
+    - _AlphaClip: 0
+    - _AlphaTintMin: 0.02
+    - _AnimationMode: 1
+    - _Brightness: 1
+    - _BurnProgress: 0
+    - _BurnWidth: 0.1
+    - _Contrast: 1
+    - _CoordinateMode: 0
+    - _CustomTime: 0
+    - _Cutoff: 0.01
+    - _DissolveEdgeWidth: 0.08
+    - _DistortionStrength: 0.025
+    - _EnableAddColor: 0
+    - _EnableAlphaTint: 0
+    - _EnableBrightness: 0
+    - _EnableBurn: 1
+    - _EnableColorReplace: 0
+    - _EnableContrast: 0
+    - _EnableDistortion: 1
+    - _EnableFrozen: 0
+    - _EnableGlitch: 1
+    - _EnableHologram: 1
+    - _EnableHue: 0
+    - _EnableInnerOutline: 0
+    - _EnableNegative: 0
+    - _EnableOuterOutline: 0
+    - _EnablePingPongGlow: 0
+    - _EnablePixelOutline: 0
+    - _EnablePoison: 0
+    - _EnableRainbow: 0
+    - _EnableSaturation: 0
+    - _EnableShine: 1
+    - _EnableStrongTint: 0
+    - _FadeMode: 3
+    - _FadeNoiseFactor: 0.2
+    - _FadeProgress: 0.35
+    - _FadeWidth: 0.1
+    - _FrozenDensity: 0.35
+    - _FrozenSpeed: 0.2
+    - _GlitchIntensity: 0.03
+    - _GlitchSpeed: 3
+    - _GlowFrequency: 2
+    - _GlowIntensity: 1
+    - _HologramLineFrequency: 80
+    - _HologramLineGap: 0.35
+    - _HologramMinAlpha: 0.2
+    - _HologramSpeed: 1.5
+    - _Hue: 0
+    - _InnerOutlineWidth: 0.08
+    - _NegativeFade: 1
+    - _OuterOutlineWidth: 0.005
+    - _PixelOutlineWidth: 1
+    - _PoisonDensity: 3
+    - _PoisonSpeed: 1
+    - _RainbowBrightness: 1
+    - _RainbowDensity: 1
+    - _RainbowSpeed: 1
+    - _ReplaceRange: 0.1
+    - _ReplaceSoftness: 0.1
+    - _Saturation: 1
+    - _SequenceColumns: 1
+    - _SequenceFrame: 0
+    - _SequenceRows: 1
+    - _SequenceSpeed: 8
+    - _ShineAngle: 30
+    - _ShineIntensity: 1
+    - _ShineSpeed: 1
+    - _ShineWidth: 0.15
+    - _StrongTintFade: 1
+    - _TimeMode: 0
+    - _VertexColorStrength: 1
+    m_Colors:
+    - _AddColor: {r: 1, g: 0, b: 0, a: 1}
+    - _AlphaTint: {r: 1, g: 1, b: 1, a: 1}
+    - _BurnEdgeColor: {r: 1, g: 0.1, b: 0.01, a: 1}
+    - _BurnInsideColor: {r: 0.2, g: 0.02, b: 0, a: 1}
+    - _Color: {r: 0.35, g: 0.8, b: 1, a: 1}
+    - _DissolveEdgeColor: {r: 1, g: 0.08, b: 0.01, a: 1}
+    - _FadePosition: {r: 0.5, g: 0.5, b: 0, a: 0}
+    - _FrozenColor: {r: 0.3, g: 0.8, b: 1, a: 1}
+    - _FrozenHighlight: {r: 1, g: 1, b: 1, a: 1}
+    - _GlowFrom: {r: 1, g: 0, b: 0, a: 1}
+    - _GlowTo: {r: 0, g: 0.3, b: 1, a: 1}
+    - _HologramColor: {r: 0.05, g: 0.8, b: 1, a: 1}
+    - _InnerOutlineColor: {r: 1, g: 0.2, b: 0.05, a: 1}
+    - _NoiseScale: {r: 1, g: 1, b: 0, a: 0}
+    - _NoiseSpeed: {r: 0, g: 0, b: 0, a: 0}
+    - _OuterOutlineColor: {r: 0, g: 0, b: 0, a: 1}
+    - _PixelOutlineColor: {r: 1, g: 1, b: 1, a: 1}
+    - _PoisonColor: {r: 0.2, g: 1, b: 0.1, a: 1}
+    - _ReplaceFrom: {r: 0, g: 0, b: 0, a: 1}
+    - _ReplaceTo: {r: 1, g: 1, b: 1, a: 1}
+    - _ShineColor: {r: 1, g: 1, b: 1, a: 1}
+    - _StrongTint: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []

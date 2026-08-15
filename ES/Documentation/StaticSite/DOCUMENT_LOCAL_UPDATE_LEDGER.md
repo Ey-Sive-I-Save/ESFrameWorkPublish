@@ -97,6 +97,7 @@ git commit -m "本批语义说明"
 | `LOCAL-20260803-015` | `documented` | 补齐静态站点阅读和同步治理规则，明确 Git、台账、HTML 与验收证据的边界。 | UTF-8、staged-only 门禁与范围化空白检查通过。 | 文档治理章节；当前 HTML 仍不提前改写。 |
 | `LOCAL-20260803-016` | `documented`，本地已提交待推送 | 模块审计增加受控续接检查点：默认只读、精确区域授权、事实漂移失效与恢复前重新核对。 | AICommands 53/0、文本编码与结构检查通过；未运行 Unity 或官方 Python 验证器。 | `#editor-overview`、`#deep-warning-16`；先 push 与统一回归，后续才可整合。 |
 | `LOCAL-20260803-017` | `documented` | 固定模块审计状态路径，并建立“审计”“审计并记录”“继续审计”三个直接触发协议。 | 固定路径和触发词已同步至 Skill、AICommand、AIWarning 与入口索引；不扩大源码、Git、Unity 或发布权限。 | `#editor-overview`、`#deep-warning-16`；当前延期。 |
+| `LOCAL-20260815-001` | `documented` | 新增 URP Composite Shader 完整切片，覆盖 2D、3D Lit、3D VFX、UI、PropertyBlock 强类型参数、案例材质与卡片化 Inspector。 | C# 静态构建通过；Unity 本次日志无 Shader/C# 编译错误；Inspector 视觉和运行表现仍待实机验收。 | `#runtime-overview`、`#editor-overview`、`#editor-verification`；当前延期。 |
 
 ### LOCAL-20260802-002：UnityMCP 安装与 Codex 接入
 
@@ -313,6 +314,15 @@ git commit -m "本批语义说明"
 - **回归状态**：提交前执行 staged-only 指纹门禁；规则与工具已纳入同一可追溯范围。
 - **已知缺口**：真实窄窗口、高 DPI、视觉和交互仍需 Unity 实机检查。未跟踪静态 HTML 仍被开放批次的 `ready-for-html` 门禁阻断，未绕过。
 - **HTML 目标**：后续统一整合，当前延期。
+
+### LOCAL-20260815-001：URP Composite Shader 与卡片化材质面板
+
+- **源码路径**：`0_Stand/BaseDefine_RunTime/ShaderSystem`、`0_Stand/InternalAssets/Shaders`、`0_Stand/InternalAssets/ShaderExamples` 与 `Editor/ESShader`，包含对应 Unity `.meta`。
+- **规范与证据**：只支持 URP，按 2D、3D Lit、3D VFX、UI 分离 Shader 职责；运行时通过强类型属性 ID 和 `MaterialPropertyBlock` 写入，编辑器通过分类卡片、功能卡片、中文标签、搜索导航、状态/成本提示及逐属性 C# 示例组织材质参数。
+- **完成分析**：Shader、共享 HLSL、属性合同、案例材质与 CustomEditor 必须同批，否则会产生材质 Shader 丢失、属性名漂移或自定义 Inspector 无法加载。排版借鉴成熟的分类/功能折叠策略，但没有复制第三方 Shader 或 Editor 源码。
+- **回归状态**：`ES_Stand.csproj` 为 0 警告、0 错误；`ES_Editor.csproj` 为 0 错误，仅有两个与 Shader 无关的既有警告；Unity 2022.3.45f1 启动当前工程后，本次 `Editor.log` 区段没有 Shader/C# 编译错误；目标文本通过严格 UTF-8 与范围化空白检查。
+- **已知缺口**：Inspector 的窄窗口、高 DPI、多选混合值与完整点击交互仍需 Unity 实机人工验收；案例材质的 PlayMode、Profiler、Player、IL2CPP 和各平台 Shader Variant 尚未验收。
+- **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
 ## 条目模板
 

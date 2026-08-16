@@ -20,7 +20,8 @@ namespace ES
         MissingGameCoreKey = 10,
         MissingWeaponConfig = 11,
         InvalidTagDefinition = 12,
-        InvalidAttributeValues = 13
+        InvalidAttributeValues = 13,
+        MissingItemConfigKey = 14
     }
 
     [ESCreatePath("数据信息", "物品数据信息")]
@@ -29,6 +30,10 @@ namespace ES
         [Title("摘要")]
         [ShowInInspector, ReadOnly, LabelText("配置说明")]
         private string EditorSummary => BuildEditorSummary();
+
+        [Title("稳定身份")]
+        [LabelText("Item 定义 Key")]
+        public ESItemConfigKey itemKey = new ESItemConfigKey();
 
         [Title("出生 Tag")]
         [LabelText("出生时添加")]
@@ -71,6 +76,11 @@ namespace ES
             if (tags == null)
             {
                 tags = new List<ESTagStableReference>();
+                changed = true;
+            }
+            if (itemKey == null)
+            {
+                itemKey = new ESItemConfigKey();
                 changed = true;
             }
             if (floatValues == null)
@@ -132,6 +142,8 @@ namespace ES
                 return ESItemDataValidationCode.MissingBaseConfig;
             if (baseConfig.kind == ItemKind.None)
                 return ESItemDataValidationCode.ItemKindNotSelected;
+            if (itemKey == null || !itemKey.IsConfigured)
+                return ESItemDataValidationCode.MissingItemConfigKey;
             if (interactConfig == null)
                 return ESItemDataValidationCode.MissingInteractConfig;
             if (logicConfig == null)
@@ -175,6 +187,7 @@ namespace ES
             {
                 case ESItemDataValidationCode.Valid: return "配置有效。";
                 case ESItemDataValidationCode.MissingBusinessKey: return "缺少 Item 业务 Key（SoDataInfo.KeyName）。";
+                case ESItemDataValidationCode.MissingItemConfigKey: return "缺少正式 Item ConfigKey；KeyName 不能作为 GameCore 身份。";
                 case ESItemDataValidationCode.MissingBaseConfig: return "缺少基础配置 BaseConfig。";
                 case ESItemDataValidationCode.ItemKindNotSelected: return "尚未选择 ItemKind。";
                 case ESItemDataValidationCode.MissingInteractConfig: return "缺少通用交互配置。";
@@ -196,10 +209,16 @@ namespace ES
             if (baseConfig == null) return "未配置";
             switch (baseConfig.kind)
             {
-                case ItemKind.Shot: return "Item/Shot -> ESRuntimeDataGameCore.Shots";
-                case ItemKind.Weapon: return "Item/Weapon -> ESRuntimeDataGameCore.Weapons";
-                default: return "普通 Item（不进入 GameCore 启动表）";
+                case ItemKind.Shot: return "Item -> Items + Shot -> Shots";
+                case ItemKind.Weapon: return "Item -> Items + Weapon -> Weapons";
+                default: return "Item -> ESRuntimeDataGameCore.Items";
             }
+        }
+
+        public bool TryGetItemGameCoreKey(out ESItemConfigKey key)
+        {
+            key = itemKey;
+            return key != null && key.IsConfigured;
         }
 
         public bool TryGetGameCoreKey(out IESConfigKey key)
@@ -310,12 +329,12 @@ namespace ES
                     || baseConfig.kind == ItemKind.Zone);
         }
 
-        public bool IsGameCoreRoot => baseConfig != null && (baseConfig.kind == ItemKind.Shot || baseConfig.kind == ItemKind.Weapon);
+        public bool IsGameCoreRoot => baseConfig != null && baseConfig.kind != ItemKind.None;
 
         public void InjectGameCoreTables()
         {
-            // Item Group/Pack 会按 IGameCoreSO 统一转发；条件型普通 Item 在这里安全跳过，
-            // 只有 Shot/Weapon 才是实际 GameCore 根并进入强类型表。
+            // Item Group/Pack 会按 IGameCoreSO 统一转发。每条 Item 都先进入基础 Item 表；
+            // Shot/Weapon 再由同一根 SO 显式形成第二个强类型能力投影。
             if (!IsGameCoreRoot)
                 return;
 
@@ -483,19 +502,108 @@ namespace ES
         }
     }
 
-    /// <summary>Item 的枚举分流注册入口；Shot/Weapon 分别写入各自强类型表。</summary>
+    /// <summary>
+    /// Item 根 SO 的显式双投影入口：所有 Item 写入基础 Item 表，
+    /// Shot/Weapon 再写入各自能力表。跨表 RuntimeKey 永不互相解释。
+    /// </summary>
     public static class ESItemGameCoreTable
     {
+        public static ESItemConfigKeyTable Table => ESRuntimeDataGameCore.Items;
+
         public static void Inject(ItemDataInfo info)
         {
             if (info == null) throw new System.ArgumentNullException(nameof(info));
             if (info.baseConfig == null) throw new System.InvalidOperationException("Item 缺少 BaseConfig：" + info.name);
 
-            switch (info.baseConfig.kind)
+            ESItemConfigKey itemKey = info.itemKey;
+            if (itemKey == null || !itemKey.IsConfigured)
+                throw new System.InvalidOperationException("Item 缺少正式 Item ConfigKey：" + info.name);
+
+            bool hasShotProjection = info.baseConfig.kind == ItemKind.Shot;
+            bool hasWeaponProjection = info.baseConfig.kind == ItemKind.Weapon;
+            bool ownsItemBuild = !Table.IsBuilding;
+            bool ownsProjectionBuild = hasShotProjection
+                ? !ESShotGameCoreTable.Table.IsBuilding
+                : hasWeaponProjection && !ESWeaponGameCoreTable.Table.IsBuilding;
+
+            if (ownsItemBuild)
+                Table.BeginBuild();
+            if (hasShotProjection && ownsProjectionBuild)
+                ESShotGameCoreTable.Table.BeginBuild();
+            else if (hasWeaponProjection && ownsProjectionBuild)
+                ESWeaponGameCoreTable.Table.BeginBuild();
+
+            ESItemRuntimeData preparedItem = null;
+            int committedItemRuntimeKey = 0;
+            try
             {
-                case ItemKind.Shot: ESShotGameCoreTable.Inject(info); return;
-                case ItemKind.Weapon: ESWeaponGameCoreTable.Inject(info); return;
-                default: throw new System.InvalidOperationException("非 GameCore Item 不得注入：" + info.name + " (" + info.baseConfig.kind + ")");
+                bool itemAlreadyReady = Table.TryGet(itemKey, out ESItemRuntimeData existingItem);
+                if (itemAlreadyReady && !object.ReferenceEquals(existingItem.soSource, info))
+                    throw new System.InvalidOperationException("Item GameCore Key 重复：" + info.name);
+
+                ValidateProjectionOwner(info);
+
+                if (!itemAlreadyReady)
+                {
+                    preparedItem = Table.AcquireRetained(itemKey);
+                    ESItemConfigKeyTable.PrepareFromInfo(preparedItem, info);
+                    committedItemRuntimeKey = Table.CommitRetained(itemKey, preparedItem, debugName: info.name);
+                }
+
+                if (hasShotProjection)
+                    ESShotGameCoreTable.Inject(info);
+                else if (hasWeaponProjection)
+                    ESWeaponGameCoreTable.Inject(info);
+            }
+            catch (System.Exception exception)
+            {
+                if (committedItemRuntimeKey != 0 && !Table.Remove(committedItemRuntimeKey))
+                {
+                    throw new System.AggregateException(
+                        "Item 双投影提交失败，且基础 Item 投影回滚不完整：" + info.name,
+                        exception,
+                        new System.InvalidOperationException("无法移除本轮 Item RuntimeData。"));
+                }
+
+                Table.AbandonRetained(preparedItem);
+                throw;
+            }
+            finally
+            {
+                if (hasWeaponProjection && ownsProjectionBuild)
+                    ESWeaponGameCoreTable.Table.EndBuild();
+                else if (hasShotProjection && ownsProjectionBuild)
+                    ESShotGameCoreTable.Table.EndBuild();
+                if (ownsItemBuild)
+                    Table.EndBuild();
+            }
+        }
+
+        private static void ValidateProjectionOwner(ItemDataInfo info)
+        {
+            if (info.kindData is ItemShotDataBlock shot)
+            {
+                if (shot.key == null || !shot.key.IsConfigured || shot.sharedData == null)
+                    throw new System.InvalidOperationException("Shot 投影配置不完整：" + info.name);
+                if (ESShotGameCoreTable.Table.TryGet(shot.key, out ESShotRuntimeData existing)
+                    && !object.ReferenceEquals(existing.soSource, info))
+                {
+                    throw new System.InvalidOperationException("Shot GameCore Key 重复：" + info.name);
+                }
+                return;
+            }
+
+            if (info.kindData is ItemWeaponDataBlock weapon)
+            {
+                if (weapon.key == null || !weapon.key.IsConfigured || weapon.sharedData == null)
+                    throw new System.InvalidOperationException("Weapon 投影配置不完整：" + info.name);
+                if (!weapon.sharedData.ValidateDefinition(out string validationError))
+                    throw new System.InvalidOperationException("WeaponDefinition 校验失败：" + validationError + " | " + info.name);
+                if (ESWeaponGameCoreTable.Table.TryGet(weapon.key, out ESWeaponRuntimeData existing)
+                    && !object.ReferenceEquals(existing.soSource, info))
+                {
+                    throw new System.InvalidOperationException("Weapon GameCore Key 重复：" + info.name);
+                }
             }
         }
     }

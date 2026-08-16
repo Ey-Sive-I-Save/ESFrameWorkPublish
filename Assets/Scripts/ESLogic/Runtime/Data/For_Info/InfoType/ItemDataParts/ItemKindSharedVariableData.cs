@@ -131,9 +131,6 @@ namespace ES
         [LabelText("默认冷却")]
         public float cooldown;
 
-        [LabelText("挂点名")]
-        public string socketName;
-
         [Title("射击定义")]
         [InlineProperty]
         public WeaponFireDefinitionData fire = WeaponFireDefinitionData.Default;
@@ -149,7 +146,6 @@ namespace ES
             defaultShot = new ESShotConfigKey(),
             hitRadius = 0.2f,
             cooldown = 0.2f,
-            socketName = string.Empty,
             fire = WeaponFireDefinitionData.Default,
             recoil = WeaponRecoilDefinitionData.Default
         };
@@ -162,7 +158,6 @@ namespace ES
             defaultShot = new ESShotConfigKey();
             hitRadius = 0.2f;
             cooldown = 0.2f;
-            socketName = string.Empty;
             fire = WeaponFireDefinitionData.Default;
             recoil = WeaponRecoilDefinitionData.Default;
         }

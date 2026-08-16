@@ -80,15 +80,15 @@ EntityBasicMoveRotateModule
 
 `EntityTransformMapping` 是运行时缓存挂点服务：固定键读取连续缓存，动态键只可用于初始化或事件边界。装备、相机、特效和战斗热路径禁止重新 `Find` 层级。
 
-`WeaponSocket` 是武器业务挂点；Humanoid `RightHand` 只保留骨骼语义。武器手持优先级固定为：
+Humanoid `RightHand` 只保留骨骼语义，不承担最终业务偏移。角色整体挂载必须使用作者化业务 Socket：
 
 ```text
-武器显式 handMount
-  -> 角色 WeaponSocket
-    -> Combat 回退挂点
+MainHandSocket / OffHandSocket
+PrimaryBackSocket / SecondaryBackSocket
+HipSocket / TemporaryHandSocket
 ```
 
-双手武器的副手目标和局部偏移都写入该武器根的 `EntityWeaponBinding`，不得写回 Humanoid 手骨。
+武器根的 `EntityWeaponBinding` 只保存 GripPivot、OffHandGrip、Muzzle、AimReference 与 PresentationRoot 等武器本地参考。双手武器的副手目标和局部偏移不得写回 Humanoid 手骨；正式资产缺失业务 Socket 时必须拒绝装配，禁止回退到角色根或运行时自动创建。
 
 ## 发布门禁与验收
 
@@ -104,7 +104,7 @@ P0 发布门禁必须阻止 `ES基础角色模板.prefab`、全局预览模型�
 
 ## 大黑塔正式玩家 Variant 迁移
 
-`Assets/ESNormalAssets/EditorTools/大黑塔.prefab` 是旧预览样例，只能作为模型和 Animator 的迁移来源，禁止成为场景、对象池预热或发布资源的依赖。
+`Assets/ESNormalAssets/EditorTools/大黑塔.prefab` 是旧预览样例，已经退出正式 Variant Builder 的输入链路，禁止成为正式场景、对象池预热或发布资源的依赖。当前 `Example_SimpleTools/New Scene 1.unity` 仍显式引用该样例；在该示例场景完成受控重建前不得直接删除 Prefab，且不得把这项示例引用解释为正式兼容路径。
 
 在 Unity 脚本编译通过后，可只重建正式角色，执行：
 
@@ -116,10 +116,11 @@ P0 发布门禁必须阻止 `ES基础角色模板.prefab`、全局预览模型�
 
 ```text
 Assets/ESNormalAssets/CharacterVariants/大黑塔.prefab
+Assets/ESNormalAssets/CharacterPresentation/大黑塔_表现.prefab
 Assets/ESNormalAssets/Data/CharacterVariants/大黑塔_ActorData.asset
 ```
 
-迁移只保留旧样例的模型、Animator 和纯表现组件；旧 `Entity`、KCC、Collider、运行模块及其他业务脚本一律剥离。输出角色固定为 `CharacterVariant + Player + ActorDataInfo`，显式配置移动、输入、骑乘、攀爬、HurtBox、Humanoid Mapping 与 Solver-free FinalIK 基线，并在保存后立即运行正式角色门禁。
+正式 Builder 只读取独立表现 Prefab；旧 Preview 不再是迁移来源。表现资产只保存模型、Animator 和纯表现组件；正式 Variant 的 `Entity`、KCC、Collider、五个 Domain 与其他业务组件全部由最新通用模板重建。输出角色固定为 `CharacterVariant + Player + ActorDataInfo`，显式配置移动、输入、骑乘、攀爬、HurtBox、Equipment、Humanoid Mapping 与 Solver-free FinalIK 基线，并在保存后立即运行正式角色门禁。
 
 方块载具原型首次配套使用前，可单独执行：
 

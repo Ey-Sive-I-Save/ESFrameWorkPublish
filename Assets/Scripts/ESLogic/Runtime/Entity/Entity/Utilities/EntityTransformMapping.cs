@@ -1,30 +1,128 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
+
+[assembly: InternalsVisibleTo("ES_Logic.Editor")]
+[assembly: InternalsVisibleTo("ES_Logic.Editor.Generation.Tests")]
 
 namespace ES
 {
     public enum DefaultTransformKey
     {
-        Root,
-        Head,
-        Chest,
-        Hip,
-        LeftHand,
-        RightHand,
-        LeftFoot,
-        RightFoot,
-        Weapon,
-        Camera,
-        CustomA,
-        CustomB
+        Root = 0,
+        Head = 1,
+        Chest = 2,
+        Hip = 3,
+        LeftHand = 4,
+        RightHand = 5,
+        LeftFoot = 6,
+        RightFoot = 7,
+        Camera = 9,
+        CustomA = 10,
+        CustomB = 11
+    }
+
+    /// <summary>Allocation-free read-only access to one entity's serialized transform map.</summary>
+    public readonly struct EntityTransformMapView
+    {
+        private readonly EntityTransformMap map;
+
+        internal EntityTransformMapView(EntityTransformMap map)
+        {
+            this.map = map;
+        }
+
+        public bool IsCreated => map != null;
+        public int Count => map?.Count ?? 0;
+        public int Generation => map?.Generation ?? 0;
+        public bool IsValid => map != null && map.IsValid;
+        internal EntityTransformMap.Conflict LastConflict => map != null ? map.LastConflict : default;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Transform Resolve(DefaultTransformKey key)
+        {
+            return map != null ? map.Resolve(key) : null;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Transform Resolve(string key)
+        {
+            return map != null ? map.Resolve(key) : null;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryGet(DefaultTransformKey key, out Transform value)
+        {
+            if (map != null)
+                return map.TryGet(key, out value);
+            value = null;
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryGet(string key, out Transform value)
+        {
+            if (map != null)
+                return map.TryGet(key, out value);
+            value = null;
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryGet(DefaultTransformKey defaultKey, string stringKey, out Transform value)
+        {
+            if (map != null)
+                return map.TryGet(defaultKey, stringKey, out value);
+            value = null;
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool ContainsAlias(DefaultTransformKey key)
+        {
+            return map != null && map.ContainsAlias(key);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool ContainsAlias(string key)
+        {
+            return map != null && map.ContainsAlias(key);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool ContainsKey(DefaultTransformKey key)
+        {
+            return map != null && map.ContainsKey(key);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool ContainsKey(string key)
+        {
+            return map != null && map.ContainsKey(key);
+        }
+
+        internal bool TryGetEntryAt(int index, out EntityTransformMap.Entry entry)
+        {
+            if (map != null)
+                return map.TryGetEntryAt(index, out entry);
+            entry = default;
+            return false;
+        }
+
+        internal void CopyEntries(List<EntityTransformMap.Entry> destination)
+        {
+            if (destination == null)
+                throw new ArgumentNullException(nameof(destination));
+            map?.CopyEntries(destination);
+        }
     }
 
     /// <summary>
     /// Entity-specific serialized identity for transform sockets. Generic mirror mechanics stay in the shared container.
     /// </summary>
     [Serializable]
-    public sealed class EntityTransformMap : ESEnumStringMirrorMap<DefaultTransformKey, Transform>
+    internal sealed class EntityTransformMap : ESEnumStringMirrorMap<DefaultTransformKey, Transform>
     {
         [NonSerialized] private Dictionary<string, Transform> runtimeDynamicValues;
         [NonSerialized] private int observedBaseGeneration;
@@ -74,14 +172,29 @@ namespace ES
 
         public bool TrySetDynamic(string key, Transform value, out Conflict conflict)
         {
-            bool hasStringKey = !string.IsNullOrEmpty(key);
-            if (!ValidateStringKey(key, hasStringKey, -1, out conflict)
+            if (string.IsNullOrEmpty(key))
+            {
+                conflict = NewConflict(
+                    ConflictKind.MissingKey,
+                    -1,
+                    -1,
+                    "A non-empty dynamic string key is required.");
+                return false;
+            }
+
+            if (!ValidateStringKey(key, true, -1, out conflict)
                 || !ValidateValue(value, -1, out conflict))
             {
                 return false;
             }
 
-            if (base.ContainsKey(key))
+            if (!base.IsValid)
+            {
+                conflict = base.LastConflict;
+                return false;
+            }
+
+            if (base.ContainsAlias(key))
             {
                 return base.TryAdd(key, value, out conflict);
             }
@@ -95,9 +208,15 @@ namespace ES
 
         public new bool TrySet(string key, Transform value, out Conflict conflict)
         {
+            bool removedDynamic = TryTakeDynamicValue(key, out Transform dynamicValue);
             bool committed = base.TrySet(key, value, out conflict);
-            if (committed)
-                runtimeDynamicValues?.Remove(key);
+            if (!committed)
+            {
+                RestoreDynamicValue(key, dynamicValue, removedDynamic);
+                return false;
+            }
+            if (removedDynamic)
+                AdvanceCombinedGeneration();
             return committed;
         }
 
@@ -107,9 +226,15 @@ namespace ES
             Transform value,
             out Conflict conflict)
         {
+            bool removedDynamic = TryTakeDynamicValue(stringKey, out Transform dynamicValue);
             bool committed = base.TrySet(defaultKey, stringKey, value, out conflict);
-            if (committed)
-                runtimeDynamicValues?.Remove(stringKey);
+            if (!committed)
+            {
+                RestoreDynamicValue(stringKey, dynamicValue, removedDynamic);
+                return false;
+            }
+            if (removedDynamic)
+                AdvanceCombinedGeneration();
             return committed;
         }
 
@@ -139,11 +264,53 @@ namespace ES
         public new void Clear()
         {
             base.Clear();
-            if (runtimeDynamicValues != null && runtimeDynamicValues.Count > 0)
+        }
+
+        protected override bool ValidateAdditionalEntry(
+            Entry entry,
+            int entryIndex,
+            int ignoredIndex,
+            out Conflict conflict)
+        {
+            if (entry.HasStringKey
+                && runtimeDynamicValues != null
+                && runtimeDynamicValues.ContainsKey(entry.stringKey))
             {
-                runtimeDynamicValues.Clear();
-                AdvanceCombinedGeneration();
+                conflict = NewConflict(
+                    ConflictKind.DuplicateStringKey,
+                    entryIndex,
+                    -1,
+                    "String alias conflicts with a runtime-dynamic entry: " + entry.stringKey + ".");
+                return false;
             }
+
+            conflict = Conflict.None;
+            return true;
+        }
+
+        protected override void OnAuthorityCleared()
+        {
+            ClearDynamicOnlyEntries();
+        }
+
+        private bool TryTakeDynamicValue(string key, out Transform value)
+        {
+            value = null;
+            if (key == null
+                || runtimeDynamicValues == null
+                || !runtimeDynamicValues.TryGetValue(key, out value))
+            {
+                return false;
+            }
+
+            runtimeDynamicValues.Remove(key);
+            return true;
+        }
+
+        private void RestoreDynamicValue(string key, Transform value, bool removed)
+        {
+            if (removed)
+                runtimeDynamicValues[key] = value;
         }
 
         private void SyncBaseGeneration()
@@ -186,50 +353,41 @@ namespace ES
             NewEntryMode = ESEnumStringTableNewEntryMode.EnumAndString)]
         [SerializeField] private EntityTransformMap transformMappings = new EntityTransformMap();
 
-#if UNITY_EDITOR
-        [Serializable]
-        public struct LegacyOdinSerializationNode
-        {
-            public string Name;
-            public int Entry;
-            public string Data;
-        }
-
-        [Serializable]
-        public struct LegacyOdinSerializationData
-        {
-            public int SerializedFormat;
-            public byte[] SerializedBytes;
-            public List<UnityEngine.Object> ReferencedUnityObjects;
-            public string SerializedBytesString;
-            public UnityEngine.Object Prefab;
-            public List<UnityEngine.Object> PrefabModificationsReferencedUnityObjects;
-            public List<string> PrefabModifications;
-            public List<LegacyOdinSerializationNode> SerializationNodes;
-
-            public bool ContainsData => (SerializedBytes != null && SerializedBytes.Length > 0)
-                                        || !string.IsNullOrEmpty(SerializedBytesString)
-                                        || (SerializationNodes != null && SerializationNodes.Count > 0);
-
-            public void Reset()
-            {
-                this = default;
-            }
-        }
-
-        // One-version migration bridge for the former SerializedMonoBehaviour payload.
-        // Runtime code never reads this data; the explicit editor migration must consume and clear it.
-        [SerializeField, HideInInspector] private LegacyOdinSerializationData serializationData;
-
-        public bool HasLegacyOdinMappings => serializationData.ContainsData;
-#endif
-
-        public EntityTransformMap TransformMappings
+        public EntityTransformMapView TransformMappings
         {
             get
             {
                 EnsureMap();
-                return transformMappings;
+                return new EntityTransformMapView(transformMappings);
+            }
+        }
+
+        internal int MappingGeneration
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                EnsureMap();
+                return transformMappings.Generation;
+            }
+        }
+
+        internal bool IsMappingValid
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                EnsureMap();
+                return transformMappings.IsValid;
+            }
+        }
+
+        internal EntityTransformMap.Conflict LastMappingConflict
+        {
+            get
+            {
+                EnsureMap();
+                return transformMappings.LastConflict;
             }
         }
 
@@ -247,100 +405,91 @@ namespace ES
         /// <summary>
         /// 从 Unity 序列化条目重建 Enum 连续数组与 String 字典镜像。
         /// </summary>
-        public void RebuildRuntimeCache()
+        internal void RebuildRuntimeCache()
         {
-#if UNITY_EDITOR
-            if (HasLegacyOdinMappings)
-            {
-                Debug.LogError(
-                    "[EntityTransformMapping] 检测到尚未迁移的 Odin 挂点数据。请先执行角色挂点显式迁移，禁止把空的新表当作有效结果。",
-                    this);
-                return;
-            }
-#endif
             EnsureMap();
             transformMappings.MarkDirty();
             if (!transformMappings.TryRebuild(out EntityTransformMap.Conflict conflict))
                 Debug.LogError("[EntityTransformMapping] 挂点镜像重建失败：" + conflict.Message, this);
         }
 
-#if UNITY_EDITOR
-        public LegacyOdinSerializationData CopyLegacyOdinSerializationData()
-        {
-            return serializationData;
-        }
-
-        public void ClearLegacyOdinSerializationData()
-        {
-            serializationData.Reset();
-        }
-#endif
-
         public Transform Resolve(DefaultTransformKey key)
         {
-            return TransformMappings.Resolve(key);
+            EnsureMap();
+            return transformMappings.Resolve(key);
         }
 
         public Transform Resolve(string key)
         {
-            return TransformMappings.Resolve(key);
+            EnsureMap();
+            return transformMappings.Resolve(key);
         }
 
-        public bool Set(DefaultTransformKey key, Transform transform)
+        internal bool Set(DefaultTransformKey key, Transform transform)
         {
-            return TransformMappings.TrySet(key, transform, out _);
+            EnsureMap();
+            return transformMappings.TrySet(key, transform, out _);
         }
 
-        public bool Set(
+        internal bool Set(
             DefaultTransformKey key,
             Transform transform,
             out EntityTransformMap.Conflict conflict)
         {
-            return TransformMappings.TrySet(key, transform, out conflict);
+            EnsureMap();
+            return transformMappings.TrySet(key, transform, out conflict);
         }
 
-        public bool Set(string key, Transform transform)
+        internal bool Set(string key, Transform transform)
         {
-            return TransformMappings.TrySet(key, transform, out _);
+            EnsureMap();
+            return transformMappings.TrySet(key, transform, out _);
         }
 
-        public bool Set(string key, Transform transform, out EntityTransformMap.Conflict conflict)
+        internal bool Set(string key, Transform transform, out EntityTransformMap.Conflict conflict)
         {
-            return TransformMappings.TrySet(key, transform, out conflict);
+            EnsureMap();
+            return transformMappings.TrySet(key, transform, out conflict);
         }
 
         public bool SetDynamic(string key, Transform transform)
         {
-            return TransformMappings.TrySetDynamic(key, transform, out _);
+            EnsureMap();
+            return transformMappings.TrySetDynamic(key, transform, out _);
         }
 
-        public bool SetDynamic(string key, Transform transform, out EntityTransformMap.Conflict conflict)
+        internal bool SetDynamic(string key, Transform transform, out EntityTransformMap.Conflict conflict)
         {
-            return TransformMappings.TrySetDynamic(key, transform, out conflict);
+            EnsureMap();
+            return transformMappings.TrySetDynamic(key, transform, out conflict);
         }
 
-        public bool Set(
+        internal bool Set(
             DefaultTransformKey defaultKey,
             string stringKey,
             Transform transform,
             out EntityTransformMap.Conflict conflict)
         {
-            return TransformMappings.TrySet(defaultKey, stringKey, transform, out conflict);
+            EnsureMap();
+            return transformMappings.TrySet(defaultKey, stringKey, transform, out conflict);
         }
 
-        public bool Remove(DefaultTransformKey key)
+        internal bool Remove(DefaultTransformKey key)
         {
-            return TransformMappings.Remove(key);
+            EnsureMap();
+            return transformMappings.Remove(key);
         }
 
-        public bool Remove(string key)
+        internal bool Remove(string key)
         {
-            return TransformMappings.Remove(key);
+            EnsureMap();
+            return transformMappings.Remove(key);
         }
 
         public void ClearDynamic()
         {
-            TransformMappings.ClearDynamicOnlyEntries();
+            EnsureMap();
+            transformMappings.ClearDynamicOnlyEntries();
         }
 
         private void EnsureMap()

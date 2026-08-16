@@ -10,9 +10,12 @@ namespace ES
     /// </summary>
     public static class ESLongBarMeleeWeaponBuilder
     {
+        public const string ItemKey = "item.weapon.melee.long_bar";
         public const string WeaponKey = "weapon.melee.long_bar";
         public const string WeaponPrefabAssetKey = "prefab.weapon.melee.long_bar";
         public const string WeaponPrefabPath = "Assets/ESNormalAssets/WeaponPrototypes/大长条.prefab";
+        private const string WeaponPrefabRebuildPath = "Assets/ESNormalAssets/WeaponPrototypes/大长条_Rebuild.prefab";
+        private const string WeaponBindingScriptPath = "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityWeaponBinding.cs";
         public const string WeaponInfoPath = "Assets/ESNormalAssets/Data/Group/Item/大长条_ItemDataInfo.asset";
         public const string WeaponGroupPath = "Assets/ESNormalAssets/Data/Group/Item/大长条_WeaponDataGroup.asset";
         public const string AssetLibraryPath = "Assets/ESNormalAssets/Data/AssetLibrary/基本库.asset";
@@ -115,6 +118,13 @@ namespace ES
             if (info.baseConfig != null && info.baseConfig.kind != ItemKind.None && info.baseConfig.kind != ItemKind.Weapon)
                 throw new System.InvalidOperationException("大长条定义路径已属于其他 ItemKind，拒绝转换：" + info.baseConfig.kind);
 
+            if (info.itemKey != null
+                && info.itemKey.IsConfigured
+                && !string.Equals(info.itemKey.StringKey, ItemKey, System.StringComparison.Ordinal))
+            {
+                throw new System.InvalidOperationException("大长条定义内的 Item Key 已属于其他物品，拒绝覆盖：" + info.itemKey.StringKey);
+            }
+
             ItemWeaponDataBlock weapon = info.kindData as ItemWeaponDataBlock;
             if (weapon != null
                 && weapon.key != null
@@ -163,8 +173,6 @@ namespace ES
             Transform[] requiredTemplateReferences =
             {
                 template.mount?.mountRoot,
-                template.mount?.holdSocket,
-                template.mount?.backSocket,
                 template.mount?.rightHandGrip,
                 template.mount?.leftHandGrip,
                 template.mount?.aimReference,
@@ -194,13 +202,14 @@ namespace ES
                 throw new System.InvalidOperationException("大长条 Prefab 的 RuntimeBridge.ItemRoot 未绑定根 Item。");
 
             if (!binding.twoHanded
-                || !IsOwnedTransform(binding.offHandGripTarget, prefab.transform)
-                || !IsOwnedTransform(binding.fireOrigin, prefab.transform)
-                || !IsOwnedTransform(binding.aimTarget, prefab.transform)
-                || !IsOwnedTransform(binding.switchAssistLeftHandTarget, prefab.transform)
-                || !IsOwnedTransform(binding.switchAssistRightHandTarget, prefab.transform))
+                || !IsOwnedTransform(binding.GripPivot, prefab.transform)
+                || !IsOwnedTransform(binding.OffHandGrip, prefab.transform)
+                || !IsOwnedTransform(binding.Muzzle, prefab.transform)
+                || !IsOwnedTransform(binding.AimReference, prefab.transform)
+                || binding.PresentationRoot == null
+                || !IsOwnedTransform(binding.PresentationRoot.transform, prefab.transform))
             {
-                throw new System.InvalidOperationException("大长条 EntityWeaponBinding 的双手握点、攻击参考或切换辅助目标不完整。");
+                throw new System.InvalidOperationException("大长条 EntityWeaponBinding 的 GripPivot、OffHandGrip、Muzzle、AimReference 或 PresentationRoot 不完整。");
             }
 
             if (prefab.GetComponentInChildren<Rigidbody>(true) != null
@@ -218,6 +227,13 @@ namespace ES
 
             if (!string.Equals(info.KeyName, WeaponKey, System.StringComparison.Ordinal))
                 throw new System.InvalidOperationException("大长条 Item 定义 Key 不匹配：" + info.KeyName);
+
+            if (info.itemKey == null
+                || !info.itemKey.IsConfigured
+                || !string.Equals(info.itemKey.StringKey, ItemKey, System.StringComparison.Ordinal))
+            {
+                throw new System.InvalidOperationException("大长条缺少匹配的正式 Item Key：" + ItemKey);
+            }
 
             ItemWeaponDataBlock weapon = info.kindData as ItemWeaponDataBlock;
             if (weapon == null
@@ -259,15 +275,20 @@ namespace ES
 
         private static void ValidatePrefabOwnership(GameObject prefab, ItemDataInfo info)
         {
-            Item item = prefab.GetComponent<Item>();
-            if (item == null || item.prefabDefinition != info)
-                throw new System.InvalidOperationException("大长条 Prefab 不属于当前 ItemDataInfo，拒绝复用或改绑：" + WeaponPrefabPath);
+            ValidatePrefabDefinitionOwnership(prefab, info);
 
             if (prefab.GetComponents<ESWeaponSceneTemplate>().Length != 1
                 || prefab.GetComponents<EntityWeaponBinding>().Length != 1)
             {
                 throw new System.InvalidOperationException("大长条 Prefab 必须且只能包含一套 ESWeaponSceneTemplate 与 EntityWeaponBinding。");
             }
+        }
+
+        private static void ValidatePrefabDefinitionOwnership(GameObject prefab, ItemDataInfo info)
+        {
+            Item item = prefab.GetComponent<Item>();
+            if (item == null || item.prefabDefinition != info)
+                throw new System.InvalidOperationException("大长条 Prefab 不属于当前 ItemDataInfo，拒绝复用或改绑：" + WeaponPrefabPath);
         }
 
         internal static void ValidateLongBarPrefabForAuthoring(GameObject prefab)
@@ -287,33 +308,43 @@ namespace ES
                 throw new System.InvalidOperationException("升级大长条前必须先存在定义与 Prefab。");
 
             ValidateDefinitionOwnership(info);
-            ValidatePrefabOwnership(prefab, info);
+            // 开发期硬重建负责替换旧作者结构。这里只证明固定资产仍属于
+            // 当前 ItemDataInfo；保存后再执行完整组件与引用校验。
+            ValidatePrefabDefinitionOwnership(prefab, info);
             ConfigureDefinition(info);
             RegisterPrefabAndBindKey(info, prefab);
             ValidateWeaponDefinition(info);
             ValidatePrefabAssetKey(info, prefab);
             EditorUtility.SetDirty(info);
 
-            GameObject root = PrefabUtility.LoadPrefabContents(WeaponPrefabPath);
+            GameObject root = BuildWeaponRoot(info);
+            string rebuildPath = AssetDatabase.GenerateUniqueAssetPath(WeaponPrefabRebuildPath);
             try
             {
-                ESWeaponSceneTemplate template = root.GetComponent<ESWeaponSceneTemplate>();
-                EntityWeaponBinding binding = root.GetComponent<EntityWeaponBinding>();
-                if (template == null || binding == null)
-                    throw new System.InvalidOperationException("大长条 Prefab 缺少可升级的模板或 Binding 根组件。");
-
-                EnsureTemplateSections(template);
-                template.AutoBindByStandardNames();
-                ConfigureTemplateIdentity(template);
-                ConfigureBinding(binding, template);
-
-                GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, WeaponPrefabPath);
+                GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, rebuildPath);
                 if (saved == null)
-                    throw new System.InvalidOperationException("保存升级后的大长条 Prefab 失败：" + WeaponPrefabPath);
+                    throw new System.InvalidOperationException("保存临时重建的大长条 Prefab 失败：" + rebuildPath);
+
+                ValidateExistingPrefab(saved, info);
+                if (Selection.activeObject != null
+                    && string.Equals(
+                        AssetDatabase.GetAssetPath(Selection.activeObject),
+                        WeaponPrefabPath,
+                        System.StringComparison.Ordinal))
+                {
+                    Selection.activeObject = null;
+                }
+                FileUtil.ReplaceFile(
+                    System.IO.Path.GetFullPath(rebuildPath),
+                    System.IO.Path.GetFullPath(WeaponPrefabPath));
+                AssetDatabase.ImportAsset(
+                    WeaponPrefabPath,
+                    ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
             }
             finally
             {
-                PrefabUtility.UnloadPrefabContents(root);
+                Object.DestroyImmediate(root);
+                AssetDatabase.DeleteAsset(rebuildPath);
             }
 
             AssetDatabase.SaveAssetIfDirty(info);
@@ -327,6 +358,7 @@ namespace ES
         {
             info.name = "大长条_ItemDataInfo";
             info.SetKey(WeaponKey);
+            info.itemKey = new ESItemConfigKey { stringKey = ItemKey };
             info.baseConfig ??= new ItemBaseConfig();
             info.baseConfig.kind = ItemKind.Weapon;
             info.baseConfig.displayName = WeaponDisplayName;
@@ -347,7 +379,6 @@ namespace ES
             weapon.sharedData.defaultShot = new ESShotConfigKey();
             weapon.sharedData.hitRadius = 0.65f;
             weapon.sharedData.cooldown = 0.35f;
-            weapon.sharedData.socketName = "WeaponSocket";
             weapon.sharedData.fire ??= WeaponFireDefinitionData.Default;
             weapon.sharedData.fire.enabled = false;
             weapon.sharedData.recoil ??= WeaponRecoilDefinitionData.Default;
@@ -427,7 +458,7 @@ namespace ES
             Item item = root.AddComponent<Item>();
             item.prefabDefinition = info;
             ESWeaponSceneTemplate template = root.AddComponent<ESWeaponSceneTemplate>();
-            EntityWeaponBinding binding = root.AddComponent<EntityWeaponBinding>();
+            EntityWeaponBinding binding = AddWeaponBinding(root);
             ConfigureTemplateIdentity(template);
 
             Transform runtimeRoot = CreateChild(root.transform, ESWeaponSceneTemplate.RuntimeRootName);
@@ -436,8 +467,6 @@ namespace ES
             Transform presentationRoot = CreateChild(root.transform, ESWeaponSceneTemplate.PresentationRootName);
             Transform debugRoot = CreateChild(root.transform, ESWeaponSceneTemplate.DebugRootName);
 
-            Transform holdSocket = CreateChild(mountRoot, "HoldSocket");
-            Transform backSocket = CreateChild(mountRoot, "BackSocket", new Vector3(0f, 0.1f, -0.25f));
             Transform rightHandGrip = CreateChild(mountRoot, "RightHandGrip", new Vector3(0.03f, -0.03f, -0.08f));
             Transform leftHandGrip = CreateChild(mountRoot, "LeftHandGrip", new Vector3(-0.03f, -0.02f, 0.18f));
             Transform aimReference = CreateChild(mountRoot, "AimReference", new Vector3(0f, 0.05f, 0.9f));
@@ -466,16 +495,15 @@ namespace ES
             // Weapon-local grip/aim references are presentation data; hand/holster roots
             // are resolved by EntityWeaponBinding from the owning Entity.
             binding.twoHanded = true;
-            binding.offHandGripTarget = leftHandGrip;
-            binding.fireOrigin = muzzle;
-            binding.aimTarget = aimReference;
-            binding.switchAssistLeftHandTarget = leftHandGrip;
-            binding.switchAssistRightHandTarget = rightHandGrip;
+            binding.ConfigureReferences(
+                rightHandGrip,
+                leftHandGrip,
+                muzzle,
+                aimReference,
+                presentationRoot.gameObject);
 
             template.runtimeBridge.itemRoot = item;
             template.mount.mountRoot = mountRoot;
-            template.mount.holdSocket = holdSocket;
-            template.mount.backSocket = backSocket;
             template.mount.rightHandGrip = rightHandGrip;
             template.mount.leftHandGrip = leftHandGrip;
             template.mount.aimReference = aimReference;
@@ -495,6 +523,25 @@ namespace ES
             template.presentation.animationRoot = presentationRoot.Find("AnimationRoot");
             template.debug.debugRoot = debugRoot;
             return root;
+        }
+
+        private static EntityWeaponBinding AddWeaponBinding(GameObject root)
+        {
+            MonoScript script = AssetDatabase.LoadAssetAtPath<MonoScript>(WeaponBindingScriptPath);
+            System.Type scriptType = script != null ? script.GetClass() : null;
+            if (scriptType != typeof(EntityWeaponBinding))
+            {
+                throw new System.InvalidOperationException(
+                    "EntityWeaponBinding MonoScript 未解析到当前正式类型：" + WeaponBindingScriptPath);
+            }
+
+            EntityWeaponBinding binding = root.AddComponent(scriptType) as EntityWeaponBinding;
+            if (binding == null || MonoScript.FromMonoBehaviour(binding) != script)
+            {
+                throw new System.InvalidOperationException(
+                    "EntityWeaponBinding 组件未绑定到正式 MonoScript，拒绝生成 Missing Component。");
+            }
+            return binding;
         }
 
         private static void EnsureTemplateSections(ESWeaponSceneTemplate template)
@@ -519,11 +566,14 @@ namespace ES
         private static void ConfigureBinding(EntityWeaponBinding binding, ESWeaponSceneTemplate template)
         {
             binding.twoHanded = true;
-            binding.offHandGripTarget = template.mount.leftHandGrip;
-            binding.fireOrigin = template.ballistic.muzzle;
-            binding.aimTarget = template.mount.aimReference;
-            binding.switchAssistLeftHandTarget = template.mount.leftHandGrip;
-            binding.switchAssistRightHandTarget = template.mount.rightHandGrip;
+            binding.ConfigureReferences(
+                template.mount.rightHandGrip,
+                template.mount.leftHandGrip,
+                template.ballistic.muzzle,
+                template.mount.aimReference,
+                template.presentation.presentationRoot != null
+                    ? template.presentation.presentationRoot.gameObject
+                    : throw new System.InvalidOperationException("正式武器缺少作者化 PresentationRoot。"));
         }
 
         private static bool IsOwnedTransform(Transform target, Transform root)

@@ -141,7 +141,6 @@ namespace ES
             ESShotConfigKey defaultShot = null,
             float? hitRadius = null,
             float? cooldown = null,
-            string socketName = null,
             float? durability = null,
             float? cooldownLeft = null,
             int? ammo = null,
@@ -157,7 +156,7 @@ namespace ES
                 ItemWeaponSharedData ownedShared = runtimeData.PrepareDefaultSharedData();
                 ResolveDefaults(
                     ownedShared, null,
-                    weaponKind, primaryAttackAction, defaultShot, hitRadius, cooldown, socketName,
+                    weaponKind, primaryAttackAction, defaultShot, hitRadius, cooldown,
                     durability, cooldownLeft, ammo, logicSeed,
                     fillShared, fillVariable,
                     out ItemWeaponSharedData sharedData, out ItemWeaponVariableData resolvedVariableData);
@@ -186,7 +185,6 @@ namespace ES
             ESShotConfigKey defaultShot = null,
             float? hitRadius = null,
             float? cooldown = null,
-            string socketName = null,
             float? durability = null,
             float? cooldownLeft = null,
             int? ammo = null,
@@ -206,7 +204,7 @@ namespace ES
                 ItemWeaponSharedData ownedShared = runtimeData.PrepareDefaultSharedData();
                 ResolveDefaults(
                     ownedShared, null,
-                    weaponKind, primaryAttackAction, defaultShot, hitRadius, cooldown, socketName,
+                    weaponKind, primaryAttackAction, defaultShot, hitRadius, cooldown,
                     durability, cooldownLeft, ammo, logicSeed,
                     fillShared, fillVariable,
                     out ItemWeaponSharedData sharedData, out ItemWeaponVariableData resolvedVariableData);
@@ -260,7 +258,6 @@ namespace ES
             ESShotConfigKey defaultShot,
             float? hitRadius,
             float? cooldown,
-            string socketName,
             float? durability,
             float? cooldownLeft,
             int? ammo,
@@ -278,8 +275,6 @@ namespace ES
             if (defaultShot != null) resolvedShared.defaultShot = defaultShot;
             if (hitRadius.HasValue) resolvedShared.hitRadius = hitRadius.Value;
             if (cooldown.HasValue) resolvedShared.cooldown = cooldown.Value;
-            if (socketName != null) resolvedShared.socketName = socketName;
-
             if (durability.HasValue) resolvedVariable.durability = durability.Value;
             if (cooldownLeft.HasValue) resolvedVariable.cooldownLeft = cooldownLeft.Value;
             if (ammo.HasValue) resolvedVariable.ammo = ammo.Value;

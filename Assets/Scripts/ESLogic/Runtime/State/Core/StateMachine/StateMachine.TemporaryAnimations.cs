@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -5,6 +6,8 @@ namespace ES
 {
     public partial class StateMachine
     {
+        public event Action<StateBase, string, string> AnimationEvent;
+
         public bool AddTemporaryAnimation(string tempKey, AnimationClip clip, StateLayerType layer = StateLayerType.Main, float speed = 1.0f, bool loopable = false)
         {
             if (string.IsNullOrEmpty(tempKey))
@@ -390,6 +393,8 @@ namespace ES
 
         public void BroadcastAnimationEvent(StateBase state, string eventName, string eventParam)
         {
+            AnimationEvent?.Invoke(state, eventName, eventParam);
+
             if (hostEntity != null)
             {
                 // Reserved: broadcast through Entity if needed.

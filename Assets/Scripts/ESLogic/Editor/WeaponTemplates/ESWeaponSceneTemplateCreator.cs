@@ -22,8 +22,6 @@ namespace ES.Editor
             Transform presentationRoot = CreateChild(root.transform, ESWeaponSceneTemplate.PresentationRootName);
             Transform debugRoot = CreateChild(root.transform, ESWeaponSceneTemplate.DebugRootName);
 
-            Transform holdSocket = CreateChild(mountRoot, "HoldSocket", new Vector3(0f, 0f, 0f));
-            Transform backSocket = CreateChild(mountRoot, "BackSocket", new Vector3(0f, 0.1f, -0.25f));
             Transform rightHandGrip = CreateChild(mountRoot, "RightHandGrip", new Vector3(0.03f, -0.03f, -0.08f));
             Transform leftHandGrip = CreateChild(mountRoot, "LeftHandGrip", new Vector3(-0.03f, -0.02f, 0.18f));
             Transform aimReference = CreateChild(mountRoot, "AimReference", new Vector3(0f, 0.05f, 0.32f));
@@ -49,8 +47,6 @@ namespace ES.Editor
 
             template.runtimeBridge.itemRoot = item;
             template.mount.mountRoot = mountRoot;
-            template.mount.holdSocket = holdSocket;
-            template.mount.backSocket = backSocket;
             template.mount.rightHandGrip = rightHandGrip;
             template.mount.leftHandGrip = leftHandGrip;
             template.mount.aimReference = aimReference;

@@ -6,7 +6,7 @@
 
 在 Unity 菜单执行：
 
-`ES/Weapon/创建通用武器场景模板`
+`【ES】/内容制作/武器模板/创建通用武器场景模板`
 
 会在当前场景生成：
 
@@ -14,8 +14,6 @@
 WeaponTemplate_通用武器
 ├── 00_运行根
 ├── 10_挂载与握持
-│   ├── HoldSocket
-│   ├── BackSocket
 │   ├── RightHandGrip
 │   ├── LeftHandGrip
 │   ├── AimReference
@@ -39,8 +37,6 @@ WeaponTemplate_通用武器
 
 ## 节点职责
 
-- `HoldSocket`：角色手持时武器挂载点。
-- `BackSocket`：收枪或背挂时使用。
 - `RightHandGrip` / `LeftHandGrip`：IK 握持点。
 - `AimReference`：瞄准方向参考点。
 - `RecoilPivot`：后坐力表现轴心。
@@ -59,7 +55,11 @@ WeaponTemplate_通用武器
 这个模板只负责“场景结构”和“挂点命名”。正式逻辑建议按下面边界接入：
 
 - `Item`：武器作为世界物品或投射物的基础宿主。
+- `ItemDataInfo`：一份作者资产同时配置基础 `ItemKey` 与专项 `WeaponKey`；两者进入独立强类型表，RuntimeKey 不得跨表比较。
 - `Entity`：武器拥有者、阵营、输入、目标来源。
+- `EntityEquipmentDomain`：Inventory / Slot / Attachment / Effect 的装备事务权威。
+- `EntityTransformMapping`：角色侧 MainHand / OffHand / Back / Hip / TemporaryHand 业务 Socket；武器 Prefab 不保存 `HoldSocket` 或 `BackSocket`。
+- `EntityWeaponBinding`：武器本地 GripPivot / OffHandGrip / Muzzle / AimReference / PresentationRoot 参考。
 - `StateMachine`：持枪、开火、换弹、收枪等动作状态。
 - `StateFinalIKDriver`：握持、瞄准、后坐力、探头、受击反馈。
 - `Operation`：命中、Buff、音效、特效、对象开关等可编排行为。

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Text;
 using Sirenix.OdinInspector;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace ES
 {
@@ -417,7 +416,6 @@ namespace ES
         public int startWeaponIndex;
 
         [LabelText("默认普攻 Action")]
-        [FormerlySerializedAs("defaultMeleeAttackAction")]
         public ESActionConfigKey defaultPrimaryAttackAction = "melee.attack";
 
         [LabelText("允许徒手普攻")]
@@ -433,46 +431,8 @@ namespace ES
         [LabelText("启动时持枪")]
         public bool startWithWeaponInHand = false;
 
-        [LabelText("默认身上挂点")]
-        public Transform defaultHolsterMount;
-
-        [LabelText("默认身上挂点列表")]
-        [Tooltip("当槽位未指定 holsterMount 时，按 holsterMountIndex 选择默认挂点。")]
-        public System.Collections.Generic.List<Transform> defaultHolsterMounts = new System.Collections.Generic.List<Transform>();
-
-        [LabelText("自动创建背挂点")]
-        [Tooltip("当所有身上挂点都未配置时，运行时自动在角色上创建一个背挂点作为兜底。")]
-        public bool autoCreateBackHolsterMount = true;
-
-        [LabelText("自动背挂点局部位置")]
-        public Vector3 autoBackHolsterLocalPosition = new Vector3(-0.18f, 0.1f, -0.22f);
-
-        [LabelText("自动背挂点局部旋转")]
-        public Vector3 autoBackHolsterLocalEuler = new Vector3(15f, -100f, 15f);
-
-        [LabelText("默认手上挂点")]
-        public Transform defaultHandMount;
-
-        [LabelText("自动创建右手挂点")]
-        [Tooltip("当手持挂点未配置或落在背挂点层级下时，运行时自动在右手骨创建挂点作为兜底。")]
-        public bool autoCreateRightHandMount = true;
-
-        [LabelText("自动右手挂点局部位置")]
-        public Vector3 autoRightHandLocalPosition = Vector3.zero;
-
-        [LabelText("自动右手挂点局部旋转")]
-        public Vector3 autoRightHandLocalEuler = Vector3.zero;
-
         [LabelText("默认瞄准目标")]
         public Transform defaultAimTarget;
-
-        [LabelText("武器槽位")]
-        [Tooltip("仅用于武器顺序管理；每个 weaponRoot 必须挂 EntityWeaponBinding。")]
-        public System.Collections.Generic.List<WeaponSlot> weaponSlots = new System.Collections.Generic.List<WeaponSlot>();
-
-        [LabelText("缺失绑定时自动补齐")]
-        [Tooltip("当 weaponRoot 未挂 EntityWeaponBinding 时，运行时自动添加，避免槽位失效导致挂点不生效。")]
-        public bool autoAddWeaponBindingIfMissing = true;
 
         [LabelText("输出挂载告警")]
         public bool logWeaponMountWarnings = true;
@@ -511,13 +471,15 @@ namespace ES
         public void OnPoolSpawned()
         {
             poolSpawnCount++;
-            ResolveAttachmentModule()?.NotifySlotsChanged();
+            BindEquipmentTransitionEvents();
+            if (HasStart)
+                InitializeWeaponFusionRuntime();
         }
 
         public void OnPoolDespawned()
         {
             poolDespawnCount++;
-            _attachmentModule?.NotifySlotsChanged();
+            ClearPendingEquipmentTransition();
             ESActionPoolLifecycleDiagnostics.Record("Combat.BridgeDispose");
             actionPresentationBridge?.Dispose();
             actionPresentationBridge = null;
@@ -527,17 +489,9 @@ namespace ES
             PrimaryAttackEvent = null;
         }
 
-        [LabelText("阻止收枪挂到手臂链")]
-        [Tooltip("开启后，如果 holsterMount 落在手臂/手腕骨链上，将自动回退到默认身上挂点或自动背挂点。")]
-        public bool preventHolsterOnArmChain = true;
-
         [LabelText("Refresh Parent Snapshot Every Frame")]
         [Tooltip("Debug only. Builds transform path strings and can allocate heavily at runtime.")]
         public bool refreshWeaponParentSnapshotEveryFrame = false;
-
-        [LabelText("Compare Mount By Hierarchy Path")]
-        [Tooltip("Debug/compatibility only. Builds transform path strings during mount checks.")]
-        public bool compareMountByHierarchyPath = false;
 
         [ShowInInspector, ReadOnly, LabelText("武器父节点快照")]
         [MultiLineProperty(8)]
@@ -580,44 +534,10 @@ namespace ES
         [LabelText("允许注入开火状态")]
         public bool allowFireStateInjection = true;
 
-        [Title("切枪IK辅助")]
-        [LabelText("启用切枪双手IK")]
-        public bool enableSwitchAssistIK = true;
-
-        [LabelText("切枪IK持续时长")]
-        [MinValue(0.05f)]
-        public float switchAssistDuration = 0.35f;
-
-        [LabelText("切枪IK淡入时长")]
-        [MinValue(0.01f)]
-        public float switchAssistFadeIn = 0.08f;
-
-        [LabelText("切枪IK淡出时长")]
-        [MinValue(0.01f)]
-        public float switchAssistFadeOut = 0.12f;
-
-        [LabelText("左手IK权重")]
-        [Range(0f, 1f)]
-        public float switchAssistLeftHandWeight = 0.55f;
-
-        [LabelText("右手IK权重")]
-        [Range(0f, 1f)]
-        public float switchAssistRightHandWeight = 0.85f;
-
-        [LabelText("切枪IK插值速率")]
-        [MinValue(0.05f)]
-        public float switchAssistLerpingRate = 1.8f;
-
         [LabelText("切枪/拿枪后收枪保护时长")]
         [Tooltip("防止同一帧输入冲突导致刚拿到手又被收回背后。")]
         [MinValue(0f)]
         public float holsterRequestGraceAfterEquip = 0.12f;
-
-        [LabelText("默认切枪左手目标")]
-        public Transform defaultSwitchAssistLeftHandTarget;
-
-        [LabelText("默认切枪右手目标")]
-        public Transform defaultSwitchAssistRightHandTarget;
 
         [LabelText("上半身层混合速度")]
         [MinValue(0.1f)]
@@ -648,15 +568,14 @@ namespace ES
         [NonSerialized] private Animator _cachedIKDriverAnimator;
         [NonSerialized] private StateLifecycleTracker _aimLifecycle = new StateLifecycleTracker();
         [NonSerialized] private StateLifecycleTracker _peekLifecycle = new StateLifecycleTracker();
-        [NonSerialized] private bool _isInAttachmentConsistencyPass;
-        [NonSerialized] private EntityEquipmentAttachmentModule _attachmentModule;
+        [NonSerialized] private EntityEquipmentDomain _equipmentDomain;
+        [NonSerialized] private bool _equipmentEventsBound;
 
         public override void Start()
         {
             base.Start();
-            ResolveAttachmentModule();
+            BindEquipmentTransitionEvents();
             CacheStateMachine();
-            ValidateAndRepairMountConfiguration();
             ResolveAimState();
             ResolvePeekState();
             _aimLifecycle.SetTarget(_sm, _aimState, GetAimStateKeyForLifecycle(_aimState));
@@ -734,22 +653,34 @@ namespace ES
         [NonSerialized] private int _recoilBurstShotCount;
         [NonSerialized] private int _recoilBurstWeaponIndex = int.MinValue;
         [NonSerialized] private float _recoilBurstLastShotTime = -999f;
-        [NonSerialized] private int _activeWeaponSlot = -1;
-        [NonSerialized] private bool _weaponInHand;
-        [NonSerialized] private ESTagLeaseSet _equippedWeaponTagLeases;
+        private List<EntityEquipmentWeaponSlot> weaponSlots =>
+            ResolveEquipmentDomain()?.Slots?.weaponSlots;
+
+        private int _activeWeaponSlot
+        {
+            get => ResolveEquipmentDomain()?.Slots?.ActiveWeaponSlot ?? -1;
+            set => ResolveEquipmentDomain()?.Slots?.TrySetActiveWeaponSlot(value);
+        }
+
+        private bool _weaponInHand
+        {
+            get => ResolveEquipmentDomain()?.Slots?.WeaponInHand ?? false;
+            set => ResolveEquipmentDomain()?.Slots?.SetWeaponInHand(value);
+        }
         [NonSerialized] private float _upperBodyLayerWeightCurrent;
         [NonSerialized] private float _equipBlendCurrent;
         [NonSerialized] private float _firePulseCurrent;
         [NonSerialized] private float _firePulseEndTime = -999f;
         [NonSerialized] private int _actionPhase;
-        [NonSerialized] private Transform _autoBackHolsterMount;
-        [NonSerialized] private Transform _autoRightHandMount;
-        [NonSerialized] private bool _switchAssistSubscribed;
-        [NonSerialized] private float _switchAssistStartTime = -1f;
-        [NonSerialized] private float _switchAssistEndTime = -1f;
-        [NonSerialized] private Transform _switchAssistLeftTarget;
-        [NonSerialized] private Transform _switchAssistRightTarget;
         [NonSerialized] private float _lastEquipOrSwitchTime = -999f;
+        [NonSerialized] private int _equipmentTargetRevision;
+        [NonSerialized] private EntityEquipmentTransitionToken _pendingEquipmentToken;
+        [NonSerialized] private EntityEquipmentTransitionPhase _pendingEquipmentPhase;
+        [NonSerialized] private int _pendingWeaponSlot = -1;
+        [NonSerialized] private bool _pendingWeaponInHand;
+        [NonSerialized] private int _rollbackWeaponSlot = -1;
+        [NonSerialized] private bool _rollbackWeaponInHand;
+        [NonSerialized] private int _rollbackActionPhase;
 
         private readonly struct PendingPrimaryAttack
         {
@@ -847,7 +778,7 @@ namespace ES
                     "当前没有活动武器，执行徒手普攻");
             }
 
-            if (!TryGetWeaponSlot(_activeWeaponSlot, out WeaponSlot currentSlot))
+            if (!TryGetWeaponSlot(_activeWeaponSlot, out EntityEquipmentWeaponSlot currentSlot))
             {
                 lastPrimaryAttackFailureReason = "当前活动 WeaponSlot 无效；这是装配错误，不允许回退徒手攻击。";
                 return false;
@@ -1138,40 +1069,40 @@ namespace ES
             if (_activeWeaponSlot == index && _weaponInHand)
                 return true;
 
-            NotifyEquipmentSlotsChanged();
-            SetActionPhase(3);
-            StartSwitchAssistIK(currentSlot, currentWeaponBinding, nextSlot, nextWeaponBinding);
-            bool switchTransitionActivated = TryActivateTransitionState(
-                nextWeaponBinding != null ? nextWeaponBinding.switchStateInfo : null,
-                nextWeaponBinding != null ? nextWeaponBinding.switchStateKey : string.Empty,
-                switchStateInfo,
-                switchStateKey,
-                allowSwitchStateInjection,
-                "Switch");
-            HolsterCurrentWeaponInternal(playTransitionState: false);
+            EntityEquipmentAttachmentOperation equipOperation = CreateAttachmentOperation(
+                nextSlot,
+                EntityEquipmentAttachmentPose.MainHand);
+            bool hasCurrentHandView = _weaponInHand
+                && currentSlot != null
+                && currentWeaponBinding != null;
+            bool accepted = hasCurrentHandView
+                ? TryRequestEquipmentTransition(
+                    EntityEquipmentTransitionPhase.Switching,
+                    CreateAttachmentOperation(
+                        currentSlot,
+                        ResolveHolsterAttachmentPose(_activeWeaponSlot)),
+                    equipOperation,
+                    index,
+                    true,
+                    nextWeaponBinding.switchStateInfo,
+                    nextWeaponBinding.switchStateKey,
+                    switchStateInfo,
+                    switchStateKey,
+                    allowSwitchStateInjection,
+                    "Switch")
+                : TryRequestEquipmentTransition(
+                    EntityEquipmentTransitionPhase.Switching,
+                    equipOperation,
+                    index,
+                    true,
+                    nextWeaponBinding.switchStateInfo,
+                    nextWeaponBinding.switchStateKey,
+                    switchStateInfo,
+                    switchStateKey,
+                    allowSwitchStateInjection,
+                    "Switch");
 
-            _activeWeaponSlot = index;
-            weaponIndex = index;
-            ResetRecoilBurst();
-
-            AttachWeaponToHand(index);
-            _weaponInHand = true;
-            ApplyEquippedWeaponTags(nextWeaponBinding);
-            _lastEquipOrSwitchTime = Time.time;
-
-            SetActionPhase(1);
-            // If switch transition is active, do not immediately replace it with equip on the same layer.
-            if (!switchTransitionActivated)
-            {
-                TryActivateTransitionState(
-                    nextWeaponBinding != null ? nextWeaponBinding.equipStateInfo : null,
-                    nextWeaponBinding != null ? nextWeaponBinding.equipStateKey : string.Empty,
-                    equipStateInfo,
-                    equipStateKey,
-                    allowEquipStateInjection,
-                    "Equip");
-            }
-            return true;
+            return accepted;
         }
 
         public bool EquipCurrentWeapon()
@@ -1183,28 +1114,10 @@ namespace ES
             {
                 int first = FindNextValidWeaponIndex(-1, +1);
                 if (first < 0) return false;
-                _activeWeaponSlot = first;
-                weaponIndex = first;
+                return RequestEquipWeapon(first);
             }
 
-            if (!TryGetWeaponSlot(_activeWeaponSlot, out var slot))
-                return false;
-
-            var weaponBinding = GetWeaponBinding(slot);
-
-            AttachWeaponToHand(_activeWeaponSlot);
-            _weaponInHand = true;
-            ApplyEquippedWeaponTags(weaponBinding);
-            _lastEquipOrSwitchTime = Time.time;
-            SetActionPhase(1);
-            TryActivateTransitionState(
-                weaponBinding != null ? weaponBinding.equipStateInfo : null,
-                weaponBinding != null ? weaponBinding.equipStateKey : string.Empty,
-                equipStateInfo,
-                equipStateKey,
-                allowEquipStateInjection,
-                "Equip");
-            return true;
+            return RequestEquipWeapon(_activeWeaponSlot);
         }
 
         public bool HolsterCurrentWeapon()
@@ -1216,12 +1129,28 @@ namespace ES
                 return false;
             }
 
-            return HolsterCurrentWeaponInternal(playTransitionState: true);
+            if (!TryGetWeaponSlot(_activeWeaponSlot, out EntityEquipmentWeaponSlot slot))
+                return false;
+
+            EntityWeaponBinding binding = GetWeaponBinding(slot);
+            return TryRequestEquipmentTransition(
+                EntityEquipmentTransitionPhase.Holstering,
+                CreateAttachmentOperation(
+                    slot,
+                    ResolveHolsterAttachmentPose(_activeWeaponSlot)),
+                _activeWeaponSlot,
+                false,
+                binding.holsterStateInfo,
+                binding.holsterStateKey,
+                holsterStateInfo,
+                holsterStateKey,
+                allowHolsterStateInjection,
+                "Holster");
         }
 
         public bool TryFireWeapon()
         {
-            if (!TryGetWeaponSlot(_activeWeaponSlot, out WeaponSlot slot)
+            if (!TryGetWeaponSlot(_activeWeaponSlot, out EntityEquipmentWeaponSlot slot)
                 || slot.weaponKey == null
                 || !slot.weaponKey.IsConfigured
                 || !TryResolveCurrentWeaponDefinition(out ItemWeaponSharedData definition))
@@ -1477,21 +1406,18 @@ namespace ES
             RemovePendingPrimaryAttack(bufferedPulseId);
         }
 
-        private Transform ResolveCurrentWeaponMount()
+        private Transform ResolveCurrentWeaponPresentationMount()
         {
-            if (!TryGetWeaponSlot(_activeWeaponSlot, out WeaponSlot slot) || slot.weaponRoot == null)
+            if (!TryGetWeaponSlot(_activeWeaponSlot, out EntityEquipmentWeaponSlot slot))
                 return null;
 
             EntityWeaponBinding binding = GetWeaponBinding(slot);
-            if (binding != null && binding.handMount != null)
-                return binding.handMount;
-
-            return slot.weaponRoot;
+            return binding != null ? binding.GripPivot : null;
         }
 
         private ESWeaponConfigKey ResolveCurrentWeaponKey()
         {
-            return TryGetWeaponSlot(_activeWeaponSlot, out WeaponSlot slot)
+            return TryGetWeaponSlot(_activeWeaponSlot, out EntityEquipmentWeaponSlot slot)
                 && slot.weaponKey != null
                 && slot.weaponKey.IsConfigured
                 ? slot.weaponKey
@@ -1499,7 +1425,7 @@ namespace ES
         }
 
         private ESActionConfigKey ResolvePrimaryAttackAction(
-            WeaponSlot slot,
+            EntityEquipmentWeaponSlot slot,
             ItemWeaponSharedData definition)
         {
             if (slot != null
@@ -1567,11 +1493,11 @@ namespace ES
             {
                 actionPresentationBridge = new ESActionPresentationBridge(
                     actionEventHub,
-                    ESActionGameCoreTable.Table,
-                    MyCore,
-                    null,
-                    ResolveCurrentWeaponMount,
-                    ResolveCurrentWeaponKey);
+                     ESActionGameCoreTable.Table,
+                     MyCore,
+                     null,
+                     ResolveCurrentWeaponPresentationMount,
+                     ResolveCurrentWeaponKey);
             }
         }
 
@@ -1900,6 +1826,7 @@ namespace ES
 
         protected override void OnDisable()
         {
+            CancelPendingEquipmentTransition();
             actionPresentationBridge?.Dispose();
             actionPresentationBridge = null;
             FinishPendingPrimaryAttacks();
@@ -1910,13 +1837,13 @@ namespace ES
 
         public override void OnDestroy()
         {
+            CancelPendingEquipmentTransition();
+            UnbindEquipmentTransitionEvents();
             actionPresentationBridge?.Dispose();
             actionPresentationBridge = null;
             FinishPendingPrimaryAttacks();
             actionRuntime?.ResetForLifecycle();
             actionRuntime = null;
-            UnbindSwitchAssistIKPostProcess();
-
             if (_aimLifecycle.Release())
                 OnAimExit();
 
@@ -1985,7 +1912,7 @@ namespace ES
 
         private void InitializeWeaponFusionRuntime()
         {
-            NotifyEquipmentSlotsChanged();
+            ClearPendingEquipmentTransition();
             _upperBodyLayerWeightCurrent = 0f;
             _equipBlendCurrent = 0f;
             _firePulseCurrent = 0f;
@@ -2012,13 +1939,22 @@ namespace ES
 
             for (int i = 0; i < weaponSlots.Count; i++)
             {
-                if (!TryGetWeaponSlot(i, out _))
+                if (!TryGetWeaponSlot(i, out EntityEquipmentWeaponSlot slot))
                     continue;
 
-                if (i == _activeWeaponSlot && startWithWeaponInHand)
-                    AttachWeaponToHand(i);
-                else
-                    AttachWeaponToHolster(i);
+                EntityEquipmentAttachmentPose pose = i == _activeWeaponSlot && startWithWeaponInHand
+                    ? EntityEquipmentAttachmentPose.MainHand
+                    : ResolveHolsterAttachmentPose(i);
+                if (!TryApplyInitialWeaponPose(slot, pose, out string error))
+                {
+                    _activeWeaponSlot = -1;
+                    weaponIndex = -1;
+                    _weaponInHand = false;
+                    Debug.LogError(
+                        "[EntityBasicCombatModule] 武器初始挂载失败，装备运行时未启动：" + error,
+                        MyCore);
+                    return;
+                }
             }
 
             _weaponInHand = startWithWeaponInHand;
@@ -2035,8 +1971,6 @@ namespace ES
         {
             if (!enableWeaponFusion || _sm == null)
                 return;
-
-            EnsureWeaponAttachmentConsistency();
 
             float upperTarget = _weaponInHand ? 1f : 0f;
             _upperBodyLayerWeightCurrent = Mathf.MoveTowards(
@@ -2086,438 +2020,322 @@ namespace ES
                 RefreshWeaponParentSnapshot();
         }
 
-        private void EnsureWeaponAttachmentConsistency()
+        private bool RequestEquipWeapon(int slotIndex)
         {
-            if (weaponSlots == null || weaponSlots.Count == 0)
-                return;
-
-            _isInAttachmentConsistencyPass = true;
-            try
-            {
-                if (TryGetWeaponSlot(_activeWeaponSlot, out var activeSlot))
-                {
-                    var activeBinding = GetWeaponBinding(activeSlot);
-                    Transform activeRoot = activeSlot.weaponRoot;
-                    if (activeRoot != null)
-                    {
-                        if (_weaponInHand)
-                        {
-                            Transform desiredHandMount = ResolveHandMount(activeSlot, activeBinding);
-                            if (desiredHandMount != null && !IsAttachedOrEquivalentMount(activeRoot, desiredHandMount))
-                                AttachWeaponToHand(_activeWeaponSlot);
-                        }
-                        else
-                        {
-                            Transform desiredHolsterMount = ResolveHolsterMount(activeSlot, activeBinding, activeRoot);
-                            if (desiredHolsterMount != null && !IsAttachedOrEquivalentMount(activeRoot, desiredHolsterMount))
-                                AttachWeaponToHolster(_activeWeaponSlot);
-                        }
-                    }
-                }
-
-                for (int i = 0; i < weaponSlots.Count; i++)
-                {
-                    // Active slot has been processed above. Skip here to avoid duplicate holster checks/logs.
-                    if (i == _activeWeaponSlot)
-                        continue;
-
-                    if (!TryGetWeaponSlot(i, out var slot))
-                        continue;
-
-                    Transform root = slot.weaponRoot;
-                    if (root == null)
-                        continue;
-
-                    var binding = GetWeaponBinding(slot);
-                    Transform desiredHolsterMount = ResolveHolsterMount(slot, binding, root);
-                    if (desiredHolsterMount != null && !IsAttachedOrEquivalentMount(root, desiredHolsterMount))
-                        AttachWeaponToHolster(i);
-                }
-            }
-            finally
-            {
-                _isInAttachmentConsistencyPass = false;
-            }
-        }
-
-        private bool IsAttachedOrEquivalentMount(Transform weaponRoot, Transform mount)
-        {
-            if (weaponRoot == null || mount == null)
+            if (!TryGetWeaponSlot(slotIndex, out EntityEquipmentWeaponSlot slot))
                 return false;
 
-            if (weaponRoot.parent == mount || weaponRoot.IsChildOf(mount))
-                return true;
+            EntityWeaponBinding binding = GetWeaponBinding(slot);
+            return TryRequestEquipmentTransition(
+                EntityEquipmentTransitionPhase.Equipping,
+                CreateAttachmentOperation(slot, EntityEquipmentAttachmentPose.MainHand),
+                slotIndex,
+                true,
+                binding.equipStateInfo,
+                binding.equipStateKey,
+                equipStateInfo,
+                equipStateKey,
+                allowEquipStateInjection,
+                "Equip");
+        }
 
-            Transform currentParent = weaponRoot.parent;
-            if (currentParent == null)
+        private EntityEquipmentAttachmentOperation CreateAttachmentOperation(
+            EntityEquipmentWeaponSlot slot,
+            EntityEquipmentAttachmentPose targetPose)
+        {
+            EntityWeaponBinding binding = GetWeaponBinding(slot);
+            return new EntityEquipmentAttachmentOperation(
+                slot != null ? slot.weaponRoot : null,
+                binding,
+                targetPose,
+                EntityEquipmentVisibilityState.Visible);
+        }
+
+        private static EntityEquipmentAttachmentPose ResolveHolsterAttachmentPose(int slotIndex)
+        {
+            if (slotIndex == 1)
+                return EntityEquipmentAttachmentPose.SecondaryBack;
+            if (slotIndex >= 2)
+                return EntityEquipmentAttachmentPose.Hip;
+            return EntityEquipmentAttachmentPose.PrimaryBack;
+        }
+
+        private bool TryApplyInitialWeaponPose(
+            EntityEquipmentWeaponSlot slot,
+            EntityEquipmentAttachmentPose pose,
+            out string error)
+        {
+            EntityEquipmentDomain domain = ResolveEquipmentDomain();
+            if (domain == null)
+            {
+                error = "EntityEquipmentDomain is missing.";
                 return false;
+            }
 
-            if (!compareMountByHierarchyPath)
+            EntityEquipmentAttachmentOperation operation = CreateAttachmentOperation(slot, pose);
+            return domain.TryApplyInitialAttachmentPose(operation, out error);
+        }
+
+        private bool TryRequestEquipmentTransition(
+            EntityEquipmentTransitionPhase phase,
+            in EntityEquipmentAttachmentOperation operation,
+            int targetSlot,
+            bool targetInHand,
+            StateAniDataInfo weaponInfo,
+            string weaponKey,
+            StateAniDataInfo fallbackInfo,
+            string fallbackKey,
+            bool allowInjection,
+            string actionTag)
+        {
+            int revision = NextEquipmentTargetRevision();
+            var request = new EntityEquipmentTransitionRequest(
+                operation,
+                phase,
+                revision);
+            return TryStartEquipmentTransition(
+                request,
+                targetSlot,
+                targetInHand,
+                weaponInfo,
+                weaponKey,
+                fallbackInfo,
+                fallbackKey,
+                allowInjection,
+                actionTag);
+        }
+
+        private bool TryRequestEquipmentTransition(
+            EntityEquipmentTransitionPhase phase,
+            in EntityEquipmentAttachmentOperation primary,
+            in EntityEquipmentAttachmentOperation secondary,
+            int targetSlot,
+            bool targetInHand,
+            StateAniDataInfo weaponInfo,
+            string weaponKey,
+            StateAniDataInfo fallbackInfo,
+            string fallbackKey,
+            bool allowInjection,
+            string actionTag)
+        {
+            int revision = NextEquipmentTargetRevision();
+            var request = new EntityEquipmentTransitionRequest(
+                primary,
+                secondary,
+                phase,
+                revision);
+            return TryStartEquipmentTransition(
+                request,
+                targetSlot,
+                targetInHand,
+                weaponInfo,
+                weaponKey,
+                fallbackInfo,
+                fallbackKey,
+                allowInjection,
+                actionTag);
+        }
+
+        private bool TryStartEquipmentTransition(
+            in EntityEquipmentTransitionRequest request,
+            int targetSlot,
+            bool targetInHand,
+            StateAniDataInfo weaponInfo,
+            string weaponKey,
+            StateAniDataInfo fallbackInfo,
+            string fallbackKey,
+            bool allowInjection,
+            string actionTag)
+        {
+            CancelPendingEquipmentTransition();
+            EntityEquipmentDomain domain = ResolveEquipmentDomain();
+            if (domain == null)
+            {
+                WarnEquipmentTransitionFailure("EntityEquipmentDomain is missing.");
                 return false;
-
-            // In some setups mounts are rebuilt/rebound and reference changes, but hierarchy path remains stable.
-            return string.Equals(GetTransformPath(currentParent), GetTransformPath(mount), StringComparison.Ordinal);
-        }
-
-        private Transform ResolveHandMount(WeaponSlot slot, EntityWeaponBinding weaponBinding)
-        {
-            Transform explicitMount = weaponBinding != null
-                && weaponBinding.handMountPolicy != EntityWeaponHandMountPolicy.CharacterSocketOnly
-                ? weaponBinding.handMount
-                : null;
-            Transform mount = null;
-            EntityEquipmentAttachmentModule attachment = ResolveAttachmentModule();
-            attachment?.TryResolveTarget(
-                EntityEquipmentAttachmentTarget.MainHand,
-                explicitMount,
-                defaultHandMount,
-                out mount,
-                out _);
-
-            if (mount == null && attachment == null)
-                mount = weaponBinding != null
-                    ? weaponBinding.ResolveHandMount(MyCore, defaultHandMount)
-                    : ResolveCharacterWeaponSocket(defaultHandMount);
-
-            if (IsHandMountConflictingWithHolster(slot, weaponBinding, mount))
-            {
-                Transform fallbackHandMount = ResolveFallbackHandMount(slot, weaponBinding);
-                bool fallbackIsValid = fallbackHandMount != null
-                    && !IsHandMountConflictingWithHolster(slot, weaponBinding, fallbackHandMount);
-
-                if (logWeaponMountWarnings)
-                {
-                    Debug.LogWarning(
-                        $"[EntityBasicCombatModule] 手持挂点与收枪挂点冲突，已回退默认手持挂点 | Weapon={(slot != null && slot.weaponRoot != null ? slot.weaponRoot.name : "<null>")} | HandPath={GetTransformPath(mount)} | HolsterPath={GetTransformPath(weaponBinding != null ? weaponBinding.holsterMount : null)} | FallbackPath={GetTransformPath(fallbackIsValid ? fallbackHandMount : null)}",
-                        MyCore);
-                }
-
-                mount = fallbackIsValid ? fallbackHandMount : null;
             }
-
-            if (mount == null)
+            if (!domain.TryPrepareAttachmentTransition(
+                    request,
+                    out EntityEquipmentTransitionToken token,
+                    out string prepareError))
             {
-                Transform fallbackHandMount = ResolveFallbackHandMount(slot, weaponBinding);
-                bool fallbackIsValid = fallbackHandMount != null
-                    && !IsHandMountConflictingWithHolster(slot, weaponBinding, fallbackHandMount);
-                mount = fallbackIsValid ? fallbackHandMount : null;
-            }
-
-            if (mount == null)
-                mount = MyCore != null ? MyCore.transform : null;
-
-            return mount;
-        }
-
-        private Transform ResolveFallbackHandMount(WeaponSlot slot, EntityWeaponBinding weaponBinding)
-        {
-            Transform candidate = ResolveCharacterWeaponSocket(defaultHandMount);
-            if (candidate != null && !IsHandMountConflictingWithHolster(slot, weaponBinding, candidate))
-                return candidate;
-
-            candidate = EnsureAutoRightHandMount();
-            if (candidate != null && !IsHandMountConflictingWithHolster(slot, weaponBinding, candidate))
-                return candidate;
-
-            return null;
-        }
-
-        private Transform ResolveCharacterWeaponSocket(Transform fallback)
-        {
-            if (MyCore != null && MyCore.TryResolveTransform(EntityEquipmentSocketKeys.WeaponSocket, out Transform weaponSocket))
-                return weaponSocket;
-
-            if (MyCore != null && MyCore.TryResolveTransform(DefaultTransformKey.Weapon, out Transform mappedWeapon))
-                return mappedWeapon;
-
-            return fallback;
-        }
-
-        private bool IsHandMountConflictingWithHolster(WeaponSlot slot, EntityWeaponBinding weaponBinding, Transform handMount)
-        {
-            if (handMount == null)
+                WarnEquipmentTransitionFailure(prepareError);
                 return false;
-
-            if (weaponBinding != null && IsSameOrChildOfEitherWay(handMount, weaponBinding.holsterMount))
-                return true;
-
-            if (IsSameOrChildOfEitherWay(handMount, defaultHolsterMount))
-                return true;
-
-            if (defaultHolsterMounts != null)
-            {
-                for (int i = 0; i < defaultHolsterMounts.Count; i++)
-                {
-                    if (IsSameOrChildOfEitherWay(handMount, defaultHolsterMounts[i]))
-                        return true;
-                }
             }
 
-            return false;
-        }
-
-        private void ValidateAndRepairMountConfiguration()
-        {
-            EntityEquipmentAttachmentModule attachment = ResolveAttachmentModule();
-            if (attachment != null && !attachment.allowEntityRootFallback)
-                return;
-
-            if (defaultHandMount == null)
+            StateAniDataInfo resolvedInfo = weaponInfo != null ? weaponInfo : fallbackInfo;
+            string resolvedKey = ResolveTransitionStateKey(weaponKey, fallbackKey);
+            StateBase state = ResolveStateByInfoOrKey(
+                resolvedInfo,
+                resolvedKey,
+                allowInjection,
+                actionTag);
+            if (state == null || _sm == null || !_sm.TryActivateState(state))
             {
-                defaultHandMount = EnsureAutoRightHandMount();
-                return;
-            }
-
-            if (IsHandMountConflictingWithHolster(null, null, defaultHandMount))
-            {
-                Transform old = defaultHandMount;
-                Transform repaired = EnsureAutoRightHandMount();
-
-                if (repaired != null)
-                    defaultHandMount = repaired;
-
-                if (logWeaponMountWarnings)
-                {
-                    Debug.LogWarning(
-                        $"[EntityBasicCombatModule] 检测到默认手持挂点与背挂点层级冲突，已自动修复 | Old={GetTransformPath(old)} | New={GetTransformPath(defaultHandMount)}",
-                        MyCore);
-                }
-            }
-        }
-
-        private static bool IsSameOrChildOf(Transform target, Transform possibleAncestor)
-        {
-            if (target == null || possibleAncestor == null)
+                domain.TryCancelAttachment(token, out _);
+                WarnEquipmentTransitionFailure(
+                    "Equipment transition state could not be activated: " + resolvedKey + ".");
                 return false;
-
-            return target == possibleAncestor || target.IsChildOf(possibleAncestor);
-        }
-
-        private static bool IsSameOrChildOfEitherWay(Transform a, Transform b)
-        {
-            return IsSameOrChildOf(a, b) || IsSameOrChildOf(b, a);
-        }
-
-        private Transform ResolveHolsterMount(WeaponSlot slot, EntityWeaponBinding weaponBinding, Transform root)
-        {
-            int holsterIndex = ResolveHolsterMountIndex(slot, weaponBinding);
-            Transform explicitMount = weaponBinding != null ? weaponBinding.holsterMount : null;
-            Transform legacyFallback = ResolveDefaultHolsterMount(holsterIndex, root);
-            Transform mount = null;
-            EntityEquipmentAttachmentModule attachment = ResolveAttachmentModule();
-            attachment?.TryResolveTarget(
-                ResolveHolsterAttachmentTarget(holsterIndex),
-                explicitMount,
-                legacyFallback,
-                out mount,
-                out _);
-
-            if (mount == null && attachment == null)
-                mount = explicitMount != null ? explicitMount : legacyFallback;
-
-            if (preventHolsterOnArmChain && IsTransformOnArmChain(mount))
+            }
+            if (!domain.TryBindAnimationState(token, state, out string bindingError))
             {
-                mount = ResolveDefaultHolsterMount(holsterIndex, root);
-                if (mount != null && IsTransformOnArmChain(mount))
-                    mount = EnsureAutoBackHolsterMount();
+                domain.TryCancelAttachment(token, out _);
+                WarnEquipmentTransitionFailure(bindingError);
+                return false;
             }
 
-            if (mount == null)
-                mount = MyCore != null ? MyCore.transform : null;
-
-            return mount;
-        }
-
-        private bool HolsterCurrentWeaponInternal(bool playTransitionState)
-        {
-            if (!enableWeaponFusion)
-                return false;
-
-            if (!TryGetWeaponSlot(_activeWeaponSlot, out var currentSlot))
-                return false;
-
-            var weaponBinding = GetWeaponBinding(currentSlot);
-
-            ReleaseEquippedWeaponTags();
-            AttachWeaponToHolster(_activeWeaponSlot);
-            _weaponInHand = false;
-            SetActionPhase(2);
-
-            if (playTransitionState)
-            {
-                TryActivateTransitionState(
-                    weaponBinding != null ? weaponBinding.holsterStateInfo : null,
-                    weaponBinding != null ? weaponBinding.holsterStateKey : string.Empty,
-                    holsterStateInfo,
-                    holsterStateKey,
-                    allowHolsterStateInjection,
-                    "Holster");
-            }
-
+            _pendingEquipmentToken = token;
+            _pendingEquipmentPhase = request.phase;
+            _pendingWeaponSlot = targetSlot;
+            _pendingWeaponInHand = targetInHand;
+            _rollbackWeaponSlot = _activeWeaponSlot;
+            _rollbackWeaponInHand = _weaponInHand;
+            _rollbackActionPhase = _actionPhase;
+            SetActionPhase(request.phase == EntityEquipmentTransitionPhase.Switching ? 3 : _actionPhase);
             return true;
+        }
+
+        private int NextEquipmentTargetRevision()
+        {
+            _equipmentTargetRevision++;
+            if (_equipmentTargetRevision <= 0)
+                _equipmentTargetRevision = 1;
+            return _equipmentTargetRevision;
+        }
+
+        private void BindEquipmentTransitionEvents()
+        {
+            EntityEquipmentDomain domain = MyCore != null ? MyCore.equipmentDomain : null;
+            if (_equipmentEventsBound && ReferenceEquals(_equipmentDomain, domain))
+                return;
+
+            UnbindEquipmentTransitionEvents();
+            _equipmentDomain = domain;
+            if (_equipmentDomain == null)
+                return;
+
+            _equipmentDomain.AttachmentTransitionChanged += OnEquipmentTransitionChanged;
+            _equipmentEventsBound = true;
+        }
+
+        private void UnbindEquipmentTransitionEvents()
+        {
+            if (_equipmentEventsBound && _equipmentDomain != null)
+                _equipmentDomain.AttachmentTransitionChanged -= OnEquipmentTransitionChanged;
+            _equipmentEventsBound = false;
+            _equipmentDomain = null;
+        }
+
+        private void OnEquipmentTransitionChanged(
+            EntityEquipmentTransitionToken token,
+            EntityEquipmentTransitionPhase phase,
+            EntityEquipmentTransitionSignal signal)
+        {
+            if (!_pendingEquipmentToken.IsValid || token != _pendingEquipmentToken)
+                return;
+
+            switch (signal)
+            {
+                case EntityEquipmentTransitionSignal.Committed:
+                    _activeWeaponSlot = _pendingWeaponSlot;
+                    weaponIndex = _pendingWeaponSlot;
+                    _weaponInHand = _pendingWeaponInHand;
+                    ResetRecoilBurst();
+                    if (_weaponInHand
+                        && TryGetWeaponSlot(_activeWeaponSlot, out EntityEquipmentWeaponSlot committedSlot))
+                    {
+                        ApplyEquippedWeaponTags(GetWeaponBinding(committedSlot));
+                        _lastEquipOrSwitchTime = Time.time;
+                    }
+                    else
+                    {
+                        ReleaseEquippedWeaponTags();
+                    }
+                    SetActionPhase(_weaponInHand ? 1 : 2);
+                    break;
+
+                case EntityEquipmentTransitionSignal.Completed:
+                    ClearPendingEquipmentTransition();
+                    break;
+
+                case EntityEquipmentTransitionSignal.Cancelled:
+                    _activeWeaponSlot = _rollbackWeaponSlot;
+                    weaponIndex = _rollbackWeaponSlot;
+                    _weaponInHand = _rollbackWeaponInHand;
+                    if (_weaponInHand
+                        && TryGetWeaponSlot(_activeWeaponSlot, out EntityEquipmentWeaponSlot rollbackSlot))
+                    {
+                        ApplyEquippedWeaponTags(GetWeaponBinding(rollbackSlot));
+                    }
+                    else
+                    {
+                        ReleaseEquippedWeaponTags();
+                    }
+                    SetActionPhase(_rollbackActionPhase);
+                    ClearPendingEquipmentTransition();
+                    break;
+            }
+        }
+
+        private void CancelPendingEquipmentTransition()
+        {
+            if (!_pendingEquipmentToken.IsValid)
+                return;
+
+            EntityEquipmentDomain domain = MyCore != null ? MyCore.equipmentDomain : null;
+            if (domain != null
+                && domain.TryCancelAttachment(_pendingEquipmentToken, out _))
+            {
+                return;
+            }
+
+            ClearPendingEquipmentTransition();
+        }
+
+        private void ClearPendingEquipmentTransition()
+        {
+            _pendingEquipmentToken = default;
+            _pendingEquipmentPhase = EntityEquipmentTransitionPhase.Idle;
+            _pendingWeaponSlot = -1;
+            _pendingWeaponInHand = false;
+            _rollbackWeaponSlot = -1;
+            _rollbackWeaponInHand = false;
+            _rollbackActionPhase = 0;
+        }
+
+        private EntityEquipmentDomain ResolveEquipmentDomain()
+        {
+            return MyCore != null ? MyCore.equipmentDomain : null;
+        }
+
+        private void WarnEquipmentTransitionFailure(string error)
+        {
+            if (logWeaponMountWarnings)
+            {
+                Debug.LogWarning(
+                    "[EntityBasicCombatModule] 装备过渡失败：" + error,
+                    MyCore);
+            }
         }
 
         private void ApplyEquippedWeaponTags(EntityWeaponBinding binding)
         {
-            _equippedWeaponTagLeases ??= new ESTagLeaseSet();
-            if (binding == null || binding.equippedTags == null || binding.equippedTags.Count == 0)
-            {
-                _equippedWeaponTagLeases.ReleaseAll();
-                return;
-            }
-
-            if (_equippedWeaponTagLeases.TryApply(MyCore.Tags, binding.equippedTags, this, out string error))
+            EntityEquipmentDomain domain = ResolveEquipmentDomain();
+            string error = "EntityEquipmentDomain is missing.";
+            if (domain != null
+                && domain.TryApplyEquippedWeaponEffects(binding, this, out error))
                 return;
 
             if (logWeaponMountWarnings)
-                Debug.LogWarning("[EntityBasicCombatModule] 手持武器 Tag 添加失败: " + error, MyCore);
+                Debug.LogWarning(
+                    "[EntityBasicCombatModule] 手持武器效果添加失败: "
+                    + error,
+                    MyCore);
         }
 
         private void ReleaseEquippedWeaponTags()
         {
-            _equippedWeaponTagLeases?.ReleaseAll();
-        }
-
-        private void AttachWeaponToHand(int slotIndex)
-        {
-            if (!TryGetWeaponSlot(slotIndex, out var slot))
-            {
-                if (logWeaponMountWarnings)
-                    Debug.LogWarning($"[EntityBasicCombatModule] AttachWeaponToHand 失败：槽位无效 | Slot={slotIndex}", MyCore);
-                return;
-            }
-
-            Transform root = slot.weaponRoot;
-            if (root == null)
-                return;
-
-            var weaponBinding = GetWeaponBinding(slot);
-            EntityEquipmentAttachmentModule attachment = ResolveAttachmentModule();
-            if (attachment != null)
-            {
-                Transform explicitMount = weaponBinding != null
-                    && weaponBinding.handMountPolicy != EntityWeaponHandMountPolicy.CharacterSocketOnly
-                    ? weaponBinding.handMount
-                    : null;
-                if (IsHandMountConflictingWithHolster(slot, weaponBinding, explicitMount))
-                    explicitMount = null;
-
-                if (!attachment.TryAttach(
-                        EntityEquipmentAttachmentTarget.MainHand,
-                        root,
-                        explicitMount,
-                        defaultHandMount,
-                        true,
-                        out _,
-                        out string attachmentError))
-                {
-                    if (logWeaponMountWarnings)
-                        Debug.LogWarning("[EntityBasicCombatModule] 手持挂载事务失败：" + attachmentError, MyCore);
-                    return;
-                }
-
-                weaponBinding?.ApplyHandMountLocalPose(root);
-                if (logWeaponMountSuccess && !_isInAttachmentConsistencyPass)
-                    Debug.Log($"[EntityBasicCombatModule] 手持挂载成功 | Slot={slotIndex} | Weapon={root.name} | Mount={root.parent.name} | ParentPath={GetTransformPath(root.parent)}", MyCore);
-                return;
-            }
-
-            Transform mount = ResolveHandMount(slot, weaponBinding);
-
-            if (mount == null)
-            {
-                if (logWeaponMountWarnings)
-                    Debug.LogWarning($"[EntityBasicCombatModule] 手持挂点为空，无法挂载武器 | Slot={slotIndex} | Weapon={(root != null ? root.name : "<null>")}", MyCore);
-                return;
-            }
-
-            if (IsAttachedOrEquivalentMount(root, mount))
-                return;
-
-            root.SetParent(mount, false);
-            root.localPosition = Vector3.zero;
-            root.localRotation = Quaternion.identity;
-            weaponBinding?.ApplyHandMountLocalPose(root);
-
-            if (logWeaponMountSuccess && !_isInAttachmentConsistencyPass)
-                Debug.Log($"[EntityBasicCombatModule] 手持挂载成功 | Slot={slotIndex} | Weapon={root.name} | Mount={mount.name} | ParentPath={GetTransformPath(root.parent)}", MyCore);
-        }
-
-        private void AttachWeaponToHolster(int slotIndex)
-        {
-            if (!TryGetWeaponSlot(slotIndex, out var slot))
-            {
-                if (logWeaponMountWarnings)
-                    Debug.LogWarning($"[EntityBasicCombatModule] AttachWeaponToHolster 失败：槽位无效 | Slot={slotIndex}", MyCore);
-                return;
-            }
-
-            Transform root = slot.weaponRoot;
-            if (root == null)
-                return;
-
-            var weaponBinding = GetWeaponBinding(slot);
-            int holsterIndex = ResolveHolsterMountIndex(slot, weaponBinding);
-
-            EntityEquipmentAttachmentModule attachment = ResolveAttachmentModule();
-            if (attachment != null)
-            {
-                Transform explicitMount = weaponBinding != null ? weaponBinding.holsterMount : null;
-                if (preventHolsterOnArmChain && IsTransformOnArmChain(explicitMount))
-                    explicitMount = null;
-
-                if (!attachment.TryAttach(
-                        ResolveHolsterAttachmentTarget(holsterIndex),
-                        root,
-                        explicitMount,
-                        ResolveDefaultHolsterMount(holsterIndex, root),
-                        true,
-                        out _,
-                        out string attachmentError))
-                {
-                    if (logWeaponMountWarnings)
-                        Debug.LogWarning("[EntityBasicCombatModule] 收纳挂载事务失败：" + attachmentError, MyCore);
-                    return;
-                }
-
-                if (logWeaponMountSuccess && !_isInAttachmentConsistencyPass)
-                    Debug.Log($"[EntityBasicCombatModule] 收枪挂载成功 | Slot={slotIndex} | Weapon={root.name} | Mount={root.parent.name} | HolsterIndex={holsterIndex} | ParentPath={GetTransformPath(root.parent)}", MyCore);
-                return;
-            }
-
-            Transform mount = weaponBinding != null && weaponBinding.holsterMount != null
-                ? weaponBinding.holsterMount
-                : ResolveDefaultHolsterMount(holsterIndex, root);
-
-            if (preventHolsterOnArmChain && IsTransformOnArmChain(mount))
-            {
-                if (logWeaponMountWarnings)
-                    Debug.LogWarning($"[EntityBasicCombatModule] 收枪挂点位于手臂链，已忽略该挂点并回退默认背挂点 | Slot={slotIndex} | Weapon={root.name} | MountPath={GetTransformPath(mount)}", MyCore);
-
-                mount = ResolveDefaultHolsterMount(holsterIndex, root);
-                if (mount != null && IsTransformOnArmChain(mount))
-                    mount = EnsureAutoBackHolsterMount();
-            }
-
-            if (mount == null)
-            {
-                if (logWeaponMountWarnings)
-                    Debug.LogWarning($"[EntityBasicCombatModule] 身上挂点为空，无法收枪 | Slot={slotIndex} | Weapon={(root != null ? root.name : "<null>")}", MyCore);
-                mount = MyCore != null ? MyCore.transform : null;
-            }
-
-            if (mount == null)
-                return;
-
-            if (IsAttachedOrEquivalentMount(root, mount))
-                return;
-
-            root.SetParent(mount, false);
-            root.localPosition = Vector3.zero;
-            root.localRotation = Quaternion.identity;
-
-            if (logWeaponMountSuccess && !_isInAttachmentConsistencyPass)
-                Debug.Log($"[EntityBasicCombatModule] 收枪挂载成功 | Slot={slotIndex} | Weapon={root.name} | Mount={(mount != null ? mount.name : "<null>")} | HolsterIndex={holsterIndex} | ParentPath={GetTransformPath(root.parent)}", MyCore);
+            ResolveEquipmentDomain()?.ReleaseEquippedEffects();
         }
 
         private void RefreshWeaponParentSnapshot()
@@ -2574,263 +2392,26 @@ namespace ES
             return sb.ToString();
         }
 
-        private bool IsTransformOnArmChain(Transform mount)
+        private EntityWeaponBinding GetWeaponBinding(EntityEquipmentWeaponSlot slot)
         {
-            if (mount == null)
-                return false;
-
-            Animator animator = _sm != null ? _sm.BoundAnimator : null;
-            if (animator == null && MyCore != null)
-                animator = MyCore.animator;
-            if (animator == null || !animator.isHuman)
-                return false;
-
-            return IsUnderBone(animator, mount, HumanBodyBones.LeftHand)
-                || IsUnderBone(animator, mount, HumanBodyBones.RightHand)
-                || IsUnderBone(animator, mount, HumanBodyBones.LeftLowerArm)
-                || IsUnderBone(animator, mount, HumanBodyBones.RightLowerArm)
-                || IsUnderBone(animator, mount, HumanBodyBones.LeftUpperArm)
-                || IsUnderBone(animator, mount, HumanBodyBones.RightUpperArm)
-                || IsUnderBone(animator, mount, HumanBodyBones.LeftShoulder)
-                || IsUnderBone(animator, mount, HumanBodyBones.RightShoulder);
+            return ResolveEquipmentDomain()?.Slots?.GetBinding(slot);
         }
 
-        private static bool IsUnderBone(Animator animator, Transform target, HumanBodyBones bone)
+        private bool TryGetWeaponSlot(int index, out EntityEquipmentWeaponSlot slot)
         {
-            if (animator == null || target == null)
-                return false;
-
-            Transform boneTransform = animator.GetBoneTransform(bone);
-            if (boneTransform == null)
-                return false;
-
-            return target == boneTransform || target.IsChildOf(boneTransform);
-        }
-
-        private Transform ResolveDefaultHolsterMount(int holsterMountIndex, Transform ignoreWeaponRoot = null)
-        {
-            if (defaultHolsterMounts != null
-                && defaultHolsterMounts.Count > 0)
-            {
-                if (holsterMountIndex >= 0 && holsterMountIndex < defaultHolsterMounts.Count)
-                {
-                    Transform indexedMount = defaultHolsterMounts[holsterMountIndex];
-                    if (indexedMount != null)
-                        return indexedMount;
-                }
-
-                if (holsterMountIndex < 0)
-                {
-                    Transform freeMount = FindFirstFreeHolsterMount(ignoreWeaponRoot);
-                    if (freeMount != null)
-                        return freeMount;
-                }
-
-                for (int i = 0; i < defaultHolsterMounts.Count; i++)
-                {
-                    if (defaultHolsterMounts[i] != null)
-                        return defaultHolsterMounts[i];
-                }
-            }
-
-            if (defaultHolsterMount != null)
-                return defaultHolsterMount;
-
-            if (autoCreateBackHolsterMount)
-                return EnsureAutoBackHolsterMount();
-
-            return null;
-        }
-
-        private Transform FindFirstFreeHolsterMount(Transform ignoreWeaponRoot)
-        {
-            if (defaultHolsterMounts == null || defaultHolsterMounts.Count == 0)
-                return null;
-
-            for (int i = 0; i < defaultHolsterMounts.Count; i++)
-            {
-                Transform mount = defaultHolsterMounts[i];
-                if (mount == null)
-                    continue;
-
-                if (!IsHolsterMountOccupiedByOtherWeapon(mount, ignoreWeaponRoot))
-                    return mount;
-            }
-
-            return null;
-        }
-
-        private bool IsHolsterMountOccupiedByOtherWeapon(Transform mount, Transform ignoreWeaponRoot)
-        {
-            if (mount == null || weaponSlots == null || weaponSlots.Count == 0)
-                return false;
-
-            for (int i = 0; i < weaponSlots.Count; i++)
-            {
-                var slot = weaponSlots[i];
-                if (slot == null || slot.weaponRoot == null)
-                    continue;
-
-                Transform weaponRoot = slot.weaponRoot;
-                if (weaponRoot == ignoreWeaponRoot)
-                    continue;
-
-                if (weaponRoot == mount || weaponRoot.IsChildOf(mount))
-                    return true;
-            }
-
-            return false;
-        }
-
-        private Transform EnsureAutoBackHolsterMount()
-        {
-            if (_autoBackHolsterMount != null)
-                return _autoBackHolsterMount;
-
-            Transform parent = null;
-            Animator animator = null;
-            if (_sm != null)
-                animator = _sm.BoundAnimator;
-            if (animator == null && MyCore != null)
-                animator = MyCore.animator;
-
-            if (animator != null && animator.isHuman)
-            {
-                parent = animator.GetBoneTransform(HumanBodyBones.UpperChest);
-                if (parent == null) parent = animator.GetBoneTransform(HumanBodyBones.Chest);
-                if (parent == null) parent = animator.GetBoneTransform(HumanBodyBones.Spine);
-                if (parent == null) parent = animator.GetBoneTransform(HumanBodyBones.Hips);
-            }
-
-            if (parent == null)
-                parent = MyCore != null ? MyCore.transform : null;
-
-            if (parent == null)
-                return null;
-
-            var mountGo = new GameObject("__AutoBackHolsterMount");
-            mountGo.transform.SetParent(parent, false);
-            mountGo.transform.localPosition = autoBackHolsterLocalPosition;
-            mountGo.transform.localRotation = Quaternion.Euler(autoBackHolsterLocalEuler);
-            _autoBackHolsterMount = mountGo.transform;
-            return _autoBackHolsterMount;
-        }
-
-        private Transform EnsureAutoRightHandMount()
-        {
-            if (!autoCreateRightHandMount)
-                return null;
-
-            if (_autoRightHandMount != null)
-                return _autoRightHandMount;
-
-            Animator animator = _sm != null ? _sm.BoundAnimator : null;
-            if (animator == null && MyCore != null)
-                animator = MyCore.animator;
-
-            Transform parent = null;
-            if (animator != null && animator.isHuman)
-                parent = animator.GetBoneTransform(HumanBodyBones.RightHand);
-
-            if (parent == null)
-                return null;
-
-            var mountGo = new GameObject("__AutoRightHandMount");
-            mountGo.transform.SetParent(parent, false);
-            mountGo.transform.localPosition = autoRightHandLocalPosition;
-            mountGo.transform.localRotation = Quaternion.Euler(autoRightHandLocalEuler);
-            _autoRightHandMount = mountGo.transform;
-            return _autoRightHandMount;
-        }
-
-        private int ResolveHolsterMountIndex(WeaponSlot slot, EntityWeaponBinding weaponBinding)
-        {
-            if (weaponBinding != null && weaponBinding.holsterMountIndex >= 0)
-                return weaponBinding.holsterMountIndex;
-
-            if (slot != null && weaponSlots != null && weaponSlots.Count > 0)
-            {
-                int slotIndex = weaponSlots.IndexOf(slot);
-                if (slotIndex >= 0)
-                    return slotIndex;
-            }
-
-            return -1;
-        }
-
-        private EntityWeaponBinding GetWeaponBinding(WeaponSlot slot)
-        {
-            if (slot == null || slot.weaponRoot == null)
-                return null;
-
-            return slot.weaponRoot.GetComponent<EntityWeaponBinding>();
-        }
-
-        private EntityWeaponBinding EnsureWeaponBinding(WeaponSlot slot)
-        {
-            if (slot == null || slot.weaponRoot == null)
-                return null;
-
-            var binding = slot.weaponRoot.GetComponent<EntityWeaponBinding>();
-            if (binding != null)
-                return binding;
-
-            if (!autoAddWeaponBindingIfMissing)
-                return null;
-
-            binding = slot.weaponRoot.gameObject.AddComponent<EntityWeaponBinding>();
+            EntityEquipmentSlotModule slots = ResolveEquipmentDomain()?.Slots;
+            string error = "EntityEquipmentSlotModule is missing.";
+            if (slots != null && slots.TryGetWeaponSlot(index, out slot, out error))
+                return true;
+            slot = null;
             if (logWeaponMountWarnings)
-                Debug.LogWarning($"[EntityBasicCombatModule] 自动补齐 EntityWeaponBinding | Weapon={slot.weaponRoot.name}", slot.weaponRoot);
-            return binding;
-        }
-
-        private bool TryGetWeaponSlot(int index, out WeaponSlot slot)
-        {
-            if (weaponSlots == null || index < 0 || index >= weaponSlots.Count)
-            {
-                if (logWeaponMountWarnings)
-                    Debug.LogWarning($"[EntityBasicCombatModule] 槽位索引越界 | Index={index} | Count={(weaponSlots != null ? weaponSlots.Count : 0)}", MyCore);
-                slot = null;
-                return false;
-            }
-
-            slot = weaponSlots[index];
-            if (slot == null || slot.weaponRoot == null)
-            {
-                if (logWeaponMountWarnings)
-                    Debug.LogWarning($"[EntityBasicCombatModule] 槽位缺少 weaponRoot | Index={index}", MyCore);
-                return false;
-            }
-
-            if (!slot.weaponRoot.gameObject.scene.IsValid())
-            {
-                if (logWeaponMountWarnings)
-                    Debug.LogWarning($"[EntityBasicCombatModule] weaponRoot 不是场景实例（可能拖了Prefab资源）| Index={index} | Weapon={slot.weaponRoot.name}", MyCore);
-                return false;
-            }
-
-            return EnsureWeaponBinding(slot) != null;
+                Debug.LogWarning("[EntityBasicCombatModule] " + error, MyCore);
+            return false;
         }
 
         private int FindNextValidWeaponIndex(int from, int dir)
         {
-            if (weaponSlots == null || weaponSlots.Count == 0)
-                return -1;
-
-            int count = weaponSlots.Count;
-            int start = from;
-            if (start < 0 || start >= count)
-                start = 0;
-
-            for (int step = 1; step <= count; step++)
-            {
-                int idx = (start + step * dir) % count;
-                if (idx < 0) idx += count;
-                if (TryGetWeaponSlot(idx, out _))
-                    return idx;
-            }
-
-            return -1;
+            return ResolveEquipmentDomain()?.Slots?.FindNextValidWeaponIndex(from, dir) ?? -1;
         }
 
         private void SetActionPhase(int phase)
@@ -2913,8 +2494,8 @@ namespace ES
 
             var weaponBinding = GetWeaponBinding(slot);
 
-            if (weaponBinding != null && weaponBinding.fireOrigin != null)
-                return weaponBinding.fireOrigin;
+            if (weaponBinding != null && weaponBinding.Muzzle != null)
+                return weaponBinding.Muzzle;
 
             return slot.weaponRoot;
         }
@@ -2925,134 +2506,11 @@ namespace ES
             {
                 var weaponBinding = GetWeaponBinding(slot);
 
-                if (weaponBinding != null && weaponBinding.aimTarget != null)
-                    return weaponBinding.aimTarget;
+                if (weaponBinding != null && weaponBinding.AimReference != null)
+                    return weaponBinding.AimReference;
             }
 
             return defaultAimTarget;
-        }
-
-        private void StartSwitchAssistIK(WeaponSlot currentSlot, EntityWeaponBinding currentBinding, WeaponSlot nextSlot, EntityWeaponBinding nextBinding)
-        {
-            if (!enableSwitchAssistIK || _sm == null)
-                return;
-
-            _switchAssistLeftTarget = ResolveSwitchAssistLeftTarget(currentSlot, currentBinding, nextSlot, nextBinding);
-            _switchAssistRightTarget = ResolveSwitchAssistRightTarget(currentSlot, currentBinding, nextSlot, nextBinding);
-            if (_switchAssistLeftTarget == null && _switchAssistRightTarget == null)
-                return;
-
-            float duration = Mathf.Max(0.05f, switchAssistDuration);
-            _switchAssistStartTime = Time.time;
-            _switchAssistEndTime = _switchAssistStartTime + duration;
-            BindSwitchAssistIKPostProcess();
-        }
-
-        private Transform ResolveSwitchAssistLeftTarget(WeaponSlot currentSlot, EntityWeaponBinding currentBinding, WeaponSlot nextSlot, EntityWeaponBinding nextBinding)
-        {
-            if (nextBinding != null && nextBinding.switchAssistLeftHandTarget != null)
-                return nextBinding.switchAssistLeftHandTarget;
-
-            if (currentBinding != null && currentBinding.switchAssistLeftHandTarget != null)
-                return currentBinding.switchAssistLeftHandTarget;
-
-            if (currentBinding != null && currentBinding.holsterMount != null)
-                return currentBinding.holsterMount;
-
-            int holsterIndex = ResolveHolsterMountIndex(currentSlot, currentBinding);
-            Transform defaultMount = ResolveDefaultHolsterMount(holsterIndex);
-            if (defaultMount != null)
-                return defaultMount;
-
-            return defaultSwitchAssistLeftHandTarget;
-        }
-
-        private Transform ResolveSwitchAssistRightTarget(WeaponSlot currentSlot, EntityWeaponBinding currentBinding, WeaponSlot nextSlot, EntityWeaponBinding nextBinding)
-        {
-            if (nextBinding != null && nextBinding.switchAssistRightHandTarget != null)
-                return nextBinding.switchAssistRightHandTarget;
-
-            if (currentBinding != null && currentBinding.switchAssistRightHandTarget != null)
-                return currentBinding.switchAssistRightHandTarget;
-
-            if (nextBinding != null)
-            {
-                if (nextBinding.twoHanded && nextBinding.offHandGripTarget != null)
-                    return nextBinding.offHandGripTarget;
-
-                Transform nextHandMount = nextBinding.ResolveHandMount(MyCore, defaultHandMount);
-                if (nextHandMount != null)
-                    return nextHandMount;
-            }
-
-            if (nextSlot != null && nextSlot.weaponRoot != null)
-                return nextSlot.weaponRoot;
-
-            return defaultSwitchAssistRightHandTarget;
-        }
-
-        private void BindSwitchAssistIKPostProcess()
-        {
-            if (_switchAssistSubscribed || _sm == null)
-                return;
-
-            _sm.OnStateGeneralFinalIKDriverPosePostProcess += OnSwitchAssistIKPostProcess;
-            _switchAssistSubscribed = true;
-        }
-
-        private void UnbindSwitchAssistIKPostProcess()
-        {
-            if (!_switchAssistSubscribed || _sm == null)
-                return;
-
-            _sm.OnStateGeneralFinalIKDriverPosePostProcess -= OnSwitchAssistIKPostProcess;
-            _switchAssistSubscribed = false;
-        }
-
-        private void OnSwitchAssistIKPostProcess(StateMachine machine, ref StateGeneralFinalIKDriverPose pose, float deltaTime)
-        {
-            if (!enableSwitchAssistIK)
-                return;
-
-            float now = Time.time;
-            if (now >= _switchAssistEndTime || _switchAssistStartTime < 0f)
-                return;
-
-            float fadeIn = Mathf.Clamp01((now - _switchAssistStartTime) / Mathf.Max(0.01f, switchAssistFadeIn));
-            float fadeOut = Mathf.Clamp01((_switchAssistEndTime - now) / Mathf.Max(0.01f, switchAssistFadeOut));
-            float envelope = Mathf.Min(fadeIn, fadeOut);
-            if (envelope <= 0.0001f)
-                return;
-
-            if (_switchAssistLeftTarget != null)
-            {
-                ApplySwitchAssistGoal(
-                    ref pose.leftHand,
-                    _switchAssistLeftTarget,
-                    Mathf.Clamp01(switchAssistLeftHandWeight) * envelope,
-                    switchAssistLerpingRate);
-            }
-
-            if (_switchAssistRightTarget != null)
-            {
-                ApplySwitchAssistGoal(
-                    ref pose.rightHand,
-                    _switchAssistRightTarget,
-                    Mathf.Clamp01(switchAssistRightHandWeight) * envelope,
-                    switchAssistLerpingRate);
-            }
-        }
-
-        private static void ApplySwitchAssistGoal(ref IKGoalPose goal, Transform target, float weight, float lerpingRate)
-        {
-            if (target == null || weight <= 0.0001f)
-                return;
-
-            goal.weight = Mathf.Max(goal.weight, weight);
-            goal.position = target.position;
-            goal.rotation = target.rotation;
-            goal.lerpingRate = Mathf.Max(goal.lerpingRate, Mathf.Max(0.05f, lerpingRate));
-            goal.hintPosition = Vector3.zero;
         }
 
         private string GetCurrentSlotFireStateKey()
@@ -3292,56 +2750,6 @@ namespace ES
             _recoilBurstShotCount = 0;
             _recoilBurstWeaponIndex = int.MinValue;
             _recoilBurstLastShotTime = -999f;
-        }
-
-        public void NotifyEquipmentSlotsChanged()
-        {
-            ResolveAttachmentModule()?.NotifySlotsChanged();
-        }
-
-        private EntityEquipmentAttachmentModule ResolveAttachmentModule()
-        {
-            if (_attachmentModule != null && ReferenceEquals(_attachmentModule.MyCore, MyCore))
-                return _attachmentModule;
-            if (MyCore == null)
-                return null;
-
-            if (MyCore.ModuleTables.TryGetValue(
-                    typeof(EntityEquipmentAttachmentModule),
-                    out IModule registered))
-            {
-                _attachmentModule = registered as EntityEquipmentAttachmentModule;
-            }
-
-            _attachmentModule ??= MyCore.basicDomain?.FindMyModule<EntityEquipmentAttachmentModule>();
-            return _attachmentModule;
-        }
-
-        private static EntityEquipmentAttachmentTarget ResolveHolsterAttachmentTarget(int holsterIndex)
-        {
-            if (holsterIndex == 1)
-                return EntityEquipmentAttachmentTarget.SecondaryBack;
-            if (holsterIndex >= 2)
-                return EntityEquipmentAttachmentTarget.Hip;
-            return EntityEquipmentAttachmentTarget.PrimaryBack;
-        }
-
-        [Serializable]
-        public class WeaponSlot
-        {
-            [LabelText("显示名")]
-            public string displayName;
-
-            [LabelText("武器定义 Key")]
-            [Tooltip("当前槽位对应的正式武器定义身份；动作表现可用它选择武器特化映射。")]
-            public ESWeaponConfigKey weaponKey = new ESWeaponConfigKey();
-
-            [LabelText("武器根节点")]
-            public Transform weaponRoot;
-
-            [LabelText("普攻 Action 覆盖")]
-            [Tooltip("仅覆盖当前角色/装配槽位的 Action 型普攻；为空时读取 WeaponDefinition，再回退角色默认普攻。双持组合技应由成对装配提供独立 Action，不得执行两次单手普攻代替。")]
-            public ESActionConfigKey primaryAttackActionOverride = new ESActionConfigKey();
         }
 
     }

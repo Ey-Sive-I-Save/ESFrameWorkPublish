@@ -64,7 +64,6 @@ namespace ES
             DefaultTransformKey.RightHand,
             DefaultTransformKey.LeftFoot,
             DefaultTransformKey.RightFoot,
-            DefaultTransformKey.Weapon,
             DefaultTransformKey.Camera,
         };
 
@@ -98,7 +97,6 @@ namespace ES
             "TemporaryEffectsRoot",
             "RuntimeAttachmentsRoot",
             "RuntimeGeneratedRoot",
-            EntityEquipmentSocketKeys.WeaponSocket,
             EntityEquipmentSocketKeys.MainHandSocket,
             EntityEquipmentSocketKeys.OffHandSocket,
             EntityEquipmentSocketKeys.PrimaryBackSocket,
@@ -134,12 +132,6 @@ namespace ES
             "05_检测碰撞_Detection/HurtBoxes",
             "05_检测碰撞_Detection/InteractionProbes/InteractionProbe",
             "06_装备_Equipment/WeaponSlots",
-            "06_装备_Equipment/WeaponSlots/MainHandSocket",
-            "06_装备_Equipment/WeaponSlots/OffHandSocket",
-            "06_装备_Equipment/WeaponSlots/PrimaryBackSocket",
-            "06_装备_Equipment/WeaponSlots/SecondaryBackSocket",
-            "06_装备_Equipment/WeaponSlots/HipSocket",
-            "06_装备_Equipment/WeaponSlots/TemporaryHandSocket",
             "06_装备_Equipment/ArmorSlots",
             "06_装备_Equipment/EquipmentVisuals",
             "07_特效音频_Effects/VFX",
@@ -353,7 +345,6 @@ namespace ES
 
             Transform equipmentRoot = CreateNode(root.transform, "06_装备_Equipment");
             Transform weaponSlots = CreateNode(equipmentRoot, "WeaponSlots");
-            Transform weaponSocket = CreateNode(weaponSlots, EntityEquipmentSocketKeys.WeaponSocket, new Vector3(0.25f, 1.15f, 0.2f));
             Transform mainHandSocket = CreateNode(weaponSlots, EntityEquipmentSocketKeys.MainHandSocket, new Vector3(0.25f, 1.15f, 0.2f));
             Transform offHandSocket = CreateNode(weaponSlots, EntityEquipmentSocketKeys.OffHandSocket, new Vector3(-0.25f, 1.15f, 0.2f));
             Transform primaryBackSocket = CreateNode(weaponSlots, EntityEquipmentSocketKeys.PrimaryBackSocket, new Vector3(0.22f, 1.35f, -0.18f));
@@ -389,6 +380,14 @@ namespace ES
             StateMachineConfig stateMachineConfig =
                 AssetDatabase.LoadAssetAtPath<StateMachineConfig>(DefaultStateMachineConfigPath);
             Animator animator = CreateModelAndAnimator(modelRoot, stateMachineConfig);
+            BindEquipmentSocketsToHumanoid(
+                animator,
+                mainHandSocket,
+                offHandSocket,
+                primaryBackSocket,
+                secondaryBackSocket,
+                hipSocket,
+                temporaryHandSocket);
             StateFinalIKDriver ikDriver = EnsureIKDriver(animator);
             BakeHumanoidBinding(ikDriver, animator);
             ConfigureFinalIKBaseline(ikDriver);
@@ -408,7 +407,6 @@ namespace ES
                 headAnchor,
                 chestAnchor,
                 hipAnchor,
-                weaponSocket,
                 mainHandSocket,
                 offHandSocket,
                 primaryBackSocket,
@@ -517,11 +515,59 @@ namespace ES
             entity.kcc.debugMonitor = false;
         }
 
+        private static void BindEquipmentSocketsToHumanoid(
+            Animator animator,
+            Transform mainHandSocket,
+            Transform offHandSocket,
+            Transform primaryBackSocket,
+            Transform secondaryBackSocket,
+            Transform hipSocket,
+            Transform temporaryHandSocket)
+        {
+            Transform rightHand = GetRequiredHumanBone(animator, HumanBodyBones.RightHand);
+            Transform leftHand = GetRequiredHumanBone(animator, HumanBodyBones.LeftHand);
+            Transform chest = GetHumanBone(animator, HumanBodyBones.UpperChest)
+                ?? GetHumanBone(animator, HumanBodyBones.Chest)
+                ?? GetRequiredHumanBone(animator, HumanBodyBones.Spine);
+            Transform hips = GetRequiredHumanBone(animator, HumanBodyBones.Hips);
+
+            BindSocket(mainHandSocket, rightHand, Vector3.zero, Vector3.zero);
+            BindSocket(offHandSocket, leftHand, Vector3.zero, Vector3.zero);
+            BindSocket(primaryBackSocket, chest, new Vector3(0.22f, 0.1f, -0.18f), new Vector3(15f, -100f, 15f));
+            BindSocket(secondaryBackSocket, chest, new Vector3(-0.22f, 0.1f, -0.18f), new Vector3(15f, 100f, -15f));
+            BindSocket(hipSocket, hips, new Vector3(0.32f, 0f, 0f), new Vector3(0f, 0f, 90f));
+            BindSocket(temporaryHandSocket, rightHand, Vector3.zero, Vector3.zero);
+        }
+
+        private static Transform GetRequiredHumanBone(Animator animator, HumanBodyBones bone)
+        {
+            Transform result = GetHumanBone(animator, bone);
+            if (result == null)
+                throw new InvalidOperationException("角色模板缺少必需 Humanoid 骨骼：" + bone);
+            return result;
+        }
+
+        private static void BindSocket(
+            Transform socket,
+            Transform bone,
+            Vector3 localPosition,
+            Vector3 localEuler)
+        {
+            socket.SetParent(bone, false);
+            socket.localPosition = localPosition;
+            socket.localRotation = Quaternion.Euler(localEuler);
+            socket.localScale = Vector3.one;
+        }
+
         private static void ConfigureDomains(Entity entity, Transform aimTarget)
         {
             entity.basicDomain.MyModules.Add(new EntityBasicMoveRotateModule());
-            entity.basicDomain.MyModules.Add(new EntityEquipmentAttachmentModule());
             entity.basicDomain.MyModules.ApplyBuffers(true);
+            entity.equipmentDomain.MyModules.Add(new EntityEquipmentInventoryModule());
+            entity.equipmentDomain.MyModules.Add(new EntityEquipmentSlotModule());
+            entity.equipmentDomain.MyModules.Add(new EntityEquipmentAttachmentModule());
+            entity.equipmentDomain.MyModules.Add(new EntityEquipmentEffectModule());
+            entity.equipmentDomain.MyModules.ApplyBuffers(true);
 
             entity.aiDomain.turnMode = TurnMode.MoveDirection;
             entity.aiDomain.enableCameraLook = false;
@@ -545,7 +591,6 @@ namespace ES
             Transform headFallback,
             Transform chestFallback,
             Transform hipFallback,
-            Transform weaponSocket,
             Transform mainHandSocket,
             Transform offHandSocket,
             Transform primaryBackSocket,
@@ -590,10 +635,6 @@ namespace ES
             mapping.Set(DefaultTransformKey.RightHand, GetHumanBone(animator, HumanBodyBones.RightHand) ?? rightHandTarget);
             mapping.Set(DefaultTransformKey.LeftFoot, GetHumanBone(animator, HumanBodyBones.LeftFoot) ?? leftFootTarget);
             mapping.Set(DefaultTransformKey.RightFoot, GetHumanBone(animator, HumanBodyBones.RightFoot) ?? rightFootTarget);
-            // Weapon 是制作好的挂载 Socket；RightHand 则始终保留为骨骼语义。
-            // 这样每个角色可在 Socket 上处理手型、偏移和双手武器辅助，而不会把业务挂载混入 Humanoid 骨骼。
-            Transform resolvedWeaponSocket = weaponSocket ?? GetHumanBone(animator, HumanBodyBones.RightHand);
-            SetRequiredMapping(mapping, DefaultTransformKey.Weapon, EntityEquipmentSocketKeys.WeaponSocket, resolvedWeaponSocket);
             mapping.Set(EntityEquipmentSocketKeys.MainHandSocket, mainHandSocket);
             mapping.Set(EntityEquipmentSocketKeys.OffHandSocket, offHandSocket);
             mapping.Set(EntityEquipmentSocketKeys.PrimaryBackSocket, primaryBackSocket);
@@ -788,15 +829,22 @@ namespace ES
                 expectDebugRoot ? AuthoringTopLevelOrder : CompleteTopLevelOrder);
 
             int moveCount = CountBasicModule<EntityBasicMoveRotateModule>(entity);
-            int attachmentCount = CountBasicModule<EntityEquipmentAttachmentModule>(entity);
+            int inventoryCount = CountEquipmentModule<EntityEquipmentInventoryModule>(entity);
+            int slotCount = CountEquipmentModule<EntityEquipmentSlotModule>(entity);
+            int attachmentCount = CountEquipmentModule<EntityEquipmentAttachmentModule>(entity);
+            int effectCount = CountEquipmentModule<EntityEquipmentEffectModule>(entity);
             int playerWriterCount = CountAiModule<EntityPlayerInputWriteModule>(entity);
             int optionalMotionCount = CountOptionalMotionModules(entity);
             bool modulesValid = moveCount == 1
+                && inventoryCount == 1
+                && slotCount == 1
                 && attachmentCount == 1
+                && effectCount == 1
                 && playerWriterCount == 0
                 && optionalMotionCount == 0
                 && entity != null
-                && entity.aiDomain != null;
+                && entity.aiDomain != null
+                && entity.equipmentDomain != null;
 
             bool mappingValid = ValidateAllMappings(mapping, prefab.transform, expectDebugRoot);
             EntityCharacterPrefabRole expectedProfileRole = expectDebugRoot
@@ -821,7 +869,7 @@ namespace ES
 
             string stage = expectDebugRoot ? "第一次构建前基础模板" : "完整通用角色架构";
             report = valid
-                ? $"[{stage}检查] 通过：底盘组件唯一性、无武器内容组件、KCC胶囊契约、Entity四域、Playable动画、轻量禁用IK、全量Mapping、十区顺序、递归Missing Script、Rigidbody和运行时剥离规则完整。"
+                ? $"[{stage}检查] 通过：底盘组件唯一性、无武器内容组件、KCC胶囊契约、Entity五域、Playable动画、轻量禁用IK、全量Mapping、十区顺序、递归Missing Script、Rigidbody和运行时剥离规则完整。"
                 : $"[{stage}检查] 未通过 | Root={rootAuthorityValid} | Animation={animationValid} | "
                   + $"Components={componentCountValid} | Hierarchy={hierarchyValid} | Mapping={mappingValid} | Profile={profileValid}({profileError}) | Strip={stripValid} | MissingScripts={missingScripts} | "
                   + $"Move={moveCount}, Attachment={attachmentCount}, DomainExecutor={(entity != null && entity.aiDomain != null ? "有效" : "缺失")}, PlayerWriter={playerWriterCount}, OptionalMotion={optionalMotionCount}";
@@ -961,8 +1009,6 @@ namespace ES
             bool expectDebugRoot)
         {
             if (mapping == null
-                || mapping.HasLegacyOdinMappings
-                || mapping.TransformMappings == null
                 || !mapping.TransformMappings.IsValid)
                 return false;
 
@@ -1182,6 +1228,21 @@ namespace ES
 
             int count = 0;
             List<EntityAIModuleBase> modules = entity.aiDomain.MyModules.ValuesNow;
+            for (int i = 0; i < modules.Count; i++)
+            {
+                if (modules[i] is T)
+                    count++;
+            }
+            return count;
+        }
+
+        private static int CountEquipmentModule<T>(Entity entity) where T : EntityEquipmentModuleBase
+        {
+            if (entity?.equipmentDomain?.MyModules?.ValuesNow == null)
+                return 0;
+
+            int count = 0;
+            List<EntityEquipmentModuleBase> modules = entity.equipmentDomain.MyModules.ValuesNow;
             for (int i = 0; i < modules.Count; i++)
             {
                 if (modules[i] is T)

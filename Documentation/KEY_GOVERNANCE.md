@@ -64,7 +64,7 @@
 - `StateMachineContext._sharedData` and runtime flags are scoped to one generated context and are discarded with it. They must not be serialized as a cross-system gameplay contract.
 - State-machine name maps are indexes over a registered machine, not a project-wide state identity. A state name becomes a stable key only when another asset, save, or packet refers to it independently of that machine.
 - State default Int/Bool parameters retain their explicit stable enum values and names, while every `StateMachineContext` resolves them to deterministic dense RuntimeKeys before indexing its arrays. Do not use the enum's sparse numeric value as per-instance storage layout.
-- `EntityTransformMapping.dynamicMap` is a per-entity binding map. A key that is only meaningful inside that prefab remains local; a key shared by authored equipment, skills, DLC, or external data must be declared in an appropriate scoped catalog before use.
+- `EntityTransformMapping.TransformMappings` is a per-entity binding map. A key that is only meaningful inside that prefab remains local; a key shared by authored equipment, skills, DLC, or external data must be declared in an appropriate scoped catalog before use.
 - Object-pool group keys are runtime ownership names. Prefab business identity belongs to the asset ConfigKey; a pool does not create a second persistent identity.
 - GUIDs, addresses, bundle names/hashes, paths, Unity instance IDs, and generated context IDs are locator or lifetime data. They must remain separate from business stable keys.
 

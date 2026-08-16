@@ -236,6 +236,7 @@ namespace ES
             GameObject guideObject = new GameObject("验收导视（ES Scene Validation Guide）");
             guideObject.transform.SetParent(root, false);
             ESSceneValidationGuide guide = guideObject.AddComponent<ESSceneValidationGuide>();
+            guideObject.AddComponent<ESAITestSceneValidationProvider>();
             // 显式绑定测试场景的 Player 与输出 Camera。Guide 不会回退到 Camera.main，
             // 因此不会与角色、载具或正式 Camera Prefab 形成隐藏耦合。
             guide.routeObserver = player != null ? player.transform : null;

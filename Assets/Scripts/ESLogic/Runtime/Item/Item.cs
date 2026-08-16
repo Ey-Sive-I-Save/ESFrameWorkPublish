@@ -70,6 +70,7 @@ namespace ES
 
         protected override void OnDestroy()
         {
+            basicDomain?.FindMyModule<ItemShotModule>()?.OnPoolDespawned();
             basicDomain?.FindMyModule<ItemMotionModule>()?.ResetMotionInfluences();
             ResetItemAttributesForLifecycleEnd();
             UnsubscribeFromAttributeCatalog();
@@ -91,6 +92,7 @@ namespace ES
         /// <summary>Called before the pooled Item is deactivated; ends the current Tag lifetime.</summary>
         public void OnPoolDespawned()
         {
+            basicDomain?.FindMyModule<ItemShotModule>()?.OnPoolDespawned();
             basicDomain?.FindMyModule<ItemMotionModule>()?.ResetMotionInfluences();
             ResetItemAttributesForLifecycleEnd();
             UnsubscribeFromAttributeCatalog();
@@ -139,6 +141,7 @@ namespace ES
             EnsureItemOpSupport();
             EnsureItemAttributes();
             TryBindPrefabDefinition();
+            basicDomain?.FindMyModule<ItemShotModule>()?.OnPoolSpawned();
         }
 
         /// <summary>Binds the ItemDataInfo that is the sole authority for this Item's birth Tags.</summary>

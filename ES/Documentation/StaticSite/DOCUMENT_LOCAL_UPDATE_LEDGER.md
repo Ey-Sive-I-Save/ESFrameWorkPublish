@@ -360,6 +360,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：静态构建包含仍未提交的工作树依赖，不能证明单个 Commit 独立可构建；未运行 Unity Test Runner、ReloadDomain、PlayMode、Player 或 IL2CPP。
 - **HTML 目标**：后续在 `#runtime-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-005：实体装备、物品实例与角色表现
+
+- **源码路径**：Item/Weapon ConfigKey、物品实例表、Equipment Domain、装备挂接与武器绑定、角色/武器构建器、Prefab、测试场景和领域测试。
+- **规范与证据**：定义身份与实例身份分离；装备事务由独立 Domain 管理库存、槽位、挂接和效果；角色内挂点通过稳定映射解析；移动脚本保留原 Unity GUID。
+- **完成分析**：定义、实例、装备事务、动画事件、表现挂点和正式 Prefab 必须同批，否则会留下旧 Basic Domain 类型引用、失效挂点或无法解析的 Weapon/Item Key。
+- **回归状态**：`ES_Logic.Editor.Generation.Tests.csproj` 为 0 警告、0 错误；`ES_Logic.Editor.csproj` 为 0 错误并保留 17 个非本批阻断警告；39 个目标文本通过严格 UTF-8 检查。
+- **已知缺口**：未运行 Unity Test Runner、ReloadDomain、PlayMode、Player 或 IL2CPP；装备动画事件、视图转移、存档恢复及多人并发仍需真实运行验收；Unity YAML 空字段尾空格按序列化格式保留。
+- **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

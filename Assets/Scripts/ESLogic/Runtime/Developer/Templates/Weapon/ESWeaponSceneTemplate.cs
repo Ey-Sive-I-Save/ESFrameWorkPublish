@@ -53,8 +53,6 @@ namespace ES
         public sealed class MountSection
         {
             [LabelText("挂载根")] public Transform mountRoot;
-            [LabelText("持有挂点")] public Transform holdSocket;
-            [LabelText("背挂挂点")] public Transform backSocket;
             [LabelText("右手握把")] public Transform rightHandGrip;
             [LabelText("左手握把")] public Transform leftHandGrip;
             [LabelText("瞄准参考")] public Transform aimReference;
@@ -118,8 +116,6 @@ namespace ES
             runtimeBridge.itemRoot = runtimeBridge.itemRoot != null ? runtimeBridge.itemRoot : GetComponent<Item>();
 
             mount.mountRoot = FindDeepChild(MountRootName);
-            mount.holdSocket = FindDeepChild("HoldSocket");
-            mount.backSocket = FindDeepChild("BackSocket");
             mount.rightHandGrip = FindDeepChild("RightHandGrip");
             mount.leftHandGrip = FindDeepChild("LeftHandGrip");
             mount.aimReference = FindDeepChild("AimReference");

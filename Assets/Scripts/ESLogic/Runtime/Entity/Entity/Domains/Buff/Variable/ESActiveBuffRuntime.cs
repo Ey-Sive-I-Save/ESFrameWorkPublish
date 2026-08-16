@@ -82,6 +82,9 @@ namespace ES
         public int DefinitionKey { get; private set; }
 
         [ShowInInspector, ReadOnly]
+        public ESInstanceHandle RuntimeInstanceHandle { get; internal set; }
+
+        [ShowInInspector, ReadOnly]
         public int SourceKey => variableData.sourceKey;
 
         [ShowInInspector, ReadOnly]
@@ -473,6 +476,7 @@ namespace ES
             lastStateTime = 0f;
             valueChangesDirty = false;
             DefinitionKey = 0;
+            RuntimeInstanceHandle = default;
             GroupKey = null;
             Strength = 0;
             FrameOwner = null;

@@ -1569,6 +1569,73 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-005",
+                        "status":  "documented",
+                        "summary":  "建立 Item/Weapon 配置键、物品实例表与独立 Equipment Domain，迁移装备挂接和武器绑定，并同步角色模板、表现 Prefab 与领域测试。",
+                        "sourcePaths":  [
+                                            "Assets/ESNormalAssets/CharacterPresentation.meta",
+                                            "Assets/ESNormalAssets/CharacterPresentation",
+                                            "Assets/ESNormalAssets/CharacterTemplates",
+                                            "Assets/ESNormalAssets/CharacterVariants",
+                                            "Assets/ESNormalAssets/Data/Group/Item",
+                                            "Assets/ESNormalAssets/EditorTools/大黑塔.prefab",
+                                            "Assets/ESNormalAssets/WeaponPrototypes.meta",
+                                            "Assets/ESNormalAssets/WeaponPrototypes",
+                                            "Assets/Plugins/ES/1_Design/ESDesignAssemblyInfo.cs",
+                                            "Assets/Plugins/ES/1_Design/ESDesignAssemblyInfo.cs.meta",
+                                            "Assets/Plugins/ES/3_Examples/1_Runtime/Example_WeaponTemplate/README.md",
+                                            "Assets/Scenes/Tests/ESPlayerControllerTest.unity",
+                                            "Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Item.meta",
+                                            "Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Item",
+                                            "Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Weapon/ESWeaponConfigKeyData.cs",
+                                            "Assets/Scripts/ESLogic/Editor/CharacterTemplates",
+                                            "Assets/Scripts/ESLogic/Editor/Generation/Tests",
+                                            "Assets/Scripts/ESLogic/Editor/WeaponTemplates",
+                                            "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ItemDataInfo.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ItemDataParts/ItemKindSharedVariableData.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Developer/Templates/Weapon",
+                                            "Assets/Scripts/ESLogic/Runtime/Entity",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/ESGameManager.StaticCache.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Item",
+                                            "Assets/Scripts/ESLogic/Runtime/State/Core/StateMachine/StateMachine.TemporaryAnimations.cs",
+                                            "Documentation/CHARACTER_PREFAB_CONTRACT.md",
+                                            "Documentation/KEY_GOVERNANCE.md"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Scripts/ESLogic/Editor/Generation/Tests/ESEquipmentDomainTransactionTests.cs",
+                                              "Assets/Scripts/ESLogic/Editor/Generation/Tests/ESItemInstanceTableTests.cs",
+                                              "Assets/Scripts/ESLogic/Editor/Generation/Tests/ESEquipmentAttachmentModuleTests.cs",
+                                              "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityEquipmentDomain.cs",
+                                              "Assets/ESNormalAssets/WeaponPrototypes/大长条.prefab"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "物品定义、运行时实例、装备事务、挂点映射、武器状态事件和角色表现 Prefab 构成同一实体装备边界；原 Basic Domain 中的装备类型迁入独立 Equipment Domain，并保留移动文件的 Unity GUID。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Logic.Editor.Generation.Tests.csproj 静态构建为 0 警告、0 错误",
+                                                            "ES_Logic.Editor.csproj 静态构建为 0 错误；17 个警告来自嵌入 HybridCLR、当前 VFX 字段和既有 Editor 字段/成员隐藏",
+                                                            "39 个目标文本通过严格 UTF-8 检查",
+                                                            "staged/unstaged 交集在账本指纹前为 0"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "未运行 Unity Test Runner、ReloadDomain 或角色/武器 PlayMode 流程",
+                                                             "Prefab、场景和 ScriptableObject 的 Unity YAML 空字段保留序列化尾空格，diff --check 会报告格式提示",
+                                                             "装备切换动画事件、视图转移、存档恢复和多人并发仍需真实运行验收"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1581,13 +1648,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T10:20:23+08:00",
-                       "head":  "9e7cccd709f7d528abaa3edb94bb2b85ca6c7951",
-                       "stagedSourcePatchSha256":  "ea08cc5bb67c194895ee6f91a514e8b6c175110c6ddfd58956ecbb9828ddbf51",
-                       "stagedSourceManifestSha256":  "0b724904f19a9996e885e52739ba9112065601c0116ef7eb7e64d7d19475d636",
-                       "stagedSourceFileCount":  9,
+                       "preparedAt":  "2026-08-16T10:24:24+08:00",
+                       "head":  "440f9f216c5f9f3ee7929b8d71e6945c1f1ca152",
+                       "stagedSourcePatchSha256":  "4e6ceb9a296df02010b316b1bd3aa9382c6da2d54fcc545ab9e96fd86a56272b",
+                       "stagedSourceManifestSha256":  "fe7cc503617360bc65d20b37544727c5e5b9269070ee4fd8a68031601e977842",
+                       "stagedSourceFileCount":  72,
                        "entryIds":  [
-                                        "LOCAL-20260816-004"
+                                        "LOCAL-20260816-005"
                                     ]
                    }
 }

@@ -22,6 +22,12 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   KeyName: "\u6570\u636E\u952E2"
+  itemKey:
+    enumKey: 0
+    stringKey: item.shot.test.data_key_2
+    definitionGuid: 
+    definitionLocalFileId: 0
+    definitionTypeName: 
   tags: []
   baseConfig:
     kind: 4
@@ -146,6 +152,12 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   KeyName: "\u6570\u636E\u952E"
+  itemKey:
+    enumKey: 0
+    stringKey: item.shot.data_key
+    definitionGuid: 
+    definitionLocalFileId: 0
+    definitionTypeName: 
   tags: []
   baseConfig:
     kind: 4

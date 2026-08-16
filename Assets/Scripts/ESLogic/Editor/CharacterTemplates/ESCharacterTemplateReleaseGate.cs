@@ -246,14 +246,19 @@ namespace ES
                 return false;
             }
 
-            if (entity.basicDomain == null || entity.aiDomain == null)
+            if (entity.basicDomain == null
+                || entity.aiDomain == null
+                || entity.equipmentDomain == null)
             {
-                error = "缺少基础域或 AI 域。";
+                error = "缺少基础域、AI 域或装备域。";
                 return false;
             }
 
             int moveCount = CountBasicModule<EntityBasicMoveRotateModule>(entity);
-            int attachmentCount = CountBasicModule<EntityEquipmentAttachmentModule>(entity);
+            int inventoryCount = CountEquipmentModule<EntityEquipmentInventoryModule>(entity);
+            int slotCount = CountEquipmentModule<EntityEquipmentSlotModule>(entity);
+            int attachmentCount = CountEquipmentModule<EntityEquipmentAttachmentModule>(entity);
+            int effectCount = CountEquipmentModule<EntityEquipmentEffectModule>(entity);
             int playerWriterCount = CountAiModule<EntityPlayerInputWriteModule>(entity);
             if (moveCount != 1 || entity.aiDomain == null)
             {
@@ -262,18 +267,13 @@ namespace ES
                 return false;
             }
 
-            if (attachmentCount != 1)
+            if (inventoryCount != 1 || slotCount != 1 || attachmentCount != 1 || effectCount != 1)
             {
-                error = "正式角色必须有唯一的 EntityEquipmentAttachmentModule（当前=" + attachmentCount + "）。";
-                return false;
-            }
-
-            EntityEquipmentAttachmentModule attachment = GetBasicModule<EntityEquipmentAttachmentModule>(entity);
-            if (profile.prefabRole == EntityCharacterPrefabRole.CharacterVariant
-                && attachment != null
-                && attachment.allowEntityRootFallback)
-            {
-                error = "正式角色的 EntityEquipmentAttachmentModule 不得允许根节点挂点降级。";
+                error = "正式角色必须各有唯一的 Equipment Inventory/Slot/Attachment/Effect Module"
+                        + "（当前 Inventory=" + inventoryCount
+                        + "，Slot=" + slotCount
+                        + "，Attachment=" + attachmentCount
+                        + "，Effect=" + effectCount + "）。";
                 return false;
             }
 
@@ -385,6 +385,20 @@ namespace ES
             return null;
         }
 
+        private static int CountEquipmentModule<T>(Entity entity) where T : EntityEquipmentModuleBase
+        {
+            if (entity?.equipmentDomain?.MyModules?.ValuesNow == null)
+                return 0;
+
+            int count = 0;
+            for (int i = 0; i < entity.equipmentDomain.MyModules.ValuesNow.Count; i++)
+            {
+                if (entity.equipmentDomain.MyModules.ValuesNow[i] is T)
+                    count++;
+            }
+            return count;
+        }
+
         private static int CountAiModule<T>(Entity entity) where T : EntityAIModuleBase
         {
             if (entity?.aiDomain?.MyModules?.ValuesNow == null)
@@ -457,19 +471,17 @@ namespace ES
             }
 
             EntityTransformMapping mapping = entity.GetComponent<EntityTransformMapping>();
-            if (mapping == null || mapping.HasLegacyOdinMappings)
+            if (mapping == null)
             {
-                error = "EntityTransformMapping 仍包含未迁移的旧 Odin 挂点数据，禁止发布。";
+                error = "正式角色缺少 EntityTransformMapping。";
                 return false;
             }
-            Transform weaponSocket = mapping != null ? mapping.Resolve(DefaultTransformKey.Weapon) : null;
-            Transform namedWeaponSocket = mapping != null
-                ? mapping.Resolve(EntityEquipmentSocketKeys.WeaponSocket)
+            Transform mainHandSocket = mapping != null
+                ? mapping.Resolve(EntityEquipmentSocketKeys.MainHandSocket)
                 : null;
-            if (weaponSocket == null || namedWeaponSocket == null || weaponSocket != namedWeaponSocket
-                || !weaponSocket.IsChildOf(entity.transform))
+            if (mainHandSocket == null || !mainHandSocket.IsChildOf(entity.transform))
             {
-                error = "必须在 EntityTransformMapping 中以 Weapon 和 WeaponSocket 指向同一角色内挂点。";
+                error = "必须在 EntityTransformMapping 中配置角色内 MainHandSocket。";
                 return false;
             }
 
@@ -490,6 +502,36 @@ namespace ES
                     error = "正式角色缺少角色侧装备挂点映射：" + requiredAttachmentKeys[i];
                     return false;
                 }
+            }
+
+            Animator animator = entity.animator;
+            Transform rightHand = animator != null && animator.isHuman
+                ? animator.GetBoneTransform(HumanBodyBones.RightHand)
+                : null;
+            Transform leftHand = animator != null && animator.isHuman
+                ? animator.GetBoneTransform(HumanBodyBones.LeftHand)
+                : null;
+            Transform chest = animator != null && animator.isHuman
+                ? animator.GetBoneTransform(HumanBodyBones.UpperChest)
+                    ?? animator.GetBoneTransform(HumanBodyBones.Chest)
+                    ?? animator.GetBoneTransform(HumanBodyBones.Spine)
+                : null;
+            Transform hips = animator != null && animator.isHuman
+                ? animator.GetBoneTransform(HumanBodyBones.Hips)
+                : null;
+            if (rightHand == null
+                || leftHand == null
+                || chest == null
+                || hips == null
+                || mainHandSocket.parent != rightHand
+                || mapping.Resolve(EntityEquipmentSocketKeys.OffHandSocket).parent != leftHand
+                || mapping.Resolve(EntityEquipmentSocketKeys.PrimaryBackSocket).parent != chest
+                || mapping.Resolve(EntityEquipmentSocketKeys.SecondaryBackSocket).parent != chest
+                || mapping.Resolve(EntityEquipmentSocketKeys.HipSocket).parent != hips
+                || mapping.Resolve(EntityEquipmentSocketKeys.TemporaryHandSocket).parent != rightHand)
+            {
+                error = "正式角色装备 Socket 必须直接作者化在对应 Humanoid 手骨、胸骨或髋骨下。";
+                return false;
             }
 
             bool hasHurtBox = false;
@@ -535,9 +577,9 @@ namespace ES
             }
 
             EntityTransformMapping mapping = entity.GetComponent<EntityTransformMapping>();
-            if (mapping == null || mapping.HasLegacyOdinMappings)
+            if (mapping == null)
             {
-                error = "EntityTransformMapping 仍包含未迁移的旧 Odin 挂点数据，禁止发布。";
+                error = "正式角色缺少 EntityTransformMapping。";
                 return false;
             }
             Transform cameraTarget = mapping != null ? mapping.Resolve("CameraTarget") : null;

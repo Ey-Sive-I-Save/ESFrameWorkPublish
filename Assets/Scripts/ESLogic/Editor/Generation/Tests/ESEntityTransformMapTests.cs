@@ -34,16 +34,16 @@ namespace ES.Tests
         public void DualAlias_ResolvesOneTransformThroughBothKeys()
         {
             EntityTransformMap map = new EntityTransformMap();
-            Transform target = CreateTransform(EntityEquipmentSocketKeys.WeaponSocket);
+            Transform target = CreateTransform(EntityEquipmentSocketKeys.MainHandSocket);
 
             Assert.That(
-                map.TrySet(DefaultTransformKey.Weapon, EntityEquipmentSocketKeys.WeaponSocket, target, out var conflict),
+                map.TrySet(DefaultTransformKey.CustomA, EntityEquipmentSocketKeys.MainHandSocket, target, out var conflict),
                 Is.True,
                 conflict.ToString());
 
-            Assert.That(map.Resolve(DefaultTransformKey.Weapon), Is.SameAs(target));
-            Assert.That(map.Resolve(EntityEquipmentSocketKeys.WeaponSocket), Is.SameAs(target));
-            Assert.That(map.TryGet(DefaultTransformKey.Weapon, EntityEquipmentSocketKeys.WeaponSocket, out Transform paired), Is.True);
+            Assert.That(map.Resolve(DefaultTransformKey.CustomA), Is.SameAs(target));
+            Assert.That(map.Resolve(EntityEquipmentSocketKeys.MainHandSocket), Is.SameAs(target));
+            Assert.That(map.TryGet(DefaultTransformKey.CustomA, EntityEquipmentSocketKeys.MainHandSocket, out Transform paired), Is.True);
             Assert.That(paired, Is.SameAs(target));
         }
 
@@ -53,17 +53,17 @@ namespace ES.Tests
             EntityTransformMap map = new EntityTransformMap();
             Transform weapon = CreateTransform("Weapon");
             Transform camera = CreateTransform("Camera");
-            Assert.That(map.TrySet(DefaultTransformKey.Weapon, EntityEquipmentSocketKeys.WeaponSocket, weapon, out _), Is.True);
+            Assert.That(map.TrySet(DefaultTransformKey.CustomA, EntityEquipmentSocketKeys.MainHandSocket, weapon, out _), Is.True);
             Assert.That(map.TrySet(DefaultTransformKey.Camera, "CameraTarget", camera, out _), Is.True);
             int generation = map.Generation;
 
             Assert.That(
-                map.TrySet(DefaultTransformKey.Weapon, "CameraTarget", camera, out var conflict),
+                map.TrySet(DefaultTransformKey.CustomA, "CameraTarget", camera, out var conflict),
                 Is.False);
 
             Assert.That(conflict.Kind, Is.EqualTo(EntityTransformMap.ConflictKind.AliasMismatch));
             Assert.That(map.Generation, Is.EqualTo(generation));
-            Assert.That(map.Resolve(DefaultTransformKey.Weapon), Is.SameAs(weapon));
+            Assert.That(map.Resolve(DefaultTransformKey.CustomA), Is.SameAs(weapon));
             Assert.That(map.Resolve("CameraTarget"), Is.SameAs(camera));
         }
 
@@ -71,13 +71,13 @@ namespace ES.Tests
         public void RemovingOneAlias_PreservesTheOtherAliasAndEntry()
         {
             EntityTransformMap map = new EntityTransformMap();
-            Transform target = CreateTransform(EntityEquipmentSocketKeys.WeaponSocket);
-            Assert.That(map.TrySet(DefaultTransformKey.Weapon, EntityEquipmentSocketKeys.WeaponSocket, target, out _), Is.True);
+            Transform target = CreateTransform(EntityEquipmentSocketKeys.MainHandSocket);
+            Assert.That(map.TrySet(DefaultTransformKey.CustomA, EntityEquipmentSocketKeys.MainHandSocket, target, out _), Is.True);
 
-            Assert.That(map.Remove(EntityEquipmentSocketKeys.WeaponSocket), Is.True);
+            Assert.That(map.Remove(EntityEquipmentSocketKeys.MainHandSocket), Is.True);
 
-            Assert.That(map.Resolve(EntityEquipmentSocketKeys.WeaponSocket), Is.Null);
-            Assert.That(map.Resolve(DefaultTransformKey.Weapon), Is.SameAs(target));
+            Assert.That(map.Resolve(EntityEquipmentSocketKeys.MainHandSocket), Is.Null);
+            Assert.That(map.Resolve(DefaultTransformKey.CustomA), Is.SameAs(target));
             Assert.That(map.Count, Is.EqualTo(1));
         }
 
@@ -85,17 +85,118 @@ namespace ES.Tests
         public void ClearDynamicOnlyEntries_PreservesStableDualAliases()
         {
             EntityTransformMap map = new EntityTransformMap();
-            Transform weapon = CreateTransform(EntityEquipmentSocketKeys.WeaponSocket);
+            Transform weapon = CreateTransform(EntityEquipmentSocketKeys.MainHandSocket);
             Transform runtimeRoot = CreateTransform("RuntimeAttachmentsRoot");
-            Assert.That(map.TrySet(DefaultTransformKey.Weapon, EntityEquipmentSocketKeys.WeaponSocket, weapon, out _), Is.True);
+            Assert.That(map.TrySet(DefaultTransformKey.CustomA, EntityEquipmentSocketKeys.MainHandSocket, weapon, out _), Is.True);
             Assert.That(map.TrySetDynamic("RuntimeAttachmentsRoot", runtimeRoot, out _), Is.True);
 
             map.ClearDynamicOnlyEntries();
 
-            Assert.That(map.Resolve(DefaultTransformKey.Weapon), Is.SameAs(weapon));
-            Assert.That(map.Resolve(EntityEquipmentSocketKeys.WeaponSocket), Is.SameAs(weapon));
+            Assert.That(map.Resolve(DefaultTransformKey.CustomA), Is.SameAs(weapon));
+            Assert.That(map.Resolve(EntityEquipmentSocketKeys.MainHandSocket), Is.SameAs(weapon));
             Assert.That(map.Resolve("RuntimeAttachmentsRoot"), Is.Null);
             Assert.That(map.Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void DynamicWrites_RejectMissingOrUnnormalizedKeysWithoutMutation()
+        {
+            EntityTransformMap map = new EntityTransformMap();
+            Transform value = CreateTransform("DynamicSocket");
+            int generation = map.Generation;
+
+            Assert.That(map.TrySetDynamic(null, value, out var nullConflict), Is.False);
+            Assert.That(nullConflict.Kind, Is.EqualTo(EntityTransformMap.ConflictKind.MissingKey));
+            Assert.That(map.TrySetDynamic(string.Empty, value, out var emptyConflict), Is.False);
+            Assert.That(emptyConflict.Kind, Is.EqualTo(EntityTransformMap.ConflictKind.MissingKey));
+            Assert.That(map.TrySetDynamic(" invalid ", value, out var whitespaceConflict), Is.False);
+            Assert.That(whitespaceConflict.Kind, Is.EqualTo(EntityTransformMap.ConflictKind.InvalidStringKey));
+
+            Assert.That(map.Generation, Is.EqualTo(generation));
+            Assert.That(map.Count, Is.Zero);
+            Assert.That(map.TryGet(string.Empty, out _), Is.False);
+        }
+
+        [Test]
+        public void InheritedSerializedWrite_CannotCollideWithDynamicAlias()
+        {
+            EntityTransformMap map = new EntityTransformMap();
+            Transform dynamicValue = CreateTransform("DynamicSocket");
+            Transform serializedValue = CreateTransform("SerializedSocket");
+            Assert.That(map.TrySetDynamic("RuntimeSocket", dynamicValue, out _), Is.True);
+
+            var baseMap = (ESEnumStringMirrorMap<DefaultTransformKey, Transform>)map;
+            Assert.That(baseMap.TryAdd("RuntimeSocket", serializedValue, out var conflict), Is.False);
+
+            Assert.That(conflict.Kind, Is.EqualTo(EntityTransformMap.ConflictKind.DuplicateStringKey));
+            Assert.That(map.Resolve("RuntimeSocket"), Is.SameAs(dynamicValue));
+            Assert.That(map.Count, Is.Zero);
+        }
+
+        [Test]
+        public void BatchSerializedWrite_CannotCollideWithDynamicAlias()
+        {
+            EntityTransformMap map = new EntityTransformMap();
+            Transform dynamicValue = CreateTransform("DynamicSocket");
+            Transform serializedValue = CreateTransform("SerializedSocket");
+            Assert.That(map.TrySetDynamic("RuntimeSocket", dynamicValue, out _), Is.True);
+
+            var entries = new List<EntityTransformMap.Entry>
+            {
+                new EntityTransformMap.Entry("RuntimeSocket", serializedValue)
+            };
+            Assert.That(map.TryReplaceEntries(entries, out var conflict), Is.False);
+
+            Assert.That(conflict.Kind, Is.EqualTo(EntityTransformMap.ConflictKind.DuplicateStringKey));
+            Assert.That(map.Resolve("RuntimeSocket"), Is.SameAs(dynamicValue));
+            Assert.That(map.Count, Is.Zero);
+        }
+
+        [Test]
+        public void SerializedSet_AtomicallyPromotesDynamicAlias()
+        {
+            EntityTransformMap map = new EntityTransformMap();
+            Transform dynamicValue = CreateTransform("DynamicSocket");
+            Transform serializedValue = CreateTransform("SerializedSocket");
+            Assert.That(map.TrySetDynamic("RuntimeSocket", dynamicValue, out _), Is.True);
+            int generation = map.Generation;
+
+            Assert.That(map.TrySet("RuntimeSocket", serializedValue, out var conflict), Is.True, conflict.ToString());
+
+            Assert.That(map.Resolve("RuntimeSocket"), Is.SameAs(serializedValue));
+            Assert.That(map.Count, Is.EqualTo(1));
+            Assert.That(map.Generation, Is.GreaterThan(generation));
+            ((ISerializationCallbackReceiver)map).OnAfterDeserialize();
+            Assert.That(map.Resolve("RuntimeSocket"), Is.SameAs(serializedValue));
+        }
+
+        [Test]
+        public void FailedSerializedPromotion_RestoresDynamicAlias()
+        {
+            EntityTransformMap map = new EntityTransformMap();
+            Transform dynamicValue = CreateTransform("DynamicSocket");
+            Assert.That(map.TrySetDynamic("RuntimeSocket", dynamicValue, out _), Is.True);
+            int generation = map.Generation;
+
+            Assert.That(map.TrySet("RuntimeSocket", null, out var conflict), Is.False);
+
+            Assert.That(conflict.Kind, Is.EqualTo(EntityTransformMap.ConflictKind.NullValue));
+            Assert.That(map.Resolve("RuntimeSocket"), Is.SameAs(dynamicValue));
+            Assert.That(map.Count, Is.Zero);
+            Assert.That(map.Generation, Is.EqualTo(generation));
+        }
+
+        [Test]
+        public void BaseClear_AlsoClearsDynamicState()
+        {
+            EntityTransformMap map = new EntityTransformMap();
+            Transform dynamicValue = CreateTransform("DynamicSocket");
+            Assert.That(map.TrySetDynamic("RuntimeSocket", dynamicValue, out _), Is.True);
+
+            ((ESEnumStringMirrorMap<DefaultTransformKey, Transform>)map).Clear();
+
+            Assert.That(map.Resolve("RuntimeSocket"), Is.Null);
+            Assert.That(map.Count, Is.Zero);
         }
 
         [Test]
@@ -127,7 +228,8 @@ namespace ES.Tests
                 Is.True,
                 conflict.ToString());
 
-            Assert.That(mapping.TransformMappings, Is.TypeOf<EntityTransformMap>());
+            Assert.That(mapping.TransformMappings.IsCreated, Is.True);
+            Assert.That((object)mapping.TransformMappings, Is.TypeOf<EntityTransformMapView>());
             Assert.That(mapping.Resolve(DefaultTransformKey.Camera), Is.SameAs(target));
             Assert.That(mapping.Resolve("CameraTarget"), Is.SameAs(target));
         }
@@ -136,6 +238,7 @@ namespace ES.Tests
         public void ComponentField_IsConcreteAndUsesUnitySerializeField()
         {
             Assert.That(typeof(EntityTransformMap).IsSealed, Is.True);
+            Assert.That(typeof(EntityTransformMap).IsNotPublic, Is.True);
             Assert.That(
                 typeof(EntityTransformMap).BaseType,
                 Is.EqualTo(typeof(ESEnumStringMirrorMap<DefaultTransformKey, Transform>)));
@@ -147,6 +250,49 @@ namespace ES.Tests
             Assert.That(field, Is.Not.Null);
             Assert.That(field.FieldType, Is.EqualTo(typeof(EntityTransformMap)));
             Assert.That(field.IsDefined(typeof(SerializeField), false), Is.True);
+            Assert.That(
+                typeof(EntityTransformMapping).GetProperty(nameof(EntityTransformMapping.TransformMappings))?.PropertyType,
+                Is.EqualTo(typeof(EntityTransformMapView)));
+            Assert.That(typeof(EntityTransformMapView).IsValueType, Is.True);
+            Assert.That(typeof(EntityTransformMapView).GetMethod("TrySet"), Is.Null);
+            Assert.That(typeof(EntityTransformMapView).GetMethod("TryAdd"), Is.Null);
+            Assert.That(typeof(EntityTransformMapView).GetMethod("Clear"), Is.Null);
+            Assert.That(
+                typeof(EntityTransformMapView).GetProperty(
+                    "LastConflict",
+                    BindingFlags.Instance | BindingFlags.Public),
+                Is.Null);
+            Assert.That(
+                typeof(EntityTransformMapView).GetMethod(
+                    "TryGetEntryAt",
+                    BindingFlags.Instance | BindingFlags.Public),
+                Is.Null);
+            Assert.That(
+                typeof(EntityTransformMapView).GetMethod(
+                    "CopyEntries",
+                    BindingFlags.Instance | BindingFlags.Public),
+                Is.Null);
+            Assert.That(
+                typeof(EntityTransformMapping).GetMethod(
+                    "Set",
+                    BindingFlags.Instance | BindingFlags.Public,
+                    null,
+                    new[] { typeof(string), typeof(Transform) },
+                    null),
+                Is.Null);
+            Assert.That(
+                typeof(EntityTransformMapping).GetMethod(
+                    "SetDynamic",
+                    BindingFlags.Instance | BindingFlags.Public,
+                    null,
+                    new[]
+                    {
+                        typeof(string),
+                        typeof(Transform),
+                        typeof(EntityTransformMap.Conflict).MakeByRefType()
+                    },
+                    null),
+                Is.Null);
 
             ESEnumStringTableAttribute table = field.GetCustomAttribute<ESEnumStringTableAttribute>();
             Assert.That(table, Is.Not.Null);
@@ -196,10 +342,10 @@ namespace ES.Tests
             GameObject root = CreateObject("EntityTransformMapRoundTrip");
             root.AddComponent<Entity>();
             EntityTransformMapping mapping = root.AddComponent<EntityTransformMapping>();
-            Transform weapon = new GameObject(EntityEquipmentSocketKeys.WeaponSocket).transform;
+            Transform weapon = new GameObject(EntityEquipmentSocketKeys.MainHandSocket).transform;
             weapon.SetParent(root.transform, false);
             Assert.That(
-                mapping.Set(DefaultTransformKey.Weapon, EntityEquipmentSocketKeys.WeaponSocket, weapon, out var conflict),
+                mapping.Set(DefaultTransformKey.CustomA, EntityEquipmentSocketKeys.MainHandSocket, weapon, out var conflict),
                 Is.True,
                 conflict.ToString());
 
@@ -212,73 +358,19 @@ namespace ES.Tests
             {
                 EntityTransformMapping reloaded = loaded.GetComponent<EntityTransformMapping>();
                 Assert.That(reloaded, Is.Not.Null);
-                Assert.That(reloaded.TransformMappings, Is.TypeOf<EntityTransformMap>());
+                Assert.That((object)reloaded.TransformMappings, Is.TypeOf<EntityTransformMapView>());
                 Assert.That(reloaded.TransformMappings.IsValid, Is.True);
                 Assert.That(reloaded.TransformMappings.Count, Is.EqualTo(1));
-                Assert.That(reloaded.Resolve(DefaultTransformKey.Weapon), Is.Not.Null);
+                Assert.That(reloaded.Resolve(DefaultTransformKey.CustomA), Is.Not.Null);
                 Assert.That(
-                    reloaded.Resolve(DefaultTransformKey.Weapon),
-                    Is.SameAs(reloaded.Resolve(EntityEquipmentSocketKeys.WeaponSocket)));
-                Assert.That(reloaded.Resolve(DefaultTransformKey.Weapon).name, Is.EqualTo(EntityEquipmentSocketKeys.WeaponSocket));
+                    reloaded.Resolve(DefaultTransformKey.CustomA),
+                    Is.SameAs(reloaded.Resolve(EntityEquipmentSocketKeys.MainHandSocket)));
+                Assert.That(reloaded.Resolve(DefaultTransformKey.CustomA).name, Is.EqualTo(EntityEquipmentSocketKeys.MainHandSocket));
             }
             finally
             {
                 PrefabUtility.UnloadPrefabContents(loaded);
             }
-        }
-
-        [Test]
-        public void LegacyMigration_KnownAliasesAreMergedWithoutDroppingOtherKeys()
-        {
-            Transform weapon = CreateTransform(EntityEquipmentSocketKeys.WeaponSocket);
-            Transform camera = CreateTransform("CameraTarget");
-            Transform head = CreateTransform("Head");
-            Transform aim = CreateTransform("CameraAimTarget");
-            var defaults = new Dictionary<DefaultTransformKey, Transform>
-            {
-                { DefaultTransformKey.Weapon, weapon },
-                { DefaultTransformKey.Camera, camera },
-                { DefaultTransformKey.Head, head },
-            };
-            var dynamics = new Dictionary<string, Transform>(System.StringComparer.Ordinal)
-            {
-                { EntityEquipmentSocketKeys.WeaponSocket, weapon },
-                { "CameraTarget", camera },
-                { "CameraAimTarget", aim },
-            };
-
-            Assert.That(
-                ESEntityTransformMappingMigration.TryBuildMigratedEntries(defaults, dynamics, out var entries, out string error),
-                Is.True,
-                error);
-
-            EntityTransformMap map = new EntityTransformMap();
-            Assert.That(map.TryReplaceEntries(entries, out var conflict), Is.True, conflict.ToString());
-            Assert.That(map.Count, Is.EqualTo(4));
-            Assert.That(map.TryGet(DefaultTransformKey.Weapon, EntityEquipmentSocketKeys.WeaponSocket, out _), Is.True);
-            Assert.That(map.TryGet(DefaultTransformKey.Camera, "CameraTarget", out _), Is.True);
-            Assert.That(map.Resolve(DefaultTransformKey.Head), Is.SameAs(head));
-            Assert.That(map.Resolve("CameraAimTarget"), Is.SameAs(aim));
-        }
-
-        [Test]
-        public void LegacyMigration_ConflictingKnownAliasIsBlocked()
-        {
-            Transform enumWeapon = CreateTransform("EnumWeapon");
-            Transform stringWeapon = CreateTransform("StringWeapon");
-            var defaults = new Dictionary<DefaultTransformKey, Transform>
-            {
-                { DefaultTransformKey.Weapon, enumWeapon },
-            };
-            var dynamics = new Dictionary<string, Transform>(System.StringComparer.Ordinal)
-            {
-                { EntityEquipmentSocketKeys.WeaponSocket, stringWeapon },
-            };
-
-            Assert.That(
-                ESEntityTransformMappingMigration.TryBuildMigratedEntries(defaults, dynamics, out _, out string error),
-                Is.False);
-            Assert.That(error, Does.Contain("指向不同 Transform"));
         }
 
         private Transform CreateTransform(string name)

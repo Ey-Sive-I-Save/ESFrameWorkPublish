@@ -325,6 +325,10 @@ namespace ES
         [NonSerialized] private Transform _targetTransform;
         [NonSerialized] private Vector3 _externalMotionVelocity;
         [NonSerialized] private bool _hasSubmittedMotionResult;
+        [NonSerialized] private int _runtimeDefinitionKey;
+        [NonSerialized] private ESInstanceHandle _runtimeInstanceHandle;
+
+        public ESInstanceHandle RuntimeInstanceHandle => _runtimeInstanceHandle;
 
         public override void Start()
         {
@@ -333,6 +337,7 @@ namespace ES
             ResolveMotionModule();
             sharedData ??= ItemShotSharedData.Default;
             ApplyShotData(sharedData, variableData);
+            ResolveRuntimeDefinitionKey(MyCore != null ? MyCore.prefabDefinition : null);
         }
 
         public void Launch(Vector3 direction)
@@ -357,6 +362,8 @@ namespace ES
                 hasTarget = false,
                 launched = true
             };
+            if (!TryRegisterRuntimeInstance())
+                state.launched = false;
         }
 
         public void LaunchTo(Vector3 targetPosition)
@@ -383,6 +390,8 @@ namespace ES
                 hasTarget = true,
                 launched = true
             };
+            if (!TryRegisterRuntimeInstance())
+                state.launched = false;
         }
 
         public void LaunchTo(Transform target)
@@ -434,7 +443,10 @@ namespace ES
             itemData.EnsureActiveKindData();
             ItemShotDataBlock block = itemData.kindData as ItemShotDataBlock;
             if (block != null)
+            {
                 ApplyShotData(block.sharedData, block.initialState);
+                ResolveRuntimeDefinitionKey(itemData);
+            }
         }
 
         protected override void Update()
@@ -476,7 +488,64 @@ namespace ES
             _hasSubmittedMotionResult = motionModule != null;
 
             if (latestResult.kind == ShotMotionKind.Arrived || latestResult.kind == ShotMotionKind.Expired)
+            {
                 state.launched = false;
+                UnregisterRuntimeInstance();
+            }
+        }
+
+        public void OnPoolSpawned()
+        {
+            UnregisterRuntimeInstance();
+            ResolveRuntimeDefinitionKey(MyCore != null ? MyCore.prefabDefinition : null);
+        }
+
+        public void OnPoolDespawned()
+        {
+            UnregisterRuntimeInstance();
+            state = default;
+            latestResult = default;
+            _targetTransform = null;
+            _externalMotionVelocity = Vector3.zero;
+            _hasSubmittedMotionResult = false;
+        }
+
+        private void ResolveRuntimeDefinitionKey(ItemDataInfo itemData)
+        {
+            _runtimeDefinitionKey = 0;
+            if (itemData == null || !(itemData.kindData is ItemShotDataBlock block) || block.key == null)
+                return;
+            ESRuntimeDataGameCore.Shots.TryGetRuntimeKey(block.key, out _runtimeDefinitionKey);
+        }
+
+        private bool TryRegisterRuntimeInstance()
+        {
+            UnregisterRuntimeInstance();
+            if (MyCore == null)
+                return false;
+            if (_runtimeDefinitionKey <= 0)
+                ResolveRuntimeDefinitionKey(MyCore.prefabDefinition);
+            if (_runtimeDefinitionKey <= 0)
+            {
+                Debug.LogError("[ItemShotModule] Shot 定义尚未注入运行时表，已拒绝发射。", MyCore);
+                return false;
+            }
+            if (ESRuntimeDataModule.ShotInstanceTable.TryAddInstance(
+                MyCore,
+                _runtimeDefinitionKey,
+                MyCore.GetInstanceID(),
+                out _runtimeInstanceHandle))
+                return true;
+
+            Debug.LogError("[ItemShotModule] Shot 实例表容量不足或身份无效，已拒绝发射。", MyCore);
+            return false;
+        }
+
+        private void UnregisterRuntimeInstance()
+        {
+            if (_runtimeInstanceHandle.IsValid)
+                ESRuntimeDataModule.ShotInstanceTable.TryRemove(_runtimeInstanceHandle, out _);
+            _runtimeInstanceHandle = default;
         }
 
         private void ApplyExternalMotion(

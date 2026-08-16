@@ -5,8 +5,7 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>
-    /// 将 EditorTools 中的大黑塔视觉样例迁移为新版通用角色底盘上的正式玩家 Variant。
-    /// 旧样例只作为视觉来源，不能作为正式内容资产。
+    /// 将独立的大黑塔表现源装配到新版通用角色底盘上的正式玩家 Variant。
     /// </summary>
     public static class ESFormalHertaPlayerVariantBuilder
     {
@@ -19,11 +18,10 @@ namespace ES
         public const string DefinitionPath = DataFolder + "/大黑塔_ActorData.asset";
         public const string PlayerStatePackPath = DataFolder + "/大黑塔_PlayerStatePack.asset";
 
-        private const string LegacyPreviewPath = "Assets/ESNormalAssets/EditorTools/大黑塔.prefab";
+        public const string PresentationFolder = "Assets/ESNormalAssets/CharacterPresentation";
+        public const string PresentationSourcePath = PresentationFolder + "/大黑塔_表现.prefab";
         private const string ModelRootPath = "03_模型表现_Presentation/ModelOffset/ModelRoot";
         private const string HurtBoxRootPath = "05_检测碰撞_Detection/HurtBoxes";
-        private const string WeaponSocketPath = "06_装备_Equipment/WeaponSlots/WeaponSocket";
-        private const string EquipmentSocketRootPath = "06_装备_Equipment/WeaponSlots/";
         private const string EquipmentVisualsPath = "06_装备_Equipment/EquipmentVisuals";
         private const string LongBarWeaponPrefabPath = ESLongBarMeleeWeaponBuilder.WeaponPrefabPath;
         private const string LongBarWeaponKey = ESLongBarMeleeWeaponBuilder.WeaponKey;
@@ -37,13 +35,6 @@ namespace ES
             "Assets/ESNormalAssets/VehiclePrototypes/BlockCar.prefab",
             "Assets/ESNormalAssets/VehiclePrototypes/BlockBicycle.prefab",
             "Assets/ESNormalAssets/VehiclePrototypes/BlockHelicopter.prefab",
-        };
-
-        private static readonly string[] LegacyPreviewPlaceholderCubeNames =
-        {
-            "Cube1",
-            "Cube1 (1)",
-            "Cube1 (2)",
         };
 
         [MenuItem("【ES】/内容制作/角色模板/重建正式玩家 Variant/大黑塔（新版通用模板）", false, 120)]
@@ -76,6 +67,7 @@ namespace ES
             EnsureVariantAuthoringIsSafe();
             EnsureAssetFolder(VariantFolder);
             EnsureAssetFolder(DataFolder);
+            EnsureAssetFolder(PresentationFolder);
             ESCameraDefaultContentBuilder.EnsureDefaultPlayerCameraContent();
 
             ActorDataInfo definition = EnsureHertaDefinition();
@@ -83,7 +75,8 @@ namespace ES
             if (template == null)
                 throw new InvalidOperationException("缺少新版通用角色模板：" + ESBasicCharacterTemplateBuilder.CompleteTemplatePath);
 
-            GameObject legacy = PrefabUtility.LoadPrefabContents(LegacyPreviewPath);
+            EnsureHertaPresentationSource();
+            GameObject presentationSource = PrefabUtility.LoadPrefabContents(PresentationSourcePath);
             GameObject variant = PrefabUtility.LoadPrefabContents(ESBasicCharacterTemplateBuilder.CompleteTemplatePath);
             try
             {
@@ -94,7 +87,7 @@ namespace ES
                 if (entity == null || profile == null || mapping == null)
                     throw new InvalidOperationException("新版通用角色模板缺少 Entity、EntityCharacterIdentity 或 EntityTransformMapping。");
 
-                Animator animator = ReplaceTemplateVisual(variant, legacy);
+                Animator animator = ReplaceTemplateVisual(variant, presentationSource);
                 ConfigureVariantIdentity(profile, definition);
                 ConfigurePlayerStatePack(entity);
                 ConfigurePlayerModules(entity, mapping);
@@ -117,7 +110,7 @@ namespace ES
             finally
             {
                 PrefabUtility.UnloadPrefabContents(variant);
-                PrefabUtility.UnloadPrefabContents(legacy);
+                PrefabUtility.UnloadPrefabContents(presentationSource);
             }
         }
 
@@ -153,41 +146,62 @@ namespace ES
             return definition;
         }
 
-        private static Animator ReplaceTemplateVisual(GameObject variant, GameObject legacy)
+        private static GameObject EnsureHertaPresentationSource()
         {
-            Entity legacyEntity = legacy.GetComponent<Entity>();
-            Animator legacyAnimator = legacyEntity != null ? legacyEntity.animator : null;
-            if (legacyAnimator == null)
-                legacyAnimator = legacy.GetComponentInChildren<Animator>(true);
-            if (legacyAnimator == null)
-                throw new InvalidOperationException("旧大黑塔预览 Prefab 缺少 Animator，无法迁移视觉模型。");
+            GameObject existing = AssetDatabase.LoadAssetAtPath<GameObject>(PresentationSourcePath);
+            if (existing != null)
+            {
+                ValidatePresentationSource(existing);
+                return existing;
+            }
+
+            GameObject currentVariant = PrefabUtility.LoadPrefabContents(VariantPath);
+            try
+            {
+                Animator sourceAnimator = currentVariant.GetComponentInChildren<Animator>(true);
+                if (sourceAnimator == null)
+                    throw new InvalidOperationException("当前正式大黑塔 Variant 缺少 Animator，无法建立独立表现源。");
+
+                GameObject source = UnityEngine.Object.Instantiate(sourceAnimator.gameObject);
+                source.name = "大黑塔_表现";
+                StateFinalIKDriver[] drivers = source.GetComponentsInChildren<StateFinalIKDriver>(true);
+                for (int index = 0; index < drivers.Length; index++)
+                    UnityEngine.Object.DestroyImmediate(drivers[index]);
+                ValidatePresentationSource(source);
+
+                GameObject saved = PrefabUtility.SaveAsPrefabAsset(source, PresentationSourcePath);
+                UnityEngine.Object.DestroyImmediate(source);
+                if (saved == null)
+                    throw new InvalidOperationException("保存大黑塔独立表现源失败：" + PresentationSourcePath);
+                AssetDatabase.SaveAssets();
+                return saved;
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(currentVariant);
+            }
+        }
+
+        private static Animator ReplaceTemplateVisual(GameObject variant, GameObject presentationSource)
+        {
+            ValidatePresentationSource(presentationSource);
 
             Transform modelRoot = FindRequired(variant.transform, ModelRootPath);
             for (int i = modelRoot.childCount - 1; i >= 0; i--)
                 UnityEngine.Object.DestroyImmediate(modelRoot.GetChild(i).gameObject);
 
-            // 旧样例把 Animator 与旧 Entity 同挂在根上。克隆整个视觉层级后必须剥离
-            // 旧的运行时底盘，不能把旧 Entity、KCC 或模块带入正式 Variant。
-            GameObject visual = UnityEngine.Object.Instantiate(legacyAnimator.gameObject);
-            StripLegacyNonPresentationComponents(visual);
-            DisableLegacyPreviewPlaceholderCubes(visual);
-            if (visual.GetComponentInChildren<Entity>(true) != null)
-            {
-                UnityEngine.Object.DestroyImmediate(visual);
-                throw new InvalidOperationException("旧大黑塔 Animator 层级包含 Entity，不能作为纯视觉模型迁移。");
-            }
-
+            GameObject visual = UnityEngine.Object.Instantiate(presentationSource);
             visual.name = "大黑塔_Model";
             visual.transform.SetParent(modelRoot, false);
-            visual.transform.localPosition = legacy.transform.InverseTransformPoint(legacyAnimator.transform.position);
-            visual.transform.localRotation = Quaternion.Inverse(legacy.transform.rotation) * legacyAnimator.transform.rotation;
-            visual.transform.localScale = legacyAnimator.transform.lossyScale;
+            visual.transform.localPosition = Vector3.zero;
+            visual.transform.localRotation = Quaternion.identity;
+            visual.transform.localScale = Vector3.one;
 
             Animator animator = visual.GetComponent<Animator>();
             if (animator == null)
                 animator = visual.GetComponentInChildren<Animator>(true);
             if (animator == null)
-                throw new InvalidOperationException("迁移后的大黑塔视觉模型缺少 Animator。");
+                throw new InvalidOperationException("大黑塔独立表现源缺少 Animator。");
 
             // 通用模板允许带一个无模型的占位 Animator 以便制作期查看结构。Variant 迁入
             // 真实表现树后必须移除它及任何附带表现 Animator，正式角色只保留迁入模型的唯一 Animator。
@@ -225,67 +239,31 @@ namespace ES
             return animator;
         }
 
-        private static void DisableLegacyPreviewPlaceholderCubes(GameObject visual)
+        private static void ValidatePresentationSource(GameObject source)
         {
-            if (visual == null)
-                throw new ArgumentNullException(nameof(visual));
+            if (source == null)
+                throw new InvalidOperationException("大黑塔独立表现源为空：" + PresentationSourcePath);
+            Animator[] animators = source.GetComponentsInChildren<Animator>(true);
+            if (animators.Length != 1)
+                throw new InvalidOperationException("大黑塔独立表现源必须且只能有一个 Animator。");
 
-            for (int i = 0; i < LegacyPreviewPlaceholderCubeNames.Length; i++)
+            Component[] components = source.GetComponentsInChildren<Component>(true);
+            for (int index = 0; index < components.Length; index++)
             {
-                Transform placeholder = visual.transform.Find(LegacyPreviewPlaceholderCubeNames[i]);
-                if (placeholder == null)
+                Component component = components[index];
+                if (component == null
+                    || component is Transform
+                    || component is Animator
+                    || component is Renderer
+                    || component is MeshFilter
+                    || component is ParticleSystem
+                    || component is AudioSource
+                    || component is Light
+                    || component is LODGroup)
                     continue;
-
-                if (placeholder.GetComponent<MeshFilter>() == null || placeholder.GetComponent<MeshRenderer>() == null)
-                {
-                    throw new InvalidOperationException(
-                        "旧预览占位对象名称与真实模型冲突，拒绝自动禁用：" + placeholder.name);
-                }
-
-                placeholder.gameObject.SetActive(false);
+                throw new InvalidOperationException(
+                    "大黑塔独立表现源包含运行时或物理组件：" + component.GetType().FullName);
             }
-        }
-
-        /// <summary>
-        /// 旧预览 Prefab 不是模型资源，而是完整的角色试验场。迁移时仅保留可渲染、
-        /// 动画和纯表现组件，任何脚本、物理或导航组件都不能进入正式角色表现树。
-        /// </summary>
-        private static void StripLegacyNonPresentationComponents(GameObject visual)
-        {
-            Transform[] transforms = visual.GetComponentsInChildren<Transform>(true);
-            // KinematicCharacterMotor requires its CapsuleCollider. Remove controller scripts
-            // before colliders so a legacy test character cannot leave dependent physics behind.
-            for (int phase = 0; phase < 2; phase++)
-            {
-                bool removeColliders = phase == 1;
-                for (int i = 0; i < transforms.Length; i++)
-                {
-                    Component[] components = transforms[i].GetComponents<Component>();
-                    for (int j = 0; j < components.Length; j++)
-                    {
-                        Component component = components[j];
-                        if (component == null || IsPresentationComponent(component))
-                            continue;
-
-                        if ((component is Collider) != removeColliders)
-                            continue;
-
-                        UnityEngine.Object.DestroyImmediate(component);
-                    }
-                }
-            }
-        }
-
-        private static bool IsPresentationComponent(Component component)
-        {
-            return component is Transform
-                   || component is Animator
-                   || component is Renderer
-                   || component is MeshFilter
-                   || component is ParticleSystem
-                   || component is AudioSource
-                   || component is Light
-                   || component is LODGroup;
         }
 
         private static void ConfigureVariantIdentity(EntityCharacterIdentity profile, ActorDataInfo definition)
@@ -403,14 +381,23 @@ namespace ES
             climb.ClimbJump_StateName = "攀爬跳跃";
 
             EntityBasicCombatModule combat = GetOrAddBasicModule(entity, () => new EntityBasicCombatModule());
-            EntityEquipmentAttachmentModule attachment = GetOrAddBasicModule(
+            GetOrAddEquipmentModule(
+                entity,
+                () => new EntityEquipmentInventoryModule());
+            EntityEquipmentSlotModule slots = GetOrAddEquipmentModule(
+                entity,
+                () => new EntityEquipmentSlotModule());
+            GetOrAddEquipmentModule(
                 entity,
                 () => new EntityEquipmentAttachmentModule());
-            attachment.allowEntityRootFallback = false;
-            ConfigureLongBarMeleeWeapon(combat, mapping);
+            GetOrAddEquipmentModule(
+                entity,
+                () => new EntityEquipmentEffectModule());
+            ConfigureLongBarMeleeWeapon(combat, slots, mapping);
 
             entity.basicDomain.MyModules.ApplyBuffers(true);
             entity.aiDomain.MyModules.ApplyBuffers(true);
+            entity.equipmentDomain.MyModules.ApplyBuffers(true);
         }
 
         private static void ConfigurePlayerKcc(Entity entity)
@@ -425,10 +412,13 @@ namespace ES
 
         }
 
-        private static void ConfigureLongBarMeleeWeapon(EntityBasicCombatModule combat, EntityTransformMapping mapping)
+        private static void ConfigureLongBarMeleeWeapon(
+            EntityBasicCombatModule combat,
+            EntityEquipmentSlotModule slots,
+            EntityTransformMapping mapping)
         {
-            if (combat == null || mapping == null)
-                throw new InvalidOperationException("大长条近战切片缺少 Combat Module 或 TransformMapping。");
+            if (combat == null || slots == null || mapping == null)
+                throw new InvalidOperationException("大长条近战切片缺少 Combat、Equipment Slot 或 TransformMapping。");
 
             GameObject weaponPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(LongBarWeaponPrefabPath);
             if (weaponPrefab == null)
@@ -439,11 +429,11 @@ namespace ES
             if (equipmentVisuals == null)
                 equipmentVisuals = FindRequired(mapping.transform, EquipmentVisualsPath);
 
-            combat.weaponSlots ??= new System.Collections.Generic.List<EntityBasicCombatModule.WeaponSlot>();
+            slots.weaponSlots ??= new System.Collections.Generic.List<EntityEquipmentWeaponSlot>();
             int longBarSlotIndex = -1;
-            for (int i = 0; i < combat.weaponSlots.Count; i++)
+            for (int i = 0; i < slots.weaponSlots.Count; i++)
             {
-                EntityBasicCombatModule.WeaponSlot candidate = combat.weaponSlots[i];
+                EntityEquipmentWeaponSlot candidate = slots.weaponSlots[i];
                 if (candidate == null
                     || candidate.weaponKey == null
                     || !string.Equals(candidate.weaponKey.StringKey, LongBarWeaponKey, StringComparison.Ordinal))
@@ -455,15 +445,15 @@ namespace ES
                 longBarSlotIndex = i;
             }
 
-            Transform old = longBarSlotIndex >= 0 ? combat.weaponSlots[longBarSlotIndex].weaponRoot : null;
+            Transform old = longBarSlotIndex >= 0 ? slots.weaponSlots[longBarSlotIndex].weaponRoot : null;
             if (old != null)
             {
                 if (old.parent != equipmentVisuals)
                     throw new InvalidOperationException("大长条槽位指向 EquipmentVisuals 之外的对象，拒绝跨层级删除：" + old.name);
 
-                for (int i = 0; i < combat.weaponSlots.Count; i++)
+                for (int i = 0; i < slots.weaponSlots.Count; i++)
                 {
-                    if (i != longBarSlotIndex && combat.weaponSlots[i] != null && combat.weaponSlots[i].weaponRoot == old)
+                    if (i != longBarSlotIndex && slots.weaponSlots[i] != null && slots.weaponSlots[i].weaponRoot == old)
                         throw new InvalidOperationException("大长条与其他 Weapon Slot 共享同一个 weaponRoot，拒绝删除共享对象：" + old.name);
                 }
 
@@ -490,10 +480,9 @@ namespace ES
             // 大长条自身关闭 fire，因此不会走 Hitscan，同时未来枪械槽位无需改角色结构。
             combat.enableGunFire = true;
             combat.fireOnAttackInput = true;
-            combat.autoAddWeaponBindingIfMissing = false;
             combat.startWithWeaponInHand = false;
 
-            var longBarSlot = new EntityBasicCombatModule.WeaponSlot
+            var longBarSlot = new EntityEquipmentWeaponSlot
             {
                 displayName = "大长条",
                 weaponKey = new ESWeaponConfigKey { stringKey = LongBarWeaponKey },
@@ -501,11 +490,11 @@ namespace ES
             };
 
             if (longBarSlotIndex >= 0)
-                combat.weaponSlots[longBarSlotIndex] = longBarSlot;
+                slots.weaponSlots[longBarSlotIndex] = longBarSlot;
             else
             {
-                longBarSlotIndex = combat.weaponSlots.Count;
-                combat.weaponSlots.Add(longBarSlot);
+                longBarSlotIndex = slots.weaponSlots.Count;
+                slots.weaponSlots.Add(longBarSlot);
             }
 
             combat.startWeaponIndex = longBarSlotIndex;
@@ -533,47 +522,122 @@ namespace ES
             collider.center = new Vector3(0f, 0.85f, 0f);
         }
 
-        private static void RebuildHumanoidMappings(Transform root, EntityTransformMapping mapping, Animator animator)
+        private static void RebuildHumanoidMappings(
+            Transform root,
+            EntityTransformMapping mapping,
+            Animator animator)
         {
             Transform head = GetHumanBone(animator, HumanBodyBones.Head) ?? FindRequired(root, HeadAnchorPath);
-            Transform chest = GetHumanBone(animator, HumanBodyBones.Chest)
+            Transform chest = GetHumanBone(animator, HumanBodyBones.UpperChest)
+                              ?? GetHumanBone(animator, HumanBodyBones.Chest)
                               ?? GetHumanBone(animator, HumanBodyBones.Spine)
                               ?? FindRequired(root, ChestAnchorPath);
             Transform hip = GetHumanBone(animator, HumanBodyBones.Hips) ?? FindRequired(root, HipAnchorPath);
-            Transform weaponSocket = FindRequired(root, WeaponSocketPath);
+            Transform rightHand = GetRequiredHumanBone(animator, HumanBodyBones.RightHand);
+            Transform leftHand = GetRequiredHumanBone(animator, HumanBodyBones.LeftHand);
+            Transform mainHandSocket = EnsureEquipmentSocket(
+                root,
+                EntityEquipmentSocketKeys.MainHandSocket,
+                rightHand,
+                Vector3.zero,
+                Vector3.zero);
+            Transform offHandSocket = EnsureEquipmentSocket(
+                root,
+                EntityEquipmentSocketKeys.OffHandSocket,
+                leftHand,
+                Vector3.zero,
+                Vector3.zero);
+            Transform primaryBackSocket = EnsureEquipmentSocket(
+                root,
+                EntityEquipmentSocketKeys.PrimaryBackSocket,
+                chest,
+                new Vector3(0.22f, 0.1f, -0.18f),
+                new Vector3(15f, -100f, 15f));
+            Transform secondaryBackSocket = EnsureEquipmentSocket(
+                root,
+                EntityEquipmentSocketKeys.SecondaryBackSocket,
+                chest,
+                new Vector3(-0.22f, 0.1f, -0.18f),
+                new Vector3(15f, 100f, -15f));
+            Transform hipSocket = EnsureEquipmentSocket(
+                root,
+                EntityEquipmentSocketKeys.HipSocket,
+                hip,
+                new Vector3(0.32f, 0f, 0f),
+                new Vector3(0f, 0f, 90f));
+            Transform temporaryHandSocket = EnsureEquipmentSocket(
+                root,
+                EntityEquipmentSocketKeys.TemporaryHandSocket,
+                rightHand,
+                Vector3.zero,
+                Vector3.zero);
 
             mapping.Set(DefaultTransformKey.Root, root);
             mapping.Set(DefaultTransformKey.Head, head);
             mapping.Set(DefaultTransformKey.Chest, chest);
             mapping.Set(DefaultTransformKey.Hip, hip);
-            mapping.Set(DefaultTransformKey.LeftHand, GetHumanBone(animator, HumanBodyBones.LeftHand));
-            mapping.Set(DefaultTransformKey.RightHand, GetHumanBone(animator, HumanBodyBones.RightHand));
+            mapping.Set(DefaultTransformKey.LeftHand, leftHand);
+            mapping.Set(DefaultTransformKey.RightHand, rightHand);
             mapping.Set(DefaultTransformKey.LeftFoot, GetHumanBone(animator, HumanBodyBones.LeftFoot));
             mapping.Set(DefaultTransformKey.RightFoot, GetHumanBone(animator, HumanBodyBones.RightFoot));
-            if (!mapping.Set(DefaultTransformKey.Weapon, EntityEquipmentSocketKeys.WeaponSocket, weaponSocket, out EntityTransformMap.Conflict weaponConflict))
-                throw new InvalidOperationException("正式角色武器挂点映射失败：" + weaponConflict.Message);
-            SetRequiredStringMapping(mapping, root, EntityEquipmentSocketKeys.MainHandSocket);
-            SetRequiredStringMapping(mapping, root, EntityEquipmentSocketKeys.OffHandSocket);
-            SetRequiredStringMapping(mapping, root, EntityEquipmentSocketKeys.PrimaryBackSocket);
-            SetRequiredStringMapping(mapping, root, EntityEquipmentSocketKeys.SecondaryBackSocket);
-            SetRequiredStringMapping(mapping, root, EntityEquipmentSocketKeys.HipSocket);
-            SetRequiredStringMapping(mapping, root, EntityEquipmentSocketKeys.TemporaryHandSocket);
+            SetRequiredStringMapping(mapping, EntityEquipmentSocketKeys.MainHandSocket, mainHandSocket);
+            SetRequiredStringMapping(mapping, EntityEquipmentSocketKeys.OffHandSocket, offHandSocket);
+            SetRequiredStringMapping(mapping, EntityEquipmentSocketKeys.PrimaryBackSocket, primaryBackSocket);
+            SetRequiredStringMapping(mapping, EntityEquipmentSocketKeys.SecondaryBackSocket, secondaryBackSocket);
+            SetRequiredStringMapping(mapping, EntityEquipmentSocketKeys.HipSocket, hipSocket);
+            SetRequiredStringMapping(mapping, EntityEquipmentSocketKeys.TemporaryHandSocket, temporaryHandSocket);
 
             Transform cameraTarget = FindRequired(root, CameraTargetPath);
-            if (!mapping.Set(DefaultTransformKey.Camera, "CameraTarget", cameraTarget, out EntityTransformMap.Conflict cameraConflict))
-                throw new InvalidOperationException("正式角色相机挂点映射失败：" + cameraConflict.Message);
+            if (!mapping.Set(
+                    DefaultTransformKey.Camera,
+                    "CameraTarget",
+                    cameraTarget,
+                    out EntityTransformMap.Conflict cameraConflict))
+            {
+                throw new InvalidOperationException(
+                    "正式角色相机挂点映射失败：" + cameraConflict.Message);
+            }
 
             mapping.RebuildRuntimeCache();
         }
 
+        private static Transform EnsureEquipmentSocket(
+            Transform root,
+            string key,
+            Transform bone,
+            Vector3 localPosition,
+            Vector3 localEuler)
+        {
+            Transform socket = null;
+            Transform[] transforms = root.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                if (!string.Equals(transforms[i].name, key, StringComparison.Ordinal))
+                    continue;
+                if (socket != null)
+                    throw new InvalidOperationException("正式角色存在重复装备挂点：" + key);
+                socket = transforms[i];
+            }
+
+            if (socket == null)
+                socket = new GameObject(key).transform;
+            socket.SetParent(bone, false);
+            socket.localPosition = localPosition;
+            socket.localRotation = Quaternion.Euler(localEuler);
+            socket.localScale = Vector3.one;
+            return socket;
+        }
+
         private static void SetRequiredStringMapping(
             EntityTransformMapping mapping,
-            Transform root,
-            string key)
+            string key,
+            Transform socket)
         {
-            Transform socket = FindRequired(root, EquipmentSocketRootPath + key);
             if (!mapping.Set(key, socket, out EntityTransformMap.Conflict conflict))
-                throw new InvalidOperationException("正式角色装备挂点映射失败（" + key + "）：" + conflict.Message);
+            {
+                throw new InvalidOperationException(
+                    "正式角色装备挂点映射失败（" + key + "）：" + conflict.Message);
+            }
         }
 
         private static T GetOrAddBasicModule<T>(Entity entity, Func<T> create) where T : EntityBasicModuleBase
@@ -599,6 +663,20 @@ namespace ES
 
             module = create();
             entity.aiDomain.MyModules.Add(module);
+            return module;
+        }
+
+        private static T GetOrAddEquipmentModule<T>(Entity entity, Func<T> create)
+            where T : EntityEquipmentModuleBase
+        {
+            T module = FindEquipmentModule<T>(entity, out int count);
+            if (count > 1)
+                throw new InvalidOperationException("新版通用角色底盘出现重复装备模块：" + typeof(T).Name);
+            if (module != null)
+                return module;
+
+            module = create();
+            entity.equipmentDomain.MyModules.Add(module);
             return module;
         }
 
@@ -638,6 +716,25 @@ namespace ES
             return result;
         }
 
+        private static T FindEquipmentModule<T>(Entity entity, out int count)
+            where T : EntityEquipmentModuleBase
+        {
+            count = 0;
+            T result = null;
+            if (entity?.equipmentDomain?.MyModules?.ValuesNow == null)
+                return null;
+
+            for (int i = 0; i < entity.equipmentDomain.MyModules.ValuesNow.Count; i++)
+            {
+                if (entity.equipmentDomain.MyModules.ValuesNow[i] is T module)
+                {
+                    count++;
+                    result = module;
+                }
+            }
+            return result;
+        }
+
         private static Transform FindRequired(Transform root, string path)
         {
             Transform result = root.Find(path);
@@ -651,6 +748,14 @@ namespace ES
             if (animator == null || animator.avatar == null || !animator.avatar.isValid)
                 return null;
             return animator.GetBoneTransform(bone);
+        }
+
+        private static Transform GetRequiredHumanBone(Animator animator, HumanBodyBones bone)
+        {
+            Transform result = GetHumanBone(animator, bone);
+            if (result == null)
+                throw new InvalidOperationException("正式角色缺少必需 Humanoid 骨骼：" + bone);
+            return result;
         }
 
         /// <summary>

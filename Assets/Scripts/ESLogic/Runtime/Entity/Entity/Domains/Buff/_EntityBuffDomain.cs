@@ -761,7 +761,7 @@ namespace ES
             buff.Initialize(this, write.definition, write.sharedData, write.target, write.sourceSupport, null,
                 -1f, 1, write.definitionKey, sourceKey, 1, owner, frameNumber);
             activeBuffs.Add(buff);
-            if (!buff.TryApply() || !ContainsActiveBuff(buff))
+            if (!TryApplyRegisteredRuntimeBuff(buff))
             {
                 ReturnFailedApplyBuffToPool(buff);
                 return false;
@@ -846,7 +846,7 @@ namespace ES
             // Buff. TryApply rolls back its owned resources on failure; this path then removes the
             // provisional list entry before the runtime is returned to the pool.
             activeBuffs.Add(buff);
-            if (!buff.TryApply() || !ContainsActiveBuff(buff))
+            if (!TryApplyRegisteredRuntimeBuff(buff))
             {
                 ReturnFailedApplyBuffToPool(buff);
                 return null;
@@ -1156,6 +1156,7 @@ namespace ES
 
         private void ReturnFailedApplyBuffToPool(ESActiveBuffRuntime buff)
         {
+            UnregisterRuntimeBuff(buff);
             for (int i = activeBuffs.Count - 1; i >= 0; i--)
             {
                 if (!ReferenceEquals(activeBuffs[i], buff))
@@ -1165,6 +1166,7 @@ namespace ES
                 if (i != last)
                     activeBuffs[i] = activeBuffs[last];
                 activeBuffs.RemoveAt(last);
+                buff.Deactivate(false);
                 buff.TryAutoPushedToPool();
                 return;
             }
@@ -1190,6 +1192,7 @@ namespace ES
                 activeBuffs[index] = activeBuffs[last];
 
             activeBuffs.RemoveAt(last);
+            UnregisterRuntimeBuff(buff);
             buff.Deactivate(true);
             inactiveBuffs.Add(buff);
             NotifyBuffChanged(change);
@@ -1204,9 +1207,53 @@ namespace ES
                 activeBuffs[index] = activeBuffs[last];
 
             activeBuffs.RemoveAt(last);
+            UnregisterRuntimeBuff(buff);
             buff.Deactivate(triggerRemoveOps);
             buff.TryAutoPushedToPool();
             NotifyBuffChanged(change);
+        }
+
+        private bool TryRegisterRuntimeBuff(ESActiveBuffRuntime buff)
+        {
+            if (buff == null || MyCore == null)
+                return false;
+            if (ESRuntimeDataModule.BuffInstanceTable.TryAddInstance(
+                    buff,
+                    buff.DefinitionKey,
+                    MyCore.GetInstanceID(),
+                    out ESInstanceHandle handle))
+            {
+                buff.RuntimeInstanceHandle = handle;
+                return true;
+            }
+
+            Debug.LogError("[Buff] Buff 实例表容量不足或身份无效，已拒绝激活。", MyCore);
+            return false;
+        }
+
+        private bool TryApplyRegisteredRuntimeBuff(ESActiveBuffRuntime buff)
+        {
+            if (!TryRegisterRuntimeBuff(buff))
+                return false;
+
+            ESInstanceHandle registeredHandle = buff.RuntimeInstanceHandle;
+            if (buff.TryApply() && ContainsActiveBuff(buff))
+                return true;
+
+            if (registeredHandle.IsValid)
+                ESRuntimeDataModule.BuffInstanceTable.TryRemove(registeredHandle, out _);
+            buff.RuntimeInstanceHandle = default;
+            return false;
+        }
+
+        private static void UnregisterRuntimeBuff(ESActiveBuffRuntime buff)
+        {
+            if (buff == null)
+                return;
+            ESInstanceHandle handle = buff.RuntimeInstanceHandle;
+            if (handle.IsValid)
+                ESRuntimeDataModule.BuffInstanceTable.TryRemove(handle, out _);
+            buff.RuntimeInstanceHandle = default;
         }
 
         internal void NotifyBuffRefreshed(ESActiveBuffRuntime buff)

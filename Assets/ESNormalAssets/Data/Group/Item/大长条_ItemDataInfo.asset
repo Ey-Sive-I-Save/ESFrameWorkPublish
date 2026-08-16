@@ -22,6 +22,12 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   KeyName: weapon.melee.long_bar
+  itemKey:
+    enumKey: 0
+    stringKey: item.weapon.melee.long_bar
+    definitionGuid: 
+    definitionLocalFileId: 0
+    definitionTypeName: 
   tags: []
   floatValues: []
   permitValues: []
@@ -33,21 +39,21 @@ MonoBehaviour:
       guid: bf2dc9bca456f2848b25fc58ea478f1f
       localFileId: 0
       assetTypeName: UnityEngine.GameObject
-      address:
-      groupName:
+      address: 
+      groupName: 
       editorPath: "Assets/ESNormalAssets/WeaponPrototypes/\u5927\u957F\u6761.prefab"
       editorOnly: 0
       alwaysLoaded: 0
     displayName: "\u5927\u957F\u6761"
     iconKey:
       enumKey: 0
-      stringKey:
-      guid:
+      stringKey: 
+      guid: 
       localFileId: 0
-      assetTypeName:
-      address:
-      groupName:
-      editorPath:
+      assetTypeName: 
+      address: 
+      groupName: 
+      editorPath: 
       editorOnly: 0
       alwaysLoaded: 0
   interactConfig:
@@ -104,7 +110,6 @@ MonoBehaviour:
             definitionTypeName: 
           hitRadius: 0.65
           cooldown: 0.35
-          socketName: WeaponSocket
           fire:
             enabled: 0
             interval: 0.12

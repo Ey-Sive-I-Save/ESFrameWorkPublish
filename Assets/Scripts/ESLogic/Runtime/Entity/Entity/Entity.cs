@@ -125,6 +125,10 @@ namespace ES
         [HideLabel, HideReferenceObjectPicker, SerializeReference]
         public EntityBuffDomain buffDomain = new EntityBuffDomain();
 
+        [ESEditorSection("equipment", "装备", 40f)]
+        [HideLabel, HideReferenceObjectPicker, SerializeReference]
+        public EntityEquipmentDomain equipmentDomain = new EntityEquipmentDomain();
+
         [ESEditorSection("state", "状态表现", 50f)]
         [HideLabel, HideReferenceObjectPicker, SerializeReference]
         public EntityStateDomain stateDomain = new EntityStateDomain();
@@ -172,6 +176,7 @@ namespace ES
             RegisterDomain(aiDomain);
             RegisterDomain(buffDomain);
             RegisterDomain(stateDomain);
+            RegisterDomain(equipmentDomain);
         }
 
         #endregion
@@ -193,6 +198,8 @@ namespace ES
             kcc?.ResetMotionInfluences();
             ESActionPoolLifecycleDiagnostics.RecordDespawn();
             basicDomain?.NotifyPoolDespawned();
+            equipmentDomain?.NotifyPoolDespawned();
+            EnsureTransformMapping()?.ClearDynamic();
             ESActionPoolLifecycleDiagnostics.Record("Entity.CameraRelease");
             ESGameManager.Camera?.ReleaseOwnedBy(this);
             ESActionPoolLifecycleDiagnostics.Record("Entity.DefaultCameraRelease");
@@ -219,6 +226,7 @@ namespace ES
             ESActionPoolLifecycleDiagnostics.RecordSpawn();
             EnsureEntityStructure();
             basicDomain?.NotifyPoolSpawned();
+            equipmentDomain?.NotifyPoolSpawned();
             CaptureAuthoringMotionBaseline();
             EnsureEntityOpSupport();
             Tags.Warmup();
@@ -303,6 +311,7 @@ namespace ES
             basicDomain ??= new EntityBasicDomain();
             aiDomain ??= new EntityAIDomain();
             buffDomain ??= new EntityBuffDomain();
+            equipmentDomain ??= new EntityEquipmentDomain();
             BindGameCoreAttributeCatalog();
             stateDomain ??= new EntityStateDomain();
             stateDomain.stateMachine ??= new StateMachine();

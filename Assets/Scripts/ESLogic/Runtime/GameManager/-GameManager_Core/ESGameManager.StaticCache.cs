@@ -38,9 +38,11 @@ namespace ES
         public static ESConfigKeyTable<ESShotRuntimeData> ShotData => ESRuntimeDataModule.ShotTable;
         public static ESConfigKeyTable<ESMonsterRuntimeData> MonsterData => ESRuntimeDataModule.MonsterTable;
         public static ESConfigKeyTable<ESNpcRuntimeData> NpcData => ESRuntimeDataModule.NpcTable;
+        public static ESItemConfigKeyTable ItemData => ESRuntimeDataModule.ItemTable;
         public static ESConfigKeyTable<ESWeaponRuntimeData> WeaponData => ESRuntimeDataModule.WeaponTable;
         public static ESConfigKeyTable<ESSkillRuntimeData> SkillData => ESRuntimeDataModule.SkillTable;
         public static ESBuffConfigKeyTable RuntimeBuffData => ESRuntimeDataGameCore.Buffs;
+        public static ESItemConfigKeyTable RuntimeItemData => ESRuntimeDataGameCore.Items;
         public static ESShotConfigKeyTable RuntimeShotData => ESRuntimeDataGameCore.Shots;
         public static ESMonsterConfigKeyTable RuntimeMonsterData => ESRuntimeDataGameCore.Monsters;
         public static ESNpcConfigKeyTable RuntimeNpcData => ESRuntimeDataGameCore.Npcs;
@@ -54,8 +56,9 @@ namespace ES
         public static ESAudioCueConfigKeyTable RuntimeAudioCueData => ESRuntimeDataGameCore.AudioCues;
         public static ESVfxConfigKeyTable RuntimeVfxData => ESRuntimeDataGameCore.Vfx;
         public static ESAssetConfigTableReader<ESAssetReferAnimationClipConfigData, UnityEngine.AnimationClip> RuntimeAnimationClipAssets => ESRuntimeDataAsset.AnimationClips;
-        public static ESRuntimeInstanceIndex<ESActiveBuffRuntime> BuffRuntimeInstances => ESRuntimeDataModule.BuffInstanceIndex;
-        public static ESRuntimeInstanceIndex<Item> ShotRuntimeInstances => ESRuntimeDataModule.ShotInstanceIndex;
+        public static ESItemInstanceTable ItemRuntimeInstances => ESRuntimeDataModule.ItemInstanceTable;
+        public static ESBuffInstanceTable BuffRuntimeInstances => ESRuntimeDataModule.BuffInstanceTable;
+        public static ESShotInstanceTable ShotRuntimeInstances => ESRuntimeDataModule.ShotInstanceTable;
 
         public static bool IsReady
         {

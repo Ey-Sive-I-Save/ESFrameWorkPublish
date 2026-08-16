@@ -192,6 +192,11 @@ namespace ES
                 Add(issues, ESStoryValidationSeverity.Error, "Definition.EnumId", "切片 A 的 Story 身份只允许稳定 StringKey。", null);
             if (definition.contentVersion < 1)
                 Add(issues, ESStoryValidationSeverity.Error, "Definition.Version", "ContentVersion 必须大于 0。", null);
+            if (!Enum.IsDefined(typeof(ESStoryLocalizationMode), definition.localizationMode))
+                Add(issues, ESStoryValidationSeverity.Error, "Localization.Mode", "本地化合同值无效。", null);
+            else if (definition.localizationMode == ESStoryLocalizationMode.LegacyLiteral)
+                Add(issues, ESStoryValidationSeverity.Warning, "Localization.LegacyLiteral",
+                    "当前定义仍使用旧字符串迁移模式；正式内容必须迁移为稳定文本 Key。", null);
             if (definition.storyKind == ESStoryKind.Story)
                 Add(issues, ESStoryValidationSeverity.Error, "Definition.KindUnsupported", "切片 A 尚未提供长期 Story 专用进度记录。", null);
             if (definition.nodes == null || definition.nodes.Count == 0)
@@ -213,7 +218,7 @@ namespace ES
                 Add(issues, ESStoryValidationSeverity.Error, "Graph.Entry", "EntryNodeId 不存在。", definition.entryNodeId);
 
             foreach (KeyValuePair<string, ESStoryNodeDefinition> pair in byId)
-                ValidateNode(pair.Value, byId, issues);
+                ValidateNode(pair.Value, definition.localizationMode, byId, issues);
 
             if (byId.ContainsKey(definition.entryNodeId))
             {
@@ -226,7 +231,8 @@ namespace ES
             return issues;
         }
 
-        private static void ValidateNode(ESStoryNodeDefinition node, Dictionary<string, ESStoryNodeDefinition> byId, List<ESStoryValidationIssue> issues)
+        private static void ValidateNode(ESStoryNodeDefinition node, ESStoryLocalizationMode localizationMode,
+            Dictionary<string, ESStoryNodeDefinition> byId, List<ESStoryValidationIssue> issues)
         {
             if (node.nodeKind == ESStoryNodeKind.Start || node.nodeKind == ESStoryNodeKind.Dialogue || node.nodeKind == ESStoryNodeKind.Action)
                 RequireTarget(node.nextNodeId, "NextNode", node.nodeId, byId, issues);
@@ -240,6 +246,25 @@ namespace ES
                 if (string.IsNullOrWhiteSpace(node.actionId)) Add(issues, ESStoryValidationSeverity.Error, "Action.Id", "ActionId 不能为空。", node.nodeId);
                 if (node.setTag.IsEmpty) Add(issues, ESStoryValidationSeverity.Error, "Action.Tag", "SetTag 必须选择稳定 Tag。", node.nodeId);
             }
+            if (node.nodeKind == ESStoryNodeKind.Dialogue || node.nodeKind == ESStoryNodeKind.Choice)
+            {
+                if (localizationMode == ESStoryLocalizationMode.StableTextKey)
+                {
+                    bool bodyRequired = node.nodeKind == ESStoryNodeKind.Dialogue;
+                    ValidateLocalizedText(node.bodyText, bodyRequired, "Localization.BodyKey", "正文", node.nodeId, issues);
+                    bool hasSpeaker = node.speakerText.Key.IsValid
+                        || !string.IsNullOrWhiteSpace(node.speakerText.fallbackLiteral)
+                        || !string.IsNullOrWhiteSpace(node.speakerName);
+                    ValidateLocalizedText(node.speakerText, hasSpeaker, "Localization.SpeakerKey", "说话者", node.nodeId, issues);
+                    if (!string.IsNullOrWhiteSpace(node.speakerName) || !string.IsNullOrWhiteSpace(node.text))
+                        Add(issues, ESStoryValidationSeverity.Warning, "Localization.IgnoredLegacyNodeText",
+                            "稳定 TextKey 模式会忽略节点中的旧说话者或旧正文。", node.nodeId);
+                }
+                else if (node.nodeKind == ESStoryNodeKind.Dialogue && string.IsNullOrWhiteSpace(node.text))
+                {
+                    Add(issues, ESStoryValidationSeverity.Error, "Localization.LegacyBody", "旧字符串模式的对话正文不能为空。", node.nodeId);
+                }
+            }
             if (node.nodeKind != ESStoryNodeKind.Choice) return;
             if (node.options == null || node.options.Count == 0) Add(issues, ESStoryValidationSeverity.Error, "Choice.Empty", "Choice 至少需要一个选项。", node.nodeId);
             HashSet<string> optionIds = new HashSet<string>(StringComparer.Ordinal);
@@ -250,7 +275,29 @@ namespace ES
                 if (option == null || string.IsNullOrWhiteSpace(option.optionId)) { Add(issues, ESStoryValidationSeverity.Error, "Option.Id", "OptionId 不能为空。", node.nodeId); continue; }
                 if (!optionIds.Add(option.optionId)) Add(issues, ESStoryValidationSeverity.Error, "Option.Duplicate", "重复 OptionId：" + option.optionId, node.nodeId);
                 RequireTarget(option.nextNodeId, "Option.NextNode", node.nodeId, byId, issues);
+                if (localizationMode == ESStoryLocalizationMode.StableTextKey)
+                {
+                    ValidateLocalizedText(option.displayText, true, "Localization.OptionKey", "选项显示文本", node.nodeId, issues);
+                    if (!string.IsNullOrWhiteSpace(option.text))
+                        Add(issues, ESStoryValidationSeverity.Warning, "Localization.IgnoredLegacyOptionText",
+                            "稳定 TextKey 模式会忽略选项中的旧显示文本。", node.nodeId);
+                }
+                else if (string.IsNullOrWhiteSpace(option.text))
+                    Add(issues, ESStoryValidationSeverity.Error, "Localization.LegacyOption", "旧字符串模式的选项显示文本不能为空。", node.nodeId);
             }
+        }
+
+        private static void ValidateLocalizedText(ESLocalizedTextRef reference, bool required,
+            string code, string displayName, string nodeId, List<ESStoryValidationIssue> issues)
+        {
+            if (required && !reference.Key.IsValid)
+                Add(issues, ESStoryValidationSeverity.Error, code, displayName + "必须使用稳定 TextKey。", nodeId);
+            else if (reference.Key.IsValid && !ESTextKey.IsCanonical(reference.textKey))
+                Add(issues, ESStoryValidationSeverity.Error, code + ".Canonical",
+                    displayName + "的 TextKey 不能包含首尾空白。", nodeId);
+            if (reference.language != EnumCollect.Envir_LanguageType.NotClear
+                && !ESLocalizationRuntime.IsConcreteLanguage(reference.language))
+                Add(issues, ESStoryValidationSeverity.Error, code + ".Language", displayName + "指定了无效语言。", nodeId);
         }
 
         private static void RequireTarget(string target, string code, string nodeId, Dictionary<string, ESStoryNodeDefinition> byId, List<ESStoryValidationIssue> issues)

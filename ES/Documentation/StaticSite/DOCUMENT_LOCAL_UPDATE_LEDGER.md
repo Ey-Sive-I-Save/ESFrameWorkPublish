@@ -342,6 +342,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：本轮没有 UnityMCP，未取得 Unity Editor 编译、ReloadDomain、Test Runner 或真实 GraphView 交互证据；少数 Unity `.meta` 空字段保留 Unity 序列化尾空格格式。
 - **HTML 目标**：后续在 `#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-003：UI、本地化与剧情呈现链
+
+- **源码路径**：十语言稳定身份和本地化测试、字体制作工具、Story 文本引用、运行时 UI Window、Dialog 模态合同及对应 Unity `.meta`。
+- **规范与证据**：本地化目录、运行时字体目录和字体生成工具以同一语言身份协作；Story 与 UI 使用稳定文本/窗口身份；Dialog 只在宿主实现原生模态 Presenter 时提供同步调用。
+- **完成分析**：语言、字体、剧情文本和 UI 生命周期属于同一呈现数据边界，必须保持序列化身份和运行时注册顺序一致，避免字体目录已更新但 Story/UI 仍使用旧身份。
+- **回归状态**：`ES_Stand.csproj`、`ES_Design.csproj`、`ES_Logic.csproj`、`ES_Logic.UI.Tests.csproj`、`ES_Logic.Story.Tests.csproj` 与 `ES_Design.ConfigKey.Tests.csproj` 静态构建均为 0 警告、0 错误。
+- **已知缺口**：没有 Unity Editor 编译、ReloadDomain 或 Test Runner 证据；字体资产生成、TMP Fallback、多语言字形和 UI Window PlayMode 生命周期仍需 Unity 实机验收。
+- **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

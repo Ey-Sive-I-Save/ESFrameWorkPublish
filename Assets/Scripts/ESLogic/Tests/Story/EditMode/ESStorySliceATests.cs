@@ -12,8 +12,9 @@ namespace ES.Tests
         {
             public ESDialogueViewData LastView;
             public int CloseCount;
+            public int ShowCount;
 
-            public void Show(ESDialogueViewData view) { LastView = view; }
+            public void Show(ESDialogueViewData view) { LastView = view; ShowCount++; }
             public void Close(string storyInstanceId, string sessionId, int sessionGeneration) { CloseCount++; }
         }
 
@@ -220,6 +221,93 @@ namespace ES.Tests
             Assert.That(first.ContentSignature, Is.Not.EqualTo(second.ContentSignature));
             Object.DestroyImmediate(first);
             Object.DestroyImmediate(second);
+        }
+
+        [Test]
+        public void LegacyLocalizationSignature_IgnoresUnusedStableTextReferences()
+        {
+            ESStoryDefinitionDataInfo definition = CreateDialogueDefinition();
+            string before = definition.ContentSignature;
+            definition.nodes[1].bodyText = new ESLocalizedTextRef("story.unused", fallbackLiteral: "未使用");
+            Assert.That(definition.ContentSignature, Is.EqualTo(before));
+            Object.DestroyImmediate(definition);
+        }
+
+        [Test]
+        public void StableLocalization_RequiresKeysAndSignsOnlyActiveLocalizedContent()
+        {
+            ESStoryDefinitionDataInfo definition = CreateStableDialogueDefinition();
+            Assert.That(ESStoryDefinitionValidator.Validate(definition).Exists(x => x.severity == ESStoryValidationSeverity.Error), Is.False);
+            string before = definition.ContentSignature;
+
+            definition.nodes[1].text = "旧字段不参与稳定合同";
+            Assert.That(definition.ContentSignature, Is.EqualTo(before));
+            definition.nodes[1].bodyText = new ESLocalizedTextRef("story.line.changed", fallbackLiteral: "你好");
+            Assert.That(definition.ContentSignature, Is.Not.EqualTo(before));
+
+            definition.nodes[1].bodyText = default;
+            Assert.That(ESStoryDefinitionValidator.Validate(definition)
+                .Exists(x => x.code == "Localization.BodyKey" && x.severity == ESStoryValidationSeverity.Error), Is.True);
+            Object.DestroyImmediate(definition);
+        }
+
+        [Test]
+        public void LocaleChange_RefreshesForegroundWithoutInvalidatingSubmissionGeneration()
+        {
+            IESLocalizationProvider originalProvider = ESLocalizationRuntime.Provider;
+            EnumCollect.Envir_LanguageType originalLanguage = ESLocalizationRuntime.CurrentLanguage;
+            if (originalProvider != null) Assert.That(ESLocalizationRuntime.UnregisterProvider(originalProvider), Is.True);
+
+            var provider = new ESInMemoryLocalizationProvider();
+            Assert.That(provider.Set("story.speaker", EnumCollect.Envir_LanguageType.ChineseSimplified, "向导"), Is.True);
+            Assert.That(provider.Set("story.speaker", EnumCollect.Envir_LanguageType.English, "Guide"), Is.True);
+            Assert.That(provider.Set("story.line", EnumCollect.Envir_LanguageType.ChineseSimplified, "你好"), Is.True);
+            Assert.That(provider.Set("story.line", EnumCollect.Envir_LanguageType.English, "Hello"), Is.True);
+            Assert.That(ESLocalizationRuntime.RegisterProvider(provider), Is.True);
+            ESLocalizationRuntime.SetCurrentLanguageOrThrow(EnumCollect.Envir_LanguageType.ChineseSimplified);
+
+            ESStoryDefinitionDataInfo definition = CreateStableDialogueDefinition();
+            ESStoryDefinitionCatalog.Inject(definition);
+            ESStoryModule story = new ESStoryModule();
+            CapturingPresenter presenter = new CapturingPresenter();
+            story.BindPresenter(presenter);
+            InvokeStoryLocalizationSubscription(story);
+            GameObject actorObject = new GameObject("localized-story-actor");
+            Entity actor = actorObject.AddComponent<Entity>();
+            GameObject targetObject = new GameObject("localized-story-target");
+            ESInteractable target = targetObject.AddComponent<ESInteractable>();
+            ESInteractionBinding binding = new ESInteractionBinding(31, 7, actor, target);
+
+            try
+            {
+                Assert.That(story.TryStartFromInteraction(definition.definitionId, actor, binding, out _, out string error), Is.True, error);
+                ESDialogueViewData chinese = presenter.LastView;
+                Assert.That(chinese.text, Is.EqualTo("你好"));
+                Assert.That(chinese.speakerName, Is.EqualTo("向导"));
+                Assert.That(chinese.bodyResolveStatus, Is.EqualTo(ESLocalizationResolveStatus.Resolved));
+
+                ESLocalizationRuntime.SetCurrentLanguageOrThrow(EnumCollect.Envir_LanguageType.English);
+                ESDialogueViewData english = presenter.LastView;
+                Assert.That(presenter.ShowCount, Is.EqualTo(2));
+                Assert.That(english.text, Is.EqualTo("Hello"));
+                Assert.That(english.speakerName, Is.EqualTo("Guide"));
+                Assert.That(english.instanceRevision, Is.EqualTo(chinese.instanceRevision));
+                Assert.That(english.viewRevision, Is.EqualTo(chinese.viewRevision));
+                Assert.That(story.SubmitContinue(new ESStoryViewSubmission(chinese.storyInstanceId,
+                    chinese.instanceRevision, chinese.sessionId, chinese.sessionGeneration, chinese.viewRevision)), Is.True);
+            }
+            finally
+            {
+                story.OnDestroy();
+                Object.DestroyImmediate(targetObject);
+                Object.DestroyImmediate(actorObject);
+                Object.DestroyImmediate(definition);
+                if (ReferenceEquals(ESLocalizationRuntime.Provider, provider))
+                    ESLocalizationRuntime.UnregisterProvider(provider);
+                ESLocalizationRuntime.SetCurrentLanguageOrThrow(originalLanguage);
+                if (originalProvider != null)
+                    Assert.That(ESLocalizationRuntime.RegisterProvider(originalProvider), Is.True);
+            }
         }
 
         [Test]
@@ -754,6 +842,7 @@ namespace ES.Tests
         {
             ESStoryDefinitionDataInfo definition = ScriptableObject.CreateInstance<ESStoryDefinitionDataInfo>();
             definition.definitionId.stringKey = "dialogue.test";
+            definition.localizationMode = ESStoryLocalizationMode.LegacyLiteral;
             definition.entryNodeId = "start";
             definition.nodes = new List<ESStoryNodeDefinition>
             {
@@ -769,6 +858,7 @@ namespace ES.Tests
             ESStoryDefinitionDataInfo definition = ScriptableObject.CreateInstance<ESStoryDefinitionDataInfo>();
             definition.definitionId.stringKey = "dialogue.choice-order";
             definition.storyKind = ESStoryKind.Dialogue;
+            definition.localizationMode = ESStoryLocalizationMode.LegacyLiteral;
             definition.entryNodeId = "start";
             definition.nodes = new List<ESStoryNodeDefinition>
             {
@@ -785,6 +875,29 @@ namespace ES.Tests
                 },
                 new ESStoryNodeDefinition { nodeId = "first-end", nodeKind = ESStoryNodeKind.Complete },
                 new ESStoryNodeDefinition { nodeId = "second-end", nodeKind = ESStoryNodeKind.Complete }
+            };
+            return definition;
+        }
+
+        private static ESStoryDefinitionDataInfo CreateStableDialogueDefinition()
+        {
+            ESStoryDefinitionDataInfo definition = ScriptableObject.CreateInstance<ESStoryDefinitionDataInfo>();
+            definition.definitionId.stringKey = "dialogue.localized";
+            definition.storyKind = ESStoryKind.Dialogue;
+            definition.localizationMode = ESStoryLocalizationMode.StableTextKey;
+            definition.entryNodeId = "start";
+            definition.nodes = new List<ESStoryNodeDefinition>
+            {
+                new ESStoryNodeDefinition { nodeId = "start", nodeKind = ESStoryNodeKind.Start, nextNodeId = "line" },
+                new ESStoryNodeDefinition
+                {
+                    nodeId = "line",
+                    nodeKind = ESStoryNodeKind.Dialogue,
+                    speakerText = new ESLocalizedTextRef("story.speaker", fallbackLiteral: "向导"),
+                    bodyText = new ESLocalizedTextRef("story.line", fallbackLiteral: "你好"),
+                    nextNodeId = "done"
+                },
+                new ESStoryNodeDefinition { nodeId = "done", nodeKind = ESStoryNodeKind.Complete }
             };
             return definition;
         }
@@ -867,6 +980,13 @@ namespace ES.Tests
             MethodInfo method = typeof(ESStoryModule).GetMethod("ReplaySaveCandidateWithDiagnostics", BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(method, Is.Not.Null);
             return (ESGameSaveApplyResult)method.Invoke(story, new object[] { candidate });
+        }
+
+        private static void InvokeStoryLocalizationSubscription(ESStoryModule story)
+        {
+            MethodInfo method = typeof(ESStoryModule).GetMethod("SubscribeLocalizationEvents", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(story, null);
         }
 
         private static StorySaveHooks AttachStorySaveParticipant(ESStoryModule story)

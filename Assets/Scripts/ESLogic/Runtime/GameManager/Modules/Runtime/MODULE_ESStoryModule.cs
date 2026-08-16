@@ -30,6 +30,7 @@ namespace ES
         [NonSerialized] private long checkpointRevision;
         [NonSerialized] private bool isDestroying;
         [NonSerialized] private bool checkpointDirty;
+        [NonSerialized] private bool localizationEventsSubscribed;
 
         private sealed class ESStoryPreparedSaveApply
         {
@@ -55,6 +56,7 @@ namespace ES
             ESGameSave.CommitCandidate += OnCommitSaveCandidate;
             ESGameSave.RollbackCandidate += OnRollbackSaveCandidate;
             ESGameSave.FinalizeCandidate += OnFinalizeSaveCandidate;
+            SubscribeLocalizationEvents();
             ReplayCurrentSaveCandidate();
         }
 
@@ -63,7 +65,11 @@ namespace ES
             if (checkpointDirty) FlushCheckpoint();
         }
 
-        public void BindPresenter(IESStoryDialoguePresenter value) => presenter = value;
+        public void BindPresenter(IESStoryDialoguePresenter value)
+        {
+            presenter = value;
+            RefreshForegroundLocalization();
+        }
 
         public bool TryStartFromInteraction(ESStoryConfigKey definitionKey, Entity actor, ESInteractionBinding binding, out string instanceId, out string error)
         {
@@ -460,16 +466,85 @@ namespace ES
 
         private static ESDialogueViewData BuildViewData(ESStoryInstance instance, ESStoryNodeSnapshot node, bool canContinue)
         {
+            ESLocalizationTextResult speaker = ESLocalizationRuntime.ResolveText(node.SpeakerText);
+            ESLocalizationTextResult body = ESLocalizationRuntime.ResolveText(node.BodyText);
+            bool hasSpeaker = node.SpeakerText.Key.IsValid || !string.IsNullOrEmpty(node.SpeakerText.fallbackLiteral);
+            bool hasBodyText = node.BodyText.Key.IsValid || !string.IsNullOrEmpty(node.BodyText.fallbackLiteral);
             ESDialogueViewData view = new ESDialogueViewData
             {
                 definitionId = instance.Definition.DefinitionId, storyInstanceId = instance.InstanceId,
                 instanceRevision = instance.Revision, sessionId = instance.SessionId,
                 sessionGeneration = instance.SessionGeneration, viewRevision = instance.ViewRevision,
-                speakerName = node.SpeakerName, text = node.Text, canContinue = canContinue
+                localizationGeneration = ESLocalizationRuntime.Generation,
+                hasSpeaker = hasSpeaker,
+                speakerTextKey = node.SpeakerText.textKey, speakerName = speaker.Value,
+                speakerResolveStatus = speaker.Status, speakerRequestedLanguage = speaker.RequestedLanguage,
+                speakerResolvedLanguage = speaker.ResolvedLanguage, hasBodyText = hasBodyText,
+                bodyTextKey = node.BodyText.textKey, text = body.Value,
+                bodyResolveStatus = body.Status, requestedLanguage = body.RequestedLanguage,
+                bodyResolvedLanguage = body.ResolvedLanguage, canContinue = canContinue
             };
             if (!canContinue)
-                for (int i = 0; i < node.Options.Count; i++) view.options.Add(new ESDialogueOptionViewData { optionId = node.Options[i].OptionId, text = node.Options[i].Text });
+            {
+                for (int i = 0; i < node.Options.Count; i++)
+                {
+                    ESStoryOptionSnapshot option = node.Options[i];
+                    ESLocalizationTextResult optionText = ESLocalizationRuntime.ResolveText(option.DisplayText);
+                    view.options.Add(new ESDialogueOptionViewData
+                    {
+                        optionId = option.OptionId,
+                        textKey = option.DisplayText.textKey,
+                        text = optionText.Value,
+                        resolveStatus = optionText.Status,
+                        requestedLanguage = optionText.RequestedLanguage,
+                        resolvedLanguage = optionText.ResolvedLanguage
+                    });
+                }
+            }
             return view;
+        }
+
+        private void SubscribeLocalizationEvents()
+        {
+            if (localizationEventsSubscribed) return;
+            ESLocalizationRuntime.CurrentLanguageChanged += HandleCurrentLanguageChanged;
+            ESLocalizationRuntime.ProviderChanged += HandleLocalizationProviderChanged;
+            localizationEventsSubscribed = true;
+        }
+
+        private void UnsubscribeLocalizationEvents()
+        {
+            if (!localizationEventsSubscribed) return;
+            ESLocalizationRuntime.CurrentLanguageChanged -= HandleCurrentLanguageChanged;
+            ESLocalizationRuntime.ProviderChanged -= HandleLocalizationProviderChanged;
+            localizationEventsSubscribed = false;
+        }
+
+        private void HandleCurrentLanguageChanged(EnumCollect.Envir_LanguageType previous,
+            EnumCollect.Envir_LanguageType current, int generation)
+        {
+            RefreshForegroundLocalization();
+        }
+
+        private void HandleLocalizationProviderChanged(int generation)
+        {
+            RefreshForegroundLocalization();
+        }
+
+        private void RefreshForegroundLocalization()
+        {
+            if (isDestroying || presenter == null || foreground == null
+                || foreground.RunState != ESStoryRunState.WaitingForUI
+                || !foreground.Definition.TryGetNode(foreground.CurrentNodeId, out ESStoryNodeSnapshot node)
+                || (node.NodeKind != ESStoryNodeKind.Dialogue && node.NodeKind != ESStoryNodeKind.Choice))
+                return;
+
+            try { presenter.Show(BuildViewData(foreground, node, node.NodeKind == ESStoryNodeKind.Dialogue)); }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                RecordDiagnostic("本地化刷新当前 Story 视图失败：" + exception.Message);
+            }
         }
 
         private bool TryValidateSubmission(ESStoryViewSubmission submission, out ESStoryInstance instance, out ESStoryNodeSnapshot node)
@@ -567,6 +642,7 @@ namespace ES
         public override void OnDestroy()
         {
             isDestroying = true;
+            UnsubscribeLocalizationEvents();
             ESGameSave.BeforeSave -= FlushCheckpoint;
             ESGameSave.ValidateCandidate -= OnValidateSaveCandidate;
             ESGameSave.PrepareCandidate -= OnPrepareSaveCandidate;

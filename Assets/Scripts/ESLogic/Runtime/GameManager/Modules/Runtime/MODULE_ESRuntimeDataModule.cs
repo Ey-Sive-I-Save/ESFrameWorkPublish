@@ -13,6 +13,7 @@ namespace ES
 {
     public static class ESRuntimeDataGameCore
     {
+        public static readonly ESItemConfigKeyTable Items = new ESItemConfigKeyTable(256);
         public static readonly ESBuffConfigKeyTable Buffs = new ESBuffConfigKeyTable(128);
         public static readonly ESShotConfigKeyTable Shots = new ESShotConfigKeyTable(128);
         public static readonly ESMonsterConfigKeyTable Monsters = new ESMonsterConfigKeyTable(128);
@@ -27,6 +28,7 @@ namespace ES
         public static void BeginBuild(bool clear)
         {
             ESAudioGameCoreTable.NotifyCatalogBuildStarted();
+            Items.BeginBuild(clear);
             Buffs.BeginBuild(clear);
             Shots.BeginBuild(clear);
             Monsters.BeginBuild(clear);
@@ -47,6 +49,7 @@ namespace ES
 
         internal static void EndBuild(bool audioCueCatalogReady)
         {
+            Items.EndBuild();
             Buffs.EndBuild();
             Shots.EndBuild();
             Monsters.EndBuild();
@@ -70,7 +73,7 @@ namespace ES
         /// </summary>
         public static void ResetForResourceTransition()
         {
-            if (Buffs.IsBuilding || Shots.IsBuilding || Monsters.IsBuilding || Npcs.IsBuilding
+            if (Items.IsBuilding || Buffs.IsBuilding || Shots.IsBuilding || Monsters.IsBuilding || Npcs.IsBuilding
                 || Weapons.IsBuilding || Skills.IsBuilding || AudioCues.IsBuilding || Vfx.IsBuilding
                 || Actions.IsBuilding || SkillTracks.IsBuilding
                 || ESActionPresentationMappingTable.IsBuilding)
@@ -1311,12 +1314,14 @@ namespace ES
         public int requestedCount;
         public int loadedCount;
         public int skippedCount;
+        public int presentationCatalogCount;
         public readonly List<string> errors = new List<string>();
     }
 
     [Serializable, TypeRegistryItem("RuntimeData/Table")]
     public sealed class ESRuntimeDataModule : ESSystemModule
     {
+        public static readonly ESItemConfigKeyTable ItemTable = ESRuntimeDataGameCore.Items;
         public static readonly ESBuffConfigKeyTable BuffTable = ESRuntimeDataGameCore.Buffs;
         public static readonly ESShotConfigKeyTable ShotTable = ESRuntimeDataGameCore.Shots;
         public static readonly ESMonsterConfigKeyTable MonsterTable = ESRuntimeDataGameCore.Monsters;
@@ -1327,9 +1332,12 @@ namespace ES
         public static readonly ESVfxConfigKeyTable VfxTable = ESRuntimeDataGameCore.Vfx;
         public static readonly ESActionConfigKeyTable ActionTable = ESRuntimeDataGameCore.Actions;
         public static readonly ESSkillTrackConfigKeyTable SkillTrackTable = ESRuntimeDataGameCore.SkillTracks;
-        public static readonly ESRuntimeInstanceIndex<ESActiveBuffRuntime> BuffInstanceIndex = new ESRuntimeInstanceIndex<ESActiveBuffRuntime>(128);
-        public static readonly ESRuntimeInstanceIndex<Item> ShotInstanceIndex = new ESRuntimeInstanceIndex<Item>(128);
+        public static readonly ESItemInstanceTable ItemInstanceTable = new ESItemInstanceTable(4096);
+        public static readonly ESBuffInstanceTable BuffInstanceTable = new ESBuffInstanceTable(2048);
+        public static readonly ESShotInstanceTable ShotInstanceTable = new ESShotInstanceTable(4096);
 
+        [ShowInInspector, ReadOnly, LabelText("Item Table")]
+        public readonly ESItemConfigKeyTable Items = ItemTable;
         [ShowInInspector, ReadOnly, LabelText("Buff Table")]
         public readonly ESBuffConfigKeyTable Buffs = BuffTable;
         [ShowInInspector, ReadOnly, LabelText("\u98de\u884c\u7269\u8868")]
@@ -1353,11 +1361,14 @@ namespace ES
         public readonly ESActionConfigKeyTable Actions = ActionTable;
         [ShowInInspector, ReadOnly, LabelText("SkillTrack Table")]
         public readonly ESSkillTrackConfigKeyTable SkillTracks = SkillTrackTable;
-        [ShowInInspector, ReadOnly, LabelText("Buff\u5b9e\u4f8b\u7d22\u5f15")]
-        public readonly ESRuntimeInstanceIndex<ESActiveBuffRuntime> BuffInstances = BuffInstanceIndex;
+        [ShowInInspector, ReadOnly, LabelText("Item 实例表")]
+        public readonly ESItemInstanceTable ItemInstances = ItemInstanceTable;
+
+        [ShowInInspector, ReadOnly, LabelText("Buff 实例表")]
+        public readonly ESBuffInstanceTable BuffInstances = BuffInstanceTable;
 
         [ShowInInspector, ReadOnly, LabelText("Shot Instance Index")]
-        public readonly ESRuntimeInstanceIndex<Item> ShotInstances = ShotInstanceIndex;
+        public readonly ESShotInstanceTable ShotInstances = ShotInstanceTable;
 
         [ShowInInspector, ReadOnly, LabelText("Building")]
         private static bool isBuilding;
@@ -1366,6 +1377,14 @@ namespace ES
         private ESRuntimeDataAssetLoadingService assetLoadingService;
         [NonSerialized]
         private ESAssetScope consumerResidentAssetScope;
+        [NonSerialized]
+        private ESLocalizationCatalog consumerLocalizationCatalog;
+        [NonSerialized]
+        private ESRuntimeFontCatalog consumerFontCatalog;
+        [NonSerialized]
+        private bool ownsConsumerLocalizationRegistration;
+        [NonSerialized]
+        private bool ownsConsumerFontRegistration;
         [NonSerialized]
         private ESAssetScope consumerGameCoreAssetScope;
         [NonSerialized]
@@ -1494,6 +1513,14 @@ namespace ES
                 activeReleaseResult = null;
                 activeConsumerIds.Clear();
                 activeLibraryKeys.Clear();
+                try
+                {
+                    DisposeConsumerStartupAssets();
+                }
+                catch (Exception cleanupException)
+                {
+                    Debug.LogException(cleanupException);
+                }
                 try
                 {
                     AssetLoadingService.Dispose();
@@ -1654,7 +1681,7 @@ namespace ES
             if (!AssetLoadingService.IsInitialized)
                 throw new InvalidOperationException("[ESRes][Resident] 必须先初始化 Asset Provider。");
 
-            consumerResidentAssetScope?.Dispose();
+            DisposeConsumerResidentAssets();
             consumerResidentAssetScope = ESAssets.CreateScope();
             var report = new ESConsumerResidentAssetPreloadReport();
             var identities = new HashSet<ESAssetIdentity>();
@@ -1674,7 +1701,9 @@ namespace ES
                     {
                         var refer = new ESAssetReferUnityObject();
                         refer.InitializeGeneratedReference(entry.guid, entry.localFileId, ESAssetReferKind.Other, 0, string.Empty);
-                        await consumerResidentAssetScope.LoadAsync(refer, cancellationToken);
+                        UnityEngine.Object loaded = await consumerResidentAssetScope.LoadAsync(refer, cancellationToken);
+                        if (TryRegisterPresentationCatalog(loaded))
+                            report.presentationCatalogCount++;
                         report.loadedCount++;
                     }
                     catch (Exception exception)
@@ -1698,9 +1727,62 @@ namespace ES
 
         private void DisposeConsumerResidentAssets()
         {
+            if (ownsConsumerLocalizationRegistration && consumerLocalizationCatalog != null)
+                ESLocalizationRuntime.UnregisterProvider(consumerLocalizationCatalog);
+            if (ownsConsumerFontRegistration && consumerFontCatalog != null)
+                ESFontRuntime.UnregisterCatalog(consumerFontCatalog);
+            consumerLocalizationCatalog = null;
+            consumerFontCatalog = null;
+            ownsConsumerLocalizationRegistration = false;
+            ownsConsumerFontRegistration = false;
             consumerResidentAssetScope?.Dispose();
             consumerResidentAssetScope = null;
             LastResidentAssetPreloadReport = null;
+        }
+
+        private bool TryRegisterPresentationCatalog(UnityEngine.Object loaded)
+        {
+            if (loaded is ESLocalizationCatalog localization)
+            {
+                if (consumerLocalizationCatalog != null && !ReferenceEquals(consumerLocalizationCatalog, localization))
+                    throw new InvalidOperationException("[ESRes][Resident] 同一 Consumer 不能加载多个 ESLocalizationCatalog。");
+                if (localization.Validate().Count > 0)
+                    throw new InvalidOperationException("[ESRes][Resident] ESLocalizationCatalog 验证失败。请在本地化工作台修复后重新发布。");
+                if (ESLocalizationRuntime.Provider == null)
+                {
+                    if (!ESLocalizationRuntime.RegisterProvider(localization))
+                        throw new InvalidOperationException("[ESRes][Resident] 无法注册 ESLocalizationCatalog。");
+                    ownsConsumerLocalizationRegistration = true;
+                }
+                else if (!ReferenceEquals(ESLocalizationRuntime.Provider, localization))
+                {
+                    throw new InvalidOperationException("[ESRes][Resident] 已存在不同生命周期持有的本地化 Provider，拒绝覆盖。");
+                }
+                consumerLocalizationCatalog = localization;
+                return true;
+            }
+
+            if (loaded is ESRuntimeFontCatalog fontCatalog)
+            {
+                if (consumerFontCatalog != null && !ReferenceEquals(consumerFontCatalog, fontCatalog))
+                    throw new InvalidOperationException("[ESRes][Resident] 同一 Consumer 不能加载多个 ESRuntimeFontCatalog。");
+                if (fontCatalog.Validate().Count > 0)
+                    throw new InvalidOperationException("[ESRes][Resident] ESRuntimeFontCatalog 验证失败。请在字体工作台修复后重新发布。");
+                if (ESFontRuntime.Catalog == null)
+                {
+                    if (!ESFontRuntime.RegisterCatalog(fontCatalog))
+                        throw new InvalidOperationException("[ESRes][Resident] 无法注册 ESRuntimeFontCatalog。");
+                    ownsConsumerFontRegistration = true;
+                }
+                else if (!ReferenceEquals(ESFontRuntime.Catalog, fontCatalog))
+                {
+                    throw new InvalidOperationException("[ESRes][Resident] 已存在不同生命周期持有的字体目录，拒绝覆盖。");
+                }
+                consumerFontCatalog = fontCatalog;
+                return true;
+            }
+
+            return false;
         }
 
         private void DisposeConsumerStartupAssets()

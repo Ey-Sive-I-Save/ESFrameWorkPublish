@@ -56,7 +56,11 @@ namespace ES
     public sealed class ESDialogueOptionViewData
     {
         public string optionId;
+        public string textKey;
         public string text;
+        public ESLocalizationResolveStatus resolveStatus;
+        public EnumCollect.Envir_LanguageType requestedLanguage;
+        public EnumCollect.Envir_LanguageType resolvedLanguage;
     }
 
     [Serializable]
@@ -68,8 +72,19 @@ namespace ES
         public string sessionId;
         public int sessionGeneration;
         public long viewRevision;
+        public int localizationGeneration;
+        public bool hasSpeaker;
+        public string speakerTextKey;
         public string speakerName;
+        public ESLocalizationResolveStatus speakerResolveStatus;
+        public EnumCollect.Envir_LanguageType speakerRequestedLanguage;
+        public EnumCollect.Envir_LanguageType speakerResolvedLanguage;
+        public bool hasBodyText;
+        public string bodyTextKey;
         public string text;
+        public ESLocalizationResolveStatus bodyResolveStatus;
+        public EnumCollect.Envir_LanguageType requestedLanguage;
+        public EnumCollect.Envir_LanguageType bodyResolvedLanguage;
         public bool canContinue;
         public List<ESDialogueOptionViewData> options = new List<ESDialogueOptionViewData>();
     }

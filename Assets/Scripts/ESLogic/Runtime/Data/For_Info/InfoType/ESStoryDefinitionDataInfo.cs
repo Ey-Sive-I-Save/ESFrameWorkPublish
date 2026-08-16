@@ -11,14 +11,21 @@ namespace ES
     public enum ESStoryKind : byte { Quest, Dialogue, Story }
     public enum ESStoryNodeKind : byte { Start, Dialogue, Choice, Condition, Action, Complete, Fail }
     public enum ESStoryValidationSeverity : byte { Info, Warning, Error }
+    public enum ESStoryLocalizationMode : byte
+    {
+        [InspectorName("旧字符串（仅迁移期）")] LegacyLiteral = 0,
+        [InspectorName("稳定文本 Key")] StableTextKey = 1
+    }
 
     [Serializable]
     public sealed class ESStoryOptionDefinition
     {
         [LabelText("选项 ID")]
         public string optionId;
-        [LabelText("显示文本"), TextArea(2, 5)]
+        [LabelText("旧显示文本（仅迁移）"), TextArea(2, 5)]
         public string text;
+        [LabelText("本地化显示文本")]
+        public ESLocalizedTextRef displayText;
         [LabelText("目标节点 ID")]
         public string nextNodeId;
     }
@@ -32,11 +39,17 @@ namespace ES
         public ESStoryNodeKind nodeKind;
 
         [ShowIf("@nodeKind == ES.ESStoryNodeKind.Dialogue || nodeKind == ES.ESStoryNodeKind.Choice")]
-        [LabelText("说话者")]
+        [LabelText("旧说话者（仅迁移）")]
         public string speakerName;
         [ShowIf("@nodeKind == ES.ESStoryNodeKind.Dialogue || nodeKind == ES.ESStoryNodeKind.Choice")]
-        [LabelText("文本"), TextArea(3, 8)]
+        [LabelText("旧正文（仅迁移）"), TextArea(3, 8)]
         public string text;
+        [ShowIf("@nodeKind == ES.ESStoryNodeKind.Dialogue || nodeKind == ES.ESStoryNodeKind.Choice")]
+        [LabelText("本地化说话者")]
+        public ESLocalizedTextRef speakerText;
+        [ShowIf("@nodeKind == ES.ESStoryNodeKind.Dialogue || nodeKind == ES.ESStoryNodeKind.Choice")]
+        [LabelText("本地化正文")]
+        public ESLocalizedTextRef bodyText;
 
         [ShowIf("@nodeKind == ES.ESStoryNodeKind.Start || nodeKind == ES.ESStoryNodeKind.Dialogue || nodeKind == ES.ESStoryNodeKind.Action")]
         [LabelText("下一节点 ID")]
@@ -79,6 +92,8 @@ namespace ES
         public ESStoryConfigKey definitionId = new ESStoryConfigKey();
         [TitleGroup("任务与剧情"), LabelText("类型")]
         public ESStoryKind storyKind = ESStoryKind.Quest;
+        [TitleGroup("任务与剧情"), LabelText("本地化合同")]
+        public ESStoryLocalizationMode localizationMode = ESStoryLocalizationMode.StableTextKey;
         [TitleGroup("任务与剧情"), LabelText("显示名称")]
         public string displayName;
         [TitleGroup("任务与剧情"), LabelText("说明"), TextArea(2, 6)]
@@ -126,11 +141,15 @@ namespace ES
     {
         public string OptionId { get; }
         public string Text { get; }
+        public ESLocalizedTextRef DisplayText { get; }
         public string NextNodeId { get; }
-        internal ESStoryOptionSnapshot(ESStoryOptionDefinition source)
+        internal ESStoryOptionSnapshot(ESStoryOptionDefinition source, ESStoryLocalizationMode localizationMode)
         {
             OptionId = source.optionId;
             Text = source.text ?? string.Empty;
+            DisplayText = localizationMode == ESStoryLocalizationMode.StableTextKey
+                ? source.displayText
+                : new ESLocalizedTextRef(string.Empty, EnumCollect.Envir_LanguageType.NotClear, Text);
             NextNodeId = source.nextNodeId;
         }
     }
@@ -142,6 +161,8 @@ namespace ES
         public ESStoryNodeKind NodeKind { get; }
         public string SpeakerName { get; }
         public string Text { get; }
+        public ESLocalizedTextRef SpeakerText { get; }
+        public ESLocalizedTextRef BodyText { get; }
         public string NextNodeId { get; }
         public IReadOnlyList<ESStoryOptionSnapshot> Options => options;
         public ESTagConditionRuntime TagCondition { get; }
@@ -151,12 +172,18 @@ namespace ES
         public ESTagStableReference SetTag { get; }
         public bool SetTagActive { get; }
 
-        internal ESStoryNodeSnapshot(ESStoryNodeDefinition source)
+        internal ESStoryNodeSnapshot(ESStoryNodeDefinition source, ESStoryLocalizationMode localizationMode)
         {
             NodeId = source.nodeId;
             NodeKind = source.nodeKind;
             SpeakerName = source.speakerName ?? string.Empty;
             Text = source.text ?? string.Empty;
+            SpeakerText = localizationMode == ESStoryLocalizationMode.StableTextKey
+                ? source.speakerText
+                : new ESLocalizedTextRef(string.Empty, EnumCollect.Envir_LanguageType.NotClear, SpeakerName);
+            BodyText = localizationMode == ESStoryLocalizationMode.StableTextKey
+                ? source.bodyText
+                : new ESLocalizedTextRef(string.Empty, EnumCollect.Envir_LanguageType.NotClear, Text);
             NextNodeId = source.nextNodeId;
             TrueNodeId = source.trueNodeId;
             FalseNodeId = source.falseNodeId;
@@ -169,7 +196,7 @@ namespace ES
             TagCondition = condition;
             int count = source.options != null ? source.options.Count : 0;
             options = new ESStoryOptionSnapshot[count];
-            for (int i = 0; i < count; i++) options[i] = new ESStoryOptionSnapshot(source.options[i]);
+            for (int i = 0; i < count; i++) options[i] = new ESStoryOptionSnapshot(source.options[i], localizationMode);
         }
     }
 
@@ -179,6 +206,7 @@ namespace ES
         private readonly Dictionary<string, ESStoryNodeSnapshot> byId;
         public string DefinitionId { get; }
         public ESStoryKind StoryKind { get; }
+        public ESStoryLocalizationMode LocalizationMode { get; }
         public int ContentVersion { get; }
         public string ContentSignature { get; }
         public string EntryNodeId { get; }
@@ -188,6 +216,7 @@ namespace ES
         {
             DefinitionId = source.definitionId.StringKey;
             StoryKind = source.storyKind;
+            LocalizationMode = source.localizationMode;
             ContentVersion = source.contentVersion;
             ContentSignature = CalculateSignature(source);
             EntryNodeId = source.entryNodeId;
@@ -195,7 +224,7 @@ namespace ES
             byId = new Dictionary<string, ESStoryNodeSnapshot>(source.nodes.Count, StringComparer.Ordinal);
             for (int i = 0; i < source.nodes.Count; i++)
             {
-                ESStoryNodeSnapshot node = new ESStoryNodeSnapshot(source.nodes[i]);
+                ESStoryNodeSnapshot node = new ESStoryNodeSnapshot(source.nodes[i], source.localizationMode);
                 nodes[i] = node;
                 byId.Add(node.NodeId, node);
             }
@@ -246,8 +275,8 @@ namespace ES
                     WriteString(writer, n.actionId);
                     WriteTag(writer, n.setTag);
                     writer.Write(n.setTagActive);
-                    WriteString(writer, n.speakerName);
-                    WriteString(writer, n.text);
+                    WriteString(writer, source.localizationMode == ESStoryLocalizationMode.LegacyLiteral ? n.speakerName : null);
+                    WriteString(writer, source.localizationMode == ESStoryLocalizationMode.LegacyLiteral ? n.text : null);
                     WriteCondition(writer, n.tagCondition);
                     int optionCount = n.options != null ? n.options.Count : 0;
                     writer.Write(optionCount);
@@ -258,7 +287,26 @@ namespace ES
                         if (o == null) continue;
                         WriteString(writer, o.optionId);
                         WriteString(writer, o.nextNodeId);
-                        WriteString(writer, o.text);
+                        WriteString(writer, source.localizationMode == ESStoryLocalizationMode.LegacyLiteral ? o.text : null);
+                    }
+                }
+                if (source.localizationMode == ESStoryLocalizationMode.StableTextKey)
+                {
+                    writer.Write((byte)0x4c);
+                    writer.Write((byte)0x31);
+                    writer.Write((byte)source.localizationMode);
+                    for (int i = 0; i < orderedNodes.Count; i++)
+                    {
+                        ESStoryNodeDefinition node = orderedNodes[i];
+                        if (node == null) continue;
+                        WriteLocalizedText(writer, node.speakerText);
+                        WriteLocalizedText(writer, node.bodyText);
+                        int optionCount = node.options != null ? node.options.Count : 0;
+                        for (int j = 0; j < optionCount; j++)
+                        {
+                            ESStoryOptionDefinition option = node.options[j];
+                            if (option != null) WriteLocalizedText(writer, option.displayText);
+                        }
                     }
                 }
                 writer.Flush();
@@ -274,6 +322,13 @@ namespace ES
         {
             writer.Write(value != null);
             if (value != null) writer.Write(value);
+        }
+
+        private static void WriteLocalizedText(BinaryWriter writer, ESLocalizedTextRef value)
+        {
+            WriteString(writer, value.textKey);
+            writer.Write((int)value.language);
+            WriteString(writer, value.fallbackLiteral);
         }
 
         private static void WriteTag(BinaryWriter writer, ESTagStableReference tag)

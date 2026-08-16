@@ -372,7 +372,7 @@ namespace ES
         private void ValidateContract()
         {
             if (string.IsNullOrWhiteSpace(DialogId))
-                throw new ArgumentException("ESDialog requires a stable DialogId.", nameof(DialogId));
+                throw new ArgumentException("ESDialog requires a stable dialogId.", nameof(DialogId));
             if (string.IsNullOrWhiteSpace(Title))
                 throw new ArgumentException("ESDialog title cannot be empty.", nameof(Title));
             if (string.IsNullOrWhiteSpace(ConfirmText))
@@ -637,9 +637,10 @@ namespace ES
                 }
                 registration.ActiveDispatches++;
             }
+            Task<ESDialogResult> dispatch;
             try
             {
-                return registration.Presenter.ShowAsync(request, cancellationToken)
+                dispatch = registration.Presenter.ShowAsync(request, cancellationToken)
                     ?? Task.FromResult(new ESDialogResult(
                         ESDialogCompletion.Failed,
                         registration.Presenter.Host,
@@ -647,7 +648,65 @@ namespace ES
             }
             catch (Exception exception)
             {
+                CompleteDispatch(registration);
                 return Task.FromException<ESDialogResult>(exception);
+            }
+            return AwaitDispatchAsync(registration, dispatch);
+        }
+
+        public static ESDialogResult ShowModal(ESDialogRequest request)
+        {
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+            request = request.CreateSnapshot();
+
+            Registration registration;
+            IESDialogModalPresenter modalPresenter;
+            lock (gate)
+            {
+                registration = ResolveRegistration(request.Host, out ESDialogResult routingFailure);
+                if (registration == null)
+                    return routingFailure;
+                ESDialogCapabilities required = request.GetRequiredCapabilities();
+                ESDialogCapabilities missing = required & ~registration.Presenter.Capabilities;
+                if (missing != ESDialogCapabilities.None)
+                {
+                    return new ESDialogResult(
+                        ESDialogCompletion.CapabilityUnavailable,
+                        registration.Presenter.Host,
+                        error: "ESDialog presenter does not support: " + missing + ".");
+                }
+                modalPresenter = registration.Presenter as IESDialogModalPresenter;
+                if (modalPresenter == null)
+                {
+                    return new ESDialogResult(
+                        ESDialogCompletion.CapabilityUnavailable,
+                        registration.Presenter.Host,
+                        error: "The selected ESDialog presenter does not support modal presentation.");
+                }
+                registration.ActiveDispatches++;
+            }
+            try
+            {
+                return modalPresenter.ShowModal(request)
+                    ?? new ESDialogResult(
+                        ESDialogCompletion.Failed,
+                        registration.Presenter.Host,
+                        error: "ESDialog modal presenter returned no result.");
+            }
+            finally
+            {
+                CompleteDispatch(registration);
+            }
+        }
+
+        private static async Task<ESDialogResult> AwaitDispatchAsync(
+            Registration registration,
+            Task<ESDialogResult> dispatch)
+        {
+            try
+            {
+                return await dispatch;
             }
             finally
             {
@@ -731,6 +790,52 @@ namespace ES
             request.Tone = tone;
             request.Host = host;
             ESDialogResult result = await ShowAsync(request, cancellationToken);
+            EnsureCompletedByUser(result);
+            if (result.Completion != ESDialogCompletion.Accepted)
+                return ESDialogChoice.Cancelled;
+            return string.Equals(result.ActionId, "dialog.secondary", StringComparison.Ordinal)
+                ? ESDialogChoice.Secondary
+                : ESDialogChoice.Primary;
+        }
+
+        public static bool ConfirmModal(
+            string dialogId,
+            string title,
+            string message,
+            string confirmText = "确定",
+            string cancelText = "取消",
+            string detail = "",
+            ESDialogTone tone = ESDialogTone.Info,
+            ESDialogHost host = ESDialogHost.Auto)
+        {
+            ESDialogRequest request = ESDialogRequest.ConfirmRequest(
+                dialogId, title, message, confirmText, cancelText);
+            request.Detail = detail ?? string.Empty;
+            request.Tone = tone;
+            request.Host = host;
+            ESDialogResult result = ShowModal(request);
+            EnsureCompletedByUser(result);
+            return result.Accepted;
+        }
+
+        public static ESDialogChoice ChooseModal(
+            string dialogId,
+            string title,
+            string message,
+            string primaryText,
+            string secondaryText,
+            string cancelText = "取消",
+            string detail = "",
+            ESDialogTone tone = ESDialogTone.Info,
+            ESDialogHost host = ESDialogHost.Auto)
+        {
+            ESDialogRequest request = ESDialogRequest.ConfirmRequest(
+                dialogId, title, message, primaryText, cancelText);
+            request.SecondaryText = secondaryText ?? string.Empty;
+            request.Detail = detail ?? string.Empty;
+            request.Tone = tone;
+            request.Host = host;
+            ESDialogResult result = ShowModal(request);
             EnsureCompletedByUser(result);
             if (result.Completion != ESDialogCompletion.Accepted)
                 return ESDialogChoice.Cancelled;

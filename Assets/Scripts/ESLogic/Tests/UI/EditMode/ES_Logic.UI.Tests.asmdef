@@ -1,13 +1,11 @@
 {
-    "name": "ES_Design.ConfigKey.Tests",
-    "rootNamespace": "ES.Tests",
+    "name": "ES_Logic.UI.Tests",
+    "rootNamespace": "ES.Tests.UI",
     "references": [
-        "ES_Design",
-        "ES_Stand",
         "ES_Logic",
-        "ES_Editor",
-        "UniTask",
-        "KCC"
+        "ES_Stand",
+        "ES_Design",
+        "UniTask"
     ],
     "includePlatforms": [
         "Editor"
@@ -15,11 +13,7 @@
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
-    "precompiledReferences": [
-        "Newtonsoft.Json.dll",
-        "Sirenix.OdinInspector.Attributes.dll",
-        "Sirenix.Serialization.dll"
-    ],
+    "precompiledReferences": [],
     "autoReferenced": false,
     "defineConstraints": [],
     "versionDefines": [],

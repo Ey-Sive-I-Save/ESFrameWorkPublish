@@ -1468,6 +1468,62 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-003",
+                        "status":  "documented",
+                        "summary":  "建立十语言本地化与字体制作链、Story 文本引用和运行时 UI Window 生命周期，并补齐同步模态 Dialog 合同与定向测试。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_Law",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESLocalizationLanguageTests.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ES_Design.ConfigKey.Tests.asmdef",
+                                            "Assets/Plugins/ES/1_Design/ValueType/EnumCollect/BaseEnums/EnumForEnvirLanguage.cs",
+                                            "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESLocalizedTextRefDrawer.cs",
+                                            "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESLocalizedTextRefDrawer.cs.meta",
+                                            "Assets/Plugins/ES/Editor/ESFontTools",
+                                            "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow",
+                                            "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESStoryDefinitionDataInfo.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataModule.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESStoryModule.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Story",
+                                            "Assets/Scripts/ESLogic/Runtime/UI.meta",
+                                            "Assets/Scripts/ESLogic/Runtime/UI",
+                                            "Assets/Scripts/ESLogic/Tests/Story",
+                                            "Assets/Scripts/ESLogic/Tests/UI.meta",
+                                            "Assets/Scripts/ESLogic/Tests/UI"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/1_Design/Tests/ESLocalizationLanguageTests.cs",
+                                              "Assets/Scripts/ESLogic/Tests/Story/EditMode/ESStorySliceATests.cs",
+                                              "Assets/Scripts/ESLogic/Tests/UI/EditMode/ESUIWindowCatalogTests.cs",
+                                              "Assets/Scripts/ESLogic/Runtime/UI/Window/ESUIRootCoordinator.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "语言稳定身份、本地化目录、运行时字体目录、字体制作工具、Story 文本引用和 UI Window 租约共同构成呈现链；Dialog 仅在宿主明确提供原生模态能力时开放同步 API，避免通过阻塞 Task 伪造模态行为。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Stand.csproj、ES_Design.csproj 与 ES_Logic.csproj 静态构建均为 0 警告、0 错误",
+                                                            "ES_Logic.UI.Tests.csproj 静态构建为 0 警告、0 错误",
+                                                            "ES_Logic.Story.Tests.csproj 静态构建为 0 警告、0 错误",
+                                                            "ES_Design.ConfigKey.Tests.csproj 静态构建为 0 警告、0 错误"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "dotnet build 仅证明生成项目静态编译，不替代 Unity Editor 编译、ReloadDomain 或 Test Runner",
+                                                             "字体资产生成、TMP Fallback 覆盖和多语言字形仍需带授权字体资产的 Unity 实机验收",
+                                                             "UI Window 的异步过渡、对象池和真实 Prefab 生命周期仍需 PlayMode 验收"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1480,13 +1536,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T10:11:59+08:00",
-                       "head":  "65401e2c992643b3b1c7a1485a4084f505e55409",
-                       "stagedSourcePatchSha256":  "d0ff6a9206fd1c082f2b0a13e91ca0f8e7049a04d56d9ecd6ca0d4ca50aeba25",
-                       "stagedSourceManifestSha256":  "0b396d88412be5207357732a1603e59cbf1bd611df7ff691c67be55a4f04155e",
-                       "stagedSourceFileCount":  52,
+                       "preparedAt":  "2026-08-16T10:17:45+08:00",
+                       "head":  "3d39333aa0e1418e82ab54b6f798f0db564cc588",
+                       "stagedSourcePatchSha256":  "f1fad1131908814c6fcf0a2b089026138ba7444e956ceae0da083c4c15c2a271",
+                       "stagedSourceManifestSha256":  "63bcac79e6275284e59a05ea942240f4108fa68f77faaa3e52ab9ddd1c187781",
+                       "stagedSourceFileCount":  45,
                        "entryIds":  [
-                                        "LOCAL-20260816-002"
+                                        "LOCAL-20260816-003"
                                     ]
                    }
 }

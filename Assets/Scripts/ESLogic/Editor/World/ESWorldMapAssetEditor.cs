@@ -1,0 +1,62 @@
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEngine;
+
+namespace ES
+{
+    [CustomEditor(typeof(ESWorldMapAsset))]
+    public sealed class ESWorldMapAssetEditor : UnityEditor.Editor
+    {
+        private SerializedProperty definitionProperty;
+
+        private void OnEnable()
+        {
+            definitionProperty = serializedObject.FindProperty("definition");
+        }
+
+        public override void OnInspectorGUI()
+        {
+            serializedObject.Update();
+            EditorGUILayout.HelpBox("地图资产是脱离 Scene 的权威定义。Scene、Prefab 或随机生成结果都只能作为内容来源，不直接成为运行时状态。", MessageType.Info);
+
+            if (definitionProperty != null)
+                EditorGUILayout.PropertyField(definitionProperty, new GUIContent("地图定义"), true);
+
+            EditorGUILayout.Space(6f);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("验证地图", GUILayout.Height(24f)))
+                {
+                    ESWorldMapAsset asset = (ESWorldMapAsset)target;
+                    if (asset.Validate(out string error))
+                        Debug.Log("[ES] 地图定义验证通过：" + asset.name, asset);
+                    else
+                        Debug.LogError("[ES] 地图定义验证失败：" + error, asset);
+                }
+
+                if (GUILayout.Button("填充默认空间模板", GUILayout.Height(24f)))
+                {
+                    Undo.RecordObject(target, "填充地图空间模板");
+                    SerializedProperty template = definitionProperty.FindPropertyRelative("spaceTemplate");
+                    template.FindPropertyRelative("templateId").stringValue = "default-space";
+                    template.FindPropertyRelative("gridWidth").intValue = 16;
+                    template.FindPropertyRelative("gridHeight").intValue = 16;
+                    template.FindPropertyRelative("cellSize").floatValue = 16f;
+                    template.FindPropertyRelative("sceneFreeAuthoring").boolValue = true;
+                    serializedObject.ApplyModifiedProperties();
+                    ESWorldMapAuthoringUtility.MarkChanged((ESWorldMapAsset)target);
+                }
+                if (GUILayout.Button("保存地图资产", GUILayout.Height(24f)))
+                {
+                    ESWorldMapSaveResult result = ESWorldMapAuthoringUtility.Save((ESWorldMapAsset)target, serializedObject);
+                    if (!result.success) Debug.LogError("[ES] 地图资产保存失败：" + result.error, target);
+                    else Debug.Log("[ES] 地图资产已保存，内容版本 " + result.contentVersion + "。", target);
+                }
+            }
+
+            EditorGUILayout.HelpBox("默认后端为 Unity Terrain，ES Heightfield 作为地图数据源和降级路径；Voxel 是后续可选提供器。运行时只消费已构建的地形数据，不扫描 AssetDatabase。", MessageType.None);
+            serializedObject.ApplyModifiedProperties();
+        }
+    }
+}
+#endif

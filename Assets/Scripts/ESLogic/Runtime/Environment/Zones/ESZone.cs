@@ -31,7 +31,11 @@ namespace ES
                 if (Key == null || RootObject == null)
                     return false;
 
-                return Core != null ? Core.isActiveAndEnabled : RootObject.activeInHierarchy;
+                if (Core != null)
+                    return Core.isActiveAndEnabled;
+                if (MotionReceiver is Behaviour receiverBehaviour)
+                    return receiverBehaviour.isActiveAndEnabled;
+                return RootObject.activeInHierarchy;
             }
         }
 
@@ -155,8 +159,9 @@ namespace ES
 
         private void OnEnable()
         {
-            // SubsystemRegistration clears the static queue even when domain/scene reload
-            // is disabled. Reconcile the instance flag with the actual registry.
+            // SubsystemRegistration preserves live registrations when scene reload is disabled,
+            // while an ordinary domain/scene reload rebuilds them through OnEnable. Register is
+            // idempotent, so reconciling here is safe for either lifecycle.
             if (trackedColliders != null && trackedColliders.Count > 0)
             {
                 maintenanceRegistered = false;
@@ -301,7 +306,10 @@ namespace ES
             }
 
             if (!occupants.TryGetValue(overlap.memberKey, out Occupant occupant))
+            {
+                ReleaseTrackingCollectionsIfEmpty();
                 return;
+            }
 
             occupant.overlapCount -= removedCount;
             if (occupant.overlapCount > 0)
@@ -412,15 +420,33 @@ namespace ES
             if (attachedBody != null)
             {
                 VehicleController vehicle = attachedBody.GetComponentInParent<VehicleController>();
+                if (vehicle != null)
+                {
+                    key = vehicle;
+                    member = new ESZoneMember(vehicle, vehicle.gameObject, null, vehicle);
+                    return true;
+                }
+
                 key = attachedBody;
-                member = new ESZoneMember(attachedBody, attachedBody.gameObject, null, vehicle);
+                member = new ESZoneMember(attachedBody, attachedBody.gameObject, null, null);
                 return true;
             }
 
             GameObject colliderObject = collider.gameObject;
             VehicleController fallbackVehicle = collider.GetComponentInParent<VehicleController>();
+            if (fallbackVehicle != null)
+            {
+                key = fallbackVehicle;
+                member = new ESZoneMember(
+                    fallbackVehicle,
+                    fallbackVehicle.gameObject,
+                    null,
+                    fallbackVehicle);
+                return true;
+            }
+
             key = colliderObject;
-            member = new ESZoneMember(colliderObject, colliderObject, null, fallbackVehicle);
+            member = new ESZoneMember(colliderObject, colliderObject, null, null);
             return true;
         }
 

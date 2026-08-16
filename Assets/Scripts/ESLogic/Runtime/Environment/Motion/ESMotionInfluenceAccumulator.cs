@@ -320,18 +320,40 @@ namespace ES
             float maxCombinedAcceleration,
             float maxCombinedVelocityDelta)
         {
-            float safeDeltaTime = Mathf.Max(0f, deltaTime);
+            bool canApplyFields = true;
+            float safeDeltaTime = 0f;
+            if (!IsFinite(deltaTime) || deltaTime < 0f)
+            {
+                invalidSolveCount++;
+                canApplyFields = false;
+            }
+            else
+            {
+                safeDeltaTime = deltaTime;
+            }
+
+            if (!IsValidLimit(maxCombinedAcceleration))
+            {
+                invalidSolveCount++;
+                canApplyFields = false;
+            }
+
+            bool canApplyVelocityDelta = IsValidLimit(maxCombinedVelocityDelta);
+            if (!canApplyVelocityDelta)
+                invalidSolveCount++;
+
             double combinedAccelerationX = 0d;
             double combinedAccelerationY = 0d;
             double combinedAccelerationZ = 0d;
-            if (fieldStore != null)
+            if (canApplyFields && fieldStore != null)
             {
                 int priorityCutoff = int.MinValue;
                 for (int i = 0; i < fieldStore.activeCount; i++)
                 {
                     ref FieldStore.Slot candidate = ref fieldStore.slots[fieldStore.activeIndices[i]];
                     if (candidate.request.blendMode == ESMotionFieldBlendMode.OverrideLowerPriority
-                        && ESMotionInfluenceSolver.IsAllowed(candidate.request.permissions, lockState))
+                        && ESMotionInfluenceSolver.IsAllowed(candidate.request.permissions, lockState)
+                        && IsRuntimeFieldValid(candidate.request))
                     {
                         priorityCutoff = candidate.request.priority;
                         break;
@@ -356,13 +378,28 @@ namespace ES
                     }
                     else
                     {
-                        Accumulate(
+                        Vector3 anchorPosition = slot.request.ResolveAnchorPosition();
+                        if (!IsFinite(anchorPosition))
+                        {
+                            invalidSolveCount++;
+                            continue;
+                        }
+
+                        Vector3 attractionAcceleration =
                             ESMotionInfluenceSolver.EvaluateAttractionAcceleration(
                                 position,
                                 velocity,
-                                slot.request.ResolveAnchorPosition(),
+                                anchorPosition,
                                 slot.request.attraction,
-                                safeDeltaTime),
+                                safeDeltaTime);
+                        if (!IsFinite(attractionAcceleration))
+                        {
+                            invalidSolveCount++;
+                            continue;
+                        }
+
+                        Accumulate(
+                            attractionAcceleration,
                             ref combinedAccelerationX,
                             ref combinedAccelerationY,
                             ref combinedAccelerationZ);
@@ -374,9 +411,8 @@ namespace ES
                 combinedAccelerationX,
                 combinedAccelerationY,
                 combinedAccelerationZ,
+                maxCombinedAcceleration,
                 ref invalidSolveCount);
-            if (maxCombinedAcceleration > 0f)
-                combinedAcceleration = Vector3.ClampMagnitude(combinedAcceleration, maxCombinedAcceleration);
             Vector3 nextVelocity = velocity + combinedAcceleration * safeDeltaTime;
             if (IsFinite(nextVelocity))
                 velocity = nextVelocity;
@@ -389,8 +425,14 @@ namespace ES
                 velocityDelta = pendingVelocityDelta;
                 ClearPendingVelocityDelta();
             }
-            if (maxCombinedVelocityDelta > 0f)
-                velocityDelta = Vector3.ClampMagnitude(velocityDelta, maxCombinedVelocityDelta);
+            velocityDelta = canApplyVelocityDelta
+                ? ToFiniteVector(
+                    velocityDelta.x,
+                    velocityDelta.y,
+                    velocityDelta.z,
+                    maxCombinedVelocityDelta,
+                    ref invalidSolveCount)
+                : Vector3.zero;
             nextVelocity = velocity + velocityDelta;
             if (IsFinite(nextVelocity))
                 velocity = nextVelocity;
@@ -419,6 +461,11 @@ namespace ES
             if (!fieldStore.Release(slotIndex, slotGeneration))
                 return false;
 
+            if (fieldStore.activeCount == 0)
+            {
+                fieldStore = null;
+                ownerGeneration = NextGeneration(ownerGeneration);
+            }
             return true;
         }
 
@@ -446,6 +493,12 @@ namespace ES
                 && IsFinite(attraction.damping);
         }
 
+        private static bool IsRuntimeFieldValid(in ESMotionFieldRequest request)
+        {
+            return request.kind != ESMotionFieldKind.Attraction
+                || IsFinite(request.ResolveAnchorPosition());
+        }
+
         private static bool IsFinite(Vector3 value)
         {
             return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
@@ -454,6 +507,12 @@ namespace ES
         private static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
+        private static bool IsValidLimit(float value)
+        {
+            // Zero is the established unlimited setting. Negative and non-finite limits are invalid.
+            return IsFinite(value) && value >= 0f;
         }
 
         private static void Accumulate(
@@ -471,6 +530,7 @@ namespace ES
             double x,
             double y,
             double z,
+            float maxMagnitude,
             ref int invalidSolveCount)
         {
             if (double.IsNaN(x) || double.IsInfinity(x)
@@ -479,6 +539,26 @@ namespace ES
             {
                 invalidSolveCount++;
                 return Vector3.zero;
+            }
+
+            if (maxMagnitude > 0f)
+            {
+                double maxComponent = Math.Max(Math.Abs(x), Math.Max(Math.Abs(y), Math.Abs(z)));
+                if (maxComponent > 0d)
+                {
+                    double scaledX = x / maxComponent;
+                    double scaledY = y / maxComponent;
+                    double scaledZ = z / maxComponent;
+                    double magnitude = maxComponent * Math.Sqrt(
+                        scaledX * scaledX + scaledY * scaledY + scaledZ * scaledZ);
+                    if (magnitude > maxMagnitude)
+                    {
+                        double scale = maxMagnitude / magnitude;
+                        x *= scale;
+                        y *= scale;
+                        z *= scale;
+                    }
+                }
             }
 
             return new Vector3(

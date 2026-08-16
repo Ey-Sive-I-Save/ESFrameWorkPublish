@@ -369,6 +369,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：未运行 Unity Test Runner、ReloadDomain、PlayMode、Player 或 IL2CPP；装备动画事件、视图转移、存档恢复及多人并发仍需真实运行验收；Unity YAML 空字段尾空格按序列化格式保留。
 - **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-006：Workbench 作者底座与世界地图对话工作流
+
+- **源码路径**：Workbench 通用作者合同与 UI Toolkit 宿主、World 地图/地形/对话编辑器、运行时 WorldMap 模块、Zone/Motion 扩展、相机 Rig、定向测试和贡献指南。
+- **规范与证据**：Workbench 统一贡献注册、草稿持久化、预览场景和提交边界；World 工具在该底座上维护地图、地形、对话锚点与编辑会话，并通过 WorldMap 模块接入运行时。
+- **完成分析**：作者底座、世界数据合同、编辑工作流和运行时模块共同形成一条职责链；同批提交可避免编辑器加载缺失贡献、草稿合同错位或运行时无法解析地图数据。
+- **回归状态**：`ES_Logic.World.Tests.csproj` 为 0 错误、1 个当前 VFX `CS0649` 警告；`ES_Logic.Editor.World.Tests.csproj` 为 0 错误、17 个非本批阻断警告；42 个目标文本通过严格 UTF-8 检查。
+- **已知缺口**：没有 Unity Editor 编译、ReloadDomain、Test Runner、PlayMode 或 Player 证据；地图地形预览、对话锚点场景绑定、相机 Rig 和 Workbench UI 仍需 Unity 实机交互验收；静态构建来自当前完整工作树。
+- **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

@@ -1636,6 +1636,69 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-006",
+                        "status":  "documented",
+                        "summary":  "建立 Workbench 通用作者底座、世界地图与对话编辑工作流，并接入 WorldMap 运行时模块、Zone/Motion 扩展和定向测试。",
+                        "sourcePaths":  [
+                                            "Assets/ESNormalAssets/Camera/Rigs/PlayerThirdPersonRig.prefab",
+                                            "Assets/ESNormalAssets/Camera/Rigs/VehicleChaseRig.prefab",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESTagCatalogRuntimeTests.cs",
+                                            "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/专业工作台（Workbench）.meta",
+                                            "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/专业工作台（Workbench）",
+                                            "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/UGC工作台_UI Toolkit作者底座与草稿提交边界_AI协作警告.md",
+                                            "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/UGC工作台_UI Toolkit作者底座与草稿提交边界_AI协作警告.md.meta",
+                                            "Assets/Scripts/ESLogic/Editor/ES_Logic.Editor.asmdef",
+                                            "Assets/Scripts/ESLogic/Editor/Generation/Tests/ESMotionInfluenceTests.cs",
+                                            "Assets/Scripts/ESLogic/Editor/Workbench.meta",
+                                            "Assets/Scripts/ESLogic/Editor/Workbench",
+                                            "Assets/Scripts/ESLogic/Editor/World.meta",
+                                            "Assets/Scripts/ESLogic/Editor/World",
+                                            "Assets/Scripts/ESLogic/Runtime/Environment/Motion/ESMotionInfluenceAccumulator.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Environment/Zones/ESZone.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/ESGameManager.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/ESWorldMapModule.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/ESWorldMapModule.cs.meta",
+                                            "Assets/Scripts/ESLogic/Runtime/Profile/Zone",
+                                            "Assets/Scripts/ESLogic/Runtime/World.meta",
+                                            "Assets/Scripts/ESLogic/Runtime/World",
+                                            "Assets/Scripts/ESLogic/Tests/World.meta",
+                                            "Assets/Scripts/ESLogic/Tests/World",
+                                            "ES/Documentation/Guides/ESWorkbench_ContributionAndModuleGuide.md"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Scripts/ESLogic/Editor/World/Tests/ESWorkbenchAuthoringFoundationTests.cs",
+                                              "Assets/Scripts/ESLogic/Editor/World/Tests/ESWorldEditSessionTests.cs",
+                                              "Assets/Scripts/ESLogic/Tests/World/EditMode/ESWorldDialogueDataTests.cs",
+                                              "Assets/Scripts/ESLogic/Editor/Generation/Tests/ESMotionInfluenceTests.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "Workbench 作者合同、贡献注册、草稿持久化、预览场景与 UI Toolkit 宿主构成可复用编辑器底座；地图、地形、对话锚点和编辑会话在其上协作，并通过 WorldMap 模块连接运行时世界数据。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Logic.World.Tests.csproj 静态构建为 0 错误、1 个当前 VFX CS0649 警告",
+                                                            "ES_Logic.Editor.World.Tests.csproj 静态构建为 0 错误、17 个非本批阻断警告",
+                                                            "42 个目标文本通过严格 UTF-8 检查",
+                                                            "staged/unstaged 交集在账本指纹前为 0"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "未运行 Unity Editor 编译、ReloadDomain、Test Runner、PlayMode 或 Player",
+                                                             "地图地形预览、对话锚点场景绑定、相机 Rig 和 Workbench UI 仍需 Unity 实机交互验收",
+                                                             "静态构建来自当前完整工作树，不能证明该 Commit 可脱离后续未提交改动独立构建"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1648,13 +1711,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T10:24:24+08:00",
-                       "head":  "440f9f216c5f9f3ee7929b8d71e6945c1f1ca152",
-                       "stagedSourcePatchSha256":  "4e6ceb9a296df02010b316b1bd3aa9382c6da2d54fcc545ab9e96fd86a56272b",
-                       "stagedSourceManifestSha256":  "fe7cc503617360bc65d20b37544727c5e5b9269070ee4fd8a68031601e977842",
-                       "stagedSourceFileCount":  72,
+                       "preparedAt":  "2026-08-16T10:29:19+08:00",
+                       "head":  "63ead9b2ff8c10058ec7ccb0a79570062e233fe9",
+                       "stagedSourcePatchSha256":  "ef4ae2713920c3305be556d989c954d2f6d150f578f148258c0a2e3238efad93",
+                       "stagedSourceManifestSha256":  "dfe1c5b9d6f983aa566b18a34715eef953ce532f722a2f5d1df2b6ae6b0b0480",
+                       "stagedSourceFileCount":  86,
                        "entryIds":  [
-                                        "LOCAL-20260816-005"
+                                        "LOCAL-20260816-006"
                                     ]
                    }
 }

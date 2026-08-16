@@ -219,8 +219,11 @@ namespace ES
             if (settings.Mode != ESZoneMotionInfluenceMode.VelocityDelta)
             {
                 int capacity = settings.PrewarmMemberCapacity;
-                leases = new Dictionary<UnityEngine.Object, ESMotionFieldLease>(capacity);
-                context.EnsureMemberCapacity(capacity);
+                if (capacity > 0)
+                {
+                    leases = new Dictionary<UnityEngine.Object, ESMotionFieldLease>(capacity);
+                    context.EnsureMemberCapacity(capacity);
+                }
             }
         }
 
@@ -241,12 +244,19 @@ namespace ES
 
             if (settings.Mode == ESZoneMotionInfluenceMode.VelocityDelta)
             {
-                if (receiver.AddVelocity(
-                        settings.BuildVelocityDelta(profile.transform),
-                        settings.Permissions))
+                ESMotionSubmitResult submitResult = receiver.TryAddVelocity(
+                    settings.BuildVelocityDelta(profile.transform),
+                    settings.Permissions);
+                if (submitResult == ESMotionSubmitResult.Accepted)
                 {
                     error = null;
                     return ESZoneMemberEnterResult.AppliedTransiently;
+                }
+
+                if (submitResult != ESMotionSubmitResult.Locked)
+                {
+                    error = "目标拒绝瞬时速度增量: " + submitResult + "。";
+                    return ESZoneMemberEnterResult.Failed;
                 }
 
                 error = null;
@@ -263,6 +273,7 @@ namespace ES
 
             try
             {
+                leases ??= new Dictionary<UnityEngine.Object, ESMotionFieldLease>();
                 leases.Add(member.Key, lease);
             }
             catch

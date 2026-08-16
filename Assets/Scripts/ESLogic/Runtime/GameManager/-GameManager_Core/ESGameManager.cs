@@ -52,8 +52,20 @@ namespace ES
         public bool autoCreateLODModule = true;
 
         [TabGroup("配置")]
+        [LabelText("自动创建世界地图模块")]
+        public bool autoCreateWorldMapModule = true;
+
+        [TabGroup("配置")]
         [LabelText("自动创建运行时动态图集模块")]
         public bool autoCreateDynamicAtlasModule = false;
+
+        [TabGroup("配置")]
+        [LabelText("本地化目录")]
+        public ESLocalizationCatalog localizationCatalog;
+
+        [TabGroup("配置")]
+        [LabelText("运行时字体目录")]
+        public ESRuntimeFontCatalog runtimeFontCatalog;
 
         [TabGroup("设置")]
         [LabelText("跨场景不销毁")]
@@ -113,14 +125,59 @@ namespace ES
             if (autoCreateLODModule)
                 GetMoudle<ESLODModule>();
 
+            if (autoCreateWorldMapModule)
+                GetMoudle<ESWorldMapModule>();
+
             if (autoCreateDynamicAtlasModule)
                 GetMoudle<ESDynamicAtlasModule>();
+
+            RegisterPresentationCatalogs();
 
             CacheStaticReferences();
         }
 
+        private void RegisterPresentationCatalogs()
+        {
+            if (localizationCatalog != null)
+            {
+                var localizationErrors = localizationCatalog.Validate();
+                if (localizationErrors.Count > 0)
+                    throw new System.InvalidOperationException("本地化目录无效：\n" + string.Join("\n", localizationErrors));
+            }
+            if (runtimeFontCatalog != null)
+            {
+                var fontErrors = runtimeFontCatalog.Validate();
+                if (fontErrors.Count > 0)
+                    throw new System.InvalidOperationException("运行时字体目录无效：\n" + string.Join("\n", fontErrors));
+            }
+
+            bool localizationRegistered = false;
+            if (localizationCatalog != null)
+            {
+                if (!ESLocalizationRuntime.RegisterProvider(localizationCatalog))
+                    throw new System.InvalidOperationException("本地化 Provider 已被其他生命周期持有。");
+                localizationRegistered = true;
+            }
+            if (runtimeFontCatalog != null)
+            {
+                if (!ESFontRuntime.RegisterCatalog(runtimeFontCatalog))
+                {
+                    if (localizationRegistered)
+                        ESLocalizationRuntime.UnregisterProvider(localizationCatalog);
+                    throw new System.InvalidOperationException("运行时字体目录已被其他生命周期持有。");
+                }
+            }
+        }
+
         protected override void OnDestroy()
         {
+            if (Instance == this)
+            {
+                if (localizationCatalog != null)
+                    ESLocalizationRuntime.UnregisterProvider(localizationCatalog);
+                if (runtimeFontCatalog != null)
+                    ESFontRuntime.UnregisterCatalog(runtimeFontCatalog);
+            }
             base.OnDestroy();
             if (Instance == this)
             {

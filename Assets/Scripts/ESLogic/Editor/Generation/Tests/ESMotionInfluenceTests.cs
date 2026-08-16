@@ -121,7 +121,7 @@ namespace ES.Tests
             for (int i = 0; i < leases.Length; i++)
                 leases[i].Dispose();
             Assert.That(accumulator.ActiveFieldCount, Is.Zero);
-            Assert.That(accumulator.FieldCapacity, Is.GreaterThanOrEqualTo(leases.Length));
+            Assert.That(accumulator.FieldCapacity, Is.Zero);
         }
 
         [Test]
@@ -131,9 +131,36 @@ namespace ES.Tests
 
             accumulator.AddVelocity(Vector3.right);
 
-            Assert.That(accumulator.FieldCapacity, Is.EqualTo(ESMotionInfluenceAccumulator.MaxFieldCapacity));
+            Assert.That(accumulator.FieldCapacity, Is.Zero);
             Assert.That(accumulator.ActiveFieldCount, Is.Zero);
             Assert.That(accumulator.HasPendingVelocityDelta, Is.True);
+        }
+
+        [Test]
+        public void ReleasedStore_RejectsStaleLeaseCopyAfterNewStoreIsCreated()
+        {
+            var accumulator = new ESMotionInfluenceAccumulator(1);
+            Assert.That(accumulator.TryAcquireField(new ESMotionFieldRequest
+            {
+                kind = ESMotionFieldKind.Acceleration,
+                acceleration = Vector3.right
+            }, out ESMotionFieldLease firstLease), Is.True);
+            ESMotionFieldLease staleCopy = firstLease;
+
+            firstLease.Dispose();
+            Assert.That(accumulator.FieldCapacity, Is.Zero);
+            Assert.That(accumulator.TryAcquireField(new ESMotionFieldRequest
+            {
+                kind = ESMotionFieldKind.Acceleration,
+                acceleration = Vector3.up
+            }, out ESMotionFieldLease secondLease), Is.True);
+
+            staleCopy.Dispose();
+
+            Assert.That(accumulator.ActiveFieldCount, Is.EqualTo(1));
+            secondLease.Dispose();
+            Assert.That(accumulator.ActiveFieldCount, Is.Zero);
+            Assert.That(accumulator.FieldCapacity, Is.Zero);
         }
 
         [Test]
@@ -155,6 +182,104 @@ namespace ES.Tests
             Assert.That(float.IsInfinity(velocity.x), Is.False);
             Assert.That(float.IsNaN(velocity.x), Is.False);
             Assert.That(velocity.x, Is.EqualTo(float.MaxValue));
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(-0.02f)]
+        public void InvalidDeltaTime_SkipsFieldsButStillConsumesAcceptedVelocityDelta(float deltaTime)
+        {
+            var accumulator = new ESMotionInfluenceAccumulator();
+            Assert.That(accumulator.TryAcquireField(new ESMotionFieldRequest
+            {
+                kind = ESMotionFieldKind.Acceleration,
+                acceleration = Vector3.right * 10f
+            }, out _), Is.True);
+            accumulator.AddVelocity(Vector3.up * 2f);
+            Vector3 velocity = Vector3.zero;
+
+            accumulator.Apply(
+                ref velocity,
+                Vector3.zero,
+                deltaTime,
+                ESMotionReceiverLockState.None,
+                100f,
+                100f);
+
+            Assert.That(velocity, Is.EqualTo(Vector3.up * 2f));
+            Assert.That(accumulator.HasPendingVelocityDelta, Is.False);
+            Assert.That(accumulator.InvalidSolveCount, Is.EqualTo(1));
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(-1f)]
+        public void InvalidAccelerationLimit_RejectsFieldContribution(float limit)
+        {
+            var accumulator = new ESMotionInfluenceAccumulator();
+            Assert.That(accumulator.TryAcquireField(new ESMotionFieldRequest
+            {
+                kind = ESMotionFieldKind.Acceleration,
+                acceleration = Vector3.right * 10f
+            }, out _), Is.True);
+            Vector3 velocity = Vector3.up;
+
+            accumulator.Apply(
+                ref velocity,
+                Vector3.zero,
+                1f,
+                ESMotionReceiverLockState.None,
+                limit,
+                100f);
+
+            Assert.That(velocity, Is.EqualTo(Vector3.up));
+            Assert.That(accumulator.InvalidSolveCount, Is.EqualTo(1));
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(-1f)]
+        public void InvalidVelocityDeltaLimit_ConsumesAndRejectsPendingDelta(float limit)
+        {
+            var accumulator = new ESMotionInfluenceAccumulator();
+            accumulator.AddVelocity(Vector3.right * 10f);
+            Vector3 velocity = Vector3.up;
+
+            accumulator.Apply(
+                ref velocity,
+                Vector3.zero,
+                1f,
+                ESMotionReceiverLockState.None,
+                100f,
+                limit);
+
+            Assert.That(velocity, Is.EqualTo(Vector3.up));
+            Assert.That(accumulator.HasPendingVelocityDelta, Is.False);
+            Assert.That(accumulator.InvalidSolveCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void ZeroLimits_PreserveEstablishedUnlimitedSemantics()
+        {
+            var accumulator = new ESMotionInfluenceAccumulator();
+            Assert.That(accumulator.TryAcquireField(new ESMotionFieldRequest
+            {
+                kind = ESMotionFieldKind.Acceleration,
+                acceleration = Vector3.right * 10f
+            }, out _), Is.True);
+            accumulator.AddVelocity(Vector3.up * 20f);
+            Vector3 velocity = Vector3.zero;
+
+            accumulator.Apply(
+                ref velocity,
+                Vector3.zero,
+                1f,
+                ESMotionReceiverLockState.None,
+                0f,
+                0f);
+
+            Assert.That(velocity, Is.EqualTo(new Vector3(10f, 20f, 0f)));
+            Assert.That(accumulator.InvalidSolveCount, Is.Zero);
         }
 
         [Test]
@@ -278,6 +403,54 @@ namespace ES.Tests
 
             Assert.That(velocity, Is.EqualTo(Vector3.right * 80f));
             Assert.That(accumulator.InvalidSolveCount, Is.Zero);
+        }
+
+        [Test]
+        public void InvalidDynamicAttraction_DoesNotSuppressValidAccelerationField()
+        {
+            var anchorObject = new GameObject("Invalid Attraction Anchor");
+            try
+            {
+                var accumulator = new ESMotionInfluenceAccumulator();
+                accumulator.TryAcquireField(new ESMotionFieldRequest
+                {
+                    kind = ESMotionFieldKind.Acceleration,
+                    acceleration = Vector3.right * 2f,
+                    sourceId = 1UL
+                }, out _);
+                accumulator.TryAcquireField(new ESMotionFieldRequest
+                {
+                    kind = ESMotionFieldKind.Attraction,
+                    anchorTransform = anchorObject.transform,
+                    attraction = new ESMotionAttractionSettings
+                    {
+                        model = ESMotionAttractionModel.TargetVelocity,
+                        maxSpeed = 10f,
+                        maxAcceleration = 10f,
+                        response = 1f
+                    },
+                    priority = 10,
+                    blendMode = ESMotionFieldBlendMode.OverrideLowerPriority,
+                    sourceId = 2UL
+                }, out _);
+                anchorObject.transform.position = new Vector3(float.NaN, 0f, 0f);
+                Vector3 velocity = Vector3.zero;
+
+                accumulator.Apply(
+                    ref velocity,
+                    Vector3.zero,
+                    1f,
+                    ESMotionReceiverLockState.None,
+                    100f,
+                    100f);
+
+                Assert.That(velocity, Is.EqualTo(Vector3.right * 2f));
+                Assert.That(accumulator.InvalidSolveCount, Is.EqualTo(1));
+            }
+            finally
+            {
+                Object.DestroyImmediate(anchorObject);
+            }
         }
 
         [Test]

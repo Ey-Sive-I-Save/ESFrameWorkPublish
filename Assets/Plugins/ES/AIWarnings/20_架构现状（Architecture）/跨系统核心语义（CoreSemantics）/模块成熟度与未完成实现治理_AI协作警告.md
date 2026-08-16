@@ -26,9 +26,21 @@
 
 `Blocked` 不是成熟度状态，而是附加结论。任何状态都可以因编译、依赖、Unity、平台、外部服务或用户决策而阻断；必须记录具体阻断证据。
 
+## 三轴状态记录
+
+模块状态卡必须把以下维度分开，不能用一个词同时代替三者：
+
+| 维度 | 唯一用途 |
+|---|---|
+| `ModuleMaturity` | 使用本文件的 `Proposed` 至 `Archived`，描述模块演进和可依赖范围。 |
+| `EvidenceLevel` | 使用 AI 交付声明 P0 的 S0-S6，描述当前声明被验证到哪一层。 |
+| `DeliveryVerdict` | 使用 `Designed / Implemented-Unverified / Accepted / Released`，描述本次范围的交付结论。 |
+
+`Blocked` 与 `Failed` 只能作为当前阻断或最近验证结果附加到状态卡，必须带证据入口。它们不改变上述三轴的语义。
+
 ## 状态权威
 
-1. 状态必须落在当前模块已有的唯一权威开发文档、模块状态资产或项目级模块清单之一；禁止在多个 README、AIWarnings、提案和代码注释中分别维护不同状态。
+1. 状态必须落在当前模块已有的唯一权威开发文档、模块状态资产或项目级模块清单之一；禁止在多个 README、AIWarnings、提案和代码注释中分别维护不同状态。活跃状态卡至少记录 `ModuleMaturity`、`EvidenceLevel`、`DeliveryVerdict`、`lastVerifiedHead`、证据入口和失效条件。
 2. AIWarnings 定义状态语义和禁令，不替代模块自己的实现清单；AICommand 负责本次审计权限；Skill 负责执行工作流。
 3. 现有成熟模块不要求为了本规则一次性补齐全库状态文件。首次发生功能扩展、重构、交付或争议时，再按本规则建立或核对唯一状态入口。
 4. 提案中的 `Proposed` 不能因创建空目录、空接口或占位类型自动升级。
@@ -113,7 +125,9 @@ Stable -> Deprecated -> Archived
 
 | 字段 | 要求 |
 |---|---|
-| 当前状态 | 使用本规则的一个状态，并单列 `Blocked` 原因 |
+| ModuleMaturity | 使用本规则的一个状态，并单列 `Blocked` 原因 |
+| EvidenceLevel | S0-S6，精确说明平台、入口和验证范围 |
+| DeliveryVerdict | `Designed / Implemented-Unverified / Accepted / Released`；不得冒充 ModuleMaturity |
 | 承诺范围 | 本状态实际覆盖哪些功能、平台和入口 |
 | 权威入口 | 源码、配置、资产或文档的唯一入口 |
 | 默认激活 | 是否注册、自动初始化、进入场景或发布 |

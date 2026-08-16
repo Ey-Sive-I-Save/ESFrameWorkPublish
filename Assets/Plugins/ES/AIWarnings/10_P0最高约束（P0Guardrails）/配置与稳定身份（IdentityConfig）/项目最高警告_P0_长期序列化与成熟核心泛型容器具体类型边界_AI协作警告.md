@@ -1,8 +1,12 @@
 # P0：保留通用泛型底座，长期合同使用领域具体类型
 
 > 状态：现行 P0 约束。  
+> 规则 ID：`es.p0.identity.generic-container-contract`。
+> 权威级别：Project Authority / P0。
+> 路由键：`generic-container-contract`。
 > 适用范围：ES 自定义泛型容器进入 Unity/Odin 持久化数据、GameCore/RuntimeData 权威表、稳定跨模块 API 或其他长期核心合同时。  
 > 不适用范围：普通 BCL 集合、局部算法、测试临时对象，以及不承担领域身份的短生命周期实现型泛型。
+> 代表案例证据入口：`ESEnumStringMirrorMap.cs`、`ESEnumStringMirrorMapTests.cs` 及其领域具体类型消费者；该案例不构成唯一适用类型。
 
 ## 最高结论
 

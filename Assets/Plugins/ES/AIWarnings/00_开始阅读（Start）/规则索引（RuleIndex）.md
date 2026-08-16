@@ -1,6 +1,6 @@
 # AIWarnings 规则索引
 
-本索引是 AIWarnings 的任务路由入口，不是全目录阅读清单。所有任务先读 README 与 CurrentStatus，再按下表选择最小权威规则集；禁止为了“熟悉项目”递归读取全部 AIWarnings。
+本索引是 AIWarnings 的任务路由入口，不是全目录阅读清单。所有任务先读 README 与短活跃 `CurrentStatus`，再按下表选择最小权威规则集；禁止为了“熟悉项目”递归读取全部 AIWarnings。
 
 加载规则：
 
@@ -11,12 +11,19 @@
 5. 普通任务约 1～2 万字符、复杂跨系统任务约 2～5 万字符只是预算建议；不得为了满足预算跳过命中的 P0、现行状态或专项原文。
 6. 跨系统分批摘要必须保留规则路径、状态、结论、禁止事项和证据入口；摘要不能冒充已逐条复核的规则原文。
 
+## 路由状态
+
+- 本表中的普通行均为 `current`：对应规则已存在且必须按任务读取。
+- `reserved` 路由位于“预留路由”表，并同步投影到 `AIWarningsRouteCatalog.json`。它只定义未来任务应先读取的约束集合，不得被解释为现有模块、公共 API、AICommand、默认注册或修改授权。
+- 当任务找不到匹配 AICommand 时，记录为 `NoMatchingCommand` 并仅按用户明确授权和当前规则工作；禁止套用不相干合同，也禁止伪造“已选择唯一 AICommand”。
+
 | 任务 | 必读目录或文档 |
 |---|---|
 | 修改 GameCore、ConfigKey、RuntimeData | `10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）`、`配置与稳定身份（IdentityConfig）` |
 | 新增或修改继承、成员可见性、`new` 成员隐藏、内部入口命名、只读 View、组合包装或程序集收口 | `10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_代码结构规范_Internal前缀与new成员隐藏边界_AI协作警告.md`；禁止仅为了让普通用户不使用某方法而改变代码结构，ES 自有非普通用户入口使用 `Internal_` 前缀 |
 | 新增或重命名 Program、Compiler、Runner、Snapshot、Scheduler、Dispatcher、Router、Selector、Policy、Definition、Template、Binding、Table、Registry、Catalog 等架构类型 | `10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md`；`Program` 当前且唯一保留给 `ESBehaviorTreeProgram`，`Scheduler/调度器` 语义由 ES 调度框架独占，普通分支选择或 `ShouldTick` 判断不得占用 |
 | ES 自定义泛型容器进入 Unity/Odin 长期序列化字段，或成为成熟大系统长期持有的权威表、稳定公共 API、跨模块缓存或核心生命周期合同 | `10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_长期序列化与成熟核心泛型容器具体类型边界_AI协作警告.md`、`项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md`；保留并复用通用泛型底座，仅长期合同先取得 `sealed` 具体类型；不得误读为删除、禁用或全局替换泛型容器，也不得扩大到局部变量、短期缓存、普通非序列化字段或所有泛型 |
+| 新增或修改进入运行时高频链路的容器、索引、缓存、Registry、Queue、Set、Pool 内部缓冲或快照缓冲，设计容量预热、扩容、重建、复用，或声称无分配、低 GC、0 GC | `10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_P0_热路径容器预热与稳态GC边界_AI协作警告.md`、同目录 `项目最高警告_核心热路径缺失依赖不判空_AI协作警告.md`；涉及稳定 Key 时再读 `配置与稳定身份（IdentityConfig）`，涉及 Player/IL2CPP 或发布结论时再读 `50_验证与发布（ValidationRelease）`。`ESEnumStringMirrorMap` 只是当前案例，不是唯一触发类型或未来容器 API 模板 |
 | AI 生成或迁移 GameCore 内容定义、Action、Weapon、Skill、SkillTrack 或跨定义稳定引用 | `10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_稳定Key_Catalog烘焙与RuntimeKey进程边界_AI协作警告.md`、`10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）`、`20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AI自动化内容身份与GameCoreKey迁移_AI协作警告.md`；涉及资源时再读资源运行时 P0，涉及 Tag 时再读 Buff/Tag 领域规则 |
 | 注册普通资产、修改 AssetKey、注册 GameCore、同步 Consumer，或接入 Inspector、资源窗口、MCP、C# 自动化注册入口 | `10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_统一内容注册唯一入口与事务边界_AI协作警告.md`、`10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）`；GameCore 同时读取 GameCore 边界规则 |
 | 新增或修改 SoDataInfo、SoDataGroup、SoDataPack、内容库或 Consumer 聚合 | `10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_P0_Info必须对应Group_Pack非默认聚合_AI协作警告.md`、`项目最高警告_GameCore根SO注入边界_禁止Key与嵌套数据伪装核心_AI协作警告.md`；涉及 SO 表格时再读 `40_编辑器与工具（EditorTooling）/SO表格（SOTable）` |
@@ -67,6 +74,12 @@
 | 打开新 Codex、开启新对话、恢复/分叉会话、初始化 Codex 或接手项目 | `$es-codex-session-bootstrap`；恢复历史时再读取上一行的 session 恢复 P0，普通新会话只加载开始链与任务命中规则 |
 | 新建自动化任务、Python/PowerShell Worker、发布物审计、上传、清理或发布门禁 | `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md`、`Documentation/ES_AUTOMATION_CENTER_STANDARD.md`；先检查 C# Editor 注册和任务合同，禁止先写散落脚本 |
 
+## 预留路由
+
+| Route Key | 状态 | 触发条件 | 必读边界 |
+|---|---|---|---|
+| `runtime-ui-window` | `reserved` | 新增或修改运行时 UI Root、Window Lease、窗口层级、Open/Close、强制关闭效果、KeepInactive、PoolOnClose、DestroyOnClose、UI 焦点或窗口资源 Scope | `项目最高警告_P0_ES活跃请求仲裁协议_跨领域安全标准_AI协作警告.md`、`30_运行时专项（RuntimeOperations）/对象池（Pool）/GameObject对象池_GameManager模块_AI协作警告.md`、`10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）`、`项目最高警告_P0_ESDialog跨宿主唯一合同与Presenter注册边界_AI协作警告.md`、`项目最高警告_P0_实际可玩闭环与运行证据_AI协作警告.md`。当前不宣称 Runtime UI Window 实现或对应 AICommand 已存在。 |
+
 ## 领域 Skill 快速路由
 
 | 任务 | 推荐 Skill |
@@ -84,6 +97,6 @@
 | “审计”“审计并记录”“继续审计”、未开始/半成品模块状态、依赖渗透、成熟度跃迁与续接检查点 | `$es-module-lifecycle` |
 | 新建、恢复、分叉或初始化 Codex 项目会话 | `$es-codex-session-bootstrap` |
 
-领域 Skill 只负责执行工作流和导航，仍必须按上表读取对应 AIWarnings，并由用户要求与唯一选中的 AICommand 决定本次权限。
+领域 Skill 只负责执行工作流和导航，仍必须按上表读取对应 AIWarnings。存在匹配 AICommand 时，由用户要求与唯一选中的 AICommand 共同决定本次权限；不存在匹配合同则显式标记 `NoMatchingCommand`，不能借用无关合同扩大或缩小用户已明确授权的范围。
 
 `80_交接与复盘（Handover）` 用于补充背景；`90_提案与废止（Archive）` 中的文件不能作为新增实现的唯一依据。

@@ -1,5 +1,7 @@
 # Codex Tool Rewrite Context
 
+> 状态：历史上下文。仅用于理解 2026-07 的工具重写决策，不作为当前编译、验收或发布事实。
+
 > Role: this Codex pass is responsible for ES editor-tool rewrite support and commercial-grade validation, not for redefining the whole gameplay architecture.
 > Purpose: give future AI collaborators a dense, verifiable starting point before modifying or rewriting ES Framework tools.
 > Scope: observations from the local project at `F:\aaProject\ESFrameWorkPublish` on 2026-07-17. Treat this as a tool-rewrite context map, not as product documentation.

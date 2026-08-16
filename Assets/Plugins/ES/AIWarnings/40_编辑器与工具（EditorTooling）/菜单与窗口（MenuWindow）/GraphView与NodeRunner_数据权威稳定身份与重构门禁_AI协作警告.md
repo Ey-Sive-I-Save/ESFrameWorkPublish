@@ -69,6 +69,25 @@ AISkill 执行图
 - 新建边获得新 `EdgeId` 和新顺序；重连同一关系保留 `EdgeId` 和原顺序；调整顺序只能经过
   `ESGraphEditService` 的原子事务，失败不得 Dirty、保存或留下 Undo。
 
+## 多端口与单端口多连接严格术语合同
+
+“端口/端点数量”和“连接数量”是两个正交维度，禁止互相代称：
+
+- **多端口节点**：同一节点在至少一个方向拥有两个或更多独立稳定端点。每个端点必须由不同的
+  `PortId + StableKey + Direction + Meaning` 表达；普通的一入一出节点不因此称为多端口节点。
+- **单端口多连接**：同一个端点的 `ESGraphPortCapacity.Multi` 允许它承载多条 Edge。输入或输出连接数量
+  按 Edge 计数，容量和 Edge 数都不增加节点的独立端点数量。
+- `capacity == Multi` 只证明该端点允许多连接，绝不推出 `IsMultiEndpointNode`；同一端点当前有多条输入边
+  或多条输出边，也绝不推出节点拥有多个输入端口或多个输出端口。
+- `PortId` 必须在整张图内唯一，`StableKey` 必须在节点内唯一，方向必须合法且 Meaning 必须明确；身份缺失、
+  重复或非法的端点记录一律不参与多端口计数，并必须作为异常记录显示和校验，禁止去重后当作一个有效端点。
+- FanOut 可以是一个 `Multi` 容量输出端点连接多个目标，Join 可以是一个 `Multi` 容量输入端点接收多个来源；
+  这两者分别是单出口多连接和单入口多连接，禁止标注为“多输出端口”或“多输入端口”。
+- Task、SkillCall、Branch 等只有在同一方向实际声明多个不同稳定端点时，才可作为多端口案例；模板、Badge、
+  Tooltip、校验和测试必须按稳定端点身份计数，不得用 `PortCapacity.Multi` 或 Edge 数冒充。
+- 诊断和验收必须分别报告：节点总端点数、独立输入端点数、独立输出端点数、每个端点的连接容量，以及
+  每个端点的实际连接数。项目统一通过 `ESGraphTopologyAnalyzer` 获取这些事实。
+
 ## `Program` 后缀唯一语义与 BehaviorTree 保留合同
 
 `Program` 是 ESFramework 的保留后缀，当前且唯一归属 BehaviorTree。它不是 Graph 通用产物名，

@@ -113,7 +113,7 @@ EntityBasicCombatModule
 - 作者 Prefab 位于 `Assets/ESNormalAssets/WeaponPrototypes/大长条.prefab`，根节点显式包含 `Item`、`ESWeaponSceneTemplate` 与 `EntityWeaponBinding`；模型是无 Collider 的长条 Cube，没有 Rigidbody、2D 物理组件或第二运动后端。
 - 正式大黑塔 Variant 已由 `ESFormalHertaPlayerVariantBuilder` 装配唯一 `EntityBasicCombatModule`、唯一 Equipment Domain 与唯一 Equipment Weapon Slot；武器作为嵌套 Prefab 放在 `06_装备_Equipment/EquipmentVisuals`，不依赖场景实例手工覆盖。
 - 大长条模板身份固定为 `weapon.melee.long_bar / 大长条 / Custom`；硬重建后武器 Prefab 不再保存 `HoldSocket/BackSocket`，本地参考只由 `EntityWeaponBinding` 提供。正式作者验证拒绝缺失引用、Prefab 外部引用、重复模板/Binding，以及 Rigidbody、Rigidbody2D、Collider2D。
-- 最新证据为：Unity 2022.3.45f1 完成脚本导入与 Domain Reload；实例表、Item 转移、Attachment 与 Equipment 事务四组定向 EditMode Job `9247373e6bb04b41a49bdc9532dfbad2` 为 27/27，统一内容注册 Job `e81aeb064b8a4b70ac1fc889b98c04e5` 为 19/19；正式 Weapon Slot 会校验实例 Weapon 投影 RuntimeKey 与已注入 WeaponKey 一致。这仍不代表 PlayMode 中 Action、动画事件、命中或伤害已可用。
+- 最新证据为：Unity 2022.3.45f1 完成脚本导入与 Domain Reload；实例表、Item 转移、Attachment 与 Equipment 事务四组定向 EditMode Job `f9f317312e3e49d882662a4c1f11e95b` 为 30/30，统一内容注册 Job `addbfbcb03ba4bfdab49c12df253341a` 为 19/19；正式 Weapon Slot 会校验实例 Weapon 投影 RuntimeKey 与已注入 WeaponKey 一致，普通 Item、跨 Owner Item 和活动 Attachment 过渡中的关系变更都会失败关闭。这仍不代表 PlayMode 中直接销毁、Action、动画事件、命中或伤害已可用。
 - 生成器已按扩展性门禁加固：重复执行只验证并复用现有作者资产，不重置已有配置；固定路径或稳定 Key 若属于其他资产会硬失败；角色构建器只按 `weapon.melee.long_bar` 定向 upsert，不再 `Clear()` 其他武器槽位。Combat 的通用枪械入口保持开启，具体武器是否射击由各自 `WeaponDefinition.fire.enabled` 决定。
 - 正式大黑塔 Builder 只读取独立 `CharacterPresentation/大黑塔_表现.prefab`；旧 `EditorTools/大黑塔.prefab` 已退出正式输入链路，Builder 中不存在 Legacy Preview 清洗或旧业务组件迁移路径。
 
@@ -148,7 +148,7 @@ EntityBasicCombatModule
 以下阻塞仍未解除，不得据此宣称已可玩：
 
 1. 既有 `Assets/ESNormalAssets/Data/Group/Item/新建物品数据组1566.asset` 中 `信息数据键2` 的 Shot 子定义原先缺少显式 Key，已补为唯一 `shot.test.data_key_2`；Unity 正式 Item GameCore 全量重建已通过，实际注入 Item 3 / Shot 2 / Weapon 1。不得删除该测试数据，也不得复用已有的 `数据键2`。
-2. 当前已取得 Unity 编译、Domain Reload 和装备/实例表定向 EditMode 27/27 证据，但没有进入 PlayMode。Equip、Holster、Attack 的实际 Action 消费、动画事件、Tag、IK 和近战命中/伤害仍未完成运行验收，不能把 EditMode 契约测试写成“已可玩”。
+2. 当前已取得 Unity 编译、Domain Reload 和装备/实例表定向 EditMode 30/30 证据，但没有进入 PlayMode。Entity 直接销毁、Equip、Holster、Attack 的实际 Action 消费、动画事件、Tag、IK 和近战命中/伤害仍未完成运行验收，不能把 EditMode 契约测试写成“已可玩”。
 3. 当前 `TryFireWeapon()` 的 Hitscan 路径不等于近战攻击实现。大长条主动攻击必须继续走既有 `ESInputService -> EntityAIDomain -> EntityBasicCombatModule -> Action/Combat` 入口；若近战 Action、命中采样或伤害消费尚缺，应作为下一阶段补齐，不得绕过 Entity KCC 直接写 Transform、Motor 或 Rigidbody。
 4. `ESWeaponRuntimeData.prefabKey` 已是类型化 `ESAssetReferPrefabConfigKey`，默认 Shot 已是 `ESShotConfigKey`；仍需 Catalog、Provider、Scope 与发布证据，禁止回退到裸 `GameObject/Object` 或字符串 Shot Key。
 5. `EntityWeaponBinding` 和角色业务 Socket 都必须作者化；正式运行时不得自动补 Binding、回退角色根或创建隐藏 Socket。
@@ -226,7 +226,7 @@ Input System / ESInputService
 [x] 大长条 Weapon Prefab 显式 EntityWeaponBinding，无 HoldSocket/BackSocket 与临时物理组件
 [x] 正式玩家 Variant 由构建器装配 Equipment 四模块、Combat 与 Equipment Weapon Slot
 [x] 两个角色模板和正式大黑塔使用作者化 Hand/Back/Hip/Temporary Socket，无 WeaponSocket
-[x] ESInstanceTable / Item / Attachment / Equipment 事务定向 EditMode 27/27
+[x] ESInstanceTable / Item / Attachment / Equipment 事务定向 EditMode 30/30
 [x] Attack 输入只经现有输入链路进入单一 Combat 执行入口，近战/枪械不再按 Action 注册状态互相回退
 [ ] Equip/Switch/Holster/Attack 的 PlayMode 实际消费均来自现有输入链路
 [ ] 近战 Action、命中采样与伤害均来自现有 Combat/Action 链路

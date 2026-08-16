@@ -2139,6 +2139,44 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-016",
+                        "status":  "documented",
+                        "summary":  "建立 AIWarnings 增量路由目录、自检门禁与迁移前历史快照，并同步当前状态、规则索引和领域治理边界。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/AIWarnings",
+                                            "ES/Tools/Validation/Test-ESAIWarnings.ps1"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/AIWarningsRouteCatalog.json",
+                                              "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_P0_热路径容器预热与稳态GC边界_AI协作警告.md",
+                                              "ES/Tools/Validation/Test-ESAIWarnings.ps1"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "路由目录只承载增量命中规则，README、CurrentStatus 与 RuleIndex 保持入口职责；迁移前快照进入历史上下文，热路径容器预热和稳态 GC 边界进入 P0 治理。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "Test-ESAIWarnings.ps1 通过，确认 2 条目录路由且 CurrentStatus 长度为 1213",
+                                                            "治理目标文件通过严格 UTF-8 初检与 git diff --check",
+                                                            "新增 JSON、Markdown 和 Unity meta 文件均纳入精确提交白名单"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "自检覆盖目录结构、路由和入口长度，不等价于所有领域规则的语义完备性证明",
+                                                             "未运行 Unity Editor、ReloadDomain、Test Runner、PlayMode 或 Player",
+                                                             "本批只建立治理入口和静态门禁，不声明任何运行时模块成熟度提升"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#ai-governance",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -2151,13 +2189,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T13:41:05+08:00",
-                       "head":  "94572991b0611c924d123225cd3ab6a1dacc9498",
-                       "stagedSourcePatchSha256":  "7ef7caec1801be3afa1805810225e9006188b6ca6a14255f9128be2a179c2b1a",
-                       "stagedSourceManifestSha256":  "d288aa2c78ee2e2bf3a99de2f8b2c21730993f2b24943f3f8b80ee502c5925c7",
-                       "stagedSourceFileCount":  22,
+                       "preparedAt":  "2026-08-16T13:47:52+08:00",
+                       "head":  "2668aff045004edfee5482670cc3757751317541",
+                       "stagedSourcePatchSha256":  "65d372ce7ec65fd5596b690ca0c6dfe12d50b15795f1e24c0827a6495c99eda5",
+                       "stagedSourceManifestSha256":  "21fc4fad1d5076a5756cfb1ce125eaa156c16e91c6f1570b38824f1077462bc5",
+                       "stagedSourceFileCount":  19,
                        "entryIds":  [
-                                        "LOCAL-20260816-015"
+                                        "LOCAL-20260816-016"
                                     ]
                    }
 }

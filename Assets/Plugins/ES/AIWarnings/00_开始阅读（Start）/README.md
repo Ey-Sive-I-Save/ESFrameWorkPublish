@@ -4,7 +4,7 @@
 
 ## 阅读顺序
 
-1. 先读本入口，再读 `当前状态（CurrentStatus）.md`，确认编译、验收与正在推进的边界。
+1. 先读本入口，再读 `当前状态（CurrentStatus）.md`。该文件现在只保存活跃模块索引、路由状态和证据入口；不要把它当作编译日志或历史叙事。
 2. 改任何代码前，按任务在 `规则索引（RuleIndex）.md` 找到命中的 P0 与专项规则。
 3. 读取命中的 `10_P0最高约束（P0Guardrails）` 原文；P0 不可绕过，也不能由旧摘要替代。
 4. 再读当前任务对应的架构现状、运行时专项、编辑器工具或验证标准原文。
@@ -20,7 +20,7 @@
 
 ```text
 README
-  -> CurrentStatus
+  -> CurrentStatus（短活跃索引）
   -> RuleIndex
   -> 命中的 P0 原文
   -> 当前领域专项原文
@@ -29,11 +29,13 @@ README
 ```
 
 - 普通任务通常把规则读取控制在约 1～2 万字符；复杂跨系统任务通常为 2～5 万字符。这只是上下文预算建议，不是截断必读规则的硬限制。
+- `当前状态（CurrentStatus）.md` 必须保持为短活跃索引，不记录编译失败详情、Console 文本、错误码或 Warning 数量。详细日志只保留在本次构建回执、测试结果或用户要求的交付报告中；历史快照仅按需从 `80_交接与复盘（Handover）` 读取。
 - 真正标准是读取完成当前任务所需的最小权威规则集。P0、现行状态和任务专项必须读取原文，不能只依赖旧摘要、搜索片段或其他 AI 的转述。
 - `80_交接与复盘（Handover）`、`90_提案与废止（Archive）` 默认不得全量加载。
 - 跨系统任务按领域分批读取；每批只保留规则路径、状态、结论、禁止事项和证据入口，再进入下一领域。摘要用于导航，不能冒充原文权威。
 - 全项目治理审计允许分批遍历，但不得一次把全目录塞入上下文，也不得把分批摘要写成“全部规则已经逐条复核”。
 - AIWarnings 必须由 `规则索引（RuleIndex）.md`、明确的 AICommand 或任务命中关系路由；禁止无目标递归扫目录后凭关键词自行扩大任务范围。
+- `AIWarningsRouteCatalog.json` 是增量机器可读路由投影：现有 Markdown 索引仍是人工阅读入口。Catalog 中的 `reserved` 路由只预留未来任务的必读边界，不代表模块、API、AICommand 或修改授权已经存在。
 
 ## 目录状态
 
@@ -69,7 +71,7 @@ README
 - `ESCommandPlayerRunner.TickAll()` 只能由 `MODULE_ESCommandModule` 驱动；ESCommand 运行时、交互运行时、编辑器序列化与 GraphView 均有独立专项规则，不能用输入文档、AI Command 模板或 SimpleTools 文档替代。
 - AI 协作历程只有在用户明确要求时才能创建、更新或恢复；普通任务禁止自动落账。连续约 10 轮后 AI 只能询问一次，用户确认前不得写入或催促。获准维护时仍严格一窗口一文件；失联窗口先从本机 `history.jsonl` 模糊定位 session 候选，再人工确认归属并从 `rollout-*.jsonl` 逐轮恢复。候选分数不得直接授权合并或覆盖已有档案。
 - Legacy GraphView / NodeRunner 已删除；正式图基础统一使用 Stable Graph V2。V2 已具备稳定身份、Undo、迁移与烘焙快照，当前处于 `Verifying`，正式业务接入仍须通过 Unity Test Runner、真实执行闭环、失败恢复与性能门禁。
-- 模块成熟度统一使用 `Proposed -> Scaffolded -> Experimental/Implementing -> Integrating -> Verifying -> Stable -> Deprecated -> Archived`；`Blocked` 只能作为附加结论。目录、接口或源码存在不等于完成，半成品不得默认注册、渗透稳定模块或进入正式发布链路。说“审计”默认只读并最多询问一次是否记录；说“审计并记录”更新 `ES/Documentation/Status/MODULE_AUDIT_STATE.md` 的目标模块块；说“继续审计”从该固定入口恢复并复核事实。检查点只用于导航，不授权下次实现。具体路由见 `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md`。
+- 模块成熟度统一使用 `Proposed -> Scaffolded -> Experimental/Implementing -> Integrating -> Verifying -> Stable -> Deprecated -> Archived`；`Blocked` 只能作为附加结论。它与 S0-S6 证据等级、`Designed / Implemented-Unverified / Accepted / Released` 交付结论是三个独立维度，禁止混称“统一状态”。目录、接口或源码存在不等于完成，半成品不得默认注册、渗透稳定模块或进入正式发布链路。说“审计”默认只读并最多询问一次是否记录；说“审计并记录”更新 `ES/Documentation/Status/MODULE_AUDIT_STATE.md` 的目标模块块；说“继续审计”从该固定入口恢复并复核事实。检查点只用于导航，不授权下次实现。具体路由见 `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md`。
 - `Documentation/DOCUMENTATION_CATALOG.md` 是文档分类唯一入口。历史归档、未来方案、生成报告和待源码复验资料不得替代现行规范或 AIWarnings。
 - 不恢复 `EntityAIInputSystemModule`、`EntityInputStateModule` 等旧输入兼容类型；应清理序列化坏引用。
 - ES 自有 Unity 菜单根统一为 `【ES】/`；顶部菜单采用五个正式业务域加“常用窗口”快捷投影，`Assets/Create` 与 `Add Component` 必须按各自用户心智分别建模，详见菜单 P2 专项。
@@ -84,7 +86,7 @@ README
 - `AITalk`：会话过程和共识记录，不替代源码验证。
 - 交互风格不能授权改代码，也不能覆盖项目安全规则。
 
-维护本目录时，必须在文档顶部明确其状态：现行约束、已实现事实、联调中、待验收提案、历史复盘或已废止。出现冲突时，以 P0 约束、当前源码和最新验收证据为准。
+维护本目录时，必须在文档顶部明确其状态：现行约束、已实现事实、联调中、待验收提案、历史复盘或已废止。新建或修改的现行规则还应使用稳定 `id`、`authority`、`routeKeys` 和证据入口；历史文件不要求为了格式统一而机械重写。出现冲突时，以 P0 约束、当前源码和最新验收证据为准。
 
 Agent Skills 与 AICommands 的完整映射和后续扩展边界见：
 

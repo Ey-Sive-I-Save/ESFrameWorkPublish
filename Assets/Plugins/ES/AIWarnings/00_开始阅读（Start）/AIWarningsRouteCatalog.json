@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "catalogStatus": "incremental",
+  "description": "Machine-readable projection of selected AIWarnings routes. RuleIndex remains the human-readable routing authority during migration.",
+  "routes": [
+    {
+      "id": "ui-icon-atlas",
+      "state": "current",
+      "match": [
+        "SpriteAtlas",
+        "ESDynamicAtlasGraphic",
+        "runtime texture routing"
+      ],
+      "mustRead": [
+        "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/UI与图集（UIAtlas）/P2_UI图标_SpriteAtlas与运行时动态图集分流_AI协作警告.md"
+      ]
+    },
+    {
+      "id": "runtime-ui-window",
+      "state": "reserved",
+      "implementationStatus": "not-implemented",
+      "match": [
+        "ESUIRootCoordinator",
+        "runtime UI window",
+        "window lease",
+        "open close policy",
+        "KeepInactive",
+        "PoolOnClose",
+        "DestroyOnClose"
+      ],
+      "mustRead": [
+        "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_ES活跃请求仲裁协议_跨领域安全标准_AI协作警告.md",
+        "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/对象池（Pool）/GameObject对象池_GameManager模块_AI协作警告.md",
+        "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源加载底层_Library只属Editor_Runtime只认ManifestTable_AI协作警告.md",
+        "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_ESDialog跨宿主唯一合同与Presenter注册边界_AI协作警告.md",
+        "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_实际可玩闭环与运行证据_AI协作警告.md"
+      ],
+      "reservedRulePath": "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/UI窗口（RuntimeUIWindow）/P2_运行时UI窗口生命周期与路由_AI协作警告.md",
+      "nonClaims": [
+        "No runtime UI implementation is asserted.",
+        "No public API or default registration is asserted.",
+        "No AICommand or write permission is created by this route."
+      ]
+    }
+  ]
+}

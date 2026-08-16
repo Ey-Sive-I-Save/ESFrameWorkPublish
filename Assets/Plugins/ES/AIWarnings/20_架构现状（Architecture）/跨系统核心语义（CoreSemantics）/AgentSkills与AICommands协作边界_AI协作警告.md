@@ -30,8 +30,8 @@ ESFramework 已采用项目级 Agent Skills。目录结构而非手写数量清�
 
 ```text
 用户目标
-  -> 选择一个 AICommand
-  -> AICommand 确定任务权限与必读规则
+  -> 匹配一个 AICommand；无匹配时显式记录 NoMatchingCommand
+  -> 已匹配时由 AICommand 确定任务权限与必读规则；无匹配时只按用户明确授权和命中的 AIWarnings 工作
   -> Skill 提供可复用执行流程
   -> UnityMCP / 脚本 / 编译器执行
   -> 按证据等级交付
@@ -74,7 +74,7 @@ $es-worktree-audit
   -> $es-utf8-guard
 ```
 
-这不代表多个 Skill 共同授予更大修改范围；权限始终来自用户要求与唯一选中的 AICommand。
+这不代表多个 Skill 共同授予更大修改范围。存在匹配合同时，权限来自用户要求与唯一选中的 AICommand；不存在匹配合同时必须报告 `NoMatchingCommand`，不得套用无关合同，也不得把 Skill、Catalog 或路由本身当作写权限。
 
 ## 当前已实现事实
 

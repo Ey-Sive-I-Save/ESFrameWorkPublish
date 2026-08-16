@@ -355,14 +355,7 @@ OrientationSharpness    = 18
 - `ShotMotionSolver`
 - `ShotMotionTypes`
 
-历史静态证据（已过期，不可替代当前验收）：
-
-```text
-dotnet build ES_Logic.csproj --no-restore -v:minimal
-0 warning, 0 error
-```
-
-上述记录对应本文件早期阶段。当前生成的 `.csproj` 可能因 Unity 尚未刷新而包含陈旧路径或漏收录；是否已通过，必须以当次命令输出、Unity Editor 域重载、Unity Test Runner、PlayMode 和目标平台 Profiler 分层判断。不得引用这一历史 `0/0` 结论来签收当前 Character、Item/Shot、Vehicle 或 Camera 改动。
+历史静态证据（已过期，不可替代当前验收）曾在本文件早期阶段存在。具体命令输出、错误码和 Warning 数量不再写入 AIWarnings；是否已通过，必须以当次构建回执、Unity Editor 域重载、Unity Test Runner、PlayMode 和目标平台 Profiler 分层判断。不得引用任何历史静态结论来签收当前 Character、Item/Shot、Vehicle 或 Camera 改动。
 
 尚未落地但方向明确：
 

@@ -2,7 +2,7 @@
 
 状态：现行强约束。
 
-最后验证：2026-08-01，`ES_Logic` 0 warning / 0 error；Unity Test Runner、Player/IL2CPP 待实跑。
+最后验证：2026-08-01，`ES_Logic` 已有历史静态构建证据；Unity Test Runner、Player/IL2CPP 待实跑。具体诊断仅以当次构建回执为准，不在本规则记录数量。
 
 适用源码入口：
 

@@ -459,6 +459,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：当前 C# 复跑被非本批资源配置缺口阻断；未运行 Unity Shader 导入、Console、材质 Inspector、预览场景、平台 Variant、PlayMode 或 Player。
 - **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-016：AIWarnings 增量路由与自检门禁
+
+- **源码路径**：AIWarnings 入口、增量路由目录、P0 热路径容器规则、迁移前历史快照、领域规则与 `Test-ESAIWarnings.ps1`。
+- **规范与证据**：目录只承载增量命中规则，README、CurrentStatus 与 RuleIndex 保持入口职责；历史信息移入快照，热路径预热和稳态 GC 边界进入 P0。
+- **完成分析**：治理入口与领域规则同步收口，自检脚本可验证路由目录、关键入口和最小结构约束。
+- **回归状态**：`Test-ESAIWarnings.ps1` 通过，确认 2 条目录路由且 CurrentStatus 长度为 1213；目标文件严格 UTF-8 初检与 `git diff --check` 通过。
+- **已知缺口**：静态自检不等价于领域语义完备性证明；未运行 Unity Editor、ReloadDomain、Test Runner、PlayMode 或 Player；不声明运行时模块成熟度提升。
+- **HTML 目标**：后续在 `#ai-governance` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

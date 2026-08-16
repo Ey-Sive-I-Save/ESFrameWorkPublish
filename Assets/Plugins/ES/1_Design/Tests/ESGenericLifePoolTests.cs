@@ -13,6 +13,9 @@ namespace ES.Tests
         {
             ESGenericLifePoolTestReceiver.ThrowOnSpawn = false;
             ESGenericLifePoolTestReceiver.ThrowOnDespawn = false;
+            ESGenericLifePoolTestReceiver.SpawnAction = null;
+            ESGenericLifePoolTestReceiver.DespawnAction = null;
+            ESGenericLifePoolTestReceiver.LastSpawned = null;
             ESGenericLifePoolTestReceiver.Calls.Clear();
             LogAssert.ignoreFailingMessages = false;
         }
@@ -161,6 +164,180 @@ namespace ES.Tests
         }
 
         [Test]
+        public void Pool_ClearActiveInstance_DispatchesDespawnBeforeTerminalDestroy()
+        {
+            GameObject prefab = CreatePoolPrefab("ESGenericLifePoolTests_ClearActive");
+            ESGameObjectPoolModule pool = new ESGameObjectPoolModule();
+            try
+            {
+                GameObject instance = pool.GetInPool(prefab, Vector3.zero, Quaternion.identity);
+                Assert.That(instance, Is.Not.Null);
+
+                ESGenericLifePoolTestReceiver receiver = instance.GetComponent<ESGenericLifePoolTestReceiver>();
+                Assert.That(receiver.despawnCount, Is.EqualTo(1));
+
+                pool.Clear(prefab);
+
+                Assert.That(receiver.despawnCount, Is.EqualTo(2), "Clear must close the active Spawn with exactly one Despawn before destruction.");
+                Assert.That(pool.TryGetStats(prefab, out ESGameObjectPoolStats afterClear), Is.True);
+                Assert.That(afterClear.activeCount, Is.Zero);
+                Assert.That(afterClear.inactiveCount, Is.Zero);
+                Assert.That(afterClear.createdCount, Is.Zero);
+            }
+            finally
+            {
+                pool.ClearAll();
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Pool_ClearInactiveInstance_DoesNotDispatchDuplicateDespawn()
+        {
+            GameObject prefab = CreatePoolPrefab("ESGenericLifePoolTests_ClearInactive");
+            ESGameObjectPoolModule pool = new ESGameObjectPoolModule();
+            try
+            {
+                GameObject instance = pool.GetInPool(prefab, Vector3.zero, Quaternion.identity);
+                Assert.That(instance, Is.Not.Null);
+
+                ESGenericLifePoolTestReceiver receiver = instance.GetComponent<ESGenericLifePoolTestReceiver>();
+                Assert.That(pool.PushToPool(instance), Is.True);
+                int despawnCountAfterReturn = receiver.despawnCount;
+
+                pool.Clear(prefab);
+
+                Assert.That(receiver.despawnCount, Is.EqualTo(despawnCountAfterReturn), "An inactive instance has already completed Despawn and must not receive it again during Clear.");
+                Assert.That(pool.TryGetStats(prefab, out ESGameObjectPoolStats afterClear), Is.True);
+                Assert.That(afterClear.totalCount, Is.Zero);
+                Assert.That(afterClear.createdCount, Is.Zero);
+            }
+            finally
+            {
+                pool.ClearAll();
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Pool_ClearActiveInstanceWithFailedDespawn_StillClosesBookkeeping()
+        {
+            GameObject prefab = CreatePoolPrefab("ESGenericLifePoolTests_ClearFailedDespawn");
+            ESGameObjectPoolModule pool = new ESGameObjectPoolModule();
+            try
+            {
+                GameObject instance = pool.GetInPool(prefab, Vector3.zero, Quaternion.identity);
+                Assert.That(instance, Is.Not.Null);
+
+                ESGenericLifePoolTestReceiver receiver = instance.GetComponent<ESGenericLifePoolTestReceiver>();
+                ESGenericLifePoolTestReceiver.ThrowOnDespawn = true;
+                LogAssert.ignoreFailingMessages = true;
+
+                pool.Clear(prefab);
+
+                Assert.That(receiver.despawnCount, Is.EqualTo(2), "A throwing receiver must still be invoked once for the terminal Despawn edge.");
+                Assert.That(pool.TryGetStats(prefab, out ESGameObjectPoolStats afterClear), Is.True);
+                Assert.That(afterClear.activeCount, Is.Zero);
+                Assert.That(afterClear.inactiveCount, Is.Zero);
+                Assert.That(afterClear.createdCount, Is.Zero);
+            }
+            finally
+            {
+                pool.ClearAll();
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Pool_ClearRejectsReentrantRentFromDespawnCallback()
+        {
+            GameObject prefab = CreatePoolPrefab("ESGenericLifePoolTests_ClearReentrantRent");
+            ESGameObjectPoolModule pool = new ESGameObjectPoolModule();
+            try
+            {
+                GameObject instance = pool.GetInPool(prefab, Vector3.zero, Quaternion.identity);
+                Assert.That(instance, Is.Not.Null);
+
+                GameObject reentrantRent = instance;
+                ESGenericLifePoolTestReceiver.DespawnAction = () =>
+                    reentrantRent = pool.GetInPool(prefab, Vector3.one, Quaternion.identity);
+
+                pool.Clear(prefab);
+
+                Assert.That(reentrantRent, Is.Null, "Clear must not allow a Despawn callback to repopulate the group it is terminating.");
+                Assert.That(pool.TryGetStats(prefab, out ESGameObjectPoolStats afterClear), Is.True);
+                Assert.That(afterClear.totalCount, Is.Zero);
+                Assert.That(afterClear.createdCount, Is.Zero);
+            }
+            finally
+            {
+                ESGenericLifePoolTestReceiver.DespawnAction = null;
+                pool.ClearAll();
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Pool_ClearRequestedDuringSpawn_DefersTerminalDespawnUntilSpawnCompletes()
+        {
+            GameObject prefab = CreatePoolPrefab("ESGenericLifePoolTests_ClearDuringSpawn");
+            ESGameObjectPoolModule pool = new ESGameObjectPoolModule();
+            try
+            {
+                bool insideSpawn = false;
+                bool despawnReenteredSpawn = false;
+                int despawnCountWhenClearReturned = -1;
+                ESGenericLifePoolTestReceiver.DespawnAction = () => despawnReenteredSpawn |= insideSpawn;
+                ESGenericLifePoolTestReceiver.SpawnAction = () =>
+                {
+                    insideSpawn = true;
+                    pool.Clear(prefab);
+                    despawnCountWhenClearReturned = ESGenericLifePoolTestReceiver.LastSpawned.despawnCount;
+                    insideSpawn = false;
+                };
+
+                Assert.That(pool.GetInPool(prefab, Vector3.zero, Quaternion.identity), Is.Null);
+
+                ESGenericLifePoolTestReceiver receiver = ESGenericLifePoolTestReceiver.LastSpawned;
+                Assert.That(receiver, Is.Not.Null);
+                Assert.That(despawnCountWhenClearReturned, Is.EqualTo(1), "Clear called inside Spawn must defer instead of re-entering Despawn.");
+                Assert.That(despawnReenteredSpawn, Is.False);
+                Assert.That(receiver.despawnCount, Is.EqualTo(2), "The deferred terminal pass must close the completed Spawn exactly once.");
+                Assert.That(pool.TryGetStats(prefab, out ESGameObjectPoolStats afterClear), Is.True);
+                Assert.That(afterClear.totalCount, Is.Zero);
+                Assert.That(afterClear.createdCount, Is.Zero);
+            }
+            finally
+            {
+                pool.ClearAll();
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Pool_ClearAllRequestedDuringSpawn_DefersAndRemovesAllGroups()
+        {
+            GameObject prefab = CreatePoolPrefab("ESGenericLifePoolTests_ClearAllDuringSpawn");
+            ESGameObjectPoolModule pool = new ESGameObjectPoolModule();
+            try
+            {
+                ESGenericLifePoolTestReceiver.SpawnAction = pool.ClearAll;
+
+                Assert.That(pool.GetInPool(prefab, Vector3.zero, Quaternion.identity), Is.Null);
+
+                ESGenericLifePoolTestReceiver receiver = ESGenericLifePoolTestReceiver.LastSpawned;
+                Assert.That(receiver, Is.Not.Null);
+                Assert.That(receiver.despawnCount, Is.EqualTo(2));
+                Assert.That(pool.TryGetStats(prefab, out _), Is.False, "Deferred ClearAll must remove the terminated group from lookup tables.");
+            }
+            finally
+            {
+                pool.ClearAll();
+                Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
         public void GenericLife_RegistersTypeUniquePoolExtensions_AndUsesDefinedOrder()
         {
             GameObject root = new GameObject("ESGenericLifePoolTests_Root");
@@ -254,6 +431,9 @@ namespace ES.Tests
         public static readonly List<string> Calls = new List<string>();
         public static bool ThrowOnSpawn;
         public static bool ThrowOnDespawn;
+        public static System.Action SpawnAction;
+        public static System.Action DespawnAction;
+        public static ESGenericLifePoolTestReceiver LastSpawned;
 
         public int spawnCount;
         public int despawnCount;
@@ -264,6 +444,8 @@ namespace ES.Tests
             spawnCount++;
             spawnedOnlyWhileInactive &= !gameObject.activeSelf;
             Calls.Add("root.spawn");
+            LastSpawned = this;
+            SpawnAction?.Invoke();
             if (ThrowOnSpawn)
                 throw new System.InvalidOperationException("Pool spawn test exception.");
         }
@@ -272,6 +454,7 @@ namespace ES.Tests
         {
             despawnCount++;
             Calls.Add("root.despawn");
+            DespawnAction?.Invoke();
             if (ThrowOnDespawn)
                 throw new System.InvalidOperationException("Pool despawn test exception.");
         }

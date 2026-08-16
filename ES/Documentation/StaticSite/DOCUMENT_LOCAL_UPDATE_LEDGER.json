@@ -1811,6 +1811,52 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-009",
+                        "status":  "documented",
+                        "summary":  "收紧对象池终止与重入语义、装备实例归属和过渡事务，并修复动态图集未知提交回收与 UI 窗口层级恢复。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/1_Design/Tests/ESGenericLifePoolTests.cs",
+                                            "Assets/Plugins/ES/3_Examples/0_Foundation/Example_Container/TestContainer.cs",
+                                            "Assets/Scripts/ESLogic/Editor/Generation/Tests/ESEquipmentDomainTransactionTests.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityEquipmentDomain.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityEquipmentInventoryModule.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityEquipmentSlotModule.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESGameObjectPoolModule.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Graphics/DynamicAtlas/ESDynamicAtlasRuntime.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/UI/Window/ESUIRootCoordinator.cs"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/1_Design/Tests/ESGenericLifePoolTests.cs",
+                                              "Assets/Scripts/ESLogic/Editor/Generation/Tests/ESEquipmentDomainTransactionTests.cs",
+                                              "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESGameObjectPoolModule.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "对象池 Clear/ClearAll 在回调重入、异常和 Spawn 中止时保持终态；装备槽要求已注入且归属匹配的 Weapon 投影，并在活动挂接过渡期间禁止关系变更；动态图集不复用提交结果未知的 CommandBuffer，UI 重开窗口恢复顶层顺序。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Logic.csproj 顺序静态构建为 0 警告、0 错误",
+                                                            "ES_Design.ConfigKey.Tests.csproj 顺序静态构建为 0 警告、0 错误",
+                                                            "ES_Logic.Editor.Generation.Tests.csproj 顺序静态构建为 0 警告、0 错误",
+                                                            "9 个目标文本通过严格 UTF-8 检查"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "未运行 Unity Test Runner、PlayMode、场景切换或对象池真实回调压力测试",
+                                                             "未执行动态图集 GPU 提交失败注入或 UI 多窗口交互验收",
+                                                             "静态构建不等价于 Unity Editor、Player 或 IL2CPP 验收"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1823,13 +1869,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T10:36:44+08:00",
-                       "head":  "bf1f95a40c6af9f72a6d9c0209ccdce6bf136097",
-                       "stagedSourcePatchSha256":  "e5f310382a5afc118e79406c1894877f5644390091c7b00bbe8c5798604e03ba",
-                       "stagedSourceManifestSha256":  "9dc72402bbbe0f2eff52868cd50630d38cfceca89a1a9e9d3cc0ee33edee67eb",
-                       "stagedSourceFileCount":  34,
+                       "preparedAt":  "2026-08-16T10:40:41+08:00",
+                       "head":  "42ffb99733159e562ce08b92c6325f0c56c55629",
+                       "stagedSourcePatchSha256":  "b286c4ee4a6f0671ca32cdb2470eac25782dd4eeddc3ddab9744b5159f9033f9",
+                       "stagedSourceManifestSha256":  "d23eaaa3fac1144a8e82cc265f5f69eb6baa1e5e32dafa1297078c5879a39d6f",
+                       "stagedSourceFileCount":  9,
                        "entryIds":  [
-                                        "LOCAL-20260816-008"
+                                        "LOCAL-20260816-009"
                                     ]
                    }
 }

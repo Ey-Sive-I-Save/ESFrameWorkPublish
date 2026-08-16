@@ -1461,6 +1461,7 @@ namespace ES
                 SourceHold uploadHold = entry.sourceHold;
                 Texture source = uploadHold.texture;
                 CommandBuffer command = GetUploadCommandBuffer($"ES Dynamic Atlas Upload {entry.key.content}");
+                bool commandSubmissionUnknown = false;
                 try
                 {
                     ESDynamicAtlasUploadPath path;
@@ -1534,6 +1535,7 @@ namespace ES
                     }
                     catch (Exception exception)
                     {
+                        commandSubmissionUnknown = true;
                         PreserveUnknownSubmission(entry, page, uploadHold, exception);
                         return;
                     }
@@ -1541,7 +1543,10 @@ namespace ES
                     {
                         if (command != null)
                         {
-                            ReturnUploadCommandBuffer(command);
+                            if (commandSubmissionUnknown)
+                                command.Dispose();
+                            else
+                                ReturnUploadCommandBuffer(command);
                             command = null;
                         }
                     }

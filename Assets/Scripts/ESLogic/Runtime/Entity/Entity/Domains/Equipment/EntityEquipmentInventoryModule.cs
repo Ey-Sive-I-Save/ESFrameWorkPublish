@@ -83,7 +83,7 @@ namespace ES
             return true;
         }
 
-        public bool TryEquipItem(int inventorySlot, int equipmentSlot, out ESInstanceHandle handle)
+        internal bool TryEquipItem(int inventorySlot, int equipmentSlot, out ESInstanceHandle handle)
         {
             handle = default;
             if (equipmentSlot < 0 || !TryGetItem(inventorySlot, out handle))
@@ -100,14 +100,14 @@ namespace ES
             return true;
         }
 
-        public bool TryStoreItem(ESInstanceHandle handle, out int inventorySlot)
+        internal bool TryStoreItem(ESInstanceHandle handle, out int inventorySlot)
         {
             EnsureRuntimeState();
             inventorySlot = FindFreeSlot();
             return inventorySlot >= 0 && TryStoreItemAt(handle, inventorySlot);
         }
 
-        public bool TryStoreItemAt(ESInstanceHandle handle, int inventorySlot)
+        internal bool TryStoreItemAt(ESInstanceHandle handle, int inventorySlot)
         {
             EnsureRuntimeState();
             if ((uint)inventorySlot >= (uint)itemSlots.Length

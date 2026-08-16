@@ -396,6 +396,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：未运行 Unity Shader 导入、材质 Inspector、预览场景、PlayMode、Profiler、Player 或平台 Shader Variant；没有 UnityMCP，不能声称 ReloadDomain、Console 或 Shader 编译已通过；Unity `.meta` 空字段尾空格按序列化格式保留。
 - **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-009：运行时终止语义与事务边界
+
+- **源码路径**：通用对象池及其定向测试、Equipment Domain/Inventory/Slot 与事务测试、动态图集上传回收、UI Root 窗口层级和过时容器示例清理。
+- **规范与证据**：对象池在 Clear/ClearAll、回调异常与重入下保持终态；装备槽只接纳已注入且归属匹配的 Weapon 投影，并在活动挂接过渡期间禁止关系变更。
+- **完成分析**：终止回调、实例账本与装备关系都涉及跨模块可见状态，必须以明确事务边界阻止回调重入、陈旧句柄和部分提交状态。
+- **回归状态**：`ES_Logic.csproj`、`ES_Design.ConfigKey.Tests.csproj`、`ES_Logic.Editor.Generation.Tests.csproj` 顺序静态构建均为 0 警告、0 错误；9 个目标文本严格 UTF-8 通过。
+- **已知缺口**：未运行 Unity Test Runner、PlayMode、场景切换、对象池真实回调压力、动态图集 GPU 失败注入或 UI 多窗口交互；静态构建不等价于 Unity Editor、Player 或 IL2CPP 验收。
+- **HTML 目标**：后续在 `#runtime-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

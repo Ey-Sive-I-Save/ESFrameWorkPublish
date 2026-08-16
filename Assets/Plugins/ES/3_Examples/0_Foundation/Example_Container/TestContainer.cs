@@ -7,35 +7,12 @@ namespace ES.Samples{
         #region List
         
         public List<int> ints=new List<int>();
-        public SafeBasicList<int> safeBasicList = new SafeBasicList<int>();
         public SafeNormalList<int> safeNormalList = new SafeNormalList<int>();
-        public SafeThreadBasicList<int> safeThreadBasicList = new SafeThreadBasicList<int>();
-        public SafeThreadNormalList<int> safeThreadNormalList = new SafeThreadNormalList<int>();
 
 
         void MethodsForList()
         {
             // 示例（SafeList）简介：
-            // 目标：演示 SafeBasicList / SafeNormalList / SafeThreadBasicList / SafeThreadNormalList 的常用操作与遍历模式。
-            // 说明：这些容器支持缓冲写入以允许在遍历期间安全入队/出队，最终通过 ApplyBuffers/TryApplyBuffers 提交变更。
-
-            // --- SafeBasicList（非线程安全、可见 OnChange 回调）
-            // 注册变化回调（可用于 UI 更新或日志）
-            safeBasicList.OnChange = (isAdd, item) => Debug.Log($"SafeBasicList OnChange: {(isAdd?"Add":"Remove")} {item}");
-            // 单项/批量入队
-            safeBasicList.Add(1);
-            safeBasicList.AddRange(new[] { 2, 3, 4 });
-            // 单项/批量出队
-            safeBasicList.Remove(2);
-            safeBasicList.RemoveRange(new[] { 3 });
-            // 在遍历时不会立刻修改 ValuesNow（需要 ApplyBuffers 提交）
-            foreach (var v in safeBasicList)
-            {
-                // 读取当前生效集合
-            }
-            // 提交缓冲并触发回调
-            safeBasicList.ApplyBuffers();
-         
             // --- SafeNormalList（脏标记 + 队列缓冲）
             
             safeNormalList.Add(10);
@@ -51,46 +28,8 @@ namespace ES.Samples{
                 // 处理 v
             }
 
-            // --- SafeThreadBasicList（基本线程安全；内部通过锁保护缓冲）
-            // 在其他线程中也可调用 TryAdd/TryRemove
-            safeThreadBasicList.Add(100);
-            safeThreadBasicList.AddRange(new[] { 101, 102 });
-            safeThreadBasicList.Remove(101);
-            // 安全提交（内部已使用锁）
-            safeThreadBasicList.ApplyBuffers();
-
-            // 线程安全遍历（读取 ValuesNow）
-            foreach (var v in safeThreadBasicList)
-            {
-                // 读取 v（注意：ValuesNow 是普通 List，若跨线程访问需额外同步/快照）
-            }
-
-            // --- SafeThreadNormalList（脏标记 + 线程安全队列）
-            safeThreadNormalList.Add(200);
-            safeThreadNormalList.AddRange(new List<int> { 201, 202 });
-            safeThreadNormalList.Remove(201);
-            //ApplyBuffers 不考虑  isDirty 
-            // TryApplyBuffers 会根据 isDirty 快速返回，适合每帧调用
-            safeThreadNormalList.ApplyBuffers();
-            safeThreadNormalList.ApplyBuffers();
-
-            foreach (var v in safeThreadNormalList)
-            {
-                // 读取 v
-            }
-            
-            safeBasicList.AutoApplyBuffers=true;
             safeNormalList.AutoApplyBuffers=true;
-            safeThreadBasicList.AutoApplyBuffers=true;
-            safeThreadNormalList.AutoApplyBuffers=true;
-            //AutoApplyBuffers 让 每次使用 foreach 前自动提交缓冲，简化使用
-            //否则需要用户自己完成 ApplyBuffers/TryApplyBuffers 调用
-            
-
-            // 小结（SafeList）：
-            // - 使用 Add/Remove/AddRange/RemoveRange 入队变更，使用 ApplyBuffers/TryApplyBuffers 提交（旧 Try* API 已弃用）。
-            // - 对于需要 UI 或日志的场景，可在 Basic 版使用 OnChange 回调。
-            // - 线程安全版本在跨线程调用缓冲方法时更安全，但读取 ValuesNow 跨线程仍需谨慎或使用快照。
+            // 小结：SafeNormalList 用于在遍历期间延迟提交增删。
         }
         #endregion/*  */ 
 

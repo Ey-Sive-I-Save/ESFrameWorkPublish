@@ -8,13 +8,16 @@ namespace ES.Tests
     [Parallelizable(ParallelScope.None)]
     public sealed class ESEquipmentDomainTransactionTests
     {
+        private const string DefaultWeaponKey = "tests.equipment.default-weapon";
         private readonly List<GameObject> created = new List<GameObject>();
+        private int defaultWeaponRuntimeKey;
 
         [SetUp]
         public void SetUp()
         {
             ESRuntimeDataModule.ItemInstanceTable.Clear();
             ResetWeaponDefinitions();
+            defaultWeaponRuntimeKey = InjectWeaponDefinition(DefaultWeaponKey);
         }
 
         [TearDown]
@@ -48,7 +51,10 @@ namespace ES.Tests
 
             Assert.That(
                 inventory.TryCreateItem(
-                    new ESItemInstanceCreateRequest(10, 1),
+                    new ESItemInstanceCreateRequest(
+                        10,
+                        1,
+                        weaponDefinitionRuntimeKey: defaultWeaponRuntimeKey),
                     out ESInstanceHandle handle,
                     out int inventorySlot),
                 Is.True);
@@ -94,7 +100,10 @@ namespace ES.Tests
                 out _);
             Assert.That(
                 inventory.TryCreateItem(
-                    new ESItemInstanceCreateRequest(10, 1),
+                    new ESItemInstanceCreateRequest(
+                        10,
+                        1,
+                        weaponDefinitionRuntimeKey: defaultWeaponRuntimeKey),
                     out ESInstanceHandle handle,
                     out int inventorySlot),
                 Is.True);
@@ -123,7 +132,10 @@ namespace ES.Tests
 
             Assert.That(
                 inventory.TryCreateItem(
-                    new ESItemInstanceCreateRequest(10, 1),
+                    new ESItemInstanceCreateRequest(
+                        10,
+                        1,
+                        weaponDefinitionRuntimeKey: defaultWeaponRuntimeKey),
                     out ESInstanceHandle handle,
                     out int inventorySlot),
                 Is.True);
@@ -144,6 +156,106 @@ namespace ES.Tests
                 Is.True);
             Assert.That(record.location, Is.EqualTo(ESItemInstanceLocation.Inventory));
             Assert.That(record.relationSlot, Is.EqualTo(inventorySlot));
+        }
+
+        [Test]
+        public void NonWeaponItem_CannotEnterWeaponSlotAndRollsBack()
+        {
+            CreateDomain(
+                out Entity entity,
+                out EntityEquipmentInventoryModule inventory,
+                out EntityEquipmentSlotModule slots);
+            Assert.That(
+                inventory.TryCreateItem(
+                    new ESItemInstanceCreateRequest(10, 1),
+                    out ESInstanceHandle handle,
+                    out int inventorySlot),
+                Is.True);
+
+            Assert.That(
+                entity.equipmentDomain.TryEquipInventoryItem(
+                    inventorySlot,
+                    0,
+                    out _,
+                    out string error),
+                Is.False);
+            Assert.That(error, Does.Contain("Weapon projection"));
+            Assert.That(inventory.TryGetItem(inventorySlot, out ESInstanceHandle stored), Is.True);
+            Assert.That(stored, Is.EqualTo(handle));
+            Assert.That(slots.TryGetBoundItem(0, out _), Is.False);
+        }
+
+        [Test]
+        public void DestroyWithoutPoolCallback_RemovesOwnedItemInstances()
+        {
+            CreateDomain(
+                out Entity entity,
+                out EntityEquipmentInventoryModule inventory,
+                out _);
+            Assert.That(
+                inventory.TryCreateItem(
+                    new ESItemInstanceCreateRequest(
+                        10,
+                        1,
+                        weaponDefinitionRuntimeKey: defaultWeaponRuntimeKey),
+                    out ESInstanceHandle handle,
+                    out _),
+                Is.True);
+
+            UnityEngine.Object.DestroyImmediate(entity.gameObject);
+
+            Assert.That(ESRuntimeDataModule.ItemInstanceTable.IsCurrent(handle), Is.False);
+        }
+
+        [Test]
+        public void ActiveAttachmentTransition_BlocksInventoryEquipmentMutation()
+        {
+            CreateDomain(
+                out Entity entity,
+                out EntityEquipmentInventoryModule inventory,
+                out EntityEquipmentSlotModule slots);
+            Assert.That(
+                inventory.TryCreateItem(
+                    new ESItemInstanceCreateRequest(
+                        10,
+                        1,
+                        weaponDefinitionRuntimeKey: defaultWeaponRuntimeKey),
+                    out ESInstanceHandle handle,
+                    out int inventorySlot),
+                Is.True);
+
+            EntityTransformMapping mapping = entity.EnsureTransformMapping();
+            Transform mainHand = CreateObject(EntityEquipmentSocketKeys.MainHandSocket).transform;
+            mainHand.SetParent(entity.transform, false);
+            Assert.That(mapping.Set(EntityEquipmentSocketKeys.MainHandSocket, mainHand), Is.True);
+            EntityEquipmentWeaponSlot slot = slots.weaponSlots[0];
+            var request = new EntityEquipmentTransitionRequest(
+                new EntityEquipmentAttachmentOperation(
+                    slot.weaponRoot,
+                    slots.GetBinding(slot),
+                    EntityEquipmentAttachmentPose.MainHand,
+                    EntityEquipmentVisibilityState.Visible),
+                EntityEquipmentTransitionPhase.Equipping,
+                1);
+            Assert.That(
+                entity.equipmentDomain.TryPrepareAttachmentTransition(
+                    request,
+                    out EntityEquipmentTransitionToken token,
+                    out string prepareError),
+                Is.True,
+                prepareError);
+
+            Assert.That(
+                entity.equipmentDomain.TryEquipInventoryItem(
+                    inventorySlot,
+                    0,
+                    out _,
+                    out string equipError),
+                Is.False);
+            Assert.That(equipError, Does.Contain("active attachment transition"));
+            Assert.That(inventory.TryGetItem(inventorySlot, out ESInstanceHandle stored), Is.True);
+            Assert.That(stored, Is.EqualTo(handle));
+            Assert.That(entity.equipmentDomain.TryCancelAttachment(token, out _), Is.True);
         }
 
         [Test]
@@ -227,6 +339,7 @@ namespace ES.Tests
             slots.weaponSlots.Add(new EntityEquipmentWeaponSlot
             {
                 displayName = "Test Weapon",
+                weaponKey = new ESWeaponConfigKey { stringKey = DefaultWeaponKey },
                 weaponRoot = weaponRoot.transform,
             });
         }
@@ -244,6 +357,22 @@ namespace ES.Tests
                 Assert.Fail("Weapon definition table leaked an active build transaction.");
             ESRuntimeDataGameCore.Weapons.BeginBuild(true);
             ESRuntimeDataGameCore.Weapons.EndBuild();
+        }
+
+        private static int InjectWeaponDefinition(string stringKey)
+        {
+            ESRuntimeDataGameCore.Weapons.BeginBuild();
+            try
+            {
+                return ESRuntimeDataGameCore.Weapons.InjectWith(
+                    new ESWeaponConfigKey { stringKey = stringKey },
+                    ItemWeaponSharedData.Default,
+                    ItemWeaponVariableData.Default);
+            }
+            finally
+            {
+                ESRuntimeDataGameCore.Weapons.EndBuild();
+            }
         }
     }
 }

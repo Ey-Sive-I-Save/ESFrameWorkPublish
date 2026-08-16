@@ -428,6 +428,7 @@ namespace ES
 
                 instance.state = ESUIWindowState.Binding;
                 instance.gameObject.SetActive(true);
+                instance.gameObject.transform.SetAsLastSibling();
                 instance.view.Bind(instance.context);
                 EnsureCanContinue(instance);
 

@@ -124,7 +124,7 @@ namespace ES
             AdvanceRevision();
         }
 
-        public bool TryBindItem(int index, ESInstanceHandle handle, out string error)
+        internal bool TryBindItem(int index, ESInstanceHandle handle, out string error)
         {
             if (!TryGetWeaponSlot(index, out EntityEquipmentWeaponSlot slot, out error))
                 return false;
@@ -133,20 +133,36 @@ namespace ES
                 error = "Item instance handle is stale or belongs to another table.";
                 return false;
             }
-            if (slot.weaponKey != null && slot.weaponKey.IsConfigured)
+            if (slot.weaponKey == null || !slot.weaponKey.IsConfigured)
             {
-                if (!ESRuntimeDataGameCore.Weapons.TryGetRuntimeKey(
-                        slot.weaponKey,
-                        out int expectedDefinitionRuntimeKey))
-                {
-                    error = "Weapon slot " + index + " references a Weapon Key that is not injected.";
-                    return false;
-                }
-                if (record.weaponDefinitionRuntimeKey != expectedDefinitionRuntimeKey)
-                {
-                    error = "Item instance Weapon projection does not match Weapon slot " + index + ".";
-                    return false;
-                }
+                error = "Weapon slot " + index + " must configure a Weapon Key before binding an item.";
+                return false;
+            }
+            if (!ESRuntimeDataGameCore.Weapons.TryGetRuntimeKey(
+                    slot.weaponKey,
+                    out int expectedDefinitionRuntimeKey))
+            {
+                error = "Weapon slot " + index + " references a Weapon Key that is not injected.";
+                return false;
+            }
+            if (record.weaponDefinitionRuntimeKey <= 0
+                || record.weaponDefinitionRuntimeKey != expectedDefinitionRuntimeKey)
+            {
+                error = "Item instance Weapon projection does not match Weapon slot " + index + ".";
+                return false;
+            }
+            EntityEquipmentInventoryModule inventory = MyDomain != null ? MyDomain.Inventory : null;
+            if (inventory == null
+                || inventory.OwnerId <= 0
+                || !ESRuntimeDataModule.ItemInstanceTable.TryGetIdentity(
+                    handle,
+                    out _,
+                    out _,
+                    out int itemOwnerId)
+                || itemOwnerId != inventory.OwnerId)
+            {
+                error = "Item instance owner does not match the equipment domain owner.";
+                return false;
             }
             if (record.location != ESItemInstanceLocation.Equipped || record.relationSlot != index)
             {
@@ -177,7 +193,7 @@ namespace ES
             return true;
         }
 
-        public bool TryUnbindItem(int index, ESInstanceHandle expectedHandle)
+        internal bool TryUnbindItem(int index, ESInstanceHandle expectedHandle)
         {
             if (!TryGetBoundItem(index, out ESInstanceHandle current)
                 || current != expectedHandle)

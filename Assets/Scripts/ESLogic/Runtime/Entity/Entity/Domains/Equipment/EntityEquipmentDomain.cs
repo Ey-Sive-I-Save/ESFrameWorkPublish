@@ -75,8 +75,7 @@ namespace ES
 
         protected override void OnDestroy()
         {
-            Effects?.ReleaseAllEffects();
-            UnbindAnimationEvents();
+            NotifyPoolDespawned();
             AttachmentTransitionChanged = null;
             base.OnDestroy();
         }
@@ -116,6 +115,11 @@ namespace ES
                     : "EntityEquipmentSlotModule is missing.";
                 return false;
             }
+            if (Attachment != null && Attachment.HasActiveTransition)
+            {
+                error = "Equipment relations cannot change during an active attachment transition.";
+                return false;
+            }
             if (slots.TryGetBoundItem(equipmentSlot, out _))
             {
                 error = "Equipment slot " + equipmentSlot + " is already occupied.";
@@ -152,6 +156,11 @@ namespace ES
                 error = inventory == null
                     ? "EntityEquipmentInventoryModule is missing."
                     : "EntityEquipmentSlotModule is missing.";
+                return false;
+            }
+            if (Attachment != null && Attachment.HasActiveTransition)
+            {
+                error = "Equipment relations cannot change during an active attachment transition.";
                 return false;
             }
             if (!slots.TryGetBoundItem(equipmentSlot, out handle))

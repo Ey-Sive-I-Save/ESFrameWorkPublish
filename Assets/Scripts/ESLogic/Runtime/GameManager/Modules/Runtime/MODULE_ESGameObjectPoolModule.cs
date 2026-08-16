@@ -172,6 +172,10 @@ namespace ES
         public int missCount;
         public int repairCount;
         public int overflowDestroyCount;
+        public int spawnDispatchDepth;
+        public bool isTerminating;
+        public bool clearRequested;
+        public bool destroyActiveWhenExclusiveRequested;
 
         public readonly Dictionary<object, int> prewarmSources = new Dictionary<object, int>(4);
 
@@ -281,6 +285,7 @@ namespace ES
 
         private readonly Dictionary<string, ESGameObjectPoolGroup> groupsByKey = new Dictionary<string, ESGameObjectPoolGroup>(DefaultGroupCapacity);
         private readonly Dictionary<GameObject, ESGameObjectPoolGroup> groupsByPrefab = new Dictionary<GameObject, ESGameObjectPoolGroup>(DefaultGroupCapacity);
+        private readonly List<ESGameObjectPoolGroup> groupBuffer = new List<ESGameObjectPoolGroup>(DefaultGroupCapacity);
         private readonly List<ParticleSystem> particleBuffer = new List<ParticleSystem>(16);
         private readonly List<TrailRenderer> trailBuffer = new List<TrailRenderer>(8);
         private readonly Dictionary<PrefabPrewarmDataInfo, HashSet<ESGameObjectPoolPrewarmScope>> loadedPrewarmScopes = new Dictionary<PrefabPrewarmDataInfo, HashSet<ESGameObjectPoolPrewarmScope>>(16);
@@ -289,6 +294,9 @@ namespace ES
         private Transform root;
         private float nextRepairTime;
         private bool sceneEventsSubscribed;
+        private int activeSpawnDispatchCount;
+        private bool isClearingAll;
+        private bool clearAllRequested;
 
         public override void Start()
         {
@@ -322,7 +330,7 @@ namespace ES
 
         public GameObject GetInPool(GameObject prefab, Vector3 position, Quaternion rotation, Transform parent = null)
         {
-            if (prefab == null)
+            if (prefab == null || isClearingAll || clearAllRequested)
                 return null;
 
             ESGameObjectPoolGroup group = GetOrCreateGroup(prefab, null, null);
@@ -337,7 +345,7 @@ namespace ES
 
         public GameObject GetInPool(GameObject prefab, Vector3 position, Quaternion rotation, Transform parent, bool autoReturn, float autoReturnDelay)
         {
-            if (prefab == null)
+            if (prefab == null || isClearingAll || clearAllRequested)
                 return null;
 
             ESGameObjectPoolGroup group = GetOrCreateGroup(prefab, null, null);
@@ -368,7 +376,7 @@ namespace ES
 
         public void Register(GameObject prefab, string key = null, ESGameObjectPoolConfig config = null)
         {
-            if (prefab == null)
+            if (prefab == null || isClearingAll || clearAllRequested)
                 return;
 
             GetOrCreateGroup(prefab, key, config);
@@ -400,7 +408,7 @@ namespace ES
 
         public void Prewarm(GameObject prefab, int count, string key = null, ESGameObjectPoolConfig config = null)
         {
-            if (prefab == null || count <= 0)
+            if (prefab == null || count <= 0 || isClearingAll || clearAllRequested)
                 return;
 
             ESGameObjectPoolGroup group = GetOrCreateGroup(prefab, key, config);
@@ -409,9 +417,12 @@ namespace ES
 
         internal void PrewarmOwned(GameObject prefab, int count, object source, string key = null, ESGameObjectPoolConfig config = null)
         {
-            if (prefab == null || count <= 0 || source == null)
+            if (prefab == null || count <= 0 || source == null || isClearingAll || clearAllRequested)
                 return;
             ESGameObjectPoolGroup group = GetOrCreateGroup(prefab, key, config);
+            if (IsGroupTerminationPending(group))
+                return;
+
             AddPrewarmSource(group, source, count);
             CreateInactive(group, count);
         }
@@ -755,16 +766,71 @@ namespace ES
 
         public void ClearAll()
         {
-            foreach (KeyValuePair<string, ESGameObjectPoolGroup> pair in groupsByKey)
-                ClearGroup(pair.Value);
+            if (isClearingAll)
+                return;
 
-            groupsByKey.Clear();
-            groupsByPrefab.Clear();
-            loadedPrewarmScopes.Clear();
-            foreach (Dictionary<ESGameObjectPoolPrewarmScope, ESGameObjectPoolAsyncPrewarmContext> contexts in asyncPrewarmContexts.Values)
-                foreach (ESGameObjectPoolAsyncPrewarmContext context in contexts.Values)
-                    context.Dispose();
-            asyncPrewarmContexts.Clear();
+            if (activeSpawnDispatchCount > 0)
+            {
+                // ClearAll may be requested by OnPoolSpawned user code. Despawn cannot re-enter
+                // that dispatch, so the terminal pass starts when the outermost Spawn completes.
+                clearAllRequested = true;
+                return;
+            }
+
+            ClearAllImmediate();
+        }
+
+        private void ClearAllImmediate()
+        {
+            clearAllRequested = false;
+
+            isClearingAll = true;
+            try
+            {
+                // Despawn callbacks are user code and may re-enter the pool. Snapshot groups so
+                // callbacks cannot invalidate dictionary enumeration; new rents/registration are
+                // rejected until the terminal pass has completed.
+                groupBuffer.Clear();
+                foreach (ESGameObjectPoolGroup group in groupsByKey.Values)
+                    groupBuffer.Add(group);
+
+                for (int i = 0; i < groupBuffer.Count; i++)
+                    ClearGroup(groupBuffer[i]);
+
+                groupsByKey.Clear();
+                groupsByPrefab.Clear();
+                loadedPrewarmScopes.Clear();
+                foreach (Dictionary<ESGameObjectPoolPrewarmScope, ESGameObjectPoolAsyncPrewarmContext> contexts in asyncPrewarmContexts.Values)
+                {
+                    foreach (ESGameObjectPoolAsyncPrewarmContext context in contexts.Values)
+                    {
+                        try
+                        {
+                            context.Dispose();
+                        }
+                        catch (Exception exception)
+                        {
+                            // One broken resource scope must not prevent the remaining scopes and
+                            // the pool hierarchy from reaching their terminal state.
+                            Debug.LogException(exception);
+                        }
+                    }
+                }
+                asyncPrewarmContexts.Clear();
+
+                // ClearAll owns the complete pool hierarchy. Releasing the root prevents empty
+                // Pool_* nodes from accumulating across repeated world/session resets.
+                if (root != null)
+                {
+                    UnityEngine.Object.Destroy(root.gameObject);
+                    root = null;
+                }
+            }
+            finally
+            {
+                groupBuffer.Clear();
+                isClearingAll = false;
+            }
         }
 
         public override void OnDestroy()
@@ -812,6 +878,9 @@ namespace ES
 
         private GameObject GetFromGroup(ESGameObjectPoolGroup group, Vector3 position, Quaternion rotation, Transform parent, bool autoReturn, float autoReturnDelay)
         {
+            if (group == null || IsGroupTerminationPending(group) || isClearingAll || clearAllRequested)
+                return null;
+
             GameObject instance = null;
             while (group.inactive.Count > 0 && instance == null)
                 instance = group.inactive.Dequeue();
@@ -832,8 +901,7 @@ namespace ES
             if (pooled == null)
             {
                 Debug.LogError("[ESGameObjectPool] A pooled instance lost its ESPooledGameObject bridge and will be discarded.", instance);
-                group.createdCount = Mathf.Max(0, group.createdCount - 1);
-                UnityEngine.Object.Destroy(instance);
+                DiscardInstance(group, instance);
                 return null;
             }
 
@@ -848,7 +916,18 @@ namespace ES
                 instanceTransform.SetPositionAndRotation(position, rotation);
 
                 pooled.MarkGetInPool(autoReturn, autoReturnDelay);
-                if (!pooled.NotifyPoolSpawned())
+                bool spawnSucceeded;
+                BeginPoolSpawnDispatch(group);
+                try
+                {
+                    spawnSucceeded = pooled.NotifyPoolSpawned();
+                }
+                finally
+                {
+                    EndPoolSpawnDispatch(group);
+                }
+
+                if (!spawnSucceeded)
                     return null;
 
                 // A receiver may request return during OnPoolSpawned. It is deferred until all
@@ -859,11 +938,14 @@ namespace ES
                     return null;
                 }
 
-                // A callback is allowed to request a return. In that case the nested return has
-                // already completed and this caller must not reactivate or hand out the instance.
-                if (!pooled.IsSpawned || !group.active.Contains(instance))
+                // Clear/ClearAll requested inside Spawn is terminal for this borrow. It is flushed
+                // only after Spawn dispatch has unwound, so Despawn never re-enters Spawn.
+                TryFlushPendingTermination(group);
+                if (IsGroupTerminationPending(group) || !pooled.IsSpawned || !group.active.Contains(instance))
                     return null;
 
+                // A callback is allowed to request a return. In that case the nested return has
+                // already completed and this caller must not reactivate or hand out the instance.
                 instance.SetActive(true);
                 if (!pooled.IsSpawned || !group.active.Contains(instance))
                     return null;
@@ -883,6 +965,8 @@ namespace ES
                 // return removes it from active itself; otherwise this finally path closes it.
                 if (!handedToCaller && group.active.Contains(instance))
                     ReturnFailedSpawnToTerminalState(group, instance, pooled);
+
+                TryFlushPendingTermination(group);
             }
         }
 
@@ -982,7 +1066,7 @@ namespace ES
 
         private bool CanCreate(ESGameObjectPoolGroup group)
         {
-            if (group == null || group.prefab == null)
+            if (group == null || group.prefab == null || IsGroupTerminationPending(group) || isClearingAll || clearAllRequested)
                 return false;
 
             if (group.config.maxTotalCount > 0 && group.TotalCount >= group.config.maxTotalCount)
@@ -1092,6 +1176,12 @@ namespace ES
 
             try
             {
+                if (group.isTerminating)
+                {
+                    DiscardInstance(group, instance);
+                    return;
+                }
+
                 if (group.config.destroyOverflow && group.inactive.Count >= group.config.maxInactiveCount)
                 {
                     group.overflowDestroyCount++;
@@ -1126,29 +1216,96 @@ namespace ES
             if (wasCounted && group != null)
                 group.createdCount = Mathf.Max(0, group.createdCount - 1);
 
+            try
+            {
+                // Destroy is deferred by Unity. A terminally discarded object must stop running
+                // immediately after its Despawn edge instead of remaining active until end of frame.
+                if (instance.activeSelf)
+                    instance.SetActive(false);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, instance);
+            }
+
             UnityEngine.Object.Destroy(instance);
+        }
+
+        private void TerminateActiveInstance(ESGameObjectPoolGroup group, GameObject instance)
+        {
+            if (group == null || !group.active.Remove(instance))
+                return;
+
+            // A Unity object may already have been destroyed externally while its managed
+            // reference is still present in the active set. Its pool count still has to close.
+            if (instance == null)
+            {
+                group.createdCount = Mathf.Max(0, group.createdCount - 1);
+                return;
+            }
+
+            ESPooledGameObject pooled = instance.GetComponent<ESPooledGameObject>();
+            if (pooled == null)
+            {
+                Debug.LogError("[ESGameObjectPool] An active instance lost its ESPooledGameObject bridge during termination; Despawn could not be dispatched.", instance);
+            }
+            else if (pooled.IsSpawned && !ResetInstanceForReturn(group, instance, pooled))
+            {
+                Debug.LogError("[ESGameObjectPool] Active instance termination Despawn failed; the instance will still be destroyed.", instance);
+            }
+
+            // Termination never returns the object to inactive storage. ResetInstanceForReturn
+            // already closes Spawn state in its finally block even when a receiver throws.
+            DiscardInstance(group, instance);
+        }
+
+        private void TerminateAllActiveInstances(ESGameObjectPoolGroup group)
+        {
+            while (group != null && group.active.Count > 0)
+            {
+                GameObject active = null;
+                HashSet<GameObject>.Enumerator enumerator = group.active.GetEnumerator();
+                if (enumerator.MoveNext())
+                    active = enumerator.Current;
+                enumerator.Dispose();
+
+                TerminateActiveInstance(group, active);
+            }
         }
 
         private void ClearGroup(ESGameObjectPoolGroup group)
         {
-            if (group == null)
+            if (group == null || group.isTerminating)
                 return;
 
-            foreach (GameObject active in group.active)
+            if (group.spawnDispatchDepth > 0)
             {
-                if (active != null)
-                    UnityEngine.Object.Destroy(active);
+                group.clearRequested = true;
+                return;
             }
 
-            while (group.inactive.Count > 0)
+            group.clearRequested = false;
+            group.destroyActiveWhenExclusiveRequested = false;
+            group.isTerminating = true;
+            try
             {
-                GameObject inactive = group.inactive.Dequeue();
-                if (inactive != null)
-                    UnityEngine.Object.Destroy(inactive);
-            }
+                // Only active instances still owe a Despawn. Inactive instances have already
+                // completed that lifecycle edge and must not receive it a second time.
+                TerminateAllActiveInstances(group);
 
-            group.active.Clear();
-            group.createdCount = 0;
+                while (group.inactive.Count > 0)
+                {
+                    GameObject inactive = group.inactive.Dequeue();
+                    if (inactive != null)
+                        UnityEngine.Object.Destroy(inactive);
+                }
+
+                group.createdCount = 0;
+            }
+            finally
+            {
+                group.isTerminating = false;
+            }
         }
 
         private void EnsureRoot()
@@ -1317,28 +1474,94 @@ namespace ES
 
         private void ClearExclusiveGroup(ESGameObjectPoolGroup group, bool destroyActive)
         {
-            if (group == null || group.PrewarmSourceCount > 0)
+            if (group == null || group.PrewarmSourceCount > 0 || group.isTerminating)
                 return;
 
-            while (group.inactive.Count > 0)
+            if (destroyActive && group.spawnDispatchDepth > 0)
             {
-                GameObject inactive = group.inactive.Dequeue();
-                if (inactive != null)
-                    UnityEngine.Object.Destroy(inactive);
+                group.destroyActiveWhenExclusiveRequested = true;
+                return;
             }
 
             if (destroyActive)
+                group.destroyActiveWhenExclusiveRequested = false;
+            group.isTerminating = true;
+            try
             {
-                foreach (GameObject active in group.active)
+                while (group.inactive.Count > 0)
                 {
-                    if (active != null)
-                        UnityEngine.Object.Destroy(active);
+                    GameObject inactive = group.inactive.Dequeue();
+                    if (inactive != null)
+                        UnityEngine.Object.Destroy(inactive);
                 }
 
-                group.active.Clear();
+                if (destroyActive)
+                    TerminateAllActiveInstances(group);
+
+                group.createdCount = group.TotalCount;
+            }
+            finally
+            {
+                group.isTerminating = false;
+            }
+        }
+
+        private void BeginPoolSpawnDispatch(ESGameObjectPoolGroup group)
+        {
+            group.spawnDispatchDepth++;
+            activeSpawnDispatchCount++;
+        }
+
+        private void EndPoolSpawnDispatch(ESGameObjectPoolGroup group)
+        {
+            if (group.spawnDispatchDepth <= 0 || activeSpawnDispatchCount <= 0)
+            {
+                Debug.LogError("[ESGameObjectPool] Pool Spawn dispatch depth became unbalanced.");
+                group.spawnDispatchDepth = 0;
+                activeSpawnDispatchCount = 0;
+                return;
             }
 
-            group.createdCount = group.TotalCount;
+            group.spawnDispatchDepth--;
+            activeSpawnDispatchCount--;
+        }
+
+        private bool TryFlushPendingTermination(ESGameObjectPoolGroup group)
+        {
+            if (clearAllRequested)
+            {
+                if (activeSpawnDispatchCount > 0)
+                    return false;
+
+                ClearAllImmediate();
+                return true;
+            }
+
+            if (group == null || group.spawnDispatchDepth > 0)
+                return false;
+
+            if (group.clearRequested)
+            {
+                ClearGroup(group);
+                return true;
+            }
+
+            if (group.destroyActiveWhenExclusiveRequested)
+            {
+                group.destroyActiveWhenExclusiveRequested = false;
+                ClearExclusiveGroup(group, true);
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool IsGroupTerminationPending(ESGameObjectPoolGroup group)
+        {
+            return isClearingAll
+                || clearAllRequested
+                || (group != null
+                    && (group.isTerminating || group.clearRequested || group.destroyActiveWhenExclusiveRequested));
         }
 
         private void RemoveGroupIfUnused(ESGameObjectPoolGroup group)

@@ -1731,7 +1731,7 @@ namespace ES.EditorInternal
                         ESGraphAuthoringRegistry.TryGetNodeDefinition(Asset.DomainKey, pair.Value.TypeKey,
                             out IESGraphNodeDefinition definition);
                         nodeView = new ESStableGraphNodeView(Asset.DomainKey, pair.Value, definition,
-                            edgeConnectorListener, OpenNodeDetails);
+                            edgeConnectorListener, OpenNodeDetails, Asset.GraphId);
                         nodeViews[pair.Key] = nodeView;
                         AddElement(nodeView);
                     }
@@ -1890,7 +1890,7 @@ namespace ES.EditorInternal
             ESGraphAuthoringRegistry.TryGetNodeDefinition(Asset.DomainKey, record.TypeKey,
                 out IESGraphNodeDefinition definition);
             var newView = new ESStableGraphNodeView(Asset.DomainKey, record, definition,
-                edgeConnectorListener, OpenNodeDetails);
+                edgeConnectorListener, OpenNodeDetails, Asset.GraphId);
             nodeViews[nodeId] = newView;
             AddElement(newView);
             if (record.ports != null)
@@ -5513,7 +5513,9 @@ namespace ES.EditorInternal
         private readonly Color projectedAccent;
         private readonly Color projectedBorder;
         private readonly Action<ESStableGraphNodeView> openDetails;
+        private readonly string bodyFoldoutStateKey;
         private VisualElement keyFields;
+        private Foldout keyFieldsFoldout;
         private ulong nodeCardContextSignature;
         private bool hasNodeCardContextSignature;
 
@@ -5562,10 +5564,13 @@ namespace ES.EditorInternal
 
         public ESStableGraphNodeView(ESGraphDomainKey domain, ESGraphNodeRecord record,
             IESGraphNodeDefinition definition, IEdgeConnectorListener edgeConnectorListener,
-            Action<ESStableGraphNodeView> openDetails = null)
+            Action<ESStableGraphNodeView> openDetails = null, string graphId = null)
         {
             NodeId = record.nodeId;
             this.openDetails = openDetails;
+            bodyFoldoutStateKey = string.IsNullOrWhiteSpace(graphId)
+                ? string.Empty
+                : "ES.StableGraph.NodeBodyExpanded." + graphId + "." + NodeId;
             projectedTypeId = record.typeId;
             projectedVersion = record.version;
             projectedTitle = record.title;
@@ -5721,15 +5726,51 @@ namespace ES.EditorInternal
         {
             if (!NeedsNodeCardRefresh(contextSignature))
                 return;
-            keyFields?.RemoveFromHierarchy();
+            keyFieldsFoldout?.RemoveFromHierarchy();
             keyFields = null;
+            keyFieldsFoldout = null;
             nodeCardContextSignature = contextSignature;
             hasNodeCardContextSignature = true;
             if (ESGraphAuthoringRegistry.TryCreateNodeCard(context, out VisualElement created))
             {
                 keyFields = created;
-                mainContainer.Add(keyFields);
+                bool bodyExpanded = !string.IsNullOrEmpty(bodyFoldoutStateKey)
+                    && SessionState.GetBool(bodyFoldoutStateKey, false);
+                keyFieldsFoldout = CreateBodyFoldout(keyFields, bodyExpanded, expandedBody =>
+                {
+                    if (!string.IsNullOrEmpty(bodyFoldoutStateKey))
+                        SessionState.SetBool(bodyFoldoutStateKey, expandedBody);
+                });
+                mainContainer.Add(keyFieldsFoldout);
             }
+        }
+
+        internal static Foldout CreateBodyFoldout(VisualElement body, bool expanded = false,
+            Action<bool> expandedChanged = null)
+        {
+            var foldout = new Foldout
+            {
+                name = "es-node-body-foldout",
+                text = "正文",
+                value = expanded,
+                tooltip = "展开或收起节点正文；端口和连接关系始终保持可见。"
+            };
+            foldout.style.marginTop = 3f;
+            foldout.style.marginBottom = 3f;
+            foldout.style.marginLeft = 0f;
+            foldout.style.marginRight = 0f;
+            Toggle toggle = foldout.Q<Toggle>();
+            if (toggle != null)
+            {
+                toggle.style.minHeight = 20f;
+                toggle.style.fontSize = 10f;
+                toggle.style.unityFontStyleAndWeight = FontStyle.Bold;
+            }
+            if (expandedChanged != null)
+                foldout.RegisterValueChangedCallback(evt => expandedChanged(evt.newValue));
+            if (body != null)
+                foldout.Add(body);
+            return foldout;
         }
 
         public void SetSelectedVisual(bool selected)

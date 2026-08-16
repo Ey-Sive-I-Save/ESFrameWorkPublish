@@ -369,7 +369,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void StableGraph_DegreeValidatorCountsEveryEdgeOnceAcrossMultiPorts()
+        public void StableGraph_DegreeValidatorCountsEveryEdgeOnOneMultiConnectionPort()
         {
             ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
             ESGraphDomainKey domain = ESGraphDomainKey.FromKind(ESGraphDomainKind.Generic);
@@ -403,6 +403,134 @@ namespace ES.Tests
                     new IESGraphNodeDefinition[] { sourceDefinition, sinkDefinition }, issues);
                 Assert.That(issues.Count(issue => issue?.code == "Graph.Degree.Outgoing.Max"),
                     Is.EqualTo(1), Describe(issues));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_TopologySeparatesMultipleEndpointsFromOnePortWithMultipleEdges()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            try
+            {
+                var sourceDefinition = new ESStableGraphNodeTemplate(
+                    ESGraphDomainKey.FromKind(ESGraphDomainKind.Generic),
+                    ESGraphNodeTypeKey.Custom("es.test.topology-source"), "Test/Source", "Source",
+                    string.Empty, ESGraphNodeCategory.Entry, ESGraphNodeTheme.Entry,
+                    "Source", string.Empty, 1, 0, default, new ESGraphDegreeRule(),
+                    new ESGraphPortDefinition("分发", "route.fan-out",
+                        ESGraphPortDirection.Output, ESGraphPortCapacity.Multi,
+                        ESGraphPortValueIds.Flow, meaning: "同一出口允许多条连接"));
+                var sinkDefinition = new ESStableGraphNodeTemplate(
+                    ESGraphDomainKey.FromKind(ESGraphDomainKind.Generic),
+                    ESGraphNodeTypeKey.Custom("es.test.topology-sink"), "Test/Sink", "Sink",
+                    string.Empty, ESGraphNodeCategory.Exit, ESGraphNodeTheme.Exit,
+                    "Sink", string.Empty, 1, 0, default, new ESGraphDegreeRule(),
+                    new ESGraphPortDefinition("输入", "route.input",
+                        ESGraphPortDirection.Input));
+                ESGraphNodeRecord source = graph.AddNode(sourceDefinition.NodeType, "Source",
+                    Vector2.zero, sourceDefinition.Ports);
+                ESGraphNodeRecord firstSink = graph.AddNode(sinkDefinition.NodeType, "Sink A",
+                    Vector2.right, sinkDefinition.Ports);
+                ESGraphNodeRecord secondSink = graph.AddNode(sinkDefinition.NodeType, "Sink B",
+                    Vector2.right * 2f, sinkDefinition.Ports);
+                Assert.That(graph.TryAddEdge(Output(source), Input(firstSink), out _, out string firstError),
+                    Is.True, firstError);
+                Assert.That(graph.TryAddEdge(Output(source), Input(secondSink), out _, out string secondError),
+                    Is.True, secondError);
+
+                ESGraphNodeTopology singleEndpoint =
+                    ESGraphTopologyAnalyzer.Analyze(source, graph.Nodes, graph.Edges);
+                Assert.That(singleEndpoint.OutputEndpointCount, Is.EqualTo(1));
+                Assert.That(singleEndpoint.OutputConnectionCount, Is.EqualTo(2));
+                Assert.That(singleEndpoint.IsMultiEndpointNode, Is.False,
+                    "同一 Multi 容量端点的两条边仍是单端口多连接，不能判成多端口节点。");
+                Assert.That(singleEndpoint.Endpoints.Single().Capacity,
+                    Is.EqualTo(ESGraphPortCapacity.Multi));
+                Assert.That(singleEndpoint.Endpoints.Single().ConnectionCount, Is.EqualTo(2));
+
+                Assert.That(graph.AddPort(source.nodeId, new ESGraphPortDefinition(
+                    "失败", "route.failure", ESGraphPortDirection.Output,
+                    ESGraphPortCapacity.Single, ESGraphPortValueIds.Flow,
+                    meaning: "独立失败出口"), out string addError), Is.Not.Null, addError);
+                ESGraphNodeTopology multipleEndpoints =
+                    ESGraphTopologyAnalyzer.Analyze(source, graph.Nodes, graph.Edges);
+                Assert.That(multipleEndpoints.OutputEndpointCount, Is.EqualTo(2));
+                Assert.That(multipleEndpoints.OutputConnectionCount, Is.EqualTo(2));
+                Assert.That(multipleEndpoints.HasMultipleOutputEndpoints, Is.True,
+                    "两个不同 PortId、StableKey、方向和用途才构成多输出端点。");
+
+                var ordinaryFlowNode = new ESGraphNodeRecord
+                {
+                    nodeId = ESGraphIdentity.NewId(),
+                    ports = new List<ESGraphPortRecord>
+                    {
+                        new ESGraphPortRecord
+                        {
+                            portId = ESGraphIdentity.NewId(), stableKey = "flow.input",
+                            meaning = "流程输入", direction = ESGraphPortDirection.Input,
+                            capacity = ESGraphPortCapacity.Multi
+                        },
+                        new ESGraphPortRecord
+                        {
+                            portId = ESGraphIdentity.NewId(), stableKey = "flow.output",
+                            meaning = "流程输出", direction = ESGraphPortDirection.Output,
+                            capacity = ESGraphPortCapacity.Multi
+                        }
+                    }
+                };
+                ESGraphNodeTopology ordinaryTopology =
+                    ESGraphTopologyAnalyzer.Analyze(ordinaryFlowNode,
+                        new[] { ordinaryFlowNode }, Array.Empty<ESGraphEdgeRecord>());
+                Assert.That(ordinaryTopology.InputEndpointCount, Is.EqualTo(1));
+                Assert.That(ordinaryTopology.OutputEndpointCount, Is.EqualTo(1));
+                Assert.That(ordinaryTopology.MultiConnectionCapacityEndpointCount, Is.EqualTo(2));
+                Assert.That(ordinaryTopology.IsMultiEndpointNode, Is.False,
+                    "普通一入一出节点即使两个端点都允许多连接，也不是多端口节点。");
+
+                var foreignNodeWithDuplicatedPortId = new ESGraphNodeRecord
+                {
+                    nodeId = ESGraphIdentity.NewId(),
+                    ports = new List<ESGraphPortRecord>
+                    {
+                        new ESGraphPortRecord
+                        {
+                            portId = ordinaryFlowNode.ports[0].portId,
+                            stableKey = "foreign.input",
+                            meaning = "冲突端点",
+                            direction = ESGraphPortDirection.Input
+                        }
+                    }
+                };
+                ESGraphNodeTopology crossNodeDuplicateTopology =
+                    ESGraphTopologyAnalyzer.Analyze(ordinaryFlowNode,
+                        new[] { ordinaryFlowNode, foreignNodeWithDuplicatedPortId },
+                        Array.Empty<ESGraphEdgeRecord>());
+                Assert.That(crossNodeDuplicateTopology.InputEndpointCount, Is.Zero,
+                    "跨节点重复 PortId 的记录不得计为独立稳定端点。");
+                Assert.That(crossNodeDuplicateTopology.OutputEndpointCount, Is.EqualTo(1));
+                Assert.That(crossNodeDuplicateTopology.InvalidEndpointRecordCount, Is.EqualTo(1));
+
+                ESGraphPortRecord duplicated = ordinaryFlowNode.ports[1];
+                ordinaryFlowNode.ports.Add(new ESGraphPortRecord
+                {
+                    portId = duplicated.portId,
+                    stableKey = duplicated.stableKey,
+                    meaning = duplicated.meaning,
+                    direction = duplicated.direction,
+                    capacity = duplicated.capacity
+                });
+                ESGraphNodeTopology duplicateTopology =
+                    ESGraphTopologyAnalyzer.Analyze(ordinaryFlowNode,
+                        new[] { ordinaryFlowNode }, Array.Empty<ESGraphEdgeRecord>());
+                Assert.That(duplicateTopology.OutputEndpointCount, Is.Zero,
+                    "重复身份的两条记录都不是可独立寻址的稳定端点。");
+                Assert.That(duplicateTopology.InvalidEndpointRecordCount, Is.EqualTo(2));
+                Assert.That(duplicateTopology.IsMultiEndpointNode, Is.False,
+                    "重复同一 PortId、StableKey、方向和用途不得伪造第二个稳定端点。");
             }
             finally
             {
@@ -804,7 +932,7 @@ namespace ES.Tests
         public void StableGraph_ReconnectIgnoresItsOwnSingleCapacityAndRejectsInvalidTargetsAtomically()
         {
             ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
-            var multiFlowPorts = new[]
+            var multiConnectionFlowPorts = new[]
             {
                 new ESGraphPortDefinition("输入", "flow.input", ESGraphPortDirection.Input,
                     ESGraphPortCapacity.Multi),
@@ -813,10 +941,10 @@ namespace ES.Tests
             };
             try
             {
-                ESGraphNodeRecord a = graph.AddNode("test.node", "A", Vector2.zero, multiFlowPorts);
-                ESGraphNodeRecord b = graph.AddNode("test.node", "B", Vector2.right, multiFlowPorts);
-                ESGraphNodeRecord c = graph.AddNode("test.node", "C", Vector2.right * 2f, multiFlowPorts);
-                ESGraphNodeRecord d = graph.AddNode("test.node", "D", Vector2.right * 3f, multiFlowPorts);
+                ESGraphNodeRecord a = graph.AddNode("test.node", "A", Vector2.zero, multiConnectionFlowPorts);
+                ESGraphNodeRecord b = graph.AddNode("test.node", "B", Vector2.right, multiConnectionFlowPorts);
+                ESGraphNodeRecord c = graph.AddNode("test.node", "C", Vector2.right * 2f, multiConnectionFlowPorts);
+                ESGraphNodeRecord d = graph.AddNode("test.node", "D", Vector2.right * 3f, multiConnectionFlowPorts);
                 ESGraphNodeRecord numberSource = graph.AddNode("test.number", "N", Vector2.left,
                     new[]
                     {
@@ -856,7 +984,7 @@ namespace ES.Tests
         public void StableGraph_ReconnectCompatibilityIndexMatchesTheAuthoritativeValidator()
         {
             ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
-            var multiFlowPorts = new[]
+            var multiConnectionFlowPorts = new[]
             {
                 new ESGraphPortDefinition("输入", "flow.input", ESGraphPortDirection.Input,
                     ESGraphPortCapacity.Multi),
@@ -865,10 +993,10 @@ namespace ES.Tests
             };
             try
             {
-                ESGraphNodeRecord a = graph.AddNode("test.node", "A", Vector2.zero, multiFlowPorts);
-                ESGraphNodeRecord b = graph.AddNode("test.node", "B", Vector2.right, multiFlowPorts);
-                ESGraphNodeRecord c = graph.AddNode("test.node", "C", Vector2.right * 2f, multiFlowPorts);
-                ESGraphNodeRecord d = graph.AddNode("test.node", "D", Vector2.right * 3f, multiFlowPorts);
+                ESGraphNodeRecord a = graph.AddNode("test.node", "A", Vector2.zero, multiConnectionFlowPorts);
+                ESGraphNodeRecord b = graph.AddNode("test.node", "B", Vector2.right, multiConnectionFlowPorts);
+                ESGraphNodeRecord c = graph.AddNode("test.node", "C", Vector2.right * 2f, multiConnectionFlowPorts);
+                ESGraphNodeRecord d = graph.AddNode("test.node", "D", Vector2.right * 3f, multiConnectionFlowPorts);
                 ESGraphNodeRecord occupied = graph.AddNode("test.node", "Occupied", Vector2.down, DefaultPorts);
                 ESGraphNodeRecord number = graph.AddNode("test.number", "Number", Vector2.up,
                     new[]

@@ -325,6 +325,207 @@ namespace ES
         [Min(0)] public int order;
     }
 
+    /// <summary>
+    /// Read-only topology facts for one stable endpoint. Capacity describes whether this one
+    /// endpoint accepts multiple edges; it never describes how many endpoints its node owns.
+    /// </summary>
+    public readonly struct ESGraphEndpointTopology
+    {
+        public string PortId { get; }
+        public string StableKey { get; }
+        public string Meaning { get; }
+        public ESGraphPortDirection Direction { get; }
+        public ESGraphPortCapacity Capacity { get; }
+        public int ConnectionCount { get; }
+        public bool IsStableIndependent { get; }
+
+        internal ESGraphEndpointTopology(ESGraphPortRecord port, int connectionCount,
+            bool isStableIndependent)
+        {
+            PortId = port?.portId ?? string.Empty;
+            StableKey = port?.stableKey ?? string.Empty;
+            Meaning = port?.meaning ?? string.Empty;
+            Direction = port?.direction ?? ESGraphPortDirection.Input;
+            Capacity = port?.capacity ?? ESGraphPortCapacity.Single;
+            ConnectionCount = Math.Max(0, connectionCount);
+            IsStableIndependent = isStableIndependent;
+        }
+    }
+
+    /// <summary>
+    /// Separates a node's independent stable endpoints from the number of edges connected to
+    /// those endpoints. A node is multi-endpoint only when one direction owns at least two
+    /// distinct PortId + StableKey + Direction + Meaning identities.
+    /// </summary>
+    public sealed class ESGraphNodeTopology
+    {
+        private static readonly ESGraphEndpointTopology[] EmptyEndpoints =
+            Array.Empty<ESGraphEndpointTopology>();
+
+        public static ESGraphNodeTopology Empty { get; } =
+            new ESGraphNodeTopology(EmptyEndpoints, 0, 0, 0, 0);
+
+        public IReadOnlyList<ESGraphEndpointTopology> Endpoints { get; }
+        public int InputEndpointCount { get; }
+        public int OutputEndpointCount { get; }
+        public int TotalEndpointCount => InputEndpointCount + OutputEndpointCount;
+        public int InputConnectionCount { get; }
+        public int OutputConnectionCount { get; }
+        public int TotalConnectionCount => InputConnectionCount + OutputConnectionCount;
+        public int ConnectedEndpointCount { get; }
+        public int MultiConnectionCapacityEndpointCount { get; }
+        public int InvalidEndpointRecordCount { get; }
+        public bool HasMultipleInputEndpoints => InputEndpointCount >= 2;
+        public bool HasMultipleOutputEndpoints => OutputEndpointCount >= 2;
+        public bool IsMultiEndpointNode => HasMultipleInputEndpoints || HasMultipleOutputEndpoints;
+
+        internal ESGraphNodeTopology(ESGraphEndpointTopology[] endpoints,
+            int inputEndpointCount, int outputEndpointCount,
+            int inputConnectionCount, int outputConnectionCount)
+        {
+            Endpoints = endpoints ?? EmptyEndpoints;
+            InputEndpointCount = Math.Max(0, inputEndpointCount);
+            OutputEndpointCount = Math.Max(0, outputEndpointCount);
+            InputConnectionCount = Math.Max(0, inputConnectionCount);
+            OutputConnectionCount = Math.Max(0, outputConnectionCount);
+            ConnectedEndpointCount = Endpoints.Count(endpoint =>
+                endpoint.IsStableIndependent && endpoint.ConnectionCount > 0);
+            MultiConnectionCapacityEndpointCount = Endpoints.Count(endpoint =>
+                endpoint.IsStableIndependent
+                && endpoint.Capacity == ESGraphPortCapacity.Multi);
+            InvalidEndpointRecordCount = Endpoints.Count(endpoint => !endpoint.IsStableIndependent);
+        }
+    }
+
+    public static class ESGraphTopologyAnalyzer
+    {
+        private readonly struct EndpointIdentity : IEquatable<EndpointIdentity>
+        {
+            private readonly string portId;
+            private readonly string stableKey;
+            private readonly string meaning;
+            private readonly ESGraphPortDirection direction;
+
+            public EndpointIdentity(ESGraphPortRecord port)
+            {
+                portId = port?.portId ?? string.Empty;
+                stableKey = port?.stableKey ?? string.Empty;
+                meaning = port?.meaning ?? string.Empty;
+                direction = port?.direction ?? ESGraphPortDirection.Input;
+            }
+
+            public bool Equals(EndpointIdentity other)
+                => direction == other.direction
+                    && string.Equals(portId, other.portId, StringComparison.Ordinal)
+                    && string.Equals(stableKey, other.stableKey, StringComparison.Ordinal)
+                    && string.Equals(meaning, other.meaning, StringComparison.Ordinal);
+
+            public override bool Equals(object obj)
+                => obj is EndpointIdentity other && Equals(other);
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hash = (int)direction;
+                    hash = (hash * 397) ^ StringComparer.Ordinal.GetHashCode(portId);
+                    hash = (hash * 397) ^ StringComparer.Ordinal.GetHashCode(stableKey);
+                    return (hash * 397) ^ StringComparer.Ordinal.GetHashCode(meaning);
+                }
+            }
+        }
+
+        public static ESGraphNodeTopology Analyze(ESGraphNodeRecord node,
+            IReadOnlyList<ESGraphNodeRecord> graphNodes,
+            IReadOnlyList<ESGraphEdgeRecord> edges)
+        {
+            if (node?.ports == null || node.ports.Count == 0)
+                return ESGraphNodeTopology.Empty;
+
+            var connectionCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            if (edges != null)
+            {
+                for (int i = 0; i < edges.Count; i++)
+                {
+                    ESGraphEdgeRecord edge = edges[i];
+                    if (edge == null)
+                        continue;
+                    Increment(connectionCounts, edge.inputPortId);
+                    Increment(connectionCounts, edge.outputPortId);
+                }
+            }
+
+            var endpoints = new List<ESGraphEndpointTopology>(node.ports.Count);
+            var inputIdentities = new HashSet<EndpointIdentity>();
+            var outputIdentities = new HashSet<EndpointIdentity>();
+            var portIdCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            var stableKeyCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            if (graphNodes != null)
+            {
+                for (int nodeIndex = 0; nodeIndex < graphNodes.Count; nodeIndex++)
+                {
+                    ESGraphNodeRecord graphNode = graphNodes[nodeIndex];
+                    if (graphNode?.ports == null)
+                        continue;
+                    for (int portIndex = 0; portIndex < graphNode.ports.Count; portIndex++)
+                        Increment(portIdCounts, graphNode.ports[portIndex]?.portId);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < node.ports.Count; i++)
+                    Increment(portIdCounts, node.ports[i]?.portId);
+            }
+            for (int i = 0; i < node.ports.Count; i++)
+            {
+                ESGraphPortRecord port = node.ports[i];
+                if (port == null)
+                    continue;
+                Increment(stableKeyCounts, port.stableKey);
+            }
+            int inputConnections = 0;
+            int outputConnections = 0;
+            for (int i = 0; i < node.ports.Count; i++)
+            {
+                ESGraphPortRecord port = node.ports[i];
+                if (port == null)
+                    continue;
+                connectionCounts.TryGetValue(port.portId ?? string.Empty, out int count);
+                bool stableIndependent = ESGraphIdentity.IsValid(port.portId)
+                    && ESGraphStableIdUtility.IsValid(port.stableKey)
+                    && ESGraphEndpointRules.IsValidMeaning(port.meaning)
+                    && Enum.IsDefined(typeof(ESGraphPortDirection), port.direction)
+                    && portIdCounts.TryGetValue(port.portId, out int portIdCount)
+                    && portIdCount == 1
+                    && stableKeyCounts.TryGetValue(port.stableKey, out int stableKeyCount)
+                    && stableKeyCount == 1;
+                endpoints.Add(new ESGraphEndpointTopology(port, count, stableIndependent));
+                if (!stableIndependent)
+                    continue;
+                if (port.direction == ESGraphPortDirection.Input)
+                {
+                    inputIdentities.Add(new EndpointIdentity(port));
+                    inputConnections += count;
+                }
+                else
+                {
+                    outputIdentities.Add(new EndpointIdentity(port));
+                    outputConnections += count;
+                }
+            }
+            return new ESGraphNodeTopology(endpoints.ToArray(), inputIdentities.Count,
+                outputIdentities.Count, inputConnections, outputConnections);
+        }
+
+        private static void Increment(Dictionary<string, int> counts, string portId)
+        {
+            if (string.IsNullOrEmpty(portId))
+                return;
+            counts.TryGetValue(portId, out int count);
+            counts[portId] = count + 1;
+        }
+    }
+
     public static class ESGraphIdentity
     {
         public static string NewId()

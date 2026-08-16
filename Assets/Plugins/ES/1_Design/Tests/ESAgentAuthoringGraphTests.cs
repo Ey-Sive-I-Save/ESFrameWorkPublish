@@ -31,29 +31,34 @@ namespace ES.EditorInternal.Tests
         }
 
         [Test]
-        public void BranchRoutes_UseCapacityThatMatchesTheirConsumerSemantics()
+        public void BranchRoutes_SeparateEndpointCountFromPerEndpointConnectionCapacity()
         {
-            AssertBranchOutputsAreMulti(new ESGenericGraphAuthoringProfile(),
+            AssertBranchOutputsAllowMultipleConnections(new ESGenericGraphAuthoringProfile(),
                 ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.GenericBranch),
                 "flow.true", "flow.false");
-            AssertBranchOutputsAreMulti(new ESStoryGraphAuthoringProfile(),
+            AssertBranchOutputsAllowMultipleConnections(new ESStoryGraphAuthoringProfile(),
                 ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.StoryCondition),
                 "flow.true", "flow.false");
-            AssertBranchOutputsAreMulti(new ESAgentAuthoringGraphProfile(),
+            AssertBranchOutputsAllowMultipleConnections(new ESAgentAuthoringGraphProfile(),
                 ESGraphNodeTypeKey.Parse(ESAgentGraphStableIds.BranchNode),
                 ESAgentGraphStableIds.BranchMatchedPortKey,
                 ESAgentGraphStableIds.BranchDefaultPortKey);
-            AssertBranchOutputsAreSingle(new ESAgentAuthoringGraphProfile(),
+            AssertBranchOutputsAllowSingleConnection(new ESAgentAuthoringGraphProfile(),
                 ESGraphNodeTypeKey.Parse(ESAgentGraphStableIds.SkillBranchNode),
                 ESAgentGraphStableIds.SkillMatchedPortKey,
                 ESAgentGraphStableIds.SkillDefaultPortKey);
         }
 
-        private static void AssertBranchOutputsAreMulti(IESGraphAuthoringProfile profile,
+        private static void AssertBranchOutputsAllowMultipleConnections(IESGraphAuthoringProfile profile,
             ESGraphNodeTypeKey nodeType, params string[] portKeys)
         {
             IESGraphNodeDefinition definition = profile.NodeDefinitions.Single(node =>
                 string.Equals(node.NodeType.StableId, nodeType.StableId, StringComparison.Ordinal));
+            Assert.That(portKeys.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(portKeys.Length));
+            Assert.That(definition.Ports.Count(port => port.direction == ESGraphPortDirection.Output
+                && portKeys.Contains(port.stableKey, StringComparer.Ordinal)),
+                Is.EqualTo(portKeys.Length).And.GreaterThanOrEqualTo(2),
+                profile.DisplayName + " 的分支必须先拥有多个不同稳定输出端点。");
             foreach (string portKey in portKeys)
             {
                 ESGraphPortDefinition port = definition.Ports.Single(value =>
@@ -64,11 +69,16 @@ namespace ES.EditorInternal.Tests
             }
         }
 
-        private static void AssertBranchOutputsAreSingle(IESGraphAuthoringProfile profile,
+        private static void AssertBranchOutputsAllowSingleConnection(IESGraphAuthoringProfile profile,
             ESGraphNodeTypeKey nodeType, params string[] portKeys)
         {
             IESGraphNodeDefinition definition = profile.NodeDefinitions.Single(node =>
                 string.Equals(node.NodeType.StableId, nodeType.StableId, StringComparison.Ordinal));
+            Assert.That(portKeys.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(portKeys.Length));
+            Assert.That(definition.Ports.Count(port => port.direction == ESGraphPortDirection.Output
+                && portKeys.Contains(port.stableKey, StringComparer.Ordinal)),
+                Is.EqualTo(portKeys.Length).And.GreaterThanOrEqualTo(2),
+                profile.DisplayName + " 的执行分支仍是多输出端口节点，容量 Single 只限制每端点连接数。");
             foreach (string portKey in portKeys)
             {
                 ESGraphPortDefinition port = definition.Ports.Single(value =>
@@ -1226,6 +1236,138 @@ namespace ES.EditorInternal.Tests
                 == ESAgentGraphStableIds.BranchNode).Ports.Count, Is.EqualTo(4));
             Assert.That(profile.NodeDefinitions.Single(item => item.NodeType.StableId
                 == ESAgentGraphStableIds.TraverseNode).Ports.Count, Is.EqualTo(4));
+            Assert.That(profile.NodeDefinitions.Where(item =>
+                    ESAgentRelationSemantics.IsSkillExecutionNode(item.NodeType.StableId))
+                .All(item => item.CurrentVersion == ESAISkillExecutionNodeContractV2.Version),
+                Is.True);
+        }
+
+        [TestCase(ESAgentGraphStableIds.SkillInputNode)]
+        [TestCase(ESAgentGraphStableIds.SkillTaskNode)]
+        [TestCase(ESAgentGraphStableIds.SkillCallNode)]
+        [TestCase(ESAgentGraphStableIds.SkillBranchNode)]
+        [TestCase(ESAgentGraphStableIds.SkillForEachNode)]
+        [TestCase(ESAgentGraphStableIds.SkillApprovalNode)]
+        [TestCase(ESAgentGraphStableIds.SkillFanOutNode)]
+        [TestCase(ESAgentGraphStableIds.SkillJoinNode)]
+        [TestCase(ESAgentGraphStableIds.SkillOutputNode)]
+        public void AISkillExecution_AllNodeTemplatesMigrateV1ToV2WithoutReplacingExistingPortIds(
+            string nodeTypeId)
+        {
+            ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
+            try
+            {
+                Assert.That(ESGraphAuthoringRegistry.TryGetNodeDefinition(graph.DomainKey,
+                    ESAgentGraphStableIds.Node(nodeTypeId), out IESGraphNodeDefinition definition),
+                    Is.True);
+                ESGraphNodeRecord node = graph.AddNode(definition.NodeType, definition.DisplayName,
+                    Vector2.zero, definition.Ports);
+                Assert.That(graph.UpdateNode(node.nodeId, node.TypeKey, 1, node.title,
+                    definition.CreateDefaultPayload(), out string updateError), Is.True, updateError);
+
+                ESGraphPortRecord removedPort = node.ports[node.ports.Count - 1];
+                node.ports.RemoveAt(node.ports.Count - 1);
+                var existingPortIds = node.ports.ToDictionary(port => port.stableKey,
+                    port => port.portId, StringComparer.Ordinal);
+                node.ports[0].name = "旧端口名称";
+                node.ports[0].meaning = "legacy.port";
+
+                Assert.That(ESGraphAuthoringRegistry.TryMigrateNode(graph, node.nodeId,
+                    out string migrationError), Is.True, migrationError);
+                Assert.That(node.version, Is.EqualTo(ESAISkillExecutionNodeContractV2.Version));
+                Assert.That(node.ports.Count, Is.EqualTo(definition.Ports.Count));
+                Assert.That(node.ports.Single(port => port.stableKey == removedPort.stableKey).portId,
+                    Is.Not.EqualTo(removedPort.portId));
+                foreach (KeyValuePair<string, string> pair in existingPortIds)
+                    Assert.That(node.ports.Single(port => port.stableKey == pair.Key).portId,
+                        Is.EqualTo(pair.Value), pair.Key);
+                foreach (ESGraphPortDefinition expected in definition.Ports)
+                {
+                    ESGraphPortRecord actual = node.ports.Single(port =>
+                        port.stableKey == expected.stableKey);
+                    Assert.That(actual.name, Is.EqualTo(expected.name), expected.stableKey);
+                    Assert.That(actual.meaning, Is.EqualTo(ESGraphEndpointRules.ResolveMeaning(
+                        expected.meaning, expected.name, expected.stableKey)), expected.stableKey);
+                    Assert.That(actual.valueTypeId, Is.EqualTo(expected.valueTypeId), expected.stableKey);
+                    Assert.That(actual.direction, Is.EqualTo(expected.direction), expected.stableKey);
+                    Assert.That(actual.capacity, Is.EqualTo(expected.capacity), expected.stableKey);
+                    Assert.That(actual.aggregation, Is.EqualTo(expected.aggregation), expected.stableKey);
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void AISkillExecution_ConnectedTemplateMigrationPreservesAllStableIdentitiesAndBake()
+        {
+            ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
+            try
+            {
+                ESAgentAuthoringGraphPreset.PopulateSceneScanReview(graph);
+                string[] nodeIds = graph.Nodes.Select(node => node.nodeId)
+                    .OrderBy(value => value, StringComparer.Ordinal).ToArray();
+                string[] portIds = graph.Nodes.SelectMany(node => node.ports)
+                    .Select(port => port.portId).OrderBy(value => value, StringComparer.Ordinal).ToArray();
+                string[] edgeIds = graph.Edges.Select(edge => edge.edgeId)
+                    .OrderBy(value => value, StringComparer.Ordinal).ToArray();
+
+                foreach (ESGraphNodeRecord node in graph.Nodes)
+                {
+                    node.version = 1;
+                    Assert.That(ESGraphAuthoringRegistry.TryMigrateNode(graph, node.nodeId,
+                        out string migrationError), Is.True, migrationError);
+                }
+
+                Assert.That(graph.Nodes.Select(node => node.nodeId)
+                    .OrderBy(value => value, StringComparer.Ordinal), Is.EqualTo(nodeIds));
+                Assert.That(graph.Nodes.SelectMany(node => node.ports).Select(port => port.portId)
+                    .OrderBy(value => value, StringComparer.Ordinal), Is.EqualTo(portIds));
+                Assert.That(graph.Edges.Select(edge => edge.edgeId)
+                    .OrderBy(value => value, StringComparer.Ordinal), Is.EqualTo(edgeIds));
+                Assert.That(ESGraphAuthoringRegistry.TryBake(graph, out _, out IESBakedGraphPlan plan,
+                    out List<ESGraphValidationIssue> issues), Is.True, Describe(issues));
+                Assert.That(plan, Is.TypeOf<ESAISkillExecutionSpec>());
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void AISkillExecution_NodeMigrationRejectsUnexpectedPortWithoutPartialMutation()
+        {
+            ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
+            try
+            {
+                Assert.That(ESGraphAuthoringRegistry.TryGetNodeDefinition(graph.DomainKey,
+                    ESAgentGraphStableIds.Node(ESAgentGraphStableIds.SkillTaskNode),
+                    out IESGraphNodeDefinition definition), Is.True);
+                ESGraphNodeRecord node = graph.AddNode(definition.NodeType, definition.DisplayName,
+                    Vector2.zero, definition.Ports);
+                Assert.That(graph.UpdateNode(node.nodeId, node.TypeKey, 1, node.title,
+                    definition.CreateDefaultPayload(), out string updateError), Is.True, updateError);
+                Assert.That(graph.AddPort(node.nodeId, new ESGraphPortDefinition(
+                    "旧自定义端口", "skill.legacy.extra", ESGraphPortDirection.Output,
+                    ESGraphPortCapacity.Single, ESGraphPortValueIds.Any), out string addError),
+                    Is.Not.Null, addError);
+                string[] portState = node.ports.Select(port => port.portId + "|" + port.stableKey
+                    + "|" + port.name + "|" + port.meaning).ToArray();
+
+                Assert.That(ESGraphAuthoringRegistry.TryMigrateNode(graph, node.nodeId,
+                    out string migrationError), Is.False);
+                Assert.That(migrationError, Does.Contain("不会自动删除或断开"));
+                Assert.That(node.version, Is.EqualTo(1));
+                Assert.That(node.ports.Select(port => port.portId + "|" + port.stableKey
+                    + "|" + port.name + "|" + port.meaning), Is.EqualTo(portState));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
         }
 
         [Test]
@@ -3061,6 +3203,119 @@ namespace ES.EditorInternal.Tests
             }
         }
 
+        [TestCase(ESAgentAuthoringPresetKind.Paired)]
+        [TestCase(ESAgentAuthoringPresetKind.AICommandOnly)]
+        [TestCase(ESAgentAuthoringPresetKind.AgentSkillOnly)]
+        [TestCase(ESAgentAuthoringPresetKind.MindMapPaired)]
+        [TestCase(ESAgentAuthoringPresetKind.SceneScanReview)]
+        [TestCase(ESAgentAuthoringPresetKind.AISkillMultiPortWorkflow)]
+        public void AgentAuthoring_AllBuiltInTemplatesBakeThroughTheirDeclaredMode(
+            ESAgentAuthoringPresetKind kind)
+        {
+            ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
+            try
+            {
+                ESAgentAuthoringGraphPreset.Populate(graph, kind);
+                Assert.DoesNotThrow(() => ESAgentAuthoringGraphPreset.EnsureTemplateCanBake(graph, kind));
+                Assert.That(ESGraphAuthoringRegistry.TryBake(graph, out _,
+                    out IESBakedGraphPlan plan, out List<ESGraphValidationIssue> issues),
+                    Is.True, Describe(issues));
+                bool executionTemplate = kind == ESAgentAuthoringPresetKind.SceneScanReview
+                    || kind == ESAgentAuthoringPresetKind.AISkillMultiPortWorkflow;
+                Assert.That(plan is ESAISkillExecutionSpec, Is.EqualTo(executionTemplate));
+                Assert.That(plan is ESAgentArtifactGenerationSpec, Is.EqualTo(!executionTemplate));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [TestCase(ESAgentAuthoringPresetKind.Paired)]
+        [TestCase(ESAgentAuthoringPresetKind.AICommandOnly)]
+        [TestCase(ESAgentAuthoringPresetKind.AgentSkillOnly)]
+        [TestCase(ESAgentAuthoringPresetKind.MindMapPaired)]
+        [TestCase(ESAgentAuthoringPresetKind.SceneScanReview)]
+        [TestCase(ESAgentAuthoringPresetKind.AISkillMultiPortWorkflow)]
+        public void AgentAuthoring_AllBuiltInTemplatesUseAConnectedMultiEndpointNode(
+            ESAgentAuthoringPresetKind kind)
+        {
+            ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
+            try
+            {
+                ESAgentAuthoringGraphPreset.Populate(graph, kind);
+                ESGraphNodeRecord multiEndpointNode = graph.Nodes.FirstOrDefault(node =>
+                {
+                    ESGraphNodeTopology topology =
+                        ESGraphTopologyAnalyzer.Analyze(node, graph.Nodes, graph.Edges);
+                    if (!topology.IsMultiEndpointNode)
+                        return false;
+                    int connectedInputs = topology.Endpoints.Count(endpoint =>
+                        endpoint.Direction == ESGraphPortDirection.Input
+                        && endpoint.ConnectionCount > 0);
+                    int connectedOutputs = topology.Endpoints.Count(endpoint =>
+                        endpoint.Direction == ESGraphPortDirection.Output
+                        && endpoint.ConnectionCount > 0);
+                    return connectedInputs >= 2 || connectedOutputs >= 2;
+                });
+
+                Assert.That(multiEndpointNode, Is.Not.Null,
+                    kind + " 模板必须实际连接同一节点上至少两个不同语义端点，"
+                    + "不能用同一 Multi 端口的多条连线冒充多端点。");
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [TestCase(ESAgentAuthoringPresetKind.Paired)]
+        [TestCase(ESAgentAuthoringPresetKind.AICommandOnly)]
+        [TestCase(ESAgentAuthoringPresetKind.AgentSkillOnly)]
+        [TestCase(ESAgentAuthoringPresetKind.MindMapPaired)]
+        public void AgentAuthoring_GenerationTemplatesBakeDistinctBranchEndpointsAndArtifactViews(
+            ESAgentAuthoringPresetKind kind)
+        {
+            ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
+            try
+            {
+                ESAgentAuthoringGraphPreset.Populate(graph, kind);
+                Assert.That(TryBakeSpec(graph, out ESAgentArtifactGenerationSpec spec,
+                    out string bakeError), Is.True, bakeError);
+                ESAgentGenerationBranch branch = spec.branches.Single();
+                string[] branchTargets = branch.matchedTargetNodeIds
+                    .Concat(branch.defaultTargetNodeIds)
+                    .Concat(branch.failureTargetNodeIds).ToArray();
+                Assert.That(branchTargets.Distinct(StringComparer.Ordinal).Count(),
+                    Is.EqualTo(branchTargets.Length),
+                    "三个分支端点必须指向不同职责节点，不能回接同一目标伪装多端点。");
+                foreach (ESAgentGenerationOutput output in spec.outputs)
+                    Assert.That(ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(
+                        spec, output.nodeId, out _, out string viewError), Is.True, viewError);
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void GraphNodeBody_UsesCollapsedFoldoutWithoutOwningThePortContainers()
+        {
+            var body = new VisualElement { name = "test-node-body" };
+            Foldout foldout = ESStableGraphNodeView.CreateBodyFoldout(body);
+
+            Assert.That(foldout.name, Is.EqualTo("es-node-body-foldout"));
+            Assert.That(foldout.value, Is.False);
+            Assert.That(foldout.Q<VisualElement>("test-node-body"), Is.SameAs(body));
+            Assert.That(foldout.tooltip, Does.Contain("端口和连接关系始终保持可见"));
+
+            Foldout restored = ESStableGraphNodeView.CreateBodyFoldout(
+                new VisualElement(), true);
+            Assert.That(restored.value, Is.True,
+                "节点视图重建时必须能恢复当前 Editor 会话中的展开状态。");
+        }
+
         [Test]
         public void AISkillExecution_SceneScanReviewTemplateBakesCompleteWorkflow()
         {
@@ -3069,7 +3324,7 @@ namespace ES.EditorInternal.Tests
             {
                 ESAgentAuthoringGraphPreset.PopulateSceneScanReview(graph);
                 Assert.That(graph.Nodes.Count, Is.EqualTo(8));
-                Assert.That(graph.Edges.Count, Is.EqualTo(13));
+                Assert.That(graph.Edges.Count, Is.EqualTo(14));
                 Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot snapshot,
                     out List<ESGraphValidationIssue> graphIssues), Is.True, Describe(graphIssues));
                 Assert.That(new ESAISkillExecutionBaker().TryBake(snapshot,
@@ -3086,6 +3341,120 @@ namespace ES.EditorInternal.Tests
                     edge.sourcePortKey == ESAgentGraphStableIds.SkillTimeoutPortKey), Is.True);
                 Assert.That(spec.controlEdges.Any(edge =>
                     edge.sourcePortKey == ESAgentGraphStableIds.SkillCancelledPortKey), Is.True);
+                Assert.That(spec.dataBindings.Any(edge =>
+                    edge.sourcePortKey == ESAgentGraphStableIds.SkillParametersPortKey
+                    && edge.targetPortKey == ESAgentGraphStableIds.SkillInputPortKey), Is.True,
+                    "场景参数必须通过真实值端点进入任务，不能只从 WorkflowParameter 旁路读取。");
+                ESAISkillExecutionStep scan = spec.steps.Single(step => step.task != null);
+                Assert.That(scan.task.inputBindings, Has.Length.EqualTo(3));
+                Assert.That(scan.task.inputBindings.All(binding =>
+                    binding.source == ESAISkillTaskInputSource.BoundValue
+                    && binding.sourceId == ESAgentGraphStableIds.SkillInputPortKey), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void AISkillExecution_MultiPortTemplateBakesCompleteEndpointContract()
+        {
+            ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
+            try
+            {
+                ESAgentAuthoringGraphPreset.PopulateAISkillMultiPortWorkflow(graph);
+                Assert.That(graph.Nodes.Count, Is.EqualTo(10));
+                Assert.That(graph.Edges.Count, Is.EqualTo(19));
+
+                ESGraphNodeRecord input = graph.Nodes.Single(node =>
+                    node.typeId == ESAgentGraphStableIds.SkillInputNode);
+                Assert.That(input.ports, Is.Not.Empty);
+                Assert.That(input.ports.All(port =>
+                    port.direction == ESGraphPortDirection.Output), Is.True,
+                    "参数入口必须是可执行合同中的纯输出节点。");
+
+                ESGraphNodeRecord task = graph.Nodes.Single(node =>
+                    node.typeId == ESAgentGraphStableIds.SkillTaskNode);
+                ESGraphNodeTopology taskTopology =
+                    ESGraphTopologyAnalyzer.Analyze(task, graph.Nodes, graph.Edges);
+                Assert.That(taskTopology.InputEndpointCount, Is.EqualTo(2));
+                Assert.That(taskTopology.OutputEndpointCount, Is.EqualTo(5));
+                Assert.That(taskTopology.IsMultiEndpointNode, Is.True,
+                    "Task 的多个独立稳定端点是该模板的多端口事实。");
+
+                ESGraphNodeRecord fanOut = graph.Nodes.Single(node =>
+                    node.typeId == ESAgentGraphStableIds.SkillFanOutNode);
+                ESGraphNodeTopology fanOutTopology =
+                    ESGraphTopologyAnalyzer.Analyze(fanOut, graph.Nodes, graph.Edges);
+                Assert.That(fanOut.ports.Single(port =>
+                    port.stableKey == ESAgentGraphStableIds.SkillFanOutPortKey).capacity,
+                    Is.EqualTo(ESGraphPortCapacity.Multi));
+                Assert.That(fanOutTopology.OutputEndpointCount, Is.EqualTo(1));
+                Assert.That(fanOutTopology.OutputConnectionCount, Is.EqualTo(2));
+                Assert.That(fanOutTopology.HasMultipleOutputEndpoints, Is.False,
+                    "FanOut 是单个 Multi 容量出口的多连接，不是多输出端口。");
+                ESGraphNodeRecord join = graph.Nodes.Single(node =>
+                    node.typeId == ESAgentGraphStableIds.SkillJoinNode);
+                ESGraphNodeTopology joinTopology =
+                    ESGraphTopologyAnalyzer.Analyze(join, graph.Nodes, graph.Edges);
+                Assert.That(join.ports.Single(port =>
+                    port.stableKey == ESGraphBuiltInPortKeys.Input).capacity,
+                    Is.EqualTo(ESGraphPortCapacity.Multi));
+                Assert.That(joinTopology.InputEndpointCount, Is.EqualTo(1));
+                Assert.That(joinTopology.InputConnectionCount, Is.EqualTo(4));
+                Assert.That(joinTopology.HasMultipleInputEndpoints, Is.False,
+                    "Join 是单个 Multi 容量入口的多连接，不是多输入端口。");
+
+                ESGraphNodeRecord[] outputs = graph.Nodes.Where(node =>
+                    node.typeId == ESAgentGraphStableIds.SkillOutputNode).ToArray();
+                Assert.That(outputs.Length, Is.EqualTo(4));
+                Assert.That(outputs.All(node => node.ports.Count == 2
+                    && node.ports.All(port => port.direction == ESGraphPortDirection.Input)),
+                    Is.True, "结构化终态必须是只接收控制和值的纯输入节点。");
+
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph,
+                    out ESBakedGraphSnapshot snapshot,
+                    out List<ESGraphValidationIssue> graphIssues), Is.True,
+                    Describe(graphIssues));
+                Assert.That(new ESAISkillExecutionBaker().TryBake(snapshot,
+                    out ESAISkillExecutionSpec spec,
+                    out IReadOnlyList<ESGraphValidationIssue> executionIssues), Is.True,
+                    Describe(executionIssues));
+                Assert.That(spec.schemaVersion,
+                    Is.EqualTo(ESAISkillExecutionSpec.CurrentSchemaVersion));
+                Assert.That(spec.controlEdges.Length, Is.EqualTo(12));
+                Assert.That(spec.dataBindings.Length, Is.EqualTo(7));
+                Assert.That(spec.fanOutJoinPairs.Length, Is.EqualTo(1));
+                Assert.That(spec.fanOutJoinPairs[0].fanOutNodeId, Is.EqualTo(fanOut.nodeId));
+                Assert.That(spec.fanOutJoinPairs[0].joinNodeId, Is.EqualTo(join.nodeId));
+                Assert.That(spec.steps.All(step => step.ports.Length == graph.Nodes
+                    .Single(node => node.nodeId == step.nodeId).ports.Count), Is.True,
+                    "Bake 必须保留每个节点的完整稳定端口合同。");
+                Assert.That(ESAISkillExecutionBaker.TryValidateSpec(spec,
+                    out string validationError), Is.True, validationError);
+
+                string bakedJoinId = spec.fanOutJoinPairs[0].joinId;
+                spec.fanOutJoinPairs[0].joinId = "tampered-join";
+                Assert.That(ESAISkillExecutionBaker.TryValidateSpec(spec,
+                    out string tamperedError), Is.False);
+                Assert.That(tamperedError, Does.Contain("配对"));
+
+                spec.fanOutJoinPairs[0].joinId = bakedJoinId;
+                ESAISkillFanOutJoinPair pair = spec.fanOutJoinPairs[0];
+                spec.fanOutJoinPairs = spec.fanOutJoinPairs.Concat(new[]
+                {
+                    new ESAISkillFanOutJoinPair
+                    {
+                        fanOutNodeId = pair.fanOutNodeId,
+                        fanOutId = pair.fanOutId,
+                        joinNodeId = pair.joinNodeId,
+                        joinId = pair.joinId
+                    }
+                }).ToArray();
+                Assert.That(ESAISkillExecutionBaker.TryValidateSpec(spec,
+                    out string duplicatePairError), Is.False);
+                Assert.That(duplicatePairError, Does.Contain("配对"));
             }
             finally
             {
@@ -3726,6 +4095,16 @@ namespace ES.EditorInternal.Tests
                     CreateControlEdge("00000000000000000000000000000013", 5, branchC,
                         ESAgentGraphStableIds.SkillSuccessPortKey, join),
                 },
+                fanOutJoinPairs = new[]
+                {
+                    new ESAISkillFanOutJoinPair
+                    {
+                        fanOutNodeId = fanOut,
+                        fanOutId = "fan-out",
+                        joinNodeId = join,
+                        joinId = "join"
+                    }
+                }
             };
         }
 

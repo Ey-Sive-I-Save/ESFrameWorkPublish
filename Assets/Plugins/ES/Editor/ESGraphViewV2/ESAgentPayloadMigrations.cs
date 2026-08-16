@@ -366,4 +366,155 @@ namespace ES.EditorInternal
                     ESAgentGraphStableIds.BranchFailurePortKey }, out error);
     }
 
+    internal static class ESAISkillExecutionNodeV1ToV2Migration
+    {
+        public static bool TryMigrate(GraphAsset asset, ESGraphNodeRecord node,
+            string expectedNodeTypeId, out string error)
+        {
+            if (asset == null || node == null
+                || !string.Equals(node.typeId, expectedNodeTypeId, StringComparison.Ordinal))
+            {
+                error = "AISkill 执行节点迁移上下文或节点类型无效。";
+                return false;
+            }
+
+            ESGraphPortDefinition[] expectedPorts;
+            try
+            {
+                expectedPorts = ESAISkillExecutionNodeContractV2.CreatePorts(expectedNodeTypeId);
+            }
+            catch (ArgumentOutOfRangeException exception)
+            {
+                error = exception.Message;
+                return false;
+            }
+
+            var currentByKey = new Dictionary<string, ESGraphPortRecord>(StringComparer.Ordinal);
+            foreach (ESGraphPortRecord port in node.ports ?? new List<ESGraphPortRecord>())
+            {
+                if (port == null || string.IsNullOrWhiteSpace(port.stableKey)
+                    || !currentByKey.TryAdd(port.stableKey, port))
+                {
+                    error = "AISkill 执行节点包含空端口或重复 StableKey，不能安全升级："
+                        + (node.title ?? node.nodeId);
+                    return false;
+                }
+            }
+
+            var expectedKeys = new HashSet<string>(
+                expectedPorts.Select(port => port.stableKey), StringComparer.Ordinal);
+            string[] unexpectedKeys = currentByKey.Keys.Where(key => !expectedKeys.Contains(key))
+                .OrderBy(key => key, StringComparer.Ordinal).ToArray();
+            if (unexpectedKeys.Length > 0)
+            {
+                error = "AISkill 执行节点包含 v2 合同之外的端口，升级不会自动删除或断开它们："
+                    + string.Join(", ", unexpectedKeys);
+                return false;
+            }
+
+            for (int i = 0; i < expectedPorts.Length; i++)
+            {
+                ESGraphPortDefinition expected = expectedPorts[i];
+                if (currentByKey.TryGetValue(expected.stableKey, out ESGraphPortRecord current))
+                {
+                    string meaning = ESGraphEndpointRules.ResolveMeaning(expected.meaning,
+                        expected.name, expected.stableKey);
+                    if (!asset.CanUpdatePort(current.portId, expected.stableKey, meaning,
+                            expected.valueTypeId, expected.direction, expected.capacity,
+                            expected.aggregation, out error))
+                    {
+                        error = "端口 " + expected.stableKey + " 无法安全升级：" + error;
+                        return false;
+                    }
+                }
+                else if (!asset.CanAddPort(node.nodeId, expected, out error))
+                {
+                    error = "缺失端口 " + expected.stableKey + " 无法补齐：" + error;
+                    return false;
+                }
+            }
+
+            for (int i = 0; i < expectedPorts.Length; i++)
+            {
+                ESGraphPortDefinition expected = expectedPorts[i];
+                if (currentByKey.TryGetValue(expected.stableKey, out ESGraphPortRecord current))
+                {
+                    string meaning = ESGraphEndpointRules.ResolveMeaning(expected.meaning,
+                        expected.name, expected.stableKey);
+                    if (!asset.UpdatePort(current.portId, expected.stableKey, expected.name, meaning,
+                            expected.valueTypeId, expected.direction, expected.capacity,
+                            expected.aggregation, out error))
+                        return false;
+                }
+                else if (asset.AddPort(node.nodeId, expected, out error) == null)
+                {
+                    return false;
+                }
+            }
+
+            error = string.Empty;
+            return true;
+        }
+    }
+
+    public abstract class ESAISkillExecutionNodeV1ToV2Migrator : IESGraphNodeMigrator
+    {
+        protected abstract string NodeTypeId { get; }
+
+        public ESGraphDomainKey Domain => ESAgentGraphStableIds.Domain;
+        public ESGraphNodeTypeKey NodeType => ESAgentGraphStableIds.Node(NodeTypeId);
+        public int FromVersion => 1;
+        public int ToVersion => ESAISkillExecutionNodeContractV2.Version;
+        public int Priority => 0;
+
+        public bool TryMigrate(GraphAsset asset, ESGraphNodeRecord node, out string error)
+            => ESAISkillExecutionNodeV1ToV2Migration.TryMigrate(asset, node,
+                NodeTypeId, out error);
+    }
+
+    public sealed class ESAISkillInputV1ToV2Migrator : ESAISkillExecutionNodeV1ToV2Migrator
+    {
+        protected override string NodeTypeId => ESAgentGraphStableIds.SkillInputNode;
+    }
+
+    public sealed class ESAISkillTaskV1ToV2Migrator : ESAISkillExecutionNodeV1ToV2Migrator
+    {
+        protected override string NodeTypeId => ESAgentGraphStableIds.SkillTaskNode;
+    }
+
+    public sealed class ESAISkillCallV1ToV2Migrator : ESAISkillExecutionNodeV1ToV2Migrator
+    {
+        protected override string NodeTypeId => ESAgentGraphStableIds.SkillCallNode;
+    }
+
+    public sealed class ESAISkillBranchV1ToV2Migrator : ESAISkillExecutionNodeV1ToV2Migrator
+    {
+        protected override string NodeTypeId => ESAgentGraphStableIds.SkillBranchNode;
+    }
+
+    public sealed class ESAISkillForEachV1ToV2Migrator : ESAISkillExecutionNodeV1ToV2Migrator
+    {
+        protected override string NodeTypeId => ESAgentGraphStableIds.SkillForEachNode;
+    }
+
+    public sealed class ESAISkillApprovalV1ToV2Migrator : ESAISkillExecutionNodeV1ToV2Migrator
+    {
+        protected override string NodeTypeId => ESAgentGraphStableIds.SkillApprovalNode;
+    }
+
+    public sealed class ESAISkillFanOutV1ToV2Migrator : ESAISkillExecutionNodeV1ToV2Migrator
+    {
+        protected override string NodeTypeId => ESAgentGraphStableIds.SkillFanOutNode;
+    }
+
+    public sealed class ESAISkillJoinV1ToV2Migrator : ESAISkillExecutionNodeV1ToV2Migrator
+    {
+        protected override string NodeTypeId => ESAgentGraphStableIds.SkillJoinNode;
+    }
+
+    public sealed class ESAISkillOutputV1ToV2Migrator : ESAISkillExecutionNodeV1ToV2Migrator
+    {
+        protected override string NodeTypeId => ESAgentGraphStableIds.SkillOutputNode;
+    }
+
 }

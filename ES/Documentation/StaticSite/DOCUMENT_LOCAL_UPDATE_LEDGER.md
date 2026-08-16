@@ -441,6 +441,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：当前复跑被非本批资源配置重构缺少两个旧调用目标阻断；未运行 Unity Editor、ReloadDomain、Test Runner、Terrain/NavMesh 正式保存重读或 Player。
 - **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-014：Stable Graph V2 双模式与恢复边界
+
+- **源码路径**：Graph 作者资产、拓扑与定向测试、Agent Authoring Profile、Payload 迁移、候选生成和 AISkill 执行工作流。
+- **规范与证据**：作者资产保持唯一权威；稳定端点与 `edge.order` 进入迁移和签名；生成模式与执行模式硬隔离，并通过 Automation 合同记录运行。
+- **完成分析**：本批没有恢复 Legacy 或用窗口状态替代业务数据，显式扫描和刷新仍位于用户操作路径。
+- **回归状态**：`ES_Editor.csproj` 曾在本批内容下静态构建通过；10 个目标文件严格 UTF-8 通过，并携带拓扑、迁移、签名和恢复测试源码。
+- **已知缺口**：当前复跑被非本批资源配置缺口阻断；未运行 Unity Editor、ReloadDomain、Test Runner、真实候选审批、取消恢复、跨窗口或深图性能验证。
+- **HTML 目标**：后续在 `#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

@@ -1205,36 +1205,24 @@ namespace ES.EditorInternal
 
             Dictionary<string, List<PortRelationTarget>> relationSummaries =
                 BuildPortRelationSummaries(node);
-            int inputCount = 0;
-            int outputCount = 0;
-            int connectedPortCount = 0;
-            int relationCount = 0;
-            if (node.ports != null)
-            {
-                for (int i = 0; i < node.ports.Count; i++)
-                {
-                    ESGraphPortRecord port = node.ports[i];
-                    if (port == null)
-                        continue;
-                    if (port.direction == ESGraphPortDirection.Input)
-                        inputCount++;
-                    else
-                        outputCount++;
-                    if (relationSummaries.TryGetValue(port.portId,
-                            out List<PortRelationTarget> connectedNodes)
-                        && connectedNodes != null && connectedNodes.Count > 0)
-                    {
-                        connectedPortCount++;
-                        relationCount += connectedNodes.Count;
-                    }
-                }
-            }
+            ESGraphNodeTopology topology =
+                ESGraphTopologyAnalyzer.Analyze(node, asset.Nodes, asset.Edges);
             VisualElement snapshot = CreateSection("节点摘要",
                 "先确认节点职责和连接状态，再编辑业务内容。", 1, categoryName);
             AddKeyValue(snapshot, "节点类型", typeName);
-            AddKeyValue(snapshot, "端口", inputCount + " 输入 · " + outputCount + " 输出");
-            AddKeyValue(snapshot, "关系", relationCount == 0
-                ? "未连接" : relationCount + " 条关系 · " + connectedPortCount + " 个端口已连接");
+            AddKeyValue(snapshot, "独立端点", topology.InputEndpointCount + " 输入 · "
+                + topology.OutputEndpointCount + " 输出"
+                + (topology.IsMultiEndpointNode ? " · 多端口节点" : string.Empty));
+            AddKeyValue(snapshot, "连接容量", topology.MultiConnectionCapacityEndpointCount == 0
+                ? "全部端点为单连接"
+                : topology.MultiConnectionCapacityEndpointCount + " 个端点允许多连接");
+            if (topology.InvalidEndpointRecordCount > 0)
+                AddKeyValue(snapshot, "异常端点", topology.InvalidEndpointRecordCount
+                    + " 条身份无效或重复的端点记录，不参与多端口判定");
+            AddKeyValue(snapshot, "实际连接", topology.TotalConnectionCount == 0
+                ? "未连接" : topology.InputConnectionCount + " 条输入 · "
+                    + topology.OutputConnectionCount + " 条输出 · "
+                    + topology.ConnectedEndpointCount + " 个端点已连接");
             details.Add(snapshot);
 
             VisualElement business = CreateSection("业务内容",

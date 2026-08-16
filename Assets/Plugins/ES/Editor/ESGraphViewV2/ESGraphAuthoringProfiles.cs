@@ -2172,6 +2172,141 @@ namespace ES.EditorInternal
         }
     }
 
+    internal static class ESAISkillExecutionNodeContractV2
+    {
+        public const int Version = 2;
+
+        public static ESGraphPortDefinition[] CreatePorts(string nodeTypeId)
+        {
+            switch (nodeTypeId)
+            {
+                case ESAgentGraphStableIds.SkillInputNode:
+                    return new[]
+                    {
+                        Output("开始", ESAgentGraphStableIds.SkillNextPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("参数", ESAgentGraphStableIds.SkillParametersPortKey,
+                            ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any)
+                    };
+                case ESAgentGraphStableIds.SkillTaskNode:
+                    return new[]
+                    {
+                        Input("执行", ESGraphBuiltInPortKeys.Input,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Input("数据", ESAgentGraphStableIds.SkillInputPortKey,
+                            ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any),
+                        Output("成功", ESAgentGraphStableIds.SkillSuccessPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("失败", ESAgentGraphStableIds.SkillFailurePortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("超时", ESAgentGraphStableIds.SkillTimeoutPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("取消", ESAgentGraphStableIds.SkillCancelledPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("运行结果", ESAgentGraphStableIds.SkillRunResultPortKey,
+                            ESGraphPortCapacity.Multi, ESAgentGraphStableIds.SkillRunResultPort)
+                    };
+                case ESAgentGraphStableIds.SkillCallNode:
+                    return new[]
+                    {
+                        Input("执行", ESGraphBuiltInPortKeys.Input,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Input("输入", ESAgentGraphStableIds.SkillInputPortKey,
+                            ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any),
+                        Output("成功", ESAgentGraphStableIds.SkillSuccessPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("失败", ESAgentGraphStableIds.SkillFailurePortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("超时", ESAgentGraphStableIds.SkillTimeoutPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("取消", ESAgentGraphStableIds.SkillCancelledPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("子运行结果", ESAgentGraphStableIds.SkillRunResultPortKey,
+                            ESGraphPortCapacity.Multi, ESAgentGraphStableIds.SkillRunResultPort)
+                    };
+                case ESAgentGraphStableIds.SkillBranchNode:
+                    return new[]
+                    {
+                        Input("执行", ESGraphBuiltInPortKeys.Input,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Input("判断值", ESAgentGraphStableIds.SkillInputPortKey,
+                            ESGraphPortCapacity.Single, ESGraphPortValueIds.Any),
+                        Output("命中", ESAgentGraphStableIds.SkillMatchedPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("默认", ESAgentGraphStableIds.SkillDefaultPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort)
+                    };
+                case ESAgentGraphStableIds.SkillForEachNode:
+                    return new[]
+                    {
+                        Input("执行", ESGraphBuiltInPortKeys.Input,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Input("集合", ESAgentGraphStableIds.SkillItemsPortKey,
+                            ESGraphPortCapacity.Single, ESGraphPortValueIds.Any),
+                        Output("逐项任务", ESAgentGraphStableIds.SkillItemPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("完成", ESAgentGraphStableIds.SkillCompletedPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("空集合", ESAgentGraphStableIds.SkillEmptyPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("失败", ESAgentGraphStableIds.SkillFailurePortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("当前项", ESAgentGraphStableIds.SkillItemValuePortKey,
+                            ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any)
+                    };
+                case ESAgentGraphStableIds.SkillApprovalNode:
+                    return new[]
+                    {
+                        Input("执行", ESGraphBuiltInPortKeys.Input,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Input("审查数据", ESAgentGraphStableIds.SkillInputPortKey,
+                            ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any),
+                        Output("批准", ESAgentGraphStableIds.SkillApprovedPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("拒绝", ESAgentGraphStableIds.SkillRejectedPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort)
+                    };
+                case ESAgentGraphStableIds.SkillFanOutNode:
+                    return new[]
+                    {
+                        Input("执行", ESGraphBuiltInPortKeys.Input,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Output("分支目标", ESAgentGraphStableIds.SkillFanOutPortKey,
+                            ESGraphPortCapacity.Multi, ESAgentGraphStableIds.SkillControlPort)
+                    };
+                case ESAgentGraphStableIds.SkillJoinNode:
+                    return new[]
+                    {
+                        Input("分支输入", ESGraphBuiltInPortKeys.Input,
+                            ESGraphPortCapacity.Multi, ESAgentGraphStableIds.SkillControlPort),
+                        Output("继续", ESAgentGraphStableIds.SkillJoinPortKey,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort)
+                    };
+                case ESAgentGraphStableIds.SkillOutputNode:
+                    return new[]
+                    {
+                        Input("执行", ESGraphBuiltInPortKeys.Input,
+                            ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                        Input("结果", ESAgentGraphStableIds.SkillInputPortKey,
+                            ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any)
+                    };
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(nodeTypeId), nodeTypeId,
+                        "不是 AISkill 执行节点类型。");
+            }
+        }
+
+        private static ESGraphPortDefinition Input(string name, string stableKey,
+            ESGraphPortCapacity capacity, string valueTypeId)
+            => new ESGraphPortDefinition(name, stableKey, ESGraphPortDirection.Input,
+                capacity, valueTypeId);
+
+        private static ESGraphPortDefinition Output(string name, string stableKey,
+            ESGraphPortCapacity capacity, string valueTypeId)
+            => new ESGraphPortDefinition(name, stableKey, ESGraphPortDirection.Output,
+                capacity, valueTypeId);
+    }
+
     public sealed class ESAgentAuthoringGraphProfile : ESGraphAuthoringProfileBase,
         IESGraphNodeAvailabilityPolicy,
         IESGraphAuthoringPlanBaker
@@ -2270,121 +2405,73 @@ namespace ES.EditorInternal
                 "AI 技能执行/参数入口", "参数入口",
                 JsonUtility.ToJson(new ESAISkillInputPayload()),
                 ESGraphNodeCategory.Entry, ESGraphNodeTheme.Entry,
+                ESAISkillExecutionNodeContractV2.Version,
                 new ESGraphDegreeRule(maxIncoming: 0, minOutgoing: 1, allowIsolated: false),
-                Output("开始", ESAgentGraphStableIds.SkillNextPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("参数", ESAgentGraphStableIds.SkillParametersPortKey, ESGraphPortCapacity.Multi,
-                    ESGraphPortValueIds.Any)),
+                ESAISkillExecutionNodeContractV2.CreatePorts(ESAgentGraphStableIds.SkillInputNode)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillTaskNode,
                 "AI 技能执行/受信任务", "受信任务",
                 JsonUtility.ToJson(new ESAISkillTaskPayload()),
                 ESGraphNodeCategory.Action, ESGraphNodeTheme.Primary,
+                ESAISkillExecutionNodeContractV2.Version,
                 new ESGraphDegreeRule(minIncoming: 1,
                     requireReachableFromEntry: true, allowIsolated: false),
-                Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
-                new ESGraphPortDefinition("数据", ESAgentGraphStableIds.SkillInputPortKey, ESGraphPortDirection.Input,
-                    ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any),
-                Output("成功", ESAgentGraphStableIds.SkillSuccessPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("失败", ESAgentGraphStableIds.SkillFailurePortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("超时", ESAgentGraphStableIds.SkillTimeoutPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("取消", ESAgentGraphStableIds.SkillCancelledPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("运行结果", ESAgentGraphStableIds.SkillRunResultPortKey, ESGraphPortCapacity.Multi,
-                    ESAgentGraphStableIds.SkillRunResultPort)),
+                ESAISkillExecutionNodeContractV2.CreatePorts(ESAgentGraphStableIds.SkillTaskNode)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillCallNode,
                 "AI 技能执行/调用 AISkill", "调用 AISkill",
                 JsonUtility.ToJson(new ESAISkillCallPayload()),
                 ESGraphNodeCategory.Action, ESGraphNodeTheme.Primary,
+                ESAISkillExecutionNodeContractV2.Version,
                 new ESGraphDegreeRule(minIncoming: 1,
                     requireReachableFromEntry: true, allowIsolated: false),
-                Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
-                new ESGraphPortDefinition("输入", ESAgentGraphStableIds.SkillInputPortKey, ESGraphPortDirection.Input,
-                    ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any),
-                Output("成功", ESAgentGraphStableIds.SkillSuccessPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("失败", ESAgentGraphStableIds.SkillFailurePortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("超时", ESAgentGraphStableIds.SkillTimeoutPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("取消", ESAgentGraphStableIds.SkillCancelledPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("子运行结果", ESAgentGraphStableIds.SkillRunResultPortKey, ESGraphPortCapacity.Multi,
-                    ESAgentGraphStableIds.SkillRunResultPort)),
+                ESAISkillExecutionNodeContractV2.CreatePorts(ESAgentGraphStableIds.SkillCallNode)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillBranchNode,
                 "AI 技能执行/条件分支", "条件分支",
                 JsonUtility.ToJson(new ESAISkillBranchPayload()),
                 ESGraphNodeCategory.Condition, ESGraphNodeTheme.Decision,
+                ESAISkillExecutionNodeContractV2.Version,
                 new ESGraphDegreeRule(minIncoming: 2, minOutgoing: 2,
                     requireReachableFromEntry: true, allowIsolated: false),
-                Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
-                new ESGraphPortDefinition("判断值", ESAgentGraphStableIds.SkillInputPortKey, ESGraphPortDirection.Input,
-                    ESGraphPortCapacity.Single, ESGraphPortValueIds.Any),
-                Output("命中", ESAgentGraphStableIds.SkillMatchedPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("默认", ESAgentGraphStableIds.SkillDefaultPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort)),
+                ESAISkillExecutionNodeContractV2.CreatePorts(ESAgentGraphStableIds.SkillBranchNode)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillForEachNode,
                 "AI 技能执行/串行遍历", "串行遍历",
                 JsonUtility.ToJson(new ESAISkillForEachPayload()),
                 ESGraphNodeCategory.Composite, ESGraphNodeTheme.Composite,
+                ESAISkillExecutionNodeContractV2.Version,
                 new ESGraphDegreeRule(minIncoming: 2, minOutgoing: 4,
                     requireReachableFromEntry: true, allowIsolated: false),
-                Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
-                new ESGraphPortDefinition("集合", ESAgentGraphStableIds.SkillItemsPortKey, ESGraphPortDirection.Input,
-                    ESGraphPortCapacity.Single, ESGraphPortValueIds.Any),
-                Output("逐项任务", ESAgentGraphStableIds.SkillItemPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("完成", ESAgentGraphStableIds.SkillCompletedPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("空集合", ESAgentGraphStableIds.SkillEmptyPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("失败", ESAgentGraphStableIds.SkillFailurePortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("当前项", ESAgentGraphStableIds.SkillItemValuePortKey, ESGraphPortCapacity.Multi,
-                    ESGraphPortValueIds.Any)),
+                ESAISkillExecutionNodeContractV2.CreatePorts(ESAgentGraphStableIds.SkillForEachNode)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillApprovalNode,
                 "AI 技能执行/人工确认", "人工确认",
                 JsonUtility.ToJson(new ESAISkillApprovalPayload()),
                 ESGraphNodeCategory.Validation, ESGraphNodeTheme.Validation,
+                ESAISkillExecutionNodeContractV2.Version,
                 new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 2, maxOutgoing: 2,
                     requireReachableFromEntry: true, allowIsolated: false),
-                Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
-                new ESGraphPortDefinition("审查数据", ESAgentGraphStableIds.SkillInputPortKey, ESGraphPortDirection.Input,
-                    ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any),
-                Output("批准", ESAgentGraphStableIds.SkillApprovedPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort),
-                Output("拒绝", ESAgentGraphStableIds.SkillRejectedPortKey, ESGraphPortCapacity.Single,
-                    ESAgentGraphStableIds.SkillControlPort)),
+                ESAISkillExecutionNodeContractV2.CreatePorts(ESAgentGraphStableIds.SkillApprovalNode)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillFanOutNode,
                 "AI 技能执行/多路分发", "多路分发",
                 JsonUtility.ToJson(new ESAISkillFanOutPayload()),
                 ESGraphNodeCategory.Composite, ESGraphNodeTheme.Composite,
+                ESAISkillExecutionNodeContractV2.Version,
                 new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 2,
                     requireReachableFromEntry: true, allowIsolated: false),
-                Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
-                Output("分支目标", ESAgentGraphStableIds.SkillFanOutPortKey,
-                    ESGraphPortCapacity.Multi, ESAgentGraphStableIds.SkillControlPort)),
+                ESAISkillExecutionNodeContractV2.CreatePorts(ESAgentGraphStableIds.SkillFanOutNode)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillJoinNode,
                 "AI 技能执行/多路汇合", "多路汇合",
                 JsonUtility.ToJson(new ESAISkillJoinPayload()),
                 ESGraphNodeCategory.Merge, ESGraphNodeTheme.Merge,
+                ESAISkillExecutionNodeContractV2.Version,
                 new ESGraphDegreeRule(minIncoming: 2, minOutgoing: 1,
                     requireReachableFromEntry: true, allowIsolated: false),
-                Input("分支输入", ESGraphPortCapacity.Multi, ESAgentGraphStableIds.SkillControlPort),
-                Output("继续", ESAgentGraphStableIds.SkillJoinPortKey,
-                    ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort)),
+                ESAISkillExecutionNodeContractV2.CreatePorts(ESAgentGraphStableIds.SkillJoinNode)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillOutputNode,
                 "AI 技能执行/结构化输出", "结构化输出",
                 JsonUtility.ToJson(new ESAISkillOutputPayload()),
                 ESGraphNodeCategory.Exit, ESGraphNodeTheme.Success,
+                ESAISkillExecutionNodeContractV2.Version,
                 new ESGraphDegreeRule(minIncoming: 2, maxOutgoing: 0,
                     requireReachableFromEntry: true, allowIsolated: false),
-                Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
-                new ESGraphPortDefinition("结果", ESAgentGraphStableIds.SkillInputPortKey, ESGraphPortDirection.Input,
-                    ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any)))
+                ESAISkillExecutionNodeContractV2.CreatePorts(ESAgentGraphStableIds.SkillOutputNode)))
         {
         }
 

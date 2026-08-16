@@ -209,9 +209,18 @@ namespace ES.EditorInternal
     }
 
     [Serializable]
+    public sealed class ESAISkillFanOutJoinPair
+    {
+        public string fanOutNodeId = string.Empty;
+        public string fanOutId = string.Empty;
+        public string joinNodeId = string.Empty;
+        public string joinId = string.Empty;
+    }
+
+    [Serializable]
     public sealed class ESAISkillExecutionSpec : IESBakedGraphPlan
     {
-        public const int CurrentSchemaVersion = 5;
+        public const int CurrentSchemaVersion = 6;
         public int schemaVersion = CurrentSchemaVersion;
         public string sourceGraphId = string.Empty;
         [JsonIgnore] public string sourceAssetGuid = string.Empty;
@@ -223,6 +232,7 @@ namespace ES.EditorInternal
         public ESAISkillExecutionStep[] steps = Array.Empty<ESAISkillExecutionStep>();
         public ESAISkillControlEdge[] controlEdges = Array.Empty<ESAISkillControlEdge>();
         public ESAISkillDataBinding[] dataBindings = Array.Empty<ESAISkillDataBinding>();
+        public ESAISkillFanOutJoinPair[] fanOutJoinPairs = Array.Empty<ESAISkillFanOutJoinPair>();
 
         public ESGraphDomainKey Domain => ESAgentGraphStableIds.Domain;
         public string DomainId => Domain.StableId;
@@ -299,7 +309,8 @@ namespace ES.EditorInternal
                 }
             }
 
-            ValidateTopology(steps, controls, bindings, failures);
+            ValidateTopology(steps, controls, bindings, failures,
+                out ESAISkillFanOutJoinPair[] fanOutJoinPairs);
             if (failures.Count > 0)
             {
                 issues = failures;
@@ -319,7 +330,8 @@ namespace ES.EditorInternal
                 controlEdges = controls.OrderBy(edge => edge.order)
                     .ThenBy(edge => edge.edgeId, StringComparer.Ordinal).ToArray(),
                 dataBindings = bindings.OrderBy(edge => edge.order)
-                    .ThenBy(edge => edge.edgeId, StringComparer.Ordinal).ToArray()
+                    .ThenBy(edge => edge.edgeId, StringComparer.Ordinal).ToArray(),
+                fanOutJoinPairs = fanOutJoinPairs
             };
             issues = failures;
             return true;
@@ -402,8 +414,10 @@ namespace ES.EditorInternal
 
         private static void ValidateTopology(List<ESAISkillExecutionStep> steps,
             List<ESAISkillControlEdge> controls, List<ESAISkillDataBinding> bindings,
-            List<ESGraphValidationIssue> failures)
+            List<ESGraphValidationIssue> failures,
+            out ESAISkillFanOutJoinPair[] fanOutJoinPairs)
         {
+            fanOutJoinPairs = Array.Empty<ESAISkillFanOutJoinPair>();
             ESAISkillExecutionStep[] entries = steps.Where(step => step.input != null).ToArray();
             if (entries.Length != 1)
                 failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.EntryCount",
@@ -581,7 +595,7 @@ namespace ES.EditorInternal
                     failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.BindingSingle",
                         "Single 输入端点不能接收多条值关系。", group.Key.ToString()));
             }
-            ValidateFanOutJoinPairing(steps, controls, failures);
+            fanOutJoinPairs = ValidateFanOutJoinPairing(steps, controls, failures);
         }
 
         internal static bool TryValidateSpec(ESAISkillExecutionSpec spec, out string error)
@@ -590,9 +604,11 @@ namespace ES.EditorInternal
                 || !ESGraphIdentity.IsValid(spec.sourceGraphId)
                 || !ES.ESAutomationWorkerRegistration.IsSha256(spec.sourceContentSignature)
                 || spec.steps == null || spec.controlEdges == null || spec.dataBindings == null
+                || spec.fanOutJoinPairs == null
                 || spec.steps.Any(step => step == null)
                 || spec.controlEdges.Any(edge => edge == null)
-                || spec.dataBindings.Any(binding => binding == null))
+                || spec.dataBindings.Any(binding => binding == null)
+                || spec.fanOutJoinPairs.Any(pair => pair == null))
             {
                 error = "执行合同缺少有效的版本、GraphId、内容签名或拓扑集合。";
                 return false;
@@ -600,7 +616,11 @@ namespace ES.EditorInternal
 
             var failures = new List<ESGraphValidationIssue>();
             var steps = spec.steps.ToList();
-            ValidateTopology(steps, spec.controlEdges.ToList(), spec.dataBindings.ToList(), failures);
+            ValidateTopology(steps, spec.controlEdges.ToList(), spec.dataBindings.ToList(), failures,
+                out ESAISkillFanOutJoinPair[] expectedPairs);
+            if (!FanOutJoinPairsMatch(spec.fanOutJoinPairs, expectedPairs))
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.FanOutJoinContract",
+                    "执行合同中的 FanOut/Join 配对与已烘焙拓扑不一致。"));
             ESAISkillExecutionStep[] entries = steps.Where(step => step.input != null).ToArray();
             if (entries.Length == 1)
             {
@@ -650,9 +670,11 @@ namespace ES.EditorInternal
             return step.output != null && step.nodeTypeId == ESAgentGraphStableIds.SkillOutputNode;
         }
 
-        private static void ValidateFanOutJoinPairing(List<ESAISkillExecutionStep> steps,
+        private static ESAISkillFanOutJoinPair[] ValidateFanOutJoinPairing(
+            List<ESAISkillExecutionStep> steps,
             List<ESAISkillControlEdge> controls, List<ESGraphValidationIssue> failures)
         {
+            var pairs = new List<ESAISkillFanOutJoinPair>();
             Dictionary<string, ESAISkillExecutionStep> stepsById = steps
                 .Where(step => step != null && !string.IsNullOrWhiteSpace(step.nodeId))
                 .GroupBy(step => step.nodeId, StringComparer.Ordinal)
@@ -664,6 +686,22 @@ namespace ES.EditorInternal
                     group => group.OrderBy(edge => edge.order)
                         .ThenBy(edge => edge.edgeId, StringComparer.Ordinal).ToArray(),
                     StringComparer.Ordinal);
+            foreach (IGrouping<string, ESAISkillExecutionStep> duplicate in steps
+                         .Where(step => step?.fanOut != null)
+                         .GroupBy(step => step.fanOut.fanOutId?.Trim() ?? string.Empty,
+                             StringComparer.Ordinal)
+                         .Where(group => group.Count() > 1))
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.FanOutIdentity",
+                    "FanOut 稳定身份必须唯一：" + duplicate.Key,
+                    duplicate.First().nodeId));
+            foreach (IGrouping<string, ESAISkillExecutionStep> duplicate in steps
+                         .Where(step => step?.join != null)
+                         .GroupBy(step => step.join.joinId?.Trim() ?? string.Empty,
+                             StringComparer.Ordinal)
+                         .Where(group => group.Count() > 1))
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.JoinIdentity",
+                    "Join 稳定身份必须唯一：" + duplicate.Key,
+                    duplicate.First().nodeId));
 
             foreach (ESAISkillExecutionStep fanOut in steps.Where(step => step?.fanOut != null))
             {
@@ -747,7 +785,42 @@ namespace ES.EditorInternal
                         failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.FanOutJoinMismatch",
                             "FanOut 的所有直接目标必须汇合到同一个 Join。", start.edgeId));
                 }
+                if (!string.IsNullOrEmpty(sharedJoinId)
+                    && stepsById.TryGetValue(sharedJoinId, out ESAISkillExecutionStep pairedJoin)
+                    && pairedJoin?.join != null)
+                    pairs.Add(new ESAISkillFanOutJoinPair
+                    {
+                        fanOutNodeId = fanOut.nodeId,
+                        fanOutId = fanOut.fanOut.fanOutId?.Trim() ?? string.Empty,
+                        joinNodeId = pairedJoin.nodeId,
+                        joinId = pairedJoin.join.joinId?.Trim() ?? string.Empty
+                    });
             }
+            return pairs.OrderBy(pair => pair.fanOutNodeId, StringComparer.Ordinal).ToArray();
+        }
+
+        private static bool FanOutJoinPairsMatch(IEnumerable<ESAISkillFanOutJoinPair> actual,
+            IEnumerable<ESAISkillFanOutJoinPair> expected)
+        {
+            ESAISkillFanOutJoinPair[] left = (actual ?? Array.Empty<ESAISkillFanOutJoinPair>())
+                .OrderBy(pair => pair?.fanOutNodeId, StringComparer.Ordinal).ToArray();
+            ESAISkillFanOutJoinPair[] right = (expected ?? Array.Empty<ESAISkillFanOutJoinPair>())
+                .OrderBy(pair => pair?.fanOutNodeId, StringComparer.Ordinal).ToArray();
+            if (left.Length != right.Length) return false;
+            for (int i = 0; i < left.Length; i++)
+            {
+                if (left[i] == null || right[i] == null
+                    || !string.Equals(left[i].fanOutNodeId, right[i].fanOutNodeId,
+                        StringComparison.Ordinal)
+                    || !string.Equals(left[i].fanOutId, right[i].fanOutId,
+                        StringComparison.Ordinal)
+                    || !string.Equals(left[i].joinNodeId, right[i].joinNodeId,
+                        StringComparison.Ordinal)
+                    || !string.Equals(left[i].joinId, right[i].joinId,
+                        StringComparison.Ordinal))
+                    return false;
+            }
+            return true;
         }
 
         private static IEnumerable<string> RequiredControlOutputs(ESAISkillExecutionStep step,
@@ -775,7 +848,8 @@ namespace ES.EditorInternal
         private static void ValidateFanOut(ESAISkillExecutionStep step,
             List<ESAISkillControlEdge> controls, List<ESGraphValidationIssue> failures)
         {
-            if (step.fanOut.schemaVersion != 1 || string.IsNullOrWhiteSpace(step.fanOut.fanOutId))
+            if (step.fanOut.schemaVersion != 1
+                || !ESGraphStableIdUtility.IsValid(step.fanOut.fanOutId))
                 failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.FanOut",
                     "FanOut 必须提供有效的版本和稳定身份。", step.nodeId));
             int count = controls.Count(edge => edge.sourceNodeId == step.nodeId
@@ -809,7 +883,8 @@ namespace ES.EditorInternal
         private static void ValidateJoin(ESAISkillExecutionStep step,
             List<ESAISkillControlEdge> controls, List<ESGraphValidationIssue> failures)
         {
-            if (step.join.schemaVersion != 1 || string.IsNullOrWhiteSpace(step.join.joinId))
+            if (step.join.schemaVersion != 1
+                || !ESGraphStableIdUtility.IsValid(step.join.joinId))
                 failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.Join",
                     "Join 必须提供有效的版本和稳定身份。", step.nodeId));
             int count = controls.Count(edge => edge.targetNodeId == step.nodeId);
@@ -2397,8 +2472,21 @@ namespace ES.EditorInternal
                 Fail(run, "FanOut 至少需要两个有效目标分支。");
                 return false;
             }
+            ESAISkillFanOutJoinPair[] pairs = (run.spec.fanOutJoinPairs
+                    ?? Array.Empty<ESAISkillFanOutJoinPair>())
+                .Where(value => value != null
+                    && string.Equals(value.fanOutNodeId, step.nodeId, StringComparison.Ordinal))
+                .ToArray();
+            ESAISkillFanOutJoinPair pair = pairs.Length == 1 ? pairs[0] : null;
+            if (pair == null || !ESGraphIdentity.IsValid(pair.joinNodeId)
+                || !string.Equals(pair.fanOutId, step.fanOut.fanOutId,
+                    StringComparison.Ordinal))
+            {
+                Fail(run, "FanOut 缺少与当前执行合同一致的 Join 配对。");
+                return false;
+            }
             run.activeFanOutNodeId = step.nodeId;
-            run.activeJoinNodeId = string.Empty;
+            run.activeJoinNodeId = pair.joinNodeId;
             run.fanOutExpectedCount = routes.Length;
             run.fanOutArrivedCount = 0;
             run.pendingFanOutNodeIds = routes.Skip(1).Select(route => route.targetNodeId).ToList();
@@ -2416,13 +2504,12 @@ namespace ES.EditorInternal
                 Fail(run, "Join 未收到活动 FanOut 分支。");
                 return false;
             }
-            if (!string.IsNullOrWhiteSpace(run.activeJoinNodeId)
-                && !string.Equals(run.activeJoinNodeId, step.nodeId, StringComparison.Ordinal))
+            if (string.IsNullOrWhiteSpace(run.activeJoinNodeId)
+                || !string.Equals(run.activeJoinNodeId, step.nodeId, StringComparison.Ordinal))
             {
-                Fail(run, "同一 FanOut 不能汇合到多个 Join。");
+                Fail(run, "当前 Join 与 FanOut 的已烘焙配对不一致。");
                 return false;
             }
-            run.activeJoinNodeId = step.nodeId;
             BeginStep(run, step.nodeId);
             run.fanOutArrivedCount++;
             if (run.fanOutArrivedCount < run.fanOutExpectedCount)
@@ -2835,6 +2922,8 @@ namespace ES.EditorInternal
                     || !string.Equals(run.executionSpecHash, ComputeExecutionSpecHash(run.spec),
                         StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("RunRecord 的执行合同 Hash 与内嵌 Spec 不一致。");
+                if (!ESAISkillExecutionBaker.TryValidateSpec(run.spec, out string specError))
+                    throw new InvalidDataException("RunRecord 的内嵌执行合同无效：" + specError);
                 if (!ES.ESAutomationWorkerRegistration.IsSha256(run.runStateHash)
                     || !string.Equals(run.runStateHash, ComputeRunStateHash(run),
                         StringComparison.OrdinalIgnoreCase))
@@ -3082,8 +3171,17 @@ namespace ES.EditorInternal
                     return false;
                 }
                 string expectedJoinNodeId = reachableJoins.Single();
-                if (!string.IsNullOrWhiteSpace(run.activeJoinNodeId)
-                    && !string.Equals(run.activeJoinNodeId, expectedJoinNodeId,
+                ESAISkillFanOutJoinPair[] declaredPairs = (run.spec.fanOutJoinPairs
+                        ?? Array.Empty<ESAISkillFanOutJoinPair>())
+                    .Where(pair => pair != null
+                        && string.Equals(pair.fanOutNodeId, run.activeFanOutNodeId,
+                            StringComparison.Ordinal)).ToArray();
+                ESAISkillFanOutJoinPair declaredPair = declaredPairs.Length == 1
+                    ? declaredPairs[0] : null;
+                if (declaredPair == null
+                    || !string.Equals(declaredPair.joinNodeId, expectedJoinNodeId,
+                        StringComparison.Ordinal)
+                    || !string.Equals(run.activeJoinNodeId, expectedJoinNodeId,
                         StringComparison.Ordinal))
                 {
                     error = "活动 Join 与 FanOut 合同声明的唯一 Join 不一致。";

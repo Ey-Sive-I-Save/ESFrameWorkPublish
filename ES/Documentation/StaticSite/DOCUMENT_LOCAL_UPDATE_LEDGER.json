@@ -2060,6 +2060,46 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-014",
+                        "status":  "documented",
+                        "summary":  "强化 Stable Graph V2 拓扑分析、Agent Authoring 双模式、Payload 迁移、候选生成与 AISkill 执行恢复边界。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/1_Design/Graph/ESGraphAssetBase.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESAgentAuthoringGraphTests.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESGraphAssetTests.cs",
+                                            "Assets/Plugins/ES/Editor/ESGraphViewV2"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/1_Design/Tests/ESAgentAuthoringGraphTests.cs",
+                                              "Assets/Plugins/ES/1_Design/Tests/ESGraphAssetTests.cs",
+                                              "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAISkillExecutionWorkflow.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "Graph 资产继续作为唯一作者权威，稳定端点和 edge.order 进入拓扑、迁移与内容签名；候选生成和 AISkill 执行保持双模式隔离，并经受控 Automation 合同记录运行与恢复。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Editor.csproj 在本批 Graph 内容下曾静态构建为 0 警告、0 错误",
+                                                            "10 个目标文件通过严格 UTF-8 与 git diff 检查",
+                                                            "定向测试源码覆盖多端点语义、迁移、内容签名、执行分支和恢复约束"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "当前复跑被非本批资源配置缺少 DetermineAssetCategory 与 IsSubAsset 阻断",
+                                                             "未运行 Unity Editor、ReloadDomain、Unity Test Runner 或真实候选生成/审批闭环",
+                                                             "取消、恢复、跨窗口、深图性能与失败注入仍无运行证据，成熟度不得提升为 Stable"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -2072,13 +2112,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T13:37:18+08:00",
-                       "head":  "6089800501742a9822e5b7293e30f1c7b1844997",
-                       "stagedSourcePatchSha256":  "9be53489dc10d2ba31c680561dfcd2909718edd635c6d8275976722c412203b9",
-                       "stagedSourceManifestSha256":  "ee08181d07a2024c427013f4c92beecae57c1e2533d9a0fa05f5450c6284a768",
-                       "stagedSourceFileCount":  18,
+                       "preparedAt":  "2026-08-16T13:39:19+08:00",
+                       "head":  "b9cd7e83224b40efc20f935e746de8db2bade8e2",
+                       "stagedSourcePatchSha256":  "f52e2f96d2ad79da93da7a9f21d44c2ffef53149cc21e031a12e63b5289418a8",
+                       "stagedSourceManifestSha256":  "4ab5f679b848918abc5083276d8c583793eb1f463c065161ac41cdb56a9f01b9",
+                       "stagedSourceFileCount":  10,
                        "entryIds":  [
-                                        "LOCAL-20260816-013"
+                                        "LOCAL-20260816-014"
                                     ]
                    }
 }

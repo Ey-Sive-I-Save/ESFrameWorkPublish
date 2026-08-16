@@ -1,18 +1,16 @@
 {
   "dependencies": {
     "com.code-philosophy.hybridclr": {
-      "version": "https://github.com/focus-creative-games/hybridclr_unity.git#v8.12.0",
+      "version": "file:com.code-philosophy.hybridclr",
       "depth": 0,
-      "source": "git",
-      "dependencies": {},
-      "hash": "e4def761d69b27b7b51a5de0f6d272861416a2d6"
+      "source": "embedded",
+      "dependencies": {}
     },
     "com.code-philosophy.luban": {
-      "version": "https://github.com/focus-creative-games/luban_unity.git",
+      "version": "file:com.code-philosophy.luban",
       "depth": 0,
-      "source": "git",
-      "dependencies": {},
-      "hash": "061314200e2f03307c4d90b448e1de7b85431905"
+      "source": "embedded",
+      "dependencies": {}
     },
     "com.coplaydev.unity-mcp": {
       "version": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v10.1.0",

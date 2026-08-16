@@ -1378,6 +1378,49 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-001",
+                        "status":  "documented",
+                        "summary":  "将 HybridCLR 8.12.0 与 Luban 1.2.0 固定为项目内嵌包，同步 Package 锁、隔离第三方顶栏菜单，并增加可复现的嵌入包完整性门禁。",
+                        "sourcePaths":  [
+                                            "Packages/com.code-philosophy.hybridclr",
+                                            "Packages/com.code-philosophy.luban",
+                                            "Packages/packages-lock.json",
+                                            "Assets/Plugins/ES/Editor/Installer/ESExternalPackageMenuSuppressor.cs",
+                                            "Assets/Plugins/ES/Editor/Installer/ESExternalPackageMenuSuppressor.cs.meta",
+                                            "ES/Tools/Validation/Test-ESEmbeddedPackages.ps1"
+                                        ],
+                        "evidencePaths":  [
+                                              "Packages/com.code-philosophy.hybridclr/package.json",
+                                              "Packages/com.code-philosophy.luban/package.json",
+                                              "Packages/packages-lock.json",
+                                              "ES/Tools/Validation/Test-ESEmbeddedPackages.ps1"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "嵌入目录、embedded 锁记录、第三方菜单隔离兼容入口和机械门禁构成同一依赖治理边界；拆分提交会产生包已复制但锁仍指向 Git、菜单旁路重新出现或验证入口缺失的中间状态。上游源码及 Unity meta 的原始空白格式作为 vendored-source 事实保留，不做机械清洗。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "Test-ESEmbeddedPackages.ps1 返回 HardFailures 0、Warnings 0",
+                                                            "两个 package.json 的包名和版本分别确认为 com.code-philosophy.hybridclr 8.12.0 与 com.code-philosophy.luban 1.2.0",
+                                                            "staged 高置信凭据模式扫描无命中，最大文件为 1.121 MiB"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "尚未在本轮重新观察 Unity Package Manager 的 Embedded 状态、脚本导入和 Domain Reload",
+                                                             "第三方上游源码与 Unity meta 自带空白尾随，范围化 git diff --check 会报告 vendored-source 既有格式",
+                                                             "尚未执行 Player、IL2CPP 或热更新真实运行验收"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1390,13 +1433,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-15T17:25:05+08:00",
-                       "head":  "98cad6b78288872db6f80916b8dce729d122c030",
-                       "stagedSourcePatchSha256":  "38c68ce4ef47626b5264eaa3329243df88b23845210b7d81f81e5d3f4ff0dd23",
-                       "stagedSourceManifestSha256":  "d1df5e907d3309361d75262caae3baaf28b7c6ebf737f95bf7c647b4be919b62",
-                       "stagedSourceFileCount":  34,
+                       "preparedAt":  "2026-08-16T10:03:27+08:00",
+                       "head":  "3d81fad83e7cbdf87b7185ef111db2f56314bdb0",
+                       "stagedSourcePatchSha256":  "69d68562baca3448fc41289d42d28a7b8c331681b7ffd923b13fe6cf17a68c19",
+                       "stagedSourceManifestSha256":  "99f942f327f9ae6e6ea4eec874388d681aa1e0499bc6f72ce776f94bf1218a6b",
+                       "stagedSourceFileCount":  340,
                        "entryIds":  [
-                                        "LOCAL-20260815-001"
+                                        "LOCAL-20260816-001"
                                     ]
                    }
 }

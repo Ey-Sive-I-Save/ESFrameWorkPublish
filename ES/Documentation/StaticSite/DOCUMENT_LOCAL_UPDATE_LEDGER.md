@@ -324,6 +324,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：Inspector 的窄窗口、高 DPI、多选混合值与完整点击交互仍需 Unity 实机人工验收；案例材质的 PlayMode、Profiler、Player、IL2CPP 和各平台 Shader Variant 尚未验收。
 - **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-001：HybridCLR 与 Luban 嵌入包治理
+
+- **源码路径**：`Packages/com.code-philosophy.hybridclr`、`Packages/com.code-philosophy.luban`、`Packages/packages-lock.json`、`Assets/Plugins/ES/Editor/Installer/ESExternalPackageMenuSuppressor.cs` 及其 `.meta`、`ES/Tools/Validation/Test-ESEmbeddedPackages.ps1`。
+- **规范与证据**：HybridCLR 8.12.0 与 Luban 1.2.0 以项目内嵌包存在，Package 锁记录使用 `embedded`；第三方原生顶栏菜单在嵌入源码中隔离，ES 保留轻量兼容入口和可复现检查脚本。
+- **完成分析**：嵌入目录、锁文件、菜单隔离和验证门禁必须同批提交，否则会形成包来源、Unity 解析状态或入口治理不一致的中间状态。第三方源码与 Unity `.meta` 的上游空白格式保持原样，不做难以追溯的机械清洗。
+- **回归状态**：`Test-ESEmbeddedPackages.ps1` 返回 HardFailures 0、Warnings 0；两个 `package.json` 的名称和版本匹配；staged 高置信凭据扫描无命中，最大文件为 1.121 MiB。
+- **已知缺口**：本轮尚未重新观察 Unity Package Manager 的 Embedded 状态、脚本导入、Domain Reload、Player、IL2CPP 或热更新真实运行；上游 vendored-source 空白格式会使范围化 `git diff --check` 报告尾随空白。
+- **HTML 目标**：后续在 `#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

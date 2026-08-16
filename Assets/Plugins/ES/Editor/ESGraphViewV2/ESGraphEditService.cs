@@ -15,18 +15,19 @@ namespace ES.EditorInternal
         public List<string> createdEdgeIds;
         public string changedNodeId;
         public List<string> createdNodeIds;
+        public ESGraphChange change;
     }
 
     internal sealed class ESGraphEditService
     {
         private readonly Action<GraphAsset> markDirty;
         private readonly Action requestAutoSave;
-        private readonly Action notifyModelChanged;
+        private readonly Action<ESGraphChange> notifyModelChanged;
 
         public ESGraphEditService(
             Action<GraphAsset> markDirty,
             Action requestAutoSave,
-            Action notifyModelChanged)
+            Action<ESGraphChange> notifyModelChanged)
         {
             this.markDirty = markDirty;
             this.requestAutoSave = requestAutoSave;
@@ -50,9 +51,11 @@ namespace ES.EditorInternal
             {
                 changed = true,
                 rebuildRequired = true,
-                createdNodeIds = new List<string> { created.nodeId }
+                createdNodeIds = new List<string> { created.nodeId },
+                change = new ESGraphChange(ESGraphChangeKind.Structure, created.nodeId,
+                    nodeIds: new[] { created.nodeId })
             };
-            Commit(asset);
+            Commit(asset, result.change);
             return result;
         }
 
@@ -78,8 +81,7 @@ namespace ES.EditorInternal
                     definition.NodeType, definition.DisplayName, position, definition.Ports);
                 asset.UpdateNode(created.nodeId, definition.NodeType, definition.CurrentVersion,
                     created.title, definition.CreateDefaultPayload(), out _);
-                ESGraphPortRecord targetPort = FindPort(
-                    created, choice.CompatiblePortIndex, choice.CompatiblePort);
+                ESGraphPortRecord targetPort = FindPort(created, choice.CompatiblePort);
                 if (targetPort == null)
                     throw new InvalidOperationException("新节点没有找到预期的兼容端口。");
                 if (!asset.TryFindPort(choice.SourcePortId, out _, out ESGraphPortRecord sourcePort))
@@ -108,9 +110,11 @@ namespace ES.EditorInternal
                 {
                     changed = true,
                     rebuildRequired = true,
-                    createdNodeIds = new List<string> { created.nodeId }
+                    createdNodeIds = new List<string> { created.nodeId },
+                    change = new ESGraphChange(ESGraphChangeKind.Structure, created.nodeId,
+                        nodeIds: new[] { created.nodeId })
                 };
-                Commit(asset);
+                Commit(asset, result.change);
                 return result;
             }
             catch (Exception exception)
@@ -153,10 +157,8 @@ namespace ES.EditorInternal
                     definition.NodeType, definition.DisplayName, position, definition.Ports);
                 asset.UpdateNode(created.nodeId, definition.NodeType, definition.CurrentVersion,
                     created.title, definition.CreateDefaultPayload(), out _);
-                ESGraphPortRecord inputPort = FindPort(created, inputPortIndex,
-                    definition.Ports[inputPortIndex]);
-                ESGraphPortRecord outputPort = FindPort(created, outputPortIndex,
-                    definition.Ports[outputPortIndex]);
+                ESGraphPortRecord inputPort = FindPort(created, definition.Ports[inputPortIndex]);
+                ESGraphPortRecord outputPort = FindPort(created, definition.Ports[outputPortIndex]);
                 if (inputPort == null || outputPort == null)
                     throw new InvalidOperationException("新节点没有找到可插入的输入/输出端口。");
 
@@ -172,9 +174,11 @@ namespace ES.EditorInternal
                 {
                     changed = true,
                     rebuildRequired = true,
-                    createdNodeIds = new List<string> { created.nodeId }
+                    createdNodeIds = new List<string> { created.nodeId },
+                    change = new ESGraphChange(ESGraphChangeKind.Structure, created.nodeId,
+                        nodeIds: new[] { created.nodeId })
                 };
-                Commit(asset);
+                Commit(asset, result.change);
                 return result;
             }
             catch (Exception exception)
@@ -200,9 +204,11 @@ namespace ES.EditorInternal
             var result = new ESGraphEditResult
             {
                 changed = true,
-                createdEdgeId = record.edgeId
+                createdEdgeId = record.edgeId,
+                change = new ESGraphChange(ESGraphChangeKind.Structure, edgeId: record.edgeId,
+                    edgeIds: new[] { record.edgeId })
             };
-            Commit(asset);
+            Commit(asset, result.change);
             return result;
         }
 
@@ -242,9 +248,38 @@ namespace ES.EditorInternal
             var result = new ESGraphEditResult
             {
                 changed = true,
-                rebuildRequired = true
+                rebuildRequired = true,
+                change = new ESGraphChange(ESGraphChangeKind.Structure, edgeId: edgeId,
+                    edgeIds: new[] { edgeId })
             };
-            Commit(asset);
+            Commit(asset, result.change);
+            return result;
+        }
+
+        public ESGraphEditResult MoveEdge(GraphAsset asset, string edgeId, int direction)
+        {
+            if (asset == null || string.IsNullOrEmpty(edgeId)
+                || direction != -1 && direction != 1)
+                return Fail("关系顺序参数非法。");
+
+            string undoName = direction < 0 ? "前移图关系" : "后移图关系";
+            Undo.IncrementCurrentGroup();
+            int undoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName(undoName);
+            Undo.RegisterCompleteObjectUndo(asset, undoName);
+            if (!asset.TryMoveEdge(edgeId, direction, out string error))
+            {
+                Undo.RevertAllDownToGroup(undoGroup);
+                return Fail(error);
+            }
+            Undo.CollapseUndoOperations(undoGroup);
+            var result = new ESGraphEditResult
+            {
+                changed = true,
+                change = new ESGraphChange(ESGraphChangeKind.Structure, edgeId: edgeId,
+                    edgeIds: new[] { edgeId })
+            };
+            Commit(asset, result.change);
             return result;
         }
 
@@ -277,9 +312,10 @@ namespace ES.EditorInternal
             var result = new ESGraphEditResult
             {
                 changed = true,
-                createdEdgeIds = createdEdgeIds
+                createdEdgeIds = createdEdgeIds,
+                change = new ESGraphChange(ESGraphChangeKind.Structure, edgeIds: createdEdgeIds)
             };
-            Commit(asset);
+            Commit(asset, result.change);
             return result;
         }
 
@@ -299,7 +335,9 @@ namespace ES.EditorInternal
             };
             if (result.createdNodeIds.Count == 0)
                 return Fail("复制节点失败。");
-            Commit(asset);
+            result.change = new ESGraphChange(ESGraphChangeKind.Structure,
+                result.createdNodeIds[0], nodeIds: result.createdNodeIds);
+            Commit(asset, result.change);
             return result;
         }
 
@@ -334,9 +372,11 @@ namespace ES.EditorInternal
             {
                 changed = true,
                 rebuildRequired = true,
-                createdNodeIds = createdIds
+                createdNodeIds = createdIds,
+                change = new ESGraphChange(ESGraphChangeKind.Structure, createdIds[0],
+                    nodeIds: createdIds)
             };
-            Commit(asset);
+            Commit(asset, result.change);
             return result;
         }
 
@@ -347,11 +387,30 @@ namespace ES.EditorInternal
         {
             if (asset == null || positions == null || positions.Count == 0)
                 return Fail("没有需要更新的节点位置。");
-            Undo.RecordObject(asset, undoName);
+            var changedPositions = new List<KeyValuePair<string, Vector2>>(positions.Count);
             foreach (KeyValuePair<string, Vector2> pair in positions)
+            {
+                ESGraphNodeRecord node = asset.FindNode(pair.Key);
+                if (node != null && node.position != pair.Value)
+                    changedPositions.Add(pair);
+            }
+            if (changedPositions.Count == 0)
+                return new ESGraphEditResult();
+            Undo.RecordObject(asset, undoName);
+            var changedNodeIds = new List<string>(changedPositions.Count);
+            for (int i = 0; i < changedPositions.Count; i++)
+            {
+                KeyValuePair<string, Vector2> pair = changedPositions[i];
                 asset.SetNodePosition(pair.Key, pair.Value);
-            var result = new ESGraphEditResult { changed = true };
-            Commit(asset);
+                changedNodeIds.Add(pair.Key);
+            }
+            var result = new ESGraphEditResult
+            {
+                changed = true,
+                change = new ESGraphChange(ESGraphChangeKind.Layout,
+                    changedNodeIds[0], nodeIds: changedNodeIds)
+            };
+            Commit(asset, result.change);
             return result;
         }
 
@@ -368,19 +427,59 @@ namespace ES.EditorInternal
             ESGraphNodeRecord node = asset.FindNode(nodeId);
             if (node == null)
                 return Fail("节点不存在。");
+            string normalizedPayload = payloadJson ?? string.Empty;
+            bool contentChanged = !string.Equals(node.typeId, typeId, StringComparison.Ordinal)
+                || node.version != version
+                || !string.Equals(node.title, title, StringComparison.Ordinal)
+                || !string.Equals(node.payloadJson ?? string.Empty, normalizedPayload,
+                    StringComparison.Ordinal);
+            if (!contentChanged)
+                return new ESGraphEditResult();
             Undo.RecordObject(asset, "修改图节点");
-            if (!asset.UpdateNode(nodeId, typeId, version, title, payloadJson, out string error))
+            if (!asset.UpdateNode(nodeId, typeId, version, title, normalizedPayload, out string error))
                 return Fail(error);
             var result = new ESGraphEditResult
             {
                 changed = true,
                 changedNodeId = nodeId,
-                rebuildRequired = !string.Equals(node.typeId, typeId, StringComparison.Ordinal)
-                    || node.version != version
-                    || !string.Equals(node.title, title, StringComparison.Ordinal)
-                    || !string.Equals(node.payloadJson, payloadJson, StringComparison.Ordinal)
+                rebuildRequired = true,
+                change = new ESGraphChange(ESGraphChangeKind.Content, nodeId,
+                    nodeIds: new[] { nodeId })
             };
-            Commit(asset);
+            Commit(asset, result.change);
+            return result;
+        }
+
+        public ESGraphEditResult UpgradeSchema(GraphAsset asset)
+        {
+            if (asset == null)
+                return Fail("图资产不可用。");
+            if (asset.schemaVersion == GraphAsset.CurrentSchemaVersion)
+                return new ESGraphEditResult();
+
+            Undo.IncrementCurrentGroup();
+            int undoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName("升级图数据");
+            Undo.RegisterCompleteObjectUndo(asset, "升级图数据");
+            if (!asset.TryUpgradeSchema(out bool changed, out string error))
+            {
+                Undo.RevertAllDownToGroup(undoGroup);
+                return Fail(error);
+            }
+            if (!changed)
+            {
+                Undo.RevertAllDownToGroup(undoGroup);
+                return new ESGraphEditResult();
+            }
+
+            Undo.CollapseUndoOperations(undoGroup);
+            var result = new ESGraphEditResult
+            {
+                changed = true,
+                rebuildRequired = true,
+                change = new ESGraphChange(ESGraphChangeKind.Schema)
+            };
+            Commit(asset, result.change);
             return result;
         }
 
@@ -394,37 +493,38 @@ namespace ES.EditorInternal
             if ((nodeIds == null || nodeIds.Count == 0)
                 && (edgeIds == null || edgeIds.Count == 0))
                 return Fail("没有可删除的元素。");
+            var removedNodeIds = new List<string>();
+            var removedEdgeIds = new List<string>();
             Undo.RecordObject(asset, "删除图元素");
             if (nodeIds != null)
                 foreach (string nodeId in nodeIds)
-                    asset.RemoveNode(nodeId);
+                    if (asset.RemoveNode(nodeId))
+                        removedNodeIds.Add(nodeId);
             if (edgeIds != null)
                 foreach (string edgeId in edgeIds)
-                    asset.RemoveEdge(edgeId);
-            var result = new ESGraphEditResult { changed = true, rebuildRequired = true };
-            Commit(asset);
+                    if (asset.RemoveEdge(edgeId))
+                        removedEdgeIds.Add(edgeId);
+            if (removedNodeIds.Count == 0 && removedEdgeIds.Count == 0)
+                return Fail("没有找到可删除的图元素。");
+            var result = new ESGraphEditResult
+            {
+                changed = true,
+                rebuildRequired = true,
+                change = new ESGraphChange(ESGraphChangeKind.Structure,
+                    nodeIds: removedNodeIds, edgeIds: removedEdgeIds)
+            };
+            Commit(asset, result.change);
             return result;
         }
 
         private static ESGraphPortRecord FindPort(ESGraphNodeRecord node,
-            int preferredIndex, ESGraphPortDefinition preferred)
+            ESGraphPortDefinition preferred)
         {
-            if (node?.ports == null || preferred == null)
+            if (node == null || preferred == null
+                || !node.TryGetPort(preferred.stableKey, out ESGraphPortRecord port)
+                || port.direction != preferred.direction)
                 return null;
-            if (preferredIndex >= 0
-                && preferredIndex < node.ports.Count
-                && node.ports[preferredIndex] != null
-                && node.ports[preferredIndex].direction == preferred.direction)
-                return node.ports[preferredIndex];
-            for (int i = 0; i < node.ports.Count; i++)
-            {
-                ESGraphPortRecord port = node.ports[i];
-                if (port != null
-                    && port.direction == preferred.direction
-                    && string.Equals(port.stableKey, preferred.stableKey, StringComparison.Ordinal))
-                    return port;
-            }
-            return null;
+            return port;
         }
 
         private static ESGraphEditResult Fail(string error)
@@ -432,11 +532,11 @@ namespace ES.EditorInternal
             return new ESGraphEditResult { error = error ?? string.Empty };
         }
 
-        private void Commit(GraphAsset asset)
+        private void Commit(GraphAsset asset, ESGraphChange change)
         {
             markDirty?.Invoke(asset);
             requestAutoSave?.Invoke();
-            notifyModelChanged?.Invoke();
+            notifyModelChanged?.Invoke(change);
         }
     }
 }

@@ -1421,6 +1421,53 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-002",
+                        "status":  "documented",
+                        "summary":  "完善 StableGraph 与 Agent Authoring 的稳定语义、编辑服务、AISkill 执行、候选生成与导入合同，并同步 AICommand 目录及协作规则。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/1_Design/Graph",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESAgentAuthoringGraphTests.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESGraphAssetTests.cs",
+                                            "Assets/Plugins/ES/Editor/ESGraphViewV2",
+                                            "Assets/Plugins/ES/AICommands",
+                                            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md",
+                                            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md",
+                                            "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/GraphView与NodeRunner_数据权威稳定身份与重构门禁_AI协作警告.md"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/1_Design/Graph/AgentAuthoring/ESAgentGraphSemantics.cs",
+                                              "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAISkillExecutionWorkflow.cs",
+                                              "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentArtifactGenerationPlan.cs",
+                                              "Assets/Plugins/ES/1_Design/Tests/ESAgentAuthoringGraphTests.cs",
+                                              "Assets/Plugins/ES/1_Design/Tests/ESGraphAssetTests.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "StableGraph 的稳定身份、快照和变更语义与编辑服务、Agent payload 迁移、候选生成、导入记录及 AISkill 执行构成同一创作闭环；按职责同批提交可避免编辑器与数据合同版本错位，或生成结果缺少可追溯记录。Graph 当前保持 Verifying，Program 仅保留给尚未实现的 ESBehaviorTreeProgram。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Design.csproj 静态构建为 0 警告、0 错误",
+                                                            "ES_Editor.csproj 静态构建为 0 警告、0 错误",
+                                                            "ES_Design.ConfigKey.Tests.csproj 静态构建为 0 错误，仅保留两个既有 CS0649 警告",
+                                                            "34 个目标文本通过严格 UTF-8 检查，范围化 diff 检查无阻断错误"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "本轮没有 UnityMCP，未获得 Unity Editor 编译、ReloadDomain 或 Test Runner 证据",
+                                                             "真实 GraphView 交互、Undo/Redo、域重载和候选审批闭环仍需 Unity 实机验收",
+                                                             "少数新增 Unity meta 空字段保留 Unity 序列化格式，git diff --check 会提示尾随空格"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1433,13 +1480,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T10:03:27+08:00",
-                       "head":  "3d81fad83e7cbdf87b7185ef111db2f56314bdb0",
-                       "stagedSourcePatchSha256":  "69d68562baca3448fc41289d42d28a7b8c331681b7ffd923b13fe6cf17a68c19",
-                       "stagedSourceManifestSha256":  "99f942f327f9ae6e6ea4eec874388d681aa1e0499bc6f72ce776f94bf1218a6b",
-                       "stagedSourceFileCount":  340,
+                       "preparedAt":  "2026-08-16T10:11:59+08:00",
+                       "head":  "65401e2c992643b3b1c7a1485a4084f505e55409",
+                       "stagedSourcePatchSha256":  "d0ff6a9206fd1c082f2b0a13e91ca0f8e7049a04d56d9ecd6ca0d4ca50aeba25",
+                       "stagedSourceManifestSha256":  "0b396d88412be5207357732a1603e59cbf1bd611df7ff691c67be55a4f04155e",
+                       "stagedSourceFileCount":  52,
                        "entryIds":  [
-                                        "LOCAL-20260816-001"
+                                        "LOCAL-20260816-002"
                                     ]
                    }
 }

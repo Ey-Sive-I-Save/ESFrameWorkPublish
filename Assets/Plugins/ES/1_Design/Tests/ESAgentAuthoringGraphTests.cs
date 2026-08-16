@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -27,6 +28,102 @@ namespace ES.EditorInternal.Tests
 
             [ESField(Required = true)]
             public string RequiredOnly { get; set; }
+        }
+
+        [Test]
+        public void BranchRoutes_UseCapacityThatMatchesTheirConsumerSemantics()
+        {
+            AssertBranchOutputsAreMulti(new ESGenericGraphAuthoringProfile(),
+                ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.GenericBranch),
+                "flow.true", "flow.false");
+            AssertBranchOutputsAreMulti(new ESStoryGraphAuthoringProfile(),
+                ESGraphNodeTypeKey.FromKind(ESGraphBuiltInNodeKind.StoryCondition),
+                "flow.true", "flow.false");
+            AssertBranchOutputsAreMulti(new ESAgentAuthoringGraphProfile(),
+                ESGraphNodeTypeKey.Parse(ESAgentGraphStableIds.BranchNode),
+                ESAgentGraphStableIds.BranchMatchedPortKey,
+                ESAgentGraphStableIds.BranchDefaultPortKey);
+            AssertBranchOutputsAreSingle(new ESAgentAuthoringGraphProfile(),
+                ESGraphNodeTypeKey.Parse(ESAgentGraphStableIds.SkillBranchNode),
+                ESAgentGraphStableIds.SkillMatchedPortKey,
+                ESAgentGraphStableIds.SkillDefaultPortKey);
+        }
+
+        private static void AssertBranchOutputsAreMulti(IESGraphAuthoringProfile profile,
+            ESGraphNodeTypeKey nodeType, params string[] portKeys)
+        {
+            IESGraphNodeDefinition definition = profile.NodeDefinitions.Single(node =>
+                string.Equals(node.NodeType.StableId, nodeType.StableId, StringComparison.Ordinal));
+            foreach (string portKey in portKeys)
+            {
+                ESGraphPortDefinition port = definition.Ports.Single(value =>
+                    string.Equals(value.stableKey, portKey, StringComparison.Ordinal));
+                Assert.That(port.direction, Is.EqualTo(ESGraphPortDirection.Output));
+                Assert.That(port.capacity, Is.EqualTo(ESGraphPortCapacity.Multi),
+                    profile.DisplayName + " 的分支路线必须允许多目标：" + portKey);
+            }
+        }
+
+        private static void AssertBranchOutputsAreSingle(IESGraphAuthoringProfile profile,
+            ESGraphNodeTypeKey nodeType, params string[] portKeys)
+        {
+            IESGraphNodeDefinition definition = profile.NodeDefinitions.Single(node =>
+                string.Equals(node.NodeType.StableId, nodeType.StableId, StringComparison.Ordinal));
+            foreach (string portKey in portKeys)
+            {
+                ESGraphPortDefinition port = definition.Ports.Single(value =>
+                    string.Equals(value.stableKey, portKey, StringComparison.Ordinal));
+                Assert.That(port.direction, Is.EqualTo(ESGraphPortDirection.Output));
+                Assert.That(port.capacity, Is.EqualTo(ESGraphPortCapacity.Single),
+                    profile.DisplayName + " 的执行分支路线必须只选择一个目标：" + portKey);
+            }
+        }
+
+        [Test]
+        public void AgentAuthoring_BranchBakePreservesEveryTargetOnTheSelectedRoute()
+        {
+            ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
+            try
+            {
+                ESAgentAuthoringGraphPreset.Populate(graph,
+                    ESAgentAuthoringPresetKind.MindMapPaired);
+                ESGraphNodeRecord branch = graph.Nodes.Single(node =>
+                    node.typeId == ESAgentGraphStableIds.BranchNode);
+                ESGraphPortRecord matchedPort = branch.ports.Single(port =>
+                    port.stableKey == ESAgentGraphStableIds.BranchMatchedPortKey);
+                ESGraphNodeRecord extraTarget = graph.Nodes
+                    .Where(node => node.typeId == ESAgentGraphStableIds.ConstraintNode)
+                    .First(node => !graph.Edges.Any(edge =>
+                        edge.outputPortId == matchedPort.portId
+                        && node.ports.Any(port => port.portId == edge.inputPortId)));
+                ConnectEndpoints(graph, branch, ESAgentGraphStableIds.BranchMatchedPortKey,
+                    extraTarget, "flow.input");
+
+                List<ESGraphValidationIssue> validation = ESGraphAuthoringRegistry.Validate(graph);
+                Assert.That(validation.Any(IsError), Is.False, Describe(validation));
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot snapshot,
+                    out List<ESGraphValidationIssue> graphIssues), Is.True, Describe(graphIssues));
+                Assert.That(new ESAgentArtifactGenerationBaker().TryBake(snapshot,
+                    out ESAgentArtifactGenerationSpec spec,
+                    out IReadOnlyList<ESGraphValidationIssue> bakeIssues), Is.True,
+                    Describe(bakeIssues));
+
+                ESAgentGenerationBranch baked = spec.branches.Single(item =>
+                    item.nodeId == branch.nodeId);
+                Assert.That(baked.matchedTargetNodeIds.Length, Is.EqualTo(2));
+                Assert.That(baked.matchedTargetNodeIds, Does.Contain(extraTarget.nodeId));
+                Assert.That(spec.relations.Count(relation =>
+                    relation.fromNodeId == branch.nodeId
+                    && relation.fromPortStableKey == ESAgentGraphStableIds.BranchMatchedPortKey),
+                    Is.EqualTo(2));
+                Assert.That(spec.relations.All(relation =>
+                    ESGraphEndpointRules.IsValidMeaning(relation.fromPortMeaning)
+                    && ESGraphEndpointRules.IsValidMeaning(relation.toPortMeaning)), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
         }
 
         [Test]
@@ -758,6 +855,10 @@ namespace ES.EditorInternal.Tests
                 Assert.That(artifact.contentSignature, Is.EqualTo(snapshot.ContentSignature));
                 Assert.That(artifact.nodes.Length, Is.EqualTo(snapshot.Nodes.Count));
                 Assert.That(artifact.edges.Length, Is.EqualTo(snapshot.Edges.Count));
+                Assert.That(artifact.edges.Select(edge => edge.order), Is.Ordered);
+                Assert.That(artifact.routes.Select(route => route.order), Is.Ordered);
+                Assert.That(artifact.routes.Select(route => route.order),
+                    Is.EqualTo(artifact.edges.Select(edge => edge.order)));
             }
             finally
             {
@@ -1407,6 +1508,58 @@ namespace ES.EditorInternal.Tests
         }
 
         [Test]
+        public void AgentAuthoring_PortRepairUsesStableKeysAfterPortOrderChanges()
+        {
+            ESGraphAssetBase graph = CreateValidGraph(out ESGraphNodeRecord outputNode);
+            try
+            {
+                outputNode.ports.Reverse();
+                string[] reorderedIds = outputNode.ports.Select(port => port.portId).ToArray();
+                Assert.That(outputNode.TryGetPort(ESGraphBuiltInPortKeys.Input,
+                    out ESGraphPortRecord input), Is.True);
+                Assert.That(outputNode.TryGetPort(ESAgentGraphStableIds.ArtifactOutputPortKey,
+                    out ESGraphPortRecord output), Is.True);
+                input.name = "错误输入";
+                input.valueTypeId = ESGraphPortValueIds.Flow;
+                output.name = "错误输出";
+                output.valueTypeId = ESGraphPortValueIds.Text;
+
+                Assert.That(ESAgentAuthoringGraphSchema.TryRepairPorts(graph, out string error),
+                    Is.True, error);
+                Assert.That(outputNode.ports.Select(port => port.portId), Is.EqualTo(reorderedIds));
+                Assert.That(input.name, Is.EqualTo("产物要求"));
+                Assert.That(input.valueTypeId, Is.EqualTo(ESAgentGraphStableIds.RequirementPort));
+                Assert.That(output.name, Is.EqualTo("候选产物"));
+                Assert.That(output.valueTypeId, Is.EqualTo(ESAgentGraphStableIds.ArtifactPort));
+            }
+            finally { Object.DestroyImmediate(graph); }
+        }
+
+        [Test]
+        public void AgentAuthoring_PortRepairFailureDoesNotPartiallyMutateGraph()
+        {
+            ESGraphAssetBase graph = CreateValidGraph(out ESGraphNodeRecord outputNode);
+            try
+            {
+                ESGraphNodeRecord goal = graph.Nodes.Single(node =>
+                    node.typeId == ESAgentGraphStableIds.GoalNode);
+                Assert.That(goal.TryGetPort(ESAgentGraphStableIds.ContextOutputPortKey,
+                    out ESGraphPortRecord goalOutput), Is.True);
+                Assert.That(outputNode.TryGetPort(ESGraphBuiltInPortKeys.Input,
+                    out ESGraphPortRecord outputInput), Is.True);
+                goalOutput.name = "失败时必须保留";
+                outputInput.stableKey = "broken.input";
+
+                Assert.That(ESAgentAuthoringGraphSchema.TryRepairPorts(graph, out string error),
+                    Is.False);
+                Assert.That(error, Does.Contain("稳定端点"));
+                Assert.That(goalOutput.name, Is.EqualTo("失败时必须保留"));
+                Assert.That(outputInput.stableKey, Is.EqualTo("broken.input"));
+            }
+            finally { Object.DestroyImmediate(graph); }
+        }
+
+        [Test]
         public void AgentAuthoring_PresetCreatesValidatedDualOutputGraph()
         {
             ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
@@ -1668,6 +1821,9 @@ namespace ES.EditorInternal.Tests
                 Assert.That(new ESAgentArtifactGenerationBaker().TryBake(snapshot,
                     out ESAgentArtifactGenerationSpec spec, out IReadOnlyList<ESGraphValidationIssue> bakeIssues),
                     Is.True, Describe(bakeIssues));
+                int[] relationOrders = spec.relations.Select(relation => relation.order).ToArray();
+                Assert.That(relationOrders, Is.Ordered);
+                spec.relations = spec.relations.Reverse().ToArray();
                 string prompt = ESAgentArtifactGenerationWorkspace.BuildPrompt(new ESAgentArtifactGenerationRequest
                 {
                     requestId = "test-request",
@@ -1677,6 +1833,10 @@ namespace ES.EditorInternal.Tests
                 });
                 Assert.That(prompt, Does.Contain("思路图关系"));
                 Assert.That(prompt, Does.Contain("```mermaid"));
+                Assert.That(prompt.IndexOf("顺序 " + relationOrders[0] + " |", StringComparison.Ordinal),
+                    Is.LessThan(prompt.IndexOf("顺序 " + relationOrders[relationOrders.Length - 1] + " |",
+                        StringComparison.Ordinal)), "Prompt 必须按显式 order 读取，不能信任数组排列。");
+                Assert.That(prompt, Does.Contain("#" + relationOrders[0]));
                 Assert.That(prompt, Does.Contain(ESAgentGraphStableIds.RequirementPort));
                 Assert.That(prompt, Does.Contain("acceptance criteria"));
             }
@@ -2490,21 +2650,50 @@ namespace ES.EditorInternal.Tests
                 relationKind = ESAgentRelationKind.ProvidesContext;
                 semanticType = ESAgentGraphStableIds.ContextPort;
             }
+            string sourcePortKey = relationKind == ESAgentRelationKind.AppliesConstraint
+                ? ESAgentGraphStableIds.RequirementOutputPortKey
+                : relationKind == ESAgentRelationKind.RequiresValidation
+                    ? ESAgentGraphStableIds.ArtifactOutputPortKey
+                    : ESAgentGraphStableIds.ContextOutputPortKey;
+            string fromTypeId = NodeTypeId(fromNodeId);
+            string toTypeId = NodeTypeId(toNodeId);
+            ESGraphPortDefinition sourcePort = GetAgentPort(fromTypeId, sourcePortKey);
+            ESGraphPortDefinition targetPort = GetAgentPort(toTypeId, ESGraphBuiltInPortKeys.Input);
             return new ESAgentGenerationRelation
             {
                 edgeId = edgeId,
                 fromNodeId = fromNodeId,
-                fromNodeTypeId = NodeTypeId(fromNodeId),
+                fromNodeTypeId = fromTypeId,
                 fromNodeTitle = fromNodeId,
-                fromPortStableKey = relationKind == ESAgentRelationKind.AppliesConstraint
-                    ? "agent.requirement.out" : relationKind == ESAgentRelationKind.RequiresValidation
-                        ? "agent.artifact.out" : "agent.context.out",
+                fromPortStableKey = sourcePortKey,
+                fromPortMeaning = ESGraphEndpointRules.ResolveMeaning(sourcePort.meaning,
+                    sourcePort.name, sourcePort.stableKey),
                 toNodeId = toNodeId,
-                toNodeTypeId = NodeTypeId(toNodeId),
+                toNodeTypeId = toTypeId,
                 toNodeTitle = toNodeId,
+                toPortStableKey = ESGraphBuiltInPortKeys.Input,
+                toPortMeaning = ESGraphEndpointRules.ResolveMeaning(targetPort.meaning,
+                    targetPort.name, targetPort.stableKey),
                 relationKind = relationKind,
-                semanticType = semanticType
+                semanticType = semanticType,
+                sourceValueTypeId = sourcePort.valueTypeId,
+                targetValueTypeId = targetPort.valueTypeId,
+                sourceAggregation = ESGraphPortAggregationRules.Resolve(sourcePort.direction,
+                    sourcePort.capacity, sourcePort.aggregation),
+                targetAggregation = ESGraphPortAggregationRules.Resolve(targetPort.direction,
+                    targetPort.capacity, targetPort.aggregation)
             };
+        }
+
+        private static ESGraphPortDefinition GetAgentPort(string nodeTypeId, string portKey)
+        {
+            Assert.That(ESGraphAuthoringRegistry.TryGetNodeDefinition(ESAgentGraphStableIds.DomainId,
+                nodeTypeId, out IESGraphNodeDefinition definition), Is.True,
+                "测试需要已注册 Agent 节点定义：" + nodeTypeId);
+            ESGraphPortDefinition[] matches = definition.Ports.Where(port => port != null
+                && port.stableKey == portKey).ToArray();
+            Assert.That(matches, Has.Length.EqualTo(1), nodeTypeId + "/" + portKey);
+            return matches[0];
         }
 
         private static string NodeTypeId(string nodeId)
@@ -2586,9 +2775,28 @@ namespace ES.EditorInternal.Tests
 
         private static void Connect(ESGraphAssetBase graph, ESGraphNodeRecord from, ESGraphNodeRecord to)
         {
-            ESGraphPortRecord output = from.ports.First(port => port.direction == ESGraphPortDirection.Output);
-            ESGraphPortRecord input = to.ports.First(port => port.direction == ESGraphPortDirection.Input);
+            ESGraphPortRecord[] outputs = from.ports.Where(port =>
+                port.direction == ESGraphPortDirection.Output).ToArray();
+            ESGraphPortRecord[] inputs = to.ports.Where(port =>
+                port.direction == ESGraphPortDirection.Input).ToArray();
+            Assert.That(outputs, Has.Length.EqualTo(1), "测试连接必须显式选择唯一输出端点。");
+            Assert.That(inputs, Has.Length.EqualTo(1), "测试连接必须显式选择唯一输入端点。");
+            ESGraphPortRecord output = outputs[0];
+            ESGraphPortRecord input = inputs[0];
             Assert.That(graph.TryAddEdge(output.portId, input.portId, out _, out string error), Is.True, error);
+        }
+
+        private static void ConnectEndpoints(ESGraphAssetBase graph, ESGraphNodeRecord from,
+            string outputPortKey, ESGraphNodeRecord to, string inputPortKey)
+        {
+            ESGraphPortRecord output = from.ports.Single(port =>
+                port.direction == ESGraphPortDirection.Output
+                && string.Equals(port.stableKey, outputPortKey, StringComparison.Ordinal));
+            ESGraphPortRecord input = to.ports.Single(port =>
+                port.direction == ESGraphPortDirection.Input
+                && string.Equals(port.stableKey, inputPortKey, StringComparison.Ordinal));
+            Assert.That(graph.TryAddEdge(output.portId, input.portId, out _, out string error),
+                Is.True, error);
         }
 
         private static FakeArtifactFileIO CreateTwoExistingFileTransaction(
@@ -2886,6 +3094,299 @@ namespace ES.EditorInternal.Tests
         }
 
         [Test]
+        public void AISkillExecution_BranchUsesTwoIndependentSingleRoutes()
+        {
+            ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
+            try
+            {
+                ESGraphNodeRecord input = AddFromProfile(graph,
+                    ESAgentGraphStableIds.SkillInputNode, new Vector2(0f, 120f));
+                ESGraphNodeRecord branch = AddFromProfile(graph,
+                    ESAgentGraphStableIds.SkillBranchNode, new Vector2(240f, 120f));
+                ESGraphNodeRecord matched = AddFromProfile(graph,
+                    ESAgentGraphStableIds.SkillOutputNode, new Vector2(520f, 40f));
+                ESGraphNodeRecord fallback = AddFromProfile(graph,
+                    ESAgentGraphStableIds.SkillOutputNode, new Vector2(520f, 240f));
+
+                ConnectEndpoints(graph, input, ESAgentGraphStableIds.SkillNextPortKey,
+                    branch, ESGraphBuiltInPortKeys.Input);
+                ConnectEndpoints(graph, input, ESAgentGraphStableIds.SkillParametersPortKey,
+                    branch, ESAgentGraphStableIds.SkillInputPortKey);
+                ConnectEndpoints(graph, branch, ESAgentGraphStableIds.SkillMatchedPortKey,
+                    matched, ESGraphBuiltInPortKeys.Input);
+                ConnectEndpoints(graph, branch, ESAgentGraphStableIds.SkillDefaultPortKey,
+                    fallback, ESGraphBuiltInPortKeys.Input);
+                ConnectEndpoints(graph, input, ESAgentGraphStableIds.SkillParametersPortKey,
+                    matched, ESAgentGraphStableIds.SkillInputPortKey);
+                ConnectEndpoints(graph, input, ESAgentGraphStableIds.SkillParametersPortKey,
+                    fallback, ESAgentGraphStableIds.SkillInputPortKey);
+
+                List<ESGraphValidationIssue> validation = ESGraphAuthoringRegistry.Validate(graph);
+                Assert.That(validation.Any(IsError), Is.False, Describe(validation));
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot snapshot,
+                    out List<ESGraphValidationIssue> graphIssues), Is.True, Describe(graphIssues));
+                Assert.That(new ESAISkillExecutionBaker().TryBake(snapshot,
+                    out ESAISkillExecutionSpec spec,
+                    out IReadOnlyList<ESGraphValidationIssue> executionIssues), Is.True,
+                    Describe(executionIssues));
+
+                ESAISkillControlEdge[] matchedRoutes = spec.controlEdges.Where(edge =>
+                    edge.sourceNodeId == branch.nodeId
+                    && edge.sourcePortKey == ESAgentGraphStableIds.SkillMatchedPortKey).ToArray();
+                Assert.That(matchedRoutes.Length, Is.EqualTo(1));
+                Assert.That(matchedRoutes.All(edge => ESGraphIdentity.IsValid(edge.edgeId)
+                    && ESGraphIdentity.IsValid(edge.sourcePortId)
+                    && ESGraphIdentity.IsValid(edge.targetPortId)
+                    && edge.targetPortKey == ESGraphBuiltInPortKeys.Input
+                    && ESGraphEndpointRules.IsValidMeaning(edge.sourceMeaning)
+                    && ESGraphEndpointRules.IsValidMeaning(edge.targetMeaning)), Is.True);
+                Assert.That(spec.controlEdges.Count(edge => edge.sourceNodeId == branch.nodeId
+                    && edge.sourcePortKey == ESAgentGraphStableIds.SkillDefaultPortKey), Is.EqualTo(1));
+                Assert.That(branch.TryGetPort(ESAgentGraphStableIds.SkillMatchedPortKey,
+                    out ESGraphPortRecord matchedPort), Is.True);
+                Assert.That(branch.TryGetPort(ESAgentGraphStableIds.SkillDefaultPortKey,
+                    out ESGraphPortRecord defaultPort), Is.True);
+                Assert.That(matchedPort.capacity, Is.EqualTo(ESGraphPortCapacity.Single));
+                Assert.That(defaultPort.capacity, Is.EqualTo(ESGraphPortCapacity.Single));
+                Assert.That(ESAISkillExecutionCoordinator.TryResolveSingleRouteTarget(spec,
+                    branch.nodeId, ESAgentGraphStableIds.SkillMatchedPortKey,
+                    out string matchedTargetId, out string matchedError), Is.True, matchedError);
+                Assert.That(matchedTargetId, Is.EqualTo(matched.nodeId));
+                Assert.That(ESAISkillExecutionCoordinator.TryResolveSingleRouteTarget(spec,
+                    branch.nodeId, ESAgentGraphStableIds.SkillDefaultPortKey,
+                    out string defaultTargetId, out string defaultError), Is.True, defaultError);
+                Assert.That(defaultTargetId, Is.EqualTo(fallback.nodeId));
+                ESAISkillExecutionStep branchStep = spec.steps.Single(step => step.nodeId == branch.nodeId);
+                branchStep.branch.valuePath = "approved";
+                branchStep.branch.expectedValue = "yes";
+                branchStep.branch.ignoreCase = true;
+                Assert.That(ESAISkillExecutionCoordinator.TrySelectBranchTarget(spec, branchStep,
+                    new JObject { ["approved"] = "YES" }, out string selectedMatchedTarget,
+                    out bool matchedResult, out _, out string matchedSelectionError), Is.True,
+                    matchedSelectionError);
+                Assert.That(matchedResult, Is.True);
+                Assert.That(selectedMatchedTarget, Is.EqualTo(matched.nodeId));
+                Assert.That(ESAISkillExecutionCoordinator.TrySelectBranchTarget(spec, branchStep,
+                    new JObject { ["approved"] = "NO" }, out string selectedDefaultTarget,
+                    out bool defaultResult, out _, out string defaultSelectionError), Is.True,
+                    defaultSelectionError);
+                Assert.That(defaultResult, Is.False);
+                Assert.That(selectedDefaultTarget, Is.EqualTo(fallback.nodeId));
+                Assert.That(spec.dataBindings, Is.Not.Empty);
+                Assert.That(spec.dataBindings.All(binding =>
+                    ESGraphIdentity.IsValid(binding.sourcePortId)
+                    && ESGraphIdentity.IsValid(binding.targetPortId)
+                    && ESGraphStableIdUtility.IsValid(binding.sourcePortKey)
+                    && ESGraphStableIdUtility.IsValid(binding.targetPortKey)
+                    && ESGraphEndpointRules.IsValidMeaning(binding.sourceMeaning)
+                    && ESGraphEndpointRules.IsValidMeaning(binding.targetMeaning)
+                    && ESGraphPortValueCatalog.IsValidStableId(binding.sourceValueTypeId)
+                    && ESGraphPortValueCatalog.IsValidStableId(binding.targetValueTypeId)
+                    && binding.targetAggregation != ESGraphPortAggregation.Auto), Is.True);
+
+                spec.controlEdges = spec.controlEdges.Concat(new[]
+                {
+                    CreateControlEdge(ESGraphIdentity.NewId(), spec.controlEdges.Max(edge => edge.order) + 1,
+                        branch.nodeId,
+                        ESAgentGraphStableIds.SkillMatchedPortKey, fallback.nodeId)
+                }).ToArray();
+                Assert.That(ESAISkillExecutionCoordinator.TryResolveSingleRouteTarget(spec,
+                    branch.nodeId, ESAgentGraphStableIds.SkillMatchedPortKey,
+                    out _, out string duplicateRouteError), Is.False);
+                Assert.That(duplicateRouteError, Does.Contain("FanOut"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void AISkillExecution_EndpointValueNeverFallsBackToNodeLevelState()
+        {
+            string sourceNodeId = ESGraphIdentity.NewId();
+            string targetNodeId = ESGraphIdentity.NewId();
+            var run = new ESAISkillWorkflowRun
+            {
+                values = new JObject
+                {
+                    [sourceNodeId] = "legacy-node-value"
+                },
+                spec = new ESAISkillExecutionSpec
+                {
+                    dataBindings = new[]
+                    {
+                        new ESAISkillDataBinding
+                        {
+                            edgeId = ESGraphIdentity.NewId(),
+                            sourceNodeId = sourceNodeId,
+                            sourcePortId = ESGraphIdentity.NewId(),
+                            sourcePortKey = "result.success",
+                            sourceMeaning = "成功结果",
+                            targetNodeId = targetNodeId,
+                            targetPortId = ESGraphIdentity.NewId(),
+                            targetPortKey = "input.success",
+                            targetMeaning = "接收成功结果",
+                            sourceValueTypeId = ESGraphPortValueIds.Text,
+                            targetValueTypeId = ESGraphPortValueIds.Text,
+                            targetAggregation = ESGraphPortAggregation.Single
+                        }
+                    }
+                }
+            };
+
+            Assert.That(ESAISkillExecutionCoordinator.ResolveBoundValue(run, targetNodeId,
+                "input.success"), Is.Null);
+            run.values[ESAISkillExecutionCoordinator.EndpointValueKey(sourceNodeId,
+                "result.success")] = "endpoint-value";
+            Assert.That(ESAISkillExecutionCoordinator.ResolveBoundValue(run, targetNodeId,
+                "input.success")?.ToString(), Is.EqualTo("endpoint-value"));
+        }
+
+        [Test]
+        public void AISkillExecution_InputAggregationKeepsAStableValueShape()
+        {
+            const string sourceA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            const string sourceB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+            const string target = "cccccccccccccccccccccccccccccccc";
+            var run = new ESAISkillWorkflowRun
+            {
+                values = new JObject
+                {
+                    [ESAISkillExecutionCoordinator.EndpointValueKey(sourceA, "result.a")] = "A",
+                    [ESAISkillExecutionCoordinator.EndpointValueKey(sourceB, "result.b")] = "B"
+                },
+                spec = new ESAISkillExecutionSpec
+                {
+                    dataBindings = new[]
+                    {
+                        new ESAISkillDataBinding
+                        {
+                            edgeId = "00000000000000000000000000000002",
+                            order = 0,
+                            sourceNodeId = sourceB,
+                            sourcePortKey = "result.b",
+                            targetNodeId = target,
+                            targetPortKey = "input.ordered",
+                            targetAggregation = ESGraphPortAggregation.Ordered
+                        },
+                        new ESAISkillDataBinding
+                        {
+                            edgeId = "00000000000000000000000000000001",
+                            order = 1,
+                            sourceNodeId = sourceA,
+                            sourcePortKey = "result.a",
+                            targetNodeId = target,
+                            targetPortKey = "input.ordered",
+                            targetAggregation = ESGraphPortAggregation.Ordered
+                        },
+                        new ESAISkillDataBinding
+                        {
+                            edgeId = "00000000000000000000000000000003",
+                            order = 2,
+                            sourceNodeId = sourceA,
+                            sourcePortKey = "result.a",
+                            targetNodeId = target,
+                            targetPortKey = "input.named",
+                            targetAggregation = ESGraphPortAggregation.Named
+                        }
+                    }
+                }
+            };
+
+            JToken ordered = ESAISkillExecutionCoordinator.ResolveBoundValue(run, target,
+                "input.ordered");
+            Assert.That(ordered, Is.TypeOf<JArray>());
+            Assert.That(ordered.Values<string>().ToArray(), Is.EqualTo(new[] { "B", "A" }),
+                "Ordered 输入必须只认显式 order，不能回退到 EdgeId 顺序。");
+
+            JToken named = ESAISkillExecutionCoordinator.ResolveBoundValue(run, target,
+                "input.named");
+            Assert.That(named, Is.TypeOf<JObject>());
+            Assert.That(named.ToObject<JObject>().Properties().Single().Value.ToString(),
+                Is.EqualTo("A"));
+
+            run.spec.dataBindings = new[] { run.spec.dataBindings[2] };
+            JToken namedSingle = ESAISkillExecutionCoordinator.ResolveBoundValue(run, target,
+                "input.named");
+            Assert.That(namedSingle, Is.TypeOf<JObject>());
+        }
+
+        [Test]
+        public void AISkillExecution_DataPublicationUsesDeclaredPortsAndFailsAtomically()
+        {
+            ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
+            try
+            {
+                ESAgentAuthoringGraphPreset.PopulateSceneScanReview(graph);
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph,
+                    out ESBakedGraphSnapshot snapshot,
+                    out List<ESGraphValidationIssue> graphIssues), Is.True,
+                    Describe(graphIssues));
+                Assert.That(new ESAISkillExecutionBaker().TryBake(snapshot,
+                    out ESAISkillExecutionSpec spec,
+                    out IReadOnlyList<ESGraphValidationIssue> executionIssues), Is.True,
+                    Describe(executionIssues));
+                ESAISkillExecutionStep task = spec.steps.Single(step => step.task != null);
+                var run = new ESAISkillWorkflowRun
+                {
+                    spec = spec,
+                    values = new JObject(),
+                };
+                var singleResult = new JObject { ["status"] = "ok" };
+
+                Assert.That(ESAISkillExecutionCoordinator.TryPublishDataOutputs(run,
+                    task.nodeId, ESAgentGraphStableIds.SkillRunResultPortKey,
+                    singleResult, out string singleError), Is.True, singleError);
+                Assert.That(run.values[ESAISkillExecutionCoordinator.EndpointValueKey(task.nodeId,
+                    ESAgentGraphStableIds.SkillRunResultPortKey)]?["status"]?.ToString(),
+                    Is.EqualTo("ok"));
+
+                const string secondPortKey = "skill.value.secondary-result";
+                task.ports = task.ports.Concat(new[]
+                {
+                    new ESAISkillExecutionPort
+                    {
+                        portId = ESGraphIdentity.NewId(),
+                        portKey = secondPortKey,
+                        meaning = "次要结果",
+                        valueTypeId = ESGraphPortValueIds.Any,
+                        direction = ESGraphPortDirection.Output,
+                        capacity = ESGraphPortCapacity.Multi,
+                        aggregation = ESGraphPortAggregation.Single,
+                    }
+                }).ToArray();
+                run.values = new JObject();
+                var incomplete = new JObject
+                {
+                    [ESAgentGraphStableIds.SkillRunResultPortKey] = "primary",
+                };
+                Assert.That(ESAISkillExecutionCoordinator.TryPublishDataOutputs(run,
+                    task.nodeId, ESAgentGraphStableIds.SkillRunResultPortKey,
+                    incomplete, out string missingError), Is.False);
+                Assert.That(missingError, Does.Contain(secondPortKey));
+                Assert.That(run.values.HasValues, Is.False, "多端点产物缺字段时不得部分写入。" );
+
+                var complete = new JObject
+                {
+                    [ESAgentGraphStableIds.SkillRunResultPortKey] = "primary",
+                    [secondPortKey] = "secondary",
+                };
+                Assert.That(ESAISkillExecutionCoordinator.TryPublishDataOutputs(run,
+                    task.nodeId, ESAgentGraphStableIds.SkillRunResultPortKey,
+                    complete, out string completeError), Is.True, completeError);
+                Assert.That(run.values[ESAISkillExecutionCoordinator.EndpointValueKey(task.nodeId,
+                    ESAgentGraphStableIds.SkillRunResultPortKey)]?.ToString(), Is.EqualTo("primary"));
+                Assert.That(run.values[ESAISkillExecutionCoordinator.EndpointValueKey(task.nodeId,
+                    secondPortKey)]?.ToString(), Is.EqualTo("secondary"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
         public void AISkillExecution_NonRetryableTaskRejectsAutomaticRetry()
         {
             ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
@@ -3010,6 +3511,40 @@ namespace ES.EditorInternal.Tests
         }
 
         [Test]
+        public void AISkillExecution_ExecutionSpecHashCoversCompleteEndpointContract()
+        {
+            ESAISkillExecutionSpec spec = CreateIntegritySpec();
+            var port = new ESAISkillExecutionPort
+            {
+                portId = ESGraphIdentity.NewId(),
+                portKey = ESAgentGraphStableIds.SkillNextPortKey,
+                meaning = "继续",
+                valueTypeId = ESAgentGraphStableIds.SkillControlPort,
+                direction = ESGraphPortDirection.Output,
+                capacity = ESGraphPortCapacity.Single,
+                aggregation = ESGraphPortAggregation.Single,
+            };
+            spec.steps[0].ports = new[] { port };
+            string original = ESAISkillExecutionCoordinator.ComputeExecutionSpecHash(spec);
+
+            port.portKey = ESAgentGraphStableIds.SkillDefaultPortKey;
+            Assert.That(ESAISkillExecutionCoordinator.ComputeExecutionSpecHash(spec),
+                Is.Not.EqualTo(original), "PortKey 必须进入执行合同 Hash。" );
+            port.portKey = ESAgentGraphStableIds.SkillNextPortKey;
+            port.meaning = "已篡改";
+            Assert.That(ESAISkillExecutionCoordinator.ComputeExecutionSpecHash(spec),
+                Is.Not.EqualTo(original), "Meaning 必须进入执行合同 Hash。" );
+            port.meaning = "继续";
+            port.valueTypeId = ESGraphPortValueIds.Any;
+            Assert.That(ESAISkillExecutionCoordinator.ComputeExecutionSpecHash(spec),
+                Is.Not.EqualTo(original), "ValueType 必须进入执行合同 Hash。" );
+            port.valueTypeId = ESAgentGraphStableIds.SkillControlPort;
+            port.aggregation = ESGraphPortAggregation.Ordered;
+            Assert.That(ESAISkillExecutionCoordinator.ComputeExecutionSpecHash(spec),
+                Is.Not.EqualTo(original), "Aggregation 必须进入执行合同 Hash。" );
+        }
+
+        [Test]
         public void AISkillExecution_RunStateHashRejectsCursorMutation()
         {
             ESAISkillExecutionSpec spec = CreateIntegritySpec();
@@ -3056,6 +3591,160 @@ namespace ES.EditorInternal.Tests
             Assert.That(ESAISkillExecutionCoordinator.TryValidateRunState(run, out string error),
                 Is.False);
             Assert.That(error, Does.Contain("ForEach"));
+        }
+
+        [Test]
+        public void AISkillExecution_FanOutContinuationUsesOrderInsteadOfEdgeId()
+        {
+            ESAISkillExecutionSpec spec = CreateFanOutIntegritySpec();
+            var run = CreateRunForSpec(spec, spec.steps[3].nodeId);
+            run.activeFanOutNodeId = spec.steps[1].nodeId;
+            run.activeJoinNodeId = spec.steps[5].nodeId;
+            run.fanOutExpectedCount = 3;
+            run.fanOutArrivedCount = 1;
+            run.pendingFanOutNodeIds = new List<string> { spec.steps[4].nodeId };
+
+            Assert.That(ESAISkillExecutionCoordinator.TryValidateRunState(run, out string error),
+                Is.True, error);
+        }
+
+        [Test]
+        public void AISkillExecution_RunStateValidationRejectsFanOutTargetSubstitution()
+        {
+            ESAISkillExecutionSpec spec = CreateFanOutIntegritySpec();
+            var run = CreateRunForSpec(spec, spec.steps[3].nodeId);
+            run.activeFanOutNodeId = spec.steps[1].nodeId;
+            run.activeJoinNodeId = spec.steps[5].nodeId;
+            run.fanOutExpectedCount = 3;
+            run.fanOutArrivedCount = 1;
+            run.pendingFanOutNodeIds = new List<string> { spec.steps[2].nodeId };
+
+            Assert.That(ESAISkillExecutionCoordinator.TryValidateRunState(run, out string error),
+                Is.False);
+            Assert.That(error, Does.Contain("FanOut"));
+        }
+
+        [Test]
+        public void AISkillExecution_RunStateValidationRejectsCurrentNodeOutsideActiveFanOutBranch()
+        {
+            ESAISkillExecutionSpec spec = CreateFanOutIntegritySpec();
+            var run = CreateRunForSpec(spec, spec.steps[2].nodeId);
+            run.activeFanOutNodeId = spec.steps[1].nodeId;
+            run.activeJoinNodeId = spec.steps[5].nodeId;
+            run.fanOutExpectedCount = 3;
+            run.fanOutArrivedCount = 1;
+            run.pendingFanOutNodeIds = new List<string> { spec.steps[4].nodeId };
+
+            Assert.That(ESAISkillExecutionCoordinator.TryValidateRunState(run, out string error),
+                Is.False);
+            Assert.That(error, Does.Contain("当前节点"));
+        }
+
+        [Test]
+        public void AISkillExecution_RunStateValidationRejectsBranchMasqueradingAsFanOut()
+        {
+            ESAISkillExecutionSpec spec = CreateFanOutIntegritySpec();
+            spec.steps[1].fanOut = null;
+            spec.steps[1].branch = new ESAISkillBranchPayload();
+            var run = CreateRunForSpec(spec, spec.steps[3].nodeId);
+            run.activeFanOutNodeId = spec.steps[1].nodeId;
+            run.activeJoinNodeId = spec.steps[5].nodeId;
+            run.fanOutExpectedCount = 3;
+            run.fanOutArrivedCount = 1;
+            run.pendingFanOutNodeIds = new List<string> { spec.steps[4].nodeId };
+
+            Assert.That(ESAISkillExecutionCoordinator.TryValidateRunState(run, out string error),
+                Is.False);
+            Assert.That(error, Does.Contain("FanOut"));
+        }
+
+        [Test]
+        public void AISkillExecution_RunStateValidationRejectsForgedFanOutContinuation()
+        {
+            ESAISkillExecutionSpec spec = CreateFanOutIntegritySpec();
+            var run = CreateRunForSpec(spec, spec.steps[2].nodeId);
+            run.activeFanOutNodeId = spec.steps[1].nodeId;
+            run.fanOutExpectedCount = 3;
+            run.fanOutArrivedCount = 0;
+            run.pendingFanOutNodeIds = new List<string>();
+
+            Assert.That(ESAISkillExecutionCoordinator.TryValidateRunState(run, out string error),
+                Is.False);
+            Assert.That(error, Does.Contain("FanOut"));
+        }
+
+        private static ESAISkillWorkflowRun CreateRunForSpec(ESAISkillExecutionSpec spec,
+            string currentNodeId)
+        {
+            return new ESAISkillWorkflowRun
+            {
+                runId = Guid.NewGuid().ToString("N"),
+                graphId = spec.sourceGraphId,
+                contentSignature = spec.sourceContentSignature,
+                executionSpecHash = ESAISkillExecutionCoordinator.ComputeExecutionSpecHash(spec),
+                currentNodeId = currentNodeId,
+                spec = spec,
+                steps = spec.steps.Select(step => new ESAISkillStepRunRecord
+                    { nodeId = step.nodeId }).ToList(),
+            };
+        }
+
+        private static ESAISkillExecutionSpec CreateFanOutIntegritySpec()
+        {
+            string input = ESGraphIdentity.NewId();
+            string fanOut = ESGraphIdentity.NewId();
+            string branchA = ESGraphIdentity.NewId();
+            string branchB = ESGraphIdentity.NewId();
+            string branchC = ESGraphIdentity.NewId();
+            string join = ESGraphIdentity.NewId();
+            return new ESAISkillExecutionSpec
+            {
+                sourceGraphId = ESGraphIdentity.NewId(),
+                sourceContentSignature = new string('b', 64),
+                entryNodeId = input,
+                steps = new[]
+                {
+                    new ESAISkillExecutionStep { nodeId = input, input = new ESAISkillInputPayload() },
+                    new ESAISkillExecutionStep { nodeId = fanOut, fanOut = new ESAISkillFanOutPayload() },
+                    new ESAISkillExecutionStep { nodeId = branchA, task = new ESAISkillTaskPayload() },
+                    new ESAISkillExecutionStep { nodeId = branchB, task = new ESAISkillTaskPayload() },
+                    new ESAISkillExecutionStep { nodeId = branchC, task = new ESAISkillTaskPayload() },
+                    new ESAISkillExecutionStep { nodeId = join, join = new ESAISkillJoinPayload() },
+                },
+                controlEdges = new[]
+                {
+                    CreateControlEdge("00000000000000000000000000000003", 0, fanOut,
+                        ESAgentGraphStableIds.SkillFanOutPortKey, branchA),
+                    CreateControlEdge("00000000000000000000000000000001", 1, fanOut,
+                        ESAgentGraphStableIds.SkillFanOutPortKey, branchB),
+                    CreateControlEdge("00000000000000000000000000000002", 2, fanOut,
+                        ESAgentGraphStableIds.SkillFanOutPortKey, branchC),
+                    CreateControlEdge("00000000000000000000000000000011", 3, branchA,
+                        ESAgentGraphStableIds.SkillSuccessPortKey, join),
+                    CreateControlEdge("00000000000000000000000000000012", 4, branchB,
+                        ESAgentGraphStableIds.SkillSuccessPortKey, join),
+                    CreateControlEdge("00000000000000000000000000000013", 5, branchC,
+                        ESAgentGraphStableIds.SkillSuccessPortKey, join),
+                },
+            };
+        }
+
+        private static ESAISkillControlEdge CreateControlEdge(string edgeId, int order,
+            string sourceNodeId, string sourcePortKey, string targetNodeId)
+        {
+            return new ESAISkillControlEdge
+            {
+                edgeId = edgeId,
+                order = order,
+                sourceNodeId = sourceNodeId,
+                sourcePortId = ESGraphIdentity.NewId(),
+                sourcePortKey = sourcePortKey,
+                sourceMeaning = "多目标路线",
+                targetNodeId = targetNodeId,
+                targetPortId = ESGraphIdentity.NewId(),
+                targetPortKey = ESGraphBuiltInPortKeys.Input,
+                targetMeaning = "执行输入",
+            };
         }
 
         private static ESAISkillExecutionSpec CreateIntegritySpec()

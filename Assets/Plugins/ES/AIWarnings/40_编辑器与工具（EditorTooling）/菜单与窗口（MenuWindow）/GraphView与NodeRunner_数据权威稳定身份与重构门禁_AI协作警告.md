@@ -1,7 +1,7 @@
 # Stable Graph V2：数据权威、稳定身份与正式接入门禁
 
 > 状态：现行约束 + Legacy 已删除事实 + V2 联调中。
-> 最后核对：2026-08-12。
+> 最后核对：2026-08-16。
 
 ## 当前结论
 
@@ -32,12 +32,42 @@ UnityEditor API。不得预设所有 Graph 都必须生成 `Plan`、`Program` �
 - 创建、连接、插入、复制、粘贴、删除与节点编辑统一通过受控编辑服务和 Undo。
 - 端口方向、类型、容量、重复边、循环和跨领域关系在模型层校验。
 - Snapshot 与作者资产分离，并使用内容签名绑定候选、批准和后续执行。
-- Agent Authoring 领域可烘焙 AICommand + AISkill 的 Skill 能力包合同。
+- Agent Authoring 复用同一资产、Profile、编辑服务和窗口基础设施，但一张图只能选择“产物生成”或
+  “AISkill 执行”一种模式；混合模式必须在校验和 Bake 阶段硬失败。
 - 候选必须经过隔离生成、Diff Review、人工批准和哈希复核。
 - Graph AI 候选生成和单次执行统一进入 `es.agent.generate@1`、`es.agent.use@1`；
   `ESAutomationFacade` 负责 RunId、输入 Hash、RunRecord 与发送回执，Graph 不得绕过该入口直连会话窗口。
+- AISkill 持久化执行工作流源码已具备受信 TaskContract、超时和幂等重试限制、条件分支、串行 ForEach、
+  人工批准、父子 AISkill 调用、八层深度与递归阻断、父子取消、结构化输出、持久化 RunRecord，以及
+  受 Asset GUID、GraphId、内容签名和父链约束的恢复；这些仍是源码事实，不是 Unity 实机或商业验收结论。
 
 这些是源码与静态结构事实，不自动等于商业级验收完成。
+
+## Agent 双模式、端口与顺序唯一语义
+
+Agent Authoring 只共享作者基础设施，不共享执行产物：
+
+```text
+产物生成图
+  -> ESAgentArtifactGenerationSpec / ESAgentSkillBundleContract
+  -> Candidate / Diff / Approval
+
+AISkill 执行图
+  -> ESAISkillExecutionSpec
+  -> ESAISkillExecutionCoordinator / Automation Task
+  -> ESAISkillWorkflowRun
+```
+
+- 产物生成图可以包含 Goal、Reference、Constraint、产物 Branch/Traverse、AICommand/AISkill Output 和
+  Validation；产物 Branch 的 matched/default/failure 是生成需求传播关系，不得解释为 AISkill 运行控制流。
+- AISkill 执行图可以包含 Input、Task、SkillCall、Branch、ForEach、Approval、FanOut、Join 和 Output。
+  执行 Branch 的 matched/default 是两个独立 `Single` 出口；普通成功、失败、超时和取消出口同样各自为
+  `Single`。只有 FanOut 的分发出口允许 `Multi`；Join 使用 `Multi` 输入并按完整端点身份汇合。
+- `ESGraphEdgeRecord.order` 是所有图关系的唯一作者顺序。它必须进入迁移、Snapshot、内容签名、消费者
+  Spec、恢复校验和 Undo/Redo；禁止再建立节点私有顺序表，禁止使用画布位置、数组偶然顺序或 `EdgeId`
+  推断业务顺序。`EdgeId` 只负责身份，并仅可在非法重复顺序、迁移或诊断中充当确定性兜底。
+- 新建边获得新 `EdgeId` 和新顺序；重连同一关系保留 `EdgeId` 和原顺序；调整顺序只能经过
+  `ESGraphEditService` 的原子事务，失败不得 Dirty、保存或留下 Undo。
 
 ## `Program` 后缀唯一语义与 BehaviorTree 保留合同
 
@@ -118,8 +148,8 @@ Story 达到商业级定义必须同时满足：
 2. 稳定身份：Snapshot 与存档精确绑定 `DefinitionId + ContentVersion + ContentSignature`；内容缺失、签名漂移、
    重复 Key 和未知节点必须硬失败，不得回退到显示名、列表下标或另一份 Graph。
 3. 完整签名：哈希必须覆盖全部可观察运行语义，包括入口、节点种类、跳转、Action、Tag 条件、文本、选项内容
-   及选项显示/执行顺序。当前实现保留选项作者顺序却按 `OptionId` 排序计算签名，重排选项可能不改变签名；
-   修复并补迁移/回归证据前不得宣称签名合同商业级完成。
+   及选项显示/执行顺序。当前工作树源码已改为按作者选项顺序写入 `OptionId`、目标节点、文本和本地化引用；
+   该修正仍需签名版本/迁移策略、选项重排回归及 Unity Test Runner 证据，不能仅凭源码宣称签名合同商业级完成。
 4. 受控生成：Graph 接入后的适配与 Bake 位于能够同时引用 `ES_Design`、`ES_Logic` 和 Editor 工具的现有
    Editor 程序集；Player 只消费已验证 Story Snapshot/Catalog，不依赖 GraphView、UnityEditor 或 Payload JSON。
 5. 原子发布：先在隔离候选中完成结构、语义、引用、签名和存档兼容验证，再整体替换 Catalog 版本；失败保留上一份
@@ -129,21 +159,27 @@ Story 达到商业级定义必须同时满足：
 7. 事务推进：UI 提交、Action 回执、前台切换和迟到结果必须继续绑定 InstanceId、Revision、Session Generation、
    ViewRevision 和 NodeVisitSequence；失败、取消、场景切换、Presenter 异常和 Interaction 结束必须释放 Lease 并形成确定终态。
 8. 运行性能：Story 保持事件驱动，禁止每帧从入口遍历或重新 Bake。Catalog 在初始化/内容切换阶段完成验证和注入，
-   `TryStart` 只能解析已注入 Snapshot；当前每次启动先 `Inject` 并重新构造 Snapshot/计算 SHA-256 的路径必须收口。
-   同步无等待推进必须有步数上限；节点查询为 O(1)，正常推进不得使用反射、LINQ 或无界临时集合。
+   `TryStart` 只能解析已注入 Snapshot；当前工作树中的 `MODULE_ESStoryModule.TryStart` 已只调用 `TryResolve`，但仍须
+   验证所有正式初始化入口不会在每次启动前重复 Inject/Bake。同步无等待推进必须有步数上限；节点查询为 O(1)，
+   正常推进不得使用反射、LINQ 或无界临时集合。
 9. 验收证据：必须覆盖 Graph/DataInfo 迁移、签名顺序、重复身份、不可达/循环、迟到 UI/Action、取消、存档跨版本、
    原子失败恢复、多实例前台队列、Domain Reload、Player/IL2CPP，以及深图和批量实例 Profiler/GC。静态编译或测试源码存在
    不能替代 Unity Test Runner、PlayMode 和 Profiler 证据。
 
-当前 Story 已有 DataInfo、Snapshot、Catalog、Instance、QuestRecord 和 Module 运行骨架，但 Graph 接入、签名顺序修复、
-启动期重复 Bake 收口、迁移和上述 Unity/Player/性能证据仍未完成；准确成熟度仍为 `Verifying`，不得标记商业级或 Stable。
+当前 Story 已有 DataInfo、Snapshot、Catalog、Instance、QuestRecord 和 Module 运行骨架；签名顺序与 TryStart 只读解析的
+源码修正已经形成，但 Graph 接入、签名迁移/回归、Catalog 初始化闭环、作者权威迁移和上述 Unity/Player/性能证据仍未完成；
+准确成熟度仍为 `Verifying`，不得标记商业级或 Stable。
 
 ## 正式业务接入门禁
 
 1. V2 相关 Unity 程序集成功编译并完成 Domain Reload。
-2. Graph 核心与 Agent Authoring 测试必须由 Unity Test Runner 实际执行，不得只以测试源码存在签收。
-3. 至少完成一次真实的
-   `Graph -> Bake -> 受控执行 -> RunRecord -> Candidate -> Diff -> Approval -> 再执行` 闭环。
+2. Graph 核心、Agent Authoring 与 AISkill 持久化执行测试必须由 Unity Test Runner 实际执行，不得只以测试源码存在签收。
+3. 两种模式必须分别完成真实闭环，不得用一条混合链互相冒充：
+   - 候选生成：`Graph -> Bake GenerationSpec/Bundle -> es.agent.generate -> Automation RunRecord/发送回执 ->
+     Candidate -> Diff -> Approval -> 独立实现 Launch Envelope/接收回执`。
+   - 单次使用：`Graph -> Bake GenerationSpec/Bundle -> es.agent.use -> Automation RunRecord/发送回执`。
+   - AISkill 执行：`Graph -> Bake ExecutionSpec -> 参数输入 -> Coordinator -> Task/子 Skill/分支 -> 人工确认 ->
+     结构化输出 -> WorkflowRun`，并覆盖取消与恢复。
 4. 多 Graph、内容签名 stale、取消、失败注入、Domain Reload 和跨窗口恢复必须有可复现证据。
 5. Graph 窗口关闭时不得保留扫描、更新或重绘负担；深图验证不得递归爆栈。
 6. 旧 Graph/NodeRunner 类型和路径不得重新进入源码、link.xml、资产指南或正式文档。
@@ -151,16 +187,16 @@ Story 达到商业级定义必须同时满足：
 
 ## AI 能力工作流边界
 
-Graph 负责生产和烘焙能力，不直接拥有执行器、运行记录、分发或业务反馈权威：
+必须区分作者资产、执行合同、运行协调器和编辑器入口的权威：
 
 ```text
-Stable Graph V2
-  -> SkillBundleContract
-  -> ESAutomationFacade / 注册任务
-  -> 受控会话或受管执行器
-  -> ESAutomationRunRecord / ReportCenter
-  -> Candidate Review / Human Approval
+ESAgentAuthoringGraphAsset       作者数据唯一权威，不保存运行态
+  -> Baked Spec                 不可变执行或生成输入
+  -> Coordinator / Automation  运行生命周期、TaskContract 与 RunRecord 权威
+  -> Inspector                  发起受控命令并投影结果
 ```
 
-Graph Inspector 只能按 GraphId、ContentSignature、BundleId、ArtifactId 和 RunId 投影只读证据。
+Graph Inspector 可以通过公开受控入口发起生成、启动、审批、取消或打开证据，并投影自动恢复结果，但不得直接改写
+`ESAutomationRunRecord`、`ESAISkillWorkflowRun` 或绕过 TaskContract。所有命令和投影必须继续绑定
+GraphId、ContentSignature、Asset GUID、BundleId/ArtifactId、RunId 及对应 Hash。
 运行结果不得自动修改 Graph；任何改进必须由用户确认后重新编辑、Bake 和批准。

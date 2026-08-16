@@ -12,15 +12,6 @@ using GraphAsset = global::ES.ESGraphAssetBase;
 
 namespace ES.EditorInternal
 {
-    public enum ESAgentAuthoringPresetKind : byte
-    {
-        Paired = 0,
-        AICommandOnly = 1,
-        AgentSkillOnly = 2,
-        MindMapPaired = 3,
-        SceneScanReview = 4
-    }
-
     public static class ESAgentAuthoringGraphPreset
     {
         public const string DefaultGraphFolder = "Assets/ESNormalAssets/Editor/AgentAuthoring/Graphs";
@@ -187,9 +178,24 @@ namespace ES.EditorInternal
                     requireHumanApproval = true,
                     additionalRequirements = "不得包含 U+FFFD；不得越过候选目录。"
                 }), out _);
-            Connect(asset, goal, reference); Connect(asset, reference, constraint);
-            if (command != null) { Connect(asset, constraint, command); Connect(asset, command, validation); }
-            if (skill != null) { Connect(asset, constraint, skill); Connect(asset, skill, validation); }
+            Connect(asset, goal, ESAgentGraphStableIds.ContextOutputPortKey,
+                reference, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, reference, ESAgentGraphStableIds.ContextOutputPortKey,
+                constraint, ESGraphBuiltInPortKeys.Input);
+            if (command != null)
+            {
+                Connect(asset, constraint, ESAgentGraphStableIds.RequirementOutputPortKey,
+                    command, ESGraphBuiltInPortKeys.Input);
+                Connect(asset, command, ESAgentGraphStableIds.ArtifactOutputPortKey,
+                    validation, ESGraphBuiltInPortKeys.Input);
+            }
+            if (skill != null)
+            {
+                Connect(asset, constraint, ESAgentGraphStableIds.RequirementOutputPortKey,
+                    skill, ESGraphBuiltInPortKeys.Input);
+                Connect(asset, skill, ESAgentGraphStableIds.ArtifactOutputPortKey,
+                    validation, ESGraphBuiltInPortKeys.Input);
+            }
         }
 
         private static ESGraphNodeRecord Add(GraphAsset graph, string nodeTypeId, Vector2 position)
@@ -204,20 +210,15 @@ namespace ES.EditorInternal
             return node;
         }
 
-        private static void Connect(GraphAsset graph, ESGraphNodeRecord from, ESGraphNodeRecord to)
+        private static void Connect(GraphAsset graph, ESGraphNodeRecord from,
+            string outputPortKey, ESGraphNodeRecord to, string inputPortKey)
         {
-            ESGraphPortRecord output = from.ports.First(port => port.direction == ESGraphPortDirection.Output);
-            ESGraphPortRecord input = to.ports.First(port => port.direction == ESGraphPortDirection.Input);
-            if (!graph.TryAddEdge(output.portId, input.portId, out _, out string error))
-                throw new InvalidOperationException(error);
-        }
-
-        private static void ConnectFromPort(GraphAsset graph, ESGraphNodeRecord from,
-            string outputStableKey, ESGraphNodeRecord to)
-        {
-            ESGraphPortRecord output = from.ports.First(port => port.direction == ESGraphPortDirection.Output
-                && string.Equals(port.stableKey, outputStableKey, StringComparison.Ordinal));
-            ESGraphPortRecord input = to.ports.First(port => port.direction == ESGraphPortDirection.Input);
+            if (from == null || !from.TryGetPort(outputPortKey, out ESGraphPortRecord output)
+                || output.direction != ESGraphPortDirection.Output)
+                throw new InvalidOperationException("源节点缺少指定输出端点：" + outputPortKey);
+            if (to == null || !to.TryGetPort(inputPortKey, out ESGraphPortRecord input)
+                || input.direction != ESGraphPortDirection.Input)
+                throw new InvalidOperationException("目标节点缺少指定输入端点：" + inputPortKey);
             if (!graph.TryAddEdge(output.portId, input.portId, out _, out string error))
                 throw new InvalidOperationException(error);
         }
@@ -314,22 +315,35 @@ namespace ES.EditorInternal
             asset.UpdateNode(validation.nodeId, validation.typeId, validation.version, validation.title,
                 JsonUtility.ToJson(new ESAgentValidationPayload()), out _);
 
-            Connect(asset, goal, rules);
-            Connect(asset, rules, contract);
-            Connect(asset, contract, branch);
-            ConnectFromPort(asset, branch, ESAgentGraphStableIds.BranchMatchedPortKey, traversal);
-            ConnectFromPort(asset, branch, ESAgentGraphStableIds.BranchDefaultPortKey, permission);
-            ConnectFromPort(asset, branch, ESAgentGraphStableIds.BranchFailurePortKey, forbidden);
-            ConnectFromPort(asset, traversal, ESAgentGraphStableIds.TraverseItemPortKey, required);
-            ConnectFromPort(asset, traversal, ESAgentGraphStableIds.TraverseCompletedPortKey, quality);
-            ConnectFromPort(asset, traversal, ESAgentGraphStableIds.TraverseFailurePortKey, forbidden);
+            Connect(asset, goal, ESAgentGraphStableIds.ContextOutputPortKey,
+                rules, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, rules, ESAgentGraphStableIds.ContextOutputPortKey,
+                contract, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, contract, ESAgentGraphStableIds.ContextOutputPortKey,
+                branch, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, branch, ESAgentGraphStableIds.BranchMatchedPortKey,
+                traversal, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, branch, ESAgentGraphStableIds.BranchDefaultPortKey,
+                permission, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, branch, ESAgentGraphStableIds.BranchFailurePortKey,
+                forbidden, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, traversal, ESAgentGraphStableIds.TraverseItemPortKey,
+                required, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, traversal, ESAgentGraphStableIds.TraverseCompletedPortKey,
+                quality, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, traversal, ESAgentGraphStableIds.TraverseFailurePortKey,
+                forbidden, ESGraphBuiltInPortKeys.Input);
             foreach (ESGraphNodeRecord constraint in new[] { required, forbidden, permission, quality })
             {
-                Connect(asset, constraint, command);
-                Connect(asset, constraint, skill);
+                Connect(asset, constraint, ESAgentGraphStableIds.RequirementOutputPortKey,
+                    command, ESGraphBuiltInPortKeys.Input);
+                Connect(asset, constraint, ESAgentGraphStableIds.RequirementOutputPortKey,
+                    skill, ESGraphBuiltInPortKeys.Input);
             }
-            Connect(asset, command, validation);
-            Connect(asset, skill, validation);
+            Connect(asset, command, ESAgentGraphStableIds.ArtifactOutputPortKey,
+                validation, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, skill, ESAgentGraphStableIds.ArtifactOutputPortKey,
+                validation, ESGraphBuiltInPortKeys.Input);
         }
 
         internal static void PopulateSceneScanReview(GraphAsset asset)
@@ -391,16 +405,25 @@ namespace ES.EditorInternal
             ConfigureOutput(asset, timedOut, "timed-out", "扫描超时记录");
             ConfigureOutput(asset, cancelled, "cancelled", "扫描取消记录");
 
-            ConnectFromPort(asset, input, ESAgentGraphStableIds.SkillNextPortKey, scan);
-            ConnectFromPort(asset, scan, ESAgentGraphStableIds.SkillSuccessPortKey, approval);
-            ConnectFromPort(asset, approval, ESAgentGraphStableIds.SkillApprovedPortKey, completed);
-            ConnectFromPort(asset, approval, ESAgentGraphStableIds.SkillRejectedPortKey, rejected);
-            ConnectFromPort(asset, scan, ESAgentGraphStableIds.SkillFailurePortKey, failed);
-            ConnectFromPort(asset, scan, ESAgentGraphStableIds.SkillTimeoutPortKey, timedOut);
-            ConnectFromPort(asset, scan, ESAgentGraphStableIds.SkillCancelledPortKey, cancelled);
-            ConnectValue(asset, scan, "skill.value.run-result", approval);
+            Connect(asset, input, ESAgentGraphStableIds.SkillNextPortKey,
+                scan, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, scan, ESAgentGraphStableIds.SkillSuccessPortKey,
+                approval, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, approval, ESAgentGraphStableIds.SkillApprovedPortKey,
+                completed, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, approval, ESAgentGraphStableIds.SkillRejectedPortKey,
+                rejected, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, scan, ESAgentGraphStableIds.SkillFailurePortKey,
+                failed, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, scan, ESAgentGraphStableIds.SkillTimeoutPortKey,
+                timedOut, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, scan, ESAgentGraphStableIds.SkillCancelledPortKey,
+                cancelled, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, scan, ESAgentGraphStableIds.SkillRunResultPortKey,
+                approval, ESAgentGraphStableIds.SkillInputPortKey);
             foreach (ESGraphNodeRecord output in new[] { completed, rejected, failed, timedOut, cancelled })
-                ConnectValue(asset, scan, "skill.value.run-result", output);
+                Connect(asset, scan, ESAgentGraphStableIds.SkillRunResultPortKey,
+                    output, ESAgentGraphStableIds.SkillInputPortKey);
         }
 
         private static ESAISkillTaskInputBinding ParameterBinding(string parameterId)
@@ -421,18 +444,6 @@ namespace ES.EditorInternal
                     outputId = outputId,
                     displayName = displayName
                 }), out _);
-        }
-
-        private static void ConnectValue(GraphAsset graph, ESGraphNodeRecord from,
-            string outputStableKey, ESGraphNodeRecord to)
-        {
-            ESGraphPortRecord output = from.ports.First(port => port.direction == ESGraphPortDirection.Output
-                && string.Equals(port.stableKey, outputStableKey, StringComparison.Ordinal));
-            ESGraphPortRecord input = to.ports.First(port => port.direction == ESGraphPortDirection.Input
-                && !string.Equals(port.valueTypeId, ESAgentGraphStableIds.SkillControlPort,
-                    StringComparison.Ordinal));
-            if (!graph.TryAddEdge(output.portId, input.portId, out _, out string error))
-                throw new InvalidOperationException(error);
         }
 
         private static void ConfigureConstraint(GraphAsset asset, ESGraphNodeRecord node,
@@ -521,143 +532,6 @@ namespace ES.EditorInternal
                 current = next;
             }
         }
-    }
-
-    [Serializable]
-    public sealed class ESAgentArtifactGenerationRequest
-    {
-        public const int CurrentSchemaVersion = 4;
-
-        public int schemaVersion = CurrentSchemaVersion;
-        public string requestId;
-        public string createdAtUtc;
-        public string requestDirectory;
-        public string candidateDirectory;
-        public ESAgentArtifactGenerationSpec spec;
-    }
-
-    [Serializable]
-    public sealed class ESAgentGraphClipboardPackage
-    {
-        public const int CurrentSchemaVersion = 2;
-
-        public int schemaVersion = CurrentSchemaVersion;
-        public ESAgentGraphCopyFormat format;
-        public string requestId;
-        public string generatedAtUtc;
-        public ESAgentArtifactGenerationSpec spec;
-    }
-
-    [Serializable]
-    public sealed class ESAgentArtifactCandidateManifest
-    {
-        public int schemaVersion = 1;
-        public string requestId;
-        public string summary;
-        public ESAgentArtifactCandidateFile[] files = Array.Empty<ESAgentArtifactCandidateFile>();
-    }
-
-    [Serializable]
-    public sealed class ESAgentArtifactCandidateFile
-    {
-        public ESAgentArtifactKind artifactKind;
-        public string candidateRelativePath;
-        public string targetProjectPath;
-        public string summary;
-    }
-
-    [Serializable]
-    public sealed class ESAgentArtifactApprovalManifest
-    {
-        public const int CurrentSchemaVersion = 3;
-
-        public int schemaVersion = CurrentSchemaVersion;
-        public string requestId;
-        public string approvedAtUtc;
-        public string sourceGraphId;
-        public string sourceContentSignature;
-        public ESGraphRiskAcceptance riskAcceptance;
-        public ESAgentArtifactApprovedFile[] files = Array.Empty<ESAgentArtifactApprovedFile>();
-    }
-
-    [Serializable]
-    public sealed class ESAgentArtifactApprovedFile
-    {
-        public ESAgentArtifactKind artifactKind;
-        public string sourceGraphId;
-        public string outputNodeId;
-        public string artifactId;
-        public string targetProjectPath;
-        public string sha256;
-    }
-
-    [Serializable]
-    public sealed class ESGraphSnapshotArtifact
-    {
-        public const int CurrentSchemaVersion = 2;
-
-        public int schemaVersion = CurrentSchemaVersion;
-        public string createdAtUtc;
-        public int graphSchemaVersion;
-        public string graphId;
-        public string originGraphId;
-        public string domainId;
-        public bool allowCycles;
-        public string contentSignature;
-        public ESGraphRiskAcceptance riskAcceptance;
-        public ESGraphSnapshotNodeArtifact[] nodes = Array.Empty<ESGraphSnapshotNodeArtifact>();
-        public ESGraphSnapshotEdgeArtifact[] edges = Array.Empty<ESGraphSnapshotEdgeArtifact>();
-    }
-
-    [Serializable]
-    public sealed class ESGraphSnapshotNodeArtifact
-    {
-        public string nodeId;
-        public string typeId;
-        public int version;
-        public string title;
-        public string payloadJson;
-        public ESGraphSnapshotPortArtifact[] ports = Array.Empty<ESGraphSnapshotPortArtifact>();
-    }
-
-    [Serializable]
-    public sealed class ESGraphSnapshotPortArtifact
-    {
-        public string portId;
-        public string stableKey;
-        public string name;
-        public string valueTypeId;
-        public ESGraphPortDirection direction;
-        public ESGraphPortCapacity capacity;
-    }
-
-    [Serializable]
-    public sealed class ESGraphSnapshotEdgeArtifact
-    {
-        public string edgeId;
-        public string outputPortId;
-        public string inputPortId;
-    }
-
-    public enum ESAgentArtifactRequestState : byte
-    {
-        None = 0,
-        AwaitingCandidate = 1,
-        AwaitingApproval = 2,
-        Approved = 3,
-        Stale = 4,
-        Invalid = 5
-    }
-
-    public sealed class ESAgentArtifactRequestStatus
-    {
-        public ESAgentArtifactRequestState State { get; internal set; }
-        public string RequestDirectory { get; internal set; }
-        public string Message { get; internal set; }
-        public string NextAction { get; internal set; }
-        public bool CanReview => State == ESAgentArtifactRequestState.AwaitingCandidate
-            || State == ESAgentArtifactRequestState.AwaitingApproval
-            || State == ESAgentArtifactRequestState.Approved;
     }
 
     public static class ESAgentArtifactGenerationWorkspace
@@ -806,6 +680,8 @@ namespace ES.EditorInternal
             ESAgentGenerationRelation[] retainedRelations = sourceRelations
                 .Where(item => retainedNodeIds.Contains(item.fromNodeId)
                     && retainedNodeIds.Contains(item.toNodeId))
+                .OrderBy(item => item.order)
+                .ThenBy(item => item.edgeId, StringComparer.Ordinal)
                 .ToArray();
             for (int i = 0; i < selectedOutputs.Length; i++)
             {
@@ -1792,19 +1668,44 @@ namespace ES.EditorInternal
                         payloadJson = node.PayloadJson,
                         ports = node.Ports.Select(port => new ESGraphSnapshotPortArtifact
                         {
+                            nodeId = port.NodeId,
                             portId = port.PortId,
                             stableKey = port.StableKey,
                             name = port.Name,
+                            meaning = port.Meaning,
                             valueTypeId = port.ValueTypeId,
                             direction = port.Direction,
-                            capacity = port.Capacity
+                            capacity = port.Capacity,
+                            aggregation = port.Aggregation
                         }).ToArray()
                     }).ToArray(),
-                    edges = snapshot.Edges.Select(edge => new ESGraphSnapshotEdgeArtifact
+                    edges = snapshot.Edges.OrderBy(edge => edge.Order)
+                        .ThenBy(edge => edge.EdgeId, StringComparer.Ordinal)
+                        .Select(edge => new ESGraphSnapshotEdgeArtifact
                     {
                         edgeId = edge.EdgeId,
+                        order = edge.Order,
                         outputPortId = edge.OutputPortId,
                         inputPortId = edge.InputPortId
+                    }).ToArray(),
+                    routes = snapshot.Routes.OrderBy(route => route.Order)
+                        .ThenBy(route => route.EdgeId, StringComparer.Ordinal)
+                        .Select(route => new ESGraphSnapshotRouteArtifact
+                    {
+                        edgeId = route.EdgeId,
+                        order = route.Order,
+                        sourceNodeId = route.SourceNodeId,
+                        sourcePortId = route.SourcePortId,
+                        sourcePortKey = route.SourcePortKey,
+                        sourceMeaning = route.SourceMeaning,
+                        sourceValueTypeId = route.SourceValueTypeId,
+                        sourceAggregation = route.SourceAggregation,
+                        targetNodeId = route.TargetNodeId,
+                        targetPortId = route.TargetPortId,
+                        targetPortKey = route.TargetPortKey,
+                        targetMeaning = route.TargetMeaning,
+                        targetValueTypeId = route.TargetValueTypeId,
+                        targetAggregation = route.TargetAggregation
                     }).ToArray()
                 };
                 relativePath = BuildSnapshotRelativePath(snapshot.GraphId, snapshot.ContentSignature);
@@ -2210,7 +2111,11 @@ namespace ES.EditorInternal
 
         private static void AppendMindMap(StringBuilder builder, ESAgentArtifactGenerationSpec spec)
         {
-            ESAgentGenerationRelation[] relations = spec.relations ?? Array.Empty<ESAgentGenerationRelation>();
+            ESAgentGenerationRelation[] relations = (spec.relations
+                    ?? Array.Empty<ESAgentGenerationRelation>())
+                .OrderBy(relation => relation.order)
+                .ThenBy(relation => relation.edgeId, StringComparer.Ordinal)
+                .ToArray();
             builder.AppendLine();
             builder.AppendLine("思路图关系（这是需求归属、约束作用和审查链，不是运行时执行图）：");
             if (relations.Length == 0)
@@ -2221,10 +2126,13 @@ namespace ES.EditorInternal
             for (int i = 0; i < relations.Length; i++)
             {
                 ESAgentGenerationRelation relation = relations[i];
-                builder.AppendLine("- " + SafeTitle(relation.fromNodeTitle, relation.fromNodeTypeId) + " → "
+                builder.AppendLine("- 顺序 " + relation.order + " | "
+                    + SafeTitle(relation.fromNodeTitle, relation.fromNodeTypeId) + " → "
                     + SafeTitle(relation.toNodeTitle, relation.toNodeTypeId) + " ["
                     + ESAgentSemanticPresentation.RelationKind(relation.relationKind)
-                    + " / " + relation.fromPortStableKey + " / " + relation.semanticType + "]");
+                    + " / " + relation.fromPortMeaning + " (" + relation.fromPortStableKey + ")"
+                    + " → " + relation.toPortMeaning + " (" + relation.toPortStableKey + ")"
+                    + " / " + relation.semanticType + "]");
             }
             builder.AppendLine();
             builder.AppendLine("```mermaid");
@@ -2239,8 +2147,13 @@ namespace ES.EditorInternal
                 builder.AppendLine("    " + fromAlias + "[\"" + EscapeMermaid(SafeTitle(relation.fromNodeTitle, relation.fromNodeTypeId)) + "\"]");
                 builder.AppendLine("    " + toAlias + "[\"" + EscapeMermaid(SafeTitle(relation.toNodeTitle, relation.toNodeTypeId)) + "\"]");
                 builder.AppendLine("    " + fromAlias + " -->|"
-                    + EscapeMermaid(ESAgentSemanticPresentation.RelationKind(relation.relationKind)
-                        + ":" + relation.fromPortStableKey) + "| " + toAlias);
+                    + EscapeMermaid("#" + relation.order + " "
+                        + ESAgentSemanticPresentation.RelationKind(relation.relationKind)
+                        + ":" + relation.fromPortMeaning + "→" + relation.toPortMeaning + " ["
+                        + (relation.sourceValueTypeId ?? relation.semanticType ?? string.Empty)
+                        + "→" + (relation.targetValueTypeId ?? string.Empty)
+                        + ";" + relation.sourceAggregation + "→" + relation.targetAggregation + "]")
+                    + "| " + toAlias);
             }
             builder.AppendLine("```");
         }
@@ -2259,9 +2172,12 @@ namespace ES.EditorInternal
             {
                 ESAgentGenerationBranch branch = branches[i];
                 builder.AppendLine("- Branch " + branch.nodeId + " | 条件：" + branch.condition);
-                builder.AppendLine("  " + ESAgentGraphStableIds.BranchMatchedPortKey + "：" + branch.matchedPath);
-                builder.AppendLine("  " + ESAgentGraphStableIds.BranchDefaultPortKey + "：" + branch.defaultPath);
-                builder.AppendLine("  " + ESAgentGraphStableIds.BranchFailurePortKey + "：" + branch.failurePath);
+                builder.AppendLine("  " + ESAgentGraphStableIds.BranchMatchedPortKey + "："
+                    + branch.matchedPath + " -> " + FormatTargetIds(branch.matchedTargetNodeIds));
+                builder.AppendLine("  " + ESAgentGraphStableIds.BranchDefaultPortKey + "："
+                    + branch.defaultPath + " -> " + FormatTargetIds(branch.defaultTargetNodeIds));
+                builder.AppendLine("  " + ESAgentGraphStableIds.BranchFailurePortKey + "："
+                    + branch.failurePath + " -> " + FormatTargetIds(branch.failureTargetNodeIds));
             }
             for (int i = 0; i < traversals.Length; i++)
             {
@@ -2274,6 +2190,13 @@ namespace ES.EditorInternal
                 builder.AppendLine("  失败：" + traversal.failureAction);
             }
             builder.AppendLine("遍历不得创建 Graph 循环；达到任一硬上限必须停止并沿完成或失败出口交付证据。");
+        }
+
+        private static string FormatTargetIds(IEnumerable<string> targetNodeIds)
+        {
+            string[] ids = (targetNodeIds ?? Array.Empty<string>())
+                .Where(id => !string.IsNullOrWhiteSpace(id)).ToArray();
+            return ids.Length == 0 ? "（缺少稳定目标）" : string.Join("、", ids);
         }
 
         private static string GetAlias(Dictionary<string, string> aliases, string nodeId, ref int nextAlias)
@@ -2330,73 +2253,6 @@ namespace ES.EditorInternal
                 for (int i = 0; i < hash.Length; i++) builder.Append(hash[i].ToString("x2"));
                 return builder.ToString();
             }
-        }
-    }
-
-    public enum ESAgentArtifactImportState : byte
-    {
-        Applied = 0,
-        FailedBeforeWrite = 1,
-        RolledBack = 2,
-        RollbackUnconfirmed = 3
-    }
-
-    public sealed class ESAgentArtifactFileOperation
-    {
-        public string SourcePath { get; set; }
-        public string TargetPath { get; set; }
-        public string BackupPath { get; set; }
-    }
-
-    public interface IESAgentArtifactFileIO
-    {
-        bool FileExists(string path);
-        void CopyAtomically(string sourcePath, string targetPath);
-        void DeleteFile(string path);
-        string ComputeSha256(string path);
-    }
-
-    public sealed class ESAgentArtifactImportResult
-    {
-        public ESAgentArtifactImportState State { get; internal set; }
-        public string PrimaryError { get; internal set; }
-        public string[] RecoveryErrors { get; internal set; } = Array.Empty<string>();
-        public bool Succeeded => State == ESAgentArtifactImportState.Applied;
-        public bool RollbackConfirmed => State == ESAgentArtifactImportState.RolledBack;
-
-        public string BuildDiagnostic()
-        {
-            var builder = new StringBuilder();
-            if (!string.IsNullOrWhiteSpace(PrimaryError))
-                builder.AppendLine(PrimaryError.Trim());
-            if (RecoveryErrors != null && RecoveryErrors.Length > 0)
-            {
-                builder.AppendLine("恢复核对错误：");
-                foreach (string error in RecoveryErrors)
-                    if (!string.IsNullOrWhiteSpace(error)) builder.AppendLine("- " + error.Trim());
-            }
-            return builder.ToString().Trim();
-        }
-    }
-
-    public sealed class ESAgentArtifactPhysicalFileIO : IESAgentArtifactFileIO
-    {
-        public bool FileExists(string path) => File.Exists(path);
-
-        public void CopyAtomically(string sourcePath, string targetPath)
-        {
-            ESAgentArtifactGenerationWorkspace.CopyFileAtomically(sourcePath, targetPath);
-        }
-
-        public void DeleteFile(string path)
-        {
-            ESAgentArtifactGenerationWorkspace.EnsureProjectWritePath(path);
-            if (File.Exists(path)) File.Delete(path);
-        }
-
-        public string ComputeSha256(string path)
-        {
-            return ESAgentArtifactGenerationWorkspace.ComputeSha256(path);
         }
     }
 
@@ -2545,30 +2401,6 @@ namespace ES.EditorInternal
                 return result;
             }
         }
-    }
-
-    [Serializable]
-    public sealed class ESCodexSessionLaunchResult
-    {
-        public string terminalMode;
-        public string terminalWindowName;
-        public string tabTitle;
-        public string responsibilityKey;
-        public string envelopePath;
-        public string handoffSnapshotDirectory;
-        public string sessionId;
-        public int processId;
-        public bool alreadyRunning;
-        public bool launched;
-        public bool terminalStarted;
-        public bool promptObserved;
-        public bool contextAccepted;
-        public bool startupFailed;
-        public bool startupTimedOut;
-        public string launchPhase;
-        public string acceptanceReceiptPath;
-        public string startupDiagnosticPath;
-        public string startupFailureReason;
     }
 
     /// <summary>

@@ -37,10 +37,8 @@ namespace ES.EditorInternal
             card.style.borderTopColor = ESEditorPresentation.DividerColor;
             card.style.borderRightColor = ESEditorPresentation.DividerColor;
             card.style.borderBottomColor = ESEditorPresentation.DividerColor;
-            card.style.borderTopLeftRadius = 5f;
-            card.style.borderTopRightRadius = 5f;
-            card.style.borderBottomLeftRadius = 5f;
-            card.style.borderBottomRightRadius = 5f;
+            ESEditorPresentation.ApplyCornerRadius(
+                card, ESEditorPresentation.ESCornerRadiusToken.Card);
 
             var headerRow = new VisualElement();
             headerRow.style.flexDirection = FlexDirection.Row;
@@ -80,10 +78,8 @@ namespace ES.EditorInternal
             badge.style.unityFontStyleAndWeight = FontStyle.Bold;
             badge.style.color = Color.white;
             badge.style.backgroundColor = new Color(accent.r, accent.g, accent.b, 0.86f);
-            badge.style.borderTopLeftRadius = 4f;
-            badge.style.borderTopRightRadius = 4f;
-            badge.style.borderBottomLeftRadius = 4f;
-            badge.style.borderBottomRightRadius = 4f;
+            ESEditorPresentation.ApplyCornerRadius(
+                badge, ESEditorPresentation.ESCornerRadiusToken.Pill);
             return badge;
         }
 
@@ -101,10 +97,8 @@ namespace ES.EditorInternal
                 ESEditorPresentation.IsProSkin ? 0.13f : 0.08f);
             notice.style.borderLeftWidth = 3f;
             notice.style.borderLeftColor = accent;
-            notice.style.borderTopLeftRadius = 4f;
-            notice.style.borderTopRightRadius = 4f;
-            notice.style.borderBottomLeftRadius = 4f;
-            notice.style.borderBottomRightRadius = 4f;
+            ESEditorPresentation.ApplyCornerRadius(
+                notice, ESEditorPresentation.ESCornerRadiusToken.Card);
             var label = new Label(text ?? string.Empty);
             label.style.whiteSpace = WhiteSpace.Normal;
             label.style.fontSize = 10f;
@@ -305,6 +299,7 @@ namespace ES.EditorInternal
             ESGraphPortValueKind.Custom
         };
         private readonly Action rebuildGraph;
+        private readonly Action<ESGraphChange> applyGraphChange;
         private readonly Action<string> report;
         private readonly Action<string> locate;
         private readonly Action requestAutoSave;
@@ -340,10 +335,12 @@ namespace ES.EditorInternal
         private ESGraphOdinPayloadSession odinPayloadSession;
 
         public ESStableGraphInspector(EditorWindow hostWindow, Action rebuildGraph, Action<string> report, Action<string> locate,
-            Action requestAutoSave = null, ESGraphEditService editService = null)
+            Action requestAutoSave = null, ESGraphEditService editService = null,
+            Action<ESGraphChange> applyGraphChange = null)
         {
             this.hostWindow = hostWindow;
             this.rebuildGraph = rebuildGraph;
+            this.applyGraphChange = applyGraphChange;
             this.report = report;
             this.locate = locate;
             this.requestAutoSave = requestAutoSave;
@@ -411,10 +408,8 @@ namespace ES.EditorInternal
             validationPanel.style.borderTopColor = ESEditorPresentation.DividerColor;
             validationPanel.style.borderRightColor = ESEditorPresentation.DividerColor;
             validationPanel.style.borderBottomColor = ESEditorPresentation.DividerColor;
-            validationPanel.style.borderTopLeftRadius = 5f;
-            validationPanel.style.borderTopRightRadius = 5f;
-            validationPanel.style.borderBottomLeftRadius = 5f;
-            validationPanel.style.borderBottomRightRadius = 5f;
+            ESEditorPresentation.ApplyCornerRadius(
+                validationPanel, ESEditorPresentation.ESCornerRadiusToken.Section);
             var validationHeader = new VisualElement();
             validationHeader.style.flexDirection = FlexDirection.Row;
             validationHeader.style.alignItems = Align.Center;
@@ -530,6 +525,13 @@ namespace ES.EditorInternal
 
         public void NotifyAssetChanged()
         {
+            NotifyAssetChanged(ESGraphChange.ExternalChange);
+        }
+
+        public void NotifyAssetChanged(ESGraphChange change)
+        {
+            if (!change.AffectsBake)
+                return;
             validationRevision++;
             RequestValidation();
         }
@@ -703,6 +705,21 @@ namespace ES.EditorInternal
             overview.Add(ESGraphInspectorVisuals.CreateNotice(
                 "添加节点 → 拖线建立关系 → 填写业务内容 → 质量检查。修改会进入自动保存队列。",
                 HelpBoxMessageType.Info));
+            if (asset.schemaVersion < GraphAsset.CurrentSchemaVersion)
+            {
+                overview.Add(ESGraphInspectorVisuals.CreateNotice(
+                    "该图使用旧数据版本。升级会保留 GraphId、NodeId、PortId、EdgeId，并为旧端点补齐明确用途。",
+                    HelpBoxMessageType.Warning));
+                overview.Add(ESGraphInspectorVisuals.CreateButton("升级图数据",
+                    "通过一个 Undo 事务升级到当前图数据版本。失败时不会修改资产。",
+                    UpgradeCurrentGraphSchema, true));
+            }
+            else if (asset.schemaVersion > GraphAsset.CurrentSchemaVersion)
+            {
+                overview.Add(ESGraphInspectorVisuals.CreateNotice(
+                    "该图来自更高版本，当前编辑器只读保护，不能降级或覆盖。",
+                    HelpBoxMessageType.Error));
+            }
             details.Add(overview);
 
             VisualElement settings = CreateSection("业务设置", "领域方案决定可用节点、端口语义和校验规则。", 1);
@@ -741,8 +758,8 @@ namespace ES.EditorInternal
                     HelpBoxMessageType.Info));
             details.Add(advanced);
 
-            VisualElement workflow = CreateSection("检查、执行与产物",
-                "质量错误会在操作前提示；结构与授权错误仍必须先修复。", 1, "业务出口");
+            VisualElement workflow = CreateSection("检查与运行",
+                "先看检查结果，再选择运行、生成候选或查看记录。结构与权限错误仍必须先修复。", 1, "下一步");
             EvaluateCurrentGraph();
             ESBakedGraphSnapshot currentSnapshot = evaluatedActionBakeSucceeded ? evaluatedSnapshot : null;
             ESAgentArtifactGenerationSpec currentAgentSpec = evaluatedActionBakeSucceeded
@@ -757,8 +774,8 @@ namespace ES.EditorInternal
             VisualElement checkActions = ESGraphInspectorVisuals.CreateActionRow();
             checkActions.Add(ESGraphInspectorVisuals.CreateButton("立即检查", "检查图的完整性、连线和领域规则。",
                 ForceValidation, true));
-            Button snapshotButton = ESGraphInspectorVisuals.CreateButton("生成并保存检查快照",
-                "生成严格 UTF-8 JSON 快照并保存到 ES/Automation/Artifacts；不会直接运行图。", BakeSnapshot);
+            Button snapshotButton = ESGraphInspectorVisuals.CreateButton("保存检查快照",
+                "保存严格 UTF-8 JSON 检查快照到 ES/Automation/Artifacts；不会直接运行图。", BakeSnapshot);
             checkActions.Add(snapshotButton);
             workflow.Add(checkActions);
             AddSnapshotStatus(workflow, currentSnapshot);
@@ -797,22 +814,22 @@ namespace ES.EditorInternal
                 else
                 {
                     workflow.Add(ESGraphInspectorVisuals.CreateNotice(
-                        "请先填写唯一的“最终目的”和“成功标准”。未明确最终目的时，即时执行、复制和永久产物生成都会被阻断。",
+                        "请先填写唯一的“最终目的”和“成功标准”。未明确目的时，运行、复制和正式内容生成都会被阻断。",
                         HelpBoxMessageType.Error));
                 }
                 if (currentAgentSpec?.skillBundle != null)
                 {
                     ESAgentSkillBundleContract bundle = currentAgentSpec.skillBundle;
                     workflow.Add(ESGraphInspectorVisuals.CreateNotice(
-                        "Skill 能力包：" + bundle.displayName + "（" + bundle.kind + "）"
+                        "能力包：" + bundle.displayName + "（" + bundle.kind + "）"
                         + "\nBundleId：" + bundle.bundleId
-                        + "\nAICommand=" + (bundle.commandOutputNodeIds?.Length ?? 0)
-                        + "，AISkill=" + (bundle.aiSkillOutputNodeIds?.Length ?? 0)
-                        + "；共享 Goal、约束、验证和人工批准边界。",
+                        + "\n命令=" + (bundle.commandOutputNodeIds?.Length ?? 0)
+                        + "，技能=" + (bundle.aiSkillOutputNodeIds?.Length ?? 0)
+                        + "；共享目标、约束、验证和人工批准边界。",
                         HelpBoxMessageType.Info));
                 }
-                VisualElement immediate = CreateSection("即时使用",
-                    "首屏保留常用动作；会话类型、直接执行和纯复制方式统一放在“高级交付”中选择。", 2, "本次任务");
+                VisualElement immediate = CreateSection("现在运行",
+                    "只显示当前图最常用的运行入口；其他交付方式放在“更多操作”中。", 2, "当前图");
                 int commandOutputCount = asset.Nodes.Count(node => node != null
                     && string.Equals(node.typeId, ESAgentGraphStableIds.AICommandOutputNode,
                         StringComparison.Ordinal));
@@ -822,21 +839,21 @@ namespace ES.EditorInternal
                 bool hasCommandOutput = commandOutputCount > 0;
                 bool hasSkillOutput = skillOutputCount > 0;
                 VisualElement immediateActions = ESGraphInspectorVisuals.CreateActionRow();
-                Button useAsCommand = ESGraphInspectorVisuals.CreateButton("执行单次 Command",
-                    "按默认受控会话执行 AICommand Output 关联分支；不生成或安装永久产物。",
+                Button useAsCommand = ESGraphInspectorVisuals.CreateButton("运行命令",
+                    "运行当前命令分支；不生成或安装永久内容。",
                     () => SendSingleUseAgentArtifact(ESAgentArtifactKind.AICommand), true);
                 useAsCommand.SetEnabled(commandOutputCount == 1);
                 immediateActions.Add(useAsCommand);
-                Button useAsSkill = ESGraphInspectorVisuals.CreateButton("执行临时 AISkill",
-                    "按默认受控会话执行 AISkill Output 关联分支；不会写入 .agents/skills。",
+                Button useAsSkill = ESGraphInspectorVisuals.CreateButton("运行技能",
+                    "运行当前技能流程；不会写入 .agents/skills。",
                     () => SendSingleUseAgentArtifact(ESAgentArtifactKind.AgentSkill));
                 useAsSkill.SetEnabled(skillOutputCount == 1);
                 immediateActions.Add(useAsSkill);
                 Button advancedDelivery = null;
                 advancedDelivery = new Button(() => OpenAgentDeliveryMenu(advancedDelivery))
                 {
-                    text = "高级交付…",
-                    tooltip = "选择受控工作台草稿、直接命令会话、候选生成、独立实现会话或纯复制。"
+                    text = "更多操作…",
+                    tooltip = "选择草稿、候选生成、批准后执行或复制文本。"
                 };
                 ESGraphInspectorVisuals.StyleButton(advancedDelivery);
                 immediateActions.Add(advancedDelivery);
@@ -849,23 +866,23 @@ namespace ES.EditorInternal
                 }
                 workflow.Add(immediate);
 
-                VisualElement permanent = CreateSection("永久化流程",
-                    "候选隔离 → Diff 审查 → 人工批准 → 独立窗口实现。", 2, "可持续更新");
+                VisualElement permanent = CreateSection("生成正式内容",
+                    "生成候选 → 查看差异 → 人工批准 → 执行已批准内容。", 2, "需要批准");
                 VisualElement saveActions = ESGraphInspectorVisuals.CreateActionRow();
-                Button saveCommand = ESGraphInspectorVisuals.CreateButton("生成 AICommand 候选",
-                    "按默认受控方式创建并提交隔离候选请求；只保留 AICommand Output 关联分支。",
+                Button saveCommand = ESGraphInspectorVisuals.CreateButton("生成命令候选",
+                    "创建隔离候选请求；只使用当前命令分支。",
                     () => SendAgentGenerationRequest(ESAgentArtifactKind.AICommand), true);
                 saveCommand.SetEnabled(hasCommandOutput);
                 saveActions.Add(saveCommand);
-                Button saveSkill = ESGraphInspectorVisuals.CreateButton("生成 AISkill 候选",
-                    "按默认受控方式创建并提交隔离候选请求；只保留 AISkill Output 关联分支。",
+                Button saveSkill = ESGraphInspectorVisuals.CreateButton("生成技能候选",
+                    "创建隔离候选请求；只使用当前技能分支。",
                     () => SendAgentGenerationRequest(ESAgentArtifactKind.AgentSkill));
                 saveSkill.SetEnabled(hasSkillOutput);
                 saveActions.Add(saveSkill);
                 Button saveAll = ESGraphInspectorVisuals.CreateButton(
-                    hasCommandOutput && hasSkillOutput ? "生成 Skill 能力包候选" : "生成全部候选",
+                    hasCommandOutput && hasSkillOutput ? "生成命令+技能候选" : "生成全部候选",
                     hasCommandOutput && hasSkillOutput
-                        ? "按默认受控方式把 AICommand + AISkill 作为同一 Skill 能力包放入隔离候选请求。"
+                        ? "按默认受控方式把命令 + 技能作为同一能力包放入隔离候选请求。"
                         : "按默认受控方式把全部 Output 放入同一隔离候选请求。",
                     SendAgentGenerationRequest);
                 saveAll.SetEnabled(hasCommandOutput && hasSkillOutput);
@@ -885,7 +902,7 @@ namespace ES.EditorInternal
                         || requestStatus.State == ESAgentArtifactRequestState.AwaitingApproval
                         ? HelpBoxMessageType.Warning : HelpBoxMessageType.Error;
                 permanent.Add(ESGraphInspectorVisuals.CreateNotice(
-                    "候选状态：" + requestStatus.Message + "\n下一步：" + requestStatus.NextAction,
+                    "候选：" + requestStatus.Message + "\n下一步：" + requestStatus.NextAction,
                     requestMessageType));
                 if (!string.IsNullOrWhiteSpace(requestStatus.RequestDirectory))
                     AddReadOnlyText(permanent, "当前请求", requestStatus.RequestDirectory);
@@ -893,7 +910,7 @@ namespace ES.EditorInternal
                     "只打开与当前 GraphId 和内容签名精确匹配的候选。",
                     () => ESAgentArtifactCandidateReviewWindow.OpenForGraph(currentAgentSpec));
                 reviewCandidate.SetEnabled(currentAgentSpec != null && requestStatus.CanReview);
-                permanent.Add(CreateWorkflowStep("2", "审查并批准",
+                permanent.Add(CreateWorkflowStep("2", "查看并批准",
                     "查看新增、删除与修改差异，确认后才允许导入正式位置。",
                     reviewCandidate));
                 if (hasCommandOutput)
@@ -905,19 +922,19 @@ namespace ES.EditorInternal
                             currentAgentSpec, out launchBlockReason);
                     if (requestStatus.State == ESAgentArtifactRequestState.Approved && !launchReady)
                         permanent.Add(ESGraphInspectorVisuals.CreateNotice(
-                            "批准状态已失效：" + launchBlockReason + "\n下一步：重新进行 Diff Review 与人工批准。",
+                            "批准状态已失效：" + launchBlockReason + "\n下一步：重新查看差异并人工批准。",
                             HelpBoxMessageType.Error));
                     Button launchImplementation = null;
                     launchImplementation = new Button(() => LaunchApprovedAgentImplementation(launchImplementation))
                     {
-                        text = "打开新窗口执行实现",
+                        text = "在新窗口执行",
                         tooltip = "验证批准清单与正式 AICommand 的 SHA-256 后，使用项目权威启动器打开独立 Codex 窗口。"
                     };
                     launchImplementation.SetEnabled(launchReady
                         && !ESAgentImplementationSessionLauncher.IsLaunching);
                     ESGraphInspectorVisuals.StyleButton(launchImplementation);
-                    permanent.Add(CreateWorkflowStep("3", "执行正式实现",
-                        "仅对已批准且哈希未变化的 AICommand 开启独立实现窗口。", launchImplementation));
+                    permanent.Add(CreateWorkflowStep("3", "执行已批准内容",
+                        "仅对已批准且内容指纹未变化的命令开启独立实现窗口。", launchImplementation));
                 }
                 workflow.Add(permanent);
 
@@ -953,7 +970,7 @@ namespace ES.EditorInternal
             if (firstBlocking == null)
             {
                 workflow.Add(ESGraphInspectorVisuals.CreateNotice(
-                    "当前下一步：结构与业务合同已通过检查。可以先保存检查快照，再选择即时执行或生成隔离候选。",
+                    "当前下一步：结构与业务要求已通过检查。可以先保存检查快照，再选择运行或生成隔离候选。",
                     HelpBoxMessageType.Info));
                 return;
             }
@@ -980,25 +997,25 @@ namespace ES.EditorInternal
             if (spec == null)
             {
                 workflow.Add(ESGraphInspectorVisuals.CreateNotice(
-                    "AISkill 执行合同未通过：" + blockReason
-                    + "\n请修复节点字段、TaskContract 或控制/数据连线后再次检查。",
+                    "技能暂时不能运行：" + blockReason
+                    + "\n请修复节点字段、任务权限或控制/数据连线后再次检查。",
                     HelpBoxMessageType.Error));
                 return;
             }
 
             workflow.Add(ESGraphInspectorVisuals.CreateNotice(
-                "可执行 AISkill：" + spec.displayName + "\nSkillId：" + spec.skillId
+                "可运行技能：" + spec.displayName + "\n技能编号：" + spec.skillId
                 + "\n步骤：" + (spec.steps?.Length ?? 0) + "，参数："
                 + (spec.parameters?.Length ?? 0)
-                + "。任务只通过已注册 Automation TaskContract 执行。",
+                + "。任务只通过已注册的任务权限执行。",
                 HelpBoxMessageType.Info));
 
             VisualElement actions = ESGraphInspectorVisuals.CreateActionRow();
             actions.Add(ESGraphInspectorVisuals.CreateButton("填写参数并运行",
-                "在 ES 高级弹窗中填写强类型参数，随后创建可恢复 RunRecord。",
+                "填写参数后开始运行，并创建可恢复的运行记录。",
                 () => OpenAISkillRunDialog(spec), true));
             actions.Add(ESGraphInspectorVisuals.CreateButton("打开运行目录",
-                "查看 AISkillGraph 的 workflow-run.json、步骤状态和结构化产物记录。",
+                "打开技能运行目录，查看步骤状态和结构化产物。",
                 () =>
                 {
                     Directory.CreateDirectory(ESAISkillExecutionCoordinator.RunsRoot);
@@ -1020,14 +1037,14 @@ namespace ES.EditorInternal
                 : run.status == "Failed" || run.status == "Cancelled" || !sameContract
                     ? HelpBoxMessageType.Error : HelpBoxMessageType.Warning;
             workflow.Add(ESGraphInspectorVisuals.CreateNotice(
-                "最近运行：" + run.status + "\nRunId：" + run.runId + "\n" + run.message
+                "最近一次运行：" + GetRunStatusLabel(run.status) + "\n运行编号：" + run.runId + "\n" + run.message
                 + (sameContract ? string.Empty
                     : "\n当前 Graph 内容签名已变化；旧 Run 只能查看，禁止继续。"), tone));
 
             VisualElement runActions = ESGraphInspectorVisuals.CreateActionRow();
             if (sameContract && run.status == "WaitingApproval")
             {
-                runActions.Add(ESGraphInspectorVisuals.CreateButton("审查并决定",
+                runActions.Add(ESGraphInspectorVisuals.CreateButton("审批",
                     "提交绑定当前 approvalGeneration 的批准或拒绝，不接受过期窗口回执。",
                     () => OpenAISkillApprovalDialog(run), true));
             }
@@ -1041,12 +1058,12 @@ namespace ES.EditorInternal
                                 Environment.UserName, out string error))
                             report?.Invoke(error);
                         else
-                            report?.Invoke("已取消 AISkill 工作流：" + run.runId);
+                            report?.Invoke("已取消技能运行：" + run.runId);
                         ForceValidation();
                     }));
             }
-            runActions.Add(ESGraphInspectorVisuals.CreateButton("查看本次记录",
-                "在文件管理器中定位当前 RunRecord。",
+            runActions.Add(ESGraphInspectorVisuals.CreateButton("查看运行记录",
+                "在文件管理器中定位当前运行记录。",
                 () => EditorUtility.RevealInFinder(Path.Combine(
                     ESAISkillExecutionCoordinator.RunsRoot, run.runId, "workflow-run.json"))));
             workflow.Add(runActions);
@@ -1069,7 +1086,7 @@ namespace ES.EditorInternal
                 return;
             }
             SessionState.SetString(AISkillLatestRunKey(spec.sourceGraphId), run.runId);
-            report?.Invoke("AISkill 工作流已启动：" + run.runId + "，当前状态：" + run.status);
+            report?.Invoke("技能运行已启动：" + run.runId + "，当前状态：" + GetRunStatusLabel(run.status));
             ForceValidation();
         }
 
@@ -1078,7 +1095,7 @@ namespace ES.EditorInternal
             var request = new ESAdvancedDialogRequest
             {
                 dialogId = "es.ai-skill.approval." + run.runId + "." + run.approvalGeneration,
-                title = "AISkill 人工确认",
+                title = "技能审批",
                 subtitle = "Run " + run.runId,
                 message = run.message,
                 confirmText = "批准并继续",
@@ -1103,12 +1120,27 @@ namespace ES.EditorInternal
                     true, result.values?.GetString("comment"), out string approvalError))
                 report?.Invoke(approvalError);
             else
-                report?.Invoke("已批准并继续执行。RunId：" + run.runId);
+                report?.Invoke("已批准并继续执行。运行编号：" + run.runId);
             ForceValidation();
         }
 
         private static string AISkillLatestRunKey(string graphId)
             => "ES.AISkillGraph.LatestRun." + (graphId ?? string.Empty);
+
+        private static string GetRunStatusLabel(string status)
+        {
+            switch (status ?? string.Empty)
+            {
+                case "Running": return "运行中";
+                case "WaitingApproval": return "等待审批";
+                case "Cancelling": return "正在取消";
+                case "Completed": return "已完成";
+                case "Failed": return "失败";
+                case "Cancelled": return "已取消";
+                case "Blocked": return "已阻断";
+                default: return string.IsNullOrWhiteSpace(status) ? "未知状态" : status;
+            }
+        }
 
         private void ShowMultipleSelectionInspector()
         {
@@ -1299,13 +1331,18 @@ namespace ES.EditorInternal
                         ? "节点内容更新失败。" : result.error);
                     return;
                 }
-                MarkChanged(successMessage);
-                if (result.rebuildRequired)
+                if (editService != null)
+                {
+                    applyGraphChange?.Invoke(result.change);
+                    report?.Invoke(successMessage);
+                }
+                else
                 {
                     rebuildGraph?.Invoke();
-                    if (projectionChanged)
-                        locate?.Invoke(node.nodeId);
+                    MarkChanged(successMessage);
                 }
+                if (projectionChanged)
+                    locate?.Invoke(node.nodeId);
             }
 
             title.RegisterCallback<FocusOutEvent>(_ =>
@@ -1411,8 +1448,8 @@ namespace ES.EditorInternal
             business.Add(ESGraphInspectorVisuals.CreateNotice(binding, HelpBoxMessageType.Info));
             Button bind = new Button(() => BindSelectedAISkillGraph(node.nodeId))
             {
-                text = "绑定当前选中的 AISkill 图",
-                tooltip = "从 Project 当前明确选中的另一张已保存 AISkill 执行图写入 Asset GUID、GraphId 和内容签名。"
+                text = "绑定当前选中的技能图",
+                tooltip = "从 Project 当前明确选中的另一张已保存技能图写入 Asset GUID、GraphId 和内容签名。"
             };
             ESGraphInspectorVisuals.StyleButton(bind, false);
             business.Add(bind);
@@ -1423,7 +1460,7 @@ namespace ES.EditorInternal
             ESGraphAssetBase target = Selection.activeObject as ESGraphAssetBase;
             if (target == null || ReferenceEquals(target, asset))
             {
-                report?.Invoke("请先在 Project 中选中另一张已保存的 AISkill 执行图。");
+                report?.Invoke("请先在 Project 中选中另一张已保存的技能执行图。");
                 return;
             }
             if (!ESAISkillExecutionLauncher.TryBake(target, out ESAISkillExecutionSpec targetSpec,
@@ -1465,7 +1502,16 @@ namespace ES.EditorInternal
                 report?.Invoke(string.IsNullOrWhiteSpace(result.error) ? "绑定子 AISkill 失败。" : result.error);
                 return;
             }
-            MarkChanged("已绑定子 AISkill：" + targetSpec.displayName);
+            if (editService != null)
+            {
+                applyGraphChange?.Invoke(result.change);
+                report?.Invoke("已绑定子 AISkill：" + targetSpec.displayName);
+            }
+            else
+            {
+                MarkChanged("已绑定子 AISkill：" + targetSpec.displayName);
+                rebuildGraph?.Invoke();
+            }
             ShowNodeInspector(nodeId);
         }
 
@@ -1481,6 +1527,8 @@ namespace ES.EditorInternal
             TextField stableKey = new TextField("稳定名称（高级）") { value = port.stableKey ?? string.Empty };
             stableKey.tooltip = "端口的稳定身份。已有连线后不要随意修改。";
             TextField name = new TextField("名称") { value = port.name ?? string.Empty };
+            TextField meaning = new TextField("用途") { value = port.meaning ?? string.Empty };
+            meaning.tooltip = "说明该端点接收、产出或触发什么。烘焙、运行和 AI 分析都会保留此用途。";
             ESGraphPortValueKind initialValueKind = port.ValueKind;
             TextField customValueType = new TextField("自定义数据标识（高级）")
             {
@@ -1493,32 +1541,38 @@ namespace ES.EditorInternal
                 selected => customValueType.SetEnabled(selected == ESGraphPortValueKind.Custom));
             VisualElement direction = CreateDirectionPicker(port.direction, out PickerValue<ESGraphPortDirection> directionValue);
             VisualElement capacity = CreateCapacityPicker(port.capacity, out PickerValue<ESGraphPortCapacity> capacityValue);
+            VisualElement aggregation = CreateAggregationPicker(port.aggregation,
+                out PickerValue<ESGraphPortAggregation> aggregationValue);
             ESGraphInspectorVisuals.StyleTextField(stableKey);
             ESGraphInspectorVisuals.StyleTextField(name);
+            ESGraphInspectorVisuals.StyleTextField(meaning);
             ESGraphInspectorVisuals.StyleTextField(customValueType);
             foldout.Add(stableKey);
             foldout.Add(name);
+            foldout.Add(meaning);
             foldout.Add(valueKind);
             foldout.Add(customValueType);
             foldout.Add(direction);
             foldout.Add(capacity);
+            foldout.Add(aggregation);
             VisualElement actions = new VisualElement();
             actions.style.flexDirection = FlexDirection.Row;
             Button apply = new Button(() =>
             {
                 ESGraphPortDirection selectedDirection = directionValue.Value;
                 ESGraphPortCapacity selectedCapacity = capacityValue.Value;
+                ESGraphPortAggregation selectedAggregation = aggregationValue.Value;
                 string selectedValueType = ESGraphPortValueCatalog.GetStableId(valueKindValue.Value,
                     customValueType.value);
-                if (!asset.CanUpdatePort(port.portId, stableKey.value, selectedValueType,
-                    selectedDirection, selectedCapacity, out string error))
+                if (!asset.CanUpdatePort(port.portId, stableKey.value, meaning.value, selectedValueType,
+                    selectedDirection, selectedCapacity, selectedAggregation, out string error))
                 {
                     report?.Invoke(error);
                     return;
                 }
                 Undo.RecordObject(asset, "修改图端口");
-                asset.UpdatePort(port.portId, stableKey.value, name.value, selectedValueType,
-                    selectedDirection, selectedCapacity, out _);
+                asset.UpdatePort(port.portId, stableKey.value, name.value, meaning.value, selectedValueType,
+                    selectedDirection, selectedCapacity, selectedAggregation, out _);
                 MarkChanged("端口规则已更新");
                 rebuildGraph?.Invoke();
                 locate?.Invoke(node.nodeId);
@@ -1548,6 +1602,8 @@ namespace ES.EditorInternal
             TextField stableKey = new TextField("稳定名称（高级）") { value = "flow.port." + (node.ports?.Count ?? 0) };
             stableKey.tooltip = "端口的稳定身份；普通使用可保持自动生成的值。";
             TextField name = new TextField("名称") { value = "新端口" };
+            TextField meaning = new TextField("用途") { value = "新端口传递的内容或触发的路线" };
+            meaning.tooltip = "使用一句简短的话说明该端点的独立意义。";
             TextField customValueType = new TextField("自定义数据标识（高级）") { value = string.Empty };
             customValueType.tooltip = "只有选择“自定义数据”时才需要填写稳定标识。";
             customValueType.SetEnabled(false);
@@ -1558,20 +1614,26 @@ namespace ES.EditorInternal
                 out PickerValue<ESGraphPortDirection> directionValue);
             VisualElement capacity = CreateCapacityPicker(ESGraphPortCapacity.Single,
                 out PickerValue<ESGraphPortCapacity> capacityValue);
+            VisualElement aggregation = CreateAggregationPicker(ESGraphPortAggregation.Auto,
+                out PickerValue<ESGraphPortAggregation> aggregationValue);
             ESGraphInspectorVisuals.StyleTextField(stableKey);
             ESGraphInspectorVisuals.StyleTextField(name);
+            ESGraphInspectorVisuals.StyleTextField(meaning);
             ESGraphInspectorVisuals.StyleTextField(customValueType);
             creator.Add(stableKey);
             creator.Add(name);
+            creator.Add(meaning);
             creator.Add(valueKind);
             creator.Add(customValueType);
             creator.Add(direction);
             creator.Add(capacity);
+            creator.Add(aggregation);
             creator.Add(ESGraphInspectorVisuals.CreateButton("添加端口",
                 "使用当前名称、数据类型、方向和容量创建端口。", () =>
             {
                 ESGraphPortDefinition definition = new ESGraphPortDefinition(name.value, stableKey.value,
-                    directionValue.Value, capacityValue.Value, valueKindValue.Value, customValueType.value);
+                    directionValue.Value, capacityValue.Value, valueKindValue.Value, customValueType.value,
+                    aggregationValue.Value, meaning.value);
                 if (!asset.CanAddPort(node.nodeId, definition, out string error))
                 {
                     report?.Invoke(error);
@@ -1669,6 +1731,8 @@ namespace ES.EditorInternal
                 case ESAgentGraphStableIds.SkillBranchNode: return typeof(ESAISkillBranchPayload);
                 case ESAgentGraphStableIds.SkillForEachNode: return typeof(ESAISkillForEachPayload);
                 case ESAgentGraphStableIds.SkillApprovalNode: return typeof(ESAISkillApprovalPayload);
+                case ESAgentGraphStableIds.SkillFanOutNode: return typeof(ESAISkillFanOutPayload);
+                case ESAgentGraphStableIds.SkillJoinNode: return typeof(ESAISkillJoinPayload);
                 case ESAgentGraphStableIds.SkillOutputNode: return typeof(ESAISkillOutputPayload);
                 default: return null;
             }
@@ -1711,6 +1775,30 @@ namespace ES.EditorInternal
             }
             details.Add(relationship);
 
+            if (asset.TryGetEdgeOrderPosition(edge.edgeId, out int position, out int count))
+            {
+                VisualElement orderSection = CreateSection("执行顺序",
+                    "多路分发按输出关系顺序执行；顺序聚合按输入关系顺序收集。", 1);
+                AddKeyValue(orderSection, "当前位置", (position + 1) + " / " + count);
+                if (count > 1)
+                {
+                    VisualElement actions = new VisualElement();
+                    actions.style.flexDirection = FlexDirection.Row;
+                    actions.style.flexWrap = Wrap.Wrap;
+                    actions.style.marginTop = 4f;
+                    Button moveEarlier = ESGraphInspectorVisuals.CreateButton("前移",
+                        "把当前关系在本组中前移一位。", () => MoveEdge(edge.edgeId, -1));
+                    Button moveLater = ESGraphInspectorVisuals.CreateButton("后移",
+                        "把当前关系在本组中后移一位。", () => MoveEdge(edge.edgeId, 1));
+                    moveEarlier.SetEnabled(position > 0);
+                    moveLater.SetEnabled(position + 1 < count);
+                    actions.Add(moveEarlier);
+                    actions.Add(moveLater);
+                    orderSection.Add(actions);
+                }
+                details.Add(orderSection);
+            }
+
             Foldout advanced = CreateAdvancedFoldout("高级关系身份");
             AddReadOnlyText(advanced, "连线编号", edge.edgeId);
             AddReadOnlyText(advanced, "输出端口", edge.outputPortId);
@@ -1726,6 +1814,49 @@ namespace ES.EditorInternal
                 rebuildGraph?.Invoke();
             }, false, true);
             details.Add(delete);
+        }
+
+        private void MoveEdge(string edgeId, int direction)
+        {
+            ESGraphEditResult result;
+            if (editService != null)
+            {
+                result = editService.MoveEdge(asset, edgeId, direction);
+                if (result.changed)
+                    applyGraphChange?.Invoke(result.change);
+            }
+            else
+            {
+                string undoName = direction < 0 ? "前移图关系" : "后移图关系";
+                Undo.IncrementCurrentGroup();
+                int undoGroup = Undo.GetCurrentGroup();
+                Undo.SetCurrentGroupName(undoName);
+                if (asset != null) Undo.RegisterCompleteObjectUndo(asset, undoName);
+                string moveError = "图资产不存在。";
+                bool moved = asset != null && asset.TryMoveEdge(edgeId, direction, out moveError);
+                if (!moved)
+                    Undo.RevertAllDownToGroup(undoGroup);
+                else
+                    Undo.CollapseUndoOperations(undoGroup);
+                result = new ESGraphEditResult
+                {
+                    changed = moved,
+                    error = moveError,
+                };
+                if (result.changed)
+                {
+                    EditorUtility.SetDirty(asset);
+                    requestAutoSave?.Invoke();
+                    rebuildGraph?.Invoke();
+                }
+            }
+            if (!result.changed)
+            {
+                report?.Invoke(string.IsNullOrWhiteSpace(result.error) ? "关系顺序没有变化。" : result.error);
+                return;
+            }
+            report?.Invoke(direction < 0 ? "关系已前移。" : "关系已后移。");
+            ShowEdgeInspector(edgeId);
         }
 
         private void RefreshValidation()
@@ -1910,7 +2041,7 @@ namespace ES.EditorInternal
                 return;
             }
             SendAgentGenerationRequest(artifactView,
-                artifactKind == ESAgentArtifactKind.AICommand ? "AICommand" : "Agent Skill");
+                artifactKind == ESAgentArtifactKind.AICommand ? "命令" : "技能");
         }
 
         private void SendAgentGenerationRequest(ESAgentArtifactGenerationSpec spec, string displayName)
@@ -1964,7 +2095,7 @@ namespace ES.EditorInternal
 
         private void SendSingleUseAgentArtifact(ESAgentArtifactKind artifactKind)
         {
-            if (!TryBakeAgentSpec("即时执行", out ESAgentArtifactGenerationSpec spec))
+            if (!TryBakeAgentSpec("运行", out ESAgentArtifactGenerationSpec spec))
                 return;
             if (!ESAgentArtifactGenerationWorkspace.SendSingleUse(spec, artifactKind, out string requestId,
                     out string dispatchMessage, out string error))
@@ -2055,22 +2186,22 @@ namespace ES.EditorInternal
                 .Any(item => item != null && item.artifactKind == ESAgentArtifactKind.AgentSkill);
             if (hasCommand)
             {
-                entries.Add(ESSearchDropdown.Entry.Item("工作台草稿 · AICommand 候选",
+                entries.Add(ESSearchDropdown.Entry.Item("工作台草稿 · 命令候选",
                     () => StageAgentGenerationRequest(ESAgentArtifactKind.AICommand),
                     groupPath: "候选生成", subtitle: "创建隔离请求，只把生成指令放入输入框",
                     badge: "不自动发送"));
-                entries.Add(ESSearchDropdown.Entry.Item("直接生成会话 · AICommand 候选",
+                entries.Add(ESSearchDropdown.Entry.Item("直接生成会话 · 命令候选",
                     () => SendAgentGenerationRequest(ESAgentArtifactKind.AICommand),
                     groupPath: "候选生成", subtitle: "创建隔离请求并立即提交生成",
                     badge: "直接执行"));
             }
             if (hasSkill)
             {
-                entries.Add(ESSearchDropdown.Entry.Item("工作台草稿 · Agent Skill 候选",
+                entries.Add(ESSearchDropdown.Entry.Item("工作台草稿 · 技能候选",
                     () => StageAgentGenerationRequest(ESAgentArtifactKind.AgentSkill),
                     groupPath: "候选生成", subtitle: "创建隔离请求，只把生成指令放入输入框",
                     badge: "不自动发送"));
-                entries.Add(ESSearchDropdown.Entry.Item("直接生成会话 · Agent Skill 候选",
+                entries.Add(ESSearchDropdown.Entry.Item("直接生成会话 · 技能候选",
                     () => SendAgentGenerationRequest(ESAgentArtifactKind.AgentSkill),
                     groupPath: "候选生成", subtitle: "创建隔离请求并立即提交生成",
                     badge: "直接执行"));
@@ -2087,8 +2218,8 @@ namespace ES.EditorInternal
                     badge: "直接执行"));
             }
 
-            entries.Add(ESSearchDropdown.Entry.Item("复制即时执行文本",
-                () => CopyAgentGraph(ESAgentGraphCopyFormat.ImmediateExecutionPrompt, "即时执行文本"),
+            entries.Add(ESSearchDropdown.Entry.Item("复制运行文本",
+                () => CopyAgentGraph(ESAgentGraphCopyFormat.ImmediateExecutionPrompt, "运行文本"),
                 groupPath: "仅复制，不发送", subtitle: "适合粘贴到任意受信任会话"));
             entries.Add(ESSearchDropdown.Entry.Item("复制候选请求 JSON",
                 () => CopyAgentGraph(ESAgentGraphCopyFormat.ArtifactRequestJson, "候选请求 JSON"),
@@ -2242,14 +2373,16 @@ namespace ES.EditorInternal
                     asset, node.nodeId, node.typeId, node.version, node.title, payloadJson);
                 if (!result.changed)
                     return;
+                applyGraphChange?.Invoke(result.change);
+                report?.Invoke("业务内容已更新，正在自动检查整张图。");
             }
             else
             {
                 Undo.RecordObject(asset, "修改节点业务内容");
                 asset.UpdateNode(node.nodeId, node.typeId, node.version, node.title, payloadJson, out _);
+                MarkChanged("业务内容已更新，正在自动检查整张图。");
+                rebuildGraph?.Invoke();
             }
-            MarkChanged("业务内容已更新，正在自动检查整张图。");
-            rebuildGraph?.Invoke();
         }
 
         private void MigrateNode(string nodeId)
@@ -2356,6 +2489,60 @@ namespace ES.EditorInternal
             {
                 captured.Value = value;
                 button.text = ESGraphChinesePresentation.GetCapacityName(value) + "  ▼";
+            }
+        }
+
+        private VisualElement CreateAggregationPicker(ESGraphPortAggregation initial,
+            out PickerValue<ESGraphPortAggregation> selection)
+        {
+            selection = new PickerValue<ESGraphPortAggregation>(initial);
+            PickerValue<ESGraphPortAggregation> captured = selection;
+            VisualElement field = CreateSearchPickerField(
+                "输入聚合",
+                ESGraphChinesePresentation.GetAggregationName(initial),
+                "Single 为单值，Ordered 按 EdgeId 顺序形成数组，Named 按来源端点形成对象。Auto 根据连接容量决定。",
+                out Button button);
+            button.clicked += () =>
+            {
+                ESSearchDropdown.Open(
+                    button,
+                    hostWindow,
+                    "选择输入聚合",
+                    () => new[]
+                    {
+                        ESSearchDropdown.Entry.Item(
+                            "自动",
+                            () => SetAggregation(ESGraphPortAggregation.Auto),
+                            subtitle: "Single=单值，Multi=有序数组",
+                            keywords: "自动 auto 默认",
+                            selected: captured.Value == ESGraphPortAggregation.Auto),
+                        ESSearchDropdown.Entry.Item(
+                            "单值",
+                            () => SetAggregation(ESGraphPortAggregation.Single),
+                            subtitle: "只接受一个值",
+                            keywords: "单值 single",
+                            selected: captured.Value == ESGraphPortAggregation.Single),
+                        ESSearchDropdown.Entry.Item(
+                            "有序聚合",
+                            () => SetAggregation(ESGraphPortAggregation.Ordered),
+                            subtitle: "按稳定 EdgeId 顺序输出数组",
+                            keywords: "有序 ordered 数组 list",
+                            selected: captured.Value == ESGraphPortAggregation.Ordered),
+                        ESSearchDropdown.Entry.Item(
+                            "命名聚合",
+                            () => SetAggregation(ESGraphPortAggregation.Named),
+                            subtitle: "按来源 NodeId/PortKey 输出对象",
+                            keywords: "命名 named 对象 map",
+                            selected: captured.Value == ESGraphPortAggregation.Named)
+                    },
+                    minimumWindowSize: new Vector2(460f, 340f));
+            };
+            return field;
+
+            void SetAggregation(ESGraphPortAggregation value)
+            {
+                captured.Value = value;
+                button.text = ESGraphChinesePresentation.GetAggregationName(value) + "  ▼";
             }
         }
 
@@ -2575,7 +2762,11 @@ namespace ES.EditorInternal
                 ? "尚未连接"
                 : (input ? "来自：" : "前往：") + BuildRelationPreview(connectedNodes);
             var detail = new Label(ESGraphChinesePresentation.GetPortValueTypeName(port.valueTypeId)
-                + " · " + ESGraphChinesePresentation.GetCapacityName(port.capacity) + " · " + relationship);
+                + " · " + ESGraphChinesePresentation.GetCapacityName(port.capacity)
+                + " · " + ESGraphChinesePresentation.GetAggregationName(
+                    ESGraphPortAggregationRules.Resolve(port.direction, port.capacity,
+                        port.aggregation))
+                + " · " + relationship);
             detail.style.whiteSpace = WhiteSpace.Normal;
             detail.style.fontSize = 10f;
             detail.style.color = connectedNodes.Count == 0
@@ -2635,10 +2826,43 @@ namespace ES.EditorInternal
             return result;
         }
 
+        private void UpgradeCurrentGraphSchema()
+        {
+            if (asset == null)
+                return;
+            if (editService != null)
+            {
+                ESGraphEditResult result = editService.UpgradeSchema(asset);
+                if (!result.changed)
+                {
+                    report?.Invoke(string.IsNullOrWhiteSpace(result.error)
+                        ? "图数据已经是当前版本。" : "图数据升级失败：" + result.error);
+                    return;
+                }
+                applyGraphChange?.Invoke(result.change);
+                report?.Invoke("图数据已升级到 Schema " + GraphAsset.CurrentSchemaVersion + "。");
+                ShowGraphInspector();
+                return;
+            }
+
+            Undo.RecordObject(asset, "升级图数据");
+            if (!asset.TryUpgradeSchema(out bool changed, out string error))
+            {
+                report?.Invoke("图数据升级失败：" + error);
+                return;
+            }
+            if (!changed)
+                return;
+            MarkChanged("图数据已升级到 Schema " + GraphAsset.CurrentSchemaVersion + "。");
+            rebuildGraph?.Invoke();
+            ShowGraphInspector();
+        }
+
         private void MarkChanged(string message)
         {
             EditorUtility.SetDirty(asset);
             requestAutoSave?.Invoke();
+            ESGraphBakeCache.Invalidate(asset);
             validationRevision++;
             RequestValidation();
             report?.Invoke(message);

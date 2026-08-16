@@ -3,28 +3,40 @@ using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Runtime.CompilerServices;
 using GraphAsset = global::ES.ESGraphAssetBase;
+
+[assembly: InternalsVisibleTo("ES_Editor")]
 
 namespace ES
 {
     public sealed class ESGraphPortSnapshot
     {
+        public string NodeId { get; }
         public string PortId { get; }
         public string StableKey { get; }
         public string Name { get; }
+        public string Meaning { get; }
         public string ValueTypeId { get; }
         public ESGraphPortValueKind ValueKind => ESGraphPortValueCatalog.GetKind(ValueTypeId);
         public ESGraphPortDirection Direction { get; }
         public ESGraphPortCapacity Capacity { get; }
+        public ESGraphPortAggregation Aggregation { get; }
+        public ESGraphEndpointKey Endpoint { get; }
 
-        internal ESGraphPortSnapshot(ESGraphPortRecord source)
+        internal ESGraphPortSnapshot(string nodeId, ESGraphPortRecord source)
         {
+            NodeId = nodeId ?? string.Empty;
             PortId = source.portId;
             StableKey = source.stableKey;
             Name = source.name;
+            Meaning = source.meaning;
             ValueTypeId = source.valueTypeId;
             Direction = source.direction;
             Capacity = source.capacity;
+            Aggregation = ESGraphPortAggregationRules.Resolve(source.direction, source.capacity,
+                source.aggregation);
+            Endpoint = new ESGraphEndpointKey(NodeId, StableKey);
         }
     }
 
@@ -53,7 +65,7 @@ namespace ES
             ordered.Sort((left, right) => string.CompareOrdinal(left?.portId, right?.portId));
             ports = new ESGraphPortSnapshot[ordered.Count];
             for (int i = 0; i < ordered.Count; i++)
-                ports[i] = new ESGraphPortSnapshot(ordered[i]);
+                ports[i] = new ESGraphPortSnapshot(NodeId, ordered[i]);
         }
     }
 
@@ -62,12 +74,73 @@ namespace ES
         public string EdgeId { get; }
         public string OutputPortId { get; }
         public string InputPortId { get; }
+        public int Order { get; }
 
         internal ESGraphEdgeSnapshot(ESGraphEdgeRecord source)
         {
             EdgeId = source.edgeId;
             OutputPortId = source.outputPortId;
             InputPortId = source.inputPortId;
+            Order = source.order;
+        }
+    }
+
+    /// <summary>
+    /// Immutable semantic connection produced by the common Graph bake. An edge is expressed in
+    /// endpoint terms, not only raw PortIds, so every domain can read one-to-many and many-to-one
+    /// routes without rebuilding a second adjacency model.
+    /// </summary>
+    public sealed class ESGraphRouteSnapshot
+    {
+        public string EdgeId { get; }
+        public int Order { get; }
+        public ESGraphNodeSnapshot SourceNode { get; }
+        public ESGraphPortSnapshot SourcePort { get; }
+        public ESGraphNodeSnapshot TargetNode { get; }
+        public ESGraphPortSnapshot TargetPort { get; }
+        public string SourceNodeId { get; }
+        public string SourcePortId { get; }
+        public string SourcePortKey { get; }
+        public string SourceMeaning { get; }
+        public string SourceValueTypeId { get; }
+        public string TargetNodeId { get; }
+        public string TargetPortId { get; }
+        public string TargetPortKey { get; }
+        public string TargetMeaning { get; }
+        public string TargetValueTypeId { get; }
+        public ESGraphPortAggregation SourceAggregation { get; }
+        public ESGraphPortAggregation TargetAggregation { get; }
+        public ESGraphEndpointKey SourceEndpoint { get; }
+        public ESGraphEndpointKey TargetEndpoint { get; }
+        public bool IsFlow => string.Equals(SourceValueTypeId, ESGraphPortValueIds.Flow,
+            StringComparison.Ordinal);
+
+        internal ESGraphRouteSnapshot(string edgeId, int order, ESGraphNodeSnapshot sourceNode,
+            ESGraphPortSnapshot sourcePort, ESGraphNodeSnapshot targetNode,
+            ESGraphPortSnapshot targetPort)
+        {
+            EdgeId = edgeId ?? string.Empty;
+            Order = order;
+            SourceNode = sourceNode;
+            SourcePort = sourcePort;
+            TargetNode = targetNode;
+            TargetPort = targetPort;
+            SourceNodeId = sourceNode?.NodeId ?? string.Empty;
+            SourcePortId = sourcePort?.PortId ?? string.Empty;
+            SourcePortKey = sourcePort?.StableKey ?? string.Empty;
+            SourceMeaning = sourcePort?.Meaning ?? string.Empty;
+            SourceValueTypeId = sourcePort?.ValueTypeId ?? string.Empty;
+            SourceAggregation = sourcePort?.Aggregation ?? ESGraphPortAggregation.Single;
+            TargetNodeId = targetNode?.NodeId ?? string.Empty;
+            TargetPortId = targetPort?.PortId ?? string.Empty;
+            TargetPortKey = targetPort?.StableKey ?? string.Empty;
+            TargetMeaning = targetPort?.Meaning ?? string.Empty;
+            TargetValueTypeId = targetPort?.ValueTypeId ?? string.Empty;
+            TargetAggregation = targetPort?.Aggregation ?? ESGraphPortAggregation.Single;
+            SourceEndpoint = sourcePort?.Endpoint
+                ?? new ESGraphEndpointKey(SourceNodeId, SourcePortKey);
+            TargetEndpoint = targetPort?.Endpoint
+                ?? new ESGraphEndpointKey(TargetNodeId, TargetPortKey);
         }
     }
 
@@ -78,7 +151,13 @@ namespace ES
         private readonly ESGraphEdgeSnapshot[] edges;
         private readonly Dictionary<string, ESGraphNodeSnapshot> nodesById;
         private readonly Dictionary<string, ESGraphPortSnapshot> portsById;
+        private readonly Dictionary<ESGraphEndpointKey, ESGraphPortSnapshot> portsByEndpoint;
         private readonly Dictionary<string, ESGraphEdgeSnapshot> edgesById;
+        private readonly ESGraphRouteSnapshot[] routes;
+        private readonly Dictionary<ESGraphEndpointKey, IReadOnlyList<ESGraphRouteSnapshot>> outgoingRoutesByEndpoint;
+        private readonly Dictionary<ESGraphEndpointKey, IReadOnlyList<ESGraphRouteSnapshot>> incomingRoutesByEndpoint;
+        private readonly Dictionary<string, IReadOnlyList<ESGraphRouteSnapshot>> outgoingRoutesByPort;
+        private readonly Dictionary<string, IReadOnlyList<ESGraphRouteSnapshot>> incomingRoutesByPort;
 
         public int SchemaVersion { get; }
         public string GraphId { get; }
@@ -90,6 +169,7 @@ namespace ES
         public string ContentSignature { get; }
         public IReadOnlyList<ESGraphNodeSnapshot> Nodes => nodes;
         public IReadOnlyList<ESGraphEdgeSnapshot> Edges => edges;
+        public IReadOnlyList<ESGraphRouteSnapshot> Routes => routes;
 
         internal ESBakedGraphSnapshot(GraphAsset asset, List<ESGraphNodeRecord> orderedNodes,
             List<ESGraphEdgeRecord> orderedEdges, string signature)
@@ -104,7 +184,9 @@ namespace ES
             edges = new ESGraphEdgeSnapshot[orderedEdges.Count];
             nodesById = new Dictionary<string, ESGraphNodeSnapshot>(orderedNodes.Count, StringComparer.Ordinal);
             portsById = new Dictionary<string, ESGraphPortSnapshot>(StringComparer.Ordinal);
+            portsByEndpoint = new Dictionary<ESGraphEndpointKey, ESGraphPortSnapshot>();
             edgesById = new Dictionary<string, ESGraphEdgeSnapshot>(orderedEdges.Count, StringComparer.Ordinal);
+            var nodeIdsByPort = new Dictionary<string, string>(StringComparer.Ordinal);
 
             for (int i = 0; i < orderedNodes.Count; i++)
             {
@@ -112,14 +194,43 @@ namespace ES
                 nodes[i] = node;
                 nodesById.Add(node.NodeId, node);
                 for (int p = 0; p < node.Ports.Count; p++)
+                {
                     portsById.Add(node.Ports[p].PortId, node.Ports[p]);
+                    portsByEndpoint.Add(node.Ports[p].Endpoint, node.Ports[p]);
+                    nodeIdsByPort.Add(node.Ports[p].PortId, node.NodeId);
+                }
             }
+            var routeList = new List<ESGraphRouteSnapshot>(orderedEdges.Count);
+            var outgoingRoutes = new Dictionary<ESGraphEndpointKey, List<ESGraphRouteSnapshot>>();
+            var incomingRoutes = new Dictionary<ESGraphEndpointKey, List<ESGraphRouteSnapshot>>();
+            var outgoingByPort = new Dictionary<string, List<ESGraphRouteSnapshot>>(StringComparer.Ordinal);
+            var incomingByPort = new Dictionary<string, List<ESGraphRouteSnapshot>>(StringComparer.Ordinal);
             for (int i = 0; i < orderedEdges.Count; i++)
             {
                 ESGraphEdgeSnapshot edge = new ESGraphEdgeSnapshot(orderedEdges[i]);
                 edges[i] = edge;
                 edgesById.Add(edge.EdgeId, edge);
+                if (!portsById.TryGetValue(edge.OutputPortId, out ESGraphPortSnapshot output)
+                    || !portsById.TryGetValue(edge.InputPortId, out ESGraphPortSnapshot input)
+                    || !nodeIdsByPort.TryGetValue(edge.OutputPortId, out string sourceNodeId)
+                    || !nodeIdsByPort.TryGetValue(edge.InputPortId, out string targetNodeId)
+                    || !nodesById.TryGetValue(sourceNodeId, out ESGraphNodeSnapshot sourceNode)
+                    || !nodesById.TryGetValue(targetNodeId, out ESGraphNodeSnapshot targetNode))
+                    continue;
+                var route = new ESGraphRouteSnapshot(edge.EdgeId, edge.Order,
+                    sourceNode, output, targetNode, input);
+                routeList.Add(route);
+                AddRoute(outgoingRoutes, route.SourceEndpoint, route);
+                AddRoute(incomingRoutes, route.TargetEndpoint, route);
+                AddRoute(outgoingByPort, route.SourcePortId, route);
+                AddRoute(incomingByPort, route.TargetPortId, route);
             }
+            routeList.Sort(CompareRoutes);
+            routes = routeList.ToArray();
+            outgoingRoutesByEndpoint = FreezeRouteIndex(outgoingRoutes);
+            incomingRoutesByEndpoint = FreezeRouteIndex(incomingRoutes);
+            outgoingRoutesByPort = FreezeRouteIndex(outgoingByPort);
+            incomingRoutesByPort = FreezeRouteIndex(incomingByPort);
         }
 
         public bool TryGetNode(string nodeId, out ESGraphNodeSnapshot node)
@@ -132,9 +243,105 @@ namespace ES
             return portsById.TryGetValue(portId ?? string.Empty, out port);
         }
 
+        public bool TryGetPort(string nodeId, string portKey, out ESGraphPortSnapshot port)
+        {
+            return TryGetPort(new ESGraphEndpointKey(nodeId, portKey), out port);
+        }
+
+        public bool TryGetPort(ESGraphEndpointKey endpoint, out ESGraphPortSnapshot port)
+        {
+            return portsByEndpoint.TryGetValue(endpoint, out port);
+        }
+
         public bool TryGetEdge(string edgeId, out ESGraphEdgeSnapshot edge)
         {
             return edgesById.TryGetValue(edgeId ?? string.Empty, out edge);
+        }
+
+        public IReadOnlyList<ESGraphRouteSnapshot> GetOutgoingRoutes(string nodeId, string portKey)
+        {
+            return GetOutgoingRoutes(new ESGraphEndpointKey(nodeId, portKey));
+        }
+
+        public IReadOnlyList<ESGraphRouteSnapshot> GetOutgoingRoutes(ESGraphEndpointKey endpoint)
+        {
+            return outgoingRoutesByEndpoint.TryGetValue(endpoint,
+                out IReadOnlyList<ESGraphRouteSnapshot> result)
+                ? result : Array.Empty<ESGraphRouteSnapshot>();
+        }
+
+        public IReadOnlyList<ESGraphRouteSnapshot> GetIncomingRoutes(string nodeId, string portKey)
+        {
+            return GetIncomingRoutes(new ESGraphEndpointKey(nodeId, portKey));
+        }
+
+        public IReadOnlyList<ESGraphRouteSnapshot> GetIncomingRoutes(ESGraphEndpointKey endpoint)
+        {
+            return incomingRoutesByEndpoint.TryGetValue(endpoint,
+                out IReadOnlyList<ESGraphRouteSnapshot> result)
+                ? result : Array.Empty<ESGraphRouteSnapshot>();
+        }
+
+        public IReadOnlyList<ESGraphRouteSnapshot> GetOutgoingRoutesByPortId(string portId)
+            => outgoingRoutesByPort.TryGetValue(portId ?? string.Empty,
+                out IReadOnlyList<ESGraphRouteSnapshot> result) ? result : Array.Empty<ESGraphRouteSnapshot>();
+
+        public IReadOnlyList<ESGraphRouteSnapshot> GetIncomingRoutesByPortId(string portId)
+            => incomingRoutesByPort.TryGetValue(portId ?? string.Empty,
+                out IReadOnlyList<ESGraphRouteSnapshot> result) ? result : Array.Empty<ESGraphRouteSnapshot>();
+
+        private static void AddRoute(Dictionary<string, List<ESGraphRouteSnapshot>> index,
+            string key, ESGraphRouteSnapshot route)
+        {
+            if (!index.TryGetValue(key, out List<ESGraphRouteSnapshot> routes))
+            {
+                routes = new List<ESGraphRouteSnapshot>();
+                index.Add(key, routes);
+            }
+            routes.Add(route);
+        }
+
+        private static void AddRoute(Dictionary<ESGraphEndpointKey, List<ESGraphRouteSnapshot>> index,
+            ESGraphEndpointKey key, ESGraphRouteSnapshot route)
+        {
+            if (!index.TryGetValue(key, out List<ESGraphRouteSnapshot> routes))
+            {
+                routes = new List<ESGraphRouteSnapshot>();
+                index.Add(key, routes);
+            }
+            routes.Add(route);
+        }
+
+        private static Dictionary<string, IReadOnlyList<ESGraphRouteSnapshot>> FreezeRouteIndex(
+            Dictionary<string, List<ESGraphRouteSnapshot>> source)
+        {
+            var frozen = new Dictionary<string, IReadOnlyList<ESGraphRouteSnapshot>>(
+                source.Count, StringComparer.Ordinal);
+            foreach (KeyValuePair<string, List<ESGraphRouteSnapshot>> pair in source)
+            {
+                pair.Value.Sort(CompareRoutes);
+                frozen.Add(pair.Key, pair.Value.ToArray());
+            }
+            return frozen;
+        }
+
+        private static Dictionary<ESGraphEndpointKey, IReadOnlyList<ESGraphRouteSnapshot>> FreezeRouteIndex(
+            Dictionary<ESGraphEndpointKey, List<ESGraphRouteSnapshot>> source)
+        {
+            var frozen = new Dictionary<ESGraphEndpointKey, IReadOnlyList<ESGraphRouteSnapshot>>(
+                source.Count);
+            foreach (KeyValuePair<ESGraphEndpointKey, List<ESGraphRouteSnapshot>> pair in source)
+            {
+                pair.Value.Sort(CompareRoutes);
+                frozen.Add(pair.Key, pair.Value.ToArray());
+            }
+            return frozen;
+        }
+
+        private static int CompareRoutes(ESGraphRouteSnapshot left, ESGraphRouteSnapshot right)
+        {
+            int order = (left?.Order ?? int.MaxValue).CompareTo(right?.Order ?? int.MaxValue);
+            return order != 0 ? order : string.CompareOrdinal(left?.EdgeId, right?.EdgeId);
         }
     }
 
@@ -142,6 +349,24 @@ namespace ES
     {
         public static bool TryBake(GraphAsset asset, out ESBakedGraphSnapshot snapshot,
             out List<ESGraphValidationIssue> issues)
+        {
+            return TryBakeInternal(asset, true, out snapshot, out issues);
+        }
+
+        /// <summary>
+        /// Editor authoring registry uses this entry after it has already run the complete
+        /// model/domain validation pipeline. It prevents the generic model validation from
+        /// being allocated and executed a second time during the same bake transaction.
+        /// The public overload above remains self-validating for all other callers.
+        /// </summary>
+        internal static bool TryBakeValidated(GraphAsset asset,
+            out ESBakedGraphSnapshot snapshot, out List<ESGraphValidationIssue> issues)
+        {
+            return TryBakeInternal(asset, false, out snapshot, out issues);
+        }
+
+        private static bool TryBakeInternal(GraphAsset asset, bool validate,
+            out ESBakedGraphSnapshot snapshot, out List<ESGraphValidationIssue> issues)
         {
             snapshot = null;
             if (asset == null)
@@ -153,12 +378,15 @@ namespace ES
                 return false;
             }
 
-            issues = asset.ValidateGraph();
-            for (int i = 0; i < issues.Count; i++)
+            issues = validate ? asset.ValidateGraph() : new List<ESGraphValidationIssue>();
+            if (validate)
             {
-                ESGraphValidationIssue issue = issues[i];
-                if (issue != null && issue.severity == ESGraphValidationSeverity.Error)
-                    return false;
+                for (int i = 0; i < issues.Count; i++)
+                {
+                    ESGraphValidationIssue issue = issues[i];
+                    if (issue != null && issue.severity == ESGraphValidationSeverity.Error)
+                        return false;
+                }
             }
 
             List<ESGraphNodeRecord> orderedNodes = new List<ESGraphNodeRecord>(asset.Nodes.Count);
@@ -205,9 +433,11 @@ namespace ES
                         WriteString(writer, port.portId);
                         WriteString(writer, port.stableKey);
                         WriteString(writer, port.name);
+                        WriteString(writer, port.meaning);
                         WriteString(writer, port.valueTypeId);
                         writer.Write((byte)port.direction);
                         writer.Write((byte)port.capacity);
+                        writer.Write((byte)port.aggregation);
                     }
                 }
 
@@ -218,6 +448,7 @@ namespace ES
                     WriteString(writer, edge.edgeId);
                     WriteString(writer, edge.outputPortId);
                     WriteString(writer, edge.inputPortId);
+                    writer.Write(edge.order);
                 }
                 writer.Flush();
                 stream.Position = 0;

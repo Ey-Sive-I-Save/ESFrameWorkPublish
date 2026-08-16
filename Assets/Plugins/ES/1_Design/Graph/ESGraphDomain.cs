@@ -377,6 +377,17 @@ namespace ES
 
     public static class ESGraphPortValueCatalog
     {
+        public static bool IsValidStableId(string stableId)
+        {
+            return string.Equals(stableId, ESGraphPortValueIds.Flow, StringComparison.Ordinal)
+                || string.Equals(stableId, ESGraphPortValueIds.Any, StringComparison.Ordinal)
+                || string.Equals(stableId, ESGraphPortValueIds.Boolean, StringComparison.Ordinal)
+                || string.Equals(stableId, ESGraphPortValueIds.Number, StringComparison.Ordinal)
+                || string.Equals(stableId, ESGraphPortValueIds.Text, StringComparison.Ordinal)
+                || string.Equals(stableId, ESGraphPortValueIds.Object, StringComparison.Ordinal)
+                || ESGraphStableIdUtility.IsValid(stableId);
+        }
+
         public static string GetStableId(ESGraphPortValueKind kind, string customStableId = null)
         {
             switch (kind)

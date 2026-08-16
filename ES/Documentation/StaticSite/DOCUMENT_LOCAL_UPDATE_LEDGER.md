@@ -333,6 +333,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：本轮尚未重新观察 Unity Package Manager 的 Embedded 状态、脚本导入、Domain Reload、Player、IL2CPP 或热更新真实运行；上游 vendored-source 空白格式会使范围化 `git diff --check` 报告尾随空白。
 - **HTML 目标**：后续在 `#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-002：StableGraph 与 Agent Authoring 创作闭环
+
+- **源码路径**：`1_Design/Graph`、Graph 定向测试、`Editor/ESGraphViewV2`、AICommand 目录与 Graph/Automation/Agent Skills 专项 AIWarnings。
+- **规范与证据**：稳定身份、快照/变更语义、编辑服务、payload 迁移、候选生成和导入记录共同约束 AISkill 执行与 Agent Artifact 生命周期；Graph 当前保持 `Verifying`，`Program` 仅保留给尚未实现的 `ESBehaviorTreeProgram`。
+- **完成分析**：数据合同、编辑器交互、生成计划、导入记录和 AICommand 目录必须同批，避免序列化版本错位、候选缺少追溯信息或编辑器使用旧合同。
+- **回归状态**：`ES_Design.csproj` 与 `ES_Editor.csproj` 均为 0 警告、0 错误；`ES_Design.ConfigKey.Tests.csproj` 为 0 错误，仅保留两个既有 `CS0649` 警告；34 个目标文本通过严格 UTF-8 检查。
+- **已知缺口**：本轮没有 UnityMCP，未取得 Unity Editor 编译、ReloadDomain、Test Runner 或真实 GraphView 交互证据；少数 Unity `.meta` 空字段保留 Unity 序列化尾空格格式。
+- **HTML 目标**：后续在 `#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

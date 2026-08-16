@@ -49,9 +49,37 @@ namespace ES.Tests
 
         private static readonly ESGraphPortDefinition[] DefaultPorts =
         {
-            new ESGraphPortDefinition("输入", "flow.input", ESGraphPortDirection.Input, ESGraphPortCapacity.Single),
-            new ESGraphPortDefinition("输出", "flow.output", ESGraphPortDirection.Output, ESGraphPortCapacity.Multi)
+            new ESGraphPortDefinition("输入", ESGraphBuiltInPortKeys.Input,
+                ESGraphPortDirection.Input, ESGraphPortCapacity.Single),
+            new ESGraphPortDefinition("输出", ESGraphBuiltInPortKeys.Output,
+                ESGraphPortDirection.Output, ESGraphPortCapacity.Multi)
         };
+
+        [Test]
+        public void StableGraph_NodeEndpointLookupRequiresOneExactStableKey()
+        {
+            var node = new ESGraphNodeRecord
+            {
+                nodeId = ESGraphIdentity.NewId(),
+                ports = new List<ESGraphPortRecord>
+                {
+                    new ESGraphPortRecord { portId = ESGraphIdentity.NewId(), stableKey = "result.success" },
+                    new ESGraphPortRecord { portId = ESGraphIdentity.NewId(), stableKey = "result.failure" }
+                }
+            };
+
+            Assert.That(node.TryGetPort("result.success", out ESGraphPortRecord success), Is.True);
+            Assert.That(success.stableKey, Is.EqualTo("result.success"));
+            Assert.That(node.TryGetPort("result.missing", out _), Is.False);
+
+            node.ports.Add(new ESGraphPortRecord
+            {
+                portId = ESGraphIdentity.NewId(),
+                stableKey = "result.success"
+            });
+            Assert.That(node.TryGetPort("result.success", out ESGraphPortRecord duplicate), Is.False);
+            Assert.That(duplicate, Is.Null);
+        }
 
         [Test]
         public void StableGraph_ConcreteAssetTypesOwnImmutableDomains()
@@ -375,6 +403,127 @@ namespace ES.Tests
                     new IESGraphNodeDefinition[] { sourceDefinition, sinkDefinition }, issues);
                 Assert.That(issues.Count(issue => issue?.code == "Graph.Degree.Outgoing.Max"),
                     Is.EqualTo(1), Describe(issues));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_BakedRoutesPreserveOneToManyAndManyToOneEndpoints()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            var sourceDefinition = new ESStableGraphNodeTemplate(
+                ESGraphDomainKey.FromKind(ESGraphDomainKind.Generic),
+                ESGraphNodeTypeKey.Custom("es.test.route-source"), "Test/RouteSource", "Source",
+                string.Empty, ESGraphNodeCategory.Entry, ESGraphNodeTheme.Entry,
+                "Source", string.Empty, 1, 0, default,
+                new ESGraphDegreeRule(),
+                new ESGraphPortDefinition("输出", "route.out", ESGraphPortDirection.Output,
+                    ESGraphPortCapacity.Multi));
+            var targetDefinition = new ESStableGraphNodeTemplate(
+                ESGraphDomainKey.FromKind(ESGraphDomainKind.Generic),
+                ESGraphNodeTypeKey.Custom("es.test.route-target"), "Test/RouteTarget", "Target",
+                string.Empty, ESGraphNodeCategory.Exit, ESGraphNodeTheme.Exit,
+                "Target", string.Empty, 1, 0, default,
+                new ESGraphDegreeRule(),
+                new ESGraphPortDefinition("输入", "route.in", ESGraphPortDirection.Input,
+                    ESGraphPortCapacity.Multi));
+            try
+            {
+                ESGraphNodeRecord sourceA = graph.AddNode(sourceDefinition.NodeType, "Source A",
+                    Vector2.zero, sourceDefinition.Ports);
+                ESGraphNodeRecord sourceB = graph.AddNode(sourceDefinition.NodeType, "Source B",
+                    Vector2.right, sourceDefinition.Ports);
+                ESGraphNodeRecord targetA = graph.AddNode(targetDefinition.NodeType, "Target A",
+                    Vector2.right * 2f, targetDefinition.Ports);
+                ESGraphNodeRecord targetB = graph.AddNode(targetDefinition.NodeType, "Target B",
+                    Vector2.right * 3f, targetDefinition.Ports);
+                ESGraphNodeRecord targetC = graph.AddNode(targetDefinition.NodeType, "Target C",
+                    Vector2.right * 4f, targetDefinition.Ports);
+
+                string sourceAOut = sourceA.ports[0].portId;
+                string sourceBOut = sourceB.ports[0].portId;
+                string targetAIn = targetA.ports[0].portId;
+                string targetBIn = targetB.ports[0].portId;
+                string targetCIn = targetC.ports[0].portId;
+                Assert.That(graph.TryAddEdge(sourceAOut, targetAIn, out _, out string firstError),
+                    Is.True, firstError);
+                Assert.That(graph.TryAddEdge(sourceAOut, targetBIn, out _, out string secondError),
+                    Is.True, secondError);
+                Assert.That(graph.TryAddEdge(sourceBOut, targetCIn, out _, out string thirdError),
+                    Is.True, thirdError);
+                Assert.That(graph.TryAddEdge(sourceAOut, targetCIn, out _, out string fourthError),
+                    Is.True, fourthError);
+
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph,
+                    out ESBakedGraphSnapshot snapshot, out List<ESGraphValidationIssue> issues),
+                    Is.True, Describe(issues));
+                Assert.That(snapshot.GetOutgoingRoutes(sourceA.nodeId, "route.out"),
+                    Has.Count.EqualTo(3));
+                Assert.That(snapshot.GetIncomingRoutes(targetC.nodeId, "route.in"),
+                    Has.Count.EqualTo(2));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_BakedRouteExposesCompleteEndpointContractAndIndexes()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            var sourceDefinition = new ESStableGraphNodeTemplate(
+                ESGraphDomainKey.FromKind(ESGraphDomainKind.Generic),
+                ESGraphNodeTypeKey.Custom("es.test.semantic-source"), "Test/SemanticSource", "Source",
+                string.Empty, ESGraphNodeCategory.Entry, ESGraphNodeTheme.Entry,
+                "Source", string.Empty, 1, 0, default, new ESGraphDegreeRule(),
+                new ESGraphPortDefinition("输出", "semantic.out", ESGraphPortDirection.Output,
+                    ESGraphPortCapacity.Multi, ESGraphPortValueIds.Text));
+            var targetDefinition = new ESStableGraphNodeTemplate(
+                ESGraphDomainKey.FromKind(ESGraphDomainKind.Generic),
+                ESGraphNodeTypeKey.Custom("es.test.semantic-target"), "Test/SemanticTarget", "Target",
+                string.Empty, ESGraphNodeCategory.Exit, ESGraphNodeTheme.Exit,
+                "Target", string.Empty, 1, 0, default, new ESGraphDegreeRule(),
+                new ESGraphPortDefinition("输入", "semantic.in", ESGraphPortDirection.Input,
+                    ESGraphPortCapacity.Multi, ESGraphPortValueIds.Text));
+            try
+            {
+                ESGraphNodeRecord source = graph.AddNode(sourceDefinition.NodeType, "Source",
+                    Vector2.zero, sourceDefinition.Ports);
+                ESGraphNodeRecord target = graph.AddNode(targetDefinition.NodeType, "Target",
+                    Vector2.right, targetDefinition.Ports);
+                Assert.That(source.TryGetPort("semantic.out", out ESGraphPortRecord sourcePort),
+                    Is.True);
+                Assert.That(target.TryGetPort("semantic.in", out ESGraphPortRecord targetPort),
+                    Is.True);
+                string sourcePortId = sourcePort.portId;
+                string targetPortId = targetPort.portId;
+                Assert.That(graph.TryAddEdge(sourcePortId, targetPortId, out ESGraphEdgeRecord edge,
+                    out string addError), Is.True, addError);
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot snapshot,
+                    out List<ESGraphValidationIssue> issues), Is.True, Describe(issues));
+
+                ESGraphRouteSnapshot route = snapshot.Routes.Single();
+                Assert.That(route.SourceNode, Is.Not.Null);
+                Assert.That(route.TargetNode, Is.Not.Null);
+                Assert.That(route.SourcePort, Is.Not.Null);
+                Assert.That(route.TargetPort, Is.Not.Null);
+                Assert.That(route.SourcePortId, Is.EqualTo(sourcePortId));
+                Assert.That(route.TargetPortId, Is.EqualTo(targetPortId));
+                Assert.That(route.SourceValueTypeId, Is.EqualTo(ESGraphPortValueIds.Text));
+                Assert.That(route.TargetValueTypeId, Is.EqualTo(ESGraphPortValueIds.Text));
+                Assert.That(route.IsFlow, Is.False);
+                Assert.That(snapshot.GetOutgoingRoutes(source.nodeId, "semantic.out").Single().EdgeId,
+                    Is.EqualTo(edge.edgeId));
+                Assert.That(snapshot.GetIncomingRoutes(target.nodeId, "semantic.in").Single().EdgeId,
+                    Is.EqualTo(edge.edgeId));
+                Assert.That(snapshot.GetOutgoingRoutesByPortId(sourcePortId).Single().EdgeId,
+                    Is.EqualTo(edge.edgeId));
+                Assert.That(snapshot.GetIncomingRoutesByPortId(targetPortId).Single().EdgeId,
+                    Is.EqualTo(edge.edgeId));
             }
             finally
             {
@@ -781,7 +930,7 @@ namespace ES.Tests
                 int saveCount = 0;
                 int notifyCount = 0;
                 var service = new ESGraphEditService(
-                    _ => dirtyCount++, () => saveCount++, () => notifyCount++);
+                    _ => dirtyCount++, () => saveCount++, _ => notifyCount++);
 
                 ESGraphEditResult rejected = service.ReconnectEdge(
                     graph, edgeId, Input(firstSink), Input(secondSink));
@@ -814,6 +963,54 @@ namespace ES.Tests
             finally
             {
                 Undo.ClearAll();
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_LayoutChangeKeepsBakeCacheAndContentChangeInvalidatesIt()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            try
+            {
+                ESGraphNodeRecord node = graph.AddNode("test.node", "Node", Vector2.zero, DefaultPorts);
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot snapshot,
+                    out List<ESGraphValidationIssue> issues), Is.True,
+                    string.Join("\n", issues.Select(issue => issue.message)));
+                ESGraphBakeCache.Store(graph, false, snapshot, null, issues);
+
+                ESGraphChange observed = default;
+                int notifyCount = 0;
+                var service = new ESGraphEditService(null, null, change =>
+                {
+                    observed = change;
+                    notifyCount++;
+                    ESGraphBakeCache.NotifyChanged(graph, change);
+                });
+
+                ESGraphEditResult moved = service.SetNodePositions(graph,
+                    new Dictionary<string, Vector2> { { node.nodeId, Vector2.one } }, "移动图节点");
+                Assert.That(moved.changed, Is.True);
+                Assert.That(observed.Kind, Is.EqualTo(ESGraphChangeKind.Layout));
+                Assert.That(observed.AffectsBake, Is.False);
+                Assert.That(ESGraphBakeCache.TryGet(graph, false, out ESBakedGraphSnapshot cached,
+                    out _, out _), Is.True);
+                Assert.That(cached, Is.SameAs(snapshot));
+
+                ESGraphEditResult noChange = service.SetNodeContent(graph, node.nodeId,
+                    node.typeId, node.version, node.title, node.payloadJson);
+                Assert.That(noChange.changed, Is.False);
+                Assert.That(notifyCount, Is.EqualTo(1));
+
+                ESGraphEditResult content = service.SetNodeContent(graph, node.nodeId,
+                    node.typeId, node.version, "Changed", node.payloadJson);
+                Assert.That(content.changed, Is.True);
+                Assert.That(observed.Kind, Is.EqualTo(ESGraphChangeKind.Content));
+                Assert.That(observed.AffectsBake, Is.True);
+                Assert.That(ESGraphBakeCache.TryGet(graph, false, out _, out _, out _), Is.False);
+            }
+            finally
+            {
                 Object.DestroyImmediate(graph);
             }
         }
@@ -1929,15 +2126,44 @@ namespace ES.Tests
                 Assert.That(graph.TryAddEdge(output, Input(firstSink), out _, out string firstError), Is.True, firstError);
                 Assert.That(graph.TryAddEdge(output, Input(secondSink), out _, out string secondError), Is.True, secondError);
 
-                Assert.That(graph.UpdatePort(output, "flow.output", "输出", "flow", ESGraphPortDirection.Input,
-                    ESGraphPortCapacity.Multi, out _), Is.False);
-                Assert.That(graph.UpdatePort(output, "flow.output", "输出", "number", ESGraphPortDirection.Output,
-                    ESGraphPortCapacity.Multi, out _), Is.False);
-                Assert.That(graph.UpdatePort(output, "flow.output", "输出", "flow", ESGraphPortDirection.Output,
-                    ESGraphPortCapacity.Single, out _), Is.False);
+                Assert.That(graph.UpdatePort(output, "flow.output", "输出", "输出流程", "flow",
+                    ESGraphPortDirection.Input, ESGraphPortCapacity.Multi,
+                    ESGraphPortAggregation.Auto, out _), Is.False);
+                Assert.That(graph.UpdatePort(output, "flow.output", "输出", "输出流程", "number",
+                    ESGraphPortDirection.Output, ESGraphPortCapacity.Multi,
+                    ESGraphPortAggregation.Auto, out _), Is.False);
+                Assert.That(graph.UpdatePort(output, "flow.output", "输出", "输出流程", "flow",
+                    ESGraphPortDirection.Output, ESGraphPortCapacity.Single,
+                    ESGraphPortAggregation.Auto, out _), Is.False);
                 Assert.That(source.ports[0].direction, Is.EqualTo(ESGraphPortDirection.Output));
                 Assert.That(source.ports[0].valueTypeId, Is.EqualTo("flow"));
                 Assert.That(source.ports[0].capacity, Is.EqualTo(ESGraphPortCapacity.Multi));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_PortMeaningRejectsEmptyAndOversizedUpdatesWithoutMutation()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            try
+            {
+                ESGraphNodeRecord node = graph.AddNode("test.node", "Node", Vector2.zero,
+                    DefaultPorts);
+                Assert.That(node.TryGetPort(ESGraphBuiltInPortKeys.Output,
+                    out ESGraphPortRecord output), Is.True);
+                string originalMeaning = output.meaning;
+
+                Assert.That(graph.UpdatePort(output.portId, output.stableKey, output.name,
+                    string.Empty, output.valueTypeId, output.direction, output.capacity,
+                    output.aggregation, out _), Is.False);
+                Assert.That(graph.UpdatePort(output.portId, output.stableKey, output.name,
+                    new string('x', ESGraphEndpointRules.MaxMeaningLength + 1), output.valueTypeId,
+                    output.direction, output.capacity, output.aggregation, out _), Is.False);
+                Assert.That(output.meaning, Is.EqualTo(originalMeaning));
             }
             finally
             {
@@ -1960,6 +2186,9 @@ namespace ES.Tests
 
                 Assert.That(snapshot.TryGetNode(first.nodeId, out ESGraphNodeSnapshot nodeSnapshot), Is.True);
                 Assert.That(snapshot.TryGetPort(Output(first), out ESGraphPortSnapshot portSnapshot), Is.True);
+                Assert.That(snapshot.TryGetPort(first.nodeId, "flow.output",
+                    out ESGraphPortSnapshot endpointPort), Is.True);
+                Assert.That(endpointPort.PortId, Is.EqualTo(portSnapshot.PortId));
                 Assert.That(snapshot.TryGetEdge(edge.edgeId, out ESGraphEdgeSnapshot edgeSnapshot), Is.True);
                 Assert.That(portSnapshot.PortId, Is.EqualTo(Output(first)));
                 Assert.That(edgeSnapshot.EdgeId, Is.EqualTo(edge.edgeId));
@@ -1973,6 +2202,341 @@ namespace ES.Tests
             }
             finally
             {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_EndpointAggregationIsBakedAndSigned()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            try
+            {
+                ESGraphNodeRecord sourceA = graph.AddNode("test.source", "A", Vector2.zero,
+                    new[] { new ESGraphPortDefinition("值", "data.value", ESGraphPortDirection.Output,
+                        ESGraphPortCapacity.Multi, ESGraphPortValueIds.Text) });
+                ESGraphNodeRecord sourceB = graph.AddNode("test.source", "B", Vector2.right,
+                    new[] { new ESGraphPortDefinition("值", "data.value", ESGraphPortDirection.Output,
+                        ESGraphPortCapacity.Multi, ESGraphPortValueIds.Text) });
+                ESGraphNodeRecord target = graph.AddNode("test.target", "Target", Vector2.right * 2f,
+                    new[] { new ESGraphPortDefinition("输入", "data.input", ESGraphPortDirection.Input,
+                        ESGraphPortCapacity.Multi, ESGraphPortValueIds.Text, ESGraphPortAggregation.Named) });
+                Assert.That(graph.TryAddEdge(Output(sourceA), target.ports[0].portId,
+                    out _, out string firstError), Is.True, firstError);
+                Assert.That(graph.TryAddEdge(Output(sourceB), target.ports[0].portId,
+                    out _, out string secondError), Is.True, secondError);
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot named,
+                    out List<ESGraphValidationIssue> issues), Is.True,
+                    string.Join(";", issues.Select(issue => issue.message)));
+                Assert.That(named.Routes.Count, Is.EqualTo(2));
+                Assert.That(named.Routes.All(route => route.TargetAggregation == ESGraphPortAggregation.Named),
+                    Is.True);
+                Assert.That(named.Routes.All(route => route.SourceAggregation == ESGraphPortAggregation.Single),
+                    Is.True);
+
+                string originalSignature = named.ContentSignature;
+                Assert.That(graph.UpdatePort(target.ports[0].portId, "data.input", "输入", "接收文本列表",
+                    ESGraphPortValueIds.Text, ESGraphPortDirection.Input, ESGraphPortCapacity.Multi,
+                    ESGraphPortAggregation.Ordered, out string updateError), Is.True, updateError);
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot ordered,
+                    out _), Is.True);
+                Assert.That(ordered.Routes.All(route => route.TargetAggregation == ESGraphPortAggregation.Ordered),
+                    Is.True);
+                Assert.That(ordered.ContentSignature, Is.Not.EqualTo(originalSignature));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_EndpointMeaningKeepsSameTypePortsIndependentAcrossBake()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            try
+            {
+                ESGraphNodeRecord source = graph.AddNode("test.split", "Split", Vector2.zero,
+                    new[]
+                    {
+                        new ESGraphPortDefinition("成功", "result.success",
+                            ESGraphPortDirection.Output, ESGraphPortCapacity.Single,
+                            ESGraphPortValueIds.Text, meaning: "成功时产生的文本"),
+                        new ESGraphPortDefinition("失败", "result.failure",
+                            ESGraphPortDirection.Output, ESGraphPortCapacity.Single,
+                            ESGraphPortValueIds.Text, meaning: "失败时产生的文本")
+                    });
+                ESGraphNodeRecord target = graph.AddNode("test.collect", "Collect", Vector2.right,
+                    new[]
+                    {
+                        new ESGraphPortDefinition("成功输入", "input.success",
+                            ESGraphPortDirection.Input, ESGraphPortCapacity.Single,
+                            ESGraphPortValueIds.Text, meaning: "接收成功文本"),
+                        new ESGraphPortDefinition("失败输入", "input.failure",
+                            ESGraphPortDirection.Input, ESGraphPortCapacity.Single,
+                            ESGraphPortValueIds.Text, meaning: "接收失败文本")
+                    });
+                Assert.That(graph.TryAddEdge(source.ports[0].portId, target.ports[0].portId,
+                    out ESGraphEdgeRecord successEdge, out string successError), Is.True, successError);
+                Assert.That(graph.TryAddEdge(source.ports[1].portId, target.ports[1].portId,
+                    out ESGraphEdgeRecord failureEdge, out string failureError), Is.True, failureError);
+
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot snapshot,
+                    out List<ESGraphValidationIssue> issues), Is.True, Describe(issues));
+                var successEndpoint = new ESGraphEndpointKey(source.nodeId, "result.success");
+                var failureEndpoint = new ESGraphEndpointKey(source.nodeId, "result.failure");
+                Assert.That(snapshot.TryGetPort(successEndpoint, out ESGraphPortSnapshot successPort), Is.True);
+                Assert.That(snapshot.TryGetPort(failureEndpoint, out ESGraphPortSnapshot failurePort), Is.True);
+                Assert.That(successPort.NodeId, Is.EqualTo(source.nodeId));
+                Assert.That(successPort.Meaning, Is.EqualTo("成功时产生的文本"));
+                Assert.That(failurePort.Meaning, Is.EqualTo("失败时产生的文本"));
+                Assert.That(snapshot.GetOutgoingRoutes(successEndpoint).Single().EdgeId,
+                    Is.EqualTo(successEdge.edgeId));
+                Assert.That(snapshot.GetOutgoingRoutes(failureEndpoint).Single().EdgeId,
+                    Is.EqualTo(failureEdge.edgeId));
+                Assert.That(snapshot.GetOutgoingRoutes(successEndpoint).Single().TargetEndpoint,
+                    Is.EqualTo(new ESGraphEndpointKey(target.nodeId, "input.success")));
+                Assert.That(snapshot.GetOutgoingRoutes(failureEndpoint).Single().TargetEndpoint,
+                    Is.EqualTo(new ESGraphEndpointKey(target.nodeId, "input.failure")));
+
+                string originalSignature = snapshot.ContentSignature;
+                ESGraphPortRecord success = source.ports[0];
+                Assert.That(graph.UpdatePort(success.portId, success.stableKey, success.name,
+                    "成功时产生的最终文本", success.valueTypeId, success.direction,
+                    success.capacity, success.aggregation, out string updateError), Is.True, updateError);
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot updated,
+                    out _), Is.True);
+                Assert.That(updated.ContentSignature, Is.Not.EqualTo(originalSignature));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_SchemaUpgradeAddsMeaningWithoutChangingStableIdentities()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            try
+            {
+                ESGraphNodeRecord node = graph.AddNode("test.node", "Node", Vector2.zero,
+                    DefaultPorts);
+                string graphId = graph.GraphId;
+                string nodeId = node.nodeId;
+                string[] portIds = node.ports.Select(port => port.portId).ToArray();
+                graph.schemaVersion = 2;
+                foreach (ESGraphPortRecord port in node.ports)
+                    port.meaning = string.Empty;
+
+                List<ESGraphValidationIssue> before = graph.ValidateGraph();
+                Assert.That(before.Any(issue => issue.code == "Graph.Schema.MigrationRequired"), Is.True);
+                Assert.That(before.Any(issue => issue.code == "Graph.Port.Meaning"), Is.True);
+                Assert.That(graph.TryUpgradeSchema(out bool changed, out string error), Is.True, error);
+                Assert.That(changed, Is.True);
+                Assert.That(graph.schemaVersion, Is.EqualTo(ESGraphAssetBase.CurrentSchemaVersion));
+                Assert.That(graph.GraphId, Is.EqualTo(graphId));
+                Assert.That(node.nodeId, Is.EqualTo(nodeId));
+                Assert.That(node.ports.Select(port => port.portId), Is.EqualTo(portIds));
+                Assert.That(node.ports.All(port => port.meaning == port.name), Is.True);
+                Assert.That(graph.TryUpgradeSchema(out bool changedAgain, out string secondError),
+                    Is.True, secondError);
+                Assert.That(changedAgain, Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_SchemaUpgradeFailureDoesNotPartiallyMutateMeaningsOrVersion()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            try
+            {
+                ESGraphNodeRecord valid = graph.AddNode("test.valid", "Valid", Vector2.zero,
+                    DefaultPorts);
+                ESGraphNodeRecord invalid = graph.AddNode("test.invalid", "Invalid", Vector2.right,
+                    DefaultPorts);
+                graph.schemaVersion = 2;
+                valid.ports[0].meaning = string.Empty;
+                invalid.ports[0].meaning = string.Empty;
+                invalid.ports[0].name = string.Empty;
+                invalid.ports[0].stableKey = string.Empty;
+
+                Assert.That(graph.TryUpgradeSchema(out bool changed, out string error), Is.False);
+                Assert.That(changed, Is.False);
+                Assert.That(error, Does.Contain("用途"));
+                Assert.That(graph.schemaVersion, Is.EqualTo(2));
+                Assert.That(valid.ports[0].meaning, Is.Empty);
+                Assert.That(invalid.ports[0].meaning, Is.Empty);
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_SchemaUpgradeAssignsDeterministicEdgeOrderWithoutIdentityDrift()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            try
+            {
+                ESGraphNodeRecord source = graph.AddNode("test.source", "Source", Vector2.zero,
+                    new[]
+                    {
+                        new ESGraphPortDefinition("输出", "flow.out", ESGraphPortDirection.Output,
+                            ESGraphPortCapacity.Multi, ESGraphPortValueIds.Flow)
+                    });
+                ESGraphNodeRecord first = graph.AddNode("test.target", "First", Vector2.right,
+                    new[] { new ESGraphPortDefinition("输入", "flow.in", ESGraphPortDirection.Input) });
+                ESGraphNodeRecord second = graph.AddNode("test.target", "Second", Vector2.right * 2f,
+                    new[] { new ESGraphPortDefinition("输入", "flow.in", ESGraphPortDirection.Input) });
+                Assert.That(graph.TryAddEdge(source.ports[0].portId, first.ports[0].portId,
+                    out ESGraphEdgeRecord firstEdge, out string firstError), Is.True, firstError);
+                Assert.That(graph.TryAddEdge(source.ports[0].portId, second.ports[0].portId,
+                    out ESGraphEdgeRecord secondEdge, out string secondError), Is.True, secondError);
+                string[] identities = graph.Edges.Select(edge => edge.edgeId).ToArray();
+                string[] endpoints = graph.Edges.Select(edge => edge.outputPortId + ">" + edge.inputPortId)
+                    .ToArray();
+                graph.schemaVersion = 3;
+                firstEdge.order = 99;
+                secondEdge.order = 99;
+
+                Assert.That(graph.TryUpgradeSchema(out bool changed, out string error), Is.True, error);
+                Assert.That(changed, Is.True);
+                Assert.That(graph.schemaVersion, Is.EqualTo(ESGraphAssetBase.CurrentSchemaVersion));
+                Assert.That(graph.Edges.Select(edge => edge.edgeId), Is.EqualTo(identities));
+                Assert.That(graph.Edges.Select(edge => edge.outputPortId + ">" + edge.inputPortId),
+                    Is.EqualTo(endpoints));
+                ESGraphEdgeRecord[] byIdentity = graph.Edges.OrderBy(edge => edge.edgeId,
+                    StringComparer.Ordinal).ToArray();
+                Assert.That(byIdentity.Select(edge => edge.order), Is.EqualTo(new[] { 0, 1 }));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_EdgeOrderMovesWithinOneGroupAndChangesSnapshotSignature()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            try
+            {
+                ESGraphNodeRecord source = graph.AddNode("test.source", "Source", Vector2.zero,
+                    new[]
+                    {
+                        new ESGraphPortDefinition("输出", "flow.out", ESGraphPortDirection.Output,
+                            ESGraphPortCapacity.Multi, ESGraphPortValueIds.Flow)
+                    });
+                var targets = new List<ESGraphNodeRecord>();
+                var created = new List<ESGraphEdgeRecord>();
+                for (int i = 0; i < 3; i++)
+                {
+                    ESGraphNodeRecord target = graph.AddNode("test.target", "Target " + i,
+                        Vector2.right * (i + 1),
+                        new[] { new ESGraphPortDefinition("输入", "flow.in", ESGraphPortDirection.Input) });
+                    targets.Add(target);
+                    Assert.That(graph.TryAddEdge(source.ports[0].portId, target.ports[0].portId,
+                        out ESGraphEdgeRecord edge, out string addError), Is.True, addError);
+                    created.Add(edge);
+                }
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot before,
+                    out List<ESGraphValidationIssue> beforeIssues), Is.True, Describe(beforeIssues));
+
+                Assert.That(graph.TryMoveEdge(created[2].edgeId, -1, out string moveError),
+                    Is.True, moveError);
+                Assert.That(graph.TryGetEdgeOrderPosition(created[2].edgeId,
+                    out int position, out int count), Is.True);
+                Assert.That(position, Is.EqualTo(1));
+                Assert.That(count, Is.EqualTo(3));
+                Assert.That(created[2].edgeId, Is.Not.Empty);
+                Assert.That(created[2].outputPortId, Is.EqualTo(source.ports[0].portId));
+                Assert.That(created[2].inputPortId, Is.EqualTo(targets[2].ports[0].portId));
+                Assert.That(ESGraphSnapshotBaker.TryBake(graph, out ESBakedGraphSnapshot after,
+                    out List<ESGraphValidationIssue> afterIssues), Is.True, Describe(afterIssues));
+                Assert.That(after.ContentSignature, Is.Not.EqualTo(before.ContentSignature));
+                Assert.That(after.GetOutgoingRoutes(source.nodeId, "flow.out")
+                    .Select(route => route.TargetNodeId),
+                    Is.EqualTo(new[] { targets[0].nodeId, targets[2].nodeId, targets[1].nodeId }));
+                Assert.That(after.GetOutgoingRoutes(source.nodeId, "flow.out")
+                    .Select(route => route.Order), Is.EqualTo(new[] { 0, 1, 2 }));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_MoveEdgeServiceIsAtomicAndUndoRedoKeepsIdentityAndEndpoints()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            try
+            {
+                Undo.ClearAll();
+                ESGraphNodeRecord source = graph.AddNode("test.source", "Source", Vector2.zero,
+                    new[]
+                    {
+                        new ESGraphPortDefinition("输出", "flow.out", ESGraphPortDirection.Output,
+                            ESGraphPortCapacity.Multi, ESGraphPortValueIds.Flow)
+                    });
+                var edges = new List<ESGraphEdgeRecord>();
+                for (int i = 0; i < 3; i++)
+                {
+                    ESGraphNodeRecord target = graph.AddNode("test.target", "Target " + i,
+                        Vector2.right * (i + 1),
+                        new[] { new ESGraphPortDefinition("输入", "flow.in", ESGraphPortDirection.Input) });
+                    Assert.That(graph.TryAddEdge(source.ports[0].portId, target.ports[0].portId,
+                        out ESGraphEdgeRecord edge, out string addError), Is.True, addError);
+                    edges.Add(edge);
+                }
+
+                string movedEdgeId = edges[2].edgeId;
+                string movedOutputPortId = edges[2].outputPortId;
+                string movedInputPortId = edges[2].inputPortId;
+                int originalOrder = edges[2].order;
+                int swappedOrder = edges[1].order;
+                int dirtyCount = 0;
+                int saveCount = 0;
+                int notifyCount = 0;
+                var service = new ESGraphEditService(
+                    _ => dirtyCount++, () => saveCount++, _ => notifyCount++);
+
+                ESGraphEditResult rejected = service.MoveEdge(graph, edges[0].edgeId, -1);
+                Assert.That(rejected.changed, Is.False);
+                Assert.That(rejected.error, Is.Not.Empty);
+                Assert.That(dirtyCount + saveCount + notifyCount, Is.Zero);
+
+                ESGraphEditResult moved = service.MoveEdge(graph, movedEdgeId, -1);
+                Undo.FlushUndoRecordObjects();
+                Assert.That(moved.changed, Is.True, moved.error);
+                Assert.That(dirtyCount, Is.EqualTo(1));
+                Assert.That(saveCount, Is.EqualTo(1));
+                Assert.That(notifyCount, Is.EqualTo(1));
+                Assert.That(graph.FindEdge(movedEdgeId).order, Is.EqualTo(swappedOrder));
+                Assert.That(graph.FindEdge(movedEdgeId).outputPortId, Is.EqualTo(movedOutputPortId));
+                Assert.That(graph.FindEdge(movedEdgeId).inputPortId, Is.EqualTo(movedInputPortId));
+
+                Undo.PerformUndo();
+                Assert.That(graph.FindEdge(movedEdgeId).edgeId, Is.EqualTo(movedEdgeId));
+                Assert.That(graph.FindEdge(movedEdgeId).order, Is.EqualTo(originalOrder));
+                Assert.That(graph.FindEdge(movedEdgeId).outputPortId, Is.EqualTo(movedOutputPortId));
+                Assert.That(graph.FindEdge(movedEdgeId).inputPortId, Is.EqualTo(movedInputPortId));
+
+                Undo.PerformRedo();
+                Assert.That(graph.FindEdge(movedEdgeId).edgeId, Is.EqualTo(movedEdgeId));
+                Assert.That(graph.FindEdge(movedEdgeId).order, Is.EqualTo(swappedOrder));
+                Assert.That(graph.FindEdge(movedEdgeId).outputPortId, Is.EqualTo(movedOutputPortId));
+                Assert.That(graph.FindEdge(movedEdgeId).inputPortId, Is.EqualTo(movedInputPortId));
+            }
+            finally
+            {
+                Undo.ClearAll();
                 Object.DestroyImmediate(graph);
             }
         }

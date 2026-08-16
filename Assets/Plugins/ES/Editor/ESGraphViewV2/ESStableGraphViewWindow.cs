@@ -72,6 +72,7 @@ namespace ES.EditorInternal
         private VisualElement toolbarContainer;
         private Toolbar primaryToolbar;
         private Toolbar secondaryToolbar;
+        private VisualElement systemActionHost;
         private ObjectField assetField;
         private ToolbarButton createButton;
         private ToolbarButton openButton;
@@ -182,11 +183,19 @@ namespace ES.EditorInternal
         {
             DisposeGraphProjection();
             rootVisualElement.Clear();
-            ESEditorPresentation.BindWindow(this);
             toolbarContainer = new VisualElement();
             toolbarContainer.style.flexShrink = 0f;
             primaryToolbar = new Toolbar();
             secondaryToolbar = new Toolbar();
+            systemActionHost = new VisualElement
+            {
+                name = "ESStableGraphSystemActions",
+                tooltip = "系统：窗口生命周期与休眠控制"
+            };
+            systemActionHost.style.flexDirection = FlexDirection.Row;
+            systemActionHost.style.alignItems = Align.Center;
+            systemActionHost.style.flexShrink = 0f;
+            systemActionHost.style.marginLeft = 4f;
             toolbarContainer.Add(primaryToolbar);
             toolbarContainer.Add(secondaryToolbar);
             assetField = new ObjectField("图资产（可拖入）")
@@ -240,6 +249,9 @@ namespace ES.EditorInternal
             rootVisualElement.Add(toolbarContainer);
             toolbarLayoutMode = (ToolbarLayoutMode)byte.MaxValue;
             ApplyToolbarLayout(position.width > 0f ? position.width : 1200f);
+            ESWindowFoundation.Bind(
+                this,
+                new ESWindowActionHosts(system: systemActionHost));
             rootVisualElement.UnregisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
             rootVisualElement.RegisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
 
@@ -253,7 +265,8 @@ namespace ES.EditorInternal
             graphView.style.flexGrow = 1f;
             graphView.style.backgroundColor = ESEditorPresentation.CanvasSurfaceColor;
             inspector = new ESStableGraphInspector(this, () => graphView?.Rebuild(), UpdateStatus,
-                id => graphView?.FindAndFrame(id), () => RequestAutoSave(graphView?.Asset), editService);
+                id => graphView?.FindAndFrame(id), () => RequestAutoSave(graphView?.Asset), editService,
+                change => graphView?.ApplyChange(change));
             TwoPaneSplitView workspace = new TwoPaneSplitView(1, 360f, TwoPaneSplitViewOrientation.Horizontal);
             workspace.style.flexGrow = 1f;
             workspace.Add(graphView);
@@ -425,11 +438,11 @@ namespace ES.EditorInternal
                 secondaryToolbar.Add(searchField);
                 secondaryToolbar.Add(statusLabel);
             }
+            primaryToolbar.Add(systemActionHost);
         }
 
         private void OnEnable()
         {
-            ESEditorPresentation.BindWindow(this);
             ApplyWindowPresentation();
             Undo.undoRedoPerformed -= OnUndoRedo;
             Undo.undoRedoPerformed += OnUndoRedo;
@@ -466,8 +479,9 @@ namespace ES.EditorInternal
 
         private void OnUndoRedo()
         {
+            ESGraphBakeCache.Invalidate(graphView?.Asset);
             graphView?.Rebuild();
-            inspector?.NotifyAssetChanged();
+            inspector?.NotifyAssetChanged(ESGraphChange.ExternalChange);
             RequestAutoSave(graphView?.Asset);
             UpdateStatus("已应用撤销 / 重做");
             ESEditorPresentation.PulseWindow(this, ESStatusKind.Modified);
@@ -587,26 +601,26 @@ namespace ES.EditorInternal
                     "行为图",
                     subtitle: "根节点、组合、装饰、条件与行为节点。"),
                 ESSearchDropdown.Entry.Item(
-                    "AICommand 实现链",
+                    "命令流程",
                     () => CreateTemplate(ESStableGraphCreationTemplateKind.AgentAICommand),
                     "AI 协作图/命令",
-                    subtitle: "以中文文本描述需求、权限、执行步骤和验收，交给 AI 生成可审查命令。",
+                    subtitle: "用中文描述目标、权限、步骤和验收，生成可审查命令。",
                     badge: "推荐"),
                 ESSearchDropdown.Entry.Item(
-                    "AISkill 能力链",
+                    "技能流程",
                     () => CreateTemplate(ESStableGraphCreationTemplateKind.AgentSkill),
                     "AI 协作图/技能",
-                    subtitle: "编排触发边界、工作流、非目标和验证步骤。"),
+                    subtitle: "编排触发边界、步骤、非目标和验证。"),
                 ESSearchDropdown.Entry.Item(
-                    "AICommand + AISkill",
+                    "命令 + 技能",
                     () => CreateTemplate(ESStableGraphCreationTemplateKind.AgentPaired),
                     "AI 协作图/配套产物",
-                    subtitle: "一次需求同时产出命令合同与可复用技能。"),
+                    subtitle: "一次需求同时产出命令和可复用技能。"),
                 ESSearchDropdown.Entry.Item(
-                    "AI 实战调度图",
+                    "AI 实战流程图",
                     () => CreateTemplate(ESStableGraphCreationTemplateKind.AgentMindMap),
                     "AI 协作图/完整思路",
-                    subtitle: "目标、权威资料、四类约束、双产物与人工批准。"),
+                    subtitle: "目标、资料、约束、双产物与人工批准。"),
                 ESSearchDropdown.Entry.Item(
                     "空白稳定图（高级）",
                     () => CreateTemplate(ESStableGraphCreationTemplateKind.Blank),
@@ -759,8 +773,10 @@ namespace ES.EditorInternal
                 ESGraphNodeRecord source = AddTemplateNode(asset, ESGraphBuiltInNodeKind.GenericSource, new Vector2(0f, 0f));
                 ESGraphNodeRecord flow = AddTemplateNode(asset, ESGraphBuiltInNodeKind.GenericFlow, new Vector2(320f, 0f));
                 ESGraphNodeRecord sink = AddTemplateNode(asset, ESGraphBuiltInNodeKind.GenericSink, new Vector2(640f, 0f));
-                ConnectTemplateNodes(asset, source, flow);
-                ConnectTemplateNodes(asset, flow, sink);
+                ConnectTemplateNodes(asset, source, ESGraphBuiltInPortKeys.Output,
+                    flow, ESGraphBuiltInPortKeys.Input);
+                ConnectTemplateNodes(asset, flow, ESGraphBuiltInPortKeys.Output,
+                    sink, ESGraphBuiltInPortKeys.Input);
                 return;
             }
 
@@ -772,11 +788,16 @@ namespace ES.EditorInternal
                 ESGraphNodeRecord action = AddTemplateNode(asset, ESGraphBuiltInNodeKind.StoryAction, new Vector2(960f, -100f));
                 ESGraphNodeRecord complete = AddTemplateNode(asset, ESGraphBuiltInNodeKind.StoryComplete, new Vector2(1280f, -100f));
                 ESGraphNodeRecord fail = AddTemplateNode(asset, ESGraphBuiltInNodeKind.StoryFail, new Vector2(960f, 120f));
-                ConnectTemplateNodes(asset, start, dialogue);
-                ConnectTemplateNodes(asset, dialogue, choice);
-                ConnectTemplateNodes(asset, choice, action);
-                ConnectTemplateNodes(asset, choice, fail);
-                ConnectTemplateNodes(asset, action, complete);
+                ConnectTemplateNodes(asset, start, ESGraphBuiltInPortKeys.Output,
+                    dialogue, ESGraphBuiltInPortKeys.Input);
+                ConnectTemplateNodes(asset, dialogue, ESGraphBuiltInPortKeys.Output,
+                    choice, ESGraphBuiltInPortKeys.Input);
+                ConnectTemplateNodes(asset, choice, ESGraphBuiltInPortKeys.Option,
+                    action, ESGraphBuiltInPortKeys.Input);
+                ConnectTemplateNodes(asset, choice, ESGraphBuiltInPortKeys.Option,
+                    fail, ESGraphBuiltInPortKeys.Input);
+                ConnectTemplateNodes(asset, action, ESGraphBuiltInPortKeys.Output,
+                    complete, ESGraphBuiltInPortKeys.Input);
                 return;
             }
 
@@ -787,10 +808,14 @@ namespace ES.EditorInternal
                 ESGraphNodeRecord selector = AddTemplateNode(asset, ESGraphBuiltInNodeKind.BehaviorSelector, new Vector2(640f, 0f));
                 ESGraphNodeRecord condition = AddTemplateNode(asset, ESGraphBuiltInNodeKind.BehaviorCondition, new Vector2(960f, -100f));
                 ESGraphNodeRecord behaviorAction = AddTemplateNode(asset, ESGraphBuiltInNodeKind.BehaviorAction, new Vector2(960f, 120f));
-                ConnectTemplateNodes(asset, root, sequence);
-                ConnectTemplateNodes(asset, sequence, selector);
-                ConnectTemplateNodes(asset, selector, condition);
-                ConnectTemplateNodes(asset, selector, behaviorAction);
+                ConnectTemplateNodes(asset, root, ESGraphBuiltInPortKeys.Output,
+                    sequence, ESGraphBuiltInPortKeys.Input);
+                ConnectTemplateNodes(asset, sequence, ESGraphBuiltInPortKeys.Output,
+                    selector, ESGraphBuiltInPortKeys.Input);
+                ConnectTemplateNodes(asset, selector, ESGraphBuiltInPortKeys.Output,
+                    condition, ESGraphBuiltInPortKeys.Input);
+                ConnectTemplateNodes(asset, selector, ESGraphBuiltInPortKeys.Output,
+                    behaviorAction, ESGraphBuiltInPortKeys.Input);
                 return;
             }
 
@@ -808,10 +833,15 @@ namespace ES.EditorInternal
             return node;
         }
 
-        private static void ConnectTemplateNodes(GraphAsset asset, ESGraphNodeRecord from, ESGraphNodeRecord to)
+        private static void ConnectTemplateNodes(GraphAsset asset, ESGraphNodeRecord from,
+            string outputPortKey, ESGraphNodeRecord to, string inputPortKey)
         {
-            ESGraphPortRecord output = from.ports.First(port => port.direction == ESGraphPortDirection.Output);
-            ESGraphPortRecord input = to.ports.First(port => port.direction == ESGraphPortDirection.Input);
+            if (from == null || !from.TryGetPort(outputPortKey, out ESGraphPortRecord output)
+                || output.direction != ESGraphPortDirection.Output)
+                throw new InvalidOperationException("模板源节点缺少指定输出端点：" + outputPortKey);
+            if (to == null || !to.TryGetPort(inputPortKey, out ESGraphPortRecord input)
+                || input.direction != ESGraphPortDirection.Input)
+                throw new InvalidOperationException("模板目标节点缺少指定输入端点：" + inputPortKey);
             if (!asset.TryAddEdge(output.portId, input.portId, out _, out string error))
                 throw new InvalidOperationException(error);
         }
@@ -892,27 +922,27 @@ namespace ES.EditorInternal
             var entries = new List<ESSearchDropdown.Entry>
             {
                 ESSearchDropdown.Entry.Item(
-                    "配套命令 + 技能",
+                    "命令 + 技能",
                     () => CreateAgentAuthoringPreset(ESAgentAuthoringPresetKind.Paired),
                     "常用模板",
-                    subtitle: "同时生成 AICommand 与 Agent Skill 候选",
+                    subtitle: "同时生成命令与技能候选",
                     badge: "推荐"),
                 ESSearchDropdown.Entry.Item(
-                    "AI 实战调度图",
+                    "AI 实战流程图",
                     () => CreateAgentAuthoringPreset(ESAgentAuthoringPresetKind.MindMapPaired),
                     "常用模板",
                     subtitle: "三路分支、有界遍历、双产物与人工批准闭环",
                     badge: "复杂实战"),
                 ESSearchDropdown.Entry.Item(
-                    "AICommand 实现链",
+                    "命令流程",
                     () => CreateAgentAuthoringPreset(ESAgentAuthoringPresetKind.AICommandOnly),
                     "专项模板",
-                    subtitle: "只生成 AICommand 命令候选"),
+                    subtitle: "只生成命令候选"),
                 ESSearchDropdown.Entry.Item(
-                    "Agent Skill 能力链",
+                    "技能流程",
                     () => CreateAgentAuthoringPreset(ESAgentAuthoringPresetKind.AgentSkillOnly),
                     "专项模板",
-                    subtitle: "只生成 Agent Skill 技能候选")
+                    subtitle: "只生成技能候选")
             };
             ESSearchDropdown.Open(anchor, this, "选择智能助手预设", entries,
                 minimumWindowSize: new Vector2(460f, 300f));
@@ -1079,9 +1109,10 @@ namespace ES.EditorInternal
             CaptureAssetRevision(asset, false);
         }
 
-        internal void NotifyGraphModelChanged()
+        internal void NotifyGraphModelChanged(ESGraphChange change)
         {
-            inspector?.NotifyAssetChanged();
+            ESGraphBakeCache.NotifyChanged(graphView?.Asset, change);
+            inspector?.NotifyAssetChanged(change);
         }
 
         private void OnEditorUpdate()
@@ -1140,8 +1171,9 @@ namespace ES.EditorInternal
             observedAssetDirtyCount = dirtyCount;
             if (includeDependencyHash)
                 observedAssetDependencyHash = dependencyHash;
+            ESGraphBakeCache.Invalidate(asset);
             graphView.Rebuild();
-            inspector?.NotifyAssetChanged();
+            inspector?.NotifyAssetChanged(ESGraphChange.ExternalChange);
             if (dirtyChanged && EditorUtility.IsDirty(asset))
                 RequestAutoSave(asset);
             UpdateStatus("已同步图资产外部修改 · " + BuildAssetSummary(asset));
@@ -1372,7 +1404,7 @@ namespace ES.EditorInternal
         private bool endpointReconnectMovingOutput;
         private const double ViewAnimationDurationSeconds = 0.18d;
         private const float WheelDeltaPerTick = 15f;
-        private const string ClipboardSchema = "ESStableGraph.Clipboard.V1";
+        private const string ClipboardSchema = "ESStableGraph.Clipboard.V2";
         private IVisualElementScheduledItem viewAnimationSchedule;
         private Vector2 viewAnimationFromScale = Vector2.one;
         private Vector2 viewAnimationFromTranslation = Vector2.zero;
@@ -1423,7 +1455,7 @@ namespace ES.EditorInternal
             this.editService = editService ?? new ESGraphEditService(
                 asset => EditorUtility.SetDirty(asset),
                 () => ownerWindow?.RequestAutoSave(Asset),
-                () => ownerWindow?.NotifyGraphModelChanged());
+                change => ownerWindow?.NotifyGraphModelChanged(change));
             // EdgeControl 的内部渲染点属于 Unity 私有实现，不能作为动画可用性的唯一门禁。
             // 如果当前 Unity 版本没有该字段，后续会退回到端口中心的稳定贝塞尔路径。
             edgeFlowGeometryAvailable = true;
@@ -1500,10 +1532,8 @@ namespace ES.EditorInternal
             emptyState.style.borderBottomColor = ESEditorPresentation.NodeBorderColor;
             emptyState.style.borderLeftColor = ESEditorPresentation.NodeBorderColor;
             emptyState.style.borderRightColor = ESEditorPresentation.NodeBorderColor;
-            emptyState.style.borderTopLeftRadius = 8f;
-            emptyState.style.borderTopRightRadius = 8f;
-            emptyState.style.borderBottomLeftRadius = 8f;
-            emptyState.style.borderBottomRightRadius = 8f;
+            ESEditorPresentation.ApplyCornerRadius(
+                emptyState, ESEditorPresentation.ESCornerRadiusToken.Section);
             Label guideTitle = new Label("快速上手");
             guideTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
             guideTitle.style.fontSize = 14f;
@@ -1750,6 +1780,152 @@ namespace ES.EditorInternal
             NotifySelectionChanged(true);
         }
 
+        public void ApplyChange(ESGraphChange change)
+        {
+            if (Asset == null || change.Kind == ESGraphChangeKind.None)
+                return;
+            if (change.RequiresFullProjection || (change.Kind & ESGraphChangeKind.Structure) != 0)
+            {
+                Rebuild();
+                return;
+            }
+            if ((change.Kind & ESGraphChangeKind.Layout) != 0)
+            {
+                SyncChangedNodePositions(change);
+                if (!change.AffectsBake)
+                    return;
+            }
+            if ((change.Kind & ESGraphChangeKind.Content) != 0
+                && RefreshChangedNodeViews(change))
+                return;
+            Rebuild();
+        }
+
+        private void SyncChangedNodePositions(ESGraphChange change)
+        {
+            if (change.NodeIds != null && change.NodeIds.Count > 0)
+            {
+                foreach (string nodeId in change.NodeIds)
+                    SyncNodePosition(nodeId);
+                return;
+            }
+            SyncNodePosition(change.NodeId);
+        }
+
+        private void SyncNodePosition(string nodeId)
+        {
+            if (string.IsNullOrEmpty(nodeId)
+                || !nodeViews.TryGetValue(nodeId, out ESStableGraphNodeView view))
+                return;
+            ESGraphNodeRecord record = Asset.FindNode(nodeId);
+            if (record != null)
+                view.SyncPosition(record.position);
+        }
+
+        private bool RefreshChangedNodeViews(ESGraphChange change)
+        {
+            if (change.NodeIds != null && change.NodeIds.Count > 0)
+            {
+                foreach (string nodeId in change.NodeIds)
+                    if (!RefreshChangedNodeView(nodeId))
+                        return false;
+            }
+            else if (!RefreshChangedNodeView(change.NodeId))
+            {
+                return false;
+            }
+
+            RefreshNodeCards();
+            RefreshPortRelationVisuals();
+            edgeFlowOverlay?.MarkDirtyRepaint();
+            NotifySelectionChanged(true);
+            return true;
+        }
+
+        private bool RefreshChangedNodeView(string nodeId)
+        {
+            if (string.IsNullOrEmpty(nodeId)
+                || !nodeViews.TryGetValue(nodeId, out ESStableGraphNodeView oldView))
+                return false;
+            ESGraphNodeRecord record = Asset.FindNode(nodeId);
+            if (record == null)
+                return false;
+            if (oldView.MatchesRecord(record))
+                return true;
+
+            bool nodeSelected = oldView.selected;
+            var connectedEdges = new List<ESGraphEdgeRecord>();
+            var selectedEdgeIds = new List<string>();
+            for (int i = 0; i < Asset.Edges.Count; i++)
+            {
+                ESGraphEdgeRecord edgeRecord = Asset.Edges[i];
+                if (edgeRecord == null
+                    || (!oldView.PortViews.ContainsKey(edgeRecord.outputPortId ?? string.Empty)
+                        && !oldView.PortViews.ContainsKey(edgeRecord.inputPortId ?? string.Empty)))
+                    continue;
+                connectedEdges.Add(edgeRecord);
+                if (edgeViews.TryGetValue(edgeRecord.edgeId, out Edge edgeView) && edgeView.selected)
+                    selectedEdgeIds.Add(edgeRecord.edgeId);
+            }
+
+            for (int i = 0; i < connectedEdges.Count; i++)
+            {
+                string edgeId = connectedEdges[i].edgeId;
+                if (!edgeViews.TryGetValue(edgeId, out Edge edgeView))
+                    continue;
+                edgeRenderPointViews.Remove(edgeView);
+                RemoveGraphElementSafe(edgeView);
+                edgeViews.Remove(edgeId);
+            }
+
+            foreach (string portId in oldView.PortViews.Keys)
+            {
+                portViews.Remove(portId);
+                portRecords.Remove(portId);
+                nodeIdsByPort.Remove(portId);
+            }
+            RemoveGraphElementSafe(oldView);
+            nodeViews.Remove(nodeId);
+
+            ESGraphAuthoringRegistry.TryGetNodeDefinition(Asset.DomainKey, record.TypeKey,
+                out IESGraphNodeDefinition definition);
+            var newView = new ESStableGraphNodeView(Asset.DomainKey, record, definition,
+                edgeConnectorListener, OpenNodeDetails);
+            nodeViews[nodeId] = newView;
+            AddElement(newView);
+            if (record.ports != null)
+            {
+                for (int i = 0; i < record.ports.Count; i++)
+                {
+                    ESGraphPortRecord port = record.ports[i];
+                    if (port == null || string.IsNullOrEmpty(port.portId)
+                        || !newView.PortViews.TryGetValue(port.portId, out Port portView))
+                        continue;
+                    portViews[port.portId] = portView;
+                    portRecords[port.portId] = port;
+                    nodeIdsByPort[port.portId] = nodeId;
+                }
+            }
+
+            for (int i = 0; i < connectedEdges.Count; i++)
+            {
+                ESGraphEdgeRecord edgeRecord = connectedEdges[i];
+                if (!portViews.TryGetValue(edgeRecord.outputPortId, out Port output)
+                    || !portViews.TryGetValue(edgeRecord.inputPortId, out Port input))
+                    return false;
+                Edge edge = CreateProjectedEdge(output, input, edgeRecord.edgeId);
+                edgeViews[edgeRecord.edgeId] = edge;
+                ConfigureEdgeReconnectGesture(edge);
+                RegisterEdgeFlowGeometry(edge);
+                AddElement(edge);
+                if (selectedEdgeIds.Contains(edgeRecord.edgeId))
+                    AddToSelection(edge);
+            }
+            if (nodeSelected)
+                AddToSelection(newView);
+            return true;
+        }
+
         private void ClearProjection()
         {
             CancelEndpointReconnect();
@@ -1923,6 +2099,13 @@ namespace ES.EditorInternal
                     {
                         ESGraphPortRecord port = node.ports[i];
                         AppendStringToHash(ref hash, port?.portId);
+                        AppendStringToHash(ref hash, port?.stableKey);
+                        AppendStringToHash(ref hash, port?.name);
+                        AppendStringToHash(ref hash, port?.meaning);
+                        AppendStringToHash(ref hash, port?.valueTypeId);
+                        AppendIntToHash(ref hash, (int)(port?.direction ?? default));
+                        AppendIntToHash(ref hash, (int)(port?.capacity ?? default));
+                        AppendIntToHash(ref hash, (int)(port?.aggregation ?? default));
                         connectionCounts.TryGetValue(port?.portId ?? string.Empty, out int count);
                         AppendIntToHash(ref hash, count);
                     }
@@ -2064,12 +2247,12 @@ namespace ES.EditorInternal
             if (Asset != null && string.Equals(Asset.DomainId, ESAgentGraphStableIds.DomainId,
                     StringComparison.Ordinal))
             {
-                return "1. 新建时优先选择 AICommand、AISkill 或 AI 实战调度模板，模板已带合法连接\n" +
+                return "1. 新建时优先选择命令、技能或 AI 实战流程模板，模板已带合法连接\n" +
                     "2. 先选中“生成目标”，替换最终目的、使用场景和成功标准\n" +
                     "3. 再填写引用资料与生成约束；约束必须明确作用到目标 Output\n" +
-                    "4. 选中 AICommand / AISkill Output，填写名称、正式路径、权限和验收合同\n" +
+                    "4. 选中命令 / 技能输出，填写名称、正式路径、权限和验收要求\n" +
                     "5. 保留 Output → 交付门禁，点击“立即检查”，按右侧“当前下一步”逐项修复\n" +
-                    "6. 检查通过后可即时执行，或生成候选并完成 Diff Review 与人工批准\n\n" +
+                    "6. 检查通过后可直接运行，或生成候选并完成差异查看与人工批准\n\n" +
                     "拖线时只会高亮模型层真正允许的端口；AI 编排和行为树固定禁止循环。\n" +
                     "图形编辑会自动保存，正式产物不会绕过候选与人工批准。";
             }
@@ -4844,7 +5027,7 @@ namespace ES.EditorInternal
             EditorUtility.SetDirty(Asset);
             ownerWindow?.RequestAutoSave(Asset);
             if (affectsValidation)
-                ownerWindow?.NotifyGraphModelChanged();
+                ownerWindow?.NotifyGraphModelChanged(ESGraphChange.ExternalChange);
         }
 
         private void NotifySelectionChanged(bool force = false)
@@ -4936,7 +5119,7 @@ namespace ES.EditorInternal
                     ? "节点关键信息更新失败。" : result.error);
                 return;
             }
-            Rebuild();
+            ApplyChange(result.change);
             report?.Invoke("节点关键信息已更新，并进入自动保存队列。");
         }
 
@@ -5093,10 +5276,10 @@ namespace ES.EditorInternal
         private static string LocalizeMenuPath(string path)
         {
             return (path ?? string.Empty)
-                .Replace("Agent Authoring", "智能助手编排")
+                .Replace("Agent Authoring", "AI 编排")
                 .Replace("Outputs", "产物输出")
-                .Replace("AICommand", "AI 命令")
-                .Replace("Agent Skill", "代理技能")
+                .Replace("AICommand", "命令")
+                .Replace("Agent Skill", "技能")
                 .Replace("Story", "剧情")
                 .Replace("Goal", "生成目标")
                 .Replace("Reference", "引用资料")
@@ -5136,10 +5319,8 @@ namespace ES.EditorInternal
             style.position = Position.Absolute;
             style.width = 12f;
             style.height = 12f;
-            style.borderTopLeftRadius = 6f;
-            style.borderTopRightRadius = 6f;
-            style.borderBottomLeftRadius = 6f;
-            style.borderBottomRightRadius = 6f;
+            ESEditorPresentation.ApplyCornerRadius(
+                this, ESEditorPresentation.ESCornerRadiusToken.Pill);
             style.borderTopWidth = 2f;
             style.borderBottomWidth = 2f;
             style.borderLeftWidth = 2f;
@@ -5342,9 +5523,11 @@ namespace ES.EditorInternal
             private readonly string portId;
             private readonly string stableKey;
             private readonly string name;
+            private readonly string meaning;
             private readonly string valueTypeId;
             private readonly ESGraphPortDirection direction;
             private readonly ESGraphPortCapacity capacity;
+            private readonly ESGraphPortAggregation aggregation;
 
             public PortProjectionState(ESGraphPortRecord port)
             {
@@ -5352,9 +5535,11 @@ namespace ES.EditorInternal
                 portId = port?.portId;
                 stableKey = port?.stableKey;
                 name = port?.name;
+                meaning = port?.meaning;
                 valueTypeId = port?.valueTypeId;
                 direction = port?.direction ?? default;
                 capacity = port?.capacity ?? default;
+                aggregation = port?.aggregation ?? default;
             }
 
             public bool Matches(ESGraphPortRecord port)
@@ -5365,9 +5550,11 @@ namespace ES.EditorInternal
                     && string.Equals(portId, port.portId, StringComparison.Ordinal)
                     && string.Equals(stableKey, port.stableKey, StringComparison.Ordinal)
                     && string.Equals(name, port.name, StringComparison.Ordinal)
+                    && string.Equals(meaning, port.meaning, StringComparison.Ordinal)
                     && string.Equals(valueTypeId, port.valueTypeId, StringComparison.Ordinal)
                     && direction == port.direction
-                    && capacity == port.capacity;
+                    && capacity == port.capacity
+                    && aggregation == port.aggregation;
             }
         }
         public string NodeId { get; }
@@ -5434,10 +5621,8 @@ namespace ES.EditorInternal
             style.borderBottomColor = border;
             style.borderLeftColor = border;
             style.borderRightColor = border;
-            style.borderTopLeftRadius = 7f;
-            style.borderTopRightRadius = 7f;
-            style.borderBottomLeftRadius = 7f;
-            style.borderBottomRightRadius = 7f;
+            ESEditorPresentation.ApplyCornerRadius(
+                this, ESEditorPresentation.ESCornerRadiusToken.Section);
             Label typeBadge = new Label(string.IsNullOrWhiteSpace(definition?.BadgeText)
                 ? typeName
                 : definition.BadgeText);
@@ -5447,10 +5632,8 @@ namespace ES.EditorInternal
             Color badgeSurface = Color.Lerp(ESEditorPresentation.ControlSurfaceColor, accent, 0.72f);
             badgeSurface.a = 0.92f;
             typeBadge.style.backgroundColor = badgeSurface;
-            typeBadge.style.borderTopLeftRadius = 3f;
-            typeBadge.style.borderTopRightRadius = 3f;
-            typeBadge.style.borderBottomLeftRadius = 3f;
-            typeBadge.style.borderBottomRightRadius = 3f;
+            ESEditorPresentation.ApplyCornerRadius(
+                typeBadge, ESEditorPresentation.ESCornerRadiusToken.Pill);
             typeBadge.style.paddingLeft = 5f;
             typeBadge.style.paddingRight = 5f;
             typeBadge.style.marginLeft = 5f;
@@ -5505,9 +5688,13 @@ namespace ES.EditorInternal
                     Port.Capacity capacity = portRecord.capacity == ESGraphPortCapacity.Multi ? Port.Capacity.Multi : Port.Capacity.Single;
                     ESStableGraphPortView port = ESStableGraphPortView.Create(Orientation.Horizontal,
                         direction, capacity, typeof(object), portRecord.direction, edgeConnectorListener);
-                    string portTooltip = "方向：" + ESGraphChinesePresentation.GetDirectionName(portRecord.direction)
+                    string portTooltip = "用途：" + (portRecord.meaning ?? string.Empty)
+                        + "\n方向：" + ESGraphChinesePresentation.GetDirectionName(portRecord.direction)
                         + "\n业务数据：" + ESGraphChinesePresentation.GetPortValueTypeName(portRecord.valueTypeId)
                         + "\n连接容量：" + ESGraphChinesePresentation.GetCapacityName(portRecord.capacity)
+                        + "\n输入聚合：" + ESGraphChinesePresentation.GetAggregationName(
+                            ESGraphPortAggregationRules.Resolve(portRecord.direction,
+                                portRecord.capacity, portRecord.aggregation))
                         + "\n内部类型标识：" + portRecord.valueTypeId + "\n端口编号：" + portRecord.portId;
                     port.ConfigurePresentation(BuildPortLabel(portRecord), portTooltip);
                     port.userData = portRecord.portId;

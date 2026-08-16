@@ -218,6 +218,9 @@ namespace ES.EditorInternal
             riskAcceptance = null;
             if (ESGraphAuthoringRegistry.TryBake(asset, out snapshot, out domainPlan, out issues))
             {
+                // Plans are cached for read-only authoring reuse. Risk acceptance is a
+                // per-action mutable decision and must never be written into that cache entry.
+                ESGraphBakeCache.Invalidate(asset);
                 if (domainPlan is ESAgentArtifactGenerationSpec strictSpec)
                     strictSpec.riskAcceptance = null;
                 showIssues?.Invoke(issues);
@@ -253,6 +256,9 @@ namespace ES.EditorInternal
                 report?.Invoke(actionName + "失败：当前领域没有可记录风险确认的执行合同。");
                 return false;
             }
+            // The forced plan may have come from the forceable bake cache. Detach it before
+            // attaching the action-specific acceptance record.
+            ESGraphBakeCache.Invalidate(asset);
             spec.riskAcceptance = riskAcceptance;
             showIssues?.Invoke(issues);
             report?.Invoke(actionName + "：已按用户确认继续；风险确认已绑定当前内容签名并记录 SHA-256。");
@@ -764,6 +770,17 @@ namespace ES.EditorInternal
         {
             return capacity == ESGraphPortCapacity.Multi ? "多连接" : "单连接";
         }
+
+        public static string GetAggregationName(ESGraphPortAggregation aggregation)
+        {
+            switch (aggregation)
+            {
+                case ESGraphPortAggregation.Named: return "命名聚合";
+                case ESGraphPortAggregation.Ordered: return "有序聚合";
+                case ESGraphPortAggregation.Single: return "单值";
+                default: return "自动";
+            }
+        }
     }
 
     internal static class ESGraphNodeThemePalette
@@ -811,9 +828,11 @@ namespace ES.EditorInternal
         public string PortId { get; }
         public string StableKey { get; }
         public string DisplayName { get; }
+        public string Meaning { get; }
         public string ValueTypeId { get; }
         public ESGraphPortDirection Direction { get; }
         public ESGraphPortCapacity Capacity { get; }
+        public ESGraphPortAggregation Aggregation { get; }
         public int ConnectionCount { get; }
 
         internal ESGraphNodeCardPortSummary(ESGraphPortRecord port, int connectionCount)
@@ -821,9 +840,12 @@ namespace ES.EditorInternal
             PortId = port?.portId ?? string.Empty;
             StableKey = port?.stableKey ?? string.Empty;
             DisplayName = port?.name ?? string.Empty;
+            Meaning = port?.meaning ?? string.Empty;
             ValueTypeId = port?.valueTypeId ?? string.Empty;
             Direction = port?.direction ?? default;
             Capacity = port?.capacity ?? default;
+            Aggregation = port == null ? ESGraphPortAggregation.Single
+                : ESGraphPortAggregationRules.Resolve(port.direction, port.capacity, port.aggregation);
             ConnectionCount = Math.Max(0, connectionCount);
         }
     }
@@ -1421,13 +1443,17 @@ namespace ES.EditorInternal
             out ESBakedGraphSnapshot snapshot, out IESBakedGraphPlan domainPlan,
             out List<ESGraphValidationIssue> issues)
         {
+            if (ESGraphBakeCache.TryGet(asset, acceptForceableErrors,
+                    out snapshot, out domainPlan, out issues))
+                return true;
+
             snapshot = null;
             domainPlan = null;
             issues = Validate(asset);
             if (HasBlockingErrors(issues, acceptForceableErrors))
                 return false;
 
-            if (!ESGraphSnapshotBaker.TryBake(asset,
+            if (!ESGraphSnapshotBaker.TryBakeValidated(asset,
                     out snapshot, out List<ESGraphValidationIssue> coreIssues))
             {
                 issues.AddRange(coreIssues);
@@ -1436,7 +1462,11 @@ namespace ES.EditorInternal
 
             if (!TryGetProfile(asset.DomainKey, out IESGraphAuthoringProfile profile)
                 || !(profile is IESGraphAuthoringPlanBaker domainBaker))
+            {
+                ESGraphBakeCache.Store(asset, acceptForceableErrors,
+                    snapshot, domainPlan, issues);
                 return true;
+            }
 
             if (!domainBaker.TryBakePlan(snapshot, out domainPlan,
                     out IReadOnlyList<ESGraphValidationIssue> domainIssues))
@@ -1449,6 +1479,8 @@ namespace ES.EditorInternal
                 return false;
             }
 
+            ESGraphBakeCache.Store(asset, acceptForceableErrors,
+                snapshot, domainPlan, issues);
             return true;
         }
 
@@ -1978,24 +2010,26 @@ namespace ES.EditorInternal
         }
 
         protected static ESGraphPortDefinition Input(string name = "输入", ESGraphPortCapacity capacity = ESGraphPortCapacity.Single,
-            ESGraphPortValueKind valueKind = ESGraphPortValueKind.Flow, string customValueTypeId = null)
+            ESGraphPortValueKind valueKind = ESGraphPortValueKind.Flow, string customValueTypeId = null,
+            ESGraphPortAggregation aggregation = ESGraphPortAggregation.Auto)
         {
-            return new ESGraphPortDefinition(name, "flow.input", ESGraphPortDirection.Input, capacity, valueKind,
-                customValueTypeId);
+            return new ESGraphPortDefinition(name, ESGraphBuiltInPortKeys.Input, ESGraphPortDirection.Input, capacity, valueKind,
+                customValueTypeId, aggregation);
         }
 
-        protected static ESGraphPortDefinition Output(string name = "输出", string stableKey = "flow.output",
+        protected static ESGraphPortDefinition Output(string name = "输出", string stableKey = ESGraphBuiltInPortKeys.Output,
             ESGraphPortCapacity capacity = ESGraphPortCapacity.Multi,
-            ESGraphPortValueKind valueKind = ESGraphPortValueKind.Flow, string customValueTypeId = null)
+            ESGraphPortValueKind valueKind = ESGraphPortValueKind.Flow, string customValueTypeId = null,
+            ESGraphPortAggregation aggregation = ESGraphPortAggregation.Auto)
         {
             return new ESGraphPortDefinition(name, stableKey, ESGraphPortDirection.Output, capacity, valueKind,
-                customValueTypeId);
+                customValueTypeId, aggregation);
         }
 
         protected static ESGraphPortDefinition Input(string name, ESGraphPortCapacity capacity,
             string valueTypeId)
         {
-            return new ESGraphPortDefinition(name, "flow.input", ESGraphPortDirection.Input, capacity,
+            return new ESGraphPortDefinition(name, ESGraphBuiltInPortKeys.Input, ESGraphPortDirection.Input, capacity,
                 ESGraphPortValueKind.Custom, valueTypeId);
         }
 
@@ -2026,11 +2060,11 @@ namespace ES.EditorInternal
                 new ESGraphDegreeRule(minIncoming: 1, maxOutgoing: 0,
                     requireReachableFromEntry: true, allowIsolated: false), Input()),
             new ESStableGraphNodeTemplate(ESGraphDomainKind.Generic, ESGraphBuiltInNodeKind.GenericBranch,
-                "流程/分支", "分支", ESGraphNodeCategory.Branch, ESGraphNodeTheme.Decision,
-                new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 1,
+                "流程/分支", "分支", string.Empty, ESGraphNodeCategory.Branch, ESGraphNodeTheme.Decision,
+                2, new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 1,
                     requireReachableFromEntry: true, allowIsolated: false), Input(),
-                Output("成立", "flow.true", ESGraphPortCapacity.Single),
-                Output("不成立", "flow.false", ESGraphPortCapacity.Single)),
+                Output("成立", ESGraphBuiltInPortKeys.True, ESGraphPortCapacity.Multi),
+                Output("不成立", ESGraphBuiltInPortKeys.False, ESGraphPortCapacity.Multi)),
             new ESStableGraphNodeTemplate(ESGraphDomainKind.Generic, ESGraphBuiltInNodeKind.GenericMerge,
                 "流程/汇合", "汇合", ESGraphNodeCategory.Merge, ESGraphNodeTheme.Merge,
                 new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 1,
@@ -2060,12 +2094,13 @@ namespace ES.EditorInternal
                 "剧情/选择", "选择", ESGraphNodeCategory.Choice, ESGraphNodeTheme.Decision,
                 new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 1,
                     requireReachableFromEntry: true, allowIsolated: false),
-                Input(), Output("选项", "flow.option")),
+                Input(), Output("选项", ESGraphBuiltInPortKeys.Option)),
             new ESStableGraphNodeTemplate(ESGraphDomainKind.Story, ESGraphBuiltInNodeKind.StoryCondition,
-                "剧情/条件", "条件", ESGraphNodeCategory.Condition, ESGraphNodeTheme.Decision,
-                new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 1,
+                "剧情/条件", "条件", string.Empty, ESGraphNodeCategory.Condition, ESGraphNodeTheme.Decision,
+                2, new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 1,
                     requireReachableFromEntry: true, allowIsolated: false), Input(),
-                Output("成立", "flow.true", ESGraphPortCapacity.Single), Output("不成立", "flow.false", ESGraphPortCapacity.Single)),
+                Output("成立", ESGraphBuiltInPortKeys.True, ESGraphPortCapacity.Multi),
+                Output("不成立", ESGraphBuiltInPortKeys.False, ESGraphPortCapacity.Multi)),
             new ESStableGraphNodeTemplate(ESGraphDomainKind.Story, ESGraphBuiltInNodeKind.StoryAction,
                 "剧情/行为", "行为", ESGraphNodeCategory.Action, ESGraphNodeTheme.Primary,
                 new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 1,
@@ -2155,7 +2190,7 @@ namespace ES.EditorInternal
                 ESGraphNodeCategory.Entry, ESGraphNodeTheme.Primary,
                 new ESGraphDegreeRule(maxIncoming: 0, minOutgoing: 1,
                     allowIsolated: false),
-                Output("需求上下文", "agent.context.out", ESGraphPortCapacity.Multi,
+                Output("需求上下文", ESAgentGraphStableIds.ContextOutputPortKey, ESGraphPortCapacity.Multi,
                     ESAgentGraphStableIds.ContextPort)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.ReferenceNode,
                 "智能助手编排/引用资料", "引用资料",
@@ -2164,7 +2199,7 @@ namespace ES.EditorInternal
                 new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 1,
                     requireReachableFromEntry: true, allowIsolated: false),
                 Input("上游上下文", ESGraphPortCapacity.Multi, ESAgentGraphStableIds.ContextPort),
-                Output("补充上下文", "agent.context.out", ESGraphPortCapacity.Multi,
+                Output("补充上下文", ESAgentGraphStableIds.ContextOutputPortKey, ESGraphPortCapacity.Multi,
                     ESAgentGraphStableIds.ContextPort)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.ConstraintNode,
                 "智能助手编排/生成约束", "生成约束",
@@ -2174,34 +2209,36 @@ namespace ES.EditorInternal
                 new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 1,
                     requireReachableFromEntry: true, allowIsolated: false),
                 Input("需求上下文", ESGraphPortCapacity.Multi, ESAgentGraphStableIds.ContextPort),
-                Output("产物要求", "agent.requirement.out", ESGraphPortCapacity.Multi,
+                Output("产物要求", ESAgentGraphStableIds.RequirementOutputPortKey, ESGraphPortCapacity.Multi,
                     ESAgentGraphStableIds.RequirementPort)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.BranchNode,
                 "智能助手编排/逻辑/分支", "条件分支",
                 JsonUtility.ToJson(new ESAgentBranchPayload()),
                 ESGraphNodeCategory.Condition, ESGraphNodeTheme.Decision,
-                new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 3, maxOutgoing: 3,
+                2, new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 3,
+                    maxOutgoing: ESGraphDegreeRule.Unlimited,
                     requireReachableFromEntry: true, allowIsolated: false),
                 Input("上游上下文", ESGraphPortCapacity.Multi, ESAgentGraphStableIds.ContextPort),
                 Output("条件命中", ESAgentGraphStableIds.BranchMatchedPortKey,
-                    ESGraphPortCapacity.Single, ESAgentGraphStableIds.ContextPort),
+                    ESGraphPortCapacity.Multi, ESAgentGraphStableIds.ContextPort),
                 Output("默认路径", ESAgentGraphStableIds.BranchDefaultPortKey,
-                    ESGraphPortCapacity.Single, ESAgentGraphStableIds.ContextPort),
+                    ESGraphPortCapacity.Multi, ESAgentGraphStableIds.ContextPort),
                 Output("判断失败", ESAgentGraphStableIds.BranchFailurePortKey,
-                    ESGraphPortCapacity.Single, ESAgentGraphStableIds.ContextPort)),
+                    ESGraphPortCapacity.Multi, ESAgentGraphStableIds.ContextPort)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.TraverseNode,
                 "智能助手编排/逻辑/有界遍历", "有界遍历",
                 JsonUtility.ToJson(new ESAgentTraversePayload()),
                 ESGraphNodeCategory.Composite, ESGraphNodeTheme.Composite,
-                new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 3, maxOutgoing: 3,
+                new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 3,
+                    maxOutgoing: ESGraphDegreeRule.Unlimited,
                     requireReachableFromEntry: true, allowIsolated: false),
                 Input("遍历上下文", ESGraphPortCapacity.Multi, ESAgentGraphStableIds.ContextPort),
                 Output("逐项处理", ESAgentGraphStableIds.TraverseItemPortKey,
-                    ESGraphPortCapacity.Single, ESAgentGraphStableIds.ContextPort),
+                    ESGraphPortCapacity.Multi, ESAgentGraphStableIds.ContextPort),
                 Output("遍历完成", ESAgentGraphStableIds.TraverseCompletedPortKey,
-                    ESGraphPortCapacity.Single, ESAgentGraphStableIds.ContextPort),
+                    ESGraphPortCapacity.Multi, ESAgentGraphStableIds.ContextPort),
                 Output("遍历失败", ESAgentGraphStableIds.TraverseFailurePortKey,
-                    ESGraphPortCapacity.Single, ESAgentGraphStableIds.ContextPort)),
+                    ESGraphPortCapacity.Multi, ESAgentGraphStableIds.ContextPort)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.AICommandOutputNode,
                 "智能助手编排/产物输出/AI 命令", "AICommand 产物合同",
                 JsonUtility.ToJson(new ESAgentAICommandOutputPayload()),
@@ -2210,7 +2247,7 @@ namespace ES.EditorInternal
                 new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 1, maxOutgoing: 1,
                     requireReachableFromEntry: true, allowIsolated: false),
                 Input("产物要求", ESGraphPortCapacity.Multi, ESAgentGraphStableIds.RequirementPort),
-                Output("候选产物", "agent.artifact.out", ESGraphPortCapacity.Single,
+                Output("候选产物", ESAgentGraphStableIds.ArtifactOutputPortKey, ESGraphPortCapacity.Single,
                     ESAgentGraphStableIds.ArtifactPort)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.AISkillOutputNode,
                 "智能助手编排/产物输出/AI 技能", "AISkill 产物合同",
@@ -2220,7 +2257,7 @@ namespace ES.EditorInternal
                 new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 1, maxOutgoing: 1,
                     requireReachableFromEntry: true, allowIsolated: false),
                 Input("产物要求", ESGraphPortCapacity.Multi, ESAgentGraphStableIds.RequirementPort),
-                Output("候选产物", "agent.artifact.out", ESGraphPortCapacity.Single,
+                Output("候选产物", ESAgentGraphStableIds.ArtifactOutputPortKey, ESGraphPortCapacity.Single,
                     ESAgentGraphStableIds.ArtifactPort)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.ValidationNode,
                 "智能助手编排/验证与批准", "交付门禁",
@@ -2236,7 +2273,7 @@ namespace ES.EditorInternal
                 new ESGraphDegreeRule(maxIncoming: 0, minOutgoing: 1, allowIsolated: false),
                 Output("开始", ESAgentGraphStableIds.SkillNextPortKey, ESGraphPortCapacity.Single,
                     ESAgentGraphStableIds.SkillControlPort),
-                Output("参数", "skill.value.parameters", ESGraphPortCapacity.Multi,
+                Output("参数", ESAgentGraphStableIds.SkillParametersPortKey, ESGraphPortCapacity.Multi,
                     ESGraphPortValueIds.Any)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillTaskNode,
                 "AI 技能执行/受信任务", "受信任务",
@@ -2245,7 +2282,7 @@ namespace ES.EditorInternal
                 new ESGraphDegreeRule(minIncoming: 1,
                     requireReachableFromEntry: true, allowIsolated: false),
                 Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
-                new ESGraphPortDefinition("数据", "skill.value.input", ESGraphPortDirection.Input,
+                new ESGraphPortDefinition("数据", ESAgentGraphStableIds.SkillInputPortKey, ESGraphPortDirection.Input,
                     ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any),
                 Output("成功", ESAgentGraphStableIds.SkillSuccessPortKey, ESGraphPortCapacity.Single,
                     ESAgentGraphStableIds.SkillControlPort),
@@ -2255,7 +2292,7 @@ namespace ES.EditorInternal
                     ESAgentGraphStableIds.SkillControlPort),
                 Output("取消", ESAgentGraphStableIds.SkillCancelledPortKey, ESGraphPortCapacity.Single,
                     ESAgentGraphStableIds.SkillControlPort),
-                Output("运行结果", "skill.value.run-result", ESGraphPortCapacity.Multi,
+                Output("运行结果", ESAgentGraphStableIds.SkillRunResultPortKey, ESGraphPortCapacity.Multi,
                     ESAgentGraphStableIds.SkillRunResultPort)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillCallNode,
                 "AI 技能执行/调用 AISkill", "调用 AISkill",
@@ -2264,7 +2301,7 @@ namespace ES.EditorInternal
                 new ESGraphDegreeRule(minIncoming: 1,
                     requireReachableFromEntry: true, allowIsolated: false),
                 Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
-                new ESGraphPortDefinition("输入", "skill.value.input", ESGraphPortDirection.Input,
+                new ESGraphPortDefinition("输入", ESAgentGraphStableIds.SkillInputPortKey, ESGraphPortDirection.Input,
                     ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any),
                 Output("成功", ESAgentGraphStableIds.SkillSuccessPortKey, ESGraphPortCapacity.Single,
                     ESAgentGraphStableIds.SkillControlPort),
@@ -2274,16 +2311,16 @@ namespace ES.EditorInternal
                     ESAgentGraphStableIds.SkillControlPort),
                 Output("取消", ESAgentGraphStableIds.SkillCancelledPortKey, ESGraphPortCapacity.Single,
                     ESAgentGraphStableIds.SkillControlPort),
-                Output("子运行结果", "skill.value.run-result", ESGraphPortCapacity.Multi,
+                Output("子运行结果", ESAgentGraphStableIds.SkillRunResultPortKey, ESGraphPortCapacity.Multi,
                     ESAgentGraphStableIds.SkillRunResultPort)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillBranchNode,
                 "AI 技能执行/条件分支", "条件分支",
                 JsonUtility.ToJson(new ESAISkillBranchPayload()),
                 ESGraphNodeCategory.Condition, ESGraphNodeTheme.Decision,
-                new ESGraphDegreeRule(minIncoming: 2, minOutgoing: 2, maxOutgoing: 2,
+                new ESGraphDegreeRule(minIncoming: 2, minOutgoing: 2,
                     requireReachableFromEntry: true, allowIsolated: false),
                 Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
-                new ESGraphPortDefinition("判断值", "skill.value.input", ESGraphPortDirection.Input,
+                new ESGraphPortDefinition("判断值", ESAgentGraphStableIds.SkillInputPortKey, ESGraphPortDirection.Input,
                     ESGraphPortCapacity.Single, ESGraphPortValueIds.Any),
                 Output("命中", ESAgentGraphStableIds.SkillMatchedPortKey, ESGraphPortCapacity.Single,
                     ESAgentGraphStableIds.SkillControlPort),
@@ -2296,7 +2333,7 @@ namespace ES.EditorInternal
                 new ESGraphDegreeRule(minIncoming: 2, minOutgoing: 4,
                     requireReachableFromEntry: true, allowIsolated: false),
                 Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
-                new ESGraphPortDefinition("集合", "skill.value.items", ESGraphPortDirection.Input,
+                new ESGraphPortDefinition("集合", ESAgentGraphStableIds.SkillItemsPortKey, ESGraphPortDirection.Input,
                     ESGraphPortCapacity.Single, ESGraphPortValueIds.Any),
                 Output("逐项任务", ESAgentGraphStableIds.SkillItemPortKey, ESGraphPortCapacity.Single,
                     ESAgentGraphStableIds.SkillControlPort),
@@ -2306,7 +2343,7 @@ namespace ES.EditorInternal
                     ESAgentGraphStableIds.SkillControlPort),
                 Output("失败", ESAgentGraphStableIds.SkillFailurePortKey, ESGraphPortCapacity.Single,
                     ESAgentGraphStableIds.SkillControlPort),
-                Output("当前项", "skill.value.item", ESGraphPortCapacity.Multi,
+                Output("当前项", ESAgentGraphStableIds.SkillItemValuePortKey, ESGraphPortCapacity.Multi,
                     ESGraphPortValueIds.Any)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillApprovalNode,
                 "AI 技能执行/人工确认", "人工确认",
@@ -2315,12 +2352,30 @@ namespace ES.EditorInternal
                 new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 2, maxOutgoing: 2,
                     requireReachableFromEntry: true, allowIsolated: false),
                 Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
-                new ESGraphPortDefinition("审查数据", "skill.value.input", ESGraphPortDirection.Input,
+                new ESGraphPortDefinition("审查数据", ESAgentGraphStableIds.SkillInputPortKey, ESGraphPortDirection.Input,
                     ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any),
                 Output("批准", ESAgentGraphStableIds.SkillApprovedPortKey, ESGraphPortCapacity.Single,
                     ESAgentGraphStableIds.SkillControlPort),
                 Output("拒绝", ESAgentGraphStableIds.SkillRejectedPortKey, ESGraphPortCapacity.Single,
                     ESAgentGraphStableIds.SkillControlPort)),
+            new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillFanOutNode,
+                "AI 技能执行/多路分发", "多路分发",
+                JsonUtility.ToJson(new ESAISkillFanOutPayload()),
+                ESGraphNodeCategory.Composite, ESGraphNodeTheme.Composite,
+                new ESGraphDegreeRule(minIncoming: 1, minOutgoing: 2,
+                    requireReachableFromEntry: true, allowIsolated: false),
+                Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
+                Output("分支目标", ESAgentGraphStableIds.SkillFanOutPortKey,
+                    ESGraphPortCapacity.Multi, ESAgentGraphStableIds.SkillControlPort)),
+            new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillJoinNode,
+                "AI 技能执行/多路汇合", "多路汇合",
+                JsonUtility.ToJson(new ESAISkillJoinPayload()),
+                ESGraphNodeCategory.Merge, ESGraphNodeTheme.Merge,
+                new ESGraphDegreeRule(minIncoming: 2, minOutgoing: 1,
+                    requireReachableFromEntry: true, allowIsolated: false),
+                Input("分支输入", ESGraphPortCapacity.Multi, ESAgentGraphStableIds.SkillControlPort),
+                Output("继续", ESAgentGraphStableIds.SkillJoinPortKey,
+                    ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort)),
             new ESStableGraphNodeTemplate(ESAgentGraphStableIds.Domain, ESAgentGraphStableIds.SkillOutputNode,
                 "AI 技能执行/结构化输出", "结构化输出",
                 JsonUtility.ToJson(new ESAISkillOutputPayload()),
@@ -2328,7 +2383,7 @@ namespace ES.EditorInternal
                 new ESGraphDegreeRule(minIncoming: 2, maxOutgoing: 0,
                     requireReachableFromEntry: true, allowIsolated: false),
                 Input("执行", ESGraphPortCapacity.Single, ESAgentGraphStableIds.SkillControlPort),
-                new ESGraphPortDefinition("结果", "skill.value.input", ESGraphPortDirection.Input,
+                new ESGraphPortDefinition("结果", ESAgentGraphStableIds.SkillInputPortKey, ESGraphPortDirection.Input,
                     ESGraphPortCapacity.Multi, ESGraphPortValueIds.Any)))
         {
         }
@@ -2336,8 +2391,17 @@ namespace ES.EditorInternal
         public override void Validate(GraphAsset asset, List<ESGraphValidationIssue> issues)
         {
             base.Validate(asset, issues);
+            bool hasExecution = ESAISkillExecutionGraphValidator.IsExecutionGraph(asset);
+            bool hasArtifactOutput = HasArtifactOutput(asset);
+            if (hasExecution && hasArtifactOutput)
+            {
+                issues.Add(ESGraphValidationIssue.Error(
+                    "Agent.MixedWorkflowModes",
+                    "同一张 Agent 图不能同时包含 AISkill 执行节点和 AICommand/AISkill 产物输出节点；请拆成执行图或产物图。"));
+                return;
+            }
             ESAISkillExecutionGraphValidator.ValidateMode(asset, issues);
-            if (ESAISkillExecutionGraphValidator.IsExecutionGraph(asset))
+            if (hasExecution)
                 return;
             RequireExactlyOne(asset, issues, ESAgentGraphStableIds.Node(ESAgentGraphStableIds.GoalNode),
                 "智能助手编排“生成目标”节点");
@@ -2347,8 +2411,21 @@ namespace ES.EditorInternal
         public bool TryBakePlan(ESBakedGraphSnapshot source, out IESBakedGraphPlan plan,
             out IReadOnlyList<ESGraphValidationIssue> issues)
         {
-            if (source != null && source.Nodes.Any(node =>
-                    ESAgentRelationSemantics.IsSkillExecutionNode(node.TypeId)))
+            bool hasExecution = source != null && source.Nodes.Any(node =>
+                ESAgentRelationSemantics.IsSkillExecutionNode(node.TypeId));
+            bool hasArtifactOutput = HasArtifactOutput(source);
+            if (hasExecution && hasArtifactOutput)
+            {
+                plan = null;
+                issues = new[]
+                {
+                    ESGraphValidationIssue.Error(
+                        "Agent.MixedWorkflowModes",
+                        "同一张 Agent 图不能同时烘焙 AISkill 执行合同和 AICommand/AISkill 产物合同。")
+                };
+                return false;
+            }
+            if (hasExecution)
             {
                 bool executionSuccess = executionBaker.TryBake(source,
                     out ESAISkillExecutionSpec executionPlan, out issues);
@@ -2358,6 +2435,42 @@ namespace ES.EditorInternal
             bool success = baker.TryBake(source, out ESAgentArtifactGenerationSpec bakedPlan, out issues);
             plan = bakedPlan;
             return success;
+        }
+
+        private static bool HasArtifactOutput(GraphAsset asset)
+        {
+            if (asset == null)
+                return false;
+            for (int i = 0; i < asset.Nodes.Count; i++)
+            {
+                ESGraphNodeRecord node = asset.Nodes[i];
+                if (node == null)
+                    continue;
+                if (string.Equals(node.typeId, ESAgentGraphStableIds.AICommandOutputNode,
+                        StringComparison.Ordinal)
+                    || string.Equals(node.typeId, ESAgentGraphStableIds.AISkillOutputNode,
+                        StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool HasArtifactOutput(ESBakedGraphSnapshot snapshot)
+        {
+            if (snapshot == null)
+                return false;
+            for (int i = 0; i < snapshot.Nodes.Count; i++)
+            {
+                ESGraphNodeSnapshot node = snapshot.Nodes[i];
+                if (node == null)
+                    continue;
+                if (string.Equals(node.TypeId, ESAgentGraphStableIds.AICommandOutputNode,
+                        StringComparison.Ordinal)
+                    || string.Equals(node.TypeId, ESAgentGraphStableIds.AISkillOutputNode,
+                        StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
         }
 
         public bool IsNodeAvailable(GraphAsset asset, IESGraphNodeDefinition definition)

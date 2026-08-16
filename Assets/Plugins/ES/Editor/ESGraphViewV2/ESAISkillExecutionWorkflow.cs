@@ -122,6 +122,22 @@ namespace ES.EditorInternal
     }
 
     [Serializable]
+    public sealed class ESAISkillFanOutPayload
+    {
+        public int schemaVersion = 1;
+        public string fanOutId = "fan-out";
+        public bool stopOnFailure = true;
+    }
+
+    [Serializable]
+    public sealed class ESAISkillJoinPayload
+    {
+        public int schemaVersion = 1;
+        public string joinId = "join";
+        public bool requireAll = true;
+    }
+
+    [Serializable]
     public sealed class ESAISkillOutputPayload
     {
         public int schemaVersion = 1;
@@ -130,17 +146,32 @@ namespace ES.EditorInternal
     }
 
     [Serializable]
+    public sealed class ESAISkillExecutionPort
+    {
+        public string portId = string.Empty;
+        public string portKey = string.Empty;
+        public string meaning = string.Empty;
+        public string valueTypeId = string.Empty;
+        public ESGraphPortDirection direction;
+        public ESGraphPortCapacity capacity;
+        public ESGraphPortAggregation aggregation;
+    }
+
+    [Serializable]
     public sealed class ESAISkillExecutionStep
     {
         public string nodeId = string.Empty;
         public string nodeTypeId = string.Empty;
         public string title = string.Empty;
+        public ESAISkillExecutionPort[] ports = Array.Empty<ESAISkillExecutionPort>();
         public ESAISkillInputPayload input;
         public ESAISkillTaskPayload task;
         public ESAISkillCallPayload skillCall;
         public ESAISkillBranchPayload branch;
         public ESAISkillForEachPayload forEach;
         public ESAISkillApprovalPayload approval;
+        public ESAISkillFanOutPayload fanOut;
+        public ESAISkillJoinPayload join;
         public ESAISkillOutputPayload output;
     }
 
@@ -148,26 +179,40 @@ namespace ES.EditorInternal
     public sealed class ESAISkillControlEdge
     {
         public string edgeId = string.Empty;
+        public int order;
         public string sourceNodeId = string.Empty;
+        public string sourcePortId = string.Empty;
         public string sourcePortKey = string.Empty;
+        public string sourceMeaning = string.Empty;
         public string targetNodeId = string.Empty;
+        public string targetPortId = string.Empty;
+        public string targetPortKey = string.Empty;
+        public string targetMeaning = string.Empty;
     }
 
     [Serializable]
     public sealed class ESAISkillDataBinding
     {
         public string edgeId = string.Empty;
+        public int order;
         public string sourceNodeId = string.Empty;
+        public string sourcePortId = string.Empty;
         public string sourcePortKey = string.Empty;
+        public string sourceMeaning = string.Empty;
         public string targetNodeId = string.Empty;
+        public string targetPortId = string.Empty;
         public string targetPortKey = string.Empty;
-        public string valueTypeId = string.Empty;
+        public string targetMeaning = string.Empty;
+        public string sourceValueTypeId = string.Empty;
+        public string targetValueTypeId = string.Empty;
+        public ESGraphPortAggregation targetAggregation = ESGraphPortAggregation.Auto;
     }
 
     [Serializable]
     public sealed class ESAISkillExecutionSpec : IESBakedGraphPlan
     {
-        public int schemaVersion = 1;
+        public const int CurrentSchemaVersion = 5;
+        public int schemaVersion = CurrentSchemaVersion;
         public string sourceGraphId = string.Empty;
         [JsonIgnore] public string sourceAssetGuid = string.Empty;
         public string sourceContentSignature = string.Empty;
@@ -197,15 +242,8 @@ namespace ES.EditorInternal
 
             var failures = new List<ESGraphValidationIssue>();
             var steps = new List<ESAISkillExecutionStep>();
-            var nodeByPort = new Dictionary<string, ESGraphNodeSnapshot>(StringComparer.Ordinal);
-            var portById = new Dictionary<string, ESGraphPortSnapshot>(StringComparer.Ordinal);
             foreach (ESGraphNodeSnapshot node in source.Nodes)
             {
-                foreach (ESGraphPortSnapshot port in node.Ports)
-                {
-                    nodeByPort[port.PortId] = node;
-                    portById[port.PortId] = port;
-                }
                 if (!TryBakeStep(node, out ESAISkillExecutionStep step, out string error))
                     failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.Payload", error, node.NodeId));
                 else
@@ -214,37 +252,49 @@ namespace ES.EditorInternal
 
             var controls = new List<ESAISkillControlEdge>();
             var bindings = new List<ESAISkillDataBinding>();
-            foreach (ESGraphEdgeSnapshot edge in source.Edges)
+            foreach (ESGraphRouteSnapshot route in source.Routes)
             {
-                if (!nodeByPort.TryGetValue(edge.OutputPortId, out ESGraphNodeSnapshot from)
-                    || !nodeByPort.TryGetValue(edge.InputPortId, out ESGraphNodeSnapshot to)
-                    || !portById.TryGetValue(edge.OutputPortId, out ESGraphPortSnapshot output)
-                    || !portById.TryGetValue(edge.InputPortId, out ESGraphPortSnapshot input))
+                if (route.SourceNode == null || route.TargetNode == null
+                    || route.SourcePort == null || route.TargetPort == null)
                 {
-                    failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.Edge", "无法解析执行边端点。", edge.EdgeId));
+                    failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.Edge",
+                        "无法解析执行边端点。", route.EdgeId));
                     continue;
                 }
-                if (string.Equals(output.ValueTypeId, ESAgentGraphStableIds.SkillControlPort,
+                if (string.Equals(route.SourceValueTypeId, ESAgentGraphStableIds.SkillControlPort,
                         StringComparison.Ordinal))
                 {
                     controls.Add(new ESAISkillControlEdge
                     {
-                        edgeId = edge.EdgeId,
-                        sourceNodeId = from.NodeId,
-                        sourcePortKey = output.StableKey,
-                        targetNodeId = to.NodeId
+                        edgeId = route.EdgeId,
+                        order = route.Order,
+                        sourceNodeId = route.SourceNodeId,
+                        sourcePortId = route.SourcePortId,
+                        sourcePortKey = route.SourcePortKey,
+                        sourceMeaning = route.SourceMeaning,
+                        targetNodeId = route.TargetNodeId,
+                        targetPortId = route.TargetPortId,
+                        targetPortKey = route.TargetPortKey,
+                        targetMeaning = route.TargetMeaning
                     });
                 }
                 else
                 {
                     bindings.Add(new ESAISkillDataBinding
                     {
-                        edgeId = edge.EdgeId,
-                        sourceNodeId = from.NodeId,
-                        sourcePortKey = output.StableKey,
-                        targetNodeId = to.NodeId,
-                        targetPortKey = input.StableKey,
-                        valueTypeId = output.ValueTypeId
+                        edgeId = route.EdgeId,
+                        order = route.Order,
+                        sourceNodeId = route.SourceNodeId,
+                        sourcePortId = route.SourcePortId,
+                        sourcePortKey = route.SourcePortKey,
+                        sourceMeaning = route.SourceMeaning,
+                        targetNodeId = route.TargetNodeId,
+                        targetPortId = route.TargetPortId,
+                        targetPortKey = route.TargetPortKey,
+                        targetMeaning = route.TargetMeaning,
+                        sourceValueTypeId = route.SourceValueTypeId,
+                        targetValueTypeId = route.TargetValueTypeId,
+                        targetAggregation = route.TargetAggregation
                     });
                 }
             }
@@ -266,8 +316,10 @@ namespace ES.EditorInternal
                 entryNodeId = entry.nodeId,
                 parameters = entry.input.parameters ?? Array.Empty<ESAISkillParameter>(),
                 steps = steps.OrderBy(step => step.nodeId, StringComparer.Ordinal).ToArray(),
-                controlEdges = controls.OrderBy(edge => edge.edgeId, StringComparer.Ordinal).ToArray(),
-                dataBindings = bindings.OrderBy(edge => edge.edgeId, StringComparer.Ordinal).ToArray()
+                controlEdges = controls.OrderBy(edge => edge.order)
+                    .ThenBy(edge => edge.edgeId, StringComparer.Ordinal).ToArray(),
+                dataBindings = bindings.OrderBy(edge => edge.order)
+                    .ThenBy(edge => edge.edgeId, StringComparer.Ordinal).ToArray()
             };
             issues = failures;
             return true;
@@ -280,7 +332,20 @@ namespace ES.EditorInternal
             {
                 nodeId = node.NodeId,
                 nodeTypeId = node.TypeId,
-                title = node.Title
+                title = node.Title,
+                ports = (node.Ports ?? Array.Empty<ESGraphPortSnapshot>())
+                    .Where(port => port != null)
+                    .OrderBy(port => port.PortId, StringComparer.Ordinal)
+                    .Select(port => new ESAISkillExecutionPort
+                    {
+                        portId = port.PortId,
+                        portKey = port.StableKey,
+                        meaning = port.Meaning,
+                        valueTypeId = port.ValueTypeId,
+                        direction = port.Direction,
+                        capacity = port.Capacity,
+                        aggregation = port.Aggregation,
+                    }).ToArray()
             };
             try
             {
@@ -304,6 +369,12 @@ namespace ES.EditorInternal
                     case ESAgentGraphStableIds.SkillApprovalNode:
                         step.approval = JsonUtility.FromJson<ESAISkillApprovalPayload>(node.PayloadJson);
                         break;
+                    case ESAgentGraphStableIds.SkillFanOutNode:
+                        step.fanOut = JsonUtility.FromJson<ESAISkillFanOutPayload>(node.PayloadJson);
+                        break;
+                    case ESAgentGraphStableIds.SkillJoinNode:
+                        step.join = JsonUtility.FromJson<ESAISkillJoinPayload>(node.PayloadJson);
+                        break;
                     case ESAgentGraphStableIds.SkillOutputNode:
                         step.output = JsonUtility.FromJson<ESAISkillOutputPayload>(node.PayloadJson);
                         break;
@@ -319,7 +390,8 @@ namespace ES.EditorInternal
             }
             if (step.input == null && step.task == null && step.skillCall == null
                 && step.branch == null && step.forEach == null
-                && step.approval == null && step.output == null)
+                && step.approval == null && step.fanOut == null && step.join == null
+                && step.output == null)
             {
                 error = "节点缺少可用执行 Payload。";
                 return false;
@@ -340,13 +412,75 @@ namespace ES.EditorInternal
                 failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.OutputMissing", "执行图至少需要一个结构化输出。"));
 
             var ids = new HashSet<string>(steps.Select(step => step.nodeId), StringComparer.Ordinal);
-            var controlKeys = new HashSet<string>(StringComparer.Ordinal);
+            if (ids.Count != steps.Count || ids.Any(id => !ESGraphIdentity.IsValid(id)))
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.NodeIdentity",
+                    "执行步骤必须具有有效且唯一的稳定 NodeId。"));
+            var portsByEndpoint = new Dictionary<ESGraphEndpointKey, ESAISkillExecutionPort>();
+            var portIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ESAISkillExecutionStep step in steps)
+            {
+                foreach (ESAISkillExecutionPort port in step?.ports
+                             ?? Array.Empty<ESAISkillExecutionPort>())
+                {
+                    var endpoint = new ESGraphEndpointKey(step.nodeId, port?.portKey);
+                    if (port == null || !ESGraphIdentity.IsValid(port.portId)
+                        || !ESGraphStableIdUtility.IsValid(port.portKey)
+                        || !ESGraphEndpointRules.IsValidMeaning(port.meaning)
+                        || !ESGraphPortValueCatalog.IsValidStableId(port.valueTypeId)
+                        || !Enum.IsDefined(typeof(ESGraphPortDirection), port.direction)
+                        || !Enum.IsDefined(typeof(ESGraphPortCapacity), port.capacity)
+                        || !Enum.IsDefined(typeof(ESGraphPortAggregation), port.aggregation)
+                        || port.aggregation == ESGraphPortAggregation.Auto
+                        || !portIds.Add(port.portId) || !portsByEndpoint.TryAdd(endpoint, port))
+                        failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.PortIdentity",
+                            "执行步骤包含无效或重复的稳定端点。", step?.nodeId));
+                }
+            }
+            var controlKeys = new HashSet<ESGraphEndpointKey>();
+            var edgeIds = new HashSet<string>(StringComparer.Ordinal);
+            var edgeOrders = new HashSet<int>();
             foreach (ESAISkillControlEdge edge in controls)
             {
-                if (!ids.Contains(edge.sourceNodeId) || !ids.Contains(edge.targetNodeId)
-                    || !controlKeys.Add(edge.sourceNodeId + "\n" + edge.sourcePortKey))
+                ESAISkillExecutionStep sourceStep = steps.FirstOrDefault(step =>
+                    step.nodeId == edge.sourceNodeId);
+                bool allowFanOut = sourceStep?.fanOut != null
+                    && edge.sourcePortKey == ESAgentGraphStableIds.SkillFanOutPortKey;
+                bool hasSourcePort = portsByEndpoint.TryGetValue(
+                    new ESGraphEndpointKey(edge.sourceNodeId, edge.sourcePortKey),
+                    out ESAISkillExecutionPort sourcePort);
+                bool hasTargetPort = portsByEndpoint.TryGetValue(
+                    new ESGraphEndpointKey(edge.targetNodeId, edge.targetPortKey),
+                    out ESAISkillExecutionPort targetPort);
+                if (!ESGraphIdentity.IsValid(edge.edgeId) || !edgeIds.Add(edge.edgeId)
+                    || edge.order < 0 || !edgeOrders.Add(edge.order)
+                    || !ESGraphIdentity.IsValid(edge.sourcePortId)
+                    || !ESGraphIdentity.IsValid(edge.targetPortId)
+                    || !ESGraphStableIdUtility.IsValid(edge.sourcePortKey)
+                    || !ESGraphStableIdUtility.IsValid(edge.targetPortKey)
+                    || !ESGraphEndpointRules.IsValidMeaning(edge.sourceMeaning)
+                    || !ESGraphEndpointRules.IsValidMeaning(edge.targetMeaning)
+                    || !ids.Contains(edge.sourceNodeId) || !ids.Contains(edge.targetNodeId)
+                    || !hasSourcePort || !hasTargetPort
+                    || sourcePort.direction != ESGraphPortDirection.Output
+                    || targetPort.direction != ESGraphPortDirection.Input
+                    || !string.Equals(sourcePort.portId, edge.sourcePortId,
+                        StringComparison.Ordinal)
+                    || !string.Equals(targetPort.portId, edge.targetPortId,
+                        StringComparison.Ordinal)
+                    || !string.Equals(sourcePort.meaning, edge.sourceMeaning,
+                        StringComparison.Ordinal)
+                    || !string.Equals(targetPort.meaning, edge.targetMeaning,
+                        StringComparison.Ordinal)
+                    || !string.Equals(sourcePort.valueTypeId,
+                        ESAgentGraphStableIds.SkillControlPort, StringComparison.Ordinal)
+                    || !string.Equals(targetPort.valueTypeId,
+                        ESAgentGraphStableIds.SkillControlPort, StringComparison.Ordinal)
+                    || (!allowFanOut
+                        && !controlKeys.Add(new ESGraphEndpointKey(edge.sourceNodeId,
+                            edge.sourcePortKey))))
                     failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.ControlEdge",
-                        "控制出口只能连接一个确定目标。", edge.edgeId));
+                        allowFanOut ? "多目标出口包含无效关系。"
+                            : "控制出口只能连接一个确定目标。", edge.edgeId));
             }
 
             foreach (ESAISkillExecutionStep step in steps)
@@ -354,6 +488,9 @@ namespace ES.EditorInternal
                 if (step.input != null) ValidateInput(step, failures);
                 if (step.task != null) ValidateTask(step, failures);
                 if (step.skillCall != null) ValidateSkillCall(step, failures);
+                if (step.branch != null) ValidateBranch(step, failures);
+                if (step.fanOut != null) ValidateFanOut(step, controls, failures);
+                if (step.join != null) ValidateJoin(step, controls, failures);
                 if (step.input == null && !controls.Any(edge => edge.targetNodeId == step.nodeId))
                     failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.ControlInput",
                         "执行节点缺少控制输入，数据连线不能代替执行顺序。", step.nodeId));
@@ -377,21 +514,239 @@ namespace ES.EditorInternal
                     if (step.forEach.maxItems < 1 || step.forEach.maxItems > 512)
                         failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.ForEachLimit",
                             "ForEach 最大数量必须位于 1-512。", step.nodeId));
-                    ESAISkillControlEdge item = controls.FirstOrDefault(edge => edge.sourceNodeId == step.nodeId
-                        && edge.sourcePortKey == ESAgentGraphStableIds.SkillItemPortKey);
-                    ESAISkillExecutionStep body = item == null ? null : steps.FirstOrDefault(value => value.nodeId == item.targetNodeId);
+                    ESAISkillControlEdge[] itemRoutes = controls.Where(edge => edge.sourceNodeId == step.nodeId
+                            && edge.sourcePortKey == ESAgentGraphStableIds.SkillItemPortKey)
+                        .ToArray();
+                    ESAISkillExecutionStep body = itemRoutes.Length == 1
+                        ? steps.FirstOrDefault(value => value.nodeId == itemRoutes[0].targetNodeId)
+                        : null;
                     if (body?.task == null && body?.skillCall == null)
                         failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.ForEachBody",
-                            "ForEach 的逐项出口必须直接连接一个 Task 或调用 AISkill；循环由协调器内部管理。", step.nodeId));
+                            "ForEach 的逐项出口必须且只能直接连接一个 Task 或调用 AISkill；循环由协调器内部管理。", step.nodeId));
                 }
             }
 
             foreach (ESAISkillDataBinding binding in bindings)
             {
-                if (!ids.Contains(binding.sourceNodeId) || !ids.Contains(binding.targetNodeId)
-                    || string.IsNullOrWhiteSpace(binding.valueTypeId))
+                bool hasSourcePort = portsByEndpoint.TryGetValue(
+                    new ESGraphEndpointKey(binding.sourceNodeId, binding.sourcePortKey),
+                    out ESAISkillExecutionPort sourcePort);
+                bool hasTargetPort = portsByEndpoint.TryGetValue(
+                    new ESGraphEndpointKey(binding.targetNodeId, binding.targetPortKey),
+                    out ESAISkillExecutionPort targetPort);
+                if (!ESGraphIdentity.IsValid(binding.edgeId) || !edgeIds.Add(binding.edgeId)
+                    || binding.order < 0 || !edgeOrders.Add(binding.order)
+                    || !ESGraphIdentity.IsValid(binding.sourcePortId)
+                    || !ESGraphIdentity.IsValid(binding.targetPortId)
+                    || !ESGraphStableIdUtility.IsValid(binding.sourcePortKey)
+                    || !ESGraphStableIdUtility.IsValid(binding.targetPortKey)
+                    || !ESGraphEndpointRules.IsValidMeaning(binding.sourceMeaning)
+                    || !ESGraphEndpointRules.IsValidMeaning(binding.targetMeaning)
+                    || !ids.Contains(binding.sourceNodeId) || !ids.Contains(binding.targetNodeId)
+                    || !ESGraphPortValueCatalog.IsValidStableId(binding.sourceValueTypeId)
+                    || !ESGraphPortValueCatalog.IsValidStableId(binding.targetValueTypeId)
+                    || !Enum.IsDefined(typeof(ESGraphPortAggregation), binding.targetAggregation)
+                    || binding.targetAggregation == ESGraphPortAggregation.Auto
+                    || !hasSourcePort || !hasTargetPort
+                    || sourcePort.direction != ESGraphPortDirection.Output
+                    || targetPort.direction != ESGraphPortDirection.Input
+                    || !string.Equals(sourcePort.portId, binding.sourcePortId,
+                        StringComparison.Ordinal)
+                    || !string.Equals(targetPort.portId, binding.targetPortId,
+                        StringComparison.Ordinal)
+                    || !string.Equals(sourcePort.meaning, binding.sourceMeaning,
+                        StringComparison.Ordinal)
+                    || !string.Equals(targetPort.meaning, binding.targetMeaning,
+                        StringComparison.Ordinal)
+                    || !string.Equals(sourcePort.valueTypeId, binding.sourceValueTypeId,
+                        StringComparison.Ordinal)
+                    || !string.Equals(targetPort.valueTypeId, binding.targetValueTypeId,
+                        StringComparison.Ordinal)
+                    || targetPort.aggregation != binding.targetAggregation)
                     failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.Binding",
-                        "值绑定缺少稳定端点或类型。", binding.edgeId));
+                        "值绑定缺少稳定端点、类型或已解析的输入聚合方式。", binding.edgeId));
+            }
+            foreach (IGrouping<ESGraphEndpointKey, ESAISkillDataBinding> group in bindings.GroupBy(binding =>
+                new ESGraphEndpointKey(binding.targetNodeId, binding.targetPortKey)))
+            {
+                ESAISkillDataBinding[] groupBindings = group.ToArray();
+                ESGraphPortAggregation[] modes = groupBindings.Select(binding => binding.targetAggregation)
+                    .Where(mode => mode != ESGraphPortAggregation.Auto)
+                    .Distinct().ToArray();
+                if (modes.Length > 1)
+                    failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.BindingAggregation",
+                        "同一输入端点的多条关系必须声明一致的聚合模式。", group.Key.ToString()));
+                if (modes.Length == 1 && modes[0] == ESGraphPortAggregation.Single
+                    && groupBindings.Length > 1)
+                    failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.BindingSingle",
+                        "Single 输入端点不能接收多条值关系。", group.Key.ToString()));
+            }
+            ValidateFanOutJoinPairing(steps, controls, failures);
+        }
+
+        internal static bool TryValidateSpec(ESAISkillExecutionSpec spec, out string error)
+        {
+            if (spec == null || spec.schemaVersion != ESAISkillExecutionSpec.CurrentSchemaVersion
+                || !ESGraphIdentity.IsValid(spec.sourceGraphId)
+                || !ES.ESAutomationWorkerRegistration.IsSha256(spec.sourceContentSignature)
+                || spec.steps == null || spec.controlEdges == null || spec.dataBindings == null
+                || spec.steps.Any(step => step == null)
+                || spec.controlEdges.Any(edge => edge == null)
+                || spec.dataBindings.Any(binding => binding == null))
+            {
+                error = "执行合同缺少有效的版本、GraphId、内容签名或拓扑集合。";
+                return false;
+            }
+
+            var failures = new List<ESGraphValidationIssue>();
+            var steps = spec.steps.ToList();
+            ValidateTopology(steps, spec.controlEdges.ToList(), spec.dataBindings.ToList(), failures);
+            ESAISkillExecutionStep[] entries = steps.Where(step => step.input != null).ToArray();
+            if (entries.Length == 1)
+            {
+                ESAISkillExecutionStep entry = entries[0];
+                if (!string.Equals(spec.entryNodeId, entry.nodeId, StringComparison.Ordinal)
+                    || !string.Equals(spec.skillId?.Trim(), entry.input.skillId?.Trim(),
+                        StringComparison.Ordinal)
+                    || !string.Equals(spec.displayName?.Trim(), entry.input.displayName?.Trim(),
+                        StringComparison.Ordinal)
+                    || !JToken.DeepEquals(JArray.FromObject(spec.parameters
+                            ?? Array.Empty<ESAISkillParameter>()),
+                        JArray.FromObject(entry.input.parameters
+                            ?? Array.Empty<ESAISkillParameter>())))
+                    failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.EntryContract",
+                        "执行合同入口、SkillId、名称或参数与入口节点不一致。", spec.entryNodeId));
+            }
+
+            foreach (ESAISkillExecutionStep step in steps)
+            {
+                int payloadCount = (step.input != null ? 1 : 0) + (step.task != null ? 1 : 0)
+                    + (step.skillCall != null ? 1 : 0) + (step.branch != null ? 1 : 0)
+                    + (step.forEach != null ? 1 : 0) + (step.approval != null ? 1 : 0)
+                    + (step.fanOut != null ? 1 : 0) + (step.join != null ? 1 : 0)
+                    + (step.output != null ? 1 : 0);
+                if (payloadCount != 1 || !StepTypeMatchesPayload(step))
+                    failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.StepContract",
+                        "每个执行步骤必须且只能携带与 NodeType 对应的一份 Payload。", step.nodeId));
+            }
+
+            ESGraphValidationIssue first = failures.FirstOrDefault(issue => issue != null
+                && issue.severity == ESGraphValidationSeverity.Error);
+            error = first?.message ?? string.Empty;
+            return first == null;
+        }
+
+        private static bool StepTypeMatchesPayload(ESAISkillExecutionStep step)
+        {
+            if (step == null) return false;
+            if (step.input != null) return step.nodeTypeId == ESAgentGraphStableIds.SkillInputNode;
+            if (step.task != null) return step.nodeTypeId == ESAgentGraphStableIds.SkillTaskNode;
+            if (step.skillCall != null) return step.nodeTypeId == ESAgentGraphStableIds.SkillCallNode;
+            if (step.branch != null) return step.nodeTypeId == ESAgentGraphStableIds.SkillBranchNode;
+            if (step.forEach != null) return step.nodeTypeId == ESAgentGraphStableIds.SkillForEachNode;
+            if (step.approval != null) return step.nodeTypeId == ESAgentGraphStableIds.SkillApprovalNode;
+            if (step.fanOut != null) return step.nodeTypeId == ESAgentGraphStableIds.SkillFanOutNode;
+            if (step.join != null) return step.nodeTypeId == ESAgentGraphStableIds.SkillJoinNode;
+            return step.output != null && step.nodeTypeId == ESAgentGraphStableIds.SkillOutputNode;
+        }
+
+        private static void ValidateFanOutJoinPairing(List<ESAISkillExecutionStep> steps,
+            List<ESAISkillControlEdge> controls, List<ESGraphValidationIssue> failures)
+        {
+            Dictionary<string, ESAISkillExecutionStep> stepsById = steps
+                .Where(step => step != null && !string.IsNullOrWhiteSpace(step.nodeId))
+                .GroupBy(step => step.nodeId, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            Dictionary<string, ESAISkillControlEdge[]> outgoingByNode = controls
+                .Where(edge => edge != null && !string.IsNullOrWhiteSpace(edge.sourceNodeId))
+                .GroupBy(edge => edge.sourceNodeId, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key,
+                    group => group.OrderBy(edge => edge.order)
+                        .ThenBy(edge => edge.edgeId, StringComparer.Ordinal).ToArray(),
+                    StringComparer.Ordinal);
+
+            foreach (ESAISkillExecutionStep fanOut in steps.Where(step => step?.fanOut != null))
+            {
+                ESAISkillControlEdge[] starts = controls.Where(edge => edge.sourceNodeId == fanOut.nodeId
+                    && edge.sourcePortKey == ESAgentGraphStableIds.SkillFanOutPortKey)
+                    .OrderBy(edge => edge.order)
+                    .ThenBy(edge => edge.edgeId, StringComparer.Ordinal).ToArray();
+                string sharedJoinId = string.Empty;
+                var branchOwners = new Dictionary<string, string>(StringComparer.Ordinal);
+                var reportedOverlaps = new HashSet<string>(StringComparer.Ordinal);
+                foreach (ESAISkillControlEdge start in starts)
+                {
+                    var queue = new Queue<string>();
+                    var visited = new HashSet<string>(StringComparer.Ordinal);
+                    var routeJoins = new HashSet<string>(StringComparer.Ordinal);
+                    bool containsNestedFanOut = false;
+                    bool reachesOutputBeforeJoin = false;
+                    queue.Enqueue(start.targetNodeId);
+                    while (queue.Count > 0)
+                    {
+                        string nodeId = queue.Dequeue();
+                        if (!visited.Add(nodeId)) continue;
+                        if (!stepsById.TryGetValue(nodeId, out ESAISkillExecutionStep node))
+                            continue;
+                        if (node == null) continue;
+                        if (node.join != null)
+                        {
+                            routeJoins.Add(node.nodeId);
+                            continue;
+                        }
+                        if (node.fanOut != null)
+                        {
+                            containsNestedFanOut = true;
+                            continue;
+                        }
+                        if (node.output != null)
+                        {
+                            reachesOutputBeforeJoin = true;
+                            continue;
+                        }
+                        if (outgoingByNode.TryGetValue(nodeId, out ESAISkillControlEdge[] outgoing))
+                            foreach (ESAISkillControlEdge edge in outgoing)
+                                queue.Enqueue(edge.targetNodeId);
+                    }
+                    if (containsNestedFanOut)
+                        failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.NestedFanOut",
+                            "当前版本不允许 FanOut 分支内再次进入 FanOut。", start.edgeId));
+                    if (reachesOutputBeforeJoin)
+                        failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.FanOutOutput",
+                            "FanOut 的每条可能路线都必须先经过 Join，不能直接到达输出。", start.edgeId));
+                    if (routeJoins.Count == 0)
+                    {
+                        failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.FanOutJoinMissing",
+                            "FanOut 的每个直接目标都必须可达一个 Join。", start.edgeId));
+                        continue;
+                    }
+                    if (routeJoins.Count > 1)
+                    {
+                        failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.FanOutJoinAmbiguous",
+                            "FanOut 的同一目标存在多个可能 Join。", start.edgeId));
+                        continue;
+                    }
+                    foreach (string visitedNodeId in visited.Where(nodeId => !routeJoins.Contains(nodeId)))
+                    {
+                        if (!branchOwners.TryGetValue(visitedNodeId, out string ownerEdgeId))
+                        {
+                            branchOwners.Add(visitedNodeId, start.edgeId);
+                            continue;
+                        }
+                        if (!string.Equals(ownerEdgeId, start.edgeId, StringComparison.Ordinal)
+                            && reportedOverlaps.Add(visitedNodeId))
+                            failures.Add(ESGraphValidationIssue.Error(
+                                "AISkill.Execution.FanOutEarlyMerge",
+                                "FanOut 的不同直接分支只能在共同 Join 汇合，不能提前共享执行节点。",
+                                visitedNodeId));
+                    }
+                    string routeJoinId = routeJoins.Single();
+                    if (string.IsNullOrEmpty(sharedJoinId))
+                        sharedJoinId = routeJoinId;
+                    else if (!string.Equals(sharedJoinId, routeJoinId, StringComparison.Ordinal))
+                        failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.FanOutJoinMismatch",
+                            "FanOut 的所有直接目标必须汇合到同一个 Join。", start.edgeId));
+                }
             }
         }
 
@@ -412,7 +767,55 @@ namespace ES.EditorInternal
                 ESAgentGraphStableIds.SkillFailurePortKey };
             if (step.approval != null) return new[] { ESAgentGraphStableIds.SkillApprovedPortKey,
                 ESAgentGraphStableIds.SkillRejectedPortKey };
+            if (step.fanOut != null) return new[] { ESAgentGraphStableIds.SkillFanOutPortKey };
+            if (step.join != null) return new[] { ESAgentGraphStableIds.SkillJoinPortKey };
             return Array.Empty<string>();
+        }
+
+        private static void ValidateFanOut(ESAISkillExecutionStep step,
+            List<ESAISkillControlEdge> controls, List<ESGraphValidationIssue> failures)
+        {
+            if (step.fanOut.schemaVersion != 1 || string.IsNullOrWhiteSpace(step.fanOut.fanOutId))
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.FanOut",
+                    "FanOut 必须提供有效的版本和稳定身份。", step.nodeId));
+            int count = controls.Count(edge => edge.sourceNodeId == step.nodeId
+                && edge.sourcePortKey == ESAgentGraphStableIds.SkillFanOutPortKey);
+            if (count < 2)
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.FanOutTargets",
+                    "FanOut 至少需要两个目标分支。", step.nodeId));
+        }
+
+        private static void ValidateBranch(ESAISkillExecutionStep step,
+            List<ESGraphValidationIssue> failures)
+        {
+            if (step.branch.schemaVersion != 1)
+            {
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.Branch",
+                    "条件分支 Payload 版本无效。", step.nodeId));
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(step.branch.valuePath)) return;
+            try
+            {
+                _ = new JObject().SelectToken(step.branch.valuePath, false);
+            }
+            catch (JsonException exception)
+            {
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.BranchPath",
+                    "条件分支 ValuePath 无效：" + exception.Message, step.nodeId));
+            }
+        }
+
+        private static void ValidateJoin(ESAISkillExecutionStep step,
+            List<ESAISkillControlEdge> controls, List<ESGraphValidationIssue> failures)
+        {
+            if (step.join.schemaVersion != 1 || string.IsNullOrWhiteSpace(step.join.joinId))
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.Join",
+                    "Join 必须提供有效的版本和稳定身份。", step.nodeId));
+            int count = controls.Count(edge => edge.targetNodeId == step.nodeId);
+            if (count < 2)
+                failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.JoinInputs",
+                    "Join 至少需要两个控制输入。", step.nodeId));
         }
 
         private static void ValidateInput(ESAISkillExecutionStep step, List<ESGraphValidationIssue> failures)
@@ -811,6 +1214,12 @@ namespace ES.EditorInternal
         public string iterationTaskNodeId = string.Empty;
         public int iterationIndex = -1;
         public JArray iterationItems = new JArray();
+        // FanOut 的各目标按确定顺序执行，并且必须经过同一个 Join 才能继续。
+        public string activeFanOutNodeId = string.Empty;
+        public string activeJoinNodeId = string.Empty;
+        public int fanOutExpectedCount;
+        public int fanOutArrivedCount;
+        public List<string> pendingFanOutNodeIds = new List<string>();
         public JObject inputs = new JObject();
         public JObject values = new JObject();
         public ESAISkillExecutionSpec spec;
@@ -884,6 +1293,11 @@ namespace ES.EditorInternal
                     run = existing;
                     if (!IsTerminal(existing.status) && !Active.ContainsKey(existing.runId))
                     {
+                        if (!TryValidateCurrentSource(existing, out string sourceError))
+                        {
+                            error = "稳定子 AISkill Run 当前不可恢复：" + sourceError;
+                            return false;
+                        }
                         Active.Add(existing.runId, existing);
                         TrySaveActiveRunIds();
                         EnsureUpdateHook();
@@ -962,6 +1376,11 @@ namespace ES.EditorInternal
             if (!TryGet(runId, out ESAISkillWorkflowRun run) || run.status != "WaitingApproval")
             {
                 error = "Run 不存在或当前未等待人工确认。";
+                return false;
+            }
+            if (!TryValidateCurrentSource(run, out string sourceError))
+            {
+                error = "当前 Graph 或执行合同已变化，拒绝批准旧 Run：" + sourceError;
                 return false;
             }
             if (generation != run.approvalGeneration)
@@ -1110,7 +1529,8 @@ namespace ES.EditorInternal
                 if (step == null) { Fail(run, "当前节点不在已烘焙执行合同中。"); return; }
                 if (step.input != null)
                 {
-                    run.values[step.nodeId] = run.inputs.DeepClone();
+                    SetEndpointValue(run, step.nodeId,
+                        ESAgentGraphStableIds.SkillParametersPortKey, run.inputs);
                     CompleteStep(run, step.nodeId, "Completed", "参数已绑定。", run.inputs);
                     Move(run, step.nodeId, ESAgentGraphStableIds.SkillNextPortKey);
                     continue;
@@ -1127,15 +1547,18 @@ namespace ES.EditorInternal
                 }
                 if (step.branch != null)
                 {
-                    JToken value = ResolveBoundValue(run, step.nodeId);
-                    if (!string.IsNullOrWhiteSpace(step.branch.valuePath))
-                        value = value?.SelectToken(step.branch.valuePath, false);
-                    bool matched = string.Equals(value?.ToString() ?? string.Empty,
-                        step.branch.expectedValue ?? string.Empty, step.branch.ignoreCase
-                            ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
-                    CompleteStep(run, step.nodeId, "Completed", matched ? "条件命中。" : "进入默认分支。", value);
-                    Move(run, step.nodeId, matched ? ESAgentGraphStableIds.SkillMatchedPortKey
-                        : ESAgentGraphStableIds.SkillDefaultPortKey);
+                    JToken value = ResolveBoundValue(run, step.nodeId,
+                        ESAgentGraphStableIds.SkillInputPortKey);
+                    if (!TrySelectBranchTarget(run.spec, step, value, out string targetNodeId,
+                            out bool matched, out JToken selectedValue, out string branchError))
+                    {
+                        Fail(run, branchError);
+                        return;
+                    }
+                    CompleteStep(run, step.nodeId, "Completed", matched ? "条件命中。" : "进入默认分支。",
+                        selectedValue);
+                    run.currentNodeId = targetNodeId;
+                    Save(run);
                     continue;
                 }
                 if (step.forEach != null)
@@ -1154,11 +1577,28 @@ namespace ES.EditorInternal
                 }
                 if (step.output != null)
                 {
-                    JToken output = ResolveBoundValue(run, step.nodeId) ?? JValue.CreateNull();
+                    if (!string.IsNullOrWhiteSpace(run.activeFanOutNodeId))
+                    {
+                        Fail(run, "FanOut 分支必须先经过 Join，不能直接结束工作流。");
+                        return;
+                    }
+                    JToken output = ResolveBoundValue(run, step.nodeId,
+                        ESAgentGraphStableIds.SkillInputPortKey)
+                        ?? JValue.CreateNull();
                     run.values[step.output.outputId] = output.DeepClone();
                     CompleteStep(run, step.nodeId, "Completed", "结构化输出已归集。", output);
                     Finish(run, "Completed", "AISkill 工作流执行完成。", 0);
                     return;
+                }
+                if (step.fanOut != null)
+                {
+                    if (!StartFanOut(run, step)) return;
+                    continue;
+                }
+                if (step.join != null)
+                {
+                    if (!EnterJoin(run, step)) return;
+                    continue;
                 }
             }
             if (run.status == "Running")
@@ -1325,7 +1765,10 @@ namespace ES.EditorInternal
                             && racedChild.status == "Completed")
                         {
                             JObject result = BuildChildRunResult(racedChild);
-                            run.values[step.nodeId] = result;
+                            if (!TryPublishDataOutputs(run, step.nodeId,
+                                    ESAgentGraphStableIds.SkillRunResultPortKey, result,
+                                    out string publishError))
+                                return HandleSkillCallFailure(run, step, "Failed", publishError);
                             CompleteStep(run, step.nodeId, "Completed",
                                 "子 AISkill 在取消调用前已完成。", result);
                             Move(run, step.nodeId, ESAgentGraphStableIds.SkillSuccessPortKey);
@@ -1352,7 +1795,10 @@ namespace ES.EditorInternal
             if (current.status == "Completed")
             {
                 JObject result = BuildChildRunResult(current);
-                run.values[step.nodeId] = result;
+                if (!TryPublishDataOutputs(run, step.nodeId,
+                        ESAgentGraphStableIds.SkillRunResultPortKey, result,
+                        out string publishError))
+                    return HandleSkillCallFailure(run, step, "Failed", publishError);
                 CompleteStep(run, step.nodeId, "Completed", "子 AISkill 执行完成。", result);
                 if (string.Equals(run.iterationTaskNodeId, step.nodeId, StringComparison.Ordinal))
                 {
@@ -1384,6 +1830,65 @@ namespace ES.EditorInternal
                 ["outputHashes"] = new JArray((child.steps ?? new List<ESAISkillStepRunRecord>())
                     .Where(item => item != null).SelectMany(item => item.outputHashes ?? Array.Empty<string>()))
             };
+        }
+
+        internal static bool TryPublishDataOutputs(ESAISkillWorkflowRun run, string nodeId,
+            string singlePortKey, JToken value, out string error)
+        {
+            ESAISkillExecutionStep step = FindStep(run, nodeId);
+            string[] portKeys = (step?.ports ?? Array.Empty<ESAISkillExecutionPort>())
+                .Where(port => port != null && port.direction == ESGraphPortDirection.Output
+                    && !string.Equals(port.valueTypeId, ESAgentGraphStableIds.SkillControlPort,
+                        StringComparison.Ordinal))
+                .Select(port => port.portKey)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(key => key, StringComparer.Ordinal).ToArray();
+            string[] connectedPortKeys = (run?.spec?.dataBindings
+                    ?? Array.Empty<ESAISkillDataBinding>())
+                .Where(binding => binding != null && binding.sourceNodeId == nodeId
+                    && !string.IsNullOrWhiteSpace(binding.sourcePortKey))
+                .Select(binding => binding.sourcePortKey)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(key => key, StringComparer.Ordinal).ToArray();
+            if (portKeys.Length == 0)
+            {
+                error = "节点没有声明可发布的数据输出端点。";
+                return false;
+            }
+            if (connectedPortKeys.Any(key => !portKeys.Contains(key, StringComparer.Ordinal)))
+            {
+                error = "值关系引用了节点未声明的数据输出端点。";
+                return false;
+            }
+            if (portKeys.Length == 1)
+            {
+                if (!string.Equals(portKeys[0], singlePortKey, StringComparison.Ordinal))
+                {
+                    error = "节点单一数据输出端点与执行器声明不一致：" + portKeys[0];
+                    return false;
+                }
+                SetEndpointValue(run, nodeId, portKeys[0], value);
+                error = string.Empty;
+                return true;
+            }
+
+            JObject fields = value as JObject;
+            JObject nested = fields?["outputs"] as JObject;
+            var outputValues = new Dictionary<string, JToken>(StringComparer.Ordinal);
+            foreach (string portKey in portKeys)
+            {
+                JToken field = fields?[portKey] ?? nested?[portKey];
+                if (field == null)
+                {
+                    error = "节点有多个独立输出端点，但产物没有提供对应字段：" + portKey;
+                    return false;
+                }
+                outputValues.Add(portKey, field);
+            }
+            foreach (KeyValuePair<string, JToken> output in outputValues)
+                SetEndpointValue(run, nodeId, output.Key, output.Value);
+            error = string.Empty;
+            return true;
         }
 
         internal static bool CanEnterSkillCall(int currentDepth)
@@ -1423,6 +1928,12 @@ namespace ES.EditorInternal
             ESAISkillExecutionStep step, string status, string message)
         {
             status = NormalizeTaskFailureStatus(status);
+            if (ShouldStopFanOutOnFailure(run))
+            {
+                CompleteStep(run, step.nodeId, status, message);
+                Fail(run, "FanOut 分支失败，已按 stopOnFailure 终止：" + (message ?? status));
+                return false;
+            }
             CompleteStep(run, step.nodeId, status, message);
             if (string.Equals(run.iterationTaskNodeId, step.nodeId, StringComparison.Ordinal))
             {
@@ -1457,7 +1968,7 @@ namespace ES.EditorInternal
                                 : null;
                         break;
                     default:
-                        value = ResolveBoundValue(run, targetNodeId);
+                        value = ResolveBoundValue(run, targetNodeId, binding.sourceId);
                         break;
                 }
                 if (value != null && !string.IsNullOrWhiteSpace(binding.sourcePath))
@@ -1477,7 +1988,11 @@ namespace ES.EditorInternal
         private static bool HandleTaskTerminal(ESAISkillWorkflowRun run, ESAISkillExecutionStep step,
             ES.ESAutomationTaskInvocationResult result)
         {
-            run.values[step.nodeId] = result.data?.DeepClone() ?? new JObject();
+            JToken taskData = result.data?.DeepClone() ?? new JObject();
+            if (!TryPublishDataOutputs(run, step.nodeId,
+                    ESAgentGraphStableIds.SkillRunResultPortKey, taskData,
+                    out string publishError))
+                return HandleSkillDataPublicationFailure(run, step, publishError);
             CompleteStep(run, step.nodeId, "Completed", result.message, result.data);
             if (string.Equals(run.iterationTaskNodeId, step.nodeId, StringComparison.Ordinal))
             {
@@ -1489,6 +2004,19 @@ namespace ES.EditorInternal
                 return false;
             }
             Move(run, step.nodeId, ESAgentGraphStableIds.SkillSuccessPortKey);
+            return false;
+        }
+
+        private static bool HandleSkillDataPublicationFailure(ESAISkillWorkflowRun run,
+            ESAISkillExecutionStep step, string message)
+        {
+            CompleteStep(run, step.nodeId, "Failed", message);
+            if (ShouldStopFanOutOnFailure(run))
+            {
+                Fail(run, "节点输出端点解析失败，FanOut 已终止：" + message);
+                return false;
+            }
+            Move(run, step.nodeId, ESAgentGraphStableIds.SkillFailurePortKey);
             return false;
         }
 
@@ -1512,6 +2040,11 @@ namespace ES.EditorInternal
                 return true;
             }
             CompleteStep(run, step.nodeId, status ?? "Failed", message);
+            if (ShouldStopFanOutOnFailure(run))
+            {
+                Fail(run, "FanOut 分支失败，已按 stopOnFailure 终止：" + (message ?? status));
+                return false;
+            }
             if (string.Equals(run.iterationTaskNodeId, step.nodeId, StringComparison.Ordinal))
             {
                 string owner = run.iterationNodeId;
@@ -1552,7 +2085,8 @@ namespace ES.EditorInternal
         {
             if (!string.Equals(run.iterationNodeId, step.nodeId, StringComparison.Ordinal))
             {
-                JToken source = ResolveBoundValue(run, step.nodeId);
+            JToken source = ResolveBoundValue(run, step.nodeId,
+                ESAgentGraphStableIds.SkillItemsPortKey);
                 if (!string.IsNullOrWhiteSpace(step.forEach.itemsPath))
                     source = source?.SelectToken(step.forEach.itemsPath, false);
                 JArray items = source as JArray;
@@ -1592,43 +2126,345 @@ namespace ES.EditorInternal
                 Move(run, step.nodeId, ESAgentGraphStableIds.SkillCompletedPortKey);
                 return true;
             }
-            run.values[step.nodeId] = run.iterationItems[run.iterationIndex].DeepClone();
+            SetEndpointValue(run, step.nodeId, ESAgentGraphStableIds.SkillItemValuePortKey,
+                run.iterationItems[run.iterationIndex]);
             run.currentNodeId = run.iterationTaskNodeId;
             Save(run);
             return true;
         }
 
-        private static JToken ResolveBoundValue(ESAISkillWorkflowRun run, string targetNodeId)
+        internal static string EndpointValueKey(string nodeId, string portKey)
+            => (nodeId ?? string.Empty) + "\n" + (portKey ?? string.Empty);
+
+        private static void SetEndpointValue(ESAISkillWorkflowRun run, string nodeId,
+            string portKey, JToken value)
         {
-            ESAISkillDataBinding[] bindings = run.spec.dataBindings
-                .Where(binding => binding.targetNodeId == targetNodeId)
-                .OrderBy(binding => binding.edgeId, StringComparer.Ordinal).ToArray();
+            if (run == null || string.IsNullOrWhiteSpace(nodeId)) return;
+            if (run.values == null) run.values = new JObject();
+            JToken clone = value?.DeepClone() ?? JValue.CreateNull();
+            run.values[EndpointValueKey(nodeId, portKey)] = clone;
+        }
+
+        private static JToken GetEndpointValue(ESAISkillWorkflowRun run, string nodeId,
+            string portKey)
+        {
+            if (run?.values == null) return null;
+            return run.values[EndpointValueKey(nodeId, portKey)];
+        }
+
+        internal static JToken ResolveBoundValue(ESAISkillWorkflowRun run, string targetNodeId,
+            string targetPortKey = null)
+        {
+            ESAISkillDataBinding[] bindings = (run?.spec?.dataBindings
+                ?? Array.Empty<ESAISkillDataBinding>())
+                .Where(binding => binding.targetNodeId == targetNodeId
+                    && (string.IsNullOrWhiteSpace(targetPortKey)
+                        || string.Equals(binding.targetPortKey, targetPortKey,
+                            StringComparison.Ordinal)))
+                .OrderBy(binding => binding.order)
+                .ThenBy(binding => binding.edgeId, StringComparer.Ordinal).ToArray();
             if (bindings.Length == 0) return null;
-            if (bindings.Length == 1) return run.values[bindings[0].sourceNodeId];
+
+            var groups = bindings.GroupBy(binding => binding.targetPortKey ?? string.Empty)
+                .OrderBy(group => group.Key, StringComparer.Ordinal).ToArray();
+            if (string.IsNullOrWhiteSpace(targetPortKey) && groups.Length > 1)
+            {
+                var byPort = new JObject();
+                foreach (IGrouping<string, ESAISkillDataBinding> group in groups)
+                    byPort[group.Key] = ResolveBindingValues(run, group);
+                return byPort;
+            }
+            return ResolveBindingValues(run, groups[0]);
+        }
+
+        private static JToken ResolveBindingValues(ESAISkillWorkflowRun run,
+            IEnumerable<ESAISkillDataBinding> bindings)
+        {
+            ESAISkillDataBinding[] ordered = bindings.OrderBy(binding => binding.order)
+                .ThenBy(binding => binding.edgeId, StringComparer.Ordinal).ToArray();
+            ESGraphPortAggregation aggregation = ordered
+                .Select(binding => binding.targetAggregation)
+                .FirstOrDefault(value => value != ESGraphPortAggregation.Auto);
+            if (aggregation == ESGraphPortAggregation.Single)
+            {
+                return ordered.Length == 1
+                    ? GetEndpointValue(run, ordered[0].sourceNodeId, ordered[0].sourcePortKey)
+                        ?.DeepClone() ?? JValue.CreateNull()
+                    : null;
+            }
+            if (aggregation == ESGraphPortAggregation.Named)
+            {
+                var named = new JObject();
+                foreach (IGrouping<string, ESAISkillDataBinding> group in ordered.GroupBy(
+                    BindingName, StringComparer.Ordinal))
+                {
+                    JToken value = group.Count() == 1
+                        ? GetEndpointValue(run, group.First().sourceNodeId, group.First().sourcePortKey)
+                        : new JArray(group.Select(binding =>
+                            GetEndpointValue(run, binding.sourceNodeId, binding.sourcePortKey)
+                                ?.DeepClone() ?? JValue.CreateNull()));
+                    named[group.Key] = value?.DeepClone() ?? JValue.CreateNull();
+                }
+                return named;
+            }
+            if (aggregation != ESGraphPortAggregation.Ordered)
+                return null;
             var values = new JArray();
-            foreach (ESAISkillDataBinding binding in bindings)
-                values.Add(run.values[binding.sourceNodeId]?.DeepClone() ?? JValue.CreateNull());
+            foreach (ESAISkillDataBinding binding in ordered)
+                values.Add(GetEndpointValue(run, binding.sourceNodeId, binding.sourcePortKey)
+                    ?.DeepClone() ?? JValue.CreateNull());
             return values;
         }
 
+        private static string BindingName(ESAISkillDataBinding binding)
+            => (binding?.sourceNodeId ?? string.Empty) + "/"
+                + (binding?.sourcePortKey ?? string.Empty);
+
         private static void Move(ESAISkillWorkflowRun run, string sourceNodeId, string portKey)
         {
-            string target = ResolveRoute(run, sourceNodeId, portKey);
-            if (string.IsNullOrWhiteSpace(target))
+            if (!TryResolveSingleRouteTarget(run?.spec, sourceNodeId, portKey,
+                    out string targetNodeId, out string error))
             {
-                Fail(run, "控制出口未连接：" + portKey);
+                Fail(run, error);
                 return;
             }
-            run.currentNodeId = target;
+            run.currentNodeId = targetNodeId;
             Save(run);
         }
 
         private static string ResolveRoute(ESAISkillWorkflowRun run, string nodeId, string portKey)
-            => run.spec.controlEdges.FirstOrDefault(edge => edge.sourceNodeId == nodeId
-                && edge.sourcePortKey == portKey)?.targetNodeId ?? string.Empty;
+        {
+            if (!TryResolveSingleRouteTarget(run?.spec, nodeId, portKey,
+                    out string targetNodeId, out string error))
+            {
+                Fail(run, error);
+                return string.Empty;
+            }
+            return targetNodeId;
+        }
+
+        internal static bool TryResolveSingleRouteTarget(ESAISkillExecutionSpec spec,
+            string sourceNodeId, string sourcePortKey, out string targetNodeId, out string error)
+        {
+            targetNodeId = string.Empty;
+            if (spec == null || !ESGraphIdentity.IsValid(sourceNodeId)
+                || !ESGraphStableIdUtility.IsValid(sourcePortKey))
+            {
+                error = "控制路线缺少有效的源节点或端点身份。";
+                return false;
+            }
+
+            ESAISkillControlEdge[] routes = (spec.controlEdges
+                    ?? Array.Empty<ESAISkillControlEdge>())
+                .Where(edge => edge != null
+                    && string.Equals(edge.sourceNodeId, sourceNodeId, StringComparison.Ordinal)
+                    && string.Equals(edge.sourcePortKey, sourcePortKey, StringComparison.Ordinal))
+                .OrderBy(edge => edge.order)
+                .ThenBy(edge => edge.edgeId, StringComparer.Ordinal).ToArray();
+            if (routes.Length == 0)
+            {
+                error = "控制出口未连接：" + sourcePortKey;
+                return false;
+            }
+            if (routes.Length > 1)
+            {
+                error = "控制出口只能连接一个目标；需要执行多个目标时请使用 FanOut："
+                    + sourcePortKey;
+                return false;
+            }
+
+            ESAISkillControlEdge route = routes[0];
+            ESAISkillExecutionStep[] sourceSteps = (spec.steps
+                    ?? Array.Empty<ESAISkillExecutionStep>())
+                .Where(step => step != null
+                    && string.Equals(step.nodeId, sourceNodeId, StringComparison.Ordinal))
+                .ToArray();
+            ESAISkillExecutionStep[] targetSteps = (spec.steps
+                    ?? Array.Empty<ESAISkillExecutionStep>())
+                .Where(step => step != null
+                    && string.Equals(step.nodeId, route.targetNodeId, StringComparison.Ordinal))
+                .ToArray();
+            ESAISkillExecutionPort sourcePort = null;
+            ESAISkillExecutionPort targetPort = null;
+            bool hasSourcePort = sourceSteps.Length == 1 && TryGetStepPort(sourceSteps[0],
+                sourcePortKey, out sourcePort);
+            bool hasTargetPort = targetSteps.Length == 1 && TryGetStepPort(targetSteps[0],
+                route.targetPortKey, out targetPort);
+            if (!ESGraphIdentity.IsValid(route.edgeId)
+                || !ESGraphIdentity.IsValid(route.sourcePortId)
+                || !ESGraphIdentity.IsValid(route.targetNodeId)
+                || !ESGraphIdentity.IsValid(route.targetPortId)
+                || !ESGraphStableIdUtility.IsValid(route.targetPortKey)
+                || !hasSourcePort || !hasTargetPort
+                || sourcePort.direction != ESGraphPortDirection.Output
+                || targetPort.direction != ESGraphPortDirection.Input
+                || !string.Equals(sourcePort.portId, route.sourcePortId,
+                    StringComparison.Ordinal)
+                || !string.Equals(targetPort.portId, route.targetPortId,
+                    StringComparison.Ordinal)
+                || !string.Equals(sourcePort.meaning, route.sourceMeaning,
+                    StringComparison.Ordinal)
+                || !string.Equals(targetPort.meaning, route.targetMeaning,
+                    StringComparison.Ordinal)
+                || !string.Equals(sourcePort.valueTypeId,
+                    ESAgentGraphStableIds.SkillControlPort, StringComparison.Ordinal)
+                || !string.Equals(targetPort.valueTypeId,
+                    ESAgentGraphStableIds.SkillControlPort, StringComparison.Ordinal))
+            {
+                error = "控制路线目标端点不存在或身份无效：" + sourcePortKey;
+                return false;
+            }
+
+            targetNodeId = route.targetNodeId;
+            error = string.Empty;
+            return true;
+        }
+
+        internal static bool TrySelectBranchTarget(ESAISkillExecutionSpec spec,
+            ESAISkillExecutionStep step, JToken value, out string targetNodeId, out bool matched,
+            out JToken selectedValue, out string error)
+        {
+            targetNodeId = string.Empty;
+            matched = false;
+            selectedValue = value;
+            if (step?.branch == null || step.branch.schemaVersion != 1)
+            {
+                error = "条件分支缺少有效 Payload。";
+                return false;
+            }
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(step.branch.valuePath))
+                    selectedValue = value?.SelectToken(step.branch.valuePath, false);
+            }
+            catch (JsonException exception)
+            {
+                error = "条件分支 ValuePath 无效：" + exception.Message;
+                return false;
+            }
+
+            matched = selectedValue != null && selectedValue.Type != JTokenType.Null
+                && string.Equals(selectedValue.ToString(), step.branch.expectedValue ?? string.Empty,
+                    step.branch.ignoreCase ? StringComparison.OrdinalIgnoreCase
+                        : StringComparison.Ordinal);
+            string portKey = matched ? ESAgentGraphStableIds.SkillMatchedPortKey
+                : ESAgentGraphStableIds.SkillDefaultPortKey;
+            return TryResolveSingleRouteTarget(spec, step.nodeId, portKey,
+                out targetNodeId, out error);
+        }
+
+        private static bool TryGetStepPort(ESAISkillExecutionStep step, string portKey,
+            out ESAISkillExecutionPort port)
+        {
+            port = null;
+            if (step?.ports == null || !ESGraphStableIdUtility.IsValid(portKey))
+                return false;
+            for (int i = 0; i < step.ports.Length; i++)
+            {
+                ESAISkillExecutionPort candidate = step.ports[i];
+                if (candidate == null || !string.Equals(candidate.portKey, portKey,
+                        StringComparison.Ordinal))
+                    continue;
+                if (port != null)
+                {
+                    port = null;
+                    return false;
+                }
+                port = candidate;
+            }
+            return port != null;
+        }
+
+        private static ESAISkillControlEdge[] ResolveRoutes(ESAISkillWorkflowRun run,
+            string nodeId, string portKey)
+            => (run?.spec?.controlEdges ?? Array.Empty<ESAISkillControlEdge>())
+                .Where(edge => edge != null && edge.sourceNodeId == nodeId
+                    && edge.sourcePortKey == portKey)
+                .OrderBy(edge => edge.order)
+                .ThenBy(edge => edge.edgeId, StringComparer.Ordinal).ToArray();
+
+        private static bool StartFanOut(ESAISkillWorkflowRun run, ESAISkillExecutionStep step)
+        {
+            if (!string.IsNullOrWhiteSpace(run.activeFanOutNodeId))
+            {
+                Fail(run, "不支持嵌套 FanOut，当前分支尚未汇合。");
+                return false;
+            }
+            ESAISkillControlEdge[] routes = ResolveRoutes(run, step.nodeId,
+                ESAgentGraphStableIds.SkillFanOutPortKey);
+            if (routes.Length < 2)
+            {
+                Fail(run, "FanOut 至少需要两个有效目标分支。");
+                return false;
+            }
+            run.activeFanOutNodeId = step.nodeId;
+            run.activeJoinNodeId = string.Empty;
+            run.fanOutExpectedCount = routes.Length;
+            run.fanOutArrivedCount = 0;
+            run.pendingFanOutNodeIds = routes.Skip(1).Select(route => route.targetNodeId).ToList();
+            run.currentNodeId = routes[0].targetNodeId;
+            BeginStep(run, step.nodeId);
+            CompleteStep(run, step.nodeId, "Completed", "已创建 " + routes.Length + " 个串行分支。");
+            Save(run);
+            return true;
+        }
+
+        private static bool EnterJoin(ESAISkillWorkflowRun run, ESAISkillExecutionStep step)
+        {
+            if (string.IsNullOrWhiteSpace(run.activeFanOutNodeId))
+            {
+                Fail(run, "Join 未收到活动 FanOut 分支。");
+                return false;
+            }
+            if (!string.IsNullOrWhiteSpace(run.activeJoinNodeId)
+                && !string.Equals(run.activeJoinNodeId, step.nodeId, StringComparison.Ordinal))
+            {
+                Fail(run, "同一 FanOut 不能汇合到多个 Join。");
+                return false;
+            }
+            run.activeJoinNodeId = step.nodeId;
+            BeginStep(run, step.nodeId);
+            run.fanOutArrivedCount++;
+            if (run.fanOutArrivedCount < run.fanOutExpectedCount)
+            {
+                string next = run.pendingFanOutNodeIds?.FirstOrDefault() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(next))
+                {
+                    Fail(run, "FanOut 分支数量与 Join 到达数量不一致。");
+                    return false;
+                }
+                run.pendingFanOutNodeIds.RemoveAt(0);
+                run.currentNodeId = next;
+                CompleteStep(run, step.nodeId, "WaitingBranches",
+                    "已汇合 " + run.fanOutArrivedCount + "/" + run.fanOutExpectedCount + " 个分支。");
+                Save(run);
+                return true;
+            }
+            if ((run.pendingFanOutNodeIds?.Count ?? 0) != 0)
+            {
+                Fail(run, "Join 已达到预期数量但仍存在未调度分支。");
+                return false;
+            }
+            CompleteStep(run, step.nodeId, "Completed",
+                "全部 " + run.fanOutExpectedCount + " 个分支已汇合。");
+            run.activeFanOutNodeId = string.Empty;
+            run.activeJoinNodeId = string.Empty;
+            run.fanOutExpectedCount = 0;
+            run.fanOutArrivedCount = 0;
+            run.pendingFanOutNodeIds = new List<string>();
+            Move(run, step.nodeId, ESAgentGraphStableIds.SkillJoinPortKey);
+            return true;
+        }
+
+        private static bool ShouldStopFanOutOnFailure(ESAISkillWorkflowRun run)
+        {
+            if (string.IsNullOrWhiteSpace(run?.activeFanOutNodeId)) return false;
+            ESAISkillExecutionStep fanOut = FindStep(run, run.activeFanOutNodeId);
+            return fanOut?.fanOut?.stopOnFailure == true;
+        }
 
         private static ESAISkillExecutionStep FindStep(ESAISkillWorkflowRun run, string nodeId)
-            => run.spec?.steps?.FirstOrDefault(step => step.nodeId == nodeId);
+            => run?.spec?.steps?.FirstOrDefault(step => step != null && step.nodeId == nodeId);
 
         private static ESAISkillStepRunRecord FindStepRecord(ESAISkillWorkflowRun run, string nodeId)
             => run.steps.FirstOrDefault(step => step.nodeId == nodeId);
@@ -1791,7 +2627,13 @@ namespace ES.EditorInternal
                     if (step.skillCall != null)
                     {
                         JObject result = BuildChildRunResult(childRun);
-                        run.values[step.nodeId] = result;
+                        if (!TryPublishDataOutputs(run, step.nodeId,
+                                ESAgentGraphStableIds.SkillRunResultPortKey, result,
+                                out string publishError))
+                        {
+                            HandleSkillCallFailure(run, step, "Failed", publishError);
+                            return;
+                        }
                         CompleteStep(run, step.nodeId, "Completed",
                             "子 AISkill 在取消生效前已完成。", result);
                         Move(run, step.nodeId, ESAgentGraphStableIds.SkillSuccessPortKey);
@@ -1829,12 +2671,8 @@ namespace ES.EditorInternal
             out JObject normalized, out string error)
         {
             normalized = values == null ? new JObject() : (JObject)values.DeepClone();
-            if (spec == null || !ESGraphIdentity.IsValid(spec.sourceGraphId)
-                || !ES.ESAutomationWorkerRegistration.IsSha256(spec.sourceContentSignature))
-            {
-                error = "执行合同缺少有效 GraphId 或内容签名。";
+            if (!ESAISkillExecutionBaker.TryValidateSpec(spec, out error))
                 return false;
-            }
             foreach (ESAISkillParameter parameter in spec.parameters ?? Array.Empty<ESAISkillParameter>())
             {
                 JToken value = normalized[parameter.parameterId];
@@ -1989,6 +2827,7 @@ namespace ES.EditorInternal
                 run = JsonConvert.DeserializeObject<ESAISkillWorkflowRun>(File.ReadAllText(path,
                     new System.Text.UTF8Encoding(false, true)));
                 if (run == null || run.schemaVersion != 1 || run.spec == null
+                    || run.spec.schemaVersion != ESAISkillExecutionSpec.CurrentSchemaVersion
                     || !string.Equals(run.graphId, run.spec.sourceGraphId, StringComparison.Ordinal)
                     || !string.Equals(run.contentSignature, run.spec.sourceContentSignature, StringComparison.Ordinal))
                     throw new InvalidDataException("RunRecord 与内嵌执行合同不一致。");
@@ -2164,7 +3003,8 @@ namespace ES.EditorInternal
         internal static bool TryValidateRunState(ESAISkillWorkflowRun run, out string error)
         {
             if (run == null || !Guid.TryParseExact(run.runId, "N", out _)
-                || run.spec?.steps == null)
+                || run.spec?.schemaVersion != ESAISkillExecutionSpec.CurrentSchemaVersion
+                || run.spec.steps == null)
             {
                 error = "缺少有效 RunId 或执行步骤。";
                 return false;
@@ -2211,6 +3051,52 @@ namespace ES.EditorInternal
                 error = "ForEach 游标与节点身份不一致。";
                 return false;
             }
+            bool branching = !string.IsNullOrWhiteSpace(run.activeFanOutNodeId);
+            if (branching)
+            {
+                ESAISkillExecutionStep fanOut = FindStep(run, run.activeFanOutNodeId);
+                ESAISkillControlEdge[] declaredRoutes = ResolveRoutes(run,
+                    run.activeFanOutNodeId, ESAgentGraphStableIds.SkillFanOutPortKey);
+                string[] expectedPendingTargets = declaredRoutes
+                    .Skip(run.fanOutArrivedCount + 1)
+                    .Select(route => route.targetNodeId).ToArray();
+                if (fanOut?.fanOut == null
+                    || run.fanOutExpectedCount < 2
+                    || declaredRoutes.Length != run.fanOutExpectedCount
+                    || run.fanOutArrivedCount < 0
+                    || run.fanOutArrivedCount >= run.fanOutExpectedCount
+                    || run.pendingFanOutNodeIds == null
+                    || !run.pendingFanOutNodeIds.SequenceEqual(expectedPendingTargets,
+                        StringComparer.Ordinal))
+                {
+                    error = "FanOut 活动多目标状态与执行合同不一致。";
+                    return false;
+                }
+                string currentBranchStart = declaredRoutes[run.fanOutArrivedCount].targetNodeId;
+                HashSet<string> currentBranchScope = CollectFanOutBranchScope(run.spec,
+                    currentBranchStart, out HashSet<string> reachableJoins);
+                if (!currentBranchScope.Contains(run.currentNodeId)
+                    || reachableJoins.Count != 1)
+                {
+                    error = "FanOut 当前节点不属于正在执行的合同分支，或该分支缺少唯一 Join。";
+                    return false;
+                }
+                string expectedJoinNodeId = reachableJoins.Single();
+                if (!string.IsNullOrWhiteSpace(run.activeJoinNodeId)
+                    && !string.Equals(run.activeJoinNodeId, expectedJoinNodeId,
+                        StringComparison.Ordinal))
+                {
+                    error = "活动 Join 与 FanOut 合同声明的唯一 Join 不一致。";
+                    return false;
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(run.activeJoinNodeId)
+                || run.fanOutExpectedCount != 0 || run.fanOutArrivedCount != 0
+                || (run.pendingFanOutNodeIds?.Count ?? 0) != 0)
+            {
+                error = "非活动 FanOut 不应携带分支续点状态。";
+                return false;
+            }
             foreach (ESAISkillStepRunRecord step in run.steps)
             {
                 if (!string.IsNullOrWhiteSpace(step.invocationId)
@@ -2239,6 +3125,38 @@ namespace ES.EditorInternal
             }
             error = string.Empty;
             return true;
+        }
+
+        private static HashSet<string> CollectFanOutBranchScope(ESAISkillExecutionSpec spec,
+            string startNodeId, out HashSet<string> reachableJoins)
+        {
+            reachableJoins = new HashSet<string>(StringComparer.Ordinal);
+            var scope = new HashSet<string>(StringComparer.Ordinal);
+            var steps = (spec?.steps ?? Array.Empty<ESAISkillExecutionStep>())
+                .Where(step => step != null)
+                .GroupBy(step => step.nodeId, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            var outgoing = (spec?.controlEdges ?? Array.Empty<ESAISkillControlEdge>())
+                .Where(edge => edge != null)
+                .GroupBy(edge => edge.sourceNodeId, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+            var queue = new Queue<string>();
+            queue.Enqueue(startNodeId ?? string.Empty);
+            while (queue.Count > 0)
+            {
+                string nodeId = queue.Dequeue();
+                if (!scope.Add(nodeId) || !steps.TryGetValue(nodeId, out ESAISkillExecutionStep step))
+                    continue;
+                if (step.join != null)
+                {
+                    reachableJoins.Add(nodeId);
+                    continue;
+                }
+                if (outgoing.TryGetValue(nodeId, out ESAISkillControlEdge[] routes))
+                    foreach (ESAISkillControlEdge route in routes)
+                        queue.Enqueue(route.targetNodeId);
+            }
+            return scope;
         }
 
         private static void TrySaveActiveRunIds()

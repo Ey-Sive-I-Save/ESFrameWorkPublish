@@ -1,33 +1,21 @@
 # Agent Skills 与 AICommands 协作边界 AI 协作警告
 
 > 状态：现行约束 + 已实现事实 + 后续能力展望。
-> 最后核对：2026-08-03。
+> 最后核对：2026-08-16。
 > 适用范围：`.agents/skills`、`Assets/Plugins/ES/AICommands`、`Assets/Plugins/ES/AIWarnings`、UnityMCP、确定性验证脚本。
 
 ## 当前结论
 
-ESFramework 已采用项目级 Agent Skills：
+ESFramework 已采用项目级 Agent Skills。目录结构而非手写数量清单是发现权威：
 
 ```text
 .agents/skills/
-├── es-codex-session-bootstrap/
-├── es-command-authoring/
-├── es-editor-tooling/
-├── es-entity-authoring/
-├── es-use-ai-command/
-├── es-gamecore-integration/
-├── es-input-action/
-├── es-module-lifecycle/
-├── es-unity-compile/
-├── es-fix-compile-error/
-├── es-release-acceptance/
-├── es-resource-pipeline/
-├── es-tag-config/
-├── es-utf8-guard/
-└── es-worktree-audit/
+└── <skill-name>/
+    ├── SKILL.md                 名称、触发边界与完整工作流权威
+    └── agents/openai.yaml       可发现元数据
 ```
 
-`.agents/skills` 是 Codex 支持的项目级 Skill 发现位置。它位于 Unity `Assets` 外，不由 AssetDatabase 导入，不生成 Unity `.meta`，也不得进入 AssetBundle、ResourcePlan 或 Player 发布内容。Codex 应从项目根启动；当前会话未发现新 Skill 时，需要新开项目窗口或重启，不能因此声称 Skill 不存在。
+`.agents/skills` 是 Codex 支持的项目级 Skill 发现位置。它位于 Unity `Assets` 外，不由 AssetDatabase 导入，不生成 Unity `.meta`，也不得进入 AssetBundle、ResourcePlan 或 Player 发布内容。Codex 应从项目根启动；当注入清单遗漏一个明显匹配的项目 Skill 时，必须报告“清单注入缺口”并直接核对项目内对应 `SKILL.md`。新开窗口或重启只用于刷新发现状态，不能作为 Skill 不存在的证据。
 
 四类协作入口职责不同：
 
@@ -56,7 +44,7 @@ AIWarnings 在该链路中也必须按任务加载：先读取入口、当前状
 | Skill | 当前能力 | 典型 AICommand 或任务 |
 |---|---|---|
 | `$es-codex-session-bootstrap` | 从固定项目根启动新 Codex、恢复或分叉已保存会话，并注入最小只读初始化提示 | 打开新 Codex、开启新对话、恢复对话、分叉会话、初始化 Codex、接手项目 |
-| `$es-use-ai-command` | 校验 53 个命令的 UTF-8、元数据和项目路径；选择并执行一个命令 | 用户发送 AICommand 路径、要求选择命令、进入项目任务 |
+| `$es-use-ai-command` | 校验 AICommand 的 UTF-8、元数据、目录和项目路径；选择并执行一个命令 | 用户发送 AICommand 路径、要求选择命令、进入项目任务 |
 | `$es-unity-compile` | 区分 `.csproj`、Unity Console、Domain Reload、Test Runner、PlayMode、Profiler、IL2CPP 和发布证据 | `检查_编译错误定位`、`编译与ReloadDomain内存_检查`、程序集或 Unity 验收 |
 | `$es-fix-compile-error` | 只定位、最小修复并验证一个明确编译错误 | `执行_修复单个编译错误_AI命令.md` |
 | `$es-utf8-guard` | 严格 UTF-8、U+FFFD、疑似乱码与 scoped `git diff --check` | `检查_中文编码风险_AI命令.md`、所有文本修改 |
@@ -70,6 +58,11 @@ AIWarnings 在该链路中也必须按任务加载：先读取入口、当前状
 | `$es-editor-tooling` | 开发 ReloadDomain 安全的窗口、Drawer、ESEditorSection、SO 表格和预览工具 | 编辑器窗口、序列化、预览、ReloadDomain 与 SimpleTools |
 | `$es-release-acceptance` | 建立源码、Unity、测试、Profiler、Player、IL2CPP、Provider 和发布证据矩阵 | 发布、性能、资源生命周期与外部交付复核 |
 | `$es-module-lifecycle` | 分类模块成熟度，审计默认激活和依赖渗透，并在用户确认后维护可失效的续接检查点 | `检查_模块成熟度与半成品影响_AI命令.md`、模块交付争议、重构前审计与跨窗口恢复 |
+| `$es-first-principles-analysis` | 从事实、约束、权威和失败机制推导复杂方案 | 根因分析、复杂架构设计和设计到实现 |
+| `$es-adversarial-review` | 对已完成方案、代码或交付执行只读反向验证 | 风险、漏洞、代码审查和商业可行性复核 |
+| `$es-generate-agent-artifacts` | 从 Agent Authoring Graph 请求生成隔离的 AICommand/AISkill 候选包 | Graph 生成 AICommand 或项目 Agent Skill 候选 |
+| `$es-start-estest` | 通过现有 Unity/Player/公开入口启动、监控或取消 ESTEST | 运行 ESAITest、ESTEST 或测试计划 |
+| `$es-publish-aitest-prompt` | 向运行中的 ESAITest AI 投递一次性优先消息 | 通知测试 AI、补充当前测试要求 |
 
 命令与 Skill 不是一对一关系。一个命令可以组合多个 Skill，例如修复 Unity 编译错误通常依次使用：
 
@@ -85,15 +78,15 @@ $es-worktree-audit
 
 ## 当前已实现事实
 
-- 十四个 Skill 均包含官方格式 `SKILL.md` 与 `agents/openai.yaml`。
-- 五个基础 Skill 提供 AICommand、编译、单错误修复、UTF-8 和工作树通用能力；一个跨系统治理 Skill 负责模块成熟度、半成品影响与受控续接检查点；八个 ES 领域 Skill 提供 GameCore、资源、Tag/Config、Entity、输入、ESCommand、编辑器工具与发布验收工作流。
+- 2026-08-16 的项目目录快照包含 20 个 Skill，均有 `SKILL.md` 与 `agents/openai.yaml`；该数字只用于本次对账，后续发现仍以实际目录为准。
+- 当前能力覆盖会话交接、AICommand、编译与单错误修复、UTF-8、工作树、复杂分析、反向审查、Agent 候选生成、ESTEST 调度，以及 GameCore、资源、Tag/Config、Entity、输入、ESCommand、编辑器工具、模块治理和发布验收。
 - `$es-unity-compile` 与 `$es-release-acceptance` 声明 `unityMCP` 依赖，服务地址为 `http://127.0.0.1:8080/mcp`。
 - 已提供四个确定性 PowerShell 脚本：AICommand 校验、显式 `.csproj` 构建、UTF-8 守卫和工作树审计。
 - PowerShell 脚本源码保持 ASCII，避免 Windows PowerShell 5.1 将无 BOM UTF-8 中文脚本按本地代码页解析；中文说明保留在 `SKILL.md` 和项目文档中。
-- 原有十三个 Skill 已通过官方 `quick_validate.py`；`$es-module-lifecycle` 与 `$es-codex-session-bootstrap` 已完成官方格式等价结构检查，但当前终端找不到可运行的 Python/uv，尚未取得 `quick_validate.py` 实跑证据。会话启动脚本已在 Windows PowerShell 5.1 下完成 New、Resume、Fork 与 Validate 四种 dry-run；未在验证时弹出真实交互窗口。
-- AICommand 校验最近实跑结果为 53 个命令、0 个无效引用。
+- 旧批次的 `quick_validate.py` 结果不能自动覆盖新增或修改后的 Skill；每个变更仍须重新执行官方验证。当前机器可发现 `uv`，但“工具存在”不等于全部 Skill 已重新验证。
+- 2026-08-16 的 AICommand 校验实跑结果为 54 个合同、2 个导航入口、目录 54 条、0 个无效项。
 
-八个领域 Skill 和一个跨系统治理 Skill 当前提供的是正式可发现的项目导航、工作流、边界与交付协议，不等于其涉及的 Unity、Player、Profiler、IL2CPP 或发布流程已经自动化，也不等于十四个 Skill 已完成所有真实场景前向测试。每次任务仍需读取当前 Skill、当前 AICommand、最新 AIWarnings 和源码。
+这些 Skill 提供的是正式可发现的项目导航、工作流、边界与交付协议，不等于其涉及的 Unity、Player、Profiler、IL2CPP 或发布流程已经自动化，也不等于所有 Skill 已完成全部真实场景前向测试。每次任务仍需读取当前 Skill、当前 AICommand、最新 AIWarnings 和源码。
 
 ## 绝对边界
 

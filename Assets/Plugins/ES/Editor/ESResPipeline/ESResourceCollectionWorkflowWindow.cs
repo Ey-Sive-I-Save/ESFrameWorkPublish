@@ -2068,19 +2068,10 @@ namespace ES
         {
             mode = RegistrationMode.Bake;
             expanded = true;
-            RunPreview();
-            if (lastResult == null || !lastResult.success)
-                return lastResult;
-            if (!EditorUtility.DisplayDialog(
-                    "启动资源引用 Bake",
-                    "预检已通过。Bake 将写入 ES/ResourcePipeline/Baked，并在任务完成前冻结注册源。是否继续？",
-                    "启动 Bake",
-                    "取消"))
-            {
-                return null;
-            }
-
-            RunCommit();
+            lastResult = ESContentRegistrationAuthoring.ExecuteBakeWithConfirmation();
+            previewSucceeded = lastResult != null && lastResult.success;
+            requestId = lastResult?.requestId ?? string.Empty;
+            runId = lastResult?.runId ?? string.Empty;
             return lastResult;
         }
 

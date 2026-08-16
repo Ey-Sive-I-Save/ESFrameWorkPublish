@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 namespace ES.Samples{
-    [CreateAssetMenu(menuName = "ESFrameWork/Examples/Res/CircleDenpendceSamples")]
+    [CreateAssetMenu(menuName = "【ES】/示例/Res/CircleDenpendceSamples")]
     public class CircleDenpendceSamples : ScriptableObject
     {
         [Header("Circular Dependency Test")]

@@ -13,9 +13,29 @@ using UnityEngine;
 using UnityEngine.Animations;
 using UnityEngine.Playables;
 using UnityEngine.SceneManagement;
+using ES.EditorInternal;
 
 namespace ES
 {
+    internal static class ESAssetPackagePresentation
+    {
+        public static GUIStyle Surface => ESEditorPresentation.SurfaceStyle;
+        public static GUIStyle Toolbar => ESEditorPresentation.ToolbarStyle;
+        public static GUIStyle ToolbarButton => ESEditorPresentation.ToolbarButtonStyle;
+        public static GUIStyle PrimaryButton => ESEditorPresentation.PrimaryButtonStyle;
+        public static GUIStyle Header => ESEditorPresentation.HeaderStyle;
+        public static GUIStyle Meta => ESEditorPresentation.MetaStyle;
+        public static Color Canvas => ESEditorPresentation.CanvasSurfaceColor;
+        public static Color Raised => ESEditorPresentation.WindowRaisedSurfaceColor;
+        public static Color Accent => ESEditorPresentation.SelectionColor;
+
+        public static void DrawPreviewBackground(Rect rect)
+        {
+            EditorGUI.DrawRect(rect, Canvas);
+            EditorGUI.DrawRect(new Rect(rect.x, rect.y, 3f, rect.height), Accent);
+        }
+    }
+
     public class ESAssetPackageBakeWindowLifecycleInitializer : EditorInvoker_Level2
     {
         public override void InitInvoke()
@@ -26,7 +46,8 @@ namespace ES
 
     public class ESAssetPackageBakeWindow : ESMenuTreeWindow<ESAssetPackageBakeWindow>
     {
-        internal const string CodeVersion = "ESAssetBakePreview_20260721_0310_PreviewWorkflow";
+        internal const string CodeVersion = "ESAssetBakePreview_20260813_AssetPreviewTransport";
+        internal const string SleepOwnerKey = "ES.AssetPackageBake.Window";
         public const string PageIdHome = "asset-package.home";
         public const string PageIdCurrentOverview = "asset-package.current.overview";
         private const string PageIdCategoryPrefix = "asset-package.current.category.";
@@ -85,6 +106,12 @@ namespace ES
         {
             SaveSelectedBakeGuid(selectedBake);
             base.ESWindow_OnHostDisable();
+        }
+
+        protected override void ESWindow_OnHostEnable()
+        {
+            base.ESWindow_OnHostEnable();
+            ESWindowFoundation.ResolvePendingSleepOwners(SleepOwnerKey, this);
         }
 
         protected override void ESWindow_BuildGlobalActions(
@@ -181,6 +208,47 @@ namespace ES
                     "asset-package.index.bake", state => state.bake))
                 .AddPageAction(CreateExportAction<Page_AssetPackageBakeIndex>(
                     "asset-package.index.export", state => state.bake))
+                .AddPageAction(new ESMenuTreePageAction(
+                        "asset-package.index.preflight",
+                        "导出前预检",
+                        "只读检查根资产、依赖闭包、EditorOnly 资源和导出目录，不写入资产。",
+                        context =>
+                        {
+                            Page_AssetPackageBakeIndex state = context.GetPageState<Page_AssetPackageBakeIndex>();
+                            if (state != null)
+                                ESAssetPackagePreflightUtility.ShowExportPreflight(state.bake);
+                        })
+                    .WithUnityIcon("d_console.infoicon")
+                    .WithPriority(105))
+                .AddPageAction(new ESMenuTreePageAction(
+                        "asset-package.index.analyze",
+                        "分析资产可用性",
+                        "扫描当前资产包并更新 EditorOnly 分析快照。",
+                        context =>
+                        {
+                            Page_AssetPackageBakeIndex state = context.GetPageState<Page_AssetPackageBakeIndex>();
+                            if (state?.bake != null)
+                                ESAssetPackageAnalysisUtility.Analyze(state.bake);
+                        })
+                    .WithUnityIcon("d_Search Icon")
+                    .WithPriority(104))
+                .AddPageAction(new ESMenuTreePageAction(
+                        "asset-package.index.repair-links",
+                        "修正导出链路",
+                        "清理重复、空目标和无法恢复的导出链路记录；不会删除目标资产。",
+                        context =>
+                        {
+                            Page_AssetPackageBakeIndex state = context.GetPageState<Page_AssetPackageBakeIndex>();
+                            if (state?.bake == null)
+                                return;
+                            int removed = ESAssetPackageBakeUtility.RepairExportLinks(state.bake);
+                            EditorUtility.SetDirty(state.bake);
+                            AssetDatabase.SaveAssets();
+                            EditorUtility.DisplayDialog("导出链路修正", $"已清理 {removed} 条无效或重复链路记录。目标资产未删除。", "确定");
+                            ESAssetPackageBakeWindow.UsingWindow?.Repaint();
+                        })
+                    .WithUnityIcon("TreeEditor.Trash")
+                    .WithPriority(103))
                 .AddPageAction(CreateRollbackAction<Page_AssetPackageBakeIndex>(
                     "asset-package.index.rollback", state => state.bake));
         }
@@ -302,6 +370,8 @@ namespace ES
                         ESAssetPackageBakeData bake = state != null ? getBake(state) : null;
                         if (bake == null)
                             return;
+                        if (!ESAssetPackagePreflightUtility.ShowExportPreflight(bake))
+                            return;
                         ESAssetPackageBakeUtility.ExportSelectedAssetsByCategory(bake);
                         SelectBake(bake, true);
                     })
@@ -386,40 +456,12 @@ namespace ES
 
         private static string GetCategoryIconName(ESAssetPackageCategory category)
         {
-            switch (category)
-            {
-                case ESAssetPackageCategory.Prefab: return "d_Prefab Icon";
-                case ESAssetPackageCategory.Scene: return "d_SceneAsset Icon";
-                case ESAssetPackageCategory.Material: return "d_Material Icon";
-                case ESAssetPackageCategory.Texture: return "d_Texture Icon";
-                case ESAssetPackageCategory.Model: return "d_Mesh Icon";
-                case ESAssetPackageCategory.Audio: return "d_AudioClip Icon";
-                case ESAssetPackageCategory.Animation: return "d_AnimationClip Icon";
-                case ESAssetPackageCategory.ScriptableObject: return "d_ScriptableObject Icon";
-                case ESAssetPackageCategory.Shader: return "d_Shader Icon";
-                case ESAssetPackageCategory.Font: return "d_Font Icon";
-                case ESAssetPackageCategory.Video: return "d_VideoClip Icon";
-                default: return "d_DefaultAsset Icon";
-            }
+            return ESAssetPackageCategoryCatalog.Get(category).iconName;
         }
 
         public static string GetCategoryDisplayName(ESAssetPackageCategory category)
         {
-            switch (category)
-            {
-                case ESAssetPackageCategory.Prefab: return "预制体";
-                case ESAssetPackageCategory.Scene: return "场景";
-                case ESAssetPackageCategory.Material: return "材质";
-                case ESAssetPackageCategory.Texture: return "贴图";
-                case ESAssetPackageCategory.Model: return "模型";
-                case ESAssetPackageCategory.Audio: return "音频";
-                case ESAssetPackageCategory.Animation: return "动画";
-                case ESAssetPackageCategory.ScriptableObject: return "SO资产";
-                case ESAssetPackageCategory.Shader: return "Shader";
-                case ESAssetPackageCategory.Font: return "字体";
-                case ESAssetPackageCategory.Video: return "视频";
-                default: return "其他";
-            }
+            return ESAssetPackageCategoryCatalog.Get(category).displayName;
         }
     }
 
@@ -558,7 +600,7 @@ namespace ES
 
         private void DrawBakeChooser(float pageWidth)
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(pageWidth)))
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface, GUILayout.Width(pageWidth)))
             {
                 EditorGUILayout.LabelField("CODE_VERSION: " + ESAssetPackageBakeWindow.CodeVersion, EditorStyles.miniBoldLabel);
                 using (new EditorGUILayout.HorizontalScope())
@@ -567,11 +609,11 @@ namespace ES
                     GUILayout.FlexibleSpace();
                     if (selectedBake != null)
                         EditorGUILayout.LabelField("当前: " + GetBakeTitle(selectedBake), EditorStyles.miniBoldLabel, GUILayout.Width(260));
-                    if (GUILayout.Button("刷新", EditorStyles.toolbarButton, GUILayout.Width(58)))
+                    if (GUILayout.Button("刷新", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(58)))
                         RefreshWindow();
                     using (new EditorGUI.DisabledScope(selectedBake == null))
                     {
-                        if (GUILayout.Button("Ping 当前", EditorStyles.toolbarButton, GUILayout.Width(72)))
+                        if (GUILayout.Button("Ping 当前", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(72)))
                             PingCurrentBake();
                     }
                 }
@@ -597,7 +639,7 @@ namespace ES
 
             Rect rect = GUILayoutUtility.GetRect(rowWidth, 30f, GUILayout.Width(rowWidth), GUILayout.Height(30f));
             bool current = selectedBake == bake;
-            EditorGUI.DrawRect(rect, current ? new Color(0.16f, 0.28f, 0.42f, 1f) : new Color(0.10f, 0.105f, 0.115f, 1f));
+            EditorGUI.DrawRect(rect, current ? ESAssetPackagePresentation.Accent : ESAssetPackagePresentation.Raised);
 
             Rect nameRect = new Rect(rect.x + 8f, rect.y + 6f, Mathf.Max(180f, rect.width * 0.32f), 18f);
             Rect countRect = new Rect(nameRect.xMax + 8f, rect.y + 6f, 92f, 18f);
@@ -622,7 +664,7 @@ namespace ES
 
         private void DrawCreateBakePanel(float pageWidth)
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(pageWidth)))
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface, GUILayout.Width(pageWidth)))
             {
                 EditorGUILayout.LabelField("快捷新建", EditorStyles.boldLabel);
                 newBakeName = EditorGUILayout.TextField("烘焙名称", newBakeName);
@@ -637,7 +679,7 @@ namespace ES
                     }
                 }
                 bakeImmediately = EditorGUILayout.ToggleLeft("创建后立即烘焙", bakeImmediately);
-                if (GUILayout.Button("新建资产包烘焙", GUILayout.Height(32)))
+                if (GUILayout.Button("新建资产包烘焙", ESAssetPackagePresentation.PrimaryButton, GUILayout.Height(32)))
                     CreateBakeInternal();
             }
         }
@@ -760,6 +802,8 @@ namespace ES
                 EditorGUILayout.Space(8);
                 DrawCategorySummary(pageWidth - 8f);
                 EditorGUILayout.Space(8);
+                DrawAnalysisSummary(pageWidth - 8f);
+                EditorGUILayout.Space(8);
                 DrawExportSummary(pageWidth - 8f);
             }
             EditorGUILayout.EndScrollView();
@@ -767,7 +811,7 @@ namespace ES
 
         private void DrawHeader(float width)
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(width)))
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface, GUILayout.Width(width)))
             {
                 EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(bake.displayName) ? bake.name : bake.displayName, new GUIStyle(EditorStyles.boldLabel) { fontSize = 18 });
                 using (new EditorGUILayout.HorizontalScope())
@@ -782,14 +826,14 @@ namespace ES
         private void DrawExportStateBanner(float width)
         {
             ESAssetPackageExportSession session = GetLastExportSession();
-            string attemptState = string.IsNullOrWhiteSpace(bake.lastExportAttemptState) ? "Idle" : bake.lastExportAttemptState;
-            if (string.Equals(attemptState, "Running", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(attemptState, "Failed", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(attemptState, "AwaitingInput", StringComparison.OrdinalIgnoreCase))
+            ESAssetPackageExportAttemptState attemptState = bake.lastExportAttemptState;
+            if (attemptState == ESAssetPackageExportAttemptState.Staging
+                || attemptState == ESAssetPackageExportAttemptState.Failed
+                || attemptState == ESAssetPackageExportAttemptState.AwaitingConfirmation)
             {
-                string title = string.Equals(attemptState, "Running", StringComparison.OrdinalIgnoreCase)
+                string title = attemptState == ESAssetPackageExportAttemptState.Staging
                     ? "上一次导出可能在 Unity 重载或异常中断"
-                    : string.Equals(attemptState, "AwaitingInput", StringComparison.OrdinalIgnoreCase)
+                    : attemptState == ESAssetPackageExportAttemptState.AwaitingConfirmation
                         ? "导出计划等待用户确认"
                         : "上一次导出事务失败，未确认全部目标已提交";
                 string attemptDetails = title
@@ -803,7 +847,7 @@ namespace ES
                 return;
             }
 
-            if (string.Equals(attemptState, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            if (attemptState == ESAssetPackageExportAttemptState.Cancelled)
             {
                 EditorGUILayout.HelpBox(SafeText(bake.lastExportAttemptMessage), MessageType.Info);
                 DrawExportLocationActions(session);
@@ -821,6 +865,11 @@ namespace ES
             bool warning = !string.IsNullOrWhiteSpace(session.transactionWarning) || session.errorCount > 0;
             string status = warning ? "已提交，但存在需要复核的警告" : "导出事务已提交";
             string details = $"{status}｜会话 {SafeText(session.sessionId)}｜目标 {session.totalAssetCount}｜新增 {session.createdCount}｜更新 {session.updatedCount}";
+            if (session.rollbackState == ESAssetPackageRollbackState.Partial)
+            {
+                warning = true;
+                details = "导出事务回退不完整｜" + details;
+            }
             if (warning && !string.IsNullOrWhiteSpace(session.transactionWarning))
                 details += "\n" + session.transactionWarning;
 
@@ -834,16 +883,15 @@ namespace ES
             {
                 using (new EditorGUI.DisabledScope(string.IsNullOrWhiteSpace(bake.exportRootPath)))
                 {
-                    if (GUILayout.Button("定位导出目录", EditorStyles.toolbarButton, GUILayout.Width(96)))
+                    if (GUILayout.Button("定位导出目录", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(96)))
                         RevealExportRoot();
-                    if (GUILayout.Button("复制完整路径", EditorStyles.toolbarButton, GUILayout.Width(96)))
+                    if (GUILayout.Button("复制完整路径", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(96)))
                         CopyExportRootPath();
                 }
                 GUILayout.FlexibleSpace();
                 if (session != null)
                 {
-                    string transactionState = string.IsNullOrWhiteSpace(session.transactionState) ? "历史会话" : session.transactionState;
-                    EditorGUILayout.LabelField("事务状态：" + transactionState, EditorStyles.miniLabel, GUILayout.Width(180));
+                    EditorGUILayout.LabelField("事务状态：" + session.transactionState, EditorStyles.miniLabel, GUILayout.Width(180));
                 }
             }
         }
@@ -876,7 +924,7 @@ namespace ES
 
         private void DrawPathConfig(float width)
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(width)))
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface, GUILayout.Width(width)))
             {
                 EditorGUILayout.LabelField("基础配置", EditorStyles.boldLabel);
                 bake.displayName = EditorGUILayout.TextField("显示名称", bake.displayName);
@@ -888,7 +936,7 @@ namespace ES
 
         private void DrawExportConfig(float width)
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(width)))
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface, GUILayout.Width(width)))
             {
                 EditorGUILayout.LabelField("导出配置", EditorStyles.boldLabel);
                 DrawFolderPathRow("导出根目录", ref bake.exportRootPath);
@@ -906,6 +954,8 @@ namespace ES
                 bake.exportDependencies = EditorGUILayout.ToggleLeft("导出依赖资源", bake.exportDependencies);
                 bake.remapExportedGuids = EditorGUILayout.ToggleLeft("重映射导出内部 GUID", bake.remapExportedGuids);
                 bake.overwriteExistingExport = EditorGUILayout.ToggleLeft("重复导出时覆盖旧目标", bake.overwriteExistingExport);
+                bake.updateChangedExports = EditorGUILayout.ToggleLeft("源资源变更时增量更新", bake.updateChangedExports);
+                bake.repairExportLinksOnExport = EditorGUILayout.ToggleLeft("导出前自动修正链路", bake.repairExportLinksOnExport);
                 if (bake.overwriteExistingExport)
                 {
                     EditorGUILayout.HelpBox(
@@ -939,7 +989,7 @@ namespace ES
 
         private void DrawCategorySummary(float width)
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(width)))
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface, GUILayout.Width(width)))
             {
                 EditorGUILayout.LabelField("分类统计", EditorStyles.boldLabel);
                 if (bake.categoryCounts == null || bake.categoryCounts.Count == 0)
@@ -962,7 +1012,7 @@ namespace ES
 
         private void DrawExportSummary(float width)
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(width)))
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface, GUILayout.Width(width)))
             {
                 EditorGUILayout.LabelField("导出链路", EditorStyles.boldLabel);
                 EditorGUILayout.LabelField("最近导出", string.IsNullOrEmpty(bake.lastExportTime) ? "无" : $"{bake.lastExportTime} | 总数 {bake.lastExportAssetCount} | 依赖 {bake.lastExportDependencyCount}");
@@ -974,13 +1024,60 @@ namespace ES
                 {
                     ESAssetPackageExportSession last = bake.exportSessions[bake.exportSessions.Count - 1];
                     EditorGUILayout.LabelField("最近会话", $"{last.sessionId} | 新增 {last.createdCount} | 更新 {last.updatedCount} | 失败 {last.errorCount}");
-                    EditorGUILayout.LabelField("事务状态", string.IsNullOrWhiteSpace(last.transactionState) ? "历史会话" : last.transactionState);
+                    EditorGUILayout.LabelField("事务状态", last.transactionState.ToString());
                     if (!string.IsNullOrWhiteSpace(last.transactionWarning))
                         EditorGUILayout.HelpBox(last.transactionWarning, MessageType.Warning);
                 }
                 else
                 {
                     EditorGUILayout.HelpBox("暂无导出会话。导出完成后，这里会显示事务状态、目标数量和恢复入口。", MessageType.Info);
+                }
+            }
+        }
+
+        private void DrawAnalysisSummary(float width)
+        {
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface, GUILayout.Width(width)))
+            {
+                EditorGUILayout.LabelField("AI 资产可用性分析", EditorStyles.boldLabel);
+                if (bake.analysisData == null)
+                {
+                    EditorGUILayout.HelpBox("尚未生成分析快照。请先执行“分析资产可用性”。", MessageType.Info);
+                    return;
+                }
+
+                ESAssetPackageAnalysisData analysis = bake.analysisData;
+                string status = analysis.state.ToString();
+                string currentHash = ESAssetPackageAnalysisUtility.ComputeCurrentPackageHash(bake);
+                if (!analysis.IsCurrent(currentHash))
+                    status += "（快照可能已过期）";
+                EditorGUILayout.LabelField("状态", status);
+                ESAssetPackageAnalysisSummary summary = analysis.summary;
+                if (summary != null)
+                {
+                    EditorGUILayout.LabelField(
+                        "扫描统计",
+                        $"资产 {summary.totalCount} | ParticleSystem {summary.particleSystemCount} | VFX Graph {summary.vfxGraphCount} | 可池化 {summary.poolCandidateCount} | 待确认 {summary.needsReviewCount}");
+                    if (summary.customScriptRiskCount > 0 || summary.materialRiskCount > 0)
+                    {
+                        EditorGUILayout.HelpBox(
+                            $"风险项：自定义脚本 {summary.customScriptRiskCount}，材质/Shader {summary.materialRiskCount}。高风险资产应先人工确认。",
+                            MessageType.Warning);
+                    }
+                }
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("重新分析", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(96)))
+                    {
+                        ESAssetPackageAnalysisUtility.Analyze(bake);
+                        GUI.FocusControl(null);
+                    }
+                    if (GUILayout.Button("定位分析快照", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(110)))
+                    {
+                        Selection.activeObject = analysis;
+                        EditorGUIUtility.PingObject(analysis);
+                    }
+                    GUILayout.FlexibleSpace();
                 }
             }
         }
@@ -1006,6 +1103,7 @@ namespace ES
 
         public void SaveBake()
         {
+            bake.EnsureIdentity();
             bake.EnsureCategoryFolderSettings();
             bake.RebuildStats();
             EditorUtility.SetDirty(bake);
@@ -1016,6 +1114,7 @@ namespace ES
         private void DrawCategoryFolderConfig()
         {
             bake.EnsureCategoryFolderSettings();
+            EditorGUI.BeginChangeCheck();
             EditorGUILayout.Space(4);
             EditorGUILayout.LabelField("按类型自动分目录", EditorStyles.miniBoldLabel);
 
@@ -1029,9 +1128,18 @@ namespace ES
                 {
                     EditorGUILayout.LabelField(ESAssetPackageBakeWindow.GetCategoryDisplayName(category), GUILayout.Width(90));
                     setting.folderName = EditorGUILayout.TextField(setting.folderName);
+                    setting.useFixedAssetPath = EditorGUILayout.ToggleLeft("固定", setting.useFixedAssetPath, GUILayout.Width(48));
+                    using (new EditorGUI.DisabledScope(!setting.useFixedAssetPath))
+                        setting.fixedAssetFolderPath = EditorGUILayout.TextField(setting.fixedAssetFolderPath, GUILayout.Width(250));
                     if (GUILayout.Button("默认", GUILayout.Width(48)))
                         setting.folderName = ESAssetPackageBakeData.GetDefaultExportSubFolder(category);
                 }
+            }
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(bake, "修改资产包分类导出配置");
+                bake.exportConfigFingerprint = bake.ComputeExportConfigFingerprint();
+                EditorUtility.SetDirty(bake);
             }
         }
 
@@ -1293,7 +1401,7 @@ namespace ES
         private void DrawCopyFilterButton(string label, ESAssetPackageCopyFilter filter, float width)
         {
             bool selected = copyFilter == filter;
-            bool newSelected = GUILayout.Toggle(selected, label, EditorStyles.toolbarButton, GUILayout.Width(width));
+            bool newSelected = GUILayout.Toggle(selected, label, ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(width));
             if (newSelected && copyFilter != filter)
             {
                 copyFilter = filter;
@@ -1329,7 +1437,7 @@ namespace ES
 
         private void DrawToolbar(float pageWidth)
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(pageWidth)))
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface, GUILayout.Width(pageWidth)))
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -1406,7 +1514,7 @@ namespace ES
         {
             if (!GridAnimationPreviewEnabled)
             {
-                using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+                using (new EditorGUILayout.HorizontalScope(ESAssetPackagePresentation.Surface))
                 {
                     EditorGUILayout.LabelField("网格动画预览已停用：当前 Humanoid 编辑器采样只能可靠得到 Root 位移/旋转，不能作为有效动作格子预览。", EditorStyles.miniLabel);
                 }
@@ -1415,7 +1523,7 @@ namespace ES
 
             using (new EditorGUILayout.HorizontalScope())
             {
-                bool newEnabled = GUILayout.Toggle(gridAnimationSlowPreview, "网格慢放", EditorStyles.toolbarButton, GUILayout.Width(78));
+                bool newEnabled = GUILayout.Toggle(gridAnimationSlowPreview, "网格慢放", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(78));
                 if (newEnabled != gridAnimationSlowPreview)
                 {
                     gridAnimationSlowPreview = newEnabled;
@@ -1442,13 +1550,13 @@ namespace ES
                     }
                 }
 
-                if (GUILayout.Button("清内存帧", EditorStyles.toolbarButton, GUILayout.Width(78)))
+                if (GUILayout.Button("清内存帧", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(78)))
                 {
                     ESAssetPackagePreviewWorkflow.ClearGridFrameMemory();
                     ESAssetPackageBakeWindow.UsingWindow?.Repaint();
                 }
 
-                if (GUILayout.Button("重生成当前页", EditorStyles.toolbarButton, GUILayout.Width(104)))
+                if (GUILayout.Button("重生成当前页", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(104)))
                 {
                     RebuildVisibleGridAnimationFrames();
                     ESAssetPackageBakeWindow.UsingWindow?.Repaint();
@@ -1496,7 +1604,7 @@ namespace ES
         private void DrawGridAnimationViewButton(string label, int index)
         {
             bool selected = gridAnimationViewIndex == index;
-            bool newSelected = GUILayout.Toggle(selected, label, EditorStyles.toolbarButton, GUILayout.Width(48));
+            bool newSelected = GUILayout.Toggle(selected, label, ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(48));
             if (!newSelected || selected)
                 return;
 
@@ -1514,12 +1622,12 @@ namespace ES
             {
                 using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
                 {
-                    if (GUILayout.Button("上一页", EditorStyles.toolbarButton, GUILayout.Width(60)))
+                    if (GUILayout.Button("上一页", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(60)))
                         currentPage = Mathf.Max(0, currentPage - 1);
 
                     GUILayout.Label($"{currentPage + 1}/{totalPages}  共 {records.Count} 个", EditorStyles.miniLabel, GUILayout.Width(130));
 
-                    if (GUILayout.Button("下一页", EditorStyles.toolbarButton, GUILayout.Width(60)))
+                    if (GUILayout.Button("下一页", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(60)))
                         currentPage = Mathf.Min(totalPages - 1, currentPage + 1);
 
                     GUILayout.FlexibleSpace();
@@ -1588,15 +1696,15 @@ namespace ES
                 : GetGridStaticPreviewTexture(record, asset, imageSize);
             bool hover = cardRect.Contains(Event.current.mousePosition);
             Color bg = isSelected
-                ? new Color(0.13f, 0.23f, 0.34f, 1f)
-                : hover ? new Color(0.12f, 0.13f, 0.15f, 1f) : new Color(0.085f, 0.09f, 0.10f, 1f);
-            Color border = isSelected ? new Color(0.28f, 0.52f, 0.78f, 1f) : new Color(0.20f, 0.22f, 0.25f, 1f);
+                ? ESEditorPresentation.SelectedSurfaceColor
+                : hover ? ESEditorPresentation.GetDepthBackground(1) : ESEditorPresentation.GetDepthBackground(2);
+            Color border = isSelected ? ESEditorPresentation.SelectionColor : ESEditorPresentation.DividerColor;
 
             EditorGUI.DrawRect(cardRect, bg);
             DrawBorder(cardRect, border);
 
             Rect imageRect = new Rect(cardRect.x + 8f, cardRect.y + 8f, cardRect.width - 16f, imageSize);
-            EditorGUI.DrawRect(imageRect, new Color(0.055f, 0.06f, 0.07f, 1f));
+            EditorGUI.DrawRect(imageRect, ESEditorPresentation.GetDepthBackground(3));
             if (TryDrawGridAnimationPreview(record, asset, imageRect, cardVisibleInScroll, ref activeGridAnimationCount))
             {
             }
@@ -1636,7 +1744,7 @@ namespace ES
             if (exportLink != null && AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(exportLink.targetAssetPath) != null)
             {
                 Rect exportedRect = new Rect(cardRect.x + cardRect.width - 62f, cardRect.y + 10f, 54f, 18f);
-                EditorGUI.DrawRect(exportedRect, new Color(0.16f, 0.34f, 0.22f, 0.92f));
+                EditorGUI.DrawRect(exportedRect, ESEditorPresentation.ActiveColor);
                 GUI.Label(exportedRect, "已复制", EditorStyles.centeredGreyMiniLabel);
             }
 
@@ -1650,7 +1758,10 @@ namespace ES
             {
                 SetSelectedRecord(record);
                 SelectLoadedAsset(asset);
-                ESAssetPackageRecordPreviewWindow.Open(bake, record);
+                ESAssetPackageRecordPreviewWindow.Open(
+                    bake,
+                    record,
+                    ESAssetPackageBakeWindow.UsingWindow);
                 Event.current.Use();
             }
             if (GUI.Button(pingButtonRect, "Ping"))
@@ -1670,7 +1781,10 @@ namespace ES
                 SetSelectedRecord(record);
                 SelectLoadedAsset(asset);
                 if (evt.clickCount >= 2 && asset != null)
-                    ESAssetPackageRecordPreviewWindow.Open(bake, record);
+                    ESAssetPackageRecordPreviewWindow.Open(
+                        bake,
+                        record,
+                        ESAssetPackageBakeWindow.UsingWindow);
                 ESAssetPackageBakeWindow.UsingWindow?.Repaint();
                 evt.Use();
             }
@@ -2224,14 +2338,45 @@ namespace ES
         private bool showAnimationClipInfo;
         private bool showAnimationHeaderInfo;
         private Vector2 animationDebugScroll;
-        private readonly ESAssetPackageAnimationPreviewPlayer animationPreview = new ESAssetPackageAnimationPreviewPlayer();
+        private ESAssetPackageAnimationPreviewPlayer animationPreview;
+        private ESAssetPackageDynamicPreviewPlayer dynamicPreview;
+        private ESAssetPackageMaterialPreviewPlayer materialPreview;
+        private ESAssetPackageAudioPreviewPlayer audioPreview;
 
-        public static void Open(ESAssetPackageBakeData bake, ESAssetPackageBakeRecord record)
+        protected override ESWindowSleepLinkMode ESWindow_SleepLinkMode
+            => ESWindowSleepLinkMode.FollowOwner;
+
+        protected override EditorWindow ESWindow_SleepOwner
+            => ESAssetPackageBakeWindow.UsingWindow;
+
+        protected override string ESWindow_SleepOwnerKey
+            => ESAssetPackageBakeWindow.SleepOwnerKey;
+
+        public static void Open(
+            ESAssetPackageBakeData bake,
+            ESAssetPackageBakeRecord record,
+            EditorWindow owner)
         {
             if (record == null)
                 return;
 
             ESAssetPackageRecordPreviewWindow window = GetWindow<ESAssetPackageRecordPreviewWindow>("资产完整预览");
+            window.ESWindow_SetSleepOwnerOverride(owner);
+            if (owner != null)
+            {
+                ESWindowFoundation.SetSleepOwner(
+                    window,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner);
+            }
+            else
+            {
+                ESWindowFoundation.RegisterPendingSleepOwner(
+                    window,
+                    ESAssetPackageBakeWindow.SleepOwnerKey,
+                    ESWindowSleepLinkMode.FollowOwner);
+            }
+            window.ReleasePreviewResources();
             window.bake = bake;
             window.record = record;
             window.RestoreWindowState();
@@ -2293,10 +2438,23 @@ namespace ES
                 .When(() => record != null)
                 .WithUnityIcon("UnityEditor.InspectorWindow")
                 .WithPriority(90));
+            actions.Add(new ESMenuTreePageAction(
+                    "asset-preview.copy-path",
+                    "复制资源路径",
+                    "复制当前记录的完整项目路径。",
+                    context =>
+                    {
+                        EditorGUIUtility.systemCopyBuffer = record?.assetPath ?? string.Empty;
+                        context.SetStatus("已复制当前资源路径");
+                    })
+                .When(() => record != null && !string.IsNullOrWhiteSpace(record.assetPath))
+                .WithUnityIcon("Clipboard")
+                .WithPriority(80));
         }
 
         protected override void ESWindow_OnHostEnable()
         {
+            EnsurePreviewPlayers();
             RestoreWindowState();
         }
 
@@ -2308,11 +2466,19 @@ namespace ES
 
         public void ReleasePreviewResources()
         {
-            animationPreview.Dispose();
+            animationPreview?.Dispose();
+            dynamicPreview?.Dispose();
+            materialPreview?.Dispose();
+            audioPreview?.Dispose();
+            animationPreview = null;
+            dynamicPreview = null;
+            materialPreview = null;
+            audioPreview = null;
         }
 
         protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
+            EnsurePreviewPlayers();
             if (record == null)
             {
                 EditorGUILayout.HelpBox("没有可预览资源。", MessageType.Warning);
@@ -2320,8 +2486,9 @@ namespace ES
             }
 
             UnityEngine.Object asset = record.LoadAsset();
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface))
             {
+                DrawESPreviewHeader(asset);
                 EditorGUILayout.ObjectField("资源", asset, typeof(UnityEngine.Object), false);
                 EditorGUILayout.LabelField("路径", record.assetPath, EditorStyles.wordWrappedMiniLabel);
                 EditorGUILayout.LabelField("分类", ESAssetPackageBakeWindow.GetCategoryDisplayName(record.category));
@@ -2332,9 +2499,11 @@ namespace ES
                 bool newUse = GUILayout.Toggle(
                     record.selectedForUse,
                     record.selectedForUse ? "已标记使用" : "未标记使用",
-                    EditorStyles.toolbarButton);
+                    ESAssetPackagePresentation.ToolbarButton);
                 if (newUse != record.selectedForUse)
                 {
+                    if (bake != null)
+                        Undo.RecordObject(bake, "标记资产包记录使用状态");
                     record.selectedForUse = newUse;
                     SaveBake();
                 }
@@ -2343,6 +2512,31 @@ namespace ES
             scroll = EditorGUILayout.BeginScrollView(scroll);
             DrawCategoryDetail(asset, record);
             EditorGUILayout.EndScrollView();
+        }
+
+        private void EnsurePreviewPlayers()
+        {
+            animationPreview ??= new ESAssetPackageAnimationPreviewPlayer();
+            dynamicPreview ??= new ESAssetPackageDynamicPreviewPlayer();
+            materialPreview ??= new ESAssetPackageMaterialPreviewPlayer();
+            audioPreview ??= new ESAssetPackageAudioPreviewPlayer();
+        }
+
+        private void DrawESPreviewHeader(UnityEngine.Object asset)
+        {
+            ESAssetPackagePreviewCapability capabilities = ESAssetPackagePreviewWorkflow.GetCapabilities(record.category);
+            string sourceStatus = asset == null ? "源资产缺失" : "源资产已解析";
+            string packageStatus = bake == null ? "未绑定资产包" : "资产包 " + bake.packageId;
+            EditorGUILayout.LabelField("ES 预览状态", sourceStatus + " | " + packageStatus, ESAssetPackagePresentation.Meta);
+            EditorGUILayout.LabelField("预览能力", ESAssetPackagePreviewWorkflow.GetCapabilityDisplayName(capabilities), ESAssetPackagePresentation.Meta);
+            EditorGUILayout.LabelField("生命周期", ESAssetPackagePreviewUtility.GetCacheDiagnostics(), ESAssetPackagePresentation.Meta);
+            if (GUILayout.Button("释放本窗口预览资源", ESAssetPackagePresentation.ToolbarButton))
+            {
+                ReleasePreviewResources();
+                Repaint();
+            }
+            if (asset == null)
+                EditorGUILayout.HelpBox("当前记录无法解析源资产，预览保持只读。", MessageType.Warning);
         }
 
         private void SaveBake()
@@ -2371,7 +2565,7 @@ namespace ES
                 EditorGUILayout.LabelField("复制状态", exists ? "已复制" : "链路存在但目标丢失");
                 using (new EditorGUI.DisabledScope(!exists))
                 {
-                    if (GUILayout.Button("Ping 复制目标", GUILayout.Width(96)))
+                    if (GUILayout.Button("定位复制目标", GUILayout.Width(96)))
                     {
                         UnityEngine.Object target = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(link.targetAssetPath);
                         Selection.activeObject = target;
@@ -2410,13 +2604,16 @@ namespace ES
 
         private void DrawCategoryDetail(UnityEngine.Object asset, ESAssetPackageBakeRecord targetRecord)
         {
+            if (ESAssetPackagePreviewWorkflow.Supports(targetRecord.category, ESAssetPackagePreviewCapability.DynamicEffect) && dynamicPreview.CanPreview(asset))
+                dynamicPreview.DrawDetail(asset, bake, Repaint);
+
             switch (targetRecord.category)
             {
                 case ESAssetPackageCategory.Texture:
                     ESAssetPackagePreviewUtility.DrawTextureDetail(asset as Texture2D, targetRecord.assetPath);
                     break;
                 case ESAssetPackageCategory.Material:
-                    ESAssetPackagePreviewUtility.DrawMaterialDetail(asset as Material);
+                    materialPreview.Draw(asset as Material, Repaint);
                     break;
                 case ESAssetPackageCategory.Prefab:
                 case ESAssetPackageCategory.Model:
@@ -2425,7 +2622,7 @@ namespace ES
                         DrawAnimationDetail(asset, targetRecord);
                     break;
                 case ESAssetPackageCategory.Audio:
-                    ESAssetPackagePreviewUtility.DrawAudioDetail(asset as AudioClip, targetRecord.assetPath);
+                    audioPreview.Draw(asset as AudioClip, targetRecord.assetPath, Repaint);
                     break;
                 case ESAssetPackageCategory.Animation:
                     DrawAnimationDetail(asset, targetRecord);
@@ -2545,26 +2742,26 @@ namespace ES
 
         private void DrawAnimationClipReferencePanel(UnityEngine.Object sourceAsset, AnimationClip selectedClip, AnimationClip previewClip)
         {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface))
             {
-                EditorGUILayout.LabelField("AnimationClip 引用", EditorStyles.boldLabel);
-                DrawClipObjectRow("当前选择 Clip", selectedClip);
+                EditorGUILayout.LabelField("动画片段引用", EditorStyles.boldLabel);
+                DrawClipObjectRow("当前选择动画片段", selectedClip);
                 if (previewClip != null && previewClip != selectedClip)
-                    DrawClipObjectRow("实际播放 Clip", previewClip);
+                    DrawClipObjectRow("实际播放动画片段", previewClip);
 
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.ObjectField("原始资源", sourceAsset, typeof(UnityEngine.Object), false);
                     using (new EditorGUI.DisabledScope(sourceAsset == null))
                     {
-                        if (GUILayout.Button("Ping", GUILayout.Width(54)))
+                        if (GUILayout.Button("定位", GUILayout.Width(54)))
                             EditorGUIUtility.PingObject(sourceAsset);
                     }
                 }
 
                 string clipPath = selectedClip == null ? string.Empty : AssetDatabase.GetAssetPath(selectedClip);
                 if (!string.IsNullOrEmpty(clipPath))
-                    EditorGUILayout.LabelField("Clip 路径", clipPath, EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField("动画片段路径", clipPath, EditorStyles.miniLabel);
             }
         }
 
@@ -2581,7 +2778,7 @@ namespace ES
                         EditorGUIUtility.PingObject(clip);
                     }
 
-                    if (GUILayout.Button("Ping", GUILayout.Width(54)))
+                    if (GUILayout.Button("定位", GUILayout.Width(54)))
                         EditorGUIUtility.PingObject(clip);
                 }
             }
@@ -2589,7 +2786,7 @@ namespace ES
 
         private void DrawAnimationDebug(AnimationClip clip, UnityEngine.Object model, string previewKey)
         {
-            bool newShowAnimationDebug = EditorGUILayout.Foldout(showAnimationDebug, "动画 Debug", true);
+            bool newShowAnimationDebug = EditorGUILayout.Foldout(showAnimationDebug, "动画诊断", true);
             if (newShowAnimationDebug != showAnimationDebug)
             {
                 showAnimationDebug = newShowAnimationDebug;
@@ -2599,13 +2796,13 @@ namespace ES
                 return;
 
             string report = animationPreview.GetDebugReport(clip, model, previewKey);
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface))
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     EditorGUILayout.LabelField("诊断信息", EditorStyles.boldLabel);
                     GUILayout.FlexibleSpace();
-                    if (GUILayout.Button("复制 Debug", GUILayout.Width(86)))
+                    if (GUILayout.Button("复制诊断", GUILayout.Width(86)))
                         EditorGUIUtility.systemCopyBuffer = report;
                 }
 
@@ -2783,15 +2980,581 @@ namespace ES
         }
     }
 
+    internal sealed class ESAssetPackageMaterialPreviewPlayer : IDisposable
+    {
+        private readonly ESAssetPackagePreviewSceneContext previewContext = new ESAssetPackagePreviewSceneContext();
+        private Material sourceMaterial;
+        private Material previewMaterial;
+        private GameObject previewObject;
+        private PrimitiveType previewPrimitive = PrimitiveType.Sphere;
+        private float yaw = 25f;
+        private float pitch = 12f;
+        private float zoom = 1f;
+
+        public void Draw(Material material, Action repaint)
+        {
+            if (material == null)
+            {
+                EditorGUILayout.HelpBox("材质资产缺失，无法预览。", MessageType.Warning);
+                return;
+            }
+
+            EnsureInstance(material, previewPrimitive);
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface))
+            {
+                EditorGUILayout.LabelField("ES 材质预览", ESAssetPackagePresentation.Header);
+                EditorGUILayout.LabelField("预览实例", "临时材质实例，不写回源材质", ESAssetPackagePresentation.Meta);
+                int primitiveIndex = GUILayout.Toolbar(
+                    previewPrimitive == PrimitiveType.Sphere ? 0 : previewPrimitive == PrimitiveType.Cube ? 1 : 2,
+                    new[] { "材质球", "立方体", "平面" });
+                PrimitiveType nextPrimitive = primitiveIndex == 0 ? PrimitiveType.Sphere : primitiveIndex == 1 ? PrimitiveType.Cube : PrimitiveType.Quad;
+                if (nextPrimitive != previewPrimitive)
+                {
+                    EnsureInstance(material, nextPrimitive);
+                    repaint?.Invoke();
+                }
+                Rect rect = GUILayoutUtility.GetRect(420f, 300f, GUILayout.ExpandWidth(true));
+                previewContext.Render(rect, previewObject != null ? previewObject.transform.position : Vector3.zero, 1.2f, 1.2f, yaw, pitch, zoom, ESAssetPackagePreviewBaselinePlatform.Desktop, 1d / 30d);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    yaw = EditorGUILayout.Slider("旋转", yaw, -180f, 180f);
+                    pitch = EditorGUILayout.Slider("俯仰", pitch, -80f, 80f);
+                }
+                zoom = EditorGUILayout.Slider("缩放", zoom, 0.55f, 2.5f);
+                Shader shader = previewMaterial != null ? previewMaterial.shader : null;
+                EditorGUILayout.ObjectField("着色器", shader, typeof(Shader), false);
+                EditorGUILayout.ObjectField("主贴图", previewMaterial != null ? previewMaterial.mainTexture : null, typeof(Texture), false);
+                EditorGUILayout.LabelField("渲染队列", previewMaterial != null ? previewMaterial.renderQueue.ToString() : "-");
+                EditorGUILayout.LabelField("Pass 数量", previewMaterial != null ? previewMaterial.passCount.ToString() : "-");
+                if (shader == null || !shader.isSupported)
+                    EditorGUILayout.HelpBox("Shader 缺失或当前渲染环境不支持，材质预览不可作为最终效果依据。", MessageType.Error);
+                else if (UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline != null && shader.name == "Standard")
+                    EditorGUILayout.HelpBox("当前工程使用 SRP，但材质仍使用内置 Standard Shader。请在正式导出前确认管线兼容性。", MessageType.Warning);
+                if (GUILayout.Button("恢复视角", ESAssetPackagePresentation.ToolbarButton))
+                {
+                    yaw = 25f;
+                    pitch = 12f;
+                    zoom = 1f;
+                    repaint?.Invoke();
+                }
+            }
+        }
+
+        private void EnsureInstance(Material material, PrimitiveType primitive)
+        {
+            if (sourceMaterial == material && previewObject != null && previewPrimitive == primitive)
+                return;
+            DisposeInstance();
+            sourceMaterial = material;
+            previewPrimitive = primitive;
+            previewMaterial = new Material(material) { hideFlags = HideFlags.HideAndDontSave };
+            previewObject = GameObject.CreatePrimitive(primitive);
+            previewObject.name = "ESAssetPackageMaterialPreview";
+            Collider collider = previewObject.GetComponent<Collider>();
+            if (collider != null)
+                UnityEngine.Object.DestroyImmediate(collider);
+            previewContext.PreparePreviewObject(previewObject);
+            previewObject.transform.position = previewContext.GroupOrigin;
+            Renderer renderer = previewObject.GetComponent<Renderer>();
+            if (renderer != null)
+                renderer.sharedMaterial = previewMaterial;
+        }
+
+        private void DisposeInstance()
+        {
+            if (previewObject != null)
+                UnityEngine.Object.DestroyImmediate(previewObject);
+            if (previewMaterial != null)
+                UnityEngine.Object.DestroyImmediate(previewMaterial);
+            previewObject = null;
+            previewMaterial = null;
+            sourceMaterial = null;
+        }
+
+        public void Dispose()
+        {
+            DisposeInstance();
+            previewContext.Dispose();
+        }
+    }
+
+    internal sealed class ESAssetPackageAudioPreviewPlayer : IDisposable
+    {
+        private readonly ESAssetPackagePreviewSceneContext previewContext = new ESAssetPackagePreviewSceneContext(usePreviewScene: false);
+        private AudioClip currentClip;
+        private GameObject previewAudioObject;
+        private AudioSource previewSource;
+        private AudioListener previewListener;
+        private double startedAt;
+        private float offset;
+        private bool playing;
+        private bool loop;
+        private float volume = 1f;
+        private float pitch = 1f;
+        private float spatialBlend;
+        private float minDistance = 1f;
+        private float maxDistance = 20f;
+        private float dopplerLevel;
+        private AudioRolloffMode rolloffMode = AudioRolloffMode.Logarithmic;
+        private AnimationCurve customRolloffCurve = AnimationCurve.Linear(0f, 1f, 1f, 0f);
+        private float sourceDistance = 2f;
+        private float sourceAzimuth;
+        private float sourceHeight;
+        private bool orbitSource;
+        private float orbitSpeed = 45f;
+        private double lastSpatialUpdate;
+        private float panStereo;
+        private float spread;
+        private float reverbZoneMix = 1f;
+        private bool showAdvancedSpatial;
+        private bool showDiagnostics;
+        private Action repaint;
+        private string status = "已停止";
+        private string failureReason;
+
+        public void Draw(AudioClip clip, string path, Action repaintOwner)
+        {
+            repaint = repaintOwner;
+            if (clip == null)
+            {
+                EditorGUILayout.HelpBox("音频资产缺失，无法预览。", MessageType.Warning);
+                return;
+            }
+            if (currentClip != clip)
+            {
+                Stop();
+                currentClip = clip;
+                failureReason = null;
+                EnsurePreviewAudioSource();
+            }
+
+            EnsurePreviewAudioSource();
+            ApplyAudioSettings();
+
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface))
+            {
+                EditorGUILayout.LabelField("ES 音频预览", ESAssetPackagePresentation.Header);
+                EditorGUILayout.LabelField("时长", clip.length.ToString("F2") + " 秒", ESAssetPackagePresentation.Meta);
+                EditorGUILayout.LabelField("音频格式", clip.channels + " 声道 | " + clip.frequency + " Hz | " + clip.samples + " 采样", ESAssetPackagePresentation.Meta);
+                float position = GetPosition(clip);
+                float next = EditorGUILayout.Slider("进度", position, 0f, Mathf.Max(0.01f, clip.length));
+                if (!Mathf.Approximately(next, position))
+                {
+                    offset = next;
+                    if (playing)
+                    {
+                        if (previewSource != null)
+                            previewSource.Stop();
+                        else
+                            StopAudioPreview(currentClip);
+                    }
+                    if (playing)
+                        PlayFromCurrent();
+                }
+                volume = EditorGUILayout.Slider("音量", volume, 0f, 1f);
+                pitch = EditorGUILayout.Slider("音调", pitch, 0.25f, 2f);
+                spatialBlend = EditorGUILayout.Slider("空间化", spatialBlend, 0f, 1f);
+                if (spatialBlend > 0f)
+                {
+                    sourceDistance = EditorGUILayout.Slider("声源距离", sourceDistance, 0f, Mathf.Max(1f, maxDistance));
+                    sourceAzimuth = EditorGUILayout.Slider("声源方位", sourceAzimuth, -180f, 180f);
+                    sourceHeight = EditorGUILayout.Slider("声源高度", sourceHeight, -10f, 10f);
+                    minDistance = EditorGUILayout.Slider("最小距离", minDistance, 0.01f, Mathf.Max(0.02f, maxDistance));
+                    maxDistance = EditorGUILayout.Slider("最大距离", maxDistance, Mathf.Max(0.02f, minDistance), 100f);
+                    dopplerLevel = EditorGUILayout.Slider("多普勒", dopplerLevel, 0f, 5f);
+                    rolloffMode = DrawRolloffModePopup(rolloffMode);
+                    if (rolloffMode == AudioRolloffMode.Custom)
+                        customRolloffCurve = EditorGUILayout.CurveField(
+                            "自定义衰减曲线",
+                            customRolloffCurve ?? AnimationCurve.Linear(0f, 1f, 1f, 0f));
+                    orbitSource = EditorGUILayout.Toggle("环绕运动", orbitSource);
+                    if (orbitSource)
+                        orbitSpeed = EditorGUILayout.Slider("环绕速度", orbitSpeed, -180f, 180f);
+                    EditorGUILayout.LabelField("听者位置", "预览原点", ESAssetPackagePresentation.Meta);
+                    showAdvancedSpatial = EditorGUILayout.Foldout(showAdvancedSpatial, "高级空间参数", true);
+                    if (showAdvancedSpatial)
+                    {
+                        panStereo = EditorGUILayout.Slider("声道平衡", panStereo, -1f, 1f);
+                        spread = EditorGUILayout.Slider("立体声扩散", spread, 0f, 360f);
+                        reverbZoneMix = EditorGUILayout.Slider("混响区混合", reverbZoneMix, 0f, 1.1f);
+                    }
+                }
+                if (GUILayout.Button("恢复音频参数", ESAssetPackagePresentation.ToolbarButton))
+                {
+                    volume = 1f;
+                    pitch = 1f;
+                    spatialBlend = 0f;
+                    minDistance = 1f;
+                    maxDistance = 20f;
+                    dopplerLevel = 0f;
+                    rolloffMode = AudioRolloffMode.Logarithmic;
+                    customRolloffCurve = AnimationCurve.Linear(0f, 1f, 1f, 0f);
+                    sourceDistance = 2f;
+                    sourceAzimuth = 0f;
+                    sourceHeight = 0f;
+                    orbitSource = false;
+                    orbitSpeed = 45f;
+                    panStereo = 0f;
+                    spread = 0f;
+                    reverbZoneMix = 1f;
+                    showAdvancedSpatial = false;
+                    ApplyAudioSettings();
+                    repaint?.Invoke();
+                }
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button(playing ? "暂停" : "播放", ESAssetPackagePresentation.ToolbarButton))
+                    {
+                        if (playing) Pause(); else PlayFromCurrent();
+                    }
+                    if (GUILayout.Button("停止", ESAssetPackagePresentation.ToolbarButton)) Stop();
+                    loop = GUILayout.Toggle(loop, "循环", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(60));
+                }
+                ApplyAudioSettings();
+                EditorGUILayout.LabelField("状态", status, ESAssetPackagePresentation.Meta);
+                EditorGUILayout.LabelField("播放通道", "ES 隔离编辑器音频源（不写入运行时）", ESAssetPackagePresentation.Meta);
+                showDiagnostics = EditorGUILayout.Foldout(showDiagnostics, "预览诊断（当前实际状态）", true);
+                if (showDiagnostics)
+                    DrawDiagnostics();
+                DrawImportSettings(path);
+                EditorGUILayout.LabelField("路径", path ?? string.Empty, EditorStyles.wordWrappedMiniLabel);
+            }
+            if (playing)
+                RegisterTick();
+        }
+
+        private float GetPosition(AudioClip clip)
+        {
+            if (!playing)
+                return Mathf.Clamp(offset, 0f, clip.length);
+
+            if (previewSource != null && previewSource.clip == clip)
+            {
+                float sourceTime = Mathf.Clamp(previewSource.time, 0f, clip.length);
+                if (!previewSource.isPlaying && sourceTime >= clip.length - 0.01f)
+                {
+                    if (loop)
+                    {
+                        previewSource.time = 0f;
+                        previewSource.Play();
+                        return 0f;
+                    }
+
+                    Stop();
+                    return clip.length;
+                }
+
+                return sourceTime;
+            }
+
+            float elapsed = (float)(EditorApplication.timeSinceStartup - startedAt) + offset;
+            if (elapsed >= clip.length)
+            {
+                if (loop)
+                {
+                    offset = 0f;
+                    startedAt = EditorApplication.timeSinceStartup;
+                    if (!TryPlayAudioPreview(clip, 0))
+                    {
+                        playing = false;
+                        status = "当前 Unity 版本不支持音频预览";
+                        failureReason = "AudioSource 不可用，且 UnityEditor.AudioUtil 没有可调用的兼容播放入口。";
+                    }
+                    return 0f;
+                }
+                Stop();
+                return clip.length;
+            }
+            return elapsed;
+        }
+
+        private void PlayFromCurrent()
+        {
+            if (currentClip == null) return;
+            EnsurePreviewAudioSource();
+            offset = Mathf.Clamp(offset, 0f, currentClip.length);
+            startedAt = EditorApplication.timeSinceStartup;
+            lastSpatialUpdate = startedAt;
+            playing = true;
+            ApplyAudioSettings();
+            if (previewSource != null)
+            {
+                previewSource.time = offset;
+                previewSource.Play();
+            }
+            else if (!TryPlayAudioPreview(currentClip, Mathf.Clamp(Mathf.RoundToInt(offset * currentClip.frequency), 0, Mathf.Max(0, currentClip.samples - 1))))
+            {
+                playing = false;
+                status = "当前 Unity 版本不支持音频预览";
+                failureReason = "AudioSource 不可用，且 UnityEditor.AudioUtil 没有可调用的兼容播放入口。";
+                return;
+            }
+            status = "播放中";
+            failureReason = null;
+            RegisterTick();
+            repaint?.Invoke();
+        }
+
+        private void Pause()
+        {
+            offset = GetPosition(currentClip);
+            playing = false;
+            if (previewSource != null)
+                previewSource.Pause();
+            else
+                StopAudioPreview(currentClip);
+            if (previewListener != null)
+                previewContext.SetPreviewAudioListenerPlaying(false);
+            status = "已暂停";
+            UnregisterTick();
+            repaint?.Invoke();
+        }
+
+        private void Stop()
+        {
+            playing = false;
+            offset = 0f;
+            if (previewSource != null)
+                previewSource.Stop();
+            else if (currentClip != null)
+                StopAudioPreview(currentClip);
+            if (previewListener != null)
+                previewContext.SetPreviewAudioListenerPlaying(false);
+            UnregisterTick();
+            status = "已停止";
+        }
+
+        private void RegisterTick()
+        {
+            EditorApplication.update -= Tick;
+            EditorApplication.update += Tick;
+        }
+
+        private void UnregisterTick()
+        {
+            EditorApplication.update -= Tick;
+        }
+
+        private void DrawDiagnostics()
+        {
+            string backend = previewSource != null
+                ? (previewSource.isPlaying ? "AudioSource 正在播放" : "AudioSource 已创建但当前未播放")
+                : "UnityEditor.AudioUtil 兼容降级";
+            string listener = previewContext.GetAudioListenerDescription(previewListener);
+            string clock = playing ? "EditorApplication.update 已注册" : "播放时钟未注册";
+            string spatial = spatialBlend > 0f
+                ? string.Format(
+                    "3D，距离 {0:F2}m，方位 {1:F1}°，高度 {2:F2}m，最小/最大距离 {3:F2}/{4:F2}m",
+                    sourceDistance,
+                    sourceAzimuth,
+                    sourceHeight,
+                    minDistance,
+                    maxDistance)
+                : "2D，声源位置参数不参与衰减计算";
+            string curve = rolloffMode == AudioRolloffMode.Custom
+                ? "自定义曲线已应用：" + (customRolloffCurve != null ? customRolloffCurve.length + " 个控制点" : "缺失，使用默认曲线")
+                : "距离衰减：" + GetRolloffDisplayName(rolloffMode);
+
+            EditorGUILayout.LabelField("播放后端", backend, ESAssetPackagePresentation.Meta);
+            EditorGUILayout.LabelField("监听器", listener, ESAssetPackagePresentation.Meta);
+            EditorGUILayout.LabelField("播放时钟", clock, ESAssetPackagePresentation.Meta);
+            EditorGUILayout.LabelField("空间关系", spatial, ESAssetPackagePresentation.Meta);
+            EditorGUILayout.LabelField("衰减曲线", curve, ESAssetPackagePresentation.Meta);
+            EditorGUILayout.LabelField("音调/音量", string.Format("{0:F2}x / {1:P0}", pitch, volume), ESAssetPackagePresentation.Meta);
+            if (!string.IsNullOrEmpty(failureReason))
+                EditorGUILayout.HelpBox("无法按预期播放：" + failureReason, MessageType.Warning);
+        }
+
+        private void Tick()
+        {
+            if (!playing) return;
+            double now = EditorApplication.timeSinceStartup;
+            if (orbitSource)
+            {
+                sourceAzimuth = Mathf.Repeat(sourceAzimuth + (float)(now - lastSpatialUpdate) * orbitSpeed + 180f, 360f) - 180f;
+                ApplyAudioSettings();
+            }
+            lastSpatialUpdate = now;
+            GetPosition(currentClip);
+            if (!playing)
+            {
+                repaint?.Invoke();
+                return;
+            }
+            repaint?.Invoke();
+            EditorApplication.QueuePlayerLoopUpdate();
+        }
+
+        private static bool TryPlayAudioPreview(AudioClip clip, int startSample)
+        {
+            Type audioUtil = typeof(AudioImporter).Assembly.GetType("UnityEditor.AudioUtil");
+            const BindingFlags flags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            MethodInfo method = audioUtil?.GetMethod("PlayPreviewClip", flags, null, new[] { typeof(AudioClip), typeof(int), typeof(bool) }, null)
+                ?? audioUtil?.GetMethod("PlayClip", flags, null, new[] { typeof(AudioClip), typeof(int), typeof(bool) }, null)
+                ?? audioUtil?.GetMethod("PlayClip", flags, null, new[] { typeof(AudioClip) }, null);
+            if (method == null)
+                return false;
+
+            try
+            {
+                ParameterInfo[] parameters = method.GetParameters();
+                method.Invoke(null, parameters.Length == 3
+                    ? new object[] { clip, startSample, false }
+                    : new object[] { clip });
+                return true;
+            }
+            catch (TargetInvocationException)
+            {
+                return false;
+            }
+        }
+
+        private void EnsurePreviewAudioSource()
+        {
+            previewListener = previewContext.EnsurePreviewAudioListener();
+            if (previewAudioObject == null)
+            {
+                previewAudioObject = new GameObject("ES Asset Package Audio Preview Source");
+                previewAudioObject.hideFlags = HideFlags.HideAndDontSave;
+                previewSource = previewAudioObject.AddComponent<AudioSource>();
+                previewSource.playOnAwake = false;
+                previewSource.loop = false;
+                previewContext.PreparePreviewAudioObject(previewAudioObject);
+            }
+        }
+
+        private void ApplyAudioSettings()
+        {
+            if (previewSource == null)
+                return;
+
+            previewSource.clip = currentClip;
+            previewSource.volume = Mathf.Clamp01(volume);
+            previewSource.pitch = Mathf.Clamp(pitch, 0.01f, 3f);
+            previewSource.spatialBlend = Mathf.Clamp01(spatialBlend);
+            previewSource.minDistance = Mathf.Max(0.01f, minDistance);
+            previewSource.maxDistance = Mathf.Max(previewSource.minDistance + 0.01f, maxDistance);
+            previewSource.rolloffMode = rolloffMode;
+            if (rolloffMode == AudioRolloffMode.Custom)
+                previewSource.SetCustomCurve(
+                    AudioSourceCurveType.CustomRolloff,
+                    customRolloffCurve ?? AnimationCurve.Linear(0f, 1f, 1f, 0f));
+            previewSource.dopplerLevel = Mathf.Clamp(dopplerLevel, 0f, 5f);
+            previewSource.panStereo = Mathf.Clamp(panStereo, -1f, 1f);
+            previewSource.spread = Mathf.Clamp(spread, 0f, 360f);
+            previewSource.reverbZoneMix = Mathf.Clamp(reverbZoneMix, 0f, 1.1f);
+            float distance = Mathf.Clamp(sourceDistance, 0f, previewSource.maxDistance);
+            float radians = sourceAzimuth * Mathf.Deg2Rad;
+            Vector3 horizontal = new Vector3(Mathf.Sin(radians), 0f, Mathf.Cos(radians)) * distance;
+            previewSource.transform.position = previewContext.AudioListenerOrigin +
+                previewContext.AudioListenerRotation * (horizontal + Vector3.up * sourceHeight);
+            previewSource.loop = loop;
+            if (previewListener != null && previewListener.transform != null)
+            {
+                previewContext.SetPreviewAudioListenerPlaying(playing);
+            }
+        }
+
+        private static void StopAudioPreview(AudioClip clip)
+        {
+            Type audioUtil = typeof(AudioImporter).Assembly.GetType("UnityEditor.AudioUtil");
+            if (audioUtil == null)
+                return;
+
+            MethodInfo stopClip = audioUtil.GetMethod(
+                "StopPreviewClip",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(AudioClip) },
+                null);
+            if (stopClip != null && clip != null)
+            {
+                stopClip.Invoke(null, new object[] { clip });
+                return;
+            }
+
+            MethodInfo stopAll = audioUtil.GetMethod("StopAllPreviewClips", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            stopAll?.Invoke(null, null);
+        }
+
+        private static void DrawImportSettings(string path)
+        {
+            if (!(AssetImporter.GetAtPath(path) is AudioImporter importer))
+                return;
+
+            AudioImporterSampleSettings settings = importer.defaultSampleSettings;
+            EditorGUILayout.LabelField(
+                "导入设置",
+                GetAudioLoadTypeDisplayName(settings.loadType) + " | " + GetAudioCompressionDisplayName(settings.compressionFormat) + " | 质量 " + settings.quality.ToString("F2"),
+                ESAssetPackagePresentation.Meta);
+        }
+
+        private static string GetAudioLoadTypeDisplayName(AudioClipLoadType loadType)
+        {
+            switch (loadType)
+            {
+                case AudioClipLoadType.DecompressOnLoad: return "加载时解压";
+                case AudioClipLoadType.CompressedInMemory: return "内存压缩";
+                case AudioClipLoadType.Streaming: return "流式读取";
+                default: return loadType.ToString();
+            }
+        }
+
+        private static string GetAudioCompressionDisplayName(AudioCompressionFormat compression)
+        {
+            switch (compression)
+            {
+                case AudioCompressionFormat.PCM: return "PCM 无压缩";
+                case AudioCompressionFormat.Vorbis: return "Vorbis";
+                case AudioCompressionFormat.ADPCM: return "ADPCM";
+                case AudioCompressionFormat.MP3: return "MP3";
+                default: return compression.ToString();
+            }
+        }
+
+        private static AudioRolloffMode DrawRolloffModePopup(AudioRolloffMode current)
+        {
+            int index = current == AudioRolloffMode.Linear ? 1 : current == AudioRolloffMode.Custom ? 2 : 0;
+            index = EditorGUILayout.Popup("距离衰减", index, new[] { "对数衰减", "线性衰减", "自定义曲线" });
+            return index == 1 ? AudioRolloffMode.Linear : index == 2 ? AudioRolloffMode.Custom : AudioRolloffMode.Logarithmic;
+        }
+
+        private static string GetRolloffDisplayName(AudioRolloffMode mode)
+        {
+            switch (mode)
+            {
+                case AudioRolloffMode.Linear: return "线性";
+                case AudioRolloffMode.Custom: return "自定义";
+                default: return "对数";
+            }
+        }
+
+        public void Dispose()
+        {
+            Stop();
+            if (previewAudioObject != null)
+                UnityEngine.Object.DestroyImmediate(previewAudioObject);
+            previewAudioObject = null;
+            previewSource = null;
+            previewListener = null;
+            currentClip = null;
+            repaint = null;
+            previewContext.Dispose();
+        }
+    }
+
     internal static class ESAssetPackagePreviewUtility
     {
+        private const int MaxStaticPreviewTextures = 96;
+        private const int MaxStaticModelPreviewTextures = 32;
+        private const int MaxShaderMaterialIndexEntries = 128;
+        private const int MaxMaterialsPerShaderIndex = 256;
+        private const int MaxPreviewMissEntries = 256;
         private static readonly Dictionary<string, Texture2D> PreviewCache = new Dictionary<string, Texture2D>();
         private static readonly Dictionary<string, Texture2D> ModelPreviewCache = new Dictionary<string, Texture2D>();
         private static readonly Dictionary<string, int> PreviewMissCounts = new Dictionary<string, int>();
         private static readonly Dictionary<string, List<string>> ShaderMaterialCache = new Dictionary<string, List<string>>();
         private static Material previewFallbackMaterial;
-        private static MethodInfo playClipMethod;
-        private static MethodInfo stopClipMethod;
 
         public static void ClearPreviewCache()
         {
@@ -2810,6 +3573,22 @@ namespace ES
                 ESEditorPreviewUtility.DestroyObject(previewFallbackMaterial);
                 previewFallbackMaterial = null;
             }
+        }
+
+        public static string GetCacheDiagnostics()
+        {
+            return string.Format(
+                "静态预览缓存 {0}/{1}，模型快照 {2}/{3}，失败计数 {4}/{5}，Shader 索引 {6}/{7}，网格帧上限 {8}",
+                PreviewCache.Count,
+                MaxStaticPreviewTextures,
+                ModelPreviewCache.Count,
+                MaxStaticModelPreviewTextures,
+                PreviewMissCounts.Count,
+                MaxPreviewMissEntries,
+                ShaderMaterialCache.Count,
+                MaxShaderMaterialIndexEntries,
+                ESAssetPackageGridAnimationFrameCache.MaxEntries) +
+                "，单 Shader 材质索引上限 " + MaxMaterialsPerShaderIndex;
         }
 
         public static Texture GetPreviewTexture(UnityEngine.Object asset, ESAssetPackageCategory category)
@@ -2841,6 +3620,7 @@ namespace ES
                 Texture2D modelPreview = RenderGameObjectPreview(go, Mathf.Clamp(previewPixels, 96, 256), bake != null ? bake.previewFallbackMaterial : null);
                 if (modelPreview != null)
                 {
+                    TrimModelPreviewCacheIfNeeded();
                     ModelPreviewCache[key] = modelPreview;
                     return modelPreview;
                 }
@@ -2863,7 +3643,10 @@ namespace ES
                 if (missCount < 90)
                 {
                     if (Event.current == null || Event.current.type == EventType.Repaint)
+                    {
+                        TrimPreviewMissCountsIfNeeded();
                         PreviewMissCounts[key] = missCount + 1;
+                    }
                     QueuePreviewRepaint();
                     return null;
                 }
@@ -2874,11 +3657,58 @@ namespace ES
 
             if (!string.IsNullOrEmpty(path) && preview != null)
             {
+                TrimPreviewCacheIfNeeded();
                 PreviewCache[path] = preview;
                 PreviewMissCounts.Remove(path);
             }
 
             return preview;
+        }
+
+        private static void TrimPreviewCacheIfNeeded()
+        {
+            while (PreviewCache.Count >= MaxStaticPreviewTextures)
+            {
+                string key = PreviewCache.Keys.FirstOrDefault();
+                if (string.IsNullOrEmpty(key))
+                    break;
+                PreviewCache.Remove(key);
+            }
+        }
+
+        private static void TrimModelPreviewCacheIfNeeded()
+        {
+            while (ModelPreviewCache.Count >= MaxStaticModelPreviewTextures)
+            {
+                string key = ModelPreviewCache.Keys.FirstOrDefault();
+                if (string.IsNullOrEmpty(key))
+                    break;
+                if (ModelPreviewCache.TryGetValue(key, out Texture2D texture) && texture != null)
+                    ESEditorPreviewUtility.DestroyObject(texture);
+                ModelPreviewCache.Remove(key);
+            }
+        }
+
+        private static void TrimPreviewMissCountsIfNeeded()
+        {
+            while (PreviewMissCounts.Count >= MaxPreviewMissEntries)
+            {
+                string key = PreviewMissCounts.Keys.FirstOrDefault();
+                if (string.IsNullOrEmpty(key))
+                    break;
+                PreviewMissCounts.Remove(key);
+            }
+        }
+
+        private static void TrimShaderMaterialCacheIfNeeded()
+        {
+            while (ShaderMaterialCache.Count >= MaxShaderMaterialIndexEntries)
+            {
+                string key = ShaderMaterialCache.Keys.FirstOrDefault();
+                if (string.IsNullOrEmpty(key))
+                    break;
+                ShaderMaterialCache.Remove(key);
+            }
         }
 
         private static Texture2D RenderGameObjectPreview(GameObject source, int size, Material configuredFallbackMaterial)
@@ -3203,37 +4033,17 @@ namespace ES
             if (texture != null)
             {
                 EditorGUILayout.LabelField("尺寸", $"{texture.width} x {texture.height}");
-                EditorGUILayout.LabelField("格式", texture.format.ToString());
+                EditorGUILayout.LabelField("纹理格式", texture.format.ToString());
             }
 
             if (AssetImporter.GetAtPath(path) is TextureImporter importer)
             {
-                EditorGUILayout.LabelField("TextureType", importer.textureType.ToString());
+                EditorGUILayout.LabelField("纹理类型", importer.textureType.ToString());
                 EditorGUILayout.LabelField("最大尺寸", importer.maxTextureSize.ToString());
                 EditorGUILayout.LabelField("Mipmap", importer.mipmapEnabled ? "开启" : "关闭");
                 EditorGUILayout.LabelField("压缩", importer.textureCompression.ToString());
-                EditorGUILayout.LabelField("Read/Write", importer.isReadable ? "开启" : "关闭");
+                EditorGUILayout.LabelField("可读写", importer.isReadable ? "开启" : "关闭");
             }
-        }
-
-        public static void DrawMaterialDetail(Material material)
-        {
-            DrawLargePreview(material, 180);
-            if (material == null)
-                return;
-
-            EditorGUILayout.LabelField("Shader", material.shader != null ? material.shader.name : "<无>");
-            if (material.shader == null || !material.shader.isSupported)
-                EditorGUILayout.HelpBox("材质 Shader 缺失或当前工程不支持，模型会显示为紫色。", MessageType.Error);
-            else if (UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline != null && material.shader.name == "Standard")
-                EditorGUILayout.HelpBox("当前工程使用 SRP 管线，但材质仍是内置 Standard Shader，预览或运行时可能显示紫色。建议转换到当前管线的 Lit/Simple Lit。", MessageType.Warning);
-
-            EditorGUILayout.ObjectField("主贴图", material.mainTexture, typeof(Texture), false);
-            if (material.mainTexture == null)
-                EditorGUILayout.HelpBox("材质没有绑定主贴图。如果模型依赖贴图表现，这个材质本身是不完整的。", MessageType.Warning);
-
-            EditorGUILayout.LabelField("RenderQueue", material.renderQueue.ToString());
-            EditorGUILayout.LabelField("Pass", material.passCount.ToString());
         }
 
         public static void DrawObjectPreviewDetail(UnityEngine.Object asset, string path)
@@ -3265,37 +4075,6 @@ namespace ES
                 EditorGUILayout.LabelField(Path.GetFileName(deps[i]), EditorStyles.miniLabel);
         }
 
-        public static void DrawAudioDetail(AudioClip clip, string path)
-        {
-            DrawLargePreview(clip, 96);
-            if (clip != null)
-            {
-                EditorGUILayout.LabelField("时长", $"{clip.length:F2} 秒");
-                EditorGUILayout.LabelField("声道", clip.channels.ToString());
-                EditorGUILayout.LabelField("频率", clip.frequency.ToString());
-                EditorGUILayout.LabelField("采样数", clip.samples.ToString());
-            }
-
-            if (AssetImporter.GetAtPath(path) is AudioImporter importer)
-            {
-                AudioImporterSampleSettings settings = importer.defaultSampleSettings;
-                EditorGUILayout.LabelField("加载方式", settings.loadType.ToString());
-                EditorGUILayout.LabelField("压缩格式", settings.compressionFormat.ToString());
-                EditorGUILayout.LabelField("质量", settings.quality.ToString("F2"));
-            }
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                using (new EditorGUI.DisabledScope(clip == null))
-                {
-                    if (GUILayout.Button("播放"))
-                        PlayAudioClip(clip);
-                    if (GUILayout.Button("停止"))
-                        StopAudioClip();
-                }
-            }
-        }
-
         public static void DrawAnimationClipInfo(AnimationClip clip)
         {
             DrawLargePreview(clip, 96);
@@ -3323,6 +4102,7 @@ namespace ES
             string shaderPath = AssetDatabase.GetAssetPath(shader);
             if (!ShaderMaterialCache.TryGetValue(shaderPath, out List<string> materialPaths))
             {
+                TrimShaderMaterialCacheIfNeeded();
                 materialPaths = new List<string>();
                 if (bake != null && bake.records != null)
                 {
@@ -3332,7 +4112,7 @@ namespace ES
                             continue;
 
                         var mat = record.LoadAsset() as Material;
-                        if (mat != null && mat.shader == shader)
+                        if (mat != null && mat.shader == shader && materialPaths.Count < MaxMaterialsPerShaderIndex)
                             materialPaths.Add(record.assetPath);
                     }
                 }
@@ -3398,42 +4178,13 @@ namespace ES
         private static void DrawLargePreview(Texture texture, float height)
         {
             Rect rect = GUILayoutUtility.GetRect(260, height, GUILayout.ExpandWidth(true));
-            EditorGUI.DrawRect(rect, new Color(0.075f, 0.08f, 0.09f, 1f));
+            ESAssetPackagePresentation.DrawPreviewBackground(rect);
             if (texture != null)
                 GUI.DrawTexture(rect, texture, ScaleMode.ScaleToFit);
             else
                 GUI.Label(rect, "预览不可用（资源类型、导入状态或当前 Unity 环境不支持）", EditorStyles.centeredGreyMiniLabel);
         }
 
-        private static void PlayAudioClip(AudioClip clip)
-        {
-            if (clip == null)
-                return;
-
-            Type audioUtil = typeof(AudioImporter).Assembly.GetType("UnityEditor.AudioUtil");
-            const BindingFlags flags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
-            playClipMethod ??= audioUtil?.GetMethod("PlayPreviewClip", flags, null, new[] { typeof(AudioClip), typeof(int), typeof(bool) }, null)
-                ?? audioUtil?.GetMethod("PlayClip", flags, null, new[] { typeof(AudioClip), typeof(int), typeof(bool) }, null)
-                ?? audioUtil?.GetMethod("PlayClip", flags, null, new[] { typeof(AudioClip) }, null);
-
-            if (playClipMethod == null)
-                return;
-
-            ParameterInfo[] parameters = playClipMethod.GetParameters();
-            if (parameters.Length == 3)
-                playClipMethod.Invoke(null, new object[] { clip, 0, false });
-            else
-                playClipMethod.Invoke(null, new object[] { clip });
-        }
-
-        private static void StopAudioClip()
-        {
-            Type audioUtil = typeof(AudioImporter).Assembly.GetType("UnityEditor.AudioUtil");
-            const BindingFlags flags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
-            stopClipMethod ??= audioUtil?.GetMethod("StopAllPreviewClips", flags)
-                ?? audioUtil?.GetMethod("StopAllClips", flags);
-            stopClipMethod?.Invoke(null, null);
-        }
     }
 
     internal enum ESAssetPackagePreviewBaselinePlatform
@@ -3470,6 +4221,34 @@ namespace ES
         public static string GetGridFrameLoadingStatus()
         {
             return ESAssetPackageGridAnimationFrameCache.GetPersistentFrameLoadingStatus();
+        }
+
+        public static ESAssetPackagePreviewCapability GetCapabilities(ESAssetPackageCategory category)
+        {
+            return ESAssetPackageCategoryCatalog.GetPreviewCapabilities(category);
+        }
+
+        public static bool Supports(ESAssetPackageCategory category, ESAssetPackagePreviewCapability capability)
+        {
+            return (GetCapabilities(category) & capability) == capability;
+        }
+
+        public static string GetCapabilityDisplayName(ESAssetPackagePreviewCapability capabilities)
+        {
+            if (capabilities == ESAssetPackagePreviewCapability.None)
+                return "无";
+
+            var names = new List<string>();
+            if ((capabilities & ESAssetPackagePreviewCapability.Static) != 0) names.Add("静态预览");
+            if ((capabilities & ESAssetPackagePreviewCapability.Scene) != 0) names.Add("场景预览");
+            if ((capabilities & ESAssetPackagePreviewCapability.Animation) != 0) names.Add("动画预览");
+            if ((capabilities & ESAssetPackagePreviewCapability.DynamicEffect) != 0) names.Add("特效预览");
+            if ((capabilities & ESAssetPackagePreviewCapability.Material) != 0) names.Add("材质预览");
+            if ((capabilities & ESAssetPackagePreviewCapability.Audio) != 0) names.Add("音频预览");
+            if ((capabilities & ESAssetPackagePreviewCapability.Shader) != 0) names.Add("Shader 详情");
+            if ((capabilities & ESAssetPackagePreviewCapability.Video) != 0) names.Add("视频预览");
+            if ((capabilities & ESAssetPackagePreviewCapability.Detail) != 0) names.Add("资源详情");
+            return string.Join("、", names);
         }
 
         public static UnityEngine.Object ResolveConfiguredAnimationPreviewModel(ESAssetPackageBakeData bake)
@@ -3573,6 +4352,9 @@ namespace ES
         private static readonly object AllocationLock = new object();
         private static readonly HashSet<Vector2Int> OccupiedCells = new HashSet<Vector2Int>();
         private static readonly Queue<Vector2Int> ReleasedCells = new Queue<Vector2Int>();
+        private static AudioListener sharedPreviewAudioListener;
+        private static int sharedPreviewAudioUsers;
+        private static int sharedPreviewAudioPlaying;
         private static int nextAllocationId;
         private readonly bool usePreviewScene;
         private readonly int allocationId;
@@ -3589,6 +4371,9 @@ namespace ES
         private ESAssetPackagePreviewBaselinePlatform renderTexturePlatform;
         private double lastRenderTime;
         private bool disposed;
+        private AudioListener previewAudioListener;
+        private bool ownsPreviewAudioListener;
+        private bool previewAudioListenerPlaying;
 
         public Camera Camera { get; private set; }
         public string LastStatus { get; private set; } = "Preview context not created.";
@@ -3599,6 +4384,13 @@ namespace ES
         public bool CameraSceneBound { get; private set; }
         public bool UsePreviewScene => usePreviewScene;
         public Vector3 GroupOrigin => groupOrigin;
+        public bool OwnsPreviewAudioListener => ownsPreviewAudioListener;
+        public Vector3 AudioListenerOrigin => previewAudioListener != null && previewAudioListener.transform != null
+            ? previewAudioListener.transform.position
+            : groupOrigin;
+        public Quaternion AudioListenerRotation => previewAudioListener != null && previewAudioListener.transform != null
+            ? previewAudioListener.transform.rotation
+            : Quaternion.identity;
         public bool IsReady => Camera != null && (!usePreviewScene || previewScene.IsValid());
         public string IsolationReport => IsReady
             ? (usePreviewScene
@@ -3634,6 +4426,112 @@ namespace ES
 
             Ensure();
             ApplyPreviewObjectLifecycle(obj, "Asset package preview model.", samplingTarget: true);
+        }
+
+        public AudioListener EnsurePreviewAudioListener()
+        {
+            Ensure();
+            if (Camera == null)
+                return null;
+
+            if (previewAudioListener != null)
+                return previewAudioListener;
+
+            if (sharedPreviewAudioListener == null)
+            {
+                sharedPreviewAudioUsers = 0;
+                sharedPreviewAudioPlaying = 0;
+            }
+
+            AudioListener[] listeners = UnityEngine.Object.FindObjectsOfType<AudioListener>(true);
+            for (int i = 0; i < listeners.Length; i++)
+            {
+                AudioListener candidate = listeners[i];
+                if (candidate == null || candidate == Camera.GetComponent<AudioListener>())
+                    continue;
+                if (!candidate.gameObject.scene.IsValid())
+                    continue;
+
+                bool isOwnedPreviewListener = candidate == sharedPreviewAudioListener;
+                if (!candidate.enabled && !isOwnedPreviewListener)
+                    continue;
+
+                // 隐藏监听器仍然会参与 Unity 混音；复用它可以避免多个预览窗口叠加监听器。
+                previewAudioListener = candidate;
+                ownsPreviewAudioListener = isOwnedPreviewListener;
+                if (ownsPreviewAudioListener)
+                    sharedPreviewAudioUsers++;
+                return candidate;
+            }
+
+            AudioListener cameraListener = Camera.GetComponent<AudioListener>();
+            if (cameraListener != null)
+                DestroyObject(cameraListener);
+
+            previewAudioListener = null;
+            if (previewAudioListener == null)
+            {
+                if (sharedPreviewAudioListener == null)
+                {
+                    GameObject listenerObject = new GameObject("ES Asset Package Preview Shared Audio Listener");
+                    listenerObject.hideFlags = HideFlags.HideAndDontSave;
+                    sharedPreviewAudioListener = listenerObject.AddComponent<AudioListener>();
+                }
+
+                previewAudioListener = sharedPreviewAudioListener;
+                sharedPreviewAudioUsers++;
+            }
+            previewAudioListener.enabled = false;
+            ownsPreviewAudioListener = true;
+            return previewAudioListener;
+        }
+
+        public void SetPreviewAudioListenerPlaying(bool shouldPlay)
+        {
+            if (!ownsPreviewAudioListener || previewAudioListener == null)
+                return;
+
+            if (shouldPlay)
+            {
+                if (sharedPreviewAudioListener == previewAudioListener)
+                {
+                    previewAudioListener.transform.position = groupOrigin;
+                    previewAudioListener.transform.rotation = Quaternion.identity;
+                }
+                if (!previewAudioListenerPlaying)
+                {
+                    previewAudioListenerPlaying = true;
+                    sharedPreviewAudioPlaying++;
+                }
+                previewAudioListener.enabled = true;
+                return;
+            }
+
+            if (previewAudioListenerPlaying)
+            {
+                previewAudioListenerPlaying = false;
+                sharedPreviewAudioPlaying = Mathf.Max(0, sharedPreviewAudioPlaying - 1);
+            }
+            previewAudioListener.enabled = sharedPreviewAudioPlaying > 0;
+        }
+
+        public string GetAudioListenerDescription(AudioListener listener)
+        {
+            if (listener == null)
+                return "未创建监听器";
+            if (listener == sharedPreviewAudioListener)
+                return "ES 共享编辑器监听器（租约 " + sharedPreviewAudioUsers + "，播放中 " + sharedPreviewAudioPlaying + "，当前 " + (listener.enabled ? "启用" : "停用") + "）";
+            return "复用外部场景监听器（只读，不修改其位置与生命周期，当前 " + (listener.enabled ? "启用" : "停用") + "）";
+        }
+
+        public bool PreparePreviewAudioObject(GameObject obj)
+        {
+            if (obj == null)
+                return false;
+
+            PreparePreviewObject(obj);
+            obj.transform.position = groupOrigin;
+            return obj.scene.IsValid();
         }
 
         public bool MoveToPreviewScene(GameObject obj)
@@ -3741,6 +4639,20 @@ namespace ES
             DestroyObject(cameraObject);
             DestroyObject(keyLightObject);
             DestroyObject(fillLightObject);
+            SetPreviewAudioListenerPlaying(false);
+            if (ownsPreviewAudioListener && previewAudioListener == sharedPreviewAudioListener)
+            {
+                sharedPreviewAudioUsers = Mathf.Max(0, sharedPreviewAudioUsers - 1);
+                if (sharedPreviewAudioUsers == 0)
+                {
+                    DestroyObject(sharedPreviewAudioListener.gameObject);
+                    sharedPreviewAudioListener = null;
+                    sharedPreviewAudioPlaying = 0;
+                }
+            }
+            previewAudioListener = null;
+            ownsPreviewAudioListener = false;
+            previewAudioListenerPlaying = false;
             Camera = null;
             ReleaseCell(allocatedCell);
 
@@ -3775,7 +4687,7 @@ namespace ES
             Camera.enabled = false;
             Camera.fieldOfView = 30f;
             Camera.clearFlags = CameraClearFlags.Color;
-            Camera.backgroundColor = new Color(0.06f, 0.065f, 0.075f, 1f);
+            Camera.backgroundColor = ESAssetPackagePresentation.Canvas;
             Camera.cullingMask = 1 << PreviewRenderLayer;
             Camera.allowHDR = true;
             Camera.allowMSAA = true;
@@ -4128,7 +5040,7 @@ namespace ES
         private const int GridMinFrameCount = 24;
         private const int GridMaxFrameCount = 36;
         public const int GridMaxPixels = 128;
-        private const int MaxEntries = 48;
+        public const int MaxEntries = 48;
         private const int MaxFramesPerEditorUpdate = 1;
         private static readonly Dictionary<string, Entry> Entries = new Dictionary<string, Entry>();
         private static readonly List<Entry> BuildQueue = new List<Entry>();
@@ -5102,7 +6014,7 @@ namespace ES
         public void Draw(Rect rect, string path, AnimationClip clip, UnityEngine.Object model, Material fallbackMaterial, Avatar overrideAvatar)
         {
             LoadSettings();
-            EditorGUI.DrawRect(rect, new Color(0.06f, 0.065f, 0.075f, 1f));
+            ESAssetPackagePresentation.DrawPreviewBackground(rect);
             if (clip == null || model == null)
             {
                 GUI.Label(rect, "选择动画和预览模型后点击播放", EditorStyles.centeredGreyMiniLabel);
@@ -5403,9 +6315,9 @@ namespace ES
         public void DrawPreviewOptions()
         {
             LoadSettings();
-            using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
+            using (new EditorGUILayout.HorizontalScope(ESAssetPackagePresentation.Surface))
             {
-                bool newAutoPlay = GUILayout.Toggle(autoPlay, "自动播放", EditorStyles.toolbarButton, GUILayout.Width(72));
+                bool newAutoPlay = GUILayout.Toggle(autoPlay, "自动播放", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(72));
                 if (newAutoPlay != autoPlay)
                 {
                     autoPlay = newAutoPlay;
@@ -5414,7 +6326,7 @@ namespace ES
                     SaveSettings();
                 }
 
-                bool newFollow = GUILayout.Toggle(followAnimatedBounds, "相机跟随", EditorStyles.toolbarButton, GUILayout.Width(72));
+                bool newFollow = GUILayout.Toggle(followAnimatedBounds, "相机跟随", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(72));
                 if (newFollow != followAnimatedBounds)
                 {
                     followAnimatedBounds = newFollow;
@@ -5452,7 +6364,7 @@ namespace ES
                     SaveSettings();
                 }
 
-                if (GUILayout.Button("重置视角", EditorStyles.toolbarButton, GUILayout.Width(74)))
+                if (GUILayout.Button("重置视角", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(74)))
                     ResetView();
 
                 GUILayout.FlexibleSpace();
@@ -6066,7 +6978,6 @@ namespace ES
                     if (abs > maxMuscleAbs)
                         maxMuscleAbs = abs;
                 }
-
             }
 
             public void ApplyRootMotion(float time, GameObject target, Vector3 groupOrigin)
@@ -7099,5 +8010,118 @@ namespace ES
             lastRestPoseChangedBoneSamples = string.Empty;
         }
 
+    }
+
+    internal sealed class ESAssetPackageDynamicPreviewPlayer : IDisposable
+    {
+        private readonly ESAssetPackagePreviewSceneContext previewContext = new ESAssetPackagePreviewSceneContext(usePreviewScene: false);
+        private GameObject instance;
+        private ParticleSystem[] particleSystems = Array.Empty<ParticleSystem>();
+        private UnityEngine.Object source;
+        private bool playing;
+        private bool loop = true;
+        private float playbackSpeed = 1f;
+        private float currentTime;
+        private float duration = 1f;
+        private double lastUpdate;
+        private Action repaint;
+        private string status = "未播放";
+
+        public bool CanPreview(UnityEngine.Object asset)
+        {
+            GameObject go = ESAssetPackagePreviewWorkflow.ResolvePreviewGameObject(asset);
+            return go != null && go.GetComponentsInChildren<ParticleSystem>(true).Length > 0;
+        }
+
+        public void DrawDetail(UnityEngine.Object asset, ESAssetPackageBakeData bake, Action repaintOwner)
+        {
+            if (!CanPreview(asset)) return;
+            repaint = repaintOwner;
+            EnsureInstance(asset, bake != null ? bake.previewFallbackMaterial : null);
+            if (instance == null) return;
+            EditorGUILayout.Space(6);
+            using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface))
+            {
+                EditorGUILayout.LabelField("ES 动态特效预览", ESAssetPackagePresentation.Header);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button(playing ? "暂停" : "播放", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(64))) { playing = !playing; status = playing ? "播放中" : "已暂停"; if (playing) RegisterUpdate(); else UnregisterUpdate(); }
+                    if (GUILayout.Button("停止", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(64))) Stop();
+                    loop = GUILayout.Toggle(loop, "循环", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(52));
+                    EditorGUILayout.LabelField(status, ESAssetPackagePresentation.Meta);
+                }
+                float nextTime = EditorGUILayout.Slider("时间", currentTime, 0f, Mathf.Max(0.01f, duration));
+                if (!Mathf.Approximately(nextTime, currentTime)) { currentTime = nextTime; Simulate(currentTime); }
+                playbackSpeed = EditorGUILayout.Slider("速度", playbackSpeed, 0.1f, 3f);
+                Rect rect = GUILayoutUtility.GetRect(480f, 300f, GUILayout.ExpandWidth(true));
+                Bounds bounds = ESEditorPreviewUtility.CalculateBounds(instance);
+                previewContext.Render(rect, bounds.center, Mathf.Max(0.5f, bounds.extents.magnitude), 3f, 180f, 8f, 1f, ESAssetPackagePreviewBaselinePlatform.Desktop, 1d / 60d);
+                EditorGUILayout.LabelField("粒子系统", particleSystems.Length.ToString(), ESAssetPackagePresentation.Meta);
+                EditorGUILayout.LabelField("预计时长", duration.ToString("F2") + " 秒", ESAssetPackagePresentation.Meta);
+            }
+        }
+
+        private void EnsureInstance(UnityEngine.Object asset, Material fallback)
+        {
+            if (source == asset && instance != null) return;
+            DisposeInstance();
+            GameObject sourceObject = ESAssetPackagePreviewWorkflow.ResolvePreviewGameObject(asset);
+            if (sourceObject == null) return;
+            source = asset;
+            instance = UnityEngine.Object.Instantiate(sourceObject);
+            previewContext.PreparePreviewObject(instance);
+            instance.transform.position = previewContext.GroupOrigin;
+            instance.transform.rotation = Quaternion.identity;
+            instance.transform.localScale = Vector3.one;
+            foreach (Behaviour behaviour in instance.GetComponentsInChildren<Behaviour>(true))
+                if (!(behaviour is Animator) && !(behaviour is Animation)) behaviour.enabled = false;
+            ESAssetPackagePreviewUtility.ApplyPreviewFallbackMaterials(instance, fallback);
+            particleSystems = instance.GetComponentsInChildren<ParticleSystem>(true);
+            duration = particleSystems.Length == 0 ? 1f : particleSystems.Max(EstimateDuration);
+            currentTime = 0f;
+            Simulate(0f);
+        }
+
+        private void DisposeInstance()
+        {
+            Stop();
+            if (instance != null)
+                UnityEngine.Object.DestroyImmediate(instance);
+            instance = null;
+            source = null;
+            particleSystems = Array.Empty<ParticleSystem>();
+            duration = 1f;
+            currentTime = 0f;
+        }
+
+        private static float EstimateDuration(ParticleSystem system)
+        {
+            if (system == null) return 1f;
+            ParticleSystem.MainModule main = system.main;
+            float life = main.startLifetime.mode == ParticleSystemCurveMode.Constant ? main.startLifetime.constant : 1f;
+            return Mathf.Max(0.1f, main.duration + life);
+        }
+
+        private void Simulate(float time)
+        {
+            foreach (ParticleSystem system in particleSystems)
+                if (system != null) system.Simulate(Mathf.Max(0f, time), true, true, true);
+            repaint?.Invoke();
+        }
+
+        private void RegisterUpdate() { lastUpdate = EditorApplication.timeSinceStartup; EditorApplication.update -= Update; EditorApplication.update += Update; }
+        private void UnregisterUpdate() => EditorApplication.update -= Update;
+        private void Update()
+        {
+            if (!playing || instance == null) { UnregisterUpdate(); return; }
+            double now = EditorApplication.timeSinceStartup;
+            currentTime += Mathf.Clamp((float)(now - lastUpdate), 0f, 0.1f) * playbackSpeed;
+            lastUpdate = now;
+            if (currentTime > duration) { if (loop) currentTime = 0f; else { currentTime = duration; playing = false; status = "播放完成"; UnregisterUpdate(); } }
+            Simulate(currentTime);
+        }
+
+        private void Stop() { playing = false; currentTime = 0f; status = "已停止"; UnregisterUpdate(); if (instance != null) Simulate(0f); }
+        public void Dispose() { DisposeInstance(); repaint = null; previewContext.Dispose(); }
     }
 }

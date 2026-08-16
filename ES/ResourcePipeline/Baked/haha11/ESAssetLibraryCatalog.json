@@ -1,9 +1,11 @@
 {
-  "formatVersion": 3,
+  "formatVersion": 4,
   "libraryName": "Library Name",
   "libraryFolder": "haha11",
   "libraryBundleCode": "",
   "libraryAssetGuid": "bd6a374707a713e4eb09b6802f8fe4aa",
+  "librarySourceRevision": "f2b8a6b10321b2208441e035dd2da3f1:d1639367d57fb1525f250c068353a002b55512301727b5f1e80e0bf408e9f707",
+  "generatedUtc": "2026-08-11T14:21:08.8853074Z",
   "assets": [
     {
       "identity": {
@@ -129,9 +131,60 @@
       "topLevelFolderGuid": "2aa16d78470a45f4ebf0e2be93af7358",
       "enumKey": 0,
       "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "bf2dc9bca456f2848b25fc58ea478f1f",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "bf2dc9bca456f2848b25fc58ea478f1f"
+      },
+      "assetPath": "Assets/ESNormalAssets/WeaponPrototypes/大长条.prefab",
+      "assetTypeName": "UnityEngine.GameObject",
+      "kind": "Prefab",
+      "stringKey": "prefab.weapon.melee.long_bar",
+      "libraryName": "Library Name",
+      "libraryFolder": "haha11",
+      "libraryBundleCode": "",
+      "pageName": "大长条",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "parentFolderPath": "Assets/ESNormalAssets/WeaponPrototypes",
+      "parentFolderGuid": "fb41b97ca8390284cab605960d64663b",
+      "topLevelFolderPath": "Assets/ESNormalAssets",
+      "topLevelFolderGuid": "2aa16d78470a45f4ebf0e2be93af7358",
+      "enumKey": 0,
+      "isBusinessAsset": true
+    },
+    {
+      "identity": {
+        "guid": "6bd32f5e9a6645199c104bf1d0f2095a",
+        "localFileId": 0,
+        "IsValid": true,
+        "IsSubAsset": false,
+        "Key": "6bd32f5e9a6645199c104bf1d0f2095a"
+      },
+      "assetPath": "Assets/Plugins/ES/0_Stand/_Res/Bootstrap/ESBootstrap.unity",
+      "assetTypeName": "UnityEditor.SceneAsset",
+      "kind": "Scene",
+      "stringKey": "ESBootstrap",
+      "libraryName": "Library Name",
+      "libraryFolder": "haha11",
+      "libraryBundleCode": "",
+      "pageName": "ESBootstrap",
+      "namedOption": "UseFilePath",
+      "subAssetName": "",
+      "parentFolderPath": "Assets/Plugins/ES/0_Stand/_Res/Bootstrap",
+      "parentFolderGuid": "19a380e42712f4d469f957dcd2c6e1b0",
+      "topLevelFolderPath": "Assets/Plugins",
+      "topLevelFolderGuid": "e281160275b6e6f43bffb849e2c973e3",
+      "enumKey": 0,
+      "isBusinessAsset": true
     }
   ],
   "excludedEditorOnlyPaths": [],
+  "excludedFolderPaths": [],
   "errors": [],
   "warnings": [
     "资产身份重复，规划时将按同一物理资产去重：测试库/GameObject (3) 与 Library Name/GameObject (3)",

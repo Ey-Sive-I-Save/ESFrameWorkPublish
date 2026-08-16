@@ -156,7 +156,7 @@ MonoBehaviour:
       StringKey: AA 2
       AssetGuid: 0a45407b845bf9347b7b974aaca979de
       LocalFileId: 0
-      AssetPath: Assets/Plugins/ES/0_Stand/TESTING/AA 2.asset
+      AssetPath: Assets/Plugins/ES/0_Stand/Tests/TestAssets/ResourcePipeline/AA 2.asset
       AssetTypeName: UnityEngine.Object
       SourceLibrary: 4718578158784d34ba816e7be20ffed1
       SourceBook: "\u6750\u8D28"
@@ -331,7 +331,7 @@ MonoBehaviour:
       StringKey: AA 1
       AssetGuid: 3db87459e9ff54d4395a96462c91be33
       LocalFileId: 0
-      AssetPath: Assets/Plugins/ES/0_Stand/TESTING/AA 1.asset
+      AssetPath: Assets/Plugins/ES/0_Stand/Tests/TestAssets/ResourcePipeline/AA 1.asset
       AssetTypeName: UnityEngine.Object
       SourceLibrary: 4718578158784d34ba816e7be20ffed1
       SourceBook: "\u9ED8\u8BA4 \u7CBE\u7075 Book"

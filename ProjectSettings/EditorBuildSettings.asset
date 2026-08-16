@@ -6,7 +6,7 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Plugins/ES/0_Stand/_Res/Bootstrap/ESBootstrap.unity
+    path: Assets/Plugins/ES/0_Stand/InternalAssets/ResourceBootstrap/ESBootstrap.unity
     guid: 6bd32f5e9a6645199c104bf1d0f2095a
   - enabled: 1
     path: Assets/ESNormalAssets/ESValidation/LevelAssetFlow/Scenes/ESLevelAssetValidation.unity

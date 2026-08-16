@@ -873,13 +873,18 @@ namespace ES
                     {
                         ESEditorHandle.AddSimpleHandleTask(() =>
                         {
-                            if (ESDesignUtility.SafeEditor.Wrap_DisplayDialog("开始-烘焙资产引用", "只分析资产身份与引用关系，不修改 AB 标签。", "开始", "取消"))
+                            ESContentRegistrationResult result = ESContentRegistrationAuthoring.ExecuteBakeWithConfirmation();
+                            if (result == null)
                             {
-                                ESAssetReferenceBaker.Bake();
+                                Debug.LogWarning("已取消资源引用 Bake。");
+                            }
+                            else if (!result.success)
+                            {
+                                Debug.LogError("资源引用 Bake 启动失败：" + result.message);
                             }
                             else
                             {
-                                Debug.LogWarning("放弃-<资源去向生成>");
+                                Debug.Log("资源引用 Bake 已通过统一内容注册入口入队，RunId=" + result.runId + "。入队不代表完成。");
                             }
                         }, key: ResourcePipelineTaskKey);
                     }

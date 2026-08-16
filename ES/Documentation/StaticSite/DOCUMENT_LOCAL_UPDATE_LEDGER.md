@@ -378,6 +378,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：没有 Unity Editor 编译、ReloadDomain、Test Runner、PlayMode 或 Player 证据；地图地形预览、对话锚点场景绑定、相机 Rig 和 Workbench UI 仍需 Unity 实机交互验收；静态构建来自当前完整工作树。
 - **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-007：资源管线强化与目录归属迁移
+
+- **源码路径**：AssetPackage Bake 数据与窗口、资源引用烘焙器、运行时验证案例、资源库配置、Bootstrap/测试资产/示例迁移、构建场景和四个 v4 烘焙目录。
+- **规范与证据**：Bootstrap 场景与主题归入 `InternalAssets`，测试资产归入 `Tests`，公开示例归入 `3_Examples`；迁移保留 Unity GUID，并同步当前资产库和构建场景路径。
+- **完成分析**：资源包预检、依赖图、导出合同、作者配置和运行时验证属于同一资源交付链；目录迁移与引用更新同批可避免 GUID 保留但路径合同失效。
+- **回归状态**：`ES_Stand.csproj`、`ES_Logic.csproj` 均为 0 警告、0 错误；`ES_Editor.csproj` 为 0 错误、16 个既有警告；21 个目标文本严格 UTF-8 通过；活动源码与 ProjectSettings 无旧路径残留。
+- **已知缺口**：未运行 Unity Editor 编译、ReloadDomain、资源烘焙窗口、Test Runner、Player 或真实发布流程；v4 Baked 目录未在本会话重新生成；Unity `.meta` 空字段尾空格按序列化格式保留。
+- **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

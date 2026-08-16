@@ -1,9 +1,11 @@
 {
-  "formatVersion": 3,
+  "formatVersion": 4,
   "libraryName": "测试库",
   "libraryFolder": "ceshiku",
   "libraryBundleCode": "",
   "libraryAssetGuid": "4718578158784d34ba816e7be20ffed1",
+  "librarySourceRevision": "5bd863c815db008bb93f0edd36ba1e95:2b83a6b597ffa336fd97dfa4f2727db5d6d4a32912c48c2eef268efdaf65983b",
+  "generatedUtc": "2026-08-11T14:21:08.8853074Z",
   "assets": [
     {
       "identity": {
@@ -86,6 +88,7 @@
     "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDenpendceSamples.cs",
     "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res/CircleDependenceSamplePrefabRef.cs"
   ],
+  "excludedFolderPaths": [],
   "errors": [],
   "warnings": [
     "已排除 EditorOnly Page：测试库/SingletonSeriMono (Assets/Plugins/ES/0_Stand/Stand_Tools/SingletonAndOnlyOne/SingletonSeriMono.cs)",

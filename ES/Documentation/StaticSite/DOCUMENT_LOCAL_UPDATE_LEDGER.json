@@ -1699,6 +1699,66 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-007",
+                        "status":  "documented",
+                        "summary":  "强化 AssetPackage Bake 与资源引用工作流，将 Bootstrap、测试资产和公开示例迁入正式职责目录，并同步作者配置、构建场景与 v4 烘焙目录。",
+                        "sourcePaths":  [
+                                            "Assets/ESNormalAssets/Data/AssetLibrary",
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets/ResourceBootstrap.meta",
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets/ResourceBootstrap",
+                                            "Assets/Plugins/ES/0_Stand/TESTING",
+                                            "Assets/Plugins/ES/0_Stand/Tests/TestAssets.meta",
+                                            "Assets/Plugins/ES/0_Stand/Tests/TestAssets",
+                                            "Assets/Plugins/ES/0_Stand/_Res/Bootstrap/ESResBootstrapView.cs",
+                                            "Assets/Plugins/ES/0_Stand/_Res/ResUse/ESAssetRefer.cs",
+                                            "Assets/Plugins/ES/0_Stand/目录结构与资源归属约定.md",
+                                            "Assets/Plugins/ES/0_Stand/目录结构与资源归属约定.md.meta",
+                                            "Assets/Plugins/ES/3_Examples/1_Runtime/Example_AssetFlowHotUpdate/ESAssetFlowTestSceneController.cs",
+                                            "Assets/Plugins/ES/3_Examples/1_Runtime/Example_Res",
+                                            "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow",
+                                            "Assets/Plugins/ES/Editor/ESMenuTreeWindow/ResWindow/ESResWindow.cs",
+                                            "Assets/Plugins/ES/Editor/ESResPipeline",
+                                            "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation",
+                                            "ES/ResourcePipeline/Baked/ceshiku",
+                                            "ES/ResourcePipeline/Baked/es_level_asset_validation",
+                                            "ES/ResourcePipeline/Baked/haha11",
+                                            "ES/ResourcePipeline/Baked/nanniangku",
+                                            "ProjectSettings/EditorBuildSettings.asset"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                                              "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/ESAssetPackageBakeWindow.cs",
+                                              "Assets/Scripts/ESLogic/Runtime/Developer/Examples/ResourcePipelineValidation/Components/ESLevelAssetValidationSceneController.cs",
+                                              "Assets/Plugins/ES/0_Stand/目录结构与资源归属约定.md"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "资源包数据、依赖图、预检与导出窗口共同升级；Bootstrap 场景和主题归入 InternalAssets，资源管线测试资产归入 Tests，公开示例归入 3_Examples，并保留 Unity GUID、同步资产库与构建场景路径。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Stand.csproj 与 ES_Logic.csproj 静态构建为 0 警告、0 错误",
+                                                            "ES_Editor.csproj 静态构建为 0 错误、16 个既有警告",
+                                                            "21 个目标文本通过严格 UTF-8 检查",
+                                                            "活动源码与 ProjectSettings 中未发现旧 Bootstrap 或 TESTING 路径引用"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "未运行 Unity Editor 编译、ReloadDomain、资源烘焙窗口、Test Runner、Player 或真实发布流程",
+                                                             "v4 Baked 目录来自现有生成结果，未在本会话重新调用 Unity 烘焙验证",
+                                                             "Unity .meta 空字段尾空格按序列化格式保留"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1711,13 +1771,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T10:29:19+08:00",
-                       "head":  "63ead9b2ff8c10058ec7ccb0a79570062e233fe9",
-                       "stagedSourcePatchSha256":  "ef4ae2713920c3305be556d989c954d2f6d150f578f148258c0a2e3238efad93",
-                       "stagedSourceManifestSha256":  "dfe1c5b9d6f983aa566b18a34715eef953ce532f722a2f5d1df2b6ae6b0b0480",
-                       "stagedSourceFileCount":  86,
+                       "preparedAt":  "2026-08-16T10:33:42+08:00",
+                       "head":  "1f2342bbeb925c6bce4a344d7a92f6e1497ba36b",
+                       "stagedSourcePatchSha256":  "3465e2d548abcc42da2d6a731be23e22ac5ddba368e0812a82f8ac4fac57579b",
+                       "stagedSourceManifestSha256":  "8f24bb0899a403d986528de6dbf0ab73f4260927ab22d8773e4db40a7d636c67",
+                       "stagedSourceFileCount":  43,
                        "entryIds":  [
-                                        "LOCAL-20260816-006"
+                                        "LOCAL-20260816-007"
                                     ]
                    }
 }

@@ -1,9 +1,11 @@
 {
-  "formatVersion": 3,
+  "formatVersion": 4,
   "libraryName": "关卡资源卸载验收库",
   "libraryFolder": "es_level_asset_validation",
   "libraryBundleCode": "",
   "libraryAssetGuid": "32b800c6a6fa10049a5b41dc648b6d8c",
+  "librarySourceRevision": "5b940d06477f99f268b7c31c33a2e2c4:e53d358bb44d054c9ff724412a905864e46800764f9df9f882e45f268131fbf5",
+  "generatedUtc": "2026-08-11T14:21:08.8853074Z",
   "assets": [
     {
       "identity": {
@@ -1007,6 +1009,7 @@
     }
   ],
   "excludedEditorOnlyPaths": [],
+  "excludedFolderPaths": [],
   "errors": [],
   "warnings": []
 }

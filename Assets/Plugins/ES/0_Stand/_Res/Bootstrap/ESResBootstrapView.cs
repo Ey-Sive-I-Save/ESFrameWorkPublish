@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 
@@ -15,6 +16,7 @@ namespace ES
         private TextMeshProUGUI titleText, subtitleText, announcementText, statusText, detailText, percentText, actionText;
         private Image backgroundImage, logoImage, panelImage, trackImage, progressFill, actionImage;
         private Button actionButton;
+        private GameObject ownedEventSystem;
 
         private Color Background => theme != null ? theme.backgroundTint : new Color(0.025f, 0.07f, 0.13f, 1f);
         private Color Panel => theme != null ? theme.panelTint : new Color(0.035f, 0.1f, 0.18f, 0.92f);
@@ -22,7 +24,19 @@ namespace ES
         private Color Body => theme != null ? theme.bodyColor : new Color(0.71f, 0.79f, 0.9f, 1f);
         private Color ButtonText => theme != null ? theme.buttonTextColor : new Color(0.012f, 0.018f, 0.035f, 1f);
 
-        private void Awake() => BuildCanvas();
+        private void Awake()
+        {
+            SceneManager.sceneLoaded += OnSceneLoaded;
+            SceneManager.sceneUnloaded += OnSceneUnloaded;
+            BuildCanvas();
+        }
+
+        private void OnDestroy()
+        {
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            SceneManager.sceneUnloaded -= OnSceneUnloaded;
+            ReleaseOwnedEventSystem();
+        }
 
         public void ApplyTheme(ESResBootstrapTheme value)
         {
@@ -107,14 +121,15 @@ namespace ES
         /// <summary>资源准备完成后隐藏启动 UI；Manager 本身保持存活以支持后续更新检查。</summary>
         public void SetVisible(bool visible)
         {
+            if (visible) EnsureEventSystem();
+            else ReleaseOwnedEventSystem();
             Canvas canvas = GetComponent<Canvas>();
             if (canvas != null) canvas.enabled = visible;
         }
 
         private void BuildCanvas()
         {
-            if (FindFirstObjectByType<EventSystem>() == null)
-                DontDestroyOnLoad(new GameObject("ESResBootstrapEventSystem", typeof(EventSystem), typeof(StandaloneInputModule)));
+            EnsureEventSystem();
             var canvas = gameObject.AddComponent<Canvas>(); canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = short.MaxValue;
             var scaler = gameObject.AddComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize; scaler.referenceResolution = theme != null ? theme.referenceResolution : new Vector2(1920f, 1080f); scaler.matchWidthOrHeight = 0.5f;
             gameObject.AddComponent<GraphicRaycaster>();
@@ -135,6 +150,58 @@ namespace ES
             actionText = Text("Label", actionButton.transform, 19, ButtonText, TextAlignmentOptions.Center, FontStyles.Bold); Stretch(actionText.rectTransform); actionButton.targetGraphic = actionImage;
             ApplyTheme(theme); actionButton.gameObject.SetActive(false);
             Debug.Log("[ESRes][Bootstrap][View] 启动界面初始化完成。", this);
+        }
+
+        private void EnsureEventSystem()
+        {
+            EventSystem[] eventSystems = FindObjectsByType<EventSystem>(
+                FindObjectsInactive.Exclude,
+                FindObjectsSortMode.None);
+            for (int i = 0; i < eventSystems.Length; i++)
+            {
+                if (eventSystems[i] != null && eventSystems[i].gameObject != ownedEventSystem)
+                {
+                    ReleaseOwnedEventSystem();
+                    return;
+                }
+            }
+
+            if (ownedEventSystem != null)
+                return;
+
+            ownedEventSystem = new GameObject(
+                "ESResBootstrapEventSystem",
+                typeof(EventSystem),
+                typeof(StandaloneInputModule));
+            DontDestroyOnLoad(ownedEventSystem);
+        }
+
+        private void ReleaseOwnedEventSystem()
+        {
+            if (ownedEventSystem == null)
+                return;
+
+            GameObject target = ownedEventSystem;
+            ownedEventSystem = null;
+            if (Application.isPlaying)
+            {
+                target.SetActive(false);
+                Destroy(target);
+            }
+            else DestroyImmediate(target);
+        }
+
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            if (ownedEventSystem != null)
+                EnsureEventSystem();
+        }
+
+        private void OnSceneUnloaded(Scene scene)
+        {
+            Canvas canvas = GetComponent<Canvas>();
+            if (canvas != null && canvas.enabled)
+                EnsureEventSystem();
         }
 
         private static Image Image(string name, Transform parent, Color color)

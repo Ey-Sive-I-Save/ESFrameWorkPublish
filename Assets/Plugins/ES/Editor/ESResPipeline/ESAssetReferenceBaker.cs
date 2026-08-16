@@ -890,11 +890,22 @@ namespace ES
                     continue;
                 }
 
-                if (!item.TryGetGameCoreKey(out IESConfigKey key))
+                if (!item.TryGetItemGameCoreKey(out ESItemConfigKey itemKey))
                 {
-                    errors.Add("Item GameCore 缺少 Key：" + item.name);
+                    errors.Add("Item GameCore 缺少基础 ItemKey：" + item.name);
                     continue;
                 }
+
+                string itemIdentity = "Item|" + (itemKey.EnumKeyInt != 0
+                    ? "E:" + itemKey.EnumKeyInt
+                    : "S:" + itemKey.StringKey);
+                if (owners.TryGetValue(itemIdentity, out ItemDataInfo itemOwner) && itemOwner != item)
+                    errors.Add("基础 ItemKey 重复：" + itemIdentity + "，资产为 " + DescribeItem(itemOwner) + " 与 " + DescribeItem(item));
+                else
+                    owners[itemIdentity] = item;
+
+                if (!item.TryGetGameCoreKey(out IESConfigKey key))
+                    continue;
 
                 string identity = item.baseConfig.kind + "|" + (key.EnumKeyInt != 0
                     ? "E:" + key.EnumKeyInt

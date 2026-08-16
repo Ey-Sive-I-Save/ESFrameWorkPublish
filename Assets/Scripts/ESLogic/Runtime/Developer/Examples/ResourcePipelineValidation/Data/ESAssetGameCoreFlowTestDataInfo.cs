@@ -65,6 +65,9 @@ namespace ES
     {
         [NonSerialized] private ESAssetScope testScope;
         [NonSerialized] private ESRuntimeSceneHandle testSceneHandle;
+        [NonSerialized] private object testReferenceOwner;
+        [NonSerialized] private CancellationTokenSource testSessionCancellation;
+        [NonSerialized] private long testReferenceGeneration;
 
         [TitleGroup("Test Root")]
         [ESConfigKeyUsage(ESConfigKeyUsage.Declaration)]
@@ -196,58 +199,165 @@ namespace ES
         [Button("5. Release Test References")]
         public void ReleaseTestReferences()
         {
-            testScope?.Dispose();
-            testScope = null;
-            // ESRuntimeSceneHandle owns the scene lease; Dispose is the current resource-runtime release contract.
-            testSceneHandle.Dispose();
-            testSceneHandle = default;
-            Debug.Log("[ESFlowTest][Release] Dedicated test Scope and Scene Handle disposed; all test-held asset references were returned.", this);
+            ReleaseTestReferences(this);
         }
 
         public async UniTask<string> RunAssetLoadTestAsync(CancellationToken token = default)
         {
-            testScope?.Dispose();
-            testSceneHandle.Dispose();
-            testSceneHandle = default;
-            testScope = ESAssets.CreateScope();
+            return await RunAssetLoadTestAsync(this, token);
+        }
+
+        public bool ReleaseTestReferences(object owner)
+        {
+            if (owner == null || !ReferenceEquals(testReferenceOwner, owner))
+                return false;
+
+            testReferenceGeneration++;
+            testReferenceOwner = null;
+            ReleaseHeldTestReferences();
+            Debug.Log("[ESFlowTest][Release] Dedicated test Scope and Scene Handle disposed; all test-held asset references were returned.", this);
+            return true;
+        }
+
+        public async UniTask<string> RunAssetLoadTestAsync(object owner, CancellationToken token = default)
+        {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner));
+            if (testReferenceOwner != null && !ReferenceEquals(testReferenceOwner, owner))
+                throw new InvalidOperationException(
+                    "[ESFlowTest][Ownership] Test references are already owned by another controller. Release that test session before starting a new one.");
+
+            long generation = ++testReferenceGeneration;
+            ReleaseHeldTestReferences();
+            testReferenceOwner = owner;
+            testSessionCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
+            CancellationToken sessionToken = testSessionCancellation.Token;
+            ESAssetScope runScope;
+            try
+            {
+                runScope = ESAssets.CreateScope();
+            }
+            catch
+            {
+                ReleaseTestReferences(owner, generation);
+                throw;
+            }
+            testScope = runScope;
             var report = new StringBuilder(3072);
             report.AppendLine("[ESFlowTest][Load] Full asset loading report");
-            await LoadAndAppend(report, "Prefab", prefab, testScope, token);
-            await LoadAndAppend(report, "Sprite", sprite, testScope, token);
-            await LoadAndAppend(report, "AudioClip", audioClip, testScope, token);
-            await LoadAndAppend(report, "Material", material, testScope, token);
-            await LoadAndAppend(report, "Texture", texture, testScope, token);
-            await LoadAndAppend(report, "Texture2D", texture2D, testScope, token);
-            await LoadAndAppend(report, "AnimationClip", animationClip, testScope, token);
-            await LoadAndAppend(report, "AnimatorController", animatorController, testScope, token);
-            await LoadAndAppend(report, "SpriteAtlas", spriteAtlas, testScope, token);
-            await LoadAndAppend(report, "Avatar", avatar, testScope, token);
-            await LoadAndAppend(report, "VideoClip", videoClip, testScope, token);
-            report.AppendLine("[INFO] TimelineAsset: skipped; PlayableAsset covers the runtime load contract without a hard Timeline assembly edge.");
-            await LoadAndAppend(report, "PlayableAsset", playableAsset, testScope, token);
-            await LoadAndAppend(report, "Mesh", mesh, testScope, token);
-            await LoadAndAppend(report, "TerrainData", terrainData, testScope, token);
-            await LoadAndAppend(report, "Raw", raw, testScope, token);
-            await LoadAndAppend(report, "ScriptableObject", scriptableObject, testScope, token);
-            await LoadAndAppend(report, "UnityObject", unityObject, testScope, token);
-
-            if (scene != null && scene.IsValid)
+            try
             {
-                if (!loadScene) report.AppendLine("[SKIP] Scene: valid, loading disabled to avoid changing the active scene.");
-                else
+                await LoadAndAppend(report, "Prefab", prefab, runScope, sessionToken);
+                await LoadAndAppend(report, "Sprite", sprite, runScope, sessionToken);
+                await LoadAndAppend(report, "AudioClip", audioClip, runScope, sessionToken);
+                await LoadAndAppend(report, "Material", material, runScope, sessionToken);
+                await LoadAndAppend(report, "Texture", texture, runScope, sessionToken);
+                await LoadAndAppend(report, "Texture2D", texture2D, runScope, sessionToken);
+                await LoadAndAppend(report, "AnimationClip", animationClip, runScope, sessionToken);
+                await LoadAndAppend(report, "AnimatorController", animatorController, runScope, sessionToken);
+                await LoadAndAppend(report, "SpriteAtlas", spriteAtlas, runScope, sessionToken);
+                await LoadAndAppend(report, "Avatar", avatar, runScope, sessionToken);
+                await LoadAndAppend(report, "VideoClip", videoClip, runScope, sessionToken);
+                report.AppendLine("[INFO] TimelineAsset: skipped; PlayableAsset covers the runtime load contract without a hard Timeline assembly edge.");
+                await LoadAndAppend(report, "PlayableAsset", playableAsset, runScope, sessionToken);
+                await LoadAndAppend(report, "Mesh", mesh, runScope, sessionToken);
+                await LoadAndAppend(report, "TerrainData", terrainData, runScope, sessionToken);
+                await LoadAndAppend(report, "Raw", raw, runScope, sessionToken);
+                await LoadAndAppend(report, "ScriptableObject", scriptableObject, runScope, sessionToken);
+                await LoadAndAppend(report, "UnityObject", unityObject, runScope, sessionToken);
+
+                if (scene != null && scene.IsValid)
+                {
+                    if (!loadScene) report.AppendLine("[SKIP] Scene: valid, loading disabled to avoid changing the active scene.");
+                    else
+                    {
+                        try
+                        {
+                            ESRuntimeSceneHandle handle = await scene.LoadAsync(LoadSceneMode.Single, sessionToken);
+                            if (!OwnsTestSession(owner, generation))
+                            {
+                                handle.Dispose();
+                                throw new OperationCanceledException("AssetFlow test session ownership ended before the scene load completed.");
+                            }
+                            testSceneHandle = handle;
+                            report.Append("[PASS] Scene: ").Append(handle.Scene.path).AppendLine();
+                        }
+                        catch (OperationCanceledException) { throw; }
+                        catch (Exception exception) { AppendFailure(report, "Scene", exception); }
+                    }
+                }
+                else report.AppendLine("[SKIP] Scene: not configured.");
+
+                if (OwnsTestSession(owner, generation))
+                    PublishReport(report);
+                return report.ToString();
+            }
+            catch (OperationCanceledException)
+            {
+                ReleaseTestReferences(owner, generation);
+                throw;
+            }
+            catch
+            {
+                ReleaseTestReferences(owner, generation);
+                throw;
+            }
+        }
+
+        private void ReleaseHeldTestReferences()
+        {
+            CancellationTokenSource sessionCancellation = testSessionCancellation;
+            ESAssetScope scope = testScope;
+            ESRuntimeSceneHandle sceneHandle = testSceneHandle;
+
+            // Detach shared state before invoking cancellation callbacks. A callback may re-enter
+            // this test asset or throw, but it must never release a newer session or prevent the
+            // current Scope and Scene Handle from being returned.
+            testSessionCancellation = null;
+            testScope = null;
+            testSceneHandle = default;
+
+            try
+            {
+                sessionCancellation?.Cancel();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+            }
+            finally
+            {
+                try
+                {
+                    sessionCancellation?.Dispose();
+                }
+                finally
                 {
                     try
                     {
-                        ESRuntimeSceneHandle handle = await scene.LoadAsync(LoadSceneMode.Single, token);
-                        testSceneHandle = handle;
-                        report.Append("[PASS] Scene: ").Append(handle.Scene.path).AppendLine();
+                        scope?.Dispose();
                     }
-                    catch (Exception exception) { AppendFailure(report, "Scene", exception); }
+                    finally
+                    {
+                        // ESRuntimeSceneHandle owns the scene lease; Dispose is the current resource-runtime release contract.
+                        sceneHandle.Dispose();
+                    }
                 }
             }
-            else report.AppendLine("[SKIP] Scene: not configured.");
-            PublishReport(report);
-            return lastReport;
+        }
+
+        private bool OwnsTestSession(object owner, long generation)
+        {
+            return ReferenceEquals(testReferenceOwner, owner) && testReferenceGeneration == generation;
+        }
+
+        private void ReleaseTestReferences(object owner, long generation)
+        {
+            if (!OwnsTestSession(owner, generation))
+                return;
+            testReferenceGeneration++;
+            testReferenceOwner = null;
+            ReleaseHeldTestReferences();
         }
 
         private void AppendGameCoreConfiguration(StringBuilder report)
@@ -300,6 +410,7 @@ namespace ES
                     .Append(", type=").Append(asset != null ? asset.GetType().FullName : "null")
                     .Append(", id=").Append(refer.AssetIdentity).Append(", subAsset=").Append(refer.IsSubAsset).AppendLine();
             }
+            catch (OperationCanceledException) { throw; }
             catch (Exception exception) { AppendFailure(report, label, exception); }
         }
 

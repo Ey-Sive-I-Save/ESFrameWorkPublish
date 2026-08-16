@@ -134,7 +134,7 @@ MonoBehaviour:
       StringKey: ESBootstrap
       AssetGuid: 6bd32f5e9a6645199c104bf1d0f2095a
       LocalFileId: 0
-      AssetPath: Assets/Plugins/ES/0_Stand/_Res/Bootstrap/ESBootstrap.unity
+      AssetPath: Assets/Plugins/ES/0_Stand/InternalAssets/ResourceBootstrap/ESBootstrap.unity
       AssetTypeName: UnityEditor.SceneAsset
       SourceLibrary: bd6a374707a713e4eb09b6802f8fe4aa
       SourceBook: "\u9ED8\u8BA4 \u573A\u666F Book"

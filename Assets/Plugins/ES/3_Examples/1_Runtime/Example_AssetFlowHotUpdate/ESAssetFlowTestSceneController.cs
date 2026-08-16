@@ -39,20 +39,31 @@ namespace ES
 
         private void OnEnable() => Debug.Log("[ESFlowTestScene][Lifecycle] Enabled", this);
         private void OnDisable() => Debug.Log("[ESFlowTestScene][Lifecycle] Disabled", this);
-        private void OnDestroy() => Debug.Log("[ESFlowTestScene][Lifecycle] Destroyed", this);
+        private void OnDestroy()
+        {
+            bool released = testData != null && testData.ReleaseTestReferences(this);
+            Debug.Log("[ESFlowTestScene][Lifecycle] Destroyed; owned test references released=" + released, this);
+        }
 
         public void RunConfigurationTest() { if (EnsureData()) { testData.DebugConfiguration(); status = testData.lastReport; } }
         public void RunGameCoreTest() { if (EnsureData()) { testData.DebugGameCoreQueries(); status = testData.lastReport; } }
         public void RunReadyTest() { if (EnsureData()) { testData.DebugReadyHotPath(); status = testData.lastReport; } }
         public void RunAssetLoadTest() => RunAssetLoadTestAsync(this.GetCancellationTokenOnDestroy()).Forget();
-        public void ReleaseTestAssets() { if (EnsureData()) { testData.ReleaseTestReferences(); status = "[ESFlowTestScene][Release][PASS]"; } }
+        public void ReleaseTestAssets()
+        {
+            if (!EnsureData()) return;
+            bool released = testData.ReleaseTestReferences(this);
+            status = released
+                ? "[ESFlowTestScene][Release][PASS]"
+                : "[ESFlowTestScene][Release][SKIP] This controller does not own test references.";
+        }
 
         private async UniTask RunAssetLoadTestAsync(CancellationToken token)
         {
             if (!EnsureData() || running) return;
             running = true;
             status = "[ESFlowTestScene][Load] Running...";
-            try { status = await testData.RunAssetLoadTestAsync(token); }
+            try { status = await testData.RunAssetLoadTestAsync(this, token); }
             catch (OperationCanceledException) { status = "[ESFlowTestScene][Load] Cancelled."; }
             catch (Exception exception) { status = "[ESFlowTestScene][Load][FAIL] " + exception; Debug.LogException(exception, this); }
             finally { running = false; }

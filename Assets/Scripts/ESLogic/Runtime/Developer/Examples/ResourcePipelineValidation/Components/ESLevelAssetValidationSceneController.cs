@@ -15,8 +15,11 @@ namespace ES
         private const int MaxEventLogCount = 48;
         private ESLevelAssetValidationLevel activeLevel;
         private ESRuntimeSceneHandle activeScene;
+        private ESAssetScope activePlanLifetimeScope;
         private bool hasActiveScene;
         private bool busy;
+        private bool teardownInProgress;
+        private bool destroying;
         private string report = "等待从 GameCoreTable 读取验收关卡。";
         private Vector2 scroll;
         private readonly List<string> eventLog = new List<string>(MaxEventLogCount);
@@ -55,7 +58,7 @@ namespace ES
 
         public async UniTask EnterLevelAsync(int targetIndex, CancellationToken token)
         {
-            if (busy) return;
+            if (busy || destroying) return;
             if (!ESLevelAssetValidationGameCoreTable.TryGet(out ESLevelAssetValidationGameCore gameCore))
             {
                 report = "[FAIL] GameCoreTable 未注入。请先下载并预热包含 ESLevelAssetValidationGameCore 的 Consumer。";
@@ -76,9 +79,16 @@ namespace ES
             {
                 await LeaveActiveLevelAsync(token);
                 activeLevel = gameCore.levels[targetIndex];
-                if (activeLevel.resourcePlan != null && ESGameManager.ResourcePlans != null)
+                if (activeLevel.resourcePlan != null)
                 {
-                    ESResourcePlanReport planReport = await activeLevel.resourcePlan.PrepareAsync(token);
+                    ESResourcePlanRuntimeService resourcePlans = ESGameManager.ResourcePlans;
+                    if (resourcePlans == null)
+                        throw new InvalidOperationException("资源计划服务尚未就绪，拒绝在未持有本关资源的情况下加载场景。");
+                    activePlanLifetimeScope = ESAssets.CreateScope();
+                    ESResourcePlanReport planReport = await resourcePlans.ApplyAsync(
+                        activeLevel.resourcePlan,
+                        activePlanLifetimeScope,
+                        token);
                     lastPlanReport = planReport;
                     AddPlanEvent("资源计划完成", planReport);
                     if (planReport.RequiredFailureCount > 0)
@@ -88,18 +98,21 @@ namespace ES
                     throw new InvalidOperationException("关卡场景未配置。");
                 activeScene = await activeLevel.scene.LoadAsync(LoadSceneMode.Additive, token);
                 hasActiveScene = true;
-                SceneManager.SetActiveScene(activeScene.Scene);
+                if (!SceneManager.SetActiveScene(activeScene.Scene))
+                    throw new InvalidOperationException("Unity 未能将已加载的验收关卡设为 Active Scene：" + activeScene.Scene.name);
                 report = "[PASS] 进入 " + activeLevel.levelName + "：已加载独立场景和本关 ResourcePlan。";
                 AddEvent(report + " Scene=" + activeScene.Scene.name + ", Valid=" + activeScene.Scene.IsValid()
                     + ", AssetId=" + activeLevel.scene.AssetIdentity);
             }
             catch (OperationCanceledException)
             {
+                await RollbackFailedEnterAsync();
                 report = "[CANCELED] 进入关卡等待已取消。";
                 AddEvent(report);
             }
             catch (Exception exception)
             {
+                await RollbackFailedEnterAsync();
                 report = "[FAIL] 进入关卡失败：" + exception.Message;
                 AddEvent(report);
                 Debug.LogException(exception, this);
@@ -110,44 +123,171 @@ namespace ES
         private async UniTask LeaveActiveLevelAsync(CancellationToken token)
         {
             if (activeLevel == null) return;
+            teardownInProgress = true;
             string leavingLevelName = activeLevel.levelName;
+            ESResourcePlanInfo leavingPlan = activeLevel.resourcePlan;
+            ESAssetScope leavingPlanScope = activePlanLifetimeScope;
             AddEvent("开始离开关卡：" + leavingLevelName + "。");
             // SceneManager cannot cancel an unload AsyncOperation once it has been created.
             // Teardown therefore always runs to quiescence with CancellationToken.None;
             // the caller's token is checked only after the scene lease, Plan and safe point
             // have been settled. Releasing any of those earlier would race the Unity unload.
-            if (hasActiveScene && activeScene.Scene.IsValid() && activeScene.Scene.isLoaded)
+            try
             {
-                AsyncOperation unload = SceneManager.UnloadSceneAsync(activeScene.Scene);
-                if (unload == null)
-                    throw new InvalidOperationException("Unity 未能创建验收场景卸载任务：" + activeScene.Scene.name);
-                await unload.ToUniTask();
+                if (hasActiveScene && activeScene.Scene.IsValid() && activeScene.Scene.isLoaded)
+                {
+                    AsyncOperation unload = SceneManager.UnloadSceneAsync(activeScene.Scene);
+                    if (unload == null)
+                        throw new InvalidOperationException("Unity 未能创建验收场景卸载任务：" + activeScene.Scene.name);
+                    await unload.ToUniTask();
+                }
+                if (hasActiveScene)
+                {
+                    activeScene.Dispose();
+                    activeScene = default;
+                    hasActiveScene = false;
+                }
+                await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate);
+                if (leavingPlan != null && leavingPlanScope != null && ESGameManager.ResourcePlans != null)
+                {
+                    UniTask<ESResourcePlanReport> releaseTask = ESGameManager.ResourcePlans.ReleaseAsync(
+                        leavingPlan,
+                        leavingPlanScope,
+                        CancellationToken.None);
+                    activePlanLifetimeScope = null;
+                    leavingPlanScope.Dispose();
+                    lastPlanReport = await releaseTask;
+                    AddPlanEvent("资源计划释放完成", lastPlanReport);
+                    if (lastPlanReport.State == ESResourcePlanState.Failed)
+                        throw new InvalidOperationException("资源计划释放失败：" + leavingLevelName);
+                }
+                else
+                {
+                    activePlanLifetimeScope = null;
+                    leavingPlanScope?.Dispose();
+                }
+                ESRuntimeUnusedAssetBundleUnloadResult result = await ESAssets.UnloadReleasedAssetBundlesAtSafePointAsync(CancellationToken.None);
+                lastUnloadResult = result;
+                hasUnloadResult = true;
+                report = "[PASS] 离开 " + leavingLevelName + "：卸载 AB=" + result.UnloadedAssetBundleCount
+                    + "，清除对象缓存=" + result.EvictedCachedAssetCount + "。";
+                AddEvent(report);
+                activeLevel = null;
             }
-            if (hasActiveScene)
+            finally
             {
-                activeScene.Dispose();
-                hasActiveScene = false;
+                teardownInProgress = false;
+                if (destroying)
+                {
+                    activeScene.Dispose();
+                    activeScene = default;
+                    hasActiveScene = false;
+                    activePlanLifetimeScope?.Dispose();
+                    activePlanLifetimeScope = null;
+                    activeLevel = null;
+                }
             }
-            await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate);
-            if (activeLevel.resourcePlan != null && ESGameManager.ResourcePlans != null)
-            {
-                lastPlanReport = await activeLevel.resourcePlan.ReleaseAsync(CancellationToken.None);
-                AddPlanEvent("资源计划释放完成", lastPlanReport);
-                if (lastPlanReport.State == ESResourcePlanState.Failed)
-                    throw new InvalidOperationException("资源计划释放失败：" + leavingLevelName);
-            }
-            ESRuntimeUnusedAssetBundleUnloadResult result = await ESAssets.UnloadReleasedAssetBundlesAtSafePointAsync(CancellationToken.None);
-            lastUnloadResult = result;
-            hasUnloadResult = true;
-            report = "[PASS] 离开 " + leavingLevelName + "：卸载 AB=" + result.UnloadedAssetBundleCount
-                + "，清除对象缓存=" + result.EvictedCachedAssetCount + "。";
-            AddEvent(report);
-            activeLevel = null;
             if (token.IsCancellationRequested)
             {
                 report = "[CANCELED] 已完成离开 " + leavingLevelName + " 的实际清理，但调用方等待已取消。";
                 AddEvent(report);
                 throw new OperationCanceledException(token);
+            }
+        }
+
+        private async UniTask RollbackFailedEnterAsync()
+        {
+            if (destroying || activeLevel == null)
+                return;
+            try
+            {
+                await LeaveActiveLevelAsync(CancellationToken.None);
+            }
+            catch (Exception cleanupException)
+            {
+                AddEvent("进入失败后的资源回滚也失败：" + cleanupException.Message);
+                Debug.LogException(cleanupException, this);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            destroying = true;
+            operationId++;
+            if (teardownInProgress)
+                return;
+
+            ESRuntimeSceneHandle sceneHandle = activeScene;
+            bool ownsLoadedScene = hasActiveScene && sceneHandle.Scene.IsValid() && sceneHandle.Scene.isLoaded;
+            ESAssetScope planLifetimeScope = activePlanLifetimeScope;
+            ESResourcePlanInfo plan = activeLevel != null ? activeLevel.resourcePlan : null;
+            ESResourcePlanRuntimeService resourcePlans = ESGameManager.ResourcePlans;
+            activeScene = default;
+            hasActiveScene = false;
+            activePlanLifetimeScope = null;
+            activeLevel = null;
+
+            if (ownsLoadedScene || planLifetimeScope != null)
+                CleanupDestroyedOwnerAsync(sceneHandle, plan, planLifetimeScope, resourcePlans).Forget();
+            else
+                sceneHandle.Dispose();
+        }
+
+        private static async UniTaskVoid CleanupDestroyedOwnerAsync(
+            ESRuntimeSceneHandle sceneHandle,
+            ESResourcePlanInfo plan,
+            ESAssetScope planLifetimeScope,
+            ESResourcePlanRuntimeService resourcePlans)
+        {
+            try
+            {
+                Scene scene = sceneHandle.Scene;
+                if (scene.IsValid() && scene.isLoaded)
+                {
+                    AsyncOperation unload = SceneManager.UnloadSceneAsync(scene);
+                    if (unload != null)
+                        await unload.ToUniTask();
+                }
+                await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            finally
+            {
+                sceneHandle.Dispose();
+            }
+
+            try
+            {
+                if (plan != null && planLifetimeScope != null && resourcePlans != null)
+                {
+                    UniTask<ESResourcePlanReport> releaseTask = resourcePlans.ReleaseAsync(
+                        plan,
+                        planLifetimeScope,
+                        CancellationToken.None);
+                    planLifetimeScope.Dispose();
+                    planLifetimeScope = null;
+                    await releaseTask;
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            finally
+            {
+                planLifetimeScope?.Dispose();
+            }
+
+            try
+            {
+                await ESAssets.UnloadReleasedAssetBundlesAtSafePointAsync(CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
             }
         }
 

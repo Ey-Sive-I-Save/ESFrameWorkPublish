@@ -528,7 +528,7 @@ namespace ES
 
         private void RenameStringKey(ESAssetPage page, string newKey)
         {
-            newKey = newKey == null ? string.Empty : newKey.Trim();
+            newKey ??= string.Empty;
             if (string.IsNullOrEmpty(newKey))
             {
                 Debug.LogWarning("[ESRes][Register] String Key 不能为空。", _editorAsset);

@@ -1,9 +1,11 @@
 {
-  "formatVersion": 3,
+  "formatVersion": 4,
   "libraryName": "男娘库",
   "libraryFolder": "nanniangku",
   "libraryBundleCode": "",
   "libraryAssetGuid": "15754b957c654b547a5d5dfad62fcce0",
+  "librarySourceRevision": "1d2a29825ceb1d8e5ee1ac65303de971:7f8d57b5607c4caec37636bf481128bb5080cdfd7ac16741f2408d6df3c34f86",
+  "generatedUtc": "2026-08-11T14:21:08.8853074Z",
   "assets": [
     {
       "identity": {
@@ -57,6 +59,7 @@
     }
   ],
   "excludedEditorOnlyPaths": [],
+  "excludedFolderPaths": [],
   "errors": [],
   "warnings": [
     "资产身份重复，规划时将按同一物理资产去重：测试库/GameObject (3) 与 男娘库/GameObject (3)",

@@ -1,5 +1,6 @@
 
 using System;
+using ES.EditorInternal;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -79,10 +80,8 @@ namespace ES
             style.minHeight = 26;
             style.maxHeight = 26;
             style.backgroundColor = ESTrackViewTheme.ClipSurface(m_LastTrackAccentColor);
-            style.borderTopLeftRadius = 3;
-            style.borderTopRightRadius = 3;
-            style.borderBottomLeftRadius = 3;
-            style.borderBottomRightRadius = 3;
+            ESEditorPresentation.ApplyCornerRadius(
+                this, ESEditorPresentation.ESCornerRadiusToken.Card);
             style.position = Position.Absolute;
             // 创建内容
             m_ClipContent = new VisualElement
@@ -105,13 +104,11 @@ namespace ES
                 width = 11,
                 height = 11,
                 minWidth = 11,
-                marginRight = 4,
-                borderTopLeftRadius = 2,
-                borderTopRightRadius = 2,
-                borderBottomLeftRadius = 2,
-                borderBottomRightRadius = 2
+                marginRight = 4
             }
             };
+            ESEditorPresentation.ApplyCornerRadius(
+                m_ClipIcon, ESEditorPresentation.ESCornerRadiusToken.Control);
             m_ClipContent.Add(m_ClipIcon);
 
             m_ClipNameLabel = new Label(name)
@@ -161,13 +158,11 @@ namespace ES
                     color = ESTrackViewTheme.SelectedText,
                     unityFontStyleAndWeight = FontStyle.Bold,
                     unityTextAlign = TextAnchor.MiddleCenter,
-                    backgroundColor = ESTrackViewTheme.StateBadgeSurface(ESTrackViewTheme.StatusWarning),
-                    borderTopLeftRadius = 3,
-                    borderTopRightRadius = 3,
-                    borderBottomLeftRadius = 3,
-                    borderBottomRightRadius = 3
+                    backgroundColor = ESTrackViewTheme.StateBadgeSurface(ESTrackViewTheme.StatusWarning)
                 }
             };
+            ESEditorPresentation.ApplyCornerRadius(
+                m_ClipStateBadge, ESEditorPresentation.ESCornerRadiusToken.Pill);
             m_ClipContent.Add(m_ClipStateBadge);
             Add(m_ClipContent);
 
@@ -180,8 +175,10 @@ namespace ES
             m_ResizeHandle.style.bottom = 2;
             m_ResizeHandle.style.width = 5;
             m_ResizeHandle.style.backgroundColor = ESTrackViewTheme.WithAlpha(m_LastTrackAccentColor, 0.22f);
-            m_ResizeHandle.style.borderTopLeftRadius = 2;
-            m_ResizeHandle.style.borderBottomLeftRadius = 2;
+            ESEditorPresentation.ApplyCornerRadius(
+                m_ResizeHandle,
+                ESEditorPresentation.ESCornerRadiusToken.Control,
+                ESEditorPresentation.ESCornerMask.Left);
             m_ResizeHandle.style.cursor = new UnityEngine.UIElements.Cursor
             {
                 texture = EditorGUIUtility.Load("Cursors/d_ResizeHorizontal") as Texture2D,
@@ -251,10 +248,8 @@ namespace ES
             popup.style.height = 30;
             // popup.style.translate = new Translate(new Length(-50, LengthUnit.Percent), 0);
             popup.style.backgroundColor = ESTrackViewTheme.WithAlpha(ESTrackViewTheme.SecondarySurface, 0.96f);
-            popup.style.borderTopLeftRadius = 3;
-            popup.style.borderTopRightRadius = 3;
-            popup.style.borderBottomLeftRadius = 3;
-            popup.style.borderBottomRightRadius = 3;
+            ESEditorPresentation.ApplyCornerRadius(
+                popup, ESEditorPresentation.ESCornerRadiusToken.Card);
             popup.style.display = DisplayStyle.None;
             popup.Add(popLabel = new Label());
             popLabel.style.left = 0;
@@ -359,10 +354,8 @@ namespace ES
             m_EditingFocusFrame.style.borderRightColor = ESTrackViewTheme.EditingAccent;
             m_EditingFocusFrame.style.borderTopColor = ESTrackViewTheme.EditingAccent;
             m_EditingFocusFrame.style.borderBottomColor = ESTrackViewTheme.EditingAccent;
-            m_EditingFocusFrame.style.borderTopLeftRadius = 4;
-            m_EditingFocusFrame.style.borderTopRightRadius = 4;
-            m_EditingFocusFrame.style.borderBottomLeftRadius = 4;
-            m_EditingFocusFrame.style.borderBottomRightRadius = 4;
+            ESEditorPresentation.ApplyCornerRadius(
+                m_EditingFocusFrame, ESEditorPresentation.ESCornerRadiusToken.Card);
             m_EditingFocusFrame.style.backgroundColor = ESTrackViewTheme.WithAlpha(ESTrackViewTheme.EditingAccent, 0.07f);
             m_EditingFocusFrame.style.display = DisplayStyle.None;
             Add(m_EditingFocusFrame);
@@ -387,10 +380,8 @@ namespace ES
             m_SelectionFrame.style.borderRightWidth = 2;
             m_SelectionFrame.style.borderTopWidth = 2;
             m_SelectionFrame.style.borderBottomWidth = 2;
-            m_SelectionFrame.style.borderTopLeftRadius = 4;
-            m_SelectionFrame.style.borderTopRightRadius = 4;
-            m_SelectionFrame.style.borderBottomLeftRadius = 4;
-            m_SelectionFrame.style.borderBottomRightRadius = 4;
+            ESEditorPresentation.ApplyCornerRadius(
+                m_SelectionFrame, ESEditorPresentation.ESCornerRadiusToken.Card);
             m_SelectionFrame.style.display = DisplayStyle.None;
             Add(m_SelectionFrame);
         }

@@ -131,7 +131,6 @@
                         "status":  "needs-triage",
                         "summary":  "历史全量入口保留其 ID 以维持审计连续性；已推送的 8 个提交已按 LOCAL-20260802-002 至 LOCAL-20260803-015 分项缓存，本地已提交但未推送的模块审计续接能力已记入 LOCAL-20260803-016。本条现在接管当前未提交的 Project Asset Guide 展开状态与未跟踪的 Documentation/Output 产物，二者均尚未完成行为分诊，不能授权 HTML 更新或解除同步门禁。",
                         "sourcePaths":  [
-                                            "Assets/ESNormalAssets/Data/GlobalData/ProjectAssetGuide/ESGlobalProjectAssetGuideData.asset",
                                             "ES/Documentation/Output/index.html"
                                         ],
                         "evidencePaths":  [
@@ -1857,6 +1856,74 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-010",
+                        "status":  "documented",
+                        "summary":  "统一编辑器呈现、窗口生命周期、ContentRegistration、TrackView 与菜单入口，补齐品牌图标、AICommand 发现校验和 AIWarnings 治理。",
+                        "sourcePaths":  [
+                                            ".agents/skills/es-use-ai-command",
+                                            ".gitignore",
+                                            "Assets/ESNormalAssets/Data/GlobalData/EditorConfi/全局编辑器流程基本配置.asset",
+                                            "Assets/ESNormalAssets/Data/GlobalData/ProjectAssetGuide/ESGlobalProjectAssetGuideData.asset",
+                                            "Assets/HybridCLRGenerate/link.xml",
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/GlobalEditorData/ESGlobalEditorTheme.cs",
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/GlobalEditorData/ESGlobalProjectAssetGuideData.HardcodedCommonScripts.cs",
+                                            "Assets/Plugins/ES/0_Stand/Stand_Tools/OnlyEditor/MenuItemPathDefine.cs",
+                                            "Assets/Plugins/ES/3_Examples/1_Runtime/Example_RuntimeWatch/Example_RuntimeWatchActor.cs",
+                                            "Assets/Plugins/ES/AICommands",
+                                            "Assets/Plugins/ES/AIWarnings",
+                                            "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentWindow.uss",
+                                            "Assets/Plugins/ES/Editor/ESContentRegistration",
+                                            "Assets/Plugins/ES/Editor/ESDrawer/Normal",
+                                            "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates",
+                                            "Assets/Plugins/ES/Editor/ESMenuTreeWindow/Tests",
+                                            "Assets/Plugins/ES/Editor/ESPresentation",
+                                            "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define",
+                                            "Assets/Plugins/ES/Editor/EditorTools",
+                                            "Assets/Plugins/ES/Editor/Resources/ESBrandIcons.meta",
+                                            "Assets/Plugins/ES/Editor/Resources/ESBrandIcons",
+                                            "Assets/Plugins/ES/Obsolete",
+                                            "Assets/Scripts/ESLogic/Editor/Camera/ESCameraTrackPreviewWindow.cs",
+                                            "Assets/Scripts/ESLogic/Editor/ESKeyGovernanceAudit.cs",
+                                            "Assets/Scripts/ESLogic/Editor/GameCoreEditorGlobalDataMenu.cs",
+                                            "Documentation/DOCUMENTATION_CATALOG.md",
+                                            "ES/Design/ESBrandIcons",
+                                            "ES/Documentation/Status/API_NAMING_REVIEW_20260813.md",
+                                            "ES/Tools/Validation/Test-ESMenuArchitecture.ps1",
+                                            "ESFrameWorkPublish.slnx"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/Editor/ESMenuTreeWindow/Tests/ESMenuTreeCommercialTests.cs",
+                                              "Assets/Plugins/ES/Editor/ESContentRegistration/Tests/ESContentRegistrationTests.cs",
+                                              ".agents/skills/es-use-ai-command/scripts/Test-ESAICommands.ps1",
+                                              "ES/Tools/Validation/Test-ESMenuArchitecture.ps1"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "编辑器主题、状态呈现、半休眠与父子窗口、TrackView、对话框、注册工作流和品牌资源共同构成交付体验；AICommand 发现器、规则目录与菜单审计脚本为入口治理提供可复现证据。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Editor.csproj、ES.MenuTree.Editor.Tests.csproj、ES.ContentRegistration.Editor.Tests.csproj 与 ES.CmdAgent.Editor.Tests.csproj 静态构建均为 0 警告、0 错误",
+                                                            "AICommand 全库校验：54 个命令、目录 54、invalid 0",
+                                                            "99 个目标文本通过严格 UTF-8 检查",
+                                                            "16 个正式品牌 PNG 均可解码且尺寸为 96x96；暂存范围无受禁目录或高置信凭据赋值"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "菜单架构审计当前 valid=False：3 个 CreateAssetMenu 分类不符合现行白名单，18 个正式静态 HTML 旧路径尚未整合",
+                                                             "最近匹配的 ReloadDomain AICommand 为只读体检，未授权本轮顺手修复菜单分类；静态 HTML 仍受延期门禁保护",
+                                                             "没有 Unity Editor 编译、ReloadDomain、窗口重开、窄屏、高 DPI、多窗口、Popup 或交互截图证据"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1869,13 +1936,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T10:40:41+08:00",
-                       "head":  "42ffb99733159e562ce08b92c6325f0c56c55629",
-                       "stagedSourcePatchSha256":  "b286c4ee4a6f0671ca32cdb2470eac25782dd4eeddc3ddab9744b5159f9033f9",
-                       "stagedSourceManifestSha256":  "d23eaaa3fac1144a8e82cc265f5f69eb6baa1e5e32dafa1297078c5879a39d6f",
-                       "stagedSourceFileCount":  9,
+                       "preparedAt":  "2026-08-16T10:47:56+08:00",
+                       "head":  "26aff3bdc8a2942c27c301ae457be4b419ff890e",
+                       "stagedSourcePatchSha256":  "18f1fc208ca2f338cd5198c7f574bd1c7193a9751cd5a8b9332a92d55151ebb1",
+                       "stagedSourceManifestSha256":  "a1a5fbb42fb62f0290c329092b161087edfc0f8c2d5668c80f18cc71b383b71d",
+                       "stagedSourceFileCount":  157,
                        "entryIds":  [
-                                        "LOCAL-20260816-009"
+                                        "LOCAL-20260816-010"
                                     ]
                    }
 }

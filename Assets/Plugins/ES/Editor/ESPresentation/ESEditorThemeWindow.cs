@@ -30,7 +30,21 @@ namespace ES.EditorInternal
                 { "lightAccentStart", new GUIContent("浅色强调起始色") },
                 { "lightAccentEnd", new GUIContent("浅色强调结束色") },
                 { "lightWarning", new GUIContent("浅色警告色") },
-                { "lightError", new GUIContent("浅色错误色") }
+                { "lightError", new GUIContent("浅色错误色") },
+                { "darkMapTerrainBase", new GUIContent("深色地形底色") },
+                { "darkMapGrid", new GUIContent("深色地图网格") },
+                { "darkMapRegion", new GUIContent("深色区域色") },
+                { "darkMapPoi", new GUIContent("深色 POI 色") },
+                { "darkMapSelection", new GUIContent("深色选中点") },
+                { "darkMapHeightLow", new GUIContent("深色高度低值") },
+                { "darkMapHeightHigh", new GUIContent("深色高度高值") },
+                { "lightMapTerrainBase", new GUIContent("浅色地形底色") },
+                { "lightMapGrid", new GUIContent("浅色地图网格") },
+                { "lightMapRegion", new GUIContent("浅色区域色") },
+                { "lightMapPoi", new GUIContent("浅色 POI 色") },
+                { "lightMapSelection", new GUIContent("浅色选中点") },
+                { "lightMapHeightLow", new GUIContent("浅色高度低值") },
+                { "lightMapHeightHigh", new GUIContent("浅色高度高值") }
             };
         private Vector2 scroll;
         private ESGlobalEditorTheme theme;
@@ -251,6 +265,23 @@ namespace ES.EditorInternal
                 DrawProperty("lightAccentEnd");
                 DrawProperty("lightWarning");
                 DrawProperty("lightError");
+
+                EditorGUILayout.Space(5f);
+                GUILayout.Label("地图编辑器语义色", ESEditorPresentation.SubtitleStyle);
+                DrawProperty("darkMapTerrainBase");
+                DrawProperty("darkMapGrid");
+                DrawProperty("darkMapRegion");
+                DrawProperty("darkMapPoi");
+                DrawProperty("darkMapSelection");
+                DrawProperty("darkMapHeightLow");
+                DrawProperty("darkMapHeightHigh");
+                DrawProperty("lightMapTerrainBase");
+                DrawProperty("lightMapGrid");
+                DrawProperty("lightMapRegion");
+                DrawProperty("lightMapPoi");
+                DrawProperty("lightMapSelection");
+                DrawProperty("lightMapHeightLow");
+                DrawProperty("lightMapHeightHigh");
             }
             finally
             {

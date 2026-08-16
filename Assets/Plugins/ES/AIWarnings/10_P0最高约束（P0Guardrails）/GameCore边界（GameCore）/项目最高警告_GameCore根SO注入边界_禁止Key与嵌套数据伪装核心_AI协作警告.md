@@ -59,7 +59,7 @@ bool added = ESRuntimeDataGameCore.Monsters.TryInjectWith(monsterKey, out int mo
 - `SkillDefinitionDataInfo`：注入 SkillTable。
 - `BuffDefinitionDataInfo`：注入 BuffTable。
 - `ActorDataInfo`：非 GameCore 通用角色定义，不实现 `IGameCoreSO`；Player / Rider / StoryActor 等正常由普通 Actor Group/Pack 组织。
-- `ItemDataInfo`：按 `ItemKind` 注入 Weapon / Shot 等对应 Item 领域 Table。
+- `ItemDataInfo`：始终注入基础 Item Table；`ItemKind` 为 Weapon / Shot 时，再注入唯一对应的专项能力 Table。基础 Item 与专项能力使用各自独立的强类型 ConfigKey 和 RuntimeKey。
 - 每个具体 `SoDataInfo` 类型必须有对应的具体 `SoDataGroup<TInfo>`；正式内容 Info 资产必须有唯一主 Group。详细强制规则见 `项目最高警告_P0_Info必须对应Group_Pack非默认聚合_AI协作警告.md`。
 - 承载上述 Info 的 `SoDataGroup<TInfo>` 是可被 Consumer 直接收集的标准启动聚合根，必须直接实现 `IGameCoreSO`。
 - `SoDataPack<TInfo>` 只有在通过其专门设计的准入和验收后才能作为 Consumer 启动根；它不是新领域的默认容器，也不是 ResourcePlan 或发布包。
@@ -88,7 +88,7 @@ Group 仅负责转发与聚合，不创建第二套 Key、不复制内容、不�
 
 ## 新 GameCore 类别的固定扩展边界
 
-新增类别必须在自己的领域目录内新增 Key、RuntimeData、强类型 Table 与 Info；Info 的 `InjectGameCoreTables()` 直接写入枚举选中的领域 Table。根 SO 类型不是 GameCore 类别本身：一个根 SO 类型可以通过稳定、显式的领域枚举，分流到多个兼容强类型 Table。
+新增类别必须在自己的领域目录内新增 Key、RuntimeData、强类型 Table 与 Info；Info 的 `InjectGameCoreTables()` 直接写入显式声明的领域 Table。根 SO 类型不是 GameCore 类别本身：普通根 SO 可以通过稳定、显式的领域枚举选择一个兼容强类型 Table。若领域合同明确包含“基础定义 + 专项能力投影”，同一资产实例可以进入基础 Table 和枚举选中的唯一专项 Table，但每个投影必须拥有独立 Key、RuntimeData、验证和回滚边界。
 
 ```text
 <Category>RuntimeData : ESGameCoreRuntimeData
@@ -124,9 +124,9 @@ Key 只负责业务寻址；RuntimeData 只负责运行时承载；嵌套数据�
 
 ## 注入规则
 
-1. 每个根 SO 必须校验自身 Key 有效、显式枚举类别与表匹配、目标表无冲突后再注入；一个资产实例只写入其当前枚举选中的分支。
+1. 每个根 SO 必须校验本轮全部投影的 Key 有效、显式枚举类别与表匹配、目标表无冲突后再注入；普通资产实例只写入当前枚举选中的分支，除非领域合同明确要求一个基础投影和至多一个专项投影。
 2. 同一个 Info、Group 或 Pack 不得归属多个 Consumer 启动核心包。
-3. 一个 Item 根 SO 若按 `ItemKind` 映射到 Weapon 或 Shot，只向该实际类别的表注入；禁止同一条数据盲目写入多个表。
+3. 一个 `ItemDataInfo` 始终形成一个基础 Item 投影；若 `ItemKind` 为 Weapon 或 Shot，再形成唯一对应的专项投影。基础 ItemKey 与 WeaponKey / ShotKey 可以共存，但各表 RuntimeKey 严禁跨表比较、持久化或互相解释。双投影必须先完成全部预验证，再以事务方式提交；任一投影失败时不得留下本轮半提交结果。禁止无显式枚举、无独立 Schema、无事务边界地把同一条数据盲目写入多个无关 Table。
 4. GameCore 注入不得依赖 AssetBundle 名、路径、GUID 或 RuntimeKey；如需内容资产，只保存稳定的类型化 Asset Key，不直接保存 Prefab/GameObject/场景内容引用。
 5. `ESAssetLibrary` 是编辑器组织工具；运行时启动仅认 Consumer 已收集的 `IGameCoreSO` 与其注入后的 GameCoreTable。
 6. 根 SO 在 `AcquireRetained` 后复制 SO、SharedData、VariableData、Prefab 等载荷时，全部操作必须位于内层 `try`；异常时必须先 `Table.AbandonRetained(data)` 再抛出。

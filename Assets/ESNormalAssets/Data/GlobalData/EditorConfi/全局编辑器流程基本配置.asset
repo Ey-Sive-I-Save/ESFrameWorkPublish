@@ -32,10 +32,8 @@ MonoBehaviour:
   Path_AllLibraryFolder_: Assets/ESNormalAssets/Data/AssetLibrary
   ExcludePackGroupInfo: 1
   ExcludeWindow: 1
-  ExcludeNodeRunner: 1
   ExcludeGlobal: 1
   ExcludeNameList:
-  - ESGraphViewWindow
   - ESTrackViewWindow
   - ESTreeMenuShower
   ExcludeHandle: ESTreeMenuShower

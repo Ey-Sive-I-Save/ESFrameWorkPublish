@@ -28,6 +28,7 @@
 - [ES_SCENE_VALIDATION_GUIDE_STANDARD.md](ES_SCENE_VALIDATION_GUIDE_STANDARD.md)：测试场景导视、诊断、路线与输入说明的复用边界；Unity / PlayMode / Profiler 验收待完成。
 - [SKILL_OPERATION_LIFECYCLE.md](SKILL_OPERATION_LIFECYCLE.md)：Skill Operation 默认无 Stop、按需清理及运行时所有权规则。
 - [ES_EDITOR_TOOL_WORKBENCH_STANDARD.md](ES_EDITOR_TOOL_WORKBENCH_STANDARD.md)：SimpleTools 的目录分组、页面状态、配置目录、按钮层级、安全与迁移验收规范；每个工具迁移仍须补 Unity 视觉和真实操作验证。
+- [../ES/Documentation/Guides/ESWorkbench_ContributionAndModuleGuide.md](../ES/Documentation/Guides/ESWorkbench_ContributionAndModuleGuide.md)：ES 工作台贡献注册、模块枚举模板、调整钩子、依赖/冲突诊断与窗口注入指引；当前为源码级实现指引，Unity 实机编译和交互验收待完成。
 - [ES_INSTALLER_SIGNED_UNITYPACKAGE_STANDARD.md](ES_INSTALLER_SIGNED_UNITYPACKAGE_STANDARD.md)：`Assets/Plugins/ES + .unitypackage + 旧 ESInstaller` 唯一安装发布主链、AI 快速升级步骤、签名门禁与当前恢复缺口。
 
 修改这些主题时，必须同时检查 `Assets/Plugins/ES/AIWarnings` 的对应 P0 规则。

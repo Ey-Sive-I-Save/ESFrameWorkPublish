@@ -157,7 +157,8 @@ namespace ES
             UnityEngine.Object source,
             string stableTargetKey,
             string title,
-            string page)
+            string page,
+            EditorWindow sleepOwner = null)
         {
             if (data == null || source == null)
                 return null;
@@ -173,6 +174,7 @@ namespace ES
             UsingWindow = window;
             try
             {
+                window.ESWindow_SetSleepOwnerOverride(sleepOwner);
                 if (!window.Configure(data, source, stableTargetKey, title, page))
                 {
                     window.Close();
@@ -184,6 +186,18 @@ namespace ES
                 window.ShowUtility();
                 window.Focus();
                 window.ApplyDefaultWindowBounds();
+                // CreateInstance 会先触发 OnEnable；此时显式 owner 可能尚未存在，
+                // 或窗口声明的动态 getter 仍指向另一实例。窗口真正显示并完成
+                // Presentation 绑定后，再提交一次显式关系，确保 OpenFor(..., owner)
+                // 的参数成为唯一生效的父窗口身份，并清掉可能残留的 Pending 记录。
+                if (sleepOwner != null
+                    && window.ESWindow_SleepLinkMode != ESWindowSleepLinkMode.Independent)
+                {
+                    ESWindowFoundation.SetSleepOwner(
+                        window,
+                        sleepOwner,
+                        window.ESWindow_SleepLinkMode);
+                }
                 window.ForceMenuTreeRebuild();
                 window.BuildIndependentInspectorShell();
                 window.Repaint();

@@ -85,3 +85,6 @@ crashlytics-build.properties
 # External editor feedback source packs are kept out of Git. Built-in WAV schemes
 # are runtime-imported from outside Assets and tracked so fresh clones get them.
 /ES/EditorFeedbackPacks/
+
+# Machine-local rollback copies. Reviewed baselines under ES/Bak/Reviewed remain tracked.
+/ES/Bak/Local/

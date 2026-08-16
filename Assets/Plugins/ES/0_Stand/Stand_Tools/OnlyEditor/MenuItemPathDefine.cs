@@ -73,6 +73,7 @@ namespace ES
         public const string TRACK_EDITOR_WINDOW_PATH = CONTENT_CREATION_PATH + "技能与轨道/轨道编辑器";
         public const string STABLE_GRAPH_WINDOW_PATH = CONTENT_CREATION_PATH + "图与流程/稳定图编辑器 V2";
         public const string FONT_WORKBENCH_WINDOW_PATH = CONTENT_CREATION_PATH + "UI 与字体/字体资产工作台";
+        public const string LOCALIZATION_WORKBENCH_WINDOW_PATH = CONTENT_CREATION_PATH + "UI 与字体/本地化工作台";
         public const string AGENT_WORKBENCH_WINDOW_PATH = AUTOMATION_AGENT_COLLABORATION_PATH + "打开 Agent 工作台";
         public const string COMMAND_PALETTE_WINDOW_PATH = AUTOMATION_EDITOR_EXTENSIONS_PATH + "打开 ES 命令面板";
         public const string WINDOW_LAUNCHER_PATH = AUTOMATION_EDITOR_EXTENSIONS_PATH + "打开工具启动器";

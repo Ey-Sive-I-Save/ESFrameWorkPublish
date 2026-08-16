@@ -7,8 +7,10 @@
 ES 编辑器预览底层已经收口到：
 
 ```text
-Assets/Scripts/ESLogic/Editor/Preview
+Assets/Scripts/ESLogic/Runtime/EditorPreview
 ```
+
+这里的 `Runtime` 是项目目录/程序集组织结果，不代表这些类型可进入 Player；相关源码受 `#if UNITY_EDITOR` 与 Editor asmdef 边界约束。禁止根据目录名把编辑器预览能力接入运行时发布链。
 
 核心类型：
 
@@ -41,6 +43,13 @@ ESEditorPreviewResourceScope
 8. 缓存帧不要写入 `Assets/`，默认放 `Library/ESPreviewFrames`，避免污染资源库和版本控制。
 9. 禁止临时生成 `AnimatorController` 做 Humanoid 预览；该方案已触发过 `UnityEditor.Graphs.Edge.WakeUp` 异常。
 10. 不要在业务类里新增 `[InitializeOnLoadMethod]` 注册预览清理。项目要求优先走 `EditorInvoker_Level0/1/2/50`，当前预览生命周期由 `ESEditorPreviewResourceScopeInitializer` 调用 `ESEditorPreviewLifecycleHub.RegisterGlobalHooks()`。
+
+## 当前收口范围
+
+- `ESEditorPreviewRenderContext`、`ESEditorPreviewLifecycleHub`、`ESEditorPreviewUtility`、`ESEditorPreviewResourceScope` 和 `ESEditorPreviewPersistentFramePaths` 是新预览能力的公共底层权威。
+- AssetPackage 目前仍维护 `ESAssetPackagePreviewSceneContext`、独立 Camera/Light/PreviewScene、局部 `PreviewRenderUtility` 和专用缓存根 `Library/ES/AssetPackagePreviewFrames/AssetPackageBake`。这是一条待迁移的既有专用实现，不是第二个可扩展标准。
+- 在 AssetPackage 完成迁移前，普通修复应沿其 `ESAssetPackagePreviewWorkflow` 与现有专职播放器收口生命周期；不得绕开现有链路直接混用两套 context，也不得新增第三套 Camera/Light/RT/PreviewScene 管理器。
+- “共享生命周期规则”“共享工具函数”与“共享同一个 RenderContext 实现”必须分开声明。当前只能确认前两者部分接入，不能宣称 AssetPackage 已完整复用 `ESEditorPreviewRenderContext`。
 
 ## 应用层边界
 
@@ -84,7 +93,7 @@ PlayMode 切换清理注册
 ## 后续迁移优先级
 
 1. `State`、技能预览、TrackView 大预览继续使用 `ESEditorPreviewRenderContext`。
-2. 资产包窗口中仍然存在的 PreviewRenderUtility 小块逻辑，后续逐步改为底层 context 或缓存帧工作流。
+2. 资产包窗口中仍然存在的 `ESAssetPackagePreviewSceneContext` 与 `PreviewRenderUtility` 小块逻辑，后续按播放器逐项迁移为公共 context 或缓存帧工作流；迁移前后都必须验证功能等价、内存和清理行为。
 3. 编辑器窗口里的 update 订阅后续可继续收敛，但不要一次性重写所有窗口。
 4. Obsolete 目录不要优先迁移，除非它仍参与编译或被当前工具调用。
 
@@ -97,6 +106,8 @@ PlayMode 切换清理注册
 ReloadDomain 前会释放 RT、Texture2D、PreviewScene、隐藏 GameObject
 进入/退出 PlayMode 不污染场景
 一个窗口 Dispose 不会清掉另一个窗口的预览
-业务层没有重复相机/灯光/RT/全局清理代码
-编译 ES_Logic 和 ES_Editor 均通过
+新业务层没有新增重复相机/灯光/RT/全局清理代码
+目标 Unity Editor 完成脚本导入、Domain Reload 与 Console 验收
 ```
+
+仅有 `.csproj` 编译、源码搜索、UTF-8 Guard 或 `git diff --check` 时，最高只能声明对应静态证据；不能据此声明预览生命周期、交互或内存已经验收。

@@ -22,13 +22,13 @@
 
 ## 当前实体结构
 
-`Entity` 当前源码持有 4 个 Domain；正式目标已批准增加第五个 `EntityEquipmentDomain`，但在源码注册、生命周期、Prefab 和 Unity 验收完成前不得写成已实现：
+`Entity` 当前源码持有 5 个 Domain；第五个 `EntityEquipmentDomain` 已进入源码注册、生命周期、角色模板和正式大黑塔 Variant，当前仍处于 Verifying：
 
 - `EntityBasicDomain`：身体基础能力。移动、战斗、技能、相机、RootMotion、攀爬、游泳、飞行、交互、脚贴合等。
 - `EntityAIDomain`：意识/输入/调度。AI 输入采集和输入调度属于这里。
 - `EntityBuffDomain`：已具备 Buff 运行时实例、叠层、ValueChange / Permit 与 OpSupport 入口。它仍不是“所有 RPG Buff 功能已经完成”的证明；新增能力必须以当前源码与 PlayMode 验证为准。
 - `EntityStateDomain`：状态机、动画状态数据包注册、状态预览、状态调试、StateMachine 与 FinalIK Driver 关系链。
-- `EntityEquipmentDomain`（目标，尚未接线）：背包、装备/饰品槽、挂载过渡和装备效果来源句柄。它只向 StateMachine 提交装备动作/阶段和 IK 目标请求，不直接操作 Animator 内部状态或 FinalIK Solver。
+- `EntityEquipmentDomain`：背包、装备/饰品槽、挂载过渡和装备效果来源句柄。它只向 StateMachine 提交装备动作/阶段和 IK 目标请求，不直接操作 Animator 内部状态或 FinalIK Solver；当前源码和 EditMode 事务已验证，动画事件、最终 IK 与 PlayMode 仍待验收。
 
 `EntityKCCData kcc` 不是 Domain。它是 `Entity` 上的高频运动核心，不走模块体系。
 
@@ -37,7 +37,7 @@
 推荐链路：
 
 ```text
-Entity / Basic / AI / Buff / Equipment（目标）
+Entity / Basic / AI / Buff / Equipment
     -> EntityStateDomain
     -> StateMachine
     -> Animator / PlayableGraph

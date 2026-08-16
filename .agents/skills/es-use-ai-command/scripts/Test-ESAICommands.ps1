@@ -73,6 +73,153 @@ function Test-CatalogId {
         -and $Value -match '^[a-z0-9][a-z0-9.-]*$'
 }
 
+function Get-UnicodeText {
+    param([int[]]$CodePoints)
+    return [string]::Concat(($CodePoints | ForEach-Object { [char]$_ }))
+}
+
+function Get-ContractMetadataValue {
+    param(
+        [string]$Text,
+        [string]$FieldName
+    )
+    $match = [regex]::Match($Text, ('(?m)^' + [regex]::Escape($FieldName) + '\uFF1A\s*(.+?)\s*$'))
+    if ($match.Success) {
+        return $match.Groups[1].Value.Trim()
+    }
+    return ''
+}
+
+function Get-ExpectedCatalogSemantics {
+    param(
+        [string]$CommandType,
+        [string]$DefaultWrite
+    )
+
+    $information = Get-UnicodeText @(20449,24687,34917,20840)
+    $handover = Get-UnicodeText @(20132,25509,27785,28096)
+    $candidate = Get-UnicodeText @(20505,36873,20869,23481,29983,25104)
+    $safeExecution = Get-UnicodeText @(23433,20840,25191,34892)
+    $p0GameCore = Get-UnicodeText @(80,48,32,28216,25103,26680,24515,25645,24314)
+    $no = Get-UnicodeText @(21542)
+    $yes = Get-UnicodeText @(26159)
+    $allow = Get-UnicodeText @(20801,35768)
+    $onlyAllow = Get-UnicodeText @(20165,20801,35768)
+
+    if ([string]::IsNullOrWhiteSpace($CommandType) -or [string]::IsNullOrWhiteSpace($DefaultWrite)) {
+        throw 'Contract command metadata is missing.'
+    }
+    if ($CommandType.StartsWith($information, [StringComparison]::Ordinal)) {
+        if (-not $DefaultWrite.StartsWith($no, [StringComparison]::Ordinal)) {
+            throw 'Information contract must declare no default file write.'
+        }
+        return [pscustomobject]@{ role = 'information'; writeMode = 'read-only' }
+    }
+    if ($CommandType.StartsWith($handover, [StringComparison]::Ordinal)) {
+        if (-not $DefaultWrite.StartsWith($yes, [StringComparison]::Ordinal)) {
+            throw 'Handover contract must declare a documentation write.'
+        }
+        return [pscustomobject]@{ role = 'handover'; writeMode = 'documentation-write' }
+    }
+    if ($CommandType.StartsWith($candidate, [StringComparison]::Ordinal)) {
+        if (-not $DefaultWrite.StartsWith($onlyAllow, [StringComparison]::Ordinal)) {
+            throw 'Candidate-generation contract must declare its candidate-only path.'
+        }
+        return [pscustomobject]@{ role = 'candidate-generation'; writeMode = 'candidate-only' }
+    }
+    if (
+        $CommandType.StartsWith($safeExecution, [StringComparison]::Ordinal) -or
+        $CommandType.StartsWith($p0GameCore, [StringComparison]::Ordinal)
+    ) {
+        if ($DefaultWrite.StartsWith($no, [StringComparison]::Ordinal)) {
+            return [pscustomobject]@{ role = 'controlled-execution'; writeMode = 'external-run' }
+        }
+        if (
+            $DefaultWrite.StartsWith($yes, [StringComparison]::Ordinal) -or
+            $DefaultWrite.StartsWith($allow, [StringComparison]::Ordinal)
+        ) {
+            return [pscustomobject]@{ role = 'controlled-execution'; writeMode = 'scoped-write' }
+        }
+        throw 'Controlled-execution contract has no recognized write boundary.'
+    }
+    if (-not $DefaultWrite.StartsWith($no, [StringComparison]::Ordinal)) {
+        throw 'Review contract must declare no default file write.'
+    }
+    return [pscustomobject]@{ role = 'review'; writeMode = 'read-only' }
+}
+
+function Invoke-DiscoveryIsolationRegression {
+    param(
+        [string]$ProjectRoot,
+        [string]$FindScriptPath,
+        [object]$CatalogEntry
+    )
+
+    $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("ESAICommands-Discovery-" + [guid]::NewGuid().ToString('N'))
+    $junctionPath = $null
+    try {
+        $projectPath = Join-Path $tempRoot 'Project'
+        $commandPath = Join-Path $projectPath 'Assets\Plugins\ES\AICommands'
+        $outsidePath = Join-Path $tempRoot 'Outside'
+        [IO.Directory]::CreateDirectory($commandPath) | Out-Null
+        [IO.Directory]::CreateDirectory($outsidePath) | Out-Null
+
+        $fixtureCatalog = [pscustomobject]@{
+            schemaVersion = 1
+            catalogTitle = 'Discovery isolation fixture'
+            catalogPurpose = 'Regression fixture only.'
+            commands = @($CatalogEntry)
+        }
+        $fixtureCatalogBytes = [Text.UTF8Encoding]::new($false).GetBytes(($fixtureCatalog | ConvertTo-Json -Depth 6))
+        $catalogDestination = Join-Path $commandPath 'AICommandCatalog.json'
+        [IO.File]::WriteAllBytes($catalogDestination, $fixtureCatalogBytes)
+        [IO.File]::WriteAllBytes((Join-Path $outsidePath 'AICommandCatalog.json'), $fixtureCatalogBytes)
+
+        $relativeContractPath = ([string]$CatalogEntry.path).Replace('/', [IO.Path]::DirectorySeparatorChar)
+        $contractDestination = Join-Path $projectPath $relativeContractPath
+        [IO.Directory]::CreateDirectory((Split-Path -Parent $contractDestination)) | Out-Null
+        [IO.File]::WriteAllBytes($contractDestination, [byte[]](0xFF, 0xFE, 0x00, 0x01))
+
+        $discoveryOutput = & $FindScriptPath -ProjectRoot $projectPath -CommandPath ([string]$CatalogEntry.path) -Json
+        $discovery = $discoveryOutput | ConvertFrom-Json
+        if ($null -eq $discovery -or $discovery.returnedCount -ne 1 -or [string]$discovery.candidates[0].id -ne [string]$CatalogEntry.id) {
+            throw 'Discovery unexpectedly required a contract Markdown body.'
+        }
+
+        $junctionPath = Join-Path $projectPath 'Assets\Plugins\ES\AICommands'
+        Remove-Item -LiteralPath $junctionPath -Recurse -Force
+        New-Item -ItemType Junction -Path $junctionPath -Target $outsidePath | Out-Null
+        if (
+            -not (Test-Path -LiteralPath $junctionPath -PathType Container) -or
+            (((Get-Item -LiteralPath $junctionPath -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0)
+        ) {
+            throw 'Could not create the isolated junction regression fixture.'
+        }
+
+        $rejected = $false
+        try {
+            & $FindScriptPath -ProjectRoot $projectPath -Query 'test' -Json | Out-Null
+        }
+        catch {
+            $rejected = $true
+        }
+        if (-not $rejected) {
+            throw 'Discovery accepted an AICommand directory behind a junction or symlink.'
+        }
+    }
+    finally {
+        if (-not [string]::IsNullOrWhiteSpace($junctionPath) -and (Test-Path -LiteralPath $junctionPath)) {
+            $junctionItem = Get-Item -LiteralPath $junctionPath -Force
+            if (($junctionItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                [IO.Directory]::Delete($junctionPath)
+            }
+        }
+        if (Test-Path -LiteralPath $tempRoot) {
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 $catalogErrors = New-Object Collections.Generic.List[string]
 $catalogEntries = @()
 if (-not (Test-Path -LiteralPath $catalogPath -PathType Leaf)) {
@@ -100,6 +247,7 @@ else {
 
 $catalogIds = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
 $catalogPaths = New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+$catalogByPath = @{}
 foreach ($entry in $catalogEntries) {
     if ($null -eq $entry) {
         $catalogErrors.Add('Catalog contains a null command entry.')
@@ -138,6 +286,9 @@ foreach ($entry in $catalogEntries) {
     if ($role -eq 'controlled-execution' -and $writeMode -notin @('scoped-write', 'external-run')) {
         $catalogErrors.Add("Catalog role/writeMode conflict for ${id}: controlled-execution must be scoped-write or external-run")
     }
+    if (-not [string]::IsNullOrWhiteSpace($path) -and -not $catalogByPath.ContainsKey($path)) {
+        $catalogByPath[$path] = $entry
+    }
 }
 
 $results = New-Object Collections.Generic.List[object]
@@ -168,6 +319,30 @@ foreach ($file in $files) {
     if (-not $isNavigation) {
         if (-not $catalogPaths.Contains($relativeFile)) {
             Add-UniqueError $errors 'Executable AICommand is missing from AICommandCatalog.json.'
+        }
+        elseif ($catalogByPath.ContainsKey($relativeFile)) {
+            try {
+                $catalogEntry = $catalogByPath[$relativeFile]
+                $commandType = Get-ContractMetadataValue $text (Get-UnicodeText @(21629,20196,31867,22411))
+                $defaultWrite = Get-ContractMetadataValue $text (Get-UnicodeText @(40664,35748,25913,25991,20214))
+                $bodyRisk = Get-ContractMetadataValue $text (Get-UnicodeText @(39118,38505,31561,32423))
+                $expected = Get-ExpectedCatalogSemantics $commandType $defaultWrite
+                if ($bodyRisk -notmatch '^L[123](?:[/\s\u3002\uFF0C,]|$)') {
+                    Add-UniqueError $errors 'Contract risk level is missing or invalid.'
+                }
+                elseif (-not $bodyRisk.StartsWith([string]$catalogEntry.riskLevel, [StringComparison]::Ordinal)) {
+                    Add-UniqueError $errors 'Catalog riskLevel differs from the contract body.'
+                }
+                if ([string]$catalogEntry.role -ne $expected.role) {
+                    Add-UniqueError $errors 'Catalog role differs from the contract body semantics.'
+                }
+                if ([string]$catalogEntry.writeMode -ne $expected.writeMode) {
+                    Add-UniqueError $errors 'Catalog writeMode differs from the contract body semantics.'
+                }
+            }
+            catch {
+                Add-UniqueError $errors "Catalog/body semantic validation failed: $($_.Exception.Message)"
+            }
         }
         # Existing strong-constraint commands may use a domain-specific middle section, but every
         # task contract must retain a reading gate and a delivery contract. Use metadata-derived
@@ -224,6 +399,70 @@ if ($catalogErrors.Count -eq 0 -and $catalogEntries.Count -gt 0) {
         elseif ([string]$discovery.candidates[0].id -ne [string]$catalogEntries[0].id) {
             $catalogErrors.Add('AICommand discovery did not resolve the requested exact command id.')
         }
+
+        $exactPathOutput = & $findScriptPath -ProjectRoot $ProjectRoot -CommandPath ([string]$catalogEntries[0].path) -Json
+        $exactPath = $exactPathOutput | ConvertFrom-Json
+        if (
+            $null -eq $exactPath -or $exactPath.selectionMode -ne 'exact-path' -or
+            $exactPath.returnedCount -ne 1 -or [string]$exactPath.candidates[0].id -ne [string]$catalogEntries[0].id
+        ) {
+            $catalogErrors.Add('AICommand exact-path discovery did not resolve the requested catalog entry.')
+        }
+
+        foreach ($catalogEntry in $catalogEntries) {
+            $exactOutput = & $findScriptPath -ProjectRoot $ProjectRoot -CommandPath ([string]$catalogEntry.path) -Json
+            $exact = $exactOutput | ConvertFrom-Json
+            if (
+                $null -eq $exact -or $exact.returnedCount -ne 1 -or
+                [string]$exact.candidates[0].id -ne [string]$catalogEntry.id
+            ) {
+                $catalogErrors.Add("AICommand exact-path discovery mismatch: $($catalogEntry.id)")
+                break
+            }
+        }
+
+        $truncationQuery = Get-UnicodeText @(26816,26597)
+        $truncationOutput = & $findScriptPath -ProjectRoot $ProjectRoot -Query $truncationQuery -Json
+        $truncation = $truncationOutput | ConvertFrom-Json
+        if (
+            $null -eq $truncation -or $truncation.matchedCount -le 6 -or $truncation.returnedCount -ne 6 -or
+            @($truncation.candidates).Count -ne 6
+        ) {
+            $catalogErrors.Add('AICommand discovery default result cap is not enforced or not disclosed.')
+        }
+
+        $reviewEntry = @($catalogEntries | Where-Object { $_.role -eq 'review' -and $_.riskLevel -eq 'L1' })[0]
+        $filteredOutput = & $findScriptPath -ProjectRoot $ProjectRoot -Query ([string]$reviewEntry.id) -Role review -RiskLevel L1 -Json
+        $filtered = $filteredOutput | ConvertFrom-Json
+        if (
+            $null -eq $filtered -or $filtered.returnedCount -ne 1 -or
+            [string]$filtered.candidates[0].id -ne [string]$reviewEntry.id -or
+            [string]$filtered.candidates[0].role -ne 'review' -or
+            [string]$filtered.candidates[0].riskLevel -ne 'L1'
+        ) {
+            $catalogErrors.Add('AICommand discovery role/risk filter did not preserve the requested contract.')
+        }
+
+        $negativeCases = @(
+            @('-Query', ' ', '-Json'),
+            @('-CommandPath', 'Assets/Plugins/ES/AICommands/../README.md', '-Json'),
+            @('-Query', $truncationQuery, '-MaxResults', '7', '-Json')
+        )
+        foreach ($negativeArguments in $negativeCases) {
+            $rejected = $false
+            try {
+                & $findScriptPath -ProjectRoot $ProjectRoot @negativeArguments | Out-Null
+            }
+            catch {
+                $rejected = $true
+            }
+            if (-not $rejected) {
+                $catalogErrors.Add('AICommand discovery accepted an invalid query, path, or result limit.')
+                break
+            }
+        }
+
+        Invoke-DiscoveryIsolationRegression -ProjectRoot $ProjectRoot -FindScriptPath $findScriptPath -CatalogEntry $catalogEntries[0]
     }
     catch {
         $catalogErrors.Add("AICommand discovery script execution failed: $($_.Exception.Message)")

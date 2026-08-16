@@ -274,6 +274,8 @@ namespace ES.EditorInternal
 
         private sealed class ESInputActionImportWindow : ESSinglePageIMGUIWindow<ESInputActionImportWindow>
         {
+            protected override bool ESWindow_SupportsSemiSleep => false;
+
             private SerializedObject targetObject;
             private string actionPropertyPath;
             private Holder holder;

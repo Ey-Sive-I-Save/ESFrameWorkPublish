@@ -58,7 +58,7 @@ Do not blindly migrate these yet:
 - `ESRowContainerAttribute`
 - `IESRowBindingProvider`
 - `ESWindowPageBase`
-- `ESMenuTreeWindowAB`
+- `ESMenuTreeWindow<T>` / `ESSinglePageWindow<T>` / `ESOdinMenuTreeWindow<T>` 等现行窗口公共与兼容外壳
 - TrackView and SODataInfoWindow types
 
 Reason: these are either public configuration/API surfaces or high-coupling editor systems with UXML, static references, nested page classes, and menu state. Move them only in a dedicated pass.

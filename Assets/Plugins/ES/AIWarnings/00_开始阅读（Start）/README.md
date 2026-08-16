@@ -51,6 +51,7 @@ README
 
 - 编辑器扩展 AI 常识（`40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md`）现为 Project Authority / P0；编辑器 UI 的事件隔离、目标正确性、单一滚动容器、重绘性能和 Unity 实机交互验收优先于视觉增强与功能新增。
 
+- 禁止滥用 C# `new` 成员隐藏，也禁止仅为了让普通用户不使用某方法而强制改成组合、只读 View、内部外壳、额外接口或拆分程序集。ES 自有、仍对普通调用方可见的非普通用户真实入口统一使用 `Internal_` 前缀；该前缀是使用边界标识，不是编译器访问控制。具体规则见 `10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_代码结构规范_Internal前缀与new成员隐藏边界_AI协作警告.md`。
 - 所有文本文件统一使用 UTF-8；禁止默认代码页覆写和机械转码。
 - RuntimeKey 仅在当前进程、当前强类型表生命周期内有效，禁止持久化。
 - Tag 使用 `ESTagCollection` 的 Host SetTag 与 Lease/LeaseSet 所有权模型；禁止恢复无来源 Add/Remove API、第二套 Tag event 或旧 Tag 容器。

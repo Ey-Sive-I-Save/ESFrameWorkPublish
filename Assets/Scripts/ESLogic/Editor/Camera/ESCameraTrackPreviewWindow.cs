@@ -17,12 +17,19 @@ namespace ES
         private double nextRepaintTime;
 
         [MenuItem("【ES】/内容制作/相机/打开轨道相机预览", false, 141)]
-        public static void Open()
+        private static void OpenFromMenu()
+        {
+            Open();
+        }
+
+        public static void Open(EditorWindow owner = null)
         {
             ESCameraTrackPreviewWindow window = GetWindow<ESCameraTrackPreviewWindow>();
+            window.ESWindow_SetSleepOwnerOverride(owner);
             window.titleContent = new GUIContent("轨道相机预览");
             window.minSize = new Vector2(360f, 220f);
             window.Show();
+            window.ForceMenuTreeRebuild();
         }
 
         public override GUIContent ESWindow_GetWindowGUIContent()
@@ -31,6 +38,11 @@ namespace ES
         }
 
         protected override string ESWindow_Subtitle => "TrackView 相机输出";
+        protected override ESWindowSleepLinkMode ESWindow_SleepLinkMode
+            => ESWindowSleepLinkMode.FollowOwner;
+        protected override EditorWindow ESWindow_SleepOwner
+            => ESTrackViewWindow.window;
+        protected override string ESWindow_SleepOwnerKey => "ES.TrackView.Window";
         protected override Vector2 ESWindow_MinSize => new Vector2(360f, 220f);
         protected override Vector2 ESWindow_DefaultSize => new Vector2(760f, 520f);
         protected override string ESWindow_PageStableId => "camera.track-preview";

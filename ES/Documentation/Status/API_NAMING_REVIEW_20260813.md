@@ -1,8 +1,8 @@
 # ESFramework API 命名复核报告
 
-状态：前四批低风险源码迁移已经形成，候选复核继续；不构成机械批量改名授权。
+状态：前五批低风险源码迁移已经形成，候选复核继续；不构成机械批量改名授权。
 
-最后验证：2026-08-13，第二批源码迁移前已完成声明、实现、调用方、测试、资产文本与现行文档引用扫描；验证结果见下文。
+最后验证：2026-08-13，前五批均完成声明、实现、调用方、测试、资产文本与现行文档引用扫描；严格 UTF-8 与差异检查通过，生成工程证据见下文。
 
 适用源码入口：`Assets/Plugins/ES`、`Assets/Scripts/ESLogic` 中的公开业务 API、可见工具入口及其直接调用链。
 
@@ -19,7 +19,7 @@
 
 ## 当前结论
 
-方向为“有条件通过”：项目级动词语义边界有价值，`Submit`、`Resolve`、`Process` 与 `Execute` 均不应机械禁用。前四批十个已确认问题已经完成源码与现行文本迁移，但尚无 Unity Editor、ReloadDomain 或运行证据；其余条目继续按调用链复核，不得宣称命名治理完成或可发布。
+方向为“有条件通过”：项目级动词语义边界有价值，`Submit`、`Resolve`、`Process` 与 `Execute` 均不应机械禁用。前五批 11 个已确认治理问题已经完成源码与现行文本迁移，但尚无 Unity Editor、ReloadDomain 或运行证据；其余条目继续按调用链复核，不得宣称命名治理完成或可发布。
 
 ## 分级口径
 
@@ -62,16 +62,24 @@
 
 | 原名称 | 分级与判定 | 当前名称 | 修改范围 | 剩余证据 |
 |---|---|---|---|---|
-| `ESAudioDirectClipConfig.ResolveCategory(...)` | C；只返回当前覆盖值或调用方默认值，没有查表、消歧或失败分支 | `GetEffectiveCategory(...)` | Audio Runtime 声明、唯一业务调用点与四个测试断言中的两个 | Unity 编译、Audio EditMode 测试 |
-| `ESAudioDirectClipConfig.ResolveSpatialMode(...)` | C；只返回当前覆盖值或调用方默认值，没有解析协议 | `GetEffectiveSpatialMode(...)` | Audio Runtime 声明、唯一业务调用点与四个测试断言中的两个 | Unity 编译、Audio EditMode 测试 |
+| `ESAudioClipPlayConfig.GetEffectiveCategory(...)` | C；只返回当前覆盖值或调用方默认值，`Effective` 没有增加业务信息 | `GetCategory(...)` | Audio Runtime 声明、唯一业务调用点与对应测试断言 | Unity 编译、Audio EditMode 测试 |
+| `ESAudioClipPlayConfig.GetEffectiveSpatialMode(...)` | C；只返回当前覆盖值或调用方默认值，`Effective` 没有增加业务信息 | `GetSpatialMode(...)` | Audio Runtime 声明、唯一业务调用点与对应测试断言 | Unity 编译、Audio EditMode 测试 |
 | Shot Inspector `HitResolver Tag 条件` | A；策划字段暴露内部 Resolver 架构词 | `命中 Tag 条件`，并将 Tooltip 改为“命中判定” | Inspector 可见 Label 与 Tooltip；序列化字段名保持不变 | Unity Inspector 人工验证 |
 
 本批没有保留旧名转发包装；没有修改序列化字段名、类型名、`.meta`、Prefab、Scene 或资产 YAML。
 
+## 第五批已处理
+
+| 原名称 | 分级与判定 | 当前名称 | 修改范围 | 剩余证据 |
+|---|---|---|---|---|
+| `MatchTargetGizmosDrawer.Submit(...)` | C；Editor-only 诊断路径按 Key 覆盖本帧字典数据，没有身份、拒绝或状态推进 | `SetFrameData(...)` | Drawer 声明、文件说明、唯一 StateBase 调用点及相邻注释 | Unity 编译、MatchTarget Scene Gizmos 人工验证 |
+
+本批没有保留旧名转发包装；没有修改序列化字段、类型名、`.meta`、Prefab、Scene 或资产 YAML。
+
 验证现状：
 
-- 活跃 C# 源码已无前四批十项旧名称引用；旧名只保留在本报告的迁移记录、历史协作记录和尚未按同步台账刷新的静态 HTML 快照中。
-- `ES_Logic.csproj` 与 `ES_Design.ConfigKey.Tests.csproj` 的 `dotnet-build` 均被当前共享工作树的 49 个既有缺失类型错误阻断，主要涉及未被生成工程收录的 Motion Influence、VFX 和 Enum/String Mirror Map 类型；未取得静态编译通过证据。
+- 前五批 11 个治理问题涉及的精确旧 API 与 Inspector 文案，在限定活跃范围内已归零；旧内容只保留在本报告的迁移记录、历史协作记录和尚未按同步台账刷新的静态 HTML 快照中。这里的 11 是治理问题数，不是唯一 C# 旧符号数：驾驶输入包含两个旧 API，另有一项是 Inspector 文案。
+- `ES_Design.csproj` 的 `dotnet-build` 通过，0 警告、0 错误。`ES_Logic.csproj` 被当前共享工作树的 66 个既有缺失类型错误阻断，主要涉及未被生成工程收录的 Motion Influence、VFX、Enum/String Mirror Map 与 Transform Mapping Conflict 类型；`ES_Design.ConfigKey.Tests.csproj` 因依赖 `ES_Logic` 同样失败。失败列表暂未发现本轮精确旧 API 对应的 `CS1061` / `CS0117`；由于整体编译失败，这不能证明调用链已经完整编译。
 - 当前环境没有可调用的 UnityMCP，未取得 Unity Editor Console、ReloadDomain、EditMode 或 PlayMode 证据。
 - 项目内活跃调用已经同步，但这些方法原本是 `public`；若存在仓外程序集或尚未导入的包直接调用旧名，会在升级后产生源码兼容断点。本批按“不保留无职责永久兼容包装”的项目规则处理，尚无仓外消费者清单证据。
 
@@ -89,14 +97,6 @@
 | 私有 `VehicleController.DispatchVelocity(...)` | 遍历已注册运动能力并遵守确定顺序 | 属于底层派发实现，不是业务高频入口，保留 |
 | `VehicleController.RegisterMotionFeature(...)` | 向多个 `ESWorkScheduler` 注册能力并返回可释放 Registration | 注册/注销生命周期真实存在，保留 |
 | `VehicleController.ProcessHitStabilityReport(...)` | KCC 规定的接口回调 | 外部固定合同，不纳入改名 |
-
-## 待复核候选
-
-以下项目只表示“值得继续检查”，不预设最终名称或违规等级。
-
-| 候选 | 已确认实现事实 | 尚缺检查 | 可评估方向 |
-|---|---|---|---|
-| `MatchTargetGizmosDrawer.Submit(...)` | 同一 Key 每帧覆盖开发诊断数据 | 无高优先级缺口；属于私有诊断路径 | 低优先级评估 `SetFrameData(...)`，也可维持现状 |
 
 ## 本轮复核后保留
 

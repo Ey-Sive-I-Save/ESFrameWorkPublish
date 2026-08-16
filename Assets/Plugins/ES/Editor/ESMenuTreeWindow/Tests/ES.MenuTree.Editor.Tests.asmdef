@@ -2,7 +2,8 @@
     "name": "ES.MenuTree.Editor.Tests",
     "rootNamespace": "",
     "references": [
-        "ES_Editor"
+        "ES_Editor",
+        "ES_Stand"
     ],
     "includePlatforms": [
         "Editor"

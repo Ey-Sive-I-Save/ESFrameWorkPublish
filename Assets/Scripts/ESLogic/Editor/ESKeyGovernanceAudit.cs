@@ -115,6 +115,7 @@ namespace ES
             builder.AppendLine();
 
             builder.AppendLine("## Loaded GameCore Config Catalogs");
+            AppendConfigTable(builder, "GameCore.Item", ESRuntimeDataGameCore.Items, declaredStrings, ref errors);
             AppendConfigTable(builder, "GameCore.Buff", ESRuntimeDataGameCore.Buffs, declaredStrings, ref errors);
             AppendConfigTable(builder, "GameCore.Shot", ESRuntimeDataGameCore.Shots, declaredStrings, ref errors);
             AppendConfigTable(builder, "GameCore.Monster", ESRuntimeDataGameCore.Monsters, declaredStrings, ref errors);

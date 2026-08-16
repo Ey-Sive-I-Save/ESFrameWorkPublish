@@ -1,5 +1,6 @@
 using Sirenix.Utilities.Editor;
 using System;
+using ES.EditorInternal;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -33,10 +34,8 @@ namespace ES
             if (!string.IsNullOrEmpty(tooltip)) button.tooltip = tooltip;
             button.style.width = width;
             button.style.height = height;
-            button.style.borderTopLeftRadius = 3;
-            button.style.borderTopRightRadius = 3;
-            button.style.borderBottomLeftRadius = 3;
-            button.style.borderBottomRightRadius = 3;
+            ESEditorPresentation.ApplyCornerRadius(
+                button, ESEditorPresentation.ESCornerRadiusToken.Control);
             ESTrackViewTheme.ApplyStandardButton(button);
             button.RegisterCallback<PointerEnterEvent>(_ =>
             {

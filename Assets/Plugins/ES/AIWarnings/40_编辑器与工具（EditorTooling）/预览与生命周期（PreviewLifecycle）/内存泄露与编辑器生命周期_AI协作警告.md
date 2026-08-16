@@ -2,7 +2,7 @@
 
 作者职责：Codex，负责编辑器预览底层、资产包预览工作流、玩家/生命体模型重构协作中的工程风险审计。
 
-更新时间：2026-07-22，中国时间。
+更新时间：2026-07-22，中国时间；最后路径复核：2026-08-16。
 
 ## 当前结论
 
@@ -21,12 +21,12 @@ ESFramework 现在不能再把“编辑器窗口关闭时会自然释放”当�
 - `ESEditorPreviewResourceScope` 只做局部资源登记，启动注册交给 `EditorInvoker_Level2`，不要新增 `InitializeOnLoadMethod`。
 - `ESEditorPreviewUtility.DestroyObject()` 对 `RenderTexture` 已做防御释放：销毁前先 `Release()`。
 - `EditorTimelinePlayer` 已接入 `EditorInvoker_Level2` 全局清理：重编译、退出编辑器、切 PlayMode 时会 Stop、退 update、归还预览目标。
-- `ESMenuTreeWindowAB.blackTexture` 和 `ESLibraryTemplate.buttonBackground` 这类静态编辑器 Texture 必须 `HideAndDontSave`，不要写入场景/资产。
+- `ESLibraryTemplate.buttonBackground`、Presentation 动态纹理和其他由当前窗口底层创建的静态 Editor Texture 必须 `HideAndDontSave`，并在缓存失效、域重载或受控卸载时确定性销毁；已删除的 `ESMenuTreeWindowAB.blackTexture` 不再是现行源码入口。
 - 资产包窗口的模型预览缓存、缓存帧、fallback 材质必须走统一 Clear/Dispose，不允许只清字典引用。
 
 ## 后续 AI 必须遵守
 
-1. 新增编辑器预览功能时，优先使用 `Assets/Scripts/ESLogic/Editor/Preview` 下的底层：
+1. 新增编辑器预览功能时，优先使用 `Assets/Scripts/ESLogic/Runtime/EditorPreview` 下的 Editor-only 底层；目录名中的 `Runtime` 不授权进入 Player：
    - `ESEditorPreviewRenderContext`
    - `ESEditorPreviewModelHandle`
    - `ESEditorPreviewResourceScope`
@@ -56,4 +56,3 @@ ESFramework 现在不能再把“编辑器窗口关闭时会自然释放”当�
 
 - `dotnet build ES_Logic.csproj --no-restore -v:minimal`：通过，0 警告，0 错误。
 - `dotnet build ES_Editor.csproj --no-restore -v:minimal -p:BuildProjectReferences=false`：通过，0 警告，0 错误。
-

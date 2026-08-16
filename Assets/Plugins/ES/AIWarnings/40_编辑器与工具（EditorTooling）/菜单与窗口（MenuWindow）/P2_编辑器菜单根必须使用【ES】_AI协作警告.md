@@ -1,6 +1,6 @@
 # P2：ES Unity 菜单信息架构与入口边界
 
-> 状态：现行架构决策，六域菜单静态迁移已完成，Unity 实机验收待完成。不得把源码扫描或生成工程编译视为 Unity 菜单已经验收。
+> 状态：现行架构决策，六域菜单迁移实施中。ES 自有活跃源码入口主体已迁移；正式静态技术文档、可复现扫描门禁和 Unity 实机证据全部收口前，不得宣称静态迁移完成。
 > 最后核对：2026-08-13。
 
 ## 级别
@@ -177,5 +177,13 @@ Add Component/【ES】
 3. 同步 `EditorApplication.ExecuteMenuItem`、窗口启动器、命令面板、AICommand、Agent Skill、现行 Markdown 操作指南和测试断言。
 4. 检查一个窗口是否重复出现在“常用窗口”，以及快捷入口是否误收高风险动作。
 5. 在 Unity 中实机检查三棵菜单、排序、分隔线、禁用状态、快捷键与 ReloadDomain 后行为。
+
+项目级只读门禁为：
+
+```powershell
+& 'ES/Tools/Validation/Test-ESMenuArchitecture.ps1' -ProjectRoot (Get-Location).Path
+```
+
+该脚本分别报告 ES 自有活跃源码与 `Obsolete` 兼容源码，并将 Attribute 总数拆成字面量与符号参数；只对可直接解析的字面量做分类检查。活跃源码范围包含 ES 自有测试和示例，不计算条件编译结果，也不合并 validator 重载或重复 Attribute；符号参数只报告数量，不冒充已完成路径解析。其默认正式文档范围包含 AIWarnings、AICommands、`Documentation`、Automation AI 指南、项目 Skills 和静态技术 HTML。禁止把其中任一局部计数表述为未经限定的“全仓自然计数”。
 
 菜单迁移不得改动序列化字段、资源 GUID、运行时协议或磁盘目录，也不得用“规则已写入”冒充 Unity 实机验收完成。

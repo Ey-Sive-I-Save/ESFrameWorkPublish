@@ -1,7 +1,7 @@
 # 角色 Prefab 职责与 DataInfo 入口：AI 协作警告
 
 状态：现行约束；角色模板与正式 Variant 的实现/验收按本文件执行。  
-最后核对：2026-07-31。
+最后核对：2026-08-16。
 
 ## 负责范围
 
@@ -20,10 +20,10 @@ Entity 生命周期
 - `Entity` 是唯一的定义绑定执行者；Profile 只保存 Prefab 静态身份、阵营和正式 Variant 的唯一 DataInfo。
 - `BuildInput` 无定义，禁止直接发布；`RuntimePoolTemplate` 无定义，由租出方直接 `Entity.BindDefinition(...)`；`CharacterVariant` 自动绑定 Profile 中唯一的 Actor、Monster 或 Npc DataInfo。
 - 角色根固定为 `Entity + KinematicCharacterMotor + CapsuleCollider + EntityCharacterIdentity + EntityTransformMapping`；模型固定承载一个 Animator。
-- AI、Buff、战斗和状态能力留在 Entity 的 Domain / Module。`EntityBuffDomain` 已有 Buff 实例、叠层、持续时间、ValueChange / Permit、Op 与 Tag Lease 的运行时底座，不是空域，也不等于完整玩法已经验收。
+- AI、Buff、战斗、状态和装备能力留在 Entity 的 Domain / Module。`EntityEquipmentDomain` 是正式第五 Domain，聚合 Inventory / Slot / Attachment / Effect；`EntityBuffDomain` 已有 Buff 实例、叠层、持续时间、ValueChange / Permit、Op 与 Tag Lease 的运行时底座。源码存在不等于完整玩法已经验收。
 - `StateFinalIKDriver` 是状态到 IK 的表现桥。模板使用无 Solver、全部能力关闭的轻量基线；正式 Variant 仅在对应 Solver/前置依赖齐全后启用能力。
-- `EntityWeaponBinding` 只按需挂在每个实际武器根；无武器角色不挂空组件。手持优先级为显式 `handMount -> WeaponSocket -> Combat 回退`，双手副手目标和偏移归武器 Binding。
-- `EntityTransformMapping` 是挂点缓存服务。固定挂点读取缓存，热路径禁止重新 Find。
+- `EntityWeaponBinding` 只按需挂在每个实际武器根；无武器角色不挂空组件。角色整体挂载只使用 `EntityTransformMapping` 中作者化的 MainHand / OffHand / PrimaryBack / SecondaryBack / Hip / TemporaryHand Socket；武器根只提供 GripPivot、OffHandGrip、Muzzle、AimReference 与 PresentationRoot 等本地参考。
+- `EntityTransformMapping` 是挂点缓存服务。固定挂点读取缓存，热路径禁止重新 Find；缺失正式业务 Socket 必须拒绝装配，禁止回退到 Humanoid 手骨、角色根或运行时自动造点。
 
 ## 已废止或禁止的设计
 
@@ -47,7 +47,8 @@ Entity 生命周期
 Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs
 Assets/Scripts/ESLogic/Runtime/Entity/Entity/Utilities/EntityCharacterIdentity.cs
 Assets/Scripts/ESLogic/Runtime/Entity/Entity/Utilities/EntityTransformMapping.cs
-Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/EntityWeaponBinding.cs
+Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityWeaponBinding.cs
+Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Equipment/EntityEquipmentDomain.cs
 Assets/Scripts/ESLogic/Runtime/State/IK/StateFinalIKDriver_/StateFinalIKDriver.AuthoringContract.cs
 Assets/Scripts/ESLogic/Editor/CharacterTemplates/ESBasicCharacterTemplateBuilder.cs
 Assets/ESNormalAssets/CharacterTemplates/ES基础角色模板.prefab
@@ -60,4 +61,4 @@ Assets/ESNormalAssets/CharacterTemplates/ES通用角色完整架构.prefab
 2. P0：验证器对启用的 FinalIK 能力执行 Solver 契约检查。
 3. P1：正式 Variant 补齐阵营、Layer、Collider、HurtBox/HitBox、InteractionProbe、装备和唯一 DataInfo。
 4. P1：正式 Variant 跑移动、状态切换、池复用、武器挂载、命中检测、已启用 IK 的 PlayMode 烟雾测试。
-5. P2：继续收口 WeaponSocket、Humanoid 骨骼和双手武器偏移的制作规则。
+5. P2：为动画事件驱动的 Equip / Holster / Switch、双持与最终 IK Pose 补 PlayMode、Profiler 和 Player 证据。

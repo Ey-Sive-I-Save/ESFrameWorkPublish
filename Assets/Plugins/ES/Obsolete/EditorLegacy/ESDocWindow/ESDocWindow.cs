@@ -13,9 +13,9 @@ namespace ES.Obsolete{
         /// ES文档窗口 - 专门用于制作文档界面的窗口
         /// 支持表格、代码块、网址、图片等高级特性
         /// </summary>
-        public class ESDocWindow : ESMenuTreeWindowAB<ESDocWindow>
+        public class ESDocWindow : ESOdinMenuTreeWindow<ESDocWindow>
         {
-            [MenuItem("【ES】/已废弃/EditorLegacy/文档工具/ES文档创建窗口")]
+            [MenuItem("【ES】/自动化与开发/遗留兼容/EditorLegacy/文档工具/ES文档创建窗口")]
             public static void TryOpenWindow()
             {
                 OpenWindow();

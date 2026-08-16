@@ -673,6 +673,7 @@ namespace ES.EditorInternal
             if (asset is ESAssetGameCoreFlowTestDataInfo flowTest && enumType == typeof(ESFlowTestEnumKey)) return flowTest.testKey;
             if (asset is ItemDataInfo item && item.baseConfig != null)
             {
+                if (enumType == typeof(ESItemEnumKey)) return item.itemKey;
                 if (enumType == typeof(ESShotEnumKey) && item.kindData is ItemShotDataBlock shot) return shot.key;
                 if (enumType == typeof(ESWeaponEnumKey) && item.kindData is ItemWeaponDataBlock weapon) return weapon.key;
             }
@@ -688,8 +689,10 @@ namespace ES.EditorInternal
             public int repaired;
             public int valid;
             public int invalid;
+            public int itemCount;
             public int shotCount;
             public int weaponCount;
+            public int injectedItemCount;
             public int injectedShotCount;
             public int injectedWeaponCount;
             public List<string> errors;
@@ -702,10 +705,12 @@ namespace ES.EditorInternal
                     + "，修复=" + repaired
                     + "，有效=" + valid
                     + "，无效=" + invalid
+                    + "，Item=" + itemCount
                     + "，Shot=" + shotCount
                     + "，Weapon=" + weaponCount;
-                if (injectedShotCount != 0 || injectedWeaponCount != 0)
-                    result += "，已注入 Shot=" + injectedShotCount + "，Weapon=" + injectedWeaponCount;
+                if (injectedItemCount != 0 || injectedShotCount != 0 || injectedWeaponCount != 0)
+                    result += "，已注入 Item=" + injectedItemCount
+                        + "，Shot=" + injectedShotCount + "，Weapon=" + injectedWeaponCount;
                 if (HasErrors)
                     result += "，错误=" + errors.Count;
                 return result;
@@ -760,6 +765,17 @@ namespace ES.EditorInternal
                 if (!item.IsGameCoreRoot)
                     continue;
 
+                report.itemCount++;
+                if (!item.TryGetItemGameCoreKey(out ESItemConfigKey itemKey))
+                    continue;
+                string itemSignature = "Item|" + (itemKey.EnumKeyInt != 0
+                    ? "E:" + itemKey.EnumKeyInt
+                    : "S:" + itemKey.StringKey);
+                if (keyOwners.TryGetValue(itemSignature, out ItemDataInfo itemOwner) && itemOwner != item)
+                    report.errors.Add("Item GameCore Key 重复：" + itemSignature + "，资产为 " + Describe(itemOwner) + " 与 " + Describe(item));
+                else
+                    keyOwners[itemSignature] = item;
+
                 if (item.baseConfig.kind == ItemKind.Shot) report.shotCount++;
                 if (item.baseConfig.kind == ItemKind.Weapon) report.weaponCount++;
                 if (!item.TryGetGameCoreKey(out IESConfigKey key))
@@ -809,13 +825,16 @@ namespace ES.EditorInternal
 
         private static void RebuildTables(List<ItemDataInfo> items, ref Report report)
         {
-            if (ESRuntimeDataGameCore.Shots.IsBuilding || ESRuntimeDataGameCore.Weapons.IsBuilding)
+            if (ESRuntimeDataGameCore.Items.IsBuilding
+                || ESRuntimeDataGameCore.Shots.IsBuilding
+                || ESRuntimeDataGameCore.Weapons.IsBuilding)
             {
                 report.errors.Add("当前 Item GameCore 表正在构建，不能嵌套重建。");
                 return;
             }
 
             bool failed = false;
+            ESRuntimeDataGameCore.Items.BeginBuild(true);
             ESRuntimeDataGameCore.Shots.BeginBuild(true);
             ESRuntimeDataGameCore.Weapons.BeginBuild(true);
             try
@@ -840,17 +859,21 @@ namespace ES.EditorInternal
             {
                 ESRuntimeDataGameCore.Weapons.EndBuild();
                 ESRuntimeDataGameCore.Shots.EndBuild();
+                ESRuntimeDataGameCore.Items.EndBuild();
             }
 
             if (failed)
             {
+                ESRuntimeDataGameCore.Items.BeginBuild(true);
                 ESRuntimeDataGameCore.Shots.BeginBuild(true);
                 ESRuntimeDataGameCore.Weapons.BeginBuild(true);
                 ESRuntimeDataGameCore.Weapons.EndBuild();
                 ESRuntimeDataGameCore.Shots.EndBuild();
+                ESRuntimeDataGameCore.Items.EndBuild();
                 return;
             }
 
+            report.injectedItemCount = ESRuntimeDataGameCore.Items.Count;
             report.injectedShotCount = ESRuntimeDataGameCore.Shots.Count;
             report.injectedWeaponCount = ESRuntimeDataGameCore.Weapons.Count;
         }
@@ -1075,6 +1098,12 @@ namespace ES.EditorInternal
     public sealed class ESBuffConfigKeyDrawer : ESGameCoreConfigKeyDrawerBase
     {
         protected override Type ResolveEnumType() => typeof(ESBuffEnumKey);
+    }
+
+    [CustomPropertyDrawer(typeof(ESItemConfigKey))]
+    public sealed class ESItemConfigKeyDrawer : ESGameCoreConfigKeyDrawerBase
+    {
+        protected override Type ResolveEnumType() => typeof(ESItemEnumKey);
     }
 
     [CustomPropertyDrawer(typeof(ESShotConfigKey))]

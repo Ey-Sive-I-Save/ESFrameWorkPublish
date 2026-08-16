@@ -405,6 +405,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：未运行 Unity Test Runner、PlayMode、场景切换、对象池真实回调压力、动态图集 GPU 失败注入或 UI 多窗口交互；静态构建不等价于 Unity Editor、Player 或 IL2CPP 验收。
 - **HTML 目标**：后续在 `#runtime-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-010：编辑器交付体验与 AI 治理收口
+
+- **源码路径**：编辑器呈现核心与主题、MenuTree/TrackView/对话框生命周期、ContentRegistration、Drawer、统一菜单、正式品牌图标、AICommand 发现校验、AIWarnings、项目索引和兼容入口。
+- **规范与证据**：编辑器状态、半休眠、父子窗口、注册工作流和品牌资源共同维持可发现性；AICommand 与菜单脚本提供可复现的入口治理证据。
+- **完成分析**：窗口基础层、主题资源、注册入口、规则目录和测试必须同批，避免 UI 使用旧生命周期合同、品牌资源缺失或治理脚本与实际入口脱节。
+- **回归状态**：四个 Editor/测试 csproj 均为 0 警告、0 错误；AICommand 54/54、invalid 0；99 个目标文本严格 UTF-8 通过；16 个正式 PNG 可解码且均为 96×96；暂存范围无受禁目录或高置信凭据赋值。
+- **已知缺口**：菜单审计 `valid=False`，仍有 3 个 CreateAssetMenu 分类和 18 个延期静态 HTML 旧路径；只读 AICommand 未授权顺手修复；没有 Unity Editor、ReloadDomain、窗口重开、窄屏、高 DPI、多窗口或交互截图证据。
+- **HTML 目标**：后续在 `#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

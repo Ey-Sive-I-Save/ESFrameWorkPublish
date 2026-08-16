@@ -1,5 +1,6 @@
 using Sirenix.Utilities.Editor;
 using System.Collections.Generic;
+using ES.EditorInternal;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -28,6 +29,11 @@ namespace ES
         public VisualElement EntityStatusGroup = new VisualElement();
         public Label EntityLabel = new Label();
         public Label UserEntityLabel = new Label();
+        public readonly VisualElement SystemActionHost = new VisualElement
+        {
+            name = "ESTrackViewSystemActions",
+            tooltip = "系统：窗口生命周期与休眠控制"
+        };
 
 
         private readonly VisualElement m_PlaybackGroup = new VisualElement();
@@ -63,6 +69,8 @@ namespace ES
             ConfigureGroup(m_PlaybackGroup, 0, 0);
             ConfigureGroup(m_ContextGroup, 1, 1);
             ConfigureGroup(m_RightGroup, 0, 0);
+            ConfigureGroup(SystemActionHost, 0, 0);
+            SystemActionHost.style.marginLeft = 4;
             m_RightGroup.style.position = Position.Relative;
             m_RightGroup.style.right = StyleKeyword.Auto;
             m_RightGroup.style.top = StyleKeyword.Auto;
@@ -94,6 +102,7 @@ namespace ES
             CreatePlaybackControls();
             CreateContextControls();
             CreateMoreControls();
+            m_RightGroup.Add(SystemActionHost);
             BindEvents();
             RegisterCallback<GeometryChangedEvent>(OnGeometryChanged);
             RegisterCallback<AttachToPanelEvent>(_ =>
@@ -426,10 +435,8 @@ namespace ES
             button.style.height = height;
             button.style.marginLeft = 1;
             button.style.marginRight = 1;
-            button.style.borderTopLeftRadius = 3;
-            button.style.borderTopRightRadius = 3;
-            button.style.borderBottomLeftRadius = 3;
-            button.style.borderBottomRightRadius = 3;
+            ESEditorPresentation.ApplyCornerRadius(
+                button, ESEditorPresentation.ESCornerRadiusToken.Control);
             ESTrackViewTheme.ApplyStandardButton(button);
             button.AddToClassList("track-toolbar-button");
             parent.Add(button);
@@ -644,7 +651,8 @@ namespace ES
             var editorWindow = ESTrackSkillDataTemporaryInspectorWindow.OpenFor(
                 skillData,
                 "编辑技能 <" + skillData.name + ">",
-                "技能配置");
+                "技能配置",
+                trackWindow);
 
             if (trackWindow != null)
                 trackWindow.Last_EditorWindowForSkillDataInfo = editorWindow;

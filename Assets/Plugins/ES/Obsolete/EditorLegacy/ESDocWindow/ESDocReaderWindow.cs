@@ -18,9 +18,9 @@ namespace ES.Obsolete{
     /// 高性能渲染、完整层级结构、专业视觉效果
     /// 菜单: Tools/ES文档/ES文档阅读器
     /// </summary>
-    public class ESDocReaderWindow : ESMenuTreeWindowAB<ESDocReaderWindow>
+    public class ESDocReaderWindow : ESOdinMenuTreeWindow<ESDocReaderWindow>
     {
-        [MenuItem("【ES】/已废弃/EditorLegacy/文档工具/ES文档阅读器")]
+        [MenuItem("【ES】/自动化与开发/遗留兼容/EditorLegacy/文档工具/ES文档阅读器")]
         private static new void OpenWindow()
         {
             OpenDocReaderWindow("📖 ES文档阅读器");
@@ -1393,7 +1393,7 @@ namespace ES.Obsolete{
             [Button("📝 创建新文档", ButtonHeight = 35), GUIColor(0.4f, 0.8f, 0.4f)]
             public void CreateDocument()
             {
-                EditorApplication.ExecuteMenuItem("【ES】/已废弃/EditorLegacy/文档工具/ES文档创建窗口");
+                EditorApplication.ExecuteMenuItem("【ES】/自动化与开发/遗留兼容/EditorLegacy/文档工具/ES文档创建窗口");
             }
 
             [FoldoutGroup("快捷操作")]
@@ -1418,7 +1418,7 @@ namespace ES.Obsolete{
             [Button("打开文档创建窗口", ButtonHeight = 40), GUIColor(0.3f, 0.9f, 0.3f)]
             public void OpenCreator()
             {
-                EditorApplication.ExecuteMenuItem("【ES】/已废弃/EditorLegacy/文档工具/ES文档创建窗口");
+                EditorApplication.ExecuteMenuItem("【ES】/自动化与开发/遗留兼容/EditorLegacy/文档工具/ES文档创建窗口");
             }
         }
 

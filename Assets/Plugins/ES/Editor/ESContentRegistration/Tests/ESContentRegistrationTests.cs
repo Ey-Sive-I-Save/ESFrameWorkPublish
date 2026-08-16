@@ -634,6 +634,7 @@ namespace ES.Tests
                 groupKey = "test_group_" + suffix,
                 keyMode = ESContentStableKeyMode.StringOnly,
                 stringKey = "test.weapon." + suffix,
+                itemStringKey = "test.item.weapon." + suffix,
                 gameCoreRoute = "item.weapon"
             };
             ESContentRegistrationResult gameCorePreview = ESContentRegistrationAuthoring.Execute(request);
@@ -657,6 +658,8 @@ namespace ES.Tests
             Assert.That(item.TryGetGameCoreKey(out IESConfigKey key), Is.True);
             Assert.That(key.EnumKeyInt, Is.Zero);
             Assert.That(key.StringKey, Is.EqualTo(request.stringKey));
+            Assert.That(item.itemKey.EnumKeyInt, Is.Zero);
+            Assert.That(item.itemKey.StringKey, Is.EqualTo(request.itemStringKey));
             string groupGuid = AssetDatabase.AssetPathToGUID(groupPath);
             Assert.That(consumer.GameCoreAssets.Concat(consumer.ManualGameCoreAssets).Any(entry =>
                 entry != null && entry.GUID == groupGuid && entry.LocalFileId == 0), Is.True);

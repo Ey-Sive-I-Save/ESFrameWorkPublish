@@ -40,7 +40,7 @@
     align-items: center;
     border-width: 1px;
     border-color: rgba(0, 0, 0, 0);
-    border-radius: 5px;
+    border-radius: 6px;
     background-color: rgb(24, 31, 40);
 }
 
@@ -84,7 +84,7 @@
     padding-right: 6px;
     border-width: 1px;
     border-color: rgb(43, 130, 147);
-    border-radius: 9px;
+    border-radius: 999px;
     background-color: rgb(24, 66, 75);
     color: rgb(126, 222, 235);
     font-size: 9px;

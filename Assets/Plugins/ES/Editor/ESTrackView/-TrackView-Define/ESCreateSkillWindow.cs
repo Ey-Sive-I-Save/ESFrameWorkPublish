@@ -10,6 +10,16 @@ public sealed class ESCreateSkillWindow : EditorWindow
     private bool placeInGroup;
     private SKillDataGroup targetGroup;
 
+    private void OnEnable()
+    {
+        ES.EditorInternal.ESEditorPresentation.BindWindow(this, allowSemiSleep: false);
+    }
+
+    private void OnDisable()
+    {
+        ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+    }
+
     public static void Open()
     {
         ESCreateSkillWindow window = GetWindow<ESCreateSkillWindow>(true, "新建技能");

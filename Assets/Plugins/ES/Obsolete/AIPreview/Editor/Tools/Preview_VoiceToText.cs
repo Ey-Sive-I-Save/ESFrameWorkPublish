@@ -36,14 +36,14 @@ namespace ES.Obsolete{
         private const int SAMPLE_RATE = 16000; // Azure推荐的采样率
         private const int BUFFER_SIZE = SAMPLE_RATE * 2; // 2秒缓冲
 
-        [MenuItem("【ES】/已废弃/AIPreview/AI 工具/语音转文字")]
+        [MenuItem("【ES】/自动化与开发/遗留兼容/AIPreview/AI 工具/语音转文字")]
         static void Init()
         {
             Preview_VoiceToText window = (Preview_VoiceToText)EditorWindow.GetWindow(typeof(Preview_VoiceToText));
             window.Show();
         }
 
-        [MenuItem("【ES】/已废弃/AIPreview/AI 工具/使用指南")]
+        [MenuItem("【ES】/自动化与开发/遗留兼容/AIPreview/AI 工具/使用指南")]
         static void ShowUsageGuide()
         {
             string guide = @"

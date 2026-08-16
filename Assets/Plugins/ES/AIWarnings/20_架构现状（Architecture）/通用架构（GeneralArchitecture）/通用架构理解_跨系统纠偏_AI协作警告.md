@@ -2,7 +2,7 @@
 
 职责：把 2026-07-18 多份 AIWarnings 的共同结论抽象成跨系统原则。后续 AI 在改输入、ValueChange、Buff、Entity、Item、StateMachine、GameManager、AITalk 前，都应该先读本文，避免用陈旧“大一统”思路误改工程。
 
-最后核对时间：2026-07-18。
+最后核对时间：2026-08-16。
 
 ## 已参考的现有警告
 
@@ -36,17 +36,17 @@ Editor 管制作体验，不改变运行时语义。
 
 ### 1. 不要用一个大外壳接管 Entity
 
-`CharacterActorFacade / LifeActorFacade` 这类概念只能作为结构入口、引用聚合、旧系统桥接。它不能替代 `Core -> Domain -> Module`，也不能把输入、AI、剧情、网络、运动、状态机、Buff 都收进自己内部。
+`CharacterActorFacade / LifeActorFacade` 不属于当前正式角色结构。角色 Prefab 使用 `Entity + 同根 EntityCharacterIdentity`；禁止再建同义外壳替代 `Core -> Domain -> Module`，或把输入、AI、剧情、网络、运动、状态机、Buff、Equipment 收进第二套根。
 
 正确倾向：
 
 ```text
-外壳：薄，管结构和引用。
+Entity/Identity：唯一角色运行根与定义入口。
 AI域：管控制来源和控制请求。
 Basic域：管身体能力和执行。
 State域：管状态、动画、IK表现。
-Equipment域：正式第五域目标，管背包、装备槽、饰品、挂载过渡和装备效果来源；当前尚未接线，不能冒充源码事实。
-Buff域：未来管效果、限制、叠层、来源、驱散。
+Equipment域：正式第五域，管背包、装备槽、饰品、挂载过渡和装备效果来源；当前已接线并处于 Verifying，不能冒充已可玩或已发布。
+Buff域：已有实例、效果、限制、叠层与来源底座；具体能力按证据验收。
 ```
 
 ### 2. 不要把表现层当逻辑层
@@ -163,7 +163,7 @@ Runtime Instance：存 token、计时、叠层、目标、临时状态。
 ```text
 Entity：
   只放自身总览、关系链、KCC 等自己的东西。
-  当前四个 Domain、未来接入的第五个 Equipment Domain 都只提供清晰入口，不接管 Domain 内部排版。
+  当前 Basic / AI / Buff / Equipment / State 五个 Domain 都只提供清晰入口，不接管 Domain 内部排版。
 
 Domain：
   自己负责完整 Inspector。
@@ -177,11 +177,11 @@ Domain：
 - 用 `InlineProperty` 把 Domain 摊平成 Entity 的子字段。
 - 为了“整齐”让 Entity 接管 Domain 的标题和折叠结构。
 
-这条原则适用于现有 `EntityBasicDomain`、`EntityAIDomain`、`EntityBuffDomain`、`EntityStateDomain`，也适用于已批准但尚未接线的 `EntityEquipmentDomain`。
+这条原则适用于现有 `EntityBasicDomain`、`EntityAIDomain`、`EntityBuffDomain`、`EntityStateDomain` 和 `EntityEquipmentDomain`。
 
-## 对未来 Buff 系统的一般判断
+## 对现有 Buff 系统扩展的一般判断
 
-可以开始设计 Buff，但不要绕过 ValueChange。
+扩展 Buff 时复用现有实例、ValueChange、Permit 与 OpSupport 链路，不要另建第二套运行时。
 
 最低正确路线：
 

@@ -14,7 +14,7 @@ using ES;
     private Vector2 _scroll;
     private ResLibrary[] _libraries;
 
-    [MenuItem("【ES】/已废弃/AIPreview/资源库预览")]
+    [MenuItem("【ES】/自动化与开发/遗留兼容/AIPreview/资源库预览")]
     public static void Open()
     {
         var win = GetWindow<ResLibraryPreviewWindow>(false, "ResLibrary Preview", true);

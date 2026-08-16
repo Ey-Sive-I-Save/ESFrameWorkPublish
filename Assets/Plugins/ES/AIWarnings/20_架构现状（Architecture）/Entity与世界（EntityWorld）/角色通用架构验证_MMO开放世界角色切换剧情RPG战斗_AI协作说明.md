@@ -4,11 +4,11 @@
 > 职责：给后续 AI 说明“玩家对象模型重构”必须按通用角色体系验证，不要只围绕单机本地主角做窄实现。  
 > 性质：基于当前代码的架构验证笔记，不是最终设计定稿。改代码前仍需回读源码和编译验证。
 >
-> 2026-07-31 现行纠偏：角色 Prefab 不新增 `CharacterActor`、`EntityCharacterComposition`、`EntityCharacterDefinitionBinding` 或同义桥接组件。当前有效入口是 `Entity + 同根 EntityCharacterIdentity -> Entity.BindDefinition(DataInfo)`；正式契约见 `Documentation/CHARACTER_PREFAB_CONTRACT.md` 与同目录 `角色Prefab职责与DataInfo入口_AI协作警告.md`。本文中建议另建 `CharacterActor` 的“必须补”“推荐迁移”段仅保留为历史问题记录，不得据此实施。
+> 2026-08-16 现行纠偏：角色 Prefab 不新增 `CharacterActor`、`PlayerActor`、`EntityCharacterComposition`、`EntityCharacterDefinitionBinding` 或同义桥接组件。当前有效入口是 `Entity + 同根 EntityCharacterIdentity -> Entity.BindDefinition(DataInfo)`；正式契约见 `Documentation/CHARACTER_PREFAB_CONTRACT.md` 与同目录 `角色Prefab职责与DataInfo入口_AI协作警告.md`。
 >
 > 2026-08-01 模块契约补充：角色基础能力不靠运行时自动补齐，自动补玩家输入模块的入口已删除。三种 `EntityCharacterIdentity` 身份的 Prefab 都必须显式保存唯一 `EntityBasicMoveRotateModule`，并由 `EntityAIDomain` 持有输入执行配置和统一执行入口；只有阵营为 `Player` 的正式 `CharacterVariant` 才可且必须保存唯一 `EntityPlayerInputWriteModule`、`EntityBasicMountModule`、`EntityBasicClimbModule`。玩家的骑乘状态必须满足 `Mounted` 契约，攀爬、攀上和翻越状态必须满足 `Climbing` 契约；攀爬跳跃离墙后进入空中 KCC 分支，必须满足 `Grounded` 契约。使用 `【ES】/内容制作/角色模板/审计项目角色基础模块` 做全项目制作期检查，发布门禁会复验实际进入内容的正式 Variant。此规则不授权向模板增加战斗、相机、武器或高级运动组件。
 >
-> 2026-08-12 装备域纠偏：本文的 Basic/AI/Buff/State 四域仍是当前源码事实；`EntityEquipmentDomain` 已批准为背包、装备、饰品、挂载过渡和装备效果来源句柄的正式第五域目标，但尚未接线。后续实现与迁移以同目录 `装备定义与装配推进路线_AI协作说明.md` 为现行合同，不得据本文否定第五域，也不得提前宣称已实现。
+> 2026-08-16 装备域纠偏：`EntityEquipmentDomain` 已接线为背包、装备、饰品、挂载过渡和装备效果来源句柄的正式第五域；Inventory / Slot / Attachment / Effect 的最小事务与角色 Prefab 已进入 Verifying。后续实现与验收以同目录 `装备定义与装配推进路线_AI协作说明.md` 为现行合同，不得据本文恢复四域旧事实，也不得把已接线冒充已可玩或已发布。
 
 ## 验证目标
 
@@ -20,11 +20,11 @@
 - 剧情：Cutscene/Dialogue 临时接管输入、相机、角色动作、状态锁定、剧情结束恢复。
 - RPG 战斗：技能、Buff、属性资源、目标包、多目标、受击/死亡、战斗状态标签。
 
-结论：当前工程已有多个底座，但缺少统一的“角色模型层”和“控制权协议”。重构应优先补这层，而不是继续扩大 `EntityBasicModules.cs`。
+结论：当前工程以 `Entity + EntityCharacterIdentity + 五 Domain` 作为统一角色模型，不再补一层 `CharacterActor` 或第二套控制器。后续应沿既有输入、Equipment、Combat、State/KCC 边界逐个补齐能力和证据。
 
 ## 当前可复用底座
 
-- `Entity`：当前通用实体运行体，继承 `Core`，持有 Basic/AI/Buff/State 四个 Domain，并直接接入 KCC。
+- `Entity`：当前通用实体运行体，继承 `Core`，持有 Basic/AI/Buff/Equipment/State 五个 Domain，并直接接入 KCC。
 - `ESGameManager`：三域入口，系统/流程/世界边界已经明确。
 - `ESRuntimeModeService`：已有 Gameplay、Cutscene、Dialogue、Inventory、Map、Pause 等模式和 Combat/Aiming/Mounted/Climbing/Dead/Stunned/NetworkBusy 等标签。
 - `ESInputModule / ESInputService`：全局输入服务，已按 RuntimeMode Policy 过滤输入。
@@ -36,17 +36,20 @@
 - `ESGameSave`：已有分区存档 Archive，可保存角色、世界、队伍等分区快照。
 - `EntityBuffDomain / ESActiveBuffRuntime`：已有 Buff 添加、合并、层数/时长、Tick、移除、查询、Op、ValueChange EffectLease、Tag Lease 和实例回池底座；不再是空域。
 
-## 必须补的核心层
+## 现行角色与控制边界
 
-### 1. Character Model 层
+### 1. Entity / Identity 是唯一角色模型入口
 
-需要在 `Entity` 之上建立通用角色模型，建议命名可以是：
+不在 `Entity` 之上再建 `ESCharacter / ESActor / PlayerActor` 聚合层。当前角色范围统一由以下结构表达：
 
 ```text
-ESCharacter / ESActor / PlayerActor
+Entity
+  + EntityCharacterIdentity -> Entity.BindDefinition(DataInfo)
+  + Basic / AI / Buff / Equipment / State Domains
+  + EntityTransformMapping / KCC / StateMachine / 表现驱动
 ```
 
-它不应只代表本地玩家，而应覆盖：
+这套结构同时覆盖：
 
 - 本地玩家当前操控角色。
 - 队伍中非当前操控角色。
@@ -54,57 +57,43 @@ ESCharacter / ESActor / PlayerActor
 - 剧情临时控制角色。
 - 网络同步角色。
 
-建议最小职责：
+职责边界：
 
 ```text
-身份：characterId、configId、instanceId、ownerKind、faction/team
-引用：Entity、MotionDriver、TransformMapping、StateMachine、Animator
-生命周期：Spawn、Activate、Deactivate、Despawn、SaveSnapshot、LoadSnapshot
-控制权：当前由 Player / AI / Network / Cutscene / Replay / None 控制
-能力面：Locomotion、Combat、Interaction、Inventory/Equipment、Stats、Buff
+定义身份与阵营：EntityCharacterIdentity / DataInfo
+运行身体与生命周期：Entity / GenericLife / Pool
+运动与交互执行：BasicDomain / KCC / MotionDriver
+输入与控制请求：EntityAIDomain
+装备事实：EntityEquipmentDomain
+效果与限制：EntityBuffDomain
+状态和表现：EntityStateDomain / StateMachine / IK Driver
 ```
 
-不要把这些身份/控制权字段塞进 `EntityKCCData`。KCC 是身体运动核心，不是角色身份模型。
+存档、网络和世界注册需要的稳定实例身份仍应由各自正式实例/世界合同承载，不能塞进 `EntityKCCData`，也不能据此新增第二个角色根。
 
 ### 2. Control Authority 协议
 
 角色可切换、剧情接管、网络同步、本地输入都在争夺同一个问题：谁有权给角色写意图。
 
-需要统一抽象：
+当前已经落地的本地玩家链路是：
 
 ```text
-ICharacterControllerSource
-PlayerInputController
-AIController
-NetworkController
-CutsceneController
-ReplayController
+ESInputService
+  -> EntityPlayerInputWriteModule
+  -> EntityAIDomain.inputState
+  -> Basic / Equipment / Combat 的正式执行入口
 ```
 
-输出应统一为：
-
-```text
-CharacterIntent / PlayerIntent
-```
-
-而不是让每个系统直接调用：
-
-```text
-Entity.SetMoveInput
-EntityBasicCombatModule.TriggerAttack
-EntityBasicInteractionModule.RequestInteract
-StateMachine.TryActivateState
-```
-
-推荐链路：
+AI、Network、Cutscene、Replay 后续接入时，必须先通过明确的来源授权/优先级写入 `EntityAIDomain` 可消费的请求，再复用相同执行入口；不得各自新增常驻 Controller 或直接写 KCC、Transform、Combat、StateMachine。
 
 ```text
 Input / AI / Network / Cutscene / Replay
-    -> CharacterIntent
-    -> CharacterControllerFacade
-    -> Locomotion / Combat / Interaction / Camera / State
-    -> Entity / MotionDriver / StateMachine / Operation
+    -> 来源授权与请求写入
+    -> EntityAIDomain
+    -> Entity 正式 Domain/Module 执行入口
 ```
+
+完整的多来源优先级、抢占、恢复和网络权威协议仍需单独实现与验收；本文只冻结入口边界，不把未来能力写成现成事实。
 
 ### 3. World Character Registry
 
@@ -156,13 +145,13 @@ RequestSwitch(targetCharacterId)
 
 `ESRuntimeMode.Cutscene` 和 `ESRuntimeMode.Dialogue` 已有，Command 可以驱动 RuntimeMode。这是正确底座。
 
-缺少的是角色级接管协议：
+缺少的是角色级受信接管协议：
 
 ```text
-CutsceneControllerSource 获取角色控制权
-写入 CharacterIntent 或直接播放受控动作
+Cutscene 受信 Bridge 获取有代际的控制权令牌
+通过 EntityAIDomain 写入受控请求，或经正式 Motion/State API 播放受控动作
 锁定/覆盖战斗输入和交互输入
-剧情结束后按原控制源恢复
+剧情结束后释放令牌并恢复原控制来源
 ```
 
 剧情控制不要直接乱改 KCC/Transform。优先使用：
@@ -188,8 +177,9 @@ BuffDomain 已有可运行的 Buff 生命周期底座，禁止再按“空域”
 RPG 战斗统一链路建议：
 
 ```text
-CharacterIntent.Attack/Skill
-    -> CombatController 检查资源/冷却/状态/目标
+EntityAIDomain Attack/Skill intent
+    -> EntityBasicCombatModule.TryExecutePrimaryAttack / Skill 提交入口
+    -> 当前 WeaponDefinition、Action 与相关系统检查自身条件
     -> SkillDefinitionDataInfo 准备 RuntimeTargetPack
     -> StateMachine 激活 EntityState_Skill
     -> Skill Track 执行 Operation
@@ -300,7 +290,7 @@ ES基础角色模板
 - 基础模板和 GlobalPreview 的发布门禁必须开启：Player 场景与 AssetBundle 依赖闭包中一旦出现它们，构建直接失败。
 - `EntityTransformMapping` 是运行时缓存挂点服务：固定键走缓存，动态键只用于初始化/事件边界；装备、相机、特效不得在热路径重新 `Find` 层级。
 - 正式角色 Variant 必须在根 `EntityCharacterIdentity` 绑定唯一的 Actor / Monster / NPC DataInfo，声明阵营，配置 EntityBody 主 Collider、EntityHurtbox Trigger 与需要时的 Interaction Trigger；通用池模板保持无定义，由租出方直接调用 `Entity.BindDefinition(...)`。
-- `WeaponSocket` 是武器业务挂点；Humanoid RightHand 只保留骨骼语义。双手武器的副手目标和局部偏移必须由 WeaponBinding 明确声明。
+- MainHand / OffHand / PrimaryBack / SecondaryBack / Hip / TemporaryHand 是角色作者化业务 Socket；Humanoid RightHand 只保留骨骼语义。武器根通过 `EntityWeaponBinding` 明确 GripPivot、OffHandGrip、Muzzle、AimReference 与 PresentationRoot，不得恢复单一 `WeaponSocket` 或手骨回退。
 - 完整模板不负责 AssetBundle 标记、AssetTable 或 AssetLibrary 注册；这些仍属于独立资源构建阶段。
 - 不得另造与 `Entity` 并列的 Character/Motion 大根来解决模板派生问题。
 
@@ -316,14 +306,12 @@ ES基础角色模板
 
 ## 推荐迁移顺序
 
-1. 先加角色模型和控制权协议，不急着删除旧模块。
-2. 增加 `CharacterIntent`，让本地输入、AI、剧情都能输出同一种意图。
-3. 增加 `CharacterActor`，引用现有 `Entity`，承接身份、控制权、挂点、控制器集合。
-4. 增加 `CharacterWorldModule`，放在 `ESWorldDomain`，管理实体注册、队伍、当前操控角色。
-5. 独立输入调度模块已移除；玩家、AI、剧情、网络和回放的输入意图统一进入 `EntityAIDomain`，由域级控制门禁和执行入口收口。
-6. 把 `EntityBasicCombatModule` 里的武器、瞄准、开火拆成 Combat/Weapon/Aim 三条控制器。
-7. 在现有 BuffDomain 上补对象池、固有 Tag、外部 Lease 与持久化验收，并建立到 StateMachine Buff 表现层的明确桥接；禁止另造第二套 Buff 运行时。
-8. 最后再拆 `EntityBasicModules.cs` 文件和旧模块职责，避免一开始破坏现有场景。
+1. 保持 `Entity + EntityCharacterIdentity + 五 Domain` 为唯一角色模型，不新增平行 Actor/Controller 根。
+2. 玩家、AI、剧情、网络和回放的输入意图统一进入 `EntityAIDomain`；新增来源先补控制权门禁，不直写 Basic/KCC。
+3. Equipment 继续作为 Inventory / Slot / Attachment / Effect 唯一写权威；Combat 只读活动槽并执行攻击/开火。
+4. 世界实体注册、队伍和当前操控角色若落地，应进入 `ESWorldDomain` 的明确模块，不塞入角色 Prefab 外壳。
+5. 在现有 BuffDomain 上补对象池、固有 Tag、外部 Lease 与持久化验收，并建立到 StateMachine Buff 表现层的明确桥接；禁止另造第二套 Buff 运行时。
+6. 只在职责与测试门禁明确后机械拆分巨型源文件；不得借拆文件重建 Combat/Weapon/Aim 三套控制权。
 
 ## 商业级验收场景
 

@@ -81,8 +81,8 @@ $es-worktree-audit
 - 2026-08-16 的项目目录快照包含 20 个 Skill，均有 `SKILL.md` 与 `agents/openai.yaml`；该数字只用于本次对账，后续发现仍以实际目录为准。
 - 当前能力覆盖会话交接、AICommand、编译与单错误修复、UTF-8、工作树、复杂分析、反向审查、Agent 候选生成、ESTEST 调度，以及 GameCore、资源、Tag/Config、Entity、输入、ESCommand、编辑器工具、模块治理和发布验收。
 - `$es-unity-compile` 与 `$es-release-acceptance` 声明 `unityMCP` 依赖，服务地址为 `http://127.0.0.1:8080/mcp`。
-- 已提供四个确定性 PowerShell 脚本：AICommand 校验、显式 `.csproj` 构建、UTF-8 守卫和工作树审计。
-- PowerShell 脚本源码保持 ASCII，避免 Windows PowerShell 5.1 将无 BOM UTF-8 中文脚本按本地代码页解析；中文说明保留在 `SKILL.md` 和项目文档中。
+- 已提供 AICommand 校验、显式 `.csproj` 构建、UTF-8 守卫、工作树审计、会话治理、候选生成和 ESTEST 调度等确定性 PowerShell 脚本；可用脚本以各 Skill 的实际 `scripts/` 目录为准，不维护固定总数。
+- PowerShell 脚本不得依赖系统默认代码页。能使用 ASCII 时优先保持 ASCII；确需非 ASCII 文本时必须使用严格 UTF-8，并在声明支持的 Windows PowerShell / PowerShell 环境执行代表性验证。
 - 旧批次的 `quick_validate.py` 结果不能自动覆盖新增或修改后的 Skill；每个变更仍须重新执行官方验证。当前机器可发现 `uv`，但“工具存在”不等于全部 Skill 已重新验证。
 - 2026-08-16 的 AICommand 校验实跑结果为 54 个合同、2 个导航入口、目录 54 条、0 个无效项。
 

@@ -19,23 +19,21 @@
 - 样式可以延迟到首个 OnGUI 创建，`OnEnable` 只维护引用计数。
 - 样式释放仍放 `OnDisable` / `OnDestroy`，通过引用计数保证不重复释放。
 
-## 2. EditorWindow 定位顺序
+## 2. EditorWindow 定位与首开稳定性
 
-正确的首开定位顺序：
+- 普通独立窗口默认按 Unity 主窗口可用区域居中。
+- Popup、上下文对话框、代码示例等依附交互应优先靠近显式 Owner、触发控件或指针；显式产品需求也可以使用 Owner 角落、屏幕锚点或自定义屏幕坐标。
+- 所有定位都必须基于 Unity 主窗口、显式 Owner 或已捕获的 Editor GUI 屏幕坐标，并夹取到当前可用显示区域，保证标题栏、主要内容和确认/关闭入口可触达。
+- `Show`、尺寸、定位和 `Focus` 的具体顺序由窗口种类与 Unity 行为决定，不规定所有窗口共用一种固定调用顺序；验收结果必须是首开位置正确、无明显跳变，并且重新打开和多显示器场景稳定。
 
-1. 先 `ShowUtility()` / `Show()`。
-2. 再 `Focus()`。
-3. 先计算并写入窗口尺寸。
-4. 再按主窗口位置居中。
-
-居中必须使用：
+主窗口坐标使用：
 
 ```csharp
 Rect main = EditorGUIUtility.GetMainWindowPosition();
 ```
 
-禁止用 `Screen.currentResolution` 做 Editor 窗口居中，它不代表 Unity Editor
-主窗口在显示器上的实际坐标。
+禁止用 `Screen.currentResolution` 推导 Editor 窗口位置，它不代表 Unity Editor
+主窗口、Owner 或触发控件在多显示器桌面上的实际坐标。
 
 窗口尺寸需要：
 
@@ -88,7 +86,7 @@ Rect main = EditorGUIUtility.GetMainWindowPosition();
 | NullReferenceException / GUIStyle null | 样式创建失败后仍被使用 | OnGUI 创建并校验 |
 | Getting control N's position | Layout/Repaint 控件不一致 | 统一控件路径 |
 | 按钮文本显示不全 | 固定宽度小于中文文本 | 使用 MinWidth / CalcSize |
-| 面板左上显示 | 使用 Screen.currentResolution 定位 | 用 GetMainWindowPosition 居中 |
+| 面板左上显示 | 使用 Screen.currentResolution 定位 | 按主窗口或显式 Owner/触发点坐标定位并夹取 |
 
 ## 8. 命令面板/搜索入口不要视觉重复
 
@@ -262,6 +260,117 @@ Odin PropertyTree、IMGUIContainer 和 UI Toolkit 容器。
 - 弹出路由读取旧 Track 状态，导致 Clip 弹出实际进入 Track Inspector；
 - 只做静态编译就宣称 Inspector 可用，未先用 Unity 截图和交互矩阵验证；
 - 在基础布局未确认前继续叠加动效、分栏、滚动和视觉适配，扩大返工范围。
+
+## 11.10 ES 窗口父子休眠绑定契约（P0）
+
+适用范围：所有使用 `ESEditorPresentation`、`ESWindowFoundation`、
+`ESMenuTreeWindow`、`ESSinglePageWindow` 或独立 Inspector 外壳的辅助窗口，
+尤其是由主窗口打开的临时 Inspector、预览、浮动工具和附属面板。
+
+### 11.10.1 绑定必须由打开方明确指定
+
+- 子窗口打开入口必须提供 `Open(EditorWindow owner)` 或
+  `OpenFor(..., EditorWindow owner)` 形式的可选父窗口参数；业务窗口打开子窗口时必须传入 `this` 或已验证的主窗口实例。
+- 不得只依赖 `ESWindow_SleepOwner => SomeWindow.window` 这种动态 getter 来猜测父窗口；getter 只能作为已明确契约的重载恢复兜底，不能代替打开时的 owner 传递。
+- 绑定成功必须调用 `ESWindowFoundation.SetSleepOwner(child, owner, ESWindowSleepLinkMode.FollowOwner)`。
+- `FollowOwner` 表示父窗口进入/退出半休眠时同步子窗口；`OwnedSurface` 表示内容属于宿主，不得创建独立休眠控件；`Independent` 才是完全独立窗口。
+
+### 11.10.2 父窗口暂时不存在时禁止静默降级
+
+- 子窗口先于父窗口创建、父窗口正在重载或父窗口尚未恢复时，必须登记基础层的 `PendingFollowOwner` 待绑定状态。
+- 待绑定状态必须使用稳定字符串 `ownerKey`（例如 `ES.TrackView.Window`）关联父窗口；禁止保存 `EditorWindow`、`UnityEngine.Object`、InstanceId、窗口标题或屏幕坐标作为恢复身份。
+- `ownerKey` 必须由窗口契约声明并可序列化恢复；`FollowOwner` 没有稳定 key 时必须报错并阻止待绑定登记，不得把窗口宣称为已绑定。
+- 父窗口启用或 Domain Reload 恢复后，由父窗口主动调用稳定 key 解析接口完成绑定；禁止全局扫描所有 `EditorWindow`、按标题匹配或按“最近激活窗口”猜测父子关系。
+- 显式 `SetSleepOwner(child, owner, ...)` 的优先级高于此前的 `PendingFollowOwner`；基础层必须在显式绑定成功前清理同一子窗口的旧 Pending 记录，防止宿主稍后恢复时反向覆盖已确认的 owner。
+- `CreateInstance`/`OnEnable` 早于调用方传入 owner 时，打开方必须在窗口显示并完成 Presentation 绑定后再次提交显式 owner；不能只写入字段或依赖动态 getter 让关系“碰巧”成立。
+- 同一子窗口只能存在一个活动 owner 或一个 pending 记录。重新登记前必须清理旧绑定和旧 pending，避免分叉状态。
+
+### 11.10.3 关闭、重载和生命周期收口
+
+- 父窗口真正关闭/销毁时，基础层必须解除其已绑定子窗口；被父窗口强制休眠的子窗口恢复为 `Independent`，不得留下隐藏的跟随关系。
+- 父窗口销毁时必须清理该 `ownerKey` 下未解析的 pending 记录，防止下次打开时把旧子窗口意外重新绑定。
+- Domain Reload 后只恢复稳定 `ownerKey` 和窗口自身序列化状态；不得恢复正在进行的拖动、Popup、鼠标捕获、动画计时或活动 `EditorWindow` 引用。
+- Domain Reload 后若持久化状态表明窗口处于 `SleepTile`/`EdgeTab`，必须在同一恢复步骤中先写入对应的原生窗口 `position`、`minSize` 和锚点，再显示休眠覆盖层；禁止出现“覆盖层显示为休眠但原生外框仍是大窗口”的混合状态。Reload 恢复不播放从大窗口缩小的动画。
+- `SleepTile` 的悬停只是发现和召回提示，不得重置 `SleepTile -> EdgeTab` 晋级计时；只有真实拖动、Busy、Popup、鼠标捕获或显式 `InteractionHold` 才能暂停该计时。休眠块拖动必须使用“起始指针 + 起始窗口矩形”计算绝对目标，再做工作区夹取，禁止把当前窗口坐标重复叠加到每个 PointerMove。
+- `EdgeTab` 必须可沿其所属屏幕边缘拖动，拖动期间固定边缘锚点、方向、厚度和当前展开长度；点击仍直接召回 `ActivePanel`。点击/拖动必须设置防手抖阈值，页签伸出必须有短暂悬停意图判定，图标、标题等子元素的 Enter/Leave 不得重复重置计时。方块与页签的 `PointerMove` 只计算最新目标，原生 `EditorWindow.position` 由 Editor update 合并提交，禁止在指针回调内高频同步移动原生窗体并形成 CaptureOut/坐标回写抖动。
+- 关闭窗口与半休眠不是同一操作：关闭必须真正解绑并退出生命周期，不能通过缩小、页签或休眠形态伪装关闭。
+
+### 11.10.4 实现与验收边界
+
+- 父子休眠同步属于 `ESEditorPresentation`/`ESWindowFoundation` 基础层；业务窗口只负责声明关系、传递 owner 和提供稳定 key，不得各自复制一套休眠状态机。
+- 不得使用全局启动扫描、反射目录、标题猜测或任意窗口拓扑推断来建立关系；绑定必须是用户操作或窗口打开链路中的显式动作。
+- 最少验证矩阵：父先开再开子、子先开再开父、父进入/退出半休眠、子 Busy/拖动时延迟同步、父关闭后子恢复独立、Domain Reload 后按 key 恢复、重复打开不产生第二个绑定实例。
+- 源码静态检查、`.csproj` 编译、UTF-8 Guard 和 `git diff --check` 不能替代 Unity Editor 实际打开顺序、Domain Reload、窗口关闭重建和交互验收。
+
+### 11.10.5 当前源码案例与依赖级别
+
+当前源码中已存在的子窗口案例必须按以下依赖级别理解，后续 AI 不得仅凭“临时检查器”或窗口标题自行推断：
+
+| 案例 | 打开入口 | 依赖模式 | 稳定 ownerKey | 规则级别 |
+|---|---|---|---|---|
+| `ESTrackItemTemporaryInspectorWindow` | `OpenFor(..., EditorWindow owner = null)` | `FollowOwner` | `ES.TrackView.Window` | P0 |
+| `ESTrackClipTemporaryInspectorWindow` | `OpenFor(..., EditorWindow owner = null)` | `FollowOwner` | `ES.TrackView.Window` | P0 |
+| `ESTrackSkillDataTemporaryInspectorWindow` | `OpenFor(..., EditorWindow owner = null)` | `FollowOwner` | `ES.TrackView.Window` | P0 |
+| `ESAssetPackageRecordPreviewWindow` | `Open(bake, record, EditorWindow owner)` | `FollowOwner` | `ES.AssetPackageBake.Window` | P0 |
+| `ESIndependentInspectorWindow<TWindow>` 的其他派生窗口 | `OpenIndependent(..., owner)` | 由派生类声明；未声明时只能是 `Independent` | 由窗口契约声明 | P0 |
+
+- `owner` 为空不代表独立窗口：`FollowOwner` 必须登记 `PendingFollowOwner`，直到稳定 `ownerKey` 解析成功；不能静默降级。
+- `OwnedSurface` 是“内容属于父窗口”的更强依赖级别，不得给子表面生成独立休眠按钮；它不是 `FollowOwner` 的别名。
+- `Independent` 只表示休眠生命周期独立，不表示业务数据、关闭顺序或编辑目标独立；仍须按各自资源/目标生命周期收口。
+- 父窗口关闭、目标资产失效和 Domain Reload 是三种不同事件，不能用一个 `OnDisable` 分支混为“用户关闭”。
+- 父窗口关闭或从 Presentation 解绑时，基础层负责把活动 `FollowOwner` 子窗口恢复为 `Independent`；业务父窗口禁止再调用子窗口的 `Close()` 冒充解绑。只有子窗口自身任务已经失效、用户明确关闭，或独立的业务生命周期规则要求退出时，才允许真正关闭子窗口。
+- “父窗口真实关闭后的独立状态”必须作为子窗口自身可序列化的脱离意图保留；后续页面重建或 Domain Reload 不得仅因类声明了 `FollowOwner` 就自动复活关系。只有显式再次调用 `Open(owner)`、`OpenFor(..., owner)` 或等价的 owner 重绑定入口，才能清除脱离标记。Domain Reload 只释放活动引用，不得写入该脱离标记。
+
+以下窗口虽然可能从某个工作台触发，但不得因此机械建立 `FollowOwner`：
+
+- `ESAdvancedDialogWindow`、`ESCompactChoicePopup`、`ESCreateSkillWindow`、`ESInputActionImportWindow`、`ESInputActionBindingImportWindow` 属于 Dialog、Popup 或短生命周期输入面，必须明确不参与半休眠；其中有明确 ES owner 的 Dialog/Popup 应在自身真实存活期持有 `ESWindowFoundation.HoldInteraction(owner)`，关闭、异常或取消时确定性释放，防止 owner 因焦点转移意外休眠；
+- `ESAgentArtifactCandidateReviewWindow` 可由生成流程、Graph Inspector 或“打开最新候选”进入，任务本身能够独立完成；若后续接入 Presentation，依赖模式必须是 `Independent`；
+- `ESProgressCenterWindow` 是跨任务全局进度聚合面，不属于任一业务窗口的子窗口，并保持不参与自动半休眠；
+- 仅仅“由某窗口按钮打开”“打开位置靠近某窗口”或“编辑同一资产”都不足以证明父子依赖。
+- `HoldInteraction` 只能暂停已经显式接入 ES Presentation 的窗口，不得因 owner 是原生 Inspector、SceneView 或第三方窗口而隐式执行 `BindWindow`、注入系统动作或取得半休眠所有权。
+
+生产契约门禁位于 `ESMenuTreeCommercialTests.ProductionFollowOwnerWindowsExposeExplicitStableContracts`。新增明确子窗口时必须同步：业务打开调用、稳定 ownerKey、恢复入口、本文案例表和该门禁；不得只增加基类测试。
+
+状态：现行 P0 约束；上述案例为源码事实，实际 Unity 打开顺序、父子同步和 ReloadDomain 交互仍需按 11.10.4 的矩阵验收。
+
+## 11.11 ES 窗口动作宿主与注入边界（P0）
+
+适用范围：`ESMenuTreeWindow<T>`、`ESSinglePageWindow<T>`、
+`ESSinglePageIMGUIWindow<T>`、`ESOdinMenuTreeWindow<T>`，以及直接使用
+`ESWindowFoundation.Bind` 的 TrackView、Stable Graph、Agent 等自定义窗口。
+
+### 11.11.1 四层动作职责必须分离
+
+- **系统动作**：由 ES 基础层拥有，只承载允许休眠、立即休眠/恢复、自动休眠、全局休眠开关等窗口生命周期能力。业务窗口不得替换、复制或重新实现系统状态机。
+- **全局动作**：当前工具跨页面通用的业务动作，不依赖当前页面上下文；例如全局刷新、打开设置或共享诊断入口。
+- **窗口动作**：只作用于当前窗口实例，但仍不依赖当前页面上下文；例如重建当前窗口外壳、恢复默认布局或窗口级导出。
+- **页面动作**：只作用于当前选中页面，必须通过 `ESMenuTreePageAction` 或等价页面合同取得有效 `ESMenuTreePageContext`；页面切换、删除或局部重建后旧上下文必须失效。
+- 四层动作不得塞入同一宿主后依靠按钮顺序区分。标准 MenuTree/SinglePage 外壳应按独立行布局，窄宽度时可分别折叠为菜单，但不得把系统动作与高风险业务动作混为一个无标识菜单。
+
+### 11.11.2 宿主由基类创建，派生窗口只追加
+
+- `ESMenuTreeWindow<T>`、`ESSinglePageWindow<T>` 和 `ESSinglePageIMGUIWindow<T>` 必须由基类创建系统、全局、窗口和页面动作区；派生窗口通过可重写入口追加动作，不需要也不得复制宿主结构。
+- 继续使用 Odin 的窗口由 `ESOdinMenuTreeWindow<T>` 提供兼容宿主；Odin 兼容只保留序列化和 PropertyTree 能力，不得恢复第二套窗口生命周期或动作注入机制。
+- 直接继承 `EditorWindow` / `OdinEditorWindow` 的自定义窗口若参与 ES Presentation，必须在自身标题栏/工具栏完成布局后构造 `ESWindowActionHosts`，并传给 `ESWindowFoundation.Bind`。每个宿主必须属于当前 `rootVisualElement`，System、Global、Window 不得复用同一 `VisualElement`。
+- `OwnedSurface`、Popup、Dialog 和明确不参与半休眠的短生命周期窗口可以不提供系统休眠宿主；这必须由窗口契约显式声明，不能靠基础层猜测窗口标题、尺寸或父窗口。
+
+### 11.11.3 禁止未知窗口覆盖式注入
+
+- 找不到显式 System 宿主时，基础层不得在窗口右上角创建绝对定位按钮、不得 `BringToFront()` 覆盖自定义标题栏，也不得把任意 `Toolbar`、同名元素或 CSS class 当作布局授权。
+- 缺少 System 宿主时的安全行为是：不注入系统按钮、保留可诊断状态，并要求该生产窗口完成标准宿主接入；不得静默降级成 GenericMenu 或只靠全局设置入口维持功能。
+- 当前 `AttachSemiSleepControls` 找不到显式 System 宿主时直接返回，活跃源码不再创建 `ESWindowSystemActionsFallback`。现行测试 `SemiSleepControlsRequireDeclaredHostAndUseResponsiveOverflow` 固化了同一合同：无宿主不注入，有宿主才挂载；不得恢复旧 fallback 或复制其模式。
+- TrackView、Stable Graph 和 Agent 已有显式宿主只能证明这些接入点存在；所有生产窗口、窄屏折叠和系统动作状态同步仍须分别验收。
+
+### 11.11.4 验收门禁
+
+1. System、Global、Window、Page 四层在宽窗口中分区清晰；
+2. 窄窗口下动作按职责折叠，文本不裁切，危险动作不会因折叠失去确认语义；
+3. 页面切换后仅页面动作变化，系统/全局/窗口动作实例和状态不重复注册；
+4. 未声明宿主的自定义窗口不出现覆盖式按钮或无上下文 GenericMenu；
+5. ReloadDomain、窗口重建和主题切换后宿主只存在一份，回调能够确定性释放；
+6. 半休眠允许状态、立即休眠、自动/固定和全局开关在按钮、菜单与持久化状态间保持一致。
+
+源码结构或反射测试只能证明合同形状；按钮位置、折叠手感、焦点、Popup、ContextMenu、ReloadDomain 和高 DPI 必须在 Unity 中实机验证。
 
 ## 12. ES Presentation 全局皮肤与品牌字体边界（P0）
 

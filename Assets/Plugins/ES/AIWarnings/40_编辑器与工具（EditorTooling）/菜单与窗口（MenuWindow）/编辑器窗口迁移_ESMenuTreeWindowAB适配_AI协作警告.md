@@ -1,12 +1,21 @@
-# 编辑器窗口迁移 ESMenuTreeWindowAB 适配 AI 协作警告
+# 编辑器窗口迁移：ESMenuTree、SinglePage 与 Odin 兼容外壳
 
-Last updated: 2026-07-19
+> 状态：现行迁移约束；源码接入持续实施，Unity 交互与性能待分项验收。
+>
+> 最后核对：2026-08-16。
+>
+> 历史说明：文件名因既有引用暂时保留 `ESMenuTreeWindowAB` 字样；活跃源码已不存在该类型，禁止按文件名恢复旧基类。
 
-职责：本文件属于 Codex 工具重写 / 商业级验证职责范围，记录 ES 编辑器窗口迁移到 `ESMenuTreeWindowAB` 的当前事实、边界和风险。它不是全项目 UI 总纲，也不是要求所有窗口立刻迁移。
+职责：记录 ES 编辑器窗口迁移到新版 Toolkit 菜单树、单页外壳、IMGUI 桥接和 Odin 兼容外壳的当前事实、边界和风险。它不是全项目 UI 总纲，也不要求为了数量重写成熟业务交互。
 
-## 当前已验证路径
+## 当前源码确认路径
 
 - 统一窗口基类：`Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/-ESMenuTreeWindow.cs`
+  - `ESMenuTreeWindow<T>`：新版 UI Toolkit 菜单树与页面上下文权威。
+  - `ESSinglePageWindow<T>`：无导航的 Toolkit 单页外壳。
+  - `ESSinglePageIMGUIWindow<T>`：保留既有 IMGUI 内容的单页迁移外壳。
+  - `ESOdinMenuTreeWindow<T>`：仅为仍依赖 Odin PropertyTree/序列化的兼容外壳。
+- 独立检查器基类：`Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESIndependentInspectorWindow.cs`
 - 安装器：`Assets/Plugins/ES/Editor/Installer/ESInstaller.cs`
 - 交互运行时面板：`Assets/Scripts/ESLogic/Editor/EntityBasicInteractionDebugWindow.cs`，当前因程序集边界保留为普通 `EditorWindow`
 - Solver 示例窗口目录：`Assets/Plugins/ES/3_Examples/2_Editor/Example_EditorTools/Example_ForMustEditorSolvers`
@@ -15,9 +24,9 @@ Last updated: 2026-07-19
   - `Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.cs`
   - `Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackTimerToolbar.cs`
 
-## 已迁移窗口
+## 当前迁移事实
 
-这些窗口已改为 `ESMenuTreeWindowAB` 外壳，原业务绘制逻辑基本保留：
+以下窗口已迁入 `ESSinglePageIMGUIWindow<T>`，原业务 IMGUI 绘制逻辑基本保留：
 
 - `ESInstaller`
 - `ESExample_AreaDragAtSolverWindow`
@@ -27,11 +36,18 @@ Last updated: 2026-07-19
 - `ESForMustEditorSolversSampleWindow`
 - `ESExample_RecordListSolverWindow`
 
-迁移方式：旧 `OnGUI` 入口改成内部绘制方法，例如 `DrawExampleGUI`、`DrawInstallerGUI`、`DrawRuntimePanelGUI`；再用内嵌 `ESWindowPageBase` 页面通过 `[OnInspectorGUI]` 调用。不要把原窗口逻辑拆成一堆独立脚本，除非确实存在复用价值。
+迁移方式：旧 `OnGUI` 入口改为 `ESWindow_DrawIMGUI(ESMenuTreePageContext)` 或内部绘制方法，由单页外壳提供状态栏、动作区、错误隔离、激活动效、局部重建和确定性释放。不要为套壳重写业务逻辑，也不要把原窗口逻辑机械拆成大量一次性脚本。
+
+其他已确认事实：
+
+- `ESAssetPackageBakeWindow` 使用 `ESMenuTreeWindow<ESAssetPackageBakeWindow>` 新版菜单树外壳。
+- `EntityBasicInteractionDebugWindow` 已使用 `ESSinglePageIMGUIWindow<EntityBasicInteractionDebugWindow>`；旧“程序集不可见、不能迁移”结论失效。
+- `ESInputActionImportWindow` 与 `ESInputActionBindingImportWindow` 已使用 `ESSinglePageIMGUIWindow<T>`；它们仍属于短生命周期输入面，必须显式关闭半休眠。
+- TrackView、Stable Graph、Agent 保留自身 UI Toolkit 主体，但已通过 `ESWindowFoundation.Bind` 与显式 `ESWindowActionHosts` 接入共享 Presentation；这属于标准外壳接入，不要求改造成菜单树。
 
 ## TrackView 临时弹窗迁移事实
 
-TrackView 主窗口本身暂未迁移，但它内部的临时编辑窗口已经改为 ES 临时检查器外壳：
+TrackView 主窗口保留时间轴主体，但它内部的临时编辑窗口已经改为 ES 独立检查器外壳：
 
 - 轨道项目编辑：`ESTrackItemTemporaryInspectorWindow`
 - 片段编辑：`ESTrackClipTemporaryInspectorWindow`
@@ -40,30 +56,30 @@ TrackView 主窗口本身暂未迁移，但它内部的临时编辑窗口已经�
 统一外壳是：
 
 ```text
-ESTrackTemporaryInspectorWindow<TWindow> : ESMenuTreeWindowAB<TWindow>
+ESTrackTemporaryInspectorWindow<TWindow>
+  : ESIndependentInspectorWindow<TWindow>
+  : ESOdinMenuTreeWindow<TWindow>
 ```
 
 它替代了原来的 `OdinEditorWindow.InspectObject(...)` 直接弹窗。关闭时仍然走原来的保存/刷新逻辑：清理 `drawerData`、刷新 Track/Clip、`SaveContainerChanges()`、`SetDirty` 等。
 
 重要：临时弹窗可以迁移，但不应塞进主菜单树。它们应保持“由业务窗口按需打开”的使用方式。
 
-## 哪些暂时不要硬迁移
+## 自定义主体窗口的接入边界
 
 - `ESTrackViewWindow`
   - 强 UIElements / 时间轴交互 / 多状态缓存窗口。
-  - 主窗口迁移会影响播放、选择、拖拽、焦点片段、临时预览状态，不应在窗口适配小任务里硬改。
+  - 保留主体交互，只接共享 Presentation、显式系统动作宿主、父窗口 key 和休眠生命周期；不得为了菜单树重写播放、选择、拖拽、焦点片段或预览状态。
 - `ESStableGraphViewWindow`
   - Stable Graph V2/UIElements 主体窗口。
-  - 这类窗口的核心不是菜单树页面，强迁可能破坏 Graph 生命周期。
+  - 保留 Graph 主体，只接共享 Presentation 和显式系统动作宿主；不得把画布强塞入菜单树页面。
 - `ESTreeMenuShower`
   - 弹出式快捷菜单。
   - 它的正确形态更接近弹出菜单，不是常驻工具窗口。
-- `EditorInputDialog`、`ESInputActionBindingImportWindow`
-  - 一次性输入/导入弹窗。
-  - 可以在必要时换成统一临时弹窗外壳，但不要为了数量迁移而改变交互方式。
+- `EditorInputDialog`
+  - 仍是一次性输入弹窗；新调用优先迁往 ES 权威 Dialog 请求/回调入口，不得继续扩大同步返回值用法。
 - `EntityBasicInteractionDebugWindow`
-  - 位于 `Assets/Scripts/ESLogic/Editor`，当前程序集不能直接看到 `Assets/Plugins/ES/Editor/ESMenuTreeWindow` 下的 `ESMenuTreeWindowAB`。
-  - 不要在原地继承 `ESMenuTreeWindowAB`；若要迁移，应先移动到合适的 Editor 程序集或调整 asmdef 边界。
+  - 当前已在 `ES_Logic.Editor` 依赖边界内接入 `ESSinglePageIMGUIWindow<T>`；后续保持该程序集引用，不得恢复不存在的 `ESMenuTreeWindowAB` 或复制第二套外壳。
 
 ## 迁移判断规则
 
@@ -84,9 +100,11 @@ ESTrackTemporaryInspectorWindow<TWindow> : ESMenuTreeWindowAB<TWindow>
 
 - 原窗口的保存逻辑、关闭逻辑、Undo/Dirty 行为不能丢。
 - 原窗口的菜单路径不要随手改；如果发现 diff 里已有菜单路径变化，先确认是不是其他 AI 或用户已改，不要擅自回滚。
-- `ESMenuTreeWindowAB.OpenWindow()` 默认会最大化窗口；临时弹窗不适合直接用它，应像 `ESTrackTemporaryInspectorWindow.OpenFor(...)` 一样自己设置尺寸和 `Show()`。
+- 当前 MenuTree/SinglePage/Odin 兼容外壳的 `OpenWindow()` 都不会默认最大化；首开窗口按主编辑器工作区、最小尺寸和默认尺寸居中放置。临时弹窗仍应使用自己的 `OpenFor(...)` / `Open(owner)` 明确尺寸、owner 和关闭语义。
 - 页面类可以内嵌在窗口类里，避免为每个小窗口新增很多脚本。
-- `QuickBuildRootMenu<T>` 要求页面类型有无参构造；如果页面需要传对象，可用 `RegisterAndAddPage(...)` 传已创建实例。
+- `QuickBuildRootMenu<T>` / `RegisterAndAddPage(...)` 只属于 `ESOdinMenuTreeWindow<T>` 兼容路径；新版 Toolkit 页面使用 `ESMenuTreeBuilder`、稳定页面 ID、`ESMenuTreePageDefinition` 和页面上下文。
+- 标准 MenuTree/SinglePage 基类负责创建 System、Global、Window、Page 四层动作行；派生窗口只追加动作。自定义主体窗口必须显式提供 `ESWindowActionHosts`，不得依赖未知 Toolbar 或右上绝对定位回退。
+- 半休眠与父子关系统一遵守编辑器常识第 11.10、11.11 节；窗口尺寸不能作为状态推断，子窗口必须使用显式 owner、稳定 ownerKey 和 `PendingFollowOwner`。
 
 ## 后续 AI 修改前检查
 
@@ -113,6 +131,6 @@ rg "class .*: EditorWindow|private void OnGUI\\(" <changed-folder> -n
 - 关闭临时窗口会触发原保存/清理。
 - 域重载或关闭主窗口时不会留下脏引用。
 
-## 当前未完成验证
+## 当前证据边界
 
-本次只做了静态检查和 `git diff --check`。没有在 Unity 编辑器里完成编译和手动打开验证。后续 AI 不要把“静态检查通过”写成“Unity 已验证通过”。
+本文件本次更新只复核当前源码类型、接入点和测试合同，没有重新运行 Unity Test Runner、四边页签交互矩阵或 20/50/100 窗口 Profiler。后续 AI 不得把“文档已同步”“源码存在”或 `.csproj` 编译写成 Unity 交互、ReloadDomain、性能或商业级验收通过。

@@ -21,13 +21,20 @@
 
 ```text
 Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_禁止滥用InitializeOnLoad_优先程序集流注册器_AI协作警告.md
-Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_核心热路径缺失依赖不判空_AI协作警告.md
+Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_AssemblyStream只做Editor特性注册解耦_禁止全量扫盘_AI协作警告.md
+Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/编辑器启动与生命周期（EditorLifecycle）/项目最高警告_P0_编辑器交付体验与下一步可发现性_AI协作警告.md
+Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md
 ```
+
+窗口含半休眠、父子关系或自定义工具栏时，必须同时执行上述编辑器常识第 11.10、11.11 节。只有任务确实涉及每帧热路径时，再加载运行时性能 P0；不得用运行时判空规则替代 Editor 生命周期规则。
 
 ## 执行要求
 
 ```text
-检查 OnEnable/OnDisable/InitializeOnLoad/EditorApplication.update/AssemblyReloadEvents，判断窗口恢复是否批量加载资产或重复注册。
+检查 OnEnable/OnDisable/OnDestroy/InitializeOnLoad/EditorApplication.update/AssemblyReloadEvents，判断窗口恢复是否批量加载资产、重复注册、遗留回调或恢复活 Unity 对象引用。
+检查 SessionState/EditorPrefs/序列化字段的状态所有权，确认 Domain Reload 不恢复拖动、Pointer Capture、Popup、动画计时和旧页面上下文。
+窗口参与半休眠时，检查 ActivePanel/SleepTile/EdgeTab 的原生几何与视觉状态是否同步；有父子窗口时检查稳定 ownerKey、PendingFollowOwner、关闭解绑和脱离意图。
+自定义标题栏必须声明 ESWindowActionHosts；缺少系统动作宿主时不得靠右上绝对定位或任意 Toolbar 猜测注入。
 ```
 
 ## 交付格式
@@ -36,9 +43,11 @@ Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能
 1. 已读规则：列出已读取的文件。
 2. 执行结论：用短句说明做了什么或发现什么。
 3. 改动文件：没有改文件就写“无”。
-4. 验证结果：修复时编译 Editor csproj
-5. 剩余风险：列出仍需人工确认的点。
+4. 验证结果：分别报告静态检查、Editor csproj、Unity Compile/Domain Reload、窗口重开和交互矩阵；未执行项明确写“未验证”
+5. 剩余风险：列出仍需人工确认的多窗口、窄屏、高 DPI、Popup/ContextMenu、父子同步和 Profiler 点。
 ```
+
+仅编译 Editor `.csproj` 最高属于 S2，不能表述为 Unity Domain Reload 或窗口恢复通过。修复源码后至少应取得 Unity 导入/重载证据；涉及状态恢复时还必须真实重开窗口并操作目标状态。
 
 ## 需求
 

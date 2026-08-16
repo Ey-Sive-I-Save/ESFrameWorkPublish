@@ -473,6 +473,7 @@ namespace ES
             List<string> errors = new List<string>();
             StringBuilder report = new StringBuilder("[ESKeyCatalog] Runtime catalog schema report:\n");
 
+            AppendTableSchema(report, errors, "GameCore.Item", ESRuntimeDataGameCore.Items);
             AppendTableSchema(report, errors, "GameCore.Buff", ESRuntimeDataGameCore.Buffs);
             AppendTableSchema(report, errors, "GameCore.Shot", ESRuntimeDataGameCore.Shots);
             AppendTableSchema(report, errors, "GameCore.Monster", ESRuntimeDataGameCore.Monsters);

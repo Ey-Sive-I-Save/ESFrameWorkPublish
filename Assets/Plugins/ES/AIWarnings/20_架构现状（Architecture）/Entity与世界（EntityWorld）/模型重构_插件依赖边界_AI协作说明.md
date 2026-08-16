@@ -1,8 +1,8 @@
 # 模型重构_插件依赖边界_AI协作说明
 
-职责：服务于玩家/角色对象“模型重构”。目标是让后续 AI 明确当前框架使用了哪些插件、哪些可以进入角色运行时核心、哪些必须隔离在适配层，避免在重建 `CharacterActor / Entity / Player` 体系时引入不可控耦合。
+职责：服务于玩家/角色对象模型维护。目标是让后续 AI 明确当前框架使用了哪些插件、哪些可以进入角色运行时核心、哪些必须隔离在适配层，避免在扩展 `Entity` 五域体系时引入不可控耦合或第二套角色根。
 
-最后核对时间：2026-07-17。本文件基于本地 `Assets/Plugins`、`Packages/manifest.json`、asmdef 和源码 `rg` 结果整理；如源码、包版本、asmdef 变化，以当前源码为准。
+最后核对时间：2026-08-16。本文件基于本地 `Assets/Plugins`、`Packages/manifest.json`、asmdef 和源码 `rg` 结果整理；如源码、包版本、asmdef 变化，以当前源码为准。
 
 ## 已验证入口
 
@@ -23,7 +23,7 @@
 - 路径：`Assets/Plugins/ES`
 - 角色相关定位：框架基础、Core/Domain/Module、输入设计层、RuntimeMode、编辑器工具、示例、生成数据。
 - 当前硬事实：`ES_Stand` 几乎是基础层；`ES_Design` 引用 `ES_Stand`、Odin、`Unity.InputSystem`；`ES_Logic` 引用 `ES_Stand`、`ES_Design` 和多个第三方运行时。
-- 模型重构建议：新角色体系应沿用 `Core -> Domain -> Module` 思想，但不要继续把所有功能塞进 `EntityBasicModules.cs`。角色上层应有 `CharacterActor` 或同级 facade，底层再桥接现有 `Entity`。
+- 模型维护规则：角色体系沿用 `Entity + EntityCharacterIdentity + Core -> Domain -> Module`，当前已有 Basic / AI / Buff / Equipment / State 五域。禁止新增 `CharacterActor` 或同级 facade 桥接、替代现有 `Entity`。
 
 ### Odin / Sirenix
 
@@ -137,17 +137,17 @@
 
 ## 对“从 0 构建完整角色层级模板”的插件约束
 
-- 角色根可挂 `CharacterActor`、身份/生命周期、模块注册器；不要直接挂相机、存档模块、UI 控件。
+- 角色根使用 `Entity + 同根 EntityCharacterIdentity`，由现有 Domain/Module 承载生命周期；不要新增 `CharacterActor`，也不要直接挂相机、存档模块或 UI 控件。
 - 运动根可挂 KCC motor/capsule 和 KCC adapter；外部只通过 motion request 或 motion driver 操作。
 - 表现根只放模型、Animator、骨骼、Renderer、StateMachine/IK driver 绑定；不要把 KCC/Input/Save 塞进骨骼节点。
-- 目标点层必须稳定：`CameraTarget`、`AimTarget`、`LookAtTarget`、`InteractionProbe`、`HitSockets`、`WeaponSockets`。Cinemachine/FinalIK/战斗检测都绑定这些点，而不是运行时深层 `Find`。
+- 目标点层必须稳定：`CameraTarget`、`AimTarget`、`LookAtTarget`、`InteractionProbe`、`HitSockets`，以及 MainHand / OffHand / PrimaryBack / SecondaryBack / Hip / TemporaryHand 装备 Socket。Cinemachine/FinalIK/战斗检测都绑定这些点，而不是运行时深层 `Find`。
 - 输入源必须可替换：本地玩家、AI、网络代理、剧情导演、回放系统都写入统一 intent。
 - 剧情/Timeline/切角色必须经过 `ControlAuthority`，不能直接禁用脚本或写 Transform。
 - 存档只拿角色快照，EasySave3 不进入角色 prefab 核心组件。
 
 ## 禁止误操作
 
-- 不要因为 `ESPlayer` 目录存在就认定玩家主逻辑在其中；当前主逻辑仍位于 `Assets/Scripts/ESLogic/Runtime/Entity`，正式玩家层尚未独立落地。
+- 不要因为 `ESPlayer` 目录存在就认定玩家主逻辑在其中；当前正式主逻辑位于 `Assets/Scripts/ESLogic/Runtime/Entity`，并且没有另建独立玩家根的计划。
 - 不要恢复旧 `Assets/Plugins/ES/2_Feature/ESGameCore` 作为新 GameManager。
 - 不要继续扩大 `EntityBasicModules.cs` 承担所有运动/战斗/输入职责。
 - 不要把 DOTween 用作角色权威位移。

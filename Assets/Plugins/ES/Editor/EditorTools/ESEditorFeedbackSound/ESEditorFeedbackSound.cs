@@ -1556,6 +1556,8 @@ namespace ES
 
     public sealed class ESEditorFeedbackSoundSchemeWindow : ESSinglePageIMGUIWindow<ESEditorFeedbackSoundSchemeWindow>
     {
+        protected override bool ESWindow_SupportsSemiSleep => false;
+
         private string newSchemeName = "MyScheme";
         private string auditionSchemeId;
         private ESEditorFeedbackSoundKind auditionKind =

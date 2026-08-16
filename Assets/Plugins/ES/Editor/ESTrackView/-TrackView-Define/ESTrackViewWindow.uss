@@ -138,10 +138,10 @@ Button:disabled,
     border-right-color: rgba(12, 17, 23, 0.95);
     border-bottom-width: 1px;
     border-bottom-color: rgba(12, 17, 23, 0.95);
-    border-top-left-radius: 5px;
-    border-top-right-radius: 5px;
-    border-bottom-left-radius: 5px;
-    border-bottom-right-radius: 5px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
 }
 
 .track-empty-state-title {

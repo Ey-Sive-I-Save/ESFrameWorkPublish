@@ -22,7 +22,7 @@ namespace ES.Obsolete.Preview.Editor
         /// <summary>
         /// 在Hierarchy右键菜单添加"Create ES Module"
         /// </summary>
-        [MenuItem("GameObject/【ES】/已废弃/AIPreview/Create Module Hosting", false, 0)]
+        [MenuItem("GameObject/【ES】/开发与验证/遗留兼容/AIPreview/Create Module Hosting", false, 0)]
         private static void CreateModuleHosting()
         {
             GameObject go = new GameObject("ModuleHosting");
@@ -39,7 +39,7 @@ namespace ES.Obsolete.Preview.Editor
             Debug.Log("Created Module Hosting GameObject");
         }
         
-        [MenuItem("GameObject/【ES】/已废弃/AIPreview/Create UI Panel", false, 1)]
+        [MenuItem("GameObject/【ES】/开发与验证/遗留兼容/AIPreview/Create UI Panel", false, 1)]
         private static void CreateUIPanel()
         {
             GameObject go = new GameObject("UIPanel");
@@ -80,7 +80,7 @@ namespace ES.Obsolete.Preview.Editor
         private static bool enableModuleBounds = false;
         private static bool registered;
         
-    [MenuItem("【ES】/已废弃/AIPreview/场景视图/Toggle Scene View Debug Drawer")]
+    [MenuItem("【ES】/自动化与开发/遗留兼容/AIPreview/场景视图/Toggle Scene View Debug Drawer")]
         private static void ToggleSceneViewDebugDrawer()
         {
             if (registered)
@@ -183,7 +183,7 @@ namespace ES.Obsolete.Preview.Editor
     /// </summary>
     public class ModulePerformanceProfiler : EditorWindow
     {
-        [MenuItem("【ES】/已废弃/AIPreview/编辑器工具/Module Performance Profiler")]
+        [MenuItem("【ES】/自动化与开发/遗留兼容/AIPreview/编辑器工具/Module Performance Profiler")]
         public static void ShowWindow()
         {
             GetWindow<ModulePerformanceProfiler>("Module Profiler");
@@ -294,7 +294,7 @@ namespace ES.Obsolete.Preview.Editor
     /// </summary>
     public class AssetIntegrityChecker : EditorWindow
     {
-        [MenuItem("【ES】/已废弃/AIPreview/编辑器工具/Asset Integrity Checker")]
+        [MenuItem("【ES】/自动化与开发/遗留兼容/AIPreview/编辑器工具/Asset Integrity Checker")]
         public static void ShowWindow()
         {
             GetWindow<AssetIntegrityChecker>("Asset Checker");
@@ -406,7 +406,7 @@ namespace ES.Obsolete.Preview.Editor
     /// </summary>
     public class BatchRenameTool : EditorWindow
     {
-        [MenuItem("【ES】/已废弃/AIPreview/编辑器工具/Batch Rename")]
+        [MenuItem("【ES】/自动化与开发/遗留兼容/AIPreview/编辑器工具/Batch Rename")]
         public static void ShowWindow()
         {
             GetWindow<BatchRenameTool>("Batch Rename");
@@ -544,13 +544,13 @@ namespace ES.Obsolete.Preview.Editor
     /// </summary>
     public static class QuickActions
     {
-        [MenuItem("【ES】/已废弃/AIPreview/快捷操作/Open Persistent Data Path")]
+        [MenuItem("【ES】/自动化与开发/遗留兼容/AIPreview/快捷操作/Open Persistent Data Path")]
         private static void OpenPersistentDataPath()
         {
             EditorUtility.RevealInFinder(Application.persistentDataPath);
         }
         
-        [MenuItem("【ES】/已废弃/AIPreview/快捷操作/Clear PlayerPrefs")]
+        [MenuItem("【ES】/自动化与开发/遗留兼容/AIPreview/快捷操作/Clear PlayerPrefs")]
         private static void ClearPlayerPrefs()
         {
             if (EditorUtility.DisplayDialog("Confirm", "Clear all PlayerPrefs?", "Yes", "Cancel"))
@@ -561,7 +561,7 @@ namespace ES.Obsolete.Preview.Editor
             }
         }
         
-        [MenuItem("【ES】/已废弃/AIPreview/快捷操作/Take Screenshot")]
+        [MenuItem("【ES】/自动化与开发/遗留兼容/AIPreview/快捷操作/Take Screenshot")]
         private static void TakeScreenshot()
         {
             string filename = $"Screenshot_{System.DateTime.Now:yyyyMMdd_HHmmss}.png";

@@ -13,7 +13,7 @@ namespace ES
         public Vector2 PreferredSize { get; set; } = new Vector2(560f, 440f);
     }
 
-    public sealed class ESEditorDialogPresenter : IESDialogPresenter
+    public sealed class ESEditorDialogPresenter : IESDialogPresenter, IESDialogModalPresenter
     {
         public ESDialogHost Host => ESDialogHost.Editor;
         public ESDialogCapabilities Capabilities => ESDialogCapabilities.AllCommon;
@@ -28,6 +28,14 @@ namespace ES
             ESAdvancedDialogResult result = await ESDialogService.ShowAsync(
                 editorRequest,
                 cancellationToken);
+            return MapResult(result, request);
+        }
+
+        public ESDialogResult ShowModal(ESDialogRequest request)
+        {
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+            ESAdvancedDialogResult result = ESDialogService.ShowModal(MapRequest(request, null));
             return MapResult(result, request);
         }
 

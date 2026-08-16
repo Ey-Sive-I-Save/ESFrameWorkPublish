@@ -99,7 +99,7 @@ namespace ES.EditorInternal
                 string editedStringKey = EditorGUI.DelayedTextField(stringInputRect, stringKey.stringValue);
                 if (EditorGUI.EndChangeCheck())
                 {
-                    stringKey.stringValue = editedStringKey?.Trim() ?? string.Empty;
+                    stringKey.stringValue = editedStringKey ?? string.Empty;
                     ClearAssetIdentity(property);
                     Apply(property);
                 }

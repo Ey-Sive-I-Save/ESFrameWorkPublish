@@ -2,7 +2,7 @@
 
 This note is for AI agents working on the player-object/model architecture rebuild. Keep it factual and update it when the code changes.
 
-> 2026-08-12 target correction: the four serialized domains below remain the current source fact. `EntityEquipmentDomain` has been approved as the formal fifth-domain target for inventory, equipment, accessories, attachment transitions, and equipment-effect source handles, but it is not wired into runtime yet. Use `装备定义与装配推进路线_AI协作说明.md` as the current migration contract; do not deny the target or report it as implemented.
+> 2026-08-16 current correction: `EntityEquipmentDomain` is wired as the fifth serialized domain. Inventory / Slot / Attachment / Effect now have a minimum runtime slice, but PlayMode gameplay and release acceptance remain open. Use `装备定义与装配推进路线_AI协作说明.md` as the current contract.
 
 ## Responsibility
 
@@ -31,7 +31,7 @@ This note is for AI agents working on the player-object/model architecture rebui
 - `Assets/Scripts/ESPlayer` 是当前保留的空壳程序集和历史测试材料；不要把它当作玩家实现入口。它暂不移动，因为项目文件夹图标工具缓存了该绝对路径。
 - The active runtime entry for player-like characters is `Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs`.
 - `Entity` inherits `Core` and implements `KinematicCharacterController.ICharacterController`.
-- `Entity` directly registers four serialized domains: `EntityBasicDomain`, `EntityAIDomain`, `EntityBuffDomain`, and `EntityStateDomain`.
+- `Entity` directly registers five serialized domains: `EntityBasicDomain`, `EntityAIDomain`, `EntityBuffDomain`, `EntityEquipmentDomain`, and `EntityStateDomain`.
 - The underlying framework pattern is `Core -> Domain -> Module`.
 - `Core.Update()` updates registered domains. `Domain` updates its modules. `Module.TableKeyType` writes into `Core.ModuleTables`.
 - `ESGameManager` now lives under `Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/ESGameManager.cs`, not under the deleted `Assets/Plugins/ES/2_Feature/ESGameCore` tree.
@@ -43,32 +43,32 @@ This note is for AI agents working on the player-object/model architecture rebui
 - `Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/EntityBasicModules.cs` is very large and mixes movement, combat, weapon handling, camera, quick stop, root motion, skill test code, and shared structs. Avoid adding more player-specific behavior there unless explicitly migrating.
 - `Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/AI/EntityAIModules.cs` contains input collection modules and the partial implementation of the `EntityAIDomain` input executor. It is not purely AI.
 - 当前输入主链是 `ESInputModule -> ESInputService -> EntityPlayerInputWriteModule -> EntityAIDomain.inputState -> EntityAIDomain`。`inputState` 是 Awake 时创建的纯运行态，不进入 Prefab/Scene 序列化。不要在新玩家代码中直接绑定 Unity `InputActionProperty`，也不要恢复已删除的旧实体输入类型。
-- `EntityBasicCombatModule` contains weapon mounting, aim/peek, firing, and animation parameter duties. It is not only "combat".
+- `EntityEquipmentDomain` owns inventory, weapon slots, attachment transitions and equipment-effect sources. `EntityBasicCombatModule` consumes the active equipment slot and executes attack/fire; it must not regain equipment ownership.
 - Buff 域已有运行时实例、叠层、ValueChange、Permit 和 OpSupport 链路；但仍需按当前源码确认具体能力，不能把它误当作已经完成全部商业 Buff 功能。
 
 ## Architecture Direction
 
-The safer rebuild direction is to keep `Entity` as a generic runtime body and build player-specific orchestration beside it.
+The current direction is to keep `Entity` as the generic runtime body and preserve one control path through its existing domains. Do not add a parallel player aggregate or a second controller stack.
 
 Recommended target layering:
 
-1. `Entity`: generic body, KCC adapter, domain host, state/IK bridge.
-2. `PlayerActor` or equivalent facade: the player-owned aggregate that references an `Entity`.
-3. `PlayerIntent`: frame-level intent data, independent of keyboard, gamepad, AI, replay, or network source.
-4. `PlayerInputAdapter`: converts `ESInputService`, AI, replay, or network packets into `PlayerIntent`.
-5. `PlayerLocomotionController`: owns player movement decisions and delegates raw motion to `Entity`/KCC.
-6. `PlayerCombatController`, `PlayerWeaponController`, `PlayerInteractionController`, `PlayerCameraBinding`: separated gameplay controllers.
+1. `Entity`: generic body, KCC adapter, five-domain host, state/IK bridge.
+2. `EntityCharacterIdentity`: the sole character Prefab identity and DataInfo binding entry.
+3. `ESInputService -> EntityPlayerInputWriteModule -> EntityAIDomain`: the current player intent write and execution chain.
+4. `EntityEquipmentDomain`: inventory, slot, attachment and equipment-effect ownership.
+5. `EntityBasicDomain`: motion, interaction and combat execution modules; primary attack enters through `EntityBasicCombatModule.TryExecutePrimaryAttack()`.
+6. `EntityStateDomain` and presentation drivers: animation, state and final IK consumption without owning gameplay facts.
 
-The important boundary is: input source produces intent; intent drives player controllers; controllers call stable entity APIs. Do not let UI/input/replay/network systems directly manipulate random Basic modules.
+The important boundary is: input sources write intent; `EntityAIDomain` consumes it; Equipment owns equipment facts; Basic modules execute body/combat behavior. Do not let UI/input/replay/network systems manipulate Basic modules, KCC, weapon Rigidbody or root Transform directly.
 
 ## Migration Rules For Future Agents
 
 - Read the relevant files before editing; names are not reliable enough in this codebase.
-- Prefer adding thin adapter/facade classes over rewriting `Entity.cs` immediately.
+- Do not add `PlayerActor`, `CharacterActor`, composition facades or synonymous parallel roots. Extend the existing Entity/Domain/Module contracts only where a verified responsibility is missing.
 - Avoid mass refactors while the worktree is dirty. Keep changes small and reversible.
 - Preserve Odin serialization and Unity `.meta` files when moving or creating assets.
 - 已删除的 `EntityAIInputSystemModule` 与 `EntityInputStateModule` 不得恢复；若旧场景或 Prefab 出现 Missing Type，清理其序列化坏引用。
-- 新增正式玩家层时，使用清晰的 `Assets/Scripts/ESLogic/Runtime/Player` 目录，而不是扩张 `EntityBasicModules.cs`；未验证材料只能放入 `Tests~` 或 `Samples~`。
+- 玩家专属能力不得以第二套输入、运动、战斗或装备控制器绕过现有 Domain；实验材料只能放入 `Tests~` 或 `Samples~`。
 - If splitting `EntityBasicModules.cs`, first do mechanical class-per-file extraction with no behavior change. Functional redesign should be a separate step.
 - Maintain compatibility with existing `Core.ModuleTables` lookup. Some systems call `TryGetValue(typeof(SomeModule))`, so changing `TableKeyType` can break runtime behavior.
 - Treat KCC callbacks as high-frequency and allocation-sensitive. Avoid LINQ, reflection, hierarchy search, or string work inside movement callbacks.

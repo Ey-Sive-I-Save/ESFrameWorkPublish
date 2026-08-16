@@ -37,8 +37,8 @@
 - `SceneHierarchyExpansionState`：
   - 延迟恢复从匿名 `delayCall` 改为命名方法。
   - 注册全局事件前统一先退订。
-- `ESMenuTreeWindowAB`：
-  - `OnClose += () => SaveData` 改为命名方法，避免重复挂闭包。
+- ES 窗口底层：
+  - `ESMenuTreeWindow<T>` 与 `ESOdinMenuTreeWindow<T>` 的关闭保存回调使用命名方法，并在重复注册前退订，避免窗口重建时重复挂闭包；已删除的 `ESMenuTreeWindowAB` 不再作为类型权威。
 - `EditorInitAndUpdater`：
   - 三个全局 update 初始化均改为先 `-=` 再 `+=`。
 - `ESInputBindingDefineDrawer`：

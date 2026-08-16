@@ -21,7 +21,7 @@
   -ProjectRoot (Get-Location).Path -Query "资源 发布" -Json
 ```
 
-该查询器只读取 `AICommandCatalog.json`，硬性最多返回 6 条短候选；它不读取任何合同正文。选定一条后，才读取那一份 Markdown 全文并重新计算 SHA-256。目录、候选摘要和 Skill 均不能代替该正文授权。
+该查询器只加载 `AICommandCatalog.json`，并校验目录条目的路径边界与重解析点；它不读取任何合同正文，硬性最多返回 6 条短候选。选定一条后，才读取那一份 Markdown 全文并重新计算 SHA-256。目录、候选摘要和 Skill 均不能代替该正文授权。
 
 已知合同路径时可用精确校验，不必让 AI 读取完整目录：
 

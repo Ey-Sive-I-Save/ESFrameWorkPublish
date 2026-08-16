@@ -97,6 +97,10 @@ namespace ES
                 result.stringKey = itemEdit.stringKey;
                 result.currentEnumKey = itemEdit.oldEnumKey;
                 result.currentStringKey = itemEdit.oldStringKey;
+                result.itemEnumKey = itemEdit.itemEnumKey;
+                result.itemStringKey = itemEdit.itemStringKey;
+                result.currentItemEnumKey = itemEdit.oldItemEnumKey;
+                result.currentItemStringKey = itemEdit.oldItemStringKey;
                 result.assetKind = itemEdit.route;
                 if (!ValidateItemWithProposedKey(item, itemEdit, out string validationError))
                     return ESContentRegistrationResult.Failure(request, "definition_invalid", validationError);
@@ -255,78 +259,136 @@ namespace ES
             out string error)
         {
             edit = null;
-            IESConfigKey current;
-            if (!item.TryGetGameCoreKey(out current) || current == null)
+            ESItemConfigKey currentItemKey = item.itemKey;
+            if (currentItemKey == null)
             {
-                error = "Item Weapon/Shot 缺少强类型 ConfigKey 实例。";
+                error = "Item 缺少基础 ESItemConfigKey 实例。";
                 return false;
             }
 
-            int desiredEnum = request.enumKey;
-            string desiredString = request.stringKey ?? string.Empty;
-            if (desiredEnum == 0 && string.IsNullOrEmpty(desiredString) && current.IsConfigured())
+            string route;
+            IESConfigKey currentProjectionKey = null;
+            if (item.kindData is ItemWeaponDataBlock weapon)
             {
-                desiredEnum = current.EnumKeyInt;
-                desiredString = current.StringKey ?? string.Empty;
+                route = "item.weapon";
+                currentProjectionKey = weapon.key;
             }
-            if (!ESContentStringKeyRules.TryValidateStableKey(
+            else if (item.kindData is ItemShotDataBlock shot)
+            {
+                route = "item.shot";
+                currentProjectionKey = shot.key;
+            }
+            else
+            {
+                route = "item";
+            }
+
+            if (route != "item" && currentProjectionKey == null)
+            {
+                error = route + " 缺少专项强类型 ConfigKey 实例。";
+                return false;
+            }
+
+            if (!RouteMatches(request.gameCoreRoute, route))
+            {
+                error = "gameCoreRoute 与 Item 类型不一致，期望 " + route + "。";
+                return false;
+            }
+
+            int desiredItemEnum = route == "item" ? request.enumKey : request.itemEnumKey;
+            string desiredItemString = route == "item" ? request.stringKey : request.itemStringKey;
+            bool hasExpectedItemKey = route == "item" ? request.hasExpectedCurrentKey : request.hasExpectedCurrentItemKey;
+            int expectedItemEnum = route == "item" ? request.expectedCurrentEnumKey : request.expectedCurrentItemEnumKey;
+            string expectedItemString = route == "item" ? request.expectedCurrentStringKey : request.expectedCurrentItemStringKey;
+            if (!TryResolveDesiredKey(
+                    currentItemKey,
+                    desiredItemEnum,
+                    desiredItemString,
                     request.keyMode,
-                    desiredEnum,
-                    desiredString,
-                    out _,
+                    hasExpectedItemKey,
+                    expectedItemEnum,
+                    expectedItemString,
+                    "基础 Item",
+                    out desiredItemEnum,
+                    out desiredItemString,
                     out error))
             {
                 return false;
             }
 
-            if ((request.expectedCurrentEnumKey != 0 || !string.IsNullOrEmpty(request.expectedCurrentStringKey))
-                && (current.EnumKeyInt != request.expectedCurrentEnumKey
-                    || !string.Equals(current.StringKey ?? string.Empty, request.expectedCurrentStringKey ?? string.Empty, StringComparison.Ordinal)))
+            int desiredProjectionEnum = 0;
+            string desiredProjectionString = string.Empty;
+            if (currentProjectionKey != null
+                && !TryResolveDesiredKey(
+                    currentProjectionKey,
+                    request.enumKey,
+                    request.stringKey,
+                    request.keyMode,
+                    request.hasExpectedCurrentKey,
+                    request.expectedCurrentEnumKey,
+                    request.expectedCurrentStringKey,
+                    route,
+                    out desiredProjectionEnum,
+                    out desiredProjectionString,
+                    out error))
             {
-                error = "DataInfo 当前 GameCore Key 与 expectedCurrent 不一致。";
+                return false;
+            }
+
+            if (route == "item.weapon")
+                edit = ItemKeyEdit.ForWeapon(currentItemKey, (ESWeaponConfigKey)currentProjectionKey, desiredItemEnum, desiredItemString, desiredProjectionEnum, desiredProjectionString, sourceGuid, item.GetType().FullName);
+            else if (route == "item.shot")
+                edit = ItemKeyEdit.ForShot(currentItemKey, (ESShotConfigKey)currentProjectionKey, desiredItemEnum, desiredItemString, desiredProjectionEnum, desiredProjectionString, sourceGuid, item.GetType().FullName);
+            else
+                edit = ItemKeyEdit.ForItem(currentItemKey, desiredItemEnum, desiredItemString, sourceGuid, item.GetType().FullName);
+
+            if (edit.HasForeignDefinitionGuid(sourceGuid, out string foreignRoute))
+            {
+                error = foreignRoute + " ConfigKey.definitionGuid 已指向另一 DataInfo；拒绝覆盖定义身份。";
+                edit = null;
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool TryResolveDesiredKey(
+            IESConfigKey current,
+            int requestedEnum,
+            string requestedString,
+            ESContentStableKeyMode keyMode,
+            bool hasExpectedCurrent,
+            int expectedCurrentEnum,
+            string expectedCurrentString,
+            string label,
+            out int desiredEnum,
+            out string desiredString,
+            out string error)
+        {
+            desiredEnum = requestedEnum;
+            desiredString = requestedString ?? string.Empty;
+            if (desiredEnum == 0 && string.IsNullOrEmpty(desiredString) && current.IsConfigured())
+            {
+                desiredEnum = current.EnumKeyInt;
+                desiredString = current.StringKey ?? string.Empty;
+            }
+            if (!ESContentStringKeyRules.TryValidateStableKey(keyMode, desiredEnum, desiredString, out _, out error))
+                return false;
+            if (hasExpectedCurrent
+                && (current.EnumKeyInt != expectedCurrentEnum
+                    || !string.Equals(current.StringKey ?? string.Empty, expectedCurrentString ?? string.Empty, StringComparison.Ordinal)))
+            {
+                error = label + " 当前 Key 与 expectedCurrent 不一致。";
                 return false;
             }
             if (current.IsConfigured()
                 && (current.EnumKeyInt != desiredEnum
                     || !string.Equals(current.StringKey ?? string.Empty, desiredString, StringComparison.Ordinal)))
             {
-                error = "DataInfo 已有不同稳定 Key；注册入口禁止承担 Key 改名/迁移。";
+                error = label + " 已有不同稳定 Key；注册入口禁止承担 Key 改名/迁移。";
                 return false;
             }
-
-            if (item.kindData is ItemWeaponDataBlock weapon)
-            {
-                if (!RouteMatches(request.gameCoreRoute, "item.weapon"))
-                {
-                    error = "gameCoreRoute 与 Item Weapon 不一致。";
-                    return false;
-                }
-                edit = ItemKeyEdit.ForWeapon(weapon.key, desiredEnum, desiredString, sourceGuid, item.GetType().FullName);
-            }
-            else if (item.kindData is ItemShotDataBlock shot)
-            {
-                if (!RouteMatches(request.gameCoreRoute, "item.shot"))
-                {
-                    error = "gameCoreRoute 与 Item Shot 不一致。";
-                    return false;
-                }
-                edit = ItemKeyEdit.ForShot(shot.key, desiredEnum, desiredString, sourceGuid, item.GetType().FullName);
-            }
-            else
-            {
-                error = "只有 Item Weapon/Shot 是当前 Item GameCore 根。";
-                return false;
-            }
-
-            if (!string.IsNullOrEmpty(edit.oldDefinitionGuid)
-                && !string.Equals(edit.oldDefinitionGuid, sourceGuid, StringComparison.OrdinalIgnoreCase))
-            {
-                error = "ConfigKey.definitionGuid 已指向另一 DataInfo；拒绝覆盖定义身份。";
-                edit = null;
-                return false;
-            }
-
-            error = string.Empty;
             return true;
         }
 
@@ -392,8 +454,31 @@ namespace ES
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 ItemDataInfo other = AssetDatabase.LoadAssetAtPath<ItemDataInfo>(path);
-                if (other == null || ReferenceEquals(other, source) || !other.TryGetGameCoreKey(out IESConfigKey otherKey) || otherKey == null)
+                if (other == null || ReferenceEquals(other, source))
                     continue;
+
+                ESItemConfigKey otherItemKey = other.itemKey;
+                if (otherItemKey != null)
+                {
+                    if (edit.itemEnumKey != 0 && otherItemKey.EnumKeyInt == edit.itemEnumKey)
+                    {
+                        error = "基础 Item EnumKey 已由其他定义占用：" + path;
+                        return false;
+                    }
+                    if (!string.IsNullOrEmpty(edit.itemStringKey)
+                        && string.Equals(otherItemKey.StringKey, edit.itemStringKey, StringComparison.Ordinal))
+                    {
+                        error = "基础 Item StringKey 已由其他定义占用：" + path;
+                        return false;
+                    }
+                }
+
+                if (!edit.HasProjection
+                    || !other.TryGetGameCoreKey(out IESConfigKey otherKey)
+                    || otherKey == null)
+                {
+                    continue;
+                }
                 bool sameRoute = (source.kindData is ItemWeaponDataBlock && other.kindData is ItemWeaponDataBlock)
                                  || (source.kindData is ItemShotDataBlock && other.kindData is ItemShotDataBlock);
                 if (!sameRoute)
@@ -527,57 +612,113 @@ namespace ES
 
         private sealed class ItemKeyEdit
         {
+            private readonly ESItemConfigKey itemKey;
             private readonly ESWeaponConfigKey weaponKey;
             private readonly ESShotConfigKey shotKey;
             public readonly int enumKey;
             public readonly string stringKey;
+            public readonly int itemEnumKey;
+            public readonly string itemStringKey;
             public readonly string route;
             public readonly int oldEnumKey;
             public readonly string oldStringKey;
-            public readonly string oldDefinitionGuid;
-            private readonly long oldDefinitionLocalFileId;
-            private readonly string oldDefinitionTypeName;
+            public readonly int oldItemEnumKey;
+            public readonly string oldItemStringKey;
+            private readonly string oldItemDefinitionGuid;
+            private readonly long oldItemDefinitionLocalFileId;
+            private readonly string oldItemDefinitionTypeName;
+            private readonly string oldProjectionDefinitionGuid;
+            private readonly long oldProjectionDefinitionLocalFileId;
+            private readonly string oldProjectionDefinitionTypeName;
             private readonly string definitionGuid;
             private readonly string definitionTypeName;
 
-            public bool RequiresChange => oldEnumKey != enumKey
-                                          || !string.Equals(oldStringKey, stringKey, StringComparison.Ordinal)
-                                          || !string.Equals(oldDefinitionGuid, definitionGuid, StringComparison.OrdinalIgnoreCase)
-                                          || oldDefinitionLocalFileId != 0
-                                          || !string.Equals(oldDefinitionTypeName, definitionTypeName, StringComparison.Ordinal);
+            public bool HasProjection => weaponKey != null || shotKey != null;
+
+            public bool RequiresChange => oldItemEnumKey != itemEnumKey
+                                          || !string.Equals(oldItemStringKey, itemStringKey, StringComparison.Ordinal)
+                                          || !string.Equals(oldItemDefinitionGuid, definitionGuid, StringComparison.OrdinalIgnoreCase)
+                                          || oldItemDefinitionLocalFileId != 0
+                                          || !string.Equals(oldItemDefinitionTypeName, definitionTypeName, StringComparison.Ordinal)
+                                          || (HasProjection
+                                              && (oldEnumKey != enumKey
+                                                  || !string.Equals(oldStringKey, stringKey, StringComparison.Ordinal)
+                                                  || !string.Equals(oldProjectionDefinitionGuid, definitionGuid, StringComparison.OrdinalIgnoreCase)
+                                                  || oldProjectionDefinitionLocalFileId != 0
+                                                  || !string.Equals(oldProjectionDefinitionTypeName, definitionTypeName, StringComparison.Ordinal)));
 
             private ItemKeyEdit(
+                ESItemConfigKey itemKey,
                 ESWeaponConfigKey weaponKey,
                 ESShotConfigKey shotKey,
+                int itemEnumKey,
+                string itemStringKey,
                 int enumKey,
                 string stringKey,
                 string route,
                 string definitionGuid,
                 string definitionTypeName)
             {
+                this.itemKey = itemKey;
                 this.weaponKey = weaponKey;
                 this.shotKey = shotKey;
+                this.itemEnumKey = itemEnumKey;
+                this.itemStringKey = itemStringKey ?? string.Empty;
                 this.enumKey = enumKey;
                 this.stringKey = stringKey ?? string.Empty;
                 this.route = route;
                 this.definitionGuid = definitionGuid;
                 this.definitionTypeName = definitionTypeName;
-                IESConfigKey key = (IESConfigKey)weaponKey ?? shotKey;
-                oldEnumKey = key.EnumKeyInt;
-                oldStringKey = key.StringKey ?? string.Empty;
-                oldDefinitionGuid = weaponKey != null ? weaponKey.definitionGuid : shotKey.definitionGuid;
-                oldDefinitionLocalFileId = weaponKey != null ? weaponKey.definitionLocalFileId : shotKey.definitionLocalFileId;
-                oldDefinitionTypeName = weaponKey != null ? weaponKey.definitionTypeName : shotKey.definitionTypeName;
+                oldItemEnumKey = itemKey.EnumKeyInt;
+                oldItemStringKey = itemKey.StringKey ?? string.Empty;
+                oldItemDefinitionGuid = itemKey.definitionGuid;
+                oldItemDefinitionLocalFileId = itemKey.definitionLocalFileId;
+                oldItemDefinitionTypeName = itemKey.definitionTypeName;
+
+                IESConfigKey projectionKey = (IESConfigKey)weaponKey ?? shotKey;
+                oldEnumKey = projectionKey?.EnumKeyInt ?? itemKey.EnumKeyInt;
+                oldStringKey = projectionKey?.StringKey ?? itemKey.StringKey ?? string.Empty;
+                oldProjectionDefinitionGuid = weaponKey != null ? weaponKey.definitionGuid : shotKey?.definitionGuid;
+                oldProjectionDefinitionLocalFileId = weaponKey != null ? weaponKey.definitionLocalFileId : shotKey?.definitionLocalFileId ?? 0;
+                oldProjectionDefinitionTypeName = weaponKey != null ? weaponKey.definitionTypeName : shotKey?.definitionTypeName;
             }
 
-            public static ItemKeyEdit ForWeapon(ESWeaponConfigKey key, int enumKey, string stringKey, string guid, string typeName)
-                => new ItemKeyEdit(key, null, enumKey, stringKey, "item.weapon", guid, typeName);
+            public static ItemKeyEdit ForItem(ESItemConfigKey itemKey, int enumKey, string stringKey, string guid, string typeName)
+                => new ItemKeyEdit(itemKey, null, null, enumKey, stringKey, enumKey, stringKey, "item", guid, typeName);
 
-            public static ItemKeyEdit ForShot(ESShotConfigKey key, int enumKey, string stringKey, string guid, string typeName)
-                => new ItemKeyEdit(null, key, enumKey, stringKey, "item.shot", guid, typeName);
+            public static ItemKeyEdit ForWeapon(ESItemConfigKey itemKey, ESWeaponConfigKey key, int itemEnumKey, string itemStringKey, int enumKey, string stringKey, string guid, string typeName)
+                => new ItemKeyEdit(itemKey, key, null, itemEnumKey, itemStringKey, enumKey, stringKey, "item.weapon", guid, typeName);
+
+            public static ItemKeyEdit ForShot(ESItemConfigKey itemKey, ESShotConfigKey key, int itemEnumKey, string itemStringKey, int enumKey, string stringKey, string guid, string typeName)
+                => new ItemKeyEdit(itemKey, null, key, itemEnumKey, itemStringKey, enumKey, stringKey, "item.shot", guid, typeName);
+
+            public bool HasForeignDefinitionGuid(string expectedGuid, out string foreignRoute)
+            {
+                if (!string.IsNullOrEmpty(oldItemDefinitionGuid)
+                    && !string.Equals(oldItemDefinitionGuid, expectedGuid, StringComparison.OrdinalIgnoreCase))
+                {
+                    foreignRoute = "基础 Item";
+                    return true;
+                }
+                if (HasProjection
+                    && !string.IsNullOrEmpty(oldProjectionDefinitionGuid)
+                    && !string.Equals(oldProjectionDefinitionGuid, expectedGuid, StringComparison.OrdinalIgnoreCase))
+                {
+                    foreignRoute = route;
+                    return true;
+                }
+                foreignRoute = string.Empty;
+                return false;
+            }
 
             public void Apply()
             {
+                itemKey.enumKey = (ESItemEnumKey)(ushort)itemEnumKey;
+                itemKey.stringKey = itemStringKey;
+                itemKey.definitionGuid = definitionGuid;
+                itemKey.definitionLocalFileId = 0;
+                itemKey.definitionTypeName = definitionTypeName;
+
                 if (weaponKey != null)
                 {
                     weaponKey.enumKey = (ESWeaponEnumKey)(ushort)enumKey;
@@ -586,7 +727,7 @@ namespace ES
                     weaponKey.definitionLocalFileId = 0;
                     weaponKey.definitionTypeName = definitionTypeName;
                 }
-                else
+                else if (shotKey != null)
                 {
                     shotKey.enumKey = (ESShotEnumKey)(ushort)enumKey;
                     shotKey.stringKey = stringKey;
@@ -598,21 +739,27 @@ namespace ES
 
             public void Restore()
             {
+                itemKey.enumKey = (ESItemEnumKey)(ushort)oldItemEnumKey;
+                itemKey.stringKey = oldItemStringKey;
+                itemKey.definitionGuid = oldItemDefinitionGuid;
+                itemKey.definitionLocalFileId = oldItemDefinitionLocalFileId;
+                itemKey.definitionTypeName = oldItemDefinitionTypeName;
+
                 if (weaponKey != null)
                 {
                     weaponKey.enumKey = (ESWeaponEnumKey)(ushort)oldEnumKey;
                     weaponKey.stringKey = oldStringKey;
-                    weaponKey.definitionGuid = oldDefinitionGuid;
-                    weaponKey.definitionLocalFileId = oldDefinitionLocalFileId;
-                    weaponKey.definitionTypeName = oldDefinitionTypeName;
+                    weaponKey.definitionGuid = oldProjectionDefinitionGuid;
+                    weaponKey.definitionLocalFileId = oldProjectionDefinitionLocalFileId;
+                    weaponKey.definitionTypeName = oldProjectionDefinitionTypeName;
                 }
-                else
+                else if (shotKey != null)
                 {
                     shotKey.enumKey = (ESShotEnumKey)(ushort)oldEnumKey;
                     shotKey.stringKey = oldStringKey;
-                    shotKey.definitionGuid = oldDefinitionGuid;
-                    shotKey.definitionLocalFileId = oldDefinitionLocalFileId;
-                    shotKey.definitionTypeName = oldDefinitionTypeName;
+                    shotKey.definitionGuid = oldProjectionDefinitionGuid;
+                    shotKey.definitionLocalFileId = oldProjectionDefinitionLocalFileId;
+                    shotKey.definitionTypeName = oldProjectionDefinitionTypeName;
                 }
             }
         }

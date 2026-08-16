@@ -18,6 +18,16 @@ namespace ES
         Danger,
     }
 
+    public enum ESAdvancedDialogPositionMode : byte
+    {
+        CenterOwner = 0,
+        OwnerTopLeft = 1,
+        OwnerTopRight = 2,
+        OwnerBottomLeft = 3,
+        OwnerBottomRight = 4,
+        CustomScreenPosition = 5,
+    }
+
     public sealed class ESAdvancedDialogValidation
     {
         public string fieldId;
@@ -199,6 +209,9 @@ namespace ES
         public string cancelText = "取消";
         public Vector2 minSize = new Vector2(460f, 260f);
         public Vector2 preferredSize = new Vector2(560f, 440f);
+        public ESAdvancedDialogPositionMode positionMode = ESAdvancedDialogPositionMode.CenterOwner;
+        public Vector2 customScreenPosition;
+        public Vector2 positionOffset;
         public ESDialogTone tone = ESDialogTone.Info;
         public bool showCancel = true;
         public bool animateOpening = true;
@@ -1456,6 +1469,9 @@ namespace ES
                 cancelText = source.cancelText,
                 minSize = source.minSize,
                 preferredSize = source.preferredSize,
+                positionMode = source.positionMode,
+                customScreenPosition = source.customScreenPosition,
+                positionOffset = source.positionOffset,
                 tone = source.tone,
                 showCancel = source.showCancel,
                 animateOpening = source.animateOpening,
@@ -1574,6 +1590,7 @@ namespace ES
         private CancellationTokenSource operationCancellation;
         private CancellationTokenSource validationCancellation;
         private ESProgressHandle activeProgress;
+        private IDisposable ownerInteractionHold;
         private IVisualElementScheduledItem busyRefreshSchedule;
         private int validationGeneration;
         private bool busy;
@@ -1672,9 +1689,14 @@ namespace ES
 
         private void Initialize(ESAdvancedDialogRequest value)
         {
+            ownerInteractionHold?.Dispose();
+            ownerInteractionHold = null;
             request = value;
             initialized = true;
             RefreshValidation();
+            ownerInteractionHold = ESWindowFoundation.HoldInteraction(
+                request.owner,
+                "ESAdvancedDialog");
         }
 
         public void CreateGUI()
@@ -1782,7 +1804,11 @@ namespace ES
             panel.style.paddingRight = 16f;
             panel.style.paddingTop = 14f;
             panel.style.paddingBottom = 14f;
-            panel.style.backgroundColor = ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor;
+            ES.EditorInternal.ESEditorPresentation.ApplyRoundedSurface(
+                panel,
+                ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor,
+                ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Overlay,
+                ES.EditorInternal.ESEditorPresentation.DividerColor);
             busyLabel = new Label("正在处理");
             busyLabel.style.whiteSpace = WhiteSpace.Normal;
             busyLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -1828,7 +1854,11 @@ namespace ES
             summary.style.paddingRight = 12f;
             summary.style.paddingTop = 10f;
             summary.style.paddingBottom = 10f;
-            summary.style.backgroundColor = ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor;
+            ES.EditorInternal.ESEditorPresentation.ApplyRoundedSurface(
+                summary,
+                ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor,
+                ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Section,
+                ES.EditorInternal.ESEditorPresentation.DividerColor);
             summary.style.borderLeftWidth = 3f;
             summary.style.borderLeftColor = accent;
 
@@ -1977,15 +2007,11 @@ namespace ES
             group.style.paddingRight = 8f;
             group.style.paddingTop = 5f;
             group.style.paddingBottom = 5f;
-            group.style.backgroundColor = ES.EditorInternal.ESEditorPresentation.ControlSurfaceColor;
-            group.style.borderLeftWidth = 1f;
-            group.style.borderRightWidth = 1f;
-            group.style.borderTopWidth = 1f;
-            group.style.borderBottomWidth = 1f;
-            group.style.borderLeftColor = ES.EditorInternal.ESEditorPresentation.DividerColor;
-            group.style.borderRightColor = ES.EditorInternal.ESEditorPresentation.DividerColor;
-            group.style.borderTopColor = ES.EditorInternal.ESEditorPresentation.DividerColor;
-            group.style.borderBottomColor = ES.EditorInternal.ESEditorPresentation.DividerColor;
+            ES.EditorInternal.ESEditorPresentation.ApplyRoundedSurface(
+                group,
+                ES.EditorInternal.ESEditorPresentation.ControlSurfaceColor,
+                ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Card,
+                ES.EditorInternal.ESEditorPresentation.DividerColor);
 
             Label selectionStatus = new Label();
             selectionStatus.style.marginBottom = 4f;
@@ -2158,8 +2184,8 @@ namespace ES
         {
             Color selectedBackground = Color.Lerp(
                 ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor,
-                ES.EditorInternal.ESEditorPresentation.GetSemanticAccent(2),
-                0.82f);
+                ES.EditorInternal.ESEditorPresentation.PrimaryActionColor,
+                0.90f);
             for (int i = 0; i < buttons.Count; i++)
             {
                 Button button = buttons[i];
@@ -2172,8 +2198,11 @@ namespace ES
                     ? ES.EditorInternal.ESEditorPresentation.GetSemanticAccent(2)
                     : ES.EditorInternal.ESEditorPresentation.DividerColor;
                 button.style.backgroundColor = background;
+                ES.EditorInternal.ESEditorPresentation.ApplyCornerRadius(
+                    button,
+                    ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Control);
                 button.style.color = selected
-                    ? GetReadableActionTextColor(background)
+                    ? ES.EditorInternal.ESEditorPresentation.PrimaryActionTextColor
                     : ES.EditorInternal.ESEditorPresentation.SectionSelectedTextColor;
                 button.style.borderLeftWidth = selected ? 2f : 1f;
                 button.style.borderRightWidth = selected ? 2f : 1f;
@@ -2258,9 +2287,12 @@ namespace ES
             validationPanel.style.paddingRight = 10f;
             validationPanel.style.paddingTop = 8f;
             validationPanel.style.paddingBottom = 8f;
-            validationPanel.style.backgroundColor = ES.EditorInternal.ESEditorPresentation.WarningBackground;
+            ES.EditorInternal.ESEditorPresentation.ApplyRoundedSurface(
+                validationPanel,
+                ES.EditorInternal.ESEditorPresentation.WarningBackground,
+                ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Card,
+                ES.EditorInternal.ESEditorPresentation.WarningColor);
             validationPanel.style.borderLeftWidth = 3f;
-            validationPanel.style.borderLeftColor = ES.EditorInternal.ESEditorPresentation.WarningColor;
             validationPanel.tooltip = "单击定位第一个未通过校验的字段。";
             validationPanel.RegisterCallback<PointerDownEvent>(_ => RevealInvalidField());
 
@@ -2509,16 +2541,16 @@ namespace ES
             if (role == ESAdvancedDialogActionRole.Danger)
                 background = ES.EditorInternal.ESEditorPresentation.ErrorColor;
             else if (role == ESAdvancedDialogActionRole.Primary)
-                background = Color.Lerp(
-                    ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor,
-                    ES.EditorInternal.ESEditorPresentation.GetSemanticAccent(2),
-                    0.82f);
+                background = ES.EditorInternal.ESEditorPresentation.PrimaryActionColor;
             else
                 return;
 
             button.style.backgroundColor = background;
             button.style.color = GetReadableActionTextColor(background);
             button.style.unityFontStyleAndWeight = FontStyle.Bold;
+            ES.EditorInternal.ESEditorPresentation.ApplyCornerRadius(
+                button,
+                ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Control);
         }
 
         internal static Color GetReadableActionTextColor(Color background)
@@ -2618,11 +2650,14 @@ namespace ES
                     estimatedHeight += 74f;
             }
 
-            Rect centered = CalculateCenteredPosition(
+            Rect centered = CalculatePosition(
                 main,
                 requestedMin,
                 request.preferredSize,
-                estimatedHeight);
+                estimatedHeight,
+                request.positionMode,
+                request.customScreenPosition,
+                request.positionOffset);
             minSize = new Vector2(
                 Mathf.Min(Mathf.Max(360f, requestedMin.x), centered.width),
                 Mathf.Min(Mathf.Max(240f, requestedMin.y), centered.height));
@@ -2654,6 +2689,74 @@ namespace ES
                 main.y + (main.height - height) * 0.5f,
                 width,
                 height);
+        }
+
+        internal static Rect CalculatePosition(
+            Rect owner,
+            Vector2 requestedMin,
+            Vector2 preferred,
+            float estimatedHeight,
+            ESAdvancedDialogPositionMode mode,
+            Vector2 customScreenPosition,
+            Vector2 positionOffset)
+        {
+            Rect centered = CalculateCenteredPosition(owner, requestedMin, preferred, estimatedHeight);
+            if (mode == ESAdvancedDialogPositionMode.CenterOwner)
+                return OffsetAndClamp(centered, owner, positionOffset);
+
+            Vector2 point;
+            switch (mode)
+            {
+                case ESAdvancedDialogPositionMode.OwnerTopLeft:
+                    point = new Vector2(owner.xMin, owner.yMax - centered.height);
+                    break;
+                case ESAdvancedDialogPositionMode.OwnerTopRight:
+                    point = new Vector2(owner.xMax - centered.width, owner.yMax - centered.height);
+                    break;
+                case ESAdvancedDialogPositionMode.OwnerBottomLeft:
+                    point = new Vector2(owner.xMin, owner.yMin);
+                    break;
+                case ESAdvancedDialogPositionMode.OwnerBottomRight:
+                    point = new Vector2(owner.xMax - centered.width, owner.yMin);
+                    break;
+                case ESAdvancedDialogPositionMode.CustomScreenPosition:
+                    point = customScreenPosition;
+                    break;
+                default:
+                    point = centered.position;
+                    break;
+            }
+            // CustomScreenPosition is already expressed in screen coordinates. A ShaderGUI
+            // button normally lives inside a narrow docked Inspector, so clamping against
+            // that owner would force a wide dialog to the Inspector's upper-left corner.
+            // Clamp explicit screen positions against the Unity main window instead.
+            Rect clampBounds = owner;
+            if (mode == ESAdvancedDialogPositionMode.CustomScreenPosition)
+            {
+                try
+                {
+                    Rect main = EditorGUIUtility.GetMainWindowPosition();
+                    if (main.width > 0f && main.height > 0f)
+                        clampBounds = main;
+                }
+                catch (Exception)
+                {
+                    // Keep the resolved owner bounds as a safe fallback for older Unity versions.
+                }
+            }
+            return OffsetAndClamp(new Rect(point + positionOffset, centered.size), clampBounds, Vector2.zero);
+        }
+
+        private static Rect OffsetAndClamp(Rect position, Rect bounds, Vector2 offset)
+        {
+            position.position += offset;
+            float minX = bounds.xMin + 12f;
+            float maxX = Mathf.Max(minX, bounds.xMax - position.width - 12f);
+            float minY = bounds.yMin + 12f;
+            float maxY = Mathf.Max(minY, bounds.yMax - position.height - 12f);
+            position.x = Mathf.Clamp(position.x, minX, maxX);
+            position.y = Mathf.Clamp(position.y, minY, maxY);
+            return position;
         }
 
         private Color GetToneAccent(ESDialogTone tone)
@@ -2935,6 +3038,8 @@ namespace ES
                 activeProgress = null;
             }
             ReleaseCustomContent();
+            ownerInteractionHold?.Dispose();
+            ownerInteractionHold = null;
             ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
             if (initialized && !completed)
                 TryComplete(false, true, null);

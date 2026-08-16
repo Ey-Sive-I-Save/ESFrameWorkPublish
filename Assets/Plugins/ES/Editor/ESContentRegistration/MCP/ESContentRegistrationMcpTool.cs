@@ -52,6 +52,21 @@ namespace ES
             [ToolParameter("Stable ordinal StringKey; never auto-trimmed or generated", Required = false)]
             public string stringKey { get; set; }
 
+            [ToolParameter("Base Item EnumKey for item.weapon/item.shot dual projection; zero means absent", Required = false, DefaultValue = "0")]
+            public int itemEnumKey { get; set; }
+
+            [ToolParameter("Base Item ordinal StringKey for item.weapon/item.shot dual projection", Required = false)]
+            public string itemStringKey { get; set; }
+
+            [ToolParameter("CAS value for the existing base Item EnumKey", Required = false, DefaultValue = "0")]
+            public int expectedCurrentItemEnumKey { get; set; }
+
+            [ToolParameter("CAS value for the existing base Item StringKey", Required = false)]
+            public string expectedCurrentItemStringKey { get; set; }
+
+            [ToolParameter("True when expected current base Item Key values are explicitly supplied", Required = false, DefaultValue = "false")]
+            public bool hasExpectedCurrentItemKey { get; set; }
+
             [ToolParameter("Expected target revision returned by inspect or validation", Required = false)]
             public string expectedLibraryRevision { get; set; }
 
@@ -94,7 +109,7 @@ namespace ES
             [ToolParameter("True when expected current Key values are explicitly supplied", Required = false, DefaultValue = "false")]
             public bool hasExpectedCurrentKey { get; set; }
 
-            [ToolParameter("auto, item.weapon or item.shot", Required = false, DefaultValue = "auto")]
+            [ToolParameter("auto, item, item.weapon or item.shot", Required = false, DefaultValue = "auto")]
             public string gameCoreRoute { get; set; }
 
             [ToolParameter("Bake run identifier used by status", Required = false)]
@@ -137,6 +152,11 @@ namespace ES
                     keyMode = ParseKeyMode(GetString(parameters, "keyMode", "key_mode")),
                     enumKey = GetInt(parameters, 0, "enumKey", "enum_key"),
                     stringKey = GetString(parameters, "stringKey", "string_key"),
+                    itemEnumKey = GetInt(parameters, 0, "itemEnumKey", "item_enum_key"),
+                    itemStringKey = GetString(parameters, "itemStringKey", "item_string_key"),
+                    expectedCurrentItemEnumKey = GetInt(parameters, 0, "expectedCurrentItemEnumKey", "expected_current_item_enum_key"),
+                    expectedCurrentItemStringKey = GetString(parameters, "expectedCurrentItemStringKey", "expected_current_item_string_key"),
+                    hasExpectedCurrentItemKey = GetBool(parameters, false, "hasExpectedCurrentItemKey", "has_expected_current_item_key"),
                     gameCoreRoute = GetString(parameters, "gameCoreRoute", "game_core_route"),
                     runId = GetString(parameters, "runId", "run_id")
                 };

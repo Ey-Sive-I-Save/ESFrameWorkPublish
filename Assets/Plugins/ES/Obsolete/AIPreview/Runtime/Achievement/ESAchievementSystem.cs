@@ -9,7 +9,7 @@ namespace ES.Obsolete.AIPreview.Achievement
     /// - 可通过配置条件 Key + 参数的方式实现数据驱动；
     /// - 运行时由 AchievementSystem 解释这些条件。
     /// </summary>
-    [CreateAssetMenu(menuName = "【ES】/已废弃/AIPreview/成就系统/AchievementDefinition")]
+    [CreateAssetMenu(menuName = "【ES】/示例/遗留兼容/AIPreview/成就系统/AchievementDefinition")]
     public class AchievementDefinition : ScriptableObject
     {
         public string Id;

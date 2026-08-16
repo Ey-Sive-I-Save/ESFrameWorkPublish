@@ -1,10 +1,10 @@
 # 装备定义与装配推进路线：EntityEquipmentDomain 与 Weapon 垂直切片
 
-**状态：现行目标契约；`EntityEquipmentDomain` 已确定为 Entity 正式第五 Domain，但运行时尚未接线。Weapon 作者链路与主攻击仲裁为 Verifying。最后核对：2026-08-12。**
+**状态：现行实现与验收边界；`EntityEquipmentDomain` 已接线为 Entity 正式第五 Domain，Inventory / Slot / Attachment / Effect 的最小垂直切片处于 Verifying。最后核对：2026-08-16。**
 
-## 已批准但尚未实现的目标
+## 已接线的正式边界
 
-`EntityEquipmentDomain` 是装备、背包、饰品和 Loadout 的正式域级权威，不再把这些生命周期继续扩张到 `EntityBasicCombatModule`。当前源码仍只有 Basic / AI / Buff / State 四个 Domain；在 `Entity.cs` 注册、生命周期、Prefab 作者链和 Unity 验收完成前，禁止把第五域写成已实现事实。
+`EntityEquipmentDomain` 是装备、背包、饰品和 Loadout 的正式域级权威，不再把这些生命周期继续扩张到 `EntityBasicCombatModule`。它已进入 `Entity.cs` 生命周期、两个角色模板和正式大黑塔 Variant；源码与 Prefab 存在已经验证，但 Equip/Holster/Attack、动画事件、IK 和近战伤害仍缺 PlayMode/Profiler/Player 证据。
 
 ```text
 Entity
@@ -12,7 +12,7 @@ Entity
 ├─ EntityAIDomain
 ├─ EntityBuffDomain
 ├─ EntityStateDomain
-└─ EntityEquipmentDomain                 <- 已批准目标，尚未接线
+└─ EntityEquipmentDomain                 <- 正式第五 Domain，当前 Verifying
    ├─ EntityEquipmentInventoryModule     <- 背包实例、数量、容器与所有权
    ├─ EntityEquipmentSlotModule          <- 装备槽、饰品槽、主副武器与 Loadout
    ├─ EntityEquipmentAttachmentModule    <- 手持/背挂/腰挂/临时挂点与过渡事务
@@ -34,7 +34,7 @@ Entity
 | `EntityStateDomain` / `StateMachine` | 动画生命周期、混合和 IK Pose 汇总 | 成为装备事实或背包权威 |
 | `StateFinalIKDriver` | 消费最终 IK Pose/实时目标并统一求解 | 接收 Equipment 对 Solver 的直接写入 |
 
-脚本应按上述类型拆分，禁止再创建同义的 `EquipmentManager`、`WeaponManager`、`LoadoutManager`、`AttachmentScheduler` 或把所有实现重新堆进一个 `EntityEquipmentModules.cs` 巨文件。兼容迁移期间旧 Combat 字段可暂时存在，但新功能不得继续写入旧权威。
+脚本按上述类型拆分，禁止再创建同义的 `EquipmentManager`、`WeaponManager`、`LoadoutManager`、`AttachmentScheduler` 或把所有实现重新堆进一个 `EntityEquipmentModules.cs` 巨文件。开发期硬切已经完成：旧 Combat 槽位字段、旧挂点字段和序列化转发不得恢复。
 
 ## Item 与 Weapon 双投影契约
 
@@ -50,7 +50,7 @@ ItemDataInfo
 - 一个作者 SO、两个运行时投影；背包解析链为 `ItemKey -> ItemRuntimeData -> WeaponKey -> WeaponRuntimeData`。
 - 双投影注入必须先全量预验证，再一次性提交。任一 Key 冲突、引用缺失或定义无效时，两张表都不得留下半提交结果。
 - RuntimeKey 只属于当前表生命周期，不进入 SO、存档或网络。存档和网络只保存稳定 ItemKey、WeaponKey、槽位与实例状态。
-- 当前 `ESItemConfigKey`、Item RuntimeData 和 Item 强类型表仍未落地；本节是后续实现合同，不是现有源码事实。
+- `ESItemInstanceTable` 已落地为固定容量正式实例表；Item 基础投影、Weapon/Shot 专项投影、冲突回滚与清表载荷释放已有 Unity EditMode 证据。本节的存档/网络边界仍是现行合同，RuntimeKey 不得持久化。
 
 ## 装配状态与动画事件协议
 
@@ -78,7 +78,7 @@ Equipment 只能提供稳定的握点、IK 目标和权重请求，不能直接�
 
 ## 当前事实
 
-项目现在有“武器定义 + 角色武器槽位 + 挂点绑定 + Combat 执行”的局部闭环，但不能把它称为完整装备系统：
+项目现在有“武器定义 + Item 实例 + Equipment Slot + Attachment + Combat 消费”的局部闭环，但不能把它称为完整装备玩法：
 
 ```text
 ItemDataInfo (ItemKind.Weapon)
@@ -86,18 +86,23 @@ ItemDataInfo (ItemKind.Weapon)
   -> ESWeaponGameCoreTable / ESWeaponConfigKeyTable
   -> ESWeaponRuntimeData.sharedData
 
-EntityBasicCombatModule.weaponSlots
-  -> WeaponSlot.weaponKey
+EntityEquipmentInventoryModule
+  -> ESItemInstanceTable / ESInstanceHandle
+EntityEquipmentSlotModule.weaponSlots
+  -> EntityEquipmentWeaponSlot.weaponKey
   -> EntityWeaponBinding
-  -> 手持/背挂/瞄准/开火/切枪状态
+EntityEquipmentAttachmentModule
+  -> 作者化 Character Socket / 过渡令牌
+EntityBasicCombatModule
+  -> 只读消费活动槽与 WeaponDefinition
 ```
 
 - `ItemDataInfo` 是 Weapon 作者定义入口；必须使用 `ItemWeaponDataBlock`、显式 `ESWeaponConfigKey`、`ItemWeaponSharedData` 和 `ItemWeaponVariableData`。
 - `ESWeaponGameCoreTable.Inject(...)` 会检查 SharedData、Key 和 `ValidateDefinition`；KeyName 只用于编辑器/策划识别，不能作为运行时身份。
-- `EntityBasicCombatModule` 当前仍负责槽位顺序、装备/收枪/切换、枪械开火、状态过渡和装备 Tag，这是待迁移事实；目标权威为 `EntityEquipmentDomain`，新装备生命周期不得继续扩张 CombatModule。武器平衡参数同样不得塞回 CombatModule。
+- `EntityBasicCombatModule` 不再序列化持有槽位顺序或装备 Tag；它通过 Equipment Slot 读取活动武器并执行攻击/开火。装备事务、挂点、显隐和 Effect Lease 由 Equipment 各 Module 持有。
 - `EntityBasicCombatModule.TryExecutePrimaryAttack()` 是当前唯一主攻击执行入口；`EntityAIDomain` 只消费一次 Attack，不再用“先尝试 melee、未注册再回退枪械”的注册状态分支做武器仲裁。
 - `EntityPrimaryAttackSelector` 返回“执行类别 + 攻击来源”：Action 可承载徒手、近战武器和双持组合技；只有远程且 `fire.enabled` 才选择 WeaponFire。它不消费资源、不执行 Action，也不操作 Transform/KCC/物理；投掷、法器等后续能力应扩展明确选择结果，不能回到 AI Domain 堆第二套分支。
-- `EntityWeaponBinding` 负责每把武器的手持、背挂、枪口、瞄准目标、双手握点、状态 AniInfo 和手持 Tag；不要把偏移写进 Humanoid 右手骨。
+- `EntityWeaponBinding` 只负责每把武器的 GripPivot、OffHandGrip、Muzzle、AimReference 与 PresentationRoot 等本地参考；角色手持、背挂和临时挂点来自 `EntityTransformMapping` 的作者化 String Socket。不要把偏移写进 Humanoid 右手骨。
 - `ESWeaponSceneTemplate` 只创建结构和挂点，不负责真实开火、弹药、命中或伤害。
 
 ## 当前垂直切片：大长条近战武器
@@ -106,11 +111,11 @@ EntityBasicCombatModule.weaponSlots
 
 - 定义资产 Key 为 `weapon.melee.long_bar`，使用 `ItemKind.Weapon`、`ItemWeaponKind.Melee`、显式 Weapon StringKey；`fire` 与 `recoil` 均关闭，不把近战伪装为枪械 Hitscan。
 - 作者 Prefab 位于 `Assets/ESNormalAssets/WeaponPrototypes/大长条.prefab`，根节点显式包含 `Item`、`ESWeaponSceneTemplate` 与 `EntityWeaponBinding`；模型是无 Collider 的长条 Cube，没有 Rigidbody、2D 物理组件或第二运动后端。
-- 正式大黑塔 Variant 已由 `ESFormalHertaPlayerVariantBuilder` 装配唯一 `EntityBasicCombatModule` 与唯一 Weapon Slot；武器作为嵌套 Prefab 放在 `06_装备_Equipment/EquipmentVisuals`，不依赖场景实例手工覆盖。
-- 大长条模板身份已固定为 `weapon.melee.long_bar / 大长条 / Custom`；`ShellEject`、`Magazine`、`Chamber` 等标准引用与双手 Binding/攻击参考/切换辅助目标均由升级入口补齐并受严格校验。正式作者验证会拒绝缺失引用、Prefab 外部引用、重复模板/Binding，以及 Rigidbody、Rigidbody2D、Collider2D。
-- 静态 Prefab 核验已确认 Weapon Binding、挂点和槽位存在；`ES_Logic.csproj` 与 `ES_Logic.Editor.csproj` 均取得 `0 warning / 0 error`。`EntityPrimaryAttackSelectorTests` 已覆盖徒手、主副手来源、显式双持 Action，以及投掷/法器即使误开 `fire.enabled` 也不得落入 Hitscan；这只证明攻击类型选择规则，不代表 PlayMode 中 Action、命中或伤害已可用。
+- 正式大黑塔 Variant 已由 `ESFormalHertaPlayerVariantBuilder` 装配唯一 `EntityBasicCombatModule`、唯一 Equipment Domain 与唯一 Equipment Weapon Slot；武器作为嵌套 Prefab 放在 `06_装备_Equipment/EquipmentVisuals`，不依赖场景实例手工覆盖。
+- 大长条模板身份固定为 `weapon.melee.long_bar / 大长条 / Custom`；硬重建后武器 Prefab 不再保存 `HoldSocket/BackSocket`，本地参考只由 `EntityWeaponBinding` 提供。正式作者验证拒绝缺失引用、Prefab 外部引用、重复模板/Binding，以及 Rigidbody、Rigidbody2D、Collider2D。
+- 最新证据为：Unity 2022.3.45f1 完成脚本导入与 Domain Reload；实例表、Item 转移、Attachment 与 Equipment 事务四组定向 EditMode Job `9247373e6bb04b41a49bdc9532dfbad2` 为 27/27，统一内容注册 Job `e81aeb064b8a4b70ac1fc889b98c04e5` 为 19/19；正式 Weapon Slot 会校验实例 Weapon 投影 RuntimeKey 与已注入 WeaponKey 一致。这仍不代表 PlayMode 中 Action、动画事件、命中或伤害已可用。
 - 生成器已按扩展性门禁加固：重复执行只验证并复用现有作者资产，不重置已有配置；固定路径或稳定 Key 若属于其他资产会硬失败；角色构建器只按 `weapon.melee.long_bar` 定向 upsert，不再 `Clear()` 其他武器槽位。Combat 的通用枪械入口保持开启，具体武器是否射击由各自 `WeaponDefinition.fire.enabled` 决定。
-- 正式大黑塔视觉迁移会在构建器内识别并禁用旧预览根下的 `Cube1 / Cube1 (1) / Cube1 (2)`；仅当对象仍是直接子节点且具有 `MeshFilter + MeshRenderer` 时才处理，名称与真实模型冲突会硬失败。不得在生成后的 Prefab 或场景实例上手工修这三个对象。
+- 正式大黑塔 Builder 只读取独立 `CharacterPresentation/大黑塔_表现.prefab`；旧 `EditorTools/大黑塔.prefab` 已退出正式输入链路，Builder 中不存在 Legacy Preview 清洗或旧业务组件迁移路径。
 
 ## 生成器扩展性与隔离门禁
 
@@ -125,15 +130,15 @@ EntityBasicCombatModule.weaponSlots
 ## 当前语义冲突风险
 
 - `enableGunFire`、`fireOnAttackInput`、`TryFireWeapon()` 只属于远程 WeaponFire 执行门禁，不能解释为所有武器的主攻击开关。主攻击总入口是 `TryExecutePrimaryAttack()`。
-- `EntityWeaponBinding.fireOrigin`、`fireStateKey` 与 `ESWeaponSceneTemplate.ballistic` 是远程/弹道作者字段。大长条当前保留这些标准模板引用只是为了结构完整和未来工具兼容，不代表近战 Action 已经使用枪口、膛室或开火状态；禁止把它们误报成近战命中挂点。
+- `EntityWeaponBinding.Muzzle` 与 `ESWeaponSceneTemplate.ballistic` 是远程/弹道作者参考。大长条保留统一模板中的弹道节点不代表近战 Action 已使用枪口、膛室或开火状态；禁止把它们误报成近战命中挂点。
 - `ESWeaponTemplateFireKind.Custom` 只是作者模板的自定义执行提示，不等于 `ItemWeaponKind.Melee`，也不替代正式 WeaponDefinition。模板身份和 GameCore 武器类型必须分别校验。
 - `WeaponFireDefinitionData` 出现在所有 Weapon SharedData 中是统一 Schema 的可选能力块；对近战必须保持 `enabled=false`。字段存在不代表运行时已经接入枪械。
-- `EntityBasicCombatModule` 目前同时承载通用装备切换与远程执行字段，这是既有聚合债务；后续拆分必须以实际生命周期和执行权威为依据，不能仅靠重命名再包一层 `WeaponManager`、`EquipmentScheduler` 或 `AttackDispatcher`。
+- `EntityBasicCombatModule` 仍是攻击/开火执行者，但不再拥有装备事实；后续扩展必须保持 Equipment 事务与 Combat 执行单向消费，不能重新合并成 `WeaponManager`、`EquipmentScheduler` 或 `AttackDispatcher`。
 
 ## 普攻生命周期、徒手与双持扩展边界
 
 - 没有活动武器槽位时，角色只有在 `allowUnarmedPrimaryAttack=true` 且 `unarmedPrimaryAttackAction` 有效时才能徒手普攻。活动槽位存在但缺 Root、Binding 或 Weapon Key 属于装配错误，必须失败；禁止把坏槽位静默降级成徒手。
-- Action 型武器的普攻 Action 按“当前 `WeaponSlot.primaryAttackActionOverride` → `ItemWeaponSharedData.primaryAttackAction` → 角色 `defaultPrimaryAttackAction`”解析。旧序列化字段通过 `FormerlySerializedAs` 迁移；覆盖只改变 Action 内容，不得改变 WeaponDefinition 的正式武器类型。
+- Action 型武器的普攻 Action 按“当前 `EntityEquipmentWeaponSlot.primaryAttackActionOverride` → `ItemWeaponSharedData.primaryAttackAction` → 角色 `defaultPrimaryAttackAction`”解析。开发期硬切不保留旧字段转发；覆盖只改变 Action 内容，不得改变 WeaponDefinition 的正式武器类型。
 - `EntityPrimaryAttackEvent` 使用稳定的 `attackId` 发出 `Started -> HitResolved -> Finished` 生命周期，只描述攻击事实与来源，不声明任何具体玩法效果、数值、资源或触发规则。后续系统可按自身需求选择是否订阅，Combat 不提前规定实现方式。
 - `TryExecutePrimaryAttack()` 返回成功或 Action 进入输入缓冲，只表示请求已接收，不等于攻击已经 `Started`。被覆盖且从未启动的缓冲攻击直接丢弃关联上下文；已经开始的攻击在完成、取消、打断、禁用或退池时必须收到 `Finished`，保证底层生命周期闭合。
 - Combat 不保存后续玩法系统的状态，也不决定扩展效果。若未来出现具体需求，应由实际所有者通过现有生命周期接入；不得提前把尚无消费者的玩法字段塞进 CombatModule。
@@ -142,18 +147,19 @@ EntityBasicCombatModule.weaponSlots
 
 以下阻塞仍未解除，不得据此宣称已可玩：
 
-1. 既有 `Assets/ESNormalAssets/Data/Group/Item/新建物品数据组1566.asset` 中 `信息数据键2` 的 Shot 子定义原先缺少显式 Key，已补为唯一 `shot.test.data_key_2`；但 Unity 正式 Item GameCore 全量重建尚未取得回执，因此仍不能宣称“大长条”已注入正式 Weapon Table。不得删除该测试数据，也不得复用已有的 `数据键2`。
-2. 本次生命周期枚举改名之前曾取得 Unity Editor 0 error、Selector 11/11、Action 脉冲/缓冲覆盖/取消清理定向用例 3/3、Weapon 默认注入用例 1/1 的历史基线；该基线不覆盖本次命名修订，必须重新触发 Unity 导入、域重载并复跑定向测试后才能恢复为当前证据。本轮没有进入 PlayMode。Equip、Holster、Attack 的实际 Action 消费、Tag、近战命中/伤害仍未完成运行验收，不能把 EditMode 契约测试写成“已可玩”。
+1. 既有 `Assets/ESNormalAssets/Data/Group/Item/新建物品数据组1566.asset` 中 `信息数据键2` 的 Shot 子定义原先缺少显式 Key，已补为唯一 `shot.test.data_key_2`；Unity 正式 Item GameCore 全量重建已通过，实际注入 Item 3 / Shot 2 / Weapon 1。不得删除该测试数据，也不得复用已有的 `数据键2`。
+2. 当前已取得 Unity 编译、Domain Reload 和装备/实例表定向 EditMode 27/27 证据，但没有进入 PlayMode。Equip、Holster、Attack 的实际 Action 消费、动画事件、Tag、IK 和近战命中/伤害仍未完成运行验收，不能把 EditMode 契约测试写成“已可玩”。
 3. 当前 `TryFireWeapon()` 的 Hitscan 路径不等于近战攻击实现。大长条主动攻击必须继续走既有 `ESInputService -> EntityAIDomain -> EntityBasicCombatModule -> Action/Combat` 入口；若近战 Action、命中采样或伤害消费尚缺，应作为下一阶段补齐，不得绕过 Entity KCC 直接写 Transform、Motor 或 Rigidbody。
-4. `ESWeaponRuntimeData` 仍直接持有 `GameObject prefab` 与 `UnityEngine.Object extraAsset`，这是既有资源边界迁移债务；正式发布前应迁移到类型化 AssetKey/Provider，不应在新内容中继续扩大裸对象协议。
-5. `EntityBasicCombatModule` 的自动补齐 `EntityWeaponBinding` 是运行时兜底，不是作者验收替代品；正式武器 Prefab 应显式带有正确 Binding 和挂点。
+4. `ESWeaponRuntimeData.prefabKey` 已是类型化 `ESAssetReferPrefabConfigKey`，默认 Shot 已是 `ESShotConfigKey`；仍需 Catalog、Provider、Scope 与发布证据，禁止回退到裸 `GameObject/Object` 或字符串 Shot Key。
+5. `EntityWeaponBinding` 和角色业务 Socket 都必须作者化；正式运行时不得自动补 Binding、回退角色根或创建隐藏 Socket。
+6. `ESActionRuntime.Tick()` 在运行中发现当前定义的 `phases` 被清空时会直接返回，可能保留 `isRunning=true`。注入后的 Action 定义必须视为不可变；若允许 Catalog 热切换，必须先显式取消/结束旧 Runtime，并补定义卸载中的生命周期测试。
 
 ## 推荐推进顺序
 
 ### 阶段 0：冻结边界与迁移权威
 
-- 先以 `weapon.melee.long_bar` 收口近战垂直切片；允许建立最小 `EntityEquipmentDomain` 骨架和迁移适配，但在垂直切片验证前不一次性实现背包 UI、枪械附件、网络同步或配件万能管理器。
-- 迁移期必须保持单一写权威：同一阶段要么由旧 Combat 适配器提交，要么由 Equipment 提交，禁止两边同时修改槽位、挂点、Tag 或过渡状态。
+- `weapon.melee.long_bar` 已完成开发期硬切：Equipment 是槽位、挂点、显隐与装备 Effect 的唯一写权威，Combat 只读消费；禁止恢复旧 Combat 字段、双读或迁移适配器。
+- 下一步不一次性实现背包 UI、枪械附件、网络同步或配件万能管理器；每类装备按独立垂直切片推进。
 - 近战攻击走既有 Action/Combat 意图入口；枪械 Hitscan 与 Projectile/Shot 是后续独立切片，不能借它们伪造近战可玩证据。
 - 修改构建器、Prefab 或资产前退出 PlayMode，并在 `ES/Bak` 留 before 基线。
 
@@ -169,14 +175,14 @@ EntityBasicCombatModule.weaponSlots
 
 1. 通过 `【ES】/内容制作/武器模板/创建通用武器场景模板` 创建结构。
 2. 把真实模型放进 `30_表现资源/ModelRoot`，确认 `Muzzle`、`RayOrigin`、`RightHandGrip`、`LeftHandGrip`、`AimReference`、`RecoilPivot`。
-3. 在武器根显式挂 `EntityWeaponBinding`，配置 `handMount`、`holsterMount`、`fireOrigin`、`aimTarget`、双手握点和状态映射。
+3. 在武器根显式挂 `EntityWeaponBinding`，配置 `GripPivot`、`OffHandGrip`、`Muzzle`、`AimReference` 和 `PresentationRoot`；武器 Prefab 禁止保存角色 Hand/Back Socket。
 4. 让作者 Prefab 的 `weaponKey` 与 ItemDataInfo 的显式 Key 一致；不使用显示名、Prefab 名或层级名代替 Key。
 
 ### 阶段 3：装配到正式玩家 Variant
 
-- 在 `ESFormalHertaPlayerVariantBuilder.ConfigurePlayerModules(...)` 中按既有 Basic Domain 入口装配 Combat Module；禁止直接在场景实例临时添加。
-- 通过 `WeaponSlot` 配置 Weapon Root 与 Weapon Key；正式 Variant 只保留需要的武器槽位，不空挂一套“万能装备组件”。
-- `WeaponSocket` 由 `EntityTransformMapping` 缓存；运行时通过 `EntityWeaponBinding` 解析手持/背挂，不重新扫描 Humanoid 骨骼。
+- 在 `ESFormalHertaPlayerVariantBuilder` 中同时装配 Equipment 四模块与 Combat 执行模块；禁止直接在场景实例临时添加。
+- 通过 `EntityEquipmentSlotModule` 配置 Weapon Root 与 Weapon Key；Combat 不再序列化持有槽位。
+- `EntityTransformMapping` 缓存 MainHand / OffHand / PrimaryBack / SecondaryBack / Hip / TemporaryHand Socket；Attachment 根据过渡状态选择 Socket，不重新扫描 Humanoid 骨骼。
 
 ### 阶段 4：接通玩家输入与运行态消费
 
@@ -185,7 +191,8 @@ Input System / ESInputService
   -> EntityPlayerInputWriteModule
   -> EntityAIDomain
   -> Equip/Switch/Holster/Attack intent
-  -> EntityBasicCombatModule
+  -> EntityEquipmentDomain（槽位/挂点/显隐/Effect）
+  -> EntityBasicCombatModule（攻击/开火执行）
   -> Weapon Key -> ESWeaponRuntimeData.sharedData
   -> State / IK / Hitscan
 ```
@@ -200,24 +207,26 @@ Input System / ESInputService
 
 ## 装备与武器的边界
 
-当前源码中的“装备”仍只落到武器槽位和武器挂载；正式目标已经确定为 `EntityEquipmentDomain`。护甲、饰品、背包和 Loadout 接入时，必须先定义稳定 ItemKey/类型化定义 Key、实例状态和所有权/Lease，再接入对应 Module；不得把所有类型塞进 `EntityBasicCombatModule`，也不得绕过第五域创建平行的万能 `EquipmentManager`。
+当前源码已具备 Item 实例、Inventory、Weapon Slot、Attachment 与 Effect 的最小事务闭环。护甲、饰品、堆叠、预留、交易、背包 UI 和完整 Loadout 尚未实现；接入时必须定义稳定 ItemKey/类型化定义 Key、实例状态和所有权/Lease，不得把所有类型塞进 `EntityBasicCombatModule`，也不得绕过第五域创建平行的万能 `EquipmentManager`。
 
 推荐安全迁移顺序：
 
-1. 先增加无行为接管的 Domain/Module 骨架、生命周期和只读查询，验证 Entity 注册、对象池重绑和 Inspector。
-2. 把 WeaponSlot 数据所有权迁到 SlotModule，旧 Combat 通过只读适配器查询；此阶段不改变攻击入口。
-3. 把 Equip/Holster/Switch 与挂点提交迁到 AttachmentModule，引入三重版本校验和作者 Socket 验证。
-4. 把装备 Tag/ValueChange/Permit 迁到 EffectModule，以 source handle 成对释放，BuffDomain 仍是效果权威。
-5. 增加 ItemKey 与 Item GameCore 双投影事务，再接 InventoryModule；没有稳定 Item 身份前不做存档或网络协议。
-6. 最后接饰品、护甲、背包 UI、枪械二级附件和网络/存档，每类单独做垂直验收。
+1. 已完成：第五 Domain、四模块生命周期、角色模板和正式 Variant 接线。
+2. 已完成：Weapon Slot 权威迁入 SlotModule，Combat 只读消费活动槽。
+3. 已完成源码与 EditMode：Attachment 使用 TransitionId + EntityGeneration + MappingGeneration + TargetRevision，并拒绝缺失作者 Socket。
+4. 已完成最小切片：Effect 以装备来源持有 Tag Lease；后续 ValueChange/Permit/Buff 来源仍需各自垂直测试。
+5. 已完成最小切片：Item 固定容量实例表、Inventory 与装备/卸下事务；Item/Weapon GameCore 双投影原子注入已有冲突回滚、清表释放和正式资产全量重建证据。
+6. 下一步：动画事件驱动过渡、最终 IK Pose、近战命中/伤害的 PlayMode/Profiler/Player 验收，再接饰品、护甲、堆叠、预留、UI、枪械二级附件和网络/存档。
 
 ## 验收清单
 
 ```text
 [x] 大长条 Weapon ItemDataInfo 独立存在，ItemKind/Shared/Variable/ConfigKey 静态一致
-[ ] ESWeaponGameCoreTable 注入成功，ValidateDefinition 通过
-[x] 大长条 Weapon Prefab 显式 EntityWeaponBinding，挂点无临时物理组件
-[x] 正式玩家 Variant 由构建器装配 Combat Module 与 WeaponSlot
+[x] ESWeaponGameCoreTable 注入成功，ValidateDefinition 通过（全量重建 Item 3 / Shot 2 / Weapon 1）
+[x] 大长条 Weapon Prefab 显式 EntityWeaponBinding，无 HoldSocket/BackSocket 与临时物理组件
+[x] 正式玩家 Variant 由构建器装配 Equipment 四模块、Combat 与 Equipment Weapon Slot
+[x] 两个角色模板和正式大黑塔使用作者化 Hand/Back/Hip/Temporary Socket，无 WeaponSocket
+[x] ESInstanceTable / Item / Attachment / Equipment 事务定向 EditMode 27/27
 [x] Attack 输入只经现有输入链路进入单一 Combat 执行入口，近战/枪械不再按 Action 注册状态互相回退
 [ ] Equip/Switch/Holster/Attack 的 PlayMode 实际消费均来自现有输入链路
 [ ] 近战 Action、命中采样与伤害均来自现有 Combat/Action 链路
@@ -234,6 +243,6 @@ Input System / ESInputService
 - 禁止内容构建器调用 `weaponSlots.Clear()` 清除其他内容切片，或仅凭同名 Transform 删除无法证明所有权的对象。
 - 禁止在 `EntityAIDomain` 或 Input 层恢复“先近战、失败再枪械”的回退链；攻击类型必须由当前 WeaponDefinition 选择。
 - 禁止“创建”菜单重复执行时重置已存在的作者参数、改绑其他 Prefab，或覆盖冲突 Key。
-- 禁止在首个 Weapon 垂直切片之前设计万能装备系统、配件系统或背包同步协议。
-- 禁止把 `EntityEquipmentDomain` 的批准目标描述成当前已经接线、已经可玩或已经通过 Unity 验收。
+- 禁止恢复 `DefaultTransformKey.Weapon`、`WeaponSocket`、`HoldSocket/BackSocket`、Combat WeaponSlot、Legacy Preview 输入或 `FormerlySerializedAs` 兼容转发。
+- 禁止把 `EntityEquipmentDomain` 已接线描述成已经可玩、商业级完成或通过发布验收。
 - 禁止以模板存在、Key 表存在或静态编译通过宣称武器已可玩。

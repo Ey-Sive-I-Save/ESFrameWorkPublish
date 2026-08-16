@@ -523,6 +523,8 @@ namespace ES.EditorInternal
 
         private sealed class ESInputActionBindingImportWindow : ESSinglePageIMGUIWindow<ESInputActionBindingImportWindow>
         {
+            protected override bool ESWindow_SupportsSemiSleep => false;
+
             private SerializedObject targetObject;
             private string bindingPropertyPath;
             private Holder holder;

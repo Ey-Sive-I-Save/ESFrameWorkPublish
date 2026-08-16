@@ -41,6 +41,7 @@ namespace ES
         private IReadOnlyList<Option> options = Array.Empty<Option>();
         private readonly List<Button> optionButtons = new List<Button>();
         private int keyboardIndex;
+        private IDisposable hostInteractionHold;
 
         public static bool Open(VisualElement anchor, EditorWindow hostWindow, string title,
             IReadOnlyList<Option> choices, string hint = null, Vector2? windowSize = null)
@@ -69,9 +70,22 @@ namespace ES
             popup.titleContent = new GUIContent(popup.popupTitle);
             popup.minSize = size;
             popup.maxSize = size;
-            popup.ShowAsDropDown(anchorRect, size);
-            popup.Focus();
-            return true;
+            popup.hostInteractionHold = ESWindowFoundation.HoldInteraction(
+                hostWindow,
+                "ESCompactChoicePopup");
+            try
+            {
+                popup.ShowAsDropDown(anchorRect, size);
+                popup.Focus();
+                return true;
+            }
+            catch
+            {
+                popup.ReleaseHostInteractionHold();
+                if (popup != null)
+                    popup.Close();
+                throw;
+            }
         }
 
         public void CreateGUI()
@@ -136,7 +150,14 @@ namespace ES
         private void OnDisable()
         {
             rootVisualElement.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
+            ReleaseHostInteractionHold();
             EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+        }
+
+        private void ReleaseHostInteractionHold()
+        {
+            hostInteractionHold?.Dispose();
+            hostInteractionHold = null;
         }
 
         private void OnKeyDown(KeyDownEvent evt)

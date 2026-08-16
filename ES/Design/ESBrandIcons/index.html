@@ -1,0 +1,34 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ES Brand Icons · Review Batch 02</title>
+<style>
+  :root { color-scheme: dark; --bg:#15191f; --card:#20262e; --card-hover:#293541; --text:#e8edf4; --muted:#9da8b8; --accent:#63b6e8; --selected:#68d391; --border:#303945; --state-bg:#182028; --hover-bg:#203848; --selected-bg:#1e382d; }
+  body.light { color-scheme: light; --bg:#eef2f6; --card:#ffffff; --card-hover:#f3f8fc; --text:#1d2733; --muted:#647386; --accent:#1976a8; --selected:#27834f; --border:#cbd5df; --state-bg:#e9f0f5; --hover-bg:#dceef8; --selected-bg:#e0f2e7; }
+  * { box-sizing:border-box; } body { margin:0; padding:32px; background:var(--bg); color:var(--text); font:14px/1.4 system-ui, sans-serif; }
+  h1 { margin:0 0 6px; font-size:22px; } p { margin:0 0 24px; color:var(--muted); }
+  .toolbar { display:flex; gap:8px; margin:-8px 0 22px; } button { border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--text); padding:6px 10px; cursor:pointer; } button:hover { border-color:var(--accent); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; max-width:1000px; }
+  .card { min-height:170px; padding:18px; border:1px solid var(--border); border-radius:12px; background:var(--card); display:flex; flex-direction:column; justify-content:space-between; transition:background .15s,border-color .15s; }
+  .card:hover { background:var(--card-hover); border-color:var(--accent); }
+  .icons { display:flex; align-items:center; gap:16px; color:var(--accent); }
+  .icon { width:32px; height:32px; display:block; object-fit:contain; filter:brightness(0) saturate(100%) invert(70%) sepia(32%) saturate(1044%) hue-rotate(163deg) brightness(94%) contrast(89%); }
+  .icon.small { width:16px; height:16px; } .icon.large { width:48px; height:48px; }
+  .states { display:flex; align-items:center; gap:12px; margin-top:14px; padding-top:12px; border-top:1px solid var(--border); }
+  .states span { display:grid; place-items:center; width:28px; height:28px; border-radius:7px; color:var(--accent); background:var(--state-bg); }
+  .states span.hover { color:var(--accent); background:var(--hover-bg); }
+  .states span.selected { color:var(--selected); background:var(--selected-bg); }
+  .states .icon { width:18px; height:18px; }
+  .states span.hover .icon { filter:brightness(0) saturate(100%) invert(82%) sepia(20%) saturate(1095%) hue-rotate(166deg) brightness(102%) contrast(101%); }
+  .states span.selected .icon { filter:brightness(0) saturate(100%) invert(53%) sepia(26%) saturate(1077%) hue-rotate(93deg) brightness(91%) contrast(87%); }
+  code { color:var(--muted); font-size:12px; }
+</style>
+<h1>ES Brand Icons · Review Batch 02</h1>
+  <p>统一 24×24、currentColor、主轮廓 / 结构层 / 强调面；下面展示 16 / 32 / 48px 缩放及默认、悬停、选中染色。</p>
+<div class="toolbar"><button type="button" onclick="document.body.classList.remove('light')">深色皮肤</button><button type="button" onclick="document.body.classList.add('light')">浅色皮肤</button></div>
+<div class="grid">
+  <script>
+    const names = ['workbench','content','config','assets','build','diagnostics','automation','agent','scene','data','font','audio','graph','inspector','settings','package'];
+    const icon = (n, cls='') => `<img class="icon ${cls}" src="${n}.svg" alt="${n}">`;
+    document.write(names.map(n => `<div class="card"><div class="icons">${icon(n,'small')}${icon(n)}${icon(n,'large')}</div><code>${n}.svg</code><div class="states"><span>${icon(n)}</span><span class="hover">${icon(n)}</span><span class="selected">${icon(n)}</span></div></div>`).join(''));
+  </script>
+</div>

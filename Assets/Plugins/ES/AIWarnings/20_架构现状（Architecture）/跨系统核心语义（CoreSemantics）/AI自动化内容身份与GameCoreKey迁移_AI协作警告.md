@@ -20,7 +20,7 @@ Key 不标识耐久、冷却、弹药、目标、仇恨、当前阶段等实例�
 ## 当前迁移事实
 
 - `ActionTemplateDataInfo` 已存在 `ESActionConfigKey`、Group、注入入口、RuntimeTable 和运行消费者，但 `comboTransitions.targetActionId`、`cancelRules.targetActionId` 仍是字符串，尚未完成跨 Action 稳定引用迁移。
-- Weapon 已通过 `ItemDataInfo`、`ESWeaponConfigKeyTable` 和运行消费者形成部分内容链，但 `ItemWeaponSharedData.defaultShotKey` 仍是字符串；`ESWeaponRuntimeData` 仍直接持有 `GameObject prefab` 与 `Object extraAsset`，属于待迁移资源边界。
+- Weapon 已通过 `ItemDataInfo`、`ESWeaponConfigKeyTable` 和运行消费者形成部分内容链；`ItemWeaponSharedData.defaultShot` 已使用强类型 `ESShotConfigKey`，`ESWeaponRuntimeData.prefabKey` 已使用 `ESAssetReferPrefabConfigKey`，不再保存 `extraAsset`。这证明字段迁移，不等于完整资源发布闭环已验收。
 - `ESSkillTrackConfigKey` 与 `ESSkillTrackConfigKeyTable` 当前只提供可查询身份和元数据；`ESSkillTrackRuntimeData` 尚未绑定真实轨道定义，`SkillTrackProcessInfo` 也没有独立稳定 Key 或 `IGameCoreSO` 注入入口。因此当前只能视为 Identity Scaffold，不能宣称已形成独立 GameCore 内容定义。
 - `SkillDefinitionDataInfo` 与 `ESSkillRuntimeData` 仍直接持有 `SkillTrackProcessInfo`、`StateAniDataInfo`；`linkedSkills` 仍保存 `SkillDefinitionDataInfo` 对象引用，`tags` 仍是字符串列表。其 `casterTagCondition` 已使用现有稳定 Tag 条件，后续 Tag 迁移应复用该体系。
 
@@ -40,7 +40,7 @@ Key 不标识耐久、冷却、弹药、目标、仇恨、当前阶段等实例�
 
 以下做法只能视为迁移债务，禁止作为新内容模板：
 
-- 使用 `targetActionId`、`defaultShotKey`、字符串 Tag 或资产名称表达跨定义身份。
+- 使用 `targetActionId`、字符串 Tag 或资产名称表达跨定义身份；Weapon 默认 Shot 不得退回旧字符串协议。
 - 让 RuntimeData 直接以 Prefab、`GameObject`、`UnityEngine.Object` 或作者 SO 作为 Player 内容身份与加载入口。
 - 只新增 Key、空 RuntimeTable 或占位 DTO，就宣称领域内容链已完成。
 - 为尚无正式定义和消费者的 Behavior、Perception、Targeting 预建万能 Key。
@@ -78,7 +78,7 @@ Key 不标识耐久、冷却、弹药、目标、仇恨、当前阶段等实例�
 ## 下一步
 
 1. 冻结引用迁移格式、旧值到新 Key 的可证明映射和失败策略。
-2. 将 Action 的连段/取消目标迁移为可空 `ESActionConfigKey`，将 Weapon 的默认 Shot 迁移为强类型 `ESShotConfigKey`。
+2. 将 Action 的连段/取消目标迁移为可空 `ESActionConfigKey`；保持 Weapon 默认 Shot 的 `ESShotConfigKey` 与 Prefab 的类型化 AssetRefer，不得回退。
 3. 裁决 SkillTrack 独立定义资格，再迁移 Skill 的 Track、State、LinkedSkill 与 Tag 引用。
-4. 按已设计的 AssetKey + Provider 入口迁移 Weapon 资源引用，不得只删除旧字段。
+4. 对 Weapon 的类型化 AssetRefer 继续补齐 Catalog、Provider、Scope 与发布证据，不把字段迁移冒充资源闭环完成。
 5. 用首把近战武器完成 `Weapon -> Action -> 表现编排 -> Audio/VFX AssetKey -> Tag -> Runtime Consumer` 垂直切片，并分别记录静态、Unity、PlayMode、Player 和发布证据。

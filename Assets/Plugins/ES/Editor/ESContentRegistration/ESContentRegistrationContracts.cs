@@ -56,6 +56,11 @@ namespace ES
         public ESContentStableKeyMode keyMode;
         public int enumKey;
         public string stringKey = string.Empty;
+        public int itemEnumKey;
+        public string itemStringKey = string.Empty;
+        public int expectedCurrentItemEnumKey;
+        public string expectedCurrentItemStringKey = string.Empty;
+        public bool hasExpectedCurrentItemKey;
         public string gameCoreRoute = string.Empty;
 
         public string runId = string.Empty;
@@ -86,6 +91,10 @@ namespace ES
         public string stringKey = string.Empty;
         public int currentEnumKey;
         public string currentStringKey = string.Empty;
+        public int itemEnumKey;
+        public string itemStringKey = string.Empty;
+        public int currentItemEnumKey;
+        public string currentItemStringKey = string.Empty;
         public string groupKey = string.Empty;
 
         public string targetRevision = string.Empty;

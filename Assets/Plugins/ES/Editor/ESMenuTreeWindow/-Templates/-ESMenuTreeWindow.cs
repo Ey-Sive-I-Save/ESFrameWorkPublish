@@ -19,6 +19,9 @@ namespace ES {
         private static readonly Dictionary<string, Texture> Cache =
             new Dictionary<string, Texture>(StringComparer.Ordinal);
 
+        private static readonly Dictionary<string, Texture> BrandCache =
+            new Dictionary<string, Texture>(StringComparer.Ordinal);
+
         internal static Texture Resolve(string iconName)
         {
             if (string.IsNullOrWhiteSpace(iconName))
@@ -34,6 +37,48 @@ namespace ES {
                 icon = EditorGUIUtility.Load("Icons/DefaultAsset Icon.png") as Texture;
             Cache[normalized] = icon;
             return icon;
+        }
+
+        internal static Texture ResolveBrand(string path)
+        {
+            string iconName = ResolveBrandName(path);
+            if (string.IsNullOrEmpty(iconName))
+                return null;
+            if (BrandCache.TryGetValue(iconName, out Texture cached))
+                return cached;
+
+            Texture icon = ES.EditorInternal.ESEditorPresentation.LoadESBrandIcon(iconName);
+            BrandCache[iconName] = icon;
+            return icon;
+        }
+
+        private static string ResolveBrandName(string path)
+        {
+            string key = (path ?? string.Empty).ToLowerInvariant();
+            if (ContainsAny(key, "agent", "协作")) return "agent";
+            if (ContainsAny(key, "automation", "自动化", "command")) return "automation";
+            if (ContainsAny(key, "diagnostic", "validation", "test", "验证", "诊断", "测试")) return "diagnostics";
+            if (ContainsAny(key, "font", "字体")) return "font";
+            if (ContainsAny(key, "audio", "sound", "音频", "音效")) return "audio";
+            if (ContainsAny(key, "track", "timeline", "animation", "动作", "轨道")) return "graph";
+            if (ContainsAny(key, "scene", "world", "environment", "场景", "环境")) return "scene";
+            if (ContainsAny(key, "build", "bake", "release", "publish", "构建", "发布")) return "build";
+            if (ContainsAny(key, "package", "installer", "dependency", "安装", "依赖")) return "package";
+            if (ContainsAny(key, "settings", "config", "theme", "设置", "配置", "主题")) return "settings";
+            if (ContainsAny(key, "inspector", "drawer", "property", "检查器", "属性")) return "inspector";
+            if (ContainsAny(key, "data", "so", "table", "catalog", "数据", "表", "目录")) return "data";
+            if (ContainsAny(key, "asset", "resource", "res", "资源", "资产")) return "assets";
+            if (ContainsAny(key, "workbench", "工作台", "window", "窗口")) return "workbench";
+            return null;
+        }
+
+        private static bool ContainsAny(string value, params string[] tokens)
+        {
+            for (int i = 0; i < tokens.Length; i++)
+                if (!string.IsNullOrEmpty(tokens[i])
+                    && value.IndexOf(tokens[i], StringComparison.Ordinal) >= 0)
+                    return true;
+            return false;
         }
     }
 
@@ -1190,6 +1235,50 @@ namespace ES {
     /// embedded editor panels. These helpers own presentation only; callers retain data and
     /// lifecycle ownership.
     /// </summary>
+    public sealed class ESEditorFunctionalSection
+    {
+        public VisualElement Root { get; }
+        public VisualElement Header { get; }
+        public VisualElement HeaderActions { get; }
+        public VisualElement Content { get; }
+        public Label TitleLabel { get; }
+        public Label DetailLabel { get; }
+        public Label StatusLabel { get; }
+
+        internal ESEditorFunctionalSection(
+            VisualElement root,
+            VisualElement header,
+            VisualElement headerActions,
+            VisualElement content,
+            Label titleLabel,
+            Label detailLabel,
+            Label statusLabel)
+        {
+            Root = root;
+            Header = header;
+            HeaderActions = headerActions;
+            Content = content;
+            TitleLabel = titleLabel;
+            DetailLabel = detailLabel;
+            StatusLabel = statusLabel;
+        }
+
+        public void Add(VisualElement element)
+        {
+            if (element != null)
+                Content.Add(element);
+        }
+
+        public void AddHeaderAction(VisualElement action)
+        {
+            if (action != null)
+            {
+                HeaderActions.style.display = DisplayStyle.Flex;
+                HeaderActions.Add(action);
+            }
+        }
+    }
+
     public static class ESEditorPanelUI
     {
         public static VisualElement CreateHeading(string title, string detail = null)
@@ -1219,13 +1308,118 @@ namespace ES {
             VisualElement section = CreateHeading(title, detail);
             section.name = "ESEditorPanelSection";
             section.style.marginTop = 18f;
-            section.style.paddingTop = 14f;
-            section.style.borderTopWidth = 1f;
-            section.style.borderTopColor = ES.EditorInternal.ESEditorPresentation.DividerColor;
+            section.style.paddingLeft = 10f;
+            section.style.paddingRight = 10f;
+            section.style.paddingTop = 9f;
+            section.style.paddingBottom = 9f;
+            ES.EditorInternal.ESEditorPresentation.ApplyRoundedSurface(
+                section,
+                ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor,
+                ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Card,
+                ES.EditorInternal.ESEditorPresentation.DividerColor);
+            section.style.borderLeftWidth = 3f;
+            section.style.borderLeftColor = ES.EditorInternal.ESEditorPresentation.SelectionColor;
             Label titleLabel = section.Q<Label>();
             if (titleLabel != null)
                 titleLabel.style.fontSize = 13f;
             return section;
+        }
+
+        public static ESEditorFunctionalSection CreateFunctionalSection(
+            string title,
+            string detail = null,
+            ESMenuTreePageStatus? status = null)
+        {
+            var root = new VisualElement { name = "ESEditorFunctionalSection" };
+            root.style.minWidth = 0f;
+            root.style.marginTop = 12f;
+            root.style.marginBottom = 2f;
+            ES.EditorInternal.ESEditorPresentation.ApplyRoundedSurface(
+                root,
+                ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor,
+                ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Section,
+                ES.EditorInternal.ESEditorPresentation.DividerColor);
+
+            var header = new VisualElement { name = "ESEditorFunctionalSectionHeader" };
+            header.style.flexDirection = FlexDirection.Row;
+            header.style.alignItems = Align.Center;
+            header.style.paddingLeft = 12f;
+            header.style.paddingRight = 10f;
+            header.style.paddingTop = 9f;
+            header.style.paddingBottom = 9f;
+            header.style.borderBottomWidth = 1f;
+            header.style.borderBottomColor = ES.EditorInternal.ESEditorPresentation.DividerColor;
+            root.Add(header);
+
+            var titleBlock = new VisualElement { name = "ESEditorFunctionalSectionTitleBlock" };
+            titleBlock.style.flexGrow = 1f;
+            titleBlock.style.minWidth = 0f;
+            var titleLabel = new Label(title ?? string.Empty)
+            {
+                name = "ESEditorFunctionalSectionTitle"
+            };
+            titleLabel.AddToClassList("es-brand-title");
+            titleLabel.style.fontSize = 13f;
+            titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            titleLabel.style.color = ES.EditorInternal.ESEditorPresentation.SectionSelectedTextColor;
+            titleLabel.style.whiteSpace = WhiteSpace.Normal;
+            titleBlock.Add(titleLabel);
+
+            Label detailLabel = null;
+            if (!string.IsNullOrWhiteSpace(detail))
+            {
+                detailLabel = new Label(detail.Trim())
+                {
+                    name = "ESEditorFunctionalSectionDetail"
+                };
+                detailLabel.style.marginTop = 3f;
+                detailLabel.style.fontSize = 10f;
+                detailLabel.style.whiteSpace = WhiteSpace.Normal;
+                detailLabel.style.color = ES.EditorInternal.ESEditorPresentation.SectionMutedTextColor;
+                titleBlock.Add(detailLabel);
+            }
+            header.Add(titleBlock);
+
+            Label statusLabel = null;
+            if (status.HasValue)
+            {
+                statusLabel = new Label(GetStatusLabel(status.Value))
+                {
+                    name = "ESEditorFunctionalSectionStatus"
+                };
+                statusLabel.style.flexShrink = 0f;
+                statusLabel.style.marginLeft = 8f;
+                statusLabel.style.paddingLeft = 8f;
+                statusLabel.style.paddingRight = 8f;
+                statusLabel.style.paddingTop = 2f;
+                statusLabel.style.paddingBottom = 2f;
+                statusLabel.style.fontSize = 9f;
+                statusLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+                ES.EditorInternal.ESWindowPresentation.StyleStatusPill(
+                    statusLabel, ToPresentationStatus(status.Value));
+                header.Add(statusLabel);
+            }
+
+            var headerActions = new VisualElement { name = "ESEditorFunctionalSectionActions" };
+            headerActions.style.flexDirection = FlexDirection.Row;
+            headerActions.style.flexWrap = Wrap.Wrap;
+            headerActions.style.alignItems = Align.Center;
+            headerActions.style.justifyContent = Justify.FlexEnd;
+            headerActions.style.flexShrink = 0f;
+            headerActions.style.marginLeft = 8f;
+            headerActions.style.display = DisplayStyle.None;
+            header.Add(headerActions);
+
+            var content = new VisualElement { name = "ESEditorFunctionalSectionContent" };
+            content.style.minWidth = 0f;
+            content.style.paddingLeft = 12f;
+            content.style.paddingRight = 12f;
+            content.style.paddingTop = 10f;
+            content.style.paddingBottom = 12f;
+            root.Add(content);
+
+            return new ESEditorFunctionalSection(
+                root, header, headerActions, content, titleLabel, detailLabel, statusLabel);
         }
 
         public static VisualElement CreateActionRow(params VisualElement[] controls)
@@ -1269,9 +1463,12 @@ namespace ES {
             notice.style.paddingRight = 10f;
             notice.style.paddingTop = 8f;
             notice.style.paddingBottom = 8f;
+            ES.EditorInternal.ESEditorPresentation.ApplyRoundedSurface(
+                notice,
+                surface,
+                ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Card,
+                accent);
             notice.style.borderLeftWidth = 3f;
-            notice.style.borderLeftColor = accent;
-            notice.style.backgroundColor = surface;
 
             Label titleLabel = new Label(title ?? string.Empty);
             titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -1287,6 +1484,19 @@ namespace ES {
                 notice.Add(detailLabel);
             }
             return notice;
+        }
+
+        private static string GetStatusLabel(ESMenuTreePageStatus status)
+        {
+            switch (status)
+            {
+                case ESMenuTreePageStatus.Ready: return "就绪";
+                case ESMenuTreePageStatus.Warning: return "警告";
+                case ESMenuTreePageStatus.Error: return "错误";
+                case ESMenuTreePageStatus.ReadOnly: return "只读";
+                case ESMenuTreePageStatus.Modified: return "已修改";
+                default: return "信息";
+            }
         }
 
         public static VisualElement CreateFieldRow(
@@ -1850,7 +2060,7 @@ namespace ES {
         public void Add(string stableId, string path, ESMenuTreePage page, Texture icon = null, string keywords = null)
         {
             Add(new ESMenuTreePageDefinition(stableId, path, page)
-                .WithIcon(icon)
+                .WithIcon(icon ?? ESMenuTreeUnityIconResolver.ResolveBrand(path))
                 .WithKeywords(keywords));
         }
 
@@ -1898,7 +2108,7 @@ namespace ES {
 
             current.StableId = stableId;
             current.Keywords = definition.Keywords;
-            current.Icon = definition.Icon;
+            current.Icon = definition.Icon ?? ESMenuTreeUnityIconResolver.ResolveBrand(definition.Path);
             current.Page = definition.Page;
             current.Definition = definition;
             pagesById.Add(stableId, current);
@@ -2012,7 +2222,8 @@ namespace ES {
     /// ES 的 UI Toolkit 菜单树窗口宿主。菜单、搜索、内容区和状态栏均由 UI Toolkit
     /// 管理；新页面可直接返回 VisualElement，历史页面可通过独立 PropertyTree 渐进迁移。
     /// </summary>
-    public abstract class ESMenuTreeWindow<This> : EditorWindow, IESWindowPageContextHost
+    public abstract class ESMenuTreeWindow<This> : EditorWindow, IESWindowPageContextHost,
+        IESWindowPresentationMetadata, ES.EditorInternal.IESWindowSleepRelationshipState
         where This : ESMenuTreeWindow<This>
     {
         private sealed class PageBadgeState
@@ -2026,6 +2237,9 @@ namespace ES {
 
         public string ESWindow_SelectedPageId => selectedPageId ?? string.Empty;
         public ESMenuTreePage ESWindow_SelectedPage => activePage?.Page;
+        public virtual string ESWindow_PresentationTitle =>
+            activePage?.Path ?? ESWindow_GetWindowGUIContent()?.text ?? "ES 功能窗口";
+        public virtual Texture ESWindow_PresentationIcon => activePage?.Definition?.Icon;
         public bool ESWindow_IsPinned
         {
             get => ES.EditorInternal.ESEditorPresentation.IsWindowPinned(this);
@@ -2119,7 +2333,7 @@ namespace ES {
         private Button navigateBackButton;
         private Button navigateForwardButton;
         private Button refreshPageButton;
-        private Button rebuildPageButton;
+        private Button settingsButton;
         private VisualElement actionToolbarStack;
         private VisualElement systemActionToolbar;
         private VisualElement globalActionToolbar;
@@ -2159,6 +2373,49 @@ namespace ES {
         protected virtual float ESWindow_MenuWidth => 240f;
         protected virtual bool ESWindow_ShowNavigation => true;
         /// <summary>
+        /// 是否由 ES 窗口基类提供休眠生命周期与标准系统按钮。默认开启；
+        /// 只有对话框、短生命周期弹窗等明确不适用的窗口才应覆写为 false。
+        /// </summary>
+        protected virtual bool ESWindow_SupportsSemiSleep => true;
+        /// <summary>
+        /// Whether a newly opened floating window may animate its native frame. Large authoring
+        /// workbenches can disable this because Unity may create their UI panel before DockArea and
+        /// HostView have finished binding the window.
+        /// </summary>
+        protected virtual bool ESWindow_AnimateOpeningFrame => true;
+        /// <summary>窗口休眠归属。默认独立；依附型辅助窗口可声明跟随宿主。</summary>
+        protected virtual ESWindowSleepLinkMode ESWindow_SleepLinkMode
+            => ESWindowSleepLinkMode.Independent;
+        protected virtual EditorWindow ESWindow_SleepOwner => null;
+        protected virtual string ESWindow_SleepOwnerKey => null;
+        [SerializeField] private string serializedSleepOwnerKey = string.Empty;
+        [SerializeField] private bool serializedSleepOwnerDetachedByClose;
+        [NonSerialized] private EditorWindow explicitSleepOwner;
+        protected EditorWindow ESWindow_ExplicitSleepOwner => explicitSleepOwner;
+        protected void ESWindow_SetSleepOwnerOverride(EditorWindow owner)
+        {
+            explicitSleepOwner = owner;
+            serializedSleepOwnerDetachedByClose = false;
+            if (!string.IsNullOrWhiteSpace(ESWindow_SleepOwnerKey))
+                serializedSleepOwnerKey = ESWindow_SleepOwnerKey;
+        }
+
+        bool ES.EditorInternal.IESWindowSleepRelationshipState.SleepOwnerDetachedByClose
+            => serializedSleepOwnerDetachedByClose;
+
+        void ES.EditorInternal.IESWindowSleepRelationshipState.DetachSleepOwnerAfterOwnerClose()
+        {
+            explicitSleepOwner = null;
+            serializedSleepOwnerDetachedByClose = true;
+        }
+
+        private string GetSleepOwnerKey()
+        {
+            return !string.IsNullOrWhiteSpace(ESWindow_SleepOwnerKey)
+                ? ESWindow_SleepOwnerKey
+                : serializedSleepOwnerKey;
+        }
+        /// <summary>
         /// 是否按“项目 + 窗口类型”记住最后一次成功打开的页面。只保存 StableId，
         /// 不保存页面实例、Unity 对象或业务数据。
         /// </summary>
@@ -2174,7 +2431,8 @@ namespace ES {
         }
 
         /// <summary>
-        /// 向标准系统、全局或窗口动作域添加当前窗口自有控件。宿主布局由窗口外壳拥有；
+        /// 向基类已经创建的标准系统、全局或窗口动作域追加当前窗口自有控件。
+        /// 窗口无需创建或挂载宿主，也不得重复创建休眠按钮；基础系统动作由基类负责。
         /// 页面上下文动作仍通过页面定义注册，以保留状态刷新和溢出菜单能力。
         /// </summary>
         protected virtual void ESWindow_BuildActionHosts(ESWindowActionHosts hosts)
@@ -2223,6 +2481,16 @@ namespace ES {
             return window;
         }
 
+        public static This OpenWindow(EditorWindow sleepOwner)
+        {
+            This window = OpenWindow();
+            window.ESWindow_SetSleepOwnerOverride(sleepOwner);
+            if (sleepOwner != null && window.ESWindow_SleepLinkMode != ESWindowSleepLinkMode.Independent)
+                ESWindowFoundation.SetSleepOwner(window, sleepOwner, window.ESWindow_SleepLinkMode);
+            window.ForceMenuTreeRebuild();
+            return window;
+        }
+
         public static This OpenWindow(string stableId)
         {
             This window = OpenWindow();
@@ -2266,21 +2534,19 @@ namespace ES {
 
         private void ScheduleOpeningActivation()
         {
-            if (openingActivationScheduled || rootVisualElement == null)
+            if (!ESWindow_AnimateOpeningFrame || openingActivationScheduled || rootVisualElement == null)
                 return;
             openingActivationScheduled = true;
-            if (rootVisualElement.panel != null && !docked)
-            {
-                ES.EditorInternal.ESWindowFrameActivation.Play(this, position);
-                return;
-            }
             openingActivationSchedule = rootVisualElement.schedule.Execute(() =>
             {
                 openingActivationSchedule = null;
-                if (this == null || docked || rootVisualElement.panel == null)
+                if (this == null
+                    || !ESWindow_AnimateOpeningFrame
+                    || docked
+                    || rootVisualElement.panel == null)
                     return;
                 ES.EditorInternal.ESWindowFrameActivation.Play(this, position);
-            });
+            }).StartingIn(16);
         }
 
         private void RebuildWindow()
@@ -2482,7 +2748,27 @@ namespace ES {
                 SetStatus("菜单构建失败：" + exception.Message, ESMenuTreePageStatus.Error);
             }
 
-            ESWindowFoundation.Bind(this, actionHosts);
+            ESWindowFoundation.Bind(
+                this,
+                actionHosts,
+                allowSemiSleep: ESWindow_SupportsSemiSleep
+                    && ESWindow_SleepLinkMode != ESWindowSleepLinkMode.OwnedSurface);
+            if (!serializedSleepOwnerDetachedByClose
+                && ESWindow_SleepLinkMode != ESWindowSleepLinkMode.Independent)
+            {
+                EditorWindow owner = ESWindow_ExplicitSleepOwner ?? ESWindow_SleepOwner;
+                if (owner != null)
+                    ESWindowFoundation.SetSleepOwner(this, owner, ESWindow_SleepLinkMode);
+                else if (ESWindow_SleepLinkMode == ESWindowSleepLinkMode.FollowOwner)
+                {
+                    string ownerKey = GetSleepOwnerKey();
+                    if (!ESWindowFoundation.RegisterPendingSleepOwner(
+                        this,
+                        ownerKey,
+                        ESWindow_SleepLinkMode))
+                        Debug.LogError("ES FollowOwner 窗口必须声明稳定 ESWindow_SleepOwnerKey。窗口：" + GetType().FullName);
+                }
+            }
         }
 
         private void RecoverFromWindowBuildFailure(
@@ -2761,7 +3047,8 @@ namespace ES {
                 {
                     image = node.Icon,
                     scaleMode = ScaleMode.ScaleToFit,
-                    pickingMode = PickingMode.Ignore
+                    pickingMode = PickingMode.Ignore,
+                    tintColor = ES.EditorInternal.ESEditorPresentation.SectionTextColor
                 };
                 icon.style.position = Position.Absolute;
                 icon.style.left = 6f;
@@ -2836,10 +3123,8 @@ namespace ES {
             badge.style.borderRightWidth = 1f;
             badge.style.borderTopWidth = 1f;
             badge.style.borderBottomWidth = 1f;
-            badge.style.borderTopLeftRadius = 8f;
-            badge.style.borderTopRightRadius = 8f;
-            badge.style.borderBottomLeftRadius = 8f;
-            badge.style.borderBottomRightRadius = 8f;
+            ES.EditorInternal.ESEditorPresentation.ApplyCornerRadius(
+                badge, ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Pill);
             badge.style.display = DisplayStyle.None;
             return badge;
         }
@@ -4013,6 +4298,11 @@ namespace ES {
                 globalActionToolbar,
                 windowActionToolbar);
             ESWindow_BuildActionHosts(actionHosts);
+            systemRow.style.display = ESWindow_SupportsSemiSleep
+                && ESWindow_SleepLinkMode != ESWindowSleepLinkMode.OwnedSurface
+                || systemActionToolbar.childCount > 0
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
         }
 
         private static VisualElement CreateToolbarScopeRow(
@@ -4250,10 +4540,12 @@ namespace ES {
             }
             refreshPageButton = CreateNavigationIconButton(
                 EditorIcons.Refresh.Active, "刷新当前页面", () => ESWindow_RefreshSelectedPage());
-            rebuildPageButton = CreateNavigationIconButton(
-                EditorIcons.SettingsCog.Active, "局部重建当前页面视图", () => ESWindow_RebuildSelectedPage());
+            settingsButton = CreateNavigationIconButton(
+                EditorIcons.SettingsCog.Active,
+                "打开 ES 编辑器体验设置",
+                OpenEditorExperienceSettings);
             toolbar.Add(refreshPageButton);
-            toolbar.Add(rebuildPageButton);
+            toolbar.Add(settingsButton);
             UpdateHeaderNavigationState();
         }
 
@@ -4270,6 +4562,20 @@ namespace ES {
             button.style.paddingLeft = 5f;
             button.style.paddingRight = 5f;
             return button;
+        }
+
+        private void OpenEditorExperienceSettings()
+        {
+            const string settingsSuffix = "编辑器体验/打开主题工作台";
+            string menuPath = MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + settingsSuffix;
+            if (!EditorApplication.ExecuteMenuItem(menuPath))
+            {
+                PublishFeedback(
+                    "无法打开 ES 编辑器体验设置",
+                    ESMenuTreePageStatus.Error,
+                    ESEditorFeedbackSoundKind.Error,
+                    true);
+            }
         }
 
         private void BuildPageActionToolbar(VisualElement toolbar)
@@ -4749,7 +5055,7 @@ namespace ES {
             navigateBackButton?.SetEnabled(FindNavigableHistoryIndex(-1) >= 0);
             navigateForwardButton?.SetEnabled(FindNavigableHistoryIndex(1) >= 0);
             refreshPageButton?.SetEnabled(activePage?.Page != null);
-            rebuildPageButton?.SetEnabled(activePage?.Page != null);
+            settingsButton?.SetEnabled(true);
             UpdateGlobalActionToolbar();
         }
 
@@ -4942,6 +5248,12 @@ namespace ES {
                 return;
             rebuildScheduled = true;
             rootVisualElement.schedule.Execute(RebuildWindow);
+        }
+
+        /// <summary>供窗口打开/宿主关系变更后请求一次菜单树重建。</summary>
+        public void ForceMenuTreeRebuild()
+        {
+            ScheduleMenuRebuild();
         }
 
         private bool TryResolvePendingChanges(
@@ -5419,7 +5731,8 @@ namespace ES {
         }
     }
 
-    public abstract class ESOdinMenuTreeWindow<This> : OdinMenuEditorWindow where This : ESOdinMenuTreeWindow<This>
+    public abstract class ESOdinMenuTreeWindow<This> : OdinMenuEditorWindow,
+        ES.EditorInternal.IESWindowSleepRelationshipState where This : ESOdinMenuTreeWindow<This>
     {
         public readonly struct MigrationPage
         {
@@ -5490,6 +5803,12 @@ namespace ES {
                 : string.Empty;
         }
 
+        /// <summary>兼容窗口刷新入口；Odin 菜单由其宿主维护，刷新请求只需重绘当前树。</summary>
+        public void ForceMenuTreeRebuild()
+        {
+            Repaint();
+        }
+
         protected static string CreateMigrationStableId(string windowId, string menuPath)
         {
             if (string.IsNullOrWhiteSpace(windowId))
@@ -5534,6 +5853,38 @@ namespace ES {
         protected virtual Vector2 ESWindow_DefaultSize => new Vector2(1120f, 720f);
         protected virtual float ESWindow_DefaultMenuWidth => 220f;
         protected virtual bool ESWindow_ShowSearchToolbar => true;
+        protected virtual bool ESWindow_SupportsSemiSleep => true;
+        protected virtual ESWindowSleepLinkMode ESWindow_SleepLinkMode
+            => ESWindowSleepLinkMode.Independent;
+        protected virtual EditorWindow ESWindow_SleepOwner => null;
+        protected virtual string ESWindow_SleepOwnerKey => null;
+        [SerializeField] private string serializedSleepOwnerKey = string.Empty;
+        [SerializeField] private bool serializedSleepOwnerDetachedByClose;
+        [NonSerialized] private EditorWindow explicitSleepOwner;
+        protected EditorWindow ESWindow_ExplicitSleepOwner => explicitSleepOwner;
+        protected void ESWindow_SetSleepOwnerOverride(EditorWindow owner)
+        {
+            explicitSleepOwner = owner;
+            serializedSleepOwnerDetachedByClose = false;
+            if (!string.IsNullOrWhiteSpace(ESWindow_SleepOwnerKey))
+                serializedSleepOwnerKey = ESWindow_SleepOwnerKey;
+        }
+
+        bool ES.EditorInternal.IESWindowSleepRelationshipState.SleepOwnerDetachedByClose
+            => serializedSleepOwnerDetachedByClose;
+
+        void ES.EditorInternal.IESWindowSleepRelationshipState.DetachSleepOwnerAfterOwnerClose()
+        {
+            explicitSleepOwner = null;
+            serializedSleepOwnerDetachedByClose = true;
+        }
+
+        private string GetSleepOwnerKey()
+        {
+            return !string.IsNullOrWhiteSpace(ESWindow_SleepOwnerKey)
+                ? ESWindow_SleepOwnerKey
+                : serializedSleepOwnerKey;
+        }
         protected virtual string ESWindow_MigrationId => typeof(This).FullName ?? typeof(This).Name;
         protected virtual bool ESWindow_RememberMigrationPage => true;
 
@@ -5563,6 +5914,16 @@ namespace ES {
             }
             UsingWindow.OnClose -= SaveUsingWindowDataOnClose;
             UsingWindow.OnClose += SaveUsingWindowDataOnClose;
+        }
+
+        public static void OpenWindow(EditorWindow sleepOwner)
+        {
+            OpenWindow();
+            This window = UsingWindow;
+            window.ESWindow_SetSleepOwnerOverride(sleepOwner);
+            if (sleepOwner != null && window.ESWindow_SleepLinkMode != ESWindowSleepLinkMode.Independent)
+                ESWindowFoundation.SetSleepOwner(window, sleepOwner, window.ESWindow_SleepLinkMode);
+            window.ForceMenuTreeRebuild();
         }
 
         public static void OpenWindow(string stableId)
@@ -5826,7 +6187,26 @@ namespace ES {
             else
                 rootVisualElement.AddToClassList(
                     ES.EditorInternal.ESWindowFrameActivation.NativeFrameClass);
-            ES.EditorInternal.ESEditorPresentation.BindWindow(this);
+            ES.EditorInternal.ESEditorPresentation.BindWindow(
+                this,
+                allowSemiSleep: ESWindow_SupportsSemiSleep
+                    && ESWindow_SleepLinkMode != ESWindowSleepLinkMode.OwnedSurface);
+            if (!serializedSleepOwnerDetachedByClose
+                && ESWindow_SleepLinkMode != ESWindowSleepLinkMode.Independent)
+            {
+                EditorWindow owner = ESWindow_ExplicitSleepOwner ?? ESWindow_SleepOwner;
+                if (owner != null)
+                    ESWindowFoundation.SetSleepOwner(this, owner, ESWindow_SleepLinkMode);
+                else if (ESWindow_SleepLinkMode == ESWindowSleepLinkMode.FollowOwner)
+                {
+                    string ownerKey = GetSleepOwnerKey();
+                    if (!ESWindowFoundation.RegisterPendingSleepOwner(
+                        this,
+                        ownerKey,
+                        ESWindow_SleepLinkMode))
+                        Debug.LogError("ES FollowOwner 窗口必须声明稳定 ESWindow_SleepOwnerKey。窗口：" + GetType().FullName);
+                }
+            }
             ScheduleOpeningActivation();
         }
 
@@ -5850,18 +6230,13 @@ namespace ES {
             if (openingActivationScheduled || rootVisualElement == null)
                 return;
             openingActivationScheduled = true;
-            if (rootVisualElement.panel != null && !docked)
-            {
-                ES.EditorInternal.ESWindowFrameActivation.Play(this, position);
-                return;
-            }
             openingActivationSchedule = rootVisualElement.schedule.Execute(() =>
             {
                 openingActivationSchedule = null;
                 if (this == null || docked || rootVisualElement.panel == null)
                     return;
                 ES.EditorInternal.ESWindowFrameActivation.Play(this, position);
-            });
+            }).StartingIn(16);
         }
 
         protected override void OnImGUI()

@@ -19,7 +19,7 @@ namespace ES.Obsolete.Preview.SkillSystem
     /// <summary>
     /// 技能定义（ScriptableObject资产）
     /// </summary>
-    [CreateAssetMenu(menuName = "【ES】/已废弃/AIPreview/技能系统/Skill Definition")]
+    [CreateAssetMenu(menuName = "【ES】/示例/遗留兼容/AIPreview/技能系统/Skill Definition")]
     public class SkillDefinition : ScriptableObject
     {
         [Header("Basic Info")]

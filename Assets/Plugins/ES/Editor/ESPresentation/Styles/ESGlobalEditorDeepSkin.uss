@@ -25,11 +25,11 @@
 .es-global-editor-skin--dark .unity-toolbar-button:hover,
 .es-global-editor-skin--dark .unity-toolbar-menu:hover,
 .es-global-editor-skin--dark .unity-button:hover {
-    background-color: rgb(42, 70, 86);
-    border-left-color: rgb(83, 145, 184);
-    border-right-color: rgb(83, 145, 184);
-    border-top-color: rgb(83, 145, 184);
-    border-bottom-color: rgb(83, 145, 184);
+    background-color: rgb(53, 56, 61);
+    border-left-color: rgb(74, 130, 168);
+    border-right-color: rgb(74, 130, 168);
+    border-top-color: rgb(74, 130, 168);
+    border-bottom-color: rgb(74, 130, 168);
 }
 
 .es-global-editor-skin--dark .unity-button {
@@ -39,19 +39,22 @@
     border-right-color: rgb(66, 82, 95);
     border-top-color: rgb(66, 82, 95);
     border-bottom-color: rgb(66, 82, 95);
-    border-top-left-radius: 3px;
-    border-top-right-radius: 3px;
-    border-bottom-left-radius: 3px;
-    border-bottom-right-radius: 3px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
 }
 
 .es-global-editor-skin--dark .unity-button:active,
-.es-global-editor-skin--dark .unity-button:checked {
-    background-color: rgb(31, 96, 132);
-    border-left-color: rgb(102, 178, 220);
-    border-right-color: rgb(102, 178, 220);
-    border-top-color: rgb(102, 178, 220);
-    border-bottom-color: rgb(102, 178, 220);
+.es-global-editor-skin--dark .unity-button:checked,
+.es-global-editor-skin--dark .unity-toolbar-button:active,
+.es-global-editor-skin--dark .unity-toolbar-button:checked,
+.es-global-editor-skin--dark .unity-toolbar-menu:active {
+    background-color: rgb(77, 82, 89);
+    border-left-color: rgb(110, 116, 124);
+    border-right-color: rgb(110, 116, 124);
+    border-top-color: rgb(110, 116, 124);
+    border-bottom-color: rgb(110, 116, 124);
 }
 
 .es-global-editor-skin--dark .unity-base-field__label,
@@ -69,10 +72,10 @@
     border-right-color: rgb(59, 78, 92);
     border-top-color: rgb(59, 78, 92);
     border-bottom-color: rgb(59, 78, 92);
-    border-top-left-radius: 2px;
-    border-top-right-radius: 2px;
-    border-bottom-left-radius: 2px;
-    border-bottom-right-radius: 2px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
 }
 
 .es-global-editor-skin--dark .unity-base-field__input:focus,
@@ -89,13 +92,13 @@
 .es-global-editor-skin--dark .unity-collection-view__item:hover,
 .es-global-editor-skin--dark .unity-list-view__item:hover,
 .es-global-editor-skin--dark .unity-tree-view__item:hover {
-    background-color: rgba(54, 91, 111, 0.50);
+    background-color: rgba(67, 78, 85, 0.55);
 }
 
 .es-global-editor-skin--dark .unity-collection-view__item--selected,
 .es-global-editor-skin--dark .unity-list-view__item--selected,
 .es-global-editor-skin--dark .unity-tree-view__item--selected {
-    background-color: rgb(32, 91, 123);
+    background-color: rgb(51, 70, 80);
     color: rgb(241, 247, 250);
 }
 
@@ -106,10 +109,10 @@
     border-top-color: rgb(57, 76, 89);
     border-bottom-color: rgb(57, 76, 89);
     border-left-width: 3px;
-    border-top-left-radius: 2px;
-    border-top-right-radius: 2px;
-    border-bottom-left-radius: 2px;
-    border-bottom-right-radius: 2px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
 }
 
 .es-global-editor-skin--dark .unity-help-box__message {
@@ -144,20 +147,33 @@
     border-right-color: rgb(137, 153, 165);
     border-top-color: rgb(137, 153, 165);
     border-bottom-color: rgb(137, 153, 165);
-    border-top-left-radius: 3px;
-    border-top-right-radius: 3px;
-    border-bottom-left-radius: 3px;
-    border-bottom-right-radius: 3px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
 }
 
 .es-global-editor-skin--light .unity-toolbar-button:hover,
 .es-global-editor-skin--light .unity-toolbar-menu:hover,
 .es-global-editor-skin--light .unity-button:hover {
-    background-color: rgb(169, 196, 213);
-    border-left-color: rgb(66, 128, 166);
-    border-right-color: rgb(66, 128, 166);
-    border-top-color: rgb(66, 128, 166);
-    border-bottom-color: rgb(66, 128, 166);
+    background-color: rgb(184, 189, 195);
+    border-left-color: rgb(61, 117, 158);
+    border-right-color: rgb(61, 117, 158);
+    border-top-color: rgb(61, 117, 158);
+    border-bottom-color: rgb(61, 117, 158);
+}
+
+.es-global-editor-skin--light .unity-button:active,
+.es-global-editor-skin--light .unity-button:checked,
+.es-global-editor-skin--light .unity-toolbar-button:active,
+.es-global-editor-skin--light .unity-toolbar-button:checked,
+.es-global-editor-skin--light .unity-toolbar-menu:active {
+    background-color: rgb(51, 56, 63);
+    color: rgb(250, 252, 255);
+    border-left-color: rgb(82, 88, 96);
+    border-right-color: rgb(82, 88, 96);
+    border-top-color: rgb(82, 88, 96);
+    border-bottom-color: rgb(82, 88, 96);
 }
 
 .es-global-editor-skin--light .unity-base-field__label,
@@ -175,10 +191,10 @@
     border-right-color: rgb(137, 153, 165);
     border-top-color: rgb(137, 153, 165);
     border-bottom-color: rgb(137, 153, 165);
-    border-top-left-radius: 2px;
-    border-top-right-radius: 2px;
-    border-bottom-left-radius: 2px;
-    border-bottom-right-radius: 2px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
 }
 
 .es-global-editor-skin--light .unity-base-field__input:focus,
@@ -195,13 +211,13 @@
 .es-global-editor-skin--light .unity-collection-view__item:hover,
 .es-global-editor-skin--light .unity-list-view__item:hover,
 .es-global-editor-skin--light .unity-tree-view__item:hover {
-    background-color: rgba(112, 161, 190, 0.34);
+    background-color: rgba(145, 157, 166, 0.38);
 }
 
 .es-global-editor-skin--light .unity-collection-view__item--selected,
 .es-global-editor-skin--light .unity-list-view__item--selected,
 .es-global-editor-skin--light .unity-tree-view__item--selected {
-    background-color: rgb(103, 158, 190);
+    background-color: rgb(176, 185, 192);
     color: rgb(18, 35, 46);
 }
 
@@ -212,10 +228,10 @@
     border-top-color: rgb(143, 160, 172);
     border-bottom-color: rgb(143, 160, 172);
     border-left-width: 3px;
-    border-top-left-radius: 2px;
-    border-top-right-radius: 2px;
-    border-bottom-left-radius: 2px;
-    border-bottom-right-radius: 2px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
 }
 
 .es-global-editor-skin--light .unity-help-box__message {

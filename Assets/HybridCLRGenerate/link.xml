@@ -100,7 +100,6 @@
     <type fullname="ES.IESRuntimeDirectAssetProvider" preserve="all" />
     <type fullname="ES.IESWithLife" preserve="all" />
     <type fullname="ES.IGameCoreSO" preserve="all" />
-    <type fullname="ES.INodeRunner_Origin" preserve="all" />
     <type fullname="ES.IPoolable" preserve="all" />
     <type fullname="ES.IPoolableAuto" preserve="all" />
     <type fullname="ES.IPreviewCollector" preserve="all" />

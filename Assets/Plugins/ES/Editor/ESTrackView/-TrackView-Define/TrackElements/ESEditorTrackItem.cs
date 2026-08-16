@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using ES.EditorInternal;
 using UnityEngine;
 using UnityEngine.UIElements;
 namespace ES
@@ -312,13 +313,11 @@ namespace ES
                     flexShrink = 0,
                     height = 15,
                     marginRight = 7,
-                    borderTopLeftRadius = 2,
-                    borderTopRightRadius = 2,
-                    borderBottomLeftRadius = 2,
-                    borderBottomRightRadius = 2,
                     backgroundColor = ESTrackViewTheme.Accent
                 }
             };
+            ESEditorPresentation.ApplyCornerRadius(
+                m_AccentBar, ESEditorPresentation.ESCornerRadiusToken.Pill);
             m_Header.Add(m_AccentBar);
 
             m_EnableButton = new Button(ToggleTrackEnabled)
@@ -337,16 +336,14 @@ namespace ES
                     paddingRight = 0,
                     fontSize = 10,
                     unityTextAlign = TextAnchor.MiddleCenter,
-                    borderTopLeftRadius = 3,
-                    borderTopRightRadius = 3,
-                    borderBottomLeftRadius = 3,
-                    borderBottomRightRadius = 3,
                     borderTopWidth = 1,
                     borderRightWidth = 1,
                     borderBottomWidth = 1,
                     borderLeftWidth = 1
                 }
             };
+            ESEditorPresentation.ApplyCornerRadius(
+                m_EnableButton, ESEditorPresentation.ESCornerRadiusToken.Control);
             m_EnableButton.AddToClassList("track-enable-button");
             ESTrackViewTheme.ApplyStandardButton(m_EnableButton);
             m_Header.Add(m_EnableButton);
@@ -383,13 +380,11 @@ namespace ES
                 minWidth = 14,
                 flexShrink = 0,
                 marginRight = 7,
-                borderTopLeftRadius = 2,
-                borderTopRightRadius = 2,
-                borderBottomLeftRadius = 2,
-                borderBottomRightRadius = 2,
                 //backgroundColor = m_TrackColor
             }
             };
+            ESEditorPresentation.ApplyCornerRadius(
+                m_Icon, ESEditorPresentation.ESCornerRadiusToken.Control);
             m_Icon.AddToClassList("icon-default");
             m_Header.Add(m_Icon);
 
@@ -426,13 +421,11 @@ namespace ES
                     marginLeft = 5,
                     fontSize = 9,
                     unityFontStyleAndWeight = FontStyle.Bold,
-                    unityTextAlign = TextAnchor.MiddleCenter,
-                    borderTopLeftRadius = 3,
-                    borderTopRightRadius = 3,
-                    borderBottomLeftRadius = 3,
-                    borderBottomRightRadius = 3
+                    unityTextAlign = TextAnchor.MiddleCenter
                 }
             };
+            ESEditorPresentation.ApplyCornerRadius(
+                m_TrackStateBadge, ESEditorPresentation.ESCornerRadiusToken.Pill);
             m_Header.Add(m_TrackStateBadge);
 
             m_LeftPanel.Add(m_Header);

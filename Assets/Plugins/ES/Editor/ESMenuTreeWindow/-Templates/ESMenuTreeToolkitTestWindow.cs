@@ -523,10 +523,11 @@ namespace ES
             content.Add(ESEditorPanelUI.CreateHeading(
                 "快速功能面板",
                 "使用 AddPanel 注册，宿主统一处理滚动、缓存、上下文和释放。"));
-            content.Add(ESEditorPanelUI.CreateSection(
+            ESEditorFunctionalSection commonActions = ESEditorPanelUI.CreateFunctionalSection(
                 "常用动作",
-                "按钮回调只持有当前页面上下文，上下文失效后会自动拒绝操作。"));
-            content.Add(ESEditorPanelUI.CreateActionRow(
+                "按钮回调只持有当前页面上下文，上下文失效后会自动拒绝操作。",
+                ESMenuTreePageStatus.Ready);
+            commonActions.Add(ESEditorPanelUI.CreateActionRow(
                 ESEditorPanelUI.CreateButton(
                     "标记就绪",
                     "发布当前页面状态。",
@@ -543,7 +544,7 @@ namespace ES
                     "打开 Odin 页",
                     "通过稳定 ID 驱动页面选择。",
                     () => context.SelectPage("odin.serialized"))));
-            content.Add(ESEditorPanelUI.CreateActionRow(
+            commonActions.Add(ESEditorPanelUI.CreateActionRow(
                 ESEditorPanelUI.CreateButton(
                     "显示菜单徽标",
                     "为当前菜单节点写入轻量提示。",
@@ -552,6 +553,7 @@ namespace ES
                     "清除菜单徽标",
                     "移除当前菜单节点提示。",
                     context.ClearMenuBadge)));
+            content.Add(commonActions.Root);
         }
 
         private void BuildAdvancedPanel(
@@ -1328,12 +1330,12 @@ namespace ES
         }
     }
 
-    /// <summary>显式压力测试入口：分帧打开 20 个低风险窗口并验证半休眠网格。</summary>
+    /// <summary>显式压力测试入口：分帧打开 21 个低风险窗口并验证半休眠网格。</summary>
     public static class ESWindowSemiSleepStressTest
     {
-        private const int WindowCount = 20;
+        private const int WindowCount = 21;
         private const int Columns = 5;
-        private const int Rows = 4;
+        private const int Rows = (WindowCount + Columns - 1) / Columns;
         private const float SleepSize = 100f;
         private const float Margin = 18f;
 
@@ -1362,6 +1364,7 @@ namespace ES
             new WindowSpec("ES.ESMenuTreeToolkitTestWindow, ES_Editor", "Toolkit MenuTree"),
             new WindowSpec("ES.ESSinglePageToolkitTestWindow, ES_Editor", "Toolkit 单页"),
             new WindowSpec("ES.ESFontToolsWindow, ES_Editor", "字体资产工作台"),
+            new WindowSpec("ES.ESLocalizationToolsWindow, ES_Editor", "本地化工作台"),
             new WindowSpec("ES.SimpleToolsWindow, ES_Editor", "简单工具集"),
             new WindowSpec("ES.ESAssetReleaseUploadWindow, ES_Editor", "发布计划查看"),
             new WindowSpec("ES.ESEditorFeedbackSoundSchemeWindow, ES_Editor", "编辑器音效方案"),
@@ -1379,8 +1382,8 @@ namespace ES
 
         internal static int ConfiguredWindowCount => WindowSpecs.Length;
 
-        [MenuItem("【ES】/验证与诊断/测试与验收/编辑器窗口/打开 20 个半休眠窗口", false, 9170)]
-        private static void OpenTwentySemiSleepWindows()
+        [MenuItem("【ES】/验证与诊断/测试与验收/编辑器窗口/打开 21 个半休眠窗口", false, 9170)]
+        private static void OpenTwentyOneSemiSleepWindows()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
             {

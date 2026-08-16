@@ -36,7 +36,7 @@ Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataM
 可选：<Category>DataGroup / <Category>DataPack
 ```
 
-`<Category>DataInfo.InjectGameCoreTables()` 必须直接校验 Key 并写入所属强类型 RuntimeTable。一个根 SO **类型**允许通过稳定、显式的领域枚举分流到多个兼容 Table；例如 `ItemDataInfo + ItemKind.Shot → ShotTable`、`ItemDataInfo + ItemKind.Weapon → WeaponTable`。每个 SO **资产实例**必须只进入当前枚举选中的一个分支，不得盲目写入全部 Table。Group/Pack 已在抽象基类中完成接口转发，因此新类别不得修改 `0_Stand`、不得添加反射注册、不得修改中央启动分发。
+`<Category>DataInfo.InjectGameCoreTables()` 必须直接校验 Key 并写入所属强类型 RuntimeTable。普通根 SO **类型**允许通过稳定、显式的领域枚举选择一个兼容 Table，单个资产实例只进入当前分支。若领域合同明确包含“基础定义 + 专项能力投影”，则可进入基础 Table 和枚举选中的唯一专项 Table；例如每个 `ItemDataInfo` 都进入 ItemTable，`ItemKind.Shot` 再进入 ShotTable，`ItemKind.Weapon` 再进入 WeaponTable。每个投影必须使用独立强类型 Key / RuntimeData，先全量预验证，再原子提交并在任一失败时回滚本轮结果；各表 RuntimeKey 不得跨表比较或互相解释。禁止无枚举、无独立 Schema、无事务边界地盲目写入多个无关 Table。Group/Pack 已在抽象基类中完成接口转发，因此新类别不得修改 `0_Stand`、不得添加反射注册、不得修改中央启动分发。
 
 运行期业务代码必须持有强类型 `<Category>ConfigKey`，直接查询 `<Category>RuntimeTable`；不得用字符串类别、`Type` 或 `Dictionary<Type, object>` 作为热路径入口。
 
@@ -47,7 +47,7 @@ Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataM
 2. 不得让 RuntimeData、SharedData、VariableData、AssetTable 记录实现 IGameCoreSO。
 3. 不得在 InjectGameCoreTables 内加载 AB、下载资源、读取 Library 或依赖 RuntimeKey。
 4. 不得为兼容旧 JSON 源、旧 ESResKey 恢复旧配置链路。
-5. 不得把“一类根 SO”错误等同于“一类 GameCore”。允许由显式领域枚举做兼容分流；禁止隐式猜测、字符串/类型名分发，禁止一个资产实例不经枚举选择就盲目注入多个 Table。
+5. 不得把“一类根 SO”错误等同于“一类 GameCore”。允许由显式领域枚举做兼容分流，也允许领域合同明确的基础投影加唯一专项投影；禁止隐式猜测、字符串/类型名分发，禁止无独立 Key、Schema 和事务边界地盲目注入多个 Table。
 6. 不得反射查找 InjectGameCoreTables、按类型名猜测注入资格，或强制所有 Info 实现 IGameCoreSO。
 7. 不得为新增类别修改 `0_Stand`，不得新增 `ESRuntimeDataModule.InjectGameCoreRoot` 重载、中央 switch 或类型注册表。
 8. 不得继承其他类别的 `*DataInfo`；类别相似只能复用可序列化组合数据，不能复用 DataInfo 继承层级。
@@ -63,7 +63,7 @@ Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESRuntimeDataM
 ```text
 1. 在新类别目录创建 Key、非池化稳定 RuntimeData、强类型驻留 RuntimeTable 和 DataInfo；不修改 0_Stand 或中央模块。
 2. RuntimeData 继承 `ESGameCoreRuntimeData` 并完整实现 `ReleaseRuntimePayload`；Table 继承 `ESGameCoreConfigKeyTable<TData>` 并设置唯一 `GameCore.<Category>` KeyScope。禁止增加 `Rent`、`ResetRuntimeData` 或池接口。
-3. 由 DataInfo 实现 IGameCoreSO.InjectGameCoreTables：校验根 SO 的领域枚举和对应 Key、拒绝重复，随后执行 `AcquireRetained → try 内复制载荷 → CommitRetained`；catch 必须 `AbandonRetained`。
+3. 由 DataInfo 实现 IGameCoreSO.InjectGameCoreTables：校验根 SO 的领域枚举和本轮全部投影 Key、拒绝重复，随后对每个投影执行 `AcquireRetained → try 内复制载荷 → CommitRetained`；catch 必须 `AbandonRetained`。存在基础 + 专项双投影时，专项失败还必须撤销本轮已提交的基础投影，并验证回滚完整。
 4. 可选创建 Group/Pack；抽象基类会遍历 Infos.Values，并只转发实际实现 IGameCoreSO 的 Info。
 5. 配置唯一 Consumer，确认其收集到 Info、Group 或 Pack 时不混入普通资源、Key 或嵌套数据。
 6. 编译，并验证启动期加载、强类型按 Key 查询、准备异常回滚、重复 Key 回滚、Clear/Remove 后 Ready=false 与载荷释放、同 Key 重建复用，以及非 GameCore Info 跳过场景。

@@ -74,6 +74,7 @@ public sealed class ESCategoryConfigKeyTable
 - `CommitRetained/TryCommitRetained` 负责提交阶段的冲突与异常回滚。
 - `AbandonRetained` 幂等，只清理尚未进入活动槽位的数据；不得破坏已提交记录。
 - 既有 `Inject/TryInject/RegisterAndGetRuntimeKey` 仅为稳定 API 兼容入口；新 GameCore 注入实现必须显式使用 Commit API。
+- `ESGameCoreConfigKeyTable<TData>` 不得使用 `new` 隐藏基表写入口来伪装访问控制。普通业务只使用领域 `InjectWith*` 入口；仍需保留但不面向普通业务的 ES 自有底层入口，应在权威声明处直接改为 `Internal_` 前缀。禁止仅为了“不让用户调用”而强制改成组合、只读 View、内部外壳或拆分程序集；`Internal_` 是使用边界标识，不是编译器权限控制。存量隐藏成员按触达调用链迁移，不得宣称已经强制封闭，也不得无授权全仓机械改名。
 
 ## 强制事务模板
 

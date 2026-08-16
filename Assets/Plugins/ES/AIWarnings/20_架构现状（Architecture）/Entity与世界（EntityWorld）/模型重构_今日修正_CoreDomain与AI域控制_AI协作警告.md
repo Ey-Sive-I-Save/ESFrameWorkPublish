@@ -2,7 +2,7 @@
 
 职责：服务于玩家/角色/所有生命体模型重构。本文专门纠正 2026-07-18 讨论中暴露的陈旧或不准确理解，避免后续 AI 把“外壳”“控制请求”“控制权”误做成一套脱离 ES 框架的大系统。
 
-最后核对时间：2026-07-18。
+最后核对时间：2026-08-16。
 
 ## 已核对路径
 
@@ -84,7 +84,10 @@ EntityStateDomain:
   管状态机、动画状态、状态与 IK 表现关系
 
 EntityBuffDomain:
-  未来管 Buff 逻辑、限制条件、叠层、来源、驱散等
+  已承载 Buff 实例、叠层、来源、ValueChange、Permit 与 OpSupport；商业验收仍按具体能力分项进行
+
+EntityEquipmentDomain:
+  管 Inventory、Slot、Attachment 与装备效果来源；当前最小切片处于 Verifying
 ```
 
 推荐链路：
@@ -226,8 +229,8 @@ Runtime / Save / Network 快照边界
 AI域管控制来源和控制请求。
 Basic域管身体执行。
 State域管状态和表现。
-Buff域未来管限制和效果。
+Buff域已有实例、限制和效果底座，不得按空域重建。
+Equipment域是已接线的第五域，装备事实不得回流 Combat。
 Core/Domain/Module 都能有逻辑，但职责要分清。
 先少量验证，不要铺很多新脚本。
 ```
-

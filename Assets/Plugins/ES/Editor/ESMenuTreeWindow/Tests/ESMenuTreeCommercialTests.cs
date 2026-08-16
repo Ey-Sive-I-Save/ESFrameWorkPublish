@@ -1,5 +1,8 @@
 using System;
 using System.Linq;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using System.Reflection;
 using System.Threading.Tasks;
 using NUnit.Framework;
@@ -11,6 +14,36 @@ namespace ES.Tests
 {
     public sealed class ESMenuTreeCommercialTests
     {
+        [Test]
+        public void DefaultWindowIconsUseStableSemanticMappings()
+        {
+            Assert.AreEqual(
+                "d_Font Icon",
+                ESEditorPresentation.ResolveDefaultWindowIconName(
+                    typeof(RuntimeContractWindow), "ES 字体工作台", "字体/构建"));
+            Assert.AreEqual(
+                "d_BuildSettings.Editor.Small",
+                ESEditorPresentation.ResolveDefaultWindowIconName(
+                    typeof(RuntimeContractWindow), "资源发布", "构建/Bake"));
+            Assert.AreEqual(
+                "d_Settings Icon",
+                ESEditorPresentation.ResolveDefaultWindowIconName(
+                    typeof(RuntimeContractWindow), "编辑器主题设置", "设置"));
+            Assert.AreEqual(
+                "d_Folder Icon",
+                ESEditorPresentation.ResolveDefaultWindowIconName(
+                    typeof(RuntimeContractWindow), "ES 工具窗口", ""));
+
+            Assert.AreEqual(
+                "agent",
+                ESEditorPresentation.ResolveESBrandIconResourceName(
+                    typeof(RuntimeContractWindow), "Agent 工作台", "自动化与开发/Agent"));
+            Assert.AreEqual(
+                "diagnostics",
+                ESEditorPresentation.ResolveESBrandIconResourceName(
+                    typeof(RuntimeContractWindow), "性能诊断", "验证与诊断/性能"));
+        }
+
         private sealed class EmptyPage : ESMenuTreePage
         {
             public override VisualElement CreateView(ESMenuTreePageContext context)
@@ -39,6 +72,45 @@ namespace ES.Tests
             }
         }
 
+        public sealed class NoSemiSleepContractWindow
+            : ESMenuTreeWindow<NoSemiSleepContractWindow>
+        {
+            protected override bool ESWindow_SupportsSemiSleep => false;
+
+            protected override void ESWindow_BuildMenuTree(ESMenuTreeBuilder builder)
+            {
+                builder.Add("no-sleep.page", "无休眠 / 页面", new EmptyPage());
+            }
+        }
+
+        public sealed class DefaultSemiSleepContractWindow
+            : ESMenuTreeWindow<DefaultSemiSleepContractWindow>
+        {
+            protected override void ESWindow_BuildMenuTree(ESMenuTreeBuilder builder)
+            {
+                builder.Add("default-sleep.page", "默认休眠 / 页面", new EmptyPage());
+            }
+        }
+
+        public sealed class FollowOwnerContractWindow
+            : ESMenuTreeWindow<FollowOwnerContractWindow>
+        {
+            protected override ESWindowSleepLinkMode ESWindow_SleepLinkMode
+                => ESWindowSleepLinkMode.FollowOwner;
+
+            protected override string ESWindow_SleepOwnerKey => "ES.Tests.FollowOwner";
+
+            public void ReactivateOwner(UnityEditor.EditorWindow owner)
+            {
+                ESWindow_SetSleepOwnerOverride(owner);
+            }
+
+            protected override void ESWindow_BuildMenuTree(ESMenuTreeBuilder builder)
+            {
+                builder.Add("follow.page", "跟随 / 页面", new EmptyPage());
+            }
+        }
+
         [Test]
         public void SharedPanelUIProvidesReusableStatesAndSingleAxisScrolling()
         {
@@ -55,6 +127,102 @@ namespace ES.Tests
             Assert.AreEqual("ESErrorState", error.name);
             Assert.IsNotNull(empty.Q<Button>());
             Assert.IsNotNull(error.Q<Button>());
+        }
+
+        [Test]
+        public void PresentationProvidesSharedRoundedGeometryAndFunctionalSections()
+        {
+            float control = ESEditorPresentation.GetCornerRadius(
+                ESEditorPresentation.ESCornerRadiusToken.Control);
+            float card = ESEditorPresentation.GetCornerRadius(
+                ESEditorPresentation.ESCornerRadiusToken.Card);
+            float sectionRadius = ESEditorPresentation.GetCornerRadius(
+                ESEditorPresentation.ESCornerRadiusToken.Section);
+            float overlay = ESEditorPresentation.GetCornerRadius(
+                ESEditorPresentation.ESCornerRadiusToken.Overlay);
+            Assert.Greater(control, 0f);
+            Assert.Greater(card, control);
+            Assert.Greater(sectionRadius, card);
+            Assert.Greater(overlay, sectionRadius);
+
+            var surface = new VisualElement();
+            ESEditorPresentation.ApplyRoundedSurface(
+                surface,
+                Color.black,
+                ESEditorPresentation.ESCornerRadiusToken.Section,
+                Color.gray);
+            Assert.AreEqual(sectionRadius, surface.style.borderTopLeftRadius.value.value, 0.001f);
+            Assert.AreEqual(sectionRadius, surface.style.borderTopRightRadius.value.value, 0.001f);
+            Assert.AreEqual(sectionRadius, surface.style.borderBottomLeftRadius.value.value, 0.001f);
+            Assert.AreEqual(sectionRadius, surface.style.borderBottomRightRadius.value.value, 0.001f);
+
+            ESEditorPresentation.ApplyCornerRadius(
+                surface,
+                ESEditorPresentation.ESCornerRadiusToken.Control,
+                ESEditorPresentation.ESCornerMask.Left);
+            Assert.AreEqual(control, surface.style.borderTopLeftRadius.value.value, 0.001f);
+            Assert.AreEqual(control, surface.style.borderBottomLeftRadius.value.value, 0.001f);
+            Assert.AreEqual(0f, surface.style.borderTopRightRadius.value.value, 0.001f);
+            Assert.AreEqual(0f, surface.style.borderBottomRightRadius.value.value, 0.001f);
+
+            ESEditorFunctionalSection section = ESEditorPanelUI.CreateFunctionalSection(
+                "导出计划", "先预检，再提交。", ESMenuTreePageStatus.Warning);
+            section.Add(new Label("计划正文"));
+            section.AddHeaderAction(ESEditorPanelUI.CreateButton("预检", "执行只读预检", () => { }));
+            Assert.AreEqual("ESEditorFunctionalSection", section.Root.name);
+            Assert.AreEqual("ESEditorFunctionalSectionHeader", section.Header.name);
+            Assert.AreEqual("ESEditorFunctionalSectionContent", section.Content.name);
+            Assert.AreEqual("警告", section.StatusLabel.text);
+            Assert.AreEqual(1, section.Content.childCount);
+            Assert.AreEqual(1, section.HeaderActions.childCount);
+        }
+
+        [Test]
+        public void ImguiRoundedSurfaceCachesNineSliceTexturesPerSkinGeneration()
+        {
+            Texture2D first = ESEditorPresentation.SurfaceTexture;
+            Texture2D second = ESEditorPresentation.SurfaceTexture;
+            Assert.AreSame(first, second);
+            Assert.GreaterOrEqual(first.width, 16);
+            Assert.GreaterOrEqual(first.height, 16);
+            Assert.AreEqual(HideFlags.HideAndDontSave, first.hideFlags);
+            Assert.Greater(ESEditorPresentation.SurfaceStyle.border.left, 1);
+            Assert.IsNotNull(ESEditorPresentation.ToolbarButtonStyle.normal.background);
+            Assert.IsNotNull(ESEditorPresentation.ToolbarButtonStyle.hover.background);
+            Assert.IsNotNull(ESEditorPresentation.ToolbarButtonStyle.active.background);
+            Assert.IsNotNull(ESEditorPresentation.PrimaryButtonStyle.normal.background);
+        }
+
+        [Test]
+        public void EditorCSharpCornerAssignmentsStayCentralizedInPresentationCore()
+        {
+            string editorRoot = Path.Combine(Application.dataPath, "Plugins", "ES", "Editor");
+            string presentationCore = Path.GetFullPath(Path.Combine(
+                editorRoot, "ESPresentation", "Core", "ESEditorPresentationCore.cs"));
+            string[] files = Directory.GetFiles(editorRoot, "*.cs", SearchOption.AllDirectories);
+            var violations = new List<string>();
+            var utf8 = new UTF8Encoding(false, true);
+            string[] forbiddenAssignments =
+            {
+                "borderTopLeftRadius " + "=",
+                "borderTopRightRadius " + "=",
+                "borderBottomLeftRadius " + "=",
+                "borderBottomRightRadius " + "="
+            };
+            for (int i = 0; i < files.Length; i++)
+            {
+                string file = Path.GetFullPath(files[i]);
+                if (string.Equals(file, presentationCore, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string source = File.ReadAllText(file, utf8);
+                if (forbiddenAssignments.Any(token => source.Contains(token)))
+                    violations.Add(file.Substring(editorRoot.Length).TrimStart(Path.DirectorySeparatorChar));
+            }
+
+            Assert.IsEmpty(
+                violations,
+                "ES Editor C# 圆角必须通过 ESEditorPresentation Token 设置：\n"
+                + string.Join("\n", violations));
         }
 
         [Test]
@@ -379,7 +547,7 @@ namespace ES.Tests
                     builder.PagesById[ESAssetPackageBakeWindow.PageIdHome]
                         .Definition.PageActions.Count);
                 Assert.AreEqual(
-                    4,
+                    7,
                     builder.PagesById[ESAssetPackageBakeWindow.PageIdCurrentOverview]
                         .Definition.PageActions.Count);
                 Assert.AreEqual(
@@ -391,6 +559,9 @@ namespace ES.Tests
                         "asset-package.index.save",
                         "asset-package.index.bake",
                         "asset-package.index.export",
+                        "asset-package.index.preflight",
+                        "asset-package.index.analyze",
+                        "asset-package.index.repair-links",
                         "asset-package.index.rollback"
                     },
                     GetActionIds(builder.PagesById[
@@ -765,7 +936,10 @@ namespace ES.Tests
                 true);
             MethodInfo evaluateTarget = presentation.GetMethod(
                 "EvaluateSemiSleepTarget",
-                BindingFlags.Static | BindingFlags.NonPublic);
+                BindingFlags.Static | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(Rect) },
+                null);
             MethodInfo evaluateFrame = presentation.GetMethod(
                 "EvaluateSemiSleepFrame",
                 BindingFlags.Static | BindingFlags.NonPublic);
@@ -813,6 +987,14 @@ namespace ES.Tests
             Assert.Greater(wakingMiddle.width, Mathf.Lerp(asleep.width, awake.width, 0.5f));
             Assert.AreEqual(awake.xMax, sleepingMiddle.xMax, 0.001f);
             Assert.AreEqual(awake.xMax, wakingMiddle.xMax, 0.001f);
+            Assert.AreEqual(
+                Mathf.Lerp(awake.yMax, asleep.yMax, 0.5f),
+                sleepingMiddle.yMax,
+                0.001f);
+            Assert.AreEqual(
+                Mathf.Lerp(asleep.yMax, awake.yMax, 0.5f),
+                wakingMiddle.yMax,
+                0.001f);
         }
 
         [Test]
@@ -869,7 +1051,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void SemiSleepDragUsesBoundedIncrementalMovement()
+        public void SemiSleepDragUsesWorkAreaBoundsWithoutArtificialDistanceLimit()
         {
             var tray = new Rect(100f, 80f, 1200f, 800f);
             var current = new Rect(600f, 420f, 100f, 100f);
@@ -891,9 +1073,16 @@ namespace ES.Tests
                 current,
                 new Vector2(10000f, 0f),
                 tray);
-            Assert.LessOrEqual(huge.x - current.x, 160f + 0.001f);
+            Assert.AreEqual(tray.xMax, huge.xMax, 0.001f);
             Assert.GreaterOrEqual(huge.xMin, tray.xMin);
             Assert.LessOrEqual(huge.xMax, tray.xMax);
+
+            Rect farTopLeft = ESEditorPresentation.EvaluateSemiSleepDragFrame(
+                current,
+                new Vector2(-10000f, -10000f),
+                tray);
+            Assert.AreEqual(tray.xMin, farTopLeft.xMin, 0.001f);
+            Assert.AreEqual(tray.yMin, farTopLeft.yMin, 0.001f);
         }
 
         [Test]
@@ -940,7 +1129,9 @@ namespace ES.Tests
             Assert.AreEqual(workArea.xMin, expanded.xMin, 0.001f);
             Assert.AreEqual(collapsed.y, expanded.y, 0.001f);
             Assert.AreEqual(ESEditorPresentation.EdgeTabCollapsedLength, collapsed.width, 0.001f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabThickness, collapsed.height, 0.001f);
             Assert.AreEqual(ESEditorPresentation.EdgeTabExpandedLength, expanded.width, 0.001f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabThickness, expanded.height, 0.001f);
 
             Rect bottom = ESEditorPresentation.EvaluateEdgeTabBounds(
                 workArea,
@@ -948,8 +1139,308 @@ namespace ES.Tests
                 offset,
                 1f);
             Assert.AreEqual(workArea.yMax, bottom.yMax, 0.001f);
-            Assert.AreEqual(ESEditorPresentation.EdgeTabExpandedLength, bottom.width, 0.001f);
-            Assert.AreEqual(ESEditorPresentation.EdgeTabThickness, bottom.height, 0.001f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabThickness, bottom.width, 0.001f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabExpandedLength, bottom.height, 0.001f);
+        }
+
+        [Test]
+        public void EdgeTabOrientationMatchesTheNearestScreenEdge()
+        {
+            var workArea = new Rect(100f, 80f, 1200f, 800f);
+            var cases = new[]
+            {
+                new { edge = ESEditorPresentation.ESWindowEdge.Left, tile = new Rect(100f, 400f, 100f, 100f), vertical = false },
+                new { edge = ESEditorPresentation.ESWindowEdge.Right, tile = new Rect(1200f, 400f, 100f, 100f), vertical = false },
+                new { edge = ESEditorPresentation.ESWindowEdge.Top, tile = new Rect(600f, 80f, 100f, 100f), vertical = true },
+                new { edge = ESEditorPresentation.ESWindowEdge.Bottom, tile = new Rect(600f, 780f, 100f, 100f), vertical = true }
+            };
+            foreach (var item in cases)
+            {
+                Assert.IsTrue(ESEditorPresentation.TryEvaluateEdgeTab(
+                    item.tile,
+                    workArea,
+                    out ESEditorPresentation.ESWindowEdge edge,
+                    out _,
+                    out Rect tab));
+                Assert.AreEqual(item.edge, edge);
+                Assert.AreEqual(item.vertical, tab.height > tab.width);
+            }
+        }
+
+        [Test]
+        public void SemiSleepTimingUsesFiveSecondsForTileToEdgeTabPromotion()
+        {
+            Assert.AreEqual(5f, ESEditorPresentation.SleepTileToEdgeTabDelay, 0.001f);
+            Assert.IsTrue(ESEditorPresentation.ShouldPauseSleepTilePromotion(true, true));
+            Assert.IsTrue(ESEditorPresentation.ShouldPauseSleepTilePromotion(true, false));
+            Assert.IsFalse(ESEditorPresentation.ShouldPauseSleepTilePromotion(false, true));
+        }
+
+        [Test]
+        public void TilePromotionDoesNotTreatFocusHistoryAsAnInteractionLease()
+        {
+            Assert.IsFalse(ESEditorPresentation.ShouldPauseSleepTilePromotion(false, false));
+        }
+
+        [Test]
+        public void SemiSleepDragUsesScreenDeltaWithoutDoubleAddingWindowPosition()
+        {
+            var tray = new Rect(0f, 0f, 1000f, 700f);
+            var current = new Rect(400f, 250f, 100f, 100f);
+            Rect moved = ESEditorPresentation.EvaluateSemiSleepDragFrame(
+                current,
+                new Vector2(25f, -15f),
+                tray);
+            Assert.AreEqual(425f, moved.x, 0.001f);
+            Assert.AreEqual(235f, moved.y, 0.001f);
+            Assert.Less(moved.x, current.x + 100f);
+            Assert.Greater(moved.y, current.y - 100f);
+        }
+
+        [Test]
+        public void SettledSleepStatesRequireGeometryAgreement()
+        {
+            var expected = new Rect(100f, 80f, 100f, 100f);
+            Assert.IsTrue(ESEditorPresentation.IsVisualStateGeometryConsistent(
+                ESWindowVisualState.SleepTile, expected, expected));
+            Assert.IsFalse(ESEditorPresentation.IsVisualStateGeometryConsistent(
+                ESWindowVisualState.SleepTile,
+                new Rect(100f, 80f, 900f, 600f),
+                expected));
+        }
+
+        [Test]
+        public void EdgeTabWakeKeepsTheSelectedScreenEdgeAnchored()
+        {
+            var workArea = new Rect(100f, 80f, 1200f, 800f);
+            const float offset = 240f;
+            foreach (ESEditorPresentation.ESWindowEdge edge in
+                     Enum.GetValues(typeof(ESEditorPresentation.ESWindowEdge)))
+            {
+                Rect collapsed = ESEditorPresentation.EvaluateEdgeTabBounds(workArea, edge, offset, 0f);
+                Rect awake = new Rect(180f, 140f, 820f, 540f);
+                Rect middle = ESEditorPresentation.EvaluateEdgeTabTransitionFrame(
+                    collapsed, awake, 0.5f, edge);
+                switch (edge)
+                {
+                    case ESEditorPresentation.ESWindowEdge.Left:
+                        Assert.AreEqual(workArea.xMin, middle.xMin, 0.001f);
+                        break;
+                    case ESEditorPresentation.ESWindowEdge.Right:
+                        Assert.AreEqual(workArea.xMax, middle.xMax, 0.001f);
+                        break;
+                    case ESEditorPresentation.ESWindowEdge.Top:
+                        Assert.AreEqual(workArea.yMin, middle.yMin, 0.001f);
+                        break;
+                    case ESEditorPresentation.ESWindowEdge.Bottom:
+                        Assert.AreEqual(workArea.yMax, middle.yMax, 0.001f);
+                        break;
+                }
+            }
+        }
+
+        [Test]
+        public void EdgeTabAnimationKeepsEveryScreenEdgeStableAtMidFrame()
+        {
+            var workArea = new Rect(100f, 80f, 1200f, 800f);
+            const float offset = 240f;
+            foreach (ESEditorPresentation.ESWindowEdge edge in
+                     Enum.GetValues(typeof(ESEditorPresentation.ESWindowEdge)))
+            {
+                Rect collapsed = ESEditorPresentation.EvaluateEdgeTabBounds(
+                    workArea, edge, offset, 0f);
+                Rect expanded = ESEditorPresentation.EvaluateEdgeTabBounds(
+                    workArea, edge, offset, 1f);
+                Rect middle = ESEditorPresentation.EvaluateEdgeTabTransitionFrame(
+                    collapsed, expanded, 0.5f, edge);
+
+                switch (edge)
+                {
+                    case ESEditorPresentation.ESWindowEdge.Left:
+                        Assert.AreEqual(workArea.xMin, middle.xMin, 0.001f);
+                        Assert.Greater(middle.width, middle.height);
+                        break;
+                    case ESEditorPresentation.ESWindowEdge.Right:
+                        Assert.AreEqual(workArea.xMax, middle.xMax, 0.001f);
+                        Assert.Greater(middle.width, middle.height);
+                        break;
+                    case ESEditorPresentation.ESWindowEdge.Top:
+                        Assert.AreEqual(workArea.yMin, middle.yMin, 0.001f);
+                        Assert.Greater(middle.height, middle.width);
+                        break;
+                    case ESEditorPresentation.ESWindowEdge.Bottom:
+                        Assert.AreEqual(workArea.yMax, middle.yMax, 0.001f);
+                        Assert.Greater(middle.height, middle.width);
+                        break;
+                }
+            }
+        }
+
+        [Test]
+        public void EdgeTabToSleepTileAnimationKeepsEveryScreenEdgeStableAtMidFrame()
+        {
+            var workArea = new Rect(100f, 80f, 1200f, 800f);
+            const float offset = 240f;
+            foreach (ESEditorPresentation.ESWindowEdge edge in
+                     Enum.GetValues(typeof(ESEditorPresentation.ESWindowEdge)))
+            {
+                Rect expanded = ESEditorPresentation.EvaluateEdgeTabBounds(
+                    workArea, edge, offset, 1f);
+                Rect tile = new Rect(
+                    edge == ESEditorPresentation.ESWindowEdge.Right
+                        ? workArea.xMax - ESEditorPresentation.SemiSleepSize
+                        : expanded.x,
+                    edge == ESEditorPresentation.ESWindowEdge.Bottom
+                        ? workArea.yMax - ESEditorPresentation.SemiSleepSize
+                        : expanded.y,
+                    ESEditorPresentation.SemiSleepSize,
+                    ESEditorPresentation.SemiSleepSize);
+                Rect middle = ESEditorPresentation.EvaluateEdgeTabTransitionFrame(
+                    expanded, tile, 0.5f, edge);
+
+                switch (edge)
+                {
+                    case ESEditorPresentation.ESWindowEdge.Left:
+                        Assert.AreEqual(workArea.xMin, middle.xMin, 0.001f);
+                        break;
+                    case ESEditorPresentation.ESWindowEdge.Right:
+                        Assert.AreEqual(workArea.xMax, middle.xMax, 0.001f);
+                        break;
+                    case ESEditorPresentation.ESWindowEdge.Top:
+                        Assert.AreEqual(workArea.yMin, middle.yMin, 0.001f);
+                        break;
+                    case ESEditorPresentation.ESWindowEdge.Bottom:
+                        Assert.AreEqual(workArea.yMax, middle.yMax, 0.001f);
+                        break;
+                }
+            }
+        }
+
+        [Test]
+        public void EdgeTabExpansionUsesLengthAlongItsEdgeAndKeepsTheOppositeAxisFixed()
+        {
+            var workArea = new Rect(100f, 80f, 1200f, 800f);
+            const float offset = 240f;
+            Rect rightCollapsed = ESEditorPresentation.EvaluateEdgeTabBounds(
+                workArea, ESEditorPresentation.ESWindowEdge.Right, offset, 0f);
+            Rect rightExpanded = ESEditorPresentation.EvaluateEdgeTabBounds(
+                workArea, ESEditorPresentation.ESWindowEdge.Right, offset, 1f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabCollapsedLength, rightCollapsed.width, 0.001f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabThickness, rightExpanded.height, 0.001f);
+            Assert.AreEqual(workArea.xMax, rightCollapsed.xMax, 0.001f);
+            Assert.AreEqual(workArea.xMax, rightExpanded.xMax, 0.001f);
+
+            Rect topCollapsed = ESEditorPresentation.EvaluateEdgeTabBounds(
+                workArea, ESEditorPresentation.ESWindowEdge.Top, offset, 0f);
+            Rect topExpanded = ESEditorPresentation.EvaluateEdgeTabBounds(
+                workArea, ESEditorPresentation.ESWindowEdge.Top, offset, 1f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabThickness, topCollapsed.width, 0.001f);
+            Assert.AreEqual(ESEditorPresentation.EdgeTabCollapsedLength, topCollapsed.height, 0.001f);
+            Assert.AreEqual(workArea.yMin, topExpanded.yMin, 0.001f);
+        }
+
+        [Test]
+        public void EdgeTabToTileUsesTheCurrentEdgeAnchorInsteadOfAWindowCorner()
+        {
+            var from = new Rect(1104f, 320f, 196f, 44f);
+            var tile = new Rect(1200f, 292f, 100f, 100f);
+            Rect middle = ESEditorPresentation.EvaluateEdgeTabToTileFrame(
+                from,
+                tile,
+                0.5f,
+                ESEditorPresentation.ESWindowEdge.Right);
+            Assert.AreEqual(from.xMax, middle.xMax, 0.001f);
+            Assert.Greater(middle.height, from.height);
+            Assert.Less(middle.y, from.y);
+            Rect end = ESEditorPresentation.EvaluateEdgeTabToTileFrame(
+                from,
+                tile,
+                1f,
+                ESEditorPresentation.ESWindowEdge.Right);
+            Assert.AreEqual(tile, end);
+        }
+
+        [Test]
+        public void EdgeTabReverseAnimationScalesToRemainingDistance()
+        {
+            var collapsed = new Rect(100f, 80f, 56f, 44f);
+            var expanded = new Rect(100f, 80f, 196f, 44f);
+            var almostCollapsed = new Rect(100f, 80f, 70f, 44f);
+
+            float full = ESEditorPresentation.EvaluateEdgeTabTransitionDuration(
+                collapsed, expanded, 140f, 0.30f);
+            float reverse = ESEditorPresentation.EvaluateEdgeTabTransitionDuration(
+                almostCollapsed, collapsed, 140f, 0.30f);
+
+            Assert.AreEqual(0.30f, full, 0.001f);
+            Assert.Greater(reverse, 0f);
+            Assert.Less(reverse, full * 0.35f);
+        }
+
+        [Test]
+        public void EdgeTabHoverCommitOnlyResetsForIntentionalPointerMovement()
+        {
+            var origin = new Vector2(40f, 20f);
+            Assert.IsTrue(ESEditorPresentation.ShouldResetEdgeTabHoverCommit(
+                origin, origin, false));
+            Assert.IsFalse(ESEditorPresentation.ShouldResetEdgeTabHoverCommit(
+                origin, origin + new Vector2(2f, 1f), true));
+            Assert.IsTrue(ESEditorPresentation.ShouldResetEdgeTabHoverCommit(
+                origin, origin + new Vector2(3f, 0f), true));
+        }
+
+        [Test]
+        public void EdgeTabDragMovesAlongItsOwnedEdgeWithoutBreakingTheAnchor()
+        {
+            var workArea = new Rect(100f, 80f, 1200f, 800f);
+
+            Rect right = ESEditorPresentation.EvaluateEdgeTabBounds(
+                workArea, ESEditorPresentation.ESWindowEdge.Right, 220f, 1f);
+            Rect movedRight = ESEditorPresentation.EvaluateEdgeTabDragFrame(
+                right,
+                new Vector2(-300f, 90f),
+                workArea,
+                ESEditorPresentation.ESWindowEdge.Right,
+                out float rightOffset);
+            Assert.AreEqual(workArea.xMax, movedRight.xMax, 0.001f);
+            Assert.AreEqual(right.y + 90f, movedRight.y, 0.001f);
+            Assert.AreEqual(right.size, movedRight.size);
+            Assert.AreEqual(movedRight.y - workArea.yMin, rightOffset, 0.001f);
+
+            Rect left = ESEditorPresentation.EvaluateEdgeTabBounds(
+                workArea, ESEditorPresentation.ESWindowEdge.Left, 420f, 0f);
+            Rect movedLeft = ESEditorPresentation.EvaluateEdgeTabDragFrame(
+                left,
+                new Vector2(500f, -120f),
+                workArea,
+                ESEditorPresentation.ESWindowEdge.Left,
+                out _);
+            Assert.AreEqual(workArea.xMin, movedLeft.xMin, 0.001f);
+            Assert.AreEqual(left.y - 120f, movedLeft.y, 0.001f);
+
+            Rect top = ESEditorPresentation.EvaluateEdgeTabBounds(
+                workArea, ESEditorPresentation.ESWindowEdge.Top, 360f, 1f);
+            Rect movedTop = ESEditorPresentation.EvaluateEdgeTabDragFrame(
+                top,
+                new Vector2(140f, 500f),
+                workArea,
+                ESEditorPresentation.ESWindowEdge.Top,
+                out float topOffset);
+            Assert.AreEqual(workArea.yMin, movedTop.yMin, 0.001f);
+            Assert.AreEqual(top.x + 140f, movedTop.x, 0.001f);
+            Assert.AreEqual(top.size, movedTop.size);
+            Assert.AreEqual(movedTop.x - workArea.xMin, topOffset, 0.001f);
+
+            Rect bottom = ESEditorPresentation.EvaluateEdgeTabBounds(
+                workArea, ESEditorPresentation.ESWindowEdge.Bottom, 700f, 0f);
+            Rect movedBottom = ESEditorPresentation.EvaluateEdgeTabDragFrame(
+                bottom,
+                new Vector2(-180f, -500f),
+                workArea,
+                ESEditorPresentation.ESWindowEdge.Bottom,
+                out _);
+            Assert.AreEqual(workArea.yMax, movedBottom.yMax, 0.001f);
+            Assert.AreEqual(bottom.x - 180f, movedBottom.x, 0.001f);
         }
 
         [Test]
@@ -958,12 +1449,19 @@ namespace ES.Tests
             CollectionAssert.AreEquivalent(
                 new[] { "ActivePanel", "SleepTile", "EdgeTab", "EdgeTabHover" },
                 Enum.GetNames(typeof(ESWindowVisualState)));
-            Assert.AreEqual(0.5f, ESEditorPresentation.EdgeTabHoverCommitDelay, 0.001f);
-            Assert.IsFalse(ESEditorPresentation.ShouldRestoreEdgeTabToTile(10d, 10.49d, true));
-            Assert.IsTrue(ESEditorPresentation.ShouldRestoreEdgeTabToTile(10d, 10.5d, true));
-            Assert.IsFalse(ESEditorPresentation.ShouldRestoreEdgeTabToTile(10d, 11d, false));
+            Assert.AreEqual(0.12f, ESEditorPresentation.EdgeTabHoverIntentDelay, 0.001f);
+            Assert.IsFalse(ESEditorPresentation.ShouldBeginEdgeTabHover(10d, 10.11d, true));
+            Assert.IsTrue(ESEditorPresentation.ShouldBeginEdgeTabHover(10d, 10.12d, true));
+            Assert.IsFalse(ESEditorPresentation.ShouldBeginEdgeTabHover(10d, 11d, false));
+            Assert.AreEqual(1.65f, ESEditorPresentation.EdgeTabHoverCommitDelay, 0.001f);
+            Assert.IsFalse(ESEditorPresentation.ShouldRestoreEdgeTabToTile(10d, 11.64d, true));
+            Assert.IsTrue(ESEditorPresentation.ShouldRestoreEdgeTabToTile(10d, 11.65d, true));
+            Assert.IsFalse(ESEditorPresentation.ShouldRestoreEdgeTabToTile(10d, 12d, false));
             Assert.IsTrue(ESEditorPresentation.ShouldPauseAutomaticCollection(
                 false, false, 0, false, false, true, false));
+            // A pointer inside a non-focused window is still an active interaction
+            // surface. This prevents ContextMenu/child-popup focus changes from
+            // starting an unexpected semi-sleep countdown.
             Assert.IsTrue(ESEditorPresentation.ShouldPauseAutomaticCollection(
                 true, false, 0, false, false, false, false));
             Assert.IsFalse(ESEditorPresentation.ShouldPauseAutomaticCollection(
@@ -1010,6 +1508,12 @@ namespace ES.Tests
             Assert.IsNotNull(presentation.GetMethod(
                 "SetWindowPinned",
                 BindingFlags.Static | BindingFlags.Public));
+            Assert.IsNotNull(typeof(ESWindowFoundation).GetProperty(
+                "IsGlobalSemiSleepEnabled",
+                BindingFlags.Static | BindingFlags.Public));
+            Assert.IsNotNull(typeof(ESWindowFoundation).GetMethod(
+                "SetGlobalSemiSleepEnabled",
+                BindingFlags.Static | BindingFlags.Public));
         }
 
         [Test]
@@ -1019,6 +1523,32 @@ namespace ES.Tests
                 new ESWindowActionHosts()));
             Assert.IsTrue(ESEditorPresentation.HasDeclaredSystemActionHost(
                 new ESWindowActionHosts(system: new VisualElement())));
+
+            DefaultSemiSleepContractWindow window =
+                ScriptableObject.CreateInstance<DefaultSemiSleepContractWindow>();
+            try
+            {
+                VisualElement systemHost = new VisualElement
+                {
+                    name = "DeclaredSystemActionHost"
+                };
+                window.rootVisualElement.Add(systemHost);
+
+                ESWindowFoundation.Bind(window);
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("ESWindowSystemActions"));
+                Assert.IsNull(window.rootVisualElement.Q<VisualElement>("ESWindowSystemActionsFallback"));
+
+                ESWindowFoundation.Bind(
+                    window,
+                    new ESWindowActionHosts(system: systemHost));
+                Assert.IsNotNull(systemHost.Q<VisualElement>("ESWindowSystemActions"));
+            }
+            finally
+            {
+                ESWindowFoundation.Unbind(window, true);
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+
             Assert.IsFalse(ESEditorPresentation.ShouldCompactSystemActions(1174f));
             Assert.IsTrue(ESEditorPresentation.ShouldCompactSystemActions(640f));
             Assert.IsFalse(ESCmdAgentWindow.ShouldCollapseHeaderActions(1500f));
@@ -1061,6 +1591,28 @@ namespace ES.Tests
                 new Color(0.65f, 0.90f, 0.70f));
             Assert.Greater(onDark.r, 0.9f);
             Assert.Less(onLight.r, 0.1f);
+
+            Color primary = ESEditorPresentation.PrimaryActionColor;
+            Assert.Less(Mathf.Abs(primary.b - primary.r), 0.08f,
+                "主操作底色必须保持中性石墨色，不能重新进入蓝色体系。");
+            Assert.Greater(ESEditorPresentation.PrimaryActionTextColor.r, 0.9f);
+
+            Color selection = ESEditorPresentation.SelectionColor;
+            Assert.Less(selection.b, 0.70f, "通用选中色不能退回天蓝色；它必须适合边框和导引线。");
+            Assert.Greater(selection.g, selection.r);
+
+            Color selectedSurface = ESEditorPresentation.SelectedSurfaceColor;
+            Assert.Less(Mathf.Abs(selectedSurface.b - selectedSurface.r), 0.16f,
+                "选中表面必须是低对比中性表面，不能把标记色铺成大面积蓝色背景。");
+            Assert.Greater(Vector4.Distance(selectedSurface, selection), 0.05f,
+                "选中表面与选中标记必须是独立语义色，不能复用同一颜色。");
+
+            Color inactiveAction = ESEditorPresentation.InactiveActionColor;
+            Assert.Less(Mathf.Abs(inactiveAction.b - inactiveAction.r), 0.16f,
+                "禁用/关闭操作必须使用中性底色，不能把 Warning 色铺到工具栏按钮。");
+            Assert.Greater(Vector4.Distance(inactiveAction, ESEditorPresentation.WarningColor), 0.20f,
+                "禁用/关闭操作必须与高饱和警告色保持足够区分。");
+
         }
 
         [Test]
@@ -1184,8 +1736,8 @@ namespace ES.Tests
                         "确定",
                         "取消",
                         string.Empty,
-                        null,
                         ESDialogTone.Info,
+                        ESDialogHost.Auto,
                     }));
             Assert.IsInstanceOf<ArgumentException>(wrapped.InnerException);
             StringAssert.Contains("dialogId", wrapped.InnerException.Message);
@@ -1260,12 +1812,12 @@ namespace ES.Tests
                 Assert.IsNotNull(root.Q<VisualElement>("ESMenuTreePageActionRow"));
                 Assert.IsNotNull(root.Q<VisualElement>("ESMenuTreePageActions"));
 
-                Assert.IsTrue(root.Q<VisualElement>("ESMenuTreeSystemActions")
-                    .Children().OfType<Button>().Any(button => button.text == "系统扩展"));
-                Assert.IsTrue(root.Q<VisualElement>("ESMenuTreeGlobalActions")
-                    .Children().OfType<Button>().Any(button => button.text == "全局扩展"));
-                Assert.IsTrue(root.Q<VisualElement>("ESMenuTreeWindowActions")
-                    .Children().OfType<Button>().Any(button => button.text == "窗口扩展"));
+                Assert.IsTrue(HasHeaderActionText(
+                    root.Q<VisualElement>("ESMenuTreeSystemActions"), "系统扩展"));
+                Assert.IsTrue(HasHeaderActionText(
+                    root.Q<VisualElement>("ESMenuTreeGlobalActions"), "全局扩展"));
+                Assert.IsTrue(HasHeaderActionText(
+                    root.Q<VisualElement>("ESMenuTreeWindowActions"), "窗口扩展"));
 
                 MethodInfo refreshGlobalActions =
                     typeof(ESMenuTreeWindow<RuntimeContractWindow>).GetMethod(
@@ -1273,14 +1825,331 @@ namespace ES.Tests
                         BindingFlags.Instance | BindingFlags.NonPublic);
                 Assert.IsNotNull(refreshGlobalActions);
                 refreshGlobalActions.Invoke(window, null);
-                Assert.IsTrue(root.Q<VisualElement>("ESMenuTreeGlobalActions")
-                    .Children().OfType<Button>().Any(button => button.text == "全局扩展"),
+                Assert.IsTrue(HasHeaderActionText(
+                        root.Q<VisualElement>("ESMenuTreeGlobalActions"), "全局扩展"),
                     "刷新框架内建全局动作时，不得清除窗口注入的全局动作。");
             }
             finally
             {
                 UnityEngine.Object.DestroyImmediate(window);
             }
+        }
+
+        private static bool HasHeaderActionText(VisualElement host, string expected)
+        {
+            return host != null && host.Children().OfType<Button>().Any(button =>
+                string.Equals(button.text, expected, StringComparison.Ordinal)
+                || string.Equals(button.Q<Label>()?.text, expected, StringComparison.Ordinal));
+        }
+
+        [Test]
+        public void MenuTreeBaseOwnsDefaultSemiSleepControlsWithoutWindowHostSetup()
+        {
+            DefaultSemiSleepContractWindow window =
+                ScriptableObject.CreateInstance<DefaultSemiSleepContractWindow>();
+            try
+            {
+                MethodInfo createGui = typeof(ESMenuTreeWindow<DefaultSemiSleepContractWindow>)
+                    .GetMethod("CreateGUI", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(createGui);
+                createGui.Invoke(window, null);
+
+                VisualElement systemHost = window.rootVisualElement
+                    .Q<VisualElement>("ESMenuTreeSystemActions");
+                Assert.IsNotNull(systemHost, "System 宿主必须由窗口基类自动创建。");
+                Assert.IsNotNull(
+                    systemHost.Q<VisualElement>("ESWindowSystemActions"),
+                    "休眠控件必须由基础层自动注入，派生窗口不应手工创建。");
+            }
+            finally
+            {
+                ESWindowFoundation.Unbind(window, true);
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
+        public void MenuTreeWindowCanDisableBuiltInSemiSleepThroughOneOverride()
+        {
+            NoSemiSleepContractWindow window =
+                ScriptableObject.CreateInstance<NoSemiSleepContractWindow>();
+            try
+            {
+                MethodInfo createGui = typeof(ESMenuTreeWindow<NoSemiSleepContractWindow>)
+                    .GetMethod("CreateGUI", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(createGui);
+                createGui.Invoke(window, null);
+
+                VisualElement root = window.rootVisualElement;
+                Assert.IsNull(root.Q<VisualElement>("ESWindowSystemActions"));
+                Assert.AreEqual(
+                    DisplayStyle.None,
+                    root.Q<VisualElement>("ESMenuTreeSystemActionRow").style.display.value);
+            }
+            finally
+            {
+                ESWindowFoundation.Unbind(window, true);
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
+        public void SleepOwnerContractUsesExplicitModesAndRejectsSelfOwnership()
+        {
+            DefaultSemiSleepContractWindow owner =
+                ScriptableObject.CreateInstance<DefaultSemiSleepContractWindow>();
+            DefaultSemiSleepContractWindow child =
+                ScriptableObject.CreateInstance<DefaultSemiSleepContractWindow>();
+            try
+            {
+                ESWindowFoundation.Bind(owner);
+                ESWindowFoundation.Bind(child);
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner));
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.FollowOwner,
+                    ESWindowFoundation.GetSleepLinkMode(child));
+                Assert.IsFalse(ESWindowFoundation.SetSleepOwner(
+                    owner,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner));
+
+                ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    ESWindowSleepLinkMode.OwnedSurface);
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.OwnedSurface,
+                    ESWindowFoundation.GetSleepLinkMode(child));
+                Assert.IsFalse(ESWindowFoundation.IsWindowSemiSleepAllowed(child));
+                ESWindowFoundation.ClearSleepOwner(child);
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.Independent,
+                    ESWindowFoundation.GetSleepLinkMode(child));
+
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner));
+                ESWindowFoundation.Unbind(owner, true);
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.Independent,
+                    ESWindowFoundation.GetSleepLinkMode(child),
+                    "父窗口关闭或解绑后，子窗口必须解除跟随并继续作为独立窗口存在。");
+                Assert.IsNotNull(child);
+            }
+            finally
+            {
+                ESWindowFoundation.Unbind(child, true);
+                ESWindowFoundation.Unbind(owner, true);
+                UnityEngine.Object.DestroyImmediate(child);
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        [Test]
+        public void PendingSleepOwnerResolvesOnlyByStableOwnerKey()
+        {
+            DefaultSemiSleepContractWindow child =
+                ScriptableObject.CreateInstance<DefaultSemiSleepContractWindow>();
+            DefaultSemiSleepContractWindow owner =
+                ScriptableObject.CreateInstance<DefaultSemiSleepContractWindow>();
+            try
+            {
+                ESWindowFoundation.Bind(child);
+                Assert.IsTrue(ESWindowFoundation.RegisterPendingSleepOwner(
+                    child,
+                    "ES.Tests.Owner",
+                    ESWindowSleepLinkMode.FollowOwner));
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner),
+                    "显式 owner 绑定必须覆盖并清理此前登记的 PendingFollowOwner。");
+                Assert.AreEqual(
+                    0,
+                    ESWindowFoundation.ResolvePendingSleepOwners("ES.Tests.Owner", owner),
+                    "显式绑定后不得保留旧 Pending 记录，避免宿主恢复时反向覆盖当前关系。");
+                Assert.AreEqual(
+                    0,
+                    ESWindowFoundation.ResolvePendingSleepOwners("ES.Tests.Other", owner));
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.FollowOwner,
+                    ESWindowFoundation.GetSleepLinkMode(child));
+            }
+            finally
+            {
+                ESWindowFoundation.Unbind(child, true);
+                ESWindowFoundation.Unbind(owner, true);
+                UnityEngine.Object.DestroyImmediate(child);
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        [Test]
+        public void InteractionHoldNeverImplicitlyBindsUnknownWindows()
+        {
+            RuntimeContractWindow window =
+                ScriptableObject.CreateInstance<RuntimeContractWindow>();
+            try
+            {
+                Assert.IsFalse(ESWindowFoundation.IsBound(window));
+                using (ESWindowFoundation.HoldInteraction(window, "unbound-test"))
+                    Assert.IsFalse(
+                        ESWindowFoundation.IsBound(window),
+                        "InteractionHold 不得把原生或第三方 owner 隐式接入 ES Presentation。");
+
+                ESWindowFoundation.Bind(window);
+                Assert.IsTrue(ESWindowFoundation.IsBound(window));
+                using (ESWindowFoundation.HoldInteraction(window, "bound-test"))
+                    Assert.IsTrue(ESWindowFoundation.IsBound(window));
+            }
+            finally
+            {
+                ESWindowFoundation.Unbind(window, true);
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
+        public void OwnerCloseDetachesPersistentlyButDomainReloadKeepsRelationshipIntent()
+        {
+            RuntimeContractWindow owner =
+                ScriptableObject.CreateInstance<RuntimeContractWindow>();
+            FollowOwnerContractWindow child =
+                ScriptableObject.CreateInstance<FollowOwnerContractWindow>();
+            FieldInfo reloadFlag = typeof(ESEditorPresentation).GetField(
+                "domainReloadInProgress",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(reloadFlag);
+            try
+            {
+                ESWindowFoundation.Bind(owner);
+                ESWindowFoundation.Bind(child);
+                child.ReactivateOwner(owner);
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner));
+
+                ESWindowFoundation.Unbind(owner, true);
+                var relationship = (IESWindowSleepRelationshipState)child;
+                Assert.IsTrue(
+                    relationship.SleepOwnerDetachedByClose,
+                    "父窗口真实关闭后必须持久化脱离意图，防止重建时偷偷恢复 PendingFollowOwner。");
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.Independent,
+                    ESWindowFoundation.GetSleepLinkMode(child));
+
+                UnityEngine.Object.DestroyImmediate(owner);
+                owner = ScriptableObject.CreateInstance<RuntimeContractWindow>();
+                ESWindowFoundation.Bind(owner);
+                child.ReactivateOwner(owner);
+                Assert.IsFalse(relationship.SleepOwnerDetachedByClose);
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner));
+
+                reloadFlag.SetValue(null, true);
+                ESWindowFoundation.Unbind(owner, true);
+                Assert.IsFalse(
+                    relationship.SleepOwnerDetachedByClose,
+                    "Domain Reload 期间只释放活动引用，不得把声明关系误记为用户关闭后的永久脱离。");
+            }
+            finally
+            {
+                reloadFlag.SetValue(null, false);
+                ESWindowFoundation.Unbind(child, true);
+                ESWindowFoundation.Unbind(owner, true);
+                UnityEngine.Object.DestroyImmediate(child);
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        [Test]
+        public void ProductionFollowOwnerWindowsExposeExplicitStableContracts()
+        {
+            AssertFollowOwnerContract(
+                typeof(ESTrackItemTemporaryInspectorWindow),
+                "ES.TrackView.Window");
+            AssertFollowOwnerContract(
+                typeof(ESTrackClipTemporaryInspectorWindow),
+                "ES.TrackView.Window");
+            AssertFollowOwnerContract(
+                typeof(ESTrackSkillDataTemporaryInspectorWindow),
+                "ES.TrackView.Window");
+            AssertFollowOwnerContract(
+                typeof(ESAssetPackageRecordPreviewWindow),
+                "ES.AssetPackageBake.Window");
+
+            MethodInfo assetPreviewOpen = typeof(ESAssetPackageRecordPreviewWindow).GetMethod(
+                "Open",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[]
+                {
+                    typeof(ESAssetPackageBakeData),
+                    typeof(ESAssetPackageBakeRecord),
+                    typeof(UnityEditor.EditorWindow)
+                },
+                null);
+            Assert.IsNotNull(
+                assetPreviewOpen,
+                "资产记录预览必须由打开方显式传入 EditorWindow owner。");
+            Assert.IsNotNull(
+                typeof(ESAssetPackageBakeWindow).GetMethod(
+                    "ESWindow_OnHostEnable",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly),
+                "资产包主窗口必须在恢复时按稳定 ownerKey 解析 PendingFollowOwner。");
+        }
+
+        private static void AssertFollowOwnerContract(Type windowType, string expectedOwnerKey)
+        {
+            UnityEditor.EditorWindow window =
+                ScriptableObject.CreateInstance(windowType) as UnityEditor.EditorWindow;
+            Assert.IsNotNull(window, windowType.FullName + " 必须是 EditorWindow。");
+            try
+            {
+                PropertyInfo modeProperty = FindInstanceProperty(
+                    windowType,
+                    "ESWindow_SleepLinkMode");
+                PropertyInfo ownerKeyProperty = FindInstanceProperty(
+                    windowType,
+                    "ESWindow_SleepOwnerKey");
+                Assert.IsNotNull(modeProperty, windowType.FullName + " 缺少休眠依赖声明。");
+                Assert.IsNotNull(ownerKeyProperty, windowType.FullName + " 缺少稳定 ownerKey 声明。");
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.FollowOwner,
+                    modeProperty.GetValue(window),
+                    windowType.FullName + " 必须显式声明 FollowOwner。");
+                Assert.AreEqual(
+                    expectedOwnerKey,
+                    ownerKeyProperty.GetValue(window),
+                    windowType.FullName + " 的 ownerKey 必须与父窗口权威常量一致。");
+            }
+            finally
+            {
+                ESWindowFoundation.Unbind(window, true);
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        private static PropertyInfo FindInstanceProperty(Type type, string propertyName)
+        {
+            while (type != null)
+            {
+                PropertyInfo property = type.GetProperty(
+                    propertyName,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                    | BindingFlags.DeclaredOnly);
+                if (property != null)
+                    return property;
+                type = type.BaseType;
+            }
+            return null;
         }
 
         [Test]
@@ -1345,15 +2214,15 @@ namespace ES.Tests
         }
 
         [Test]
-        public void SemiSleepStressGridDistributesTwentyWindowsInsideMainBounds()
+        public void SemiSleepStressGridDistributesTwentyOneWindowsInsideMainBounds()
         {
-            Assert.AreEqual(20, ESWindowSemiSleepStressTest.ConfiguredWindowCount);
+            Assert.AreEqual(21, ESWindowSemiSleepStressTest.ConfiguredWindowCount);
             Rect main = new Rect(100f, 80f, 1800f, 1000f);
-            Rect[] bounds = Enumerable.Range(0, 20)
+            Rect[] bounds = Enumerable.Range(0, 21)
                 .Select(index => ESWindowSemiSleepStressTest.BuildSleepBounds(main, index))
                 .ToArray();
 
-            Assert.AreEqual(20, bounds.Distinct().Count());
+            Assert.AreEqual(21, bounds.Distinct().Count());
             foreach (Rect item in bounds)
             {
                 Assert.AreEqual(100f, item.width);
@@ -1529,6 +2398,185 @@ namespace ES.Tests
                 UnityEngine.Object.DestroyImmediate(first);
                 UnityEngine.Object.DestroyImmediate(second);
             }
+        }
+
+        [Test]
+        public void AssetPackagePathSafetyRejectsTraversalAndAbsolutePaths()
+        {
+            Assert.IsFalse(ESAssetPackagePathSafety.TryNormalizeProjectAssetPath(
+                "Assets/../ProjectSettings", out _));
+            Assert.IsFalse(ESAssetPackagePathSafety.TryNormalizeProjectAssetPath(
+                "C:/Outside", out _));
+            Assert.IsFalse(ESAssetPackagePathSafety.TryNormalizeProjectAssetPath(
+                "../Assets/Outside", out _));
+
+            Assert.IsTrue(ESAssetPackagePathSafety.TryNormalizeProjectAssetPath(
+                "assets\\Exports\\VFX", out string normalized));
+            Assert.AreEqual("Assets/Exports/VFX", normalized);
+        }
+
+        [Test]
+        public void AssetPackagePathSafetyRejectsReservedAndTransactionFolders()
+        {
+            Assert.IsTrue(ESAssetPackagePathSafety.IsForbiddenExportFolder("Assets/Resources/Effects"));
+            Assert.IsTrue(ESAssetPackagePathSafety.IsForbiddenExportFolder("Assets/Tools/Editor"));
+            Assert.IsTrue(ESAssetPackagePathSafety.IsForbiddenExportFolder("Assets/.Recovery/Package"));
+            Assert.IsTrue(ESAssetPackagePathSafety.IsForbiddenExportFolder("Assets/.ESBakeTransactions/Run"));
+            Assert.IsFalse(ESAssetPackagePathSafety.IsForbiddenExportFolder("Assets/_ESAssetPackageExport/VFX"));
+        }
+
+        [Test]
+        public void AssetPackagePathSafetyOnlyAllowsAssetsRootOverlapInsideConfiguredExportRoot()
+        {
+            Assert.IsTrue(ESAssetPackagePathSafety.IsAllowedExportOverlap(
+                "Assets", "Assets/_ESAssetPackageExport", "Assets/_ESAssetPackageExport/VFX"));
+            Assert.IsFalse(ESAssetPackagePathSafety.IsAllowedExportOverlap(
+                "Assets", "Assets/_ESAssetPackageExport", "Assets/OtherSource"));
+            Assert.IsFalse(ESAssetPackagePathSafety.IsAllowedExportOverlap(
+                "Assets/Source", "Assets/_ESAssetPackageExport", "Assets/Source/Output"));
+        }
+
+        [Test]
+        public void AssetPackageResolutionSnapshotSealDetectsMutation()
+        {
+            var snapshot = new ESAssetPackageResolutionSnapshot
+            {
+                packageId = "package.test",
+                definitionHash = "definition.hash",
+                createdUtc = "2026-08-13T00:00:00.0000000Z",
+                items = new List<ESAssetPackageResolutionItem>
+                {
+                    new ESAssetPackageResolutionItem
+                    {
+                        sourceGuid = "source-guid",
+                        sourcePath = "Assets/Source.prefab",
+                        sourceDependencyHash = "dependency-hash",
+                        sourceFileHash = "source-file-hash",
+                        targetPath = "Assets/Export/Target.prefab",
+                        expectedTargetGuid = string.Empty,
+                        expectedTargetFileHash = string.Empty,
+                        category = ESAssetPackageCategory.Prefab,
+                        operation = ESAssetPackageExportOperation.Create,
+                        reasonCode = ESAssetPackageExportReasonCode.NewSource
+                    }
+                }
+            };
+
+            snapshot.Seal();
+            Assert.IsTrue(snapshot.HasValidIntegrity());
+            snapshot.items[0].targetPath = "Assets/Other/Target.prefab";
+            Assert.IsFalse(snapshot.HasValidIntegrity());
+        }
+
+        [Test]
+        public void AssetPackageFixedPathInvalidDoesNotFallbackToDefaultFolder()
+        {
+            var setting = new ESAssetPackageCategoryFolderSetting
+            {
+                category = ESAssetPackageCategory.Prefab,
+                folderName = "Prefabs",
+                useFixedAssetPath = true,
+                fixedAssetFolderPath = "C:/outside"
+            };
+            Assert.IsTrue(setting.useFixedAssetPath);
+            Assert.IsFalse(ESAssetPackagePathSafety.TryNormalizeProjectAssetPath(setting.fixedAssetFolderPath, out _));
+        }
+
+        [Test]
+        public void AssetPackageExportContractHasSingleEntryAndStructuredRollbackState()
+        {
+            MethodInfo[] exports = typeof(ESAssetPackageBakeUtility)
+                .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Where(method => method.Name == "ExportSelectedAssetsByCategory")
+                .ToArray();
+            Assert.AreEqual(1, exports.Length);
+            Assert.IsNotNull(typeof(ESAssetPackageExportSession).GetField("rollbackState"));
+            Assert.IsNotNull(typeof(ESAssetPackageExportSession).GetField("sourceAssetGuids"));
+        }
+
+        [Test]
+        public void AssetPackageCategoryCatalogProvidesStableIdentityAndPreviewCapabilities()
+        {
+            ESAssetPackageCategoryDescriptor prefab = ESAssetPackageCategoryCatalog.Get(ESAssetPackageCategory.Prefab);
+            ESAssetPackageCategoryDescriptor animation = ESAssetPackageCategoryCatalog.Get(ESAssetPackageCategory.Animation);
+            Assert.AreEqual("prefab", prefab.stableKey);
+            Assert.AreEqual("Prefabs", prefab.defaultExportFolder);
+            Assert.AreEqual("d_Prefab Icon", prefab.iconName);
+            Assert.IsTrue((prefab.previewCapabilities & ESAssetPackagePreviewCapability.DynamicEffect) != 0);
+            Assert.AreEqual("animation", animation.stableKey);
+            Assert.IsTrue((animation.previewCapabilities & ESAssetPackagePreviewCapability.Animation) != 0);
+            Assert.AreEqual("Prefabs", ESAssetPackageCategoryCatalog.Get(ESAssetPackageCategory.Prefab).defaultExportFolder);
+        }
+
+        [Test]
+        public void AssetPackagePreviewCapabilityContractSeparatesDynamicAndAnimationRoutes()
+        {
+            ESAssetPackagePreviewCapability prefab = ESAssetPackageCategoryCatalog.GetPreviewCapabilities(ESAssetPackageCategory.Prefab);
+            ESAssetPackagePreviewCapability texture = ESAssetPackageCategoryCatalog.GetPreviewCapabilities(ESAssetPackageCategory.Texture);
+            Assert.IsTrue((prefab & ESAssetPackagePreviewCapability.DynamicEffect) != 0);
+            Assert.IsTrue((prefab & ESAssetPackagePreviewCapability.Animation) != 0);
+            Assert.IsFalse((texture & ESAssetPackagePreviewCapability.DynamicEffect) != 0);
+        }
+
+        [Test]
+        public void AssetPackageMaterialAndAudioUseDedicatedPreviewCapabilities()
+        {
+            ESAssetPackagePreviewCapability material = ESAssetPackageCategoryCatalog.GetPreviewCapabilities(ESAssetPackageCategory.Material);
+            ESAssetPackagePreviewCapability audio = ESAssetPackageCategoryCatalog.GetPreviewCapabilities(ESAssetPackageCategory.Audio);
+
+            Assert.IsTrue((material & ESAssetPackagePreviewCapability.Material) != 0);
+            Assert.IsTrue((material & ESAssetPackagePreviewCapability.Detail) != 0);
+            Assert.IsFalse((material & ESAssetPackagePreviewCapability.Animation) != 0);
+            Assert.IsTrue((audio & ESAssetPackagePreviewCapability.Audio) != 0);
+            Assert.IsTrue((audio & ESAssetPackagePreviewCapability.Detail) != 0);
+            Assert.IsFalse((audio & ESAssetPackagePreviewCapability.Animation) != 0);
+        }
+
+        [Test]
+        public void AssetPackageAudioPreviewKeepsSpatialControlsEditorOnly()
+        {
+            Type audioPlayer = typeof(ESAssetPackageAudioPreviewPlayer);
+            Assert.IsNotNull(audioPlayer.GetField("pitch", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNotNull(audioPlayer.GetField("spatialBlend", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNotNull(audioPlayer.GetField("dopplerLevel", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNotNull(audioPlayer.GetField("sourceAzimuth", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNotNull(audioPlayer.GetField("orbitSource", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNotNull(audioPlayer.GetField("customRolloffCurve", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNotNull(audioPlayer.GetField("previewSource", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNotNull(audioPlayer.GetField("previewContext", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNull(audioPlayer.GetField("runtimeAudioModule", BindingFlags.Instance | BindingFlags.NonPublic));
+
+            Type context = typeof(ESAssetPackagePreviewSceneContext);
+            Assert.IsNotNull(context.GetProperty("OwnsPreviewAudioListener", BindingFlags.Instance | BindingFlags.Public));
+            Assert.IsNotNull(context.GetProperty("AudioListenerOrigin", BindingFlags.Instance | BindingFlags.Public));
+            Assert.IsNotNull(context.GetProperty("AudioListenerRotation", BindingFlags.Instance | BindingFlags.Public));
+            Assert.IsNotNull(context.GetField("sharedPreviewAudioListener", BindingFlags.Static | BindingFlags.NonPublic));
+            Assert.IsNotNull(context.GetField("sharedPreviewAudioUsers", BindingFlags.Static | BindingFlags.NonPublic));
+            Assert.IsNotNull(context.GetField("sharedPreviewAudioPlaying", BindingFlags.Static | BindingFlags.NonPublic));
+            Assert.IsNotNull(context.GetMethod("SetPreviewAudioListenerPlaying", BindingFlags.Instance | BindingFlags.Public));
+            Assert.IsNotNull(context.GetMethod("GetAudioListenerDescription", BindingFlags.Instance | BindingFlags.Public));
+            Assert.IsNotNull(audioPlayer.GetMethod("RegisterTick", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNotNull(audioPlayer.GetMethod("UnregisterTick", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNotNull(audioPlayer.GetMethod("DrawDiagnostics", BindingFlags.Instance | BindingFlags.NonPublic));
+        }
+
+        [Test]
+        public void AssetPackageRecordPreviewWindowUsesSingleEsPreviewHostAndDedicatedPlayers()
+        {
+            Type windowType = typeof(ESAssetPackageRecordPreviewWindow);
+            PropertyInfo stableId = windowType.GetProperty("ESWindow_PageStableId", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(stableId);
+            Assert.AreEqual(typeof(string), stableId.PropertyType);
+            Assert.IsTrue(stableId.GetMethod.IsFamily || stableId.GetMethod.IsAssembly);
+            Assert.IsNotNull(windowType.GetField("animationPreview", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNotNull(windowType.GetField("dynamicPreview", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNotNull(windowType.GetField("materialPreview", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNotNull(windowType.GetField("audioPreview", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNull(typeof(ESAssetPackagePreviewUtility).GetMethod("DrawMaterialDetail", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic));
+            Assert.IsNull(typeof(ESAssetPackagePreviewUtility).GetMethod("DrawAudioDetail", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic));
+            Assert.IsNotNull(typeof(ESAssetPackagePreviewUtility).GetMethod("GetCacheDiagnostics", BindingFlags.Static | BindingFlags.Public));
+            Assert.IsNotNull(typeof(ESAssetPackageDynamicPreviewPlayer).GetMethod("DisposeInstance", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.LessOrEqual(ESAssetPackageGridAnimationFrameCache.MaxEntries, 48);
         }
 
         [Test]

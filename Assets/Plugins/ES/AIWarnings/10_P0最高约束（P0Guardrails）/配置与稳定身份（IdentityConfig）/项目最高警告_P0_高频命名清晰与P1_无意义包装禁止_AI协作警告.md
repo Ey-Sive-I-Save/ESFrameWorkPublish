@@ -20,7 +20,7 @@
 | 实际语义 | 高频推荐 | 通常不推荐 | 判定理由 |
 |---|---|---|---|
 | 给现有数值增加一段量 | `AddVelocity`、`AddTag`、`AddItem` | `SubmitVelocityDelta`、`DispatchVelocityChangeRequest` | 调用者关心“增加了什么”，不应先理解提交协议 |
-| 设置当前或下一步使用的值 | `SetDriverInput`、`SetCameraLook`、`SetPendingShotResult` | `SubmitDriverInput`、`SubmitCameraLook`、`SubmitShotResult` | 若实现只是校验后覆盖字段，`Set` 更准确；可能拒绝时使用 `TrySet...` |
+| 设置当前或下一步使用的值 | `SetMoveInput`、`SetLookInput`、`SetPendingResult` | `SubmitValueMutationRequest`、`ProcessPendingValueSubmission` | 若实现只是校验后覆盖字段，`Set` 更准确；可能拒绝时使用 `TrySet...` |
 | 立即把规则或效果作用到目标 | `ApplyDamage`、`ApplyMotionInfluences`、`ApplyDefinition` | `ExecuteDamageApplication`、`ProcessMotionInfluenceRequest` | `Apply` 已能表达“根据规则作用”，无需重复包装成执行协议 |
 | 清除、释放或移除已有内容 | `ClearDriverInput`、`ReleaseDriver`、`RemoveTag` | `InvalidateDriverInputSubmission`、`ProcessDriverRelease` | 直接说明结果和对象，避免抽象名词化 |
 | 查询并返回一个值 | `GetAnchorPosition`、`TryGetTransform` | `ResolveAnchorPosition`、`ExecuteTransformResolution` | 单源读取或简单二选一通常是 `Get/TryGet`；只有真正跨来源消歧时才使用 `Resolve` |
@@ -50,7 +50,7 @@
 - `ESStoryModule.SubmitContinue(ESStoryViewSubmission)` 与 `SubmitOption(...)` 可以保留：Submission 携带 Instance、View Session、Revision 与选项身份，模块会拒绝旧视图或错误节点，并在接受后推进 Story 状态。
 - 自动化系统的 `SubmitInput(ESAutomationTaskInputSubmission)` 可以保留：它跨 Facade/Endpoint 权威边界，输入带运行身份和 Schema 约束，并存在明确的接受、拒绝和等待继续流程。
 - `EntityEquipmentAttachmentModule.TryCommit(...)` 可以保留：它校验四项 Transition Stamp，在挂载前后复核代际，并在中途失效时恢复原父级和局部变换。这是真正的提交阶段，不是一次普通 `SetParent` 包装。
-- `ESTagCollection.Acquire(...)` 与 `TryAcquireField(...)` 可以保留：它们产生需要释放、带代际保护的 Lease，`Acquire` 表达了真实的生命周期所有权。
+- `ESTagCollection.Acquire(...)` 与 `IESMotionInfluenceReceiver.TryAcquireField(...)` 可以保留：它们分别产生需要释放、带代际保护的 Tag Lease 与 Motion Field Lease，`Acquire` 表达了真实的生命周期所有权。
 - 底层 `DispatchVelocity(...)` 可以保留为私有实现：它遍历已注册的运动能力并遵守确定顺序；但不得直接作为技能或策划高频入口。
 
 ## P0：核心架构词具有项目语义所有权
@@ -83,58 +83,32 @@
 - Shot 每帧是否 Tick 只是规则判断，使用 `IItemShotTickPolicy`，不得恢复 `IItemShotTickScheduler`。
 - 武器槽位同时承载近战和远程，使用 `WeaponSlot`，不得恢复会把近战伪装成枪械的 `GunWeaponSlot`。
 
-### 已存在但尚未迁移的语义债务
+### 审查流程与动态记录边界
 
-以下名称已经进入资产、序列化或大范围 API，本轮只登记风险，禁止后续代码继续照抄；迁移时必须单独设计兼容和资产升级：
+P0 正文只保存长期稳定的语义、禁止事项和判定流程。带扫描日期、候选数量、具体改名建议、迁移阶段或当前验证状态的内容必须放入独立审查报告；`CurrentStatus` 只登记报告入口和当前阶段。动态候选不得反向成为永久禁词。
 
-- `ActionTemplateDataInfo` / `ActionTemplateDataGroup` 实际是会注入 `ESActionGameCoreTable` 的正式 Action Definition，不是可随意复制的作者模板。新类型不得继续使用 `*TemplateDataInfo` 表示正式 GameCore 定义；后续应评估迁移到 `ActionDefinitionDataInfo/Group`。
-- `ESWeaponSceneTemplate.RuntimeBridgeSection` 当前只是模板内的作者引用分组与接入说明，不是独立 Runtime Service，也不拥有运行时生命周期。禁止据此新增 `*RuntimeBridge` 转发包装；未来若重命名，应按序列化字段迁移处理。
-- `ESWeaponTemplateFireKind` 只描述模板的射击/弹道作者提示，却容易被误解为正式武器种类。正式近战/远程身份只认 `ItemWeaponSharedData.weaponKind`；新工具不得用 Template FireKind 替代 WeaponDefinition。
-- `EntityWeaponBinding.fireOrigin`、`fireStateKey` 是远程执行字段，不是通用 Attack Origin/State。近战命中若需要独立参考，应新增语义明确且由 Action 消费的字段，不能偷偷复用“开火”字段后宣称已接线。
+项目扫描必须遵守以下流程：
 
-### 项目复杂用词扫描：首轮候选
+1. 先识别入口是否真的由策划、业务代码或 AI 高频接触，私有实现和外部固定合同不得混入同一等级；
+2. 同时检查声明、实现和调用点，禁止仅凭 `Submit`、`Resolve`、`Manager` 等单词命中判错；
+3. 记录唯一权威、调用频率、拒绝语义、生命周期、序列化资产和兼容影响；
+4. 将结果分为“确认合理”“待复核候选”“已确认问题”，候选不能写成已经违反 P0；
+5. 成对协议、接口实现和调用链必须整体评估，不得只改其中一个符号；
+6. 批量改名、兼容别名、序列化迁移和源码修改均需单独授权，审查报告本身不提供实施权限；
+7. UTF-8、`git diff --check`、静态编译和会话上下文验收只证明各自范围，不能代替命名判断或 Unity 迁移验收。
 
-本节是 2026-08-13 的只读首轮源码扫描结果，只登记已经回看实现的候选。它不是批量改名授权，也不能仅凭单词命中判定违规。`Obsolete`、`Generated`、测试名、第三方接口实现和 Unity/KCC/Odin 固定回调默认不进入业务 API 改名范围。
+当前动态候选和迁移建议统一记录于 `ES/Documentation/Status/API_NAMING_REVIEW_20260813.md`。
 
-| 候选 | 当前实现事实 | 初步等级 | 建议方向 |
-|---|---|---|---|
-| `VehicleController.SubmitDriverInput(...)` | 校验当前驾驶者后只调用 `inputState.Set(...)`；属于每帧角色到载具的高频输入 | P0 新代码禁止继续扩散；既有改名需单独迁移 | 优先评估 `TrySetDriverInput(...)`；若上层已保证驾驶权且无需返回拒绝结果，可用 `SetDriverInput(...)` |
-| `EntityMountable.SubmitDriverInput(...)` | 校验当前 Rider 后转发给 VehicleController，同样是每帧高频入口 | P0 新代码禁止继续扩散；与上一项成套迁移 | 与载具端统一为 `TrySetDriverInput(...)`，避免两层都暴露协议化动词 |
-| `Entity.SubmitCameraLook(...)` | 检查本地控制权后调用 Lease 的 `TrySetLook(...)`，本质是高频输入设置 | P0 新代码禁止继续扩散；既有改名需检查输入调用链 | 优先评估 `TrySetCameraLook(...)`，调用点能直接理解“设置镜头观察输入” |
-| `ItemMotionModule.SubmitShotResult(...)` | 只把 `ShotMotionResult` 写入 `_pendingResult` 并设置 `_hasPendingResult` | P1 命名债务；若成为跨模块日常入口则升级 P0 | 优先评估 `SetPendingShotResult(...)`；若结果会立刻进入合成阶段可评估 `ApplyShotResult(...)` |
-| Track Editor Preview 的 `SubmitClipState(...)` | 缓存原始 Active，合并同一采样帧多个 Clip 请求并写最终 Active | 暂不判违规 | `Submit` 有“多来源请求合并”事实，但名称未说明仲裁对象；后续评估 `SetClipActiveRequest(...)` 或保留并补充职责说明 |
-| `MatchTargetGizmosDrawer.Submit(...)` | 同一 Key 每帧覆盖诊断数据，属于开发诊断写入，不是玩法业务入口 | P2 可读性债务 | 可评估 `SetFrameData(...)`；不应与玩法 API 同优先级处理 |
-| `ESMotionInfluenceReceiverResolver.TryResolve(...)` | 在目标父级 Core、VehicleController 和显式 Receiver 间按权威顺序查找接收器 | 合理 | 这里确实存在多来源解析和优先级，且 Resolver 被隐藏在 `ESMotion.AddVelocity(...)` 业务入口之后 |
-| `ESStoryDefinitionCatalog.TryResolve(...)` | 通过稳定 Key、内容版本和签名解析不可变 Snapshot | 合理 | `Resolve` 表达跨稳定身份到运行时定义的解析，不应机械改成 `Get` |
-| `ESTagCollection.Acquire(...)`、`TryAcquireStringKey(...)` | 创建 generation-safe Lease，调用方必须释放 | 合理 | `Acquire` 表达真实所有权；改为 `AddTag` 会丢失释放义务 |
-| `VehicleController.RegisterMotionFeature(...)` | 按阶段向多个 `ESWorkScheduler` 注册能力并返回可释放 Registration | 合理但应关注高频入口文案 | 注册与注销生命周期真实存在；无需为了简单词改成 `AddFeature` |
-| `VehicleController.ProcessHitStabilityReport(...)` | KCC 接口规定的固定回调签名 | 外部合同，不纳入改名 | 不得为满足本规则破坏 KCC 接口 |
+### 既有命名问题分级
 
-后续扫描顺序：
+| 等级 | 情况 | 默认处理 |
+|---|---|---|
+| A | 策划字段、Inspector、菜单、业务高频 API 明显难懂 | 优先整改；先保证使用者可直接理解，再处理低频内部名称 |
+| B | 公共协议名与真实职责不符，可能误导后续架构 | 按完整调用链迁移；声明、实现、调用方、测试和现行文档必须同步评估 |
+| C | 内部或低频名称不够好，但职责尚可理解 | 登记；只在相关代码本来就要修改且风险可控时顺带处理，不单独扩大重构 |
+| D | 私有实现、第三方回调、生成代码、历史代码 | 默认不动；外部固定合同不得为了项目命名风格强行改写 |
 
-1. 先处理 Runtime 业务调用面中的 `Submit/Process/Execute/Resolve/Acquire/Commit`；
-2. 再检查 Inspector、菜单和 AICommand 的可见文案，优先于私有实现名；
-3. 最后审查 `Manager/Bridge/Context/Request/Result/Payload` 等类型后缀是否有真实职责；
-4. 每个候选必须记录声明、实现、调用频率、唯一权威、序列化影响和推荐名，不能直接全局替换。
-
-## 语义优化计划：分级迁移，不把审计扩大成重构
-
-本计划只确定顺序、风险和验收门禁，不授权自动执行后续大范围改名或职责拆分。每一阶段必须独立评审、独立验证；上一阶段的审计结果不能直接当作下一阶段的修改许可。
-
-| 阶段 | 优先级与范围 | 序列化风险 | 主要风险 | 进入下一阶段前的门禁 |
-|---|---|---|---|---|
-| A：安全纠偏 | P0，已处理 `EntityPrimaryAttackRouter -> EntityPrimaryAttackSelector`、`GunWeaponSlot -> WeaponSlot`、`IItemShotTickScheduler -> IItemShotTickPolicy` | 不改变现有资产字段结构；脚本改名必须保留 `.meta` GUID | 遗漏源码、测试或文档引用；Prefab 反序列化异常 | 可执行源码与现行说明不再引用旧符号（迁移记录除外）；Runtime、Editor、Tests 静态编译通过；Selector EditMode 测试通过；正式角色 Prefab 可加载 |
-| B：Action Definition 正名 | P1，评估 `ActionTemplateDataInfo/Group -> ActionDefinitionDataInfo/Group` | 高；涉及 ScriptableObject 脚本身份、Group 泛型、Picker、GameCore 注入与现有 `.asset` | Missing Script、资产类型丢失、创建菜单或 Table 扫描分叉 | 修改前先统计全部 Action 资产与引用；设计 `MovedFrom`/GUID 保留方案；准备迁移器与回滚备份；迁移后逐资产加载、GameCore 重建和 EditMode/PlayMode 验证 |
-| C：Weapon 模板字段正名 | P1，先确认 `RuntimeBridgeSection` 是否仅为接入引用分组；确认 `ESWeaponTemplateFireKind` 是否只表达模板布局提示，再决定 `IntegrationReferencesSection`、`ESWeaponTemplateLayoutKind` 等最终名称 | 中；嵌套序列化字段和枚举值已进入 Prefab | 只改类型名却丢字段、枚举含义继续与正式 `ItemWeaponKind` 混淆、构建器与旧 Prefab 分叉 | 先做使用点与 Prefab 扫描；字段改名必须有 `FormerlySerializedAs`，类型迁移按 Unity 版本验证 `MovedFrom`；构建器重复执行哈希稳定；全部 Weapon Prefab 严格校验通过 |
-| D：远程/近战字段边界 | P1，`fireOrigin`、`fireStateKey` 继续保持远程专用；只有近战 Action 出现真实消费需求时，才新增明确的近战命中参考 | 新字段通常低；若搬迁既有 Binding 字段则高 | 为复用挂点把近战伪装成开火，或建立一套没有消费者的“通用攻击绑定” | 先取得近战 Action、命中采样和伤害消费者证据；新增字段必须有唯一消费者、Prefab 作者校验与 PlayMode 命中证据；禁止仅因模板已有节点就宣称接线 |
-| E：Combat 职责拆分评估 | P2，审计 `EntityBasicCombatModule` 中装备切换、挂载、远程射击和状态表现的生命周期；只在出现独立权威与可独立测试边界后拆分 | 很高；角色 Prefab、运行时状态和调用链均可能受影响 | 新增万能 Manager/Dispatcher/Scheduler、双权威、切枪与攻击状态不同步 | 先形成调用图、状态所有权表、池化/销毁顺序和 PlayMode 基线；评审通过后再决定是否拆分及最终名称，不预建空接口或兼容包装 |
-
-执行约束：
-
-1. 阶段 A 之外的改名不得与玩法功能开发混在同一批修改中。
-2. 涉及 Unity 序列化的阶段必须先退出 PlayMode，并把 before 基线放入 `ES/Bak/Local` 或 `ES/Bak/Reviewed`；是否入 Git 按备份分层规则决定。
-3. 迁移必须验证资产反序列化、GameCore 注入、构建器幂等和对应 PlayMode 行为；`dotnet build`、MCP clean 或菜单成功都不能单独作为完成证据。
-4. 审计发现名称可疑时先登记债务，不得顺手创建 `WeaponManager`、`EquipmentScheduler`、`AttackDispatcher` 或第二套输入/攻击链。
+等级描述的是影响面和处理顺序，不是对单词的永久定罪。同一符号可以同时命中 A 与 B，此时按更严格的完整调用链迁移；D 类若泄漏成现行高频入口，必须重新分级。
 
 ## P1：禁止无职责包装、无意义嵌套
 

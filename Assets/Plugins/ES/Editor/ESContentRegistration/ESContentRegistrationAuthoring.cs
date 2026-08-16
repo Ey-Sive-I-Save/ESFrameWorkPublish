@@ -180,6 +180,36 @@ namespace ES
             }
         }
 
+        /// <summary>
+        /// 人工启动正式 Bake 的统一入口。预检与提交使用同一 requestId，实际执行仍只经过 Execute。
+        /// </summary>
+        public static ESContentRegistrationResult ExecuteBakeWithConfirmation()
+        {
+            ESContentRegistrationResult preview = Execute(new ESContentRegistrationRequest
+            {
+                action = ESContentRegistrationAction.Bake,
+                commit = false
+            });
+            if (preview == null || !preview.success)
+                return preview;
+
+            if (!EditorUtility.DisplayDialog(
+                    "启动资源引用 Bake",
+                    "预检已通过。Bake 将写入 ES/ResourcePipeline/Baked，并在任务完成前冻结注册源。是否继续？",
+                    "启动 Bake",
+                    "取消"))
+            {
+                return null;
+            }
+
+            return Execute(new ESContentRegistrationRequest
+            {
+                action = ESContentRegistrationAction.Bake,
+                requestId = preview.requestId,
+                commit = true
+            });
+        }
+
         public static bool TryGetAuthoringWriteBlockReason(out string reason)
         {
             if (editorMainThreadId == 0 || Thread.CurrentThread.ManagedThreadId != editorMainThreadId)

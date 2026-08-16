@@ -15,6 +15,7 @@ using Cursor = UnityEngine.UIElements.Cursor;
 
 public class ESTrackViewWindow : OdinEditorWindow
 {
+    internal const string SleepOwnerKey = "ES.TrackView.Window";
     private static readonly Vector2 s_MinWindowSize = new Vector2(600f, 420f);
     private const string LastTimelineGuidPrefKey = "ES.TrackView.LastTimelineGuid";
     private const string LastTimelinePathPrefKey = "ES.TrackView.LastTimelineAssetPath";
@@ -141,6 +142,7 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     protected override void OnDestroy()
     {
+        ESWindowFoundation.ClearPendingSleepOwners(SleepOwnerKey);
         ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
         EditorApplication.update -= FlushScheduledViewRefresh;
         EditorApplication.update -= FlushAutoSave;
@@ -159,7 +161,6 @@ public class ESTrackViewWindow : OdinEditorWindow
         EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
         CleanupTrackPreviewPlayer();
         ESTrackViewWindowHelper.CancelPendingSelectionTrackRefresh();
-        CloseExternalInspectorWindows();
         DetachProjectionVisuals();
         base.OnDestroy();
 
@@ -177,7 +178,6 @@ public class ESTrackViewWindow : OdinEditorWindow
     protected override void OnEnable()
     {
         base.OnEnable();
-        ES.EditorInternal.ESEditorPresentation.BindWindow(this);
         window = this;
         minSize = s_MinWindowSize;
         m_IsInspectorDrawerOpen = m_SerializedInspectorDrawerOpen;
@@ -587,7 +587,6 @@ public class ESTrackViewWindow : OdinEditorWindow
 
     public void CreateGUI()
     {
-        ES.EditorInternal.ESEditorPresentation.BindWindow(this);
         ResetEditorProjectionForRebuild();
         // Each editor window contains a root VisualElement object
         VisualElement root = rootVisualElement;
@@ -603,6 +602,10 @@ public class ESTrackViewWindow : OdinEditorWindow
         //隐藏特殊资源
 
         BindElements();
+        ESWindowFoundation.Bind(
+            this,
+            new ESWindowActionHosts(system: toolbar.SystemActionHost));
+        ESWindowFoundation.ResolvePendingSleepOwners(SleepOwnerKey, this);
         ApplyTrackViewTheme();
         FindTrackAssets();
         RestoreRememberedPreviewEntity();
@@ -854,16 +857,6 @@ public class ESTrackViewWindow : OdinEditorWindow
         EndTransientInteractions(true);
         FlushAutoSaveImmediate();
         ForceFlushPlaybackContextSave();
-    }
-
-    private void CloseExternalInspectorWindows()
-    {
-        ESTrackItemTemporaryInspectorWindow.CloseCurrentWindow();
-        Last_EditorWindowForTrackItem = null;
-        ESTrackClipTemporaryInspectorWindow.CloseCurrentWindow();
-        Last_EditorWindowForTrackClip = null;
-        ESTrackSkillDataTemporaryInspectorWindow.CloseCurrentWindow();
-        Last_EditorWindowForSkillDataInfo = null;
     }
 
     private void ClearTrackVisuals()
@@ -3010,13 +3003,11 @@ public class ESTrackViewWindow : OdinEditorWindow
             height = 6,
             left = 2.5f,
             top = 1,
-            borderTopLeftRadius = 3,
-            borderTopRightRadius = 3,
-            borderBottomLeftRadius = 2,
-            borderBottomRightRadius = 2,
             backgroundColor = ESTrackViewTheme.PlayheadHandle
         }
         };
+        ESEditorPresentation.ApplyCornerRadius(
+            m_TimeCursorHandle, ESEditorPresentation.ESCornerRadiusToken.Control);
         timeCursor.Add(m_TimeCursorHandle);
 
         leftPanel.Add(timeCursor);
@@ -5391,7 +5382,8 @@ public class ESTrackViewWindow : OdinEditorWindow
             trackItem.item,
             TrackContainer as UnityEngine.Object,
             "编辑轨道<" + trackItem.item.DisplayName + ">",
-            "轨道项目");
+            "轨道项目",
+            this);
         Last_EditorWindowForTrackItem?.Focus();
     }
 
@@ -5420,7 +5412,8 @@ public class ESTrackViewWindow : OdinEditorWindow
             clip.trackClip,
             TrackContainer as UnityEngine.Object,
             "编辑片段<" + clip.trackClip.DisplayName + ">",
-            "片段");
+            "片段",
+            this);
         Last_EditorWindowForTrackClip?.Focus();
     }
 

@@ -8,9 +8,26 @@ using UnityEngine;
 using UnityEngine.UIElements;
 
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("ES.MenuTree.Editor.Tests")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("ES_Logic.Editor")]
 
 namespace ES
 {
+    public enum ESWindowVisualState : byte
+    {
+        ActivePanel,
+        SleepTile,
+        EdgeTab,
+        EdgeTabHover
+    }
+
+    /// <summary>窗口半休眠的生命周期归属。关系只存在于当前 Editor 域，不持久化窗口引用。</summary>
+    public enum ESWindowSleepLinkMode : byte
+    {
+        Independent,
+        FollowOwner,
+        OwnedSurface
+    }
+
     public enum ESWindowActionScope : byte
     {
         System,
@@ -18,9 +35,16 @@ namespace ES
         Window
     }
 
+    /// <summary>可选的 ES 窗口展示元数据。只返回当前页面的轻量标题与图标。</summary>
+    public interface IESWindowPresentationMetadata
+    {
+        string ESWindow_PresentationTitle { get; }
+        Texture ESWindow_PresentationIcon { get; }
+    }
+
     /// <summary>
-    /// ES 窗口三域动作宿主。宿主的具体行列、换行和折叠布局完全由窗口拥有；
-    /// 基础层只校验归属，并向 System 域接入窗口生命周期动作。
+    /// ES 窗口三域动作宿主。标准 ES 窗口由基类创建宿主并传入此合同；
+    /// 派生窗口只追加动作。基础层校验归属，并向 System 域接入窗口生命周期动作。
     /// </summary>
     public sealed class ESWindowActionHosts
     {
@@ -146,6 +170,98 @@ namespace ES
         public static void Unbind(EditorWindow window, bool windowClosing = false)
         {
             EditorInternal.ESEditorPresentation.UnbindWindow(window, windowClosing);
+        }
+
+        /// <summary>查询窗口是否已经显式接入 ES Presentation；不会隐式绑定原生或第三方窗口。</summary>
+        public static bool IsBound(EditorWindow window)
+        {
+            return EditorInternal.ESEditorPresentation.IsWindowBound(window);
+        }
+
+        public static bool Sleep(EditorWindow window)
+        {
+            return EditorInternal.ESEditorPresentation.RequestWindowSemiSleep(window);
+        }
+
+        public static bool Wake(EditorWindow window)
+        {
+            return EditorInternal.ESEditorPresentation.RequestWindowWake(window);
+        }
+
+        public static ESWindowVisualState GetVisualState(EditorWindow window)
+        {
+            return EditorInternal.ESEditorPresentation.GetWindowVisualState(window);
+        }
+
+        public static bool IsWindowSemiSleepAllowed(EditorWindow window)
+        {
+            return EditorInternal.ESEditorPresentation.IsWindowSemiSleepAllowed(window);
+        }
+
+        /// <summary>
+        /// 读取全局自动半休眠开关。窗口级“自动”只表示参与资格，真正的自动策略由此开关统一控制。
+        /// </summary>
+        public static bool IsGlobalSemiSleepEnabled
+        {
+            get { return EditorInternal.ESEditorPresentation.SemiSleepEnabled; }
+        }
+
+        /// <summary>
+        /// 设置全局自动半休眠开关；只更新稳定偏好和已绑定窗口的控件，不重建窗口内容。
+        /// </summary>
+        public static void SetGlobalSemiSleepEnabled(bool enabled)
+        {
+            EditorInternal.ESEditorPresentation.SetSemiSleepEnabled(enabled);
+        }
+
+        public static IDisposable HoldInteraction(EditorWindow window, string reason = null)
+        {
+            return EditorInternal.ESEditorPresentation.BeginWindowInteractionHold(window, reason);
+        }
+
+        /// <summary>
+        /// 为辅助窗口设置明确的休眠归属。FollowOwner 会同步主窗口的进入/退出休眠；
+        /// OwnedSurface 表示内容应由宿主窗口承载，不生成独立休眠控件。
+        /// </summary>
+        public static bool SetSleepOwner(
+            EditorWindow child,
+            EditorWindow owner,
+            ESWindowSleepLinkMode mode = ESWindowSleepLinkMode.FollowOwner)
+        {
+            return EditorInternal.ESEditorPresentation.SetWindowSleepOwner(child, owner, mode);
+        }
+
+        public static void ClearSleepOwner(EditorWindow child)
+        {
+            EditorInternal.ESEditorPresentation.ClearWindowSleepOwner(child);
+        }
+
+        public static ESWindowSleepLinkMode GetSleepLinkMode(EditorWindow window)
+        {
+            return EditorInternal.ESEditorPresentation.GetWindowSleepLinkMode(window);
+        }
+
+        public static bool RegisterPendingSleepOwner(
+            EditorWindow child,
+            string ownerKey,
+            ESWindowSleepLinkMode mode = ESWindowSleepLinkMode.FollowOwner)
+        {
+            return EditorInternal.ESEditorPresentation.RegisterPendingSleepOwner(child, ownerKey, mode);
+        }
+
+        public static int ResolvePendingSleepOwners(string ownerKey, EditorWindow owner)
+        {
+            return EditorInternal.ESEditorPresentation.ResolvePendingSleepOwners(ownerKey, owner);
+        }
+
+        public static void ClearPendingSleepOwner(EditorWindow child)
+        {
+            EditorInternal.ESEditorPresentation.ClearPendingSleepOwner(child);
+        }
+
+        public static void ClearPendingSleepOwners(string ownerKey)
+        {
+            EditorInternal.ESEditorPresentation.ClearPendingSleepOwners(ownerKey);
         }
     }
 }
@@ -375,7 +491,9 @@ namespace ES.EditorInternal
             if (Running.ContainsKey(window.GetInstanceID()))
                 return;
             Stop(window);
-            if (window.rootVisualElement == null
+            VisualElement root = window.rootVisualElement;
+            if (root == null
+                || root.panel == null
                 || !ESEditorPresentation.MotionEnabled
                 || ESEditorPresentation.MotionIntensity <= 0.001f
                 || target.width <= 1f
@@ -386,7 +504,7 @@ namespace ES.EditorInternal
             {
                 WindowId = window.GetInstanceID(),
                 Window = window,
-                Root = window.rootVisualElement,
+                Root = root,
                 Target = target,
                 OriginalMinSize = window.minSize,
                 Intensity = ESEditorPresentation.MotionIntensity,
@@ -403,6 +521,12 @@ namespace ES.EditorInternal
                     Mathf.Min(running.OriginalMinSize.y, Mathf.Max(180f, target.height * 0.28f)));
                 window.position = EvaluateFrame(target, 0f, running.Intensity);
                 window.Repaint();
+                if (!Running.TryGetValue(running.WindowId, out RunningAnimation current)
+                    || !ReferenceEquals(current, running)
+                    || running.Window == null
+                    || running.Root == null
+                    || running.Root.panel == null)
+                    return;
                 running.Schedule = running.Root.schedule
                     .Execute(() => Update(running))
                     .Every(16);
@@ -966,14 +1090,37 @@ namespace ES.EditorInternal
     /// created once per editor skin and are reused by Section, polymorphic and future ES drawers.
     /// This keeps the IMGUI repaint path free from style/texture allocations.
     /// </summary>
+    public interface IESWindowSleepRelationshipState
+    {
+        bool SleepOwnerDetachedByClose { get; }
+        void DetachSleepOwnerAfterOwnerClose();
+    }
+
     internal static class ESEditorPresentation
     {
-        internal enum ESWindowVisualState : byte
+        internal enum ESCornerRadiusToken : byte
         {
-            ActivePanel,
-            SleepTile,
-            EdgeTab,
-            EdgeTabHover
+            None,
+            Control,
+            Card,
+            Section,
+            Overlay,
+            Pill
+        }
+
+        [Flags]
+        internal enum ESCornerMask : byte
+        {
+            None = 0,
+            TopLeft = 1 << 0,
+            TopRight = 1 << 1,
+            BottomLeft = 1 << 2,
+            BottomRight = 1 << 3,
+            Left = TopLeft | BottomLeft,
+            Right = TopRight | BottomRight,
+            Top = TopLeft | TopRight,
+            Bottom = BottomLeft | BottomRight,
+            All = TopLeft | TopRight | BottomLeft | BottomRight
         }
 
         internal enum ESWindowEdge : byte
@@ -985,6 +1132,7 @@ namespace ES.EditorInternal
         }
 
         private static bool skinInitialized;
+        private static bool skinCleanupRegistered;
         private static bool cachedProSkin;
         private static int skinGeneration;
         private static int globalEditorSkinGeneration;
@@ -995,7 +1143,17 @@ namespace ES.EditorInternal
         private static GUIStyle compactCollectionTitleStyle;
         private static GUIStyle compactCollectionMetaStyle;
         private static GUIStyle compactCollectionBodyStyle;
+        private static GUIStyle toolbarStyle;
+        private static GUIStyle toolbarButtonStyle;
+        private static GUIStyle primaryButtonStyle;
         private static Texture2D surfaceTexture;
+        private static Texture2D toolbarTexture;
+        private static Texture2D toolbarButtonTexture;
+        private static Texture2D toolbarButtonHoverTexture;
+        private static Texture2D toolbarButtonActiveTexture;
+        private static Texture2D primaryButtonTexture;
+        private static Texture2D primaryButtonHoverTexture;
+        private static Texture2D primaryButtonActiveTexture;
         private static Texture2D compactCollectionBodyTexture;
         private static ESGlobalEditorTheme theme;
         private static bool themeInitialized;
@@ -1004,6 +1162,8 @@ namespace ES.EditorInternal
             new Dictionary<int, WindowBinding>(32);
         private static readonly Dictionary<VisualElement, WindowBinding> windowBindingsByRoot =
             new Dictionary<VisualElement, WindowBinding>(32);
+        private static readonly Dictionary<string, Texture> esBrandIconCache =
+            new Dictionary<string, Texture>(StringComparer.Ordinal);
         private const string BrandFontResourcePath = "ESPresentation/Fonts/ESBrandSansSC";
         private const string BrandTypographyStyleSheetPath =
             "Assets/Plugins/ES/Editor/ESPresentation/Styles/ESBrandTypography.uss";
@@ -1020,12 +1180,16 @@ namespace ES.EditorInternal
             public VisualElement sweep;
             public VisualElement semiSleepOverlay;
             public Label semiSleepMonogram;
+            public Image semiSleepIcon;
             public Label semiSleepTitleLabel;
+            public VisualElement semiSleepPromotionProgress;
+            public VisualElement semiSleepDockProgress;
             public VisualElement semiSleepControls;
             public ES.ESWindowActionHosts actionHosts;
             public Button semiSleepToggleButton;
             public Button semiSleepAllowedButton;
             public Button semiSleepPinButton;
+            public Button semiSleepGlobalButton;
             public ToolbarMenu semiSleepOverflowMenu;
             public IVisualElementScheduledItem animation;
             public bool activationPending;
@@ -1044,8 +1208,12 @@ namespace ES.EditorInternal
             public double semiSleepTransitionDuration;
             public double sleepTileIdleStartedAt = -1d;
             public double edgeTabFullyExpandedAt = -1d;
+            public double edgeTabHoverIntentStartedAt = -1d;
+            public double edgeTabHoverExitGraceUntil = -1d;
             public double lastInteractionAt;
             public double transientInteractionGraceUntil;
+            public Vector2 edgeTabLastPointerPosition;
+            public bool hasEdgeTabPointerPosition;
             public Rect awakeBounds;
             public Rect semiSleepFromBounds;
             public Rect semiSleepToBounds;
@@ -1055,9 +1223,14 @@ namespace ES.EditorInternal
             public bool hasSemiSleepDockBounds;
             public Rect semiSleepDockBounds;
             public int semiSleepDragPointerId = -1;
-            public Vector2 semiSleepDragLastPointerPosition;
+            public Vector2 semiSleepDragScreenStart;
             public Rect semiSleepDragWindowStart;
+            public ESWindowVisualState semiSleepDragStartState;
+            public Rect semiSleepDragPendingBounds;
+            public float semiSleepDragPendingEdgeOffset;
+            public bool hasSemiSleepDragPendingBounds;
             public bool semiSleepDragging;
+            public bool semiSleepRecaptureScheduled;
             public bool semiSleepManualHold;
             public bool pointerInside;
             public int interactionHoldCount;
@@ -1070,27 +1243,49 @@ namespace ES.EditorInternal
             public string activityPageId;
             public string activityContext;
             public bool focusModeForcedSleep;
+            public ES.ESWindowSleepLinkMode sleepLinkMode;
+            public EditorWindow sleepOwner;
+            public bool sleepOwnerForcedSleep;
+            public bool sleepLinkSyncing;
+            public bool ownedSurfacePreviousSupports;
+            public bool ownedSurfacePreviousAllow;
+            public bool restorePersistedSleepOnBind;
         }
+
+        private sealed class PendingSleepOwner
+        {
+            internal EditorWindow child;
+            internal string ownerKey;
+            internal ES.ESWindowSleepLinkMode mode;
+        }
+
+        private static readonly List<PendingSleepOwner> pendingSleepOwners =
+            new List<PendingSleepOwner>(8);
 
         private const float GlobalAccentLineHeight = 2f;
         private const float GlobalSweepDuration = 0.52f;
         internal const float SemiSleepSize = 100f;
         internal const float SemiSleepDelay = 1.6f;
         internal const float SemiSleepDuration = 0.56f;
-        internal const float SleepTileToEdgeTabDelay = 6f;
-        internal const float EdgeTabHoverCommitDelay = 0.5f;
+        internal const float SleepTileToEdgeTabDelay = 5f;
+        internal const float EdgeTabHoverCommitDelay = 1.65f;
+        internal const float EdgeTabHoverIntentDelay = 0.12f;
         internal const float EdgeTabCollapsedLength = 56f;
         internal const float EdgeTabExpandedLength = 196f;
         internal const float EdgeTabThickness = 44f;
-        internal const float EdgeTabSnapDistance = 24f;
-        private const float EdgeTabTransitionDuration = 0.30f;
-        private const float EdgeTabHoverDuration = 0.18f;
-        private const float TransientInteractionGrace = 0.75f;
+        internal const float EdgeTabSnapDistance = 72f;
+        private const float EdgeTabTransitionDuration = 0.22f;
+        private const float EdgeTabHoverDuration = 0.16f;
+        private const float EdgeTabToTileDuration = 0.30f;
+        private const float EdgeTabMinimumReverseDuration = 0.045f;
+        private const float EdgeTabPointerIntentDistance = 3f;
+        private const float EdgeTabHoverExitGrace = 0.22f;
+        private const float TransientInteractionGrace = 1.5f;
         private const float SemiSleepTrayGap = 8f;
         private const float SemiSleepTrayMargin = 12f;
-        private const float SemiSleepDragThreshold = 4f;
-        private const float SemiSleepMaxPointerDelta = 160f;
+        private const float SemiSleepDragThreshold = 6f;
         private const string SemiSleepPreferenceKey = "ES.EditorPresentation.SemiSleep.Enabled";
+        private const string SemiSleepWindowPreferencePrefix = "ES.EditorPresentation.SemiSleep.Window.";
         private static bool globalEditorAdaptersInstalled;
         private static bool globalEditorAdapterLifecycleInstalled;
         private static bool deepSkinSyncQueued;
@@ -1098,9 +1293,13 @@ namespace ES.EditorInternal
         private static bool semiSleepUpdateSubscribed;
         private static bool semiSleepAnyAnimating;
         private static double nextSemiSleepIdleCheckAt;
+        private static bool windowLifecycleHooksInstalled;
+        private static bool domainReloadInProgress;
+        private static bool editorQuitting;
 
         private const string WorkspaceSessionKeyPrefix = "ES.EditorPresentation.Workspace.";
         private static int focusModeWindowId;
+        private static int lastFocusedWindowId;
 
         [Serializable]
         private sealed class WorkspaceSnapshot
@@ -1118,6 +1317,20 @@ namespace ES.EditorInternal
             public bool allowSemiSleep;
             public string pageId;
             public int focusOrder;
+        }
+
+        [Serializable]
+        private sealed class SemiSleepWindowPreferences
+        {
+            public bool allowSemiSleep = true;
+            public bool pinned;
+            public bool sleeping;
+            public int visualState;
+            public int edge;
+            public float edgeOffset;
+            public Rect awakeBounds;
+            public Rect dockBounds;
+            public bool hasDockBounds;
         }
 
         private sealed class EmptyWindowLease : IDisposable
@@ -1311,11 +1524,14 @@ namespace ES.EditorInternal
             binding.root.UnregisterCallback<PointerDownEvent>(OnWindowPointerDown, TrickleDown.TrickleDown);
             binding.root.UnregisterCallback<PointerEnterEvent>(OnWindowPointerEnter, TrickleDown.TrickleDown);
             binding.root.UnregisterCallback<PointerLeaveEvent>(OnWindowPointerLeave, TrickleDown.TrickleDown);
+            binding.root.UnregisterCallback<PointerMoveEvent>(OnWindowPointerMove, TrickleDown.TrickleDown);
             binding.root.UnregisterCallback<WheelEvent>(OnWindowWheel, TrickleDown.TrickleDown);
             binding.root.UnregisterCallback<KeyDownEvent>(OnWindowKeyDown, TrickleDown.TrickleDown);
             binding.root.UnregisterCallback<GeometryChangedEvent>(OnWindowGeometryChanged);
             binding.root.UnregisterCallback<DetachFromPanelEvent>(OnWindowRootDetached);
             binding.semiSleepOverlay?.UnregisterCallback<PointerDownEvent>(OnSemiSleepOverlayPointerDown);
+            binding.semiSleepOverlay?.UnregisterCallback<PointerEnterEvent>(OnSemiSleepOverlayPointerEnter);
+            binding.semiSleepOverlay?.UnregisterCallback<PointerLeaveEvent>(OnSemiSleepOverlayPointerLeave);
             binding.semiSleepOverlay?.UnregisterCallback<PointerMoveEvent>(OnSemiSleepOverlayPointerMove);
             binding.semiSleepOverlay?.UnregisterCallback<PointerUpEvent>(OnSemiSleepOverlayPointerUp);
             binding.semiSleepOverlay?.UnregisterCallback<PointerCancelEvent>(OnSemiSleepOverlayPointerCancel);
@@ -1396,7 +1612,7 @@ namespace ES.EditorInternal
                     {
                         margin = new RectOffset(0, 0, Metric(2f), Metric(2f)),
                         padding = new RectOffset(Metric(9f), Metric(9f), Metric(7f), Metric(8f)),
-                        border = new RectOffset(1, 1, 1, 1)
+                        border = CreateNineSlice(ESCornerRadiusToken.Section)
                     };
                     surfaceStyle.normal.background = SurfaceTexture;
                 }
@@ -1545,12 +1761,81 @@ namespace ES.EditorInternal
                     compactCollectionBodyStyle = new GUIStyle
                     {
                         margin = new RectOffset(0, 0, 0, Metric(2f)),
-                        padding = new RectOffset(Metric(9f), Metric(7f), Metric(6f), Metric(7f))
+                        padding = new RectOffset(Metric(9f), Metric(7f), Metric(6f), Metric(7f)),
+                        border = CreateNineSlice(ESCornerRadiusToken.Card)
                     };
                     compactCollectionBodyStyle.normal.background = CompactCollectionBodyTexture;
                 }
 
                 return compactCollectionBodyStyle;
+            }
+        }
+
+        public static GUIStyle ToolbarStyle
+        {
+            get
+            {
+                EnsureSkin();
+                if (toolbarStyle == null)
+                {
+                    toolbarStyle = new GUIStyle(EditorStyles.toolbar)
+                    {
+                        padding = new RectOffset(Metric(4f), Metric(4f), Metric(2f), Metric(2f)),
+                        border = CreateNineSlice(ESCornerRadiusToken.Control)
+                    };
+                    toolbarStyle.normal.background = ToolbarTexture;
+                }
+                return toolbarStyle;
+            }
+        }
+
+        public static GUIStyle ToolbarButtonStyle
+        {
+            get
+            {
+                EnsureSkin();
+                if (toolbarButtonStyle == null)
+                {
+                    toolbarButtonStyle = new GUIStyle(EditorStyles.toolbarButton)
+                    {
+                        padding = new RectOffset(Metric(7f), Metric(7f), Metric(2f), Metric(2f)),
+                        border = CreateNineSlice(ESCornerRadiusToken.Control)
+                    };
+                    ApplyButtonState(
+                        toolbarButtonStyle,
+                        ToolbarButtonTexture,
+                        ToolbarButtonHoverTexture,
+                        ToolbarButtonActiveTexture,
+                        SectionSelectedTextColor,
+                        PrimaryActionTextColor);
+                }
+                return toolbarButtonStyle;
+            }
+        }
+
+        public static GUIStyle PrimaryButtonStyle
+        {
+            get
+            {
+                EnsureSkin();
+                if (primaryButtonStyle == null)
+                {
+                    primaryButtonStyle = new GUIStyle(EditorStyles.miniButton)
+                    {
+                        alignment = TextAnchor.MiddleCenter,
+                        padding = new RectOffset(Metric(10f), Metric(10f), Metric(3f), Metric(3f)),
+                        border = CreateNineSlice(ESCornerRadiusToken.Control)
+                    };
+                    ApplyButtonState(
+                        primaryButtonStyle,
+                        PrimaryButtonTexture,
+                        PrimaryButtonHoverTexture,
+                        PrimaryButtonActiveTexture,
+                        PrimaryActionTextColor,
+                        PrimaryActionTextColor);
+                }
+
+                return primaryButtonStyle;
             }
         }
 
@@ -1632,7 +1917,7 @@ namespace ES.EditorInternal
         }
 
         /// <summary>
-        /// 用户显式开启的浮动 ES 工具窗口半休眠。偏好只保存开关，不保存窗口引用或矩形。
+        /// 用户显式开启的浮动 ES 工具窗口半休眠。全局开关与窗口级偏好均只保存稳定标量。
         /// </summary>
         public static bool SemiSleepEnabled
         {
@@ -1668,6 +1953,7 @@ namespace ES.EditorInternal
         {
             if (!GlobalEditorShellEnabled || window == null || window.rootVisualElement == null)
                 return;
+            EnsureWindowLifecycleHooks();
             actionHosts?.ValidateOwnership(window.rootVisualElement);
 
             int id = window.GetInstanceID();
@@ -1689,6 +1975,14 @@ namespace ES.EditorInternal
                     pulseStatus = ESStatusKind.None,
                     pulseDuration = GlobalSweepDuration
                 };
+                LoadSemiSleepPreferences(binding);
+                if (!binding.allowSemiSleep || window.docked)
+                {
+                    binding.semiSleepTarget = false;
+                    binding.restorePersistedSleepOnBind = false;
+                    binding.visualState = ESWindowVisualState.ActivePanel;
+                    binding.transitionTargetState = ESWindowVisualState.ActivePanel;
+                }
                 windowBindings[id] = binding;
             }
             else
@@ -1716,6 +2010,24 @@ namespace ES.EditorInternal
                 RemoveSemiSleepControls(binding);
             RefreshSemiSleepControls(binding);
             RefreshSemiSleepUpdateSubscription();
+            if (binding.semiSleepTarget && binding.allowSemiSleep && !binding.window.docked)
+            {
+                // CreateGUI normally has a live panel already. Restore the native frame
+                // before the first repaint so ReloadDomain cannot expose a large frame
+                // underneath the sleep overlay.
+                if (binding.root.panel != null && CanEnterSemiSleep(binding, false))
+                    RestorePersistedSemiSleepGeometry(binding);
+                else
+                    binding.root.schedule.Execute(() =>
+                    {
+                        if (binding.window != null
+                            && binding.root != null
+                            && binding.root.panel != null
+                            && binding.restorePersistedSleepOnBind
+                            && CanEnterSemiSleep(binding, false))
+                            RestorePersistedSemiSleepGeometry(binding);
+                    });
+            }
         }
 
         /// <summary>运行时调整当前 ES 窗口是否参与半休眠，不需要重建窗口内容。</summary>
@@ -1728,6 +2040,7 @@ namespace ES.EditorInternal
             binding.focusLostAt = -1d;
             if (!binding.allowSemiSleep)
                 RestoreSemiSleep(binding, true);
+            SaveSemiSleepPreferences(binding);
             if (binding.supportsSemiSleep && binding.semiSleepControls == null)
                 AttachSemiSleepControls(binding);
             RefreshSemiSleepControls(binding);
@@ -1735,8 +2048,8 @@ namespace ES.EditorInternal
         }
 
         /// <summary>
-        /// 为当前域内的已绑定窗口指定半休眠落点。它只影响本次窗口实例，
-        /// 不写入 EditorPrefs、SessionState 或业务资产。
+        /// 为当前域内的已绑定窗口指定半休眠落点。落点会按项目与窗口类型持久化，
+        /// 只保存矩形和模式，不保存窗口引用、页面实例或业务资产。
         /// </summary>
         public static bool SetWindowSemiSleepDockBounds(EditorWindow window, Rect bounds)
         {
@@ -1753,6 +2066,8 @@ namespace ES.EditorInternal
             binding.semiSleepDockBounds = ClampSemiSleepDockBounds(
                 bounds,
                 GetSemiSleepTrayBounds(binding.window.position));
+            binding.semiSleepManualHold = true;
+            SaveSemiSleepPreferences(binding);
             RefreshSemiSleepControls(binding);
             return true;
         }
@@ -1767,6 +2082,7 @@ namespace ES.EditorInternal
             binding.focusLostAt = EditorApplication.timeSinceStartup - SemiSleepDelay;
             binding.semiSleepManualHold = true;
             BeginSemiSleepTransition(binding, true);
+            SaveSemiSleepPreferences(binding);
             RefreshSemiSleepControls(binding);
             RefreshSemiSleepUpdateSubscription();
             return true;
@@ -1790,6 +2106,7 @@ namespace ES.EditorInternal
             binding.semiSleepManualHold = false;
             window.Focus();
             BeginSemiSleepTransition(binding, false);
+            SaveSemiSleepPreferences(binding);
             RefreshSemiSleepControls(binding);
             RefreshSemiSleepUpdateSubscription();
             return true;
@@ -1802,6 +2119,15 @@ namespace ES.EditorInternal
                 && (binding.semiSleeping || binding.semiSleepAnimating && binding.semiSleepTarget);
         }
 
+        public static ES.ESWindowVisualState GetWindowVisualState(EditorWindow window)
+        {
+            return window != null
+                && windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding)
+                && binding != null
+                ? binding.visualState
+                : ES.ESWindowVisualState.ActivePanel;
+        }
+
         /// <summary>固定窗口，固定期间不会自动进入半休眠。</summary>
         public static void SetWindowPinned(EditorWindow window, bool pinned)
         {
@@ -1810,6 +2136,7 @@ namespace ES.EditorInternal
             binding.pinned = pinned;
             if (pinned && !binding.semiSleepManualHold)
                 RestoreSemiSleep(binding, true);
+            SaveSemiSleepPreferences(binding);
             RefreshSemiSleepControls(binding);
             RefreshSemiSleepUpdateSubscription();
         }
@@ -1819,6 +2146,177 @@ namespace ES.EditorInternal
             return window != null
                 && windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding)
                 && binding.pinned;
+        }
+
+        /// <summary>
+        /// 设置当前域内的明确父子休眠关系。不会扫描全部 EditorWindow，也不会持久化对象引用。
+        /// </summary>
+        public static bool SetWindowSleepOwner(
+            EditorWindow child,
+            EditorWindow owner,
+            ES.ESWindowSleepLinkMode mode = ES.ESWindowSleepLinkMode.FollowOwner)
+        {
+            if (child == null || child == owner)
+                return false;
+            if (!windowBindings.TryGetValue(child.GetInstanceID(), out WindowBinding childBinding)
+                || childBinding == null)
+                BindWindow(child, mode != ES.ESWindowSleepLinkMode.OwnedSurface);
+            if (!windowBindings.TryGetValue(child.GetInstanceID(), out childBinding)
+                || childBinding == null)
+                return false;
+
+            if (mode == ES.ESWindowSleepLinkMode.FollowOwner && owner == null)
+                return false;
+            if (owner != null)
+            {
+                if (!windowBindings.TryGetValue(owner.GetInstanceID(), out WindowBinding ownerBinding)
+                    || ownerBinding == null)
+                {
+                    BindWindow(owner);
+                    windowBindings.TryGetValue(owner.GetInstanceID(), out ownerBinding);
+                }
+
+                // 拒绝任意长度的 owner 环，避免同步递归和互相唤醒。
+                WindowBinding cursor = ownerBinding;
+                int guard = windowBindings.Count + 1;
+                while (cursor != null && guard-- > 0)
+                {
+                    if (cursor.window == child)
+                        return false;
+                    cursor = cursor.sleepOwner != null
+                        && windowBindings.TryGetValue(
+                            cursor.sleepOwner.GetInstanceID(),
+                            out WindowBinding next)
+                        ? next
+                        : null;
+                }
+            }
+
+            // 显式绑定拥有更高优先级：只有所有输入和 owner 环校验通过后，
+            // 才移除此前因宿主尚未恢复而登记的 PendingFollowOwner；被拒绝的
+            // 非法绑定不能破坏原有可恢复意图。
+            ClearPendingSleepOwner(child);
+            childBinding.sleepOwner = owner;
+            childBinding.sleepLinkMode = mode;
+            childBinding.sleepOwnerForcedSleep = false;
+            if (mode == ES.ESWindowSleepLinkMode.OwnedSurface)
+            {
+                childBinding.ownedSurfacePreviousSupports = childBinding.supportsSemiSleep;
+                childBinding.ownedSurfacePreviousAllow = childBinding.allowSemiSleep;
+                childBinding.supportsSemiSleep = false;
+                childBinding.allowSemiSleep = false;
+                RestoreSemiSleep(childBinding, true);
+                RemoveSemiSleepControls(childBinding);
+            }
+            else
+            {
+                childBinding.supportsSemiSleep = true;
+                childBinding.allowSemiSleep = true;
+                if (childBinding.semiSleepControls == null)
+                    AttachSemiSleepControls(childBinding);
+            }
+            RefreshSemiSleepControls(childBinding);
+            RefreshSemiSleepUpdateSubscription();
+            return true;
+        }
+
+        public static bool RegisterPendingSleepOwner(
+            EditorWindow child,
+            string ownerKey,
+            ES.ESWindowSleepLinkMode mode = ES.ESWindowSleepLinkMode.FollowOwner)
+        {
+            if (child == null || string.IsNullOrWhiteSpace(ownerKey)
+                || mode != ES.ESWindowSleepLinkMode.FollowOwner)
+                return false;
+
+            ClearWindowSleepOwner(child);
+            ClearPendingSleepOwner(child);
+            pendingSleepOwners.Add(new PendingSleepOwner
+            {
+                child = child,
+                ownerKey = ownerKey.Trim(),
+                mode = mode
+            });
+            return true;
+        }
+
+        public static int ResolvePendingSleepOwners(string ownerKey, EditorWindow owner)
+        {
+            if (owner == null || string.IsNullOrWhiteSpace(ownerKey))
+                return 0;
+
+            int resolved = 0;
+            for (int i = pendingSleepOwners.Count - 1; i >= 0; i--)
+            {
+                PendingSleepOwner pending = pendingSleepOwners[i];
+                if (pending == null || pending.child == null)
+                {
+                    pendingSleepOwners.RemoveAt(i);
+                    continue;
+                }
+                if (!string.Equals(pending.ownerKey, ownerKey.Trim(), StringComparison.Ordinal))
+                    continue;
+
+                pendingSleepOwners.RemoveAt(i);
+                if (SetWindowSleepOwner(pending.child, owner, pending.mode))
+                    resolved++;
+            }
+            return resolved;
+        }
+
+        public static void ClearPendingSleepOwner(EditorWindow child)
+        {
+            if (child == null)
+                return;
+            for (int i = pendingSleepOwners.Count - 1; i >= 0; i--)
+                if (pendingSleepOwners[i] == null || pendingSleepOwners[i].child == child)
+                    pendingSleepOwners.RemoveAt(i);
+        }
+
+        public static void ClearPendingSleepOwners(string ownerKey)
+        {
+            if (string.IsNullOrWhiteSpace(ownerKey))
+                return;
+            string normalized = ownerKey.Trim();
+            for (int i = pendingSleepOwners.Count - 1; i >= 0; i--)
+            {
+                PendingSleepOwner pending = pendingSleepOwners[i];
+                if (pending == null || string.Equals(pending.ownerKey, normalized, StringComparison.Ordinal))
+                    pendingSleepOwners.RemoveAt(i);
+            }
+        }
+
+        public static void ClearWindowSleepOwner(EditorWindow child)
+        {
+            if (child == null
+                || !windowBindings.TryGetValue(child.GetInstanceID(), out WindowBinding binding)
+                || binding == null)
+                return;
+            binding.sleepOwner = null;
+            binding.sleepOwnerForcedSleep = false;
+            binding.sleepLinkSyncing = false;
+            if (binding.sleepLinkMode == ES.ESWindowSleepLinkMode.OwnedSurface)
+            {
+                binding.sleepLinkMode = ES.ESWindowSleepLinkMode.Independent;
+                binding.supportsSemiSleep = binding.ownedSurfacePreviousSupports;
+                binding.allowSemiSleep = binding.ownedSurfacePreviousAllow;
+                if (binding.supportsSemiSleep)
+                    AttachSemiSleepControls(binding);
+            }
+            else
+            {
+                binding.sleepLinkMode = ES.ESWindowSleepLinkMode.Independent;
+            }
+            RefreshSemiSleepControls(binding);
+        }
+
+        public static ES.ESWindowSleepLinkMode GetWindowSleepLinkMode(EditorWindow window)
+        {
+            return window != null
+                && windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding)
+                && binding != null
+                ? binding.sleepLinkMode
+                : ES.ESWindowSleepLinkMode.Independent;
         }
 
         public static bool IsWindowSemiSleepAllowed(EditorWindow window)
@@ -1869,12 +2367,11 @@ namespace ES.EditorInternal
         {
             if (window == null)
                 return EmptyWindowLease.Instance;
-            if (!windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding) || binding == null)
-            {
-                BindWindow(window);
-                windowBindings.TryGetValue(window.GetInstanceID(), out binding);
-            }
-            if (binding == null)
+            // InteractionHold 只能暂停一个已经显式接入 Presentation 的 ES 窗口。
+            // 禁止因为 Dialog/Popup 的 owner 恰好是原生 Inspector 或第三方窗口，
+            // 就在这里隐式 Bind 并向其注入 ES 系统按钮与半休眠生命周期。
+            if (!windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding)
+                || binding == null)
                 return EmptyWindowLease.Instance;
             binding.interactionHoldCount++;
             RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
@@ -2077,6 +2574,68 @@ namespace ES.EditorInternal
             return string.IsNullOrWhiteSpace(workspaceId) ? "default" : workspaceId.Trim();
         }
 
+        private static string GetSemiSleepPreferenceKey(EditorWindow window)
+        {
+            string typeName = window?.GetType().AssemblyQualifiedName ?? "UnknownWindow";
+            string project = Application.dataPath ?? string.Empty;
+            return SemiSleepWindowPreferencePrefix + Hash128.Compute(
+                project + "|" + typeName);
+        }
+
+        private static void LoadSemiSleepPreferences(WindowBinding binding)
+        {
+            if (binding?.window == null)
+                return;
+            string json = EditorPrefs.GetString(GetSemiSleepPreferenceKey(binding.window), string.Empty);
+            if (string.IsNullOrEmpty(json))
+                return;
+            try
+            {
+                SemiSleepWindowPreferences saved = JsonUtility.FromJson<SemiSleepWindowPreferences>(json);
+                if (saved == null)
+                    return;
+                binding.allowSemiSleep = binding.supportsSemiSleep && saved.allowSemiSleep;
+                binding.pinned = saved.pinned;
+                binding.semiSleepTarget = saved.sleeping;
+                binding.restorePersistedSleepOnBind = saved.sleeping;
+                if (saved.edge >= 0 && saved.edge <= (int)ESWindowEdge.Bottom)
+                    binding.edge = (ESWindowEdge)saved.edge;
+                binding.edgeOffset = saved.edgeOffset;
+                if (saved.visualState == (int)ESWindowVisualState.EdgeTab
+                    || saved.visualState == (int)ESWindowVisualState.EdgeTabHover)
+                    binding.transitionTargetState = ESWindowVisualState.EdgeTab;
+                binding.awakeBounds = saved.awakeBounds;
+                binding.hasSemiSleepDockBounds = saved.hasDockBounds;
+                binding.semiSleepDockBounds = saved.dockBounds;
+            }
+            catch (ArgumentException)
+            {
+            }
+        }
+
+        private static void SaveSemiSleepPreferences(WindowBinding binding)
+        {
+            if (binding?.window == null)
+                return;
+            var saved = new SemiSleepWindowPreferences
+            {
+                allowSemiSleep = binding.allowSemiSleep,
+                pinned = binding.pinned,
+                sleeping = binding.semiSleeping || binding.semiSleepAnimating && binding.semiSleepTarget,
+                visualState = (int)(binding.semiSleepTarget
+                    ? (binding.transitionTargetState == ESWindowVisualState.ActivePanel
+                        ? binding.visualState
+                        : binding.transitionTargetState)
+                    : ESWindowVisualState.ActivePanel),
+                edge = (int)binding.edge,
+                edgeOffset = binding.edgeOffset,
+                awakeBounds = binding.awakeBounds.width > 1f ? binding.awakeBounds : binding.window.position,
+                dockBounds = binding.semiSleepDockBounds,
+                hasDockBounds = binding.hasSemiSleepDockBounds
+            };
+            EditorPrefs.SetString(GetSemiSleepPreferenceKey(binding.window), JsonUtility.ToJson(saved));
+        }
+
         private static int CompareWindowBindings(WindowBinding left, WindowBinding right)
         {
             int leftId = left?.window == null ? int.MaxValue : left.window.GetInstanceID();
@@ -2112,12 +2671,34 @@ namespace ES.EditorInternal
             if (!windowBindings.TryGetValue(id, out binding))
                 return;
 
+            ClearPendingSleepOwner(window);
+
             RestoreSemiSleep(binding, true);
             if (binding.animation != null)
                 binding.animation.Pause();
             ESWindowOpeningSweep.Stop(binding.root);
             UnregisterWindowCallbacks(binding);
             RemoveBrandTypography(binding.root);
+            foreach (WindowBinding child in windowBindings.Values)
+            {
+                if (child == null || child == binding || child.sleepOwner != window)
+                    continue;
+                bool ownerForcedSleep = child.sleepOwnerForcedSleep;
+                if (windowClosing
+                    && !domainReloadInProgress
+                    && !editorQuitting
+                    && child.window is IESWindowSleepRelationshipState relationshipState)
+                {
+                    relationshipState.DetachSleepOwnerAfterOwnerClose();
+                }
+                child.sleepOwner = null;
+                child.sleepOwnerForcedSleep = false;
+                child.sleepLinkSyncing = false;
+                child.sleepLinkMode = ES.ESWindowSleepLinkMode.Independent;
+                if (ownerForcedSleep)
+                    RestoreSemiSleep(child, true);
+                RefreshSemiSleepControls(child);
+            }
             if (binding.host != null)
             {
                 binding.host.RemoveFromHierarchy();
@@ -2127,8 +2708,31 @@ namespace ES.EditorInternal
             RemoveSemiSleepControls(binding);
             if (focusModeWindowId == id)
                 ExitFocusMode();
+            if (lastFocusedWindowId == id)
+                lastFocusedWindowId = 0;
             windowBindings.Remove(id);
             RefreshSemiSleepUpdateSubscription();
+        }
+
+        private static void EnsureWindowLifecycleHooks()
+        {
+            if (windowLifecycleHooksInstalled)
+                return;
+            windowLifecycleHooksInstalled = true;
+            AssemblyReloadEvents.beforeAssemblyReload -= HandleBeforeAssemblyReload;
+            AssemblyReloadEvents.beforeAssemblyReload += HandleBeforeAssemblyReload;
+            EditorApplication.quitting -= HandleEditorQuitting;
+            EditorApplication.quitting += HandleEditorQuitting;
+        }
+
+        private static void HandleBeforeAssemblyReload()
+        {
+            domainReloadInProgress = true;
+        }
+
+        private static void HandleEditorQuitting()
+        {
+            editorQuitting = true;
         }
 
         /// <summary>
@@ -2213,6 +2817,7 @@ namespace ES.EditorInternal
             root.RegisterCallback<PointerDownEvent>(OnWindowPointerDown, TrickleDown.TrickleDown);
             root.RegisterCallback<PointerEnterEvent>(OnWindowPointerEnter, TrickleDown.TrickleDown);
             root.RegisterCallback<PointerLeaveEvent>(OnWindowPointerLeave, TrickleDown.TrickleDown);
+            root.RegisterCallback<PointerMoveEvent>(OnWindowPointerMove, TrickleDown.TrickleDown);
             root.RegisterCallback<WheelEvent>(OnWindowWheel, TrickleDown.TrickleDown);
             root.RegisterCallback<KeyDownEvent>(OnWindowKeyDown, TrickleDown.TrickleDown);
             root.RegisterCallback<GeometryChangedEvent>(OnWindowGeometryChanged);
@@ -2250,6 +2855,7 @@ namespace ES.EditorInternal
                 if (focusModeWindowId != 0
                     && focusModeWindowId != binding.window.GetInstanceID())
                     ExitFocusMode();
+                lastFocusedWindowId = binding.window.GetInstanceID();
                 binding.focusLostAt = -1d;
                 if (binding.activityState == ESWindowActivityState.Attention
                     || binding.activityState == ESWindowActivityState.Background)
@@ -2291,20 +2897,39 @@ namespace ES.EditorInternal
         private static void OnWindowPointerEnter(PointerEnterEvent evt)
         {
             WindowBinding binding = FindBindingByRoot(evt.currentTarget as VisualElement);
-            if (binding == null)
+            if (binding == null || evt.target != evt.currentTarget)
                 return;
             binding.pointerInside = true;
+            binding.edgeTabHoverExitGraceUntil = -1d;
             RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
+        }
+
+        private static void OnWindowPointerMove(PointerMoveEvent evt)
+        {
+            WindowBinding binding = FindBindingByRoot(evt.currentTarget as VisualElement);
+            if (binding?.root == null)
+                return;
+
+            // PointerMove is observed at the root so child controls, context menus and
+            // non-focused windows still keep the owning window active while the pointer
+            // remains inside its actual visual bounds.
+            Vector2 rootPointerPosition = new Vector2(evt.position.x, evt.position.y);
+            bool inside = binding.root.worldBound.Contains(rootPointerPosition);
+            binding.pointerInside = inside;
+            if (inside)
+                RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
         }
 
         private static void OnWindowPointerLeave(PointerLeaveEvent evt)
         {
             WindowBinding binding = FindBindingByRoot(evt.currentTarget as VisualElement);
-            if (binding == null)
+            if (binding == null || evt.target != evt.currentTarget)
                 return;
             binding.pointerInside = false;
-            if (binding.visualState == ESWindowVisualState.EdgeTabHover
-                && !binding.semiSleepAnimating)
+            if (!binding.semiSleepAnimating
+                    && binding.visualState == ESWindowVisualState.EdgeTabHover
+                || binding.semiSleepAnimating
+                    && binding.transitionTargetState == ESWindowVisualState.EdgeTabHover)
                 BeginVisualStateTransition(binding, ESWindowVisualState.EdgeTab);
         }
 
@@ -2355,8 +2980,279 @@ namespace ES.EditorInternal
             width = Mathf.Max(1f, width + to.width * overshoot * accent);
             height = Mathf.Max(1f, height + to.height * overshoot * accent);
             float anchorX = Mathf.Lerp(from.xMax, to.xMax, eased);
-            float top = Mathf.Lerp(from.y, to.y, eased);
-            return new Rect(anchorX - width, top, width, height);
+            float anchorY = Mathf.Lerp(from.yMax, to.yMax, eased);
+            return new Rect(anchorX - width, anchorY - height, width, height);
+        }
+
+        internal static Rect EvaluateEdgeTabTransitionFrame(
+            Rect from,
+            Rect to,
+            float progress,
+            ESWindowEdge edge)
+        {
+            float t = Mathf.Clamp01(progress);
+            float eased = t < 0.5f
+                ? 4f * t * t * t
+                : 1f - Mathf.Pow(-2f * t + 2f, 3f) * 0.5f;
+            float width = Mathf.Lerp(from.width, to.width, eased);
+            float height = Mathf.Lerp(from.height, to.height, eased);
+            float x = Mathf.Lerp(from.x, to.x, eased);
+            float y = Mathf.Lerp(from.y, to.y, eased);
+            // 页签召回时先沿当前屏幕边缘完成主要展开，再在后半程平滑回到
+            // 大窗口位置。这样鼠标触发后的第一视觉锚点稳定，不会刚展开就
+            // 像从边缘被横向甩走；progress=1 仍精确到达原窗口几何。
+            float anchorProgress = Mathf.Clamp01((eased - 0.5f) * 2f);
+            anchorProgress = anchorProgress * anchorProgress * (3f - 2f * anchorProgress);
+            switch (edge)
+            {
+                case ESWindowEdge.Left:
+                    x = Mathf.Lerp(from.xMin, to.xMin, anchorProgress);
+                    break;
+                case ESWindowEdge.Right:
+                    x = Mathf.Lerp(from.xMax, to.xMax, anchorProgress) - width;
+                    break;
+                case ESWindowEdge.Top:
+                    y = Mathf.Lerp(from.yMin, to.yMin, anchorProgress);
+                    break;
+                case ESWindowEdge.Bottom:
+                    y = Mathf.Lerp(from.yMax, to.yMax, anchorProgress) - height;
+                    break;
+            }
+            return new Rect(x, y, width, height);
+        }
+
+        /// <summary>
+        /// 根据停靠边缘从当前形态向方块态过渡。方块态始终以页签的屏幕锚点为基准，
+        /// 不允许从窗口右上角或其他默认角点飞入。
+        /// </summary>
+        internal static Rect EvaluateEdgeTabToTileFrame(
+            Rect from,
+            Rect tile,
+            float progress,
+            ESWindowEdge edge)
+        {
+            float t = Mathf.Clamp01(progress);
+            float eased = t < 0.5f
+                ? 4f * t * t * t
+                : 1f - Mathf.Pow(-2f * t + 2f, 3f) * 0.5f;
+            float width = Mathf.Lerp(from.width, tile.width, eased);
+            float height = Mathf.Lerp(from.height, tile.height, eased);
+            float x = Mathf.Lerp(from.x, tile.x, eased);
+            float y = Mathf.Lerp(from.y, tile.y, eased);
+            switch (edge)
+            {
+                case ESWindowEdge.Left:
+                    x = Mathf.Lerp(from.xMin, tile.xMin, eased);
+                    break;
+                case ESWindowEdge.Right:
+                    x = Mathf.Lerp(from.xMax, tile.xMax, eased) - width;
+                    break;
+                case ESWindowEdge.Top:
+                    y = Mathf.Lerp(from.yMin, tile.yMin, eased);
+                    break;
+                case ESWindowEdge.Bottom:
+                    y = Mathf.Lerp(from.yMax, tile.yMax, eased) - height;
+                    break;
+            }
+            return new Rect(x, y, width, height);
+        }
+
+        internal static float EvaluateEdgeTabTransitionDuration(
+            Rect current,
+            Rect target,
+            float fullDistance,
+            float fullDuration)
+        {
+            float distance = Mathf.Max(
+                Mathf.Abs(target.width - current.width),
+                Mathf.Abs(target.height - current.height));
+            float ratio = fullDistance > 0.001f
+                ? Mathf.Clamp01(distance / fullDistance)
+                : 1f;
+            return Mathf.Lerp(
+                EdgeTabMinimumReverseDuration,
+                Mathf.Max(EdgeTabMinimumReverseDuration, fullDuration),
+                ratio);
+        }
+
+        internal static bool ShouldResetEdgeTabHoverCommit(
+            Vector2 previousPointerPosition,
+            Vector2 currentPointerPosition,
+            bool hasPreviousPosition)
+        {
+            return !hasPreviousPosition
+                || (currentPointerPosition - previousPointerPosition).sqrMagnitude
+                >= EdgeTabPointerIntentDistance * EdgeTabPointerIntentDistance;
+        }
+
+        internal static bool TryEvaluateEdgeTab(
+            Rect tileBounds,
+            Rect workArea,
+            out ESWindowEdge edge,
+            out float edgeOffset,
+            out Rect tabBounds)
+        {
+            edge = ESWindowEdge.Right;
+            edgeOffset = 0f;
+            tabBounds = tileBounds;
+            if (!IsFinite(tileBounds.position)
+                || !IsFinite(tileBounds.size)
+                || !IsFinite(workArea.position)
+                || !IsFinite(workArea.size)
+                || workArea.width < EdgeTabCollapsedLength
+                || workArea.height < EdgeTabThickness)
+                return false;
+
+            float left = Mathf.Abs(tileBounds.xMin - workArea.xMin);
+            float right = Mathf.Abs(workArea.xMax - tileBounds.xMax);
+            float top = Mathf.Abs(tileBounds.yMin - workArea.yMin);
+            float bottom = Mathf.Abs(workArea.yMax - tileBounds.yMax);
+            float nearest = Mathf.Min(left, right, top, bottom);
+            if (nearest > EdgeTabSnapDistance)
+                return false;
+
+            if (nearest == left)
+                edge = ESWindowEdge.Left;
+            else if (nearest == right)
+                edge = ESWindowEdge.Right;
+            else if (nearest == top)
+                edge = ESWindowEdge.Top;
+            else
+                edge = ESWindowEdge.Bottom;
+
+            // ES tabs extend inward perpendicular to the screen edge. The product
+            // interaction contract intentionally uses a vertical tab at the top/
+            // bottom edge and a horizontal tab at the left/right edge.
+            bool horizontalEdge = edge == ESWindowEdge.Top || edge == ESWindowEdge.Bottom;
+            if (horizontalEdge)
+            {
+                edgeOffset = Mathf.Clamp(
+                    tileBounds.center.x - workArea.xMin - EdgeTabThickness * 0.5f,
+                    0f,
+                    Mathf.Max(0f, workArea.width - EdgeTabThickness));
+                float y = edge == ESWindowEdge.Top
+                    ? workArea.yMin
+                    : workArea.yMax - EdgeTabCollapsedLength;
+                tabBounds = new Rect(
+                    workArea.xMin + edgeOffset,
+                    y,
+                    EdgeTabThickness,
+                    EdgeTabCollapsedLength);
+            }
+            else
+            {
+                edgeOffset = Mathf.Clamp(
+                    tileBounds.center.y - workArea.yMin - EdgeTabThickness * 0.5f,
+                    0f,
+                    Mathf.Max(0f, workArea.height - EdgeTabThickness));
+                float x = edge == ESWindowEdge.Left
+                    ? workArea.xMin
+                    : workArea.xMax - EdgeTabCollapsedLength;
+                tabBounds = new Rect(
+                    x,
+                    workArea.yMin + edgeOffset,
+                    EdgeTabCollapsedLength,
+                    EdgeTabThickness);
+            }
+            return true;
+        }
+
+        internal static Rect EvaluateEdgeTabBounds(
+            Rect workArea,
+            ESWindowEdge edge,
+            float edgeOffset,
+            float expansion)
+        {
+            float length = Mathf.Lerp(
+                EdgeTabCollapsedLength,
+                EdgeTabExpandedLength,
+                Mathf.Clamp01(expansion));
+            bool horizontalEdge = edge == ESWindowEdge.Top || edge == ESWindowEdge.Bottom;
+            if (horizontalEdge)
+            {
+                float x = Mathf.Clamp(
+                    workArea.xMin + edgeOffset,
+                    workArea.xMin,
+                    Mathf.Max(workArea.xMin, workArea.xMax - EdgeTabThickness));
+                float y = edge == ESWindowEdge.Top ? workArea.yMin : workArea.yMax - length;
+                return new Rect(x, y, EdgeTabThickness, length);
+            }
+
+            float yPosition = Mathf.Clamp(
+                workArea.yMin + edgeOffset,
+                workArea.yMin,
+                Mathf.Max(workArea.yMin, workArea.yMax - EdgeTabThickness));
+            float xPosition = edge == ESWindowEdge.Left
+                ? workArea.xMin
+                : workArea.xMax - length;
+            return new Rect(xPosition, yPosition, length, EdgeTabThickness);
+        }
+
+        /// <summary>
+        /// 沿页签所属屏幕边缘移动原生窗口。拖动只改变沿边坐标，边缘锚点、
+        /// 当前展开长度和厚度保持不变，避免拖动时页签离开屏幕边缘或突然换向。
+        /// </summary>
+        internal static Rect EvaluateEdgeTabDragFrame(
+            Rect current,
+            Vector2 pointerDelta,
+            Rect workArea,
+            ESWindowEdge edge,
+            out float edgeOffset)
+        {
+            edgeOffset = 0f;
+            if (!IsFinite(pointerDelta)
+                || !IsFinite(current.position)
+                || !IsFinite(current.size)
+                || !IsFinite(workArea.position)
+                || !IsFinite(workArea.size))
+                return current;
+
+            Rect target = current;
+            bool verticalTab = edge == ESWindowEdge.Top || edge == ESWindowEdge.Bottom;
+            if (verticalTab)
+            {
+                float minX = workArea.xMin;
+                float maxX = Mathf.Max(minX, workArea.xMax - current.width);
+                target.x = Mathf.Clamp(current.x + pointerDelta.x, minX, maxX);
+                target.y = edge == ESWindowEdge.Top
+                    ? workArea.yMin
+                    : workArea.yMax - current.height;
+                edgeOffset = target.x - workArea.xMin;
+            }
+            else
+            {
+                float minY = workArea.yMin;
+                float maxY = Mathf.Max(minY, workArea.yMax - current.height);
+                target.y = Mathf.Clamp(current.y + pointerDelta.y, minY, maxY);
+                target.x = edge == ESWindowEdge.Left
+                    ? workArea.xMin
+                    : workArea.xMax - current.width;
+                edgeOffset = target.y - workArea.yMin;
+            }
+
+            return target;
+        }
+
+        internal static bool ShouldRestoreEdgeTabToTile(
+            double fullyExpandedAt,
+            double now,
+            bool interactionHeld)
+        {
+            return interactionHeld
+                && fullyExpandedAt >= 0d
+                && now >= fullyExpandedAt
+                && now - fullyExpandedAt >= EdgeTabHoverCommitDelay;
+        }
+
+        internal static bool ShouldBeginEdgeTabHover(
+            double intentStartedAt,
+            double now,
+            bool pointerInside)
+        {
+            return pointerInside
+                && intentStartedAt >= 0d
+                && now >= intentStartedAt
+                && now - intentStartedAt >= EdgeTabHoverIntentDelay;
         }
 
         private static VisualElement CreateSemiSleepOverlay(WindowBinding binding)
@@ -2384,16 +3280,44 @@ namespace ES.EditorInternal
             overlay.style.borderRightColor = ActiveColor;
             overlay.style.borderTopColor = ActiveColor;
             overlay.style.borderBottomColor = ActiveColor;
+            // 休眠提示由视觉状态和按钮承担；不要把诊断文本挂到整个覆盖层，
+            // 否则悬停时会遮挡窗口内容并把次要信息提升为主反馈。
+            overlay.tooltip = null;
 
-            binding.semiSleepMonogram = new Label("ES");
-            binding.semiSleepMonogram.style.fontSize = 20f;
-            binding.semiSleepMonogram.style.unityFontStyleAndWeight = FontStyle.Bold;
-            binding.semiSleepMonogram.style.color = SelectedTextColor;
-            overlay.Add(binding.semiSleepMonogram);
+            Texture icon = ResolveWindowPresentationIcon(binding.window);
+            if (icon != null)
+            {
+                binding.semiSleepIcon = new Image
+                {
+                    image = icon,
+                    scaleMode = ScaleMode.ScaleToFit,
+                    pickingMode = PickingMode.Ignore,
+                    tintColor = SelectedTextColor
+                };
+                binding.semiSleepIcon.style.width = 22f;
+                binding.semiSleepIcon.style.height = 22f;
+                overlay.Add(binding.semiSleepIcon);
+            }
+            else
+            {
+                binding.semiSleepMonogram = new Label("ES")
+                {
+                    pickingMode = PickingMode.Ignore
+                };
+                binding.semiSleepMonogram.style.fontSize = 20f;
+                binding.semiSleepMonogram.style.unityFontStyleAndWeight = FontStyle.Bold;
+                binding.semiSleepMonogram.style.color = SelectedTextColor;
+                overlay.Add(binding.semiSleepMonogram);
+            }
 
-            string title = binding.window?.titleContent?.text;
+            string title = binding.window is ES.IESWindowPresentationMetadata metadata
+                ? metadata.ESWindow_PresentationTitle
+                : binding.window?.titleContent?.text;
             binding.semiSleepTitleLabel = new Label(
-                string.IsNullOrWhiteSpace(title) ? "工具窗口" : title.Trim());
+                string.IsNullOrWhiteSpace(title) ? "工具窗口" : title.Trim())
+            {
+                pickingMode = PickingMode.Ignore
+            };
             binding.semiSleepTitleLabel.style.maxWidth = 172f;
             binding.semiSleepTitleLabel.style.marginTop = 3f;
             binding.semiSleepTitleLabel.style.fontSize = 9f;
@@ -2402,14 +3326,178 @@ namespace ES.EditorInternal
             binding.semiSleepTitleLabel.style.overflow = Overflow.Hidden;
             binding.semiSleepTitleLabel.style.textOverflow = TextOverflow.Ellipsis;
             overlay.Add(binding.semiSleepTitleLabel);
-            overlay.RegisterCallback<PointerEnterEvent>(OnSemiSleepOverlayPointerEnter);
-            overlay.RegisterCallback<PointerLeaveEvent>(OnSemiSleepOverlayPointerLeave);
-            overlay.RegisterCallback<PointerDownEvent>(OnSemiSleepOverlayPointerDown);
-            overlay.RegisterCallback<PointerMoveEvent>(OnSemiSleepOverlayPointerMove);
-            overlay.RegisterCallback<PointerUpEvent>(OnSemiSleepOverlayPointerUp);
-            overlay.RegisterCallback<PointerCancelEvent>(OnSemiSleepOverlayPointerCancel);
-            overlay.RegisterCallback<PointerCaptureOutEvent>(OnSemiSleepOverlayPointerCaptureOut);
+            binding.semiSleepPromotionProgress = CreateSemiSleepDiagnosticBar("ESPromotionProgress");
+            binding.semiSleepDockProgress = CreateSemiSleepDiagnosticBar("ESDockProgress");
+            binding.semiSleepDockProgress.style.display = DisplayStyle.None;
+            overlay.Add(binding.semiSleepPromotionProgress);
+            overlay.Add(binding.semiSleepDockProgress);
+            overlay.RegisterCallback<PointerEnterEvent>(OnSemiSleepOverlayPointerEnter, TrickleDown.TrickleDown);
+            overlay.RegisterCallback<PointerLeaveEvent>(OnSemiSleepOverlayPointerLeave, TrickleDown.TrickleDown);
+            overlay.RegisterCallback<PointerDownEvent>(OnSemiSleepOverlayPointerDown, TrickleDown.TrickleDown);
+            overlay.RegisterCallback<PointerMoveEvent>(OnSemiSleepOverlayPointerMove, TrickleDown.TrickleDown);
+            overlay.RegisterCallback<PointerUpEvent>(OnSemiSleepOverlayPointerUp, TrickleDown.TrickleDown);
+            overlay.RegisterCallback<PointerCancelEvent>(OnSemiSleepOverlayPointerCancel, TrickleDown.TrickleDown);
+            overlay.RegisterCallback<PointerCaptureOutEvent>(OnSemiSleepOverlayPointerCaptureOut, TrickleDown.TrickleDown);
             return overlay;
+        }
+
+        private static VisualElement CreateSemiSleepDiagnosticBar(string name)
+        {
+            // Diagnostic only: never become a pointer target, otherwise moving
+            // across the two rails can synthesize overlay leave/enter events.
+            var bar = new VisualElement { name = name, pickingMode = PickingMode.Ignore };
+            bar.style.position = Position.Absolute;
+            bar.style.left = 8f;
+            bar.style.bottom = 4f;
+            bar.style.height = 3f;
+            bar.style.width = 0f;
+            bar.style.minWidth = 0f;
+            bar.style.maxWidth = 82f;
+            bar.style.backgroundColor = SectionMutedTextColor;
+            bar.style.flexShrink = 0f;
+            return bar;
+        }
+
+        private static Texture ResolveWindowPresentationIcon(EditorWindow window)
+        {
+            string metadataTitle = null;
+            if (window is ES.IESWindowPresentationMetadata metadata)
+            {
+                metadataTitle = metadata.ESWindow_PresentationTitle;
+                if (metadata.ESWindow_PresentationIcon != null)
+                    return metadata.ESWindow_PresentationIcon;
+            }
+            Texture titleIcon = window?.titleContent?.image;
+            if (titleIcon != null)
+                return titleIcon;
+            return ResolveDefaultWindowIcon(window, metadataTitle ?? window?.titleContent?.text, null);
+        }
+
+        internal static Texture ResolveDefaultWindowIcon(
+            EditorWindow window,
+            string title,
+            string pagePath)
+        {
+            Texture brandIcon = LoadESBrandIcon(
+                ResolveESBrandIconResourceName(window?.GetType(), title, pagePath));
+            if (brandIcon != null)
+                return brandIcon;
+            string iconName = ResolveDefaultWindowIconName(window?.GetType(), title, pagePath);
+            return LoadUnityIcon(iconName)
+                ?? LoadUnityIcon("d_Folder Icon")
+                ?? EditorGUIUtility.Load("Icons/DefaultAsset Icon.png") as Texture;
+        }
+
+        internal static string ResolveDefaultWindowIconName(
+            Type windowType,
+            string title,
+            string pagePath)
+        {
+            // 标题与页路径是窗口主动声明的语义，必须优先于类型名回退。
+            // 否则测试程序集、Window/Inspector 等技术后缀会污染真正的业务图标。
+            string semanticKey = ((title ?? string.Empty) + " " + (pagePath ?? string.Empty))
+                .ToLowerInvariant();
+            string resolved = ResolveDefaultWindowIconNameFromKey(semanticKey);
+            if (!string.IsNullOrEmpty(resolved))
+                return resolved;
+            string typeKey = (windowType?.Name ?? string.Empty).ToLowerInvariant();
+            return ResolveDefaultWindowIconNameFromKey(typeKey) ?? "d_Folder Icon";
+        }
+
+        private static string ResolveDefaultWindowIconNameFromKey(string key)
+        {
+            if (ContainsAny(key, "font", "字体"))
+                return "d_Font Icon";
+            if (ContainsAny(key, "audio", "sound", "音频", "音效"))
+                return "d_AudioClip Icon";
+            if (ContainsAny(key, "track", "timeline", "animation", "动作", "轨道"))
+                return "d_AnimationClip Icon";
+            if (ContainsAny(key, "scene", "world", "environment", "场景", "环境"))
+                return "d_UnityEditor.SceneView";
+            if (ContainsAny(key, "camera", "相机"))
+                return "d_Camera Icon";
+            if (ContainsAny(key, "build", "bake", "release", "publish", "构建", "发布"))
+                return "d_BuildSettings.Editor.Small";
+            if (ContainsAny(key, "package", "installer", "dependency", "安装", "依赖"))
+                return "d_Package Manager";
+            if (ContainsAny(key, "agent", "automation", "command", "协作", "自动化"))
+                return "d_UnityEditor.ConsoleWindow";
+            if (ContainsAny(key, "health", "diagnostic", "validation", "test", "health", "验证", "诊断", "测试"))
+                return "d_console.infoicon";
+            if (ContainsAny(key, "settings", "config", "theme", "设置", "配置", "主题"))
+                return "d_Settings Icon";
+            if (ContainsAny(key, "inspector", "drawer", "property", "检查器", "属性"))
+                return "d_UnityEditor.InspectorWindow";
+            if (ContainsAny(key, "data", "so", "table", "catalog", "数据", "表", "目录"))
+                return "d_ScriptableObject Icon";
+            if (ContainsAny(key, "asset", "resource", "res", "资源", "资产"))
+                return "d_Project";
+            return null;
+        }
+
+        /// <summary>
+        /// 返回 ES 品牌语义图标的项目内资源名。资源不存在时返回 null，
+        /// 调用方继续走 Unity 内置图标回退，不影响旧窗口。
+        /// </summary>
+        internal static string ResolveESBrandIconResourceName(
+            Type windowType,
+            string title,
+            string pagePath)
+        {
+            string key = ((windowType?.FullName ?? string.Empty) + " "
+                + (title ?? string.Empty) + " " + (pagePath ?? string.Empty))
+                .ToLowerInvariant();
+            if (ContainsAny(key, "agent", "协作")) return "agent";
+            if (ContainsAny(key, "automation", "自动化", "command")) return "automation";
+            if (ContainsAny(key, "diagnostic", "validation", "test", "验证", "诊断", "测试")) return "diagnostics";
+            if (ContainsAny(key, "font", "字体")) return "font";
+            if (ContainsAny(key, "audio", "sound", "音频", "音效")) return "audio";
+            if (ContainsAny(key, "track", "timeline", "animation", "动作", "轨道")) return "graph";
+            if (ContainsAny(key, "scene", "world", "environment", "场景", "环境")) return "scene";
+            if (ContainsAny(key, "camera", "相机")) return "scene";
+            if (ContainsAny(key, "build", "bake", "release", "publish", "构建", "发布")) return "build";
+            if (ContainsAny(key, "package", "installer", "dependency", "安装", "依赖")) return "package";
+            if (ContainsAny(key, "settings", "config", "theme", "设置", "配置", "主题")) return "settings";
+            if (ContainsAny(key, "inspector", "drawer", "property", "检查器", "属性")) return "inspector";
+            if (ContainsAny(key, "data", "so", "table", "catalog", "数据", "表", "目录")) return "data";
+            if (ContainsAny(key, "asset", "resource", "res", "资源", "资产")) return "assets";
+            if (ContainsAny(key, "workbench", "工作台", "window", "窗口")) return "workbench";
+            return null;
+        }
+
+        internal static Texture LoadESBrandIcon(string resourceName)
+        {
+            if (string.IsNullOrWhiteSpace(resourceName))
+                return null;
+            string key = resourceName.Trim();
+            if (esBrandIconCache.TryGetValue(key, out Texture cached))
+                return cached;
+            Texture icon = AssetDatabase.LoadAssetAtPath<Texture2D>(
+                "Assets/Plugins/ES/Editor/Resources/ESBrandIcons/"
+                + key + ".png");
+            if (icon != null)
+                esBrandIconCache[key] = icon;
+            return icon;
+        }
+
+        private static bool ContainsAny(string value, params string[] tokens)
+        {
+            for (int i = 0; i < tokens.Length; i++)
+                if (!string.IsNullOrEmpty(tokens[i])
+                    && value.IndexOf(tokens[i], StringComparison.Ordinal) >= 0)
+                    return true;
+            return false;
+        }
+
+        private static Texture LoadUnityIcon(string iconName)
+        {
+            if (string.IsNullOrWhiteSpace(iconName))
+                return null;
+            string normalized = iconName.Trim();
+            Texture icon = EditorGUIUtility.Load("Icons/" + normalized + ".png") as Texture;
+            if (icon == null && normalized.StartsWith("d_", StringComparison.Ordinal))
+                icon = EditorGUIUtility.Load("Icons/" + normalized.Substring(2) + ".png") as Texture;
+            return icon;
         }
 
         private static void OnSemiSleepOverlayPointerDown(PointerDownEvent evt)
@@ -2419,26 +3507,121 @@ namespace ES.EditorInternal
             if (binding?.window == null || overlay == null || evt.button != 0)
                 return;
             RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
+            binding.edgeTabHoverIntentStartedAt = -1d;
+            // A user gesture owns the native frame. In particular, invalidate a
+            // domain-reload recovery callback before it can write the old frame back.
+            binding.restorePersistedSleepOnBind = false;
+            if (binding.semiSleepAnimating
+                && binding.transitionTargetState == ESWindowVisualState.SleepTile)
+            {
+                // Do not snap to the stale animation target under the pointer. The
+                // current intermediate frame becomes the drag origin instead.
+                binding.visualState = ESWindowVisualState.SleepTile;
+                binding.semiSleeping = true;
+                binding.semiSleepTarget = true;
+                binding.semiSleepAnimating = false;
+                binding.semiSleepFromBounds = binding.window.position;
+                binding.semiSleepToBounds = binding.window.position;
+                ApplySemiSleepOverlayState(binding, ESWindowVisualState.SleepTile);
+                RefreshSemiSleepUpdateSubscription();
+            }
+            else if (binding.semiSleepAnimating
+                && (binding.transitionTargetState == ESWindowVisualState.EdgeTab
+                    || binding.transitionTargetState == ESWindowVisualState.EdgeTabHover))
+            {
+                // Freeze the current native frame as an expanded tab drag origin.
+                // On release it will collapse from this exact geometry, instead of
+                // snapping to either end of the interrupted hover animation.
+                binding.visualState = ESWindowVisualState.EdgeTabHover;
+                binding.semiSleeping = true;
+                binding.semiSleepTarget = true;
+                binding.semiSleepAnimating = false;
+                binding.semiSleepFromBounds = binding.window.position;
+                binding.semiSleepToBounds = binding.window.position;
+                ApplySemiSleepOverlayState(binding, ESWindowVisualState.EdgeTabHover);
+                RefreshSemiSleepUpdateSubscription();
+            }
+            if (binding.semiSleepAnimating
+                || binding.visualState != ESWindowVisualState.SleepTile
+                    && binding.visualState != ESWindowVisualState.EdgeTab
+                    && binding.visualState != ESWindowVisualState.EdgeTabHover)
+            {
+                binding.semiSleepManualHold = false;
+                binding.window.Focus();
+                BeginSemiSleepTransition(binding, false);
+                evt.StopImmediatePropagation();
+                return;
+            }
             binding.semiSleepDragPointerId = evt.pointerId;
-            binding.semiSleepDragLastPointerPosition = new Vector2(evt.position.x, evt.position.y)
-                + binding.window.position.position;
+            binding.semiSleepDragStartState = binding.visualState;
+            // Store a fixed screen-space pointer anchor and native frame. Every move
+            // is solved from this anchor, so the moving native frame cannot feed its
+            // changing panel-local coordinates back into the next target.
             binding.semiSleepDragWindowStart = binding.window.position;
+            binding.semiSleepDragScreenStart = binding.window.position.position
+                + new Vector2(evt.position.x, evt.position.y);
+            binding.semiSleepDragPendingBounds = binding.window.position;
+            binding.semiSleepDragPendingEdgeOffset = binding.edgeOffset;
+            binding.hasSemiSleepDragPendingBounds = false;
             binding.semiSleepDragging = false;
             overlay.CapturePointer(evt.pointerId);
+            nextSemiSleepIdleCheckAt = 0d;
+            RefreshSemiSleepUpdateSubscription();
             evt.StopImmediatePropagation();
         }
 
         private static void OnSemiSleepOverlayPointerMove(PointerMoveEvent evt)
         {
             WindowBinding binding = (evt.currentTarget as VisualElement)?.userData as WindowBinding;
-            if (binding?.window == null || binding.semiSleepDragPointerId != evt.pointerId)
+            if (binding?.window == null)
+                return;
+
+            if (binding.visualState == ESWindowVisualState.EdgeTabHover
+                || binding.semiSleepAnimating
+                && binding.transitionTargetState == ESWindowVisualState.EdgeTabHover)
+            {
+                Vector2 hoverPointerPosition = binding.window.position.position
+                    + new Vector2(evt.position.x, evt.position.y);
+                if (ShouldResetEdgeTabHoverCommit(
+                    binding.edgeTabLastPointerPosition,
+                    hoverPointerPosition,
+                    binding.hasEdgeTabPointerPosition))
+                {
+                    binding.edgeTabLastPointerPosition = hoverPointerPosition;
+                    binding.hasEdgeTabPointerPosition = true;
+                    if (binding.visualState == ESWindowVisualState.EdgeTabHover
+                        && !binding.semiSleepAnimating)
+                        binding.edgeTabFullyExpandedAt = EditorApplication.timeSinceStartup;
+                }
+            }
+
+            if (binding.semiSleepDragPointerId != evt.pointerId)
+                return;
+            if (binding.semiSleepRecaptureScheduled)
+            {
+                // The native frame moved after the last accepted event. Ignore
+                // panel coordinates until pointer capture is re-established;
+                // those coordinates may still be relative to the previous frame
+                // and would otherwise create a one-frame teleport and rollback.
+                evt.StopImmediatePropagation();
+                return;
+            }
+
+            bool tileDrag = binding.semiSleepDragStartState == ESWindowVisualState.SleepTile;
+            bool edgeTabDrag = binding.semiSleepDragStartState == ESWindowVisualState.EdgeTab
+                || binding.semiSleepDragStartState == ESWindowVisualState.EdgeTabHover;
+            if (!tileDrag && !edgeTabDrag)
                 return;
 
             RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
 
-            Vector2 pointerScreenPosition = new Vector2(evt.position.x, evt.position.y)
-                + binding.window.position.position;
-            Vector2 delta = pointerScreenPosition - binding.semiSleepDragLastPointerPosition;
+            // PointerEvent.position is panel-local. Convert it back to a stable
+            // screen coordinate using the current native frame before solving the
+            // target; otherwise moving the window changes the local coordinate and
+            // feeds a false reverse delta into the next event.
+            Vector2 currentScreenPosition = binding.window.position.position
+                + new Vector2(evt.position.x, evt.position.y);
+            Vector2 delta = currentScreenPosition - binding.semiSleepDragScreenStart;
             if (!IsFinite(delta))
                 return;
             if (!binding.semiSleepDragging
@@ -2446,13 +3629,31 @@ namespace ES.EditorInternal
                 return;
 
             binding.semiSleepDragging = true;
-            Rect target = EvaluateSemiSleepDragFrame(
-                binding.window.position,
-                delta,
-                GetSemiSleepTrayBounds(binding.awakeBounds));
-            binding.window.position = target;
-            binding.semiSleepToBounds = target;
-            binding.semiSleepDragLastPointerPosition = pointerScreenPosition;
+            Rect workArea = GetSemiSleepTrayBounds(binding.awakeBounds);
+            Rect target;
+            if (edgeTabDrag)
+            {
+                target = EvaluateEdgeTabDragFrame(
+                    binding.semiSleepDragWindowStart,
+                    delta,
+                    workArea,
+                    binding.edge,
+                    out float edgeOffset);
+                binding.semiSleepDragPendingEdgeOffset = edgeOffset;
+            }
+            else
+            {
+                target = EvaluateSemiSleepDragFrame(
+                    binding.semiSleepDragWindowStart,
+                    delta,
+                    workArea);
+            }
+            // Native EditorWindow movement can invalidate pointer capture. Do not
+            // mutate it re-entrantly from the pointer callback; the editor update
+            // loop coalesces multiple events into one stable frame write.
+            binding.semiSleepDragPendingBounds = target;
+            binding.hasSemiSleepDragPendingBounds = true;
+            nextSemiSleepIdleCheckAt = 0d;
             evt.StopImmediatePropagation();
         }
 
@@ -2466,31 +3667,67 @@ namespace ES.EditorInternal
                 return;
 
             bool dragged = binding.semiSleepDragging;
+            ESWindowVisualState dragStartState = binding.semiSleepDragStartState;
+            ApplyPendingSemiSleepDragFrame(binding);
             if (overlay.HasPointerCapture(evt.pointerId))
                 overlay.ReleasePointer(evt.pointerId);
             ResetSemiSleepDrag(binding);
             if (dragged)
             {
                 binding.semiSleepManualHold = true;
-                Rect dockBounds = ClampSemiSleepDockBounds(
-                    binding.window.position,
-                    GetSemiSleepTrayBounds(binding.awakeBounds));
-                binding.window.position = dockBounds;
-                binding.semiSleepToBounds = dockBounds;
-                binding.semiSleepDockBounds = dockBounds;
-                binding.hasSemiSleepDockBounds = true;
-                binding.visualState = ESWindowVisualState.SleepTile;
-                binding.transitionTargetState = ESWindowVisualState.SleepTile;
-                binding.sleepTileIdleStartedAt = EditorApplication.timeSinceStartup;
-                ShowSemiSleepOverlay(binding, true, 1f);
-                ApplySemiSleepOverlayState(binding);
-                RefreshSemiSleepControls(binding);
+                bool edgeTabDrag = dragStartState == ESWindowVisualState.EdgeTab
+                    || dragStartState == ESWindowVisualState.EdgeTabHover;
+                if (edgeTabDrag)
+                {
+                    binding.semiSleeping = true;
+                    binding.semiSleepTarget = true;
+                    // Releasing a moved tab must settle once. Requiring a real
+                    // leave/re-enter prevents the pointer that performed the drag
+                    // from immediately opening the hover transition again.
+                    binding.pointerInside = false;
+                    binding.edgeTabHoverIntentStartedAt = -1d;
+                    binding.edgeTabFullyExpandedAt = -1d;
+                    binding.semiSleepFromBounds = binding.window.position;
+                    binding.semiSleepToBounds = binding.window.position;
+                    if (dragStartState == ESWindowVisualState.EdgeTabHover)
+                    {
+                        binding.visualState = ESWindowVisualState.EdgeTabHover;
+                        BeginVisualStateTransition(binding, ESWindowVisualState.EdgeTab);
+                    }
+                    else
+                    {
+                        binding.visualState = ESWindowVisualState.EdgeTab;
+                        binding.transitionTargetState = ESWindowVisualState.EdgeTab;
+                        ShowSemiSleepOverlay(binding, true, 1f);
+                        ApplySemiSleepOverlayState(binding, ESWindowVisualState.EdgeTab);
+                        RefreshSemiSleepControls(binding);
+                        SaveSemiSleepPreferences(binding);
+                    }
+                }
+                else
+                {
+                    Rect dockBounds = ClampSemiSleepDockBounds(
+                        binding.window.position,
+                        GetSemiSleepTrayBounds(binding.awakeBounds));
+                    binding.window.position = dockBounds;
+                    binding.semiSleepToBounds = dockBounds;
+                    binding.semiSleepDockBounds = dockBounds;
+                    binding.hasSemiSleepDockBounds = true;
+                    binding.visualState = ESWindowVisualState.SleepTile;
+                    binding.transitionTargetState = ESWindowVisualState.SleepTile;
+                    binding.sleepTileIdleStartedAt = EditorApplication.timeSinceStartup;
+                    ShowSemiSleepOverlay(binding, true, 1f);
+                    ApplySemiSleepOverlayState(binding);
+                    RefreshSemiSleepControls(binding);
+                    SaveSemiSleepPreferences(binding);
+                }
             }
             else
             {
                 binding.semiSleepManualHold = false;
                 binding.window.Focus();
                 BeginSemiSleepTransition(binding, false);
+                SaveSemiSleepPreferences(binding);
             }
             evt.StopImmediatePropagation();
         }
@@ -2498,25 +3735,41 @@ namespace ES.EditorInternal
         private static void OnSemiSleepOverlayPointerEnter(PointerEnterEvent evt)
         {
             WindowBinding binding = (evt.currentTarget as VisualElement)?.userData as WindowBinding;
-            if (binding == null)
+            if (binding == null || evt.target != evt.currentTarget)
                 return;
             binding.pointerInside = true;
-            RecordWindowInteraction(binding, EditorApplication.timeSinceStartup);
-            if (binding.visualState == ESWindowVisualState.EdgeTab
-                && !binding.semiSleepAnimating)
-                BeginVisualStateTransition(binding, ESWindowVisualState.EdgeTabHover);
+            binding.edgeTabHoverExitGraceUntil = -1d;
+            // PointerEvent.position is panel-local. A right/bottom anchored tab changes
+            // its panel origin while extending, so comparing local values would treat
+            // the window's own animation as user movement and reset the dwell timer.
+            binding.edgeTabLastPointerPosition = binding.window != null
+                ? binding.window.position.position + new Vector2(evt.position.x, evt.position.y)
+                : new Vector2(evt.position.x, evt.position.y);
+            binding.hasEdgeTabPointerPosition = true;
+            double now = EditorApplication.timeSinceStartup;
+            RecordWindowInteraction(binding, now);
+            if ((binding.visualState == ESWindowVisualState.EdgeTab
+                    && !binding.semiSleepAnimating)
+                || (binding.semiSleepAnimating
+                    && binding.transitionTargetState == ESWindowVisualState.EdgeTab))
+            {
+                binding.edgeTabHoverIntentStartedAt = now;
+                nextSemiSleepIdleCheckAt = 0d;
+                RefreshSemiSleepUpdateSubscription();
+            }
         }
 
         private static void OnSemiSleepOverlayPointerLeave(PointerLeaveEvent evt)
         {
             WindowBinding binding = (evt.currentTarget as VisualElement)?.userData as WindowBinding;
-            if (binding == null)
+            if (binding == null || evt.target != evt.currentTarget)
                 return;
             binding.pointerInside = false;
-            binding.edgeTabFullyExpandedAt = -1d;
-            if (binding.visualState == ESWindowVisualState.EdgeTabHover
-                && !binding.semiSleepAnimating)
-                BeginVisualStateTransition(binding, ESWindowVisualState.EdgeTab);
+            binding.hasEdgeTabPointerPosition = false;
+            binding.edgeTabHoverIntentStartedAt = -1d;
+            binding.edgeTabHoverExitGraceUntil = EditorApplication.timeSinceStartup
+                + EdgeTabHoverExitGrace;
+            RefreshSemiSleepUpdateSubscription();
         }
 
         private static void OnSemiSleepOverlayPointerCancel(PointerCancelEvent evt)
@@ -2527,9 +3780,30 @@ namespace ES.EditorInternal
 
         private static void OnSemiSleepOverlayPointerCaptureOut(PointerCaptureOutEvent evt)
         {
-            WindowBinding binding = (evt.currentTarget as VisualElement)?.userData as WindowBinding;
-            if (binding != null && binding.semiSleepDragPointerId == evt.pointerId)
-                ResetSemiSleepDrag(binding);
+            VisualElement overlay = evt.currentTarget as VisualElement;
+            WindowBinding binding = overlay?.userData as WindowBinding;
+            if (binding == null
+                || overlay == null
+                || binding.semiSleepDragPointerId != evt.pointerId
+                || binding.semiSleepRecaptureScheduled)
+                return;
+
+            // Native EditorWindow movement can emit PointerCaptureOut. Re-capturing
+            // synchronously here creates a capture-out/capture loop. Defer one
+            // guarded recapture so subsequent moves remain available without
+            // re-entering the event currently being dispatched.
+            binding.semiSleepRecaptureScheduled = true;
+            int pointerId = evt.pointerId;
+            overlay.schedule.Execute(() =>
+            {
+                binding.semiSleepRecaptureScheduled = false;
+                if (binding.window == null
+                    || binding.semiSleepDragPointerId != pointerId
+                    || overlay.panel == null
+                    || overlay.HasPointerCapture(pointerId))
+                    return;
+                overlay.CapturePointer(pointerId);
+            });
         }
 
         private static void CancelSemiSleepDrag(VisualElement overlay, int pointerId)
@@ -2537,14 +3811,67 @@ namespace ES.EditorInternal
             WindowBinding binding = overlay?.userData as WindowBinding;
             if (binding == null || binding.semiSleepDragPointerId != pointerId)
                 return;
+            ESWindowVisualState dragStartState = binding.semiSleepDragStartState;
+            ApplyPendingSemiSleepDragFrame(binding);
             if (binding.semiSleepDragging && binding.window != null)
             {
-                binding.window.position = binding.semiSleepDragWindowStart;
-                binding.semiSleepToBounds = binding.semiSleepDragWindowStart;
+                // Pointer cancellation can be emitted when the native frame changes
+                // under the pointer. Preserve the latest valid position instead of
+                // snapping back to the drag origin.
+                binding.semiSleepManualHold = true;
+                binding.semiSleeping = true;
+                binding.semiSleepTarget = true;
+                bool edgeTabDrag = dragStartState == ESWindowVisualState.EdgeTab
+                    || dragStartState == ESWindowVisualState.EdgeTabHover;
+                if (edgeTabDrag)
+                {
+                    binding.pointerInside = false;
+                    binding.edgeTabHoverIntentStartedAt = -1d;
+                    binding.visualState = ESWindowVisualState.EdgeTabHover;
+                    binding.transitionTargetState = ESWindowVisualState.EdgeTabHover;
+                    binding.semiSleepFromBounds = binding.window.position;
+                    binding.semiSleepToBounds = binding.window.position;
+                    binding.edgeTabFullyExpandedAt = -1d;
+                }
+                else
+                {
+                    Rect dockBounds = ClampSemiSleepDockBounds(
+                        binding.window.position,
+                        GetSemiSleepTrayBounds(binding.awakeBounds));
+                    binding.window.position = dockBounds;
+                    binding.semiSleepToBounds = dockBounds;
+                    binding.semiSleepDockBounds = dockBounds;
+                    binding.hasSemiSleepDockBounds = true;
+                    binding.visualState = ESWindowVisualState.SleepTile;
+                    binding.transitionTargetState = ESWindowVisualState.SleepTile;
+                    binding.sleepTileIdleStartedAt = EditorApplication.timeSinceStartup;
+                    SaveSemiSleepPreferences(binding);
+                }
             }
             if (overlay.HasPointerCapture(pointerId))
                 overlay.ReleasePointer(pointerId);
             ResetSemiSleepDrag(binding);
+            if (binding.window != null
+                && (dragStartState == ESWindowVisualState.EdgeTab
+                    || dragStartState == ESWindowVisualState.EdgeTabHover))
+            {
+                BeginVisualStateTransition(binding, ESWindowVisualState.EdgeTab);
+            }
+        }
+
+        private static void ApplyPendingSemiSleepDragFrame(WindowBinding binding)
+        {
+            if (binding?.window == null || !binding.hasSemiSleepDragPendingBounds)
+                return;
+            Rect target = binding.semiSleepDragPendingBounds;
+            binding.hasSemiSleepDragPendingBounds = false;
+            if (!IsFinite(target.position) || !IsFinite(target.size))
+                return;
+            binding.window.position = target;
+            binding.semiSleepToBounds = target;
+            if (binding.semiSleepDragStartState == ESWindowVisualState.EdgeTab
+                || binding.semiSleepDragStartState == ESWindowVisualState.EdgeTabHover)
+                binding.edgeOffset = binding.semiSleepDragPendingEdgeOffset;
         }
 
         private static void ResetSemiSleepDrag(WindowBinding binding)
@@ -2552,7 +3879,11 @@ namespace ES.EditorInternal
             if (binding == null)
                 return;
             binding.semiSleepDragPointerId = -1;
+            binding.semiSleepDragStartState = ESWindowVisualState.ActivePanel;
+            binding.hasSemiSleepDragPendingBounds = false;
             binding.semiSleepDragging = false;
+            binding.semiSleepRecaptureScheduled = false;
+            RefreshSemiSleepUpdateSubscription();
         }
 
         private static void AttachSemiSleepControls(WindowBinding binding)
@@ -2589,9 +3920,15 @@ namespace ES.EditorInternal
                 "自动",
                 "自动：失去焦点后休眠。固定：保持展开且不会自动休眠。",
                 () => ToggleSemiSleepPinFromHeader(binding));
+            binding.semiSleepGlobalButton = ESWindowPresentation.CreateHeaderActionButton(
+                null,
+                "全局",
+                "切换所有 ES 浮动窗口的自动半休眠总开关；不会重建窗口内容。",
+                () => SetSemiSleepEnabled(!SemiSleepEnabled));
             controls.Add(binding.semiSleepAllowedButton);
             controls.Add(binding.semiSleepToggleButton);
             controls.Add(binding.semiSleepPinButton);
+            controls.Add(binding.semiSleepGlobalButton);
             binding.semiSleepOverflowMenu = CreateSemiSleepOverflowMenu(binding);
             controls.Add(binding.semiSleepOverflowMenu);
 
@@ -2677,6 +4014,13 @@ namespace ES.EditorInternal
                 "固定展开",
                 _ => SetWindowPinned(binding.window, true),
                 _ => GetPinModeStatus(binding, true));
+            menu.menu.AppendSeparator();
+            menu.menu.AppendAction(
+                "全局自动半休眠",
+                _ => SetSemiSleepEnabled(!SemiSleepEnabled),
+                _ => SemiSleepEnabled
+                    ? DropdownMenuAction.Status.Checked
+                    : DropdownMenuAction.Status.Normal);
             return menu;
         }
 
@@ -2711,6 +4055,7 @@ namespace ES.EditorInternal
             binding.semiSleepAllowedButton = null;
             binding.semiSleepToggleButton = null;
             binding.semiSleepPinButton = null;
+            binding.semiSleepGlobalButton = null;
             binding.semiSleepOverflowMenu = null;
         }
 
@@ -2723,7 +4068,11 @@ namespace ES.EditorInternal
         {
             VisualElement root = evt.currentTarget as VisualElement;
             if (root != null && windowBindingsByRoot.TryGetValue(root, out WindowBinding binding))
+            {
+                if (binding.supportsSemiSleep && binding.semiSleepControls == null)
+                    AttachSemiSleepControls(binding);
                 RefreshSemiSleepControls(binding);
+            }
         }
 
         private static void ToggleSemiSleepFromHeader(WindowBinding binding)
@@ -2770,6 +4119,8 @@ namespace ES.EditorInternal
             binding.semiSleepAllowedButton.style.display = compact ? DisplayStyle.None : DisplayStyle.Flex;
             binding.semiSleepToggleButton.style.display = compact ? DisplayStyle.None : DisplayStyle.Flex;
             binding.semiSleepPinButton.style.display = compact ? DisplayStyle.None : DisplayStyle.Flex;
+            if (binding.semiSleepGlobalButton != null)
+                binding.semiSleepGlobalButton.style.display = compact ? DisplayStyle.None : DisplayStyle.Flex;
             if (binding.semiSleepOverflowMenu != null)
             {
                 binding.semiSleepOverflowMenu.style.display = compact
@@ -2786,20 +4137,20 @@ namespace ES.EditorInternal
             {
                 SetHeaderActionButtonText(
                     binding.semiSleepAllowedButton,
-                    binding.allowSemiSleep ? "允许" : "禁用");
+                    binding.allowSemiSleep ? "休眠:允许" : "休眠:禁用");
                 binding.semiSleepAllowedButton.tooltip = binding.allowSemiSleep
                     ? "此窗口允许参与休眠。单击禁用并立即恢复窗口。"
                     : "此窗口已禁用休眠。单击重新允许休眠命令与自动策略。";
                 binding.semiSleepAllowedButton.style.backgroundColor = binding.allowSemiSleep
                     ? ControlSurfaceColor
-                    : GetStatusAccent(0, ESStatusKind.Warning);
+                    : InactiveActionColor;
             }
 
             if (binding.semiSleepToggleButton != null)
             {
                 SetHeaderActionButtonText(
                     binding.semiSleepToggleButton,
-                    docked ? "停靠" : sleeping ? "唤醒" : "休眠");
+                    docked ? "停靠" : sleeping ? "唤醒" : "收起");
                 binding.semiSleepToggleButton.SetEnabled(commandsEnabled);
                 binding.semiSleepToggleButton.tooltip = !binding.allowSemiSleep
                     ? "此窗口已禁用休眠；先使用“禁用”按钮重新允许。"
@@ -2832,6 +4183,21 @@ namespace ES.EditorInternal
                 binding.semiSleepPinButton.style.backgroundColor = binding.pinned
                     ? GetStatusAccent(0, ESStatusKind.Warning)
                     : ControlSurfaceColor;
+            }
+            if (binding.semiSleepGlobalButton != null)
+            {
+                SetHeaderActionButtonText(
+                    binding.semiSleepGlobalButton,
+                    SemiSleepEnabled ? "全局:开" : "全局:关");
+                // 全局开关不是当前窗口的休眠命令；即使当前窗口停靠，也必须保持可操作，
+                // 否则用户会误以为“停靠”把全局自动策略一起禁用了。
+                binding.semiSleepGlobalButton.SetEnabled(true);
+                binding.semiSleepGlobalButton.tooltip = SemiSleepEnabled
+                    ? "全局自动半休眠已开启。单击关闭；不会重建窗口内容。"
+                    : "全局自动半休眠已关闭。单击开启；窗口级“自动”模式将开始生效。";
+                binding.semiSleepGlobalButton.style.backgroundColor = SemiSleepEnabled
+                    ? ActiveColor
+                    : InactiveActionColor;
             }
         }
 
@@ -2871,7 +4237,18 @@ namespace ES.EditorInternal
         private static bool HasSemiSleepCandidates()
         {
             foreach (WindowBinding binding in windowBindings.Values)
-                if (binding != null && binding.allowSemiSleep && binding.window != null)
+                if (binding != null
+                    && binding.allowSemiSleep
+                    && binding.window != null
+                    && (binding.semiSleepAnimating
+                        || binding.semiSleepDragPointerId >= 0
+                        || binding.hasSemiSleepDragPendingBounds
+                        || binding.visualState == ESWindowVisualState.ActivePanel
+                        || binding.visualState == ESWindowVisualState.SleepTile
+                        || binding.visualState == ESWindowVisualState.EdgeTabHover
+                        || (binding.visualState == ESWindowVisualState.EdgeTab
+                            && binding.pointerInside)
+                        || binding.sleepLinkMode == ES.ESWindowSleepLinkMode.FollowOwner))
                     return true;
             return false;
         }
@@ -2879,9 +4256,43 @@ namespace ES.EditorInternal
         private static bool HasSemiSleepRuntimeState()
         {
             foreach (WindowBinding binding in windowBindings.Values)
-                if (binding != null && binding.semiSleepAnimating)
+                if (binding != null
+                    && (binding.semiSleepAnimating
+                        || binding.semiSleepDragPointerId >= 0
+                        || binding.hasSemiSleepDragPendingBounds
+                        || binding.visualState == ESWindowVisualState.SleepTile
+                        || binding.visualState == ESWindowVisualState.EdgeTabHover
+                        || (binding.visualState == ESWindowVisualState.EdgeTab
+                            && binding.pointerInside)
+                        || binding.sleepLinkMode == ES.ESWindowSleepLinkMode.FollowOwner))
                     return true;
             return false;
+        }
+
+        private static bool ShouldEvaluateSemiSleepBinding(WindowBinding binding)
+        {
+            if (binding == null)
+                return false;
+            if (binding.semiSleepAnimating
+                || binding.semiSleepDragging
+                || binding.semiSleepDragPointerId >= 0)
+                return true;
+
+            switch (binding.visualState)
+            {
+                case ESWindowVisualState.ActivePanel:
+                case ESWindowVisualState.SleepTile:
+                case ESWindowVisualState.EdgeTabHover:
+                    return true;
+                case ESWindowVisualState.EdgeTab:
+                    // A settled independent tab is event-driven: PointerEnter/Leave
+                    // owns hover transitions. FollowOwner still needs the low-cost
+                    // synchronization pass in case its owner changes state.
+                    return binding.pointerInside
+                        || binding.sleepLinkMode == ES.ESWindowSleepLinkMode.FollowOwner;
+                default:
+                    return true;
+            }
         }
 
         private static bool IsSemiSleepEligible(WindowBinding binding)
@@ -2894,6 +4305,7 @@ namespace ES.EditorInternal
             if (binding == null
                 || !binding.supportsSemiSleep
                 || !binding.allowSemiSleep
+                || binding.sleepLinkMode == ES.ESWindowSleepLinkMode.OwnedSurface
                 || binding.busyCount > 0
                 || binding.window == null
                 || focusModeWindowId == binding.window.GetInstanceID()
@@ -2920,6 +4332,65 @@ namespace ES.EditorInternal
                 || typeName.IndexOf("Picker", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
+        private static void RecordWindowInteraction(WindowBinding binding, double now)
+        {
+            if (binding == null)
+                return;
+            binding.lastInteractionAt = now;
+            binding.focusLostAt = -1d;
+        }
+
+        private static bool IsWindowInteractionHeld(WindowBinding binding, double now)
+        {
+            if (binding?.window == null)
+                return false;
+            bool pointerOver = binding.pointerInside
+                || ReferenceEquals(EditorWindow.mouseOverWindow, binding.window);
+            bool isLastFocused = lastFocusedWindowId == binding.window.GetInstanceID();
+            bool transientFocus = isLastFocused
+                && IsTransientFocusWindow(EditorWindow.focusedWindow);
+            bool transientNullFocus = isLastFocused && EditorWindow.focusedWindow == null;
+            return ShouldPauseAutomaticCollection(
+                binding.pointerInside,
+                ReferenceEquals(EditorWindow.mouseOverWindow, binding.window),
+                binding.interactionHoldCount,
+                binding.semiSleepDragPointerId >= 0,
+                transientFocus,
+                transientNullFocus,
+                now <= binding.transientInteractionGraceUntil);
+        }
+
+        internal static bool ShouldPauseAutomaticCollection(
+            bool pointerInside,
+            bool mouseOverWindow,
+            int interactionHolds,
+            bool dragging,
+            bool transientFocus,
+            bool focusUnknown,
+            bool withinGrace)
+        {
+            return pointerInside
+                || mouseOverWindow
+                || interactionHolds > 0
+                || dragging
+                || transientFocus
+                || focusUnknown
+                || withinGrace;
+        }
+
+        internal static bool ShouldPauseSleepTilePromotion(
+            bool interactionHeld,
+            bool pointerOver)
+        {
+            // Hovering a tile is discovery, not an interaction lease. An explicit
+            // hold, drag, busy operation, or popup is a real lease and pauses the
+            // promotion timer even when the pointer remains over the tile.
+            // pointerOver stays in the contract so callers can pass the observed
+            // state without creating a second hover-specific policy.
+            _ = pointerOver;
+            return interactionHeld;
+        }
+
         private static void UpdateSemiSleepWindows()
         {
             double now = EditorApplication.timeSinceStartup;
@@ -2929,6 +4400,20 @@ namespace ES.EditorInternal
             bool hasAnimation = false;
             foreach (WindowBinding binding in windowBindings.Values)
             {
+                SyncSleepOwnerState(binding);
+                if (!ShouldEvaluateSemiSleepBinding(binding))
+                    continue;
+                // Native frame movement is exclusively owned by the pointer drag.
+                // Skip every automatic state/geometry path until the gesture commits.
+                if (binding != null
+                    && (binding.semiSleepDragging || binding.semiSleepDragPointerId >= 0))
+                {
+                    ApplyPendingSemiSleepDragFrame(binding);
+                    // Pointer movement owns the native frame and needs animation-rate
+                    // updates even though it is not a visual-state tween.
+                    hasAnimation = true;
+                    continue;
+                }
                 if (!CanEnterSemiSleep(binding, false))
                 {
                     RestoreSemiSleep(binding, true);
@@ -2937,16 +4422,14 @@ namespace ES.EditorInternal
 
                 bool focused = ReferenceEquals(EditorWindow.focusedWindow, binding.window);
                 if (focused)
+                    lastFocusedWindowId = binding.window.GetInstanceID();
+                bool interactionHeld = IsWindowInteractionHeld(binding, now);
+                if (focused || interactionHeld)
                 {
                     binding.focusLostAt = -1d;
                 }
                 else if (IsSemiSleepEligible(binding)
-                    && IsTransientFocusWindow(EditorWindow.focusedWindow))
-                {
-                    binding.focusLostAt = now;
-                }
-                else if (IsSemiSleepEligible(binding)
-                    && !binding.semiSleeping
+                    && binding.visualState == ESWindowVisualState.ActivePanel
                     && !binding.semiSleepAnimating)
                 {
                     binding.awakeBounds = binding.window.position;
@@ -2961,10 +4444,37 @@ namespace ES.EditorInternal
                     }
                 }
 
+                if (!binding.semiSleepAnimating)
+                {
+                    bool pointerOver = binding.pointerInside
+                        || ReferenceEquals(EditorWindow.mouseOverWindow, binding.window);
+                    // Tile-to-tab promotion is blocked only by an explicit
+                    // interaction lease, drag, or busy operation. Focus history,
+                    // transient null focus, and ordinary hover must not reset the
+                    // idle timer; those values differ between EditorWindow types.
+                    bool tileInteractionHeld = binding.interactionHoldCount > 0
+                        || binding.semiSleepDragPointerId >= 0
+                        || binding.busyCount > 0;
+                    UpdateVisualStateIdle(
+                        binding,
+                        now,
+                        // Focus and mere pointer hover are not interaction leases.
+                        // A SleepTile must still promote to EdgeTab while the
+                        // cursor rests over it; only an actual hold/drag/busy lease
+                        // pauses that timer.
+                        ShouldPauseSleepTilePromotion(tileInteractionHeld, pointerOver),
+                        pointerOver);
+                    RefreshSemiSleepDiagnosticBars(binding, now);
+                }
+
                 if (binding.semiSleepAnimating)
                 {
                     UpdateSemiSleepTransition(binding, now);
                     hasAnimation = hasAnimation || binding.semiSleepAnimating;
+                }
+                else
+                {
+                    RepairSettledSemiSleepGeometry(binding);
                 }
             }
 
@@ -2972,26 +4482,299 @@ namespace ES.EditorInternal
             nextSemiSleepIdleCheckAt = now + (hasAnimation ? 0.016d : 0.10d);
         }
 
-        private static void BeginSemiSleepTransition(WindowBinding binding, bool sleep)
+        private static void SyncSleepOwnerState(WindowBinding child)
         {
-            if (binding?.window == null || binding.semiSleepTarget == sleep && binding.semiSleepAnimating)
+            if (child == null
+                || child.sleepLinkMode != ES.ESWindowSleepLinkMode.FollowOwner)
                 return;
-            if (!sleep && !binding.semiSleeping && !binding.semiSleepAnimating)
+            // A child being dragged has temporary ownership of its native frame;
+            // owner synchronization must wait for PointerUp/PointerCancel.
+            if (child.semiSleepDragging || child.semiSleepDragPointerId >= 0)
+                return;
+            EditorWindow owner = child.sleepOwner;
+            if (owner == null)
+            {
+                child.sleepOwner = null;
+                child.sleepOwnerForcedSleep = false;
+                child.sleepLinkMode = ES.ESWindowSleepLinkMode.Independent;
+                return;
+            }
+            if (!windowBindings.TryGetValue(owner.GetInstanceID(), out WindowBinding ownerBinding)
+                || ownerBinding == null)
+            {
+                BindWindow(owner);
+                if (!windowBindings.TryGetValue(owner.GetInstanceID(), out ownerBinding)
+                    || ownerBinding == null)
+                    return;
+            }
+
+            bool ownerSleeping = ownerBinding.semiSleeping
+                || ownerBinding.semiSleepAnimating && ownerBinding.semiSleepTarget;
+            bool childSleeping = child.semiSleeping
+                || child.semiSleepAnimating && child.semiSleepTarget;
+            if (ownerSleeping
+                && !childSleeping
+                && !CanEnterSemiSleep(child, false))
+            {
+                // 子窗口可能正处于 Busy、拖动或输入交互；保留未同步状态，
+                // 下一次 tick 在交互结束后继续尝试，而不是吞掉跟随请求。
+                child.sleepOwnerForcedSleep = false;
+                return;
+            }
+            if (ownerSleeping == child.sleepOwnerForcedSleep
+                && (ownerSleeping == childSleeping || !ownerSleeping))
                 return;
 
-            if (sleep && !binding.semiSleeping)
+            child.sleepOwnerForcedSleep = ownerSleeping;
+            child.sleepLinkSyncing = true;
+            try
             {
+                if (ownerSleeping)
+                {
+                    if (!childSleeping && CanEnterSemiSleep(child, false))
+                    {
+                        child.semiSleepManualHold = true;
+                        BeginSemiSleepTransition(child, true);
+                    }
+                }
+                else if (childSleeping)
+                {
+                    child.semiSleepManualHold = false;
+                    BeginSemiSleepTransition(child, false);
+                }
+            }
+            finally
+            {
+                child.sleepLinkSyncing = false;
+            }
+        }
+
+        private static void RepairSettledSemiSleepGeometry(WindowBinding binding)
+        {
+            if (binding?.window == null
+                || !binding.semiSleeping
+                || binding.semiSleepAnimating
+                || binding.semiSleepDragging
+                || binding.semiSleepDragPointerId >= 0)
+                return;
+            Rect expected;
+            if (binding.visualState == ESWindowVisualState.SleepTile)
+            {
+                Rect tray = GetSemiSleepTrayBounds(binding.awakeBounds);
+                expected = binding.semiSleepDockBounds.width > 1f
+                    && binding.semiSleepDockBounds.height > 1f
+                    ? ClampSemiSleepDockBounds(binding.semiSleepDockBounds, tray)
+                    : EvaluateSemiSleepTarget(tray, binding.semiSleepSlot);
+            }
+            else if (binding.visualState == ESWindowVisualState.EdgeTab
+                || binding.visualState == ESWindowVisualState.EdgeTabHover)
+            {
+                expected = EvaluateEdgeTabBounds(
+                    GetSemiSleepTrayBounds(binding.awakeBounds),
+                    binding.edge,
+                    binding.edgeOffset,
+                    binding.visualState == ESWindowVisualState.EdgeTabHover ? 1f : 0f);
+            }
+            else
+                return;
+            Rect current = binding.window.position;
+            if (Mathf.Abs(current.x - expected.x) > 1f
+                || Mathf.Abs(current.y - expected.y) > 1f
+                || Mathf.Abs(current.width - expected.width) > 1f
+                || Mathf.Abs(current.height - expected.height) > 1f)
+            {
+                binding.window.position = expected;
+                binding.semiSleepToBounds = expected;
+            }
+        }
+
+        private static void RestorePersistedSemiSleepGeometry(WindowBinding binding)
+        {
+            if (binding?.window == null || !binding.restorePersistedSleepOnBind)
+                return;
+
+            binding.restorePersistedSleepOnBind = false;
+            if (binding.awakeBounds.width <= 1f || binding.awakeBounds.height <= 1f)
                 binding.awakeBounds = binding.window.position;
+            // Unity restores the original frame constraints before CreateGUI. Capture
+            // them before replacing minSize for the sleep form, otherwise waking after
+            // a domain reload would restore zero/default constraints.
+            if (binding.awakeMinSize.x <= 0f || binding.awakeMinSize.y <= 0f)
+                binding.awakeMinSize = binding.window.minSize;
+            if (binding.awakeMaxSize.x <= 0f || binding.awakeMaxSize.y <= 0f)
+                binding.awakeMaxSize = binding.window.maxSize;
+
+            ESWindowVisualState state = binding.transitionTargetState == ESWindowVisualState.EdgeTab
+                ? ESWindowVisualState.EdgeTab
+                : ESWindowVisualState.SleepTile;
+            Rect workArea = GetSemiSleepTrayBounds(binding.awakeBounds);
+            Rect target;
+            if (state == ESWindowVisualState.EdgeTab)
+            {
+                target = EvaluateEdgeTabBounds(workArea, binding.edge, binding.edgeOffset, 0f);
+                binding.window.minSize = new Vector2(32f, 32f);
+            }
+            else
+            {
+                if (binding.semiSleepSlot < 0)
+                    binding.semiSleepSlot = AcquireSemiSleepSlot(binding);
+                target = binding.hasSemiSleepDockBounds
+                    ? ClampSemiSleepDockBounds(binding.semiSleepDockBounds, workArea)
+                    : EvaluateSemiSleepTarget(workArea, binding.semiSleepSlot);
+                binding.window.minSize = new Vector2(80f, 80f);
+            }
+
+            binding.semiSleepFromBounds = target;
+            binding.semiSleepToBounds = target;
+            binding.window.position = target;
+            binding.visualState = state;
+            binding.transitionTargetState = state;
+            binding.semiSleeping = true;
+            binding.semiSleepTarget = true;
+            binding.semiSleepAnimating = false;
+            binding.semiSleepManualHold = true;
+            binding.sleepTileIdleStartedAt = state == ESWindowVisualState.SleepTile
+                ? EditorApplication.timeSinceStartup
+                : -1d;
+            binding.edgeTabFullyExpandedAt = -1d;
+            ShowSemiSleepOverlay(binding, true, 1f);
+            ApplySemiSleepOverlayState(binding, state);
+            RefreshSemiSleepControls(binding);
+            RefreshSemiSleepUpdateSubscription();
+            // Persist the normalized state (not EdgeTabHover and not an in-flight
+            // transition) so a subsequent domain reload has one deterministic target.
+            SaveSemiSleepPreferences(binding);
+        }
+
+        internal static bool IsVisualStateGeometryConsistent(
+            ESWindowVisualState state,
+            Rect actual,
+            Rect expected)
+        {
+            if (state == ESWindowVisualState.ActivePanel)
+                return true;
+            return Mathf.Abs(actual.x - expected.x) <= 1f
+                && Mathf.Abs(actual.y - expected.y) <= 1f
+                && Mathf.Abs(actual.width - expected.width) <= 1f
+                && Mathf.Abs(actual.height - expected.height) <= 1f;
+        }
+
+        private static void UpdateVisualStateIdle(
+            WindowBinding binding,
+            double now,
+            bool collectionHeld,
+            bool pointerOver)
+        {
+            if (binding == null || binding.window == null)
+                return;
+            switch (binding.visualState)
+            {
+                case ESWindowVisualState.SleepTile:
+                    if (collectionHeld)
+                    {
+                        binding.sleepTileIdleStartedAt = now;
+                        return;
+                    }
+                    if (binding.sleepTileIdleStartedAt < 0d)
+                        binding.sleepTileIdleStartedAt = now;
+                    if (now - binding.sleepTileIdleStartedAt < SleepTileToEdgeTabDelay)
+                        return;
+                    Rect workArea = GetSemiSleepTrayBounds(binding.awakeBounds);
+                    Rect currentTileBounds = binding.window.position;
+                    Rect savedTileBounds = binding.hasSemiSleepDockBounds
+                        ? ClampSemiSleepDockBounds(binding.semiSleepDockBounds, workArea)
+                        : currentTileBounds;
+                    Rect tileBounds = SelectMoreEdgeAlignedTileBounds(
+                        currentTileBounds,
+                        savedTileBounds,
+                        workArea);
+                    if (!TryEvaluateEdgeTab(
+                            tileBounds,
+                            workArea,
+                            out ESWindowEdge edge,
+                            out float edgeOffset,
+                            out Rect tabBounds))
+                        return;
+                    binding.edge = edge;
+                    binding.edgeOffset = edgeOffset;
+                    BeginVisualStateTransition(binding, ESWindowVisualState.EdgeTab, tabBounds);
+                    break;
+
+                case ESWindowVisualState.EdgeTab:
+                    if (!binding.pointerInside)
+                    {
+                        binding.edgeTabHoverIntentStartedAt = -1d;
+                    }
+                    else
+                    {
+                        if (binding.edgeTabHoverIntentStartedAt < 0d)
+                            binding.edgeTabHoverIntentStartedAt = now;
+                    }
+                    if (ShouldBeginEdgeTabHover(
+                        binding.edgeTabHoverIntentStartedAt,
+                        now,
+                        binding.pointerInside))
+                    {
+                        binding.edgeTabHoverIntentStartedAt = -1d;
+                        BeginVisualStateTransition(binding, ESWindowVisualState.EdgeTabHover);
+                    }
+                    break;
+
+                case ESWindowVisualState.EdgeTabHover:
+                    if (!pointerOver
+                        && now >= binding.edgeTabHoverExitGraceUntil)
+                    {
+                        binding.edgeTabFullyExpandedAt = -1d;
+                        BeginVisualStateTransition(binding, ESWindowVisualState.EdgeTab);
+                    }
+                    else if (ShouldRestoreEdgeTabToTile(
+                        binding.edgeTabFullyExpandedAt,
+                        now,
+                        pointerOver))
+                    {
+                        Rect hoverTileBounds = EvaluateSleepTileFromEdgeTab(
+                            binding.window.position,
+                            GetSemiSleepTrayBounds(binding.awakeBounds),
+                            binding.edge);
+                        binding.semiSleepDockBounds = hoverTileBounds;
+                        binding.hasSemiSleepDockBounds = true;
+                        BeginVisualStateTransition(binding, ESWindowVisualState.SleepTile, hoverTileBounds);
+                    }
+                    break;
+            }
+        }
+
+        private static void BeginSemiSleepTransition(WindowBinding binding, bool sleep)
+        {
+            ESWindowVisualState target = sleep
+                ? ESWindowVisualState.SleepTile
+                : ESWindowVisualState.ActivePanel;
+            if (binding?.window == null
+                || binding.semiSleepDragging
+                || binding.semiSleepDragPointerId >= 0
+                || binding.transitionTargetState == target && binding.semiSleepAnimating)
+                return;
+            if (!sleep
+                && binding.visualState == ESWindowVisualState.ActivePanel
+                && !binding.semiSleepAnimating)
+                return;
+
+            if (sleep && binding.visualState == ESWindowVisualState.ActivePanel)
+            {
+                if (binding.awakeBounds.width <= 1f || binding.awakeBounds.height <= 1f)
+                    binding.awakeBounds = binding.window.position;
                 binding.awakeMinSize = binding.window.minSize;
                 binding.awakeMaxSize = binding.window.maxSize;
                 binding.window.minSize = new Vector2(80f, 80f);
                 binding.semiSleepSlot = AcquireSemiSleepSlot(binding);
             }
 
+            binding.transitionTargetState = target;
             binding.semiSleepTarget = sleep;
             binding.semiSleepAnimating = MotionEnabled;
             semiSleepAnyAnimating = semiSleepAnyAnimating || binding.semiSleepAnimating;
             binding.semiSleepStartedAt = EditorApplication.timeSinceStartup;
+            binding.semiSleepTransitionDuration = SemiSleepDuration;
             binding.semiSleepFromBounds = binding.window.position;
             binding.semiSleepToBounds = sleep
                 ? binding.hasSemiSleepDockBounds
@@ -3001,9 +4784,88 @@ namespace ES.EditorInternal
                     : EvaluateSemiSleepTarget(
                         GetSemiSleepTrayBounds(binding.awakeBounds),
                         binding.semiSleepSlot)
-                : binding.awakeBounds;
-            ShowSemiSleepOverlay(binding, sleep || binding.semiSleeping, sleep ? 0f : 1f);
+                    : binding.awakeBounds;
+            ApplySemiSleepOverlayState(
+                binding,
+                sleep ? ESWindowVisualState.SleepTile : ESWindowVisualState.ActivePanel);
+            // The ES overlay owns the visual during the whole geometry transition.
+            // Leaving the original content visible while the native frame is shrinking
+            // creates the false state “small tile on a large window”.
+            ShowSemiSleepOverlay(binding, true, 1f);
             RefreshSemiSleepControls(binding);
+            RefreshSemiSleepUpdateSubscription();
+            if (!binding.semiSleepAnimating)
+                CompleteSemiSleepTransition(binding);
+        }
+
+        private static void BeginVisualStateTransition(
+            WindowBinding binding,
+            ESWindowVisualState target,
+            Rect? explicitBounds = null)
+        {
+            if (binding?.window == null
+                || binding.semiSleepDragging
+                || binding.semiSleepDragPointerId >= 0
+                || target == ESWindowVisualState.ActivePanel)
+                return;
+            // A visual transition is single-flight. While EdgeTabHover is
+            // converting to SleepTile, repeated hover/update ticks must not
+            // rebuild the target from the moving native frame and restart the
+            // animation at a new coordinate.
+            if (binding.semiSleepAnimating
+                && binding.transitionTargetState == target)
+                return;
+            if (binding.visualState == target && !binding.semiSleepAnimating)
+                return;
+            Rect workArea = GetSemiSleepTrayBounds(binding.awakeBounds);
+            Rect transitionFrom = binding.window.position;
+            if ((binding.visualState == ESWindowVisualState.EdgeTab
+                    || binding.visualState == ESWindowVisualState.EdgeTabHover)
+                && binding.semiSleepToBounds.width > 1f
+                && binding.semiSleepToBounds.height > 1f)
+            {
+                // The last completed tab target is more stable than the native
+                // frame during a UI Toolkit/native-window handoff.
+                transitionFrom = binding.semiSleepToBounds;
+            }
+            Rect targetBounds = explicitBounds ?? (target == ESWindowVisualState.EdgeTabHover
+                ? EvaluateEdgeTabBounds(workArea, binding.edge, binding.edgeOffset, 1f)
+                : target == ESWindowVisualState.EdgeTab
+                    ? EvaluateEdgeTabBounds(workArea, binding.edge, binding.edgeOffset, 0f)
+                    : EvaluateSleepTileFromEdgeTab(transitionFrom, workArea, binding.edge));
+            binding.transitionTargetState = target;
+            if (target == ESWindowVisualState.SleepTile)
+            {
+                binding.edgeTabFullyExpandedAt = -1d;
+                binding.hasEdgeTabPointerPosition = false;
+            }
+            if (target == ESWindowVisualState.EdgeTab
+                || target == ESWindowVisualState.EdgeTabHover)
+                binding.window.minSize = new Vector2(32f, 32f);
+            else if (target == ESWindowVisualState.SleepTile)
+                binding.window.minSize = new Vector2(80f, 80f);
+            binding.semiSleepTarget = true;
+            binding.semiSleepFromBounds = transitionFrom;
+            binding.semiSleepToBounds = targetBounds;
+            binding.semiSleepStartedAt = EditorApplication.timeSinceStartup;
+            float fullDistance = EdgeTabExpandedLength - EdgeTabCollapsedLength;
+            float fullDuration = target == ESWindowVisualState.EdgeTabHover
+                ? EdgeTabHoverDuration
+                : target == ESWindowVisualState.SleepTile
+                    ? EdgeTabToTileDuration
+                    : EdgeTabTransitionDuration;
+            binding.semiSleepTransitionDuration = target == ESWindowVisualState.EdgeTab
+                || target == ESWindowVisualState.EdgeTabHover
+                    ? EvaluateEdgeTabTransitionDuration(
+                        binding.semiSleepFromBounds,
+                        targetBounds,
+                        fullDistance,
+                        fullDuration)
+                    : fullDuration;
+            binding.semiSleepAnimating = MotionEnabled;
+            semiSleepAnyAnimating = semiSleepAnyAnimating || binding.semiSleepAnimating;
+            ShowSemiSleepOverlay(binding, true, 1f);
+            ApplySemiSleepOverlayState(binding, target);
             RefreshSemiSleepUpdateSubscription();
             if (!binding.semiSleepAnimating)
                 CompleteSemiSleepTransition(binding);
@@ -3011,18 +4873,49 @@ namespace ES.EditorInternal
 
         private static void UpdateSemiSleepTransition(WindowBinding binding, double now)
         {
-            float progress = Mathf.Clamp01((float)((now - binding.semiSleepStartedAt) / SemiSleepDuration));
+            double duration = Math.Max(0.01d, binding.semiSleepTransitionDuration);
+            float progress = Mathf.Clamp01((float)((now - binding.semiSleepStartedAt) / duration));
             try
             {
-                binding.window.position = EvaluateSemiSleepFrame(
-                    binding.semiSleepFromBounds,
-                    binding.semiSleepToBounds,
-                    progress,
-                    !binding.semiSleepTarget,
-                    MotionIntensity);
-                float overlayOpacity = binding.semiSleepTarget
-                    ? Mathf.Clamp01((progress - 0.36f) / 0.64f)
-                    : 1f - Mathf.Clamp01(progress / 0.42f);
+                bool edgeTransition = binding.transitionTargetState == ESWindowVisualState.EdgeTab
+                    || binding.transitionTargetState == ESWindowVisualState.EdgeTabHover
+                    || binding.transitionTargetState == ESWindowVisualState.SleepTile
+                    && (binding.visualState == ESWindowVisualState.EdgeTab
+                        || binding.visualState == ESWindowVisualState.EdgeTabHover);
+                bool edgeToTile = binding.transitionTargetState == ESWindowVisualState.SleepTile
+                    && (binding.visualState == ESWindowVisualState.EdgeTab
+                        || binding.visualState == ESWindowVisualState.EdgeTabHover);
+                bool edgeToActive = binding.transitionTargetState == ESWindowVisualState.ActivePanel
+                    && (binding.visualState == ESWindowVisualState.EdgeTab
+                        || binding.visualState == ESWindowVisualState.EdgeTabHover);
+                binding.window.position = edgeToTile
+                    ? EvaluateEdgeTabToTileFrame(
+                        binding.semiSleepFromBounds,
+                        binding.semiSleepToBounds,
+                        progress,
+                        binding.edge)
+                    : edgeToActive
+                    ? EvaluateEdgeTabTransitionFrame(
+                        binding.semiSleepFromBounds,
+                        binding.semiSleepToBounds,
+                        progress,
+                        binding.edge)
+                    : edgeTransition
+                    ? EvaluateEdgeTabTransitionFrame(
+                        binding.semiSleepFromBounds,
+                        binding.semiSleepToBounds,
+                        progress,
+                        binding.edge)
+                    : EvaluateSemiSleepFrame(
+                        binding.semiSleepFromBounds,
+                        binding.semiSleepToBounds,
+                        progress,
+                        binding.transitionTargetState == ESWindowVisualState.ActivePanel,
+                        MotionIntensity);
+                float overlayOpacity;
+                overlayOpacity = binding.transitionTargetState == ESWindowVisualState.ActivePanel
+                    ? 1f - Mathf.Clamp01(progress / 0.55f)
+                    : 1f;
                 ShowSemiSleepOverlay(binding, true, overlayOpacity);
                 binding.window.Repaint();
                 if (progress >= 1f)
@@ -3042,11 +4935,26 @@ namespace ES.EditorInternal
             if (binding?.window == null)
                 return;
             binding.window.position = binding.semiSleepToBounds;
-            binding.semiSleeping = binding.semiSleepTarget;
+            binding.visualState = binding.transitionTargetState;
+            binding.semiSleeping = binding.visualState != ESWindowVisualState.ActivePanel;
+            binding.semiSleepTarget = binding.semiSleeping;
             binding.semiSleepAnimating = false;
             if (binding.semiSleeping)
             {
                 ShowSemiSleepOverlay(binding, true, 1f);
+                ApplySemiSleepOverlayState(binding);
+                if (binding.visualState == ESWindowVisualState.SleepTile)
+                {
+                    binding.semiSleepDockBounds = binding.semiSleepToBounds;
+                    binding.hasSemiSleepDockBounds = true;
+                    binding.sleepTileIdleStartedAt = EditorApplication.timeSinceStartup;
+                    binding.edgeTabFullyExpandedAt = -1d;
+                }
+                else if (binding.visualState == ESWindowVisualState.EdgeTabHover)
+                {
+                    binding.edgeTabFullyExpandedAt = EditorApplication.timeSinceStartup;
+                }
+                SaveSemiSleepPreferences(binding);
             }
             else
             {
@@ -3056,9 +4964,180 @@ namespace ES.EditorInternal
                 ShowSemiSleepOverlay(binding, false, 0f);
                 ESWindowOpeningSweep.Replay(binding.root);
                 BeginWindowPulse(binding, ESStatusKind.Ready);
+                SaveSemiSleepPreferences(binding);
             }
             RefreshSemiSleepControls(binding);
             RefreshSemiSleepUpdateSubscription();
+        }
+
+        private static Rect EvaluateSleepTileFromEdgeTab(
+            Rect tabBounds,
+            Rect workArea,
+            ESWindowEdge edge)
+        {
+            // During EdgeTabHover the native frame is the authoritative visual
+            // anchor. Keep its center, then expand to the 100x100 tile on the same
+            // screen edge; never regenerate a tab from the persisted offset here.
+            if (tabBounds.width <= 1f || tabBounds.height <= 1f)
+                tabBounds = EvaluateEdgeTabBounds(workArea, edge, 0f, 1f);
+            float x;
+            float y;
+            switch (edge)
+            {
+                case ESWindowEdge.Left:
+                    x = workArea.xMin;
+                    y = tabBounds.center.y - SemiSleepSize * 0.5f;
+                    break;
+                case ESWindowEdge.Right:
+                    x = workArea.xMax - SemiSleepSize;
+                    y = tabBounds.center.y - SemiSleepSize * 0.5f;
+                    break;
+                case ESWindowEdge.Top:
+                    x = tabBounds.center.x - SemiSleepSize * 0.5f;
+                    y = workArea.yMin;
+                    break;
+                default:
+                    x = tabBounds.center.x - SemiSleepSize * 0.5f;
+                    y = workArea.yMax - SemiSleepSize;
+                    break;
+            }
+            return ClampSemiSleepDockBounds(
+                new Rect(x, y, SemiSleepSize, SemiSleepSize),
+                workArea);
+        }
+
+        private static void ApplySemiSleepOverlayState(
+            WindowBinding binding,
+            ESWindowVisualState? stateOverride = null)
+        {
+            if (binding?.semiSleepOverlay == null)
+                return;
+            RefreshSemiSleepOverlayMetadata(binding);
+            ESWindowVisualState state = stateOverride ?? binding.visualState;
+            bool tile = state == ESWindowVisualState.SleepTile;
+            bool verticalTab = binding.edge == ESWindowEdge.Top
+                || binding.edge == ESWindowEdge.Bottom;
+            binding.semiSleepOverlay.style.flexDirection = tile || verticalTab
+                ? FlexDirection.Column
+                : FlexDirection.Row;
+            if (binding.semiSleepMonogram != null)
+            {
+                binding.semiSleepMonogram.style.fontSize = tile ? 20f : 13f;
+                binding.semiSleepMonogram.style.marginRight = tile ? 0f : 5f;
+            }
+            if (binding.semiSleepTitleLabel != null)
+            {
+                string currentTitle = binding.window is ES.IESWindowPresentationMetadata metadata
+                    ? metadata.ESWindow_PresentationTitle
+                    : binding.window?.titleContent?.text;
+                if (!string.IsNullOrWhiteSpace(currentTitle))
+                    binding.semiSleepTitleLabel.text = currentTitle.Trim();
+                binding.semiSleepTitleLabel.style.display = DisplayStyle.Flex;
+                binding.semiSleepTitleLabel.style.marginTop = tile ? 3f : 0f;
+                binding.semiSleepTitleLabel.style.maxWidth = tile
+                    ? 82f
+                    : verticalTab
+                        ? 30f
+                        : state == ESWindowVisualState.EdgeTabHover
+                        ? 164f
+                        : 30f;
+            }
+            RefreshSemiSleepDiagnosticBars(binding, EditorApplication.timeSinceStartup);
+        }
+
+        private static void RefreshSemiSleepDiagnosticBars(WindowBinding binding, double now)
+        {
+            if (binding?.semiSleepPromotionProgress == null
+                || binding.semiSleepDockProgress == null)
+                return;
+            bool tile = binding.visualState == ESWindowVisualState.SleepTile
+                || binding.semiSleepAnimating
+                && binding.transitionTargetState == ESWindowVisualState.SleepTile;
+            if (!tile)
+            {
+                binding.semiSleepPromotionProgress.style.width = 0f;
+                binding.semiSleepDockProgress.style.width = 0f;
+                binding.semiSleepPromotionProgress.style.display = DisplayStyle.None;
+                binding.semiSleepDockProgress.style.display = DisplayStyle.None;
+                return;
+            }
+
+            // 只保留一条底部晋级进度条。停靠判定继续参与状态机，但不再以第二条
+            // 诊断色带或 tooltip 占用休眠块的视觉注意力。
+            binding.semiSleepPromotionProgress.style.display = DisplayStyle.Flex;
+            binding.semiSleepDockProgress.style.display = DisplayStyle.None;
+
+            double started = binding.sleepTileIdleStartedAt;
+            float progress = started < 0d
+                ? 0f
+                : Mathf.Clamp01((float)((now - started) / SleepTileToEdgeTabDelay));
+            binding.semiSleepPromotionProgress.style.width = 82f * progress;
+            binding.semiSleepPromotionProgress.style.backgroundColor = progress >= 1f
+                ? GetStatusAccent(0, ESStatusKind.Ready)
+                : SectionMutedTextColor;
+            binding.semiSleepPromotionProgress.tooltip = null;
+            binding.semiSleepDockProgress.tooltip = null;
+        }
+
+        private static Rect SelectMoreEdgeAlignedTileBounds(
+            Rect current,
+            Rect saved,
+            Rect workArea)
+        {
+            if (!IsFinite(current.position) || !IsFinite(current.size))
+                return saved;
+            if (!IsFinite(saved.position) || !IsFinite(saved.size))
+                return current;
+            float currentNearest = GetNearestEdgeDistance(current, workArea);
+            float savedNearest = GetNearestEdgeDistance(saved, workArea);
+            return currentNearest <= savedNearest ? current : saved;
+        }
+
+        private static float GetNearestEdgeDistance(Rect bounds, Rect workArea)
+        {
+            return Mathf.Min(
+                Mathf.Abs(bounds.xMin - workArea.xMin),
+                Mathf.Abs(workArea.xMax - bounds.xMax),
+                Mathf.Abs(bounds.yMin - workArea.yMin),
+                Mathf.Abs(workArea.yMax - bounds.yMax));
+        }
+
+        private static void RefreshSemiSleepOverlayMetadata(WindowBinding binding)
+        {
+            if (binding?.semiSleepOverlay == null)
+                return;
+            Texture icon = ResolveWindowPresentationIcon(binding.window);
+            if (icon != null)
+            {
+                if (binding.semiSleepIcon == null)
+                {
+                    binding.semiSleepIcon = new Image
+                    {
+                        scaleMode = ScaleMode.ScaleToFit,
+                        pickingMode = PickingMode.Ignore,
+                        tintColor = SelectedTextColor
+                    };
+                    binding.semiSleepIcon.style.width = 22f;
+                    binding.semiSleepIcon.style.height = 22f;
+                    binding.semiSleepOverlay.Insert(0, binding.semiSleepIcon);
+                }
+                binding.semiSleepIcon.image = icon;
+                binding.semiSleepIcon.tintColor = SelectedTextColor;
+                binding.semiSleepIcon.style.display = DisplayStyle.Flex;
+                binding.semiSleepMonogram?.RemoveFromHierarchy();
+            }
+            else if (binding.semiSleepIcon != null)
+            {
+                binding.semiSleepIcon.style.display = DisplayStyle.None;
+            }
+            if (binding.semiSleepTitleLabel != null)
+            {
+                string title = binding.window is ES.IESWindowPresentationMetadata metadata
+                    ? metadata.ESWindow_PresentationTitle
+                    : binding.window?.titleContent?.text;
+                if (!string.IsNullOrWhiteSpace(title))
+                    binding.semiSleepTitleLabel.text = title.Trim();
+            }
         }
 
         private static void ShowSemiSleepOverlay(
@@ -3078,6 +5157,10 @@ namespace ES.EditorInternal
         {
             if (binding == null)
                 return;
+            // A cancelled/closing lifecycle must not interrupt an active pointer
+            // gesture and restore the pre-drag awake rectangle mid-frame.
+            if (binding.semiSleepDragging || binding.semiSleepDragPointerId >= 0)
+                return;
             bool hadState = binding.semiSleeping || binding.semiSleepAnimating;
             VisualElement dragOverlay = binding.semiSleepOverlay;
             int dragPointerId = binding.semiSleepDragPointerId;
@@ -3088,9 +5171,16 @@ namespace ES.EditorInternal
             binding.semiSleeping = false;
             binding.semiSleepAnimating = false;
             binding.semiSleepTarget = false;
+            binding.visualState = ESWindowVisualState.ActivePanel;
+            binding.transitionTargetState = ESWindowVisualState.ActivePanel;
             binding.semiSleepManualHold = false;
             binding.semiSleepSlot = -1;
             binding.focusLostAt = -1d;
+            binding.sleepTileIdleStartedAt = -1d;
+            binding.edgeTabFullyExpandedAt = -1d;
+            binding.edgeTabHoverIntentStartedAt = -1d;
+            binding.pointerInside = false;
+            binding.hasEdgeTabPointerPosition = false;
             ResetSemiSleepDrag(binding);
             ShowSemiSleepOverlay(binding, false, 0f);
             RefreshSemiSleepControls(binding);
@@ -3187,9 +5277,11 @@ namespace ES.EditorInternal
                 || !IsFinite(trayBounds.size))
                 return current;
 
-            Vector2 safeDelta = Vector2.ClampMagnitude(pointerDelta, SemiSleepMaxPointerDelta);
             Rect target = current;
-            target.position += safeDelta;
+            // The tray clamp is the only movement bound. Do not clamp the total
+            // pointer displacement: a long, deliberate drag must reach any point
+            // in the valid work area rather than stop after an arbitrary distance.
+            target.position += pointerDelta;
             return ClampSemiSleepDockBounds(target, trayBounds);
         }
 
@@ -3207,7 +5299,15 @@ namespace ES.EditorInternal
             {
                 Rect main = EditorGUIUtility.GetMainWindowPosition();
                 if (main.width >= SemiSleepSize && main.height >= SemiSleepSize)
-                    return main;
+                {
+                    Rect overlap = Rect.MinMaxRect(
+                        Mathf.Max(main.xMin, fallback.xMin),
+                        Mathf.Max(main.yMin, fallback.yMin),
+                        Mathf.Min(main.xMax, fallback.xMax),
+                        Mathf.Min(main.yMax, fallback.yMax));
+                    if (overlap.width > 0f && overlap.height > 0f)
+                        return main;
+                }
             }
             catch (Exception exception) when (
                 exception is MissingMethodException
@@ -3396,7 +5496,7 @@ namespace ES.EditorInternal
         {
             return proSkin
                 ? new Color(0.18f, 0.32f, 0.46f, 0.34f)
-                : new Color(0.72f, 0.84f, 0.96f, 0.55f);
+                : new Color(0.72f, 0.78f, 0.84f, 0.42f);
         }
 
         public static Color SectionTextColor
@@ -3469,9 +5569,10 @@ namespace ES.EditorInternal
             get
             {
                 EnsureSkin();
-                return cachedProSkin
-                    ? new Color(1f, 0.66f, 0.35f, 1f)
-                    : new Color(0.72f, 0.29f, 0.05f, 1f);
+                return Color.Lerp(
+                    WarningColor,
+                    SectionTextColor,
+                    cachedProSkin ? 0.18f : 0.08f);
             }
         }
 
@@ -3492,8 +5593,8 @@ namespace ES.EditorInternal
             {
                 EnsureSkin();
                 return cachedProSkin
-                    ? new Color(0.62f, 0.80f, 1f, 1f)
-                    : new Color(0.06f, 0.31f, 0.61f, 1f);
+                    ? new Color(0.54f, 0.70f, 0.80f, 1f)
+                    : new Color(0.10f, 0.32f, 0.52f, 1f);
             }
         }
 
@@ -3527,13 +5628,90 @@ namespace ES.EditorInternal
         public static Color CanvasSurfaceColor => GetDepthBackground(3);
         public static Color ToolbarSurfaceColor => GetSelectorBackground(0);
         public static Color ControlSurfaceColor => GetSelectorBackground(1);
-        public static Color SelectionColor => GetDepthAccent(0);
+        /// <summary>
+        /// 通用选中色。选中态不复用主题的天蓝起始色，避免边框、导引线和选中卡片
+        /// 在浅色皮肤下与白色文字或浅色表面混成一片。
+        /// </summary>
+        public static Color SelectionColor
+        {
+            get
+            {
+                EnsureSkin();
+                return cachedProSkin
+                    ? new Color(0.29f, 0.51f, 0.66f, 0.96f)
+                    : new Color(0.24f, 0.46f, 0.62f, 0.96f);
+            }
+        }
+        /// <summary>
+        /// 选中对象的低对比表面色。与 SelectionColor 分离，避免把标记色直接铺到
+        /// 卡片或按钮背景上；SelectionColor 仅用于边框、导引线和小型选中标记。
+        /// </summary>
+        public static Color SelectedSurfaceColor
+        {
+            get
+            {
+                EnsureSkin();
+                return Color.Lerp(
+                    WindowRaisedSurfaceColor,
+                    ControlSurfaceColor,
+                    cachedProSkin ? 0.62f : 0.56f);
+            }
+        }
+        /// <summary>
+        /// 高对比主操作底色。SelectionColor 服务选中/标记，PrimaryActionColor 专门承载主操作背景。
+        /// </summary>
+        public static Color PrimaryActionColor
+        {
+            get
+            {
+                EnsureSkin();
+                return cachedProSkin
+                    ? new Color(0.30f, 0.32f, 0.35f, 0.98f)
+                    : new Color(0.20f, 0.22f, 0.25f, 1f);
+            }
+        }
+
+        /// <summary>
+        /// 非活动或被禁用的操作控件底色。它保持中性低对比，不借用 WarningColor，
+        /// 避免把“关闭/不可用”误读成故障或在窄工具栏中形成刺眼色块。
+        /// </summary>
+        public static Color InactiveActionColor
+        {
+            get
+            {
+                EnsureSkin();
+                return Color.Lerp(
+                    ControlSurfaceColor,
+                    WindowInsetSurfaceColor,
+                    cachedProSkin ? 0.58f : 0.42f);
+            }
+        }
+
+        public static Color PrimaryActionTextColor => new Color(0.98f, 0.99f, 1f, 1f);
         public static Color ActiveColor => GetStatusAccent(0, ESStatusKind.Ready);
         public static Color DisabledColor => GetStatusAccent(0, ESStatusKind.ReadOnly);
         public static Color WarningColor => GetStatusAccent(0, ESStatusKind.Warning);
         public static Color ErrorColor => GetStatusAccent(0, ESStatusKind.Error);
         public static Color NodeBorderColor => GetStatusFrameColor(1, ESStatusKind.None);
         public static Color NodeSelectedBorderColor => GetStatusFrameColor(0, ESStatusKind.Modified);
+
+        public static Color MapTerrainBaseColor => GetMapThemeColor(new Color(0.07f, 0.11f, 0.16f, 1f), new Color(0.92f, 0.94f, 0.97f, 1f), theme => theme.darkMapTerrainBase, theme => theme.lightMapTerrainBase);
+        public static Color MapGridColor => GetMapThemeColor(new Color(0.42f, 0.52f, 0.64f, 0.22f), new Color(0.22f, 0.34f, 0.48f, 0.24f), theme => theme.darkMapGrid, theme => theme.lightMapGrid);
+        public static Color MapRegionColor => GetMapThemeColor(new Color(0.18f, 0.48f, 0.86f, 0.22f), new Color(0.18f, 0.46f, 0.82f, 0.18f), theme => theme.darkMapRegion, theme => theme.lightMapRegion);
+        public static Color MapPoiColor => GetMapThemeColor(new Color(0.96f, 0.70f, 0.24f, 0.96f), new Color(0.78f, 0.40f, 0.04f, 1f), theme => theme.darkMapPoi, theme => theme.lightMapPoi);
+        public static Color MapSelectionColor => GetMapThemeColor(new Color(0.32f, 0.88f, 0.68f, 0.96f), new Color(0.04f, 0.54f, 0.42f, 1f), theme => theme.darkMapSelection, theme => theme.lightMapSelection);
+        public static Color MapHeightLowColor => GetMapThemeColor(new Color(0.06f, 0.22f, 0.18f, 1f), new Color(0.42f, 0.74f, 0.60f, 1f), theme => theme.darkMapHeightLow, theme => theme.lightMapHeightLow);
+        public static Color MapHeightHighColor => GetMapThemeColor(new Color(0.76f, 0.62f, 0.28f, 1f), new Color(0.86f, 0.70f, 0.30f, 1f), theme => theme.darkMapHeightHigh, theme => theme.lightMapHeightHigh);
+
+        private static Color GetMapThemeColor(Color darkFallback, Color lightFallback, Func<ESGlobalEditorTheme, Color> darkSelector, Func<ESGlobalEditorTheme, Color> lightSelector)
+        {
+            EnsureSkin();
+            ESGlobalEditorTheme theme = CurrentTheme;
+            if (theme == null || !theme.useCustomPalette) return cachedProSkin ? darkFallback : lightFallback;
+            Color color = cachedProSkin ? darkSelector(theme) : lightSelector(theme);
+            color.a = Mathf.Clamp01(color.a);
+            return color;
+        }
 
         public static Color GetSemanticAccent(int paletteIndex)
         {
@@ -3596,33 +5774,65 @@ namespace ES.EditorInternal
                 EnsureSkin();
                 if (surfaceTexture == null)
                 {
-                    Color borderColor = cachedProSkin
-                        ? new Color(0.28f, 0.34f, 0.42f, 1f)
-                        : new Color(0.58f, 0.61f, 0.64f, 1f);
-                    Color fillColor = cachedProSkin
-                        ? new Color(0.13f, 0.17f, 0.23f, 1f)
-                        : new Color(0.91f, 0.92f, 0.93f, 1f);
-
-                    // Keep the constructor version-neutral. Unity versions differ in the
-                    // TextureFormat/creation-flags overloads available to editor assemblies.
-                    surfaceTexture = new Texture2D(3, 3)
-                    {
-                        hideFlags = HideFlags.HideAndDontSave,
-                        name = "ESEditorPresentationSurface"
-                    };
-
-                    for (int y = 0; y < 3; y++)
-                    {
-                        for (int x = 0; x < 3; x++)
-                            surfaceTexture.SetPixel(x, y, x == 1 && y == 1 ? fillColor : borderColor);
-                    }
-
-                    surfaceTexture.Apply(false, true);
+                    surfaceTexture = CreateRoundedRectTexture(
+                        "ESEditorPresentationSurface",
+                        ESCornerRadiusToken.Section,
+                        DividerColor,
+                        WindowRaisedSurfaceColor);
                 }
 
                 return surfaceTexture;
             }
         }
+
+        private static Texture2D ToolbarTexture => toolbarTexture ?? (toolbarTexture =
+            CreateRoundedRectTexture(
+                "ESEditorPresentationToolbar",
+                ESCornerRadiusToken.Control,
+                DividerColor,
+                ToolbarSurfaceColor));
+
+        private static Texture2D ToolbarButtonTexture => toolbarButtonTexture ?? (toolbarButtonTexture =
+            CreateRoundedRectTexture(
+                "ESEditorPresentationToolbarButton",
+                ESCornerRadiusToken.Control,
+                DividerColor,
+                ControlSurfaceColor));
+
+        private static Texture2D ToolbarButtonHoverTexture => toolbarButtonHoverTexture ?? (toolbarButtonHoverTexture =
+            CreateRoundedRectTexture(
+                "ESEditorPresentationToolbarButtonHover",
+                ESCornerRadiusToken.Control,
+                Color.Lerp(DividerColor, SectionSelectedTextColor, 0.25f),
+                Color.Lerp(ControlSurfaceColor, WindowRaisedSurfaceColor, 0.55f)));
+
+        private static Texture2D ToolbarButtonActiveTexture => toolbarButtonActiveTexture ?? (toolbarButtonActiveTexture =
+            CreateRoundedRectTexture(
+                "ESEditorPresentationToolbarButtonActive",
+                ESCornerRadiusToken.Control,
+                PrimaryActionColor,
+                PrimaryActionColor));
+
+        private static Texture2D PrimaryButtonTexture => primaryButtonTexture ?? (primaryButtonTexture =
+            CreateRoundedRectTexture(
+                "ESEditorPresentationPrimaryButton",
+                ESCornerRadiusToken.Control,
+                PrimaryActionColor,
+                PrimaryActionColor));
+
+        private static Texture2D PrimaryButtonHoverTexture => primaryButtonHoverTexture ?? (primaryButtonHoverTexture =
+            CreateRoundedRectTexture(
+                "ESEditorPresentationPrimaryButtonHover",
+                ESCornerRadiusToken.Control,
+                Color.Lerp(PrimaryActionColor, PrimaryActionTextColor, 0.20f),
+                Color.Lerp(PrimaryActionColor, PrimaryActionTextColor, 0.10f)));
+
+        private static Texture2D PrimaryButtonActiveTexture => primaryButtonActiveTexture ?? (primaryButtonActiveTexture =
+            CreateRoundedRectTexture(
+                "ESEditorPresentationPrimaryButtonActive",
+                ESCornerRadiusToken.Control,
+                Color.Lerp(PrimaryActionColor, Color.black, 0.30f),
+                Color.Lerp(PrimaryActionColor, Color.black, 0.18f)));
 
         private static Texture2D CompactCollectionBodyTexture
         {
@@ -3631,18 +5841,14 @@ namespace ES.EditorInternal
                 EnsureSkin();
                 if (compactCollectionBodyTexture == null)
                 {
-                    compactCollectionBodyTexture = new Texture2D(1, 1)
-                    {
-                        hideFlags = HideFlags.HideAndDontSave,
-                        name = "ESEditorPresentationCompactCollectionBody"
-                    };
-                    compactCollectionBodyTexture.SetPixel(
-                        0,
-                        0,
-                        cachedProSkin
-                            ? new Color(0.16f, 0.17f, 0.19f, 0.96f)
-                            : new Color(0.94f, 0.945f, 0.95f, 1f));
-                    compactCollectionBodyTexture.Apply(false, true);
+                    Color fill = cachedProSkin
+                        ? new Color(0.16f, 0.17f, 0.19f, 0.96f)
+                        : new Color(0.94f, 0.945f, 0.95f, 1f);
+                    compactCollectionBodyTexture = CreateRoundedRectTexture(
+                        "ESEditorPresentationCompactCollectionBody",
+                        ESCornerRadiusToken.Card,
+                        DividerColor,
+                        fill);
                 }
 
                 return compactCollectionBodyTexture;
@@ -3667,8 +5873,8 @@ namespace ES.EditorInternal
             Color start = current != null && current.useCustomPalette
                 ? (cachedProSkin ? current.darkAccentStart : current.lightAccentStart)
                 : cachedProSkin
-                    ? new Color(0.48f, 0.78f, 1f, 0.92f)
-                    : new Color(0.12f, 0.46f, 0.82f, 0.92f);
+                    ? new Color(0.36f, 0.62f, 0.78f, 0.90f)
+                    : new Color(0.16f, 0.40f, 0.62f, 0.90f);
             Color end = current != null && current.useCustomPalette
                 ? (cachedProSkin ? current.darkAccentEnd : current.lightAccentEnd)
                 : cachedProSkin
@@ -3683,12 +5889,12 @@ namespace ES.EditorInternal
             float progress = GetDepthProgress(depth);
             return cachedProSkin
                 ? Color.Lerp(
-                    new Color(0.12f, 0.15f, 0.19f, 0.98f),
-                    new Color(0.025f, 0.055f, 0.10f, 0.99f),
+                    new Color(0.15f, 0.16f, 0.18f, 0.98f),
+                    new Color(0.075f, 0.08f, 0.095f, 0.99f),
                     progress)
                 : Color.Lerp(
-                    new Color(0.96f, 0.96f, 0.97f, 1f),
-                    new Color(0.76f, 0.86f, 0.95f, 1f),
+                    new Color(0.96f, 0.96f, 0.96f, 1f),
+                    new Color(0.86f, 0.87f, 0.88f, 1f),
                     progress);
         }
 
@@ -3698,12 +5904,12 @@ namespace ES.EditorInternal
             float progress = GetDepthProgress(depth);
             return cachedProSkin
                 ? Color.Lerp(
-                    new Color(0.08f, 0.14f, 0.22f, 0.94f),
-                    new Color(0.04f, 0.08f, 0.13f, 0.96f),
+                    new Color(0.12f, 0.13f, 0.15f, 0.94f),
+                    new Color(0.075f, 0.08f, 0.095f, 0.96f),
                     progress)
                 : Color.Lerp(
-                    new Color(0.88f, 0.93f, 0.98f, 1f),
-                    new Color(0.70f, 0.82f, 0.94f, 1f),
+                    new Color(0.91f, 0.92f, 0.93f, 1f),
+                    new Color(0.82f, 0.84f, 0.86f, 1f),
                     progress);
         }
 
@@ -3838,10 +6044,14 @@ namespace ES.EditorInternal
             if (status == ESStatusKind.Warning)
                 return current != null && current.useCustomPalette
                     ? (cachedProSkin ? current.darkWarning : current.lightWarning)
-                    : new Color(0.90f, 0.68f, 0.24f, 0.96f);
+                    : cachedProSkin
+                        ? new Color(0.68f, 0.48f, 0.24f, 0.92f)
+                        : new Color(0.58f, 0.33f, 0.10f, 0.92f);
 
             if (status == ESStatusKind.Modified)
-                return new Color(0.36f, 0.70f, 0.98f, 0.96f);
+                return cachedProSkin
+                    ? new Color(0.32f, 0.55f, 0.68f, 0.90f)
+                    : new Color(0.20f, 0.40f, 0.58f, 0.90f);
 
             if (status == ESStatusKind.ReadOnly)
                 return cachedProSkin
@@ -4016,6 +6226,211 @@ namespace ES.EditorInternal
             return Mathf.Max(0, Mathf.RoundToInt(value * Density));
         }
 
+        /// <summary>
+        /// 为 Inspector 右侧的小型操作按钮保留可点击的安全留白。
+        /// 窄面板尽量节省空间，宽面板逐步增加缓冲，避免按钮紧贴宿主边缘。
+        /// </summary>
+        internal static float GetInspectorRightGutter(float availableWidth)
+        {
+            if (availableWidth <= 0f)
+                return 0f;
+            if (availableWidth < 190f)
+                return 4f;
+            if (availableWidth < 300f)
+                return 8f;
+            if (availableWidth < 460f)
+                return 12f;
+            return 18f;
+        }
+
+        internal static float GetCornerRadius(ESCornerRadiusToken token)
+        {
+            if (token == ESCornerRadiusToken.Pill)
+                return 999f;
+
+            float baseRadius;
+            switch (token)
+            {
+                case ESCornerRadiusToken.Control: baseRadius = 4f; break;
+                case ESCornerRadiusToken.Card: baseRadius = 6f; break;
+                case ESCornerRadiusToken.Section: baseRadius = 8f; break;
+                case ESCornerRadiusToken.Overlay: baseRadius = 11f; break;
+                default: baseRadius = 0f; break;
+            }
+            return Mathf.Max(0f, Mathf.Round(baseRadius * Density));
+        }
+
+        internal static void ApplyCornerRadius(VisualElement element, ESCornerRadiusToken token)
+        {
+            ApplyCornerRadius(element, token, ESCornerMask.All);
+        }
+
+        internal static void ApplyCornerRadius(
+            VisualElement element,
+            ESCornerRadiusToken token,
+            ESCornerMask mask)
+        {
+            if (element == null)
+                return;
+
+            float radius = GetCornerRadius(token);
+            element.style.borderTopLeftRadius = (mask & ESCornerMask.TopLeft) != 0 ? radius : 0f;
+            element.style.borderTopRightRadius = (mask & ESCornerMask.TopRight) != 0 ? radius : 0f;
+            element.style.borderBottomLeftRadius = (mask & ESCornerMask.BottomLeft) != 0 ? radius : 0f;
+            element.style.borderBottomRightRadius = (mask & ESCornerMask.BottomRight) != 0 ? radius : 0f;
+        }
+
+        internal static void ApplyBorder(VisualElement element, Color color, float width = 1f)
+        {
+            if (element == null)
+                return;
+
+            float safeWidth = Mathf.Max(0f, width);
+            element.style.borderLeftWidth = safeWidth;
+            element.style.borderRightWidth = safeWidth;
+            element.style.borderTopWidth = safeWidth;
+            element.style.borderBottomWidth = safeWidth;
+            element.style.borderLeftColor = color;
+            element.style.borderRightColor = color;
+            element.style.borderTopColor = color;
+            element.style.borderBottomColor = color;
+        }
+
+        internal static void ApplyRoundedSurface(
+            VisualElement element,
+            Color background,
+            ESCornerRadiusToken radius,
+            Color border,
+            float borderWidth = 1f)
+        {
+            if (element == null)
+                return;
+
+            element.style.backgroundColor = background;
+            ApplyCornerRadius(element, radius);
+            ApplyBorder(element, border, borderWidth);
+        }
+
+        private static RectOffset CreateNineSlice(ESCornerRadiusToken token)
+        {
+            int slice = Mathf.Max(2, Mathf.CeilToInt(GetCornerRadius(token)) + 2);
+            return new RectOffset(slice, slice, slice, slice);
+        }
+
+        private static Texture2D CreateRoundedRectTexture(
+            string textureName,
+            ESCornerRadiusToken token,
+            Color borderColor,
+            Color fillColor)
+        {
+            EnsureSkinCleanupRegistered();
+            float requestedRadius = Mathf.Max(1f, GetCornerRadius(token));
+            int size = Mathf.Max(16, Mathf.CeilToInt(requestedRadius * 2f + 8f));
+            float radius = Mathf.Min(requestedRadius, size * 0.5f - 1f);
+            const float borderWidth = 1.25f;
+
+            // Keep the constructor version-neutral. Unity versions differ in the
+            // TextureFormat/creation-flags overloads available to editor assemblies.
+            var texture = new Texture2D(size, size)
+            {
+                hideFlags = HideFlags.HideAndDontSave,
+                name = textureName,
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            var pixels = new Color[size * size];
+            float half = size * 0.5f;
+            for (int y = 0; y < size; y++)
+            {
+                float py = y + 0.5f - half;
+                for (int x = 0; x < size; x++)
+                {
+                    float px = x + 0.5f - half;
+                    float qx = Mathf.Abs(px) - (half - radius);
+                    float qy = Mathf.Abs(py) - (half - radius);
+                    float outsideX = Mathf.Max(qx, 0f);
+                    float outsideY = Mathf.Max(qy, 0f);
+                    float signedDistance = Mathf.Sqrt(outsideX * outsideX + outsideY * outsideY)
+                                           + Mathf.Min(Mathf.Max(qx, qy), 0f)
+                                           - radius;
+                    float outerCoverage = Mathf.Clamp01(0.5f - signedDistance);
+                    float innerCoverage = Mathf.Clamp01(0.5f - (signedDistance + borderWidth));
+                    Color pixel = Color.Lerp(borderColor, fillColor, innerCoverage);
+                    pixel.a *= outerCoverage;
+                    pixels[y * size + x] = pixel;
+                }
+            }
+
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+            return texture;
+        }
+
+        private static void ApplyButtonState(
+            GUIStyle style,
+            Texture2D normal,
+            Texture2D hover,
+            Texture2D active,
+            Color normalText,
+            Color activeText)
+        {
+            ApplyStyleState(style.normal, normal, normalText);
+            ApplyStyleState(style.hover, hover, normalText);
+            ApplyStyleState(style.focused, hover, normalText);
+            ApplyStyleState(style.active, active, activeText);
+            ApplyStyleState(style.onNormal, active, activeText);
+            ApplyStyleState(style.onHover, active, activeText);
+            ApplyStyleState(style.onFocused, active, activeText);
+            ApplyStyleState(style.onActive, active, activeText);
+        }
+
+        private static void ApplyStyleState(GUIStyleState state, Texture2D background, Color textColor)
+        {
+            state.background = background;
+            state.textColor = textColor;
+        }
+
+        private static void DestroyTexture(ref Texture2D texture)
+        {
+            if (texture == null)
+                return;
+            UnityEngine.Object.DestroyImmediate(texture);
+            texture = null;
+        }
+
+        private static void EnsureSkinCleanupRegistered()
+        {
+            if (skinCleanupRegistered)
+                return;
+            skinCleanupRegistered = true;
+            AssemblyReloadEvents.beforeAssemblyReload -= ReleaseSkinResources;
+            AssemblyReloadEvents.beforeAssemblyReload += ReleaseSkinResources;
+            EditorApplication.quitting -= ReleaseSkinResources;
+            EditorApplication.quitting += ReleaseSkinResources;
+        }
+
+        private static void ReleaseSkinResources()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload -= ReleaseSkinResources;
+            EditorApplication.quitting -= ReleaseSkinResources;
+            skinCleanupRegistered = false;
+            surfaceStyle = null;
+            compactCollectionBodyStyle = null;
+            toolbarStyle = null;
+            toolbarButtonStyle = null;
+            primaryButtonStyle = null;
+            DestroyTexture(ref surfaceTexture);
+            DestroyTexture(ref toolbarTexture);
+            DestroyTexture(ref toolbarButtonTexture);
+            DestroyTexture(ref toolbarButtonHoverTexture);
+            DestroyTexture(ref toolbarButtonActiveTexture);
+            DestroyTexture(ref primaryButtonTexture);
+            DestroyTexture(ref primaryButtonHoverTexture);
+            DestroyTexture(ref primaryButtonActiveTexture);
+            DestroyTexture(ref compactCollectionBodyTexture);
+        }
+
         private static void EnsureSkin()
         {
             bool proSkin = EditorGUIUtility.isProSkin;
@@ -4032,18 +6447,19 @@ namespace ES.EditorInternal
             compactCollectionTitleStyle = null;
             compactCollectionMetaStyle = null;
             compactCollectionBodyStyle = null;
+            toolbarStyle = null;
+            toolbarButtonStyle = null;
+            primaryButtonStyle = null;
 
-            if (surfaceTexture != null)
-            {
-                UnityEngine.Object.DestroyImmediate(surfaceTexture);
-                surfaceTexture = null;
-            }
-
-            if (compactCollectionBodyTexture != null)
-            {
-                UnityEngine.Object.DestroyImmediate(compactCollectionBodyTexture);
-                compactCollectionBodyTexture = null;
-            }
+            DestroyTexture(ref surfaceTexture);
+            DestroyTexture(ref toolbarTexture);
+            DestroyTexture(ref toolbarButtonTexture);
+            DestroyTexture(ref toolbarButtonHoverTexture);
+            DestroyTexture(ref toolbarButtonActiveTexture);
+            DestroyTexture(ref primaryButtonTexture);
+            DestroyTexture(ref primaryButtonHoverTexture);
+            DestroyTexture(ref primaryButtonActiveTexture);
+            DestroyTexture(ref compactCollectionBodyTexture);
         }
     }
 
@@ -4185,18 +6601,17 @@ namespace ES.EditorInternal
             button.style.marginBottom = 2f;
             button.style.paddingLeft = 10f;
             button.style.paddingRight = 10f;
-            button.style.color = ESEditorPresentation.SectionSelectedTextColor;
+            button.style.color = primary
+                ? ESEditorPresentation.PrimaryActionTextColor
+                : ESEditorPresentation.SectionSelectedTextColor;
             button.style.backgroundColor = primary
-                ? ESEditorPresentation.SelectionColor
+                ? ESEditorPresentation.PrimaryActionColor
                 : ESEditorPresentation.ControlSurfaceColor;
-            button.style.borderLeftWidth = 1f;
-            button.style.borderRightWidth = 1f;
-            button.style.borderTopWidth = 1f;
-            button.style.borderBottomWidth = 1f;
-            button.style.borderLeftColor = ESEditorPresentation.DividerColor;
-            button.style.borderRightColor = ESEditorPresentation.DividerColor;
-            button.style.borderTopColor = ESEditorPresentation.DividerColor;
-            button.style.borderBottomColor = ESEditorPresentation.DividerColor;
+            ESEditorPresentation.ApplyCornerRadius(
+                button, ESEditorPresentation.ESCornerRadiusToken.Control);
+            ESEditorPresentation.ApplyBorder(
+                button,
+                primary ? ESEditorPresentation.PrimaryActionColor : ESEditorPresentation.DividerColor);
             return button;
         }
 
@@ -4218,15 +6633,11 @@ namespace ES.EditorInternal
             button.style.unityTextAlign = TextAnchor.MiddleCenter;
             button.style.fontSize = 14f;
             button.style.color = ESEditorPresentation.SectionSelectedTextColor;
-            button.style.backgroundColor = ESEditorPresentation.ControlSurfaceColor;
-            button.style.borderLeftWidth = 1f;
-            button.style.borderRightWidth = 1f;
-            button.style.borderTopWidth = 1f;
-            button.style.borderBottomWidth = 1f;
-            button.style.borderLeftColor = ESEditorPresentation.DividerColor;
-            button.style.borderRightColor = ESEditorPresentation.DividerColor;
-            button.style.borderTopColor = ESEditorPresentation.DividerColor;
-            button.style.borderBottomColor = ESEditorPresentation.DividerColor;
+            ESEditorPresentation.ApplyRoundedSurface(
+                button,
+                ESEditorPresentation.ControlSurfaceColor,
+                ESEditorPresentation.ESCornerRadiusToken.Control,
+                ESEditorPresentation.DividerColor);
             return button;
         }
 
@@ -4248,15 +6659,11 @@ namespace ES.EditorInternal
             button.style.paddingLeft = 6f;
             button.style.paddingRight = 6f;
             button.style.color = ESEditorPresentation.SectionSelectedTextColor;
-            button.style.backgroundColor = ESEditorPresentation.ControlSurfaceColor;
-            button.style.borderLeftWidth = 1f;
-            button.style.borderRightWidth = 1f;
-            button.style.borderTopWidth = 1f;
-            button.style.borderBottomWidth = 1f;
-            button.style.borderLeftColor = ESEditorPresentation.DividerColor;
-            button.style.borderRightColor = ESEditorPresentation.DividerColor;
-            button.style.borderTopColor = ESEditorPresentation.DividerColor;
-            button.style.borderBottomColor = ESEditorPresentation.DividerColor;
+            ESEditorPresentation.ApplyRoundedSurface(
+                button,
+                ESEditorPresentation.ControlSurfaceColor,
+                ESEditorPresentation.ESCornerRadiusToken.Control,
+                ESEditorPresentation.DividerColor);
 
             if (icon != null)
             {
@@ -4293,6 +6700,15 @@ namespace ES.EditorInternal
             empty.style.paddingRight = 24f;
             empty.style.paddingTop = 24f;
             empty.style.paddingBottom = 24f;
+            empty.style.marginLeft = 12f;
+            empty.style.marginRight = 12f;
+            empty.style.marginTop = 12f;
+            empty.style.marginBottom = 12f;
+            ESEditorPresentation.ApplyRoundedSurface(
+                empty,
+                ESEditorPresentation.CanvasSurfaceColor,
+                ESEditorPresentation.ESCornerRadiusToken.Section,
+                ESEditorPresentation.DividerColor);
             Label titleLabel = new Label(title ?? "暂无内容") { name = "ESEmptyStateTitle" };
             titleLabel.AddToClassList("es-brand-title");
             titleLabel.style.fontSize = 14f;
@@ -4333,6 +6749,15 @@ namespace ES.EditorInternal
             error.style.paddingRight = 28f;
             error.style.paddingTop = 24f;
             error.style.paddingBottom = 24f;
+            error.style.marginLeft = 12f;
+            error.style.marginRight = 12f;
+            error.style.marginTop = 12f;
+            error.style.marginBottom = 12f;
+            ESEditorPresentation.ApplyRoundedSurface(
+                error,
+                ESEditorPresentation.CanvasSurfaceColor,
+                ESEditorPresentation.ESCornerRadiusToken.Section,
+                ESEditorPresentation.DividerColor);
 
             Label titleLabel = new Label(title ?? "操作失败") { name = "ESErrorStateTitle" };
             titleLabel.AddToClassList("es-brand-title");
@@ -4387,14 +6812,22 @@ namespace ES.EditorInternal
 
             root.style.backgroundColor = ESEditorPresentation.WindowSurfaceColor;
             root.style.color = ESEditorPresentation.SectionTextColor;
-            StyleClass(root, "es-agent-header", ESEditorPresentation.WindowRaisedSurfaceColor);
-            StyleClass(root, "es-agent-sidebar", ESEditorPresentation.WindowInsetSurfaceColor);
-            StyleClass(root, "es-agent-conversation", ESEditorPresentation.WindowSurfaceColor);
-            StyleClass(root, "es-agent-context-panel", ESEditorPresentation.WindowRaisedSurfaceColor);
-            StyleClass(root, "es-agent-composer-shell", ESEditorPresentation.WindowInsetSurfaceColor);
-            StyleClass(root, "es-agent-empty", ESEditorPresentation.CanvasSurfaceColor);
-            StyleClass(root, "es-agent-header-button", ESEditorPresentation.ControlSurfaceColor);
-            StyleClass(root, "es-agent-secondary-button", ESEditorPresentation.ControlSurfaceColor);
+            StyleClass(root, "es-agent-header", ESEditorPresentation.WindowRaisedSurfaceColor,
+                ESEditorPresentation.ESCornerRadiusToken.None);
+            StyleClass(root, "es-agent-sidebar", ESEditorPresentation.WindowInsetSurfaceColor,
+                ESEditorPresentation.ESCornerRadiusToken.None);
+            StyleClass(root, "es-agent-conversation", ESEditorPresentation.WindowSurfaceColor,
+                ESEditorPresentation.ESCornerRadiusToken.None);
+            StyleClass(root, "es-agent-context-panel", ESEditorPresentation.WindowRaisedSurfaceColor,
+                ESEditorPresentation.ESCornerRadiusToken.Section);
+            StyleClass(root, "es-agent-composer-shell", ESEditorPresentation.WindowInsetSurfaceColor,
+                ESEditorPresentation.ESCornerRadiusToken.Card);
+            StyleClass(root, "es-agent-empty", ESEditorPresentation.CanvasSurfaceColor,
+                ESEditorPresentation.ESCornerRadiusToken.Section);
+            StyleClass(root, "es-agent-header-button", ESEditorPresentation.ControlSurfaceColor,
+                ESEditorPresentation.ESCornerRadiusToken.Control);
+            StyleClass(root, "es-agent-secondary-button", ESEditorPresentation.ControlSurfaceColor,
+                ESEditorPresentation.ESCornerRadiusToken.Control);
 
             VisualElement brandMark = FindClass(root, "es-agent-brand-mark");
             if (brandMark != null)
@@ -4402,13 +6835,17 @@ namespace ES.EditorInternal
                 brandMark.style.backgroundColor = ESEditorPresentation.ControlSurfaceColor;
                 SetBorderColor(brandMark, ESEditorPresentation.SelectionColor);
                 brandMark.style.color = ESEditorPresentation.SectionSelectedTextColor;
+                ESEditorPresentation.ApplyCornerRadius(
+                    brandMark, ESEditorPresentation.ESCornerRadiusToken.Card);
             }
 
             root.Query<VisualElement>(className: "es-agent-primary-button").ForEach(primary =>
             {
-                primary.style.backgroundColor = ESEditorPresentation.SelectionColor;
-                SetBorderColor(primary, ESEditorPresentation.SelectionColor);
-                primary.style.color = ESEditorPresentation.SectionTextColor;
+                primary.style.backgroundColor = ESEditorPresentation.PrimaryActionColor;
+                SetBorderColor(primary, ESEditorPresentation.PrimaryActionColor);
+                primary.style.color = ESEditorPresentation.PrimaryActionTextColor;
+                ESEditorPresentation.ApplyCornerRadius(
+                    primary, ESEditorPresentation.ESCornerRadiusToken.Control);
             });
 
             root.Query<VisualElement>(className: "es-agent-link-button").ForEach(link =>
@@ -4416,7 +6853,11 @@ namespace ES.EditorInternal
 
             VisualElement composer = FindClass(root, "es-agent-composer");
             if (composer != null)
+            {
                 SetBorderColor(composer, ESEditorPresentation.DividerColor);
+                ESEditorPresentation.ApplyCornerRadius(
+                    composer, ESEditorPresentation.ESCornerRadiusToken.Card);
+            }
         }
 
         internal static void StyleStatusPill(VisualElement pill, ESStatusKind status)
@@ -4426,9 +6867,12 @@ namespace ES.EditorInternal
             Color accent = ESEditorPresentation.GetStatusAccent(0, status);
             Color surface = accent;
             surface.a = EditorGUIUtility.isProSkin ? 0.18f : 0.12f;
-            pill.style.backgroundColor = surface;
+            ESEditorPresentation.ApplyRoundedSurface(
+                pill,
+                surface,
+                ESEditorPresentation.ESCornerRadiusToken.Pill,
+                accent);
             pill.style.color = accent;
-            pill.style.borderLeftColor = accent;
         }
 
         private static VisualElement FindClass(VisualElement root, string className)
@@ -4436,13 +6880,18 @@ namespace ES.EditorInternal
             return root?.Q<VisualElement>(className: className);
         }
 
-        private static void StyleClass(VisualElement root, string className, Color background)
+        private static void StyleClass(
+            VisualElement root,
+            string className,
+            Color background,
+            ESEditorPresentation.ESCornerRadiusToken radius)
         {
             root.Query<VisualElement>(className: className).ForEach(element =>
             {
                 element.style.backgroundColor = background;
                 SetBorderColor(element, ESEditorPresentation.DividerColor);
                 element.style.color = ESEditorPresentation.SectionTextColor;
+                ESEditorPresentation.ApplyCornerRadius(element, radius);
             });
         }
 

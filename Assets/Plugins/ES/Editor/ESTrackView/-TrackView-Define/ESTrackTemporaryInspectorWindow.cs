@@ -80,6 +80,14 @@ namespace ES
     public abstract class ESTrackTemporaryInspectorWindow<TWindow> : ESIndependentInspectorWindow<TWindow>
         where TWindow : ESTrackTemporaryInspectorWindow<TWindow>
     {
+        protected override ESWindowSleepLinkMode ESWindow_SleepLinkMode
+            => ESWindowSleepLinkMode.FollowOwner;
+
+        protected override EditorWindow ESWindow_SleepOwner
+            => ESTrackViewWindow.window;
+
+        protected override string ESWindow_SleepOwnerKey => ESTrackViewWindow.SleepOwnerKey;
+
         protected override string InspectorSubtitle => "Odin 业务字段桥接 · Track 独立编辑器";
 
         protected override void DrawIndependentInspectorSummary(UnityEngine.Object target)
@@ -140,10 +148,11 @@ namespace ES
             ITrackItem track,
             UnityEngine.Object sourceAsset,
             string title,
-            string page)
+            string page,
+            EditorWindow owner = null)
         {
             string stableId = EnsureStableTrackId(track, sourceAsset);
-            return OpenIndependent(track, sourceAsset, stableId, title, page);
+            return OpenIndependent(track, sourceAsset, stableId, title, page, owner);
         }
 
         private static string EnsureStableTrackId(ITrackItem track, UnityEngine.Object sourceAsset)
@@ -182,10 +191,11 @@ namespace ES
             ITrackClip clip,
             UnityEngine.Object sourceAsset,
             string title,
-            string page)
+            string page,
+            EditorWindow owner = null)
         {
             string stableId = EnsureStableClipId(clip, sourceAsset);
-            return OpenIndependent(clip, sourceAsset, stableId, title, page);
+            return OpenIndependent(clip, sourceAsset, stableId, title, page, owner);
         }
 
         private static string EnsureStableClipId(ITrackClip clip, UnityEngine.Object sourceAsset)
@@ -223,9 +233,10 @@ namespace ES
         public static ESTrackSkillDataTemporaryInspectorWindow OpenFor(
             UnityEngine.Object skillData,
             string title,
-            string page)
+            string page,
+            EditorWindow owner = null)
         {
-            return OpenIndependent(skillData, skillData, string.Empty, title, page);
+            return OpenIndependent(skillData, skillData, string.Empty, title, page, owner);
         }
 
         protected override bool TryResolveManagedInspectorData(

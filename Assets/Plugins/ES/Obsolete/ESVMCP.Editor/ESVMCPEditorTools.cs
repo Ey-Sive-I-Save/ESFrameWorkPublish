@@ -10,7 +10,7 @@ namespace ES.Obsolete.VMCP.Editor
     /// </summary>
     public static class ESVMCPEditorTools
     {
-        public const string MenuRoot = "【ES】/已废弃/VMCP/";
+        public const string MenuRoot = "【ES】/自动化与开发/遗留兼容/VMCP/";
         private const string DefaultDataFolderRoot = "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/ESVMCP/RunningData";
         private const string DefaultRootFolder = "Assets/Plugins/ES/Obsolete/Assets_ES_Legacy/ESVMCP";
 

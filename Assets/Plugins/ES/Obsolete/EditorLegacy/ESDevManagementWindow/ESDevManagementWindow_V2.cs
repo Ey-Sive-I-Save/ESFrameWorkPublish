@@ -13,9 +13,9 @@ namespace ES.Obsolete{
     /// ES开发管理窗口 V2.0 - Notion风格
     /// 功能完善的团队协作开发管理系统
     /// </summary>
-    public partial class ESDevManagementWindow_V2 : ESMenuTreeWindowAB<ESDevManagementWindow_V2>
+    public partial class ESDevManagementWindow_V2 : ESOdinMenuTreeWindow<ESDevManagementWindow_V2>
     {
-        [MenuItem("【ES】/已废弃/EditorLegacy/开发管理/开发管理窗口（日志）", false, 1)]
+        [MenuItem("【ES】/自动化与开发/遗留兼容/EditorLegacy/开发管理/开发管理窗口（日志）", false, 1)]
         private static void OpenDevWindow()
         {
             OpenWindow();

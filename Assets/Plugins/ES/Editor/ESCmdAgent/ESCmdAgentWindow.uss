@@ -28,7 +28,7 @@
     height: 30px;
     border-width: 1px;
     border-color: rgb(57, 205, 224);
-    border-radius: 7px;
+    border-radius: 6px;
     background-color: rgb(25, 100, 116);
     color: rgb(232, 252, 255);
     -unity-text-align: middle-center;
@@ -435,7 +435,7 @@
     padding-right: 7px;
     border-width: 1px;
     border-color: rgb(49, 61, 76);
-    border-radius: 3px;
+    border-radius: 4px;
     background-color: rgb(28, 35, 45);
     color: rgb(155, 174, 195);
     font-size: 9px;
@@ -529,7 +529,7 @@
     padding: 6px 9px;
     border-width: 1px;
     border-color: rgb(47, 72, 86);
-    border-radius: 12px;
+    border-radius: 999px;
     background-color: rgba(33, 91, 105, 0.2);
     color: rgb(148, 211, 220);
     font-size: 9px;
@@ -877,7 +877,7 @@
     border-color: rgb(46, 111, 126);
     border-left-width: 3px;
     border-left-color: rgb(46, 199, 221);
-    border-radius: 5px;
+    border-radius: 8px;
     background-color: rgb(25, 37, 45);
 }
 
@@ -903,7 +903,7 @@
 .es-agent-identity-value {
     min-height: 34px;
     padding: 7px;
-    border-radius: 3px;
+    border-radius: 4px;
     background-color: rgb(17, 25, 31);
     color: rgb(184, 214, 224);
     font-size: 9px;

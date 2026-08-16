@@ -2,8 +2,11 @@ Shader "ES/3D/Lit Composite URP"
 {
     Properties
     {
+        // Base Material
         [MainTexture] _BaseMap ("基础颜色纹理", 2D) = "white" {}
         [MainColor] _BaseColor ("基础颜色", Color) = (1,1,1,1)
+
+        // Time And Deformation
         _MainTexScaleOffset ("主纹理缩放/偏移", Vector) = (1,1,0,0)
         [Enum(SceneTime,0,UnscaledTime,1,CustomTime,2)] _TimeMode ("时间来源", Float) = 0
         _CustomTime ("自定义时间", Float) = 0
@@ -14,6 +17,7 @@ Shader "ES/3D/Lit Composite URP"
         _VertexAnimationFrequency ("顶点动画频率", Range(0,20)) = 2
         _VertexAnimationSpeed ("顶点动画速度", Float) = 1
         [Enum(None,0,Red,1,Green,2,Blue,3,Alpha,4)] _VertexAnimationMask ("顶点色动画遮罩", Float) = 0
+        // Lighting Inputs
         [Toggle] _UseNormalMap ("启用法线纹理", Float) = 0
         [Normal] _NormalMap ("法线纹理", 2D) = "bump" {}
         _NormalScale ("法线强度", Range(0,2)) = 1
@@ -25,6 +29,7 @@ Shader "ES/3D/Lit Composite URP"
         [Toggle] _UseEmission ("启用自发光", Float) = 0
         [HDR] _EmissionColor ("自发光颜色", Color) = (0,0,0,1)
         _EmissionMap ("自发光纹理", 2D) = "black" {}
+        // Masks And Dissolve
         [Enum(Off,0,Noise,1,Distance,2)] _DissolveMode ("溶解模式", Float) = 0
         [NoScaleOffset] _NoiseTex ("噪声纹理", 2D) = "gray" {}
         _NoiseScale ("噪声缩放", Vector) = (1,1,1,1)
@@ -33,6 +38,7 @@ Shader "ES/3D/Lit Composite URP"
         _DissolveSoftness ("溶解柔和度", Range(0.001,1)) = 0.08
         [HDR] _DissolveEdgeColor ("溶解边缘颜色", Color) = (1,0.1,0.01,1)
         _DissolveEdgeWidth ("溶解边缘宽度", Range(0.001,1)) = 0.08
+        // Dynamic Effects
         [Toggle] _EnableRim ("启用边缘光", Float) = 0
         [HDR] _RimColor ("边缘光颜色", Color) = (0.1,0.6,1,1)
         _RimPower ("边缘光幂次", Range(0.1,8)) = 3
@@ -70,6 +76,7 @@ Shader "ES/3D/Lit Composite URP"
         [HDR] _BurnEdgeColor ("燃烧边缘颜色", Color) = (1,0.05,0,1)
         _BurnProgress ("燃烧进度", Range(0,1)) = 0
         _BurnWidth ("燃烧边缘宽度", Range(0.001,1)) = 0.1
+        // Output And Quality
         [Toggle] _AlphaClip ("启用透明裁剪", Float) = 0
         _Cutoff ("透明裁剪阈值", Range(0,1)) = 0.5
         [Toggle] _ReceiveShadows ("接收阴影", Float) = 1
@@ -191,12 +198,46 @@ Shader "ES/3D/Lit Composite URP"
             #include "ES3DLitCompositeURPCommon.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MetaInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UniversalMetaPass.hlsl"
-            struct ES3DMetaAttributes { float4 positionOS:POSITION; float2 uv:TEXCOORD0; float2 lightmapUV:TEXCOORD1; float2 dynamicLightmapUV:TEXCOORD2; };
-            struct ES3DMetaVaryings { float4 positionCS:SV_POSITION; float2 uv:TEXCOORD0; };
+
+            // Meta Pass Contracts
+            struct ES3DMetaAttributes
+            {
+                float4 positionOS : POSITION;
+                float2 uv : TEXCOORD0;
+                float2 lightmapUV : TEXCOORD1;
+                float2 dynamicLightmapUV : TEXCOORD2;
+            };
+
+            struct ES3DMetaVaryings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+            };
+
             ES3DMetaVaryings ES3DMetaVertex(ES3DMetaAttributes input)
-            { ES3DMetaVaryings output; output.positionCS=UnityMetaVertexPosition(input.positionOS.xyz, input.lightmapUV, input.dynamicLightmapUV, unity_LightmapST, unity_DynamicLightmapST); output.uv=TRANSFORM_TEX(input.uv,_BaseMap); output.uv=output.uv*_MainTexScaleOffset.xy+_MainTexScaleOffset.zw; return output; }
-            half4 ES3DMetaFragment(ES3DMetaVaryings input):SV_Target
-            { half4 albedo=SAMPLE_TEXTURE2D(_BaseMap,sampler_BaseMap,input.uv)*_BaseColor; MetaInput meta=(MetaInput)0; meta.Albedo=albedo.rgb; meta.Emission=_UseEmission>0.5?SAMPLE_TEXTURE2D(_EmissionMap,sampler_EmissionMap,input.uv).rgb*_EmissionColor.rgb:0; return UnityMetaFragment(meta); }
+            {
+                ES3DMetaVaryings output;
+                output.positionCS = UnityMetaVertexPosition(
+                    input.positionOS.xyz,
+                    input.lightmapUV,
+                    input.dynamicLightmapUV,
+                    unity_LightmapST,
+                    unity_DynamicLightmapST);
+                output.uv = TRANSFORM_TEX(input.uv, _BaseMap);
+                output.uv = output.uv * _MainTexScaleOffset.xy + _MainTexScaleOffset.zw;
+                return output;
+            }
+
+            half4 ES3DMetaFragment(ES3DMetaVaryings input) : SV_Target
+            {
+                half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv) * _BaseColor;
+                MetaInput meta = (MetaInput)0;
+                meta.Albedo = albedo.rgb;
+                meta.Emission = _UseEmission > 0.5
+                    ? SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, input.uv).rgb * _EmissionColor.rgb
+                    : 0;
+                return UnityMetaFragment(meta);
+            }
             ENDHLSL
         }
     }

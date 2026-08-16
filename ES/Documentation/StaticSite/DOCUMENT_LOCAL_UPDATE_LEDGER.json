@@ -2100,6 +2100,45 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-015",
+                        "status":  "documented",
+                        "summary":  "拆分 Composite ShaderGUI 与代码助手职责，抽取 3D VFX 公共 HLSL，并完善 2D、3D Lit、VFX 与 UI Shader 实现。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets/Shaders",
+                                            "Assets/Plugins/ES/Editor/ESShader"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/0_Stand/InternalAssets/Shaders/ES3DVFXCompositeURPCommon.hlsl",
+                                              "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderGUI.Diagnostics.cs",
+                                              "Assets/Plugins/ES/Editor/ESShader/ESCompositeCodingHelper.Generation.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "大型 ShaderGUI 与 CodingHelper 按绘制、材质状态、诊断、元数据、生成和帮助目录拆分 partial；3D VFX Shader 只保留 Pass 声明并复用同目录公共 HLSL。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Stand.csproj 与 ES_Editor.csproj 在本批内容下曾静态构建通过",
+                                                            "15 个 Shader、HLSL 与 C# 文件通过严格 UTF-8 和 diff 检查",
+                                                            "partial 类型声明、VFX include 路径与 HLSLPROGRAM/ENDHLSL 配对已做源码核对"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "当前 C# 复跑被非本批资源配置缺口阻断",
+                                                             "没有 Unity Shader 导入、Console、材质 Inspector、预览场景或平台 Variant 编译证据",
+                                                             "未运行 PlayMode、Profiler、Player 或 IL2CPP"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -2112,13 +2151,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T13:39:19+08:00",
-                       "head":  "b9cd7e83224b40efc20f935e746de8db2bade8e2",
-                       "stagedSourcePatchSha256":  "f52e2f96d2ad79da93da7a9f21d44c2ffef53149cc21e031a12e63b5289418a8",
-                       "stagedSourceManifestSha256":  "4ab5f679b848918abc5083276d8c583793eb1f463c065161ac41cdb56a9f01b9",
-                       "stagedSourceFileCount":  10,
+                       "preparedAt":  "2026-08-16T13:41:05+08:00",
+                       "head":  "94572991b0611c924d123225cd3ab6a1dacc9498",
+                       "stagedSourcePatchSha256":  "7ef7caec1801be3afa1805810225e9006188b6ca6a14255f9128be2a179c2b1a",
+                       "stagedSourceManifestSha256":  "d288aa2c78ee2e2bf3a99de2f8b2c21730993f2b24943f3f8b80ee502c5925c7",
+                       "stagedSourceFileCount":  22,
                        "entryIds":  [
-                                        "LOCAL-20260816-014"
+                                        "LOCAL-20260816-015"
                                     ]
                    }
 }

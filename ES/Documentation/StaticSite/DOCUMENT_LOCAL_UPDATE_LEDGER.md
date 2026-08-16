@@ -450,6 +450,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：当前复跑被非本批资源配置缺口阻断；未运行 Unity Editor、ReloadDomain、Test Runner、真实候选审批、取消恢复、跨窗口或深图性能验证。
 - **HTML 目标**：后续在 `#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-015：Composite Shader 职责拆分与公共 HLSL
+
+- **源码路径**：2D、3D Lit、3D VFX、UI Composite Shader，VFX 公共 HLSL，ShaderGUI 和 CodingHelper partial 文件。
+- **规范与证据**：ShaderGUI 按绘制、材质状态、诊断和元数据拆分；代码助手按生成与帮助目录拆分；VFX Pass 复用同目录公共实现。
+- **完成分析**：拆分保持原 partial 类型和属性合同，减少单文件耦合，同时不把编辑器帮助逻辑带入运行时 Shader。
+- **回归状态**：Stand 与 Editor 项目曾在本批内容下静态构建通过；15 个目标文本严格 UTF-8 通过，include 与 HLSL 块已核对。
+- **已知缺口**：当前 C# 复跑被非本批资源配置缺口阻断；未运行 Unity Shader 导入、Console、材质 Inspector、预览场景、平台 Variant、PlayMode 或 Player。
+- **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

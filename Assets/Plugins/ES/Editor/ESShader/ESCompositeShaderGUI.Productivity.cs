@@ -1,14 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace ES.EditorInternal
 {
     public sealed partial class ESCompositeShaderGUI
     {
+        #region View And Preset Model
+
         private enum InspectorViewLevel
         {
             Standard = 0,
@@ -22,7 +22,6 @@ namespace ES.EditorInternal
             Color,
             Vector
         }
-
         private sealed class PresetAssignment
         {
             internal readonly string PropertyName;
@@ -115,7 +114,10 @@ namespace ES.EditorInternal
         }
 
         private static readonly string[] ViewModeNames = { "标准", "进阶", "高级" };
-
+        private static readonly GUIContent ClearFilterButtonContent = new GUIContent("清除筛选", "清除当前搜索与快捷分类筛选");
+        private static readonly GUIContent SelectPresetDifferencesButtonContent = new GUIContent("全选差异");
+        private static readonly GUIContent CancelPresetSelectionButtonContent = new GUIContent("全部取消");
+        private static readonly GUIContent ApplyPresetSelectionButtonContent = new GUIContent("应用所选");
         // 显示级别是明确的编辑器元数据，不根据名称片段推断，避免新增属性被意外藏起来。
         // 未列出的属性保持“标准”可见；只有确实需要背景知识或较高成本的入口才提升级别。
         private static readonly HashSet<string> AdvancedViewProperties = new HashSet<string>(StringComparer.Ordinal)
@@ -267,34 +269,16 @@ namespace ES.EditorInternal
 
         private static readonly Dictionary<string, CompositePreset[]> PresetCache = new Dictionary<string, CompositePreset[]>(StringComparer.Ordinal);
         private static readonly Dictionary<string, string[]> PresetNameCache = new Dictionary<string, string[]>(StringComparer.Ordinal);
-        private static readonly List<ParticleSystemVertexStream> RequiredParticleStreams = new List<ParticleSystemVertexStream>
-        {
-            ParticleSystemVertexStream.Position,
-            ParticleSystemVertexStream.Normal,
-            ParticleSystemVertexStream.Color,
-            ParticleSystemVertexStream.UV,
-            ParticleSystemVertexStream.Custom1XYZW,
-            ParticleSystemVertexStream.Custom2X
-        };
-        private static ParticleSystemRenderer particleConfigurationTarget;
-        private static readonly List<ParticleSystemRenderer> CachedSelectedParticleRenderers = new List<ParticleSystemRenderer>();
-        private static readonly List<ParticleSystemRenderer> DiagnosticParticleRenderers = new List<ParticleSystemRenderer>();
-        private static readonly HashSet<Material> CachedTargetMaterials = new HashSet<Material>();
-        private static readonly HashSet<int> CachedParticleRendererIds = new HashSet<int>();
-        private static readonly List<ParticleSystemRenderer> CachedHierarchyParticleRenderers = new List<ParticleSystemRenderer>();
-        private static readonly List<Material> CachedRendererMaterials = new List<Material>();
-        private static readonly List<ParticleSystemVertexStream> CachedActiveParticleStreams = new List<ParticleSystemVertexStream>();
-        private static readonly List<Camera> CachedDepthCameras = new List<Camera>();
-        private static readonly List<string> DiagnosticWarnings = new List<string>();
-        private static int cachedParticleSelectionSignature = int.MinValue;
-        private static double cachedParticleSelectionTime;
+        #endregion
+
+        #region View And Preset Workflow
 
         private static InspectorViewLevel DrawInspectorViewMode(string shaderName)
         {
             string key = "ES.Composite.ViewLevel." + shaderName;
             InspectorViewLevel current = (InspectorViewLevel)Mathf.Clamp(SessionState.GetInt(key, 0), 0, 2);
 
-            EditorGUILayout.BeginVertical(ESEditorPresentation.SurfaceStyle);
+            EditorGUILayout.Space(2f);
             EditorGUILayout.BeginHorizontal();
             GUILayout.Label("显示范围", ESEditorPresentation.HeaderStyle, GUILayout.Width(72f));
             int next = GUILayout.Toolbar((int)current, ViewModeNames, EditorStyles.miniButton);
@@ -311,8 +295,6 @@ namespace ES.EditorInternal
                     ? "坐标、遮罩与深度"
                     : "顶点流与渲染状态";
             GUILayout.Label(guidance + " · 仅改变显示，不修改材质", ESEditorPresentation.SubtitleStyle);
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.Space(4f);
             return current;
         }
 
@@ -371,10 +353,26 @@ namespace ES.EditorInternal
             string selectedKey = "ES.Composite.Preset.Selected." + shaderName;
             int selected = Mathf.Clamp(SessionState.GetInt(selectedKey, 0), 0, presets.Length - 1);
             string[] names = GetPresetNames(shaderName, presets);
+            CompositePreset preset = presets[selected];
+            string panelKey = "ES.Composite.Preset.Panel." + shaderName;
+            bool expanded = SessionState.GetBool(panelKey, false);
 
             EditorGUILayout.BeginVertical(ESEditorPresentation.SurfaceStyle);
+            bool nextExpanded = EditorGUILayout.Foldout(expanded, "效果预设 · " + preset.Name, true);
+            if (nextExpanded != expanded)
+            {
+                expanded = nextExpanded;
+                SessionState.SetBool(panelKey, expanded);
+            }
+            if (!expanded)
+            {
+                EditorGUILayout.EndVertical();
+                EditorGUILayout.Space(4f);
+                return;
+            }
+
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("效果预设", ESEditorPresentation.HeaderStyle, GUILayout.Width(72f));
+            GUILayout.Label("选择预设", ESEditorPresentation.HeaderStyle, GUILayout.MinWidth(56f), GUILayout.ExpandWidth(false));
             int next = EditorGUILayout.Popup(selected, names);
             EditorGUILayout.EndHorizontal();
             if (next != selected)
@@ -383,29 +381,30 @@ namespace ES.EditorInternal
                 SessionState.SetInt(selectedKey, selected);
             }
 
-            CompositePreset preset = presets[selected];
+            preset = presets[selected];
             GUILayout.Label(preset.Description, ESEditorPresentation.SubtitleStyle);
             string foldoutKey = "ES.Composite.Preset.Preview." + shaderName;
-            bool expanded = SessionState.GetBool(foldoutKey, false);
-            bool nextExpanded = EditorGUILayout.Foldout(expanded, "预览并选择要应用的差异", true);
-            if (nextExpanded != expanded)
+            bool previewExpanded = SessionState.GetBool(foldoutKey, false);
+            bool nextPreviewExpanded = EditorGUILayout.Foldout(previewExpanded, "预览并选择要应用的差异", true);
+            if (nextPreviewExpanded != previewExpanded)
             {
-                expanded = nextExpanded;
-                SessionState.SetBool(foldoutKey, expanded);
+                previewExpanded = nextPreviewExpanded;
+                SessionState.SetBool(foldoutKey, previewExpanded);
             }
 
             int differenceCount = 0;
             int selectedCount = 0;
-            if (expanded)
+            if (previewExpanded)
             {
                 EditorGUILayout.BeginHorizontal();
                 GUILayout.FlexibleSpace();
-                if (GUILayout.Button("全选差异", EditorStyles.miniButton, GUILayout.Width(68f)))
+                if (DrawContentSizedButton(SelectPresetDifferencesButtonContent, EditorStyles.miniButton))
                     SetPresetSelections(editor, preset, true, true);
-                if (GUILayout.Button("全部取消", EditorStyles.miniButton, GUILayout.Width(68f)))
+                if (DrawContentSizedButton(CancelPresetSelectionButtonContent, EditorStyles.miniButton))
                     SetPresetSelections(editor, preset, false, false);
                 EditorGUILayout.EndHorizontal();
 
+                bool narrowComparison = EditorGUIUtility.currentViewWidth < 330f;
                 for (int i = 0; i < preset.Assignments.Length; i++)
                 {
                     PresetAssignment assignment = preset.Assignments[i];
@@ -415,11 +414,25 @@ namespace ES.EditorInternal
                     bool apply = different && SessionState.GetBool(selectionKey, true);
                     string displayName = GetPresetPropertyDisplayName(properties, assignment.PropertyName);
                     string comparison = FormatCurrentValue(editor, assignment) + "  →  " + assignment.FormatTarget();
-                    EditorGUILayout.BeginHorizontal();
-                    bool nextApply = EditorGUILayout.Toggle(apply, GUILayout.Width(18f));
-                    GUILayout.Label(displayName, GUILayout.Width(Mathf.Clamp(EditorGUIUtility.currentViewWidth * 0.28f, 92f, 180f)));
-                    GUILayout.Label(different ? comparison : "已一致", different ? EditorStyles.miniLabel : ESEditorPresentation.MetaStyle);
-                    EditorGUILayout.EndHorizontal();
+                    bool nextApply;
+                    if (narrowComparison)
+                    {
+                        EditorGUILayout.BeginVertical();
+                        EditorGUILayout.BeginHorizontal();
+                        nextApply = EditorGUILayout.Toggle(apply, GUILayout.Width(18f));
+                        GUILayout.Label(displayName);
+                        EditorGUILayout.EndHorizontal();
+                        GUILayout.Label(different ? comparison : "已一致", ESEditorPresentation.SubtitleStyle);
+                        EditorGUILayout.EndVertical();
+                    }
+                    else
+                    {
+                        EditorGUILayout.BeginHorizontal();
+                        nextApply = EditorGUILayout.Toggle(apply, GUILayout.Width(18f));
+                        GUILayout.Label(displayName, GUILayout.Width(Mathf.Clamp(EditorGUIUtility.currentViewWidth * 0.28f, 92f, 180f)));
+                        GUILayout.Label(different ? comparison : "已一致", different ? EditorStyles.miniLabel : ESEditorPresentation.MetaStyle);
+                        EditorGUILayout.EndHorizontal();
+                    }
                     if (nextApply != apply)
                     {
                         apply = nextApply;
@@ -444,7 +457,7 @@ namespace ES.EditorInternal
             GUILayout.FlexibleSpace();
             using (new EditorGUI.DisabledScope(selectedCount == 0))
             {
-                if (GUILayout.Button("应用所选", GUILayout.Width(84f)))
+                if (DrawContentSizedButton(ApplyPresetSelectionButtonContent))
                     ApplyPreset(editor, preset);
             }
             EditorGUILayout.EndHorizontal();
@@ -570,334 +583,6 @@ namespace ES.EditorInternal
             editor.PropertiesChanged();
         }
 
-        private static void DrawEnvironmentDiagnostics(MaterialEditor editor, MaterialProperty[] properties, string shaderName)
-        {
-            if (shaderName != "ES/3D/VFX Composite URP") return;
-
-            DiagnosticWarnings.Clear();
-            List<string> warnings = DiagnosticWarnings;
-            bool depthEffectEnabled = IsEnabled(properties, "_EnableSoftParticles") || IsEnabled(properties, "_EnableDepthIntersection");
-            UnityEngine.Object pipelineAsset;
-            string depthState;
-            bool depthSupported = TryGetUrpDepthSupport(out pipelineAsset, out depthState);
-            if (depthEffectEnabled && !depthSupported)
-                warnings.Add("深度效果已启用，但 " + depthState);
-
-            int currentQuality = GetRoundedValue(properties, "_QualityTier", 1);
-            int requiredQuality = GetRequiredQuality(properties, shaderName);
-            if (currentQuality < requiredQuality)
-                warnings.Add("当前质量档不足：已启用效果至少需要“" + QualityName(requiredQuality) + "”。");
-
-            if (GetRoundedValue(properties, "_ZWriteMode", 0) != 0)
-                warnings.Add("透明 VFX 正在写入深度，可能遮挡后续透明物体。除非明确需要，建议关闭。 ");
-            int zTest = GetRoundedValue(properties, "_ZTest", 4);
-            if (zTest == 0 || zTest == 1 || zTest == 8)
-                warnings.Add("深度测试处于“禁用 / 从不 / 始终”之一，容易产生不可见或穿透画面。 ");
-            if (Mathf.Abs(GetFloatValue(properties, "_QueueOffset", 0f)) > 25f)
-                warnings.Add("渲染队列偏移超过 ±25，可能破坏透明物体的稳定排序。 ");
-            if (GetRoundedValue(properties, "_BlendMode", 0) == 3 && GetColorMagnitude(properties, "_EmissionColor") > 1.05f)
-                warnings.Add("正片叠底与高强度自发光同时使用，亮度语义互相冲突，结果可能难以预测。 ");
-
-            DiagnosticParticleRenderers.Clear();
-            DiagnosticParticleRenderers.AddRange(FindSelectedParticleRenderers(editor));
-            List<ParticleSystemRenderer> particleRenderers = DiagnosticParticleRenderers;
-            if (particleConfigurationTarget != null && UsesAnyMaterial(particleConfigurationTarget, GetTargetMaterials(editor))
-                && !particleRenderers.Contains(particleConfigurationTarget))
-                particleRenderers.Add(particleConfigurationTarget);
-            bool vertexStreamsEnabled = IsEnabled(properties, "_EnableVertexStreams");
-            int configuredRenderers = 0;
-            for (int i = 0; i < particleRenderers.Count; i++)
-                if (HasRequiredParticleStreams(particleRenderers[i])) configuredRenderers++;
-            if (vertexStreamsEnabled && particleRenderers.Count > 0 && configuredRenderers < particleRenderers.Count)
-                warnings.Add("粒子顶点流已启用，但所选对象仍有 " + (particleRenderers.Count - configuredRenderers) + " 个 ParticleSystemRenderer 未匹配 ES 通道合同。 ");
-
-            EditorGUILayout.BeginVertical(ESEditorPresentation.SurfaceStyle);
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("环境与风险", ESEditorPresentation.HeaderStyle);
-            GUILayout.FlexibleSpace();
-            GUILayout.Label(warnings.Count == 0 ? "未发现明显风险" : warnings.Count + " 项需要确认", ESEditorPresentation.MetaStyle);
-            EditorGUILayout.EndHorizontal();
-
-            for (int i = 0; i < warnings.Count; i++)
-                EditorGUILayout.HelpBox(warnings[i], MessageType.Warning);
-
-            if (depthEffectEnabled)
-            {
-                EditorGUILayout.BeginHorizontal();
-                GUILayout.Label(depthSupported ? "URP Depth Texture：可用" : "URP Depth Texture：不可用", ESEditorPresentation.SubtitleStyle);
-                GUILayout.FlexibleSpace();
-                using (new EditorGUI.DisabledScope(pipelineAsset == null))
-                {
-                    if (GUILayout.Button("定位 URP 资源", EditorStyles.miniButton, GUILayout.Width(92f)))
-                    {
-                        Selection.activeObject = pipelineAsset;
-                        EditorGUIUtility.PingObject(pipelineAsset);
-                    }
-                }
-                EditorGUILayout.EndHorizontal();
-            }
-
-            if (currentQuality < requiredQuality)
-            {
-                EditorGUILayout.BeginHorizontal();
-                GUILayout.FlexibleSpace();
-                if (GUILayout.Button("切换到" + QualityName(requiredQuality), GUILayout.Width(96f)))
-                    SetFloatOnTargets(editor, "_QualityTier", requiredQuality, "修正 ES Shader 质量档");
-                EditorGUILayout.EndHorizontal();
-            }
-
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Label("目标粒子", GUILayout.Width(58f));
-            particleConfigurationTarget = EditorGUILayout.ObjectField(
-                particleConfigurationTarget,
-                typeof(ParticleSystemRenderer),
-                true) as ParticleSystemRenderer;
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.BeginHorizontal();
-            string particleState = particleRenderers.Count == 0
-                ? "可拖入 Renderer，或锁定材质 Inspector 后选择粒子对象"
-                : "所选粒子 " + configuredRenderers + "/" + particleRenderers.Count + " 已匹配";
-            GUILayout.Label(particleState, ESEditorPresentation.SubtitleStyle);
-            GUILayout.FlexibleSpace();
-            using (new EditorGUI.DisabledScope(particleRenderers.Count == 0 || configuredRenderers == particleRenderers.Count))
-            {
-                if (GUILayout.Button("配置顶点流", GUILayout.Width(88f)))
-                    ConfigureParticleStreams(particleRenderers);
-            }
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.Space(4f);
-            DiagnosticParticleRenderers.Clear();
-            DiagnosticWarnings.Clear();
-            CachedTargetMaterials.Clear();
-        }
-
-        private static int GetRequiredQuality(MaterialProperty[] properties, string shaderName)
-        {
-            int required = 0;
-            for (int i = 0; i < properties.Length; i++)
-            {
-                MaterialProperty property = properties[i];
-                if (property == null || property.hasMixedValue) continue;
-                bool active = IsStatusFeatureToggle(property.name)
-                    ? property.floatValue > 0.5f
-                    : property.name == "_DissolveMode" && property.floatValue > 0.5f;
-                if (!active) continue;
-                required = Mathf.Max(required, GetMinimumQualityTier(shaderName, property.name));
-            }
-
-            if (shaderName == "ES/3D/VFX Composite URP" && Mathf.Abs(GetFloatValue(properties, "_Distortion", 0f)) > 0.00001f)
-                required = Mathf.Max(required, 1);
-            return required;
-        }
-
-        private static bool TryGetUrpDepthSupport(out UnityEngine.Object pipelineAsset, out string state)
-        {
-            pipelineAsset = GraphicsSettings.currentRenderPipeline;
-            if (pipelineAsset == null) pipelineAsset = GraphicsSettings.defaultRenderPipeline;
-            if (pipelineAsset == null)
-            {
-                state = "项目没有配置当前 Render Pipeline Asset。";
-                return false;
-            }
-
-            PropertyInfo property = pipelineAsset.GetType().GetProperty("supportsCameraDepthTexture", BindingFlags.Instance | BindingFlags.Public);
-            if (property == null || property.PropertyType != typeof(bool))
-            {
-                state = "当前管线不是可识别的 URP Asset，无法确认 Depth Texture。";
-                return false;
-            }
-
-            bool supported = (bool)property.GetValue(pipelineAsset, null);
-            if (supported)
-            {
-                state = "Depth Texture 已在 URP Asset 开启。";
-                return true;
-            }
-
-            if (IsAnyRelevantCameraDepthEnabled())
-            {
-                state = "URP Asset 默认关闭，但当前相机已单独请求 Depth Texture。";
-                return true;
-            }
-
-            state = "URP Asset 与当前相机都没有开启 Depth Texture。";
-            return false;
-        }
-
-        private static bool IsAnyRelevantCameraDepthEnabled()
-        {
-            Type cameraDataType = Type.GetType(
-                "UnityEngine.Rendering.Universal.UniversalAdditionalCameraData, Unity.RenderPipelines.Universal.Runtime");
-            if (cameraDataType == null) return false;
-            PropertyInfo property = cameraDataType.GetProperty("requiresDepthTexture", BindingFlags.Instance | BindingFlags.Public);
-            if (property == null || property.PropertyType != typeof(bool)) return false;
-
-            CachedDepthCameras.Clear();
-            List<Camera> cameras = CachedDepthCameras;
-            GameObject[] selectedObjects = Selection.gameObjects;
-            for (int i = 0; i < selectedObjects.Length; i++)
-            {
-                Camera camera = selectedObjects[i].GetComponent<Camera>();
-                if (camera != null && !cameras.Contains(camera)) cameras.Add(camera);
-            }
-            Camera mainCamera = Camera.main;
-            if (mainCamera != null && !cameras.Contains(mainCamera)) cameras.Add(mainCamera);
-
-            bool depthEnabled = false;
-            for (int i = 0; i < cameras.Count; i++)
-            {
-                if ((cameras[i].depthTextureMode & DepthTextureMode.Depth) != 0)
-                {
-                    depthEnabled = true;
-                    break;
-                }
-                Component data = cameras[i].GetComponent(cameraDataType);
-                if (data != null && (bool)property.GetValue(data, null))
-                {
-                    depthEnabled = true;
-                    break;
-                }
-            }
-            CachedDepthCameras.Clear();
-            return depthEnabled;
-        }
-
-        private static List<ParticleSystemRenderer> FindSelectedParticleRenderers(MaterialEditor editor)
-        {
-            HashSet<Material> targetMaterials = GetTargetMaterials(editor);
-            GameObject[] selectedObjects = Selection.gameObjects;
-            int signature = 17;
-            unchecked
-            {
-                for (int i = 0; i < editor.targets.Length; i++)
-                    signature = signature * 31 + (editor.targets[i] == null ? 0 : editor.targets[i].GetInstanceID());
-                for (int i = 0; i < selectedObjects.Length; i++)
-                    signature = signature * 31 + (selectedObjects[i] == null ? 0 : selectedObjects[i].GetInstanceID());
-            }
-
-            double now = EditorApplication.timeSinceStartup;
-            if (signature == cachedParticleSelectionSignature && now - cachedParticleSelectionTime < 0.5d)
-                return CachedSelectedParticleRenderers;
-
-            CachedSelectedParticleRenderers.Clear();
-            CachedParticleRendererIds.Clear();
-            for (int i = 0; i < selectedObjects.Length; i++)
-            {
-                CachedHierarchyParticleRenderers.Clear();
-                selectedObjects[i].GetComponentsInChildren(true, CachedHierarchyParticleRenderers);
-                for (int r = 0; r < CachedHierarchyParticleRenderers.Count; r++)
-                {
-                    ParticleSystemRenderer renderer = CachedHierarchyParticleRenderers[r];
-                    if (renderer == null || !UsesAnyMaterial(renderer, targetMaterials) || !CachedParticleRendererIds.Add(renderer.GetInstanceID())) continue;
-                    CachedSelectedParticleRenderers.Add(renderer);
-                }
-            }
-            CachedHierarchyParticleRenderers.Clear();
-            cachedParticleSelectionSignature = signature;
-            cachedParticleSelectionTime = now;
-            return CachedSelectedParticleRenderers;
-        }
-
-        private static HashSet<Material> GetTargetMaterials(MaterialEditor editor)
-        {
-            CachedTargetMaterials.Clear();
-            for (int i = 0; i < editor.targets.Length; i++)
-            {
-                Material material = editor.targets[i] as Material;
-                if (material != null) CachedTargetMaterials.Add(material);
-            }
-            return CachedTargetMaterials;
-        }
-
-        private static bool UsesAnyMaterial(ParticleSystemRenderer renderer, HashSet<Material> targetMaterials)
-        {
-            CachedRendererMaterials.Clear();
-            renderer.GetSharedMaterials(CachedRendererMaterials);
-            bool usesTargetMaterial = false;
-            for (int i = 0; i < CachedRendererMaterials.Count; i++)
-            {
-                if (CachedRendererMaterials[i] == null || !targetMaterials.Contains(CachedRendererMaterials[i])) continue;
-                usesTargetMaterial = true;
-                break;
-            }
-            CachedRendererMaterials.Clear();
-            return usesTargetMaterial;
-        }
-
-        private static bool HasRequiredParticleStreams(ParticleSystemRenderer renderer)
-        {
-            if (renderer == null) return false;
-            CachedActiveParticleStreams.Clear();
-            renderer.GetActiveVertexStreams(CachedActiveParticleStreams);
-            if (CachedActiveParticleStreams.Count != RequiredParticleStreams.Count) return false;
-            for (int i = 0; i < CachedActiveParticleStreams.Count; i++)
-                if (CachedActiveParticleStreams[i] != RequiredParticleStreams[i]) return false;
-            return true;
-        }
-
-        private static void ConfigureParticleStreams(List<ParticleSystemRenderer> renderers)
-        {
-            if (renderers == null || renderers.Count == 0) return;
-            UnityEngine.Object[] targets = new UnityEngine.Object[renderers.Count];
-            for (int i = 0; i < renderers.Count; i++) targets[i] = renderers[i];
-            Undo.RecordObjects(targets, "配置 ES VFX 粒子顶点流");
-            for (int i = 0; i < renderers.Count; i++)
-            {
-                renderers[i].SetActiveVertexStreams(RequiredParticleStreams);
-                EditorUtility.SetDirty(renderers[i]);
-            }
-        }
-
-        private static void SetFloatOnTargets(MaterialEditor editor, string propertyName, float value, string undoName)
-        {
-            Undo.RecordObjects(editor.targets, undoName);
-            for (int i = 0; i < editor.targets.Length; i++)
-            {
-                Material material = editor.targets[i] as Material;
-                if (material == null || !material.HasProperty(propertyName)) continue;
-                material.SetFloat(propertyName, value);
-                SyncMaterialKeywords(material);
-                EditorUtility.SetDirty(material);
-            }
-            editor.PropertiesChanged();
-        }
-
-        private static bool IsEnabled(MaterialProperty[] properties, string propertyName)
-        {
-            MaterialProperty property = Find(properties, propertyName);
-            return property != null && (property.hasMixedValue || property.floatValue > 0.5f);
-        }
-
-        private static int GetRoundedValue(MaterialProperty[] properties, string propertyName, int fallback)
-        {
-            MaterialProperty property = Find(properties, propertyName);
-            return property == null || property.hasMixedValue ? fallback : Mathf.RoundToInt(property.floatValue);
-        }
-
-        private static float GetFloatValue(MaterialProperty[] properties, string propertyName, float fallback)
-        {
-            MaterialProperty property = Find(properties, propertyName);
-            return property == null || property.hasMixedValue ? fallback : property.floatValue;
-        }
-
-        private static float GetColorMagnitude(MaterialProperty[] properties, string propertyName)
-        {
-            MaterialProperty property = Find(properties, propertyName);
-            return property == null || property.hasMixedValue ? 0f : property.colorValue.maxColorComponent;
-        }
-
-        private static bool Approximately(Vector4 a, Vector4 b)
-        {
-            return Mathf.Approximately(a.x, b.x) && Mathf.Approximately(a.y, b.y)
-                && Mathf.Approximately(a.z, b.z) && Mathf.Approximately(a.w, b.w);
-        }
-
-        private static bool Approximately(Color a, Color b)
-        {
-            return Mathf.Approximately(a.r, b.r) && Mathf.Approximately(a.g, b.g)
-                && Mathf.Approximately(a.b, b.b) && Mathf.Approximately(a.a, b.a);
-        }
+        #endregion
     }
 }

@@ -5,12 +5,14 @@
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
 
+// Texture Resources
 TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
 TEXTURE2D(_NormalMap); SAMPLER(sampler_NormalMap);
 TEXTURE2D(_EmissionMap); SAMPLER(sampler_EmissionMap);
 TEXTURE2D(_OcclusionMap); SAMPLER(sampler_OcclusionMap);
 TEXTURE2D(_NoiseTex); SAMPLER(sampler_NoiseTex);
 TEXTURE2D(_FlowMap); SAMPLER(sampler_FlowMap);
+// Shared And Per-Material State
 float3 _LightDirection;
 float3 _LightPosition;
 float _ESUnscaledTime;
@@ -85,6 +87,7 @@ float4 _NoiseScale;
 float4 _NoiseSpeed;
 CBUFFER_END
 
+// Time, UV And Vertex Deformation
 float ESCompositeTime()
 {
     float baseTime = _TimeMode > 1.5 ? _CustomTime : (_TimeMode > 0.5 ? (_ESUnscaledTimeValid > 0.5 ? _ESUnscaledTime : _Time.y) : _Time.y);
@@ -138,6 +141,7 @@ float2 ESApplyFlowMap(float2 uv)
     return uv;
 }
 
+// Vertex Contracts
 struct ES3DLitAttributes
 {
     float4 positionOS : POSITION;
@@ -171,6 +175,7 @@ struct ES3DLitVaryings
     UNITY_VERTEX_OUTPUT_STEREO
 };
 
+// Surface Sampling And Dissolve
 float ESNoise(float3 positionWS)
 {
     float2 uv = positionWS.xz * _NoiseScale.xy + positionWS.y * _NoiseScale.zw + _NoiseSpeed.xy * ESCompositeTime();
@@ -252,6 +257,7 @@ void ESInitializeSurface(float2 uv, float3 positionWS, out SurfaceData surfaceDa
 #endif
 }
 
+// Forward Lit Pass
 ES3DLitVaryings ES3DLitVertex(ES3DLitAttributes input)
 {
     ES3DLitVaryings output = (ES3DLitVaryings)0;
@@ -339,7 +345,8 @@ half4 ES3DLitFragment(ES3DLitVaryings input) : SV_Target
         float sparkleRadial = saturate(1.0 - length(sparkleLocal) * 2.0);
         float sparkleCross = max(saturate(1.0 - abs(sparkleLocal.x) * 8.0), saturate(1.0 - abs(sparkleLocal.y) * 8.0));
         float sparkleShape = saturate(sparkleRadial * 0.35 + sparkleCross * 0.65);
-        float sparkle = step(1.0 - _SparkleDensity, sparkleSeed) * pow(saturate(sparkleWave * sparkleShape), max(1.0, _SparkleSharpness));
+        float sparkle = step(1.0 - _SparkleDensity, sparkleSeed)
+            * pow(saturate(sparkleWave * sparkleShape), max(1.0, _SparkleSharpness));
         result.rgb += _SparkleColor.rgb * sparkle * _SparkleIntensity;
     }
 #endif
@@ -348,7 +355,14 @@ half4 ES3DLitFragment(ES3DLitVaryings input) : SV_Target
     return result;
 }
 
-struct ES3DShadowVaryings { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; float3 positionWS : TEXCOORD1; UNITY_VERTEX_INPUT_INSTANCE_ID };
+// Shadow Pass
+struct ES3DShadowVaryings
+{
+    float4 positionCS : SV_POSITION;
+    float2 uv : TEXCOORD0;
+    float3 positionWS : TEXCOORD1;
+    UNITY_VERTEX_INPUT_INSTANCE_ID
+};
 ES3DShadowVaryings ES3DShadowVertex(ES3DLitAttributes input)
 {
     ES3DShadowVaryings output = (ES3DShadowVaryings)0;
@@ -383,7 +397,16 @@ half4 ES3DShadowFragment(ES3DShadowVaryings input) : SV_Target
     return 0;
 }
 
-struct ES3DDepthVaryings { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; float3 positionWS : TEXCOORD1; float3 normalWS : TEXCOORD2; float4 tangentWS : TEXCOORD3; UNITY_VERTEX_INPUT_INSTANCE_ID };
+// Depth Passes
+struct ES3DDepthVaryings
+{
+    float4 positionCS : SV_POSITION;
+    float2 uv : TEXCOORD0;
+    float3 positionWS : TEXCOORD1;
+    float3 normalWS : TEXCOORD2;
+    float4 tangentWS : TEXCOORD3;
+    UNITY_VERTEX_INPUT_INSTANCE_ID
+};
 ES3DDepthVaryings ES3DDepthVertex(ES3DLitAttributes input)
 {
     ES3DDepthVaryings output = (ES3DDepthVaryings)0;

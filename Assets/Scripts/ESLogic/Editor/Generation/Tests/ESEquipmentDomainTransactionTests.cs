@@ -186,7 +186,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void DestroyWithoutPoolCallback_RemovesOwnedItemInstances()
+        public void EntityPoolDespawnCallback_RemovesOwnedItemInstances()
         {
             CreateDomain(
                 out Entity entity,
@@ -202,7 +202,7 @@ namespace ES.Tests
                     out _),
                 Is.True);
 
-            UnityEngine.Object.DestroyImmediate(entity.gameObject);
+            entity.OnPoolDespawned();
 
             Assert.That(ESRuntimeDataModule.ItemInstanceTable.IsCurrent(handle), Is.False);
         }
@@ -224,7 +224,7 @@ namespace ES.Tests
                     out int inventorySlot),
                 Is.True);
 
-            EntityTransformMapping mapping = entity.EnsureTransformMapping();
+            EntityTransformMapping mapping = entity.gameObject.AddComponent<EntityTransformMapping>();
             Transform mainHand = CreateObject(EntityEquipmentSocketKeys.MainHandSocket).transform;
             mainHand.SetParent(entity.transform, false);
             Assert.That(mapping.Set(EntityEquipmentSocketKeys.MainHandSocket, mainHand), Is.True);
@@ -319,6 +319,7 @@ namespace ES.Tests
             entity = root.AddComponent<Entity>();
             entity.EnsureEntityStructure();
             entity.equipmentDomain._Editor_RegisterAllButOnlyCreateRelationship(entity);
+            entity.RegisterDomain(entity.equipmentDomain);
 
             inventory = new EntityEquipmentInventoryModule { capacity = 4 };
             slots = new EntityEquipmentSlotModule();

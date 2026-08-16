@@ -280,6 +280,13 @@ namespace ES
             string sourcePackage,
             string version)
         {
+            if (!sharedData.ValidateDefinition(out string validationError))
+                throw new InvalidOperationException("ShotDefinition 校验失败：" + validationError);
+            if (!defaultVariableData.ValidateDefinition(out string variableValidationError))
+                throw new InvalidOperationException("ShotVariable 校验失败：" + variableValidationError);
+            if (prefabKey == null || !prefabKey.IsConfigured)
+                throw new InvalidOperationException("ShotDefinition 必须配置有效 Prefab Key。");
+
             string keyName = ESConfigKeyMatch.Describe(key.EnumKeyInt, key.StringKey);
             runtimeData.keyName = keyName;
             runtimeData.displayName = string.IsNullOrWhiteSpace(displayName) ? keyName : displayName;

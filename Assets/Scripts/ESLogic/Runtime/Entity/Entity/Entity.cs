@@ -275,6 +275,7 @@ namespace ES
 
         protected override void OnDestroy()
         {
+            equipmentDomain?.NotifyPoolDespawned();
             kcc?.ResetMotionInfluences();
             ESGameManager.Camera?.ReleaseOwnedBy(this);
             ReleaseDefaultCameraRequest();

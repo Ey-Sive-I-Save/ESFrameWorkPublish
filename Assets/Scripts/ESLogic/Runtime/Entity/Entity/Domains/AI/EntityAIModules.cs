@@ -93,6 +93,7 @@ namespace ES
             state.motion.move = input.ReadVector2(ESInputActionId.Move);
             state.motion.look = input.ReadVector2(ESInputActionId.Look);
             state.motion.flyVertical = input.ReadAxis(ESInputActionId.FlyVertical);
+            state.motion.attackHold = input.IsHeld(ESInputActionId.Attack);
             state.motion.blockHold = input.IsHeld(ESInputActionId.Block);
             state.motion.peekLeftHold = input.IsHeld(ESInputActionId.PeekLeft);
             state.motion.peekRightHold = input.IsHeld(ESInputActionId.PeekRight);
@@ -244,6 +245,7 @@ namespace ES
 
             combatModule.SetBlock(false);
             combatModule.SetSlide(false);
+            combatModule.Internal_CancelPrimaryAttack();
         }
 
         private void DispatchCameraLook(EntityInputState input)
@@ -331,7 +333,9 @@ namespace ES
                 return;
 
             if (input.action.ConsumeAttack())
-                combatModule.TryExecutePrimaryAttack();
+                combatModule.BeginPrimaryAttack();
+            if (!input.motion.attackHold)
+                combatModule.EndPrimaryAttack();
             if (input.action.ConsumeHeavyAttack()
                 && !combatModule.TrySubmitHeavyAttack(out bool heavyActionRegistered)
                 && !heavyActionRegistered)
@@ -724,6 +728,9 @@ namespace ES
 
         [LabelText("飞行垂直")]
         public float flyVertical;
+
+        [LabelText("攻击(按住)")]
+        public bool attackHold;
 
         [LabelText("格挡(按住)")]
         public bool blockHold;

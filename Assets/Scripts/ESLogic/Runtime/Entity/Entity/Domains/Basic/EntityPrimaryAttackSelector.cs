@@ -2,13 +2,15 @@ namespace ES
 {
     /// <summary>
     /// 主攻击的执行类别。Action 可承载徒手、近战武器、双持组合技等作者定义攻击；
-    /// WeaponFire 只表示当前既有的远程射击执行入口。
+    /// 非 Action 值直接表达 WeaponDefinition 选择的交付后端。
     /// </summary>
     public enum EntityPrimaryAttackRoute
     {
         None = 0,
         Action = 1,
-        WeaponFire = 2,
+        HitScan = 2,
+        Shot = 3,
+        Beam = 4,
     }
 
     /// <summary>
@@ -47,7 +49,7 @@ namespace ES
 
     /// <summary>
     /// 只依据当前武器定义选择主攻击类别，不注册任务、不排序，也不执行 Action、Transform 或物理副作用。
-    /// 后续投掷、法器等能力应在这里扩展明确选择结果，而不是回到 AI Domain 堆条件分支。
+    /// weaponKind 只做内容分类，不能参与执行路由。
     /// </summary>
     public static class EntityPrimaryAttackSelector
     {
@@ -59,14 +61,21 @@ namespace ES
             if (definition == null)
                 return EntityPrimaryAttackSelection.None;
 
-            if (definition.weaponKind == ItemWeaponKind.Melee)
-                return SelectAction(actionKey, source);
-
-            return definition.weaponKind == ItemWeaponKind.Ranged
-                   && definition.fire != null
-                   && definition.fire.enabled
-                ? new EntityPrimaryAttackSelection(EntityPrimaryAttackRoute.WeaponFire, source)
-                : EntityPrimaryAttackSelection.None;
+            switch (definition.deliveryMode)
+            {
+                case WeaponAttackDeliveryMode.Action:
+                    return SelectAction(actionKey, source);
+                case WeaponAttackDeliveryMode.HitScan:
+                    return SelectDelivery(EntityPrimaryAttackRoute.HitScan, definition, source);
+                case WeaponAttackDeliveryMode.Shot:
+                    return definition.defaultShot != null && definition.defaultShot.IsConfigured
+                        ? SelectDelivery(EntityPrimaryAttackRoute.Shot, definition, source)
+                        : EntityPrimaryAttackSelection.None;
+                case WeaponAttackDeliveryMode.Beam:
+                    return SelectDelivery(EntityPrimaryAttackRoute.Beam, definition, source);
+                default:
+                    return EntityPrimaryAttackSelection.None;
+            }
         }
 
         public static EntityPrimaryAttackSelection SelectUnarmed(ESActionConfigKey actionKey)
@@ -91,6 +100,18 @@ namespace ES
                    && actionKey.IsConfigured
                    && source != EntityPrimaryAttackSource.None
                 ? new EntityPrimaryAttackSelection(EntityPrimaryAttackRoute.Action, source)
+                : EntityPrimaryAttackSelection.None;
+        }
+
+        private static EntityPrimaryAttackSelection SelectDelivery(
+            EntityPrimaryAttackRoute route,
+            ItemWeaponSharedData definition,
+            EntityPrimaryAttackSource source)
+        {
+            return definition.fire != null
+                   && definition.fire.enabled
+                   && source != EntityPrimaryAttackSource.None
+                ? new EntityPrimaryAttackSelection(route, source)
                 : EntityPrimaryAttackSelection.None;
         }
     }

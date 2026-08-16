@@ -125,6 +125,40 @@ namespace ES
             hitTagEligibility = new ESHitTagEligibility();
         }
 
+        public bool ValidateDefinition(out string error)
+        {
+            if (!enabled)
+            {
+                error = "ShotDefinition 必须启用。";
+                return false;
+            }
+            if (!Enum.IsDefined(typeof(ShotAimMode), aimMode)
+                || !Enum.IsDefined(typeof(ShotBlockMode), blockMode))
+            {
+                error = "ShotDefinition 的瞄准模式或阻挡模式无效。";
+                return false;
+            }
+            if (launchDelay < 0f || warmupTime < 0f || speed < 0f || maxSpeed < 0f
+                || trackingStartTime < 0f || turnSpeed < 0f || lifeTime <= 0f || radius < 0f)
+            {
+                error = "ShotDefinition 的时间、速度、转向、寿命和半径参数超出合法范围。";
+                return false;
+            }
+            if (hitLayers.value == 0)
+            {
+                error = "ShotDefinition 的命中层不能为空。";
+                return false;
+            }
+            if (aimMode == ShotAimMode.MustHit && !allowMustHit)
+            {
+                error = "必中瞄准模式要求允许必中。";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
         public ShotMotionConfig ToShotMotionConfig(in ItemShotVariableData variable)
         {
             ShotMotionFlags flags = ShotMotionFlags.ClampSpeed;
@@ -209,5 +243,22 @@ namespace ES
             targetOffset = Vector3.zero,
             spreadAngle = 0f
         };
+
+        public bool ValidateDefinition(out string error)
+        {
+            if (speedMultiplier <= 0f || lifeTimeMultiplier <= 0f || radiusMultiplier <= 0f)
+            {
+                error = "Shot 的速度、寿命和半径倍率必须大于零。";
+                return false;
+            }
+            if (launchDelay < 0f || trackingStartTime < 0f || spreadAngle < 0f)
+            {
+                error = "Shot 的可变延迟、追踪开始时间和散射角不能为负数。";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
     }
 }

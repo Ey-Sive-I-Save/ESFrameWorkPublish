@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace ES
 {
@@ -18,6 +19,19 @@ namespace ES
         public int weaponDefinitionRuntimeKey;
         public ESItemInstanceLocation location;
         public uint stateBits;
+        public bool hasWeaponState;
+        public ItemWeaponVariableData weaponState;
+    }
+
+    public enum ESWeaponUseFailure : byte
+    {
+        None = 0,
+        InvalidHandle = 1,
+        MissingWeaponDefinition = 2,
+        Cooldown = 3,
+        Ammo = 4,
+        Durability = 5,
+        Overheated = 6
     }
 
     public readonly struct ESItemInstanceCreateRequest
@@ -94,6 +108,17 @@ namespace ES
                 location = request.location,
                 stateBits = request.stateBits,
             };
+            if (request.weaponDefinitionRuntimeKey > 0
+                && ESRuntimeDataGameCore.Weapons.TryGet(
+                    request.weaponDefinitionRuntimeKey,
+                    out ESWeaponRuntimeData weaponRuntimeData)
+                && weaponRuntimeData != null
+                && weaponRuntimeData.Ready)
+            {
+                record.hasWeaponState = true;
+                record.weaponState = weaponRuntimeData.defaultVariableData;
+                record.weaponState.lastStateUpdateTime = 0f;
+            }
             return TryAdd(record, persistentId, request.itemDefinitionRuntimeKey, request.ownerId, out handle);
         }
 
@@ -191,6 +216,140 @@ namespace ES
             itemDefinitionRuntimeKey = 0;
             weaponDefinitionRuntimeKey = 0;
             return false;
+        }
+
+        public bool TryGetWeaponState(
+            ESInstanceHandle handle,
+            float now,
+            out ItemWeaponVariableData state)
+        {
+            state = default;
+            if (!TryGet(handle, out ESItemInstanceRecord record)
+                || !TryEnsureWeaponState(ref record))
+                return false;
+
+            RefreshWeaponState(ref record.weaponState, record.weaponDefinitionRuntimeKey, now);
+            state = record.weaponState;
+            return TrySet(handle, record);
+        }
+
+        public bool Internal_TrySetWeaponState(
+            ESInstanceHandle handle,
+            in ItemWeaponVariableData state)
+        {
+            if (!TryGet(handle, out ESItemInstanceRecord record)
+                || record.weaponDefinitionRuntimeKey <= 0)
+                return false;
+
+            record.hasWeaponState = true;
+            record.weaponState = state;
+            return TrySet(handle, record);
+        }
+
+        /// <summary>
+        /// 以一个表写事务刷新并消费当前武器实例。定义是只读规则，所有可变结果只写回 itemHandle。
+        /// </summary>
+        public bool TryConsumeWeaponUse(
+            ESInstanceHandle handle,
+            ItemWeaponSharedData definition,
+            float now,
+            out ItemWeaponVariableData state,
+            out ESWeaponUseFailure failure,
+            float cooldownOverride = -1f)
+        {
+            state = default;
+            failure = ESWeaponUseFailure.InvalidHandle;
+            if (definition == null
+                || definition.fire == null
+                || !TryGet(handle, out ESItemInstanceRecord record)
+                || !TryEnsureWeaponState(ref record))
+            {
+                failure = definition == null || definition.fire == null
+                    ? ESWeaponUseFailure.MissingWeaponDefinition
+                    : ESWeaponUseFailure.InvalidHandle;
+                return false;
+            }
+            if (!ESRuntimeDataGameCore.Weapons.TryGet(
+                    record.weaponDefinitionRuntimeKey,
+                    out ESWeaponRuntimeData boundRuntimeData)
+                || boundRuntimeData == null
+                || !boundRuntimeData.Ready
+                || !ReferenceEquals(boundRuntimeData.sharedData, definition))
+            {
+                failure = ESWeaponUseFailure.MissingWeaponDefinition;
+                return false;
+            }
+
+            RefreshWeaponState(ref record.weaponState, record.weaponDefinitionRuntimeKey, now);
+            WeaponFireDefinitionData fire = definition.fire;
+            if (record.weaponState.cooldownLeft > 0f)
+                failure = ESWeaponUseFailure.Cooldown;
+            else if (fire.ammoCost > 0 && record.weaponState.ammo < fire.ammoCost)
+                failure = ESWeaponUseFailure.Ammo;
+            else if (fire.durabilityCost > 0f && record.weaponState.durability < fire.durabilityCost)
+                failure = ESWeaponUseFailure.Durability;
+            else if (fire.maxHeat > 0f && record.weaponState.heat + fire.heatPerUse > fire.maxHeat)
+                failure = ESWeaponUseFailure.Overheated;
+            else
+            {
+                record.weaponState.ammo -= fire.ammoCost;
+                record.weaponState.durability = Mathf.Max(0f, record.weaponState.durability - fire.durabilityCost);
+                record.weaponState.heat = Mathf.Max(0f, record.weaponState.heat + fire.heatPerUse);
+                record.weaponState.cooldownLeft = cooldownOverride >= 0f
+                    ? Mathf.Max(0.01f, cooldownOverride)
+                    : Mathf.Max(
+                        Mathf.Max(0f, definition.cooldown),
+                        Mathf.Max(0.01f, fire.interval));
+                record.weaponState.logicSeed++;
+                if (record.weaponState.logicSeed == int.MinValue)
+                    record.weaponState.logicSeed = 1;
+                failure = ESWeaponUseFailure.None;
+            }
+
+            state = record.weaponState;
+            return TrySet(handle, record) && failure == ESWeaponUseFailure.None;
+        }
+
+        private static bool TryEnsureWeaponState(ref ESItemInstanceRecord record)
+        {
+            if (record.weaponDefinitionRuntimeKey <= 0)
+                return false;
+            if (record.hasWeaponState)
+                return true;
+            if (!ESRuntimeDataGameCore.Weapons.TryGet(
+                    record.weaponDefinitionRuntimeKey,
+                    out ESWeaponRuntimeData runtimeData)
+                || runtimeData == null
+                || !runtimeData.Ready)
+                return false;
+
+            record.hasWeaponState = true;
+            record.weaponState = runtimeData.defaultVariableData;
+            record.weaponState.lastStateUpdateTime = 0f;
+            return true;
+        }
+
+        private static void RefreshWeaponState(
+            ref ItemWeaponVariableData state,
+            int weaponDefinitionRuntimeKey,
+            float now)
+        {
+            float safeNow = Mathf.Max(0f, now);
+            float elapsed = state.lastStateUpdateTime > 0f
+                ? Mathf.Max(0f, safeNow - state.lastStateUpdateTime)
+                : 0f;
+            state.cooldownLeft = Mathf.Max(0f, state.cooldownLeft - elapsed);
+
+            if (elapsed > 0f
+                && ESRuntimeDataGameCore.Weapons.TryGet(
+                    weaponDefinitionRuntimeKey,
+                    out ESWeaponRuntimeData runtimeData)
+                && runtimeData?.sharedData?.fire != null)
+            {
+                float dissipation = Mathf.Max(0f, runtimeData.sharedData.fire.heatDissipationPerSecond);
+                state.heat = Mathf.Max(0f, state.heat - elapsed * dissipation);
+            }
+            state.lastStateUpdateTime = safeNow;
         }
 
         private bool TryAllocatePersistentId(out ulong persistentId)

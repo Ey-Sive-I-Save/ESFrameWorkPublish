@@ -137,4 +137,39 @@ namespace ES
         [InspectorName("法器")]
         Magic = 4
     }
+
+    /// <summary>武器内容分类之外，主攻击实际采用的交付方式。</summary>
+    public enum WeaponAttackDeliveryMode
+    {
+        [InspectorName("动作攻击")]
+        Action = 0,
+
+        [InspectorName("瞬时射线")]
+        HitScan = 1,
+
+        [InspectorName("飞行物")]
+        Shot = 2,
+
+        [InspectorName("持续射束")]
+        Beam = 3
+    }
+
+    /// <summary>一次输入如何驱动一次或多次攻击交付。</summary>
+    public enum WeaponFirePolicy
+    {
+        [InspectorName("单发")]
+        Single = 0,
+
+        [InspectorName("自动连发")]
+        Automatic = 1,
+
+        [InspectorName("点射")]
+        Burst = 2,
+
+        [InspectorName("蓄力")]
+        Charge = 3,
+
+        [InspectorName("持续")]
+        Continuous = 4
+    }
 }

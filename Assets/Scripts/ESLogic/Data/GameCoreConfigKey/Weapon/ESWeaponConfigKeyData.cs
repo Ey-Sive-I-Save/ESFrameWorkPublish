@@ -147,7 +147,9 @@ namespace ES
             int? logicSeed = null,
             ESDataFiller<ItemWeaponSharedData> fillShared = null,
             ESDataFiller<ItemWeaponVariableData> fillVariable = null,
-            ESActionConfigKey primaryAttackAction = null)
+            ESActionConfigKey primaryAttackAction = null,
+            WeaponAttackDeliveryMode? deliveryMode = null,
+            WeaponFirePolicy? firePolicy = null)
         {
             ValidateKey(key, nameof(InjectWithDefaults));
             ESWeaponRuntimeData runtimeData = AcquireRetained(key);
@@ -156,7 +158,7 @@ namespace ES
                 ItemWeaponSharedData ownedShared = runtimeData.PrepareDefaultSharedData();
                 ResolveDefaults(
                     ownedShared, null,
-                    weaponKind, primaryAttackAction, defaultShot, hitRadius, cooldown,
+                    weaponKind, deliveryMode, firePolicy, primaryAttackAction, defaultShot, hitRadius, cooldown,
                     durability, cooldownLeft, ammo, logicSeed,
                     fillShared, fillVariable,
                     out ItemWeaponSharedData sharedData, out ItemWeaponVariableData resolvedVariableData);
@@ -191,7 +193,9 @@ namespace ES
             int? logicSeed = null,
             ESDataFiller<ItemWeaponSharedData> fillShared = null,
             ESDataFiller<ItemWeaponVariableData> fillVariable = null,
-            ESActionConfigKey primaryAttackAction = null)
+            ESActionConfigKey primaryAttackAction = null,
+            WeaponAttackDeliveryMode? deliveryMode = null,
+            WeaponFirePolicy? firePolicy = null)
         {
             runtimeKey = 0;
             if (key == null || !key.IsConfigured)
@@ -204,7 +208,7 @@ namespace ES
                 ItemWeaponSharedData ownedShared = runtimeData.PrepareDefaultSharedData();
                 ResolveDefaults(
                     ownedShared, null,
-                    weaponKind, primaryAttackAction, defaultShot, hitRadius, cooldown,
+                    weaponKind, deliveryMode, firePolicy, primaryAttackAction, defaultShot, hitRadius, cooldown,
                     durability, cooldownLeft, ammo, logicSeed,
                     fillShared, fillVariable,
                     out ItemWeaponSharedData sharedData, out ItemWeaponVariableData resolvedVariableData);
@@ -238,6 +242,8 @@ namespace ES
         {
             if (!sharedData.ValidateDefinition(out string validationError))
                 throw new InvalidOperationException("WeaponDefinition 校验失败：" + validationError);
+            if (!sharedData.ValidateInitialState(defaultVariableData, out string stateValidationError))
+                throw new InvalidOperationException("WeaponVariable 校验失败：" + stateValidationError);
 
             string keyName = ESConfigKeyMatch.Describe(key.EnumKeyInt, key.StringKey);
             runtimeData.keyName = keyName;
@@ -254,6 +260,8 @@ namespace ES
             ItemWeaponSharedData sharedData,
             ItemWeaponVariableData? variableData,
             ItemWeaponKind? weaponKind,
+            WeaponAttackDeliveryMode? deliveryMode,
+            WeaponFirePolicy? firePolicy,
             ESActionConfigKey primaryAttackAction,
             ESShotConfigKey defaultShot,
             float? hitRadius,
@@ -271,6 +279,8 @@ namespace ES
             resolvedVariable = variableData ?? ItemWeaponVariableData.Default;
 
             if (weaponKind.HasValue) resolvedShared.weaponKind = weaponKind.Value;
+            if (deliveryMode.HasValue) resolvedShared.deliveryMode = deliveryMode.Value;
+            if (firePolicy.HasValue) resolvedShared.firePolicy = firePolicy.Value;
             if (primaryAttackAction != null) resolvedShared.primaryAttackAction = primaryAttackAction;
             if (defaultShot != null) resolvedShared.defaultShot = defaultShot;
             if (hitRadius.HasValue) resolvedShared.hitRadius = hitRadius.Value;

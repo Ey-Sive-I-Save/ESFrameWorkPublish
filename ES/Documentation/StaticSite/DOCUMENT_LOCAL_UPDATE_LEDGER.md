@@ -423,6 +423,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：未运行 Unity Editor 编译、ReloadDomain、Unity Test Runner、Profiler、Player 或 IL2CPP；当前最高证据等级为 S2。
 - **HTML 目标**：后续在 `#runtime-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-012：武器实例状态与攻击交付链
+
+- **源码路径**：Shot/Weapon ConfigKey、Item 定义与实例表、Entity 主攻击选择、射击命中链、装备销毁清理和定向测试。
+- **规范与证据**：武器定义保持只读规则；弹药、耐久、热量、冷却和逻辑种子写回物品实例；主攻击显式区分 Action、HitScan、Shot 与 Beam。
+- **完成分析**：定义身份、实例可变状态、攻击路由和装备生命周期属于同一运行时事务边界，避免共享定义被实例状态污染。
+- **回归状态**：目标项目曾在当前批次内容下完成 S2 静态构建；16 个目标文件严格 UTF-8 通过。
+- **已知缺口**：随后完整工作树复跑被非本批 `ESGlobalResToolsSupportConfig.cs` 并行语法中间态阻断；销毁兜底缺少直接 `DestroyImmediate` 测试；未运行 Unity Editor、ReloadDomain、Test Runner、PlayMode、Player 或 IL2CPP。
+- **HTML 目标**：后续在 `#runtime-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

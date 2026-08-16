@@ -21,7 +21,9 @@ namespace ES
         MissingWeaponConfig = 11,
         InvalidTagDefinition = 12,
         InvalidAttributeValues = 13,
-        MissingItemConfigKey = 14
+        MissingItemConfigKey = 14,
+        InvalidShotConfig = 15,
+        MissingShotPrefab = 16
     }
 
     [ESCreatePath("数据信息", "物品数据信息")]
@@ -164,11 +166,15 @@ namespace ES
                 case ItemShotDataBlock shot:
                     if (shot.sharedData == null) return ESItemDataValidationCode.MissingSharedData;
                     if (shot.key == null || !shot.key.IsConfigured) return ESItemDataValidationCode.MissingGameCoreKey;
+                    if (!shot.sharedData.ValidateDefinition(out _)) return ESItemDataValidationCode.InvalidShotConfig;
+                    if (!shot.initialState.ValidateDefinition(out _)) return ESItemDataValidationCode.InvalidShotConfig;
+                    if (baseConfig.prefabKey == null || !baseConfig.prefabKey.IsConfigured) return ESItemDataValidationCode.MissingShotPrefab;
                     break;
                 case ItemWeaponDataBlock weapon:
                     if (weapon.sharedData == null) return ESItemDataValidationCode.MissingSharedData;
                     if (weapon.key == null || !weapon.key.IsConfigured) return ESItemDataValidationCode.MissingGameCoreKey;
                     if (!weapon.sharedData.ValidateDefinition(out _)) return ESItemDataValidationCode.MissingWeaponConfig;
+                    if (!weapon.sharedData.ValidateInitialState(weapon.initialState, out _)) return ESItemDataValidationCode.MissingWeaponConfig;
                     break;
                 case ItemDoorDataBlock door when door.sharedData == null:
                 case ItemTrapDataBlock trap when trap.sharedData == null:
@@ -188,6 +194,8 @@ namespace ES
                 case ESItemDataValidationCode.Valid: return "配置有效。";
                 case ESItemDataValidationCode.MissingBusinessKey: return "缺少 Item 业务 Key（SoDataInfo.KeyName）。";
                 case ESItemDataValidationCode.MissingItemConfigKey: return "缺少正式 Item ConfigKey；KeyName 不能作为 GameCore 身份。";
+                case ESItemDataValidationCode.InvalidShotConfig: return "Shot 逻辑配置无效。";
+                case ESItemDataValidationCode.MissingShotPrefab: return "Shot 必须配置可由资源表解析的 Prefab Key。";
                 case ESItemDataValidationCode.MissingBaseConfig: return "缺少基础配置 BaseConfig。";
                 case ESItemDataValidationCode.ItemKindNotSelected: return "尚未选择 ItemKind。";
                 case ESItemDataValidationCode.MissingInteractConfig: return "缺少通用交互配置。";
@@ -585,6 +593,12 @@ namespace ES
             {
                 if (shot.key == null || !shot.key.IsConfigured || shot.sharedData == null)
                     throw new System.InvalidOperationException("Shot 投影配置不完整：" + info.name);
+                if (!shot.sharedData.ValidateDefinition(out string shotValidationError))
+                    throw new System.InvalidOperationException("ShotDefinition 校验失败：" + shotValidationError + " | " + info.name);
+                if (!shot.initialState.ValidateDefinition(out string variableValidationError))
+                    throw new System.InvalidOperationException("ShotVariable 校验失败：" + variableValidationError + " | " + info.name);
+                if (info.baseConfig == null || info.baseConfig.prefabKey == null || !info.baseConfig.prefabKey.IsConfigured)
+                    throw new System.InvalidOperationException("Shot 必须配置有效 Prefab Key：" + info.name);
                 if (ESShotGameCoreTable.Table.TryGet(shot.key, out ESShotRuntimeData existing)
                     && !object.ReferenceEquals(existing.soSource, info))
                 {
@@ -599,6 +613,8 @@ namespace ES
                     throw new System.InvalidOperationException("Weapon 投影配置不完整：" + info.name);
                 if (!weapon.sharedData.ValidateDefinition(out string validationError))
                     throw new System.InvalidOperationException("WeaponDefinition 校验失败：" + validationError + " | " + info.name);
+                if (!weapon.sharedData.ValidateInitialState(weapon.initialState, out string stateValidationError))
+                    throw new System.InvalidOperationException("WeaponVariable 校验失败：" + stateValidationError + " | " + info.name);
                 if (ESWeaponGameCoreTable.Table.TryGet(weapon.key, out ESWeaponRuntimeData existing)
                     && !object.ReferenceEquals(existing.soSource, info))
                 {
@@ -626,6 +642,16 @@ namespace ES
                 ItemShotDataBlock block = info.kindData as ItemShotDataBlock;
                 if (block == null)
                     throw new System.InvalidOperationException("Shot 缺少激活配置块：" + info.name);
+                if (block.key == null || !block.key.IsConfigured)
+                    throw new System.InvalidOperationException("Shot 缺少有效 ConfigKey：" + info.name);
+                if (block.sharedData == null)
+                    throw new System.InvalidOperationException("ShotDefinition 缺少 SharedData：" + info.name);
+                if (!block.sharedData.ValidateDefinition(out string validationError))
+                    throw new System.InvalidOperationException("ShotDefinition 校验失败：" + validationError + " | " + info.name);
+                if (!block.initialState.ValidateDefinition(out string variableValidationError))
+                    throw new System.InvalidOperationException("ShotVariable 校验失败：" + variableValidationError + " | " + info.name);
+                if (info.baseConfig.prefabKey == null || !info.baseConfig.prefabKey.IsConfigured)
+                    throw new System.InvalidOperationException("Shot 必须配置有效 Prefab Key：" + info.name);
                 if (Table.TryGet(block.key, out ESShotRuntimeData existing))
                 {
                     if (object.ReferenceEquals(existing.soSource, info)) return;
@@ -685,6 +711,8 @@ namespace ES
                         throw new System.InvalidOperationException("WeaponDefinition 缺少 SharedData | " + info.name);
                     if (!block.sharedData.ValidateDefinition(out string validationError))
                         throw new System.InvalidOperationException("WeaponDefinition 校验失败：" + validationError + " | " + info.name);
+                    if (!block.sharedData.ValidateInitialState(block.initialState, out string stateValidationError))
+                        throw new System.InvalidOperationException("WeaponVariable 校验失败：" + stateValidationError + " | " + info.name);
 
                     data.keyName = ESConfigKeyMatch.Describe(block.key.EnumKeyInt, block.key.StringKey);
                     data.displayName = ESItemGameCoreDisplayName.Get(info);

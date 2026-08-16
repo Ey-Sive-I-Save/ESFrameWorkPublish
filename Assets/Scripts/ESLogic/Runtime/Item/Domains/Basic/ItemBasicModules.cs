@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
@@ -323,12 +324,20 @@ namespace ES
         [NonSerialized] private IItemShotTickPolicy _tickPolicy;
         [NonSerialized] private ItemMotionModule _motionModule;
         [NonSerialized] private Transform _targetTransform;
+        [NonSerialized] private Transform _targetEntityTransform;
         [NonSerialized] private Vector3 _externalMotionVelocity;
         [NonSerialized] private bool _hasSubmittedMotionResult;
         [NonSerialized] private int _runtimeDefinitionKey;
         [NonSerialized] private ESInstanceHandle _runtimeInstanceHandle;
+        [NonSerialized] private ESShotLaunchContext _launchContext;
+        [NonSerialized] private ESAssetConfigPayloadLease<GameObject> _prefabLease;
+        [NonSerialized] private HashSet<int> _resolvedColliderIds;
+        [NonSerialized] private bool _targetHitResolved;
+        [NonSerialized] private bool _lifecycleActive;
 
         public ESInstanceHandle RuntimeInstanceHandle => _runtimeInstanceHandle;
+        public ESShotLaunchContext LaunchContext => _launchContext;
+        public event System.Action<ESShotLifecycleEvent> LifecycleEvent;
 
         public override void Start()
         {
@@ -340,14 +349,16 @@ namespace ES
             ResolveRuntimeDefinitionKey(MyCore != null ? MyCore.prefabDefinition : null);
         }
 
-        public void Launch(Vector3 direction)
+        public bool Launch(Vector3 direction)
         {
-            if (MyCore == null)
-                return;
+            if (MyCore == null || state.launched || _lifecycleActive)
+                return false;
 
             Vector3 dir = direction.sqrMagnitude > 0.0001f ? direction.normalized : MyCore.transform.forward;
             dir = ApplySpread(dir);
             _targetTransform = null;
+            _targetEntityTransform = null;
+            _targetHitResolved = false;
             _externalMotionVelocity = Vector3.zero;
             _hasSubmittedMotionResult = false;
             state = new ShotMotionState
@@ -363,15 +374,24 @@ namespace ES
                 launched = true
             };
             if (!TryRegisterRuntimeInstance())
+            {
                 state.launched = false;
+                return false;
+            }
+
+            _lifecycleActive = true;
+            PublishLifecycle(ESShotLifecycleKind.Launched);
+            return true;
         }
 
-        public void LaunchTo(Vector3 targetPosition)
+        public bool LaunchTo(Vector3 targetPosition)
         {
-            if (MyCore == null)
-                return;
+            if (MyCore == null || state.launched || _lifecycleActive)
+                return false;
 
             _targetTransform = null;
+            _targetEntityTransform = null;
+            _targetHitResolved = false;
             _externalMotionVelocity = Vector3.zero;
             _hasSubmittedMotionResult = false;
             Vector3 resolvedTargetPosition = targetPosition + variableData.targetOffset;
@@ -391,18 +411,25 @@ namespace ES
                 launched = true
             };
             if (!TryRegisterRuntimeInstance())
+            {
                 state.launched = false;
+                return false;
+            }
+
+            _lifecycleActive = true;
+            PublishLifecycle(ESShotLifecycleKind.Launched);
+            return true;
         }
 
-        public void LaunchTo(Transform target)
+        public bool LaunchTo(Transform target)
         {
-            LaunchTo(target, aimMode == ShotAimMode.MustHit);
+            return LaunchTo(target, aimMode == ShotAimMode.MustHit);
         }
 
-        public void LaunchTo(Transform target, bool mustHit)
+        public bool LaunchTo(Transform target, bool mustHit)
         {
-            if (target == null)
-                return;
+            if (target == null || state.launched || _lifecycleActive)
+                return false;
 
             _targetTransform = target;
             if (mustHit && sharedData.allowMustHit)
@@ -410,8 +437,47 @@ namespace ES
             else if (aimMode == ShotAimMode.Free)
                 aimMode = ShotAimMode.Target;
 
-            LaunchTo(target.position);
+            bool launched = LaunchTo(target.position);
             _targetTransform = target;
+            Entity targetEntity = target.GetComponentInParent<Entity>();
+            _targetEntityTransform = targetEntity != null ? targetEntity.transform : null;
+            return launched;
+        }
+
+        public void Internal_InitializeSpawn(
+            ESShotRuntimeData runtimeData,
+            int runtimeDefinitionKey,
+            ESAssetConfigPayloadLease<GameObject> prefabLease,
+            in ESShotLaunchContext context)
+        {
+            if (runtimeData == null || runtimeData.sharedData == null)
+                throw new System.ArgumentNullException(nameof(runtimeData));
+            if (runtimeDefinitionKey <= 0)
+                throw new System.ArgumentOutOfRangeException(nameof(runtimeDefinitionKey));
+            if (prefabLease == null || prefabLease.IsDisposed || prefabLease.Asset == null)
+                throw new System.ArgumentException("Shot spawn requires a live prefab lease.", nameof(prefabLease));
+
+            ReleasePrefabLease();
+            MyCore?.BindDefinition(runtimeData.soSource);
+            ApplyShotData(runtimeData.sharedData, runtimeData.defaultVariableData);
+            _runtimeDefinitionKey = runtimeDefinitionKey;
+            _launchContext = context;
+            _prefabLease = prefabLease;
+            (_resolvedColliderIds ??= new HashSet<int>()).Clear();
+            _targetEntityTransform = null;
+            _targetHitResolved = false;
+        }
+
+        public void Internal_Stop(bool publishStopped = true)
+        {
+            if (state.launched)
+            {
+                state.launched = false;
+                UnregisterRuntimeInstance();
+                if (publishStopped)
+                    PublishLifecycle(ESShotLifecycleKind.Stopped);
+            }
+            RequestPoolReturn();
         }
 
         public void ApplyShotData(ItemShotSharedData shared, in ItemShotVariableData variable)
@@ -473,6 +539,12 @@ namespace ES
             if (!_tickPolicy.ShouldTick(state, Time.frameCount))
                 return;
 
+            if (aimMode == ShotAimMode.Scan)
+            {
+                TickScan(deltaTime);
+                return;
+            }
+
             RefreshTargetPosition();
             ItemMotionModule motionModule = ResolveMotionModule();
             if (_hasSubmittedMotionResult
@@ -482,7 +554,11 @@ namespace ES
             latestResult = ShotMotionSolver.Step(ref state, config, deltaTime);
             ApplyExternalMotion(ref state, ref latestResult, motionModule, deltaTime);
             TryBuildHitCandidate(ref latestResult);
+            if (!state.launched)
+                return;
             TryBuildMustHitCandidate(ref latestResult);
+            if (latestResult.hasHitCandidate && !ResolveHit(latestResult.hitCandidate, ref latestResult))
+                return;
 
             motionModule?.SetPendingShotResult(latestResult);
             _hasSubmittedMotionResult = motionModule != null;
@@ -491,23 +567,49 @@ namespace ES
             {
                 state.launched = false;
                 UnregisterRuntimeInstance();
+                PublishLifecycle(latestResult.kind == ShotMotionKind.Arrived
+                    ? ESShotLifecycleKind.Arrived
+                    : ESShotLifecycleKind.Expired);
+                RequestPoolReturn();
             }
         }
 
         public void OnPoolSpawned()
         {
             UnregisterRuntimeInstance();
+            ReleasePrefabLease();
+            _launchContext = default;
+            _resolvedColliderIds?.Clear();
+            _targetEntityTransform = null;
+            _targetHitResolved = false;
+            _lifecycleActive = false;
             ResolveRuntimeDefinitionKey(MyCore != null ? MyCore.prefabDefinition : null);
         }
 
         public void OnPoolDespawned()
         {
+            bool hadSpawn = _lifecycleActive;
+            bool wasLaunched = hadSpawn && state.launched;
             UnregisterRuntimeInstance();
+            if (wasLaunched)
+            {
+                state.launched = false;
+                PublishLifecycle(ESShotLifecycleKind.Stopped);
+            }
             state = default;
             latestResult = default;
             _targetTransform = null;
+            _targetEntityTransform = null;
             _externalMotionVelocity = Vector3.zero;
             _hasSubmittedMotionResult = false;
+            if (hadSpawn)
+                PublishLifecycle(ESShotLifecycleKind.Despawned);
+            _lifecycleActive = false;
+            ReleasePrefabLease();
+            _launchContext = default;
+            _resolvedColliderIds?.Clear();
+            _targetHitResolved = false;
+            LifecycleEvent = null;
         }
 
         private void ResolveRuntimeDefinitionKey(ItemDataInfo itemData)
@@ -570,9 +672,6 @@ namespace ES
 
         private void TryBuildHitCandidate(ref ShotMotionResult result)
         {
-            if (blockMode == ShotBlockMode.None)
-                return;
-
             if (result.kind == ShotMotionKind.Delayed || result.kind == ShotMotionKind.Warmup)
                 return;
 
@@ -594,15 +693,30 @@ namespace ES
             if (_hitSolver.IsOverflow)
                 hitOverflowCount++;
 
-            ShotHitCandidate hit = _hitResults[0];
-            hit.incomingVelocity = result.velocity;
-            result.hasHitCandidate = true;
-            result.hitCandidate = hit;
+            for (int index = 0; index < count && state.launched; index++)
+            {
+                ShotHitCandidate hit = _hitResults[index];
+                if (hit.collider == null || IsOwnCollider(hit.collider))
+                    continue;
+                int colliderId = hit.collider.GetInstanceID();
+                if (_resolvedColliderIds != null && _resolvedColliderIds.Contains(colliderId))
+                    continue;
+
+                hit.incomingVelocity = result.velocity;
+                result.hasHitCandidate = true;
+                result.hitCandidate = hit;
+                if (!ResolveHit(hit, ref result))
+                    return;
+                result.hasHitCandidate = false;
+            }
         }
 
         private void TryBuildMustHitCandidate(ref ShotMotionResult result)
         {
-            if (aimMode != ShotAimMode.MustHit || result.hasHitCandidate || result.kind != ShotMotionKind.Arrived)
+            if (aimMode != ShotAimMode.MustHit
+                || _targetHitResolved
+                || result.hasHitCandidate
+                || result.kind != ShotMotionKind.Arrived)
                 return;
 
             Collider targetCollider = _targetTransform != null ? _targetTransform.GetComponentInChildren<Collider>() : null;
@@ -617,6 +731,137 @@ namespace ES
                 layer = targetCollider != null ? targetCollider.gameObject.layer : 0,
                 isTrigger = targetCollider != null && targetCollider.isTrigger
             };
+        }
+
+        private bool ResolveHit(in ShotHitCandidate hit, ref ShotMotionResult result)
+        {
+            IESShotHitResolver resolver = _launchContext.hitResolver ?? ESDefaultShotHitResolver.Instance;
+            ESShotHitDecision decision = resolver.Resolve(_launchContext, sharedData, hit);
+            if (IsTargetCollider(hit.collider))
+                _targetHitResolved = true;
+            PublishLifecycle(ESShotLifecycleKind.Hit, hit, decision);
+
+            if (decision != ESShotHitDecision.Stop && hit.collider != null)
+                (_resolvedColliderIds ??= new HashSet<int>()).Add(hit.collider.GetInstanceID());
+            if (decision != ESShotHitDecision.Stop)
+                return true;
+
+            result.kind = ShotMotionKind.Blocked;
+            result.currentPosition = hit.point;
+            state.currentPosition = hit.point;
+            state.launched = false;
+            UnregisterRuntimeInstance();
+            PublishLifecycle(ESShotLifecycleKind.Stopped, hit, decision);
+            RequestPoolReturn();
+            return false;
+        }
+
+        private void TickScan(float deltaTime)
+        {
+            state.elapsedTime += Mathf.Max(0f, deltaTime);
+            float launchDelay = Mathf.Max(0f, config.launchDelay);
+            float warmupEnd = launchDelay + Mathf.Max(0f, config.warmupTime);
+            if (state.elapsedTime < launchDelay)
+            {
+                SetScanWaitingResult(ShotMotionKind.Delayed);
+                return;
+            }
+            if (state.elapsedTime < warmupEnd)
+            {
+                SetScanWaitingResult(ShotMotionKind.Warmup);
+                return;
+            }
+
+            ExecuteScan(state.direction);
+        }
+
+        private void SetScanWaitingResult(ShotMotionKind kind)
+        {
+            state.previousPosition = state.currentPosition;
+            latestResult = new ShotMotionResult
+            {
+                kind = kind,
+                previousPosition = state.previousPosition,
+                currentPosition = state.currentPosition,
+                currentRotation = state.currentRotation,
+                velocity = state.velocity,
+                elapsedTime = state.elapsedTime,
+                remainingDistance = 0f
+            };
+        }
+
+        private void ExecuteScan(Vector3 direction)
+        {
+            float distance = Mathf.Max(0.01f, config.speed * Mathf.Max(0.01f, config.maxLifetime));
+            latestResult = new ShotMotionResult
+            {
+                kind = ShotMotionKind.Moving,
+                previousPosition = MyCore.transform.position,
+                currentPosition = MyCore.transform.position + direction * distance,
+                currentRotation = MyCore.transform.rotation,
+                velocity = direction * Mathf.Max(0f, config.speed),
+                elapsedTime = state.elapsedTime,
+                remainingDistance = distance
+            };
+            state.currentPosition = latestResult.currentPosition;
+            TryBuildHitCandidate(ref latestResult);
+            if (!state.launched)
+                return;
+
+            state.launched = false;
+            latestResult.kind = ShotMotionKind.Arrived;
+            latestResult.remainingDistance = 0f;
+            UnregisterRuntimeInstance();
+            PublishLifecycle(ESShotLifecycleKind.Arrived);
+            RequestPoolReturn();
+        }
+
+        private bool IsOwnCollider(Collider collider)
+        {
+            if (collider == null || MyCore == null)
+                return false;
+            Transform hitTransform = collider.transform;
+            return hitTransform == MyCore.transform || hitTransform.IsChildOf(MyCore.transform);
+        }
+
+        private bool IsTargetCollider(Collider collider)
+        {
+            if (collider == null || _targetTransform == null)
+                return false;
+
+            Transform hitTransform = collider.transform;
+            Transform targetRoot = _targetEntityTransform != null
+                ? _targetEntityTransform
+                : _targetTransform;
+            return hitTransform == targetRoot
+                || hitTransform.IsChildOf(targetRoot)
+                || (_targetEntityTransform == null && _targetTransform.IsChildOf(hitTransform));
+        }
+
+        private void PublishLifecycle(
+            ESShotLifecycleKind kind,
+            in ShotHitCandidate hit = default,
+            ESShotHitDecision decision = ESShotHitDecision.Ignore)
+        {
+            var evt = new ESShotLifecycleEvent(kind, this, _launchContext, latestResult, hit, decision);
+            try { LifecycleEvent?.Invoke(evt); }
+            catch (System.Exception exception) { Debug.LogException(exception, MyCore); }
+            try { _launchContext.lifecycleObserver?.Invoke(evt); }
+            catch (System.Exception exception) { Debug.LogException(exception, MyCore); }
+        }
+
+        private void RequestPoolReturn()
+        {
+            ESPooledGameObject pooled = MyCore != null ? MyCore.GetComponent<ESPooledGameObject>() : null;
+            if (pooled != null && pooled.IsSpawned)
+                pooled.RequestPushToPool();
+        }
+
+        private void ReleasePrefabLease()
+        {
+            ESAssetConfigPayloadLease<GameObject> ownedLease = _prefabLease;
+            _prefabLease = null;
+            ownedLease?.Dispose();
         }
 
         private void RefreshTargetPosition()

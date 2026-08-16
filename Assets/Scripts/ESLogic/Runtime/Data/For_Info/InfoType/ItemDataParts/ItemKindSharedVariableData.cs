@@ -116,7 +116,14 @@ namespace ES
     public sealed class ItemWeaponSharedData
     {
         [LabelText("武器类型")]
+        [Tooltip("只描述内容分类，不决定攻击走 Action、射线、飞行物或射束。")]
         public ItemWeaponKind weaponKind;
+
+        [LabelText("攻击交付模式")]
+        public WeaponAttackDeliveryMode deliveryMode;
+
+        [LabelText("发射策略")]
+        public WeaponFirePolicy firePolicy;
 
         [LabelText("普攻 Action")]
         [Tooltip("近战武器的默认普攻 Action。为空时可由角色或当前装配槽位提供回退；远程 WeaponFire 不读取该字段。")]
@@ -142,6 +149,8 @@ namespace ES
         public static ItemWeaponSharedData Default => new ItemWeaponSharedData
         {
             weaponKind = ItemWeaponKind.None,
+            deliveryMode = WeaponAttackDeliveryMode.Action,
+            firePolicy = WeaponFirePolicy.Single,
             primaryAttackAction = new ESActionConfigKey(),
             defaultShot = new ESShotConfigKey(),
             hitRadius = 0.2f,
@@ -154,6 +163,8 @@ namespace ES
         internal void ResetToDefaults()
         {
             weaponKind = ItemWeaponKind.None;
+            deliveryMode = WeaponAttackDeliveryMode.Action;
+            firePolicy = WeaponFirePolicy.Single;
             primaryAttackAction = new ESActionConfigKey();
             defaultShot = new ESShotConfigKey();
             hitRadius = 0.2f;
@@ -164,9 +175,67 @@ namespace ES
 
         public bool ValidateDefinition(out string error)
         {
+            if (!Enum.IsDefined(typeof(WeaponAttackDeliveryMode), deliveryMode))
+            {
+                error = "WeaponDefinition 的攻击交付模式无效。";
+                return false;
+            }
+
+            if (!Enum.IsDefined(typeof(WeaponFirePolicy), firePolicy))
+            {
+                error = "WeaponDefinition 的发射策略无效。";
+                return false;
+            }
+
             if (fire == null)
             {
                 error = "正式 WeaponDefinition 缺少射击定义。";
+                return false;
+            }
+
+            if (deliveryMode == WeaponAttackDeliveryMode.Action
+                && firePolicy != WeaponFirePolicy.Single)
+            {
+                error = "Action 交付模式的连发、蓄力与持续语义应由 Action 定义表达，WeaponFirePolicy 必须为 Single。";
+                return false;
+            }
+
+            if (deliveryMode != WeaponAttackDeliveryMode.Action && !fire.enabled)
+            {
+                error = "非 Action 交付模式必须启用射击定义。";
+                return false;
+            }
+
+            if (deliveryMode == WeaponAttackDeliveryMode.Beam
+                && firePolicy != WeaponFirePolicy.Continuous)
+            {
+                error = "Beam 交付模式必须使用 Continuous 发射策略。";
+                return false;
+            }
+
+            if (firePolicy == WeaponFirePolicy.Burst
+                && (fire.burstCount < 2 || fire.burstInterval < 0.01f))
+            {
+                error = "Burst 发射策略必须至少 2 发，且点射间隔不小于 0.01 秒。";
+                return false;
+            }
+
+            if (firePolicy == WeaponFirePolicy.Charge && fire.chargeTime < 0f)
+            {
+                error = "Charge 发射策略的蓄力时间不能小于零。";
+                return false;
+            }
+
+            if (firePolicy == WeaponFirePolicy.Continuous && fire.continuousInterval < 0.01f)
+            {
+                error = "Continuous 发射策略的持续结算间隔不能小于 0.01 秒。";
+                return false;
+            }
+
+            if (deliveryMode == WeaponAttackDeliveryMode.Shot
+                && (defaultShot == null || !defaultShot.IsConfigured))
+            {
+                error = "Shot 交付模式必须配置默认飞行物 Key。";
                 return false;
             }
 
@@ -180,6 +249,23 @@ namespace ES
             }
 
             return recoil.Validate(out error);
+        }
+
+        public bool ValidateInitialState(in ItemWeaponVariableData state, out string error)
+        {
+            if (state.durability < 0f || state.cooldownLeft < 0f || state.ammo < 0 || state.heat < 0f)
+            {
+                error = "Weapon 初始耐久、冷却、弹药和热量不能为负数。";
+                return false;
+            }
+            if (fire != null && fire.maxHeat > 0f && state.heat > fire.maxHeat)
+            {
+                error = "Weapon 初始热量不能超过最大热量。";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
         }
     }
 
@@ -204,6 +290,33 @@ namespace ES
         [LabelText("必须在瞄准中")]
         public bool requiresAiming = true;
 
+        [LabelText("点射发数"), MinValue(2)]
+        public int burstCount = 3;
+
+        [LabelText("点射内间隔（秒）"), MinValue(0.01f)]
+        public float burstInterval = 0.08f;
+
+        [LabelText("蓄力时间（秒）"), MinValue(0f)]
+        public float chargeTime = 0.5f;
+
+        [LabelText("持续结算间隔（秒）"), MinValue(0.01f)]
+        public float continuousInterval = 0.1f;
+
+        [LabelText("单次弹药消耗"), MinValue(0)]
+        public int ammoCost = 0;
+
+        [LabelText("单次耐久消耗"), MinValue(0f)]
+        public float durabilityCost = 0f;
+
+        [LabelText("单次热量"), MinValue(0f)]
+        public float heatPerUse = 0f;
+
+        [LabelText("最大热量"), MinValue(0f)]
+        public float maxHeat = 0f;
+
+        [LabelText("每秒散热"), MinValue(0f)]
+        public float heatDissipationPerSecond = 0f;
+
         public static WeaponFireDefinitionData Default => new WeaponFireDefinitionData();
 
         public bool Validate(out string error)
@@ -217,6 +330,25 @@ namespace ES
             if (distance < 0.5f)
             {
                 error = "WeaponDefinition 的射击距离必须不小于 0.5。";
+                return false;
+            }
+
+            if (burstCount < 0 || burstInterval < 0f || chargeTime < 0f || continuousInterval < 0f)
+            {
+                error = "WeaponDefinition 的策略参数不能为负数。";
+                return false;
+            }
+
+            if (ammoCost < 0 || durabilityCost < 0f || heatPerUse < 0f
+                || maxHeat < 0f || heatDissipationPerSecond < 0f)
+            {
+                error = "WeaponDefinition 的弹药、耐久和热量参数不能为负数。";
+                return false;
+            }
+
+            if (heatPerUse > 0f && maxHeat <= 0f)
+            {
+                error = "启用单次热量时必须配置大于零的最大热量。";
                 return false;
             }
 
@@ -292,6 +424,12 @@ namespace ES
         [LabelText("当前装填")]
         public int ammo;
 
+        [LabelText("当前热量")]
+        public float heat;
+
+        [NonSerialized]
+        public float lastStateUpdateTime;
+
         [LabelText("逻辑随机种子")]
         public int logicSeed;
 
@@ -300,6 +438,8 @@ namespace ES
             durability = 1f,
             cooldownLeft = 0f,
             ammo = 0,
+            heat = 0f,
+            lastStateUpdateTime = 0f,
             logicSeed = 0
         };
     }

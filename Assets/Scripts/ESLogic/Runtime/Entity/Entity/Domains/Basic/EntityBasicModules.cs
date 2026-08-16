@@ -610,6 +610,7 @@ namespace ES
             }
 
             TickWeaponFusion(Time.deltaTime);
+            TickWeaponFirePolicy();
             if (actionRuntime != null && actionRuntime.IsRunning)
                 actionRuntime.Tick(Time.deltaTime);
         }
@@ -650,6 +651,12 @@ namespace ES
 
         [NonSerialized] private float _lastRecoilWarnTime = -999f;
         [NonSerialized] private float _lastWeaponDefinitionWarnTime = -999f;
+        [NonSerialized] private RaycastHit[] _weaponFireHits;
+        [NonSerialized] private bool _weaponTriggerHeld;
+        [NonSerialized] private bool _chargeReleaseReady;
+        [NonSerialized] private float _chargeStartedAt = -1f;
+        [NonSerialized] private int _pendingBurstShots;
+        [NonSerialized] private float _nextPolicyFireAt = -1f;
         [NonSerialized] private int _recoilBurstShotCount;
         [NonSerialized] private int _recoilBurstWeaponIndex = int.MinValue;
         [NonSerialized] private float _recoilBurstLastShotTime = -999f;
@@ -689,6 +696,9 @@ namespace ES
             public readonly ESActionConfigKey actionKey;
             public readonly ESWeaponConfigKey primaryWeaponKey;
             public readonly ESWeaponConfigKey secondaryWeaponKey;
+            public readonly ESInstanceHandle consumedItemHandle;
+            public readonly ItemWeaponVariableData previousWeaponState;
+            public readonly bool hasWeaponConsumption;
             public readonly bool started;
 
             public PendingPrimaryAttack(
@@ -697,6 +707,9 @@ namespace ES
                 ESActionConfigKey actionKey,
                 ESWeaponConfigKey primaryWeaponKey,
                 ESWeaponConfigKey secondaryWeaponKey,
+                ESInstanceHandle consumedItemHandle = default,
+                ItemWeaponVariableData previousWeaponState = default,
+                bool hasWeaponConsumption = false,
                 bool started = false)
             {
                 this.attackId = attackId;
@@ -704,6 +717,9 @@ namespace ES
                 this.actionKey = actionKey;
                 this.primaryWeaponKey = primaryWeaponKey;
                 this.secondaryWeaponKey = secondaryWeaponKey;
+                this.consumedItemHandle = consumedItemHandle;
+                this.previousWeaponState = previousWeaponState;
+                this.hasWeaponConsumption = hasWeaponConsumption;
                 this.started = started;
             }
 
@@ -714,6 +730,9 @@ namespace ES
                     actionKey,
                     primaryWeaponKey,
                     secondaryWeaponKey,
+                    consumedItemHandle,
+                    previousWeaponState,
+                    hasWeaponConsumption,
                     true);
         }
 
@@ -733,10 +752,61 @@ namespace ES
         public string lastPrimaryAttackFailureReason;
 
         private const float RecoilWarnInterval = 2f;
+        private const int InitialWeaponFireHitCapacity = 16;
+        private const int MaximumWeaponFireHitCapacity = 256;
 
         public void TriggerAttack()
         {
             TryExecutePrimaryAttack();
+        }
+
+        public bool BeginPrimaryAttack()
+        {
+            if (_weaponTriggerHeld)
+                return false;
+
+            _weaponTriggerHeld = true;
+            _chargeReleaseReady = false;
+            _chargeStartedAt = -1f;
+            if (TryResolveCurrentWeaponDefinition(out ItemWeaponSharedData definition)
+                && definition.firePolicy == WeaponFirePolicy.Charge)
+            {
+                _chargeStartedAt = Time.time;
+                return true;
+            }
+            return TryExecutePrimaryAttack();
+        }
+
+        public bool EndPrimaryAttack()
+        {
+            bool wasHeld = _weaponTriggerHeld;
+            _weaponTriggerHeld = false;
+            float chargeStartedAt = _chargeStartedAt;
+            _chargeStartedAt = -1f;
+            if (!wasHeld
+                || !TryResolveCurrentWeaponDefinition(out ItemWeaponSharedData definition)
+                || definition.firePolicy != WeaponFirePolicy.Charge)
+                return false;
+
+            float heldTime = chargeStartedAt >= 0f ? Time.time - chargeStartedAt : 0f;
+            if (heldTime < Mathf.Max(0f, definition.fire.chargeTime))
+            {
+                lastPrimaryAttackFailureReason = "蓄力时间不足。";
+                return false;
+            }
+
+            _chargeReleaseReady = true;
+            try { return TryExecutePrimaryAttack(); }
+            finally { _chargeReleaseReady = false; }
+        }
+
+        public void Internal_CancelPrimaryAttack()
+        {
+            _weaponTriggerHeld = false;
+            _chargeReleaseReady = false;
+            _chargeStartedAt = -1f;
+            _pendingBurstShots = 0;
+            _nextPolicyFireAt = -1f;
         }
 
         /// <summary>
@@ -744,6 +814,11 @@ namespace ES
         /// 仲裁由当前 WeaponDefinition 决定，禁止在输入层按注册状态互相回退。
         /// </summary>
         public bool TryExecutePrimaryAttack()
+        {
+            return TryExecutePrimaryAttack(false);
+        }
+
+        private bool TryExecutePrimaryAttack(bool policyTick)
         {
             lastAttackTime = Time.time;
             lastPrimaryAttackRoute = EntityPrimaryAttackRoute.None;
@@ -810,17 +885,24 @@ namespace ES
                 EntityPrimaryAttackSource.PrimaryWeapon);
             lastPrimaryAttackRoute = selection.route;
             lastPrimaryAttackSource = selection.source;
+            if (definition.firePolicy == WeaponFirePolicy.Charge && !_chargeReleaseReady)
+            {
+                lastPrimaryAttackFailureReason = "蓄力武器必须通过 BeginPrimaryAttack/EndPrimaryAttack 完成输入生命周期。";
+                return false;
+            }
             switch (lastPrimaryAttackRoute)
             {
                 case EntityPrimaryAttackRoute.Action:
-                    return TrySubmitPrimaryAttackAction(
+                    return TrySubmitWeaponPrimaryAttackAction(
                         selection,
                         actionKey,
                         currentWeaponKey,
-                        null,
+                        definition,
                         "当前武器定义选择 Action 普攻");
 
-                case EntityPrimaryAttackRoute.WeaponFire:
+                case EntityPrimaryAttackRoute.HitScan:
+                case EntityPrimaryAttackRoute.Shot:
+                case EntityPrimaryAttackRoute.Beam:
                     if (!fireOnAttackInput)
                     {
                         lastPrimaryAttackFailureReason = "Combat 已关闭 Attack 输入触发射击。";
@@ -832,13 +914,16 @@ namespace ES
                             attackId,
                             selection,
                             currentWeaponKey,
-                            definition))
+                            definition,
+                            policyTick))
                     {
                         lastPrimaryAttackId = attackId;
+                        ScheduleWeaponPolicy(definition, policyTick);
                         return true;
                     }
 
-                    lastPrimaryAttackFailureReason = "WeaponFire 已选中，但射击运行时拒绝本次请求。";
+                    if (string.IsNullOrEmpty(lastPrimaryAttackFailureReason))
+                        lastPrimaryAttackFailureReason = selection.route + " 已选中，但武器运行时拒绝本次请求。";
                     return false;
 
                 default:
@@ -852,7 +937,10 @@ namespace ES
             ESActionConfigKey actionKey,
             ESWeaponConfigKey primaryWeaponKey,
             ESWeaponConfigKey secondaryWeaponKey,
-            string context)
+            string context,
+            ESInstanceHandle consumedItemHandle = default,
+            ItemWeaponVariableData previousWeaponState = default,
+            bool hasWeaponConsumption = false)
         {
             lastPrimaryAttackRoute = selection.route;
             lastPrimaryAttackSource = selection.source;
@@ -877,19 +965,32 @@ namespace ES
                 selection,
                 actionKey,
                 primaryWeaponKey,
-                secondaryWeaponKey);
+                secondaryWeaponKey,
+                consumedItemHandle,
+                previousWeaponState,
+                hasWeaponConsumption);
 
-            bool submitted = actionRuntime.TrySubmit(
-                new ESActionIntent(
-                    actionKey,
-                    actionRuntime.LifecycleGeneration,
-                    actionPulseId,
-                    MyCore),
-                out _,
-                out int replacedBufferedPulseId);
+            bool submitted;
+            int replacedBufferedPulseId;
+            try
+            {
+                submitted = actionRuntime.TrySubmit(
+                    new ESActionIntent(
+                        actionKey,
+                        actionRuntime.LifecycleGeneration,
+                        actionPulseId,
+                        MyCore),
+                    out _,
+                    out replacedBufferedPulseId);
+            }
+            catch
+            {
+                RemovePendingPrimaryAttack(actionPulseId);
+                throw;
+            }
 
             if (replacedBufferedPulseId != 0)
-                _pendingPrimaryAttacks.Remove(replacedBufferedPulseId);
+                RemovePendingPrimaryAttack(replacedBufferedPulseId);
 
             if (submitted)
             {
@@ -897,12 +998,74 @@ namespace ES
                 return true;
             }
 
-            _pendingPrimaryAttacks.Remove(actionPulseId);
+            RemovePendingPrimaryAttack(actionPulseId);
 
             lastPrimaryAttackFailureReason = actionRegistered
                 ? context + "，但 ActionRuntime 拒绝了本次普攻 Action。"
                 : context + "，但普攻 Action 尚未注册到 Action GameCore Table。";
             return false;
+        }
+
+        private bool TrySubmitWeaponPrimaryAttackAction(
+            EntityPrimaryAttackSelection selection,
+            ESActionConfigKey actionKey,
+            ESWeaponConfigKey weaponKey,
+            ItemWeaponSharedData definition,
+            string context)
+        {
+            EnsureActionRuntime();
+            bool actionRegistered = actionKey != null
+                && actionKey.IsConfigured
+                && ESActionGameCoreTable.Table.TryGet(actionKey, out _);
+            if (actionRuntime == null || !actionRegistered)
+            {
+                lastPrimaryAttackFailureReason = actionRegistered
+                    ? context + "，但 ActionRuntime 尚未初始化。"
+                    : context + "，但普攻 Action 尚未注册到 Action GameCore Table。";
+                return false;
+            }
+
+            EntityEquipmentSlotModule slots = ResolveEquipmentDomain()?.Slots;
+            if (slots == null
+                || !slots.TryGetBoundItem(_activeWeaponSlot, out ESInstanceHandle itemHandle))
+            {
+                lastPrimaryAttackFailureReason = context + "，但当前槽位没有有效的绑定 Item 实例。";
+                return false;
+            }
+            if (HasPendingWeaponConsumption(itemHandle))
+            {
+                lastPrimaryAttackFailureReason = context + "，但当前 Item 已有尚未开始的武器 Action 消费预留。";
+                return false;
+            }
+            if (!ESRuntimeDataModule.ItemInstanceTable.TryGetWeaponState(
+                    itemHandle,
+                    Time.time,
+                    out ItemWeaponVariableData previousState))
+            {
+                lastPrimaryAttackFailureReason = context + "，但当前 Item 的武器实例状态不可用。";
+                return false;
+            }
+
+            if (!ESRuntimeDataModule.ItemInstanceTable.TryConsumeWeaponUse(
+                    itemHandle,
+                    definition,
+                    Time.time,
+                    out _,
+                    out ESWeaponUseFailure failure))
+            {
+                lastPrimaryAttackFailureReason = context + "，但武器实例拒绝消耗：" + failure;
+                return false;
+            }
+
+            return TrySubmitPrimaryAttackAction(
+                selection,
+                actionKey,
+                weaponKey,
+                null,
+                context,
+                itemHandle,
+                previousState,
+                true);
         }
 
         public void TriggerHeavyAttack()
@@ -1055,6 +1218,7 @@ namespace ES
         {
             if (!enableWeaponFusion)
             {
+                Internal_CancelPrimaryAttack();
                 weaponIndex = index;
                 return true;
             }
@@ -1148,7 +1312,7 @@ namespace ES
                 "Holster");
         }
 
-        public bool TryFireWeapon()
+        public bool Internal_TryFireWeapon()
         {
             if (!TryGetWeaponSlot(_activeWeaponSlot, out EntityEquipmentWeaponSlot slot)
                 || slot.weaponKey == null
@@ -1160,13 +1324,15 @@ namespace ES
                 definition,
                 ResolvePrimaryAttackAction(slot, definition),
                 EntityPrimaryAttackSource.PrimaryWeapon);
-            if (selection.route != EntityPrimaryAttackRoute.WeaponFire)
+            if (selection.route == EntityPrimaryAttackRoute.None
+                || selection.route == EntityPrimaryAttackRoute.Action)
                 return false;
 
             int attackId = NextPrimaryAttackId();
-            bool fired = TryFireWeapon(attackId, selection, slot.weaponKey, definition);
+            bool fired = TryFireWeapon(attackId, selection, slot.weaponKey, definition, false);
             if (fired)
             {
+                ScheduleWeaponPolicy(definition, false);
                 lastPrimaryAttackRoute = selection.route;
                 lastPrimaryAttackSource = selection.source;
                 lastPrimaryAttackId = attackId;
@@ -1178,7 +1344,8 @@ namespace ES
             int attackId,
             EntityPrimaryAttackSelection selection,
             ESWeaponConfigKey primaryWeaponKey,
-            ItemWeaponSharedData weaponDefinition)
+            ItemWeaponSharedData weaponDefinition,
+            bool policyTick)
         {
             if (!enableGunFire || MyCore == null)
                 return false;
@@ -1187,7 +1354,7 @@ namespace ES
                 return false;
 
             if (!selection.IsValid
-                || selection.route != EntityPrimaryAttackRoute.WeaponFire
+                || selection.route == EntityPrimaryAttackRoute.Action
                 || weaponDefinition == null)
                 return false;
 
@@ -1202,7 +1369,13 @@ namespace ES
                 return false;
             }
 
-            if (Time.time - lastFireTime < fireDefinition.interval)
+            EntityEquipmentSlotModule slots = ResolveEquipmentDomain()?.Slots;
+            if (slots == null
+                || !slots.TryGetBoundItem(_activeWeaponSlot, out ESInstanceHandle itemHandle)
+                || !ESRuntimeDataModule.ItemInstanceTable.TryGetWeaponState(
+                    itemHandle,
+                    Time.time,
+                    out ItemWeaponVariableData previousState))
                 return false;
 
             float distance = Mathf.Max(0.5f, fireDefinition.distance);
@@ -1214,16 +1387,68 @@ namespace ES
             Vector3 visualOrigin;
             ResolveFireRay(distance, hitMask, triggerInteraction, out rayOrigin, out rayDirection, out visualOrigin);
 
-            RaycastHit hit;
-            bool hasHit = Physics.Raycast(
-                rayOrigin,
-                rayDirection,
-                out hit,
-                distance,
-                hitMask,
-                triggerInteraction);
+            float cooldownOverride = ResolvePolicyCooldown(weaponDefinition, policyTick);
+            if (!ESRuntimeDataModule.ItemInstanceTable.TryConsumeWeaponUse(
+                    itemHandle,
+                    weaponDefinition,
+                    Time.time,
+                    out ItemWeaponVariableData consumedState,
+                    out ESWeaponUseFailure useFailure,
+                    cooldownOverride))
+            {
+                lastPrimaryAttackFailureReason = "武器实例拒绝消耗：" + useFailure;
+                return false;
+            }
 
-            Vector3 endPoint = hasHit ? hit.point : rayOrigin + rayDirection * distance;
+            RaycastHit hit = default;
+            bool hasHit = false;
+            bool persistentShot = false;
+            Vector3 endPoint = rayOrigin + rayDirection * distance;
+            if (selection.route == EntityPrimaryAttackRoute.Shot)
+            {
+                Transform target = null;
+                if (ESRuntimeDataGameCore.Shots.TryGet(
+                        weaponDefinition.defaultShot,
+                        out ESShotRuntimeData shotData)
+                    && shotData?.sharedData != null
+                    && (shotData.sharedData.aimMode == ShotAimMode.Target
+                        || shotData.sharedData.aimMode == ShotAimMode.MustHit))
+                    target = defaultAimTarget;
+
+                var launchContext = new ESShotLaunchContext(
+                    attackId,
+                    MyCore,
+                    itemHandle,
+                    primaryWeaponKey,
+                    selection,
+                    target,
+                    null,
+                    HandleShotLifecycle);
+                if (!ESShotSpawner.TrySpawn(
+                        weaponDefinition.defaultShot,
+                        visualOrigin,
+                        rayDirection,
+                        launchContext,
+                        out _,
+                        out string spawnError))
+                {
+                    ESRuntimeDataModule.ItemInstanceTable.Internal_TrySetWeaponState(itemHandle, previousState);
+                    lastPrimaryAttackFailureReason = "Shot 生成失败：" + spawnError;
+                    return false;
+                }
+                persistentShot = true;
+            }
+            else
+            {
+                hasHit = TryResolveWeaponRaycast(
+                    rayOrigin,
+                    rayDirection,
+                    distance,
+                    hitMask,
+                    triggerInteraction,
+                    out hit);
+                endPoint = hasHit ? hit.point : endPoint;
+            }
 
             lastFireTime = Time.time;
             fireCount++;
@@ -1263,7 +1488,7 @@ namespace ES
                 primaryWeaponKey,
                 null));
 
-            if (hasHit)
+            if (!persistentShot && hasHit)
             {
                 PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
                     EntityPrimaryAttackEventKind.HitResolved,
@@ -1277,15 +1502,127 @@ namespace ES
                     true));
             }
 
-            PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
-                EntityPrimaryAttackEventKind.Finished,
-                attackId,
-                selection,
-                null,
-                primaryWeaponKey,
-                null));
+            if (!persistentShot)
+            {
+                PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
+                    EntityPrimaryAttackEventKind.Finished,
+                    attackId,
+                    selection,
+                    null,
+                    primaryWeaponKey,
+                    null));
+            }
 
             return true;
+        }
+
+        private float ResolvePolicyCooldown(ItemWeaponSharedData definition, bool policyTick)
+        {
+            WeaponFireDefinitionData fire = definition.fire;
+            switch (definition.firePolicy)
+            {
+                case WeaponFirePolicy.Burst:
+                    return policyTick && _pendingBurstShots <= 1
+                        ? Mathf.Max(Mathf.Max(0f, definition.cooldown), fire.interval)
+                        : fire.burstInterval;
+                case WeaponFirePolicy.Continuous:
+                    return fire.continuousInterval;
+                default:
+                    return -1f;
+            }
+        }
+
+        private void ScheduleWeaponPolicy(ItemWeaponSharedData definition, bool policyTick)
+        {
+            if (definition?.fire == null)
+                return;
+
+            switch (definition.firePolicy)
+            {
+                case WeaponFirePolicy.Burst:
+                    if (!policyTick)
+                        _pendingBurstShots = Mathf.Max(0, definition.fire.burstCount - 1);
+                    else
+                        _pendingBurstShots = Mathf.Max(0, _pendingBurstShots - 1);
+                    _nextPolicyFireAt = Time.time + (_pendingBurstShots > 0
+                        ? definition.fire.burstInterval
+                        : Mathf.Max(definition.cooldown, definition.fire.interval));
+                    break;
+
+                case WeaponFirePolicy.Automatic:
+                    _nextPolicyFireAt = Time.time + definition.fire.interval;
+                    break;
+
+                case WeaponFirePolicy.Continuous:
+                    _nextPolicyFireAt = Time.time + definition.fire.continuousInterval;
+                    break;
+            }
+        }
+
+        private void TickWeaponFirePolicy()
+        {
+            if (Time.time < _nextPolicyFireAt)
+                return;
+
+            if (_pendingBurstShots > 0)
+            {
+                if (!TryExecutePrimaryAttack(true))
+                {
+                    if (lastPrimaryAttackFailureReason.IndexOf("Cooldown", StringComparison.Ordinal) >= 0)
+                        _nextPolicyFireAt = Time.time + 0.01f;
+                    else
+                        _pendingBurstShots = 0;
+                }
+                return;
+            }
+
+            if (!_weaponTriggerHeld
+                || !TryResolveCurrentWeaponDefinition(out ItemWeaponSharedData definition)
+                || (definition.firePolicy != WeaponFirePolicy.Automatic
+                    && definition.firePolicy != WeaponFirePolicy.Continuous))
+                return;
+
+            if (!TryExecutePrimaryAttack(true))
+                _nextPolicyFireAt = Time.time + Mathf.Max(
+                    0.01f,
+                    definition.firePolicy == WeaponFirePolicy.Continuous
+                        ? definition.fire.continuousInterval
+                        : definition.fire.interval);
+        }
+
+        private void HandleShotLifecycle(ESShotLifecycleEvent evt)
+        {
+            if (evt.context.owner != MyCore)
+                return;
+
+            if (evt.kind == ESShotLifecycleKind.Hit
+                && evt.hitDecision != ESShotHitDecision.Ignore)
+            {
+                PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
+                    EntityPrimaryAttackEventKind.HitResolved,
+                    evt.context.attackId,
+                    evt.context.attackSelection,
+                    null,
+                    evt.context.sourceWeaponKey,
+                    null,
+                    evt.hit.collider,
+                    evt.hit.point,
+                    true));
+                return;
+            }
+
+            if (evt.kind == ESShotLifecycleKind.Arrived
+                || evt.kind == ESShotLifecycleKind.Expired
+                || evt.kind == ESShotLifecycleKind.Stopped)
+            {
+                PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
+                    EntityPrimaryAttackEventKind.Finished,
+                    evt.context.attackId,
+                    evt.context.attackSelection,
+                    null,
+                    evt.context.sourceWeaponKey,
+                    null));
+            }
         }
 
         public bool TrySubmitAction(ESActionIntent intent)
@@ -1562,15 +1899,40 @@ namespace ES
                         pending.actionKey,
                         pending.primaryWeaponKey,
                         pending.secondaryWeaponKey));
-                    _pendingPrimaryAttacks.Remove(evt.sourcePulseId);
+                    RemovePendingPrimaryAttack(evt.sourcePulseId);
                     break;
             }
         }
 
         private void RemovePendingPrimaryAttack(int sourcePulseId)
         {
-            if (sourcePulseId != 0)
-                _pendingPrimaryAttacks?.Remove(sourcePulseId);
+            if (sourcePulseId == 0
+                || _pendingPrimaryAttacks == null
+                || !_pendingPrimaryAttacks.TryGetValue(sourcePulseId, out PendingPrimaryAttack pending))
+                return;
+
+            if (!pending.started && pending.hasWeaponConsumption)
+            {
+                ESRuntimeDataModule.ItemInstanceTable.Internal_TrySetWeaponState(
+                    pending.consumedItemHandle,
+                    pending.previousWeaponState);
+            }
+            _pendingPrimaryAttacks.Remove(sourcePulseId);
+        }
+
+        private bool HasPendingWeaponConsumption(ESInstanceHandle itemHandle)
+        {
+            if (!itemHandle.IsValid || _pendingPrimaryAttacks == null)
+                return false;
+
+            foreach (PendingPrimaryAttack pending in _pendingPrimaryAttacks.Values)
+            {
+                if (!pending.started
+                    && pending.hasWeaponConsumption
+                    && pending.consumedItemHandle == itemHandle)
+                    return true;
+            }
+            return false;
         }
 
         private void FinishPendingPrimaryAttacks()
@@ -1584,7 +1946,15 @@ namespace ES
             {
                 PendingPrimaryAttack pending = pendingAttacks[i];
                 if (!pending.started)
+                {
+                    if (pending.hasWeaponConsumption)
+                    {
+                        ESRuntimeDataModule.ItemInstanceTable.Internal_TrySetWeaponState(
+                            pending.consumedItemHandle,
+                            pending.previousWeaponState);
+                    }
                     continue;
+                }
 
                 PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
                     EntityPrimaryAttackEventKind.Finished,
@@ -1670,6 +2040,61 @@ namespace ES
                 rayOrigin = actualOrigin.position;
                 rayDirection = actualOrigin.forward.sqrMagnitude > 0.0001f ? actualOrigin.forward.normalized : rayDirection;
             }
+        }
+
+        private bool TryResolveWeaponRaycast(
+            Vector3 origin,
+            Vector3 direction,
+            float distance,
+            LayerMask hitMask,
+            QueryTriggerInteraction triggerInteraction,
+            out RaycastHit nearestHit)
+        {
+            nearestHit = default;
+            if (direction.sqrMagnitude <= 0.0001f || distance <= 0f)
+                return false;
+
+            _weaponFireHits ??= new RaycastHit[InitialWeaponFireHitCapacity];
+            int count;
+            while (true)
+            {
+                count = Physics.RaycastNonAlloc(
+                    origin,
+                    direction.normalized,
+                    _weaponFireHits,
+                    distance,
+                    hitMask,
+                    triggerInteraction);
+                if (count < _weaponFireHits.Length
+                    || _weaponFireHits.Length >= MaximumWeaponFireHitCapacity)
+                    break;
+
+                Array.Resize(
+                    ref _weaponFireHits,
+                    Mathf.Min(_weaponFireHits.Length * 2, MaximumWeaponFireHitCapacity));
+            }
+
+            float nearestDistance = float.PositiveInfinity;
+            for (int index = 0; index < count; index++)
+            {
+                RaycastHit candidate = _weaponFireHits[index];
+                Collider collider = candidate.collider;
+                if (collider == null || IsOwnedWeaponCollider(collider) || candidate.distance >= nearestDistance)
+                    continue;
+
+                nearestDistance = candidate.distance;
+                nearestHit = candidate;
+            }
+            return !float.IsPositiveInfinity(nearestDistance);
+        }
+
+        private bool IsOwnedWeaponCollider(Collider collider)
+        {
+            if (collider == null || MyCore == null)
+                return false;
+
+            Transform hitTransform = collider.transform;
+            return hitTransform == MyCore.transform || hitTransform.IsChildOf(MyCore.transform);
         }
 
         private Transform GetActiveCameraTransform()
@@ -1826,6 +2251,7 @@ namespace ES
 
         protected override void OnDisable()
         {
+            Internal_CancelPrimaryAttack();
             CancelPendingEquipmentTransition();
             actionPresentationBridge?.Dispose();
             actionPresentationBridge = null;
@@ -1912,6 +2338,7 @@ namespace ES
 
         private void InitializeWeaponFusionRuntime()
         {
+            Internal_CancelPrimaryAttack();
             ClearPendingEquipmentTransition();
             _upperBodyLayerWeightCurrent = 0f;
             _equipBlendCurrent = 0f;
@@ -2191,6 +2618,7 @@ namespace ES
             _rollbackWeaponSlot = _activeWeaponSlot;
             _rollbackWeaponInHand = _weaponInHand;
             _rollbackActionPhase = _actionPhase;
+            Internal_CancelPrimaryAttack();
             SetActionPhase(request.phase == EntityEquipmentTransitionPhase.Switching ? 3 : _actionPhase);
             return true;
         }

@@ -1970,6 +1970,55 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-012",
+                        "status":  "documented",
+                        "summary":  "扩展武器交付模式、物品实例可变状态、射击命中链与实体主攻击选择，并补齐销毁清理和定向测试。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/1_Design/Tests/EntityPrimaryAttackSelectorTests.cs",
+                                            "Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Shot",
+                                            "Assets/Scripts/ESLogic/Data/GameCoreConfigKey/Weapon",
+                                            "Assets/Scripts/ESLogic/Editor/Generation/Tests/ESEquipmentDomainTransactionTests.cs",
+                                            "Assets/Scripts/ESLogic/Editor/Generation/Tests/ESItemInstanceTableTests.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ItemDataInfo.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ItemDataParts",
+                                            "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/AI/EntityAIModules.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/EntityBasicModules.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Basic/EntityPrimaryAttackSelector.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Entity/Entity/Entity.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/Item/Domains/Basic",
+                                            "Assets/Scripts/ESLogic/Runtime/Item/Domains/Equipment/ESItemInstanceTable.cs"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Scripts/ESLogic/Editor/Generation/Tests/ESItemInstanceTableTests.cs",
+                                              "Assets/Plugins/ES/1_Design/Tests/EntityPrimaryAttackSelectorTests.cs",
+                                              "Assets/Scripts/ESLogic/Runtime/Item/Domains/Equipment/ESItemInstanceTable.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "WeaponDefinition 只保存交付规则，实例弹药、耐久、热量、冷却和逻辑种子由物品实例表持有；Entity 主攻击按 Action、HitScan、Shot、Beam 路由，装备域在销毁兜底中释放实例所有权。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Logic.csproj、ES_Logic.Editor.Generation.Tests.csproj 与 ES_Design.ConfigKey.Tests.csproj 在并行文件破坏前静态构建通过",
+                                                            "16 个目标文件通过严格 UTF-8 与 git diff 检查",
+                                                            "定向测试覆盖实例状态消费、冷却、弹药、耐久、热量、主攻击路由和装备清理"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "当前完整工作树复跑被非本批 ESGlobalResToolsSupportConfig.cs 的并行语法中间态阻断",
+                                                             "销毁兜底没有直接对应的 DestroyImmediate 测试，现有测试覆盖 Entity 池回收入口",
+                                                             "未运行 Unity Editor、ReloadDomain、Test Runner、PlayMode、Player 或 IL2CPP"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1982,13 +2031,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T13:30:41+08:00",
-                       "head":  "4c849e33ce32c36069c89034793847f1ce3dca30",
-                       "stagedSourcePatchSha256":  "b3f6f6d1506ed42b40dda25df2543175706b453562a9ca442162d525d38c8f0c",
-                       "stagedSourceManifestSha256":  "6ba589d0e4455404213fa3268fdee66445c3f3b0162d911884bf79fbd6610047",
-                       "stagedSourceFileCount":  10,
+                       "preparedAt":  "2026-08-16T13:35:44+08:00",
+                       "head":  "82ecab84c1072fd1576f2614c04297b3d54d3c50",
+                       "stagedSourcePatchSha256":  "d184f5ef67069d2c02844b32302da427e9a810c17c6ee7d27e00b7a30bf314f4",
+                       "stagedSourceManifestSha256":  "b406e9548ad995d769aac2414b56fd06a5ba252de6aca933251d2e0ef8abbcd7",
+                       "stagedSourceFileCount":  16,
                        "entryIds":  [
-                                        "LOCAL-20260816-011"
+                                        "LOCAL-20260816-012"
                                     ]
                    }
 }

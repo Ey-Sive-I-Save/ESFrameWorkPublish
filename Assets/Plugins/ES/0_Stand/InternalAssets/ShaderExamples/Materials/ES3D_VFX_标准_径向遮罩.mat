@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ES3D_VFX_标准_径向遮罩
+  m_Shader: {fileID: 4800000, guid: 4e8b2c6d0f1a3b5c7d9e2f4a6c8b0d12, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _ES_QUALITY_STANDARD
+  m_InvalidKeywords: []
+  m_LightmapFlags: 0
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: 3000
+  stringTagMap:
+    RenderType: Transparent
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _EnablePolarUV: 1
+    - _PolarRadialScale: 1.25
+    - _PolarAngularScale: 1
+    - _PolarRotationSpeed: 0.2
+    - _EnableRadialMask: 1
+    - _RadialMaskRadius: 0.55
+    - _RadialMaskSoftness: 0.08
+    - _RadialMaskInvert: 0
+    - _EnableFlow: 1
+    - _FlowStrength: 0.8
+    - _QualityTier: 1
+    - _BlendMode: 1
+    - _ZWriteMode: 0
+    - _ZTest: 4
+    - _Cull: 0
+    - _QueueOffset: 0
+    - _SrcBlend: 5
+    - _DstBlend: 1
+    - _BlendOp: 0
+    m_Colors:
+    - _Color: {r: 0.08, g: 0.72, b: 1.6, a: 0.9}
+    - _PolarCenter: {r: 0.5, g: 0.5, b: 0, a: 0}
+    - _RadialMaskCenter: {r: 0.5, g: 0.5, b: 0, a: 0}
+    - _FlowSpeed: {r: 0.2, g: -0.35, b: 0, a: 0}
+    - _EmissionColor: {r: 0.02, g: 0.35, b: 0.8, a: 1}
+  m_BuildTextureStacks: []

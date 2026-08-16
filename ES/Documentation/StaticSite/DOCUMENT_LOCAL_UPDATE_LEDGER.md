@@ -387,6 +387,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：未运行 Unity Editor 编译、ReloadDomain、资源烘焙窗口、Test Runner、Player 或真实发布流程；v4 Baked 目录未在本会话重新生成；Unity `.meta` 空字段尾空格按序列化格式保留。
 - **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-008：Composite Shader 与 VFX 预览能力
+
+- **源码路径**：Composite 强类型参数、2D/3D Lit/3D VFX/UI URP Shader、材质检查器及效率扩展、VFX 示例材质、预览场景/控制器、VFX 目录身份和专项 AIWarnings。
+- **规范与证据**：Shader 与检查器统一粒子顶点流、序列帧、径向/菲涅尔遮罩、深度交界、混合状态和 PropertyBlock 示例；VFX 规则明确模板、运行后端、预览保存与发布验收边界。
+- **完成分析**：运行时属性合同、Shader/HLSL、Inspector、案例材质和预览场景必须同批，避免属性名漂移、材质失效或作者工具展示旧能力。
+- **回归状态**：`ES_Stand.csproj` 为 0 警告、0 错误；`ES_Editor.csproj` 为 0 错误、16 个既有警告；新增 C# 已包含在对应生成 csproj；12 个目标文本严格 UTF-8 通过。
+- **已知缺口**：未运行 Unity Shader 导入、材质 Inspector、预览场景、PlayMode、Profiler、Player 或平台 Shader Variant；没有 UnityMCP，不能声称 ReloadDomain、Console 或 Shader 编译已通过；Unity `.meta` 空字段尾空格按序列化格式保留。
+- **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

@@ -7,13 +7,12 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: ES3D_Lit_标准_边缘光
+  m_Name: "ES3D_Lit_\u6807\u51C6_\u8FB9\u7F18\u5149"
   m_Shader: {fileID: 4800000, guid: 9d3c1f7a6b5e4d2c8f0a1b3e5c7d9f20, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
   - _ES_QUALITY_STANDARD
-  - _NORMALMAP
   m_InvalidKeywords: []
   m_LightmapFlags: 0
   m_EnableInstancingVariants: 1
@@ -21,6 +20,7 @@ Material:
   m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses: []
+  m_LockedProperties:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -28,26 +28,93 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _FlowMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NoiseTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _NormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Metallic: 0.15
-    - _Smoothness: 0.72
-    - _Occlusion: 1
-    - _DissolveMode: 1
-    - _DissolveProgress: 0
-    - _EnableRim: 1
-    - _RimPower: 3
-    - _RimIntensity: 1.4
-    - _EnableShine: 0
-    - _EnableBurn: 0
     - _AlphaClip: 0
-    - _ReceiveShadows: 1
+    - _BlurIntensity: 0.35
+    - _BlurRadius: 0.001
+    - _BurnProgress: 0
+    - _BurnWidth: 0.1
+    - _ChromaticAngle: 0
+    - _ChromaticEdgeOnly: 0.6
+    - _ChromaticIntensity: 1
+    - _ChromaticOffset: 0.001
+    - _CustomTime: 0
+    - _Cutoff: 0.5
+    - _DissolveEdgeWidth: 0.08
+    - _DissolveMode: 0
+    - _DissolveProgress: 0
+    - _DissolveSoftness: 0.08
+    - _EnableBlur: 0
+    - _EnableBurn: 0
+    - _EnableChromatic: 0
+    - _EnableFlow: 0
+    - _EnableFlowMap: 0
+    - _EnableRim: 1
+    - _EnableShine: 0
+    - _EnableSparkle: 0
+    - _EnableVertexAnimation: 0
+    - _FlowMapStrength: 0.03
+    - _FlowStrength: 1
+    - _Metallic: 0.15
+    - _NormalScale: 1
+    - _Occlusion: 1
     - _QualityTier: 1
+    - _ReceiveShadows: 1
+    - _RimIntensity: 1.4
+    - _RimPower: 3
+    - _ShineIntensity: 1
+    - _ShineSpeed: 1
+    - _ShineWidth: 0.15
+    - _Smoothness: 0.72
+    - _SparkleDensity: 0.16
+    - _SparkleIntensity: 1
+    - _SparkleScale: 24
+    - _SparkleSharpness: 6
+    - _SparkleSpeed: 2
+    - _TimeMode: 0
+    - _TimeScale: 1
+    - _UseEmission: 0
+    - _UseNormalMap: 0
+    - _UseOcclusionMap: 0
+    - _VertexAnimationAmplitude: 0.1
+    - _VertexAnimationFrequency: 2
+    - _VertexAnimationMask: 0
+    - _VertexAnimationSpeed: 1
     m_Colors:
     - _BaseColor: {r: 0.65, g: 0.72, b: 0.82, a: 1}
-    - _RimColor: {r: 0.05, g: 0.45, b: 1, a: 1}
+    - _BurnEdgeColor: {r: 1, g: 0.05, b: 0, a: 1}
+    - _DissolveEdgeColor: {r: 1, g: 0.1, b: 0.01, a: 1}
     - _EmissionColor: {r: 0, g: 0.02, b: 0.08, a: 1}
+    - _FlowMapScale: {r: 1, g: 1, b: 0, a: 0}
+    - _FlowMapSpeed: {r: 0, g: 0, b: 0, a: 0}
+    - _FlowSpeed: {r: 0, g: 0, b: 0, a: 0}
+    - _MainTexScaleOffset: {r: 1, g: 1, b: 0, a: 0}
+    - _NoiseScale: {r: 1, g: 1, b: 1, a: 1}
+    - _NoiseSpeed: {r: 0, g: 0, b: 0, a: 0}
+    - _RimColor: {r: 0.05, g: 0.45, b: 1, a: 1}
+    - _ShineColor: {r: 1, g: 1, b: 1, a: 1}
+    - _ShineDirection: {r: 0, g: 1, b: 0, a: 0}
+    - _SparkleColor: {r: 1, g: 1, b: 1, a: 1}
+    - _VertexAnimationDirection: {r: 0, g: 1, b: 0, a: 0}
+  m_BuildTextureStacks: []

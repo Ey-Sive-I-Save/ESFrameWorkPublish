@@ -5,9 +5,15 @@ Shader "ES/3D/Lit Composite URP"
         [MainTexture] _BaseMap ("基础颜色纹理", 2D) = "white" {}
         [MainColor] _BaseColor ("基础颜色", Color) = (1,1,1,1)
         _MainTexScaleOffset ("主纹理缩放/偏移", Vector) = (1,1,0,0)
-        [Enum(场景时间,0,非缩放时间,1,自定义时间,2)] _TimeMode ("时间来源", Float) = 0
+        [Enum(SceneTime,0,UnscaledTime,1,CustomTime,2)] _TimeMode ("时间来源", Float) = 0
         _CustomTime ("自定义时间", Float) = 0
         _TimeScale ("时间倍率", Range(0,4)) = 1
+        [Toggle] _EnableVertexAnimation ("启用顶点动画", Float) = 0
+        _VertexAnimationDirection ("顶点动画局部方向", Vector) = (0,1,0,0)
+        _VertexAnimationAmplitude ("顶点动画幅度", Range(0,2)) = 0.1
+        _VertexAnimationFrequency ("顶点动画频率", Range(0,20)) = 2
+        _VertexAnimationSpeed ("顶点动画速度", Float) = 1
+        [Enum(None,0,Red,1,Green,2,Blue,3,Alpha,4)] _VertexAnimationMask ("顶点色动画遮罩", Float) = 0
         [Toggle] _UseNormalMap ("启用法线纹理", Float) = 0
         [Normal] _NormalMap ("法线纹理", 2D) = "bump" {}
         _NormalScale ("法线强度", Range(0,2)) = 1
@@ -19,7 +25,7 @@ Shader "ES/3D/Lit Composite URP"
         [Toggle] _UseEmission ("启用自发光", Float) = 0
         [HDR] _EmissionColor ("自发光颜色", Color) = (0,0,0,1)
         _EmissionMap ("自发光纹理", 2D) = "black" {}
-        [Enum(关闭,0,噪声溶解,1,距离溶解,2)] _DissolveMode ("溶解模式", Float) = 0
+        [Enum(Off,0,Noise,1,Distance,2)] _DissolveMode ("溶解模式", Float) = 0
         [NoScaleOffset] _NoiseTex ("噪声纹理", 2D) = "gray" {}
         _NoiseScale ("噪声缩放", Vector) = (1,1,1,1)
         _NoiseSpeed ("噪声速度", Vector) = (0,0,0,0)
@@ -36,6 +42,30 @@ Shader "ES/3D/Lit Composite URP"
         _ShineSpeed ("扫光速度", Float) = 1
         _ShineWidth ("扫光宽度", Range(0.001,1)) = 0.15
         _ShineIntensity ("扫光强度", Range(0,8)) = 1
+        _ShineDirection ("扫光方向", Vector) = (0,1,0,0)
+        [Toggle] _EnableSparkle ("启用亮晶晶", Float) = 0
+        [HDR] _SparkleColor ("亮晶晶颜色", Color) = (1,1,1,1)
+        _SparkleScale ("亮晶晶密度", Range(1,128)) = 24
+        _SparkleSpeed ("亮晶晶速度", Float) = 2
+        _SparkleDensity ("亮晶晶数量", Range(0,1)) = 0.16
+        _SparkleSharpness ("亮晶晶锐度", Range(1,16)) = 6
+        _SparkleIntensity ("亮晶晶强度", Range(0,8)) = 1
+        [Toggle] _EnableFlow ("启用纹理流动", Float) = 0
+        _FlowSpeed ("流动速度", Vector) = (0,0,0,0)
+        _FlowStrength ("流动强度", Range(0,1)) = 1
+        [Toggle] _EnableFlowMap ("启用流向贴图", Float) = 0
+        [NoScaleOffset] _FlowMap ("流向贴图", 2D) = "gray" {}
+        _FlowMapScale ("流向贴图缩放/偏移", Vector) = (1,1,0,0)
+        _FlowMapSpeed ("流向贴图速度", Vector) = (0,0,0,0)
+        _FlowMapStrength ("流向贴图强度", Range(0,0.2)) = 0.03
+        [Toggle] _EnableChromatic ("启用色差", Float) = 0
+        _ChromaticOffset ("色差偏移", Range(0,0.02)) = 0.001
+        _ChromaticIntensity ("色差强度", Range(0,1)) = 1
+        _ChromaticEdgeOnly ("边缘色差", Range(0,1)) = 0.6
+        _ChromaticAngle ("色差方向", Range(0,360)) = 0
+        [Toggle] _EnableBlur ("启用纹理模糊", Float) = 0
+        _BlurRadius ("模糊半径", Range(0,0.02)) = 0.001
+        _BlurIntensity ("模糊强度", Range(0,1)) = 0.35
         [Toggle] _EnableBurn ("启用燃烧边缘", Float) = 0
         [HDR] _BurnEdgeColor ("燃烧边缘颜色", Color) = (1,0.05,0,1)
         _BurnProgress ("燃烧进度", Range(0,1)) = 0
@@ -43,7 +73,7 @@ Shader "ES/3D/Lit Composite URP"
         [Toggle] _AlphaClip ("启用透明裁剪", Float) = 0
         _Cutoff ("透明裁剪阈值", Range(0,1)) = 0.5
         [Toggle] _ReceiveShadows ("接收阴影", Float) = 1
-        [Enum(基础,0,标准,1,高质量,2)] _QualityTier ("效果质量档位", Float) = 1
+        [Enum(Basic,0,Standard,1,High,2)] _QualityTier ("效果质量档位", Float) = 1
     }
     SubShader
     {
@@ -126,7 +156,8 @@ Shader "ES/3D/Lit Composite URP"
             half4 ES3DDepthNormalsFragment(ES3DDepthVaryings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
-                half alpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv).a * _BaseColor.a;
+                float2 surfaceUV = ESApplyFlowMap(input.uv);
+                half alpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, surfaceUV).a * _BaseColor.a;
                 float edge;
                 alpha *= ESDissolveAlpha(input.positionWS, edge);
                 if (_AlphaClip > 0.5) clip(alpha - _Cutoff);
@@ -134,7 +165,7 @@ Shader "ES/3D/Lit Composite URP"
                 if (_UseNormalMap > 0.5)
                 {
                     float3 bitangent = input.tangentWS.w * cross(input.normalWS, input.tangentWS.xyz);
-                    float3 normalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, input.uv), _NormalScale);
+                    float3 normalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, surfaceUV), _NormalScale);
                     normalWS = TransformTangentToWorld(normalTS, half3x3(input.tangentWS.xyz, bitangent, input.normalWS));
                 }
                 normalWS = NormalizeNormalPerPixel(normalWS);
@@ -157,10 +188,9 @@ Shader "ES/3D/Lit Composite URP"
             #pragma target 3.0
             #pragma vertex ES3DMetaVertex
             #pragma fragment ES3DMetaFragment
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "ES3DLitCompositeURPCommon.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MetaInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/UniversalMetaPass.hlsl"
-            #include "ES3DLitCompositeURPCommon.hlsl"
             struct ES3DMetaAttributes { float4 positionOS:POSITION; float2 uv:TEXCOORD0; float2 lightmapUV:TEXCOORD1; float2 dynamicLightmapUV:TEXCOORD2; };
             struct ES3DMetaVaryings { float4 positionCS:SV_POSITION; float2 uv:TEXCOORD0; };
             ES3DMetaVaryings ES3DMetaVertex(ES3DMetaAttributes input)

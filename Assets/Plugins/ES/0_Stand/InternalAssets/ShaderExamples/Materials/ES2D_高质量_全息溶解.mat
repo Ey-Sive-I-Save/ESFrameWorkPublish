@@ -12,12 +12,7 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
-  m_InvalidKeywords:
-  - _ENABLEBURN_ON
-  - _ENABLEDISTORTION_ON
-  - _ENABLEGLITCH_ON
-  - _ENABLEHOLOGRAM_ON
-  - _ENABLESHINE_ON
+  m_InvalidKeywords: []
   m_LightmapFlags: 0
   m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0

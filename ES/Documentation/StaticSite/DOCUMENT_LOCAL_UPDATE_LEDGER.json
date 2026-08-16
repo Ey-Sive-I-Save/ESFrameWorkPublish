@@ -1759,6 +1759,58 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-008",
+                        "status":  "documented",
+                        "summary":  "扩展 Composite URP Shader 与强类型参数合同，完善材质检查器效率工具，并新增 VFX 示例材质、预览场景和制作边界。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_RunTime/ShaderSystem/ESCompositeShaderParameters.cs",
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets/Shaders",
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets/ShaderExamples/Materials",
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets/ShaderExamples/Scenes.meta",
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets/ShaderExamples/Scenes",
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets/ShaderExamples/Scripts.meta",
+                                            "Assets/Plugins/ES/0_Stand/InternalAssets/ShaderExamples/Scripts",
+                                            "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/特效（VFX）.meta",
+                                            "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/特效（VFX）",
+                                            "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/ESCompositeShader_URP职责与材质检查器验收边界_AI协作警告.md",
+                                            "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/ESCompositeShader_URP职责与材质检查器验收边界_AI协作警告.md.meta",
+                                            "Assets/Plugins/ES/Editor/ESShader",
+                                            "Assets/Scripts/ESLogic/Data/GameCoreConfigKey/VFX.meta"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/0_Stand/InternalAssets/ShaderExamples/Scenes/ESCompositeShaderVFXPreview.unity",
+                                              "Assets/Plugins/ES/0_Stand/InternalAssets/ShaderExamples/Scripts/ESCompositeShaderPreviewController.cs",
+                                              "Assets/Plugins/ES/Editor/ESShader/ESCompositeShaderGUI.Productivity.cs",
+                                              "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/特效（VFX）/VFX运行时与制作边界_AI协作警告.md"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "2D、3D Lit、3D VFX 与 UI Composite Shader 共享强类型参数和材质检查器语义；VFX 增补粒子顶点流、序列帧、径向/菲涅尔遮罩、深度交界、混合状态与示例预览，同时明确模板、运行后端和发布验收边界。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Stand.csproj 静态构建为 0 警告、0 错误",
+                                                            "ES_Editor.csproj 静态构建为 0 错误、16 个既有警告",
+                                                            "新增预览控制器和材质检查器 partial 文件已包含在对应生成 csproj 中",
+                                                            "12 个目标文本通过严格 UTF-8 检查"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "未运行 Unity Shader 导入、材质 Inspector 交互、预览场景、PlayMode、Profiler、Player 或平台 Shader Variant 验收",
+                                                             "没有 UnityMCP，不能声称 ReloadDomain、Console 或 Shader 编译已通过",
+                                                             "Unity .meta 空字段尾空格按序列化格式保留"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1771,13 +1823,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T10:33:42+08:00",
-                       "head":  "1f2342bbeb925c6bce4a344d7a92f6e1497ba36b",
-                       "stagedSourcePatchSha256":  "3465e2d548abcc42da2d6a731be23e22ac5ddba368e0812a82f8ac4fac57579b",
-                       "stagedSourceManifestSha256":  "8f24bb0899a403d986528de6dbf0ab73f4260927ab22d8773e4db40a7d636c67",
-                       "stagedSourceFileCount":  43,
+                       "preparedAt":  "2026-08-16T10:36:44+08:00",
+                       "head":  "bf1f95a40c6af9f72a6d9c0209ccdce6bf136097",
+                       "stagedSourcePatchSha256":  "e5f310382a5afc118e79406c1894877f5644390091c7b00bbe8c5798604e03ba",
+                       "stagedSourceManifestSha256":  "9dc72402bbbe0f2eff52868cd50630d38cfceca89a1a9e9d3cc0ee33edee67eb",
+                       "stagedSourceFileCount":  34,
                        "entryIds":  [
-                                        "LOCAL-20260816-007"
+                                        "LOCAL-20260816-008"
                                     ]
                    }
 }

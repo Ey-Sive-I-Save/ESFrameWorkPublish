@@ -6,18 +6,18 @@ Shader "ES/2D/Composite URP"
         _Color ("基础颜色", Color) = (1,1,1,1)
         _MainTexScaleOffset ("主纹理缩放/偏移", Vector) = (1,1,0,0)
         _VertexColorStrength ("顶点色强度", Range(0,1)) = 1
-        [Enum(UV,0,世界空间,1,屏幕空间,2)] _CoordinateMode ("坐标空间", Float) = 0
-        [Enum(场景时间,0,非缩放时间,1,自定义时间,2)] _TimeMode ("时间来源", Float) = 0
+        [Enum(UV,0,World,1,Screen,2)] _CoordinateMode ("坐标空间", Float) = 0
+        [Enum(SceneTime,0,UnscaledTime,1,CustomTime,2)] _TimeMode ("时间来源", Float) = 0
         _CustomTime ("自定义时间", Float) = 0
         _TimeScale ("时间倍率", Range(0,4)) = 1
 
-        [Enum(关闭,0,序列帧,1)] _AnimationMode ("序列帧模式", Float) = 0
+        [Enum(Off,0,Sequence,1)] _AnimationMode ("序列帧模式", Float) = 0
         _SequenceColumns ("序列帧列数", Float) = 1
         _SequenceRows ("序列帧行数", Float) = 1
         _SequenceFrame ("序列帧当前帧", Float) = 0
         _SequenceSpeed ("序列帧速度", Float) = 0
 
-        [Enum(关闭,0,方向渐隐,1,纹理遮罩,2,噪声溶解,3)] _FadeMode ("渐隐模式", Float) = 0
+        [Enum(Off,0,Directional,1,TextureMask,2,NoiseDissolve,3)] _FadeMode ("渐隐模式", Float) = 0
         _FadeProgress ("渐隐进度", Range(0,1)) = 0
         _FadePosition ("渐隐位置", Vector) = (0.5,0.5,0,0)
         _FadeWidth ("渐隐宽度", Range(0.001,1)) = 0.1
@@ -72,6 +72,24 @@ Shader "ES/2D/Composite URP"
         _ShineWidth ("扫光宽度", Range(0.001,1)) = 0.15
         _ShineAngle ("扫光角度", Range(0,360)) = 30
         _ShineIntensity ("扫光强度", Range(0,8)) = 1
+        [Toggle] _EnableSparkle ("启用亮晶晶", Float) = 0
+        [HDR] _SparkleColor ("亮晶晶颜色", Color) = (1,1,1,1)
+        _SparkleScale ("亮晶晶密度", Range(1,128)) = 32
+        _SparkleSpeed ("亮晶晶速度", Float) = 2
+        _SparkleDensity ("亮晶晶数量", Range(0,1)) = 0.18
+        _SparkleSharpness ("亮晶晶锐度", Range(1,16)) = 6
+        _SparkleIntensity ("亮晶晶强度", Range(0,8)) = 1
+        [Toggle] _EnableFlow ("启用纹理流动", Float) = 0
+        _FlowSpeed ("流动速度", Vector) = (0,0,0,0)
+        _FlowStrength ("流动强度", Range(0,1)) = 1
+        [Toggle] _EnableChromatic ("启用色差", Float) = 0
+        _ChromaticOffset ("色差偏移", Range(0,0.02)) = 0.002
+        _ChromaticIntensity ("色差强度", Range(0,1)) = 1
+        _ChromaticEdgeOnly ("边缘色差", Range(0,1)) = 0.5
+        _ChromaticAngle ("色差方向", Range(0,360)) = 0
+        [Toggle] _EnableBlur ("启用纹理模糊", Float) = 0
+        _BlurRadius ("模糊半径", Range(0,0.02)) = 0.002
+        _BlurIntensity ("模糊强度", Range(0,1)) = 0.5
         [Toggle] _EnablePingPongGlow ("启用往返发光", Float) = 0
         [HDR] _GlowFrom ("往返发光起点", Color) = (1,0,0,1)
         [HDR] _GlowTo ("往返发光终点", Color) = (0,0.3,1,1)
@@ -136,7 +154,7 @@ Shader "ES/2D/Composite URP"
             TEXTURE2D(_FadeMask); SAMPLER(sampler_FadeMask);
 
             CBUFFER_START(UnityPerMaterial)
-                float4 _MainTex_ST; half4 _Color; float4 _MainTexScaleOffset; float _VertexColorStrength;
+                float4 _MainTex_ST; float4 _MainTex_TexelSize; half4 _Color; float4 _MainTexScaleOffset; float _VertexColorStrength;
                 float _CoordinateMode; float _TimeMode; float _CustomTime; float _TimeScale;
                 float _AnimationMode; float _SequenceColumns; float _SequenceRows; float _SequenceFrame; float _SequenceSpeed;
                 float _FadeMode; float _FadeProgress; float4 _FadePosition; float _FadeWidth; float _FadeNoiseFactor; half4 _DissolveEdgeColor; float _DissolveEdgeWidth;
@@ -145,7 +163,12 @@ Shader "ES/2D/Composite URP"
                 float _EnableBrightness; float _Brightness; float _EnableContrast; float _Contrast; float _EnableSaturation; float _Saturation; float _EnableHue; float _Hue; float _EnableNegative; float _NegativeFade;
                 float _EnableRainbow; float _RainbowSpeed; float _RainbowDensity; float _RainbowBrightness;
                 float _EnableInnerOutline; half4 _InnerOutlineColor; float _InnerOutlineWidth; float _EnableOuterOutline; half4 _OuterOutlineColor; float _OuterOutlineWidth; float _EnablePixelOutline; half4 _PixelOutlineColor; float _PixelOutlineWidth;
-                float _EnableShine; half4 _ShineColor; float _ShineSpeed; float _ShineWidth; float _ShineAngle; float _ShineIntensity; float _EnablePingPongGlow; half4 _GlowFrom; half4 _GlowTo; float _GlowFrequency; float _GlowIntensity;
+                float _EnableShine; half4 _ShineColor; float _ShineSpeed; float _ShineWidth; float _ShineAngle; float _ShineIntensity;
+                float _EnableSparkle; half4 _SparkleColor; float _SparkleScale; float _SparkleSpeed; float _SparkleDensity; float _SparkleSharpness; float _SparkleIntensity;
+                float _EnableFlow; float4 _FlowSpeed; float _FlowStrength;
+                float _EnableChromatic; float _ChromaticOffset; float _ChromaticIntensity; float _ChromaticEdgeOnly; float _ChromaticAngle;
+                float _EnableBlur; float _BlurRadius; float _BlurIntensity;
+                float _EnablePingPongGlow; half4 _GlowFrom; half4 _GlowTo; float _GlowFrequency; float _GlowIntensity;
                 float _EnableDistortion; float4 _NoiseScale; float4 _NoiseSpeed; float _DistortionStrength;
                 float _EnableHologram; half4 _HologramColor; float _HologramLineFrequency; float _HologramLineGap; float _HologramSpeed; float _HologramMinAlpha; float _EnableGlitch; float _GlitchIntensity; float _GlitchSpeed;
                 float _EnableFrozen; half4 _FrozenColor; half4 _FrozenHighlight; float _FrozenDensity; float _FrozenSpeed; float _EnableBurn; half4 _BurnEdgeColor; half4 _BurnInsideColor; float _BurnProgress; float _BurnWidth; float _EnablePoison; half4 _PoisonColor; float _PoisonDensity; float _PoisonSpeed;
@@ -162,6 +185,16 @@ Shader "ES/2D/Composite URP"
             float3 ESHsvToRgb(float3 c) { float3 p=abs(frac(c.xxx+float3(0,1.0/3.0,2.0/3.0))*6-3); return c.z*lerp(float3(1,1,1),saturate(p-1),c.y); }
             float2 ESSequenceUV(float2 uv,float time) { float cols=max(1,_SequenceColumns),rows=max(1,_SequenceRows); float frame=max(0,floor(_SequenceFrame+(_AnimationMode>0.5?time*_SequenceSpeed:0))); float2 cell=1/float2(cols,rows); return uv*cell+float2(fmod(frame,cols),rows-1-fmod(floor(frame/cols),rows))*cell; }
             float2 ESOutlineUV(float2 uv,float2 offset) { return uv+offset; }
+            half4 ESBlurSample(float2 uv)
+            {
+                float2 delta = _MainTex_TexelSize.xy * (_BlurRadius * 512.0);
+                half4 result = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv) * 0.4h;
+                result += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv + float2(delta.x, 0)) * 0.15h;
+                result += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv - float2(delta.x, 0)) * 0.15h;
+                result += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv + float2(0, delta.y)) * 0.15h;
+                result += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv - float2(0, delta.y)) * 0.15h;
+                return result;
+            }
 
             ESVaryings ESVertex(ESAttributes v)
             {
@@ -178,7 +211,21 @@ Shader "ES/2D/Composite URP"
                     noise=SAMPLE_TEXTURE2D(_NoiseTex,sampler_NoiseTex,noiseUV).r;
                 if(_EnableGlitch>0.5) uv+=float2((ESRandom(floor(coord.y*_GlitchSpeed+time*_GlitchSpeed))-0.5)*_GlitchIntensity,0);
                 if(_EnableDistortion>0.5) uv+=(noise-0.5)*_DistortionStrength;
-                half4 src=SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex,uv)*i.color; if(_AlphaClip>0.5) clip(src.a-_Cutoff); float alpha=src.a; float3 c=src.rgb;
+                if (_EnableFlow > 0.5) uv += _FlowSpeed.xy * time * _FlowStrength;
+                half4 src=SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex,uv)*i.color;
+                if (_EnableBlur > 0.5) src = lerp(src, ESBlurSample(uv) * i.color, saturate(_BlurIntensity));
+                if(_AlphaClip>0.5) clip(src.a-_Cutoff); float alpha=src.a; float3 c=src.rgb;
+                if (_EnableChromatic > 0.5)
+                {
+                    float2 chromaDir = float2(cos(radians(_ChromaticAngle)), sin(radians(_ChromaticAngle)));
+                    float2 localCoord = frac(coord);
+                    float edgeFactor = saturate(length(localCoord - 0.5) * 2.0);
+                    float amount = _ChromaticOffset * lerp(1.0, edgeFactor, _ChromaticEdgeOnly);
+                    float3 chroma = c;
+                    chroma.r = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv + chromaDir * amount).r * i.color.r;
+                    chroma.b = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv - chromaDir * amount).b * i.color.b;
+                    c = lerp(c, chroma, saturate(_ChromaticIntensity));
+                }
 
                 if(_FadeMode>0.5) { float mask=_FadeMode>2.5?noise:(_FadeMode>1.5?SAMPLE_TEXTURE2D(_FadeMask,sampler_FadeMask,uv).r:saturate(dot(coord-_FadePosition.xy,float2(1,1))+0.5)); mask=lerp(mask,noise,_FadeNoiseFactor); float fade=smoothstep(_FadeProgress-_FadeWidth,_FadeProgress+_FadeWidth,mask); alpha*=(1-fade); if(_FadeMode>2.5) { float edge=1-smoothstep(_FadeProgress,_FadeProgress+_DissolveEdgeWidth,mask); c=lerp(c,_DissolveEdgeColor.rgb,edge); } }
                 if(_EnableAddColor>0.5) c+=_AddColor.rgb*_AddColorFade;
@@ -193,8 +240,20 @@ Shader "ES/2D/Composite URP"
                 if(_EnableInnerOutline>0.5) { half n=SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex,ESOutlineUV(uv,float2(_InnerOutlineWidth,0))).a; half s=SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex,ESOutlineUV(uv,float2(-_InnerOutlineWidth,0))).a; float edge=saturate(src.a-min(n,s)); c=lerp(c,_InnerOutlineColor.rgb,edge); }
                 if(_EnableOuterOutline>0.5||_EnablePixelOutline>0.5) { float w=_EnablePixelOutline>0.5?_PixelOutlineWidth/1024:_OuterOutlineWidth; half around=0; around=max(around,SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex,uv+float2(w,0)).a); around=max(around,SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex,uv-float2(w,0)).a); around=max(around,SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex,uv+float2(0,w)).a); around=max(around,SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex,uv-float2(0,w)).a); float edge=saturate(around-src.a); c=lerp(c,_EnablePixelOutline>0.5?_PixelOutlineColor.rgb:_OuterOutlineColor.rgb,edge); alpha=max(alpha,around); }
                 if(_EnableShine>0.5) { float2 dir=float2(cos(radians(_ShineAngle)),sin(radians(_ShineAngle))); float shine=1-smoothstep(0,_ShineWidth,abs(frac(dot(coord,dir)+time*_ShineSpeed)-0.5)); c+=_ShineColor.rgb*shine*_ShineIntensity; }
+                if(_EnableSparkle>0.5)
+                {
+                    float2 sparkleCell = floor(coord * max(1.0, _SparkleScale));
+                    float sparkleSeed = ESRandom(sparkleCell);
+                    float sparkleWave = 0.5 + 0.5 * sin(time * _SparkleSpeed + sparkleSeed * 6.2831853);
+                    float2 sparkleLocal = frac(coord * max(1.0, _SparkleScale)) - 0.5;
+                    float sparkleRadial = saturate(1.0 - length(sparkleLocal) * 2.0);
+                    float sparkleCross = max(saturate(1.0 - abs(sparkleLocal.x) * 8.0), saturate(1.0 - abs(sparkleLocal.y) * 8.0));
+                    float sparkleShape = saturate(sparkleRadial * 0.35 + sparkleCross * 0.65);
+                    float sparkle = step(1.0 - _SparkleDensity, sparkleSeed) * pow(saturate(sparkleWave * sparkleShape), max(1.0, _SparkleSharpness));
+                    c += _SparkleColor.rgb * sparkle * _SparkleIntensity;
+                }
                 if(_EnablePingPongGlow>0.5) { float wave=0.5+0.5*sin(time*_GlowFrequency); c+=lerp(_GlowFrom.rgb,_GlowTo.rgb,wave)*_GlowIntensity; }
-                if(_EnableHologram>0.5) { float line=step(_HologramLineGap,frac(coord.y*_HologramLineFrequency+time*_HologramSpeed)); c=lerp(c,_HologramColor.rgb,0.55); alpha*=max(_HologramMinAlpha,line); }
+                if(_EnableHologram>0.5) { float scanLine=step(_HologramLineGap,frac(coord.y*_HologramLineFrequency+time*_HologramSpeed)); c=lerp(c,_HologramColor.rgb,0.55); alpha*=max(_HologramMinAlpha,scanLine); }
                 if(_EnableFrozen>0.5) { float snow=smoothstep(1-_FrozenDensity,1,noise); c=lerp(c,_FrozenColor.rgb,0.65); c+=_FrozenHighlight.rgb*snow*(0.5+0.5*sin(time*_FrozenSpeed+noise*6)); }
                 if(_EnableBurn>0.5) { float burn=smoothstep(_BurnProgress-_BurnWidth,_BurnProgress+_BurnWidth,noise); c=lerp(_BurnInsideColor.rgb,_BurnEdgeColor.rgb,burn); alpha*=step(_BurnProgress-0.02,noise); }
                 if(_EnablePoison>0.5) { float poison=0.5+0.5*sin(time*_PoisonSpeed+noise*_PoisonDensity*6); c=lerp(c,_PoisonColor.rgb,saturate(poison*0.45)); }

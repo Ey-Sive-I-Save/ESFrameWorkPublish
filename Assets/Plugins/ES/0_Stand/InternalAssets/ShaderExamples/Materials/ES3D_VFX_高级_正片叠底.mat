@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ES3D_VFX_高级_正片叠底
+  m_Shader: {fileID: 4800000, guid: 4e8b2c6d0f1a3b5c7d9e2f4a6c8b0d12, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _ES_QUALITY_HIGH
+  m_InvalidKeywords: []
+  m_LightmapFlags: 0
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: 3000
+  stringTagMap:
+    RenderType: Transparent
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _EnableHologram: 1
+    - _HologramFrequency: 48
+    - _HologramGap: 0.42
+    - _HologramSpeed: 0.8
+    - _HologramMinAlpha: 0.28
+    - _QualityTier: 2
+    - _BlendMode: 3
+    - _ZWriteMode: 0
+    - _ZTest: 4
+    - _Cull: 0
+    - _QueueOffset: 0
+    - _SrcBlend: 2
+    - _DstBlend: 0
+    - _BlendOp: 0
+    m_Colors:
+    - _Color: {r: 0.55, g: 0.85, b: 1, a: 0.75}
+    - _HologramColor: {r: 0.05, g: 0.75, b: 1.1, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+  m_BuildTextureStacks: []

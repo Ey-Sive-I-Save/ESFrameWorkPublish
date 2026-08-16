@@ -2019,6 +2019,47 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-013",
+                        "status":  "documented",
+                        "summary":  "强化 Workbench 作者活动持久化、世界地图地形编辑、NavMesh 引用与预览交互，并补齐贡献指南和定向测试。",
+                        "sourcePaths":  [
+                                            "Assets/Scripts/ESLogic/Editor/Workbench",
+                                            "Assets/Scripts/ESLogic/Editor/World",
+                                            "Assets/Scripts/ESLogic/Runtime/World",
+                                            "ES/Documentation/Guides/ESWorkbench_ContributionAndModuleGuide.md"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Scripts/ESLogic/Editor/World/Tests/ESWorkbenchAuthoringFoundationTests.cs",
+                                              "Assets/Scripts/ESLogic/Editor/World/Tests/ESWorldEditSessionTests.cs",
+                                              "Assets/Scripts/ESLogic/Editor/Workbench/ESWorkbenchPersistentActivityStore.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "Workbench 活动存储、UI Toolkit 宿主、世界视口、地形门面和运行时地图引用共同维护作者会话；正式 NavMesh 资产仍以稳定引用进入地图数据，不由预览对象冒充。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Logic.World.Tests.csproj 与 ES_Logic.Editor.World.Tests.csproj 在本批内容下静态构建均为 0 警告、0 错误",
+                                                            "16 个目标文本通过严格 UTF-8 检查",
+                                                            "定向测试覆盖作者活动持久化、地形编辑事务、撤销边界和世界会话"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "当前完整工作树复跑被非本批资源配置重构缺少 DetermineAssetCategory 与 IsSubAsset 阻断",
+                                                             "未运行 Unity Editor、ReloadDomain、Test Runner 或真实 Terrain/NavMesh 保存与重读",
+                                                             "预览交互、Undo、场景绑定和 Player 运行仍需 Unity 实机验收"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -2031,13 +2072,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T13:35:44+08:00",
-                       "head":  "82ecab84c1072fd1576f2614c04297b3d54d3c50",
-                       "stagedSourcePatchSha256":  "d184f5ef67069d2c02844b32302da427e9a810c17c6ee7d27e00b7a30bf314f4",
-                       "stagedSourceManifestSha256":  "b406e9548ad995d769aac2414b56fd06a5ba252de6aca933251d2e0ef8abbcd7",
-                       "stagedSourceFileCount":  16,
+                       "preparedAt":  "2026-08-16T13:37:18+08:00",
+                       "head":  "6089800501742a9822e5b7293e30f1c7b1844997",
+                       "stagedSourcePatchSha256":  "9be53489dc10d2ba31c680561dfcd2909718edd635c6d8275976722c412203b9",
+                       "stagedSourceManifestSha256":  "ee08181d07a2024c427013f4c92beecae57c1e2533d9a0fa05f5450c6284a768",
+                       "stagedSourceFileCount":  18,
                        "entryIds":  [
-                                        "LOCAL-20260816-012"
+                                        "LOCAL-20260816-013"
                                     ]
                    }
 }

@@ -5,21 +5,6 @@ using System.Linq;
 
 namespace ES
 {
-    /// <summary>工作台可启用的标准模块类型；具体工作台通过默认列表和调整钩子决定启用顺序。</summary>
-    public enum ESWorkbenchModuleKind : byte
-    {
-        Overview,
-        Terrain,
-        Material,
-        Vegetation,
-        Prefab,
-        Navigation,
-        WaterWeather,
-        Streaming,
-        Collision,
-        UGC
-    }
-
     /// <summary>工作台贡献所属的编辑器语义分类。</summary>
     public enum ESWorkbenchContributionCategory : byte
     {
@@ -38,7 +23,7 @@ namespace ES
     }
 
     /// <summary>工作台模块向底座声明的可注入能力。</summary>
-    public sealed class ESWorkbenchContributionDescriptor
+    public sealed class ESWorkbenchContributionDescriptor<TModule> where TModule : struct, Enum
     {
         public string WorkbenchId { get; }
         public string ContributionId { get; }
@@ -47,6 +32,7 @@ namespace ES
         public string Owner { get; }
         public int Priority { get; }
         public int Revision { get; }
+        public TModule Module { get; }
         public ESWorkbenchContributionCategory Category { get; }
         public IReadOnlyList<string> Dependencies { get; }
         public Func<ESWorkbenchContributionContext, bool> IsEnabled { get; }
@@ -56,6 +42,7 @@ namespace ES
             string workbenchId,
             string contributionId,
             string displayName,
+            TModule module,
             ESWorkbenchContributionCategory category,
             Func<ESWorkbenchContributionContext, IDisposable> inject,
             string tooltip = null,
@@ -75,6 +62,7 @@ namespace ES
             Owner = string.IsNullOrWhiteSpace(owner) ? "ES" : owner.Trim();
             Priority = priority;
             Revision = Math.Max(1, revision);
+            Module = module;
             Category = category;
             Dependencies = (dependencies ?? Enumerable.Empty<string>())
                 .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -104,6 +92,8 @@ namespace ES
         private readonly Action<ESWorkbenchToolDescriptor> registerTool;
         private readonly Action<ESWorkbenchCommandDescriptor> registerCommand;
         private readonly Action<ESWorkbenchCollectionSource<ESWorkbenchIssueDescriptor>> registerIssueSource;
+        private readonly Action<ESWorkbenchHostPresentationDescriptor> registerPresentation;
+        private readonly Action<ESWorkbenchBottomPanelDescriptor> registerBottomPanel;
         private readonly Action<string> reportDiagnostic;
 
         internal ESWorkbenchContributionContext(
@@ -122,6 +112,8 @@ namespace ES
             Action<ESWorkbenchToolDescriptor> registerTool,
             Action<ESWorkbenchCommandDescriptor> registerCommand,
             Action<ESWorkbenchCollectionSource<ESWorkbenchIssueDescriptor>> registerIssueSource,
+            Action<ESWorkbenchHostPresentationDescriptor> registerPresentation,
+            Action<ESWorkbenchBottomPanelDescriptor> registerBottomPanel,
             Action<string> reportDiagnostic)
         {
             WorkbenchId = workbenchId;
@@ -139,6 +131,8 @@ namespace ES
             this.registerTool = registerTool;
             this.registerCommand = registerCommand;
             this.registerIssueSource = registerIssueSource;
+            this.registerPresentation = registerPresentation;
+            this.registerBottomPanel = registerBottomPanel;
             this.reportDiagnostic = reportDiagnostic;
         }
 
@@ -210,6 +204,16 @@ namespace ES
             if (source != null) registerIssueSource?.Invoke(source);
         }
 
+        public void RegisterPresentation(ESWorkbenchHostPresentationDescriptor presentation)
+        {
+            if (presentation != null) registerPresentation?.Invoke(presentation);
+        }
+
+        public void RegisterBottomPanel(ESWorkbenchBottomPanelDescriptor panel)
+        {
+            if (panel != null) registerBottomPanel?.Invoke(panel);
+        }
+
         public void ReportDiagnostic(string message)
         {
             if (!string.IsNullOrWhiteSpace(message)) reportDiagnostic?.Invoke(message);
@@ -237,13 +241,13 @@ namespace ES
         }
     }
 
-    public sealed class ESWorkbenchContributionSession : IDisposable
+    public sealed class ESWorkbenchContributionSession<TModule> : IDisposable where TModule : struct, Enum
     {
         private readonly List<IDisposable> releases;
 
         internal ESWorkbenchContributionSession(
             string workbenchId,
-            IReadOnlyList<ESWorkbenchContributionDescriptor> descriptors,
+            IReadOnlyList<ESWorkbenchContributionDescriptor<TModule>> descriptors,
             List<IDisposable> releases,
             IReadOnlyDictionary<string, ESWorkbenchAssetRegistrationSlot> assetSlots,
             List<ESWorkbenchContributionEntry> entries,
@@ -257,6 +261,8 @@ namespace ES
             List<ESWorkbenchToolDescriptor> tools,
             List<ESWorkbenchCommandDescriptor> commands,
             List<ESWorkbenchCollectionSource<ESWorkbenchIssueDescriptor>> issueSources,
+            List<ESWorkbenchHostPresentationDescriptor> presentations,
+            List<ESWorkbenchBottomPanelDescriptor> bottomPanels,
             List<string> diagnostics)
         {
             WorkbenchId = workbenchId;
@@ -274,11 +280,13 @@ namespace ES
             Tools = tools;
             Commands = commands;
             IssueSources = issueSources;
+            Presentations = presentations;
+            BottomPanels = bottomPanels;
             Diagnostics = diagnostics;
         }
 
         public string WorkbenchId { get; }
-        public IReadOnlyList<ESWorkbenchContributionDescriptor> Descriptors { get; }
+        public IReadOnlyList<ESWorkbenchContributionDescriptor<TModule>> Descriptors { get; }
         public IReadOnlyList<ESWorkbenchContributionEntry> Entries { get; }
         public IReadOnlyDictionary<string, ESWorkbenchAssetRegistrationSlot> AssetSlots { get; }
         public IReadOnlyList<ESWorkbenchViewportDescriptor> Viewports { get; }
@@ -291,6 +299,8 @@ namespace ES
         public IReadOnlyList<ESWorkbenchToolDescriptor> Tools { get; }
         public IReadOnlyList<ESWorkbenchCommandDescriptor> Commands { get; }
         public IReadOnlyList<ESWorkbenchCollectionSource<ESWorkbenchIssueDescriptor>> IssueSources { get; }
+        public IReadOnlyList<ESWorkbenchHostPresentationDescriptor> Presentations { get; }
+        public IReadOnlyList<ESWorkbenchBottomPanelDescriptor> BottomPanels { get; }
         public IReadOnlyList<string> Diagnostics { get; }
 
         public void Dispose()
@@ -307,16 +317,16 @@ namespace ES
     /// <summary>
     /// 工作台贡献目录。RegisterOrUpdate 只写入轻量描述；Open 才在窗口主线程实例化真实页面和工具。
     /// </summary>
-    public static class ESWorkbenchContributionRegistry
+    public static class ESWorkbenchContributionRegistry<TModule> where TModule : struct, Enum
     {
-        private static readonly Dictionary<string, ESWorkbenchContributionDescriptor> descriptors =
-            new Dictionary<string, ESWorkbenchContributionDescriptor>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, ESWorkbenchContributionDescriptor<TModule>> descriptors =
+            new Dictionary<string, ESWorkbenchContributionDescriptor<TModule>>(StringComparer.Ordinal);
 
-        public static bool RegisterOrUpdate(ESWorkbenchContributionDescriptor descriptor, out string message)
+        public static bool RegisterOrUpdate(ESWorkbenchContributionDescriptor<TModule> descriptor, out string message)
         {
             message = string.Empty;
             if (descriptor == null) { message = "贡献描述为空。"; return false; }
-            if (!descriptors.TryGetValue(descriptor.StableKey, out ESWorkbenchContributionDescriptor existing))
+            if (!descriptors.TryGetValue(descriptor.StableKey, out ESWorkbenchContributionDescriptor<TModule> existing))
             {
                 descriptors.Add(descriptor.StableKey, descriptor);
                 return true;
@@ -344,7 +354,7 @@ namespace ES
             return true;
         }
 
-        public static IReadOnlyList<ESWorkbenchContributionDescriptor> GetDescriptors(string workbenchId)
+        public static IReadOnlyList<ESWorkbenchContributionDescriptor<TModule>> GetDescriptors(string workbenchId)
         {
             return descriptors.Values
                 .Where(value => string.Equals(value.WorkbenchId, workbenchId, StringComparison.Ordinal))
@@ -353,8 +363,9 @@ namespace ES
                 .ToArray();
         }
 
-        public static ESWorkbenchContributionSession Open(
+        public static ESWorkbenchContributionSession<TModule> Open(
             string workbenchId,
+            IEnumerable<TModule> modules,
             object window,
             Action<ESWorkbenchPageDefinition> registerPage,
             Action<ESWorkbenchAssetRegistrationSlot> registerAssetSlot,
@@ -369,9 +380,21 @@ namespace ES
             Action<ESWorkbenchToolDescriptor> registerTool,
             Action<ESWorkbenchCommandDescriptor> registerCommand,
             Action<string> reportDiagnostic,
-            Action<ESWorkbenchCollectionSource<ESWorkbenchIssueDescriptor>> registerIssueSource = null)
+            Action<ESWorkbenchCollectionSource<ESWorkbenchIssueDescriptor>> registerIssueSource = null,
+            Action<ESWorkbenchHostPresentationDescriptor> registerPresentation = null,
+            Action<ESWorkbenchBottomPanelDescriptor> registerBottomPanel = null)
         {
-            IReadOnlyList<ESWorkbenchContributionDescriptor> ordered = GetDescriptors(workbenchId);
+            TModule[] finalModules = (modules ?? Enumerable.Empty<TModule>())
+                .Distinct()
+                .ToArray();
+            var moduleOrder = new Dictionary<TModule, int>();
+            for (int i = 0; i < finalModules.Length; i++) moduleOrder.Add(finalModules[i], i);
+            ESWorkbenchContributionDescriptor<TModule>[] ordered = GetDescriptors(workbenchId)
+                .Where(value => moduleOrder.ContainsKey(value.Module))
+                .OrderBy(value => moduleOrder[value.Module])
+                .ThenByDescending(value => value.Priority)
+                .ThenBy(value => value.ContributionId, StringComparer.Ordinal)
+                .ToArray();
             var available = new HashSet<string>(ordered.Select(value => value.ContributionId), StringComparer.Ordinal);
             var injected = new HashSet<string>(StringComparer.Ordinal);
             var releases = new List<IDisposable>();
@@ -397,6 +420,9 @@ namespace ES
             var commandIds = new HashSet<string>(StringComparer.Ordinal);
             var issueSourceIds = new HashSet<string>(StringComparer.Ordinal);
             var issueSources = new List<ESWorkbenchCollectionSource<ESWorkbenchIssueDescriptor>>();
+            var presentations = new List<ESWorkbenchHostPresentationDescriptor>();
+            var bottomPanelIds = new HashSet<string>(StringComparer.Ordinal);
+            var bottomPanels = new List<ESWorkbenchBottomPanelDescriptor>();
             var diagnostics = new List<string>();
             var context = new ESWorkbenchContributionContext(
                 workbenchId,
@@ -425,15 +451,30 @@ namespace ES
                 tool => RegisterUnique(tool?.ToolId, tool, toolIds, tools, registerTool, diagnostics, reportDiagnostic, "工具"),
                 command => RegisterUnique(command?.CommandId, command, commandIds, commands, registerCommand, diagnostics, reportDiagnostic, "命令"),
                 source => RegisterUnique(source?.SourceId, source, issueSourceIds, issueSources, registerIssueSource, diagnostics, reportDiagnostic, "问题源"),
+                value =>
+                {
+                    if (value == null) return;
+                    if (presentations.Count > 0)
+                    {
+                        string message = "展示合同冲突：" + value.PresentationId
+                            + "，已保留 " + presentations[0].PresentationId + "。";
+                        diagnostics.Add(message);
+                        reportDiagnostic?.Invoke(message);
+                        return;
+                    }
+                    presentations.Add(value);
+                    registerPresentation?.Invoke(value);
+                },
+                panel => RegisterUnique(panel?.PanelId, panel, bottomPanelIds, bottomPanels, registerBottomPanel, diagnostics, reportDiagnostic, "底部面板"),
                 message => { diagnostics.Add(message); reportDiagnostic?.Invoke(message); });
 
-            var pending = new List<ESWorkbenchContributionDescriptor>(ordered);
+            var pending = new List<ESWorkbenchContributionDescriptor<TModule>>(ordered);
             while (pending.Count > 0)
             {
                 bool progressed = false;
                 for (int i = 0; i < pending.Count; i++)
                 {
-                    ESWorkbenchContributionDescriptor descriptor = pending[i];
+                    ESWorkbenchContributionDescriptor<TModule> descriptor = pending[i];
                     string missing = descriptor.Dependencies.FirstOrDefault(value => !available.Contains(value));
                     if (!string.IsNullOrEmpty(missing))
                     {
@@ -479,7 +520,7 @@ namespace ES
                 {
                     for (int i = 0; i < pending.Count; i++)
                     {
-                        ESWorkbenchContributionDescriptor descriptor = pending[i];
+                        ESWorkbenchContributionDescriptor<TModule> descriptor = pending[i];
                         string dependency = descriptor.Dependencies.FirstOrDefault(value => !injected.Contains(value));
                         string message = "贡献 " + descriptor.ContributionId + " 存在循环或失败依赖 " + dependency + "，已跳过注入。";
                         diagnostics.Add(message);
@@ -489,9 +530,9 @@ namespace ES
                 }
             }
 
-            return new ESWorkbenchContributionSession(workbenchId, ordered, releases, assetSlots, entries,
+            return new ESWorkbenchContributionSession<TModule>(workbenchId, ordered, releases, assetSlots, entries,
                 viewports, objects, objectSources, hierarchy, hierarchySources, authoringAdapters,
-                inspectors, tools, commands, issueSources, diagnostics);
+                inspectors, tools, commands, issueSources, presentations, bottomPanels, diagnostics);
         }
 
         private static void RegisterUnique<T>(

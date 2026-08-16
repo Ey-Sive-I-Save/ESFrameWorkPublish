@@ -8,7 +8,8 @@ using UnityEngine.UIElements;
 
 namespace ES
 {
-    internal sealed class ESWorldWorkbenchViewportAdapter : IESWorkbenchViewport, IESWorkbenchFrameableViewport
+    internal sealed class ESWorldWorkbenchViewportAdapter : IESWorkbenchViewport, IESWorkbenchFrameableViewport,
+        IESWorkbenchViewportStatusProvider
     {
         private readonly ESWorldBuilderWorkbenchWindow window;
         private readonly ESWorkbenchViewportContext viewportContext;
@@ -24,11 +25,12 @@ namespace ES
             this.window = window ?? throw new ArgumentNullException(nameof(window));
             viewportContext = context ?? throw new ArgumentNullException(nameof(context));
             this.kind = kind;
-            if (kind == ESWorkbenchViewportKind.Scene3D)
+            if (kind == ESWorkbenchViewportKind.Scene3D || kind == ESWorkbenchViewportKind.Game)
             {
                 viewport3D = new ESWorldAuthoringViewport(
                     point => window.HandleAuthoringPoint(point, context.IsHierarchyVisible, context.IsHierarchyLocked),
-                    context);
+                    context,
+                    kind == ESWorkbenchViewportKind.Game);
                 Root = viewport3D;
             }
             else
@@ -55,14 +57,14 @@ namespace ES
 
         public void FrameAll()
         {
-            if (kind == ESWorkbenchViewportKind.Scene3D) viewport3D?.FrameAll();
+            if (kind == ESWorkbenchViewportKind.Scene3D || kind == ESWorkbenchViewportKind.Game) viewport3D?.FrameAll();
             else viewport2D?.FrameAll();
         }
 
         public void Refresh(ESWorkbenchRefreshReason reason)
         {
             ESWorldMapAsset draft = window.ESWorld_Draft;
-            if (kind == ESWorkbenchViewportKind.Scene3D)
+            if (kind == ESWorkbenchViewportKind.Scene3D || kind == ESWorkbenchViewportKind.Game)
             {
                 if (reason == ESWorkbenchRefreshReason.SelectionChanged) return;
                 viewport3D?.Bind(draft, reason == ESWorkbenchRefreshReason.Initial || reason == ESWorkbenchRefreshReason.AssetChanged);
@@ -72,6 +74,7 @@ namespace ES
 
         public bool CanAccept(ESWorkbenchObjectDescriptor item)
         {
+            if (kind == ESWorkbenchViewportKind.Game) return false;
             return item?.Source is GameObject gameObject
                 && PrefabUtility.IsPartOfPrefabAsset(gameObject)
                 && viewportContext.Actions.Authoring.CanCreate(item);
@@ -80,6 +83,11 @@ namespace ES
         public bool TryAccept(ESWorkbenchDropContext context, out string message)
         {
             message = string.Empty;
+            if (kind == ESWorkbenchViewportKind.Game)
+            {
+                message = "游戏视图是只读构图预览，请在 2D 地图或 3D 世界视口中放置对象。";
+                return false;
+            }
             if (context?.Item == null || !CanAccept(context.Item))
             {
                 message = "世界视口只接受 Project 中已注册的 Prefab。";
@@ -106,6 +114,9 @@ namespace ES
             Refresh(ESWorkbenchRefreshReason.DataChanged);
             return true;
         }
+
+        public IReadOnlyList<ESWorkbenchViewportStatusDescriptor> GetStatusSnapshot()
+            => window.GetViewportStatusSnapshot(kind);
 
         public void Dispose()
         {

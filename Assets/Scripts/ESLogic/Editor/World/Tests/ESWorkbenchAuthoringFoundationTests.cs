@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEditor;
@@ -12,12 +13,20 @@ namespace ES.Tests.Editor.World
 {
     public sealed class ESWorkbenchAuthoringFoundationTests
     {
+        private enum TestModule : byte
+        {
+            Core,
+            Alpha,
+            Beta,
+            Gamma
+        }
+
         private const string Owner = "ES.Tests.WorkbenchFoundation";
 
         [TearDown]
         public void TearDown()
         {
-            ESWorkbenchContributionRegistry.ClearOwner(Owner);
+            ESWorkbenchContributionRegistry<TestModule>.ClearOwner(Owner);
         }
 
         [Test]
@@ -41,11 +50,12 @@ namespace ES.Tests.Editor.World
         public void ContributionContextRegistersCompleteAuthoringSurface()
         {
             string workbenchId = "tests.workbench.complete-surface";
-            Assert.IsTrue(ESWorkbenchContributionRegistry.RegisterOrUpdate(
-                new ESWorkbenchContributionDescriptor(
+            Assert.IsTrue(ESWorkbenchContributionRegistry<TestModule>.RegisterOrUpdate(
+                new ESWorkbenchContributionDescriptor<TestModule>(
                     workbenchId,
                     "authoring",
                     "Authoring",
+                    TestModule.Core,
                     ESWorkbenchContributionCategory.General,
                     context =>
                     {
@@ -73,7 +83,7 @@ namespace ES.Tests.Editor.World
                     owner: Owner),
                 out string registrationMessage), registrationMessage);
 
-            using (ESWorkbenchContributionSession session = Open(workbenchId))
+            using (ESWorkbenchContributionSession<TestModule> session = Open(workbenchId))
             {
                 Assert.AreEqual(1, session.Viewports.Count);
                 Assert.AreEqual(1, session.Objects.Count);
@@ -90,11 +100,12 @@ namespace ES.Tests.Editor.World
         public void DuplicateCapabilityIdKeepsFirstDeclarationAndReportsDiagnostic()
         {
             string workbenchId = "tests.workbench.duplicate-id";
-            Assert.IsTrue(ESWorkbenchContributionRegistry.RegisterOrUpdate(
-                new ESWorkbenchContributionDescriptor(
+            Assert.IsTrue(ESWorkbenchContributionRegistry<TestModule>.RegisterOrUpdate(
+                new ESWorkbenchContributionDescriptor<TestModule>(
                     workbenchId,
                     "duplicates",
                     "Duplicates",
+                    TestModule.Core,
                     ESWorkbenchContributionCategory.Validation,
                     context =>
                     {
@@ -105,12 +116,212 @@ namespace ES.Tests.Editor.World
                     owner: Owner),
                 out string registrationMessage), registrationMessage);
 
-            using (ESWorkbenchContributionSession session = Open(workbenchId))
+            using (ESWorkbenchContributionSession<TestModule> session = Open(workbenchId))
             {
                 Assert.AreEqual(1, session.Tools.Count);
                 Assert.AreEqual("First", session.Tools[0].DisplayName);
                 CollectionAssert.Contains(session.Diagnostics, "工具 ID 冲突：same，已保留首次声明。");
             }
+        }
+
+        [Test]
+        public void PresentationAndBottomPanelsFollowModuleFiltering()
+        {
+            string workbenchId = "tests.workbench.presentation-panels";
+            Assert.IsTrue(ESWorkbenchContributionRegistry<TestModule>.RegisterOrUpdate(
+                new ESWorkbenchContributionDescriptor<TestModule>(
+                    workbenchId,
+                    "beta.surface",
+                    "Beta Surface",
+                    TestModule.Beta,
+                    ESWorkbenchContributionCategory.General,
+                    context =>
+                    {
+                        context.RegisterPresentation(new ESWorkbenchHostPresentationDescriptor(
+                            "beta.presentation", "测试工作台"));
+                        context.RegisterBottomPanel(new ESWorkbenchBottomPanelDescriptor(
+                            "beta.panel", "测试面板",
+                            _ => new ESWorkbenchBottomPanelContent(new VisualElement())));
+                        return null;
+                    },
+                    owner: Owner),
+                out string betaMessage), betaMessage);
+            Assert.IsTrue(ESWorkbenchContributionRegistry<TestModule>.RegisterOrUpdate(
+                new ESWorkbenchContributionDescriptor<TestModule>(
+                    workbenchId,
+                    "alpha.surface",
+                    "Alpha Surface",
+                    TestModule.Alpha,
+                    ESWorkbenchContributionCategory.General,
+                    context =>
+                    {
+                        context.RegisterPresentation(new ESWorkbenchHostPresentationDescriptor(
+                            "alpha.presentation", "不应加载"));
+                        context.RegisterBottomPanel(new ESWorkbenchBottomPanelDescriptor(
+                            "alpha.panel", "不应加载",
+                            _ => new ESWorkbenchBottomPanelContent(new VisualElement())));
+                        return null;
+                    },
+                    owner: Owner),
+                out string alphaMessage), alphaMessage);
+
+            using (ESWorkbenchContributionSession<TestModule> session = Open(
+                workbenchId,
+                new[] { TestModule.Beta }))
+            {
+                Assert.AreEqual(1, session.Presentations.Count);
+                Assert.AreEqual("测试工作台", session.Presentations[0].BrandTitle);
+                Assert.AreEqual(1, session.BottomPanels.Count);
+                Assert.AreEqual("beta.panel", session.BottomPanels[0].PanelId);
+            }
+        }
+
+        [Test]
+        public void DuplicatePresentationAndBottomPanelIdsKeepFirstDeclaration()
+        {
+            string workbenchId = "tests.workbench.presentation-panel-duplicates";
+            Assert.IsTrue(ESWorkbenchContributionRegistry<TestModule>.RegisterOrUpdate(
+                new ESWorkbenchContributionDescriptor<TestModule>(
+                    workbenchId,
+                    "surface",
+                    "Surface",
+                    TestModule.Core,
+                    ESWorkbenchContributionCategory.General,
+                    context =>
+                    {
+                        context.RegisterPresentation(new ESWorkbenchHostPresentationDescriptor(
+                            "main", "首次展示"));
+                        context.RegisterPresentation(new ESWorkbenchHostPresentationDescriptor(
+                            "main", "重复展示"));
+                        context.RegisterBottomPanel(new ESWorkbenchBottomPanelDescriptor(
+                            "status", "首次面板",
+                            _ => new ESWorkbenchBottomPanelContent(new VisualElement())));
+                        context.RegisterBottomPanel(new ESWorkbenchBottomPanelDescriptor(
+                            "status", "重复面板",
+                            _ => new ESWorkbenchBottomPanelContent(new VisualElement())));
+                        return null;
+                    },
+                    owner: Owner),
+                out string message), message);
+
+            using (ESWorkbenchContributionSession<TestModule> session = Open(workbenchId))
+            {
+                Assert.AreEqual("首次展示", session.Presentations.Single().BrandTitle);
+                Assert.AreEqual("首次面板", session.BottomPanels.Single().Title);
+                CollectionAssert.Contains(session.Diagnostics, "展示合同冲突：main，已保留 main。");
+                CollectionAssert.Contains(session.Diagnostics, "底部面板 ID 冲突：status，已保留首次声明。");
+            }
+        }
+
+        [Test]
+        public void OpenFiltersDisabledModulesAndUsesModuleThenPriorityStableOrder()
+        {
+            string workbenchId = "tests.workbench.module-order";
+            var injected = new List<string>();
+            RegisterContribution(workbenchId, "alpha-high", TestModule.Alpha, injected, priority: 100);
+            RegisterContribution(workbenchId, "beta-low", TestModule.Beta, injected, priority: 0);
+            RegisterContribution(workbenchId, "beta-high", TestModule.Beta, injected, priority: 10);
+            RegisterContribution(workbenchId, "gamma", TestModule.Gamma, injected, priority: 1000);
+
+            using (ESWorkbenchContributionSession<TestModule> session = Open(
+                workbenchId,
+                new[] { TestModule.Beta, TestModule.Alpha, TestModule.Beta }))
+            {
+                CollectionAssert.AreEqual(
+                    new[] { "beta-high", "beta-low", "alpha-high" },
+                    injected,
+                    "模块顺序必须优先于跨模块 Priority，重复模块只采用首次位置。");
+                CollectionAssert.AreEqual(
+                    new[] { "beta-high", "beta-low", "alpha-high" },
+                    GetContributionIds(session.Descriptors));
+            }
+        }
+
+        [Test]
+        public void DisabledModuleCannotInjectPagesSlotsOrTools()
+        {
+            string workbenchId = "tests.workbench.module-filter";
+            int injectionCount = 0;
+            Assert.IsTrue(ESWorkbenchContributionRegistry<TestModule>.RegisterOrUpdate(
+                new ESWorkbenchContributionDescriptor<TestModule>(
+                    workbenchId,
+                    "gamma.surface",
+                    "Gamma Surface",
+                    TestModule.Gamma,
+                    ESWorkbenchContributionCategory.General,
+                    context =>
+                    {
+                        injectionCount++;
+                        context.RegisterPage(new ESWorkbenchPageDefinition(
+                            "gamma", "Gamma", "Gamma", ESWorkbenchDirtyFlags.Authoring, () => { }));
+                        context.RegisterAssetSlot(new ESWorkbenchAssetRegistrationSlot(
+                            "gamma.slot", "Gamma", string.Empty, string.Empty, string.Empty,
+                            typeof(UnityEngine.Object), default, "Gamma", "gamma"));
+                        context.RegisterTool(new ESWorkbenchToolDescriptor("gamma.tool", "Gamma", _ => { }));
+                        return null;
+                    },
+                    owner: Owner),
+                out string message), message);
+
+            using (ESWorkbenchContributionSession<TestModule> session = Open(
+                workbenchId,
+                new[] { TestModule.Core }))
+            {
+                Assert.Zero(injectionCount);
+                Assert.Zero(session.Descriptors.Count);
+                Assert.Zero(session.AssetSlots.Count);
+                Assert.Zero(session.Tools.Count);
+            }
+        }
+
+        [Test]
+        public void DependenciesOverrideModuleOrderButRemainStable()
+        {
+            string workbenchId = "tests.workbench.dependency-order";
+            var injected = new List<string>();
+            RegisterContribution(
+                workbenchId,
+                "alpha",
+                TestModule.Alpha,
+                injected,
+                priority: 100,
+                dependencies: new[] { "beta" });
+            RegisterContribution(workbenchId, "beta", TestModule.Beta, injected);
+
+            using (Open(workbenchId, new[] { TestModule.Alpha, TestModule.Beta }))
+                CollectionAssert.AreEqual(new[] { "beta", "alpha" }, injected);
+        }
+
+        [Test]
+        public void MissingAndCyclicDependenciesAreSkippedWithDiagnostics()
+        {
+            string workbenchId = "tests.workbench.dependency-errors";
+            var injected = new List<string>();
+            RegisterContribution(workbenchId, "missing", TestModule.Core, injected,
+                dependencies: new[] { "absent" });
+            RegisterContribution(workbenchId, "cycle-a", TestModule.Alpha, injected,
+                dependencies: new[] { "cycle-b" });
+            RegisterContribution(workbenchId, "cycle-b", TestModule.Beta, injected,
+                dependencies: new[] { "cycle-a" });
+
+            using (ESWorkbenchContributionSession<TestModule> session = Open(workbenchId))
+            {
+                Assert.Zero(injected.Count);
+                Assert.IsTrue(session.Diagnostics.Any(value => value.Contains("缺少依赖 absent")));
+                Assert.IsTrue(session.Diagnostics.Any(value => value.Contains("存在循环或失败依赖")));
+            }
+        }
+
+        [Test]
+        public void SameRevisionRegistrationUsesLatestDelegate()
+        {
+            string workbenchId = "tests.workbench.reload-domain";
+            var injected = new List<string>();
+            RegisterContribution(workbenchId, "same", TestModule.Core, injected, marker: "old");
+            RegisterContribution(workbenchId, "same", TestModule.Core, injected, marker: "latest");
+
+            using (Open(workbenchId, new[] { TestModule.Core }))
+                CollectionAssert.AreEqual(new[] { "latest" }, injected);
         }
 
         [Test]
@@ -181,6 +392,8 @@ namespace ES.Tests.Editor.World
             var host = new ESWorkbenchUIToolkitHost(
                 window,
                 actions,
+                "foundation-tests",
+                "ES 底座测试",
                 typeof(TestAsset),
                 () => null,
                 _ => { },
@@ -217,6 +430,96 @@ namespace ES.Tests.Editor.World
         }
 
         [Test]
+        public void HostConsumesPresentationAndDeterministicallyReleasesBottomPanelContent()
+        {
+            var window = ScriptableObject.CreateInstance<TestEditorWindow>();
+            var actions = new ESWorkbenchActionContext(
+                window,
+                new ESWorkbenchSelectionService(),
+                new ESWorkbenchToolStateService(),
+                new ESWorkbenchAuthoringService(),
+                (_, __) => { },
+                (_, __) => { },
+                _ => { },
+                (_, __) => { });
+            int created = 0;
+            int released = 0;
+            var panels = new[]
+            {
+                new ESWorkbenchBottomPanelDescriptor(
+                    "test.panel",
+                    "测试通道",
+                    _ =>
+                    {
+                        created++;
+                        return new ESWorkbenchBottomPanelContent(
+                            new Label("测试内容"),
+                            () => released++);
+                    },
+                    priority: 1000)
+            };
+            var layout = new ESWorkbenchLayoutState { activeBottomTab = "test.panel" };
+            var presentation = new ESWorkbenchHostPresentationDescriptor(
+                "test.presentation",
+                "ES 测试工作台",
+                "测试资产",
+                "测试视图",
+                "测试视图说明",
+                "测试检查器");
+            var host = new ESWorkbenchUIToolkitHost(
+                window,
+                actions,
+                "foundation-tests",
+                "兼容标题",
+                typeof(TestAsset),
+                () => null,
+                _ => { },
+                () => Array.Empty<ESWorkbenchPageDefinition>(),
+                () => Array.Empty<ESWorkbenchViewportDescriptor>(),
+                () => Array.Empty<ESWorkbenchObjectDescriptor>(),
+                () => Array.Empty<ESWorkbenchHierarchyDescriptor>(),
+                () => Array.Empty<ESWorkbenchInspectorDescriptor>(),
+                () => Array.Empty<ESWorkbenchToolDescriptor>(),
+                () => Array.Empty<ESWorkbenchCommandDescriptor>(),
+                layout,
+                _ => null,
+                _ => { },
+                () => string.Empty,
+                null,
+                null,
+                () => panels,
+                presentation);
+            try
+            {
+                VisualElement root = host.Build();
+                bool foundBrand = false;
+                root.Query<Label>().ForEach(label =>
+                    foundBrand |= label.text == "ES 测试工作台");
+                Assert.IsTrue(foundBrand);
+                Assert.AreEqual(1, created);
+                Assert.Zero(released);
+
+                host.UpdatePresentation(new ESWorkbenchHostPresentationDescriptor(
+                    "test.presentation.reloaded",
+                    "ES 重载后工作台"));
+                host.RefreshRegistrations();
+
+                Assert.AreEqual(2, created);
+                Assert.AreEqual(1, released);
+                bool foundReloadedBrand = false;
+                root.Query<Label>().ForEach(label =>
+                    foundReloadedBrand |= label.text == "ES 重载后工作台");
+                Assert.IsTrue(foundReloadedBrand);
+            }
+            finally
+            {
+                host.Dispose();
+                Assert.AreEqual(created, released);
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
         public void HostRestoresSelectionFromFreshHierarchyDescriptor()
         {
             var window = ScriptableObject.CreateInstance<TestEditorWindow>();
@@ -245,6 +548,8 @@ namespace ES.Tests.Editor.World
             var host = new ESWorkbenchUIToolkitHost(
                 window,
                 actions,
+                "foundation-tests",
+                "ES 底座测试",
                 typeof(TestAsset),
                 () => null,
                 _ => { },
@@ -296,6 +601,8 @@ namespace ES.Tests.Editor.World
             var host = new ESWorkbenchUIToolkitHost(
                 window,
                 actions,
+                "foundation-tests",
+                "ES 底座测试",
                 typeof(TestAsset),
                 () => null,
                 _ => { },
@@ -371,6 +678,145 @@ namespace ES.Tests.Editor.World
         }
 
         [Test]
+        public void PageSwitchReleasesOnlyPageBeingLeftAndCleanupClearsDefinitions()
+        {
+            var window = ScriptableObject.CreateInstance<TestWorkbenchWindow>();
+            int firstReleased = 0;
+            int secondReleased = 0;
+            try
+            {
+                window.RegisterPageForTest("first", () => firstReleased++);
+                window.RegisterPageForTest("second", () => secondReleased++);
+
+                window.SelectPageForTest("first");
+                window.SelectPageForTest("second");
+                window.SelectPageForTest("second");
+
+                Assert.AreEqual(1, firstReleased);
+                Assert.Zero(secondReleased);
+                Assert.AreEqual(2, window.PageCountForTest);
+
+                window.ReleaseForTest();
+
+                Assert.AreEqual(1, firstReleased);
+                Assert.AreEqual(1, secondReleased);
+                Assert.Zero(window.PageCountForTest);
+                Assert.AreEqual(string.Empty, window.SelectedPageIdForTest);
+            }
+            finally
+            {
+                window.ReleaseForTest();
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
+        public void ReloadRebindAndCloseReleaseCurrentPageWithoutKeepingOldClosure()
+        {
+            int oldReleased = 0;
+            int latestReleased = 0;
+            RegisterPageDescriptor(TestWorkbenchWindow.WorkbenchIdForTest, "old", () => oldReleased++);
+            var window = ScriptableObject.CreateInstance<TestWorkbenchWindow>();
+            var asset = ScriptableObject.CreateInstance<TestAsset>();
+            try
+            {
+                window.InitializeForTest();
+                Assert.AreEqual(1, window.PageCountForTest);
+
+                RegisterPageDescriptor(TestWorkbenchWindow.WorkbenchIdForTest, "latest", () => latestReleased++);
+                window.ReloadForTest();
+                Assert.AreEqual(1, oldReleased, "贡献重载必须释放旧页面闭包。");
+                Assert.AreEqual(1, window.PageCountForTest, "重复加载不得保留旧页面定义。");
+
+                window.BindAssetForTest(asset);
+                Assert.AreEqual(1, latestReleased, "资产重绑必须释放重绑前的当前页。");
+                Assert.AreEqual(1, window.PageCountForTest);
+
+                window.ReleaseForTest();
+                Assert.AreEqual(2, latestReleased, "窗口清理必须释放重绑后的当前页。");
+                Assert.Zero(window.PageCountForTest);
+            }
+            finally
+            {
+                window.ReleaseForTest();
+                UnityEngine.Object.DestroyImmediate(asset);
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
+        public void RemovingModuleReleasesOldPageAndFallsBackToRemainingPage()
+        {
+            int coreReleased = 0;
+            int alphaReleased = 0;
+            RegisterPageDescriptor(
+                TestWorkbenchWindow.WorkbenchIdForTest,
+                "core-page",
+                "core",
+                TestModule.Core,
+                () => coreReleased++);
+            RegisterPageDescriptor(
+                TestWorkbenchWindow.WorkbenchIdForTest,
+                "alpha-page",
+                "alpha",
+                TestModule.Alpha,
+                () => alphaReleased++);
+            var window = ScriptableObject.CreateInstance<TestWorkbenchWindow>();
+            window.ModulesForTest.Add(TestModule.Alpha);
+            try
+            {
+                window.InitializeForTest();
+                window.SelectPageForTest("alpha");
+                Assert.AreEqual(1, coreReleased);
+
+                window.ModulesForTest.Remove(TestModule.Alpha);
+                window.ReloadForTest();
+
+                Assert.AreEqual(1, alphaReleased);
+                Assert.AreEqual(1, window.PageCountForTest);
+                Assert.AreEqual("core", window.SelectedPageIdForTest);
+            }
+            finally
+            {
+                window.ReleaseForTest();
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
+        public void IntegrationTestWindowUsesFormalContributionRegistry()
+        {
+            var window = ScriptableObject.CreateInstance<ESWorkbenchIntegrationTestWindow>();
+            try
+            {
+                window.InitializeForTest();
+                Assert.AreEqual(10, window.RegisteredContributionCountForTest);
+                Assert.AreEqual(10, window.RegisteredPageCountForTest);
+            }
+            finally
+            {
+                window.DisableForTest();
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
+        public void WorldFirstEnableCreatesSingleContributionSession()
+        {
+            var window = ScriptableObject.CreateInstance<ESWorldBuilderWorkbenchWindow>();
+            try
+            {
+                window.InitializeForTest();
+                Assert.AreEqual(1, window.ContributionLoadCountForTest);
+            }
+            finally
+            {
+                window.DisableForTest();
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
         public void DynamicObjectSourceObservesDataChangesWithoutReopeningContributionSession()
         {
             string workbenchId = "tests.workbench.dynamic-source";
@@ -378,11 +824,12 @@ namespace ES.Tests.Editor.World
             {
                 new ESWorkbenchObjectDescriptor("first", "First", "Tests", null)
             };
-            Assert.IsTrue(ESWorkbenchContributionRegistry.RegisterOrUpdate(
-                new ESWorkbenchContributionDescriptor(
+            Assert.IsTrue(ESWorkbenchContributionRegistry<TestModule>.RegisterOrUpdate(
+                new ESWorkbenchContributionDescriptor<TestModule>(
                     workbenchId,
                     "dynamic",
                     "Dynamic",
+                    TestModule.Core,
                     ESWorkbenchContributionCategory.General,
                     context =>
                     {
@@ -393,7 +840,7 @@ namespace ES.Tests.Editor.World
                     owner: Owner),
                 out string registrationMessage), registrationMessage);
 
-            using (ESWorkbenchContributionSession session = Open(workbenchId))
+            using (ESWorkbenchContributionSession<TestModule> session = Open(workbenchId))
             {
                 Assert.AreEqual(1, session.ObjectSources.Count);
                 CollectionAssert.AreEqual(new[] { "first" },
@@ -838,10 +1285,85 @@ namespace ES.Tests.Editor.World
             }
         }
 
-        private static ESWorkbenchContributionSession Open(string workbenchId)
+        private static void RegisterContribution(
+            string workbenchId,
+            string contributionId,
+            TestModule module,
+            List<string> injected,
+            int priority = 0,
+            IEnumerable<string> dependencies = null,
+            string marker = null)
         {
-            return ESWorkbenchContributionRegistry.Open(
+            Assert.IsTrue(ESWorkbenchContributionRegistry<TestModule>.RegisterOrUpdate(
+                new ESWorkbenchContributionDescriptor<TestModule>(
+                    workbenchId,
+                    contributionId,
+                    contributionId,
+                    module,
+                    ESWorkbenchContributionCategory.General,
+                    _ =>
+                    {
+                        injected.Add(marker ?? contributionId);
+                        return null;
+                    },
+                    owner: Owner,
+                    priority: priority,
+                    dependencies: dependencies),
+                out string message), message);
+        }
+
+        private static void RegisterPageDescriptor(
+            string workbenchId,
+            string marker,
+            Action release)
+        {
+            RegisterPageDescriptor(workbenchId, "page", "page", TestModule.Core, release, marker);
+        }
+
+        private static void RegisterPageDescriptor(
+            string workbenchId,
+            string contributionId,
+            string pageId,
+            TestModule module,
+            Action release,
+            string displayName = null)
+        {
+            Assert.IsTrue(ESWorkbenchContributionRegistry<TestModule>.RegisterOrUpdate(
+                new ESWorkbenchContributionDescriptor<TestModule>(
+                    workbenchId,
+                    contributionId,
+                    displayName ?? pageId,
+                    module,
+                    ESWorkbenchContributionCategory.General,
+                    context =>
+                    {
+                        context.RegisterPage(new ESWorkbenchPageDefinition(
+                            pageId,
+                            displayName ?? pageId,
+                            pageId,
+                            ESWorkbenchDirtyFlags.Authoring,
+                            () => { },
+                            release: release));
+                        return null;
+                    },
+                    owner: Owner,
+                    revision: 1),
+                out string message), message);
+        }
+
+        private static string[] GetContributionIds(
+            IEnumerable<ESWorkbenchContributionDescriptor<TestModule>> descriptors)
+        {
+            return descriptors.Select(value => value.ContributionId).ToArray();
+        }
+
+        private static ESWorkbenchContributionSession<TestModule> Open(
+            string workbenchId,
+            IEnumerable<TestModule> modules = null)
+        {
+            return ESWorkbenchContributionRegistry<TestModule>.Open(
                 workbenchId,
+                modules ?? new[] { TestModule.Core, TestModule.Alpha, TestModule.Beta, TestModule.Gamma },
                 new object(),
                 _ => { },
                 _ => { },
@@ -894,8 +1416,12 @@ namespace ES.Tests.Editor.World
         {
         }
 
-        private sealed class TestWorkbenchWindow : ESWorkbenchWindowBase<TestWorkbenchWindow, TestAsset>
+        private sealed class TestWorkbenchWindow : ESWorkbenchWindowBase<TestWorkbenchWindow, TestAsset, TestModule>
         {
+            public const string WorkbenchIdForTest = "tests.workbench.window-lifecycle";
+            public List<TestModule> ModulesForTest { get; } = new List<TestModule> { TestModule.Core };
+            protected override List<TestModule> ESWorkbench_DefaultModules => new List<TestModule>(ModulesForTest);
+            protected override string ESWorkbench_WorkbenchId => WorkbenchIdForTest;
             public bool AnimateOpeningFrameForTest => ESWindow_AnimateOpeningFrame;
             public string LastDirtyKeyForTest { get; private set; }
             public ESWorkbenchDirtyFlags LastDirtyFlagsForTest { get; private set; }
@@ -932,6 +1458,19 @@ namespace ES.Tests.Editor.World
 
             public void InitializeForTest() => base.ESWindow_OnHostEnable();
             public void ReleaseForTest() => ESWorkbench_ReleaseContributions();
+            public void ReloadForTest() => ESWorkbench_LoadContributions();
+            public void BindAssetForTest(TestAsset asset) => ESWorkbench_BindAsset(asset);
+            public void RegisterPageForTest(string pageId, Action release) => ESWorkbench_RegisterPage(
+                new ESWorkbenchPageDefinition(
+                    pageId,
+                    pageId,
+                    pageId,
+                    ESWorkbenchDirtyFlags.Authoring,
+                    () => { },
+                    release: release));
+            public void SelectPageForTest(string pageId) => ESWorkbench_SelectPage(pageId);
+            public int PageCountForTest => ESWorkbench_Pages.Count;
+            public string SelectedPageIdForTest => ESWorkbench_SelectedPageId;
             public void MarkDirtyForTest(string key, ESWorkbenchDirtyFlags flags) => ESWorkbench_MarkDirty(key, flags);
             protected override void ESWorkbench_OnDirtyStateChanged(string dirtyKey, ESWorkbenchDirtyFlags flags)
             {

@@ -13,6 +13,7 @@ namespace ES
         private readonly IMGUIContainer renderHost;
         private readonly Action<Vector3> worldClick;
         private readonly ESWorkbenchViewportContext context;
+        private readonly bool readOnlyGameView;
         private ESEditorPreviewRenderContext preview;
         private readonly List<GameObject> previewObjects = new List<GameObject>();
         private readonly List<string> previewStableIds = new List<string>();
@@ -45,11 +46,15 @@ namespace ES
         {
         }
 
-        public ESWorldAuthoringViewport(Action<Vector3> worldClick, ESWorkbenchViewportContext context)
+        public ESWorldAuthoringViewport(
+            Action<Vector3> worldClick,
+            ESWorkbenchViewportContext context,
+            bool readOnlyGameView = false)
         {
-            name = "ESWorldAuthoringViewport";
+            name = readOnlyGameView ? "ESWorldGameViewport" : "ESWorldAuthoringViewport";
             this.worldClick = worldClick;
             this.context = context;
+            this.readOnlyGameView = readOnlyGameView;
             style.flexGrow = 1f;
             style.minWidth = 0f;
             style.minHeight = 240f;
@@ -57,7 +62,9 @@ namespace ES
             renderHost.style.flexGrow = 1f;
             renderHost.style.minWidth = 0f;
             renderHost.style.minHeight = 240f;
-            renderHost.tooltip = "左键选择和变换，右键旋转视角，中键平移，滚轮缩放，Esc 取消变换。";
+            renderHost.tooltip = readOnlyGameView
+                ? "只读游戏构图预览；使用右键、中键和滚轮检查运行时相机构图。"
+                : "左键选择和变换，右键旋转视角，中键平移，滚轮缩放，Esc 取消变换。";
             Add(renderHost);
         }
 
@@ -106,6 +113,12 @@ namespace ES
             {
                 focus = new Vector3((min.x + max.x) * 0.5f, definition.terrainHeightScale * 0.2f, (min.y + max.y) * 0.5f);
                 distance = Mathf.Max(80f, Mathf.Max(max.x - min.x, max.y - min.y) * 1.15f);
+                if (readOnlyGameView)
+                {
+                    pitch = 24f;
+                    yaw = 35f;
+                    distance *= 0.72f;
+                }
             }
 
             CreateTerrain(definition);
@@ -227,6 +240,11 @@ namespace ES
                 }
                 else if (evt.button == 0)
                 {
+                    if (readOnlyGameView)
+                    {
+                        evt.Use();
+                        return;
+                    }
                     if (IsSelectionInteraction()
                         && TryHitPlacement(rect, evt.mousePosition, out string stableId, out GameObject instance))
                     {
@@ -503,11 +521,12 @@ namespace ES
             preview.Camera.farClipPlane = 10000f;
         }
 
-        private static void DrawOverlay(Rect rect)
+        private void DrawOverlay(Rect rect)
         {
-            Rect badge = new Rect(rect.x + 10f, rect.y + 10f, 92f, 24f);
+            Rect badge = new Rect(rect.x + 10f, rect.y + 10f, readOnlyGameView ? 116f : 92f, 24f);
             EditorGUI.DrawRect(badge, new Color(0.02f, 0.025f, 0.03f, 0.82f));
-            GUI.Label(new Rect(badge.x + 8f, badge.y + 3f, badge.width - 12f, 18f), "3D DRAFT", EditorStyles.miniLabel);
+            GUI.Label(new Rect(badge.x + 8f, badge.y + 3f, badge.width - 12f, 18f),
+                readOnlyGameView ? "游戏预览" : "三维草稿", EditorStyles.miniLabel);
         }
 
         private void ClearPreviewContent()

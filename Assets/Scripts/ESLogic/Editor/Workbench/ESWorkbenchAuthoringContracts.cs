@@ -45,6 +45,110 @@ namespace ES
         }
     }
 
+    /// <summary>工作台外壳的展示合同。稳定 ID 用于冲突判定，展示文案可以由领域贡献覆盖。</summary>
+    public sealed class ESWorkbenchHostPresentationDescriptor
+    {
+        public ESWorkbenchHostPresentationDescriptor(
+            string presentationId,
+            string brandTitle,
+            string assetFieldLabel = "资产",
+            string viewportDocumentTitle = "场景",
+            string viewportDocumentTooltip = "二维 / 三维可视作者区域",
+            string inspectorTitle = "检查器")
+        {
+            if (string.IsNullOrWhiteSpace(presentationId))
+                throw new ArgumentException("展示合同 ID 不能为空。", nameof(presentationId));
+            PresentationId = presentationId.Trim();
+            BrandTitle = string.IsNullOrWhiteSpace(brandTitle) ? "ES 内容工作台" : brandTitle.Trim();
+            AssetFieldLabel = string.IsNullOrWhiteSpace(assetFieldLabel) ? "资产" : assetFieldLabel.Trim();
+            ViewportDocumentTitle = string.IsNullOrWhiteSpace(viewportDocumentTitle) ? "场景" : viewportDocumentTitle.Trim();
+            ViewportDocumentTooltip = viewportDocumentTooltip ?? string.Empty;
+            InspectorTitle = string.IsNullOrWhiteSpace(inspectorTitle) ? "检查器" : inspectorTitle.Trim();
+        }
+
+        public string PresentationId { get; }
+        public string BrandTitle { get; }
+        public string AssetFieldLabel { get; }
+        public string ViewportDocumentTitle { get; }
+        public string ViewportDocumentTooltip { get; }
+        public string InspectorTitle { get; }
+
+        public static ESWorkbenchHostPresentationDescriptor CreateDefault(string brandTitle = null)
+        {
+            return new ESWorkbenchHostPresentationDescriptor(
+                "core.default",
+                string.IsNullOrWhiteSpace(brandTitle) ? "ES 内容工作台" : brandTitle);
+        }
+    }
+
+    /// <summary>底部面板工厂收到的只读窗口上下文，不持有可序列化业务状态。</summary>
+    public sealed class ESWorkbenchBottomPanelContext
+    {
+        internal ESWorkbenchBottomPanelContext(
+            string workbenchId,
+            ESWorkbenchActionContext actions,
+            IReadOnlyList<ESWorkbenchIssueDescriptor> issues)
+        {
+            WorkbenchId = workbenchId ?? string.Empty;
+            Actions = actions;
+            Issues = issues ?? Array.Empty<ESWorkbenchIssueDescriptor>();
+        }
+
+        public string WorkbenchId { get; }
+        public ESWorkbenchActionContext Actions { get; }
+        public IReadOnlyList<ESWorkbenchIssueDescriptor> Issues { get; }
+    }
+
+    /// <summary>一次底部面板实例。宿主在切换、重载或关闭时确定性释放。</summary>
+    public sealed class ESWorkbenchBottomPanelContent : IDisposable
+    {
+        private Action release;
+
+        public ESWorkbenchBottomPanelContent(VisualElement root, Action release = null)
+        {
+            Root = root ?? throw new ArgumentNullException(nameof(root));
+            this.release = release;
+        }
+
+        public VisualElement Root { get; }
+
+        public void Dispose()
+        {
+            Action callback = release;
+            release = null;
+            callback?.Invoke();
+        }
+    }
+
+    /// <summary>可排序、可覆盖的底部通道合同。内部稳定 ID 与中文展示文案相互独立。</summary>
+    public sealed class ESWorkbenchBottomPanelDescriptor
+    {
+        public ESWorkbenchBottomPanelDescriptor(
+            string panelId,
+            string title,
+            Func<ESWorkbenchBottomPanelContext, ESWorkbenchBottomPanelContent> createContent,
+            string tooltip = null,
+            int priority = 0,
+            Func<ESWorkbenchBottomPanelContext, bool> isAvailable = null)
+        {
+            if (string.IsNullOrWhiteSpace(panelId))
+                throw new ArgumentException("底部面板 ID 不能为空。", nameof(panelId));
+            PanelId = panelId.Trim();
+            Title = string.IsNullOrWhiteSpace(title) ? PanelId : title.Trim();
+            CreateContent = createContent ?? throw new ArgumentNullException(nameof(createContent));
+            Tooltip = tooltip ?? string.Empty;
+            Priority = priority;
+            IsAvailable = isAvailable;
+        }
+
+        public string PanelId { get; }
+        public string Title { get; }
+        public string Tooltip { get; }
+        public int Priority { get; }
+        public Func<ESWorkbenchBottomPanelContext, ESWorkbenchBottomPanelContent> CreateContent { get; }
+        public Func<ESWorkbenchBottomPanelContext, bool> IsAvailable { get; }
+    }
+
     [Serializable]
     public sealed class ESWorkbenchViewportLayoutState
     {
@@ -61,7 +165,33 @@ namespace ES
     {
         Canvas2D,
         Scene3D,
+        Game,
         Custom
+    }
+
+    public sealed class ESWorkbenchViewportStatusDescriptor
+    {
+        public ESWorkbenchViewportStatusDescriptor(
+            string statusId,
+            string label,
+            string value,
+            string tooltip = null,
+            int priority = 0)
+        {
+            if (string.IsNullOrWhiteSpace(statusId))
+                throw new ArgumentException("视口状态 ID 不能为空。", nameof(statusId));
+            StatusId = statusId.Trim();
+            Label = label?.Trim() ?? string.Empty;
+            Value = value?.Trim() ?? string.Empty;
+            Tooltip = tooltip ?? string.Empty;
+            Priority = priority;
+        }
+
+        public string StatusId { get; }
+        public string Label { get; }
+        public string Value { get; }
+        public string Tooltip { get; }
+        public int Priority { get; }
     }
 
     public enum ESWorkbenchRefreshReason : byte
@@ -1019,6 +1149,12 @@ namespace ES
     public interface IESWorkbenchFrameableViewport
     {
         void FrameAll();
+    }
+
+    /// <summary>视口对宿主提供的只读生产状态；状态不拥有领域数据，也不执行写入。</summary>
+    public interface IESWorkbenchViewportStatusProvider
+    {
+        IReadOnlyList<ESWorkbenchViewportStatusDescriptor> GetStatusSnapshot();
     }
 
     public sealed class ESWorkbenchViewportDescriptor

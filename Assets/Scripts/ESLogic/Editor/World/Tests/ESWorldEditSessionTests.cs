@@ -135,6 +135,35 @@ namespace ES.Tests.Editor.World
                 ESWorldBuilderWorkbenchWindow.ResolveBuildStage(result));
         }
 
+        [Test]
+        public void FormalOutputPathPreflightDerivesStableNavigationAsset()
+        {
+            bool valid = ESWorldMapTerrainEditorFacade.TryValidateOutputPaths(
+                source,
+                "Assets/Generated/Test_Terrain.asset",
+                "Assets/Generated/Test.unity",
+                out string navigationPath,
+                out string error);
+
+            Assert.IsTrue(valid, error);
+            Assert.AreEqual("Assets/Generated/Test_NavMesh.asset", navigationPath);
+        }
+
+        [TestCase("../Outside.asset", "Assets/Generated/Test.unity")]
+        [TestCase("Assets/Generated/Test.txt", "Assets/Generated/Test.unity")]
+        [TestCase("Assets/Generated/Test.asset", "../Outside.unity")]
+        [TestCase("Assets/Generated/Test.asset", "Assets/Generated/Test.prefab")]
+        public void FormalOutputPathPreflightRejectsUnsafeOrWrongTypedTargets(
+            string terrainPath,
+            string scenePath)
+        {
+            bool valid = ESWorldMapTerrainEditorFacade.TryValidateOutputPaths(
+                source, terrainPath, scenePath, out _, out string error);
+
+            Assert.IsFalse(valid);
+            Assert.IsNotEmpty(error);
+        }
+
         private static void InitializeValid(ESWorldMapAsset asset, string mapId)
         {
             ESWorldMapDefinition definition = asset.Definition;

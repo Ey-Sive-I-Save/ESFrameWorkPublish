@@ -2,6 +2,7 @@
     "name": "ES_Logic.Editor.World.Tests",
     "rootNamespace": "ES.Tests.Editor.World",
     "references": [
+        "ES_Stand",
         "ES_Logic",
         "ES_Logic.Editor",
         "ES_Editor"

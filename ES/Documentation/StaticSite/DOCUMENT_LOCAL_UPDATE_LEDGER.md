@@ -432,6 +432,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：随后完整工作树复跑被非本批 `ESGlobalResToolsSupportConfig.cs` 并行语法中间态阻断；销毁兜底缺少直接 `DestroyImmediate` 测试；未运行 Unity Editor、ReloadDomain、Test Runner、PlayMode、Player 或 IL2CPP。
 - **HTML 目标**：后续在 `#runtime-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-013：Workbench 活动持久化与世界编辑
+
+- **源码路径**：Workbench 作者合同与活动存储、世界视口、地形编辑门面、NavMesh 引用、世界测试和贡献指南。
+- **规范与证据**：作者活动、预览状态、正式地图数据和 NavMesh 资产引用保持分层；预览对象不能替代正式 Terrain/NavMesh 资产。
+- **完成分析**：Workbench 宿主、活动存储、世界编辑事务和运行时地图引用形成同一作者会话边界。
+- **回归状态**：两个 World 测试项目曾在本批内容下静态构建为 0 警告、0 错误；16 个目标文本严格 UTF-8 通过。
+- **已知缺口**：当前复跑被非本批资源配置重构缺少两个旧调用目标阻断；未运行 Unity Editor、ReloadDomain、Test Runner、Terrain/NavMesh 正式保存重读或 Player。
+- **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

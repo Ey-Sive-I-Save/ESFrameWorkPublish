@@ -223,6 +223,8 @@ namespace ES
         public bool includeNavigation = true;
         public bool includeVegetation = true;
         public bool includeScatter = true;
+        public string formalSceneAssetPath = string.Empty;
+        public string navigationDataAssetPath = string.Empty;
     }
 
     [Serializable]
@@ -537,4 +539,5 @@ namespace ES
         public ESWorldMapRuntimeState Clone() => new ESWorldMapRuntimeState { schemaVersion = schemaVersion, mapId = mapId, contentVersion = contentVersion, contentHash = contentHash, discoveredRegionIds = discoveredRegionIds != null ? new List<string>(discoveredRegionIds) : new List<string>(), unlockedPoiIds = unlockedPoiIds != null ? new List<string>(unlockedPoiIds) : new List<string>() };
         public bool IsValid(out string error) { error = null; if (schemaVersion != CurrentSchemaVersion) { error = "地图运行状态 schemaVersion 不受支持：" + schemaVersion; return false; } if (string.IsNullOrWhiteSpace(mapId)) { error = "地图运行状态 mapId 不能为空。"; return false; } if (contentVersion <= 0 || string.IsNullOrWhiteSpace(contentHash)) { error = "地图运行状态内容签名无效。"; return false; } return true; }
     }
+
 }

@@ -19,17 +19,12 @@ namespace ES
             public bool pointerDown;
         }
 
-        private sealed class ActivityEntry
-        {
-            public DateTime time;
-            public string message;
-            public MessageType type;
-        }
-
         private const string DragPayloadKey = "ES.Workbench.ObjectDescriptor";
 
         private readonly EditorWindow owner;
         private readonly ESWorkbenchActionContext actions;
+        private readonly string workbenchId;
+        private ESWorkbenchHostPresentationDescriptor presentation;
         private readonly Type assetType;
         private readonly Func<UnityEngine.Object> getAsset;
         private readonly Action<UnityEngine.Object> bindAsset;
@@ -41,6 +36,7 @@ namespace ES
         private readonly Func<IReadOnlyList<ESWorkbenchToolDescriptor>> getTools;
         private readonly Func<IReadOnlyList<ESWorkbenchCommandDescriptor>> getCommands;
         private readonly Func<IReadOnlyList<ESWorkbenchIssueDescriptor>> getIssues;
+        private readonly Func<IReadOnlyList<ESWorkbenchBottomPanelDescriptor>> getBottomPanels;
         private readonly Func<bool> isDirty;
         private readonly ESWorkbenchLayoutState layout;
         private readonly Func<ESWorkbenchPageDefinition, VisualElement> createPageView;
@@ -55,7 +51,8 @@ namespace ES
         private readonly HashSet<string> expandedHierarchyIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> hiddenHierarchyIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> lockedHierarchyIds = new HashSet<string>(StringComparer.Ordinal);
-        private readonly List<ActivityEntry> activity = new List<ActivityEntry>();
+        private readonly List<ESWorkbenchBottomPanelDescriptor> standardBottomPanels = new List<ESWorkbenchBottomPanelDescriptor>();
+        private readonly List<ESWorkbenchBottomPanelDescriptor> resolvedBottomPanels = new List<ESWorkbenchBottomPanelDescriptor>();
 
         private VisualElement root;
         private VisualElement commandBar;
@@ -71,7 +68,9 @@ namespace ES
         private TwoPaneSplitView outerSplit;
         private TwoPaneSplitView contentSplit;
         private TwoPaneSplitView workspaceSplit;
+        private VisualElement bottomTabs;
         private VisualElement bottomContent;
+        private ESWorkbenchBottomPanelContent activeBottomPanelContent;
         private Label inspectorTitle;
         private Label statusLabel;
         private Label documentStatusLabel;
@@ -99,6 +98,8 @@ namespace ES
         internal ESWorkbenchUIToolkitHost(
             EditorWindow owner,
             ESWorkbenchActionContext actions,
+            string workbenchId,
+            string brandTitle,
             Type assetType,
             Func<UnityEngine.Object> getAsset,
             Action<UnityEngine.Object> bindAsset,
@@ -114,10 +115,14 @@ namespace ES
             Action<string> selectPage,
             Func<string> getSelectedPage,
             Func<IReadOnlyList<ESWorkbenchIssueDescriptor>> getIssues = null,
-            Func<bool> isDirty = null)
+            Func<bool> isDirty = null,
+            Func<IReadOnlyList<ESWorkbenchBottomPanelDescriptor>> getBottomPanels = null,
+            ESWorkbenchHostPresentationDescriptor presentation = null)
         {
             this.owner = owner ?? throw new ArgumentNullException(nameof(owner));
             this.actions = actions ?? throw new ArgumentNullException(nameof(actions));
+            this.workbenchId = string.IsNullOrWhiteSpace(workbenchId) ? owner.GetType().FullName : workbenchId.Trim();
+            this.presentation = presentation ?? ESWorkbenchHostPresentationDescriptor.CreateDefault(brandTitle);
             this.assetType = assetType ?? typeof(UnityEngine.Object);
             this.getAsset = getAsset;
             this.bindAsset = bindAsset;
@@ -134,6 +139,8 @@ namespace ES
             this.getSelectedPage = getSelectedPage;
             this.getIssues = getIssues;
             this.isDirty = isDirty;
+            this.getBottomPanels = getBottomPanels;
+            CreateStandardBottomPanelDescriptors();
             if (!this.layout.responsiveLayoutInitialized)
             {
                 this.layout.leftPaneVisible = true;
@@ -145,6 +152,7 @@ namespace ES
             activeDocument = string.IsNullOrWhiteSpace(this.layout.activeDocument) ? "viewport" : this.layout.activeDocument;
             activeViewportId = this.layout.activeViewportId ?? string.Empty;
             activeBottomTab = string.IsNullOrWhiteSpace(this.layout.activeBottomTab) ? "problems" : this.layout.activeBottomTab;
+            if (activeBottomTab == "build") activeBottomTab = this.layout.activeBottomTab = "tasks";
             hierarchyExpansionInitialized = this.layout.hierarchyExpansionInitialized;
             if (this.layout.expandedHierarchyIds != null)
                 expandedHierarchyIds.UnionWith(this.layout.expandedHierarchyIds.Where(value => !string.IsNullOrWhiteSpace(value)));
@@ -233,8 +241,20 @@ namespace ES
             RebuildObjectList();
             RebuildHierarchyList();
             RebuildInspector(actions.Selection.Current);
+            BuildBottomTabs();
             RebuildBottomDrawer();
             ShowDocument(activeDocument);
+        }
+
+        internal void UpdatePresentation(ESWorkbenchHostPresentationDescriptor descriptor)
+        {
+            presentation = descriptor ?? ESWorkbenchHostPresentationDescriptor.CreateDefault();
+        }
+
+        internal void ReleaseContributedContent()
+        {
+            ReleaseBottomPanelContent();
+            bottomContent?.Clear();
         }
 
         public void Refresh(ESWorkbenchRefreshReason reason)
@@ -242,6 +262,7 @@ namespace ES
             if (disposed) return;
             UpdateDocumentStatus();
             activeViewport?.Refresh(reason);
+            UpdateViewportFooter();
             if (reason == ESWorkbenchRefreshReason.AssetChanged || reason == ESWorkbenchRefreshReason.DataChanged
                 || reason == ESWorkbenchRefreshReason.UndoRedo || reason == ESWorkbenchRefreshReason.Explicit)
             {
@@ -356,6 +377,8 @@ namespace ES
             viewportHost.Add(surface);
             panel.Add(viewportHost);
             viewportFooter = CreateHorizontalBar("ESWorkbenchViewportFooter", 25f);
+            viewportFooter.style.height = 44f;
+            viewportFooter.style.flexWrap = Wrap.Wrap;
             viewportFooter.style.borderTopWidth = 1f;
             viewportFooter.style.borderTopColor = ESEditorPresentation.DividerColor;
             panel.Add(viewportFooter);
@@ -373,22 +396,51 @@ namespace ES
                 float height = evt.newRect.height;
                 if (height >= 149f && height <= 361f) layout.bottomDrawerHeight = height;
             });
-            VisualElement tabs = CreateHorizontalBar("ESWorkbenchBottomTabs", 29f);
-            AddBottomTab(tabs, "problems", "问题");
-            AddBottomTab(tabs, "history", "操作历史");
-            AddBottomTab(tabs, "build", "构建任务");
-            AddBottomTab(tabs, "performance", "性能 / 配额");
-            VisualElement spacer = new VisualElement();
-            spacer.style.flexGrow = 1f;
-            tabs.Add(spacer);
-            tabs.Add(CreateActionButton(null, "收起", "收起生产诊断抽屉", ToggleBottomDrawer));
-            drawer.Add(tabs);
+            bottomTabs = CreateHorizontalBar("ESWorkbenchBottomTabs", 29f);
+            drawer.Add(bottomTabs);
+            BuildBottomTabs();
             bottomContent = new ScrollView(ScrollViewMode.Vertical) { name = "ESWorkbenchBottomContent" };
             ((ScrollView)bottomContent).horizontalScrollerVisibility = ScrollerVisibility.Hidden;
             bottomContent.style.flexGrow = 1f;
             bottomContent.style.minHeight = 0f;
             drawer.Add(bottomContent);
             return drawer;
+        }
+
+        private void CreateStandardBottomPanelDescriptors()
+        {
+            standardBottomPanels.Add(new ESWorkbenchBottomPanelDescriptor(
+                "problems", "问题",
+                _ => CreateIssuePanel(
+                    issue => issue.Channel != ESWorkbenchIssueChannel.Build
+                        && issue.Channel != ESWorkbenchIssueChannel.Performance,
+                    "当前没有已知问题"),
+                "资产、作者数据与系统问题", 500));
+            standardBottomPanels.Add(new ESWorkbenchBottomPanelDescriptor(
+                "history", "操作历史",
+                _ => CreateActivityPanel(
+                    ESWorkbenchActivityChannel.History,
+                    "暂无操作记录"),
+                "按项目持久化的工作台操作记录", 400));
+            standardBottomPanels.Add(new ESWorkbenchBottomPanelDescriptor(
+                "tasks", "任务中心",
+                _ => CreateActivityPanel(
+                    ESWorkbenchActivityChannel.Task,
+                    "暂无持久任务"),
+                "按项目持久化的构建与处理任务", 300));
+            standardBottomPanels.Add(new ESWorkbenchBottomPanelDescriptor(
+                "performance", "性能与配额",
+                _ => CreateIssuePanel(
+                    issue => issue.Channel == ESWorkbenchIssueChannel.Performance
+                        || issue.Channel == ESWorkbenchIssueChannel.Security,
+                    "没有性能或配额问题"),
+                "性能预算、安全限制与生产配额", 200));
+            standardBottomPanels.Add(new ESWorkbenchBottomPanelDescriptor(
+                "logs", "日志",
+                _ => CreateActivityPanel(
+                    ESWorkbenchActivityChannel.Log,
+                    "暂无日志"),
+                "按项目持久化的工作台日志", 100));
         }
 
         private VisualElement BuildInspectorPanel()
@@ -406,7 +458,7 @@ namespace ES
                 if (width >= 239f && width <= 521f) layout.inspectorPaneWidth = width;
             });
             VisualElement titleBar = CreateHorizontalBar("ESWorkbenchInspectorTitleBar", 31f);
-            inspectorTitle = new Label("检查器");
+            inspectorTitle = new Label(presentation.InspectorTitle);
             inspectorTitle.AddToClassList("es-brand-title");
             inspectorTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
             inspectorTitle.style.overflow = Overflow.Hidden;
@@ -423,7 +475,7 @@ namespace ES
         private void BuildCommandBar()
         {
             commandBar.Clear();
-            Label brand = new Label("ES UGC WORKBENCH");
+            Label brand = new Label(presentation.BrandTitle);
             brand.AddToClassList("es-brand-title");
             brand.style.unityFontStyleAndWeight = FontStyle.Bold;
             brand.style.marginRight = 10f;
@@ -452,7 +504,7 @@ namespace ES
             bottomPaneButton.name = "ESWorkbenchToggleBottomDrawer";
             bottomPaneButton.style.width = 28f;
             commandBar.Add(bottomPaneButton);
-            var assetField = new ObjectField("资产")
+            var assetField = new ObjectField(presentation.AssetFieldLabel)
             {
                 objectType = assetType,
                 allowSceneObjects = false,
@@ -522,7 +574,10 @@ namespace ES
         {
             if (documentTabs == null) return;
             documentTabs.Clear();
-            AddDocumentTab("viewport", "场景", "2D / 3D 可视作者区域");
+            AddDocumentTab(
+                "viewport",
+                presentation.ViewportDocumentTitle,
+                presentation.ViewportDocumentTooltip);
             IReadOnlyList<ESWorkbenchPageDefinition> pages = getPages?.Invoke();
             if (pages != null)
             for (int i = 0; i < pages.Count; i++)
@@ -1441,9 +1496,65 @@ namespace ES
             if (layout.bottomDrawerExpanded) RebuildBottomDrawer();
         }
 
-        private void AddBottomTab(VisualElement parent, string id, string label)
+        private void BuildBottomTabs()
         {
-            var toggle = new ToolbarToggle { text = label, value = activeBottomTab == id, userData = id };
+            if (bottomTabs == null) return;
+            bottomTabs.Clear();
+            ResolveBottomPanels();
+            if (!resolvedBottomPanels.Exists(value => value.PanelId == activeBottomTab))
+            {
+                activeBottomTab = resolvedBottomPanels.FirstOrDefault()?.PanelId ?? string.Empty;
+                layout.activeBottomTab = activeBottomTab;
+            }
+            for (int i = 0; i < resolvedBottomPanels.Count; i++)
+                AddBottomTab(bottomTabs, resolvedBottomPanels[i]);
+            VisualElement spacer = new VisualElement();
+            spacer.style.flexGrow = 1f;
+            bottomTabs.Add(spacer);
+            bottomTabs.Add(CreateActionButton(null, "收起", "收起生产诊断抽屉", ToggleBottomDrawer));
+        }
+
+        private void ResolveBottomPanels()
+        {
+            resolvedBottomPanels.Clear();
+            var merged = new Dictionary<string, ESWorkbenchBottomPanelDescriptor>(StringComparer.Ordinal);
+            for (int i = 0; i < standardBottomPanels.Count; i++)
+                merged[standardBottomPanels[i].PanelId] = standardBottomPanels[i];
+            IReadOnlyList<ESWorkbenchBottomPanelDescriptor> contributed = getBottomPanels?.Invoke();
+            if (contributed != null)
+                for (int i = 0; i < contributed.Count; i++)
+                {
+                    ESWorkbenchBottomPanelDescriptor panel = contributed[i];
+                    if (panel != null) merged[panel.PanelId] = panel;
+                }
+            var context = new ESWorkbenchBottomPanelContext(workbenchId, actions, getIssues?.Invoke());
+            foreach (ESWorkbenchBottomPanelDescriptor panel in merged.Values
+                .OrderByDescending(value => value.Priority)
+                .ThenBy(value => value.PanelId, StringComparer.Ordinal))
+            {
+                try
+                {
+                    if (panel.IsAvailable == null || panel.IsAvailable(context))
+                        resolvedBottomPanels.Add(panel);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning("[ESWorkbench] 底部面板可用性判断失败："
+                        + panel.PanelId + "，" + exception.Message);
+                }
+            }
+        }
+
+        private void AddBottomTab(VisualElement parent, ESWorkbenchBottomPanelDescriptor panel)
+        {
+            string id = panel.PanelId;
+            var toggle = new ToolbarToggle
+            {
+                text = panel.Title,
+                tooltip = panel.Tooltip,
+                value = activeBottomTab == id,
+                userData = id
+            };
             toggle.RegisterValueChangedCallback(evt =>
             {
                 if (evt.newValue) ShowBottomTab(id);
@@ -1454,7 +1565,7 @@ namespace ES
 
         private void ShowBottomTab(string id)
         {
-            activeBottomTab = string.IsNullOrWhiteSpace(id) ? "problems" : id;
+            activeBottomTab = id ?? string.Empty;
             layout.activeBottomTab = activeBottomTab;
             root?.Q<VisualElement>("ESWorkbenchBottomTabs")?.Query<ToolbarToggle>()
                 .ForEach(toggle => toggle.SetValueWithoutNotify((string)toggle.userData == activeBottomTab));
@@ -1464,64 +1575,137 @@ namespace ES
         private void RebuildBottomDrawer()
         {
             if (bottomContent == null) return;
+            ReleaseBottomPanelContent();
             bottomContent.Clear();
-            if (activeBottomTab == "history")
+            ResolveBottomPanels();
+            ESWorkbenchBottomPanelDescriptor descriptor = resolvedBottomPanels.FirstOrDefault(
+                value => value.PanelId == activeBottomTab);
+            if (descriptor == null)
             {
-                if (activity.Count == 0)
-                {
-                    bottomContent.Add(ESWindowPresentation.CreateEmptyState(
-                        "暂无操作记录", "本次窗口会话中的工具、命令和状态会显示在这里。", null, null));
-                    return;
-                }
-                for (int i = activity.Count - 1; i >= 0; i--)
-                {
-                    ActivityEntry entry = activity[i];
-                    VisualElement row = CreateProductionRow();
-                    Label time = new Label(entry.time.ToString("HH:mm:ss"));
-                    time.style.width = 64f;
-                    time.style.flexShrink = 0f;
-                    time.style.color = ESEditorPresentation.SectionMutedTextColor;
-                    row.Add(time);
-                    Label message = new Label(entry.message);
-                    message.style.flexGrow = 1f;
-                    message.style.whiteSpace = WhiteSpace.Normal;
-                    message.style.color = entry.type == MessageType.Error
-                        ? ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Error)
-                        : entry.type == MessageType.Warning
-                            ? ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Warning)
-                            : ESEditorPresentation.SectionTextColor;
-                    row.Add(message);
-                    bottomContent.Add(row);
-                }
                 return;
             }
-
-            IReadOnlyList<ESWorkbenchIssueDescriptor> source = getIssues?.Invoke();
-            IEnumerable<ESWorkbenchIssueDescriptor> filtered = (source ?? Array.Empty<ESWorkbenchIssueDescriptor>())
-                .Where(issue => issue != null && MatchesBottomTab(issue, activeBottomTab))
-                .OrderByDescending(issue => issue.Severity)
-                .ThenByDescending(issue => issue.Priority)
-                .ThenBy(issue => issue.IssueId, StringComparer.Ordinal);
-            ESWorkbenchIssueDescriptor[] issues = filtered.ToArray();
-            if (issues.Length == 0)
+            try
             {
-                string title = activeBottomTab == "build" ? "没有构建阻断"
-                    : activeBottomTab == "performance" ? "没有性能或配额问题"
-                    : "当前没有已知问题";
+                var context = new ESWorkbenchBottomPanelContext(workbenchId, actions, getIssues?.Invoke());
+                activeBottomPanelContent = descriptor.CreateContent(context);
+                if (activeBottomPanelContent?.Root != null)
+                    bottomContent.Add(activeBottomPanelContent.Root);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
                 bottomContent.Add(ESWindowPresentation.CreateEmptyState(
-                    title, "问题源会在资产、作者数据或任务状态变化后增量刷新。", null, null));
-                return;
+                    "面板加载失败",
+                    "当前通道无法创建：" + exception.Message,
+                    null,
+                    null));
             }
-            for (int i = 0; i < issues.Length; i++) bottomContent.Add(CreateIssueRow(issues[i]));
         }
 
-        private static bool MatchesBottomTab(ESWorkbenchIssueDescriptor issue, string tab)
+        private void ReleaseBottomPanelContent()
         {
-            if (tab == "build") return issue.Channel == ESWorkbenchIssueChannel.Build;
-            if (tab == "performance") return issue.Channel == ESWorkbenchIssueChannel.Performance
-                || issue.Channel == ESWorkbenchIssueChannel.Security;
-            return issue.Channel != ESWorkbenchIssueChannel.Build
-                && issue.Channel != ESWorkbenchIssueChannel.Performance;
+            ESWorkbenchBottomPanelContent content = activeBottomPanelContent;
+            activeBottomPanelContent = null;
+            try { content?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+        }
+
+        private ESWorkbenchBottomPanelContent CreateActivityPanel(
+            ESWorkbenchActivityChannel channel,
+            string emptyTitle)
+        {
+            VisualElement container = new VisualElement();
+            IReadOnlyList<ESWorkbenchActivityRecord> records =
+                ESWorkbenchPersistentActivityStore.Query(workbenchId, channel);
+            if (records.Count == 0)
+            {
+                container.Add(ESWindowPresentation.CreateEmptyState(
+                    emptyTitle,
+                    "记录会按项目持久化并限制数量；窗口或脚本域重载后仍可查询。",
+                    null,
+                    null));
+                return new ESWorkbenchBottomPanelContent(container);
+            }
+            for (int i = 0; i < records.Count; i++)
+            {
+                ESWorkbenchActivityRecord entry = records[i];
+                VisualElement row = CreateProductionRow();
+                DateTime.TryParse(entry.updatedUtc, null,
+                    System.Globalization.DateTimeStyles.RoundtripKind, out DateTime updatedUtc);
+                Label time = new Label(updatedUtc == default
+                    ? "--:--:--" : updatedUtc.ToLocalTime().ToString("HH:mm:ss"));
+                time.style.width = 64f;
+                time.style.flexShrink = 0f;
+                time.style.color = ESEditorPresentation.SectionMutedTextColor;
+                row.Add(time);
+                string localizedStatus = LocalizeActivityStatus(entry.status);
+                string prefix = string.IsNullOrWhiteSpace(localizedStatus)
+                    ? string.Empty : "[" + localizedStatus + "] ";
+                Label message = new Label(prefix + entry.message);
+                message.style.flexGrow = 1f;
+                message.style.whiteSpace = WhiteSpace.Normal;
+                message.style.color = entry.status.IndexOf("fail", StringComparison.OrdinalIgnoreCase) >= 0
+                    || entry.status.IndexOf("error", StringComparison.OrdinalIgnoreCase) >= 0
+                    ? ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Error)
+                    : entry.status.IndexOf("warning", StringComparison.OrdinalIgnoreCase) >= 0
+                        ? ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Warning)
+                        : ESEditorPresentation.SectionTextColor;
+                row.Add(message);
+                if (!string.IsNullOrWhiteSpace(entry.artifactPath))
+                {
+                    Label artifact = new Label(entry.artifactPath) { tooltip = entry.artifactPath };
+                    artifact.style.maxWidth = 320f;
+                    artifact.style.overflow = Overflow.Hidden;
+                    artifact.style.textOverflow = TextOverflow.Ellipsis;
+                    artifact.style.color = ESEditorPresentation.SectionMutedTextColor;
+                    row.Add(artifact);
+                }
+                container.Add(row);
+            }
+            return new ESWorkbenchBottomPanelContent(container);
+        }
+
+        private ESWorkbenchBottomPanelContent CreateIssuePanel(
+            Func<ESWorkbenchIssueDescriptor, bool> filter,
+            string emptyTitle)
+        {
+            VisualElement container = new VisualElement();
+            ESWorkbenchIssueDescriptor[] issues = (getIssues?.Invoke()
+                    ?? Array.Empty<ESWorkbenchIssueDescriptor>())
+                .Where(issue => issue != null && (filter == null || filter(issue)))
+                .OrderByDescending(issue => issue.Severity)
+                .ThenByDescending(issue => issue.Priority)
+                .ThenBy(issue => issue.IssueId, StringComparer.Ordinal)
+                .ToArray();
+            if (issues.Length == 0)
+                container.Add(ESWindowPresentation.CreateEmptyState(
+                    emptyTitle,
+                    "问题源会在资产、作者数据或任务状态变化后增量刷新。",
+                    null,
+                    null));
+            else
+                for (int i = 0; i < issues.Length; i++) container.Add(CreateIssueRow(issues[i]));
+            return new ESWorkbenchBottomPanelContent(container);
+        }
+
+        private static string LocalizeActivityStatus(string status)
+        {
+            if (string.IsNullOrWhiteSpace(status)) return string.Empty;
+            switch (status.Trim().ToLowerInvariant())
+            {
+                case "running": return "进行中";
+                case "succeeded":
+                case "success": return "已成功";
+                case "failed":
+                case "failure": return "已失败";
+                case "cancelled":
+                case "canceled": return "已取消";
+                case "warning": return "警告";
+                case "error": return "错误";
+                case "info":
+                case "information": return "信息";
+                default: return status.Trim();
+            }
         }
 
         private VisualElement CreateIssueRow(ESWorkbenchIssueDescriptor issue)
@@ -1626,17 +1810,41 @@ namespace ES
         private void RecordActivity(string message, MessageType type)
         {
             if (string.IsNullOrWhiteSpace(message)) return;
-            if (activity.Count > 0 && activity[activity.Count - 1].message == message
-                && (DateTime.UtcNow - activity[activity.Count - 1].time).TotalMilliseconds < 250d) return;
-            activity.Add(new ActivityEntry { time = DateTime.Now, message = message.Trim(), type = type });
-            if (activity.Count > 100) activity.RemoveAt(0);
-            if (layout.bottomDrawerExpanded && activeBottomTab == "history") RebuildBottomDrawer();
+            string status = type == MessageType.Error ? "Error"
+                : type == MessageType.Warning ? "Warning" : "Info";
+            ESWorkbenchPersistentActivityStore.Append(
+                workbenchId, ESWorkbenchActivityChannel.History, status, message);
+            if (type == MessageType.Warning || type == MessageType.Error)
+                ESWorkbenchPersistentActivityStore.Append(
+                    workbenchId, ESWorkbenchActivityChannel.Log, status, message);
+            if (layout.bottomDrawerExpanded) RebuildBottomDrawer();
+        }
+
+        internal void RefreshPersistentPanels()
+        {
+            if (layout.bottomDrawerExpanded) RebuildBottomDrawer();
         }
 
         private void UpdateViewportFooter()
         {
             if (viewportFooter == null) return;
             viewportFooter.Clear();
+            if (activeViewport is IESWorkbenchViewportStatusProvider statusProvider)
+            {
+                IReadOnlyList<ESWorkbenchViewportStatusDescriptor> statuses = statusProvider.GetStatusSnapshot();
+                foreach (ESWorkbenchViewportStatusDescriptor status in
+                    (statuses ?? Array.Empty<ESWorkbenchViewportStatusDescriptor>())
+                    .Where(value => value != null)
+                    .OrderByDescending(value => value.Priority)
+                    .ThenBy(value => value.StatusId, StringComparer.Ordinal))
+                {
+                    Label label = new Label(string.IsNullOrEmpty(status.Label)
+                        ? status.Value : status.Label + "：" + status.Value) { tooltip = status.Tooltip };
+                    label.style.flexShrink = 0f;
+                    viewportFooter.Add(label);
+                    viewportFooter.Add(CreateFooterDivider());
+                }
+            }
             string toolName = getTools?.Invoke()?.FirstOrDefault(value => value != null && actions.Tools.IsActive(value.ToolId))?.DisplayName ?? "无工具";
             ESWorkbenchViewportLayoutState state = string.IsNullOrWhiteSpace(activeViewportId)
                 ? null
@@ -1851,6 +2059,7 @@ namespace ES
             disposed = true;
             actions.Selection.Changed -= OnSelectionChanged;
             actions.Tools.Changed -= OnToolChanged;
+            ReleaseContributedContent();
             activeViewport?.Deactivate();
             foreach (IESWorkbenchViewport viewport in liveViewports.Values)
             {
@@ -2487,7 +2696,7 @@ namespace ES
             HandleInput(rect, controlId);
             Rect badge = new Rect(rect.x + 10f, rect.y + 10f, 112f, 23f);
             EditorGUI.DrawRect(badge, new Color(0.01f, 0.015f, 0.02f, 0.82f));
-            GUI.Label(new Rect(badge.x + 7f, badge.y + 3f, badge.width - 12f, 17f), "3D AUTHORING", EditorStyles.miniLabel);
+            GUI.Label(new Rect(badge.x + 7f, badge.y + 3f, badge.width - 12f, 17f), "三维作者视图", EditorStyles.miniLabel);
         }
 
         private void HandleInput(Rect rect, int controlId)

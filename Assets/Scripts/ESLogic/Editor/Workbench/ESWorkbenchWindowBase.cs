@@ -73,9 +73,10 @@ namespace ES
     /// ES UGC 工作台通用底座。底座拥有 UI Toolkit 外壳、2D/3D 视口、对象库、层级、选择、
     /// 上下文 Inspector、命令、快捷键和弹窗生命周期；业务工作台只注册领域内容与写入语义。
     /// </summary>
-    public abstract class ESWorkbenchWindowBase<This, TAsset> : ESSinglePageWindow<This>
-        where This : ESWorkbenchWindowBase<This, TAsset>
+    public abstract class ESWorkbenchWindowBase<This, TAsset, TModule> : ESSinglePageWindow<This>
+        where This : ESWorkbenchWindowBase<This, TAsset, TModule>
         where TAsset : UnityEngine.Object
+        where TModule : struct, Enum
     {
         protected TAsset ESWorkbench_Asset { get; private set; }
         protected SerializedObject ESWorkbench_SerializedAsset { get; private set; }
@@ -90,7 +91,7 @@ namespace ES
         private readonly Dictionary<string, ESWorkbenchAssetRegistrationState> registrationStates = new Dictionary<string, ESWorkbenchAssetRegistrationState>(StringComparer.Ordinal);
         private readonly Dictionary<string, ESWorkbenchAssetRegistrationSlot> contributionSlots = new Dictionary<string, ESWorkbenchAssetRegistrationSlot>(StringComparer.Ordinal);
         private readonly List<ESWorkbenchContributionEntry> contributionEntries = new List<ESWorkbenchContributionEntry>();
-        private readonly List<ESWorkbenchModuleKind> activeModules = new List<ESWorkbenchModuleKind>();
+        private readonly List<TModule> activeModules = new List<TModule>();
         private readonly List<ESWorkbenchViewportDescriptor> viewports = new List<ESWorkbenchViewportDescriptor>();
         private readonly List<ESWorkbenchObjectDescriptor> objects = new List<ESWorkbenchObjectDescriptor>();
         private readonly List<ESWorkbenchCollectionSource<ESWorkbenchObjectDescriptor>> objectSources = new List<ESWorkbenchCollectionSource<ESWorkbenchObjectDescriptor>>();
@@ -104,29 +105,43 @@ namespace ES
         private readonly List<ESWorkbenchCommandDescriptor> commands = new List<ESWorkbenchCommandDescriptor>();
         private readonly List<ESWorkbenchCollectionSource<ESWorkbenchIssueDescriptor>> issueSources = new List<ESWorkbenchCollectionSource<ESWorkbenchIssueDescriptor>>();
         private readonly List<ESWorkbenchIssueDescriptor> resolvedIssues = new List<ESWorkbenchIssueDescriptor>();
+        private readonly List<ESWorkbenchBottomPanelDescriptor> bottomPanels = new List<ESWorkbenchBottomPanelDescriptor>();
         private readonly ESWorkbenchSelectionService selection = new ESWorkbenchSelectionService();
         private readonly ESWorkbenchToolStateService toolState = new ESWorkbenchToolStateService();
         private readonly ESWorkbenchAuthoringService authoringService = new ESWorkbenchAuthoringService();
         private ESWorkbenchPreviewScene previewScene;
-        private ESWorkbenchContributionSession contributionSession;
+        private ESWorkbenchContributionSession<TModule> contributionSession;
+        private int contributionLoadCount;
         private ESWorkbenchUIToolkitHost toolkitHost;
         private ESWorkbenchActionContext actionContext;
         private IVisualElementScheduledItem pendingDataRefresh;
         private bool suppressSelectionPersistence;
+        private bool presentationRegistered;
+        private ESWorkbenchHostPresentationDescriptor presentation;
         private Vector2 standardContentScroll;
         private const string AssetGuidPrefix = "ES.Workbench.AssetGuid.";
         private const string PagePrefix = "ES.Workbench.Page.";
 
         protected virtual IESWorkbenchPersistenceAdapter<TAsset> ESWorkbench_PersistenceAdapter => null;
         protected virtual string ESWorkbench_WorkbenchId => GetType().FullName;
+        protected virtual string ESWorkbench_BrandTitle => "ES 内容工作台";
+        protected virtual ESWorkbenchHostPresentationDescriptor ESWorkbench_DefaultPresentation =>
+            new ESWorkbenchHostPresentationDescriptor(
+                "core.default",
+                ESWorkbench_BrandTitle,
+                ESWorkbench_AssetLabel);
         protected sealed override bool ESWindow_AnimateOpeningFrame => false;
         protected virtual bool ESWorkbench_IncludeDefaultViewports => true;
         protected virtual bool ESWorkbench_IncludeDefaultTools => true;
         protected virtual void ESWorkbench_RegisterDomainContributions()
         {
         }
+        protected virtual void ESWorkbench_BeforeLoadContributions()
+        {
+        }
         protected IReadOnlyList<ESWorkbenchContributionEntry> ESWorkbench_ContributionEntries => contributionEntries;
-        protected IReadOnlyList<ESWorkbenchModuleKind> ESWorkbench_ActiveModules => activeModules;
+        protected int ESWorkbench_ContributionLoadCount => contributionLoadCount;
+        protected IReadOnlyList<TModule> ESWorkbench_ActiveModules => activeModules;
         protected ESWorkbenchSelectionService ESWorkbench_Selection => selection;
         protected ESWorkbenchToolStateService ESWorkbench_ToolState => toolState;
         protected ESWorkbenchAuthoringService ESWorkbench_Authoring => authoringService;
@@ -138,24 +153,29 @@ namespace ES
         protected IReadOnlyList<ESWorkbenchToolDescriptor> ESWorkbench_Tools => tools;
         protected IReadOnlyList<ESWorkbenchCommandDescriptor> ESWorkbench_Commands => commands;
         protected IReadOnlyList<ESWorkbenchIssueDescriptor> ESWorkbench_Issues => resolvedIssues;
+        protected IReadOnlyList<ESWorkbenchBottomPanelDescriptor> ESWorkbench_BottomPanels => bottomPanels;
+
+        protected void ESWorkbench_RecordTask(string taskId, string status, string message, string artifactPath = null)
+        {
+            ESWorkbenchPersistentActivityStore.UpsertTask(
+                taskId, ESWorkbench_WorkbenchId, status, message, artifactPath);
+            toolkitHost?.RefreshPersistentPanels();
+        }
+
+        protected void ESWorkbench_RecordLog(string message, MessageType type = MessageType.Info)
+        {
+            string status = type == MessageType.Error ? "Error"
+                : type == MessageType.Warning ? "Warning" : "Info";
+            ESWorkbenchPersistentActivityStore.Append(
+                ESWorkbench_WorkbenchId, ESWorkbenchActivityChannel.Log, status, message);
+            toolkitHost?.RefreshPersistentPanels();
+        }
 
         /// <summary>工作台的默认模块模板；派生类可直接返回新的枚举列表。</summary>
-        protected virtual List<ESWorkbenchModuleKind> ESWorkbench_DefaultModules => new List<ESWorkbenchModuleKind>
-        {
-            ESWorkbenchModuleKind.Overview,
-            ESWorkbenchModuleKind.Terrain,
-            ESWorkbenchModuleKind.Material,
-            ESWorkbenchModuleKind.Vegetation,
-            ESWorkbenchModuleKind.Prefab,
-            ESWorkbenchModuleKind.Navigation,
-            ESWorkbenchModuleKind.WaterWeather,
-            ESWorkbenchModuleKind.Streaming,
-            ESWorkbenchModuleKind.Collision,
-            ESWorkbenchModuleKind.UGC
-        };
+        protected abstract List<TModule> ESWorkbench_DefaultModules { get; }
 
         /// <summary>在默认模块模板上执行删除、新增和排序；不会修改默认模板本身。</summary>
-        protected virtual void ESWorkbench_AdjustModules(List<ESWorkbenchModuleKind> modules)
+        protected virtual void ESWorkbench_AdjustModules(List<TModule> modules)
         {
         }
 
@@ -170,6 +190,8 @@ namespace ES
         protected virtual string ESWorkbench_AssetLabel => "资产";
         protected void ESWorkbench_BindAsset(TAsset asset)
         {
+            bool reloadContributions = contributionSession != null;
+            if (reloadContributions) ESWorkbench_ReleaseContributions();
             workbenchLayout ??= new ESWorkbenchLayoutState();
             string assetGuid = ResolveAssetGuid(asset);
             bool restorePreviousSelection = !string.IsNullOrEmpty(assetGuid)
@@ -189,7 +211,7 @@ namespace ES
                 if (asset != null)
                     SessionState.SetString(ESWorkbench_StateKey(AssetGuidPrefix), assetGuid);
                 ESWorkbench_OnAssetBound(asset);
-                if (contributionSession != null)
+                if (reloadContributions)
                     ESWorkbench_LoadContributions();
                 workbenchLayout.selectedStableId = selectedStableId;
                 workbenchLayout.selectedKind = selectedKind;
@@ -300,6 +322,19 @@ namespace ES
             if (source != null && !issueSources.Exists(value => value.SourceId == source.SourceId)) issueSources.Add(source);
         }
 
+        protected void ESWorkbench_RegisterPresentation(ESWorkbenchHostPresentationDescriptor descriptor)
+        {
+            if (descriptor == null || presentationRegistered) return;
+            presentation = descriptor;
+            presentationRegistered = true;
+        }
+
+        protected void ESWorkbench_RegisterBottomPanel(ESWorkbenchBottomPanelDescriptor descriptor)
+        {
+            if (descriptor != null && !bottomPanels.Exists(value => value.PanelId == descriptor.PanelId))
+                bottomPanels.Add(descriptor);
+        }
+
         protected IReadOnlyList<ESWorkbenchPageDefinition> ESWorkbench_Pages => pages;
         protected string ESWorkbench_SelectedPageId => selectedPageId;
 
@@ -311,7 +346,7 @@ namespace ES
                 {
                     if (selectedPageId != pageId)
                     {
-                        for (int j = 0; j < pages.Count; j++) pages[j].release?.Invoke();
+                        ESWorkbench_ReleaseCurrentPage();
                         selectedPageId = pageId;
                         SessionState.SetString(ESWorkbench_StateKey(PagePrefix), pageId);
                         pages[i].refresh?.Invoke();
@@ -320,11 +355,27 @@ namespace ES
                 }
         }
 
+        private void ESWorkbench_ReleaseCurrentPage()
+        {
+            if (string.IsNullOrEmpty(selectedPageId)) return;
+            string releasingPageId = selectedPageId;
+            selectedPageId = string.Empty;
+            ESWorkbenchPageDefinition page = pages.FirstOrDefault(value => value.pageId == releasingPageId);
+            if (page?.release == null) return;
+            try { page.release(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+        }
+
         protected void ESWorkbench_RestoreSelectedPage()
         {
             string saved = SessionState.GetString(ESWorkbench_StateKey(PagePrefix), string.Empty);
-            if (!string.IsNullOrEmpty(saved)) ESWorkbench_SelectPage(saved);
-            else if (pages.Count > 0) ESWorkbench_SelectPage(pages[0].pageId);
+            if (!string.IsNullOrEmpty(saved))
+            {
+                ESWorkbench_SelectPage(saved);
+                if (!string.IsNullOrEmpty(selectedPageId)) return;
+            }
+            for (int i = 0; i < pages.Count && string.IsNullOrEmpty(selectedPageId); i++)
+                ESWorkbench_SelectPage(pages[i].pageId);
         }
 
         protected void ESWorkbench_MarkDirty(ESWorkbenchDirtyFlags flags)
@@ -450,6 +501,8 @@ namespace ES
             toolkitHost = new ESWorkbenchUIToolkitHost(
                 this,
                 actionContext,
+                ESWorkbench_WorkbenchId,
+                ESWorkbench_BrandTitle,
                 typeof(TAsset),
                 () => ESWorkbench_Asset,
                 value => ESWorkbench_BindAsset(value as TAsset),
@@ -465,7 +518,9 @@ namespace ES
                 ESWorkbench_SelectPage,
                 () => selectedPageId,
                 () => resolvedIssues,
-                () => ESWorkbench_IsDirty);
+                () => ESWorkbench_IsDirty,
+                () => bottomPanels,
+                presentation);
             content.style.paddingLeft = 0f;
             content.style.paddingRight = 0f;
             content.style.paddingTop = 0f;
@@ -567,11 +622,14 @@ namespace ES
         /// </summary>
         protected void ESWorkbench_LoadContributions()
         {
-            ESWorkbench_InitializeModules();
             ESWorkbench_ReleaseContributions();
+            presentation = ESWorkbench_DefaultPresentation ?? ESWorkbenchHostPresentationDescriptor.CreateDefault();
+            presentationRegistered = false;
+            ESWorkbench_InitializeModules();
             RegisterDefaultAuthoringCapabilities();
-            contributionSession = ESWorkbenchContributionRegistry.Open(
+            contributionSession = ESWorkbenchContributionRegistry<TModule>.Open(
                 ESWorkbench_WorkbenchId,
+                activeModules,
                 this,
                 ESWorkbench_RegisterPage,
                 slot =>
@@ -589,10 +647,15 @@ namespace ES
                 ESWorkbench_RegisterTool,
                 ESWorkbench_RegisterCommand,
                 message => ESWorkbench_SetStatus(message, MessageType.Warning),
-                ESWorkbench_RegisterIssueSource);
+                ESWorkbench_RegisterIssueSource,
+                ESWorkbench_RegisterPresentation,
+                ESWorkbench_RegisterBottomPanel);
+            contributionLoadCount++;
             ResolveDynamicCollections();
             EnsureActiveTool();
+            toolkitHost?.UpdatePresentation(presentation);
             toolkitHost?.RefreshRegistrations();
+            ESWorkbench_RestoreSelectedPage();
         }
 
         private void ResolveDynamicCollections()
@@ -677,7 +740,7 @@ namespace ES
         protected void ESWorkbench_InitializeModules()
         {
             activeModules.Clear();
-            List<ESWorkbenchModuleKind> defaults = ESWorkbench_DefaultModules ?? new List<ESWorkbenchModuleKind>();
+            List<TModule> defaults = ESWorkbench_DefaultModules ?? new List<TModule>();
             activeModules.AddRange(defaults);
             ESWorkbench_AdjustModules(activeModules);
             for (int i = activeModules.Count - 1; i >= 0; i--)
@@ -809,7 +872,7 @@ namespace ES
             return root;
         }
 
-        protected bool ESWorkbench_IsModuleEnabled(ESWorkbenchModuleKind module)
+        protected bool ESWorkbench_IsModuleEnabled(TModule module)
         {
             return activeModules.Contains(module);
         }
@@ -821,26 +884,13 @@ namespace ES
             return names;
         }
 
-        protected static string ESWorkbench_GetModuleDisplayName(ESWorkbenchModuleKind module)
-        {
-            switch (module)
-            {
-                case ESWorkbenchModuleKind.Overview: return "总览";
-                case ESWorkbenchModuleKind.Terrain: return "地形";
-                case ESWorkbenchModuleKind.Material: return "材质层";
-                case ESWorkbenchModuleKind.Vegetation: return "植被 / 细节";
-                case ESWorkbenchModuleKind.Prefab: return "Prefab 散布";
-                case ESWorkbenchModuleKind.Navigation: return "导航 / AI";
-                case ESWorkbenchModuleKind.WaterWeather: return "水体 / 天气";
-                case ESWorkbenchModuleKind.Streaming: return "地形块流式";
-                case ESWorkbenchModuleKind.Collision: return "碰撞 / 物理";
-                case ESWorkbenchModuleKind.UGC: return "构建 / UGC";
-                default: return module.ToString();
-            }
-        }
+        protected virtual string ESWorkbench_GetModuleDisplayName(TModule module) => module.ToString();
 
         protected void ESWorkbench_ReleaseContributions()
         {
+            toolkitHost?.ReleaseContributedContent();
+            ESWorkbench_ReleaseCurrentPage();
+            pages.Clear();
             contributionSession?.Dispose();
             contributionSession = null;
             contributionEntries.Clear();
@@ -858,6 +908,8 @@ namespace ES
             commands.Clear();
             issueSources.Clear();
             resolvedIssues.Clear();
+            bottomPanels.Clear();
+            presentationRegistered = false;
         }
 
         protected bool ESWorkbench_IsHierarchyLocked(string itemId)
@@ -898,6 +950,7 @@ namespace ES
             selection.Changed -= PersistStableSelection;
             selection.Changed += PersistStableSelection;
             ESWorkbench_RegisterDomainContributions();
+            ESWorkbench_BeforeLoadContributions();
             ESWorkbench_LoadContributions();
         }
 
@@ -910,6 +963,7 @@ namespace ES
         {
             pendingDataRefresh?.Pause();
             pendingDataRefresh = null;
+            ESWorkbench_ReleaseContributions();
             toolkitHost?.Dispose();
             toolkitHost = null;
             authoringService.Unbind();

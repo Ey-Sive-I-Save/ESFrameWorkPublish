@@ -1,10 +1,11 @@
 # ES 工作台贡献注册与模块模板指引
 
-状态：现行实现指引（源码级，已标注基础合同缺口，Unity 实机验收待完成）  
-最后验证：2026-08-16（源码复核、`ES_Logic.Editor` 与 `ES_Logic.Editor.World.Tests` 静态构建；不替代 Unity 验收）  
+状态：现行实现指引（源码级，已标注 Unity 实机验收边界）
+
+最后验证：2026-08-16（源码复核、`ES_Logic.Editor` 与 `ES_Logic.Editor.World.Tests` 静态构建；不替代 Unity 验收）
 适用源码入口：`Assets/Scripts/ESLogic/Editor/Workbench`、`Assets/Scripts/ESLogic/Editor/World`
 
-本文说明 ES 专业工作台如何接入模块、页面、资源注册槽位和其他编辑器能力。
+本文说明 ES 专业工作台如何接入模块、页面、展示外壳、底部通道、资源注册槽位和其他编辑器能力。
 
 适用范围：
 
@@ -21,14 +22,12 @@
         ↓
 模块模板：当前工作台期望启用哪些模块，以及期望顺序
         ↓
-模块绑定策略：贡献显式声明或由 IsEnabled 判断是否启用
+模块强类型合同：每个工作台定义自己的 `TModule : struct, Enum`
         ↓
-窗口会话注入：按贡献依赖与优先级创建真实页面、槽位和工具
+窗口会话注入：先按最终模块列表过滤，再按模块顺序、模块内优先级和依赖拓扑创建能力
 ```
 
 贡献描述只保存轻量元数据和工厂委托，不把委托、窗口引用或临时 Unity 对象写入资产。
-
-当前源码必须注意：`ESWorkbenchContributionDescriptor` 尚无模块字段，注册表也不接收最终模块列表。World 页面贡献通过自己的 `IsEnabled` 委托查询模块开关；这不是基础注册表已经自动完成模块过滤和模块顺序注入。后续专业工作台不能只声明模块 List 就假设贡献会自动裁剪。
 
 ## 相关源码
 
@@ -39,11 +38,12 @@
 
 ## 模块枚举
 
-标准模块类型是 `ESWorkbenchModuleKind`：
+底座不提供跨领域的统一模块枚举。每个工作台必须定义自己的模块合同；例如 World 使用 `ESWorldWorkbenchModule`：
 
 ```csharp
-public enum ESWorkbenchModuleKind : byte
+public enum ESWorldWorkbenchModule : byte
 {
+    Foundation,
     Overview,
     Terrain,
     Material,
@@ -57,35 +57,38 @@ public enum ESWorkbenchModuleKind : byte
 }
 ```
 
-模块枚举表示工作台功能边界；贡献分类 `ESWorkbenchContributionCategory` 表示能力归属。两者不要混用：一个模块可以由多个贡献共同实现，一个贡献也可以只提供模块中的一个入口。
+综合 Test 独立使用 `ESWorkbenchIntegrationTestModule`，不得借用 World 枚举。模块枚举表示工作台功能边界；贡献分类 `ESWorkbenchContributionCategory` 表示能力归属。两者不要混用：一个模块可以由多个贡献共同实现，一个贡献也可以只提供模块中的一个入口。
+
+World 的 `Foundation` 承载通用视口、对象库、Inspector、工具与命令。常规 World 变体应保留它；只有明确要移除整套作者能力时才从最终模块列表删除。
 
 ## 默认模块与调整钩子
 
 基础工作台提供默认模块模板：
 
 ```csharp
-protected virtual List<ESWorkbenchModuleKind> ESWorkbench_DefaultModules
+protected override List<ESWorldWorkbenchModule> ESWorkbench_DefaultModules
 {
     get
     {
-        return new List<ESWorkbenchModuleKind>
+        return new List<ESWorldWorkbenchModule>
         {
-            ESWorkbenchModuleKind.Overview,
-            ESWorkbenchModuleKind.Terrain,
-            ESWorkbenchModuleKind.Material,
-            ESWorkbenchModuleKind.Vegetation,
-            ESWorkbenchModuleKind.Prefab,
-            ESWorkbenchModuleKind.Navigation,
-            ESWorkbenchModuleKind.WaterWeather,
-            ESWorkbenchModuleKind.Streaming,
-            ESWorkbenchModuleKind.Collision,
-            ESWorkbenchModuleKind.UGC
+            ESWorldWorkbenchModule.Foundation,
+            ESWorldWorkbenchModule.Overview,
+            ESWorldWorkbenchModule.Terrain,
+            ESWorldWorkbenchModule.Material,
+            ESWorldWorkbenchModule.Vegetation,
+            ESWorldWorkbenchModule.Prefab,
+            ESWorldWorkbenchModule.Navigation,
+            ESWorldWorkbenchModule.WaterWeather,
+            ESWorldWorkbenchModule.Streaming,
+            ESWorldWorkbenchModule.Collision,
+            ESWorldWorkbenchModule.UGC
         };
     }
 }
 
 protected virtual void ESWorkbench_AdjustModules(
-    List<ESWorkbenchModuleKind> modules)
+    List<ESWorldWorkbenchModule> modules)
 {
 }
 ```
@@ -97,16 +100,16 @@ protected virtual void ESWorkbench_AdjustModules(
 适合完全不同的专业工作台：
 
 ```csharp
-protected override List<ESWorkbenchModuleKind>
+protected override List<ESWorldWorkbenchModule>
     ESWorkbench_DefaultModules
 {
     get
     {
-        return new List<ESWorkbenchModuleKind>
+        return new List<ESWorldWorkbenchModule>
         {
-            ESWorkbenchModuleKind.Overview,
-            ESWorkbenchModuleKind.Prefab,
-            ESWorkbenchModuleKind.UGC
+            ESWorldWorkbenchModule.Overview,
+            ESWorldWorkbenchModule.Prefab,
+            ESWorldWorkbenchModule.UGC
         };
     }
 }
@@ -118,12 +121,12 @@ protected override List<ESWorkbenchModuleKind>
 
 ```csharp
 protected override void ESWorkbench_AdjustModules(
-    List<ESWorkbenchModuleKind> modules)
+    List<ESWorldWorkbenchModule> modules)
 {
-    modules.Remove(ESWorkbenchModuleKind.WaterWeather);
-    modules.Remove(ESWorkbenchModuleKind.Streaming);
-    modules.Insert(1, ESWorkbenchModuleKind.Prefab);
-    modules.Add(ESWorkbenchModuleKind.Navigation);
+    modules.Remove(ESWorldWorkbenchModule.WaterWeather);
+    modules.Remove(ESWorldWorkbenchModule.Streaming);
+    modules.Insert(1, ESWorldWorkbenchModule.Prefab);
+    modules.Add(ESWorldWorkbenchModule.Navigation);
 }
 ```
 
@@ -131,14 +134,15 @@ protected override void ESWorkbench_AdjustModules(
 
 ## 注册贡献
 
-贡献使用 `ESWorkbenchContributionDescriptor` 注册：
+贡献使用与工作台模块类型一致的泛型描述注册，并且必须显式携带模块身份：
 
 ```csharp
-ESWorkbenchContributionRegistry.RegisterOrUpdate(
-    new ESWorkbenchContributionDescriptor(
+ESWorkbenchContributionRegistry<ESWorldWorkbenchModule>.RegisterOrUpdate(
+    new ESWorkbenchContributionDescriptor<ESWorldWorkbenchModule>(
         workbenchId: "world",
         contributionId: "world.terrain.unity",
         displayName: "Unity Terrain 地形",
+        module: ESWorldWorkbenchModule.Terrain,
         category: ESWorkbenchContributionCategory.Terrain,
         inject: context =>
         {
@@ -150,21 +154,14 @@ ESWorkbenchContributionRegistry.RegisterOrUpdate(
             context.RegisterPage(new ESWorkbenchPageDefinition(
                 "terrain",
                 "地形",
-                "Unity Terrain / Heightfield",
+                "Unity Terrain / 高度场",
                 ESWorkbenchDirtyFlags.Authoring,
                 () => window.DrawTerrain()));
             return null;
         },
         owner: "ES.World",
         priority: 100,
-        revision: 1,
-        isEnabled: context =>
-        {
-            ESWorldBuilderWorkbenchWindow window =
-                context.Window as ESWorldBuilderWorkbenchWindow;
-            return window != null
-                && window.ESWorkbench_IsModuleEnabled(ESWorkbenchModuleKind.Terrain);
-        }),
+        revision: 1),
     out string message);
 ```
 
@@ -186,12 +183,21 @@ ESWorkbenchContributionRegistry.RegisterOrUpdate(
 
 `ESWorkbenchContributionContext` 当前支持：
 
+- `RegisterPresentation`：声明中文品牌、资产字段、视口文档与检查器标题；
+- `RegisterBottomPanel`：注入带稳定 ID、顺序和确定性释放合同的底部通道；
 - `RegisterPage`：注入页面；
 - `RegisterAssetSlot`：注入材质、Prefab 等资源注册槽位；
 - `RegisterEntry`：注入贡献目录项；
+- `RegisterViewport`：注入二维、三维、游戏或自定义视口；
+- `RegisterObject` / `RegisterObjectSource`：注入对象库条目或动态来源；
+- `RegisterHierarchy` / `RegisterHierarchySource`：注入作者层级或动态来源；
+- `RegisterAuthoringAdapter`：注入正式作者事务适配器；
+- `RegisterInspector`：注入上下文检查器；
+- `RegisterTool` / `RegisterCommand`：注入工具与命令；
+- `RegisterIssueSource`：注入问题、性能与安全状态来源；
 - `ReportDiagnostic`：报告可见诊断信息。
 
-后续可以按同一模式增加：
+后续仍可以按同一模式增加：
 
 - PreviewAdapter；
 - AuthoringTool；
@@ -216,15 +222,16 @@ ESWorkbenchContributionRegistry.RegisterOrUpdate(
 
 ## 生命周期
 
-当前第一版采用“窗口打开时发现并注入”：
+工作台采用“窗口打开时发现并注入”的单一加载入口：
 
 1. 工作台声明默认模块列表；
 2. 执行模块调整钩子；
-3. 注册或更新本工作台的贡献描述；
-4. 贡献自己的 `IsEnabled` 可以读取最终模块列表并决定是否注入；当前通用注册表不会自动按模块过滤；
-5. 注册表按 Priority、ContributionId 和依赖关系注入，不按模块 List 顺序排列；
-6. 窗口关闭或重新装配时释放本次会话句柄并清理注入集合；当前基础实现尚未清理页面列表；
-7. 重新绑定地图资产时重新生成与资产相关的槽位，并防止旧窗口闭包残留。
+3. 注册或更新本工作台的强类型贡献描述；
+4. 在首次贡献会话创建前恢复或创建待绑定资产；
+5. `Open` 对最终模块列表去重并保留首次顺序，过滤未启用模块；
+6. 贡献先按模块顺序、模块内 `Priority` 降序与 `ContributionId` 升序形成稳定基线，再解析依赖拓扑；
+7. 切页只释放离开的当前页；切换底部通道会先释放旧通道内容；贡献重载、资产重绑和窗口关闭会释放当前页与当前底部通道、清空定义并释放会话句柄；
+8. 同 revision 重注册会替换为最新委托，避免 Disable Domain Reload 或窗口重开后保留旧窗口闭包。
 
 不要在静态初始化阶段创建正式 Scene 对象、加载大量资源或写入资产。程序集级注册可以只登记轻量描述；真正的 Unity 对象和资源解析必须发生在窗口主线程的注入阶段。
 
@@ -232,9 +239,9 @@ ESWorkbenchContributionRegistry.RegisterOrUpdate(
 
 World 和底座综合 Test 都必须提供自己的 `ESWorkbench_DefaultModules`，不能依赖基础类的隐式默认值来表达业务范围。
 
-World 当前启用全部标准模块，并使用贡献注入页面和材质/植被/Prefab 注册槽位。其页面贡献逐项设置 `IsEnabled` 完成模块过滤，但页面排序仍由贡献 Priority/ID 决定，不由模块 List 顺序决定。
+World 当前启用自己的全部模块，并使用 `ESWorkbenchContributionRegistry<ESWorldWorkbenchModule>` 注入页面和材质/植被/Prefab 注册槽位。资产恢复在首次 `Open` 之前完成，窗口不再通过 `RegisterPages()` 二次加载。
 
-Test 当前启用全部标准模块，模块下拉由枚举列表驱动，但页面仍由窗口直接调用 `ESWorkbench_RegisterPage` 注册，没有经过贡献注册主流程。当前测试窗口是 `sealed`，不存在通过派生测试窗口覆写 `ESWorkbench_AdjustModules` 的现成验证路径。
+综合 Test 使用独立的 `ESWorkbenchIntegrationTestModule`，页面全部通过正式贡献注册表注入；其 HideAndDontSave 内存资产也在首次贡献会话创建前完成绑定。
 
 ## 资产与委托边界
 
@@ -258,7 +265,7 @@ Test 当前启用全部标准模块，模块下拉由枚举列表驱动，但页
 
 ## 验证清单
 
-新增工作台或贡献后的目标验证清单如下；其中模块顺序、通用裁剪和页面释放当前仍是待补证能力，不能把清单误读为已经通过：
+新增工作台或贡献后的验证清单如下：
 
 - 相同贡献重复注册不会抛出重复 Key 异常；
 - 不同 owner 使用相同 ID 会显示冲突；
@@ -273,9 +280,9 @@ Test 当前启用全部标准模块，模块下拉由枚举列表驱动，但页
 
 ## 当前边界
 
-这套底座已经形成模块候选 List、调整钩子、贡献稳定身份、去重、依赖和窗口注入骨架，但尚未在基础注册表中统一解决模块绑定、按模块顺序显示、页面释放和综合测试走贡献主流程的问题。
+这套底座已经收口模块强类型合同、模块候选 List、调整钩子、贡献稳定身份、去重、依赖、页面生命周期和窗口注入主流程。新增工作台必须提供自己的模块枚举，并沿用同一泛型类型贯穿底座、描述、会话和注册表。
 
-例如，Terrain 笔刷是否真实写入 `TerrainData`、Prefab 排版是否正式落盘、NavMesh 是否实际烘焙，仍必须由对应贡献的 AuthoringTool、BakeProvider 和验证测试完成。当前公开 Terrain Facade 仍封锁正式 `TerrainData` 输出，内部后端代码存在不能作为正式保存能力已经开放的证据。
+例如，Terrain 笔刷、Prefab 排版和 NavMesh 烘焙仍必须由对应贡献的作者事务、构建提供器和验证测试负责。World 已提供显式确认的正式输出事务，但不能绕过预检、备份、重读验证和失败回滚，也不能把本地输出等同于资源发布成功。
 
 ## 世界对话工作台
 
@@ -373,3 +380,27 @@ ESWorldDialogueAnchor
 - 多 Inspector 同时编辑；
 - 保存后重新加载 Graph、Map 和 Scene 的三方关联；
 - 窄窗口、中文长文本和高 DPI 布局。
+
+## 世界商业工作台合同
+
+World 工作台通过正式展示贡献把品牌声明为“ES 世界工作台”，宿主不写死业务品牌。二维地图、三维世界和游戏视图都由 World 模块贡献；游戏视图是只读运行时透视构图，不允许拖放或修改作者数据。World 还通过底部面板合同贡献“世界状态”，底座继续提供问题、操作历史、任务中心、性能与配额、日志等标准通道。
+
+活动信息分为三类项目级记录，保存在 `Library/ESWorkbench/activity-v1.json`：
+
+- 操作历史：用户命令和状态变化；
+- 日志：独立日志通道；
+- 任务中心：以稳定任务 ID 更新预检、排队、运行、成功、失败和产物路径。
+
+记录只包含字符串、状态和 UTC 时间，不保存 `UnityEngine.Object`、`EditorWindow`、委托或实例 ID；按需读取并限制总量，不使用 `InitializeOnLoad`。
+
+正式 World 输出必须由用户点击“生成正式 Terrain / Scene / NavMesh”并再次确认。事务顺序固定为：
+
+1. 验证地图定义、Assets 路径、目标扩展名和已保存地图资产；
+2. 任一已加载 Scene 为 Dirty，或目标正式 Scene 仍处于加载状态时拒绝启动；
+3. 在 `Library/ESWorkbench/Backups/<transactionId>` 备份地图资产和所有既有目标；
+4. 生成或更新 TerrainData，创建包含 TerrainCollider 与 Prefab 放置的 staging Scene；
+5. 使用 Unity `NavMeshBuilder` 从正式内容根收集来源并生成 NavMeshData；
+6. 提交 Scene 后逐项重读 TerrainData、Scene 和 NavMeshData；
+7. 任一步失败时恢复提交前文件并刷新 AssetDatabase。
+
+本地正式输出不等于资源发布成功。资源收集和发布构建继续使用现有 `ESContentRegistration` 预检、提交和状态查询，不创建第二套 Manifest、Provider 或上传流程。

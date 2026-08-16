@@ -1924,6 +1924,52 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-011",
+                        "status":  "documented",
+                        "summary":  "预热枚举字符串镜像索引，并新增固定容量队列与近期历史容器及定向测试。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/Container/DictionatyPro/ESEnumStringMirrorMap.cs",
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/Container/ListPro/ESFixedQueue.cs",
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/Container/ListPro/ESFixedQueue.cs.meta",
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/Container/ListPro/ESRecentHistory.cs",
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/Container/ListPro/ESRecentHistory.cs.meta",
+                                            "Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESEnumStringMirrorMapTests.cs",
+                                            "Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESFixedQueueTests.cs",
+                                            "Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESFixedQueueTests.cs.meta",
+                                            "Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESRecentHistoryTests.cs",
+                                            "Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESRecentHistoryTests.cs.meta"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESEnumStringMirrorMapTests.cs",
+                                              "Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESFixedQueueTests.cs",
+                                              "Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESRecentHistoryTests.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "镜像映射保留权威列表并预热运行时字典，批量重建只分配最终枚举镜像；固定队列和近期历史提供固定容量、FIFO、引用释放、变更检测与稳态无分配合同。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Stand.csproj 与 ES_Stand.ValueChange.Tests.csproj 静态构建为 0 警告、0 错误",
+                                                            "6 个目标源码与测试文件通过严格 UTF-8 检查",
+                                                            "定向测试覆盖容量、环形顺序、引用释放、枚举变更检测和稳态分配"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "未运行 Unity Editor 编译、ReloadDomain 或 Unity Test Runner",
+                                                             "无 Profiler、Player 或 IL2CPP 长时间压力证据",
+                                                             "静态构建只达到 S2 证据等级"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1936,13 +1982,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T10:47:56+08:00",
-                       "head":  "26aff3bdc8a2942c27c301ae457be4b419ff890e",
-                       "stagedSourcePatchSha256":  "18f1fc208ca2f338cd5198c7f574bd1c7193a9751cd5a8b9332a92d55151ebb1",
-                       "stagedSourceManifestSha256":  "a1a5fbb42fb62f0290c329092b161087edfc0f8c2d5668c80f18cc71b383b71d",
-                       "stagedSourceFileCount":  157,
+                       "preparedAt":  "2026-08-16T13:30:41+08:00",
+                       "head":  "4c849e33ce32c36069c89034793847f1ce3dca30",
+                       "stagedSourcePatchSha256":  "b3f6f6d1506ed42b40dda25df2543175706b453562a9ca442162d525d38c8f0c",
+                       "stagedSourceManifestSha256":  "6ba589d0e4455404213fa3268fdee66445c3f3b0162d911884bf79fbd6610047",
+                       "stagedSourceFileCount":  10,
                        "entryIds":  [
-                                        "LOCAL-20260816-010"
+                                        "LOCAL-20260816-011"
                                     ]
                    }
 }

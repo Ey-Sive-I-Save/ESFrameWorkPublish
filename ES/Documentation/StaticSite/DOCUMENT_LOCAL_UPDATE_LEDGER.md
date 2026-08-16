@@ -414,6 +414,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：菜单审计 `valid=False`，仍有 3 个 CreateAssetMenu 分类和 18 个延期静态 HTML 旧路径；只读 AICommand 未授权顺手修复；没有 Unity Editor、ReloadDomain、窗口重开、窄屏、高 DPI、多窗口或交互截图证据。
 - **HTML 目标**：后续在 `#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-011：固定容量容器与镜像索引预热
+
+- **源码路径**：枚举字符串镜像映射、`ESFixedQueue`、`ESRecentHistory` 及三组定向测试。
+- **规范与证据**：镜像映射预热权威列表和运行时索引；固定队列提供 FIFO、环形存储、引用释放和枚举变更检测；近期历史在容量满时稳定淘汰最旧项。
+- **完成分析**：三者属于运行时热路径容器职责，统一约束固定容量、稳态复用和批量重建分配边界。
+- **回归状态**：`ES_Stand.csproj` 与 `ES_Stand.ValueChange.Tests.csproj` 静态构建均为 0 警告、0 错误；6 个目标源码与测试文件通过严格 UTF-8 检查。
+- **已知缺口**：未运行 Unity Editor 编译、ReloadDomain、Unity Test Runner、Profiler、Player 或 IL2CPP；当前最高证据等级为 S2。
+- **HTML 目标**：后续在 `#runtime-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

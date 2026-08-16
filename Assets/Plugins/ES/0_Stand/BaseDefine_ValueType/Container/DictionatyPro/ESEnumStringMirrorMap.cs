@@ -95,7 +95,7 @@ namespace ES
             }
         }
 
-        private sealed class RuntimeMirrors
+        private struct RuntimeMirrors
         {
             public int[] denseEnumEntries;
             public Dictionary<TEnum, int> sparseEnumEntries;
@@ -129,6 +129,7 @@ namespace ES
         [NonSerialized] private bool isDirty = true;
         [NonSerialized] private int generation;
         [NonSerialized] private int observedSerializedRevision;
+        [NonSerialized] private int runtimeCapacityHint;
 
         public int Count => entries?.Count ?? 0;
         public int Generation => generation;
@@ -169,6 +170,7 @@ namespace ES
             if (capacity < 0)
                 throw new ArgumentOutOfRangeException(nameof(capacity));
             entries = new List<Entry>(capacity);
+            runtimeCapacityHint = capacity;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -650,7 +652,16 @@ namespace ES
             }
 
             entries.Clear();
-            ApplyMirrors(CreateEmptyMirrors());
+            denseEnumEntries = Array.Empty<int>();
+            sparseEnumEntries?.Clear();
+            stringEntries ??= new Dictionary<string, int>(runtimeCapacityHint, StringComparer.Ordinal);
+            stringEntries.Clear();
+            enumMirrorKind = EnumMirrorKind.None;
+            enumEntryCount = 0;
+            lastConflict = Conflict.None;
+            isDirty = false;
+            isReady = true;
+            observedSerializedRevision = serializedRevision;
             AdvanceGeneration();
             OnAuthorityCleared();
         }
@@ -679,14 +690,17 @@ namespace ES
             return TryCommit(candidate, out conflict);
         }
 
-        /// <summary>Reserves runtime list capacity without changing content or Generation.</summary>
+        /// <summary>Reserves authority and active mirror capacity without changing content or Generation.</summary>
         public void EnsureCapacity(int capacity)
         {
             if (capacity < 0)
                 throw new ArgumentOutOfRangeException(nameof(capacity));
+            runtimeCapacityHint = Math.Max(runtimeCapacityHint, capacity);
             entries ??= new List<Entry>(capacity);
             if (entries.Capacity < capacity)
                 entries.Capacity = capacity;
+            stringEntries?.EnsureCapacity(capacity);
+            sparseEnumEntries?.EnsureCapacity(capacity);
         }
 
         public void CopyEntries(List<Entry> destination)
@@ -1018,6 +1032,8 @@ namespace ES
                 return false;
             }
 
+            if (candidate.Capacity < runtimeCapacityHint)
+                candidate.Capacity = runtimeCapacityHint;
             entries = candidate;
             ApplyMirrors(mirrors);
             AdvanceGeneration();
@@ -1141,22 +1157,38 @@ namespace ES
         private int GetDenseEnumCapacity(int currentCapacity, int requiredIndex)
         {
             int limit = denseEnumLimit > 0 ? denseEnumLimit : DefaultDenseEnumLimit;
-            int requiredCapacity = requiredIndex + 1;
-            int doubledCapacity = currentCapacity > 0 ? currentCapacity * 2 : 4;
-            return Math.Min(limit + 1, Math.Max(requiredCapacity, doubledCapacity));
+            int maximumCapacity = limit < int.MaxValue ? limit + 1 : int.MaxValue;
+            int requiredCapacity = requiredIndex < int.MaxValue ? requiredIndex + 1 : int.MaxValue;
+            int doubledCapacity = currentCapacity > 0
+                ? currentCapacity <= int.MaxValue / 2 ? currentCapacity * 2 : int.MaxValue
+                : 4;
+            return Math.Min(maximumCapacity, Math.Max(requiredCapacity, doubledCapacity));
         }
 
         private bool CanUseDenseEnumIndex(int denseIndex, int futureEnumCount)
         {
             int limit = denseEnumLimit > 0 ? denseEnumLimit : DefaultDenseEnumLimit;
             int ratio = denseEnumRatio > 0 ? denseEnumRatio : DefaultDenseEnumRatio;
-            int densityLimit = Math.Max(64, futureEnumCount * ratio);
+            long scaledDensityLimit = (long)futureEnumCount * ratio;
+            int densityLimit = scaledDensityLimit >= int.MaxValue
+                ? int.MaxValue
+                : Math.Max(64, (int)scaledDensityLimit);
             return denseIndex <= limit && denseIndex <= densityLimit;
         }
 
         private void ConvertEnumMirrorToSparse(int capacity)
         {
-            Dictionary<TEnum, int> sparse = new Dictionary<TEnum, int>(Math.Max(capacity, enumEntryCount));
+            int requiredCapacity = Math.Max(runtimeCapacityHint, Math.Max(capacity, enumEntryCount));
+            Dictionary<TEnum, int> sparse = sparseEnumEntries;
+            if (sparse == null)
+            {
+                sparse = new Dictionary<TEnum, int>(requiredCapacity);
+            }
+            else
+            {
+                sparse.Clear();
+                sparse.EnsureCapacity(requiredCapacity);
+            }
             for (int index = 0; index < entries.Count; index++)
             {
                 Entry entry = entries[index];
@@ -1248,80 +1280,38 @@ namespace ES
 
         private bool TryBuildMirrors(List<Entry> source, out RuntimeMirrors mirrors, out Conflict conflict)
         {
-            int capacity = source.Count;
-            Dictionary<TEnum, int> enumEntries = new Dictionary<TEnum, int>(capacity);
-            Dictionary<string, int> strings = new Dictionary<string, int>(capacity, StringComparer.Ordinal);
+            int capacity = Math.Max(source.Count, runtimeCapacityHint);
             bool canUseDenseEnum = true;
             int enumCount = 0;
             int maxDenseIndex = -1;
 
+            // Determine the final enum representation without allocating a temporary dictionary.
             for (int i = 0; i < source.Count; i++)
             {
                 Entry entry = source[i];
-                bool hasStringKey = !string.IsNullOrEmpty(entry.stringKey);
-                if (!entry.hasEnumKey && !hasStringKey)
-                {
-                    mirrors = null;
-                    conflict = NewConflict(ConflictKind.MissingKey, i, -1, "Entry " + i + " has neither an enum alias nor a string alias.");
-                    return false;
-                }
+                if (!entry.hasEnumKey)
+                    continue;
 
-                if (!ValidateStringKey(entry.stringKey, hasStringKey, i, out conflict)
-                    || !ValidateValue(entry.value, i, out conflict))
-                {
-                    mirrors = null;
-                    return false;
-                }
-
-                if (!ValidateAdditionalEntry(entry, i, -1, out conflict))
-                {
-                    mirrors = null;
-                    return false;
-                }
-
-                if (entry.hasEnumKey)
-                {
-                    if (enumEntries.TryGetValue(entry.enumKey, out int existingIndex))
-                    {
-                        mirrors = null;
-                        conflict = NewConflict(ConflictKind.DuplicateEnumKey, i, existingIndex, "Entry " + i + " duplicates enum alias from entry " + existingIndex + ".");
-                        return false;
-                    }
-
-                    enumEntries.Add(entry.enumKey, i);
-                    enumCount++;
-                    if (canUseDenseEnum && TryGetDenseEnumIndex(entry.enumKey, out int denseIndex))
-                        maxDenseIndex = Math.Max(maxDenseIndex, denseIndex);
-                    else
-                        canUseDenseEnum = false;
-                }
-
-                if (hasStringKey)
-                {
-                    if (strings.TryGetValue(entry.stringKey, out int existingIndex))
-                    {
-                        mirrors = null;
-                        conflict = NewConflict(ConflictKind.DuplicateStringKey, i, existingIndex, "Entry " + i + " duplicates string alias from entry " + existingIndex + ".");
-                        return false;
-                    }
-                    strings.Add(entry.stringKey, i);
-                }
+                enumCount++;
+                if (canUseDenseEnum && TryGetDenseEnumIndex(entry.enumKey, out int denseIndex))
+                    maxDenseIndex = Math.Max(maxDenseIndex, denseIndex);
+                else
+                    canUseDenseEnum = false;
             }
 
-            int limit = denseEnumLimit > 0 ? denseEnumLimit : DefaultDenseEnumLimit;
-            int ratio = denseEnumRatio > 0 ? denseEnumRatio : DefaultDenseEnumRatio;
-            int densityLimit = Math.Max(64, enumCount * ratio);
             canUseDenseEnum = enumCount > 0
                 && canUseDenseEnum
-                && maxDenseIndex <= limit
-                && maxDenseIndex <= densityLimit;
+                && CanUseDenseEnumIndex(maxDenseIndex, enumCount);
 
+            Dictionary<string, int> strings = new Dictionary<string, int>(capacity, StringComparer.Ordinal);
             mirrors = new RuntimeMirrors
             {
                 stringEntries = strings,
                 enumEntryCount = enumCount
             };
 
+            int[] denseEntries = null;
+            Dictionary<TEnum, int> sparseEntries = null;
             if (enumCount == 0)
             {
                 mirrors.denseEnumEntries = Array.Empty<int>();
@@ -1329,20 +1319,75 @@ namespace ES
             }
             else if (canUseDenseEnum)
             {
-                int[] denseEntries = new int[maxDenseIndex + 1];
-                foreach (KeyValuePair<TEnum, int> pair in enumEntries)
-                {
-                    TryGetDenseEnumIndex(pair.Key, out int denseIndex);
-                    denseEntries[denseIndex] = pair.Value + 1;
-                }
+                denseEntries = new int[maxDenseIndex + 1];
                 mirrors.denseEnumEntries = denseEntries;
                 mirrors.enumMirrorKind = EnumMirrorKind.DenseArray;
             }
             else
             {
+                sparseEntries = new Dictionary<TEnum, int>(capacity);
                 mirrors.denseEnumEntries = Array.Empty<int>();
-                mirrors.sparseEnumEntries = enumEntries;
+                mirrors.sparseEnumEntries = sparseEntries;
                 mirrors.enumMirrorKind = EnumMirrorKind.SparseDictionary;
+            }
+
+            for (int i = 0; i < source.Count; i++)
+            {
+                Entry entry = source[i];
+                bool hasStringKey = !string.IsNullOrEmpty(entry.stringKey);
+                if (!entry.hasEnumKey && !hasStringKey)
+                {
+                    mirrors = default;
+                    conflict = NewConflict(ConflictKind.MissingKey, i, -1, "Entry " + i + " has neither an enum alias nor a string alias.");
+                    return false;
+                }
+
+                if (!ValidateStringKey(entry.stringKey, hasStringKey, i, out conflict)
+                    || !ValidateValue(entry.value, i, out conflict)
+                    || !ValidateAdditionalEntry(entry, i, -1, out conflict))
+                {
+                    mirrors = default;
+                    return false;
+                }
+
+                if (entry.hasEnumKey)
+                {
+                    int existingIndex;
+                    if (canUseDenseEnum)
+                    {
+                        TryGetDenseEnumIndex(entry.enumKey, out int denseIndex);
+                        int encodedIndex = denseEntries[denseIndex];
+                        existingIndex = encodedIndex - 1;
+                        if (encodedIndex == 0)
+                        {
+                            denseEntries[denseIndex] = i + 1;
+                            existingIndex = -1;
+                        }
+                    }
+                    else if (!sparseEntries.TryGetValue(entry.enumKey, out existingIndex))
+                    {
+                        sparseEntries.Add(entry.enumKey, i);
+                        existingIndex = -1;
+                    }
+
+                    if (existingIndex >= 0)
+                    {
+                        mirrors = default;
+                        conflict = NewConflict(ConflictKind.DuplicateEnumKey, i, existingIndex, "Entry " + i + " duplicates enum alias from entry " + existingIndex + ".");
+                        return false;
+                    }
+                }
+
+                if (hasStringKey)
+                {
+                    if (strings.TryGetValue(entry.stringKey, out int existingIndex))
+                    {
+                        mirrors = default;
+                        conflict = NewConflict(ConflictKind.DuplicateStringKey, i, existingIndex, "Entry " + i + " duplicates string alias from entry " + existingIndex + ".");
+                        return false;
+                    }
+                    strings.Add(entry.stringKey, i);
+                }
             }
 
             conflict = Conflict.None;
@@ -1532,17 +1577,6 @@ namespace ES
             enumMirrorKind = EnumMirrorKind.None;
             enumEntryCount = 0;
             isReady = false;
-        }
-
-        private RuntimeMirrors CreateEmptyMirrors()
-        {
-            return new RuntimeMirrors
-            {
-                denseEnumEntries = Array.Empty<int>(),
-                stringEntries = new Dictionary<string, int>(StringComparer.Ordinal),
-                enumMirrorKind = EnumMirrorKind.None,
-                enumEntryCount = 0
-            };
         }
 
         private void AdvanceGeneration()

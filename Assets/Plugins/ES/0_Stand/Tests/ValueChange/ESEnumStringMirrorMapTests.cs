@@ -21,6 +21,12 @@ namespace ES.Tests
             Huge = 100000
         }
 
+        private enum WideDenseKey
+        {
+            Zero = 0,
+            Thousand = 1000
+        }
+
         [Test]
         public void PairAliases_ResolveTheSameEntryThroughDenseEnumAndStringMirrors()
         {
@@ -153,6 +159,97 @@ namespace ES.Tests
             Assert.That(GetPrivateField(map, "denseEnumEntries"), Is.Not.SameAs(initialDenseMirror));
             Assert.That(map.TryGetValue(DenseKey.None, out _), Is.True);
             Assert.That(map.TryGetValue(DenseKey.Weapon, out _), Is.True);
+        }
+
+        [Test]
+        public void EnsureCapacity_PrewarmsAuthorityAndRuntimeDictionariesWithoutChangingGeneration()
+        {
+            const int requestedCapacity = 32;
+            ESEnumStringMirrorMap<DenseKey, string> denseMap = new ESEnumStringMirrorMap<DenseKey, string>();
+            ESEnumStringMirrorMap<SparseKey, string> sparseMap = new ESEnumStringMirrorMap<SparseKey, string>();
+
+            denseMap.EnsureCapacity(requestedCapacity);
+            sparseMap.EnsureCapacity(requestedCapacity);
+
+            Assert.That(denseMap.Generation, Is.Zero);
+            Assert.That(sparseMap.Generation, Is.Zero);
+            Assert.That(
+                denseMap.TryReplaceEntries(
+                    new[] { new ESEnumStringMirrorMap<DenseKey, string>.Entry(DenseKey.Hand, "slot.hand", "hand") },
+                    out _),
+                Is.True);
+            Assert.That(sparseMap.TryAdd(SparseKey.Negative, "slot.negative", "negative", out _), Is.True);
+
+            var denseAuthority = (List<ESEnumStringMirrorMap<DenseKey, string>.Entry>)GetPrivateField(denseMap, "entries");
+            var denseStrings = (Dictionary<string, int>)GetPrivateField(denseMap, "stringEntries");
+            var sparseEnums = (Dictionary<SparseKey, int>)GetPrivateField(sparseMap, "sparseEnumEntries");
+            var sparseStrings = (Dictionary<string, int>)GetPrivateField(sparseMap, "stringEntries");
+            Assert.That(denseAuthority.Capacity, Is.GreaterThanOrEqualTo(requestedCapacity));
+            Assert.That(denseStrings.EnsureCapacity(0), Is.GreaterThanOrEqualTo(requestedCapacity));
+            Assert.That(sparseEnums.EnsureCapacity(0), Is.GreaterThanOrEqualTo(requestedCapacity));
+            Assert.That(sparseStrings.EnsureCapacity(0), Is.GreaterThanOrEqualTo(requestedCapacity));
+        }
+
+        [Test]
+        public void Clear_ReusesStringAndSparseMirrorsAcrossTheNextSparseInsert()
+        {
+            ESEnumStringMirrorMap<SparseKey, string> map = new ESEnumStringMirrorMap<SparseKey, string>(8);
+            Assert.That(map.TryAdd(SparseKey.Negative, "slot.negative", "negative", out _), Is.True);
+            object stringMirror = GetPrivateField(map, "stringEntries");
+            object sparseMirror = GetPrivateField(map, "sparseEnumEntries");
+
+            map.Clear();
+
+            Assert.That(GetPrivateField(map, "stringEntries"), Is.SameAs(stringMirror));
+            Assert.That(GetPrivateField(map, "sparseEnumEntries"), Is.SameAs(sparseMirror));
+            Assert.That(map.ActiveEnumMirror, Is.EqualTo(ESEnumStringMirrorMap<SparseKey, string>.EnumMirrorKind.None));
+            Assert.That(map.TryAdd(SparseKey.Huge, "slot.huge", "huge", out _), Is.True);
+            Assert.That(GetPrivateField(map, "stringEntries"), Is.SameAs(stringMirror));
+            Assert.That(GetPrivateField(map, "sparseEnumEntries"), Is.SameAs(sparseMirror));
+        }
+
+        [Test]
+        public void DenseBulkRebuild_UsesOnlyTheFinalDenseEnumMirror()
+        {
+            ESEnumStringMirrorMap<DenseKey, string> map = new ESEnumStringMirrorMap<DenseKey, string>();
+
+            Assert.That(
+                map.TryReplaceEntries(
+                    new[]
+                    {
+                        new ESEnumStringMirrorMap<DenseKey, string>.Entry(DenseKey.Hand, "slot.hand", "hand"),
+                        new ESEnumStringMirrorMap<DenseKey, string>.Entry(DenseKey.Weapon, "slot.weapon", "weapon")
+                    },
+                    out var conflict),
+                Is.True,
+                conflict.ToString());
+
+            Assert.That(map.ActiveEnumMirror, Is.EqualTo(ESEnumStringMirrorMap<DenseKey, string>.EnumMirrorKind.DenseArray));
+            Assert.That(GetPrivateField(map, "sparseEnumEntries"), Is.Null);
+            Assert.That(map.TryGetValue(DenseKey.Weapon, "slot.weapon", out string value), Is.True);
+            Assert.That(value, Is.EqualTo("weapon"));
+        }
+
+        [Test]
+        public void ExtremeDenseRatio_DoesNotOverflowIntoSparseSelection()
+        {
+            ESEnumStringMirrorMap<WideDenseKey, string> map = new ESEnumStringMirrorMap<WideDenseKey, string>();
+            SetPrivateField(map, "denseEnumRatio", int.MaxValue);
+
+            Assert.That(
+                map.TryReplaceEntries(
+                    new[]
+                    {
+                        new ESEnumStringMirrorMap<WideDenseKey, string>.Entry(WideDenseKey.Zero, "zero"),
+                        new ESEnumStringMirrorMap<WideDenseKey, string>.Entry(WideDenseKey.Thousand, "thousand")
+                    },
+                    out var conflict),
+                Is.True,
+                conflict.ToString());
+
+            Assert.That(map.ActiveEnumMirror, Is.EqualTo(ESEnumStringMirrorMap<WideDenseKey, string>.EnumMirrorKind.DenseArray));
+            Assert.That(map.TryGetValue(WideDenseKey.Thousand, out string value), Is.True);
+            Assert.That(value, Is.EqualTo("thousand"));
         }
 
         [Test]
@@ -580,6 +677,19 @@ namespace ES.Tests
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(field, Is.Not.Null, fieldName);
             return field.GetValue(map);
+        }
+
+        private static void SetPrivateField<TEnum, TValue>(
+            ESEnumStringMirrorMap<TEnum, TValue> map,
+            string fieldName,
+            object value)
+            where TEnum : struct, System.Enum
+        {
+            FieldInfo field = typeof(ESEnumStringMirrorMap<TEnum, TValue>).GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, fieldName);
+            field.SetValue(map, value);
         }
 
         [TestCase("")]

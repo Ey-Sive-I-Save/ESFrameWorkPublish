@@ -108,6 +108,125 @@ namespace ES.Tests
         }
 
         [Test]
+        public void SingleEntryMutations_KeepAuthorityAndMirrorInstances()
+        {
+            ESEnumStringMirrorMap<DenseKey, string> map = new ESEnumStringMirrorMap<DenseKey, string>(4);
+            Assert.That(map.TryAdd(DenseKey.Hand, "slot.hand", "hand", out _), Is.True);
+            Assert.That(map.TryAdd(DenseKey.Weapon, "slot.weapon", "weapon", out _), Is.True);
+            Assert.That(map.TryRemoveEntry(DenseKey.Weapon, out _, out _), Is.True);
+
+            object entries = GetPrivateField(map, "entries");
+            object denseMirror = GetPrivateField(map, "denseEnumEntries");
+            object stringMirror = GetPrivateField(map, "stringEntries");
+
+            Assert.That(map.TrySetValue(DenseKey.Hand, "hand.updated", out var valueConflict), Is.True, valueConflict.ToString());
+            Assert.That(GetPrivateField(map, "entries"), Is.SameAs(entries));
+            Assert.That(GetPrivateField(map, "denseEnumEntries"), Is.SameAs(denseMirror));
+            Assert.That(GetPrivateField(map, "stringEntries"), Is.SameAs(stringMirror));
+
+            Assert.That(map.TryReplaceEnumKey(DenseKey.Hand, DenseKey.Head, out var enumConflict), Is.True, enumConflict.ToString());
+            Assert.That(map.TryReplaceStringKey("slot.hand", "slot.primary-hand", out var stringConflict), Is.True, stringConflict.ToString());
+            Assert.That(GetPrivateField(map, "entries"), Is.SameAs(entries));
+            Assert.That(GetPrivateField(map, "denseEnumEntries"), Is.SameAs(denseMirror));
+            Assert.That(GetPrivateField(map, "stringEntries"), Is.SameAs(stringMirror));
+            Assert.That(map.TryGetValue(DenseKey.Head, "slot.primary-hand", out string value), Is.True);
+            Assert.That(value, Is.EqualTo("hand.updated"));
+        }
+
+        [Test]
+        public void SequentialAdds_GrowAuthorityAndDenseMirrorGeometrically()
+        {
+            ESEnumStringMirrorMap<DenseKey, string> map = new ESEnumStringMirrorMap<DenseKey, string>();
+            Assert.That(map.TryAdd(DenseKey.None, "none", out _), Is.True);
+            List<ESEnumStringMirrorMap<DenseKey, string>.Entry> entries =
+                (List<ESEnumStringMirrorMap<DenseKey, string>.Entry>)GetPrivateField(map, "entries");
+            int initialAuthorityCapacity = entries.Capacity;
+            object initialDenseMirror = GetPrivateField(map, "denseEnumEntries");
+
+            Assert.That(map.TryAdd("one", "one", out _), Is.True);
+            Assert.That(map.TryAdd("two", "two", out _), Is.True);
+            Assert.That(map.TryAdd("three", "three", out _), Is.True);
+            Assert.That(map.TryAdd("four", "four", out _), Is.True);
+            Assert.That(map.TryAdd(DenseKey.Weapon, "weapon", out _), Is.True);
+
+            Assert.That(entries.Capacity, Is.GreaterThanOrEqualTo(initialAuthorityCapacity * 2));
+            Assert.That(GetPrivateField(map, "denseEnumEntries"), Is.Not.SameAs(initialDenseMirror));
+            Assert.That(map.TryGetValue(DenseKey.None, out _), Is.True);
+            Assert.That(map.TryGetValue(DenseKey.Weapon, out _), Is.True);
+        }
+
+        [Test]
+        public void IdenticalSetAndEntryReplacement_DoNotAdvanceGeneration()
+        {
+            ESEnumStringMirrorMap<DenseKey, string> map = new ESEnumStringMirrorMap<DenseKey, string>();
+            Assert.That(map.TryAdd(DenseKey.Hand, "slot.hand", "hand", out _), Is.True);
+            int generation = map.Generation;
+
+            Assert.That(map.TrySet(DenseKey.Hand, "slot.hand", "hand", out var setConflict), Is.True, setConflict.ToString());
+            Assert.That(
+                map.TryReplaceEntryAt(
+                    0,
+                    new ESEnumStringMirrorMap<DenseKey, string>.Entry(DenseKey.Hand, "slot.hand", "hand"),
+                    out var replaceConflict),
+                Is.True,
+                replaceConflict.ToString());
+
+            Assert.That(map.Generation, Is.EqualTo(generation));
+        }
+
+        [Test]
+        public void EquivalentAbsentAliases_DoNotAdvanceGeneration()
+        {
+            ESEnumStringMirrorMap<DenseKey, string> map = new ESEnumStringMirrorMap<DenseKey, string>();
+            Assert.That(map.TryAdd(DenseKey.Hand, "hand", out _), Is.True);
+            int generation = map.Generation;
+
+            var replacement = new ESEnumStringMirrorMap<DenseKey, string>.Entry
+            {
+                hasEnumKey = true,
+                enumKey = DenseKey.Hand,
+                stringKey = string.Empty,
+                value = "hand"
+            };
+            Assert.That(map.TryReplaceEntryAt(0, replacement, out var conflict), Is.True, conflict.ToString());
+            Assert.That(map.Generation, Is.EqualTo(generation));
+        }
+
+        [Test]
+        public void IncrementalInsertMoveAndRemove_KeepEveryMirrorConsistent()
+        {
+            ESEnumStringMirrorMap<DenseKey, string> map = new ESEnumStringMirrorMap<DenseKey, string>();
+            Assert.That(map.TryAdd(DenseKey.Hand, "slot.hand", "hand", out _), Is.True);
+            Assert.That(map.TryAdd(DenseKey.Weapon, "slot.weapon", "weapon", out _), Is.True);
+            object authority = GetPrivateField(map, "entries");
+            object stringMirror = GetPrivateField(map, "stringEntries");
+
+            Assert.That(
+                map.TryInsertEntry(
+                    1,
+                    new ESEnumStringMirrorMap<DenseKey, string>.Entry(DenseKey.Head, "slot.head", "head"),
+                    out var insertConflict),
+                Is.True,
+                insertConflict.ToString());
+            Assert.That(map.TryMoveEntry(2, 0, out var moveConflict), Is.True, moveConflict.ToString());
+            Assert.That(map.TryRemoveEntry(DenseKey.Head, out string removed, out var removeConflict), Is.True, removeConflict.ToString());
+
+            Assert.That(GetPrivateField(map, "entries"), Is.SameAs(authority));
+            Assert.That(GetPrivateField(map, "stringEntries"), Is.SameAs(stringMirror));
+            Assert.That(removed, Is.EqualTo("head"));
+            Assert.That(map.TryGetValue(DenseKey.Weapon, "slot.weapon", out string weapon), Is.True);
+            Assert.That(map.TryGetValue(DenseKey.Hand, "slot.hand", out string hand), Is.True);
+            Assert.That(weapon, Is.EqualTo("weapon"));
+            Assert.That(hand, Is.EqualTo("hand"));
+            Assert.That(map.TryGetValue(DenseKey.Head, out _), Is.False);
+            Assert.That(map.TryGetValue("slot.head", out _), Is.False);
+            Assert.That(map.TryGetEntryAt(0, out var first), Is.True);
+            Assert.That(map.TryGetEntryAt(1, out var second), Is.True);
+            Assert.That(first.enumKey, Is.EqualTo(DenseKey.Weapon));
+            Assert.That(second.enumKey, Is.EqualTo(DenseKey.Hand));
+        }
+
+        [Test]
         public void RuntimeMutations_RejectConflictsWithoutPartialChanges()
         {
             ESEnumStringMirrorMap<DenseKey, string> map = new ESEnumStringMirrorMap<DenseKey, string>();
@@ -141,6 +260,7 @@ namespace ES.Tests
             Assert.That(map.TryGetValue(DenseKey.Head, "slot.head", out string head), Is.True);
             Assert.That(hand, Is.EqualTo("hand"));
             Assert.That(head, Is.EqualTo("head"));
+            Assert.That(map.LastConflict.HasConflict, Is.False);
         }
 
         [Test]
@@ -375,11 +495,16 @@ namespace ES.Tests
             Assert.That(map.TryAdd(SparseKey.Negative, "negative", out _), Is.True);
             Assert.That(map.TryAdd(SparseKey.Huge, "huge", out _), Is.True);
 
+            object sparseMirror = GetPrivateField(map, "sparseEnumEntries");
+            Assert.That(map.TrySetValue(SparseKey.Negative, "negative.updated", out var valueConflict), Is.True, valueConflict.ToString());
+            Assert.That(map.TryRemoveEntry(SparseKey.Huge, out string removed, out var removeConflict), Is.True, removeConflict.ToString());
+
             Assert.That(map.ActiveEnumMirror, Is.EqualTo(ESEnumStringMirrorMap<SparseKey, string>.EnumMirrorKind.SparseDictionary));
+            Assert.That(GetPrivateField(map, "sparseEnumEntries"), Is.SameAs(sparseMirror));
             Assert.That(map.TryGetValue(SparseKey.Negative, out string negative), Is.True);
-            Assert.That(map.TryGetValue(SparseKey.Huge, out string huge), Is.True);
-            Assert.That(negative, Is.EqualTo("negative"));
-            Assert.That(huge, Is.EqualTo("huge"));
+            Assert.That(map.TryGetValue(SparseKey.Huge, out _), Is.False);
+            Assert.That(negative, Is.EqualTo("negative.updated"));
+            Assert.That(removed, Is.EqualTo("huge"));
         }
 
         [Test]
@@ -419,8 +544,42 @@ namespace ES.Tests
 
             Object.DestroyImmediate(target);
 
+            Assert.That(map.ContainsAlias(DenseKey.Hand), Is.True);
+            Assert.That(map.ContainsAlias("slot.hand"), Is.True);
+            Assert.That(map.ContainsKey(DenseKey.Hand), Is.False);
+            Assert.That(map.ContainsKey("slot.hand"), Is.False);
             Assert.That(map.TryGetValue(DenseKey.Hand, out _), Is.False);
             Assert.That(map.TryGetValue("slot.hand", out _), Is.False);
+        }
+
+        [Test]
+        public void DestroyedUnityObject_AfterDeserializeStillOccupiesAliases()
+        {
+            ESEnumStringMirrorMap<DenseKey, object> map = new ESEnumStringMirrorMap<DenseKey, object>();
+            GameObject target = new GameObject("MirrorMapDeserializedTarget");
+            Assert.That(map.TryAdd(DenseKey.Hand, "slot.hand", target, out _), Is.True);
+
+            Object.DestroyImmediate(target);
+            ((ISerializationCallbackReceiver)map).OnAfterDeserialize();
+
+            Assert.That(map.IsValid, Is.False);
+            Assert.That(map.LastConflict.Kind, Is.EqualTo(ESEnumStringMirrorMap<DenseKey, object>.ConflictKind.NullValue));
+            Assert.That(map.ContainsAlias(DenseKey.Hand), Is.True);
+            Assert.That(map.ContainsAlias("slot.hand"), Is.True);
+            Assert.That(map.ContainsKey(DenseKey.Hand), Is.False);
+            Assert.That(map.ContainsKey("slot.hand"), Is.False);
+        }
+
+        private static object GetPrivateField<TEnum, TValue>(
+            ESEnumStringMirrorMap<TEnum, TValue> map,
+            string fieldName)
+            where TEnum : struct, System.Enum
+        {
+            FieldInfo field = typeof(ESEnumStringMirrorMap<TEnum, TValue>).GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, fieldName);
+            return field.GetValue(map);
         }
 
         [TestCase("")]

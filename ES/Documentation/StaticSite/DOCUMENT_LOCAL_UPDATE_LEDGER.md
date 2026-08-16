@@ -351,6 +351,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：没有 Unity Editor 编译、ReloadDomain 或 Test Runner 证据；字体资产生成、TMP Fallback、多语言字形和 UI Window PlayMode 生命周期仍需 Unity 实机验收。
 - **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260816-004：核心身份与通用实例表
+
+- **源码路径**：稳定镜像映射、`ESInstanceTable`、`ESConfigKeyTable`、本地化运行时目录类型和对应定向测试。
+- **规范与证据**：实例 token、持久身份、定义键和所有者键由通用表统一；同一 ConfigKey 数据实例不能接受第二个不同 StringKey；本地化目录提供运行时解析和校验合同。
+- **完成分析**：镜像身份、配置身份与运行时实例索引属于共享底层合同，同批提交可避免上层装备、Buff、Shot 或本地化目录继续依赖已移除的旧实例索引语义。
+- **回归状态**：`ES_Stand.csproj`、`ES_Design.csproj`、`ES_Logic.csproj` 与 `ES_Design.ConfigKey.Tests.csproj` 在当前完整工作树上静态构建均为 0 警告、0 错误；批次携带三组定向 NUnit 测试源码。
+- **已知缺口**：静态构建包含仍未提交的工作树依赖，不能证明单个 Commit 独立可构建；未运行 Unity Test Runner、ReloadDomain、PlayMode、Player 或 IL2CPP。
+- **HTML 目标**：后续在 `#runtime-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

@@ -134,6 +134,10 @@ namespace ES
         public int Generation => generation;
         public EnumMirrorKind ActiveEnumMirror => EnsureReady() ? enumMirrorKind : EnumMirrorKind.None;
         public bool IsValid => EnsureReady();
+        /// <summary>
+        /// Gets the last conflict produced while validating or rebuilding the serialized authority.
+        /// Mutation-specific failures are returned through the operation's <c>out Conflict</c> value.
+        /// </summary>
         public Conflict LastConflict => lastConflict;
 
         public TValue this[TEnum enumKey]
@@ -219,12 +223,34 @@ namespace ES
             return true;
         }
 
+        /// <summary>Checks whether the enum alias is present, regardless of whether its value is currently valid.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool ContainsAlias(TEnum enumKey)
+        {
+            if (EnsureReady())
+                return TryGetEnumEntryIndex(enumKey, out _);
+            return ContainsSerializedAlias(enumKey);
+        }
+
+        /// <summary>Checks whether the string alias is present, regardless of whether its value is currently valid.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool ContainsAlias(string stringKey)
+        {
+            if (string.IsNullOrEmpty(stringKey))
+                return false;
+            if (EnsureReady())
+                return stringEntries.TryGetValue(stringKey, out _);
+            return ContainsSerializedAlias(stringKey);
+        }
+
+        /// <summary>Checks whether the alias resolves to a currently valid value.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ContainsKey(TEnum enumKey)
         {
             return TryGetValue(enumKey, out _);
         }
 
+        /// <summary>Checks whether the string alias resolves to a currently valid value.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ContainsKey(string stringKey)
         {
@@ -478,8 +504,17 @@ namespace ES
             }
 
             Entry moving = entries[fromIndex];
-            entries.RemoveAt(fromIndex);
-            entries.Insert(toIndex, moving);
+            if (fromIndex < toIndex)
+            {
+                for (int index = fromIndex; index < toIndex; index++)
+                    entries[index] = entries[index + 1];
+            }
+            else
+            {
+                for (int index = fromIndex; index > toIndex; index--)
+                    entries[index] = entries[index - 1];
+            }
+            entries[toIndex] = moving;
             RefreshMirrorIndexes(Math.Min(fromIndex, toIndex), Math.Max(fromIndex, toIndex));
             CompleteIncrementalMutation();
             conflict = Conflict.None;
@@ -609,11 +644,15 @@ namespace ES
             if (entries == null)
                 entries = new List<Entry>();
             if (entries.Count == 0 && isReady)
+            {
+                OnAuthorityCleared();
                 return;
+            }
 
             entries.Clear();
             ApplyMirrors(CreateEmptyMirrors());
             AdvanceGeneration();
+            OnAuthorityCleared();
         }
 
         /// <summary>Atomically replaces serialized authority after validating every alias.</summary>
@@ -663,6 +702,7 @@ namespace ES
         {
             isDirty = true;
             isReady = false;
+            lastConflict = Conflict.None;
         }
 
         public bool TryRebuild(out Conflict conflict)
@@ -790,11 +830,16 @@ namespace ES
         {
             if (!ValidateEntry(replacement, entryIndex, entryIndex, out conflict))
             {
-                lastConflict = conflict;
                 return false;
             }
 
             Entry current = entries[entryIndex];
+            if (EntriesEqual(current, replacement))
+            {
+                conflict = Conflict.None;
+                return true;
+            }
+
             bool enumChanged = current.hasEnumKey != replacement.hasEnumKey
                 || current.hasEnumKey && !EqualityComparer<TEnum>.Default.Equals(current.enumKey, replacement.enumKey);
             bool stringChanged = !string.Equals(current.stringKey, replacement.stringKey, StringComparison.Ordinal);
@@ -802,6 +847,8 @@ namespace ES
             int futureEnumCount = enumEntryCount;
             if (current.hasEnumKey != replacement.hasEnumKey)
                 futureEnumCount += replacement.hasEnumKey ? 1 : -1;
+            if (replacement.HasStringKey && stringChanged)
+                stringEntries.EnsureCapacity(entries.Count);
             if (replacement.hasEnumKey && enumChanged)
                 PrepareEnumMirrorForKey(replacement.enumKey, futureEnumCount);
 
@@ -968,7 +1015,6 @@ namespace ES
         {
             if (!TryBuildMirrors(candidate, out RuntimeMirrors mirrors, out conflict))
             {
-                lastConflict = conflict;
                 return false;
             }
 
@@ -983,11 +1029,14 @@ namespace ES
         {
             if (!ValidateEntry(entry, index, -1, out conflict))
             {
-                lastConflict = conflict;
                 return false;
             }
 
             int futureEnumCount = enumEntryCount + (entry.hasEnumKey ? 1 : 0);
+            if (entries.Capacity < entries.Count + 1)
+                entries.Capacity = GetExpandedCapacity(entries.Capacity, entries.Count + 1);
+            if (entry.HasStringKey)
+                stringEntries.EnsureCapacity(entries.Count + 1);
             if (entry.hasEnumKey)
                 PrepareEnumMirrorForKey(entry.enumKey, futureEnumCount);
 
@@ -1042,14 +1091,35 @@ namespace ES
                 return false;
             }
 
-            conflict = Conflict.None;
-            return true;
+            return ValidateAdditionalEntry(entry, entryIndex, ignoredIndex, out conflict);
+        }
+
+        private static bool EntriesEqual(Entry left, Entry right)
+        {
+            return left.hasEnumKey == right.hasEnumKey
+                && (!left.hasEnumKey
+                    || EqualityComparer<TEnum>.Default.Equals(left.enumKey, right.enumKey))
+                && (!left.HasStringKey && !right.HasStringKey
+                    || left.HasStringKey && right.HasStringKey
+                    && string.Equals(left.stringKey, right.stringKey, StringComparison.Ordinal))
+                && EqualityComparer<TValue>.Default.Equals(left.value, right.value);
+        }
+
+        private static int GetExpandedCapacity(int currentCapacity, int requiredCapacity)
+        {
+            int doubledCapacity = currentCapacity > 0
+                ? currentCapacity <= int.MaxValue / 2 ? currentCapacity * 2 : int.MaxValue
+                : 4;
+            return Math.Max(requiredCapacity, doubledCapacity);
         }
 
         private void PrepareEnumMirrorForKey(TEnum enumKey, int futureEnumCount)
         {
             if (enumMirrorKind == EnumMirrorKind.SparseDictionary)
+            {
+                sparseEnumEntries.EnsureCapacity(futureEnumCount);
                 return;
+            }
 
             if (!TryGetDenseEnumIndex(enumKey, out int denseIndex) || !CanUseDenseEnumIndex(denseIndex, futureEnumCount))
             {
@@ -1059,13 +1129,21 @@ namespace ES
 
             if (enumMirrorKind == EnumMirrorKind.None)
             {
-                denseEnumEntries = new int[denseIndex + 1];
+                denseEnumEntries = new int[GetDenseEnumCapacity(0, denseIndex)];
                 enumMirrorKind = EnumMirrorKind.DenseArray;
                 return;
             }
 
             if (denseIndex >= denseEnumEntries.Length)
-                Array.Resize(ref denseEnumEntries, denseIndex + 1);
+                Array.Resize(ref denseEnumEntries, GetDenseEnumCapacity(denseEnumEntries.Length, denseIndex));
+        }
+
+        private int GetDenseEnumCapacity(int currentCapacity, int requiredIndex)
+        {
+            int limit = denseEnumLimit > 0 ? denseEnumLimit : DefaultDenseEnumLimit;
+            int requiredCapacity = requiredIndex + 1;
+            int doubledCapacity = currentCapacity > 0 ? currentCapacity * 2 : 4;
+            return Math.Min(limit + 1, Math.Max(requiredCapacity, doubledCapacity));
         }
 
         private bool CanUseDenseEnumIndex(int denseIndex, int futureEnumCount)
@@ -1158,6 +1236,7 @@ namespace ES
                 observedSerializedRevision = serializedRevision;
                 isDirty = true;
                 isReady = false;
+                lastConflict = Conflict.None;
             }
 
             if (isReady)
@@ -1189,6 +1268,12 @@ namespace ES
 
                 if (!ValidateStringKey(entry.stringKey, hasStringKey, i, out conflict)
                     || !ValidateValue(entry.value, i, out conflict))
+                {
+                    mirrors = null;
+                    return false;
+                }
+
+                if (!ValidateAdditionalEntry(entry, i, -1, out conflict))
                 {
                     mirrors = null;
                     return false;
@@ -1358,6 +1443,59 @@ namespace ES
             return true;
         }
 
+        /// <summary>
+        /// Lets a domain type reject writes that conflict with non-serialized state.
+        /// It is only called while validating mutations or rebuilding mirrors.
+        /// </summary>
+        protected virtual bool ValidateAdditionalEntry(
+            Entry entry,
+            int entryIndex,
+            int ignoredIndex,
+            out Conflict conflict)
+        {
+            conflict = Conflict.None;
+            return true;
+        }
+
+        /// <summary>Called after the serialized authority has been cleared, including an already-empty authority.</summary>
+        protected virtual void OnAuthorityCleared()
+        {
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool ContainsSerializedAlias(TEnum enumKey)
+        {
+            if (entries == null)
+                return false;
+
+            EqualityComparer<TEnum> comparer = EqualityComparer<TEnum>.Default;
+            for (int index = 0; index < entries.Count; index++)
+            {
+                Entry entry = entries[index];
+                if (entry.hasEnumKey && comparer.Equals(entry.enumKey, enumKey))
+                    return true;
+            }
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool ContainsSerializedAlias(string stringKey)
+        {
+            if (entries == null)
+                return false;
+
+            for (int index = 0; index < entries.Count; index++)
+            {
+                Entry entry = entries[index];
+                if (entry.HasStringKey
+                    && string.Equals(entry.stringKey, stringKey, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool IsNullValue(TValue value)
         {
@@ -1366,15 +1504,6 @@ namespace ES
             if (ReferenceEquals(value, null))
                 return true;
             return value is UnityEngine.Object unityObject && unityObject == null;
-        }
-
-        private List<Entry> CloneEntriesWithAdditionalCapacity()
-        {
-            int count = entries?.Count ?? 0;
-            List<Entry> candidate = new List<Entry>(count + 1);
-            if (count > 0)
-                candidate.AddRange(entries);
-            return candidate;
         }
 
         private List<Entry> CloneEntries()

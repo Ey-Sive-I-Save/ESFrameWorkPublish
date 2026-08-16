@@ -1524,6 +1524,51 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260816-004",
+                        "status":  "documented",
+                        "summary":  "统一稳定镜像映射、ConfigKey 单一字符串身份和通用实例表合同，并补齐本地化运行时目录类型与定向测试。",
+                        "sourcePaths":  [
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/Container/DictionatyPro/ESEnumStringMirrorMap.cs",
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/Container/DictionatyPro/ESInstanceTable.cs",
+                                            "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/Container/DictionatyPro/ESInstanceTable.cs.meta",
+                                            "Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESEnumStringMirrorMapTests.cs",
+                                            "Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESInstanceTableTests.cs",
+                                            "Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESInstanceTableTests.cs.meta",
+                                            "Assets/Plugins/ES/1_Design/ConfigKey/ESConfigKey.cs",
+                                            "Assets/Plugins/ES/1_Design/Tests/ESConfigKeyTableTests.cs",
+                                            "Assets/Scripts/ESLogic/Runtime/GameManager/-GameManager_Core/StaticPart-System.cs"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESInstanceTableTests.cs",
+                                              "Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESEnumStringMirrorMapTests.cs",
+                                              "Assets/Plugins/ES/1_Design/Tests/ESConfigKeyTableTests.cs"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "实例 token、持久身份、定义键和所有者键由通用实例表统一管理；ConfigKey 拒绝同一数据实例绑定第二个不同 StringKey；本地化目录类型为上一呈现批次提供运行时数据合同。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "ES_Stand.csproj、ES_Design.csproj 与 ES_Logic.csproj 在当前完整工作树上静态构建均为 0 警告、0 错误",
+                                                            "ES_Design.ConfigKey.Tests.csproj 在当前完整工作树上静态构建为 0 警告、0 错误",
+                                                            "批次包含镜像映射、实例表和 ConfigKey 的定向 NUnit 测试源码"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "静态构建包含仍未提交的当前工作树依赖，不能作为单个 Commit 独立可构建的证明",
+                                                             "未运行 Unity Test Runner、ReloadDomain、PlayMode、Player 或 IL2CPP",
+                                                             "实例 token 耗尽与超大表压力仍缺少长时间运行验收"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -1536,13 +1581,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-16T10:17:45+08:00",
-                       "head":  "3d39333aa0e1418e82ab54b6f798f0db564cc588",
-                       "stagedSourcePatchSha256":  "f1fad1131908814c6fcf0a2b089026138ba7444e956ceae0da083c4c15c2a271",
-                       "stagedSourceManifestSha256":  "63bcac79e6275284e59a05ea942240f4108fa68f77faaa3e52ab9ddd1c187781",
-                       "stagedSourceFileCount":  45,
+                       "preparedAt":  "2026-08-16T10:20:23+08:00",
+                       "head":  "9e7cccd709f7d528abaa3edb94bb2b85ca6c7951",
+                       "stagedSourcePatchSha256":  "ea08cc5bb67c194895ee6f91a514e8b6c175110c6ddfd58956ecbb9828ddbf51",
+                       "stagedSourceManifestSha256":  "0b724904f19a9996e885e52739ba9112065601c0116ef7eb7e64d7d19475d636",
+                       "stagedSourceFileCount":  9,
                        "entryIds":  [
-                                        "LOCAL-20260816-003"
+                                        "LOCAL-20260816-004"
                                     ]
                    }
 }

@@ -1279,6 +1279,136 @@ namespace ES.Tests
         }
 
         [Test]
+        public void RetainedTable_DifferentStringAlias_IsRejectedWithoutPollutingCanonicalBinding()
+        {
+            var table = new ESGameCoreConfigKeyTable<TestGameCoreRuntimeData>(4);
+            var canonical = new TestConfigKey
+            {
+                enumKey = TestEnumKey.EnumEntry,
+                stringKey = "canonical"
+            };
+            var differentAlias = new TestConfigKey
+            {
+                enumKey = TestEnumKey.EnumEntry,
+                stringKey = "different-alias"
+            };
+            TestGameCoreRuntimeData data = table.AcquireRetained(canonical);
+            Assert.That(table.TryCommitRetained(canonical, data, out int runtimeKey), Is.True);
+
+            Assert.That(table.TryCommitRetained(differentAlias, data, out int rejectedRuntimeKey), Is.False);
+
+            Assert.That(rejectedRuntimeKey, Is.Zero);
+            Assert.That(data.Ready, Is.True);
+            Assert.That(data.runtimeKey, Is.EqualTo(runtimeKey));
+            Assert.That(table.TryGet(canonical, out TestGameCoreRuntimeData canonicalData), Is.True);
+            Assert.That(canonicalData, Is.SameAs(data));
+            Assert.That(table.TryGetByStringKey("different-alias", out _), Is.False);
+        }
+
+        [Test]
+        public void RetainedTable_StringOnlyDefinition_RejectsDifferentStringForSameData()
+        {
+            var table = new ESGameCoreConfigKeyTable<TestGameCoreRuntimeData>(4);
+            var canonical = new TestConfigKey { stringKey = "canonical-string-only" };
+            var differentAlias = new TestConfigKey { stringKey = "different-string-only" };
+            TestGameCoreRuntimeData data = table.AcquireRetained(canonical);
+            Assert.That(table.TryCommitRetained(canonical, data, out int runtimeKey), Is.True);
+
+            Assert.That(table.TryCommitRetained(differentAlias, data, out int rejectedRuntimeKey), Is.False);
+
+            Assert.That(rejectedRuntimeKey, Is.Zero);
+            Assert.That(data.Ready, Is.True);
+            Assert.That(data.runtimeKey, Is.EqualTo(runtimeKey));
+            Assert.That(table.TryGetByStringKey(canonical.StringKey, out TestGameCoreRuntimeData canonicalData), Is.True);
+            Assert.That(canonicalData, Is.SameAs(data));
+            Assert.That(table.TryGetByStringKey(differentAlias.StringKey, out _), Is.False);
+        }
+
+        [Test]
+        public void RetainedTable_AcquireRejectsDifferentStringAliasBeforeMutatingRetainedMap()
+        {
+            var table = new ESGameCoreConfigKeyTable<TestGameCoreRuntimeData>(4);
+            var canonical = new TestConfigKey
+            {
+                enumKey = TestEnumKey.EnumEntry,
+                stringKey = "canonical-retained"
+            };
+            var differentAlias = new TestConfigKey
+            {
+                enumKey = TestEnumKey.EnumEntry,
+                stringKey = "different-retained"
+            };
+            TestGameCoreRuntimeData data = table.AcquireRetained(canonical);
+            int retainedCount = table.RetainedCount;
+
+            bool acquired = table.TryAcquireRetained(
+                differentAlias,
+                () => new TestGameCoreRuntimeData(),
+                out TestGameCoreRuntimeData rejected);
+
+            Assert.That(acquired, Is.False);
+            Assert.That(rejected, Is.Null);
+            Assert.That(table.RetainedCount, Is.EqualTo(retainedCount));
+        }
+
+        [Test]
+        public void ConfigKeyTable_UpsertCannotCreateSecondStringOnlySlotForSameData()
+        {
+            var table = new ESConfigKeyTable<TestRuntimeData>(4);
+            var canonical = new TestConfigKey { stringKey = "canonical-upsert" };
+            var differentAlias = new TestConfigKey { stringKey = "different-upsert" };
+            var data = new TestRuntimeData();
+            table.BeginBuild();
+            int runtimeKey = table.RegisterAndGetRuntimeKey(canonical, data);
+
+            bool upserted = table.Upsert(differentAlias, data);
+            table.EndBuild();
+
+            Assert.That(runtimeKey, Is.Not.Zero);
+            Assert.That(upserted, Is.False);
+            Assert.That(table.TryGetByStringKey(canonical.StringKey, out TestRuntimeData canonicalData), Is.True);
+            Assert.That(canonicalData, Is.SameAs(data));
+            Assert.That(table.TryGetByStringKey(differentAlias.StringKey, out _), Is.False);
+        }
+
+        [Test]
+        public void ConfigKeyTable_RemoveAndClear_ReleaseCanonicalStringBinding()
+        {
+            var table = new ESConfigKeyTable<TestRuntimeData>(4);
+            var first = new TestConfigKey { stringKey = "canonical-first" };
+            var second = new TestConfigKey { stringKey = "canonical-second" };
+            var third = new TestConfigKey { stringKey = "canonical-third" };
+            var data = new TestRuntimeData();
+            Assert.That(table.TryInject(first, data, out int firstRuntimeKey), Is.True);
+
+            table.BeginBuild();
+            Assert.That(table.Remove(firstRuntimeKey), Is.True);
+            table.EndBuild();
+            Assert.That(table.TryInject(second, data, out _), Is.True);
+
+            table.BeginBuild(clear: true);
+            table.EndBuild();
+            Assert.That(table.TryInject(third, data, out _), Is.True);
+        }
+
+        [Test]
+        public void RetainedTable_Clear_KeepsCanonicalStringBinding()
+        {
+            var table = new ESGameCoreConfigKeyTable<TestGameCoreRuntimeData>(4);
+            var canonical = new TestConfigKey { stringKey = "retained-before-clear" };
+            var differentAlias = new TestConfigKey { stringKey = "retained-after-clear" };
+            TestGameCoreRuntimeData data = table.AcquireRetained(canonical);
+            Assert.That(table.TryCommitRetained(canonical, data, out _), Is.True);
+
+            table.BeginBuild(clear: true);
+            table.EndBuild();
+
+            Assert.That(table.TryCommitRetained(differentAlias, data, out int rejectedRuntimeKey), Is.False);
+            Assert.That(rejectedRuntimeKey, Is.Zero);
+            Assert.That(data.Ready, Is.False);
+        }
+
+        [Test]
         public void RetainedTable_FailedCommit_ReleasesPayloadAndKeepsStableShell()
         {
             var table = new ESGameCoreConfigKeyTable<TestGameCoreRuntimeData>(4);

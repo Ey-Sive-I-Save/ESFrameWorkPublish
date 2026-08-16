@@ -252,6 +252,15 @@ namespace ES
     /// </summary>
     public class ESConfigKeyTable<TData> where TData : class
     {
+        protected sealed class DataReferenceComparer : IEqualityComparer<TData>
+        {
+            public static readonly DataReferenceComparer Instance = new DataReferenceComparer();
+
+            public bool Equals(TData left, TData right) => ReferenceEquals(left, right);
+
+            public int GetHashCode(TData value) => RuntimeHelpers.GetHashCode(value);
+        }
+
         private struct Slot
         {
             public int runtimeKey;
@@ -267,6 +276,7 @@ namespace ES
         private readonly Dictionary<int, int> slotByRuntimeKey;
         private readonly Dictionary<int, int> slotByEnumKey;
         private readonly Dictionary<string, int> slotByStringKey;
+        private readonly Dictionary<TData, string> canonicalStringKeyByData;
         // Bake 可能先于 Register 被调用；预留表保证同一构建生命周期内重复 Bake
         // 不会为同一个 StringKey 分配多个临时 RuntimeKey。
         private readonly Dictionary<string, int> reservedRuntimeKeyByString;
@@ -282,6 +292,7 @@ namespace ES
             slotByRuntimeKey = new Dictionary<int, int>(capacity);
             slotByEnumKey = new Dictionary<int, int>(capacity);
             slotByStringKey = new Dictionary<string, int>(capacity);
+            canonicalStringKeyByData = new Dictionary<TData, string>(capacity, DataReferenceComparer.Instance);
             reservedRuntimeKeyByString = new Dictionary<string, int>(capacity, StringComparer.Ordinal);
             reservedStringRuntimeKeys = new HashSet<int>();
             conflicts = new List<ESConfigKeyConflict>(8);
@@ -374,6 +385,7 @@ namespace ES
             slotByRuntimeKey.Clear();
             slotByEnumKey.Clear();
             slotByStringKey.Clear();
+            canonicalStringKeyByData.Clear();
             reservedRuntimeKeyByString.Clear();
             reservedStringRuntimeKeys.Clear();
             conflicts.Clear();
@@ -924,6 +936,12 @@ namespace ES
             if (!string.IsNullOrEmpty(entry.stringKey))
             {
                 slotByStringKey.Remove(entry.stringKey);
+                if (entry.data != null
+                    && canonicalStringKeyByData.TryGetValue(entry.data, out string canonicalStringKey)
+                    && string.Equals(canonicalStringKey, entry.stringKey, StringComparison.Ordinal))
+                {
+                    canonicalStringKeyByData.Remove(entry.data);
+                }
                 if (reservedRuntimeKeyByString.TryGetValue(entry.stringKey, out int reservedRuntimeKey))
                 {
                     reservedRuntimeKeyByString.Remove(entry.stringKey);
@@ -992,6 +1010,11 @@ namespace ES
                 AddConflict(runtimeKey, debugName, "The stable business key is already bound to another data instance.");
                 return false;
             }
+            if (HasDifferentStringKeyForData(data, stringKey))
+            {
+                AddConflict(runtimeKey, debugName, "A registered definition cannot accept a second, different StringKey alias.");
+                return false;
+            }
 
             if (slotByRuntimeKey.TryGetValue(runtimeKey, out int runtimeSlot))
             {
@@ -1002,9 +1025,9 @@ namespace ES
                     return false;
                 }
 
-                if (!BindAliasesToSlot(runtimeSlot, enumKey, stringKey))
+                if (!BindAliasesToSlot(runtimeSlot, enumKey, stringKey, out string aliasConflict))
                 {
-                    AddConflict(runtimeKey, debugName, "EnumKey/StringKey aliases point at different data slots.");
+                    AddConflict(runtimeKey, debugName, aliasConflict);
                     return false;
                 }
 
@@ -1022,11 +1045,15 @@ namespace ES
                     return false;
                 }
 
-                bool bound = BindAliasesToSlot(stringSlot, enumKey, stringKey);
+                bool bound = BindAliasesToSlot(stringSlot, enumKey, stringKey, out string aliasConflict);
                 if (bound)
                 {
                     ConsumeStringRuntimeKeyReservation(stringKey);
                     OnDataRegistered(existing.runtimeKey, enumKey, stringKey, data);
+                }
+                else
+                {
+                    AddConflict(runtimeKey, debugName, aliasConflict);
                 }
                 return bound;
             }
@@ -1048,6 +1075,8 @@ namespace ES
                 slotByEnumKey[enumKey] = slot;
             if (!string.IsNullOrEmpty(stringKey))
                 slotByStringKey[stringKey] = slot;
+            if (!string.IsNullOrEmpty(stringKey))
+                canonicalStringKeyByData[data] = stringKey;
 
             ConsumeStringRuntimeKeyReservation(stringKey);
             OnDataRegistered(runtimeKey, enumKey, stringKey, data);
@@ -1066,6 +1095,13 @@ namespace ES
             if (!CanRegisterData(enumKey, stringKey, data))
             {
                 AddConflict(runtimeKey, debugName, "The stable business key is already bound to another data instance.");
+                return false;
+            }
+            if (HasDifferentStringKeyForData(data, stringKey)
+                && (!slotByRuntimeKey.TryGetValue(runtimeKey, out int ownRuntimeSlot)
+                    || !ReferenceEquals(slots[ownRuntimeSlot].data, data)))
+            {
+                AddConflict(runtimeKey, debugName, "Upsert cannot add a second, different StringKey alias to an existing definition.");
                 return false;
             }
 
@@ -1090,6 +1126,14 @@ namespace ES
         {
             Slot entry = slots[slot];
             TData replacedData = entry.data;
+
+            if (replacedData != null
+                && !string.IsNullOrEmpty(entry.stringKey)
+                && canonicalStringKeyByData.TryGetValue(replacedData, out string replacedCanonical)
+                && string.Equals(replacedCanonical, entry.stringKey, StringComparison.Ordinal))
+            {
+                canonicalStringKeyByData.Remove(replacedData);
+            }
 
             if (entry.runtimeKey != runtimeKey)
             {
@@ -1124,6 +1168,8 @@ namespace ES
             entry.version++;
             entry.valid = true;
             slots[slot] = entry;
+            if (!string.IsNullOrEmpty(stringKey))
+                canonicalStringKeyByData[data] = stringKey;
             OnDataRegistered(runtimeKey, enumKey, stringKey, data);
             if (replacedData != null && !ReferenceEquals(replacedData, data))
                 OnDataReleased(replacedData);
@@ -1163,18 +1209,35 @@ namespace ES
         /// Adds missing aliases without changing the entry's RuntimeKey. This preserves process
         /// handles when a partial Enum/String reference is resolved after the canonical entry.
         /// </summary>
-        private bool BindAliasesToSlot(int slot, int enumKey, string stringKey)
+        private bool BindAliasesToSlot(int slot, int enumKey, string stringKey, out string conflictReason)
         {
+            conflictReason = string.Empty;
             if ((uint)slot >= (uint)slots.Count || !slots[slot].valid)
+            {
+                conflictReason = "Cannot bind aliases to an invalid data slot.";
                 return false;
+            }
             if (enumKey != 0 && slotByEnumKey.TryGetValue(enumKey, out int enumSlot) && enumSlot != slot)
+            {
+                conflictReason = "EnumKey alias already points at another data slot.";
                 return false;
+            }
             if (!string.IsNullOrEmpty(stringKey)
                 && slotByStringKey.TryGetValue(stringKey, out int stringSlot)
                 && stringSlot != slot)
+            {
+                conflictReason = "StringKey alias already points at another data slot.";
                 return false;
+            }
 
             Slot entry = slots[slot];
+            if (!string.IsNullOrEmpty(entry.stringKey)
+                && !string.IsNullOrEmpty(stringKey)
+                && !string.Equals(entry.stringKey, stringKey, StringComparison.Ordinal))
+            {
+                conflictReason = "A registered definition cannot accept a second, different StringKey alias.";
+                return false;
+            }
             if (entry.enumKey == 0 && enumKey != 0)
                 entry.enumKey = enumKey;
             if (string.IsNullOrEmpty(entry.stringKey) && !string.IsNullOrEmpty(stringKey))
@@ -1184,6 +1247,8 @@ namespace ES
                 slotByEnumKey[enumKey] = slot;
             if (!string.IsNullOrEmpty(stringKey))
                 slotByStringKey[stringKey] = slot;
+            if (!string.IsNullOrEmpty(entry.stringKey))
+                canonicalStringKeyByData[entry.data] = entry.stringKey;
             slots[slot] = entry;
             return true;
         }
@@ -1336,6 +1401,15 @@ namespace ES
             return false;
         }
 
+        private bool HasDifferentStringKeyForData(TData data, string stringKey)
+        {
+            if (data == null || string.IsNullOrEmpty(stringKey))
+                return false;
+
+            return canonicalStringKeyByData.TryGetValue(data, out string canonicalStringKey)
+                   && !string.Equals(canonicalStringKey, stringKey, StringComparison.Ordinal);
+        }
+
         private void EnsureCanBuild()
         {
             if (!isBuilding)
@@ -1361,11 +1435,13 @@ namespace ES
     {
         private readonly Dictionary<int, TData> retainedByEnumKey;
         private readonly Dictionary<string, TData> retainedByStringKey;
+        private readonly Dictionary<TData, string> retainedStringKeyByData;
 
         public ESRetainedConfigKeyTable(int capacity = 64, string keyScope = null) : base(capacity, keyScope)
         {
             retainedByEnumKey = new Dictionary<int, TData>(capacity);
             retainedByStringKey = new Dictionary<string, TData>(capacity, StringComparer.Ordinal);
+            retainedStringKeyByData = new Dictionary<TData, string>(capacity, DataReferenceComparer.Instance);
         }
 
         /// <summary>当前驻留的 EnumKey/StringKey 绑定总数；同一实例拥有两个别名时计为两项。</summary>
@@ -1412,11 +1488,19 @@ namespace ES
             data = hasEnum ? byEnum : hasString ? byString : factory?.Invoke();
             if (data == null)
                 return false;
+            if (HasDifferentRetainedStringKey(data, stringKey))
+            {
+                data = null;
+                return false;
+            }
 
             if (enumKey != 0)
                 retainedByEnumKey[enumKey] = data;
             if (!string.IsNullOrEmpty(stringKey))
+            {
                 retainedByStringKey[stringKey] = data;
+                retainedStringKeyByData[data] = stringKey;
+            }
 
             OnRetainedAcquired(data);
             return true;
@@ -1430,7 +1514,19 @@ namespace ES
             bool stringValid = string.IsNullOrEmpty(stringKey)
                 || !retainedByStringKey.TryGetValue(stringKey, out TData retainedByString)
                 || ReferenceEquals(retainedByString, data);
-            return enumValid && stringValid && CanRegisterRetainedData(enumKey, stringKey, data);
+            return enumValid
+                   && stringValid
+                   && !HasDifferentRetainedStringKey(data, stringKey)
+                   && CanRegisterRetainedData(enumKey, stringKey, data);
+        }
+
+        private bool HasDifferentRetainedStringKey(TData data, string stringKey)
+        {
+            if (data == null || string.IsNullOrEmpty(stringKey))
+                return false;
+
+            return retainedStringKeyByData.TryGetValue(data, out string canonicalStringKey)
+                   && !string.Equals(canonicalStringKey, stringKey, StringComparison.Ordinal);
         }
 
         protected sealed override void OnDataRegistered(
@@ -1442,7 +1538,10 @@ namespace ES
             if (enumKey != 0)
                 retainedByEnumKey[enumKey] = data;
             if (!string.IsNullOrEmpty(stringKey))
+            {
                 retainedByStringKey[stringKey] = data;
+                retainedStringKeyByData[data] = stringKey;
+            }
 
             OnRetainedRegistered(runtimeKey, enumKey, stringKey, data);
         }
@@ -1668,92 +1767,6 @@ namespace ES
         [NonSerialized] public int runtimeKey;
         public string stringKey;
         public string reason;
-    }
-
-    [Serializable]
-    public struct ESRuntimeInstanceHandle
-    {
-        public int id;
-        public int version;
-
-        public bool IsValid => id > 0;
-    }
-
-    public sealed class ESRuntimeInstanceIndex<TInstance> where TInstance : class
-    {
-        private readonly Dictionary<int, TInstance> instanceById;
-        private readonly Dictionary<int, List<TInstance>> instancesByRuntimeKey;
-        private int nextInstanceId;
-
-        public ESRuntimeInstanceIndex(int capacity = 64)
-        {
-            instanceById = new Dictionary<int, TInstance>(capacity);
-            instancesByRuntimeKey = new Dictionary<int, List<TInstance>>(capacity);
-            nextInstanceId = 1;
-        }
-
-        public int Count => instanceById.Count;
-
-        public ESRuntimeInstanceHandle Add(int runtimeKey, TInstance instance)
-        {
-            if (runtimeKey == 0 || instance == null)
-                return default;
-
-            int id = nextInstanceId++;
-            if (nextInstanceId <= 0)
-                nextInstanceId = 1;
-
-            instanceById[id] = instance;
-            if (!instancesByRuntimeKey.TryGetValue(runtimeKey, out List<TInstance> list))
-            {
-                list = new List<TInstance>(4);
-                instancesByRuntimeKey.Add(runtimeKey, list);
-            }
-
-            list.Add(instance);
-            return new ESRuntimeInstanceHandle { id = id, version = 1 };
-        }
-
-        public bool Remove(int runtimeKey, ESRuntimeInstanceHandle handle, TInstance instance)
-        {
-            if (!handle.IsValid)
-                return false;
-
-            bool removed = instanceById.Remove(handle.id);
-            if (runtimeKey != 0 && instancesByRuntimeKey.TryGetValue(runtimeKey, out List<TInstance> list))
-            {
-                int index = list.IndexOf(instance);
-                if (index >= 0)
-                {
-                    int last = list.Count - 1;
-                    list[index] = list[last];
-                    list.RemoveAt(last);
-                }
-            }
-
-            return removed;
-        }
-
-        public bool TryGet(ESRuntimeInstanceHandle handle, out TInstance instance)
-        {
-            if (handle.IsValid)
-                return instanceById.TryGetValue(handle.id, out instance);
-
-            instance = null;
-            return false;
-        }
-
-        public bool TryGetInstances(int runtimeKey, out List<TInstance> instances)
-        {
-            return instancesByRuntimeKey.TryGetValue(runtimeKey, out instances);
-        }
-
-        public void Clear()
-        {
-            instanceById.Clear();
-            instancesByRuntimeKey.Clear();
-            nextInstanceId = 1;
-        }
     }
 
 }

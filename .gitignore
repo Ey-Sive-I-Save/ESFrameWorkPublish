@@ -96,6 +96,13 @@ crashlytics-build.properties
 /ES/Automation/Temp/
 /ES/Automation/Processing/
 /ES/Automation/Output/
+/ES/Automation/AI/Inbox/
+/ES/Automation/AI/Responses/
+/ES/Automation/Runs/AISkillGraph/active-runs.json
+/ES/Automation/Runs/*-latest.json
+
+# Misplaced local validation output.
+/Boundary
 
 # Local build, test and review outputs.
 /bin/

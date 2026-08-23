@@ -2352,6 +2352,89 @@
                                                      "#ai-governance"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260823-005",
+                        "status":  "documented",
+                        "summary":  "收录提交过程中新增的 Skill 发现治理、AIBrain 路由知识、Feishu Worker 与验证运行记录。",
+                        "sourcePaths":  [
+                                            ".agents",
+                                            "Assets/Plugins/ES/Editor/ESAutomation",
+                                            "Documentation/AIKnowledge",
+                                            "ES/Automation"
+                                        ],
+                        "evidencePaths":  [
+                                              ".agents/SKILL_DISCOVERY_POLICY.json",
+                                              "Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs",
+                                              "ES/Automation/Runs/es-skill-validator-full-latest.json"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "后续工作树漂移限定为 Skill 发现和 AIBrain/Automation 合同相关文件，按独立台账批次纳入，避免与前两批混淆。"
+                                     },
+                        "regression":  {
+                                           "status":  "not-run",
+                                           "evidence":  [
+                                                            "隔离 Git 索引范围检查",
+                                                            "台账门禁校验"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "未运行 Unity Editor、ReloadDomain、真实外部 Worker 或端到端验收",
+                                                             "运行记录仅为已保存工件，不代表本轮新鲜运行证据"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#ai-governance",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260823-006",
+                        "status":  "documented",
+                        "summary":  "纠正公开提交中误纳的本机验证结果、Automation 运行态与未审阅证据、无效 Reviewed 备份及快照归档，同时保留全部本机文件。",
+                        "sourcePaths":  [
+                                            ".gitignore",
+                                            "Boundary",
+                                            "ES/Automation/AI/Archive",
+                                            "ES/Automation/AI/Inbox",
+                                            "ES/Automation/AI/Responses",
+                                            "ES/Automation/Candidates",
+                                            "ES/Automation/Runs/AISkillGraph/active-runs.json",
+                                            "ES/Automation/Runs/es-skill-governance-static-replay-latest.json",
+                                            "ES/Automation/Runs/es-skill-validator-full-latest.json",
+                                            "ES/Bak/Reviewed/20260810_LongBarMelee",
+                                            "ES/Archive/Snapshots"
+                                        ],
+                        "evidencePaths":  [
+                                              ".gitignore",
+                                              "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.json"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "本批仅从 Git 索引退出不应公开或尚未通过审阅合同的路径；git rm --cached 不删除本机工作树内容。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "排除路径逐项核对",
+                                                            "git diff --cached --check 通过",
+                                                            "本机文件保留检查"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "后续删除提交不能抹除已经推送的 b7e6f42 历史内容",
+                                                             "未执行远端历史重写或 force-push"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#ai-governance",
+                                                     "#release-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -2364,13 +2447,14 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-23T19:38:50+08:00",
-                       "head":  "d77ef8eb7d0e83cbdb24a9c2edf0be8933a8621e",
-                       "stagedSourcePatchSha256":  "07610a215fffd1fc40eb6e84b78b1aed6b7086f8c561633cea78f975c0d3d5d0",
-                       "stagedSourceManifestSha256":  "c5bfc8da28d9de1b8b92e122f0a361a5290bfb75e8aed01def1fa2d2e92c1a6e",
-                       "stagedSourceFileCount":  759,
+                       "preparedAt":  "2026-08-23T19:45:02+08:00",
+                       "head":  "b7e6f429e950e1587c5dc763526046fc5cde134b",
+                       "stagedSourcePatchSha256":  "9f20ea3016e36deac4117b25aea71491aef695809c6e79fa8c671c40468e5ff7",
+                       "stagedSourceManifestSha256":  "2caf9e08fea800e3b345bf4702882c112f8a7555f6bc7cf9581e46eb292dbcc7",
+                       "stagedSourceFileCount":  351,
                        "entryIds":  [
-                                        "LOCAL-20260823-003"
+                                        "LOCAL-20260823-004",
+                                        "LOCAL-20260823-006"
                                     ]
                    }
 }

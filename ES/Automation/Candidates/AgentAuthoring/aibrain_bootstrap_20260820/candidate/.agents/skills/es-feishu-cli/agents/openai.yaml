@@ -1,4 +1,0 @@
-interface:
-  display_name: "ES Feishu CLI"
-  short_description: "通过 ESAutomationCenter 受管调用 Feishu"
-  default_prompt: "使用 $es-feishu-cli 通过 ESAutomationCenter 执行受管 Feishu 操作，默认先 DryRun。"

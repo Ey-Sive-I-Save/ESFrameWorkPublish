@@ -1,9 +1,0 @@
-{
-  "protocolVersion": 1,
-  "requestId": "c8e01d6389d24a98bfed5470a6d12c31",
-  "actorId": "codex.local",
-  "action": "triggerUnityCompilation",
-  "payload": {
-    "forceRefresh": true
-  }
-}

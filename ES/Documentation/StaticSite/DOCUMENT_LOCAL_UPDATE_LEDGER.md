@@ -495,6 +495,33 @@ git commit -m "本批语义说明"
 - **已知缺口**：未运行 Unity Editor、ReloadDomain、Test Runner、PlayMode、Profiler、Player 或 IL2CPP；已保存的证据不代表本轮新鲜验收。
 - **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview`、`#editor-verification` 与 `#ai-governance` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260823-004：退跟踪缓存与本地发布产物
+
+- **源码路径**：`.gitignore`、`*.csproj.lscache`、`ES/Automation/Temp`、`ES/ResourcePipeline` 与 `ES/Releases/Packages`。
+- **规范与证据**：可再生成的 IDE 缓存、Automation 临时快照、资源构建中间物和本地发布包不作为源码版本化。
+- **完成分析**：使用 `git rm --cached` 仅退出 Git 索引，全部本机文件保持存在。
+- **回归状态**：精确 ignore 规则、暂存范围和 `git diff --cached --check` 纳入提交门禁。
+- **已知缺口**：未运行 Unity Editor、资源构建、Player 或发布验收，不证明产物可在所有目标环境重建。
+- **HTML 目标**：后续在 `#ai-governance` 与 `#release-verification` 统一整合，当前不修改正式 HTML。
+
+### LOCAL-20260823-005：Skill 发现与 AIBrain 后续漂移
+
+- **源码路径**：`.agents`、`ESAutomation`、`Documentation/AIKnowledge` 与 `ES/Automation`。
+- **规范与证据**：提交过程中新增的 Skill 发现治理、路由知识、Worker 与保存的验证记录按独立批次版本化。
+- **完成分析**：后续漂移与前两批区分，防止提交后产生的协议文件被遗漏或错误归属。
+- **回归状态**：隔离 Git 索引与台账门禁校验；未运行 Unity 或外部 Worker。
+- **已知缺口**：保存的运行记录不是本轮新鲜运行证据，Unity Editor、ReloadDomain、真实外部 Worker 和端到端验收均未运行。
+- **HTML 目标**：后续在 `#ai-governance` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
+### LOCAL-20260823-006：纠正误纳运行态与未审阅证据
+
+- **源码路径**：`Boundary`、Automation Inbox/Responses/Archive/Candidates、`active-runs.json`、`*-latest.json`、无效 Reviewed 备份和未审阅快照归档。
+- **规范与证据**：运行态和候选证据必须先审阅再显式提交；Reviewed 备份必须带 `BACKUP_MANIFEST.md`。
+- **完成分析**：本批只从 Git 索引退出误纳路径并保留本机文件，同时补齐稳定运行态 ignore 边界。
+- **回归状态**：逐项核对排除路径、本机文件存在性、暂存范围和 `git diff --cached --check`。
+- **已知缺口**：后续删除提交不能抹除已推送的 `b7e6f42` 历史内容；未执行远端历史重写或 force-push。
+- **HTML 目标**：后续在 `#ai-governance` 与 `#release-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

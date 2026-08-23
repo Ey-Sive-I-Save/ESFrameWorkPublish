@@ -1,0 +1,155 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52758267bd164f04b97a1e68d0fb0bb3, type: 3}
+  m_Name: "\u57FA\u7840\u6B65\u67AA\u5F39\u4E38_ItemDataInfo"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: shot.basic_rifle.round
+  itemKey:
+    enumKey: 0
+    stringKey: item.shot.basic_rifle.round
+    definitionGuid: 
+    definitionLocalFileId: 0
+    definitionTypeName: 
+  tags: []
+  floatValues: []
+  permitValues: []
+  baseConfig:
+    kind: 4
+    prefabKey:
+      enumKey: 0
+      stringKey: prefab.shot.basic_rifle.round
+      guid: f1997c4cd36ed324c8679fb3fecdf36b
+      localFileId: 0
+      assetTypeName: UnityEngine.GameObject
+      address: 
+      groupName: 
+      editorPath: "Assets/ESNormalAssets/ProjectilePrototypes/\u57FA\u7840\u6B65\u67AA\u5F39\u4E38.prefab"
+      editorOnly: 0
+      alwaysLoaded: 0
+    displayName: "\u57FA\u7840\u6B65\u67AA\u5F39\u4E38"
+    iconKey:
+      enumKey: 0
+      stringKey: 
+      guid: 
+      localFileId: 0
+      assetTypeName: 
+      address: 
+      groupName: 
+      editorPath: 
+      editorOnly: 0
+      alwaysLoaded: 0
+  interactConfig:
+    canInteract: 0
+    useMode: 1
+    prompt: 
+    distance: 1.5
+    requireFacing: 1
+    condition:
+      rid: -2
+  logicConfig:
+    onSpawn:
+      rid: -2
+    onUse:
+      rid: -2
+    onHit:
+      rid: -2
+    onExpire:
+      rid: -2
+    onDestroy:
+      rid: -2
+  moveConfig:
+    mode: 0
+    speed: 1
+    rotateSpeed: 90
+    amount: 1
+    points: []
+    loop: 1
+    backAndForth: 1
+    useGravity: 1
+  kindData:
+    rid: 5312548087992942632
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 5312548087992942632
+      type: {class: ItemShotDataBlock, ns: ES, asm: ES_Logic}
+      data:
+        sharedData:
+          enabled: 1
+          aimMode: 0
+          blockMode: 2
+          launchDelay: 0
+          warmupTime: 0
+          speed: 80
+          acceleration: 0
+          maxSpeed: 80
+          trackingStartTime: 0
+          trackingDuration: 0
+          turnSpeed: 720
+          lifeTime: 2.5
+          radius: 0.04
+          hitLayers:
+            serializedVersion: 2
+            m_Bits: 7936
+          useGravity: 0
+          orientToVelocity: 1
+          allowMustHit: 0
+          hitTagEligibility:
+            attackerCondition:
+              required: []
+              requiredAny: []
+              forbidden: []
+              requiredCore: 
+              requiredAnyCore: 
+              forbiddenCore: 
+              requiredExtensions: []
+              requiredAnyExtensions: []
+              forbiddenExtensions: []
+            targetCondition:
+              required: []
+              requiredAny: []
+              forbidden: []
+              requiredCore: 
+              requiredAnyCore: 
+              forbiddenCore: 
+              requiredExtensions: []
+              requiredAnyExtensions: []
+              forbiddenExtensions: []
+        key:
+          enumKey: 0
+          stringKey: shot.basic_rifle.round
+          definitionGuid: 
+          definitionLocalFileId: 0
+          definitionTypeName: 
+        initialState:
+          logicSeed: 0
+          speedMultiplier: 1
+          lifeTimeMultiplier: 1
+          radiusMultiplier: 1
+          forceMustHit: 0
+          overrideLaunchDelay: 0
+          launchDelay: 0
+          overrideTrackingStartTime: 0
+          trackingStartTime: 0
+          targetOffset: {x: 0, y: 0, z: 0}
+          spreadAngle: 0

@@ -36,6 +36,7 @@ namespace ES
         {
             return new GUIContent("轨道相机预览", "查看当前 TrackView 相机轨道拥有的独立预览输出");
         }
+        public override string ESWindow_PresentationShortTitle => "相机";
 
         protected override string ESWindow_Subtitle => "TrackView 相机输出";
         protected override ESWindowSleepLinkMode ESWindow_SleepLinkMode

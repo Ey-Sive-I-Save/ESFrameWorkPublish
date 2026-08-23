@@ -66,8 +66,8 @@ namespace ES
             RegisterBuiltIn("runtime_watch", MenuItemPathDefine.RUNTIME_WATCH_WINDOW_PATH, "RuntimeWatch", "验证与诊断", "运行时 观察 监控");
             RegisterBuiltIn("track_editor", MenuItemPathDefine.TRACK_EDITOR_WINDOW_PATH, "轨道编辑器", "内容制作", "技能 Timeline Clip");
             RegisterBuiltIn("stable_graph_v2", MenuItemPathDefine.STABLE_GRAPH_WINDOW_PATH, "稳定图编辑器 V2", "内容制作", "Graph 流程 行为树");
-            RegisterBuiltIn("font_workbench", MenuItemPathDefine.FONT_WORKBENCH_WINDOW_PATH, "字体资产工作台", "内容制作", "TMP 字符集 Fallback");
-            RegisterBuiltIn("cmd_agent", MenuItemPathDefine.AGENT_WORKBENCH_WINDOW_PATH, "Agent 工作台", "自动化与开发", "Codex 命令 AI Agent");
+            RegisterBuiltIn("font_workbench", MenuItemPathDefine.FONT_WORKBENCH_WINDOW_PATH, "字体资产工具", "内容制作", "TMP 字符集 Fallback");
+            RegisterBuiltIn("cmd_agent", MenuItemPathDefine.AGENT_WORKBENCH_WINDOW_PATH, "Agent 控制台", "自动化与开发", "Codex 命令 AI Agent");
         }
 
         public static IReadOnlyList<ESWindowDescriptor> All => OrderedDescriptors;

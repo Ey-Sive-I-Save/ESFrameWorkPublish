@@ -113,10 +113,11 @@ namespace ES
                     request.weaponDefinitionRuntimeKey,
                     out ESWeaponRuntimeData weaponRuntimeData)
                 && weaponRuntimeData != null
-                && weaponRuntimeData.Ready)
+                && weaponRuntimeData.Ready
+                && weaponRuntimeData.PreparedSharedData != null)
             {
                 record.hasWeaponState = true;
-                record.weaponState = weaponRuntimeData.defaultVariableData;
+                record.weaponState = weaponRuntimeData.PreparedDefaultVariableData;
                 record.weaponState.lastStateUpdateTime = 0f;
             }
             return TryAdd(record, persistentId, request.itemDefinitionRuntimeKey, request.ownerId, out handle);
@@ -251,7 +252,6 @@ namespace ES
         /// </summary>
         public bool TryConsumeWeaponUse(
             ESInstanceHandle handle,
-            ItemWeaponSharedData definition,
             float now,
             out ItemWeaponVariableData state,
             out ESWeaponUseFailure failure,
@@ -259,14 +259,10 @@ namespace ES
         {
             state = default;
             failure = ESWeaponUseFailure.InvalidHandle;
-            if (definition == null
-                || definition.fire == null
-                || !TryGet(handle, out ESItemInstanceRecord record)
+            if (!TryGet(handle, out ESItemInstanceRecord record)
                 || !TryEnsureWeaponState(ref record))
             {
-                failure = definition == null || definition.fire == null
-                    ? ESWeaponUseFailure.MissingWeaponDefinition
-                    : ESWeaponUseFailure.InvalidHandle;
+                failure = ESWeaponUseFailure.InvalidHandle;
                 return false;
             }
             if (!ESRuntimeDataGameCore.Weapons.TryGet(
@@ -274,12 +270,13 @@ namespace ES
                     out ESWeaponRuntimeData boundRuntimeData)
                 || boundRuntimeData == null
                 || !boundRuntimeData.Ready
-                || !ReferenceEquals(boundRuntimeData.sharedData, definition))
+                || boundRuntimeData.PreparedSharedData == null)
             {
                 failure = ESWeaponUseFailure.MissingWeaponDefinition;
                 return false;
             }
 
+            ItemWeaponSharedData definition = boundRuntimeData.PreparedSharedData;
             RefreshWeaponState(ref record.weaponState, record.weaponDefinitionRuntimeKey, now);
             WeaponFireDefinitionData fire = definition.fire;
             if (record.weaponState.cooldownLeft > 0f)
@@ -310,6 +307,30 @@ namespace ES
             return TrySet(handle, record) && failure == ESWeaponUseFailure.None;
         }
 
+        /// <summary>作者/测试兼容入口；运行时消费始终以 handle 绑定的 Prepared 定义为权威。</summary>
+        public bool TryConsumeWeaponUse(
+            ESInstanceHandle handle,
+            ItemWeaponSharedData definition,
+            float now,
+            out ItemWeaponVariableData state,
+            out ESWeaponUseFailure failure,
+            float cooldownOverride = -1f)
+        {
+            if (definition == null)
+            {
+                state = default;
+                failure = ESWeaponUseFailure.MissingWeaponDefinition;
+                return false;
+            }
+
+            return TryConsumeWeaponUse(
+                handle,
+                now,
+                out state,
+                out failure,
+                cooldownOverride);
+        }
+
         private static bool TryEnsureWeaponState(ref ESItemInstanceRecord record)
         {
             if (record.weaponDefinitionRuntimeKey <= 0)
@@ -320,11 +341,12 @@ namespace ES
                     record.weaponDefinitionRuntimeKey,
                     out ESWeaponRuntimeData runtimeData)
                 || runtimeData == null
-                || !runtimeData.Ready)
+                || !runtimeData.Ready
+                || runtimeData.PreparedSharedData == null)
                 return false;
 
             record.hasWeaponState = true;
-            record.weaponState = runtimeData.defaultVariableData;
+            record.weaponState = runtimeData.PreparedDefaultVariableData;
             record.weaponState.lastStateUpdateTime = 0f;
             return true;
         }
@@ -344,9 +366,11 @@ namespace ES
                 && ESRuntimeDataGameCore.Weapons.TryGet(
                     weaponDefinitionRuntimeKey,
                     out ESWeaponRuntimeData runtimeData)
-                && runtimeData?.sharedData?.fire != null)
+                && runtimeData?.PreparedSharedData?.fire != null)
             {
-                float dissipation = Mathf.Max(0f, runtimeData.sharedData.fire.heatDissipationPerSecond);
+                float dissipation = Mathf.Max(
+                    0f,
+                    runtimeData.PreparedSharedData.fire.heatDissipationPerSecond);
                 state.heat = Mathf.Max(0f, state.heat - elapsed * dissipation);
             }
             state.lastStateUpdateTime = safeNow;

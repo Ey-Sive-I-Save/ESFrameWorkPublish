@@ -133,6 +133,23 @@ namespace ES.Tests
         }
 
         [Test]
+        public void LookOnNewWinner_DoesNotClearPendingConfigurationChange()
+        {
+            ESCameraLease first = director.Push(CreateRequest("first", 1));
+            Assert.That(first.IsValid, Is.True);
+            director.FlushNow(ESCameraViewId.Main);
+            Assert.That(adapter.last.definition.stringKey, Is.EqualTo("first"));
+
+            ESCameraLease second = director.Push(CreateRequest("second", 10));
+            Assert.That(director.TrySetLook(second, new Vector2(2f, -1f)), Is.True);
+            director.FlushNow(ESCameraViewId.Main);
+
+            Assert.That(adapter.last.definition.stringKey, Is.EqualTo("second"));
+            Assert.That(adapter.last.configurationChanged, Is.True);
+            Assert.That(adapter.last.hasLookInput, Is.True);
+        }
+
+        [Test]
         public void Modifiers_ComposeByExplicitOperationAndPriority()
         {
             director.Push(CreateRequest("player", 1));

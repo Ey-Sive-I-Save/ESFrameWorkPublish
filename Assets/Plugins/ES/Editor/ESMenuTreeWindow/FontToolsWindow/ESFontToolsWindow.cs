@@ -11,7 +11,7 @@ namespace ES
     public sealed class ESFontToolsWindow : ESMenuTreeWindow<ESFontToolsWindow>
     {
         [MenuItem(MenuItemPathDefine.FONT_WORKBENCH_WINDOW_PATH, false, 20)]
-        [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "字体资产工作台", false, -945)]
+        [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "字体资产工具", false, -945)]
         public static void TryOpenWindow()
         {
             ESWindowCommandRegistry.RecordOpened("font_workbench");
@@ -21,7 +21,8 @@ namespace ES
         [System.NonSerialized] private Page_FontBuild fontBuildPage;
         [System.NonSerialized] private Page_FontPreview fontPreviewPage;
 
-        public override GUIContent ESWindow_GetWindowGUIContent() => new GUIContent("ES 字体资产工作台", "管理十语言字体族、字符集、生成资产和自动回退链。");
+        public override GUIContent ESWindow_GetWindowGUIContent() => new GUIContent("ES 字体资产工具", "管理十语言字体族、字符集、生成资产和自动回退链。");
+        public override string ESWindow_PresentationShortTitle => "字体";
         protected override string ESWindow_Subtitle => "十语言字体族、字符收集、生成与覆盖验证";
         protected override Vector2 ESWindow_MinSize => new Vector2(760f, 540f);
         protected override Vector2 ESWindow_DefaultSize => new Vector2(1120f, 760f);

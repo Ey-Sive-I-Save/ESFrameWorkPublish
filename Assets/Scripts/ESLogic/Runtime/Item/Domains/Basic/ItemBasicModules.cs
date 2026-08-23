@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
@@ -50,6 +49,7 @@ namespace ES
             }
         }
 
+        [ESHotPath]
         public void SetPendingShotResult(in ShotMotionResult result)
         {
             _pendingResult = result;
@@ -81,6 +81,7 @@ namespace ES
             return EnsureMotionInfluences().TryAcquireField(request, out lease);
         }
 
+        [ESHotPath]
         public void ApplyMotionInfluences(
             ref Vector3 velocity,
             Vector3 position,
@@ -98,6 +99,7 @@ namespace ES
                 maxCombinedInfluenceVelocityDelta);
         }
 
+        [ESHotPath]
         public bool TryReadDynamicVelocity(out Vector3 velocity)
         {
             Rigidbody body = driverKind == ItemMotionDriverKind.Rigidbody
@@ -292,6 +294,11 @@ namespace ES
     [Serializable, TypeRegistryItem("Item 飞行物模块")]
     public sealed class ItemShotModule : ItemBasicModuleBase
     {
+        private const int MaximumHitBufferCapacity = 256;
+        private const int DefaultResolvedColliderCapacity = 32;
+        private const int MaximumResolvedColliderCapacity = 1024;
+        private const int MaximumImpactColliderCapacity = 128;
+
         [Title("飞行物Shared")]
         [HideLabel]
         public ItemShotSharedData sharedData = ItemShotSharedData.Default;
@@ -311,13 +318,23 @@ namespace ES
         [LabelText("命中半径")]
         public float castRadius = 0.05f;
         [LabelText("命中缓存容量")]
+        [MinValue(1), MaxValue(MaximumHitBufferCapacity)]
         public int hitBufferCapacity = 8;
+        [LabelText("单次生命周期去重容量")]
+        [MinValue(1), MaxValue(MaximumResolvedColliderCapacity)]
+        public int resolvedColliderCapacity = DefaultResolvedColliderCapacity;
 
         [Title("运行监控")]
         [ShowInInspector, ReadOnly] public ShotMotionState state;
         [ShowInInspector, ReadOnly] public ShotMotionResult latestResult;
         [LabelText("命中缓存溢出次数")]
         [ShowInInspector, ReadOnly] public int hitOverflowCount;
+        [LabelText("命中查询饱和停止次数")]
+        [ShowInInspector, ReadOnly] public int hitOverflowStopCount;
+        [LabelText("命中去重容量停止次数")]
+        [ShowInInspector, ReadOnly] public int resolvedColliderOverflowCount;
+        [LabelText("范围冲击容量饱和次数")]
+        [ShowInInspector, ReadOnly] public int impactOverflowCount;
 
         [NonSerialized] private ShotHitCandidate[] _hitResults;
         [NonSerialized] private IItemShotHitSolver _hitSolver;
@@ -325,25 +342,76 @@ namespace ES
         [NonSerialized] private ItemMotionModule _motionModule;
         [NonSerialized] private Transform _targetTransform;
         [NonSerialized] private Transform _targetEntityTransform;
+        [NonSerialized] private Collider _targetCollider;
         [NonSerialized] private Vector3 _externalMotionVelocity;
+        [NonSerialized] private float _pendingTickDeltaTime;
         [NonSerialized] private bool _hasSubmittedMotionResult;
         [NonSerialized] private int _runtimeDefinitionKey;
         [NonSerialized] private ESInstanceHandle _runtimeInstanceHandle;
         [NonSerialized] private ESShotLaunchContext _launchContext;
-        [NonSerialized] private ESAssetConfigPayloadLease<GameObject> _prefabLease;
-        [NonSerialized] private HashSet<int> _resolvedColliderIds;
+        [NonSerialized] private int[] _resolvedColliderIds;
+        [NonSerialized] private int _resolvedColliderCount;
+        [NonSerialized] private int _resolvedColliderMask;
+        [NonSerialized] private int _runtimeHitCapacity;
+        [NonSerialized] private int _runtimeResolvedColliderCapacity;
+        [NonSerialized] private bool _motionModuleResolved;
+        [NonSerialized] private ESPooledGameObject _pooledObject;
         [NonSerialized] private bool _targetHitResolved;
         [NonSerialized] private bool _lifecycleActive;
+        [NonSerialized] private ESAssetIdentity _prefabIdentity;
+        [NonSerialized] private System.Action<ESAssetIdentity> _resourceTransitionObserver;
+        [NonSerialized] private bool _resourceTransitionSubscribed;
+        [NonSerialized] private int _simulationIndex = -1;
+        [NonSerialized] private Collider[] _impactColliders;
+        [NonSerialized] private int _bounceCount;
+        [NonSerialized] private System.Action<ESShotLifecycleEvent> _lifecycleEvent;
+        [NonSerialized] private System.Delegate[] _lifecycleEventSnapshot =
+            System.Array.Empty<System.Delegate>();
 
         public ESInstanceHandle RuntimeInstanceHandle => _runtimeInstanceHandle;
+        internal int Internal_SimulationIndex
+        {
+            get => _simulationIndex;
+            set => _simulationIndex = value;
+        }
         public ESShotLaunchContext LaunchContext => _launchContext;
-        public event System.Action<ESShotLifecycleEvent> LifecycleEvent;
+        public event System.Action<ESShotLifecycleEvent> LifecycleEvent
+        {
+            add
+            {
+                if (value == null)
+                    return;
+                _lifecycleEvent += value;
+                _lifecycleEventSnapshot = _lifecycleEvent.GetInvocationList();
+            }
+            remove
+            {
+                if (value == null || _lifecycleEvent == null)
+                    return;
+
+                System.Action<ESShotLifecycleEvent> before = _lifecycleEvent;
+                System.Action<ESShotLifecycleEvent> after =
+                    (System.Action<ESShotLifecycleEvent>)System.Delegate.Remove(before, value);
+                if (ReferenceEquals(before, after))
+                    return;
+
+                _lifecycleEvent = after;
+                _lifecycleEventSnapshot = after != null
+                    ? after.GetInvocationList()
+                    : System.Array.Empty<System.Delegate>();
+            }
+        }
 
         public override void Start()
         {
             base.Start();
-            EnsureRuntimeHelpers();
+            Internal_PrepareHotPath();
             ResolveMotionModule();
+            // A first-time pooled instance reaches Start after ESShotSpawner has already
+            // applied RuntimeData and launched it. The prefab defaults must not overwrite
+            // that authoritative per-spawn state.
+            if (_lifecycleActive || state.launched)
+                return;
             sharedData ??= ItemShotSharedData.Default;
             ApplyShotData(sharedData, variableData);
             ResolveRuntimeDefinitionKey(MyCore != null ? MyCore.prefabDefinition : null);
@@ -358,8 +426,11 @@ namespace ES
             dir = ApplySpread(dir);
             _targetTransform = null;
             _targetEntityTransform = null;
+            _targetCollider = null;
             _targetHitResolved = false;
+            _bounceCount = 0;
             _externalMotionVelocity = Vector3.zero;
+            _pendingTickDeltaTime = 0f;
             _hasSubmittedMotionResult = false;
             state = new ShotMotionState
             {
@@ -391,8 +462,11 @@ namespace ES
 
             _targetTransform = null;
             _targetEntityTransform = null;
+            _targetCollider = null;
             _targetHitResolved = false;
+            _bounceCount = 0;
             _externalMotionVelocity = Vector3.zero;
+            _pendingTickDeltaTime = 0f;
             _hasSubmittedMotionResult = false;
             Vector3 resolvedTargetPosition = targetPosition + variableData.targetOffset;
             Vector3 toTarget = resolvedTargetPosition - MyCore.transform.position;
@@ -441,31 +515,36 @@ namespace ES
             _targetTransform = target;
             Entity targetEntity = target.GetComponentInParent<Entity>();
             _targetEntityTransform = targetEntity != null ? targetEntity.transform : null;
+            _targetCollider = target.GetComponentInChildren<Collider>();
             return launched;
         }
 
         public void Internal_InitializeSpawn(
             ESShotRuntimeData runtimeData,
             int runtimeDefinitionKey,
-            ESAssetConfigPayloadLease<GameObject> prefabLease,
+            in ItemShotVariableData spawnVariableData,
             in ESShotLaunchContext context)
         {
-            if (runtimeData == null || runtimeData.sharedData == null)
+            if (runtimeData == null || !runtimeData.Ready || runtimeData.PreparedSharedData == null)
                 throw new System.ArgumentNullException(nameof(runtimeData));
             if (runtimeDefinitionKey <= 0)
                 throw new System.ArgumentOutOfRangeException(nameof(runtimeDefinitionKey));
-            if (prefabLease == null || prefabLease.IsDisposed || prefabLease.Asset == null)
-                throw new System.ArgumentException("Shot spawn requires a live prefab lease.", nameof(prefabLease));
-
-            ReleasePrefabLease();
-            MyCore?.BindDefinition(runtimeData.soSource);
-            ApplyShotData(runtimeData.sharedData, runtimeData.defaultVariableData);
+            ItemShotSharedData preparedDefinition = runtimeData.PreparedSharedData;
+            RequireHitTagEligibilityPrepared(preparedDefinition);
+            ApplyPreparedShotData(preparedDefinition, spawnVariableData);
             _runtimeDefinitionKey = runtimeDefinitionKey;
             _launchContext = context;
-            _prefabLease = prefabLease;
-            (_resolvedColliderIds ??= new HashSet<int>()).Clear();
+            _prefabIdentity = runtimeData.TryGetPreparedPrefabIdentity(out ESAssetIdentity prefabIdentity)
+                ? prefabIdentity
+                : default;
+            Internal_SubscribeToResourceTransitions();
+            Internal_PrepareHotPath();
+            ResetResolvedColliders();
             _targetEntityTransform = null;
+            _targetCollider = null;
             _targetHitResolved = false;
+            _bounceCount = 0;
+            _pendingTickDeltaTime = 0f;
         }
 
         public void Internal_Stop(bool publishStopped = true)
@@ -482,22 +561,36 @@ namespace ES
 
         public void ApplyShotData(ItemShotSharedData shared, in ItemShotVariableData variable)
         {
-            if (shared == null)
-                throw new System.ArgumentNullException(nameof(shared), "Shot SharedData 不能为空。");
-            if (!shared.enabled)
-                return;
+            ValidateShotDataForApply(shared, variable);
+            ApplyPreparedShotData(shared, variable);
+        }
+
+        private void ApplyPreparedShotData(
+            ItemShotSharedData shared,
+            in ItemShotVariableData variable)
+        {
+            if (shared.hitTagEligibility != null && !shared.hitTagEligibility.IsPrepared)
+            {
+                throw new System.InvalidOperationException(
+                    "ShotDefinition 的命中 Tag 条件尚未冻结，拒绝提交运行态。");
+            }
+
+            ItemShotVariableData normalizedVariable = NormalizeVariable(variable);
+            ShotAimMode resolvedAimMode = shared.aimMode;
+            if (normalizedVariable.forceMustHit && shared.allowMustHit)
+                resolvedAimMode = ShotAimMode.MustHit;
+            ShotBlockMode resolvedBlockMode = shared.blockMode;
+            LayerMask resolvedHitLayers = ESPhysicsLayers.GetShotHitMask(shared.hitLayers);
+            float resolvedCastRadius = Mathf.Max(0f, shared.radius * normalizedVariable.radiusMultiplier);
+            ShotMotionConfig resolvedConfig = shared.ToShotMotionConfig(normalizedVariable);
 
             sharedData = shared;
-            variableData = NormalizeVariable(variable);
-
-            aimMode = shared.aimMode;
-            if (variableData.forceMustHit && shared.allowMustHit)
-                aimMode = ShotAimMode.MustHit;
-
-            blockMode = shared.blockMode;
-            hitLayers = ESPhysicsLayers.GetShotHitMask(shared.hitLayers);
-            castRadius = Mathf.Max(0f, shared.radius * variableData.radiusMultiplier);
-            config = shared.ToShotMotionConfig(variableData);
+            variableData = normalizedVariable;
+            aimMode = resolvedAimMode;
+            blockMode = resolvedBlockMode;
+            hitLayers = resolvedHitLayers;
+            castRadius = resolvedCastRadius;
+            config = resolvedConfig;
         }
 
         public void ApplyShotData(ItemDataInfo itemData)
@@ -505,54 +598,64 @@ namespace ES
             if (itemData == null)
                 return;
 
-            MyCore?.BindDefinition(itemData);
             itemData.EnsureActiveKindData();
             ItemShotDataBlock block = itemData.kindData as ItemShotDataBlock;
             if (block != null)
             {
-                ApplyShotData(block.sharedData, block.initialState);
+                ValidateShotDataForApply(block.sharedData, block.initialState);
+                MyCore?.BindDefinition(itemData);
+                ApplyPreparedShotData(block.sharedData, block.initialState);
                 ResolveRuntimeDefinitionKey(itemData);
             }
         }
 
-        protected override void Update()
+        [ESHotPath]
+        internal void Internal_TickCentralized(float deltaTime)
         {
-            Tick(Time.deltaTime);
+            Tick(deltaTime);
         }
 
         public void SetHitSolver(IItemShotHitSolver solver)
         {
             _hitSolver = solver;
+            if (_hitSolver == null)
+                Internal_PrepareHotPath();
         }
 
         public void SetTickPolicy(IItemShotTickPolicy policy)
         {
             _tickPolicy = policy;
+            if (_tickPolicy == null)
+                _tickPolicy = ItemShotAlwaysTickPolicy.Instance;
         }
 
+        [ESHotPath]
         private void Tick(float deltaTime)
         {
-            EnsureRuntimeHelpers();
             if (!state.launched)
                 return;
 
+            _pendingTickDeltaTime += Mathf.Max(0f, deltaTime);
             if (!_tickPolicy.ShouldTick(state, Time.frameCount))
                 return;
 
+            float stepDeltaTime = _pendingTickDeltaTime;
+            _pendingTickDeltaTime = 0f;
+
             if (aimMode == ShotAimMode.Scan)
             {
-                TickScan(deltaTime);
+                TickScan(stepDeltaTime);
                 return;
             }
 
             RefreshTargetPosition();
-            ItemMotionModule motionModule = ResolveMotionModule();
+            ItemMotionModule motionModule = _motionModule;
             if (_hasSubmittedMotionResult
                 && motionModule != null
                 && motionModule.TryReadDynamicVelocity(out Vector3 bodyVelocity))
                 _externalMotionVelocity = bodyVelocity - state.velocity;
-            latestResult = ShotMotionSolver.Step(ref state, config, deltaTime);
-            ApplyExternalMotion(ref state, ref latestResult, motionModule, deltaTime);
+            latestResult = ShotMotionSolver.Step(ref state, config, stepDeltaTime);
+            ApplyExternalMotion(ref state, ref latestResult, motionModule, stepDeltaTime);
             TryBuildHitCandidate(ref latestResult);
             if (!state.launched)
                 return;
@@ -576,18 +679,32 @@ namespace ES
 
         public void OnPoolSpawned()
         {
+            Internal_PrepareHotPath();
             UnregisterRuntimeInstance();
-            ReleasePrefabLease();
+            Internal_ResetOverflowDiagnostics();
             _launchContext = default;
-            _resolvedColliderIds?.Clear();
+            ResetResolvedColliders();
+            _pendingTickDeltaTime = 0f;
             _targetEntityTransform = null;
+            _targetCollider = null;
             _targetHitResolved = false;
             _lifecycleActive = false;
             ResolveRuntimeDefinitionKey(MyCore != null ? MyCore.prefabDefinition : null);
         }
 
+        internal void Internal_ResetOverflowDiagnostics()
+        {
+            hitOverflowCount = 0;
+            hitOverflowStopCount = 0;
+            resolvedColliderOverflowCount = 0;
+            impactOverflowCount = 0;
+        }
+
         public void OnPoolDespawned()
         {
+            // The pool calls the initial Despawn baseline while prewarming, so default query
+            // buffers are allocated before a projectile enters steady gameplay.
+            Internal_PrepareHotPath();
             bool hadSpawn = _lifecycleActive;
             bool wasLaunched = hadSpawn && state.launched;
             UnregisterRuntimeInstance();
@@ -600,16 +717,20 @@ namespace ES
             latestResult = default;
             _targetTransform = null;
             _targetEntityTransform = null;
+            _targetCollider = null;
             _externalMotionVelocity = Vector3.zero;
+            _pendingTickDeltaTime = 0f;
             _hasSubmittedMotionResult = false;
             if (hadSpawn)
                 PublishLifecycle(ESShotLifecycleKind.Despawned);
             _lifecycleActive = false;
-            ReleasePrefabLease();
             _launchContext = default;
-            _resolvedColliderIds?.Clear();
+            ResetResolvedColliders();
             _targetHitResolved = false;
-            LifecycleEvent = null;
+            Internal_UnsubscribeFromResourceTransitions();
+            _prefabIdentity = default;
+            _lifecycleEvent = null;
+            _lifecycleEventSnapshot = System.Array.Empty<System.Delegate>();
         }
 
         private void ResolveRuntimeDefinitionKey(ItemDataInfo itemData)
@@ -637,7 +758,15 @@ namespace ES
                 _runtimeDefinitionKey,
                 MyCore.GetInstanceID(),
                 out _runtimeInstanceHandle))
-                return true;
+            {
+                if (ESShotSimulationBatch.Internal_Register(this))
+                    return true;
+
+                ESRuntimeDataModule.ShotInstanceTable.TryRemove(_runtimeInstanceHandle, out _);
+                _runtimeInstanceHandle = default;
+                Debug.LogError("[ItemShotModule] 集中模拟容量不足，已拒绝发射。", MyCore);
+                return false;
+            }
 
             Debug.LogError("[ItemShotModule] Shot 实例表容量不足或身份无效，已拒绝发射。", MyCore);
             return false;
@@ -645,11 +774,13 @@ namespace ES
 
         private void UnregisterRuntimeInstance()
         {
+            ESShotSimulationBatch.Internal_Unregister(this);
             if (_runtimeInstanceHandle.IsValid)
                 ESRuntimeDataModule.ShotInstanceTable.TryRemove(_runtimeInstanceHandle, out _);
             _runtimeInstanceHandle = default;
         }
 
+        [ESHotPath]
         private void ApplyExternalMotion(
             ref ShotMotionState motionState,
             ref ShotMotionResult result,
@@ -670,12 +801,12 @@ namespace ES
             motionState.velocity = baseVelocity;
         }
 
+        [ESHotPath]
         private void TryBuildHitCandidate(ref ShotMotionResult result)
         {
             if (result.kind == ShotMotionKind.Delayed || result.kind == ShotMotionKind.Warmup)
                 return;
 
-            EnsureRuntimeHelpers();
             ItemShotHitQuery query = new ItemShotHitQuery
             {
                 from = result.previousPosition,
@@ -690,27 +821,48 @@ namespace ES
             if (count <= 0)
                 return;
 
-            if (_hitSolver.IsOverflow)
+            bool queryOverflow = _hitSolver.IsOverflow;
+            if (queryOverflow)
                 hitOverflowCount++;
 
+            ShotHitCandidate lastResolvedHit = default;
+            bool resolvedAnyHit = false;
             for (int index = 0; index < count && state.launched; index++)
             {
                 ShotHitCandidate hit = _hitResults[index];
                 if (hit.collider == null || IsOwnCollider(hit.collider))
                     continue;
                 int colliderId = hit.collider.GetInstanceID();
-                if (_resolvedColliderIds != null && _resolvedColliderIds.Contains(colliderId))
+                if (ContainsResolvedCollider(colliderId))
+                    continue;
+                if (ESShotColliderOwnerRegistry.TryResolveEntity(hit.collider, out Entity hitOwner)
+                    && hitOwner != null
+                    && ContainsResolvedCollider(hitOwner.GetInstanceID()))
                     continue;
 
                 hit.incomingVelocity = result.velocity;
+                lastResolvedHit = hit;
+                resolvedAnyHit = true;
                 result.hasHitCandidate = true;
                 result.hitCandidate = hit;
+                int bounceCountBeforeResolve = _bounceCount;
                 if (!ResolveHit(hit, ref result))
                     return;
                 result.hasHitCandidate = false;
+                if (_bounceCount != bounceCountBeforeResolve)
+                    return;
+            }
+
+            if (queryOverflow && state.launched)
+            {
+                hitOverflowStopCount++;
+                StopAtHitBoundary(
+                    resolvedAnyHit ? lastResolvedHit : default,
+                    ref result);
             }
         }
 
+        [ESHotPath]
         private void TryBuildMustHitCandidate(ref ShotMotionResult result)
         {
             if (aimMode != ShotAimMode.MustHit
@@ -719,7 +871,7 @@ namespace ES
                 || result.kind != ShotMotionKind.Arrived)
                 return;
 
-            Collider targetCollider = _targetTransform != null ? _targetTransform.GetComponentInChildren<Collider>() : null;
+            Collider targetCollider = _targetCollider;
             result.hasHitCandidate = true;
             result.hitCandidate = new ShotHitCandidate
             {
@@ -733,29 +885,277 @@ namespace ES
             };
         }
 
+        [ESHotPath]
         private bool ResolveHit(in ShotHitCandidate hit, ref ShotMotionResult result)
         {
             IESShotHitResolver resolver = _launchContext.hitResolver ?? ESDefaultShotHitResolver.Instance;
             ESShotHitDecision decision = resolver.Resolve(_launchContext, sharedData, hit);
             if (IsTargetCollider(hit.collider))
                 _targetHitResolved = true;
+
+            if (decision != ESShotHitDecision.Stop
+                && hit.collider != null
+                && !TryAddResolvedCollider(hit.collider.GetInstanceID()))
+            {
+                resolvedColliderOverflowCount++;
+                decision = ESShotHitDecision.Stop;
+            }
+            if (decision == ESShotHitDecision.Stop
+                && TryApplyPreparedBounce(hit, ref result))
+                decision = ESShotHitDecision.Bounce;
             PublishLifecycle(ESShotLifecycleKind.Hit, hit, decision);
 
-            if (decision != ESShotHitDecision.Stop && hit.collider != null)
-                (_resolvedColliderIds ??= new HashSet<int>()).Add(hit.collider.GetInstanceID());
+            if (decision != ESShotHitDecision.Ignore)
+                PublishPreparedImpactHits(hit);
+
             if (decision != ESShotHitDecision.Stop)
                 return true;
 
+            return StopAtHitBoundary(hit, ref result);
+        }
+
+        [ESHotPath]
+        private bool TryApplyPreparedBounce(
+            in ShotHitCandidate hit,
+            ref ShotMotionResult result)
+        {
+            ShotImpactDefinitionData impact = sharedData != null ? sharedData.impact : null;
+            if (impact == null
+                || _bounceCount >= impact.bounceCount
+                || hit.normal.sqrMagnitude <= 0.0001f)
+                return false;
+
+            Vector3 incoming = state.velocity.sqrMagnitude > 0.0001f
+                ? state.velocity
+                : hit.incomingVelocity;
+            if (incoming.sqrMagnitude <= 0.0001f)
+                return false;
+
+            if (hit.collider != null
+                && !TryAddResolvedCollider(hit.collider.GetInstanceID()))
+                return false;
+
+            _bounceCount++;
+            Vector3 reflected = Vector3.Reflect(incoming, hit.normal.normalized)
+                * impact.bounceVelocityScale;
+            Vector3 position = hit.point + hit.normal.normalized * 0.002f;
+            state.previousPosition = position;
+            state.currentPosition = position;
+            state.velocity = reflected;
+            state.direction = reflected.normalized;
+            result.kind = ShotMotionKind.Moving;
+            result.previousPosition = position;
+            result.currentPosition = position;
+            result.velocity = reflected;
+            result.hasHitCandidate = false;
+            return true;
+        }
+
+        [ESHotPath]
+        private void PublishPreparedImpactHits(in ShotHitCandidate sourceHit)
+        {
+            ShotImpactDefinitionData impact = sharedData != null ? sharedData.impact : null;
+            if (impact == null)
+                return;
+
+            if (sourceHit.collider != null
+                && ESShotColliderOwnerRegistry.TryResolveEntity(sourceHit.collider, out Entity sourceTarget)
+                && sourceTarget != null)
+                TryAddResolvedCollider(sourceTarget.GetInstanceID());
+
+            if (impact.explosionRadius > 0f)
+            {
+                PublishAreaHits(
+                    sourceHit,
+                    impact.explosionRadius,
+                    impact.explosionTargetCapacity);
+            }
+            if (impact.chainTargetCount > 0 && impact.chainRadius > 0f)
+                PublishChainHits(sourceHit, impact.chainRadius, impact.chainTargetCount);
+        }
+
+        [ESHotPath]
+        private void PublishAreaHits(
+            in ShotHitCandidate sourceHit,
+            float radius,
+            int targetLimit)
+        {
+            Collider[] colliders = _impactColliders;
+            if (colliders == null || colliders.Length == 0 || targetLimit <= 0)
+                return;
+
+            int count = Physics.OverlapSphereNonAlloc(
+                sourceHit.point,
+                radius,
+                colliders,
+                hitLayers,
+                QueryTriggerInteraction.Collide);
+            if (count >= colliders.Length)
+                impactOverflowCount++;
+            int published = 0;
+            while (published < targetLimit
+                   && TrySelectNearestImpactTarget(
+                       sourceHit.point,
+                       sourceHit.collider,
+                       colliders,
+                       count,
+                       out int selectedIndex,
+                       out Collider collider,
+                       out Entity target,
+                       out Vector3 point))
+            {
+                colliders[selectedIndex] = null;
+                int targetId = target.GetInstanceID();
+                if (!TryAddResolvedCollider(targetId))
+                {
+                    resolvedColliderOverflowCount++;
+                    break;
+                }
+
+                Vector3 normal = point - sourceHit.point;
+                ShotHitCandidate areaHit = BuildImpactHit(
+                    sourceHit,
+                    collider,
+                    point,
+                    normal);
+                PublishLifecycle(ESShotLifecycleKind.Hit, areaHit, ESShotHitDecision.Pierce);
+                published++;
+            }
+        }
+
+        [ESHotPath]
+        private void PublishChainHits(
+            in ShotHitCandidate sourceHit,
+            float radius,
+            int targetLimit)
+        {
+            Collider[] colliders = _impactColliders;
+            if (colliders == null || colliders.Length == 0 || targetLimit <= 0)
+                return;
+
+            Vector3 chainOrigin = sourceHit.point;
+            for (int hop = 0; hop < targetLimit; hop++)
+            {
+                int count = Physics.OverlapSphereNonAlloc(
+                    chainOrigin,
+                    radius,
+                    colliders,
+                    hitLayers,
+                    QueryTriggerInteraction.Collide);
+                if (count >= colliders.Length)
+                    impactOverflowCount++;
+                if (!TrySelectNearestImpactTarget(
+                        chainOrigin,
+                        sourceHit.collider,
+                        colliders,
+                        count,
+                        out _,
+                        out Collider collider,
+                        out Entity target,
+                        out Vector3 point))
+                    return;
+
+                if (!TryAddResolvedCollider(target.GetInstanceID()))
+                {
+                    resolvedColliderOverflowCount++;
+                    return;
+                }
+
+                Vector3 normal = point - chainOrigin;
+                ShotHitCandidate chainHit = BuildImpactHit(
+                    sourceHit,
+                    collider,
+                    point,
+                    normal);
+                PublishLifecycle(ESShotLifecycleKind.Hit, chainHit, ESShotHitDecision.Pierce);
+                chainOrigin = point;
+            }
+        }
+
+        [ESHotPath]
+        private bool TrySelectNearestImpactTarget(
+            Vector3 origin,
+            Collider sourceCollider,
+            Collider[] colliders,
+            int count,
+            out int selectedIndex,
+            out Collider selectedCollider,
+            out Entity selectedTarget,
+            out Vector3 selectedPoint)
+        {
+            selectedIndex = -1;
+            selectedCollider = null;
+            selectedTarget = null;
+            selectedPoint = default;
+            float bestDistanceSquared = float.PositiveInfinity;
+            int bestTieBreaker = int.MaxValue;
+
+            for (int index = 0; index < count; index++)
+            {
+                Collider collider = colliders[index];
+                if (collider == null
+                    || collider == sourceCollider
+                    || !ESShotColliderOwnerRegistry.TryResolveEntity(collider, out Entity target)
+                    || target == null
+                    || target == _launchContext.owner
+                    || ContainsResolvedCollider(target.GetInstanceID()))
+                    continue;
+
+                Vector3 point = collider.ClosestPoint(origin);
+                float distanceSquared = (point - origin).sqrMagnitude;
+                int tieBreaker = collider.GetInstanceID();
+                if (distanceSquared > bestDistanceSquared
+                    || (Mathf.Approximately(distanceSquared, bestDistanceSquared)
+                        && tieBreaker >= bestTieBreaker))
+                    continue;
+
+                bestDistanceSquared = distanceSquared;
+                bestTieBreaker = tieBreaker;
+                selectedIndex = index;
+                selectedCollider = collider;
+                selectedTarget = target;
+                selectedPoint = point;
+            }
+
+            return selectedIndex >= 0;
+        }
+
+        [ESHotPath]
+        private static ShotHitCandidate BuildImpactHit(
+            in ShotHitCandidate sourceHit,
+            Collider collider,
+            Vector3 point,
+            Vector3 normal)
+        {
+            return new ShotHitCandidate
+            {
+                collider = collider,
+                point = point,
+                normal = normal.sqrMagnitude > 0.0001f ? normal.normalized : Vector3.up,
+                incomingVelocity = sourceHit.incomingVelocity,
+                distance = normal.magnitude,
+                layer = collider.gameObject.layer,
+                isTrigger = collider.isTrigger
+            };
+        }
+
+        [ESHotPath]
+        private bool StopAtHitBoundary(
+            in ShotHitCandidate hit,
+            ref ShotMotionResult result)
+        {
             result.kind = ShotMotionKind.Blocked;
-            result.currentPosition = hit.point;
-            state.currentPosition = hit.point;
+            if (hit.collider != null)
+                result.currentPosition = hit.point;
+            state.currentPosition = result.currentPosition;
             state.launched = false;
             UnregisterRuntimeInstance();
-            PublishLifecycle(ESShotLifecycleKind.Stopped, hit, decision);
+            PublishLifecycle(ESShotLifecycleKind.Stopped, hit, ESShotHitDecision.Stop);
             RequestPoolReturn();
             return false;
         }
 
+        [ESHotPath]
         private void TickScan(float deltaTime)
         {
             state.elapsedTime += Mathf.Max(0f, deltaTime);
@@ -775,6 +1175,7 @@ namespace ES
             ExecuteScan(state.direction);
         }
 
+        [ESHotPath]
         private void SetScanWaitingResult(ShotMotionKind kind)
         {
             state.previousPosition = state.currentPosition;
@@ -790,6 +1191,7 @@ namespace ES
             };
         }
 
+        [ESHotPath]
         private void ExecuteScan(Vector3 direction)
         {
             float distance = Mathf.Max(0.01f, config.speed * Mathf.Max(0.01f, config.maxLifetime));
@@ -838,32 +1240,37 @@ namespace ES
                 || (_targetEntityTransform == null && _targetTransform.IsChildOf(hitTransform));
         }
 
+        [ESHotPath]
         private void PublishLifecycle(
             ESShotLifecycleKind kind,
             in ShotHitCandidate hit = default,
             ESShotHitDecision decision = ESShotHitDecision.Ignore)
         {
             var evt = new ESShotLifecycleEvent(kind, this, _launchContext, latestResult, hit, decision);
-            try { LifecycleEvent?.Invoke(evt); }
-            catch (System.Exception exception) { Debug.LogException(exception, MyCore); }
+            System.Delegate[] invocationList = _lifecycleEventSnapshot;
+            for (int index = 0; index < invocationList.Length; index++)
+            {
+                try
+                {
+                    ((System.Action<ESShotLifecycleEvent>)invocationList[index]).Invoke(evt);
+                }
+                catch (System.Exception exception)
+                {
+                    Debug.LogException(exception, MyCore);
+                }
+            }
             try { _launchContext.lifecycleObserver?.Invoke(evt); }
             catch (System.Exception exception) { Debug.LogException(exception, MyCore); }
         }
 
+        [ESHotPath]
         private void RequestPoolReturn()
         {
-            ESPooledGameObject pooled = MyCore != null ? MyCore.GetComponent<ESPooledGameObject>() : null;
-            if (pooled != null && pooled.IsSpawned)
-                pooled.RequestPushToPool();
+            if (_pooledObject != null && _pooledObject.IsSpawned)
+                _pooledObject.RequestPushToPool();
         }
 
-        private void ReleasePrefabLease()
-        {
-            ESAssetConfigPayloadLease<GameObject> ownedLease = _prefabLease;
-            _prefabLease = null;
-            ownedLease?.Dispose();
-        }
-
+        [ESHotPath]
         private void RefreshTargetPosition()
         {
             if (_targetTransform == null || !state.hasTarget)
@@ -872,6 +1279,7 @@ namespace ES
             state.targetPosition = _targetTransform.position + variableData.targetOffset;
         }
 
+        [ESHotPath]
         private Vector3 ApplySpread(Vector3 direction)
         {
             float spreadAngle = Mathf.Max(0f, variableData.spreadAngle);
@@ -899,6 +1307,7 @@ namespace ES
             return variable;
         }
 
+        [ESHotPath]
         private static float RangeFromSeed(int seed, uint channel, float min, float max)
         {
             uint value = (uint)seed;
@@ -914,24 +1323,185 @@ namespace ES
 
         private ItemMotionModule ResolveMotionModule()
         {
-            if (_motionModule != null)
+            if (_motionModuleResolved)
                 return _motionModule;
 
             _motionModule = MyCore != null ? MyCore.GetMoudle<ItemMotionModule>() : null;
+            _motionModuleResolved = true;
             return _motionModule;
         }
 
-        private void EnsureRuntimeHelpers()
+        [ESHotPath]
+        private bool ContainsResolvedCollider(int colliderId)
         {
-            int capacity = Mathf.Max(1, hitBufferCapacity);
-            if (_hitResults == null || _hitResults.Length != capacity)
-                _hitResults = new ShotHitCandidate[capacity];
+            int index = GetResolvedColliderSlot(colliderId);
+            for (int probe = 0; probe < _resolvedColliderIds.Length; probe++)
+            {
+                int storedId = _resolvedColliderIds[index];
+                if (storedId == 0)
+                    return false;
+                if (storedId == colliderId)
+                    return true;
+                index = (index + 1) & _resolvedColliderMask;
+            }
 
-            if (_hitSolver == null)
-                _hitSolver = new ItemShotPhysicsHitSolver(capacity);
+            return false;
+        }
+
+        [ESHotPath]
+        private bool TryAddResolvedCollider(int colliderId)
+        {
+            int index = GetResolvedColliderSlot(colliderId);
+            for (int probe = 0; probe < _resolvedColliderIds.Length; probe++)
+            {
+                int storedId = _resolvedColliderIds[index];
+                if (storedId == colliderId)
+                    return true;
+                if (storedId == 0)
+                {
+                    if (_resolvedColliderCount >= _runtimeResolvedColliderCapacity)
+                        return false;
+
+                    _resolvedColliderIds[index] = colliderId;
+                    _resolvedColliderCount++;
+                    return true;
+                }
+                index = (index + 1) & _resolvedColliderMask;
+            }
+
+            return false;
+        }
+
+        private int GetResolvedColliderSlot(int colliderId)
+        {
+            uint hash = unchecked((uint)colliderId * 2654435761u);
+            return (int)(hash & (uint)_resolvedColliderMask);
+        }
+
+        private void ResetResolvedColliders()
+        {
+            if (_resolvedColliderIds != null && _resolvedColliderCount > 0)
+                Array.Clear(_resolvedColliderIds, 0, _resolvedColliderIds.Length);
+            _resolvedColliderCount = 0;
+        }
+
+        private void Internal_SubscribeToResourceTransitions()
+        {
+            if (_resourceTransitionSubscribed || !_prefabIdentity.IsValid)
+                return;
+
+            _resourceTransitionObserver ??= OnActivePlanAssetOwnershipEnding;
+            ESAssets.ActivePlanAssetOwnershipEnding += _resourceTransitionObserver;
+            _resourceTransitionSubscribed = true;
+        }
+
+        private void Internal_UnsubscribeFromResourceTransitions()
+        {
+            if (!_resourceTransitionSubscribed)
+                return;
+
+            ESAssets.ActivePlanAssetOwnershipEnding -= _resourceTransitionObserver;
+            _resourceTransitionSubscribed = false;
+        }
+
+        private void OnActivePlanAssetOwnershipEnding(ESAssetIdentity identity)
+        {
+            if (state.launched && _prefabIdentity.Equals(identity))
+                Internal_Stop();
+        }
+
+        private void Internal_PrepareHotPath()
+        {
+            int hitCapacity = Mathf.Clamp(hitBufferCapacity, 1, MaximumHitBufferCapacity);
+            bool hitCapacityChanged = _runtimeHitCapacity != hitCapacity;
+            if (_hitResults == null || _hitResults.Length != hitCapacity)
+                _hitResults = new ShotHitCandidate[hitCapacity];
+
+            int resolvedCapacity = Mathf.Clamp(
+                resolvedColliderCapacity,
+                1,
+                MaximumResolvedColliderCapacity);
+            if (_resolvedColliderIds == null
+                || _runtimeResolvedColliderCapacity != resolvedCapacity)
+            {
+                int tableCapacity = Mathf.NextPowerOfTwo(resolvedCapacity * 2);
+                _resolvedColliderIds = new int[tableCapacity];
+                _resolvedColliderCount = 0;
+                _resolvedColliderMask = tableCapacity - 1;
+            }
+
+            if (_hitSolver == null
+                || (hitCapacityChanged && _hitSolver is ItemShotPhysicsHitSolver))
+                _hitSolver = new ItemShotPhysicsHitSolver(hitCapacity);
 
             if (_tickPolicy == null)
-                _tickPolicy = new ItemShotAlwaysTickPolicy();
+                _tickPolicy = ItemShotAlwaysTickPolicy.Instance;
+
+            ShotImpactDefinitionData impact = sharedData != null ? sharedData.impact : null;
+            int impactCapacity = impact != null
+                ? Mathf.Clamp(
+                    Mathf.Max(impact.explosionTargetCapacity, impact.chainTargetCount),
+                    1,
+                    MaximumImpactColliderCapacity)
+                : 1;
+            if (_impactColliders == null || _impactColliders.Length != impactCapacity)
+                _impactColliders = new Collider[impactCapacity];
+
+            if (!_motionModuleResolved)
+                ResolveMotionModule();
+            if (_pooledObject == null && MyCore != null)
+                _pooledObject = MyCore.GetComponent<ESPooledGameObject>();
+            if (sharedData != null)
+                PrepareHitTagEligibility(sharedData);
+
+            _runtimeHitCapacity = hitCapacity;
+            _runtimeResolvedColliderCapacity = resolvedCapacity;
+        }
+
+        private static void PrepareHitTagEligibility(ItemShotSharedData definition)
+        {
+            ESHitTagEligibility eligibility = definition.hitTagEligibility;
+            if (eligibility == null || eligibility.IsPrepared)
+                return;
+
+            if (!eligibility.TryPrepare(out string error))
+            {
+                throw new System.InvalidOperationException(
+                    "ShotDefinition 的命中 Tag 条件无法进入运行态：" + error);
+            }
+        }
+
+        private static void RequireHitTagEligibilityPrepared(ItemShotSharedData definition)
+        {
+            ESHitTagEligibility eligibility = definition.hitTagEligibility;
+            if (eligibility != null && !eligibility.IsPrepared)
+            {
+                throw new System.InvalidOperationException(
+                    "Shot RuntimeData 的命中 Tag 条件尚未在注入边界冻结。");
+            }
+        }
+
+        private static void ValidateShotDataForApply(
+            ItemShotSharedData shared,
+            in ItemShotVariableData variable)
+        {
+            if (shared == null)
+                throw new System.ArgumentNullException(nameof(shared), "Shot SharedData 不能为空。");
+            if (!shared.ValidateDefinition(out string sharedError))
+            {
+                throw new System.InvalidOperationException(
+                    "Shot SharedData 无法提交运行态：" + sharedError);
+            }
+            if (!variable.ValidateDefinition(out string variableError))
+            {
+                throw new System.InvalidOperationException(
+                    "Shot VariableData 无法提交运行态：" + variableError);
+            }
+            if (variable.forceMustHit && !shared.allowMustHit)
+            {
+                throw new System.InvalidOperationException(
+                    "Shot VariableData 强制必中，但 SharedData 未允许必中。");
+            }
         }
     }
 }

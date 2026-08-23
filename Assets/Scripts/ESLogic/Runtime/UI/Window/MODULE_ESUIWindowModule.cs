@@ -18,7 +18,8 @@ namespace ES
 
         [NonSerialized] private Dictionary<string, ESUIRootCoordinator> roots;
         [NonSerialized] private List<ESUIRootCoordinator> rootBuffer;
-        [NonSerialized] private HashSet<GameObject> pooledPrefabs;
+        [NonSerialized] private HashSet<string> pooledGroupKeys;
+        [NonSerialized] private Dictionary<string, int> rootRegistrationGenerations;
         [NonSerialized] private bool providerEventsBound;
         [NonSerialized] private int nextRegistrationGeneration;
         [NonSerialized] private int poolScopeGeneration;
@@ -104,16 +105,22 @@ namespace ES
 
             int registrationGeneration = NextPositive(ref nextRegistrationGeneration);
             roots.Add(rootKey, root);
+            rootRegistrationGenerations.Add(rootKey, registrationGeneration);
             return new ESUIRootLease(this, root, rootKey, registrationGeneration);
         }
 
         internal bool IsRootRegistrationCurrent(ESUIRootLease registration)
         {
-            if (registration == null || registration.IsReleased || roots == null)
+            if (registration == null
+                || registration.IsReleased
+                || roots == null
+                || rootRegistrationGenerations == null)
                 return false;
 
             return roots.TryGetValue(registration.RootKey, out ESUIRootCoordinator root)
-                   && ReferenceEquals(root, registration.Root);
+                   && ReferenceEquals(root, registration.Root)
+                   && rootRegistrationGenerations.TryGetValue(registration.RootKey, out int generation)
+                   && generation == registration.RegistrationGeneration;
         }
 
         internal void UnregisterRoot(ESUIRootLease registration)
@@ -122,9 +129,13 @@ namespace ES
                 return;
 
             if (roots.TryGetValue(registration.RootKey, out ESUIRootCoordinator root)
-                && ReferenceEquals(root, registration.Root))
+                && ReferenceEquals(root, registration.Root)
+                && rootRegistrationGenerations != null
+                && rootRegistrationGenerations.TryGetValue(registration.RootKey, out int generation)
+                && generation == registration.RegistrationGeneration)
             {
                 roots.Remove(registration.RootKey);
+                rootRegistrationGenerations.Remove(registration.RootKey);
             }
         }
 
@@ -149,8 +160,27 @@ namespace ES
 
             EnsurePoolLoadCurrent(expectedPoolScopeGeneration, expectedProviderGeneration);
             EnsureRuntimeState();
-            pooledPrefabs.Add(prefab);
+            if (!TryGetPoolModule(out ESGameObjectPoolModule poolModule))
+                throw new InvalidOperationException("PoolOnClose 需要已启用 ESGameObjectPoolModule。");
+
+            string poolKey = GetPoolKey(definition);
+            if (!poolModule.TryRegister(prefab, poolKey, out string poolError))
+            {
+                throw new InvalidOperationException(
+                    "窗口 Pool 组注册失败。PoolOnClose 窗口必须独占其 Prefab/Pool Key："
+                    + definition.name + "；" + poolError);
+            }
+
+            pooledGroupKeys.Add(poolKey);
             return prefab;
+        }
+
+        internal string GetPoolKey(ESUIWindowDefinition definition)
+        {
+            if (definition == null || string.IsNullOrEmpty(definition.StringKey))
+                throw new ArgumentException("PoolOnClose 窗口需要具有稳定 StringKey 的 Definition。", nameof(definition));
+
+            return "ui:window-pool:" + definition.StringKey;
         }
 
         internal bool TryGetPoolModule(out ESGameObjectPoolModule poolModule)
@@ -180,6 +210,7 @@ namespace ES
 
             SnapshotRoots();
             roots.Clear();
+            rootRegistrationGenerations?.Clear();
             for (int i = 0; i < rootBuffer.Count; i++)
                 rootBuffer[i]?.HandleModuleStopped();
             rootBuffer.Clear();
@@ -196,19 +227,19 @@ namespace ES
         private void ClearSharedPool()
         {
             poolScopeGeneration = NextPositive(ref poolScopeGeneration);
-            if (pooledPrefabs == null)
+            if (pooledGroupKeys == null)
                 return;
 
             if (TryGetPoolModule(out ESGameObjectPoolModule poolModule))
             {
-                foreach (GameObject prefab in pooledPrefabs)
+                foreach (string poolKey in pooledGroupKeys)
                 {
-                    if (prefab != null)
-                        poolModule.Clear(prefab);
+                    if (!string.IsNullOrEmpty(poolKey))
+                        poolModule.ClearAndRelease(poolKey);
                 }
             }
 
-            pooledPrefabs.Clear();
+            pooledGroupKeys.Clear();
             if (ESAssets.IsReady)
                 ESAssets.ReleaseScope(PoolResourceScopeKey);
         }
@@ -249,8 +280,10 @@ namespace ES
                 roots = new Dictionary<string, ESUIRootCoordinator>(4, StringComparer.Ordinal);
             if (rootBuffer == null)
                 rootBuffer = new List<ESUIRootCoordinator>(4);
-            if (pooledPrefabs == null)
-                pooledPrefabs = new HashSet<GameObject>();
+            if (pooledGroupKeys == null)
+                pooledGroupKeys = new HashSet<string>(StringComparer.Ordinal);
+            if (rootRegistrationGenerations == null)
+                rootRegistrationGenerations = new Dictionary<string, int>(4, StringComparer.Ordinal);
         }
 
         private static void EnsureRuntimeOnly()

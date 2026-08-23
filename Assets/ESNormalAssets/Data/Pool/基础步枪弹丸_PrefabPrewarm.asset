@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c55f1c561a44b0b85c64b0c5439adef, type: 3}
+  m_Name: "\u57FA\u7840\u6B65\u67AA\u5F39\u4E38_PrefabPrewarm"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: prewarm.shot.basic_rifle.round
+  supportAllScenes: 1
+  supportedScenes: []
+  supportAllSpaces: 1
+  supportedSpaces: []
+  entries:
+  - enabled: 1
+    key: shot.basic_rifle.round
+    prefabKey:
+      enumKey: 0
+      stringKey: prefab.shot.basic_rifle.round
+      guid: f1997c4cd36ed324c8679fb3fecdf36b
+      localFileId: 0
+      assetTypeName: UnityEngine.GameObject
+      address: 
+      groupName: 
+      editorPath: "Assets/ESNormalAssets/ProjectilePrototypes/\u57FA\u7840\u6B65\u67AA\u5F39\u4E38.prefab"
+      editorOnly: 0
+      alwaysLoaded: 0
+    prewarmCount: 64
+    useCustomConfig: 0
+    config:
+      prewarmCount: 0
+      maxInactiveCount: 64
+      maxTotalCount: 256
+      allowExpand: 1
+      destroyOverflow: 1
+      autoRepair: 1
+      repairInactiveTarget: 0
+      clearParentOnReturn: 1
+      stopParticlesOnReturn: 1
+      clearTrailsOnReturn: 1
+      defaultAutoReturn: 0
+      defaultAutoReturnDelay: 2

@@ -12,8 +12,6 @@ using UnityEditor.Animations;
 
 // 抑制私有字段未使用警告
 #pragma warning disable CS0414
-// 抑制无法访问的代码警告（提前return）
-#pragma warning disable CS0162
 
 namespace ES
 {
@@ -68,12 +66,12 @@ namespace ES
         }
 
         [FoldoutGroup("说明与风险"), InfoBox("用途：批量维护 Unity GameObject 的 Static Flags。\n" +
-                 "这些标记会被 Unity 的静态批处理、光照烘焙、反射探针、遮挡剔除和旧导航流程读取。\n" +
+                 "这些标记会被 Unity 的静态批处理、光照烘焙、反射探针和遮挡剔除流程读取。\n" +
                  "适合处理运行时不会移动、不会缩放、不会频繁启停的场景物体，例如建筑、地面、墙体、岩石、固定装饰。\n" +
                  "不适合角色、可移动平台、门、机关、运行时生成/回收对象，以及会在运行时改变 Transform 或 Renderer 状态的对象。", InfoMessageType.Info)]
 
         [FoldoutGroup("说明与风险"), InfoBox("风险：Static Flags 不是普通分类标签，错误标记会导致烘焙结果、遮挡剔除、合批和运行时表现不符合预期。\n" +
-                 "这些标记会被 Unity 的静态批处理、光照烘焙、反射探针、遮挡剔除和旧导航流程读取。\n" +
+                 "这些标记会被 Unity 的静态批处理、光照烘焙、反射探针和遮挡剔除流程读取。\n" +
                  "适合处理运行时不会移动、不会缩放、不会频繁启停的场景物体，例如建筑、地面、墙体、岩石、固定装饰。\n" +
                  "适合处理运行时不会移动、不会缩放、不会频繁启停的场景物体，例如建筑、地面、墙体、岩石、固定装饰。\n" +
                  "建议先刷新预览，只勾选确认要处理的对象，再执行。", InfoMessageType.Warning)]
@@ -94,7 +92,6 @@ namespace ES
                  "• 遮挡剔除静态：将对象作为遮挡物参与遮挡剔除数据构建。\n" +
                  "• 被遮挡物静态：允许对象作为可被遮挡对象参与遮挡剔除。\n" +
                  "• 批处理静态：允许 Unity 对静止 Renderer 做静态批处理，通常用于降低 Draw Call，但会增加相关内存占用。\n" +
-                 "• 导航静态：旧 Unity 导航静态标记；新项目通常由 NavMesh 工作流单独管理。\n" +
                  "• 反射探针静态：让对象参与反射探针烘焙和静态反射采样。", InfoMessageType.Info)]
         [LabelText("应用模式"), Space(5)]
         public StaticApplyMode applyMode = StaticApplyMode.Override;
@@ -128,10 +125,6 @@ namespace ES
         [LabelText("批处理静态")]
         public bool batchingStatic = false;
 
-        [Tooltip("兼容旧 Unity 导航静态标记。新项目通常由 NavMesh 工作流单独管理。")]
-        [LabelText("导航静态")]
-        public bool navigationStatic = false;
-
         [Tooltip("参与反射探针烘焙和静态反射采样。")]
         [LabelText("反射探针静态")]
         public bool reflectionProbeStatic = false;
@@ -163,7 +156,6 @@ namespace ES
             occluderStatic = false;
             occludeeStatic = true;
             batchingStatic = true;
-            navigationStatic = false;
             reflectionProbeStatic = true;
         }
 
@@ -176,7 +168,6 @@ namespace ES
             occluderStatic = false;
             occludeeStatic = true;
             batchingStatic = true;
-            navigationStatic = false;
             reflectionProbeStatic = true;
         }
 
@@ -189,7 +180,6 @@ namespace ES
             occluderStatic = true;
             occludeeStatic = true;
             batchingStatic = false;
-            navigationStatic = false;
             reflectionProbeStatic = false;
         }
 
@@ -407,7 +397,6 @@ namespace ES
             occluderStatic = false;
             occludeeStatic = false;
             batchingStatic = false;
-            navigationStatic = false;
             reflectionProbeStatic = false;
         }
 
@@ -439,7 +428,7 @@ namespace ES
 
             string preview = SimpleToolsSafetyUtility.JoinPreview(targets.Select(GetObjectLabel), 10);
             if (!EditorUtility.DisplayDialog("确认清除静态标记",
-                $"将清除 {targets.Count} 个对象的所有 Static Flags。\n风险: 目标对象将不再作为静态批处理、光照烘焙、反射探针、遮挡剔除或旧导航静态对象参与对应流程。\n过滤对象: {targetInfo.FilteredCount} 个\n\n{preview}\n\n支持 Ctrl+Z 撤销。继续吗？",
+                $"将清除 {targets.Count} 个对象的所有 Static Flags。\n风险: 目标对象将不再作为静态批处理、光照烘焙、反射探针或遮挡剔除对象参与对应流程。\n过滤对象: {targetInfo.FilteredCount} 个\n\n{preview}\n\n支持 Ctrl+Z 撤销。继续吗？",
                 "开始清除", "取消"))
                 return;
 
@@ -639,9 +628,6 @@ namespace ES
             if (occluderStatic) flags |= StaticEditorFlags.OccluderStatic;
             if (occludeeStatic) flags |= StaticEditorFlags.OccludeeStatic;
             if (batchingStatic) flags |= StaticEditorFlags.BatchingStatic;
-#pragma warning disable CS0618
-            if (navigationStatic) flags |= StaticEditorFlags.NavigationStatic;
-#pragma warning restore CS0618
             if (reflectionProbeStatic) flags |= StaticEditorFlags.ReflectionProbeStatic;
             return flags;
         }
@@ -666,9 +652,6 @@ namespace ES
             occluderStatic = (flags & StaticEditorFlags.OccluderStatic) != 0;
             occludeeStatic = (flags & StaticEditorFlags.OccludeeStatic) != 0;
             batchingStatic = (flags & StaticEditorFlags.BatchingStatic) != 0;
-#pragma warning disable CS0618
-            navigationStatic = (flags & StaticEditorFlags.NavigationStatic) != 0;
-#pragma warning restore CS0618
             reflectionProbeStatic = (flags & StaticEditorFlags.ReflectionProbeStatic) != 0;
         }
 
@@ -752,11 +735,6 @@ namespace ES
                 purposes.Add("参与反射探针烘焙");
             if ((selectedFlags & StaticEditorFlags.OccluderStatic) != 0 || (selectedFlags & StaticEditorFlags.OccludeeStatic) != 0)
                 purposes.Add("参与遮挡剔除数据构建");
-#pragma warning disable CS0618
-            if ((selectedFlags & StaticEditorFlags.NavigationStatic) != 0)
-                purposes.Add("兼容旧版导航静态标记");
-#pragma warning restore CS0618
-
             return purposes.Count == 0 ? "Set Unity Static Flags" : string.Join(", ", purposes);
         }
 
@@ -786,9 +764,6 @@ namespace ES
             if ((flags & StaticEditorFlags.OccluderStatic) != 0) names.Add("遮挡");
             if ((flags & StaticEditorFlags.OccludeeStatic) != 0) names.Add("被遮挡");
             if ((flags & StaticEditorFlags.BatchingStatic) != 0) names.Add("批处理");
-#pragma warning disable CS0618
-            if ((flags & StaticEditorFlags.NavigationStatic) != 0) names.Add("导航");
-#pragma warning restore CS0618
             if ((flags & StaticEditorFlags.ReflectionProbeStatic) != 0) names.Add("反射");
 
             var knownFlags = GetKnownManagedFlags();
@@ -806,9 +781,6 @@ namespace ES
                                       StaticEditorFlags.OccludeeStatic |
                                       StaticEditorFlags.BatchingStatic |
                                       StaticEditorFlags.ReflectionProbeStatic;
-#pragma warning disable CS0618
-            flags |= StaticEditorFlags.NavigationStatic;
-#pragma warning restore CS0618
             return flags;
         }
 

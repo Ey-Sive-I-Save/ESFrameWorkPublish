@@ -1,0 +1,14 @@
+{
+  "name": "es-feishu-read-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Read-only Feishu Open Platform worker for ESAutomationCenter.",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "1.73.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

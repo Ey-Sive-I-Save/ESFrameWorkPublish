@@ -18,16 +18,46 @@ namespace ES
         public bool persistent;
     }
 
+    internal enum ESWorldTerrainBrushMode : byte
+    {
+        Flatten,
+        Raise,
+        Lower,
+        Smooth
+    }
+
     internal interface IESWorldMapTerrainEditorBackend
     {
         bool CanHandle(ESWorldMapTerrainMode mode);
         bool TryCreatePreview(ESWorldMapDefinition definition, Scene previewScene, out ESWorldMapTerrainPreviewHandle handle, out string error);
-        bool TryPaintHeight(ESWorldMapDefinition definition, Vector2 worldPoint, Vector2 worldMin, Vector2 worldMax, float normalizedHeight, out string error);
+        bool TryPaintHeight(ESWorldMapDefinition definition, Vector2 worldPoint, Vector2 worldMin, Vector2 worldMax, float normalizedHeight, float radiusWorld, float strength, float falloff, ESWorldTerrainBrushMode mode, out string error);
         bool TryBakePersistent(ESWorldMapAsset asset, string terrainDataPath, string scenePath, out string error);
     }
 
     internal sealed class ESWorldMapUnityTerrainEditorBackend : IESWorldMapTerrainEditorBackend
     {
+        private readonly List<float> smoothSnapshot = new List<float>();
+        private float[] smoothIntegral = Array.Empty<float>();
+        private int smoothIntegralStride;
+        private ESWorldMapHeightfield smoothSnapshotField;
+        private int smoothSnapshotWidth;
+        private int smoothSnapshotHeight;
+        private bool paintStrokeActive;
+
+        internal void BeginPaintStroke()
+        {
+            paintStrokeActive = true;
+            smoothSnapshotField = null;
+            smoothSnapshot.Clear();
+        }
+
+        internal void EndPaintStroke()
+        {
+            paintStrokeActive = false;
+            smoothSnapshotField = null;
+            smoothSnapshot.Clear();
+        }
+
         public bool CanHandle(ESWorldMapTerrainMode mode)
             => mode == ESWorldMapTerrainMode.UnityTerrain || mode == ESWorldMapTerrainMode.Heightfield;
 
@@ -78,17 +108,126 @@ namespace ES
             return true;
         }
 
-        public bool TryPaintHeight(ESWorldMapDefinition definition, Vector2 worldPoint, Vector2 worldMin, Vector2 worldMax, float normalizedHeight, out string error)
+        public bool TryPaintHeight(ESWorldMapDefinition definition, Vector2 worldPoint, Vector2 worldMin, Vector2 worldMax, float normalizedHeight, float radiusWorld, float strength, float falloff, ESWorldTerrainBrushMode mode, out string error)
         {
             error = string.Empty;
             if (definition == null || definition.heightfield == null) { error = "地图定义缺少 Heightfield。"; return false; }
             if (worldMax.x <= worldMin.x || worldMax.y <= worldMin.y) { error = "地图范围无效。"; return false; }
+            if (worldPoint.x < worldMin.x || worldPoint.x > worldMax.x
+                || worldPoint.y < worldMin.y || worldPoint.y > worldMax.y)
+            {
+                error = "地形笔刷落点不在地图范围内。";
+                return false;
+            }
             ESWorldMapHeightfield field = definition.heightfield;
             field.EnsureSamples();
-            int x = Mathf.RoundToInt(Mathf.InverseLerp(worldMin.x, worldMax.x, worldPoint.x) * (field.width - 1));
-            int y = Mathf.RoundToInt(Mathf.InverseLerp(worldMin.y, worldMax.y, worldPoint.y) * (field.height - 1));
-            field.Set(x, y, normalizedHeight);
+            List<float> samples = field.samples;
+            normalizedHeight = Mathf.Clamp01(normalizedHeight);
+            radiusWorld = Mathf.Max(0f, radiusWorld);
+            strength = Mathf.Clamp01(strength);
+            falloff = Mathf.Clamp01(falloff);
+            float worldWidth = Mathf.Max(0.001f, worldMax.x - worldMin.x);
+            float worldDepth = Mathf.Max(0.001f, worldMax.y - worldMin.y);
+            int centerX = Mathf.RoundToInt(Mathf.InverseLerp(worldMin.x, worldMax.x, worldPoint.x) * (field.width - 1));
+            int centerY = Mathf.RoundToInt(Mathf.InverseLerp(worldMin.y, worldMax.y, worldPoint.y) * (field.height - 1));
+            int radiusX = Mathf.Max(0, Mathf.CeilToInt(radiusWorld / worldWidth * (field.width - 1)));
+            int radiusY = Mathf.Max(0, Mathf.CeilToInt(radiusWorld / worldDepth * (field.height - 1)));
+            float exponent = Mathf.Lerp(1f, 4f, falloff);
+            float smoothRadius = Mathf.Max(1f, Mathf.Max(radiusX, radiusY) * 0.5f);
+            // Smooth 必须基于本次采样开始前的稳定快照，避免遍历顺序改变结果。
+            if (mode == ESWorldTerrainBrushMode.Smooth
+                && (!paintStrokeActive
+                    || smoothSnapshotField != field
+                    || smoothSnapshotWidth != field.width
+                    || smoothSnapshotHeight != field.height
+                    || smoothSnapshot.Count != field.width * field.height))
+            {
+                smoothSnapshot.Clear();
+                smoothSnapshot.AddRange(field.samples);
+                smoothSnapshotField = field;
+                smoothSnapshotWidth = field.width;
+                smoothSnapshotHeight = field.height;
+                BuildSmoothIntegral(smoothSnapshot, field.width, field.height);
+            }
+            for (int y = centerY - radiusY; y <= centerY + radiusY; y++)
+                for (int x = centerX - radiusX; x <= centerX + radiusX; x++)
+                {
+                    if (x < 0 || y < 0 || x >= field.width || y >= field.height) continue;
+                    float distance;
+                    if (radiusWorld <= 0f)
+                        distance = x == centerX && y == centerY ? 0f : float.PositiveInfinity;
+                    else
+                    {
+                        float sampleWorldX = Mathf.Lerp(worldMin.x, worldMax.x, x / (float)(field.width - 1));
+                        float sampleWorldY = Mathf.Lerp(worldMin.y, worldMax.y, y / (float)(field.height - 1));
+                        float dx = sampleWorldX - worldPoint.x;
+                        float dy = sampleWorldY - worldPoint.y;
+                        distance = Mathf.Sqrt(dx * dx + dy * dy) / radiusWorld;
+                    }
+                    if (distance > 1f) continue;
+                    float weight = Mathf.Pow(1f - distance, exponent) * (radiusWorld <= 0f ? 1f : strength);
+                    int sampleIndex = y * field.width + x;
+                    float current = samples[sampleIndex];
+                    float target = normalizedHeight;
+                    switch (mode)
+                    {
+                        case ESWorldTerrainBrushMode.Raise:
+                            target = Mathf.Clamp01(current + Mathf.Pow(1f - distance, exponent));
+                            break;
+                        case ESWorldTerrainBrushMode.Lower:
+                            target = Mathf.Clamp01(current - Mathf.Pow(1f - distance, exponent));
+                            break;
+                        case ESWorldTerrainBrushMode.Smooth:
+                            target = SampleNeighborhoodAverage(
+                                x, y, Mathf.CeilToInt(smoothRadius), field.width, field.height);
+                            break;
+                    }
+                    samples[sampleIndex] = Mathf.Clamp01(Mathf.Lerp(current, target, Mathf.Clamp01(weight)));
+                }
             return true;
+        }
+
+        private void BuildSmoothIntegral(IList<float> snapshot, int width, int height)
+        {
+            smoothIntegralStride = width + 1;
+            int required = smoothIntegralStride * (height + 1);
+            if (smoothIntegral.Length != required) smoothIntegral = new float[required];
+            else Array.Clear(smoothIntegral, 0, smoothIntegral.Length);
+            for (int y = 1; y <= height; y++)
+            {
+                float rowSum = 0f;
+                int sourceRow = (y - 1) * width;
+                int integralRow = y * smoothIntegralStride;
+                int previousRow = (y - 1) * smoothIntegralStride;
+                for (int x = 1; x <= width; x++)
+                {
+                    rowSum += snapshot[sourceRow + x - 1];
+                    smoothIntegral[integralRow + x] = smoothIntegral[previousRow + x] + rowSum;
+                }
+            }
+        }
+
+        private float SampleNeighborhoodAverage(
+            int centerX,
+            int centerY,
+            int radius,
+            int width,
+            int height)
+        {
+            int minX = Mathf.Max(0, centerX - radius);
+            int minY = Mathf.Max(0, centerY - radius);
+            int maxX = Mathf.Min(width - 1, centerX + radius);
+            int maxY = Mathf.Min(height - 1, centerY + radius);
+            int left = minX;
+            int top = minY;
+            int right = maxX + 1;
+            int bottom = maxY + 1;
+            float sum = smoothIntegral[bottom * smoothIntegralStride + right]
+                - smoothIntegral[top * smoothIntegralStride + right]
+                - smoothIntegral[bottom * smoothIntegralStride + left]
+                + smoothIntegral[top * smoothIntegralStride + left];
+            int count = (maxX - minX + 1) * (maxY - minY + 1);
+            return count <= 0 ? 0f : sum / count;
         }
 
         public bool TryBakePersistent(ESWorldMapAsset asset, string terrainDataPath, string scenePath, out string error)
@@ -157,6 +296,16 @@ namespace ES
     {
         private static readonly IESWorldMapTerrainEditorBackend UnityTerrainBackend = new ESWorldMapUnityTerrainEditorBackend();
 
+        internal static void BeginPaintStroke()
+        {
+            ((ESWorldMapUnityTerrainEditorBackend)UnityTerrainBackend).BeginPaintStroke();
+        }
+
+        internal static void EndPaintStroke()
+        {
+            ((ESWorldMapUnityTerrainEditorBackend)UnityTerrainBackend).EndPaintStroke();
+        }
+
         private sealed class FileBackup
         {
             public string assetPath;
@@ -196,12 +345,53 @@ namespace ES
 
         public static bool TryPaintHeight(ESWorldMapDefinition definition, Vector2 worldPoint, Vector2 worldMin, Vector2 worldMax, float normalizedHeight, out string error)
         {
+            return TryPaintHeight(definition, worldPoint, worldMin, worldMax, normalizedHeight, 0f, 1f, 0f, out error);
+        }
+
+        public static bool TryPaintHeight(
+            ESWorldMapDefinition definition,
+            Vector2 worldPoint,
+            Vector2 worldMin,
+            Vector2 worldMax,
+            float normalizedHeight,
+            float radiusWorld,
+            float strength,
+            float falloff,
+            out string error)
+        {
+            return TryPaintHeight(
+                definition, worldPoint, worldMin, worldMax, normalizedHeight,
+                radiusWorld, strength, falloff, ESWorldTerrainBrushMode.Flatten, out error);
+        }
+
+        public static bool TryPaintHeight(
+            ESWorldMapDefinition definition,
+            Vector2 worldPoint,
+            Vector2 worldMin,
+            Vector2 worldMax,
+            float normalizedHeight,
+            float radiusWorld,
+            float strength,
+            float falloff,
+            ESWorldTerrainBrushMode mode,
+            out string error)
+        {
             if (definition == null || !UnityTerrainBackend.CanHandle(definition.terrainMode))
             {
                 error = "当前地形后端暂未提供统一绘制入口。";
                 return false;
             }
-            return UnityTerrainBackend.TryPaintHeight(definition, worldPoint, worldMin, worldMax, normalizedHeight, out error);
+            return UnityTerrainBackend.TryPaintHeight(
+                definition,
+                worldPoint,
+                worldMin,
+                worldMax,
+                normalizedHeight,
+                radiusWorld,
+                strength,
+                falloff,
+                mode,
+                out error);
         }
 
         public static bool TryBakePersistent(ESWorldMapAsset asset, string terrainDataPath, string scenePath, out string error)

@@ -1071,15 +1071,45 @@ namespace ES
 
         public static void Open(ESAssetReferKind kind, ESAssetPage current, Action<ESAssetPage> onSelected)
         {
-            ESAssetReferKeyPickerWindow window = CreateInstance<ESAssetReferKeyPickerWindow>();
+            ESAssetReferKeyPickerWindow window = GetWindow<ESAssetReferKeyPickerWindow>(
+                true,
+                "选择 " + kind + " Key",
+                false);
+            window.hideFlags = HideFlags.DontSave;
             window.titleContent = new GUIContent("选择 " + kind + " Key");
             window.minSize = new Vector2(480f, 340f);
             window.cache = ESAssetReferKeyCache.Get(kind);
             window.current = current;
             window.onSelected = onSelected;
+            window.search = string.Empty;
+            window.appliedSearch = null;
+            window.scroll = Vector2.zero;
+            window.cacheVersion = -1;
             window.RebuildFilter();
             window.ShowAuxWindow();
             window.Focus();
+            window.Repaint();
+        }
+
+        private void OnEnable()
+        {
+            EditorApplication.delayCall -= CloseIfContextWasLost;
+            EditorApplication.delayCall += CloseIfContextWasLost;
+        }
+
+        private void OnDisable()
+        {
+            EditorApplication.delayCall -= CloseIfContextWasLost;
+            onSelected = null;
+            cache = null;
+            current = null;
+        }
+
+        private void CloseIfContextWasLost()
+        {
+            EditorApplication.delayCall -= CloseIfContextWasLost;
+            if (this != null && cache == null)
+                Close();
         }
 
         private void OnGUI()

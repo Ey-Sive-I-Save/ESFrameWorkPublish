@@ -90,3 +90,94 @@
     font-size: 9px;
     -unity-text-align: middle-center;
 }
+
+/* ES dialogs use a dedicated mint-green family in both Unity skin modes. */
+.es-compact-choice-dark {
+    background-color: rgb(18, 38, 27);
+}
+
+.es-compact-choice-dark .es-compact-choice-header {
+    border-bottom-color: rgb(66, 111, 77);
+}
+
+.es-compact-choice-dark .es-compact-choice-title {
+    color: rgb(218, 242, 223);
+}
+
+.es-compact-choice-dark .es-compact-choice-hint {
+    color: rgb(161, 197, 169);
+}
+
+.es-compact-choice-dark .es-compact-choice-option {
+    background-color: rgb(25, 49, 34);
+}
+
+.es-compact-choice-dark .es-compact-choice-option:hover,
+.es-compact-choice-dark .es-compact-choice-option:focus {
+    border-color: rgb(78, 153, 96);
+    background-color: rgb(35, 70, 47);
+}
+
+.es-compact-choice-dark .es-compact-choice-option.selected {
+    border-left-color: rgb(99, 199, 119);
+    background-color: rgb(31, 76, 45);
+}
+
+.es-compact-choice-dark .es-compact-choice-label {
+    color: rgb(201, 232, 207);
+}
+
+.es-compact-choice-dark .es-compact-choice-subtitle {
+    color: rgb(147, 184, 155);
+}
+
+.es-compact-choice-dark .es-compact-choice-badge {
+    border-color: rgb(76, 151, 91);
+    background-color: rgb(30, 82, 48);
+    color: rgb(150, 229, 164);
+}
+
+.es-compact-choice-light {
+    background-color: rgb(230, 246, 234);
+}
+
+.es-compact-choice-light .es-compact-choice-header {
+    border-bottom-color: rgb(142, 190, 151);
+}
+
+.es-compact-choice-light .es-compact-choice-title {
+    color: rgb(35, 80, 45);
+}
+
+.es-compact-choice-light .es-compact-choice-hint {
+    color: rgb(77, 121, 85);
+}
+
+.es-compact-choice-light .es-compact-choice-option {
+    background-color: rgb(242, 251, 244);
+}
+
+.es-compact-choice-light .es-compact-choice-option:hover,
+.es-compact-choice-light .es-compact-choice-option:focus {
+    border-color: rgb(92, 158, 104);
+    background-color: rgb(221, 244, 225);
+}
+
+.es-compact-choice-light .es-compact-choice-option.selected {
+    border-left-color: rgb(49, 137, 66);
+    background-color: rgb(211, 239, 216);
+}
+
+.es-compact-choice-light .es-compact-choice-label {
+    color: rgb(39, 93, 50);
+}
+
+.es-compact-choice-light .es-compact-choice-subtitle {
+    color: rgb(88, 130, 95);
+}
+
+.es-compact-choice-light .es-compact-choice-badge {
+    border-color: rgb(91, 157, 101);
+    background-color: rgb(211, 239, 216);
+    color: rgb(42, 112, 55);
+}

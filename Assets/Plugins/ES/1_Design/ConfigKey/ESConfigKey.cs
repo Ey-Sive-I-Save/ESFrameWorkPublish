@@ -1685,12 +1685,12 @@ namespace ES
             data?.MarkNotReady();
         }
 
-        // 保留既有公共 API 名称，同时令驻留表的所有常用注入入口统一获得事务语义。
-        public new int Inject<TEnumKey>(ESGameCoreConfigKey<TEnumKey> key, TData data, string debugName = null)
+        // ES 自有兼容入口使用 Internal_ 前缀表达使用边界，不再用 new 隐藏基类成员。
+        public int Internal_Inject<TEnumKey>(ESGameCoreConfigKey<TEnumKey> key, TData data, string debugName = null)
             where TEnumKey : struct, Enum
             => CommitRetained(key, data, debugName);
 
-        public new bool TryInject<TEnumKey>(
+        public bool Internal_TryInject<TEnumKey>(
             ESGameCoreConfigKey<TEnumKey> key,
             TData data,
             out int runtimeKey,
@@ -1698,11 +1698,11 @@ namespace ES
             where TEnumKey : struct, Enum
             => TryCommitRetained(key, data, out runtimeKey, debugName);
 
-        public new bool Register<TEnumKey>(ESGameCoreConfigKey<TEnumKey> key, TData data, string debugName = null)
+        public bool Internal_Register<TEnumKey>(ESGameCoreConfigKey<TEnumKey> key, TData data, string debugName = null)
             where TEnumKey : struct, Enum
             => TryCommitRetained(key, data, out _, debugName);
 
-        public new int RegisterAndGetRuntimeKey<TEnumKey>(
+        public int Internal_RegisterAndGetRuntimeKey<TEnumKey>(
             ESGameCoreConfigKey<TEnumKey> key,
             TData data,
             string debugName = null)

@@ -141,6 +141,12 @@ namespace ES.EditorInternal
                 call = "ES3DLitCompositeURPProperties.SetQuality(materialInstance, 效果质量);";
                 type = "枚举 + 材质关键词";
             }
+            else if (propertyName == "_ResourceProfile" && shader.name == "ES/3D/Lit Composite URP")
+            {
+                declaration = "public ES3DLitResourceProfile 资源配置 = ES3DLitResourceProfile.动态完整;";
+                call = "ES3DLitCompositeURPProperties.SetResourceProfile(materialInstance, 资源配置);";
+                type = "枚举 + 资源掩码关键词";
+            }
             else if (propertyName == "_QualityTier" && shader.name == "ES/3D/VFX Composite URP")
             {
                 declaration = "public ESCompositeQualityTier 效果质量 = ESCompositeQualityTier.标准;";
@@ -451,6 +457,64 @@ namespace ES.EditorInternal
         {
             if (shader != null)
             {
+                bool litAdvancedSurfaceProperty = shader.name == "ES/3D/Lit Composite URP"
+                    && (propertyName == "_EnableInnerOutline" || propertyName.StartsWith("_InnerOutline", StringComparison.Ordinal)
+                        || propertyName == "_EnableOuterOutline" || propertyName.StartsWith("_OuterOutline", StringComparison.Ordinal)
+                        || propertyName == "_EnablePixelOutline" || propertyName.StartsWith("_PixelOutline", StringComparison.Ordinal)
+                        || propertyName == "_EnableHologram" || propertyName.StartsWith("_Hologram", StringComparison.Ordinal)
+                        || propertyName == "_EnableGlitch" || propertyName.StartsWith("_Glitch", StringComparison.Ordinal));
+                if (litAdvancedSurfaceProperty)
+                    return "ES3DLitCompositeURPProperties." + ToPascal(propertyName);
+
+                bool sharedSSUGuiProperty = propertyName == "_EnableAddColor"
+                    || propertyName.StartsWith("_AddColor", StringComparison.Ordinal)
+                    || propertyName == "_EnableStrongTint" || propertyName.StartsWith("_StrongTint", StringComparison.Ordinal)
+                    || propertyName == "_EnableAlphaTint" || propertyName.StartsWith("_AlphaTint", StringComparison.Ordinal)
+                    || propertyName == "_EnableColorReplace" || propertyName.StartsWith("_Replace", StringComparison.Ordinal)
+                    || propertyName == "_EnableBrightness" || propertyName == "_Brightness"
+                    || propertyName == "_EnableContrast" || propertyName == "_Contrast"
+                    || propertyName == "_EnableSaturation" || propertyName == "_Saturation"
+                    || propertyName == "_EnableHue" || propertyName == "_Hue"
+                    || propertyName == "_EnableNegative" || propertyName == "_NegativeFade"
+                    || propertyName == "_EnableRainbow" || propertyName.StartsWith("_Rainbow", StringComparison.Ordinal)
+                    || propertyName == "_EnableRecolorRGB" || propertyName.StartsWith("_RecolorRGB", StringComparison.Ordinal)
+                    || propertyName == "_EnableRecolorRGBYCP" || propertyName.StartsWith("_RecolorRGBYCP", StringComparison.Ordinal)
+                    || propertyName == "_EnableSplitToning" || propertyName.StartsWith("_SplitTone", StringComparison.Ordinal)
+                    || propertyName == "_EnableInnerOutline" || propertyName.StartsWith("_InnerOutline", StringComparison.Ordinal)
+                    || propertyName == "_EnableOuterOutline" || propertyName.StartsWith("_OuterOutline", StringComparison.Ordinal)
+                    || propertyName == "_EnablePixelOutline" || propertyName.StartsWith("_PixelOutline", StringComparison.Ordinal)
+                    || propertyName == "_EnablePingPongGlow" || propertyName.StartsWith("_Glow", StringComparison.Ordinal)
+                    || propertyName == "_EnableFrozen" || propertyName.StartsWith("_Frozen", StringComparison.Ordinal)
+                    || propertyName == "_EnableBurn" || propertyName.StartsWith("_Burn", StringComparison.Ordinal)
+                    || propertyName == "_EnablePoison" || propertyName.StartsWith("_Poison", StringComparison.Ordinal)
+                    || propertyName == "_EnableBlackTint" || propertyName.StartsWith("_BlackTint", StringComparison.Ordinal)
+                    || propertyName == "_EnableInkSpread" || propertyName.StartsWith("_InkSpread", StringComparison.Ordinal)
+                    || propertyName == "_EnableShiftHue" || propertyName.StartsWith("_ShiftHue", StringComparison.Ordinal)
+                    || propertyName == "_EnableAddHue" || propertyName.StartsWith("_AddHue", StringComparison.Ordinal)
+                    || propertyName == "_EnableSineGlow" || propertyName.StartsWith("_SineGlow", StringComparison.Ordinal)
+                    || propertyName == "_EnableCamouflage" || propertyName.StartsWith("_Camouflage", StringComparison.Ordinal)
+                    || propertyName == "_EnableMetal"
+                    || (propertyName.StartsWith("_Metal", StringComparison.Ordinal)
+                        && !propertyName.StartsWith("_Metallic", StringComparison.Ordinal))
+                    || propertyName == "_EnableEnchanted" || propertyName.StartsWith("_Enchanted", StringComparison.Ordinal)
+                    || propertyName == "_EnableShifting" || propertyName.StartsWith("_Shifting", StringComparison.Ordinal)
+                    || propertyName == "_UberNoiseTexture";
+                if (sharedSSUGuiProperty)
+                    return "ESCompositeURPProperties." + ToPascal(propertyName);
+
+                bool sharedTimeProperty = propertyName == "_EnableTimeFPS"
+                    || propertyName == "_TimeFPS"
+                    || propertyName == "_EnableTimeFrequency"
+                    || propertyName == "_TimeFrequency"
+                    || propertyName == "_TimeRange";
+                if (sharedTimeProperty)
+                {
+                    if (shader.name == "ES/2D/Composite URP") return "ES2DCompositeURPProperties." + ToPascal(propertyName);
+                    if (shader.name == "ES/3D/Lit Composite URP") return "ES3DLitCompositeURPProperties." + ToPascal(propertyName);
+                    if (shader.name == "ES/3D/VFX Composite URP") return "ES3DVFXCompositeURPProperties." + ToPascal(propertyName);
+                    if (shader.name == "ES/UI/Composite URP") return "ESUICompositeURPProperties." + ToPascal(propertyName);
+                }
+
                 bool motionProperty = propertyName == "_EnableSparkle"
                     || propertyName == "_SparkleColor"
                     || propertyName == "_SparkleScale"
@@ -474,8 +538,36 @@ namespace ES.EditorInternal
                     || propertyName == "_ChromaticEdgeOnly"
                     || propertyName == "_ChromaticAngle"
                     || propertyName == "_EnableBlur"
-                    || propertyName == "_BlurRadius"
-                    || propertyName == "_BlurIntensity"
+                     || propertyName == "_BlurRadius"
+                     || propertyName == "_BlurIntensity"
+                     || propertyName == "_TilingMode"
+                     || propertyName.StartsWith("_WorldTiling", StringComparison.Ordinal)
+                     || propertyName.StartsWith("_ScreenTiling", StringComparison.Ordinal)
+                     || propertyName == "_EnableSmoothPixelArt"
+                     || propertyName == "_SmoothPixelStrength"
+                     || propertyName == "_EnableCheckerboard"
+                     || propertyName.StartsWith("_Checkerboard", StringComparison.Ordinal)
+                     || propertyName == "_UberNoiseTexture"
+                     || propertyName == "_EnableFlame"
+                     || propertyName.StartsWith("_Flame", StringComparison.Ordinal)
+                    || propertyName == "_EnableSmoke"
+                    || propertyName.StartsWith("_Smoke", StringComparison.Ordinal)
+                    || propertyName == "_EnableShadow" || propertyName.StartsWith("_Shadow", StringComparison.Ordinal)
+                    || propertyName == "_EnableBlackTint" || propertyName.StartsWith("_BlackTint", StringComparison.Ordinal)
+                    || propertyName == "_EnableInkSpread" || propertyName.StartsWith("_InkSpread", StringComparison.Ordinal)
+                    || propertyName == "_EnableShiftHue" || propertyName.StartsWith("_ShiftHue", StringComparison.Ordinal)
+                    || propertyName == "_EnableAddHue" || propertyName.StartsWith("_AddHue", StringComparison.Ordinal)
+                    || propertyName == "_EnableSineGlow" || propertyName.StartsWith("_SineGlow", StringComparison.Ordinal)
+                    || propertyName == "_EnableSqueeze" || propertyName.StartsWith("_Squeeze", StringComparison.Ordinal)
+                    || propertyName == "_EnableSineRotate" || propertyName.StartsWith("_SineRotate", StringComparison.Ordinal)
+                    || propertyName == "_EnableSineMove" || propertyName.StartsWith("_SineMove", StringComparison.Ordinal)
+                    || propertyName == "_EnableSineScale" || propertyName.StartsWith("_SineScale", StringComparison.Ordinal)
+                    || propertyName == "_EnableCustomFade" || propertyName.StartsWith("_CustomFade", StringComparison.Ordinal)
+                    || propertyName == "_EnableFullGlowDissolve" || propertyName.StartsWith("_FullGlowDissolve", StringComparison.Ordinal)
+                    || propertyName == "_EnableCamouflage" || propertyName.StartsWith("_Camouflage", StringComparison.Ordinal)
+                    || propertyName == "_EnableMetal" || propertyName.StartsWith("_Metal", StringComparison.Ordinal)
+                    || propertyName == "_EnableEnchanted" || propertyName.StartsWith("_Enchanted", StringComparison.Ordinal)
+                    || propertyName == "_EnableShifting" || propertyName.StartsWith("_Shifting", StringComparison.Ordinal)
                     || propertyName == "_EnableShine"
                     || propertyName == "_ShineColor"
                     || propertyName == "_ShineSpeed"
@@ -490,6 +582,11 @@ namespace ES.EditorInternal
                     if (shader.name == "ES/3D/VFX Composite URP") return "ES3DVFXCompositeURPProperties." + ToPascal(propertyName);
                     if (shader.name == "ES/UI/Composite URP") return "ESUICompositeURPProperties." + ToPascal(propertyName);
                 }
+                if (propertyName == "_EnableTextureLayer1"
+                    || propertyName == "_EnableTextureLayer2"
+                    || propertyName.StartsWith("_TextureLayer1", StringComparison.Ordinal)
+                    || propertyName.StartsWith("_TextureLayer2", StringComparison.Ordinal))
+                    return "ESCompositeURPProperties." + ToPascal(propertyName);
                 switch (shader.name)
                 {
                     case "ES/2D/Composite URP":
@@ -527,6 +624,8 @@ namespace ES.EditorInternal
                             || propertyName == "_RimIntensity"
                             || propertyName == "_ShineIntensity"
                             || propertyName == "_BaseColor"
+                            || propertyName == "_UseMetallicMap"
+                            || propertyName == "_MetallicMap"
                             || propertyName == "_Metallic"
                             || propertyName == "_Smoothness"
                             || propertyName == "_Occlusion"
@@ -564,7 +663,17 @@ namespace ES.EditorInternal
                             || propertyName == "_GlitchSpeed"
                             || propertyName == "_Color"
                             || propertyName == "_VertexColorStrength"
-                            || propertyName == "_AlphaClip")
+                            || propertyName == "_AlphaClip"
+                            || propertyName == "_EnableTMPCompatibility"
+                            || propertyName == "_FaceColor"
+                            || propertyName == "_FaceDilate"
+                            || propertyName == "_OutlineColor"
+                            || propertyName == "_OutlineWidth"
+                            || propertyName == "_OutlineSoftness"
+                            || propertyName == "_EnableUnderlay"
+                            || propertyName.StartsWith("_Underlay", StringComparison.Ordinal)
+                            || propertyName == "_WeightNormal"
+                            || propertyName == "_WeightBold")
                             return "ESUICompositeURPProperties." + ToPascal(propertyName);
                         break;
                 }
@@ -579,6 +688,8 @@ namespace ES.EditorInternal
             {
                 case "EnableHologram": return "HologramEnabled";
                 case "EnableGlitch": return "GlitchEnabled";
+                case "EnableTimeFPS": return "TimeFPSEnabled";
+                case "EnableTimeFrequency": return "TimeFrequencyEnabled";
                 case "EnableBurn": return "BurnEnabled";
                 case "EnablePoison": return "PoisonEnabled";
                 case "EnableFrozen": return "FrozenEnabled";
@@ -597,7 +708,88 @@ namespace ES.EditorInternal
                 case "EnableDepthIntersection": return "DepthIntersectionEnabled";
                 case "EnableChromatic": return "ChromaticEnabled";
                 case "EnableBlur": return "BlurEnabled";
+                case "EnableSmoothPixelArt": return "SmoothPixelArtEnabled";
+                case "EnableCheckerboard": return "CheckerboardEnabled";
+                case "EnableFlame": return "FlameEnabled";
+                case "EnableSmoke": return "SmokeEnabled";
+                case "EnableShadow": return "SpriteShadowEnabled";
+                case "ShadowFade": return "SpriteShadowFade";
+                case "ShadowOffset": return "SpriteShadowOffset";
+                case "ShadowColor": return "SpriteShadowColor";
+                case "EnableBlackTint": return "BlackTintEnabled";
+                case "EnableInkSpread": return "InkSpreadEnabled";
+                case "EnableShiftHue": return "ShiftHueEnabled";
+                case "EnableAddHue": return "AddHueEnabled";
+                case "AddHueMaskToggle": return "AddHueMaskEnabled";
+                case "EnableSineGlow": return "SineGlowEnabled";
+                case "SineGlowMaskToggle": return "SineGlowMaskEnabled";
+                case "EnableSqueeze": return "SqueezeEnabled";
+                case "EnableSineRotate": return "SineRotateEnabled";
+                case "EnableSineMove": return "SineMoveEnabled";
+                case "EnableSineScale": return "SineScaleEnabled";
+                case "EnableCustomFade": return "CustomFadeEnabled";
+                case "CustomFadeFadeMask": return "CustomFadeMask";
+                case "EnableFullGlowDissolve": return "FullGlowDissolveEnabled";
+                case "EnableCamouflage": return "CamouflageEnabled";
+                case "CamouflageAnimationToggle": return "CamouflageAnimationEnabled";
+                case "EnableMetal": return "MetalEnabled";
+                case "MetalMaskToggle": return "MetalMaskEnabled";
+                case "EnableEnchanted": return "EnchantedEnabled";
+                case "EnchantedRainbowToggle": return "EnchantedRainbowEnabled";
+                case "EnchantedLerpToggle": return "EnchantedLerpEnabled";
+                case "EnableShifting": return "ShiftingEnabled";
+                case "ShiftingRainbowToggle": return "ShiftingRainbowEnabled";
+                case "EnableAddColor": return "AddColorEnabled";
+                case "EnableStrongTint": return "StrongTintEnabled";
+                case "EnableAlphaTint": return "AlphaTintEnabled";
+                case "EnableColorReplace": return "ColorReplaceEnabled";
+                case "EnableBrightness": return "BrightnessEnabled";
+                case "EnableContrast": return "ContrastEnabled";
+                case "EnableSaturation": return "SaturationEnabled";
+                case "EnableHue": return "HueEnabled";
+                case "EnableNegative": return "NegativeEnabled";
+                case "EnableRainbow": return "RainbowEnabled";
+                case "EnableRecolorRGB": return "RecolorRGBEnabled";
+                case "RecolorRGBMaskToggle": return "RecolorRGBMaskEnabled";
+                case "EnableRecolorRGBYCP": return "RecolorRGBYCPEnabled";
+                case "RecolorRGBYCPMaskToggle": return "RecolorRGBYCPMaskEnabled";
+                case "EnableSplitToning": return "SplitToningEnabled";
+                case "EnableInnerOutline": return "InnerOutlineEnabled";
+                case "InnerOutlineDistortionToggle": return "InnerOutlineDistortionEnabled";
+                case "InnerOutlineTextureToggle": return "InnerOutlineTextureEnabled";
+                case "InnerOutlineOutlineOnlyToggle": return "InnerOutlineOnly";
+                case "EnableOuterOutline": return "OuterOutlineEnabled";
+                case "OuterOutlineDistortionToggle": return "OuterOutlineDistortionEnabled";
+                case "OuterOutlineTextureToggle": return "OuterOutlineTextureEnabled";
+                case "OuterOutlineOutlineOnlyToggle": return "OuterOutlineOnly";
+                case "EnablePixelOutline": return "PixelOutlineEnabled";
+                case "PixelOutlineTextureToggle": return "PixelOutlineTextureEnabled";
+                case "PixelOutlineOutlineOnlyToggle": return "PixelOutlineOnly";
+                case "EnablePingPongGlow": return "PingPongGlowEnabled";
                 case "UseNormalMap": return "NormalMapEnabled";
+                case "UseMetallicMap": return "MetallicMapEnabled";
+                case "EnableTextureLayer1": return "TextureLayer1Enabled";
+                case "EnableTextureLayer2": return "TextureLayer2Enabled";
+                case "TextureLayer1ScrollToggle": return "TextureLayer1ScrollEnabled";
+                case "TextureLayer2ScrollToggle": return "TextureLayer2ScrollEnabled";
+                case "TextureLayer1SheetToggle": return "TextureLayer1SheetEnabled";
+                case "TextureLayer2SheetToggle": return "TextureLayer2SheetEnabled";
+                case "TextureLayer1ContrastToggle": return "TextureLayer1ContrastEnabled";
+                case "TextureLayer2ContrastToggle": return "TextureLayer2ContrastEnabled";
+                case "EnableTMPCompatibility": return "TMPCompatibility";
+                case "FaceColor": return "TMPFaceColor";
+                case "FaceDilate": return "TMPFaceDilate";
+                case "OutlineColor": return "TMPOutlineColor";
+                case "OutlineWidth": return "TMPOutlineWidth";
+                case "OutlineSoftness": return "TMPOutlineSoftness";
+                case "EnableUnderlay": return "TMPUnderlayEnabled";
+                case "UnderlayColor": return "TMPUnderlayColor";
+                case "UnderlayOffsetX": return "TMPUnderlayOffsetX";
+                case "UnderlayOffsetY": return "TMPUnderlayOffsetY";
+                case "UnderlayDilate": return "TMPUnderlayDilate";
+                case "UnderlaySoftness": return "TMPUnderlaySoftness";
+                case "WeightNormal": return "TMPWeightNormal";
+                case "WeightBold": return "TMPWeightBold";
                 case "UseOcclusionMap": return "OcclusionMapEnabled";
                 case "UseEmission": return "EmissionEnabled";
             }

@@ -10,10 +10,14 @@ namespace ES
     /// ES 编辑器少量固定选项选择器。适合 2～12 个枚举、模式或职责模板；
     /// 大型、动态或需要搜索的数据源应继续使用 ESSearchDropdown。
     /// </summary>
+    [ESWindowSleepContract(ESWindowSleepMode.Transient, "短生命周期选择弹窗")]
+    [ESWindowPresentationShortTitle("选择")]
     public sealed class ESCompactChoicePopup : EditorWindow
     {
         private const string StylePath = "Assets/Plugins/ES/Editor/EditorTools/ESCompactChoicePopup.uss";
         private const int RecommendedMaximumOptions = 12;
+        private static ESCompactChoicePopup activePopup;
+        private static bool openingPopup;
 
         public readonly struct Option
         {
@@ -42,6 +46,7 @@ namespace ES
         private readonly List<Button> optionButtons = new List<Button>();
         private int keyboardIndex;
         private IDisposable hostInteractionHold;
+        private bool configured;
 
         public static bool Open(VisualElement anchor, EditorWindow hostWindow, string title,
             IReadOnlyList<Option> choices, string hint = null, Vector2? windowSize = null)
@@ -62,19 +67,25 @@ namespace ES
 
             Vector2 size = windowSize ?? new Vector2(400f,
                 Mathf.Clamp(62f + choices.Count * 43f, 190f, 460f));
-            var popup = CreateInstance<ESCompactChoicePopup>();
-            popup.hideFlags = HideFlags.DontSave;
-            popup.popupTitle = string.IsNullOrWhiteSpace(title) ? "选择" : title.Trim();
-            popup.popupHint = string.IsNullOrWhiteSpace(hint) ? "少量固定选项" : hint.Trim();
-            popup.options = choices;
-            popup.titleContent = new GUIContent(popup.popupTitle);
-            popup.minSize = size;
-            popup.maxSize = size;
-            popup.hostInteractionHold = ESWindowFoundation.HoldInteraction(
-                hostWindow,
-                "ESCompactChoicePopup");
+            if (activePopup != null)
+                activePopup.Close();
+            openingPopup = true;
+            ESCompactChoicePopup popup = null;
             try
             {
+                popup = CreateInstance<ESCompactChoicePopup>();
+                activePopup = popup;
+                popup.hideFlags = HideFlags.DontSave;
+                popup.popupTitle = string.IsNullOrWhiteSpace(title) ? "选择" : title.Trim();
+                popup.popupHint = string.IsNullOrWhiteSpace(hint) ? "少量固定选项" : hint.Trim();
+                popup.options = choices;
+                popup.configured = true;
+                popup.titleContent = new GUIContent(popup.popupTitle);
+                popup.minSize = size;
+                popup.maxSize = size;
+                popup.hostInteractionHold = ESWindowFoundation.HoldInteraction(
+                    hostWindow,
+                    "ESCompactChoicePopup");
                 popup.ShowAsDropDown(anchorRect, size);
                 popup.Focus();
                 return true;
@@ -86,6 +97,18 @@ namespace ES
                     popup.Close();
                 throw;
             }
+            finally
+            {
+                openingPopup = false;
+            }
+        }
+
+        private void OnEnable()
+        {
+            if (openingPopup)
+                return;
+            EditorApplication.delayCall -= CloseIfContextWasLost;
+            EditorApplication.delayCall += CloseIfContextWasLost;
         }
 
         public void CreateGUI()
@@ -95,6 +118,10 @@ namespace ES
             if (style != null && !rootVisualElement.styleSheets.Contains(style))
                 rootVisualElement.styleSheets.Add(style);
             rootVisualElement.AddToClassList("es-compact-choice-root");
+            rootVisualElement.AddToClassList(
+                EditorInternal.ESEditorPresentation.IsProSkin
+                    ? "es-compact-choice-dark"
+                    : "es-compact-choice-light");
             rootVisualElement.RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
 
             VisualElement header = new VisualElement();
@@ -149,9 +176,22 @@ namespace ES
 
         private void OnDisable()
         {
+            EditorApplication.delayCall -= CloseIfContextWasLost;
             rootVisualElement.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
             ReleaseHostInteractionHold();
             EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+            configured = false;
+            options = Array.Empty<Option>();
+            optionButtons.Clear();
+            if (ReferenceEquals(activePopup, this))
+                activePopup = null;
+        }
+
+        private void CloseIfContextWasLost()
+        {
+            EditorApplication.delayCall -= CloseIfContextWasLost;
+            if (this != null && !configured)
+                Close();
         }
 
         private void ReleaseHostInteractionHold()

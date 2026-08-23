@@ -1,0 +1,138 @@
+{
+  "protocolVersion": 1,
+  "requestId": "478bcf1c0c34488ab258462c7e55a637",
+  "action": "listTasks",
+  "status": "Completed",
+  "message": "已返回 AI 可调用任务与已注册内容提案入口。",
+  "runId": "",
+  "receiptId": "",
+  "data": {
+    "tasks": [
+      {
+        "taskId": "es.agent.generate",
+        "taskVersion": 1,
+        "category": "Graph/AI",
+        "displayName": "生成 Graph AI 候选",
+        "summary": "将已校验 Graph Prompt 派发到受控 AI 会话，结果写入候选目录。",
+        "allowAiInvoke": false,
+        "allowInPlayMode": false,
+        "inputSchemaHash": "",
+        "presets": [
+          {
+            "presetId": "candidate",
+            "label": "生成候选",
+            "summary": "将已校验 Graph Prompt 派发到受控 AI 会话，结果写入候选目录。"
+          }
+        ],
+        "inputSchemas": []
+      },
+      {
+        "taskId": "es.agent.use",
+        "taskVersion": 1,
+        "category": "Graph/AI",
+        "displayName": "执行 Graph AI 单次任务",
+        "summary": "将已校验 Graph Prompt 派发到受控 AI 会话，保留完整 Run 证据。",
+        "allowAiInvoke": false,
+        "allowInPlayMode": false,
+        "inputSchemaHash": "",
+        "presets": [
+          {
+            "presetId": "use",
+            "label": "单次执行",
+            "summary": "将已校验 Graph Prompt 派发到受控 AI 会话，保留完整 Run 证据。"
+          }
+        ],
+        "inputSchemas": []
+      },
+      {
+        "taskId": "es.feishu.read",
+        "taskVersion": 1,
+        "category": "External/Feishu",
+        "displayName": "Feishu 只读知识接入",
+        "summary": "受管执行 auth-status、knowledge-search、document-pull；不发送、不发布。",
+        "allowAiInvoke": true,
+        "allowInPlayMode": false,
+        "inputSchemaHash": "",
+        "presets": [],
+        "inputSchemas": []
+      },
+      {
+        "taskId": "es.scene.scan",
+        "taskVersion": 1,
+        "category": "场景/分析",
+        "displayName": "快速扫描当前场景",
+        "summary": "导出当前 Active Scene 快照并生成只读场景统计报告。",
+        "allowAiInvoke": true,
+        "allowInPlayMode": false,
+        "inputSchemaHash": "4bbaa61e9bf8a2e2664d3b9cf98944711aa26d5c714e911044298193f08a14cb",
+        "presets": [
+          {
+            "presetId": "default",
+            "label": "快速摘要",
+            "summary": "不包含未激活对象；摘要；展示前 10 个组件类型。"
+          },
+          {
+            "presetId": "explicit",
+            "label": "规范化输入",
+            "summary": "必须提交已注册 Schema 的完整报告选项。"
+          },
+          {
+            "presetId": "interactive",
+            "label": "请求高级输入",
+            "summary": "Python 先进入检查点，再由 ESAdvancedDialog 或 AI submitInput 提交同一份类型化选项。"
+          }
+        ],
+        "inputSchemas": [
+          {
+            "stepId": "scene-scan.report-options",
+            "schemaHash": "4bbaa61e9bf8a2e2664d3b9cf98944711aa26d5c714e911044298193f08a14cb",
+            "title": "场景扫描报告选项",
+            "summary": "Python 只分析 Unity 已导出的场景快照；这些选项不会修改场景、Asset 或发布物。",
+            "fields": [
+              {
+                "fieldId": "includeInactive",
+                "label": "包含未激活对象",
+                "description": "关闭时排除 activeInHierarchy 为 false 的对象。",
+                "valueType": "Boolean",
+                "defaultValue": false,
+                "minimumInteger": 0,
+                "maximumInteger": 0,
+                "choices": []
+              },
+              {
+                "fieldId": "detailMode",
+                "label": "报告粒度",
+                "description": "summary 仅输出聚合统计；detailed 额外列出对象，最多 5000 项。",
+                "valueType": "Choice",
+                "defaultValue": "summary",
+                "minimumInteger": 0,
+                "maximumInteger": 0,
+                "choices": [
+                  {
+                    "code": "summary",
+                    "label": "摘要（聚合统计）"
+                  },
+                  {
+                    "code": "detailed",
+                    "label": "详细（对象清单）"
+                  }
+                ]
+              },
+              {
+                "fieldId": "topComponentCount",
+                "label": "高频组件数量",
+                "description": "报告中显示的组件类型 Top 数量。",
+                "valueType": "Integer",
+                "defaultValue": 10,
+                "minimumInteger": 1,
+                "maximumInteger": 50,
+                "choices": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "contentTypes": []
+  }
+}

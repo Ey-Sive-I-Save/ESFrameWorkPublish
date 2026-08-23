@@ -175,13 +175,26 @@ namespace ES
 
         public bool ValidateDefinition(out string error)
         {
-            if (!Enum.IsDefined(typeof(WeaponAttackDeliveryMode), deliveryMode))
+            if ((uint)weaponKind > (uint)ItemWeaponKind.Magic)
+            {
+                error = "WeaponDefinition 的武器类型无效。";
+                return false;
+            }
+
+            if ((uint)deliveryMode > (uint)WeaponAttackDeliveryMode.Beam)
             {
                 error = "WeaponDefinition 的攻击交付模式无效。";
                 return false;
             }
 
-            if (!Enum.IsDefined(typeof(WeaponFirePolicy), firePolicy))
+            if (!IsFinite(hitRadius) || hitRadius < 0f
+                || !IsFinite(cooldown) || cooldown < 0f)
+            {
+                error = "WeaponDefinition 的攻击半径和默认冷却必须是有限非负数。";
+                return false;
+            }
+
+            if ((uint)firePolicy > (uint)WeaponFirePolicy.Continuous)
             {
                 error = "WeaponDefinition 的发射策略无效。";
                 return false;
@@ -251,11 +264,45 @@ namespace ES
             return recoil.Validate(out error);
         }
 
+        internal ItemWeaponSharedData Internal_CreatePreparedCopy()
+        {
+            return new ItemWeaponSharedData
+            {
+                weaponKind = weaponKind,
+                deliveryMode = deliveryMode,
+                firePolicy = firePolicy,
+                primaryAttackAction = primaryAttackAction == null
+                    ? new ESActionConfigKey()
+                    : new ESActionConfigKey
+                    {
+                        enumKey = primaryAttackAction.enumKey,
+                        stringKey = primaryAttackAction.stringKey
+                    },
+                defaultShot = defaultShot == null
+                    ? new ESShotConfigKey()
+                    : new ESShotConfigKey
+                    {
+                        enumKey = defaultShot.enumKey,
+                        stringKey = defaultShot.stringKey
+                    },
+                hitRadius = hitRadius,
+                cooldown = cooldown,
+                fire = fire != null ? fire.Internal_CreatePreparedCopy() : null,
+                recoil = recoil != null ? recoil.Internal_CreatePreparedCopy() : null
+            };
+        }
+
         public bool ValidateInitialState(in ItemWeaponVariableData state, out string error)
         {
-            if (state.durability < 0f || state.cooldownLeft < 0f || state.ammo < 0 || state.heat < 0f)
+            if (!IsFinite(state.durability)
+                || !IsFinite(state.cooldownLeft)
+                || !IsFinite(state.heat)
+                || state.durability < 0f
+                || state.cooldownLeft < 0f
+                || state.ammo < 0
+                || state.heat < 0f)
             {
-                error = "Weapon 初始耐久、冷却、弹药和热量不能为负数。";
+                error = "Weapon 初始耐久、冷却和热量必须是有限非负数，弹药不能为负数。";
                 return false;
             }
             if (fire != null && fire.maxHeat > 0f && state.heat > fire.maxHeat)
@@ -266,6 +313,11 @@ namespace ES
 
             error = string.Empty;
             return true;
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 
@@ -317,10 +369,41 @@ namespace ES
         [LabelText("每秒散热"), MinValue(0f)]
         public float heatDissipationPerSecond = 0f;
 
+        [Title("命中结算")]
+        [LabelText("基础伤害"), MinValue(0f)]
+        public float damage = 10f;
+
+        [LabelText("冲击强度"), MinValue(0f)]
+        public float impactStrength = 1f;
+
+        [Title("发射图案")]
+        [LabelText("弹丸/射线数量"), MinValue(1), MaxValue(64)]
+        public int pelletCount = 1;
+
+        [LabelText("散射半角"), MinValue(0f), MaxValue(89f)]
+        public float spreadAngle = 0f;
+
         public static WeaponFireDefinitionData Default => new WeaponFireDefinitionData();
 
         public bool Validate(out string error)
         {
+            if (!IsFinite(interval)
+                || !IsFinite(distance)
+                || !IsFinite(burstInterval)
+                || !IsFinite(chargeTime)
+                || !IsFinite(continuousInterval)
+                || !IsFinite(durabilityCost)
+                || !IsFinite(heatPerUse)
+                || !IsFinite(maxHeat)
+                || !IsFinite(heatDissipationPerSecond)
+                || !IsFinite(damage)
+                || !IsFinite(impactStrength)
+                || !IsFinite(spreadAngle))
+            {
+                error = "WeaponDefinition 的射击参数必须是有限数值。";
+                return false;
+            }
+
             if (interval < 0.01f)
             {
                 error = "WeaponDefinition 的射击间隔必须不小于 0.01 秒。";
@@ -333,6 +416,18 @@ namespace ES
                 return false;
             }
 
+            if (hitMask.value == 0)
+            {
+                error = "WeaponDefinition 的射击命中层不能为空。";
+                return false;
+            }
+
+            if ((uint)triggerInteraction > (uint)QueryTriggerInteraction.Collide)
+            {
+                error = "WeaponDefinition 的射线触发器查询模式无效。";
+                return false;
+            }
+
             if (burstCount < 0 || burstInterval < 0f || chargeTime < 0f || continuousInterval < 0f)
             {
                 error = "WeaponDefinition 的策略参数不能为负数。";
@@ -340,9 +435,16 @@ namespace ES
             }
 
             if (ammoCost < 0 || durabilityCost < 0f || heatPerUse < 0f
-                || maxHeat < 0f || heatDissipationPerSecond < 0f)
+                || maxHeat < 0f || heatDissipationPerSecond < 0f
+                || damage < 0f || impactStrength < 0f)
             {
                 error = "WeaponDefinition 的弹药、耐久和热量参数不能为负数。";
+                return false;
+            }
+
+            if (pelletCount < 1 || pelletCount > 64 || spreadAngle < 0f || spreadAngle >= 90f)
+            {
+                error = "WeaponDefinition 的弹丸数量必须位于 1 到 64，散射半角必须位于 0 到 89 度。";
                 return false;
             }
 
@@ -354,6 +456,37 @@ namespace ES
 
             error = string.Empty;
             return true;
+        }
+
+        internal WeaponFireDefinitionData Internal_CreatePreparedCopy()
+        {
+            return new WeaponFireDefinitionData
+            {
+                enabled = enabled,
+                interval = interval,
+                distance = distance,
+                hitMask = hitMask,
+                triggerInteraction = triggerInteraction,
+                requiresAiming = requiresAiming,
+                burstCount = burstCount,
+                burstInterval = burstInterval,
+                chargeTime = chargeTime,
+                continuousInterval = continuousInterval,
+                ammoCost = ammoCost,
+                durabilityCost = durabilityCost,
+                heatPerUse = heatPerUse,
+                maxHeat = maxHeat,
+                heatDissipationPerSecond = heatDissipationPerSecond,
+                damage = damage,
+                impactStrength = impactStrength,
+                pelletCount = pelletCount,
+                spreadAngle = spreadAngle
+            };
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 
@@ -389,6 +522,14 @@ namespace ES
 
         public bool Validate(out string error)
         {
+            if (!IsFinite(baseMagnitude)
+                || !IsFinite(burstWindow)
+                || !IsFinite(randomJitter))
+            {
+                error = "WeaponDefinition 的后坐力参数必须是有限数值。";
+                return false;
+            }
+
             if (baseMagnitude < 0f)
             {
                 error = "WeaponDefinition 的后坐力基础强度不能小于零。";
@@ -407,8 +548,62 @@ namespace ES
                 return false;
             }
 
+            if (randomJitter < 0f || randomJitter > 1f)
+            {
+                error = "WeaponDefinition 的后坐力随机抖动必须位于 0 到 1。";
+                return false;
+            }
+
+            if (enabled)
+            {
+                if (recoilCurve == null || recoilCurve.length == 0)
+                {
+                    error = "启用后坐力时必须配置有效曲线。";
+                    return false;
+                }
+
+                Keyframe[] keys = recoilCurve.keys;
+                for (int i = 0; i < keys.Length; i++)
+                {
+                    if (!IsFinite(keys[i].time)
+                        || !IsFinite(keys[i].value))
+                    {
+                        error = "WeaponDefinition 的后坐力曲线包含非法数值。";
+                        return false;
+                    }
+                }
+            }
+
             error = string.Empty;
             return true;
+        }
+
+        internal WeaponRecoilDefinitionData Internal_CreatePreparedCopy()
+        {
+            AnimationCurve curveCopy = recoilCurve != null
+                ? new AnimationCurve(recoilCurve.keys)
+                : null;
+            if (curveCopy != null && recoilCurve != null)
+            {
+                curveCopy.preWrapMode = recoilCurve.preWrapMode;
+                curveCopy.postWrapMode = recoilCurve.postWrapMode;
+            }
+
+            return new WeaponRecoilDefinitionData
+            {
+                enabled = enabled,
+                baseMagnitude = baseMagnitude,
+                onlyWhenAiming = onlyWhenAiming,
+                burstWindow = burstWindow,
+                maxBurstShots = maxBurstShots,
+                randomJitter = randomJitter,
+                recoilCurve = curveCopy
+            };
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 

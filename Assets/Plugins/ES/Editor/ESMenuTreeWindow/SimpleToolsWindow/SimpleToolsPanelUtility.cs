@@ -12,7 +12,7 @@ using UnityEngine;
 namespace ES
 {
     /// <summary>
-    /// Marks a SimpleTools page for the restrained ES workbench presentation.
+    /// Marks a SimpleTools page for the restrained ES tool presentation.
     /// The marker affects editor-only rendering and never changes serialized data.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]

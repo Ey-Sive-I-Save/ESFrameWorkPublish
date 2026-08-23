@@ -80,6 +80,10 @@ namespace ES
         [Tooltip("飞行物只生成物理候选。命中判定会读取此条件决定是否继续命中；这里不结算伤害、阵营或部位倍率。")]
         public ESHitTagEligibility hitTagEligibility = new ESHitTagEligibility();
 
+        [ShowIf(nameof(enabled)), Title("冲击策略")]
+        [InlineProperty, HideLabel]
+        public ShotImpactDefinitionData impact = ShotImpactDefinitionData.Default;
+
         public static ItemShotSharedData Default => new ItemShotSharedData
         {
             enabled = true,
@@ -99,7 +103,8 @@ namespace ES
             useGravity = false,
             orientToVelocity = true,
             allowMustHit = true,
-            hitTagEligibility = new ESHitTagEligibility()
+            hitTagEligibility = new ESHitTagEligibility(),
+            impact = ShotImpactDefinitionData.Default
         };
 
         /// <summary>把 Table 自有的运行时默认对象原位恢复为领域默认值，不产生新对象。</summary>
@@ -123,6 +128,7 @@ namespace ES
             orientToVelocity = true;
             allowMustHit = true;
             hitTagEligibility = new ESHitTagEligibility();
+            impact = ShotImpactDefinitionData.Default;
         }
 
         public bool ValidateDefinition(out string error)
@@ -132,10 +138,24 @@ namespace ES
                 error = "ShotDefinition 必须启用。";
                 return false;
             }
-            if (!Enum.IsDefined(typeof(ShotAimMode), aimMode)
-                || !Enum.IsDefined(typeof(ShotBlockMode), blockMode))
+            if ((uint)aimMode > (uint)ShotAimMode.Scan
+                || (uint)blockMode > (uint)ShotBlockMode.AnyBlocker)
             {
                 error = "ShotDefinition 的瞄准模式或阻挡模式无效。";
+                return false;
+            }
+            if (!IsFinite(launchDelay)
+                || !IsFinite(warmupTime)
+                || !IsFinite(speed)
+                || !IsFinite(acceleration)
+                || !IsFinite(maxSpeed)
+                || !IsFinite(trackingStartTime)
+                || !IsFinite(trackingDuration)
+                || !IsFinite(turnSpeed)
+                || !IsFinite(lifeTime)
+                || !IsFinite(radius))
+            {
+                error = "ShotDefinition 的运动参数必须是有限数值。";
                 return false;
             }
             if (launchDelay < 0f || warmupTime < 0f || speed < 0f || maxSpeed < 0f
@@ -154,9 +174,70 @@ namespace ES
                 error = "必中瞄准模式要求允许必中。";
                 return false;
             }
+            if (hitTagEligibility != null
+                && !hitTagEligibility.TryPrepare(out string tagEligibilityError))
+            {
+                error = "ShotDefinition 的命中 Tag 条件无效：" + tagEligibilityError;
+                return false;
+            }
+            if (impact == null)
+            {
+                error = "ShotDefinition 缺少冲击策略。";
+                return false;
+            }
+            if (!impact.Validate(out error))
+                return false;
 
             error = string.Empty;
             return true;
+        }
+
+        internal bool Internal_TryCreatePreparedCopy(
+            out ItemShotSharedData prepared,
+            out string error)
+        {
+            prepared = null;
+            if (!ValidateDefinition(out error))
+                return false;
+
+            ESHitTagEligibility preparedEligibility = null;
+            if (hitTagEligibility != null
+                && !hitTagEligibility.Internal_TryCreatePreparedCopy(
+                    out preparedEligibility,
+                    out error))
+            {
+                return false;
+            }
+
+            prepared = new ItemShotSharedData
+            {
+                enabled = enabled,
+                aimMode = aimMode,
+                blockMode = blockMode,
+                launchDelay = launchDelay,
+                warmupTime = warmupTime,
+                speed = speed,
+                acceleration = acceleration,
+                maxSpeed = maxSpeed,
+                trackingStartTime = trackingStartTime,
+                trackingDuration = trackingDuration,
+                turnSpeed = turnSpeed,
+                lifeTime = lifeTime,
+                radius = radius,
+                hitLayers = hitLayers,
+                useGravity = useGravity,
+                orientToVelocity = orientToVelocity,
+                allowMustHit = allowMustHit,
+                hitTagEligibility = preparedEligibility,
+                impact = impact.Internal_CreatePreparedCopy()
+            };
+            error = null;
+            return true;
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         public ShotMotionConfig ToShotMotionConfig(in ItemShotVariableData variable)
@@ -186,6 +267,75 @@ namespace ES
                 trackingDuration = trackingDuration,
                 gravity = Physics.gravity,
                 flags = flags
+            };
+        }
+    }
+
+    [Serializable]
+    public sealed class ShotImpactDefinitionData
+    {
+        [LabelText("反弹次数"), MinValue(0), MaxValue(16)]
+        public int bounceCount;
+
+        [LabelText("反弹速度保留"), Range(0.05f, 1f)]
+        public float bounceVelocityScale = 0.8f;
+
+        [LabelText("爆炸半径"), MinValue(0f)]
+        public float explosionRadius;
+
+        [LabelText("爆炸目标上限"), MinValue(1), MaxValue(128)]
+        public int explosionTargetCapacity = 16;
+
+        [LabelText("链式半径"), MinValue(0f)]
+        public float chainRadius;
+
+        [LabelText("链式目标数"), MinValue(0), MaxValue(32)]
+        public int chainTargetCount;
+
+        public static ShotImpactDefinitionData Default => new ShotImpactDefinitionData();
+
+        public bool Validate(out string error)
+        {
+            if (bounceCount < 0 || bounceCount > 16
+                || float.IsNaN(bounceVelocityScale)
+                || float.IsInfinity(bounceVelocityScale)
+                || bounceVelocityScale < 0.05f
+                || bounceVelocityScale > 1f
+                || float.IsNaN(explosionRadius)
+                || float.IsInfinity(explosionRadius)
+                || explosionRadius < 0f
+                || explosionTargetCapacity < 1
+                || explosionTargetCapacity > 128
+                || float.IsNaN(chainRadius)
+                || float.IsInfinity(chainRadius)
+                || chainRadius < 0f
+                || chainTargetCount < 0
+                || chainTargetCount > 32)
+            {
+                error = "Shot 冲击策略参数超出合法范围。";
+                return false;
+            }
+
+            if (chainTargetCount > 0 && chainRadius <= 0f)
+            {
+                error = "启用链式目标时必须配置大于零的链式半径。";
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        internal ShotImpactDefinitionData Internal_CreatePreparedCopy()
+        {
+            return new ShotImpactDefinitionData
+            {
+                bounceCount = bounceCount,
+                bounceVelocityScale = bounceVelocityScale,
+                explosionRadius = explosionRadius,
+                explosionTargetCapacity = explosionTargetCapacity,
+                chainRadius = chainRadius,
+                chainTargetCount = chainTargetCount
             };
         }
     }
@@ -246,6 +396,19 @@ namespace ES
 
         public bool ValidateDefinition(out string error)
         {
+            if (!IsFinite(speedMultiplier)
+                || !IsFinite(lifeTimeMultiplier)
+                || !IsFinite(radiusMultiplier)
+                || !IsFinite(launchDelay)
+                || !IsFinite(trackingStartTime)
+                || !IsFinite(spreadAngle)
+                || !IsFinite(targetOffset.x)
+                || !IsFinite(targetOffset.y)
+                || !IsFinite(targetOffset.z))
+            {
+                error = "Shot 的每发变量必须是有限数值。";
+                return false;
+            }
             if (speedMultiplier <= 0f || lifeTimeMultiplier <= 0f || radiusMultiplier <= 0f)
             {
                 error = "Shot 的速度、寿命和半径倍率必须大于零。";
@@ -259,6 +422,11 @@ namespace ES
 
             error = string.Empty;
             return true;
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 }

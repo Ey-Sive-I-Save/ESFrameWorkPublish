@@ -4,14 +4,277 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using UnityEditor;
+using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
 using UnityEngine.UIElements;
 using ES.EditorInternal;
 
 namespace ES.Tests
 {
+    public sealed class ESParticlePreviewUnsafeProbe : MonoBehaviour
+    {
+        public static int AwakeCount;
+
+        private void Awake()
+        {
+            AwakeCount++;
+        }
+    }
+
+    internal static class ESWindowSleepCommercialBaselineRunner
+    {
+        private const string FixtureName = "ES.Tests.ESMenuTreeCommercialTests";
+        private static readonly string[] TargetSourcePaths =
+        {
+            "Assets/Plugins/ES/Editor/ESPresentation/Core/ESEditorPresentationCore.cs",
+            "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESMenuTreeToolkitTestWindow.cs",
+            "Assets/Plugins/ES/Editor/ESMenuTreeWindow/Tests/ESMenuTreeCommercialTests.cs"
+        };
+
+        private static TestRunnerApi activeApi;
+        private static BaselineCallbacks activeCallbacks;
+
+        [MenuItem(
+            "【ES】/验证与诊断/测试与验收/编辑器窗口/运行窗口休眠商业基线 %#F12",
+            false,
+            9175)]
+        private static void Run()
+        {
+            if (activeApi != null)
+            {
+                Debug.LogWarning("[ESWindowSleepBaseline] 已有本基线正在运行。");
+                return;
+            }
+
+            string head = ReadGitHead();
+            string sourceFingerprint = BuildSourceFingerprint();
+            activeApi = ScriptableObject.CreateInstance<TestRunnerApi>();
+            activeCallbacks = new BaselineCallbacks(head, sourceFingerprint, ReleaseActiveRun);
+            activeApi.RegisterCallbacks(activeCallbacks);
+
+            var filter = new Filter
+            {
+                testMode = TestMode.EditMode,
+                assemblyNames = new[] { "ES.MenuTree.Editor.Tests" },
+                groupNames = new[] { "^ES\\.Tests\\.ESMenuTreeCommercialTests" }
+            };
+
+            try
+            {
+                string jobId = activeApi.Execute(new ExecutionSettings(filter));
+                Debug.Log(
+                    "[ESWindowSleepBaseline] 已提交窗口休眠商业基线"
+                    + $" | job={jobId}"
+                    + $" | head={head}"
+                    + $" | unity={Application.unityVersion}"
+                    + $" | source={sourceFingerprint}");
+            }
+            catch
+            {
+                ReleaseActiveRun();
+                throw;
+            }
+        }
+
+        [MenuItem(
+            "【ES】/验证与诊断/测试与验收/编辑器窗口/运行窗口休眠商业基线 %#F12",
+            true)]
+        private static bool ValidateRun()
+        {
+            return activeApi == null
+                && !EditorApplication.isCompiling
+                && !EditorApplication.isPlayingOrWillChangePlaymode;
+        }
+
+        private static void ReleaseActiveRun()
+        {
+            if (activeApi == null)
+                return;
+            if (activeCallbacks != null)
+                activeApi.UnregisterCallbacks(activeCallbacks);
+            UnityEngine.Object.DestroyImmediate(activeApi);
+            activeApi = null;
+            activeCallbacks = null;
+        }
+
+        private static string ReadGitHead()
+        {
+            try
+            {
+                var startInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "git",
+                    Arguments = "rev-parse HEAD",
+                    WorkingDirectory = Directory.GetCurrentDirectory(),
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                using (System.Diagnostics.Process process =
+                       System.Diagnostics.Process.Start(startInfo))
+                {
+                    if (process == null || !process.WaitForExit(3000) || process.ExitCode != 0)
+                        return "unavailable";
+                    return process.StandardOutput.ReadToEnd().Trim();
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[ESWindowSleepBaseline] 读取 Git HEAD 失败：" + exception.Message);
+                return "unavailable";
+            }
+        }
+
+        private static string BuildSourceFingerprint()
+        {
+            return string.Join(
+                ",",
+                TargetSourcePaths.Select(path =>
+                    Path.GetFileName(path) + ":" + ComputeSha256(path)));
+        }
+
+        private static string ComputeSha256(string path)
+        {
+            try
+            {
+                using (SHA256 sha256 = SHA256.Create())
+                using (FileStream stream = File.OpenRead(path))
+                {
+                    return BitConverter.ToString(sha256.ComputeHash(stream))
+                        .Replace("-", string.Empty)
+                        .ToLowerInvariant()
+                        .Substring(0, 12);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning(
+                    "[ESWindowSleepBaseline] 计算源码指纹失败："
+                    + path
+                    + " | "
+                    + exception.Message);
+                return "unavailable";
+            }
+        }
+
+        private sealed class BaselineCallbacks : ICallbacks
+        {
+            private readonly string headAtStart;
+            private readonly string sourceFingerprint;
+            private readonly Action completed;
+            private readonly List<string> failedTests = new List<string>();
+            private bool observingTargetRun;
+
+            internal BaselineCallbacks(
+                string headAtStart,
+                string sourceFingerprint,
+                Action completed)
+            {
+                this.headAtStart = headAtStart;
+                this.sourceFingerprint = sourceFingerprint;
+                this.completed = completed;
+            }
+
+            public void RunStarted(ITestAdaptor testsToRun)
+            {
+                observingTargetRun = IsTargetFixtureRun(testsToRun);
+                if (!observingTargetRun)
+                    return;
+                failedTests.Clear();
+                Debug.Log(
+                    "[ESWindowSleepBaseline] START"
+                    + $" | head={headAtStart}"
+                    + $" | unity={Application.unityVersion}"
+                    + $" | fixture={FixtureName}"
+                    + $" | cases={testsToRun.TestCaseCount}"
+                    + $" | source={sourceFingerprint}");
+            }
+
+            public void RunFinished(ITestResultAdaptor result)
+            {
+                if (!observingTargetRun)
+                    return;
+                observingTargetRun = false;
+                string headAtFinish = ReadGitHead();
+                bool headStable = string.Equals(
+                    headAtStart,
+                    headAtFinish,
+                    StringComparison.Ordinal);
+                string sourceAtFinish = BuildSourceFingerprint();
+                bool sourceStable = string.Equals(
+                    sourceFingerprint,
+                    sourceAtFinish,
+                    StringComparison.Ordinal);
+                string summary =
+                    "[ESWindowSleepBaseline] FINISH"
+                    + $" | head={headAtStart}"
+                    + $" | headAtFinish={headAtFinish}"
+                    + $" | headStable={headStable}"
+                    + $" | sourceStable={sourceStable}"
+                    + $" | unity={Application.unityVersion}"
+                    + $" | total={result.PassCount + result.FailCount + result.SkipCount + result.InconclusiveCount}"
+                    + $" | passed={result.PassCount}"
+                    + $" | failed={result.FailCount}"
+                    + $" | skipped={result.SkipCount}"
+                    + $" | inconclusive={result.InconclusiveCount}"
+                    + $" | duration={result.Duration:0.000}s"
+                    + $" | source={sourceFingerprint}"
+                    + $" | sourceAtFinish={sourceAtFinish}"
+                    + $" | failedTests={(failedTests.Count == 0 ? "none" : string.Join(",", failedTests))}";
+
+                if (result.FailCount == 0 && headStable && sourceStable)
+                    Debug.Log(summary);
+                else
+                    Debug.LogError(summary);
+                completed();
+            }
+
+            public void TestStarted(ITestAdaptor test)
+            {
+            }
+
+            public void TestFinished(ITestResultAdaptor result)
+            {
+                if (observingTargetRun && !result.HasChildren && result.FailCount > 0)
+                    failedTests.Add(result.FullName);
+            }
+
+            private static bool IsTargetFixtureRun(ITestAdaptor root)
+            {
+                bool foundTarget = false;
+                bool foundOther = false;
+                ClassifyLeaves(root, ref foundTarget, ref foundOther);
+                return foundTarget && !foundOther;
+            }
+
+            private static void ClassifyLeaves(
+                ITestAdaptor test,
+                ref bool foundTarget,
+                ref bool foundOther)
+            {
+                if (test == null)
+                    return;
+                if (!test.HasChildren)
+                {
+                    if (test.FullName != null
+                        && test.FullName.StartsWith(FixtureName + ".", StringComparison.Ordinal))
+                        foundTarget = true;
+                    else
+                        foundOther = true;
+                    return;
+                }
+
+                foreach (ITestAdaptor child in test.Children)
+                    ClassifyLeaves(child, ref foundTarget, ref foundOther);
+            }
+        }
+    }
+
     public sealed class ESMenuTreeCommercialTests
     {
         [Test]
@@ -30,18 +293,67 @@ namespace ES.Tests
                 ESEditorPresentation.ResolveDefaultWindowIconName(
                     typeof(RuntimeContractWindow), "编辑器主题设置", "设置"));
             Assert.AreEqual(
-                "d_Folder Icon",
+                "d_UnityEditor.ConsoleWindow",
                 ESEditorPresentation.ResolveDefaultWindowIconName(
                     typeof(RuntimeContractWindow), "ES 工具窗口", ""));
+            Assert.AreEqual(
+                "d_Camera Icon",
+                ESEditorPresentation.ResolveDefaultWindowIconName(
+                    typeof(RuntimeContractWindow), "相机作者工具", "世界/相机"));
+            Assert.AreEqual(
+                "d_Shader Icon",
+                ESEditorPresentation.ResolveDefaultWindowIconName(
+                    typeof(RuntimeContractWindow), "Shader Graph 参数", "材质/着色器"));
+            Assert.AreEqual(
+                "d_ParticleSystem Icon",
+                ESEditorPresentation.ResolveDefaultWindowIconName(
+                    typeof(RuntimeContractWindow), "粒子系统调整", "层级工具/粒子"));
+            Assert.AreEqual(
+                "d_Material Icon",
+                ESEditorPresentation.ResolveDefaultWindowIconName(
+                    typeof(RuntimeContractWindow), "材质替换", "层级工具/材质"));
+            Assert.IsNull(
+                ESEditorPresentation.ResolveESBrandIconResourceName(
+                    typeof(RuntimeContractWindow), "相机作者工具", "世界/相机"),
+                "相机应使用 Unity 原生相机图标，不能被场景品牌图标冒充。");
 
             Assert.AreEqual(
                 "agent",
                 ESEditorPresentation.ResolveESBrandIconResourceName(
-                    typeof(RuntimeContractWindow), "Agent 工作台", "自动化与开发/Agent"));
+                    typeof(RuntimeContractWindow), "Agent 控制台", "自动化与开发/Agent"));
             Assert.AreEqual(
                 "diagnostics",
                 ESEditorPresentation.ResolveESBrandIconResourceName(
                     typeof(RuntimeContractWindow), "性能诊断", "验证与诊断/性能"));
+            Assert.AreEqual(
+                "diagnostics",
+                ESEditorPresentation.ResolveESBrandIconResourceName(
+                    typeof(ESProgressCenterWindow), string.Empty, string.Empty),
+                "Progress 类型名不得因为包含 res 子串而误用资源图标。");
+            Assert.AreEqual(
+                "content",
+                ESEditorPresentation.ResolveESBrandIconResourceName(
+                    typeof(RuntimeContractWindow), "角色内容制作", "技能/物品"));
+            Assert.AreEqual(
+                "workbench",
+                ESEditorPresentation.ResolveESBrandIconResourceName(
+                    typeof(RuntimeContractWindow), "ES 工具窗口", ""),
+                "未知 ES 窗口使用中性工作台图标，不再伪装成资源文件夹。");
+            Assert.AreEqual(
+                "graph",
+                ESEditorPresentation.ResolveESBrandIconResourceName(
+                    typeof(RuntimeContractWindow), "Agent Graph 工作台", "节点/流程"),
+                "图节点是当前用户目标时，不能被 Agent/Command 技术名词抢走图标语义。");
+            Assert.AreEqual(
+                "d_console.infoicon",
+                ESEditorPresentation.ResolveDefaultWindowIconName(
+                    typeof(ESProgressCenterWindow), string.Empty, string.Empty));
+            string presentationSource = File.ReadAllText(
+                Path.Combine(Application.dataPath, "Plugins", "ES", "Editor",
+                    "ESPresentation", "Core", "ESEditorPresentationCore.cs"),
+                Encoding.UTF8);
+            StringAssert.DoesNotContain("DefaultAsset Icon.png", presentationSource,
+                "未知窗口不能回退到资源文件夹图标；统一使用中性的 Console/info 语义。");
         }
 
         private sealed class EmptyPage : ESMenuTreePage
@@ -57,11 +369,18 @@ namespace ES.Tests
             public int capacity;
         }
 
-        public sealed class RuntimeContractWindow : ESMenuTreeWindow<RuntimeContractWindow>
+        public sealed class RuntimeContractWindow : ESMenuTreeWindow<RuntimeContractWindow>,
+            IESWindowMultiInstanceContract
         {
+            string IESWindowMultiInstanceContract.ESWindow_MultiInstanceCoordinatorId
+                => "ES.Tests.RuntimeContract";
             protected override void ESWindow_BuildMenuTree(ESMenuTreeBuilder builder)
             {
-                builder.Add("declared.page", "声明 / 页面", new EmptyPage());
+                builder.Add(new ESMenuTreePageDefinition(
+                        "declared.page",
+                        "声明 / 页面",
+                        new EmptyPage())
+                    .WithNavigationLabel("声明"));
             }
 
             protected override void ESWindow_BuildActionHosts(ESWindowActionHosts hosts)
@@ -69,6 +388,36 @@ namespace ES.Tests
                 hosts.AddButton(ESWindowActionScope.System, "系统扩展", "测试系统域", () => { });
                 hosts.AddButton(ESWindowActionScope.Global, "全局扩展", "测试全局域", () => { });
                 hosts.AddButton(ESWindowActionScope.Window, "窗口扩展", "测试窗口域", () => { });
+            }
+        }
+
+        public sealed class CompactRuntimeContractWindow
+            : ESMenuTreeWindow<CompactRuntimeContractWindow>
+        {
+            protected override bool ESWindow_UseCompactHostChrome => true;
+
+            protected override void ESWindow_BuildMenuTree(ESMenuTreeBuilder builder)
+            {
+                builder.Add("compact.page", "紧凑 / 页面", new EmptyPage());
+            }
+
+            protected override void ESWindow_BuildActionHosts(ESWindowActionHosts hosts)
+            {
+                hosts.AddButton(ESWindowActionScope.System, "系统扩展", "测试系统域", () => { });
+                hosts.AddButton(ESWindowActionScope.Global, "全局扩展", "测试全局域", () => { });
+                hosts.AddButton(ESWindowActionScope.Window, "窗口扩展", "测试窗口域", () => { });
+            }
+        }
+
+        public sealed class CompactSparseContractWindow
+            : ESMenuTreeWindow<CompactSparseContractWindow>
+        {
+            protected override bool ESWindow_UseCompactHostChrome => true;
+            protected override bool ESWindow_SupportsSemiSleep => false;
+
+            protected override void ESWindow_BuildMenuTree(ESMenuTreeBuilder builder)
+            {
+                builder.Add("compact-sparse.page", "紧凑空宿主 / 页面", new EmptyPage());
             }
         }
 
@@ -84,8 +433,11 @@ namespace ES.Tests
         }
 
         public sealed class DefaultSemiSleepContractWindow
-            : ESMenuTreeWindow<DefaultSemiSleepContractWindow>
+            : ESMenuTreeWindow<DefaultSemiSleepContractWindow>,
+                IESWindowMultiInstanceContract
         {
+            string IESWindowMultiInstanceContract.ESWindow_MultiInstanceCoordinatorId
+                => "ES.Tests.DefaultSemiSleep";
             protected override void ESWindow_BuildMenuTree(ESMenuTreeBuilder builder)
             {
                 builder.Add("default-sleep.page", "默认休眠 / 页面", new EmptyPage());
@@ -175,6 +527,172 @@ namespace ES.Tests
             Assert.AreEqual("警告", section.StatusLabel.text);
             Assert.AreEqual(1, section.Content.childCount);
             Assert.AreEqual(1, section.HeaderActions.childCount);
+            Assert.AreEqual(Wrap.Wrap, section.Header.style.flexWrap.value);
+            Assert.AreEqual(1f, section.HeaderActions.style.flexShrink.value, 0.001f);
+            Assert.AreEqual(0f, section.HeaderActions.style.minWidth.value.value, 0.001f);
+
+            TextField field = new TextField();
+            VisualElement fieldRow = ESEditorPanelUI.CreateFieldRow(
+                "很长的业务字段名称",
+                field);
+            Assert.AreEqual(Wrap.Wrap, fieldRow.style.flexWrap.value);
+            Assert.AreEqual(0f, fieldRow.style.minWidth.value.value, 0.001f);
+            Assert.AreEqual(0f, field.style.minWidth.value.value, 0.001f,
+                "共享字段不得用固有最小宽度挤爆窄页。");
+        }
+
+        [Test]
+        public void PresentationStyleSheetRoundsNativeControlsAcrossBoundEsWindows()
+        {
+            const string stylePath =
+                "Assets/Plugins/ES/Editor/ESPresentation/Styles/ESBrandTypography.uss";
+            string source = File.ReadAllText(stylePath, Encoding.UTF8);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-base-field__input", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-base-field", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-slider", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-scroll-view", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-search-field", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-toolbar", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-toolbar-button", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-list-view__item", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-progress-bar__progress", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-two-pane-split-view", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-property-field", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-property-field__input", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-foldout__content", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-base-slider__tracker", source);
+
+            string globalPath = Path.Combine(
+                Application.dataPath,
+                "Plugins",
+                "ES",
+                "Editor",
+                "ESPresentation",
+                "Styles",
+                "ESGlobalEditorDeepSkin.uss");
+            string globalSource = File.ReadAllText(globalPath, Encoding.UTF8);
+            StringAssert.Contains(
+                ".es-global-editor-skin .unity-toolbar-button", globalSource);
+            StringAssert.Contains(
+                ".es-global-editor-skin .unity-base-popup-field", globalSource);
+            StringAssert.Contains(
+                ".es-global-editor-skin .unity-tree-view__item", globalSource);
+            StringAssert.Contains(
+                ".es-global-editor-skin .unity-progress-bar__progress", globalSource);
+            StringAssert.Contains(
+                ".es-global-editor-skin .unity-two-pane-split-view", globalSource);
+            StringAssert.Contains(
+                ".es-global-editor-skin .unity-property-field", globalSource);
+            StringAssert.Contains(
+                ".es-global-editor-skin .unity-base-slider__tracker", globalSource);
+            StringAssert.Contains(
+                ".es-global-editor-skin .unity-popup-window", globalSource);
+            StringAssert.Contains(
+                ".es-global-editor-skin #ESWindowShell", globalSource);
+            StringAssert.Contains(
+                ".es-global-editor-skin .unity-min-max-slider__tracker", globalSource);
+            StringAssert.Contains(
+                "border-top-left-radius: 999px", globalSource);
+            StringAssert.Contains(
+                ".es-global-editor-skin .es-dialog-summary", globalSource);
+            StringAssert.Contains(".es-global-editor-skin .es-window-opening-gate", globalSource);
+            StringAssert.Contains(".es-global-editor-skin .es-functional-section", globalSource);
+            StringAssert.Contains(".es-global-editor-skin .es-error-state", globalSource);
+            StringAssert.Contains(".es-global-editor-skin .es-progress-task", globalSource);
+            StringAssert.Contains(
+                ".es-global-editor-skin .es-window-surface", globalSource);
+            StringAssert.Contains(
+                ".es-presentation-controls .es-dialog-field", source);
+            StringAssert.Contains(
+                ".es-presentation-controls .unity-inspector-element__header", source);
+            StringAssert.Contains(".es-presentation-controls .es-functional-section", source);
+            StringAssert.Contains(".es-presentation-controls .es-empty-state", source);
+            StringAssert.Contains(".es-presentation-controls .es-progress-task", source);
+
+            string presentationCoreSource = File.ReadAllText(
+                Path.Combine(Application.dataPath, "Plugins", "ES", "Editor",
+                    "ESPresentation", "Core", "ESEditorPresentationCore.cs"),
+                Encoding.UTF8);
+
+            string menuTreeSource = File.ReadAllText(
+                Path.Combine(Application.dataPath, "Plugins", "ES", "Editor",
+                    "ESMenuTreeWindow", "-Templates", "-ESMenuTreeWindow.cs"),
+                Encoding.UTF8);
+            int graphSemantic = menuTreeSource.IndexOf(
+                "ContainsAny(key, \"graph\", \"node\", \"flow\"",
+                StringComparison.Ordinal);
+            int agentSemantic = menuTreeSource.IndexOf(
+                "ContainsAny(key, \"agent\", \"协作\")",
+                StringComparison.Ordinal);
+            Assert.GreaterOrEqual(graphSemantic, 0);
+            Assert.GreaterOrEqual(agentSemantic, 0);
+            Assert.Less(graphSemantic, agentSemantic,
+                "菜单页面图标必须先表达 Graph/节点业务语义，再处理 Agent 宿主名词。");
+            StringAssert.DoesNotContain("DefaultAsset Icon.png", menuTreeSource,
+                "未知图标不能回退到资源文件夹语义；应使用中性的 Unity Console 图标。");
+            StringAssert.Contains("d_Camera Icon", menuTreeSource,
+                "相机页面必须使用 Unity 原生相机语义图标。");
+            StringAssert.Contains("ResolveUnitySemanticIcon", menuTreeSource,
+                "页面必须先尝试具体资产语义图标，不能把粒子、材质和 Shader 页面统一降级为 Console 图标。");
+            StringAssert.Contains("d_ParticleSystem Icon", menuTreeSource,
+                "粒子页面必须使用 Unity 原生粒子语义图标。");
+            StringAssert.Contains("d_Shader Icon", menuTreeSource,
+                "Shader 页面必须使用 Unity 原生 Shader 语义图标。");
+            StringAssert.Contains("d_AnimatorController Icon", presentationCoreSource,
+                "Graph/节点窗口缺少品牌资源时也必须保留图语义的 Unity 原生回退。");
+            int graphFallback = presentationCoreSource.IndexOf(
+                "ContainsAny(key, \"graph\", \"node\", \"flow\"",
+                StringComparison.Ordinal);
+            int trackFallback = presentationCoreSource.IndexOf(
+                "ContainsAny(key, \"track\", \"timeline\", \"animation\"",
+                StringComparison.Ordinal);
+            Assert.GreaterOrEqual(graphFallback, 0);
+            Assert.GreaterOrEqual(trackFallback, 0);
+            Assert.Less(graphFallback, trackFallback,
+                "Graph/节点语义必须优先于 Track/Animation 技术名词。");
+            StringAssert.DoesNotContain("Texture titleIcon = window?.titleContent?.image",
+                presentationCoreSource,
+                "未声明 Presentation metadata 的遗留 titleContent 图标不能覆盖业务语义。");
+            StringAssert.Contains("string.Equals(iconName, \"workbench\"", menuTreeSource,
+                "菜单树页面不能直接展示空白 workbench 品牌占位图。");
+            StringAssert.Contains("string.Equals(iconName, \"inspector\"", menuTreeSource,
+                "菜单树页面不能直接展示空白 inspector 品牌占位图。");
+        }
+
+        [Test]
+        public void LegacySafeEditorDialogUsesTheEsDialogContract()
+        {
+            string path = Path.Combine(
+                Application.dataPath,
+                "Plugins",
+                "ES",
+                "1_Design",
+                "Design_Tools",
+                "ESDesignUtility",
+                "SafeEditor.cs");
+            string source = File.ReadAllText(path, Encoding.UTF8);
+            StringAssert.Contains("ESDialog.ShowModal", source);
+            StringAssert.Contains("ESDialogHost.Editor", source);
+            StringAssert.Contains("BuildLegacyDialogId", source);
+            StringAssert.Contains("ResolveLegacyDialogScope", source);
+            StringAssert.DoesNotContain(
+                "EditorUtility.DisplayDialog(title, message, ok, cancel)",
+                source,
+                "旧安全封装不能继续旁路 ESDialog。");
         }
 
         [Test]
@@ -223,6 +741,86 @@ namespace ES.Tests
                 violations,
                 "ES Editor C# 圆角必须通过 ESEditorPresentation Token 设置：\n"
                 + string.Join("\n", violations));
+        }
+
+        [Test]
+        public void SearchDropdownCachesVisibleSearchMetadataAndForwardsNativeTooltip()
+        {
+            ESSearchDropdown.Entry entry = ESSearchDropdown.Entry.Item(
+                "FireBall",
+                () => { },
+                groupPath: "技能/火系",
+                subtitle: "SkillDefinitionDataInfo",
+                tooltip: "Assets/GameCore/Skills/FireBall.asset",
+                keywords: "火球 projectile",
+                badge: "子资产");
+            Type itemType = typeof(ESSearchDropdown).GetNestedType(
+                "ActionItem",
+                BindingFlags.NonPublic);
+            Assert.IsNotNull(itemType);
+            ConstructorInfo constructor = itemType.GetConstructor(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(ESSearchDropdown.Entry) },
+                null);
+            Assert.IsNotNull(constructor);
+            object item = constructor.Invoke(new object[] { entry });
+            PropertyInfo tooltip = null;
+            for (Type type = itemType; type != null && tooltip == null; type = type.BaseType)
+            {
+                tooltip = type.GetProperty(
+                    "tooltip",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            }
+            Assert.IsNotNull(tooltip);
+            object tooltipSetter = typeof(ESSearchDropdown).GetField(
+                "NativeTooltipSetter",
+                BindingFlags.Static | BindingFlags.NonPublic)?.GetValue(null);
+            object tooltipProperty = typeof(ESSearchDropdown).GetField(
+                "NativeTooltipProperty",
+                BindingFlags.Static | BindingFlags.NonPublic)?.GetValue(null);
+            Assert.IsTrue(tooltipSetter != null || tooltipProperty != null,
+                "Unity 原生 tooltip 入口应只在类型初始化时解析一次。");
+
+            string visibleName = itemType.GetProperty("name")?.GetValue(item) as string;
+            StringAssert.Contains("FireBall", visibleName);
+            StringAssert.Contains("SkillDefinitionDataInfo", visibleName);
+            StringAssert.Contains("火球 projectile", visibleName);
+            StringAssert.Contains("子资产", visibleName);
+            StringAssert.DoesNotContain("Assets/GameCore/Skills/FireBall.asset", visibleName,
+                "完整路径不得挤进可见标题。");
+            Assert.AreEqual(
+                "Assets/GameCore/Skills/FireBall.asset",
+                tooltip.GetValue(item));
+        }
+
+        [Test]
+        public void SearchDropdownLifetimeBridgeUsesDetachEventWithoutDynamicIlOrUpdatePolling()
+        {
+            string path = Path.Combine(
+                Application.dataPath,
+                "Plugins",
+                "ES",
+                "Editor",
+                "EditorTools",
+                "ESSearchDropdown.cs");
+            string source = File.ReadAllText(path, new UTF8Encoding(false, true));
+            StringAssert.Contains("DetachFromPanelEvent", source);
+            StringAssert.Contains("HoldInteraction(hostWindow", source);
+            StringAssert.DoesNotContain("EditorApplication.update +=", source);
+            StringAssert.DoesNotContain("System.Reflection.Emit", source);
+            StringAssert.DoesNotContain("AssemblyBuilder", source);
+            int drawStart = source.IndexOf("private void Draw()", StringComparison.Ordinal);
+            int drawEnd = source.IndexOf(
+                "private static float EstimateButtonWidth",
+                drawStart,
+                StringComparison.Ordinal);
+            Assert.GreaterOrEqual(drawStart, 0);
+            Assert.Greater(drawEnd, drawStart);
+            string drawSource = source.Substring(drawStart, drawEnd - drawStart);
+            StringAssert.DoesNotContain("new GUIContent", drawSource);
+            StringAssert.DoesNotContain("GUILayout", drawSource);
+            StringAssert.DoesNotContain("PropertyInfo", drawSource);
         }
 
         [Test]
@@ -455,12 +1053,405 @@ namespace ES.Tests
                         0,
                         actionPageIds[i] + " 缺少页面专属右上动作。");
                 }
+
+                ESMenuTreePageAction[] particleActions = builder.PagesById[
+                        SimpleToolsWindow.PageId_ParticleSystemAdjustment]
+                    .Definition.PageActions
+                    .ToArray();
+                CollectionAssert.AreEqual(
+                    new[] { "particles.play", "particles.stop" },
+                    particleActions.Select(action => action.ActionId).ToArray(),
+                    "粒子页必须保留稳定动作 ID，并只控制窗口独立预览，不能重新接回原场景粒子播放。");
+                FieldInfo executeField = typeof(ESMenuTreePageAction).GetField(
+                    "Execute",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(executeField);
+                CollectionAssert.AreEqual(
+                    new[] { "StartParticleWindowPreview", "StopParticleWindowPreview" },
+                    particleActions
+                        .Select(action => ((Delegate)executeField.GetValue(action)).Method.Name)
+                        .ToArray(),
+                    "粒子页顶部动作路由错误，不能调用原场景粒子播放方法。");
             }
             finally
             {
                 foreach (ESMenuTreeBuilder.Node node in builder.PagesById.Values)
                     node.Page?.Dispose();
                 UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
+        public void ParticleWindowPreviewRendersVisiblePixelsWithoutPlayingSceneSource()
+        {
+            UnityEngine.Object[] previousSelection = Selection.objects;
+            GameObject source = null;
+            Material material = null;
+            Texture2D frame = null;
+            var page = new Page_ParticleSystemAdjustment();
+            try
+            {
+                source = new GameObject("ES Particle Preview Test", typeof(ParticleSystem));
+                source.hideFlags = HideFlags.HideAndDontSave;
+                ParticleSystem sourceParticleSystem = source.GetComponent<ParticleSystem>();
+                sourceParticleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+                Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit")
+                    ?? Shader.Find("Particles/Standard Unlit")
+                    ?? Shader.Find("Unlit/Color");
+                Assert.IsNotNull(shader, "当前项目没有可用于粒子预览验收的 Unlit Shader。");
+                material = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
+                source.GetComponent<ParticleSystemRenderer>().sharedMaterial = material;
+                Selection.activeGameObject = source;
+                page.duration = 2f;
+                page.looping = true;
+                page.startLifetime = 2f;
+                page.startSpeed = 0f;
+                page.startSize = 2f;
+                page.startColor = Color.magenta;
+                page.emissionRate = 60f;
+                page.simulationSpace = ParticleSystemSimulationSpace.Local;
+
+                Assert.IsTrue(page.StartIndependentPreview(), "独立粒子预览未能启动。");
+                Assert.IsFalse(sourceParticleSystem.isPlaying, "窗口预览错误地播放了原场景粒子。");
+
+                const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+                FieldInfo previewTimeField = typeof(Page_ParticleSystemAdjustment).GetField(
+                    "previewTime", flags);
+                MethodInfo simulate = typeof(Page_ParticleSystemAdjustment).GetMethod(
+                    "SimulatePreviewAtCurrentTime", flags);
+                FieldInfo sessionField = typeof(Page_ParticleSystemAdjustment).GetField(
+                    "particlePreviewSession", flags);
+                FieldInfo viewField = typeof(Page_ParticleSystemAdjustment).GetField(
+                    "previewView", flags);
+                Assert.IsNotNull(previewTimeField);
+                Assert.IsNotNull(simulate);
+                Assert.IsNotNull(sessionField);
+                Assert.IsNotNull(viewField);
+
+                previewTimeField.SetValue(page, 0.75f);
+                simulate.Invoke(page, null);
+                var session = sessionField.GetValue(page) as ESEditorParticlePreviewSession;
+                Assert.IsNotNull(session);
+                ESEditorPreviewRenderContext context = session.RenderContext;
+                Assert.IsNotNull(context);
+                Assert.IsTrue(context.IsReady);
+                var view = viewField.GetValue(page) as ESEditorPreviewOrbitView;
+                Assert.IsNotNull(view);
+                frame = context.Snapshot(
+                    256,
+                    256,
+                    view.CreateCameraPose(context),
+                    ESEditorPreviewQuality.Balanced,
+                    "ES Particle Preview Pixel Test");
+                Assert.IsNotNull(frame, "粒子预览没有生成 RenderTexture 快照。");
+
+                Color32[] pixels = frame.GetPixels32();
+                Color32 background = pixels[0];
+                int visiblePixelCount = pixels.Count(pixel =>
+                    Math.Abs(pixel.r - background.r)
+                    + Math.Abs(pixel.g - background.g)
+                    + Math.Abs(pixel.b - background.b) > 18);
+                Assert.Greater(
+                    visiblePixelCount,
+                    16,
+                    "粒子预览快照只有背景色，没有实际可见粒子像素。");
+                Assert.IsFalse(sourceParticleSystem.isPlaying, "像素验收后原场景粒子被意外播放。");
+            }
+            finally
+            {
+                page.StopIndependentPreview();
+                Selection.objects = previousSelection;
+                if (frame != null) UnityEngine.Object.DestroyImmediate(frame);
+                if (source != null) UnityEngine.Object.DestroyImmediate(source);
+                if (material != null) UnityEngine.Object.DestroyImmediate(material);
+            }
+        }
+
+        [Test]
+        public void ParticlePreviewSessionClonesCompleteRootAndRemapsInternalReferences()
+        {
+            ESEditorPreviewDiagnosticsSnapshot before = ESEditorPreviewLifecycleHub.CaptureDiagnosticsSnapshot();
+            GameObject sourceRoot = null;
+            ESEditorParticlePreviewSession session = null;
+            try
+            {
+                sourceRoot = new GameObject("ES Particle Session Root", typeof(ParticleSystem));
+                sourceRoot.AddComponent<ESParticlePreviewUnsafeProbe>();
+                ESParticlePreviewUnsafeProbe.AwakeCount = 0;
+                GameObject simulationSpace = new GameObject("Custom Space");
+                simulationSpace.transform.SetParent(sourceRoot.transform, false);
+                GameObject lightObject = new GameObject("Particle Light", typeof(Light));
+                lightObject.transform.SetParent(sourceRoot.transform, false);
+
+                ParticleSystem sourceSystem = sourceRoot.GetComponent<ParticleSystem>();
+                sourceRoot.GetComponent<ParticleSystemRenderer>().enabled = false;
+                ParticleSystem.MainModule sourceMain = sourceSystem.main;
+                sourceMain.simulationSpace = ParticleSystemSimulationSpace.Custom;
+                sourceMain.customSimulationSpace = simulationSpace.transform;
+                ParticleSystem.LightsModule sourceLights = sourceSystem.lights;
+                sourceLights.enabled = true;
+                sourceLights.light = lightObject.GetComponent<Light>();
+
+                session = new ESEditorParticlePreviewSession(
+                    "ES Particle Session Reference Test",
+                    maximumParticleSystems: 8);
+                Assert.IsTrue(
+                    session.Rebuild(
+                        new[] { sourceRoot },
+                        new[] { sourceSystem },
+                        null,
+                        12345,
+                        2f,
+                        true,
+                        out string error),
+                    error);
+                Assert.IsTrue(session.TryGetPreviewSystem(sourceSystem, out ParticleSystem previewSystem));
+                Assert.AreNotSame(sourceSystem, previewSystem);
+                Assert.IsTrue(previewSystem.gameObject.activeInHierarchy, "粒子预览副本必须在完成映射后激活。" );
+                Assert.AreNotSame(
+                    sourceMain.customSimulationSpace,
+                    previewSystem.main.customSimulationSpace,
+                    "自定义模拟空间必须重映射到预览根副本，不能继续引用原场景。" );
+                Assert.IsTrue(previewSystem.main.customSimulationSpace.IsChildOf(previewSystem.transform));
+                Assert.AreNotSame(
+                    sourceLights.light,
+                    previewSystem.lights.light,
+                    "粒子灯光必须重映射到预览根副本。" );
+                Assert.IsTrue(previewSystem.lights.light.transform.IsChildOf(previewSystem.transform));
+                Assert.IsFalse(
+                    previewSystem.GetComponent<ParticleSystemRenderer>().enabled,
+                    "粒子预览必须保留源 Renderer 的启停状态，不能为了可见性篡改作者配置。" );
+                Assert.AreEqual(0, session.UnresolvedReferenceCount);
+                Assert.GreaterOrEqual(session.SkippedComponentCount, 1);
+                Assert.AreEqual(
+                    0,
+                    ESParticlePreviewUnsafeProbe.AwakeCount,
+                    "预览复制不得执行来源根上的业务 MonoBehaviour。" );
+                Assert.IsFalse(sourceSystem.isPlaying);
+
+                ESEditorPreviewDiagnosticsSnapshot during = ESEditorPreviewLifecycleHub.CaptureDiagnosticsSnapshot();
+                Assert.GreaterOrEqual(during.ActiveScopeCount, before.ActiveScopeCount + 2);
+            }
+            finally
+            {
+                session?.Dispose();
+                if (sourceRoot != null) UnityEngine.Object.DestroyImmediate(sourceRoot);
+            }
+
+            ESEditorPreviewDiagnosticsSnapshot after = ESEditorPreviewLifecycleHub.CaptureDiagnosticsSnapshot();
+            Assert.AreEqual(before.ActiveScopeCount, after.ActiveScopeCount);
+            Assert.AreEqual(before.ActiveRenderContextCount, after.ActiveRenderContextCount);
+        }
+
+        [Test]
+        public void ParticlePreviewSessionPreservesAncestorMatricesAndMultiRootOffsets()
+        {
+            GameObject parentA = null;
+            GameObject parentB = null;
+            ESEditorParticlePreviewSession session = null;
+            try
+            {
+                parentA = new GameObject("ES Particle Matrix Parent A");
+                parentA.transform.SetPositionAndRotation(new Vector3(12f, 3f, -7f), Quaternion.Euler(11f, 37f, 5f));
+                parentA.transform.localScale = new Vector3(2f, 0.75f, 1.35f);
+                var sourceA = new GameObject("ES Particle Matrix A", typeof(ParticleSystem));
+                sourceA.transform.SetParent(parentA.transform, false);
+                sourceA.transform.localPosition = new Vector3(1.2f, -0.4f, 2.1f);
+                sourceA.transform.localRotation = Quaternion.Euler(23f, -19f, 41f);
+                sourceA.transform.localScale = new Vector3(0.6f, 1.4f, 0.9f);
+
+                parentB = new GameObject("ES Particle Matrix Parent B");
+                parentB.transform.SetPositionAndRotation(new Vector3(-8f, 6f, 14f), Quaternion.Euler(-7f, 81f, 13f));
+                parentB.transform.localScale = new Vector3(0.8f, 1.7f, 1.1f);
+                var sourceB = new GameObject("ES Particle Matrix B", typeof(ParticleSystem));
+                sourceB.transform.SetParent(parentB.transform, false);
+                sourceB.transform.localPosition = new Vector3(-2.4f, 1.1f, 0.3f);
+                sourceB.transform.localRotation = Quaternion.Euler(9f, 28f, -16f);
+
+                ParticleSystem systemA = sourceA.GetComponent<ParticleSystem>();
+                ParticleSystem systemB = sourceB.GetComponent<ParticleSystem>();
+                ParticleSystem.MainModule mainA = systemA.main;
+                mainA.simulationSpace = ParticleSystemSimulationSpace.Custom;
+                mainA.customSimulationSpace = parentA.transform;
+                Matrix4x4 sourceMatrixA = sourceA.transform.localToWorldMatrix;
+                Matrix4x4 sourceMatrixB = sourceB.transform.localToWorldMatrix;
+                Vector3 sourceAnchor = sourceA.transform.position;
+
+                session = new ESEditorParticlePreviewSession("ES Particle Matrix Test");
+                Assert.IsTrue(session.Rebuild(
+                    new[] { sourceA, sourceB },
+                    new[] { systemA, systemB },
+                    null,
+                    12345,
+                    2f,
+                    true,
+                    out string error), error);
+                Assert.IsTrue(session.TryGetPreviewSystem(systemA, out ParticleSystem previewA));
+                Assert.IsTrue(session.TryGetPreviewSystem(systemB, out ParticleSystem previewB));
+                Assert.AreNotSame(parentA.transform, previewA.main.customSimulationSpace);
+                Matrix4x4 expectedCustomSpaceMatrix = Matrix4x4.Translate(
+                    session.RenderContext.GroupOrigin - sourceAnchor) * parentA.transform.localToWorldMatrix;
+                Assert.Less(
+                    Vector3.Distance(
+                        previewA.main.customSimulationSpace.localToWorldMatrix.MultiplyPoint3x4(Vector3.zero),
+                        expectedCustomSpaceMatrix.MultiplyPoint3x4(Vector3.zero)),
+                    0.001f,
+                    "父级自定义模拟空间必须映射到保持同一坐标矩阵的预览载体。" );
+
+                Vector3 translation = session.RenderContext.GroupOrigin - sourceAnchor;
+                Matrix4x4 expectedA = Matrix4x4.Translate(translation) * sourceMatrixA;
+                Matrix4x4 expectedB = Matrix4x4.Translate(translation) * sourceMatrixB;
+                for (int i = 0; i < 16; i++)
+                {
+                    Assert.That(previewA.transform.localToWorldMatrix[i], Is.EqualTo(expectedA[i]).Within(0.001f), "Root A matrix index " + i);
+                    Assert.That(previewB.transform.localToWorldMatrix[i], Is.EqualTo(expectedB[i]).Within(0.001f), "Root B matrix index " + i);
+                }
+
+                Vector3 previewLocalB = session.SourceWorldToPreviewLocalPoint(sourceB.transform.position);
+                Assert.Less(
+                    Vector3.Distance(session.PreviewLocalToSourceWorldPoint(previewLocalB), sourceB.transform.position),
+                    0.001f);
+                Assert.Less(
+                    Vector3.Distance(session.RenderContext.PreviewLocalToWorldPoint(previewLocalB), previewB.transform.position),
+                    0.001f);
+            }
+            finally
+            {
+                session?.Dispose();
+                if (parentA != null) UnityEngine.Object.DestroyImmediate(parentA);
+                if (parentB != null) UnityEngine.Object.DestroyImmediate(parentB);
+            }
+        }
+
+        [Test]
+        public void PreviewContextOwnsCoordinateContractOrbitMathAndOneMeterReference()
+        {
+            ESEditorPreviewDiagnosticsSnapshot before = ESEditorPreviewLifecycleHub.CaptureDiagnosticsSnapshot();
+            ESEditorPreviewRenderContext context = null;
+            try
+            {
+                context = new ESEditorPreviewRenderContext(
+                    "ES Preview Coordinate Test",
+                    ESEditorPreviewSceneMode.PreviewScene);
+                context.Ensure();
+                Vector3 local = new Vector3(1.25f, -2f, 3.5f);
+                Vector3 world = context.PreviewLocalToWorldPoint(local);
+                Assert.Less(Vector3.Distance(context.WorldToPreviewLocalPoint(world), local), 0.0001f);
+
+                var view = new ESEditorPreviewOrbitView();
+                view.Reset(local, 2f, 20f, 10f);
+                view.Orbit(new Vector2(10f, 8f));
+                Assert.That(view.Yaw, Is.EqualTo(23.5f).Within(0.0001f));
+                Assert.That(view.Pitch, Is.EqualTo(8f).Within(0.0001f));
+                Vector3 focusBeforePan = view.FocusLocal;
+                view.Pan(new Vector2(12f, -7f));
+                Assert.AreNotEqual(focusBeforePan, view.FocusLocal);
+                view.ZoomByWheel(3f, context.Camera.farClipPlane);
+                Assert.Greater(view.Zoom, 1f);
+                Bounds flatBounds = new Bounds(
+                    context.PreviewLocalToWorldPoint(new Vector3(0f, 0.1f, 0f)),
+                    new Vector3(6f, 1f, 4f));
+                view.FrameRecommendedWorldBounds(context, flatBounds);
+                Assert.That(view.Yaw, Is.EqualTo(40f).Within(0.001f));
+                Assert.That(view.Pitch, Is.EqualTo(38f).Within(0.001f));
+                Bounds tallBounds = new Bounds(
+                    context.PreviewLocalToWorldPoint(new Vector3(0f, 2f, 0f)),
+                    new Vector3(1f, 8f, 1f));
+                view.FrameRecommendedWorldBounds(context, tallBounds);
+                Assert.That(view.Pitch, Is.EqualTo(14f).Within(0.001f));
+                ESEditorPreviewCameraPose pose = view.CreateCameraPose(context);
+                Assert.Less(Vector3.Distance(pose.Center, context.PreviewLocalToWorldPoint(view.FocusLocal)), 0.0001f);
+
+                int modelCount = context.ActiveModelGroupCount;
+                context.SetScaleReferenceVisible(true);
+                Assert.IsTrue(context.IsScaleReferenceVisible);
+                Assert.AreEqual(modelCount, context.ActiveModelGroupCount, "尺寸参照不得注册成用户模型或进入模型 Bounds。" );
+                Assert.IsTrue(context.TryGetScaleReferenceBounds(out Bounds referenceBounds));
+                Assert.That(referenceBounds.size.x, Is.EqualTo(1f).Within(0.001f));
+                Assert.That(referenceBounds.size.y, Is.EqualTo(1f).Within(0.001f));
+                Assert.That(referenceBounds.size.z, Is.EqualTo(1f).Within(0.001f));
+                Assert.That(referenceBounds.min.y, Is.EqualTo(context.GroupOrigin.y).Within(0.001f));
+                context.SetScaleReferenceVisible(false);
+                Assert.IsFalse(context.IsScaleReferenceVisible);
+            }
+            finally
+            {
+                context?.Dispose();
+            }
+
+            ESEditorPreviewDiagnosticsSnapshot after = ESEditorPreviewLifecycleHub.CaptureDiagnosticsSnapshot();
+            Assert.AreEqual(before.ActiveScopeCount, after.ActiveScopeCount);
+            Assert.AreEqual(before.ActiveRenderContextCount, after.ActiveRenderContextCount);
+        }
+
+        [Test]
+        public void ParticlePreviewSessionRejectsRootsAboveHardSystemBudget()
+        {
+            GameObject sourceRoot = null;
+            ESEditorParticlePreviewSession session = null;
+            try
+            {
+                sourceRoot = new GameObject("ES Particle Budget Root", typeof(ParticleSystem));
+                GameObject child = new GameObject("Second Particle", typeof(ParticleSystem));
+                child.transform.SetParent(sourceRoot.transform, false);
+                ParticleSystem sourceSystem = sourceRoot.GetComponent<ParticleSystem>();
+
+                session = new ESEditorParticlePreviewSession(
+                    "ES Particle Session Budget Test",
+                    maximumParticleSystems: 1);
+                Assert.IsFalse(session.Rebuild(
+                    new[] { sourceRoot },
+                    new[] { sourceSystem },
+                    null,
+                    12345,
+                    2f,
+                    true,
+                    out string error));
+                StringAssert.Contains("硬上限 1", error);
+                Assert.IsFalse(session.IsReady);
+                Assert.AreEqual(0, session.ParticleSystemCount);
+            }
+            finally
+            {
+                session?.Dispose();
+                if (sourceRoot != null) UnityEngine.Object.DestroyImmediate(sourceRoot);
+            }
+        }
+
+        [Test]
+        public void AssetPackageParticlePreviewStartsSharedSessionWithoutPlayingSource()
+        {
+            GameObject sourceRoot = null;
+            ESAssetPackageDynamicPreviewPlayer player = null;
+            try
+            {
+                sourceRoot = new GameObject("ES AssetPackage Particle Preview Test", typeof(ParticleSystem));
+                sourceRoot.hideFlags = HideFlags.HideAndDontSave;
+                ParticleSystem sourceSystem = sourceRoot.GetComponent<ParticleSystem>();
+                sourceSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+                player = new ESAssetPackageDynamicPreviewPlayer();
+                MethodInfo ensureInstance = typeof(ESAssetPackageDynamicPreviewPlayer).GetMethod(
+                    "EnsureInstance",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                FieldInfo sessionField = typeof(ESAssetPackageDynamicPreviewPlayer).GetField(
+                    "particlePreviewSession",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(ensureInstance);
+                Assert.IsNotNull(sessionField);
+
+                ensureInstance.Invoke(player, new object[] { sourceRoot, null });
+                var session = sessionField.GetValue(player) as ESEditorParticlePreviewSession;
+                Assert.IsNotNull(session, "AssetPackage 没有建立公共粒子预览会话。");
+                Assert.IsTrue(session.IsReady);
+                Assert.IsTrue(session.IsPlaying, "AssetPackage 首次打开仍停在 0 秒，用户只能看到空预览背景。");
+                Assert.IsFalse(sourceSystem.isPlaying, "AssetPackage 预览错误地播放了源 ParticleSystem。");
+            }
+            finally
+            {
+                player?.Dispose();
+                if (sourceRoot != null) UnityEngine.Object.DestroyImmediate(sourceRoot);
             }
         }
 
@@ -859,6 +1850,48 @@ namespace ES.Tests
                     "Definitely.Missing.ES.Icon.Name");
             });
             Assert.AreSame(first, second);
+        }
+
+        [Test]
+        public void SimpleToolsPageIconsUseStableConcreteSemantics()
+        {
+            Assert.AreEqual(
+                "d_ParticleSystem Icon",
+                ESMenuTreeUnityIconResolver.ResolveExplicitSemanticIcon(
+                    "simple-tools.particle-system-adjustment",
+                    "02 场景批处理/08 粒子系统批量调整",
+                    "d_PreMatCube"));
+            Assert.AreEqual(
+                "d_Material Icon",
+                ESMenuTreeUnityIconResolver.ResolveExplicitSemanticIcon(
+                    "simple-tools.material-replacement",
+                    "02 场景批处理/01 材质批量替换",
+                    "d_Search Icon"));
+            Assert.AreEqual(
+                "d_Prefab Icon",
+                ESMenuTreeUnityIconResolver.ResolveExplicitSemanticIcon(
+                    "simple-tools.object-pool",
+                    "04 ES 配置与集成/01 对象池与预热配置",
+                    "d_PreMatCube"));
+            Assert.AreEqual(
+                "d_AnimationClip Icon",
+                ESMenuTreeUnityIconResolver.ResolveExplicitSemanticIcon(
+                    "simple-tools.animation-batch-setting",
+                    "02 场景批处理/04 动画器批量设置",
+                    "Animation.Record"));
+        }
+
+        [Test]
+        public void MenuTreeSemanticFallbackUsesStableIdBeforeHostWords()
+        {
+            string iconName = ESMenuTreeUnityIconResolver.ResolveExplicitSemanticIcon(
+                "simple-tools.particle-system-adjustment",
+                "自动化与开发/Agent/粒子",
+                "d_PreMatCube");
+            Assert.AreEqual(
+                "d_ParticleSystem Icon",
+                iconName,
+                "稳定页身份必须先表达粒子业务对象，不能被 Agent 或旧占位图标抢走。");
         }
 
         [Test]
@@ -1558,7 +2591,11 @@ namespace ES.Tests
         [Test]
         public void AdvancedDialogContractsStableAuxiliaryActionsAndFieldValidation()
         {
-            var request = new ESAdvancedDialogRequest();
+            var request = new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.contracts",
+                allowMainWorkspaceFallback = true,
+            };
             request.AddText("name", "名称", required: true);
             request.AddAuxiliaryAction("preview", "预览", _ => { });
             request.validateDetailed = _ => new ESAdvancedDialogValidation("名称无效。", "name");
@@ -1613,6 +2650,326 @@ namespace ES.Tests
             Assert.Greater(Vector4.Distance(inactiveAction, ESEditorPresentation.WarningColor), 0.20f,
                 "禁用/关闭操作必须与高饱和警告色保持足够区分。");
 
+            Color darkActiveAccent = new Color(0.48f, 0.78f, 1f, 0.92f);
+            Color lightActiveAccent = new Color(0.12f, 0.46f, 0.82f, 0.92f);
+            foreach (Color activeAction in new[]
+                     {
+                         ESEditorPresentation.GetActiveActionColor(true, darkActiveAccent),
+                         ESEditorPresentation.GetActiveActionColor(false, lightActiveAccent),
+                         ESEditorPresentation.GetActiveActionColor(true, Color.white),
+                         ESEditorPresentation.GetActiveActionColor(false, Color.white)
+                     })
+            {
+                Assert.Greater(
+                    CalculateContrastRatio(
+                        ESEditorPresentation.PrimaryActionTextColor,
+                        activeAction),
+                    4.5f,
+                    "暗色、浅色及极亮自定义主题的操作底色都必须保持白字可读性。");
+                Assert.AreEqual(1f, activeAction.a, 0.001f,
+                    "文字按钮的状态底色必须不透明，避免与宿主浅色背景混合后失去对比度。");
+            }
+            Assert.Greater(
+                Vector4.Distance(
+                    ESEditorPresentation.GetActiveActionColor(true, darkActiveAccent),
+                    darkActiveAccent),
+                0.10f,
+                "激活操作底色不能直接复用高亮状态强调色，否则会与浅色文字混在一起。");
+
+        }
+
+        [Test]
+        public void PresentationThemeSnapshotMatchesCurrentThemeAndSkinGenerations()
+        {
+            ESEditorPresentation.ESPresentationThemeSnapshot first =
+                ESEditorPresentation.CurrentPresentationTheme;
+            ESEditorPresentation.ESPresentationThemeSnapshot second =
+                ESEditorPresentation.CurrentPresentationTheme;
+
+            Assert.AreEqual(ESEditorPresentation.ThemeGeneration, first.ThemeGeneration);
+            Assert.AreEqual(ESEditorPresentation.SkinGeneration, first.SkinGeneration);
+            Assert.AreEqual(first.ThemeGeneration, second.ThemeGeneration);
+            Assert.AreEqual(first.SkinGeneration, second.SkinGeneration);
+            Assert.AreEqual(first.ProSkin, second.ProSkin);
+            Assert.AreEqual(first.Density, second.Density, 0.001f);
+            Assert.AreEqual(first.MotionEnabled, second.MotionEnabled);
+            AssertColorEqual(ESEditorPresentation.WindowSurfaceColor, first.WindowSurface);
+            AssertColorEqual(ESEditorPresentation.ActiveActionColor, first.ActiveActionSurface);
+        }
+
+        [Test]
+        public void PresentationResolverKeepsSurfaceRolesNeutralAndActionStatesReadable()
+        {
+            ESEditorPresentation.ESPresentationThemeSnapshot theme =
+                ESEditorPresentation.CurrentPresentationTheme;
+            ESEditorPresentation.ESPresentationStyle window =
+                ESEditorPresentation.ResolvePresentationStyle(
+                    ESEditorPresentation.ESPresentationRole.WindowSurface);
+            ESEditorPresentation.ESPresentationStyle selectedControl =
+                ESEditorPresentation.ResolvePresentationStyle(
+                    ESEditorPresentation.ESPresentationRole.Control,
+                    ESEditorPresentation.ESPresentationState.Selected);
+            ESEditorPresentation.ESPresentationStyle warningStatus =
+                ESEditorPresentation.ResolvePresentationStyle(
+                    ESEditorPresentation.ESPresentationRole.Status,
+                    ESEditorPresentation.ESPresentationState.Warning);
+            ESEditorPresentation.ESPresentationStyle modifiedStatus =
+                ESEditorPresentation.ResolvePresentationStyle(
+                    ESEditorPresentation.ESPresentationRole.Status,
+                    ESEditorPresentation.ESPresentationState.Selected);
+            ESEditorPresentation.ESPresentationStyle errorAction =
+                ESEditorPresentation.ResolvePresentationStyle(
+                    ESEditorPresentation.ESPresentationRole.Control,
+                    ESEditorPresentation.ESPresentationState.Error);
+
+            AssertColorEqual(theme.WindowSurface, window.BackgroundColor);
+            AssertColorEqual(theme.ActiveActionSurface, selectedControl.BackgroundColor);
+            AssertColorEqual(theme.ActionText, selectedControl.TextColor);
+            AssertColorEqual(theme.InsetSurface, warningStatus.BackgroundColor);
+            AssertColorEqual(theme.Warning, warningStatus.TextColor);
+            AssertColorEqual(theme.Warning, warningStatus.BorderColor);
+            AssertColorEqual(theme.InsetSurface, modifiedStatus.BackgroundColor);
+            AssertColorEqual(theme.Selection, modifiedStatus.TextColor);
+            Assert.Greater(
+                CalculateContrastRatio(errorAction.TextColor, errorAction.BackgroundColor),
+                4.5f,
+                "错误操作也必须使用可承载白字的暗色背景，不能直接铺高亮错误色。");
+        }
+
+        [Test]
+        public void PresentationInteractionOverlaysDoNotEraseSemanticState()
+        {
+            ESEditorPresentation.ESPresentationStyle warningRest =
+                ESEditorPresentation.ResolvePresentationStyle(
+                    ESEditorPresentation.ESPresentationRole.Control,
+                    ESEditorPresentation.ESPresentationState.Warning);
+            ESEditorPresentation.ESPresentationStyle warningHover =
+                ESEditorPresentation.ResolvePresentationStyle(
+                    ESEditorPresentation.ESPresentationRole.Control,
+                    ESEditorPresentation.ESPresentationState.Warning,
+                    ESEditorPresentation.ESPresentationInteraction.Hover);
+            ESEditorPresentation.ESPresentationStyle warningFocused =
+                ESEditorPresentation.ResolvePresentationStyle(
+                    ESEditorPresentation.ESPresentationRole.Control,
+                    ESEditorPresentation.ESPresentationState.Warning,
+                    ESEditorPresentation.ESPresentationInteraction.Focused);
+            ESEditorPresentation.ESPresentationStyle disabled =
+                ESEditorPresentation.ResolvePresentationStyle(
+                    ESEditorPresentation.ESPresentationRole.Control,
+                    ESEditorPresentation.ESPresentationState.Disabled);
+
+            Assert.Greater(
+                Vector4.Distance(warningRest.BackgroundColor, warningHover.BackgroundColor),
+                0.001f);
+            AssertColorEqual(warningRest.BorderColor, warningHover.BorderColor);
+            AssertColorEqual(warningRest.BorderColor, warningFocused.BorderColor);
+            Assert.Less(disabled.Opacity, 0.7f);
+        }
+
+        [Test]
+        public void PresentationApplicationCanPreserveExistingBorderWidths()
+        {
+            var element = new VisualElement();
+            element.style.borderLeftWidth = 3f;
+            element.style.borderRightWidth = 0f;
+
+            ESEditorPresentation.ApplyPresentationStyle(
+                element,
+                ESEditorPresentation.ESPresentationRole.RaisedSurface,
+                ESEditorPresentation.ESPresentationState.Warning,
+                borderWidth: null);
+
+            Assert.AreEqual(3f, element.style.borderLeftWidth.value, 0.001f);
+            Assert.AreEqual(0f, element.style.borderRightWidth.value, 0.001f);
+            AssertColorEqual(
+                ESEditorPresentation.WarningColor,
+                element.style.borderLeftColor.value);
+        }
+
+        [Test]
+        public void SharedWindowControlsUsePresentationFoundation()
+        {
+            Button button = ESWindowPresentation.CreateHeaderActionButton(
+                null,
+                "全局开关",
+                "测试",
+                () => { });
+            Assert.IsInstanceOf<ESPresentationButton>(button);
+
+            ESWindowPresentation.SetButtonPresentationState(
+                button,
+                ESEditorPresentation.ESPresentationState.Selected);
+            ESEditorPresentation.ESPresentationStyle selected =
+                ESEditorPresentation.ResolvePresentationStyle(
+                    ESEditorPresentation.ESPresentationRole.Control,
+                    ESEditorPresentation.ESPresentationState.Selected);
+            AssertColorEqual(selected.BackgroundColor, button.style.backgroundColor.value);
+            AssertColorEqual(selected.TextColor, button.Q<Label>().style.color.value);
+
+            var shell = new ESWindowShell("测试", "语义壳层", false);
+            Assert.AreEqual(
+                Wrap.Wrap,
+                shell.Header.Q<VisualElement>("ESWindowTitleRow").style.flexWrap.value,
+                "标题与动作必须允许在窄窗口确定性换行。");
+            Assert.AreEqual(0f, shell.HeaderToolbar.style.minWidth.value.value, 0.001f);
+            Assert.AreEqual(1f, shell.HeaderToolbar.style.flexShrink.value, 0.001f);
+            Assert.AreEqual(Wrap.Wrap, shell.HeaderToolbar.style.flexWrap.value);
+            Assert.AreEqual(Overflow.Visible, shell.HeaderToolbar.style.overflow.value,
+                "标题栏不得裁掉唯一系统菜单；窄宽度应通过换行和动作 overflow 收口。");
+            Assert.Greater(
+                shell.Toolbar.style.borderTopLeftRadius.value.value,
+                0f,
+                "工具栏应使用卡片级圆角，而不是只让窗口外壳有圆角。");
+            Assert.Greater(
+                shell.Content.style.borderTopLeftRadius.value.value,
+                0f,
+                "内容承载区应使用统一圆角，避免正文区域退回直角矩形。");
+            shell.ApplyCompactHostChrome();
+            Assert.AreEqual(StyleKeyword.None, shell.Header.style.maxHeight.keyword,
+                "紧凑壳不得用固定 Header 高度裁掉换行动作。");
+            Assert.AreEqual(Wrap.Wrap, shell.HeaderToolbar.style.flexWrap.value);
+            shell.SetStatus("需要处理", ESStatusKind.Warning);
+            AssertColorEqual(
+                ESEditorPresentation.WindowInsetSurfaceColor,
+                shell.StatusBar.style.backgroundColor.value);
+            AssertColorEqual(
+                ESEditorPresentation.WarningColor,
+                shell.StatusLabel.style.color.value);
+        }
+
+        [Test]
+        public void PresentationButtonKeepsSemanticStateAcrossHoverAndFocus()
+        {
+            foreach (ESEditorPresentation.ESPresentationState semanticState in new[]
+                     {
+                         ESEditorPresentation.ESPresentationState.Error,
+                         ESEditorPresentation.ESPresentationState.Selected,
+                         ESEditorPresentation.ESPresentationState.Inactive
+                     })
+            {
+                Button button = ESWindowPresentation.CreateHeaderActionButton(
+                    null,
+                    "状态按钮",
+                    "测试",
+                    () => { });
+                ESWindowPresentation.SetButtonPresentationState(button, semanticState);
+
+                using (MouseEnterEvent hover = MouseEnterEvent.GetPooled())
+                    button.SendEvent(hover);
+                ESEditorPresentation.ESPresentationStyle hoverStyle =
+                    ESEditorPresentation.ResolvePresentationStyle(
+                        ESEditorPresentation.ESPresentationRole.Control,
+                        semanticState,
+                        ESEditorPresentation.ESPresentationInteraction.Hover);
+                AssertColorEqual(hoverStyle.BackgroundColor, button.style.backgroundColor.value);
+                AssertColorEqual(hoverStyle.BorderColor, button.style.borderBottomColor.value);
+
+                using (MouseLeaveEvent leave = MouseLeaveEvent.GetPooled())
+                    button.SendEvent(leave);
+                using (FocusInEvent focus = FocusInEvent.GetPooled())
+                    button.SendEvent(focus);
+                ESEditorPresentation.ESPresentationStyle focusStyle =
+                    ESEditorPresentation.ResolvePresentationStyle(
+                        ESEditorPresentation.ESPresentationRole.Control,
+                        semanticState,
+                        ESEditorPresentation.ESPresentationInteraction.Focused);
+                AssertColorEqual(focusStyle.BackgroundColor, button.style.backgroundColor.value);
+                AssertColorEqual(focusStyle.BorderColor, button.style.borderBottomColor.value);
+            }
+        }
+
+        [Test]
+        public void SetButtonEnabledRefreshesDisabledAndRestoredVisualsImmediately()
+        {
+            Button button = ESWindowPresentation.CreateToolbarButton(
+                "执行",
+                "测试",
+                () => { });
+            ESWindowPresentation.SetButtonPresentationState(
+                button,
+                ESEditorPresentation.ESPresentationState.Selected);
+            using (MouseEnterEvent hover = MouseEnterEvent.GetPooled())
+                button.SendEvent(hover);
+
+            ESWindowPresentation.SetButtonEnabled(button, false);
+            ESEditorPresentation.ESPresentationStyle disabled =
+                ESEditorPresentation.ResolvePresentationStyle(
+                    ESEditorPresentation.ESPresentationRole.Control,
+                    ESEditorPresentation.ESPresentationState.Disabled);
+            Assert.AreEqual(disabled.Opacity, button.style.opacity.value, 0.001f);
+            AssertColorEqual(disabled.BackgroundColor, button.style.backgroundColor.value);
+            AssertColorEqual(disabled.TextColor, button.style.color.value);
+
+            ESWindowPresentation.SetButtonEnabled(button, true);
+            ESEditorPresentation.ESPresentationStyle selected =
+                ESEditorPresentation.ResolvePresentationStyle(
+                    ESEditorPresentation.ESPresentationRole.Control,
+                    ESEditorPresentation.ESPresentationState.Selected);
+            Assert.AreEqual(selected.Opacity, button.style.opacity.value, 0.001f);
+            AssertColorEqual(selected.BackgroundColor, button.style.backgroundColor.value);
+            AssertColorEqual(selected.TextColor, button.style.color.value);
+        }
+
+        [Test]
+        public void ThemeInspectorNotificationInvalidatesSerializedThemeSnapshot()
+        {
+            ESGlobalEditorTheme previousTheme = ESGlobalEditorTheme.Instance;
+            ESGlobalEditorTheme testTheme = ScriptableObject.CreateInstance<ESGlobalEditorTheme>();
+            try
+            {
+                testTheme.RestoreDefault();
+                testTheme.density = 0.90f;
+                ESGlobalEditorTheme.Instance = testTheme;
+                ESEditorPresentation.InvalidateTheme();
+                ESEditorPresentation.ESPresentationThemeSnapshot before =
+                    ESEditorPresentation.CurrentPresentationTheme;
+
+                var serializedTheme = new SerializedObject(testTheme);
+                serializedTheme.Update();
+                serializedTheme.FindProperty("density").floatValue = 1.14f;
+                Assert.IsTrue(serializedTheme.ApplyModifiedProperties());
+                ESGlobalEditorThemeChangeBridge.NotifyThemeChanged(testTheme);
+
+                ESEditorPresentation.ESPresentationThemeSnapshot after =
+                    ESEditorPresentation.CurrentPresentationTheme;
+                Assert.AreNotSame(before, after);
+                Assert.Greater(after.ThemeGeneration, before.ThemeGeneration);
+                Assert.AreEqual(1.14f, after.Density, 0.001f);
+            }
+            finally
+            {
+                ESGlobalEditorTheme.Instance = previousTheme;
+                ESEditorPresentation.InvalidateTheme();
+                UnityEngine.Object.DestroyImmediate(testTheme);
+            }
+        }
+
+        private static void AssertColorEqual(Color expected, Color actual)
+        {
+            Assert.Less(Vector4.Distance(expected, actual), 0.001f);
+        }
+
+        private static float CalculateContrastRatio(Color first, Color second)
+        {
+            float firstLuminance = CalculateRelativeLuminance(first);
+            float secondLuminance = CalculateRelativeLuminance(second);
+            float lighter = Mathf.Max(firstLuminance, secondLuminance);
+            float darker = Mathf.Min(firstLuminance, secondLuminance);
+            return (lighter + 0.05f) / (darker + 0.05f);
+        }
+
+        private static float CalculateRelativeLuminance(Color color)
+        {
+            return ToLinearColorChannel(color.r) * 0.2126f
+                + ToLinearColorChannel(color.g) * 0.7152f
+                + ToLinearColorChannel(color.b) * 0.0722f;
+        }
+
+        private static float ToLinearColorChannel(float value)
+        {
+            return value <= 0.03928f
+                ? value / 12.92f
+                : Mathf.Pow((value + 0.055f) / 1.055f, 2.4f);
         }
 
         [Test]
@@ -1631,6 +2988,7 @@ namespace ES.Tests
             var request = new ESAdvancedDialogRequest
             {
                 dialogId = "tests.dialog.contract",
+                allowMainWorkspaceFallback = true,
                 duplicatePolicy = ESDialogDuplicatePolicy.Queue,
                 initialFocusFieldId = "name",
                 asyncValidationDelayMs = 90,
@@ -1670,6 +3028,180 @@ namespace ES.Tests
         }
 
         [Test]
+        public void AdvancedDialogPositionRepairHasNativeAttachTailAndRejectsTransientOwners()
+        {
+            string source = File.ReadAllText(
+                Path.Combine(Application.dataPath, "Plugins", "ES", "Editor",
+                    "EditorTools", "ESAdvancedDialog", "ESAdvancedDialog.cs"),
+                Encoding.UTF8);
+            StringAssert.Contains(
+                "ReapplyInitialPositionOnDelayCall",
+                source,
+                "ShowUtility 后必须保留一个有界 delayCall 尾部，覆盖 native host 的最后一次几何写回。");
+            StringAssert.Contains(
+                "return IsLive(request?.owner) ? request.owner : null;",
+                source,
+                "对话框定位只能使用显式 owner；缺失 owner 时必须回退到主编辑器工作区而不是猜测窗口。");
+            StringAssert.DoesNotContain(
+                "ResolveImplicitOwner",
+                File.ReadAllText(
+                    Path.Combine(Application.dataPath, "Plugins", "ES", "Editor",
+                        "EditorTools", "ESAdvancedDialog", "ESEditorDialogPresenter.cs"),
+                    Encoding.UTF8),
+                "Editor presenter 不得根据焦点或鼠标窗口猜测 owner。");
+            StringAssert.Contains(
+                "EditorApplication.delayCall -= ReapplyInitialPositionOnDelayCall",
+                source,
+                "关闭和异常路径必须解绑定位尾部，避免静态回调残留。");
+        }
+
+        [Test]
+        public void AdvancedDialogUsesOwnerAsAnchorAndWorkAreaForAvailableSize()
+        {
+            Rect workArea = new Rect(100f, 50f, 1200f, 800f);
+            Rect narrowOwner = new Rect(560f, 100f, 280f, 700f);
+            Rect dialog = ESAdvancedDialogWindow.CalculatePosition(
+                narrowOwner,
+                workArea,
+                new Vector2(460f, 260f),
+                new Vector2(600f, 520f),
+                520f,
+                ESAdvancedDialogPositionMode.CenterOwner,
+                Vector2.zero,
+                Vector2.zero);
+
+            Assert.AreEqual(600f, dialog.width, 0.001f,
+                "窄 Inspector 只能决定居中锚点，不能把对话框压缩成侧栏宽度。");
+            Assert.AreEqual(narrowOwner.center.x, dialog.center.x, 0.001f);
+            Assert.AreEqual(narrowOwner.center.y, dialog.center.y, 0.001f);
+            Assert.GreaterOrEqual(dialog.xMin, workArea.xMin + 12f);
+            Assert.LessOrEqual(dialog.xMax, workArea.xMax - 12f);
+        }
+
+        [Test]
+        public void AdvancedDialogCornerModesMatchScreenSpaceNames()
+        {
+            Rect workArea = new Rect(0f, 0f, 1600f, 1000f);
+            Rect owner = new Rect(420f, 280f, 520f, 420f);
+            Vector2 minimum = new Vector2(360f, 260f);
+            Vector2 preferred = new Vector2(400f, 300f);
+
+            Rect topLeft = ESAdvancedDialogWindow.CalculatePosition(
+                owner, workArea, minimum, preferred, 300f,
+                ESAdvancedDialogPositionMode.OwnerTopLeft, Vector2.zero, Vector2.zero);
+            Rect topRight = ESAdvancedDialogWindow.CalculatePosition(
+                owner, workArea, minimum, preferred, 300f,
+                ESAdvancedDialogPositionMode.OwnerTopRight, Vector2.zero, Vector2.zero);
+            Rect bottomLeft = ESAdvancedDialogWindow.CalculatePosition(
+                owner, workArea, minimum, preferred, 300f,
+                ESAdvancedDialogPositionMode.OwnerBottomLeft, Vector2.zero, Vector2.zero);
+            Rect bottomRight = ESAdvancedDialogWindow.CalculatePosition(
+                owner, workArea, minimum, preferred, 300f,
+                ESAdvancedDialogPositionMode.OwnerBottomRight, Vector2.zero, Vector2.zero);
+            Rect custom = ESAdvancedDialogWindow.CalculatePosition(
+                owner, workArea, minimum, preferred, 300f,
+                ESAdvancedDialogPositionMode.CustomScreenPosition,
+                new Vector2(700f, 460f), Vector2.zero);
+
+            Assert.AreEqual(owner.xMin, topLeft.xMin, 0.001f);
+            Assert.AreEqual(owner.yMin, topLeft.yMin, 0.001f);
+            Assert.AreEqual(owner.xMax, topRight.xMax, 0.001f);
+            Assert.AreEqual(owner.yMin, topRight.yMin, 0.001f);
+            Assert.AreEqual(owner.xMin, bottomLeft.xMin, 0.001f);
+            Assert.AreEqual(owner.yMax, bottomLeft.yMax, 0.001f);
+            Assert.AreEqual(owner.xMax, bottomRight.xMax, 0.001f);
+            Assert.AreEqual(owner.yMax, bottomRight.yMax, 0.001f);
+            Assert.AreEqual(700f, custom.xMin, 0.001f);
+            Assert.AreEqual(460f, custom.yMin, 0.001f);
+        }
+
+        [Test]
+        public void AdvancedDialogBuildsToneIdentityAndRoundedFieldSurfaces()
+        {
+            string dialogSource = File.ReadAllText(
+                Path.Combine(Application.dataPath, "Plugins", "ES", "Editor", "EditorTools",
+                    "ESAdvancedDialog", "ESAdvancedDialog.cs"),
+                Encoding.UTF8);
+            StringAssert.DoesNotContain("d_P4_DeletedLocal", dialogSource,
+                "关闭动作不能使用与删除状态无关的 Perforce 图标。");
+            StringAssert.Contains("GeometryChangedEvent", dialogSource,
+                "对话框必须在原生 Utility 挂载后的首个布局事件重新应用屏幕位置。");
+            StringAssert.Contains("ShowModalUtility();", dialogSource);
+            StringAssert.Contains("ReapplyInitialPosition(false);", dialogSource,
+                "Modal 显示后不能只依赖默认左上角位置。");
+            StringAssert.Contains("EditorApplication.update += ReapplyInitialPositionOnEditorUpdate", dialogSource,
+                "Modal 首开定位必须在原生窗口挂载后的短时间内重复重放，而不能只依赖一次 delayCall。");
+            StringAssert.Contains("rootVisualElement.schedule", dialogSource,
+                "Modal 原生嵌套循环可能暂缓 Editor.update，必须保留窗口本地的 UI Toolkit 定位重放路径。");
+            StringAssert.Contains("ReapplyInitialPositionOnScheduledLayout", dialogSource,
+                "UI Toolkit 定位重放必须使用独立回调，避免把全局 Editor.update 当成唯一时序保证。");
+            StringAssert.Contains("StopInitialPositionReapplyLoop();", dialogSource,
+                "定位重放循环必须在关闭路径确定性解绑。");
+            StringAssert.Contains("InitialPositionReapplyMaxPasses", dialogSource,
+                "定位重放必须有明确上限，不能留下常驻 Editor update 回调。");
+            StringAssert.Contains("ESDialogIdentityStrip", dialogSource,
+                "对话框必须显示 ES 专用身份条，避免与普通 Unity 窗口混淆。");
+            StringAssert.Contains("ESDialogIdentityBadge", dialogSource,
+                "对话框身份条必须包含稳定的 ES 标识。");
+            StringAssert.Contains("ESDialogModeBadge", dialogSource,
+                "对话框身份条必须明确模态/非模态模式。");
+            StringAssert.Contains("ESDialogPolicyBadge", dialogSource,
+                "对话框首屏必须明确仅收集输入/确认，不直接授予业务写入权限。");
+            StringAssert.Contains("ESDialogStableId", dialogSource,
+                "对话框首屏必须暴露稳定身份，避免多个普通窗口难以区分。");
+            StringAssert.Contains("BuildNativeTitle", dialogSource,
+                "原生标题必须通过统一的 ES 标题构造路径生成。");
+            StringAssert.Contains("模态", dialogSource,
+                "原生标题必须包含模态语义，不能只依赖窗口内容区。");
+            StringAssert.Contains("ShowModal 不允许并行实例", dialogSource,
+                "同步模态入口不得绕过并发与生命周期合同。");
+            string menuTreeSource = File.ReadAllText(
+                Path.Combine(Application.dataPath, "Plugins", "ES", "Editor",
+                    "ESMenuTreeWindow", "-Templates", "-ESMenuTreeWindow.cs"),
+                Encoding.UTF8);
+            StringAssert.Contains("ResolveDefaultWindowIcon(", menuTreeSource,
+                "ESMenuTree 主窗口标题栏必须复用统一语义图标解析，而不是只在页面列表显示图标。");
+            var request = new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.visual-contract",
+                title = "视觉合同测试",
+                message = "确认对话框视觉层级。",
+                tone = ESDialogTone.Warning,
+                animateOpening = false,
+                allowMainWorkspaceFallback = true,
+            };
+            request.AddText("name", "名称", "测试");
+            ESAdvancedDialogWindow window = ESAdvancedDialogWindow.Create(request, null);
+            try
+                {
+                window.CreateGUI();
+                Assert.IsNotNull(window.rootVisualElement.Q("ESDialogIdentityStrip"));
+                Assert.IsNotNull(window.rootVisualElement.Q("ESDialogBrandMark"));
+                Assert.IsNotNull(window.rootVisualElement.Q("ESDialogLayerLabel"));
+                Assert.IsNotNull(window.rootVisualElement.Q("ESDialogToneIconSurface"));
+                Assert.IsNotNull(window.rootVisualElement.Q("ESDialogPolicyBadge"));
+                Assert.IsNotNull(window.rootVisualElement.Q("ESDialogStableId"));
+                Assert.IsNotNull(window.rootVisualElement.Q("ESWindowTitleIcon"),
+                    "对话框标题栏必须有稳定的语义图标，不应只有无设计的文字壳。");
+                VisualElement shell = window.rootVisualElement.Q("ESWindowShell");
+                Assert.IsNotNull(shell);
+                Assert.Greater(shell.style.borderTopLeftRadius.value.value, 0f,
+                    "对话框外壳必须有统一圆角，而不是只给内部字段加圆角。");
+                VisualElement field = window.rootVisualElement.Q("ESDialogField-name");
+                Assert.IsNotNull(field);
+                Assert.Greater(field.style.borderTopLeftRadius.value.value, 0f);
+                VisualElement footer = window.rootVisualElement.Q("ESDialogFooter");
+                Assert.IsNotNull(footer);
+                Assert.Greater(footer.style.borderTopLeftRadius.value.value, 0f);
+                Assert.AreEqual(0f, footer.style.borderBottomLeftRadius.value.value, 0.001f);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
         public void ProgressCenterSupportsBoundedDetailsCancellationAndIdempotentFinish()
         {
             string id = "tests.progress." + Guid.NewGuid().ToString("N");
@@ -1702,7 +3234,9 @@ namespace ES.Tests
         {
             var request = new ESAdvancedDialogRequest
             {
+                dialogId = "tests.dialog.async-modal-rejection",
                 title = "异步模态拒绝测试",
+                allowMainWorkspaceFallback = true,
                 validateAsync = (_, token) => Task.FromResult<ESAdvancedDialogValidation>(null),
             };
             InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
@@ -1783,12 +3317,29 @@ namespace ES.Tests
         {
             var request = new ESAdvancedDialogRequest
             {
+                dialogId = "tests.dialog.queue-modal-rejection",
                 title = "队列模态拒绝测试",
+                allowMainWorkspaceFallback = true,
                 duplicatePolicy = ESDialogDuplicatePolicy.Queue,
             };
             InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
                 () => ESDialogService.ShowModal(request));
             StringAssert.Contains("ShowAsync", exception.Message);
+        }
+
+        [Test]
+        public void ModalDialogRejectsParallelPolicyBeforeOpeningWindow()
+        {
+            var request = new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.parallel-modal-rejection",
+                title = "并行模态拒绝测试",
+                allowMainWorkspaceFallback = true,
+                duplicatePolicy = ESDialogDuplicatePolicy.AllowParallel,
+            };
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+                () => ESDialogService.ShowModal(request));
+            StringAssert.Contains("不允许并行实例", exception.Message);
         }
 
         [Test]
@@ -1803,6 +3354,10 @@ namespace ES.Tests
                 Assert.IsNotNull(createGui);
                 createGui.Invoke(window, null);
                 VisualElement root = window.rootVisualElement;
+                Assert.AreEqual(
+                    FlexDirection.Column,
+                    root.Q<VisualElement>("ESMenuTreeToolbarContract").style.flexDirection.value,
+                    "普通窗口必须继续保留四行职责布局。");
                 Assert.IsNotNull(root.Q<VisualElement>("ESMenuTreeSystemActionRow"));
                 Assert.IsNotNull(root.Q<VisualElement>("ESMenuTreeSystemActions"));
                 Assert.IsNotNull(root.Q<VisualElement>("ESMenuTreeGlobalActionRow"));
@@ -1811,6 +3366,44 @@ namespace ES.Tests
                 Assert.IsNotNull(root.Q<VisualElement>("ESMenuTreeWindowActions"));
                 Assert.IsNotNull(root.Q<VisualElement>("ESMenuTreePageActionRow"));
                 Assert.IsNotNull(root.Q<VisualElement>("ESMenuTreePageActions"));
+
+                TextField search = root.Q<TextField>();
+                VisualElement navigation = root.Q<VisualElement>("ESMenuTreeNavigation");
+                Assert.IsNotNull(search);
+                Assert.IsNotNull(navigation);
+                Assert.IsTrue(
+                    navigation.Query<Button>().ToList().Any(button => button.text == "声明"),
+                    "页面导航应优先显示稳定短标签，而不是强制把完整路径塞入按钮。");
+                Assert.AreEqual(96f, search.style.minWidth.value.value, 0.001f,
+                    "搜索框必须能随窄窗口收缩，不能保留 160px 硬下限。");
+                Assert.AreEqual(148f, navigation.style.minWidth.value.value, 0.001f,
+                    "导航仍保留可点击下限，但不能以旧 190px 硬宽度挤压页面。");
+                foreach (string hostName in new[]
+                         {
+                             "ESMenuTreeSystemActions",
+                             "ESMenuTreeGlobalActions",
+                             "ESMenuTreeWindowActions",
+                             "ESMenuTreePageActions"
+                         })
+                {
+                    VisualElement host = root.Q<VisualElement>(hostName);
+                    Assert.AreEqual(Wrap.Wrap, host.style.flexWrap.value, hostName);
+                    Assert.AreEqual(Overflow.Visible, host.style.overflow.value, hostName);
+                }
+                foreach (string rowName in new[]
+                         {
+                             "ESMenuTreeSystemActionRow",
+                             "ESMenuTreeGlobalActionRow",
+                             "ESMenuTreeWindowActionRow",
+                             "ESMenuTreePageActionRow"
+                         })
+                {
+                    VisualElement row = root.Q<VisualElement>(rowName);
+                    Assert.AreEqual(Wrap.Wrap, row.style.flexWrap.value, rowName);
+                    Assert.AreEqual(1f, row.style.flexShrink.value, 0.001f, rowName);
+                    Assert.AreEqual(100f, row.style.width.value.value, 0.001f,
+                        rowName + " 必须占满当前动作行宽度并允许按钮换行。");
+                }
 
                 Assert.IsTrue(HasHeaderActionText(
                     root.Q<VisualElement>("ESMenuTreeSystemActions"), "系统扩展"));
@@ -1831,6 +3424,84 @@ namespace ES.Tests
             }
             finally
             {
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
+        public void CompactHostKeepsFourResponsibilityHostsInAdaptiveRows()
+        {
+            CompactRuntimeContractWindow window =
+                ScriptableObject.CreateInstance<CompactRuntimeContractWindow>();
+            try
+            {
+                MethodInfo createGui = typeof(ESMenuTreeWindow<CompactRuntimeContractWindow>)
+                    .GetMethod("CreateGUI", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(createGui);
+                createGui.Invoke(window, null);
+
+                VisualElement root = window.rootVisualElement;
+                VisualElement contract = root.Q<VisualElement>("ESMenuTreeToolbarContract");
+                Assert.IsNotNull(contract);
+                Assert.AreEqual(FlexDirection.Row, contract.style.flexDirection.value);
+                Assert.AreEqual(Wrap.Wrap, contract.style.flexWrap.value,
+                    "紧凑壳在窄窗口必须允许职责宿主换行，不能用固定单行高度裁切动作。");
+                Assert.AreEqual(StyleKeyword.None, contract.style.maxHeight.keyword);
+                foreach (string rowName in new[]
+                         {
+                             "ESMenuTreeSystemActionRow",
+                             "ESMenuTreeGlobalActionRow",
+                             "ESMenuTreeWindowActionRow",
+                             "ESMenuTreePageActionRow"
+                         })
+                {
+                    VisualElement row = root.Q<VisualElement>(rowName);
+                    Assert.IsNotNull(row, rowName + " 仍须作为独立职责宿主存在。");
+                    Assert.AreEqual(DisplayStyle.Flex, row.style.display.value);
+                    Assert.AreEqual(Overflow.Visible, row.style.overflow.value);
+                    Assert.AreEqual(
+                        DisplayStyle.None,
+                        root.Q<Label>(rowName + "Label").style.display.value,
+                        "紧凑宿主应隐藏职责文字，但不能删除职责宿主。");
+                }
+            }
+            finally
+            {
+                ESWindowFoundation.Unbind(window, true);
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+        }
+
+        [Test]
+        public void CompactHostDoesNotReserveHeightForEmptyResponsibilityRows()
+        {
+            CompactSparseContractWindow window =
+                ScriptableObject.CreateInstance<CompactSparseContractWindow>();
+            try
+            {
+                MethodInfo createGui = typeof(ESMenuTreeWindow<CompactSparseContractWindow>)
+                    .GetMethod("CreateGUI", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(createGui);
+                createGui.Invoke(window, null);
+
+                VisualElement root = window.rootVisualElement;
+                Assert.AreEqual(
+                    DisplayStyle.None,
+                    root.Q<VisualElement>("ESMenuTreeSystemActionRow").style.display.value);
+                Assert.AreEqual(
+                    DisplayStyle.None,
+                    root.Q<VisualElement>("ESMenuTreeGlobalActionRow").style.display.value);
+                Assert.AreEqual(
+                    DisplayStyle.None,
+                    root.Q<VisualElement>("ESMenuTreeWindowActionRow").style.display.value);
+                Assert.AreEqual(
+                    DisplayStyle.Flex,
+                    root.Q<VisualElement>("ESMenuTreePageActionRow").style.display.value,
+                    "页面导航仍必须在紧凑宿主中可访问。");
+            }
+            finally
+            {
+                ESWindowFoundation.Unbind(window, true);
                 UnityEngine.Object.DestroyImmediate(window);
             }
         }
@@ -1885,6 +3556,18 @@ namespace ES.Tests
                 Assert.AreEqual(
                     DisplayStyle.None,
                     root.Q<VisualElement>("ESMenuTreeSystemActionRow").style.display.value);
+                Assert.AreEqual(
+                    DisplayStyle.None,
+                    root.Q<VisualElement>("ESMenuTreeGlobalActionRow").style.display.value,
+                    "普通宽窗口的空全局动作区不得只显示“全局”标签。");
+                Assert.AreEqual(
+                    DisplayStyle.None,
+                    root.Q<VisualElement>("ESMenuTreeWindowActionRow").style.display.value,
+                    "普通宽窗口的空窗口动作区不得只显示“窗口”标签。");
+                Assert.AreEqual(
+                    DisplayStyle.Flex,
+                    root.Q<VisualElement>("ESMenuTreePageActionRow").style.display.value,
+                    "页面导航仍必须保留。");
             }
             finally
             {
@@ -1920,6 +3603,11 @@ namespace ES.Tests
                     child,
                     owner,
                     ESWindowSleepLinkMode.OwnedSurface);
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    ESWindowSleepLinkMode.OwnedSurface),
+                    "OwnedSurface 重复登记必须保持幂等，不能覆盖进入关系前的 Full 能力。");
                 Assert.AreEqual(
                     ESWindowSleepLinkMode.OwnedSurface,
                     ESWindowFoundation.GetSleepLinkMode(child));
@@ -1928,6 +3616,26 @@ namespace ES.Tests
                 Assert.AreEqual(
                     ESWindowSleepLinkMode.Independent,
                     ESWindowFoundation.GetSleepLinkMode(child));
+                Assert.IsTrue(
+                    ESWindowFoundation.IsWindowSleepSupported(child),
+                    "OwnedSurface 解除后必须恢复窗口类型原本的默认 Full 休眠能力。");
+
+                Assert.IsTrue(ESWindowFoundation.TrySetWindowSleepAllowed(child, false));
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    ESWindowSleepLinkMode.OwnedSurface));
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner));
+                Assert.IsTrue(
+                    ESWindowFoundation.IsWindowSleepSupported(child),
+                    "OwnedSurface 切换到 FollowOwner 后必须恢复 Full 类型能力。");
+                Assert.IsFalse(
+                    ESWindowFoundation.IsWindowSemiSleepAllowed(child),
+                    "关系切换不得覆盖用户在系统菜单中关闭休眠的选择。");
+                Assert.IsTrue(ESWindowFoundation.TrySetWindowSleepAllowed(child, true));
 
                 Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
                     child,
@@ -2231,6 +3939,112 @@ namespace ES.Tests
                 Assert.GreaterOrEqual(item.yMin, main.yMin);
                 Assert.LessOrEqual(item.xMax, main.xMax);
                 Assert.LessOrEqual(item.yMax, main.yMax);
+            }
+        }
+
+        [Test]
+        public void SemiSleepPerformanceGridSupportsTwentyFiftyAndOneHundredWindows()
+        {
+            CollectionAssert.AreEqual(
+                new[] { 20, 50, 100 },
+                ESWindowSemiSleepStressTest.ConfiguredPerformanceWindowCounts);
+            Rect main = new Rect(-640f, 120f, 1920f, 1200f);
+
+            foreach (int count in ESWindowSemiSleepStressTest.ConfiguredPerformanceWindowCounts)
+            {
+                Rect[] bounds = Enumerable.Range(0, count)
+                    .Select(index => ESWindowSemiSleepStressTest.BuildSleepBounds(main, index, count))
+                    .ToArray();
+                Assert.AreEqual(count, bounds.Distinct().Count(), $"{count} 窗口网格不得重复落点。");
+                foreach (Rect item in bounds)
+                {
+                    Assert.GreaterOrEqual(item.xMin, main.xMin);
+                    Assert.GreaterOrEqual(item.yMin, main.yMin);
+                    Assert.LessOrEqual(item.xMax, main.xMax);
+                    Assert.LessOrEqual(item.yMax, main.yMax);
+                }
+            }
+        }
+
+        [Test]
+        public void SemiSleepCommercialMatrixDistributesProductionWindowsAcrossFourEdges()
+        {
+            Rect main = new Rect(-1920f, -120f, 1920f, 1200f);
+            int count = ESWindowSemiSleepStressTest.ConfiguredWindowCount;
+            Assert.GreaterOrEqual(count, 4);
+
+            for (int index = 0; index < count; index++)
+            {
+                Rect bounds = ESWindowSemiSleepStressTest.BuildCommercialEdgeBounds(
+                    main,
+                    index,
+                    count);
+                Assert.AreEqual(100f, bounds.width);
+                Assert.AreEqual(100f, bounds.height);
+                switch (index % 4)
+                {
+                    case 0:
+                        Assert.AreEqual(main.x + 18f, bounds.x, 0.001f);
+                        break;
+                    case 1:
+                        Assert.AreEqual(main.xMax - 118f, bounds.x, 0.001f);
+                        break;
+                    case 2:
+                        Assert.AreEqual(main.y + 18f, bounds.y, 0.001f);
+                        break;
+                    default:
+                        Assert.AreEqual(main.yMax - 118f, bounds.y, 0.001f);
+                        break;
+                }
+            }
+        }
+
+        [Test]
+        public void SemiSleepPerformanceSampleReportsPerUpdateMetrics()
+        {
+            var sample = new ESWindowSemiSleepPerformanceSample(
+                100,
+                4,
+                400,
+                24,
+                24,
+                System.Diagnostics.Stopwatch.Frequency * 2L,
+                400L,
+                System.Diagnostics.Stopwatch.Frequency,
+                250L,
+                8d);
+
+            Assert.AreEqual(100, sample.BoundWindowCount);
+            Assert.AreEqual(100, sample.BindingVisitCount / sample.UpdateCount);
+            Assert.AreEqual(500000d, sample.AverageUpdateMicroseconds, 0.001d);
+            Assert.AreEqual(100d, sample.AverageAllocatedBytesPerUpdate, 0.001d);
+            Assert.AreEqual(1000000d, sample.MaximumUpdateMicroseconds, 0.001d);
+            Assert.AreEqual(250L, sample.MaximumAllocatedBytesPerUpdate);
+        }
+
+        [Test]
+        public void SemiSleepBenchmarkProbeDeclaresSystemActionHost()
+        {
+            ESWindowSleepBenchmarkProbeWindow window =
+                ScriptableObject.CreateInstance<ESWindowSleepBenchmarkProbeWindow>();
+            try
+            {
+                window.Configure(0);
+                MethodInfo createGui = typeof(ESWindowSleepBenchmarkProbeWindow).GetMethod(
+                    "CreateGUI",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(createGui);
+                createGui.Invoke(window, null);
+
+                VisualElement systemHost = window.rootVisualElement
+                    .Q<VisualElement>("ESWindowSleepBenchmarkSystemActions");
+                Assert.IsNotNull(systemHost);
+                Assert.IsNotNull(systemHost.Q<VisualElement>("ESWindowSystemActions"));
+            }
+            finally
+            {
+                ESWindowFoundation.Unbind(window, true);
+                UnityEngine.Object.DestroyImmediate(window);
             }
         }
 
@@ -2575,7 +4389,14 @@ namespace ES.Tests
             Assert.IsNull(typeof(ESAssetPackagePreviewUtility).GetMethod("DrawMaterialDetail", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic));
             Assert.IsNull(typeof(ESAssetPackagePreviewUtility).GetMethod("DrawAudioDetail", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic));
             Assert.IsNotNull(typeof(ESAssetPackagePreviewUtility).GetMethod("GetCacheDiagnostics", BindingFlags.Static | BindingFlags.Public));
-            Assert.IsNotNull(typeof(ESAssetPackageDynamicPreviewPlayer).GetMethod("DisposeInstance", BindingFlags.Instance | BindingFlags.NonPublic));
+            Type dynamicPlayer = typeof(ESAssetPackageDynamicPreviewPlayer);
+            Assert.IsNotNull(dynamicPlayer.GetMethod("DisposeInstance", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNotNull(dynamicPlayer.GetField("particlePreviewSession", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNull(dynamicPlayer.GetMethod("RegisterUpdate", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNull(dynamicPlayer.GetMethod("Simulate", BindingFlags.Instance | BindingFlags.NonPublic));
+            Assert.IsNull(typeof(Page_ParticleSystemAdjustment).GetMethod(
+                "RegisterPreviewLifecycleCallbacks",
+                BindingFlags.Instance | BindingFlags.NonPublic));
             Assert.LessOrEqual(ESAssetPackageGridAnimationFrameCache.MaxEntries, 48);
         }
 
@@ -2594,6 +4415,20 @@ namespace ES.Tests
                     "same-action", "动作 B", "", _ => { })));
 
             StringAssert.Contains("动作 ID 重复", failure.Message);
+        }
+
+        [Test]
+        public void PageNavigationLabelIsStableAndSearchableMetadata()
+        {
+            var definition = ESMenuTreePageDefinition.ForPanel(
+                "world.editor",
+                "内容制作 / 场景与对象 / 世界编辑器工作台",
+                (_, __) => { })
+                .WithNavigationLabel("世界");
+
+            Assert.AreEqual("world.editor", definition.StableId);
+            Assert.AreEqual("内容制作 / 场景与对象 / 世界编辑器工作台", definition.Path);
+            Assert.AreEqual("世界", definition.NavigationLabel);
         }
 
         [Test]

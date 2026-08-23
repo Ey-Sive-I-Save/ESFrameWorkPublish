@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace ES
 {
-    /// <summary>ES 常用工具的统一菜单工作台。</summary>
+    /// <summary>ES 常用工具的统一菜单总览。</summary>
     public class SimpleToolsWindow : ESMenuTreeWindow<SimpleToolsWindow>
     {
         public const string PageId_Overview = "simple-tools.overview";
@@ -90,6 +90,7 @@ namespace ES
         {
             return new GUIContent("ES 简单工具集", "观察、批处理、资产发布与维护工具");
         }
+        public override string ESWindow_PresentationShortTitle => "工具";
 
         protected override string ESWindow_Subtitle => "观察、场景批处理、资产发布与 ES 配置维护";
         protected override Vector2 ESWindow_MinSize => new Vector2(820f, 560f);
@@ -133,7 +134,7 @@ namespace ES
 
             builder.Add(CreateOdinDefinition(
                 PageId_Overview, PathOverview, pageOverview,
-                "d_UnityEditor.InspectorWindow", "总览 导航 工具 工作台",
+                "d_UnityEditor.InspectorWindow", "总览 导航 工具",
                 ESMenuTreePageLayout.Standard, 980f));
 
             ESMenuTreePageDefinition runtimeWatchDefinition = CreateOdinDefinition(
@@ -193,14 +194,24 @@ namespace ES
                 PageId_ParticleSystemAdjustment, PathParticleSystemAdjustment, pageParticleSystemAdjustment,
                 "d_PreMatCube", "ParticleSystem 粒子 批量 调整 预览",
                 ESMenuTreePageLayout.Wide, 1240f)
-                .AddPageAction(CreatePageAction<Page_ParticleSystemAdjustment>(
-                    "particles.play", "播放预览", "播放当前目标粒子系统。",
-                    page => page.PlayAllParticleSystems(), "PlayButton", "粒子预览已开始",
-                    ESEditorFeedbackSoundKind.Confirm, 100))
-                .AddPageAction(CreatePageAction<Page_ParticleSystemAdjustment>(
-                    "particles.stop", "停止预览", "停止当前目标粒子系统。",
-                    page => page.StopAllParticleSystems(), "PauseButton", "粒子预览已停止",
-                    ESEditorFeedbackSoundKind.Navigate, 90)));
+                .AddPageAction(new ESMenuTreePageAction(
+                        "particles.play",
+                        "播放窗口预览",
+                        "从头播放独立 PreviewScene 中的临时粒子副本，不修改或播放原场景对象。",
+                        StartParticleWindowPreview)
+                    .WithUnityIcon("PlayButton")
+                    .WithCheckedState(() => pageParticleSystemAdjustment != null
+                        && pageParticleSystemAdjustment.IsIndependentPreviewActive)
+                    .WithPriority(100))
+                .AddPageAction(new ESMenuTreePageAction(
+                        "particles.stop",
+                        "结束窗口预览",
+                        "停止并释放独立 PreviewScene 中的临时粒子副本。",
+                        StopParticleWindowPreview)
+                    .WithUnityIcon("PauseButton")
+                    .When(() => pageParticleSystemAdjustment != null
+                        && pageParticleSystemAdjustment.HasIndependentPreviewSession)
+                    .WithPriority(90)));
 
             builder.Add(CreateOdinDefinition(
                 PageId_TextureSpriteTool, PathTextureSpriteTool, pageTextureSpriteTool,
@@ -257,7 +268,10 @@ namespace ES
         {
             return ESMenuTreePageDefinition
                 .ForOdin(stableId, path, target)
-                .WithUnityIcon(iconName)
+                .WithUnityIcon(ESMenuTreeUnityIconResolver.ResolveExplicitSemanticIcon(
+                    stableId,
+                    path,
+                    iconName))
                 .WithKeywords(keywords)
                 .WithLayout(layout, maxContentWidth, 18f)
                 .WithSelectionFeedback("已打开" + GetLeafName(path), ESEditorFeedbackSoundKind.Navigate);
@@ -310,6 +324,38 @@ namespace ES
                 ESMenuTreePageStatus.Ready,
                 ESEditorFeedbackSoundKind.Confirm,
                 false);
+        }
+
+        private static void StartParticleWindowPreview(ESMenuTreePageContext context)
+        {
+            Page_ParticleSystemAdjustment page = context.GetOdinTarget<Page_ParticleSystemAdjustment>();
+            if (page == null)
+                return;
+
+            if (page.StartIndependentPreview())
+            {
+                context.Notify(
+                    "窗口粒子预览已开始",
+                    ESMenuTreePageStatus.Ready,
+                    ESEditorFeedbackSoundKind.Confirm,
+                    false);
+            }
+        }
+
+        private static void StopParticleWindowPreview(ESMenuTreePageContext context)
+        {
+            Page_ParticleSystemAdjustment page = context.GetOdinTarget<Page_ParticleSystemAdjustment>();
+            if (page == null)
+                return;
+
+            if (page.StopIndependentPreview())
+            {
+                context.Notify(
+                    "窗口粒子预览已结束",
+                    ESMenuTreePageStatus.Info,
+                    ESEditorFeedbackSoundKind.Navigate,
+                    false);
+            }
         }
 
         private static void TickRuntimeWatch()

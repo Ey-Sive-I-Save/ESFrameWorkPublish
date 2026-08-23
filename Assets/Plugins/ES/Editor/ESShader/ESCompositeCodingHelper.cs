@@ -21,7 +21,17 @@ namespace ES.EditorInternal
         private static readonly string[] CoordinateModeOptions = { "UV", "世界空间", "屏幕空间" };
         private static readonly string[] TimeModeOptions = { "场景时间", "非缩放时间", "自定义时间" };
         private static readonly string[] AnimationModeOptions = { "关闭", "序列帧" };
-        private static readonly string[] FadeModeOptions = { "关闭", "方向渐隐", "纹理遮罩", "噪声溶解" };
+        private static readonly string[] FadeModeOptions =
+        {
+            "关闭",
+            "方向透明渐隐",
+            "纹理遮罩",
+            "全局透明溶解",
+            "方向发光渐隐",
+            "方向扰动",
+            "源点透明溶解",
+            "源点发光溶解"
+        };
         private static readonly string[] LitDissolveModeOptions = { "关闭", "噪声溶解", "距离溶解" };
         private static readonly string[] VfxDissolveModeOptions = { "关闭", "溶解", "溶解带边缘" };
         private static readonly string[] QualityTierOptions = { "基础", "标准", "高质量" };
@@ -82,7 +92,7 @@ namespace ES.EditorInternal
                 {
                     Material material = editor.target as Material;
                     Vector2? clickPosition = codeButtonRect.width > 0f
-                        ? GUIUtility.GUIToScreenPoint(new Vector2(codeButtonRect.xMax, codeButtonRect.yMin))
+                        ? GUIUtility.GUIToScreenPoint(new Vector2(codeButtonRect.xMin, codeButtonRect.yMin))
                         : (Vector2?)null;
                     Open(property, displayName, material, clickPosition);
                 }
@@ -130,7 +140,7 @@ namespace ES.EditorInternal
                 {
                     Material material = editor.target as Material;
                     Vector2? clickPosition = codeButtonRect.width > 0f
-                        ? GUIUtility.GUIToScreenPoint(new Vector2(codeButtonRect.xMax, codeButtonRect.yMin))
+                        ? GUIUtility.GUIToScreenPoint(new Vector2(codeButtonRect.xMin, codeButtonRect.yMin))
                         : (Vector2?)null;
                     Open(property, displayName, material, clickPosition);
                 }
@@ -195,6 +205,14 @@ namespace ES.EditorInternal
                 options = TimeModeOptions;
                 return true;
             }
+            if (propertyName == "_FadeMode"
+                && (shaderName == "ES/2D/Composite URP"
+                    || shaderName == "ES/3D/Lit Composite URP"
+                    || shaderName == "ES/UI/Composite URP"))
+            {
+                options = FadeModeOptions;
+                return true;
+            }
 
             if (shaderName == "ES/2D/Composite URP")
             {
@@ -202,7 +220,6 @@ namespace ES.EditorInternal
                 {
                     case "_CoordinateMode": options = CoordinateModeOptions; return true;
                     case "_AnimationMode": options = AnimationModeOptions; return true;
-                    case "_FadeMode": options = FadeModeOptions; return true;
                 }
             }
             else if (shaderName == "ES/3D/Lit Composite URP")
@@ -274,14 +291,18 @@ namespace ES.EditorInternal
                 showCancel = false,
                 preferredSize = new Vector2(720f, 680f),
                 minSize = new Vector2(560f, 420f),
-                owner = EditorWindow.mouseOverWindow != null
-                    ? EditorWindow.mouseOverWindow
-                    : EditorWindow.focusedWindow,
+                // Material inspectors do not expose a stable owning
+                // EditorWindow through this drawer callback. Leave the owner
+                // unset rather than guessing from mouse/focus state.
+                owner = null,
+                allowMainWorkspaceFallback = true,
             };
             if (clickPosition.HasValue)
             {
                 request.positionMode = ESAdvancedDialogPositionMode.CustomScreenPosition;
-                request.customScreenPosition = clickPosition.Value + new Vector2(14f, 14f);
+                request.customScreenPosition = CalculateCodeDialogTopLeft(
+                    clickPosition.Value,
+                    request.preferredSize);
             }
             request.createCustomContent = _ => BuildContent(code);
             request.AddAuxiliaryAction(
@@ -299,6 +320,17 @@ namespace ES.EditorInternal
                 ESAdvancedDialogActionRole.Primary,
                 false);
             ESAdvancedDialogWindow.Show(request);
+        }
+
+        internal static Vector2 CalculateCodeDialogTopLeft(
+            Vector2 buttonScreenTopLeft,
+            Vector2 dialogSize)
+        {
+            // Material Inspector 通常停靠在屏幕右侧。这里直接计算最终窗口左上角：
+            // 窗口完整位于按钮左侧，并略微高于按钮；工作区钳制只负责防止越屏。
+            return new Vector2(
+                buttonScreenTopLeft.x - dialogSize.x - 14f,
+                buttonScreenTopLeft.y - 14f);
         }
 
         private static bool IsBooleanProperty(string propertyName)

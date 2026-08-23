@@ -252,6 +252,14 @@ namespace ES
         public bool ShowCancel { get; set; } = true;
         public bool QueueBehindActiveDialog { get; set; }
         public string InitialFocusFieldId { get; set; } = string.Empty;
+        /// <summary>Optional host context; the editor presenter accepts an EditorWindow.</summary>
+        public object Owner { get; set; }
+        /// <summary>
+        /// Explicitly permits Editor presentation in the main workspace when no
+        /// trustworthy EditorWindow owner exists. This is never inferred from
+        /// focus or mouse state.
+        /// </summary>
+        public bool AllowMainWorkspaceFallback { get; set; }
         public int AsyncValidationDelayMs { get; set; } = 180;
         public List<ESDialogField> Fields { get; } = new List<ESDialogField>();
         public Func<ESDialogValues, ESDialogValidation> Validate { get; set; }
@@ -371,21 +379,71 @@ namespace ES
 
         private void ValidateContract()
         {
-            if (string.IsNullOrWhiteSpace(DialogId))
+            string dialogId = DialogId?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(dialogId))
                 throw new ArgumentException("ESDialog requires a stable dialogId.", nameof(DialogId));
+            if (dialogId.Length > 128 || !IsStableDialogId(dialogId))
+                throw new ArgumentException(
+                    "ESDialog dialogId must be a stable identifier no longer than 128 characters.",
+                    nameof(DialogId));
+            DialogId = dialogId;
+            if (!Enum.IsDefined(typeof(ESDialogHost), Host))
+                throw new ArgumentException("ESDialog host is invalid.", nameof(Host));
+            if (!Enum.IsDefined(typeof(ESDialogTone), Tone))
+                throw new ArgumentException("ESDialog tone is invalid.", nameof(Tone));
+            if (!Enum.IsDefined(typeof(ESDialogDuplicatePolicy), DuplicatePolicy))
+                throw new ArgumentException(
+                    "ESDialog duplicate policy is invalid.",
+                    nameof(DuplicatePolicy));
+            if (QueueBehindActiveDialog && DuplicatePolicy == ESDialogDuplicatePolicy.AllowParallel)
+                throw new ArgumentException(
+                    "ESDialog queueing cannot be combined with AllowParallel.",
+                    nameof(QueueBehindActiveDialog));
             if (string.IsNullOrWhiteSpace(Title))
                 throw new ArgumentException("ESDialog title cannot be empty.", nameof(Title));
+            if (Title.Trim().Length > 160
+                || (Subtitle?.Length ?? 0) > 240
+                || (Message?.Length ?? 0) > 12000
+                || (Detail?.Length ?? 0) > 24000)
+                throw new ArgumentException("ESDialog display text exceeds its contract limit.");
             if (string.IsNullOrWhiteSpace(ConfirmText))
                 throw new ArgumentException("ESDialog confirm text cannot be empty.", nameof(ConfirmText));
             if (ShowCancel && string.IsNullOrWhiteSpace(CancelText))
                 throw new ArgumentException("ESDialog cancel text cannot be empty.", nameof(CancelText));
+            if (ConfirmText.Trim().Length > 96
+                || (CancelText?.Length ?? 0) > 96
+                || (SecondaryText?.Length ?? 0) > 96)
+                throw new ArgumentException("ESDialog action text exceeds its contract limit.");
+            string initialFocusFieldId = InitialFocusFieldId?.Trim() ?? string.Empty;
+            if (initialFocusFieldId.Length > 128
+                || !string.IsNullOrEmpty(initialFocusFieldId)
+                    && !IsStableDialogId(initialFocusFieldId))
+                throw new ArgumentException(
+                    "ESDialog initialFocusFieldId must be a stable identifier.",
+                    nameof(InitialFocusFieldId));
+            InitialFocusFieldId = initialFocusFieldId;
             var ids = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < Fields.Count; i++)
             {
                 ESDialogField field = Fields[i]
                     ?? throw new ArgumentException("ESDialog field cannot be null.", nameof(Fields));
+                if (field.Id.Length > 128 || !IsStableDialogId(field.Id))
+                    throw new ArgumentException(
+                        "ESDialog field id must be a stable identifier: " + field.Id,
+                        nameof(Fields));
                 if (!ids.Add(field.Id))
                     throw new ArgumentException("Duplicate ESDialog field id: " + field.Id, nameof(Fields));
+                if (field.Label.Trim().Length > 160
+                    || (field.Help?.Length ?? 0) > 1000)
+                    throw new ArgumentException(
+                        "ESDialog field display text is too long: " + field.Id,
+                        nameof(Fields));
+                if ((field.Kind == ESDialogFieldKind.Text
+                        || field.Kind == ESDialogFieldKind.MultilineText)
+                    && (field.StringValue?.Length ?? 0) > 16000)
+                    throw new ArgumentException(
+                        "ESDialog text field value is too long: " + field.Id,
+                        nameof(Fields));
                 if (field.Kind == ESDialogFieldKind.Choice
                     || field.Kind == ESDialogFieldKind.MultiChoice)
                 {
@@ -396,6 +454,11 @@ namespace ES
                     var optionIds = new HashSet<string>(StringComparer.Ordinal);
                     for (int optionIndex = 0; optionIndex < field.Options.Count; optionIndex++)
                     {
+                        if (field.Options[optionIndex] == null
+                            || field.Options[optionIndex].Label.Trim().Length > 160)
+                            throw new ArgumentException(
+                                "Choice option is invalid or too long in field " + field.Id,
+                                nameof(Fields));
                         if (!optionIds.Add(field.Options[optionIndex].Id))
                             throw new ArgumentException(
                                 "Duplicate option id in field " + field.Id + ": "
@@ -445,6 +508,28 @@ namespace ES
                         "Recommendation range or value is invalid: " + field.Id,
                         nameof(Fields));
             }
+            if (!string.IsNullOrEmpty(initialFocusFieldId)
+                && !ids.Contains(initialFocusFieldId))
+                throw new ArgumentException(
+                    "ESDialog initialFocusFieldId does not match a declared field: "
+                    + initialFocusFieldId,
+                    nameof(InitialFocusFieldId));
+        }
+
+        private static bool IsStableDialogId(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)
+                || !string.Equals(value, value.Trim(), StringComparison.Ordinal))
+                return false;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
+                if (char.IsLetterOrDigit(c) || c == '.' || c == '-' || c == '_'
+                    || c == ':' || c == '/')
+                    continue;
+                return false;
+            }
+            return true;
         }
 
         internal ESDialogCapabilities GetRequiredCapabilities()
@@ -495,6 +580,8 @@ namespace ES
                 ShowCancel = ShowCancel,
                 QueueBehindActiveDialog = QueueBehindActiveDialog,
                 InitialFocusFieldId = InitialFocusFieldId,
+                Owner = Owner,
+                AllowMainWorkspaceFallback = AllowMainWorkspaceFallback,
                 AsyncValidationDelayMs = AsyncValidationDelayMs,
                 Validate = Validate,
                 ValidateAsync = ValidateAsync,
@@ -721,11 +808,15 @@ namespace ES
             string confirmText = "知道了",
             string detail = "",
             ESDialogHost host = ESDialogHost.Auto,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            object owner = null,
+            bool allowMainWorkspaceFallback = false)
         {
             ESDialogRequest request = ESDialogRequest.MessageRequest(dialogId, title, message, confirmText);
             request.Detail = detail ?? string.Empty;
             request.Host = host;
+            request.Owner = owner;
+            request.AllowMainWorkspaceFallback = allowMainWorkspaceFallback;
             ESDialogResult result = await ShowAsync(request, cancellationToken);
             EnsureCompletedByUser(result);
         }
@@ -739,13 +830,17 @@ namespace ES
             string detail = "",
             ESDialogTone tone = ESDialogTone.Info,
             ESDialogHost host = ESDialogHost.Auto,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            object owner = null,
+            bool allowMainWorkspaceFallback = false)
         {
             ESDialogRequest request = ESDialogRequest.ConfirmRequest(
                 dialogId, title, message, confirmText, cancelText);
             request.Detail = detail ?? string.Empty;
             request.Tone = tone;
             request.Host = host;
+            request.Owner = owner;
+            request.AllowMainWorkspaceFallback = allowMainWorkspaceFallback;
             ESDialogResult result = await ShowAsync(request, cancellationToken);
             EnsureCompletedByUser(result);
             return result.Accepted;
@@ -759,7 +854,9 @@ namespace ES
             string cancelText = "取消",
             string detail = "",
             ESDialogHost host = ESDialogHost.Auto,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            object owner = null,
+            bool allowMainWorkspaceFallback = false)
             => ConfirmAsync(
                 dialogId,
                 title,
@@ -769,7 +866,9 @@ namespace ES
                 detail,
                 ESDialogTone.Danger,
                 host,
-                cancellationToken);
+                cancellationToken,
+                owner,
+                allowMainWorkspaceFallback);
 
         public static async Task<ESDialogChoice> ChooseAsync(
             string dialogId,
@@ -781,7 +880,9 @@ namespace ES
             string detail = "",
             ESDialogTone tone = ESDialogTone.Info,
             ESDialogHost host = ESDialogHost.Auto,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            object owner = null,
+            bool allowMainWorkspaceFallback = false)
         {
             ESDialogRequest request = ESDialogRequest.ConfirmRequest(
                 dialogId, title, message, primaryText, cancelText);
@@ -789,6 +890,8 @@ namespace ES
             request.Detail = detail ?? string.Empty;
             request.Tone = tone;
             request.Host = host;
+            request.Owner = owner;
+            request.AllowMainWorkspaceFallback = allowMainWorkspaceFallback;
             ESDialogResult result = await ShowAsync(request, cancellationToken);
             EnsureCompletedByUser(result);
             if (result.Completion != ESDialogCompletion.Accepted)
@@ -806,16 +909,42 @@ namespace ES
             string cancelText = "取消",
             string detail = "",
             ESDialogTone tone = ESDialogTone.Info,
-            ESDialogHost host = ESDialogHost.Auto)
+            ESDialogHost host = ESDialogHost.Auto,
+            object owner = null,
+            bool allowMainWorkspaceFallback = false)
         {
             ESDialogRequest request = ESDialogRequest.ConfirmRequest(
                 dialogId, title, message, confirmText, cancelText);
             request.Detail = detail ?? string.Empty;
             request.Tone = tone;
             request.Host = host;
+            request.Owner = owner;
+            request.AllowMainWorkspaceFallback = allowMainWorkspaceFallback;
             ESDialogResult result = ShowModal(request);
             EnsureCompletedByUser(result);
             return result.Accepted;
+        }
+
+        public static void InfoModal(
+            string dialogId,
+            string title,
+            string message,
+            string confirmText = "知道了",
+            string detail = "",
+            ESDialogTone tone = ESDialogTone.Info,
+            ESDialogHost host = ESDialogHost.Auto,
+            object owner = null,
+            bool allowMainWorkspaceFallback = false)
+        {
+            ESDialogRequest request = ESDialogRequest.MessageRequest(
+                dialogId, title, message, confirmText);
+            request.Detail = detail ?? string.Empty;
+            request.Tone = tone;
+            request.Host = host;
+            request.Owner = owner;
+            request.AllowMainWorkspaceFallback = allowMainWorkspaceFallback;
+            ESDialogResult result = ShowModal(request);
+            EnsureCompletedByUser(result);
         }
 
         public static ESDialogChoice ChooseModal(
@@ -827,7 +956,9 @@ namespace ES
             string cancelText = "取消",
             string detail = "",
             ESDialogTone tone = ESDialogTone.Info,
-            ESDialogHost host = ESDialogHost.Auto)
+            ESDialogHost host = ESDialogHost.Auto,
+            object owner = null,
+            bool allowMainWorkspaceFallback = false)
         {
             ESDialogRequest request = ESDialogRequest.ConfirmRequest(
                 dialogId, title, message, primaryText, cancelText);
@@ -835,6 +966,8 @@ namespace ES
             request.Detail = detail ?? string.Empty;
             request.Tone = tone;
             request.Host = host;
+            request.Owner = owner;
+            request.AllowMainWorkspaceFallback = allowMainWorkspaceFallback;
             ESDialogResult result = ShowModal(request);
             EnsureCompletedByUser(result);
             if (result.Completion != ESDialogCompletion.Accepted)

@@ -361,7 +361,7 @@ namespace ES
             string normalized = (value ?? string.Empty).Replace("\r\n", "\n").Trim();
             if (normalized.Length <= maximumLength)
                 return normalized;
-            return normalized.Substring(0, maximumLength) + "\n[工作台已截断；请打开真实 CMD 查看完整内容]";
+            return normalized.Substring(0, maximumLength) + "\n[Agent 控制台已截断；请打开真实 CMD 查看完整内容]";
         }
 
         private static string FirstLine(string value, int maximumLength)

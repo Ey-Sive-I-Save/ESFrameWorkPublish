@@ -277,11 +277,24 @@ namespace ES
         {
             ValidatePrefabDefinitionOwnership(prefab, info);
 
-            if (prefab.GetComponents<ESWeaponSceneTemplate>().Length != 1
-                || prefab.GetComponents<EntityWeaponBinding>().Length != 1)
+            if (CountMissingScriptsRecursive(prefab != null ? prefab.transform : null) > 0
+                || prefab.GetComponentsInChildren<Item>(true).Length != 1
+                || prefab.GetComponentsInChildren<ESWeaponSceneTemplate>(true).Length != 1
+                || prefab.GetComponentsInChildren<EntityWeaponBinding>(true).Length != 1)
             {
-                throw new System.InvalidOperationException("大长条 Prefab 必须且只能包含一套 ESWeaponSceneTemplate 与 EntityWeaponBinding。");
+                throw new System.InvalidOperationException("大长条 Prefab 必须且只能包含一套 Item、ESWeaponSceneTemplate 与 EntityWeaponBinding。");
             }
+        }
+
+        private static int CountMissingScriptsRecursive(Transform root)
+        {
+            if (root == null)
+                return 0;
+
+            int count = GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(root.gameObject);
+            for (int i = 0; i < root.childCount; i++)
+                count += CountMissingScriptsRecursive(root.GetChild(i));
+            return count;
         }
 
         private static void ValidatePrefabDefinitionOwnership(GameObject prefab, ItemDataInfo info)

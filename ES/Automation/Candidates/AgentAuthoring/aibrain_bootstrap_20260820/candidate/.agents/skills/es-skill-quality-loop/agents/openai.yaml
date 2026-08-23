@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Skill Quality Loop"
+  short_description: "测试并迭代项目 Skill 的触发与权限边界"
+  default_prompt: "使用 $es-skill-quality-loop 验证候选 Skill 的触发边界、引用链和迭代质量。"

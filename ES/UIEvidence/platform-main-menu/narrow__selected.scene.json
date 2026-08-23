@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "command": "scene.snapshot",
+  "panelId": "platform-main-menu",
+  "profileId": "narrow",
+  "stateId": "selected",
+  "runId": "09f840a4b1ce4dec8bec25718b19f581",
+  "specHash": "ee933c302d104dab3734a7863b972364d701d51ebbb16ffb4a8c708284c302ad",
+  "sceneGeneration": 1,
+  "rootPath": "Canvas/PlatformMainMenu",
+  "canvasPath": "Canvas"
+}

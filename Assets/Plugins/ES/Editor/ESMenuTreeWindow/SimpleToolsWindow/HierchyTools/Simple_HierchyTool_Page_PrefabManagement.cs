@@ -127,10 +127,10 @@ namespace ES
         [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
         {
-            DrawPrefabWorkbench();
+            DrawPrefabTool();
         }
 
-        private void DrawPrefabWorkbench()
+        private void DrawPrefabTool()
         {
             DrawPrefabHeader();
             DrawPrefabContext();

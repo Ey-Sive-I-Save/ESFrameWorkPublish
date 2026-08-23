@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es.feishu.task.transition@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operation", "taskGuid", "expectedUpdatedAt"],
+  "properties": {
+    "operation": { "enum": ["task-update", "task-complete", "task-reopen", "members-add", "members-remove", "reminder-add", "reminder-remove"] },
+    "taskGuid": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "expectedUpdatedAt": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "description": { "type": "string", "maxLength": 4000 },
+    "startTimestamp": { "type": "string", "pattern": "^[0-9]{1,16}$" },
+    "dueTimestamp": { "type": "string", "pattern": "^[0-9]{1,16}$" },
+    "isAllDay": { "type": "boolean" },
+    "agentTaskStatus": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "agentTaskProgress": { "type": "string", "maxLength": 2000 },
+    "members": { "type": "array", "minItems": 1, "maxItems": 20 },
+    "relativeFireMinute": { "type": "integer", "minimum": -525600, "maximum": 0 },
+    "reminderId": { "type": "string", "minLength": 1, "maxLength": 128 }
+  }
+}

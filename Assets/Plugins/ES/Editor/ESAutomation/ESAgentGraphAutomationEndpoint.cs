@@ -56,25 +56,54 @@ namespace ES.EditorInternal
             string prompt, ESGraphRiskAcceptance riskAcceptance, string actorId, bool dryRun = false)
         {
             InitializeForEditor();
-            return ESAutomationFacade.RunTask(new ESAutomationTaskInvocation
+            bool isCandidate = string.Equals(taskId, GenerateTaskId, StringComparison.Ordinal);
+            JObject input = new JObject
             {
+                ["requestId"] = requestId ?? string.Empty,
+                ["requestDirectory"] = requestDirectory ?? string.Empty,
+                ["graphId"] = graphId ?? string.Empty,
+                ["contentSignature"] = contentSignature ?? string.Empty,
+                ["operationKind"] = operationKind ?? string.Empty,
+                ["prompt"] = prompt ?? string.Empty,
+                ["riskAcceptance"] = riskAcceptance == null
+                    ? JValue.CreateNull() : JObject.FromObject(riskAcceptance),
+            };
+            return ESAIBrainCoordinator.Run(new ESAIBrainRequest
+            {
+                objective = isCandidate
+                    ? "生成已校验 Stable Graph 的 Agent Artifact 候选。"
+                    : "执行已校验 Stable Graph 的单次 AI 任务。",
+                routeKeys = new List<string> { "aibrain", "orchestration" },
+                commandId = isCandidate ? "agent-artifact.candidate" : "graph.single-use.execute",
+                skillNames = isCandidate
+                    ? new List<string> { "es-generate-agent-artifacts" } : new List<string>(),
+                workflow = new ESAIBrainWorkflowAuthority
+                {
+                    workflowId = string.IsNullOrWhiteSpace(graphId) ? "graph.unknown" : graphId,
+                    contentHash = contentSignature ?? string.Empty,
+                },
                 taskId = taskId,
                 taskVersion = TaskVersion,
+                input = input,
                 actorId = string.IsNullOrWhiteSpace(actorId) ? "editor.user" : actorId,
                 fromAi = false,
                 dryRun = dryRun,
-                input = new JObject
-                {
-                    ["requestId"] = requestId ?? string.Empty,
-                    ["requestDirectory"] = requestDirectory ?? string.Empty,
-                    ["graphId"] = graphId ?? string.Empty,
-                    ["contentSignature"] = contentSignature ?? string.Empty,
-                    ["operationKind"] = operationKind ?? string.Empty,
-                    ["prompt"] = prompt ?? string.Empty,
-                    ["riskAcceptance"] = riskAcceptance == null
-                        ? JValue.CreateNull() : JObject.FromObject(riskAcceptance),
-                }
+                invocationId = CreateStableInvocationId(taskId, requestId, contentSignature),
             });
+        }
+
+        private static string CreateStableInvocationId(string taskId, string requestId,
+            string contentSignature)
+        {
+            byte[] source = Encoding.UTF8.GetBytes((taskId ?? string.Empty) + "\n"
+                + (requestId ?? string.Empty) + "\n" + (contentSignature ?? string.Empty));
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] hash = sha.ComputeHash(source);
+                byte[] guidBytes = new byte[16];
+                Buffer.BlockCopy(hash, 0, guidBytes, 0, guidBytes.Length);
+                return new Guid(guidBytes).ToString("N");
+            }
         }
 
         private static void RegisterTask(string taskId, string displayName, string summary, string operationKind)

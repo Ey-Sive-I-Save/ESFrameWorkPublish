@@ -30,6 +30,74 @@ namespace ES
     /// </summary>
     public sealed class ESWorldBuilderWorkbenchWindow : ESWorkbenchWindowBase<ESWorldBuilderWorkbenchWindow, ESWorldMapAsset, ESWorldWorkbenchModule>
     {
+        private sealed class WorldBrushPaletteTemplate
+        {
+            public WorldBrushPaletteTemplate(string id, string displayName, float normalizedHeight, string description,
+                ESWorldTerrainBrushMode mode = ESWorldTerrainBrushMode.Flatten, float strength = -1f)
+            {
+                Id = id;
+                DisplayName = displayName;
+                NormalizedHeight = Mathf.Clamp01(normalizedHeight);
+                Description = description ?? string.Empty;
+                Mode = mode;
+                Strength = strength < 0f ? -1f : Mathf.Clamp01(strength);
+            }
+
+            public string Id { get; }
+            public string DisplayName { get; }
+            public float NormalizedHeight { get; }
+            public string Description { get; }
+            public ESWorldTerrainBrushMode Mode { get; }
+            public float Strength { get; }
+        }
+
+        private sealed class WorldRegionPaletteTemplate
+        {
+            public WorldRegionPaletteTemplate(string id, string displayName, string category, Vector2 size, string description)
+            {
+                Id = id;
+                DisplayName = displayName;
+                Category = category;
+                Size = new Vector2(Mathf.Max(1f, size.x), Mathf.Max(1f, size.y));
+                Description = description ?? string.Empty;
+            }
+
+            public string Id { get; }
+            public string DisplayName { get; }
+            public string Category { get; }
+            public Vector2 Size { get; }
+            public string Description { get; }
+        }
+
+        private static readonly WorldBrushPaletteTemplate[] WorldBrushTemplates =
+        {
+            new WorldBrushPaletteTemplate("lowland", "低地塑形笔刷", 0.24f, "快速建立洼地、河谷与低海拔区域。"),
+            new WorldBrushPaletteTemplate("midland", "中位塑形笔刷", 0.5f, "建立通用地表基准高度，适合道路与建筑平台。", ESWorldTerrainBrushMode.Flatten),
+            new WorldBrushPaletteTemplate("highland", "高地塑形笔刷", 0.78f, "快速建立山脊、高台和视野制高点。"),
+            new WorldBrushPaletteTemplate("raise", "连续抬高笔刷", 0.5f, "沿连续笔划逐步抬高当前地形。", ESWorldTerrainBrushMode.Raise, 0.45f),
+            new WorldBrushPaletteTemplate("lower", "连续降低笔刷", 0.5f, "沿连续笔划逐步降低当前地形。", ESWorldTerrainBrushMode.Lower, 0.45f),
+            new WorldBrushPaletteTemplate("smooth", "地形平滑笔刷", 0.5f, "削弱尖峰和断层，保持笔划结果对称稳定。", ESWorldTerrainBrushMode.Smooth, 0.55f)
+        };
+
+        private static readonly WorldRegionPaletteTemplate[] WorldRegionTemplates =
+        {
+            new WorldRegionPaletteTemplate("playable", "可游玩区域", "Gameplay", new Vector2(48f, 48f), "常规可行走与玩法承载区域。"),
+            new WorldRegionPaletteTemplate("spawn", "出生区域", "Spawn", new Vector2(20f, 20f), "玩家或队伍出生与安全落点区域。"),
+            new WorldRegionPaletteTemplate("restricted", "限制区域", "Restricted", new Vector2(32f, 32f), "用于边界、危险区或禁止通行区域。")
+        };
+
+        internal const string CommercialValidationAssetPath =
+            "Assets/ESValidation/World/ESWorldCommercialValidationV2.asset";
+        private const string CommercialValidationPrefabPath =
+            "Assets/ESNormalAssets/Prefabs/Cube.prefab";
+        private const string CommercialValidationAlternatePrefabPath =
+            "Assets/ESNormalAssets/Prefabs/蓝色方块.prefab";
+        private const int CommercialValidationReadinessFrameLimit = 120;
+        internal const int CommercialValidationPreviewIterations = 240;
+        internal const double CommercialValidationMinimumDurationSeconds = 30d;
+        private static bool commercialValidationAcceptanceInProgress;
+        private static ESWorldEditSession commercialValidationPeerSession;
+
         private sealed class WorldPersistenceAdapter : IESWorkbenchPersistenceAdapter<ESWorldMapAsset>
         {
             public bool TrySave(ESWorldMapAsset asset, SerializedObject serializedObject, out string message)
@@ -41,6 +109,28 @@ namespace ES
         }
 
         private static readonly IESWorkbenchPersistenceAdapter<ESWorldMapAsset> PersistenceAdapter = new WorldPersistenceAdapter();
+        private static readonly ESWorkbenchResponsiveLayoutPolicy WorldLayoutPolicy =
+            new ESWorkbenchResponsiveLayoutPolicy(
+                minimumWindowWidth: 980f,
+                minimumWindowHeight: 640f,
+                wideBreakpoint: 1180f,
+                narrowBreakpoint: 980f,
+                minimumCenterWidth: 600f,
+                minimumCenterHeight: 340f,
+                minimumLeftPaneWidth: 280f,
+                minimumInspectorPaneWidth: 280f,
+                maximumLeftPaneRatio: 0.34f,
+                maximumInspectorPaneRatio: 0.30f,
+                maximumBottomDrawerRatio: 0.34f,
+                preferredLeftPaneWidth: 320f,
+                maximumLeftPaneWidth: 420f,
+                preferredInspectorPaneWidth: 320f,
+                maximumInspectorPaneWidth: 420f,
+                collapsedBottomDrawerHeight: 32f,
+                compactBottomDrawerHeight: 96f,
+                minimumBottomDrawerHeight: 112f,
+                preferredBottomDrawerHeight: 220f,
+                maximumBottomDrawerHeight: 320f);
         internal enum BuildStage { NotStarted, Preflight, Pending, Succeeded, Failed, Cancelled }
         private BuildStage buildStage;
         private ESContentRegistrationResult lastRegistrationResult;
@@ -48,9 +138,34 @@ namespace ES
         private string collectRequestId = string.Empty;
         private string bakeRequestId = string.Empty;
         private string bakeRunId = string.Empty;
+        private string previewStressResult = string.Empty;
+        private ESWorldWorkbenchAcceptanceResult? latestAcceptance;
+        [SerializeField] private string editSessionOwnerId = string.Empty;
         private ESWorldEditSession editSession;
         private ESWorldAuthoringTool authoringTool = ESWorldAuthoringTool.Select;
-        private float authoringBrushHeight = 0.5f;
+        [SerializeField] private float authoringBrushHeight = 0.5f;
+        [SerializeField] private float authoringBrushRadius = 8f;
+        [SerializeField] private float authoringBrushStrength = 0.65f;
+        [SerializeField] private float authoringBrushFalloff = 0.75f;
+        [SerializeField] private ESWorldTerrainBrushMode authoringBrushMode = ESWorldTerrainBrushMode.Flatten;
+        private bool terrainStrokeSessionOpen;
+        private bool terrainStrokeUndoRecorded;
+        private int terrainStrokeUndoGroup = -1;
+        private bool terrainStrokeSnapshotValid;
+        private bool terrainStrokeHadHeightfield;
+        private bool terrainStrokeDraftSyncPending;
+        private int terrainStrokeWidth;
+        private int terrainStrokeHeight;
+        private float terrainStrokeDefaultHeight;
+        private List<float> terrainStrokeSamplesSnapshot;
+        private float cachedBrushHeight = -1f;
+        private float cachedBrushRadius = -1f;
+        private float cachedBrushStrength = -1f;
+        private float cachedBrushFalloff = -1f;
+        private ESWorldTerrainBrushMode cachedBrushMode = ESWorldTerrainBrushMode.Flatten;
+        private string cachedBrushSummary = string.Empty;
+        [SerializeField] private string activeWorldContentId = string.Empty;
+        [SerializeField] private string activeWorldContentPresetId = string.Empty;
         private ESWorldMapAsset mapAsset => editSession?.Draft ?? ESWorkbench_Asset;
         internal ESWorldMapAsset ESWorld_Draft => mapAsset;
         private SerializedObject serializedAsset => ESWorkbench_SerializedAsset;
@@ -81,8 +196,15 @@ namespace ES
         protected override ESWorldMapAsset ESWorkbench_ResolveEditingAsset(ESWorldMapAsset asset)
         {
             editSession?.Dispose();
-            editSession = ESWorldEditSession.Open(asset);
+            editSession = ESWorldEditSession.Open(asset, EnsureEditSessionOwnerId());
             return editSession?.Draft;
+        }
+
+        private string EnsureEditSessionOwnerId()
+        {
+            if (string.IsNullOrWhiteSpace(editSessionOwnerId))
+                editSessionOwnerId = Guid.NewGuid().ToString("N");
+            return editSessionOwnerId;
         }
 
         protected override void ESWorkbench_OnAssetBound(ESWorldMapAsset asset)
@@ -170,10 +292,183 @@ namespace ES
         {
             ESWorldBuilderWorkbenchWindow window = GetWindow<ESWorldBuilderWorkbenchWindow>();
             window.titleContent = new GUIContent("ES 世界构建工作台");
-            window.minSize = new Vector2(980f, 620f);
+            window.minSize = WorldLayoutPolicy.ResolveAdaptiveMinimum(
+                EditorGUIUtility.GetMainWindowPosition());
             window.Show();
             if (Selection.activeObject is ESWorldMapAsset selected && selected != window.ESWorkbench_Asset)
                 window.ESWorkbench_BindAsset(selected);
+        }
+
+        [MenuItem("【ES】/内容制作/环境/创建或打开 World 商业验收样本", false, 121)]
+        public static void OpenCommercialValidationSample()
+        {
+            ESWorldMapAsset asset = AssetDatabase.LoadAssetAtPath<ESWorldMapAsset>(
+                CommercialValidationAssetPath);
+            if (asset == null)
+            {
+                EnsureAssetFolder("Assets/ESValidation/World");
+                asset = ScriptableObject.CreateInstance<ESWorldMapAsset>();
+                asset.name = "ES World 商业验收样本";
+                PopulateCommercialValidationSample(asset);
+                AssetDatabase.CreateAsset(asset, CommercialValidationAssetPath);
+                AssetDatabase.SaveAssets();
+            }
+            else
+            {
+                string before = EditorJsonUtility.ToJson(asset);
+                PopulateCommercialValidationSample(asset);
+                if (!string.Equals(before, EditorJsonUtility.ToJson(asset), StringComparison.Ordinal))
+                {
+                    EditorUtility.SetDirty(asset);
+                    AssetDatabase.SaveAssets();
+                }
+            }
+
+            Selection.activeObject = asset;
+            EditorGUIUtility.PingObject(asset);
+            Open();
+        }
+
+        [MenuItem("【ES】/内容制作/环境/运行 World 真实协作验收", false, 123)]
+        public static void RunCommercialValidationAcceptance()
+        {
+            if (commercialValidationAcceptanceInProgress)
+            {
+                Debug.LogWarning("[ES World 商业验收] 已有真实协作验收正在等待窗口就绪。");
+                return;
+            }
+
+            ESWorldBuilderWorkbenchWindow main = GetWindow<ESWorldBuilderWorkbenchWindow>();
+            if (main == null
+                || main.editSession == null
+                || !string.Equals(
+                    AssetDatabase.GetAssetPath(main.ESWorkbench_Asset),
+                    CommercialValidationAssetPath,
+                    StringComparison.Ordinal))
+            {
+                Debug.LogError("[ES World 商业验收] 请先打开并绑定固定商业验收样本。");
+                return;
+            }
+            commercialValidationAcceptanceInProgress = true;
+
+            main.editSession.ReloadFromSource();
+            main.ESWorkbench_ClearDirty();
+            ESWorldMapPrefabPlacement localPlacement = main.editSession.Draft.Definition
+                .prefabPlacements?.FirstOrDefault(value =>
+                    value != null && value.placementId == "placement.commercial-validation");
+            string alternateGuid = AssetDatabase.AssetPathToGUID(
+                CommercialValidationAlternatePrefabPath);
+            if (localPlacement == null || string.IsNullOrWhiteSpace(alternateGuid))
+            {
+                Debug.LogError("[ES World 商业验收] 验收放置点或备用 Prefab GUID 不可用。");
+                commercialValidationAcceptanceInProgress = false;
+                return;
+            }
+
+            Undo.RecordObject(main.editSession.Draft, "ES World 真实协作验收：保留主窗口草稿");
+            localPlacement.editorPrefabGuid = alternateGuid;
+            localPlacement.prefabKey = "validation.prefab.alternate";
+            main.editSession.NotifyDraftChanged("definition.prefabPlacements");
+            main.ESWorkbench_MarkDirty(
+                "world.live-conflict-local-draft",
+                ESWorkbenchDirtyFlags.Authoring);
+
+            ESWorldMapAsset source = main.ESWorkbench_Asset;
+            ReleaseCommercialValidationPeerSession();
+            commercialValidationPeerSession = ESWorldEditSession.Open(
+                source,
+                "world-commercial-validation-peer");
+            ESWorldEditSession peer = commercialValidationPeerSession;
+            if (peer == null)
+            {
+                FailCommercialValidationAcceptance("无法创建受管协作编辑会话。");
+                return;
+            }
+            peer.ReloadFromSource();
+            if (ESWorldEditSession.GetActiveSessionCount(source) < 2)
+            {
+                FailCommercialValidationAcceptance("主会话与协作会话未同时进入活动集合。");
+                return;
+            }
+            Undo.RecordObject(peer.Draft, "ES World 真实协作验收：协作会话提交");
+            peer.Draft.Definition.seed += 1;
+            peer.NotifyDraftChanged("definition.seed");
+            ESWorldEditCommitResult commit = peer.TryCommit();
+            if (!commit.success)
+            {
+                FailCommercialValidationAcceptance("协作会话提交失败：" + commit.message);
+                return;
+            }
+
+            WaitForCommercialValidationConflict(main, peer, source, 0);
+        }
+
+        private static void WaitForCommercialValidationConflict(
+            ESWorldBuilderWorkbenchWindow main,
+            ESWorldEditSession peer,
+            ESWorldMapAsset source,
+            int frame)
+        {
+            if (main == null
+                || peer == null
+                || !ReferenceEquals(peer, commercialValidationPeerSession)
+                || source == null
+                || main.editSession == null)
+            {
+                FailCommercialValidationAcceptance("等待冲突期间窗口或会话已失效。");
+                return;
+            }
+            if (!main.editSession.RefreshExternalConflict())
+            {
+                if (frame >= CommercialValidationReadinessFrameLimit)
+                {
+                    FailCommercialValidationAcceptance("副窗口提交后主窗口未观察到外部冲突。");
+                    return;
+                }
+                EditorApplication.delayCall += () =>
+                    WaitForCommercialValidationConflict(main, peer, source, frame + 1);
+                return;
+            }
+
+            main.ESWorkbench_SetStatus(
+                "商业验收冲突已建立：协作会话已提交，当前窗口草稿必须保留并拒绝后写。",
+                MessageType.Warning);
+            main.Focus();
+            try
+            {
+                main.RunWorldAcceptance(
+                    CommercialValidationPreviewIterations,
+                    true,
+                    CommercialValidationMinimumDurationSeconds);
+            }
+            finally
+            {
+                commercialValidationAcceptanceInProgress = false;
+                ReleaseCommercialValidationPeerSession();
+            }
+        }
+
+        private static void FailCommercialValidationAcceptance(string message)
+        {
+            commercialValidationAcceptanceInProgress = false;
+            ReleaseCommercialValidationPeerSession();
+            Debug.LogError("[ES World 商业验收] " + message);
+        }
+
+        private static void ReleaseCommercialValidationPeerSession()
+        {
+            ESWorldEditSession peer = commercialValidationPeerSession;
+            commercialValidationPeerSession = null;
+            if (peer == null)
+                return;
+            try
+            {
+                peer.ClearRecoveryState();
+            }
+            finally
+            {
+                peer.Dispose();
+            }
         }
 
         [MenuItem("【ES】/内容制作/环境/世界配置与构建", false, 122)]
@@ -183,9 +478,11 @@ namespace ES
         }
 
         public override GUIContent ESWindow_GetWindowGUIContent() => new GUIContent("ES 世界构建工作台", "统一编辑地图、地形、对象散布、导航、环境和 UGC 构建配置。");
+        public override string ESWindow_PresentationShortTitle => "世界";
         protected override string ESWindow_Subtitle => "ES 专属世界内容底板 · 地图到 UGC 构建配置";
-        protected override Vector2 ESWindow_MinSize => new Vector2(980f, 620f);
-        protected override Vector2 ESWindow_DefaultSize => new Vector2(1280f, 820f);
+        protected override Vector2 ESWindow_MinSize => WorldLayoutPolicy.ResolveAdaptiveMinimum(
+            EditorGUIUtility.GetMainWindowPosition());
+        protected override Vector2 ESWindow_DefaultSize => new Vector2(1440f, 900f);
         protected override string ESWindow_PageStableId => "world.builder-workbench";
         protected override string ESWindow_PageTitle => "世界构建工作台";
         protected override string ESWindow_PageKeywords => "地图 地形 材质 植被 Prefab 导航 水体 天气 流式 碰撞 构建 UGC";
@@ -213,7 +510,35 @@ namespace ES
 
         internal void InitializeForTest() => ESWindow_OnHostEnable();
         internal void DisableForTest() => ESWindow_OnHostDisable();
+        internal void BindAssetForTest(ESWorldMapAsset asset) => ESWorkbench_BindAsset(asset);
+        internal ESWorldEditSession EditSessionForTest => editSession;
+        internal ESWorldWorkbenchAcceptanceResult RunAcceptanceForTest(int previewIterations)
+        {
+            return ESWorldWorkbenchAcceptance.Execute(
+                mapAsset,
+                editSession,
+                WorldLayoutPolicy.CreateCommercialVisualMatrix(),
+                previewIterations,
+                false,
+                0d);
+        }
         internal int ContributionLoadCountForTest => ESWorkbench_ContributionLoadCount;
+        internal IReadOnlyList<ESWorkbenchCommandDescriptor> CommandsForTest => ESWorkbench_Commands;
+        internal Vector2 MinimumSizeForTest => ESWindow_MinSize;
+        internal Vector2 IdealMinimumSizeForTest => new Vector2(
+            WorldLayoutPolicy.MinimumWindowWidth,
+            WorldLayoutPolicy.MinimumWindowHeight);
+        internal Vector2 DefaultSizeForTest => ESWindow_DefaultSize;
+        internal ESWorkbenchResponsiveLayoutPolicy LayoutPolicyForTest => WorldLayoutPolicy;
+        internal string ActiveWorldContentIdForTest => activeWorldContentId;
+        internal string ActiveToolIdForTest => ESWorkbench_Actions?.Tools?.ActiveToolId ?? string.Empty;
+        internal void ActivateToolForTest(string toolId) => ESWorkbench_Actions?.Tools?.Activate(toolId);
+        internal float TerrainBrushRadiusForTest => authoringBrushRadius;
+        internal float TerrainBrushStrengthForTest => authoringBrushStrength;
+        internal int RegisteredDocumentCountForTest => ESWorkbench_Documents.Count;
+        internal IReadOnlyList<string> AuthoringModeIdsForTest => ESWorkbench_AuthoringModes
+            .Select(value => value.ModeId)
+            .ToArray();
 
         protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
@@ -248,7 +573,7 @@ namespace ES
             ESWorkbench_DrawStandardLayout(DrawInspectorPanel);
             bool serializedChanged = serializedAsset.hasModifiedProperties;
             serializedAsset.ApplyModifiedProperties();
-            if (serializedChanged) ESWorkbench_MarkSelectedPageDirty();
+            if (serializedChanged) ESWorkbench_MarkSelectedDocumentDirty();
         }
 
         private void DrawToolbar()
@@ -285,7 +610,7 @@ namespace ES
                     EditorGUILayout.LabelField("UGC 预算", definition.ugcLimits == null ? "缺失" : definition.ugcLimits.maxPrefabInstances.ToString("N0") + " Prefab 实例");
                 }
                 GUILayout.FlexibleSpace();
-                if (GUILayout.Button("打开对话工作台", GUILayout.Height(28f))) ESWorldDialogueWorkbenchWindow.OpenFor(mapAsset, this);
+                if (GUILayout.Button("打开对话编辑器", GUILayout.Height(28f))) ESWorldDialogueEditorWindow.OpenFor(mapAsset, this);
                 if (GUILayout.Button("打开空间编辑器", GUILayout.Height(28f))) ESWorldMapSpaceEditorWindow.OpenFor(mapAsset);
                 if (GUILayout.Button("加载中文示例注册", GUILayout.Height(28f))) InjectSampleContent();
                 if (GUILayout.Button("验证地图", GUILayout.Height(28f))) ValidateMap();
@@ -347,6 +672,22 @@ namespace ES
 
         private void DrawTerrain()
         {
+            GUILayout.Label("地形塑形笔刷", ESEditorPresentation.HeaderStyle);
+            DrawTerrainBrushModeButtons();
+            if (authoringBrushMode == ESWorldTerrainBrushMode.Flatten)
+                authoringBrushHeight = EditorGUILayout.Slider("目标高度", authoringBrushHeight, 0f, 1f);
+            else
+                EditorGUILayout.HelpBox(
+                    GetTerrainBrushModeDisplayName(authoringBrushMode) + "模式不使用目标高度；当前强度决定每次采样的变化量。",
+                    MessageType.None);
+            authoringBrushRadius = EditorGUILayout.Slider("半径（米）", authoringBrushRadius, 0.5f, 64f);
+            authoringBrushStrength = EditorGUILayout.Slider("强度", authoringBrushStrength, 0.05f, 1f);
+            if (authoringBrushMode != ESWorldTerrainBrushMode.Smooth)
+                authoringBrushFalloff = EditorGUILayout.Slider("边缘衰减", authoringBrushFalloff, 0f, 1f);
+            EditorGUILayout.HelpBox(
+                GetTerrainBrushSummary() + "\n在 2D 或 3D 视口按住左键连续塑形；一次连续笔划只生成一条撤销记录。",
+                MessageType.Info);
+            EditorGUILayout.Space(8f);
             GUILayout.Label("真实地形后端", ESEditorPresentation.HeaderStyle);
             EditorGUILayout.HelpBox("默认 Unity Terrain。Heightfield 是 ES 数据后端和降级路径；Voxel 保留为可选扩展。", MessageType.Info);
             DrawProperty("definition.terrainMode");
@@ -357,6 +698,33 @@ namespace ES
             DrawProperty("definition.maxWalkableSlope");
             DrawProperty("definition.defaultSurfaceTag");
             DrawProperty("definition.heightfield", true);
+        }
+
+        private void DrawTerrainBrushModeButtons()
+        {
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                DrawTerrainBrushModeButton(ESWorldTerrainBrushMode.Flatten, "平整");
+                DrawTerrainBrushModeButton(ESWorldTerrainBrushMode.Raise, "抬高");
+                DrawTerrainBrushModeButton(ESWorldTerrainBrushMode.Lower, "降低");
+                DrawTerrainBrushModeButton(ESWorldTerrainBrushMode.Smooth, "平滑");
+            }
+        }
+
+        private void DrawTerrainBrushModeButton(ESWorldTerrainBrushMode mode, string title)
+        {
+            Color previous = GUI.backgroundColor;
+            GUI.backgroundColor = authoringBrushMode == mode
+                ? new Color(0.19f, 0.48f, 0.72f, 1f)
+                : new Color(0.16f, 0.17f, 0.19f, 1f);
+            if (GUILayout.Button(new GUIContent(title, "切换地形笔刷模式：" + title),
+                    ESEditorPresentation.ToolbarButtonStyle, GUILayout.MinWidth(48f)))
+            {
+                authoringBrushMode = mode;
+                ESWorkbench_SetStatus("当前地形笔刷模式：" + title, MessageType.Info);
+                Repaint();
+            }
+            GUI.backgroundColor = previous;
         }
 
         private void DrawMaterialLayers()
@@ -671,12 +1039,60 @@ namespace ES
                 return;
             }
             Undo.RecordObject(mapAsset, "加载 ES 世界工作台中文示例注册");
-            EnsureDefinitionBaseline(mapAsset, ESWorkbench_Asset != null ? ESWorkbench_Asset.name : null);
-            EnsureDefinitionContainers(mapAsset.Definition);
-            PopulateSampleContent(mapAsset.Definition);
+            PopulateCommercialValidationSample(
+                mapAsset,
+                ESWorkbench_Asset != null ? ESWorkbench_Asset.name : null);
             ESWorldMapAuthoringUtility.MarkChanged(mapAsset);
             ESWorkbench_SetStatus("中文示例注册已加载：材质、植被、Prefab、导航、天气、水体、流式、碰撞、区域和 POI 均已注入。", MessageType.Info);
             ESWorkbench_MarkDirty("world.sample-registration", ESWorkbenchDirtyFlags.Authoring);
+        }
+
+        internal static void PopulateCommercialValidationSample(
+            ESWorldMapAsset asset,
+            string defaultMapId = "es.world.commercial-validation")
+        {
+            if (asset == null) throw new ArgumentNullException(nameof(asset));
+            EnsureDefinitionBaseline(asset, defaultMapId);
+            EnsureDefinitionContainers(asset.Definition);
+            PopulateSampleContent(asset.Definition);
+            EnsureRegion(asset.Definition.regions, new ESWorldMapRegionDefinition
+            {
+                regionId = "region.commercial-validation-long-cn",
+                displayName = "商业验收超长中文区域名称：中央生态湖区、出生营地与远景地标联合检查区",
+                semanticTag = "Validation",
+                min = new Vector2(24f, 128f),
+                max = new Vector2(104f, 232f),
+                priority = 30
+            });
+            EnsurePoi(asset.Definition.pois, new ESWorldMapPoiDefinition
+            {
+                poiId = "poi.commercial-validation-long-cn",
+                displayName = "商业验收超长中文兴趣点：多分辨率布局与检查器文本压力样例",
+                category = "Validation",
+                regionId = "region.commercial-validation-long-cn",
+                position = new Vector2(64f, 176f),
+                discoverable = true
+            });
+            if (asset.Definition.prefabPlacements == null)
+                asset.Definition.prefabPlacements = new List<ESWorldMapPrefabPlacement>();
+            if (!asset.Definition.prefabPlacements.Exists(value =>
+                    value != null && value.placementId == "placement.commercial-validation"))
+            {
+                string prefabGuid = AssetDatabase.AssetPathToGUID(
+                    CommercialValidationPrefabPath);
+                if (!string.IsNullOrWhiteSpace(prefabGuid))
+                    asset.Definition.prefabPlacements.Add(new ESWorldMapPrefabPlacement
+                    {
+                        placementId = "placement.commercial-validation",
+                        prefabKey = "validation.prefab.primary",
+                        editorPrefabGuid = prefabGuid,
+                        regionId = "region.spawn",
+                        position = new Vector3(48f, 24f, 48f),
+                        rotationEuler = new Vector3(0f, 35f, 0f),
+                        scale = new Vector3(6f, 6f, 6f),
+                        enabled = true
+                    });
+            }
         }
 
         private static bool HasSampleRegistration(ESWorldMapDefinition definition)
@@ -935,34 +1351,59 @@ namespace ES
         private static void EnsureContributionsRegistered()
         {
             RegisterAuthoringContribution();
-            RegisterPageContribution("overview", "总览", "地图身份与整体状态", ESWorldWorkbenchModule.Overview, ESWorkbenchContributionCategory.General, window => window.DrawOverview, ESWorkbenchDirtyFlags.Authoring);
-            RegisterPageContribution("terrain", "地形", "Unity Terrain / 高度场", ESWorldWorkbenchModule.Terrain, ESWorkbenchContributionCategory.Terrain, window => window.DrawTerrain, ESWorkbenchDirtyFlags.Authoring);
-            RegisterPageContribution("materials", "地形材质层", "材质与地表规则", ESWorldWorkbenchModule.Material, ESWorkbenchContributionCategory.Material, window => window.DrawMaterialLayers, ESWorkbenchDirtyFlags.Authoring,
+            RegisterDocumentContribution("overview", "世界总览", "地图身份与整体状态", ESWorldWorkbenchModule.Overview,
+                ESWorkbenchContributionCategory.General, window => window.DrawOverview, ESWorkbenchDirtyFlags.Authoring);
+            RegisterModeContribution("terrain", "地形", "Unity Terrain / 高度场", ESWorldWorkbenchModule.Terrain,
+                ESWorkbenchContributionCategory.Terrain, new[] { "world.select", "world.terrain" },
+                new[] { ESWorkbenchContentKind.Brush, ESWorkbenchContentKind.Terrain }, "world.terrain",
+                window => window.DrawTerrain, 1000, true);
+            RegisterModeContribution("material", "材质", "材质与地表规则", ESWorldWorkbenchModule.Material,
+                ESWorkbenchContributionCategory.Material, new[] { "world.select", "world.terrain" },
+                new[] { ESWorkbenchContentKind.Material, ESWorkbenchContentKind.Terrain }, "world.select",
+                window => window.DrawMaterialLayers, 900, true,
                 (context, window) =>
                 {
                     if (window.mapAsset?.Definition?.materialLayers == null) return;
                     ESWorldMapMaterialLayer layer = window.FindMaterialLayer("material.grass");
                     if (layer != null) context.RegisterAssetSlot(ESWorldMapWorkbenchSlots.Material(window.GetResourceLibraryPath(), window.mapAsset.Definition.materialLayers.IndexOf(layer)));
                 });
-            RegisterPageContribution("vegetation", "植被 / 细节", "植被层与生物群落", ESWorldWorkbenchModule.Vegetation, ESWorkbenchContributionCategory.Vegetation, window => window.DrawVegetationLayers, ESWorkbenchDirtyFlags.Authoring,
+            RegisterModeContribution("vegetation", "植被", "植被层与生物群落", ESWorldWorkbenchModule.Vegetation,
+                ESWorkbenchContributionCategory.Vegetation, new[] { "world.select" },
+                new[] { ESWorkbenchContentKind.Vegetation }, "world.select", window => window.DrawVegetationLayers, 800, true,
                 (context, window) =>
                 {
                     if (window.mapAsset?.Definition?.vegetationLayers == null) return;
                     ESWorldMapVegetationLayer layer = window.FindVegetationLayer("vegetation.trees");
                     if (layer != null) context.RegisterAssetSlot(ESWorldMapWorkbenchSlots.Vegetation(window.GetResourceLibraryPath(), window.mapAsset.Definition.vegetationLayers.IndexOf(layer)));
                 });
-            RegisterPageContribution("prefabs", "Prefab 散布", "批量对象布局", ESWorldWorkbenchModule.Prefab, ESWorkbenchContributionCategory.Prefab, window => window.DrawPrefabLayers, ESWorkbenchDirtyFlags.Authoring,
+            RegisterModeContribution("prefab", "预制件", "批量对象布局", ESWorldWorkbenchModule.Prefab,
+                ESWorkbenchContributionCategory.Prefab, new[] { "world.select", "world.prefab" },
+                new[] { ESWorkbenchContentKind.Prefab }, "world.prefab", window => window.DrawPrefabLayers, 700, true,
                 (context, window) =>
                 {
                     if (window.mapAsset?.Definition?.scatterLayers == null) return;
                     ESWorldMapPrefabScatterLayer layer = window.FindScatterLayer("scatter.landmarks");
                     if (layer != null) context.RegisterAssetSlot(ESWorldMapWorkbenchSlots.Scatter(window.GetResourceLibraryPath(), window.mapAsset.Definition.scatterLayers.IndexOf(layer)));
                 });
-            RegisterPageContribution("navigation", "导航 / AI 烘焙", "可行走坡度与烘焙参数", ESWorldWorkbenchModule.Navigation, ESWorkbenchContributionCategory.Navigation, window => () => window.DrawObject("导航 / AI 烘焙", "navigation"), ESWorkbenchDirtyFlags.Authoring);
-            RegisterPageContribution("water-weather", "水体 / 天气", "环境与湿度", ESWorldWorkbenchModule.WaterWeather, ESWorkbenchContributionCategory.WaterWeather, window => () => window.DrawObject("水体 / 天气", "waterWeather"), ESWorkbenchDirtyFlags.Authoring);
-            RegisterPageContribution("streaming", "地形块流式", "区块半径与加载策略", ESWorldWorkbenchModule.Streaming, ESWorkbenchContributionCategory.Streaming, window => () => window.DrawObject("地形块流式", "streaming"), ESWorkbenchDirtyFlags.Authoring);
-            RegisterPageContribution("collision", "碰撞 / 物理", "碰撞器与物理材质", ESWorldWorkbenchModule.Collision, ESWorkbenchContributionCategory.Collision, window => () => window.DrawObject("碰撞 / 物理", "collision"), ESWorkbenchDirtyFlags.Authoring);
-            RegisterPageContribution("build-ugc", "构建 / UGC", "导出、预算和安全配额", ESWorldWorkbenchModule.UGC, ESWorkbenchContributionCategory.UGC, window => window.DrawBuildUgc, ESWorkbenchDirtyFlags.Build);
+            RegisterModeContribution("navigation", "导航", "可行走坡度与烘焙参数", ESWorldWorkbenchModule.Navigation,
+                ESWorkbenchContributionCategory.Navigation, new[] { "world.select" },
+                new[] { ESWorkbenchContentKind.Navigation }, "world.select",
+                window => () => window.DrawObject("导航 / AI 烘焙", "navigation"), 400);
+            RegisterModeContribution("water-weather", "水体/天气", "环境与湿度", ESWorldWorkbenchModule.WaterWeather,
+                ESWorkbenchContributionCategory.WaterWeather, new[] { "world.select" },
+                new[] { ESWorkbenchContentKind.WaterWeather }, "world.select",
+                window => () => window.DrawObject("水体 / 天气", "waterWeather"), 500);
+            RegisterModeContribution("streaming", "流式检查", "区块半径与加载策略", ESWorldWorkbenchModule.Streaming,
+                ESWorkbenchContributionCategory.Streaming, new[] { "world.select" },
+                new[] { ESWorkbenchContentKind.Streaming }, "world.select",
+                window => () => window.DrawObject("地形块流式", "streaming"), 200);
+            RegisterModeContribution("collision", "碰撞", "碰撞器与物理材质", ESWorldWorkbenchModule.Collision,
+                ESWorkbenchContributionCategory.Collision, new[] { "world.select" },
+                new[] { ESWorkbenchContentKind.Collision }, "world.select",
+                window => () => window.DrawObject("碰撞 / 物理", "collision"), 300);
+            RegisterDocumentContribution("production", "生产与发布", "导出、预算和安全配额",
+                ESWorldWorkbenchModule.UGC, ESWorkbenchContributionCategory.UGC,
+                window => window.DrawBuildUgc, ESWorkbenchDirtyFlags.Build);
         }
 
         private static void RegisterAuthoringContribution()
@@ -978,19 +1419,41 @@ namespace ES
                     {
                         ESWorldBuilderWorkbenchWindow window = context.Window as ESWorldBuilderWorkbenchWindow;
                         if (window == null) throw new InvalidOperationException("World 作者能力缺少窗口上下文。");
+                        context.RegisterDocument(new ESWorkbenchDocumentDefinition(
+                            "authoring", "世界创作", "持久世界视口与作者模式",
+                            true, ESWorkbenchDirtyFlags.Authoring));
+                        context.RegisterAuthoringMode(new ESWorkbenchAuthoringModeDefinition(
+                            "region", "区域", "区域模板、边界与玩法承载范围",
+                            new[] { "world.select", "world.region" },
+                            new[] { ESWorkbenchContentKind.RegionTemplate },
+                            "world.region", 600, true));
+                        context.RegisterAuthoringMode(new ESWorkbenchAuthoringModeDefinition(
+                            "poi", "POI", "兴趣点、出生点与玩法地标",
+                            new[] { "world.select", "world.poi" },
+                            new[] { ESWorkbenchContentKind.Gameplay },
+                            "world.poi", 550, true));
                         context.RegisterPresentation(new ESWorkbenchHostPresentationDescriptor(
                             "world.presentation",
                             "ES 世界工作台",
-                            "世界地图",
-                            "世界视图",
-                            "二维地图、三维世界与游戏构图视图",
-                            "世界检查器"));
+                             "世界地图",
+                             "世界视图",
+                             "二维地图、三维世界与游戏构图视图",
+                             "世界检查器",
+                             WorldLayoutPolicy,
+                             leftPanelTitle: "世界内容与层级",
+                             workspaceTitle: "世界作者场景",
+                             emptyState: new ESWorkbenchEmptyStateDescriptor(
+                                 "创建或打开一张世界地图",
+                                 "从空白作者资产开始，或打开内置商业验收样本检查内容库、层级、2D / 3D / 游戏构图、检查器与生产任务布局。",
+                                 "world.create-map",
+                                 "world.load-commercial-sample",
+                                 "此启动面不会创建 PreviewScene，也不会修改正式 Scene、TerrainData、导航或发布产物。")));
                         context.RegisterBottomPanel(new ESWorkbenchBottomPanelDescriptor(
-                            "world.status",
-                            "世界状态",
-                            _ => new ESWorkbenchBottomPanelContent(window.CreateWorldStatusPanel()),
-                            "当前世界草稿、事务与构建状态",
-                            450,
+                            "diagnostics",
+                            "诊断与验收",
+                            _ => new ESWorkbenchBottomPanelContent(window.CreateWorldDiagnosticsHub()),
+                            "世界状态、预览资源、事务证据和商业视觉验收",
+                            600,
                             _ => window.mapAsset != null));
                         window.RegisterWorldAuthoringCapabilities(context);
                         return null;
@@ -1015,9 +1478,9 @@ namespace ES
                 viewportContext => new ESWorldWorkbenchViewportAdapter(this, viewportContext, ESWorkbenchViewportKind.Scene3D),
                 "Terrain 与 Prefab 三维草稿视口", priority: 90));
             context.RegisterViewport(new ESWorkbenchViewportDescriptor(
-                "world.game", "游戏视图", ESWorkbenchViewportKind.Game,
+                "world.game", "游戏构图", ESWorkbenchViewportKind.Game,
                 viewportContext => new ESWorldWorkbenchViewportAdapter(this, viewportContext, ESWorkbenchViewportKind.Game),
-                "使用运行时透视构图检查世界草稿；该视图不写入作者数据", priority: 80));
+                "使用 PreviewScene 近似检查运行时透视构图；非 Unity Game View，不写入作者数据", priority: 80));
 
             RegisterWorldTools(context);
             RegisterWorldCommands(context);
@@ -1035,6 +1498,40 @@ namespace ES
                 1000));
         }
 
+        private VisualElement CreateWorldDiagnosticsHub()
+        {
+            var root = new VisualElement { name = "ESWorldDiagnosticsHub" };
+            root.style.flexGrow = 1f;
+            var tabs = new VisualElement { name = "ESWorldDiagnosticsTabs" };
+            tabs.style.flexDirection = FlexDirection.Row;
+            tabs.style.height = 30f;
+            tabs.style.flexShrink = 0f;
+            tabs.style.paddingLeft = 6f;
+            tabs.style.paddingRight = 6f;
+            var content = new VisualElement { name = "ESWorldDiagnosticsContent" };
+            content.style.flexGrow = 1f;
+            content.style.minHeight = 0f;
+            Action<Func<VisualElement>> show = factory =>
+            {
+                content.Clear();
+                VisualElement view = factory?.Invoke();
+                if (view != null) content.Add(view);
+            };
+            var status = new Button(() => show(CreateWorldStatusPanel)) { text = "世界状态" };
+            var resources = new Button(() => show(CreatePreviewResourcePanel)) { text = "预览资源" };
+            var acceptance = new Button(() => show(CreateAcceptancePanel)) { text = "商业验收" };
+            status.tooltip = "当前世界草稿、事务与构建状态";
+            resources.tooltip = "预览场景、相机、渲染纹理、临时对象与清理统计";
+            acceptance.tooltip = "Undo/Redo、多窗口冲突、视觉矩阵和预览长压证据";
+            tabs.Add(status);
+            tabs.Add(resources);
+            tabs.Add(acceptance);
+            root.Add(tabs);
+            root.Add(content);
+            show(CreateWorldStatusPanel);
+            return root;
+        }
+
         private VisualElement CreateWorldStatusPanel()
         {
             VisualElement root = new VisualElement();
@@ -1049,7 +1546,447 @@ namespace ES
             root.Add(new Label("世界地图：" + assetName));
             root.Add(new Label("作者事务：" + draftState));
             root.Add(new Label("构建状态：" + buildState));
+            if (editSession == null) return root;
+
+            editSession.RefreshExternalConflict();
+            ESWorldEditSessionConsistencySnapshot snapshot = editSession.CaptureConsistencySnapshot();
+            root.Add(new Label("活动窗口：" + snapshot.ActiveOwnerSessionIds.Count
+                + " · 当前 Owner " + AbbreviateIdentity(snapshot.OwnerSessionId)));
+            root.Add(new Label("变更集：" + snapshot.ChangeCount
+                + " · Draft " + AbbreviateHash(snapshot.DraftHash)
+                + " · Source " + AbbreviateHash(snapshot.CurrentSourceHash)));
+            Label consistency = new Label("一致性：" + snapshot.Summary);
+            consistency.style.color = snapshot.Passed
+                ? ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Ready)
+                : ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Error);
+            consistency.style.whiteSpace = WhiteSpace.Normal;
+            root.Add(consistency);
+
+            if (snapshot.HasExternalConflict)
+            {
+                Label conflict = new Label(
+                    "冲突：正式 Source 已由其他窗口或工具改变。当前策略拒绝后写，不执行自动合并；"
+                    + "冲突来源 " + AbbreviateIdentity(snapshot.ConflictOwnerSessionId)
+                    + "。请复制诊断检查差异，或明确放弃本窗口草稿后重载正式资产。");
+                conflict.style.whiteSpace = WhiteSpace.Normal;
+                conflict.style.color = ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Warning);
+                conflict.style.marginTop = 5f;
+                root.Add(conflict);
+            }
+
+            VisualElement actions = new VisualElement();
+            actions.style.flexDirection = FlexDirection.Row;
+            actions.style.flexWrap = Wrap.Wrap;
+            actions.style.marginTop = 6f;
+            Button copy = new Button(() =>
+            {
+                EditorGUIUtility.systemCopyBuffer = snapshot.ToDiagnosticText();
+                ESWorkbench_SetStatus("已复制世界会话一致性诊断。", MessageType.Info);
+            })
+            {
+                text = "复制诊断",
+                tooltip = "复制完整 Owner、Hash、ChangeSet、SessionState 和冲突一致性信息"
+            };
+            actions.Add(copy);
+            Button verify = new Button(VerifyWorldSessionConsistency)
+            {
+                text = "验证一致性",
+                tooltip = "重新计算 Draft Hash、ChangeSet、Dirty、SessionState 和外部 Source 冲突"
+            };
+            verify.style.marginLeft = 5f;
+            actions.Add(verify);
+            if (snapshot.HasExternalConflict || !snapshot.Passed)
+            {
+                Button reload = new Button(ReloadWorldFromSource)
+                {
+                    text = "重载正式资产",
+                    tooltip = "放弃当前窗口草稿并从正式 Source 建立新基线；有未提交变更时会再次确认"
+                };
+                reload.style.marginLeft = 5f;
+                actions.Add(reload);
+            }
+            root.Add(actions);
             return root;
+        }
+
+        private void VerifyWorldSessionConsistency()
+        {
+            if (editSession == null)
+            {
+                ESWorkbench_SetStatus("当前没有可验证的 World 编辑会话。", MessageType.Warning);
+                return;
+            }
+            editSession.RefreshExternalConflict();
+            ESWorldEditSessionConsistencySnapshot snapshot = editSession.CaptureConsistencySnapshot();
+            ESWorkbench_SetStatus(
+                "会话一致性：" + snapshot.Summary,
+                snapshot.Passed ? MessageType.Info : MessageType.Warning);
+            ESWorkbench_Actions?.Refresh(ESWorkbenchRefreshReason.Explicit);
+        }
+
+        private static string AbbreviateHash(string value)
+        {
+            return string.IsNullOrEmpty(value) ? "--" : value.Substring(0, Mathf.Min(10, value.Length));
+        }
+
+        private static string AbbreviateIdentity(string value)
+        {
+            return string.IsNullOrEmpty(value) ? "外部工具/未知窗口"
+                : value.Substring(0, Mathf.Min(8, value.Length));
+        }
+
+        private VisualElement CreatePreviewResourcePanel()
+        {
+            ESEditorPreviewDiagnosticsSnapshot snapshot =
+                ESEditorPreviewLifecycleHub.CaptureDiagnosticsSnapshot();
+            VisualElement root = new VisualElement();
+            root.style.paddingLeft = 10f;
+            root.style.paddingRight = 10f;
+            root.style.paddingTop = 8f;
+            root.style.paddingBottom = 8f;
+            Label summary = new Label(snapshot.ToSummary());
+            summary.style.unityFontStyleAndWeight = FontStyle.Bold;
+            summary.style.whiteSpace = WhiteSpace.Normal;
+            root.Add(summary);
+            root.Add(new Label("临时对象 " + snapshot.ActiveTemporaryObjectCount
+                + " · ResourceScope " + snapshot.ActiveResourceScopeCount
+                + " · 累计注册/释放 " + snapshot.TotalScopeRegistrations
+                + "/" + snapshot.TotalScopeReleases));
+            root.Add(new Label("清理运行 " + snapshot.CleanupRunCount
+                + " · 失败 " + snapshot.CleanupFailureCount
+                + " · 最近原因 " + (string.IsNullOrEmpty(snapshot.LastCleanupReason)
+                    ? "尚未执行全局清理" : snapshot.LastCleanupReason)));
+            Label boundary = new Label(
+                "这里是确定性生命周期与受控重复重建自检；它不替代 Unity Profiler、Memory Profiler、长时间驻留或目标硬件显存验收。");
+            boundary.style.whiteSpace = WhiteSpace.Normal;
+            boundary.style.color = ESEditorPresentation.SectionMutedTextColor;
+            boundary.style.marginTop = 4f;
+            root.Add(boundary);
+            if (!string.IsNullOrEmpty(previewStressResult))
+            {
+                Label result = new Label(previewStressResult);
+                result.style.whiteSpace = WhiteSpace.Normal;
+                result.style.marginTop = 5f;
+                result.style.color = previewStressResult.StartsWith("通过", StringComparison.Ordinal)
+                    ? ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Ready)
+                    : ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Error);
+                root.Add(result);
+            }
+            VisualElement actions = new VisualElement();
+            actions.style.flexDirection = FlexDirection.Row;
+            actions.style.flexWrap = Wrap.Wrap;
+            actions.style.marginTop = 6f;
+            actions.Add(new Button(() => ESWorkbench_Actions?.Refresh(ESWorkbenchRefreshReason.Explicit))
+            {
+                text = "刷新统计",
+                tooltip = "重新读取当前预览生命周期统计"
+            });
+            Button stress = new Button(RunWorldPreviewStressCheck)
+            {
+                text = "运行 24 次快速生命周期检查",
+                tooltip = "显式创建、重建、调整 RT 尺寸并释放一个隔离的 World 预览；快速检查不承担商业长压持续时间门禁"
+            };
+            stress.style.marginLeft = 5f;
+            actions.Add(stress);
+            Button longStress = new Button(RunWorldPreviewLongStressCheck)
+            {
+                text = "运行商业长压（至少 240 次 / 30 秒）",
+                tooltip = "在当前地图草稿上重复重建 PreviewScene、临时对象和 RT；次数与真实持续时间必须同时达标，并记录过程趋势"
+            };
+            longStress.style.marginLeft = 5f;
+            actions.Add(longStress);
+            Button copy = new Button(() =>
+            {
+                ESEditorPreviewDiagnosticsSnapshot current =
+                    ESEditorPreviewLifecycleHub.CaptureDiagnosticsSnapshot();
+                EditorGUIUtility.systemCopyBuffer = current.ToSummary()
+                    + "\nCleanupRuns=" + current.CleanupRunCount
+                    + "\nCleanupFailures=" + current.CleanupFailureCount
+                    + "\nLastCleanupReason=" + current.LastCleanupReason
+                    + "\nStress=" + previewStressResult;
+                ESWorkbench_SetStatus("已复制预览资源诊断。", MessageType.Info);
+            })
+            {
+                text = "复制诊断",
+                tooltip = "复制当前资源统计、清理信息和最近压力检查结果"
+            };
+            copy.style.marginLeft = 5f;
+            actions.Add(copy);
+            root.Add(actions);
+            return root;
+        }
+
+        private VisualElement CreateAcceptancePanel()
+        {
+            VisualElement root = new VisualElement();
+            root.style.paddingLeft = 10f;
+            root.style.paddingRight = 10f;
+            root.style.paddingTop = 8f;
+            root.style.paddingBottom = 8f;
+            Label title = new Label("World 专项商业验收");
+            title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            root.Add(title);
+            Label boundary = new Label(
+                "显式运行会验证当前会话一致性，并在隔离样本上执行真实 Undo/Redo、SessionState 恢复和双窗口拒写；"
+                + "同时只有在两个真实窗口同源冲突已观察到、当前窗口真实 TryCommit 被守卫拒绝、"
+                + "Source 未变且本地草稿保留时才允许签收；预览长压使用当前草稿。"
+                + "不会修改正式 Source，也不替代人工交互或 Unity Game View；商业长压必须同时达到至少 240 次和 30 秒，"
+                + "完成后会自动请求真实 Memory Profiler 快照。")
+            {
+                tooltip = "验收清单写入 Library/ESWorkbench/Acceptance/world，提供可重读 UTF-8 manifest。"
+            };
+            boundary.style.whiteSpace = WhiteSpace.Normal;
+            boundary.style.color = ESEditorPresentation.SectionMutedTextColor;
+            boundary.style.marginTop = 4f;
+            root.Add(boundary);
+
+            string currentSourcePath = ESWorkbench_Asset == null
+                ? string.Empty : AssetDatabase.GetAssetPath(ESWorkbench_Asset);
+            string currentSourceGuid = string.IsNullOrWhiteSpace(currentSourcePath)
+                ? string.Empty : AssetDatabase.AssetPathToGUID(currentSourcePath);
+            if (latestAcceptance.HasValue
+                && (!string.Equals(
+                        latestAcceptance.Value.SourceAssetGuid,
+                        currentSourceGuid,
+                        StringComparison.Ordinal)
+                    || !string.Equals(
+                        latestAcceptance.Value.AssemblyModuleVersionId,
+                        ESWorldWorkbenchAcceptance.CurrentAssemblyModuleVersionId,
+                        StringComparison.OrdinalIgnoreCase)))
+                latestAcceptance = null;
+            if (!latestAcceptance.HasValue
+                && ESWorldWorkbenchAcceptance.TryGetLatest(
+                    ESWorkbench_Asset,
+                    out ESWorldWorkbenchAcceptanceResult restored))
+                latestAcceptance = restored;
+            if (latestAcceptance.HasValue)
+            {
+                ESWorldWorkbenchAcceptanceResult latest = latestAcceptance.Value;
+                Label verdict = new Label(latest.Message);
+                verdict.style.whiteSpace = WhiteSpace.Normal;
+                verdict.style.marginTop = 6f;
+                verdict.style.color = latest.Accepted
+                    ? ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Ready)
+                    : latest.AutomatedChecksPassed
+                        ? ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Warning)
+                        : ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Error);
+                root.Add(verdict);
+                Label path = new Label(latest.ManifestPath)
+                {
+                    tooltip = latest.ManifestPath
+                };
+                path.style.whiteSpace = WhiteSpace.Normal;
+                path.style.marginTop = 3f;
+                path.style.color = ESEditorPresentation.SectionMutedTextColor;
+                root.Add(path);
+            }
+
+            VisualElement actions = new VisualElement();
+            actions.style.flexDirection = FlexDirection.Row;
+            actions.style.flexWrap = Wrap.Wrap;
+            actions.style.marginTop = 7f;
+            bool memoryProfilerSupported = ESWorldWorkbenchAcceptance
+                .IsMemoryProfilerCaptureSupported(out string memoryProfilerStatus);
+            Label memoryProfiler = new Label(memoryProfilerStatus);
+            memoryProfiler.style.whiteSpace = WhiteSpace.Normal;
+            memoryProfiler.style.marginTop = 6f;
+            memoryProfiler.style.color = memoryProfilerSupported
+                ? ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Ready)
+                : ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Warning);
+            root.Add(memoryProfiler);
+            actions.Add(new Button(() => RunWorldAcceptance(24))
+            {
+                text = "运行专项快速验收（24 次）",
+                tooltip = "运行会话、真实同源拒写与 24 次 PreviewScene/Camera/临时对象/RT 重建；不承担 30 秒商业长压门禁"
+            });
+            Button longRun = new Button(() => RunWorldAcceptance(
+                CommercialValidationPreviewIterations,
+                true,
+                CommercialValidationMinimumDurationSeconds))
+            {
+                text = "运行商业长压验收（至少 240 次 / 30 秒）",
+                tooltip = "运行完整专项并执行次数与持续时间双门禁的可取消预览长压；记录生命周期过程趋势并自动挂接真实 Memory Profiler 快照"
+            };
+            longRun.style.marginLeft = 5f;
+            actions.Add(longRun);
+            Button collaborationState = new Button(InspectCollaborationSessionState)
+            {
+                text = "检查协作状态",
+                tooltip = "检查当前唯一 World 工作台的受管会话、外部冲突与草稿状态；不会创建第二个同类型窗口"
+            };
+            collaborationState.SetEnabled(ESWorkbench_Asset != null);
+            collaborationState.style.marginLeft = 5f;
+            actions.Add(collaborationState);
+            if (latestAcceptance.HasValue)
+            {
+                ESWorldWorkbenchAcceptanceResult latest = latestAcceptance.Value;
+                Button open = new Button(() =>
+                {
+                    if (!ESWorldWorkbenchAcceptance.TryOpenManifest(latest.ManifestPath))
+                        ESWorkbench_SetStatus("验收清单未通过安全检查或已经不存在。", MessageType.Warning);
+                })
+                {
+                    text = "打开清单",
+                    tooltip = "用系统默认程序打开最近一次 UTF-8 验收清单"
+                };
+                open.style.marginLeft = 5f;
+                actions.Add(open);
+                Button directory = new Button(() =>
+                {
+                    if (!ESWorldWorkbenchAcceptance.TryRevealDirectory(latest.RunDirectory))
+                        ESWorkbench_SetStatus("验收目录未通过安全检查或已经不存在。", MessageType.Warning);
+                })
+                {
+                    text = "打开目录",
+                    tooltip = "在文件管理器中显示最近一次验收运行"
+                };
+                directory.style.marginLeft = 5f;
+                actions.Add(directory);
+                Button copy = new Button(() =>
+                {
+                    EditorGUIUtility.systemCopyBuffer = latest.ManifestPath;
+                    ESWorkbench_SetStatus("已复制验收清单绝对路径。", MessageType.Info);
+                })
+                {
+                    text = "复制路径",
+                    tooltip = "复制最近一次验收清单的绝对路径"
+                };
+                copy.style.marginLeft = 5f;
+                actions.Add(copy);
+                Button snapshot = new Button(() => CaptureWorldMemoryProfilerSnapshot(latest))
+                {
+                    text = "采集 Memory 快照",
+                    tooltip = memoryProfilerSupported
+                        ? "生成真实 .snap 并挂接到最近一次验收清单"
+                        : "当前项目没有可用的 Memory Profiler 快照 API"
+                };
+                snapshot.SetEnabled(memoryProfilerSupported);
+                snapshot.style.marginLeft = 5f;
+                actions.Add(snapshot);
+            }
+            root.Add(actions);
+            return root;
+        }
+
+        private void RunWorldAcceptance(
+            int previewIterations,
+            bool captureMemoryProfilerSnapshot = false,
+            double previewMinimumDurationSeconds = 0d)
+        {
+            if (mapAsset == null || editSession == null)
+            {
+                ESWorkbench_SetStatus("未绑定 World 编辑会话，无法运行专项验收。", MessageType.Warning);
+                return;
+            }
+
+            string taskId = "world.acceptance." + previewIterations;
+            ESWorkbench_RecordTask(
+                taskId,
+                "Running",
+                "正在运行 World 会话、冲突和预览长压专项验收。",
+                AssetDatabase.GetAssetPath(editSession.Source));
+            ESWorldWorkbenchAcceptanceResult result =
+                ESWorldWorkbenchAcceptance.Execute(
+                    mapAsset,
+                    editSession,
+                    WorldLayoutPolicy.CreateCommercialVisualMatrix(),
+                    previewIterations,
+                    true,
+                    previewMinimumDurationSeconds);
+            latestAcceptance = result;
+            string status = result.Cancelled ? "Cancelled"
+                : result.Success && result.AutomatedChecksPassed ? "Succeeded"
+                : "Failed";
+            ESWorkbench_RecordTask(
+                taskId,
+                status,
+                result.Message,
+                result.ManifestPath);
+            ESWorkbench_RecordLog(
+                "World 专项验收：" + result.Message,
+                result.AutomatedChecksPassed ? MessageType.Info : MessageType.Warning);
+            ESWorkbench_SetStatus(
+                result.Message,
+                result.Accepted ? MessageType.Info
+                    : result.AutomatedChecksPassed ? MessageType.Warning : MessageType.Error);
+            ESWorkbench_Actions?.Refresh(ESWorkbenchRefreshReason.Explicit);
+            if (captureMemoryProfilerSnapshot
+                && result.Success
+                && result.AutomatedChecksPassed
+                && !result.Cancelled)
+                CaptureWorldMemoryProfilerSnapshot(result);
+        }
+
+        private void CaptureWorldMemoryProfilerSnapshot(
+            ESWorldWorkbenchAcceptanceResult acceptance)
+        {
+            const string taskId = "world.acceptance.memory-profiler";
+            ESWorkbench_RecordTask(
+                taskId,
+                "Running",
+                "正在采集 World Memory Profiler 快照。",
+                acceptance.ManifestPath);
+            ESWorkbench_SetStatus("正在启动 Memory Profiler 快照，请等待完成回调。", MessageType.Info);
+            bool started = ESWorldWorkbenchAcceptance.TryCaptureMemoryProfilerSnapshot(
+                acceptance,
+                (success, message, updated) =>
+                {
+                    latestAcceptance = updated;
+                    ESWorkbench_RecordTask(
+                        taskId,
+                        success ? "Succeeded" : "Failed",
+                        message,
+                        success ? updated.RunDirectory : updated.ManifestPath);
+                    ESWorkbench_RecordLog(message, success ? MessageType.Info : MessageType.Warning);
+                    ESWorkbench_SetStatus(message, success ? MessageType.Info : MessageType.Warning);
+                    ESWorkbench_Actions?.Refresh(ESWorkbenchRefreshReason.Explicit);
+                });
+            if (!started)
+            {
+                ESWorkbench_RecordTask(
+                    taskId,
+                    "Failed",
+                    "Memory Profiler 快照未能启动。",
+                    acceptance.ManifestPath);
+                ESWorkbench_Actions?.Refresh(ESWorkbenchRefreshReason.Explicit);
+            }
+        }
+
+        private void RunWorldPreviewStressCheck()
+        {
+            RunWorldPreviewStressCheck(24);
+        }
+
+        private void RunWorldPreviewLongStressCheck()
+        {
+            RunWorldPreviewStressCheck(
+                CommercialValidationPreviewIterations,
+                CommercialValidationMinimumDurationSeconds);
+        }
+
+        private void RunWorldPreviewStressCheck(
+            int iterations,
+            double minimumDurationSeconds = 0d)
+        {
+            ESWorldAcceptancePreviewEvidence evidence =
+                ESWorldWorkbenchAcceptance.RunPreviewStress(
+                    mapAsset,
+                    iterations,
+                    true,
+                    minimumDurationSeconds);
+            previewStressResult = (evidence.passed ? "通过" : evidence.cancelled ? "已取消" : "失败")
+                + " · " + evidence.summary
+                + " · 趋势 " + (evidence.lifecycleTrendStable ? "稳定" : "异常")
+                + " · Scope " + evidence.activeScopeDelta
+                + " · 临时对象 " + evidence.activeTemporaryObjectDelta
+                + " · RT 字节差 " + evidence.estimatedRenderTextureByteDelta.ToString("N0")
+                + " · 峰值 " + evidence.peakEstimatedRenderTextureBytes.ToString("N0") + " B"
+                + " · Memory Profiler 未采集";
+            ESWorkbench_SetStatus(
+                previewStressResult,
+                previewStressResult.StartsWith("通过", StringComparison.Ordinal)
+                    ? MessageType.Info : MessageType.Error);
+            ESWorkbench_Actions?.Refresh(ESWorkbenchRefreshReason.Explicit);
         }
 
         private static string GetBuildStageDisplayName(BuildStage stage)
@@ -1067,11 +2004,16 @@ namespace ES
 
         private void RegisterWorldTools(ESWorkbenchContributionContext context)
         {
-            context.RegisterTool(CreateWorldTool("world.select", "选择", ESWorldAuthoringTool.Select, KeyCode.Q, 500));
-            context.RegisterTool(CreateWorldTool("world.terrain", "地形笔刷", ESWorldAuthoringTool.Terrain, KeyCode.W, 490));
-            context.RegisterTool(CreateWorldTool("world.region", "区域", ESWorldAuthoringTool.Region, KeyCode.E, 480));
-            context.RegisterTool(CreateWorldTool("world.poi", "POI", ESWorldAuthoringTool.Poi, KeyCode.R, 470));
-            context.RegisterTool(CreateWorldTool("world.prefab", "Prefab 放置", ESWorldAuthoringTool.Prefab, KeyCode.T, 460));
+            context.RegisterTool(CreateWorldTool(
+                "world.select", "选择", ESWorldAuthoringTool.Select, KeyCode.Q, 500, "d_ViewToolMove"));
+            context.RegisterTool(CreateWorldTool(
+                "world.terrain", "地形笔刷", ESWorldAuthoringTool.Terrain, KeyCode.W, 490, "Terrain Icon"));
+            context.RegisterTool(CreateWorldTool(
+                "world.region", "区域", ESWorldAuthoringTool.Region, KeyCode.E, 480, "RectTool"));
+            context.RegisterTool(CreateWorldTool(
+                "world.poi", "POI", ESWorldAuthoringTool.Poi, KeyCode.R, 470, "d_SceneViewOrtho"));
+            context.RegisterTool(CreateWorldTool(
+                "world.prefab", "预制件放置", ESWorldAuthoringTool.Prefab, KeyCode.T, 460, "Prefab Icon"));
         }
 
         private ESWorkbenchToolDescriptor CreateWorldTool(
@@ -1079,50 +2021,116 @@ namespace ES
             string title,
             ESWorldAuthoringTool tool,
             KeyCode shortcut,
-            int priority)
+            int priority,
+            string unityIconName)
         {
             return new ESWorkbenchToolDescriptor(id, title, actions =>
             {
                 authoringTool = tool;
                 actions.SetStatus("当前世界工具：" + title, MessageType.Info);
-            }, title, priority: priority, isAvailable: _ => mapAsset != null,
-                shortcut: new ESWorkbenchShortcut(shortcut));
+            }, title,
+                icon: EditorGUIUtility.IconContent(unityIconName).image,
+                priority: priority,
+                isAvailable: _ => mapAsset != null,
+                shortcut: new ESWorkbenchShortcut(shortcut),
+                capabilities: tool == ESWorldAuthoringTool.Terrain
+                    ? ESWorkbenchToolCapabilities.Paint
+                    : tool == ESWorldAuthoringTool.Select
+                        ? ESWorkbenchToolCapabilities.Select | ESWorkbenchToolCapabilities.Move
+                    : tool == ESWorldAuthoringTool.Prefab
+                        ? ESWorkbenchToolCapabilities.Select | ESWorkbenchToolCapabilities.Move
+                            | ESWorkbenchToolCapabilities.GroundAction
+                    : tool == ESWorldAuthoringTool.Region || tool == ESWorldAuthoringTool.Poi
+                        ? ESWorkbenchToolCapabilities.Select | ESWorkbenchToolCapabilities.Move
+                            | ESWorkbenchToolCapabilities.GroundAction
+                        : ESWorkbenchToolCapabilities.None);
         }
 
         private void RegisterWorldCommands(ESWorkbenchContributionContext context)
         {
             context.RegisterCommand(new ESWorkbenchCommandDescriptor(
+                "world.create-map", "创建世界地图", _ => CreateAsset(),
+                "创建新的 ESWorldMapAsset 作者资产；不会创建正式 Scene 或 TerrainData。",
+                priority: 1000,
+                canExecute: _ => mapAsset == null,
+                showInToolbar: false,
+                role: ESWorkbenchCommandRole.Primary,
+                visibility: ESWorkbenchCommandVisibility.Pinned,
+                unityIconName: "CreateAddNew"));
+            context.RegisterCommand(new ESWorkbenchCommandDescriptor(
+                "world.initialize-defaults", "填充安全默认值", _ => InitializeDefaults(),
+                "为当前世界草稿填充安全默认参数，不注入商业样例内容。",
+                priority: 990,
+                canExecute: _ => mapAsset != null,
+                showInToolbar: false,
+                role: ESWorkbenchCommandRole.Authoring,
+                unityIconName: "Settings"));
+            context.RegisterCommand(new ESWorkbenchCommandDescriptor(
+                "world.load-commercial-sample", "打开商业验收样本",
+                _ => OpenCommercialValidationSample(),
+                "创建或刷新项目内固定验收样本并在当前单实例工作台中打开。",
+                priority: 980,
+                showInToolbar: false,
+                role: ESWorkbenchCommandRole.Validation,
+                visibility: ESWorkbenchCommandVisibility.Pinned,
+                unityIconName: "SceneAsset Icon"));
+            context.RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "world.validate", "验证", _ => ValidateMap(), "验证当前世界草稿",
-                EditorGUIUtility.IconContent("d_TestPassed").image, 500,
-                new ESWorkbenchShortcut(KeyCode.V, EventModifiers.Control),
-                _ => mapAsset != null));
+                priority: 500,
+                shortcut: new ESWorkbenchShortcut(KeyCode.V, EventModifiers.Control),
+                canExecute: _ => mapAsset != null,
+                role: ESWorkbenchCommandRole.Validation,
+                visibility: ESWorkbenchCommandVisibility.Pinned,
+                unityIconName: "TestPassed"));
             context.RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "world.reload-source", "重载正式资产", _ => ReloadWorldFromSource(),
                 "放弃当前草稿并从正式地图建立新基线",
-                EditorGUIUtility.IconContent("d_Refresh").image, 495,
-                canExecute: _ => editSession != null));
+                priority: 495,
+                canExecute: _ => editSession != null,
+                role: ESWorkbenchCommandRole.Dangerous,
+                unityIconName: "d_Refresh"));
+            context.RegisterCommand(new ESWorkbenchCommandDescriptor(
+                "world.inspect-collaboration-state", "检查协作状态", _ => InspectCollaborationSessionState(),
+                "检查当前工作台的受管会话、外部冲突与草稿状态",
+                priority: 492,
+                canExecute: _ => ESWorkbench_Asset != null,
+                role: ESWorkbenchCommandRole.Validation,
+                unityIconName: "d_UnityEditor.InspectorWindow"));
             context.RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "world.revert", "回退草稿", _ => RevertWorldDraft(), "回退到当前编辑会话基线",
-                EditorGUIUtility.IconContent("d_Refresh").image, 490,
+                priority: 490,
                 canExecute: _ => editSession != null && editSession.IsDirty
-                    && !ESWorkbench_IsHierarchyLocked("world.map")));
+                    && !ESWorkbench_IsHierarchyLocked("world.map"),
+                role: ESWorkbenchCommandRole.Dangerous,
+                unityIconName: "d_Refresh"));
             context.RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "world.brush", "笔刷", actions => OpenBrushPopup(actions), "设置世界地形笔刷参数",
-                EditorGUIUtility.IconContent("d_TerrainInspector.TerrainToolSculpt").image, 480,
-                canExecute: _ => mapAsset != null));
+                priority: 480,
+                canExecute: _ => mapAsset != null,
+                role: ESWorkbenchCommandRole.Authoring,
+                unityIconName: "Terrain Icon"));
             context.RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "world.build-preflight", "构建预检", _ => PreviewBake(), "验证构建输入并生成可提交的 Bake 请求",
-                EditorGUIUtility.IconContent("d_PreMatCube").image, 470,
-                canExecute: _ => mapAsset != null));
+                priority: 470,
+                canExecute: _ => mapAsset != null,
+                role: ESWorkbenchCommandRole.Build,
+                unityIconName: "d_PreMatCube"));
             context.RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "world.build", "构建", _ => CommitBake(), "提交已经通过预检的 World Bake 请求",
-                EditorGUIUtility.IconContent("d_BuildSettings.Editor.Small").image, 460,
-                canExecute: _ => mapAsset != null && !string.IsNullOrEmpty(bakeRequestId)));
+                priority: 460,
+                canExecute: _ => mapAsset != null && !string.IsNullOrEmpty(bakeRequestId),
+                role: ESWorkbenchCommandRole.Build,
+                unityIconName: "BuildSettings.Editor.Small"));
             context.RegisterCommand(new ESWorkbenchCommandDescriptor(
-                "world.formal-output", "正式输出", _ => BuildFormalWorldOutputs(),
-                "生成带事务保护的 TerrainData、Scene、碰撞和 NavMeshData",
-                EditorGUIUtility.IconContent("d_SceneAsset Icon").image, 450,
-                canExecute: _ => mapAsset != null));
+                "world.formal-output", "正式输出（另行推进）",
+                _ => ESWorkbench_SetStatus(
+                    "正式 TerrainData、Scene、碰撞、导航与发布输出不属于本轮工作台强化范围，事务门禁保持关闭。",
+                    MessageType.Warning),
+                "本轮只完善作者工作台；正式 TerrainData、Scene、导航与发布事务另行验收后开放。",
+                priority: 450,
+                canExecute: _ => false,
+                role: ESWorkbenchCommandRole.Dangerous,
+                unityIconName: "d_SceneAsset Icon"));
         }
 
         private void BuildFormalWorldOutputs()
@@ -1180,6 +2188,23 @@ namespace ES
             }
         }
 
+        private void InspectCollaborationSessionState()
+        {
+            ESWorldMapAsset source = ESWorkbench_Asset;
+            if (source == null)
+            {
+                ESWorkbench_SetStatus("未绑定正式 World Source，无法检查协作状态。", MessageType.Warning);
+                return;
+            }
+            bool conflict = editSession != null && editSession.RefreshExternalConflict();
+            int activeSessions = ESWorldEditSession.GetActiveSessionCount(source);
+            ESWorkbench_SetStatus(
+                "协作状态：活动会话 " + activeSessions
+                + " 个，外部冲突 " + (conflict ? "已检测" : "无")
+                + "，当前草稿 " + (editSession?.IsDirty == true ? "有未提交变更" : "干净") + "。",
+                conflict ? MessageType.Warning : MessageType.Info);
+        }
+
         private static string ResolveSafeFileName(string value)
         {
             string source = string.IsNullOrWhiteSpace(value) ? "World" : value.Trim();
@@ -1208,33 +2233,382 @@ namespace ES
                 _ => editSession?.Draft?.Definition != null,
                 canRotate: IsWorldPrefabSelection,
                 rotate: RotateWorldSelectionMutation,
-                canScale: IsWorldPrefabSelection,
+                canScale: IsWorldScalableSelection,
                 scale: ScaleWorldSelectionMutation);
         }
 
         private IEnumerable<ESWorkbenchObjectDescriptor> QueryWorldPalette()
         {
+            for (int i = 0; i < WorldBrushTemplates.Length; i++)
+            {
+                WorldBrushPaletteTemplate brush = WorldBrushTemplates[i];
+                yield return new ESWorkbenchObjectDescriptor(
+                    "world.brush." + brush.Id,
+                    brush.DisplayName,
+                    "地形塑形",
+                    null,
+                    brush,
+                    tooltip: brush.Description,
+                    priority: 420 - i,
+                    subtitle: GetBrushTemplateSubtitle(brush),
+                    badge: "拖入绘制",
+                    contentKind: ESWorkbenchContentKind.Brush,
+                    dragMode: ESWorkbenchContentDragMode.ActivateTool,
+                    selectionKind: "world.content.brush",
+                    presets: CreateBrushPresets(brush));
+            }
+
+            for (int i = 0; i < WorldRegionTemplates.Length; i++)
+            {
+                WorldRegionPaletteTemplate region = WorldRegionTemplates[i];
+                yield return new ESWorkbenchObjectDescriptor(
+                    "world.region-template." + region.Id,
+                    region.DisplayName,
+                    "区域模板",
+                    null,
+                    region,
+                    tooltip: region.Description,
+                    priority: 380 - i,
+                    subtitle: region.Size.x.ToString("0.#") + " × " + region.Size.y.ToString("0.#") + " 米",
+                    badge: "拖入创建",
+                    contentKind: ESWorkbenchContentKind.RegionTemplate,
+                    dragMode: ESWorkbenchContentDragMode.CreateRegion,
+                    selectionKind: "world.content.region",
+                    presets: CreateRegionPresets(region));
+            }
+
             IReadOnlyList<ESAssetPage> pages = ESAssetRegistry.Pages;
             for (int i = 0; i < pages.Count; i++)
             {
                 ESAssetPage page = pages[i];
-                if (!(page?.OB is GameObject prefab) || !PrefabUtility.IsPartOfPrefabAsset(prefab)) continue;
+                if (page?.OB == null) continue;
                 string key = page.EffectiveStringKey;
                 if (string.IsNullOrWhiteSpace(key)) key = page.AssetGuid;
                 if (string.IsNullOrWhiteSpace(key)) continue;
                 string category = string.IsNullOrWhiteSpace(page.SourceBook) ? page.Kind.ToString() : page.SourceBook;
-                yield return new ESWorkbenchObjectDescriptor(
-                    "world.asset." + key,
-                    page.OB.name,
-                    ResolveWorldAssetCategory(page, category),
-                    page.OB,
-                    page,
-                    AssetPreview.GetAssetPreview(page.OB) ?? AssetPreview.GetMiniThumbnail(page.OB),
-                    key,
-                    100,
-                    AssetDatabase.GetAssetPath(page.OB),
-                    "Prefab");
+                if (page.OB is GameObject prefab && PrefabUtility.IsPartOfPrefabAsset(prefab))
+                {
+                    yield return new ESWorkbenchObjectDescriptor(
+                        "world.asset." + key,
+                        page.OB.name,
+                        ResolveWorldAssetCategory(page, category),
+                        page.OB,
+                        page,
+                        null,
+                        key,
+                        200,
+                        AssetDatabase.GetAssetPath(page.OB),
+                        "预制件",
+                        ESWorkbenchContentKind.Prefab,
+                        ESWorkbenchContentDragMode.Place,
+                        "world.content.prefab");
+                }
+                else if (page.OB is SceneAsset)
+                {
+                    yield return new ESWorkbenchObjectDescriptor(
+                        "world.scene-template." + key,
+                        page.OB.name,
+                        "注册场景",
+                        page.OB,
+                        page,
+                        null,
+                        "拖入后将当前地图来源切换为该注册场景；不会直接打开或改写正式 Scene。",
+                        260,
+                        AssetDatabase.GetAssetPath(page.OB),
+                        "场景模板",
+                        ESWorkbenchContentKind.SceneTemplate,
+                        ESWorkbenchContentDragMode.ApplyTemplate,
+                        "world.content.scene");
+                }
             }
+        }
+
+        private static IReadOnlyList<ESWorkbenchContentPresetDescriptor> CreateBrushPresets(
+            WorldBrushPaletteTemplate brush)
+        {
+            if (brush.Mode != ESWorldTerrainBrushMode.Flatten)
+            {
+                float standard = brush.Strength < 0f ? 0.5f : brush.Strength;
+                return new[]
+                {
+                    CreateBrushStrengthPreset(brush, "gentle", "轻柔", Mathf.Clamp01(standard * 0.55f)),
+                    CreateBrushStrengthPreset(brush, "standard", "标准", standard),
+                    CreateBrushStrengthPreset(brush, "strong", "强力", Mathf.Clamp01(standard * 1.55f))
+                };
+            }
+            float lower = Mathf.Clamp01(brush.NormalizedHeight - 0.12f);
+            float higher = Mathf.Clamp01(brush.NormalizedHeight + 0.12f);
+            return new[]
+            {
+                new ESWorkbenchContentPresetDescriptor(
+                    "lower",
+                    "较低目标",
+                    "在当前笔刷语义下使用更低的目标高度。",
+                    new WorldBrushPaletteTemplate(
+                        brush.Id + ".lower", brush.DisplayName + " · 较低目标", lower, brush.Description, brush.Mode, brush.Strength),
+                    overridePayload: true,
+                    subtitle: "目标高度 " + Mathf.RoundToInt(lower * 100f) + "%",
+                    badge: "较低"),
+                new ESWorkbenchContentPresetDescriptor(
+                    "standard",
+                    "标准目标",
+                    "使用模板定义的标准目标高度。",
+                    brush,
+                    overridePayload: true,
+                    subtitle: "目标高度 " + Mathf.RoundToInt(brush.NormalizedHeight * 100f) + "%",
+                    badge: "标准"),
+                new ESWorkbenchContentPresetDescriptor(
+                    "higher",
+                    "较高目标",
+                    "在当前笔刷语义下使用更高的目标高度。",
+                    new WorldBrushPaletteTemplate(
+                        brush.Id + ".higher", brush.DisplayName + " · 较高目标", higher, brush.Description, brush.Mode, brush.Strength),
+                    overridePayload: true,
+                    subtitle: "目标高度 " + Mathf.RoundToInt(higher * 100f) + "%",
+                    badge: "较高")
+            };
+        }
+
+        private static ESWorkbenchContentPresetDescriptor CreateBrushStrengthPreset(
+            WorldBrushPaletteTemplate brush,
+            string presetId,
+            string displayName,
+            float strength)
+        {
+            int percent = Mathf.RoundToInt(strength * 100f);
+            return new ESWorkbenchContentPresetDescriptor(
+                presetId,
+                displayName + "强度",
+                "使用" + displayName + "强度执行" + GetTerrainBrushModeDisplayName(brush.Mode) + "笔划。",
+                new WorldBrushPaletteTemplate(
+                    brush.Id + "." + presetId,
+                    brush.DisplayName + " · " + displayName,
+                    brush.NormalizedHeight,
+                    brush.Description,
+                    brush.Mode,
+                    strength),
+                overridePayload: true,
+                subtitle: "强度 " + percent + "%",
+                badge: displayName);
+        }
+
+        private static string GetBrushTemplateSubtitle(WorldBrushPaletteTemplate brush)
+        {
+            if (brush.Mode == ESWorldTerrainBrushMode.Flatten)
+                return "平整 · 目标高度 " + Mathf.RoundToInt(brush.NormalizedHeight * 100f) + "%";
+            float strength = brush.Strength < 0f ? 0.5f : brush.Strength;
+            return GetTerrainBrushModeDisplayName(brush.Mode) + " · 强度 "
+                + Mathf.RoundToInt(strength * 100f) + "%";
+        }
+
+        private static IReadOnlyList<ESWorkbenchContentPresetDescriptor> CreateRegionPresets(
+            WorldRegionPaletteTemplate region)
+        {
+            return new[]
+            {
+                CreateRegionSizePreset(region, "small", "小型", 0.65f),
+                CreateRegionSizePreset(region, "standard", "标准", 1f),
+                CreateRegionSizePreset(region, "large", "大型", 1.5f)
+            };
+        }
+
+        private static ESWorkbenchContentPresetDescriptor CreateRegionSizePreset(
+            WorldRegionPaletteTemplate region,
+            string presetId,
+            string displayName,
+            float scale)
+        {
+            Vector2 size = region.Size * scale;
+            return new ESWorkbenchContentPresetDescriptor(
+                presetId,
+                displayName,
+                "以“" + displayName + "”尺寸创建该区域模板。",
+                new WorldRegionPaletteTemplate(
+                    region.Id + "." + presetId,
+                    region.DisplayName + " · " + displayName,
+                    region.Category,
+                    size,
+                    region.Description),
+                overridePayload: true,
+                subtitle: size.x.ToString("0.#") + " × " + size.y.ToString("0.#") + " 米",
+                badge: displayName);
+        }
+
+        internal IReadOnlyList<ESWorkbenchObjectDescriptor> QueryWorldPaletteForTest()
+        {
+            return QueryWorldPalette().ToArray();
+        }
+
+        internal bool CanUsePaletteItem(ESWorkbenchObjectDescriptor item, out string reason)
+        {
+            reason = string.Empty;
+            if (item == null)
+            {
+                reason = "没有可用的世界内容。";
+                return false;
+            }
+            if (editSession?.Draft?.Definition == null)
+            {
+                reason = "请先选择或创建世界地图，建立作者草稿后再使用内容。";
+                return false;
+            }
+            if (ESWorkbench_IsHierarchyLocked("world.map"))
+            {
+                reason = "世界根节点已锁定，不能修改当前草稿。";
+                return false;
+            }
+            switch (item.DragMode)
+            {
+                case ESWorkbenchContentDragMode.Place:
+                    if (!(item.Source is GameObject prefab) || !PrefabUtility.IsPartOfPrefabAsset(prefab))
+                    {
+                        reason = "放置内容必须是 Project 中已注册的 Prefab。";
+                        return false;
+                    }
+                    if (!(item.Payload is ESAssetPage prefabPage)
+                        || string.IsNullOrWhiteSpace(prefabPage.EffectiveStringKey))
+                    {
+                        reason = "预制件内容缺少有效的注册页或稳定资源 Key。";
+                        return false;
+                    }
+                    if (ESWorkbench_Actions?.Authoring?.CanCreate(item) != true)
+                    {
+                        reason = "当前作者适配器不接受该预制件。";
+                        return false;
+                    }
+                    return true;
+                case ESWorkbenchContentDragMode.ActivateTool:
+                    if (!(item.Payload is WorldBrushPaletteTemplate))
+                    {
+                        reason = "笔刷内容缺少有效的世界笔刷模板。";
+                        return false;
+                    }
+                    return true;
+                case ESWorkbenchContentDragMode.CreateRegion:
+                    if (!(item.Payload is WorldRegionPaletteTemplate))
+                    {
+                        reason = "区域内容缺少有效的区域模板。";
+                        return false;
+                    }
+                    return true;
+                case ESWorkbenchContentDragMode.ApplyTemplate:
+                    if (!(item.Source is SceneAsset sceneAsset))
+                    {
+                        reason = "场景模板必须来自已注册的 Unity Scene 资产。";
+                        return false;
+                    }
+                    if (!(item.Payload is ESAssetPage scenePage)
+                        || string.IsNullOrWhiteSpace(scenePage.EffectiveStringKey))
+                    {
+                        reason = "场景内容缺少有效的注册页或稳定资源 Key。";
+                        return false;
+                    }
+                    return true;
+                default:
+                    reason = "该内容当前仅支持查看，不能拖入作者视口。";
+                    return false;
+            }
+        }
+
+        internal Vector3 ResolvePalettePreviewSize(ESWorkbenchObjectDescriptor item)
+        {
+            ESWorldMapDefinition definition = editSession?.Draft?.Definition;
+            if (item?.Payload is WorldRegionPaletteTemplate region)
+                return new Vector3(
+                    Mathf.Max(0.1f, region.Size.x),
+                    Mathf.Max(1f, definition?.terrainHeightScale * 0.04f ?? 1f),
+                    Mathf.Max(0.1f, region.Size.y));
+            if (item?.ContentKind == ESWorkbenchContentKind.Brush)
+            {
+                float diameter = GetTerrainBrushRadius() * 2f;
+                return new Vector3(diameter, 0.2f, diameter);
+            }
+            if (item?.ContentKind == ESWorkbenchContentKind.SceneTemplate && definition != null)
+                return new Vector3(
+                    Mathf.Max(1f, definition.worldMax.x - definition.worldMin.x),
+                    Mathf.Max(1f, definition.terrainHeightScale),
+                    Mathf.Max(1f, definition.worldMax.y - definition.worldMin.y));
+            return Vector3.one * 2f;
+        }
+
+        internal bool TryUsePaletteItem(ESWorkbenchObjectDescriptor item, Vector3 worldPoint, out string message)
+        {
+            if (!CanUsePaletteItem(item, out message)) return false;
+            activeWorldContentId = item.BaseObjectId;
+            activeWorldContentPresetId = item.PresetId;
+            switch (item.DragMode)
+            {
+                case ESWorkbenchContentDragMode.Place:
+                    authoringTool = ESWorldAuthoringTool.Prefab;
+                    ESWorkbench_Actions?.Tools?.Activate("world.prefab");
+                    return ESWorkbench_Actions.Authoring.TryCreate(item, worldPoint, out message);
+                case ESWorkbenchContentDragMode.ActivateTool:
+                    WorldBrushPaletteTemplate brush = (WorldBrushPaletteTemplate)item.Payload;
+                    authoringBrushHeight = brush.NormalizedHeight;
+                    authoringBrushMode = brush.Mode;
+                    if (brush.Strength >= 0f) authoringBrushStrength = brush.Strength;
+                    // 卡片拖入是一次性笔刷操作，不应夺走当前区域/对象移动工具。
+                    // 连续笔划测试和视口内笔刷仍由已激活的 world.terrain 工具驱动。
+                    if (terrainStrokeSessionOpen)
+                    {
+                        authoringTool = ESWorldAuthoringTool.Terrain;
+                        ESWorkbench_Actions?.Tools?.Activate("world.terrain");
+                        return TryPaintWorldHeight(worldPoint, out message);
+                    }
+                    ESWorldAuthoringTool previousTool = authoringTool;
+                    string previousToolId = ESWorkbench_Actions?.Tools?.ActiveToolId ?? string.Empty;
+                    bool painted = TryPaintWorldHeight(worldPoint, out message);
+                    authoringTool = previousTool;
+                    if (ESWorkbench_Actions?.Tools != null)
+                    {
+                        if (string.IsNullOrWhiteSpace(previousToolId)) ESWorkbench_Actions.Tools.Clear();
+                        else ESWorkbench_Actions.Tools.Activate(previousToolId);
+                    }
+                    return painted;
+                case ESWorkbenchContentDragMode.CreateRegion:
+                    authoringTool = ESWorldAuthoringTool.Region;
+                    ESWorkbench_Actions?.Tools?.Activate("world.region");
+                    return TryAddWorldRegion(worldPoint, (WorldRegionPaletteTemplate)item.Payload, out message);
+                case ESWorkbenchContentDragMode.ApplyTemplate:
+                    return TryApplyWorldSceneTemplate(item, out message);
+                default:
+                    message = "该内容没有可执行的作者动作。";
+                    return false;
+            }
+        }
+
+        private bool TryApplyWorldSceneTemplate(ESWorkbenchObjectDescriptor item, out string message)
+        {
+            if (!(item?.Source is SceneAsset sceneAsset))
+            {
+                message = "场景模板资产已经失效。";
+                return false;
+            }
+            if (!ESWorkbenchContentRegistration.TryResolveRegisteredAsset(
+                    sceneAsset,
+                    ESAssetReferKind.Scene,
+                    out ESAssetPage page,
+                    out string error))
+            {
+                message = error;
+                return false;
+            }
+            string key = page.EffectiveStringKey;
+            if (string.IsNullOrWhiteSpace(key)) key = page.AssetGuid;
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                message = "注册场景缺少稳定资源 Key。";
+                return false;
+            }
+            ESWorldMapDefinition definition = editSession.Draft.Definition;
+            Undo.RecordObject(editSession.Draft, "应用世界场景模板");
+            definition.sourceMode = ESWorldMapSourceMode.Scene;
+            definition.sceneAssetKey = key;
+            NotifyWorldDraftChanged("definition.sceneAssetKey", false);
+            ESWorkbench_Selection.Select(item.ToSelection());
+            message = "场景模板已绑定到世界草稿：" + key + "。正式 Scene 未被打开或改写。";
+            ESWorkbench_SetStatus(message, MessageType.Info);
+            return true;
         }
 
         private static string ResolveWorldAssetCategory(ESAssetPage page, string fallback)
@@ -1264,10 +2638,10 @@ namespace ES
                     + hierarchyItem.Spatial.Position.y.ToString("0.##") + ", "
                     + hierarchyItem.Spatial.Position.z.ToString("0.##");
             string camera = kind == ESWorkbenchViewportKind.Canvas2D ? "正交俯视"
-                : kind == ESWorkbenchViewportKind.Game ? "运行时透视预览" : "透视作者相机";
-            string gizmo = authoringTool.ToString();
+                : kind == ESWorkbenchViewportKind.Game ? "玩家 / 第三人称构图近似" : "透视作者相机";
+            string gizmo = ResolveAuthoringToolDisplayName(authoringTool);
             string collision = definition?.collision == null ? "未配置"
-                : definition.collision.terrainCollider ? "Terrain 开" : "Terrain 关";
+                : definition.collision.terrainCollider ? "地形碰撞开启" : "地形碰撞关闭";
             string navigation = definition?.navigation == null ? "未配置"
                 : definition.navigation.enabled
                     ? "启用 / 坡度 " + definition.navigation.maxSlope.ToString("0.#") + "°"
@@ -1281,10 +2655,22 @@ namespace ES
                 new ESWorkbenchViewportStatusDescriptor("world.gizmo", "Gizmo", gizmo,
                     "当前世界作者工具", 300),
                 new ESWorkbenchViewportStatusDescriptor("world.collision", "碰撞", collision,
-                    "正式输出的 Terrain Collider 状态", 200),
+                    "正式输出的地形碰撞体状态", 200),
                 new ESWorkbenchViewportStatusDescriptor("world.navigation", "导航", navigation,
                     "NavMesh 输出配置状态", 100)
             };
+        }
+
+        private static string ResolveAuthoringToolDisplayName(ESWorldAuthoringTool tool)
+        {
+            switch (tool)
+            {
+                case ESWorldAuthoringTool.Terrain: return "地形笔刷";
+                case ESWorldAuthoringTool.Region: return "区域";
+                case ESWorldAuthoringTool.Poi: return "兴趣点";
+                case ESWorldAuthoringTool.Prefab: return "预制件放置";
+                default: return "选择";
+            }
         }
 
         private IEnumerable<ESWorkbenchIssueDescriptor> QueryWorldIssues()
@@ -1407,7 +2793,7 @@ namespace ES
                 "当前权威层：ES 世界作者草稿",
                 ESWorkbenchIssueSeverity.Information,
                 ESWorkbenchIssueChannel.System,
-                "2D/3D 视口编辑同一草稿，游戏视图只读；TerrainData、正式 Scene、NavMeshData 与资源管线发布请求分别构建并验收。",
+                "2D/3D 视口编辑同一草稿，游戏构图预览只读且不等价 Unity Game View；TerrainData、正式 Scene、NavMeshData 与资源管线发布请求分别构建并验收。",
                 "world.map",
                 priority: -100);
         }
@@ -1475,7 +2861,7 @@ namespace ES
                 }
         }
 
-        private static void RegisterPageContribution(
+        private static void RegisterDocumentContribution(
             string contributionId,
             string title,
             string tooltip,
@@ -1497,20 +2883,21 @@ namespace ES
                         ESWorldBuilderWorkbenchWindow window = context.Window as ESWorldBuilderWorkbenchWindow;
                         if (window == null) throw new InvalidOperationException("World 贡献缺少窗口上下文：" + contributionId);
                         prepare?.Invoke(context, window);
-                        Action drawPage = draw(window);
-                        context.RegisterPage(new ESWorkbenchPageDefinition(
+                        Action drawDocument = draw(window);
+                        context.RegisterDocument(new ESWorkbenchDocumentDefinition(
                             contributionId,
                             title,
                             tooltip,
+                            false,
                             dirtyFlags,
-                            () =>
+                            draw: () =>
                             {
                                 bool locked = window.ESWorkbench_IsHierarchyLocked("world.map");
                                 if (locked)
                                     EditorGUILayout.HelpBox(
-                                        "世界根节点已锁定，本页面处于只读状态。解锁后才能修改作者草稿。",
+                                        "世界根节点已锁定，当前文档处于只读状态。解锁后才能修改作者草稿。",
                                         MessageType.Warning);
-                                using (new EditorGUI.DisabledScope(locked)) drawPage?.Invoke();
+                                using (new EditorGUI.DisabledScope(locked)) drawDocument?.Invoke();
                             }));
                         return null;
                     },
@@ -1521,6 +2908,80 @@ namespace ES
                 out string message);
             if (!string.IsNullOrEmpty(message) && !message.StartsWith("忽略旧版本", System.StringComparison.Ordinal))
                 Debug.LogWarning("[ESWorkbench] " + message);
+        }
+
+        private static void RegisterModeContribution(
+            string modeId,
+            string title,
+            string tooltip,
+            ESWorldWorkbenchModule module,
+            ESWorkbenchContributionCategory category,
+            IEnumerable<string> toolIds,
+            IEnumerable<ESWorkbenchContentKind> contentKinds,
+            string defaultToolId,
+            Func<ESWorldBuilderWorkbenchWindow, Action> drawInspector,
+            int priority,
+            bool primary = false,
+            Action<ESWorkbenchContributionContext, ESWorldBuilderWorkbenchWindow> prepare = null)
+        {
+            string contributionId = "mode." + modeId;
+            ESWorkbenchContributionRegistry<ESWorldWorkbenchModule>.RegisterOrUpdate(
+                new ESWorkbenchContributionDescriptor<ESWorldWorkbenchModule>(
+                    "world",
+                    contributionId,
+                    title,
+                    module,
+                    category,
+                    context =>
+                    {
+                        ESWorldBuilderWorkbenchWindow window = context.Window as ESWorldBuilderWorkbenchWindow;
+                        if (window == null) throw new InvalidOperationException("World 模式缺少窗口上下文：" + modeId);
+                        prepare?.Invoke(context, window);
+                        Action draw = drawInspector?.Invoke(window);
+                        context.RegisterAuthoringMode(new ESWorkbenchAuthoringModeDefinition(
+                            modeId,
+                            title,
+                            tooltip,
+                            toolIds,
+                            contentKinds,
+                            defaultToolId,
+                            priority,
+                            primary,
+                            createInspector: _ => window.CreateAuthoringModeInspector(modeId, draw)));
+                        return null;
+                    },
+                    tooltip,
+                    "ES.World",
+                    priority,
+                    1),
+                out string message);
+            if (!string.IsNullOrEmpty(message) && !message.StartsWith("忽略旧版本", StringComparison.Ordinal))
+                Debug.LogWarning("[ESWorkbench] " + message);
+        }
+
+        private VisualElement CreateAuthoringModeInspector(string modeId, Action draw)
+        {
+            var container = new IMGUIContainer(() =>
+            {
+                ESWorkbench_SerializedAsset?.Update();
+                bool locked = ESWorkbench_IsHierarchyLocked("world.map");
+                if (locked)
+                    EditorGUILayout.HelpBox(
+                        "世界根节点已锁定，当前作者模式处于只读状态。解锁后才能修改作者草稿。",
+                        MessageType.Warning);
+                using (new EditorGUI.DisabledScope(locked)) draw?.Invoke();
+                bool changed = ESWorkbench_SerializedAsset != null && ESWorkbench_SerializedAsset.hasModifiedProperties;
+                ESWorkbench_SerializedAsset?.ApplyModifiedProperties();
+                if (changed) ESWorkbench_MarkDirty(modeId, ESWorkbenchDirtyFlags.Authoring);
+            })
+            {
+                name = "ESWorldAuthoringModeInspector_" + modeId
+            };
+            container.style.flexGrow = 1f;
+            container.style.paddingLeft = 8f;
+            container.style.paddingRight = 8f;
+            container.style.paddingTop = 6f;
+            return container;
         }
 
         internal void HandleAuthoringPoint(
@@ -1537,16 +2998,24 @@ namespace ES
             switch (authoringTool)
             {
                 case ESWorldAuthoringTool.Terrain:
+                    if (ResolveActiveWorldContent()?.Payload is WorldBrushPaletteTemplate brush)
+                    {
+                        authoringBrushHeight = brush.NormalizedHeight;
+                        authoringBrushMode = brush.Mode;
+                        if (brush.Strength >= 0f) authoringBrushStrength = brush.Strength;
+                    }
                     PaintWorldHeight(worldPoint);
                     break;
                 case ESWorldAuthoringTool.Region:
-                    AddWorldRegion(worldPoint);
+                    WorldRegionPaletteTemplate regionTemplate = ResolveActiveWorldContent()?.Payload
+                        as WorldRegionPaletteTemplate;
+                    TryAddWorldRegion(worldPoint, regionTemplate, out _);
                     break;
                 case ESWorldAuthoringTool.Poi:
                     AddWorldPoi(worldPoint);
                     break;
                 case ESWorldAuthoringTool.Prefab:
-                    ESWorkbenchObjectDescriptor selected = ESWorkbench_Selection.Current?.Payload as ESWorkbenchObjectDescriptor;
+                    ESWorkbenchObjectDescriptor selected = ResolveActiveWorldContent();
                     if (selected == null)
                         ESWorkbench_SetStatus("请先在对象库选择一个已注册 Prefab。", MessageType.Warning);
                     else
@@ -1588,39 +3057,279 @@ namespace ES
 
         private void PaintWorldHeight(Vector3 worldPoint)
         {
+            TryPaintWorldHeight(worldPoint, out _);
+        }
+
+        private bool TryPaintWorldHeight(Vector3 worldPoint, out string message)
+        {
+            bool ownsStroke = !terrainStrokeSessionOpen;
+            if (ownsStroke) BeginTerrainStroke();
+            try
+            {
+                return TryPaintWorldHeightSample(worldPoint, out message);
+            }
+            finally
+            {
+                if (ownsStroke) EndTerrainStroke();
+            }
+        }
+
+        private bool TryPaintWorldHeightSample(Vector3 worldPoint, out string message)
+        {
             ESWorldMapDefinition definition = editSession.Draft.Definition;
-            Undo.RecordObject(editSession.Draft, "绘制世界高度");
+            if (definition?.heightfield == null)
+            {
+                message = "当前世界草稿缺少 Heightfield，不能使用地形笔刷。";
+                ESWorkbench_SetStatus(message, MessageType.Error);
+                return false;
+            }
+            if (worldPoint.x < definition.worldMin.x || worldPoint.x > definition.worldMax.x
+                || worldPoint.z < definition.worldMin.y || worldPoint.z > definition.worldMax.y)
+            {
+                message = "地形笔刷落点不在地图范围内。";
+                ESWorkbench_SetStatus(message, MessageType.Warning);
+                return false;
+            }
+            if (!terrainStrokeUndoRecorded)
+            {
+                Undo.RecordObject(editSession.Draft, "绘制世界地形笔划");
+                terrainStrokeUndoRecorded = true;
+            }
             if (!ESWorldMapTerrainEditorFacade.TryPaintHeight(definition,
                     new Vector2(worldPoint.x, worldPoint.z), definition.worldMin, definition.worldMax,
-                    authoringBrushHeight, out string error))
+                    authoringBrushHeight,
+                    authoringBrushRadius,
+                    authoringBrushStrength,
+                    authoringBrushFalloff,
+                    authoringBrushMode,
+                    out string error))
             {
-                ESWorkbench_SetStatus(error, MessageType.Error);
-                return;
+                message = error;
+                ESWorkbench_SetStatus(message, MessageType.Error);
+                return false;
             }
-            NotifyWorldDraftChanged("definition.heightfield", false);
-            ESWorkbench_SetStatus("世界高度场已更新。", MessageType.Info);
+            if (terrainStrokeSessionOpen)
+            {
+                terrainStrokeDraftSyncPending = true;
+                ESWorkbench_SetDirtyStateWithoutNotification(
+                    true,
+                    "definition.heightfield",
+                    ESWorkbenchDirtyFlags.Authoring);
+            }
+            else
+            {
+                NotifyWorldDraftChanged("definition.heightfield", false);
+            }
+            message = "已使用" + GetTerrainBrushModeDisplayName(authoringBrushMode) + "更新世界高度场，目标高度 "
+                + Mathf.RoundToInt(authoringBrushHeight * 100f) + "%，半径 "
+                + authoringBrushRadius.ToString("0.#") + "m，强度 "
+                + Mathf.RoundToInt(authoringBrushStrength * 100f) + "%。";
+            ESWorkbench_SetStatus(message, MessageType.Info);
+            return true;
+        }
+
+        internal void BeginTerrainStroke()
+        {
+            if (terrainStrokeSessionOpen) return;
+            terrainStrokeSessionOpen = true;
+            terrainStrokeUndoRecorded = false;
+            terrainStrokeUndoGroup = -1;
+            terrainStrokeSnapshotValid = false;
+            terrainStrokeHadHeightfield = false;
+            terrainStrokeDraftSyncPending = false;
+            ESWorldMapHeightfield field = editSession?.Draft?.Definition?.heightfield;
+            if (field != null)
+            {
+                terrainStrokeHadHeightfield = true;
+                terrainStrokeWidth = field.width;
+                terrainStrokeHeight = field.height;
+                terrainStrokeDefaultHeight = field.defaultHeight;
+                terrainStrokeSamplesSnapshot = field.samples == null ? null : new List<float>(field.samples);
+                terrainStrokeSnapshotValid = true;
+            }
+            ESWorldMapTerrainEditorFacade.BeginPaintStroke();
+            Undo.IncrementCurrentGroup();
+            terrainStrokeUndoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName("绘制世界地形笔划");
+        }
+
+        internal void EndTerrainStroke()
+        {
+            if (terrainStrokeDraftSyncPending && editSession != null)
+            {
+                editSession.NotifyDraftChanged("definition.heightfield");
+                ESWorkbench_Actions?.Refresh(ESWorkbenchRefreshReason.DataChanged);
+            }
+            ESWorldMapTerrainEditorFacade.EndPaintStroke();
+            if (terrainStrokeUndoGroup >= 0 && terrainStrokeUndoRecorded)
+                Undo.CollapseUndoOperations(terrainStrokeUndoGroup);
+            terrainStrokeSessionOpen = false;
+            terrainStrokeUndoRecorded = false;
+            terrainStrokeUndoGroup = -1;
+            terrainStrokeSnapshotValid = false;
+            terrainStrokeSamplesSnapshot = null;
+            terrainStrokeDraftSyncPending = false;
+        }
+
+        internal void CancelTerrainStroke()
+        {
+            if (!terrainStrokeSessionOpen) return;
+            if (terrainStrokeUndoGroup >= 0 && terrainStrokeUndoRecorded)
+                Undo.RevertAllDownToGroup(terrainStrokeUndoGroup);
+
+            ESWorldMapDefinition definition = editSession?.Draft?.Definition;
+            if (definition != null && terrainStrokeSnapshotValid)
+            {
+                if (!terrainStrokeHadHeightfield)
+                {
+                    definition.heightfield = null;
+                }
+                else
+                {
+                    ESWorldMapHeightfield field = definition.heightfield ?? new ESWorldMapHeightfield();
+                    field.width = terrainStrokeWidth;
+                    field.height = terrainStrokeHeight;
+                    field.defaultHeight = terrainStrokeDefaultHeight;
+                    field.samples = terrainStrokeSamplesSnapshot == null
+                        ? null
+                        : new List<float>(terrainStrokeSamplesSnapshot);
+                    definition.heightfield = field;
+                }
+                editSession.SynchronizeDraftAfterUndoRedo();
+                bool conflict = editSession.RefreshExternalConflict();
+                ESWorkbench_SetDirtyStateWithoutNotification(
+                    editSession.IsDirty,
+                    "world.terrain-cancel",
+                    ESWorkbenchDirtyFlags.Authoring);
+                serializedAsset?.Update();
+                ESWorkbench_Actions?.Refresh(ESWorkbenchRefreshReason.DataChanged);
+                ESWorkbench_SetStatus(
+                    conflict ? "地形笔划已取消，但正式地图发生外部变化，请先检查冲突。" : "地形笔划已取消，草稿已恢复到笔划开始前。",
+                    conflict ? MessageType.Warning : MessageType.Info);
+            }
+            terrainStrokeSessionOpen = false;
+            ESWorldMapTerrainEditorFacade.EndPaintStroke();
+            terrainStrokeUndoRecorded = false;
+            terrainStrokeUndoGroup = -1;
+            terrainStrokeSnapshotValid = false;
+            terrainStrokeSamplesSnapshot = null;
+            terrainStrokeDraftSyncPending = false;
+        }
+
+        internal float GetTerrainBrushRadius()
+        {
+            return Mathf.Clamp(authoringBrushRadius, 0.5f, 64f);
+        }
+
+        internal bool HandleTerrainBrushShortcut(KeyCode keyCode, EventModifiers modifiers)
+        {
+            if (keyCode != KeyCode.LeftBracket && keyCode != KeyCode.RightBracket)
+                return false;
+            float direction = keyCode == KeyCode.RightBracket ? 1f : -1f;
+            if ((modifiers & EventModifiers.Shift) != 0)
+            {
+                authoringBrushStrength = Mathf.Clamp(
+                    authoringBrushStrength + direction * 0.05f,
+                    0.05f,
+                    1f);
+                ESWorkbench_SetStatus(
+                    "地形笔刷强度：" + Mathf.RoundToInt(authoringBrushStrength * 100f) + "%",
+                    MessageType.Info);
+            }
+            else
+            {
+                float step = Mathf.Max(0.5f, authoringBrushRadius * 0.1f);
+                authoringBrushRadius = Mathf.Clamp(authoringBrushRadius + direction * step, 0.5f, 64f);
+                ESWorkbench_SetStatus(
+                    "地形笔刷半径：" + authoringBrushRadius.ToString("0.#") + "m",
+                    MessageType.Info);
+            }
+            cachedBrushSummary = string.Empty;
+            ESWorkbench_Actions?.Refresh(ESWorkbenchRefreshReason.SelectionChanged);
+            Repaint();
+            return true;
+        }
+
+        internal string GetTerrainBrushSummary()
+        {
+            float height = Mathf.Clamp01(authoringBrushHeight);
+            float radius = GetTerrainBrushRadius();
+            float strength = Mathf.Clamp01(authoringBrushStrength);
+            float falloff = Mathf.Clamp01(authoringBrushFalloff);
+            if (Mathf.Approximately(cachedBrushHeight, height)
+                && Mathf.Approximately(cachedBrushRadius, radius)
+                && Mathf.Approximately(cachedBrushStrength, strength)
+                && Mathf.Approximately(cachedBrushFalloff, falloff)
+                && cachedBrushMode == authoringBrushMode)
+                return cachedBrushSummary;
+            cachedBrushHeight = height;
+            cachedBrushRadius = radius;
+            cachedBrushStrength = strength;
+            cachedBrushFalloff = falloff;
+            cachedBrushMode = authoringBrushMode;
+            cachedBrushSummary = GetTerrainBrushModeDisplayName(authoringBrushMode)
+                + (authoringBrushMode == ESWorldTerrainBrushMode.Flatten
+                    ? " · 目标 " + Mathf.RoundToInt(height * 100f) + "%"
+                    : " · 增量强度 " + Mathf.RoundToInt(strength * 100f) + "%")
+                + " · 半径 " + radius.ToString("0.#")
+                + "m · 强度 " + Mathf.RoundToInt(strength * 100f)
+                + "% · 衰减 " + Mathf.RoundToInt(falloff * 100f) + "%";
+            return cachedBrushSummary;
+        }
+
+        private static string GetTerrainBrushModeDisplayName(ESWorldTerrainBrushMode mode)
+        {
+            switch (mode)
+            {
+                case ESWorldTerrainBrushMode.Raise: return "抬高";
+                case ESWorldTerrainBrushMode.Lower: return "降低";
+                case ESWorldTerrainBrushMode.Smooth: return "平滑";
+                default: return "平整";
+            }
         }
 
         private void AddWorldRegion(Vector3 worldPoint)
+        {
+            TryAddWorldRegion(worldPoint, null, out _);
+        }
+
+        private bool TryAddWorldRegion(
+            Vector3 worldPoint,
+            WorldRegionPaletteTemplate template,
+            out string message)
         {
             ESWorldMapDefinition definition = editSession.Draft.Definition;
             Undo.RecordObject(editSession.Draft, "添加世界区域");
             if (definition.regions == null) definition.regions = new List<ESWorldMapRegionDefinition>();
             string id = NextStableId("region", value => definition.regions.Exists(item => item != null && item.regionId == value));
-            float half = Mathf.Max(2f, definition.chunkSize * 0.5f);
+            Vector2 halfSize = template == null
+                ? Vector2.one * Mathf.Max(2f, definition.chunkSize * 0.5f)
+                : template.Size * 0.5f;
             Vector3 clamped = ClampToWorld(worldPoint, definition);
+            OffsetRegionWithinWorld(
+                new Vector2(clamped.x, clamped.z) - halfSize,
+                new Vector2(clamped.x, clamped.z) + halfSize,
+                Vector2.zero,
+                definition.worldMin,
+                definition.worldMax,
+                out Vector2 regionMin,
+                out Vector2 regionMax);
             definition.regions.Add(new ESWorldMapRegionDefinition
             {
                 regionId = id,
-                displayName = "区域 " + (definition.regions.Count + 1),
-                semanticTag = "Default",
-                min = new Vector2(Mathf.Max(definition.worldMin.x, clamped.x - half), Mathf.Max(definition.worldMin.y, clamped.z - half)),
-                max = new Vector2(Mathf.Min(definition.worldMax.x, clamped.x + half), Mathf.Min(definition.worldMax.y, clamped.z + half)),
+                displayName = template?.DisplayName ?? "区域 " + (definition.regions.Count + 1),
+                semanticTag = template?.Category ?? "Default",
+                min = regionMin,
+                max = regionMax,
                 priority = definition.regions.Count
             });
             NotifyWorldDraftChanged("definition.regions", true);
             ESWorkbench_Selection.Select(new ESWorkbenchSelection("world.region." + id, "world.region", null, id));
-            ESWorkbench_SetStatus("已添加世界区域。", MessageType.Info);
+            message = template == null
+                ? "已添加世界区域。"
+                : "已按模板创建区域：" + template.DisplayName + "。";
+            ESWorkbench_SetStatus(message, MessageType.Info);
+            return true;
         }
 
         private void AddWorldPoi(Vector3 worldPoint)
@@ -1647,7 +3356,7 @@ namespace ES
             ESWorldMapDefinition definition = editSession.Draft.Definition;
             float threshold = Mathf.Max(3f, definition.chunkSize * 0.2f);
             float best = float.MaxValue;
-            ESWorkbenchSelection selection = new ESWorkbenchSelection("world.map", "world.map", ESWorkbench_Asset, definition);
+            ESWorkbenchSelection selection = ESWorkbenchSelection.Empty;
             if (definition.pois != null)
                 for (int i = 0; i < definition.pois.Count; i++)
                 {
@@ -1689,6 +3398,8 @@ namespace ES
 
         private VisualElement CreateWorldInspector(ESWorkbenchSelection selection)
         {
+            if (selection?.Payload is ESWorkbenchObjectDescriptor content)
+                return CreateWorldContentInspector(content);
             var root = new VisualElement { name = "ESWorldContextInspector" };
             root.style.paddingLeft = 8f;
             root.style.paddingRight = 8f;
@@ -1734,6 +3445,7 @@ namespace ES
                 root.RegisterCallback<SerializedPropertyChangeEvent>(evt =>
                 {
                     if (evt.changedProperty == null) return;
+                    if (editSession == null || !editSession.HasUntrackedDraftMutation) return;
                     ESWorkbench_MarkDirty(evt.changedProperty.propertyPath, ESWorkbenchDirtyFlags.Authoring);
                 });
                 root.RegisterCallback<DetachFromPanelEvent>(_ => root.Unbind());
@@ -1775,6 +3487,190 @@ namespace ES
             return root;
         }
 
+        private VisualElement CreateWorldContentInspector(ESWorkbenchObjectDescriptor content)
+        {
+            var root = new VisualElement { name = "ESWorldContentInspector" };
+            root.style.paddingLeft = 10f;
+            root.style.paddingRight = 10f;
+            root.style.paddingTop = 8f;
+            root.style.paddingBottom = 12f;
+
+            Label kind = new Label("内容库 · " + content.ContentKindDisplayName);
+            kind.style.fontSize = 9f;
+            kind.style.color = ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Ready);
+            root.Add(kind);
+            Label title = new Label(content.DisplayName);
+            title.AddToClassList("es-brand-title");
+            title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            title.style.fontSize = 15f;
+            title.style.marginTop = 3f;
+            title.style.marginBottom = 6f;
+            root.Add(title);
+
+            Texture preview = content.Icon;
+            if (preview == null && content.Source != null)
+                preview = AssetPreview.GetAssetPreview(content.Source) ?? AssetPreview.GetMiniThumbnail(content.Source);
+            if (preview != null)
+            {
+                var image = new Image { image = preview, scaleMode = ScaleMode.ScaleToFit };
+                image.style.height = 132f;
+                image.style.marginBottom = 8f;
+                image.style.backgroundColor = ESEditorPresentation.WindowInsetSurfaceColor;
+                root.Add(image);
+            }
+
+            AddWorldContentInspectorLine(root, "分类", content.Category);
+            AddWorldContentInspectorLine(root, "默认动作", content.DefaultDragHint);
+            AddWorldContentInspectorLine(root, "稳定标识", content.BaseObjectId);
+            if (!string.IsNullOrWhiteSpace(content.PresetId))
+                AddWorldContentInspectorLine(root, "参数预设", content.PresetId);
+            if (!string.IsNullOrWhiteSpace(content.Subtitle))
+                AddWorldContentInspectorLine(root, "来源", content.Subtitle);
+            if (!string.IsNullOrWhiteSpace(content.Tooltip))
+            {
+                Label description = new Label(content.Tooltip);
+                description.style.whiteSpace = WhiteSpace.Normal;
+                description.style.marginTop = 8f;
+                description.style.marginBottom = 8f;
+                root.Add(description);
+            }
+
+            if (content.Payload is WorldBrushPaletteTemplate brush)
+            {
+                AddWorldContentInspectorLine(root, "目标高度", Mathf.RoundToInt(brush.NormalizedHeight * 100f) + "%");
+                AddWorldContentInspectorLine(root, "笔刷语义", GetTerrainBrushModeDisplayName(brush.Mode));
+                if (brush.Strength >= 0f)
+                    AddWorldContentInspectorLine(root, "预设强度", Mathf.RoundToInt(brush.Strength * 100f) + "%");
+                AddWorldContentInspectorLine(root, "使用方式", "拖入 2D 或 3D 世界视口，在落点执行一次塑形并激活地形笔刷。");
+            }
+            else if (content.Payload is WorldRegionPaletteTemplate region)
+            {
+                AddWorldContentInspectorLine(root, "区域语义", region.Category);
+                AddWorldContentInspectorLine(root, "默认尺寸", region.Size.x.ToString("0.#") + " × " + region.Size.y.ToString("0.#") + " 米");
+            }
+            else if (content.ContentKind == ESWorkbenchContentKind.SceneTemplate)
+            {
+                AddWorldContentInspectorLine(root, "应用边界", "只更新世界草稿的场景资源 Key，不直接打开、合并或保存正式 Scene。");
+            }
+
+            Button use = ESWindowPresentation.CreateToolbarButton(
+                ResolveWorldContentPrimaryAction(content),
+                "将该内容设为当前作者内容；真正修改只在视口拖放或明确操作后发生。",
+                () => ActivateWorldPaletteItem(content));
+            use.style.height = 32f;
+            use.style.marginTop = 9f;
+            root.Add(use);
+
+            if (content.Source != null)
+            {
+                Button locate = ESWindowPresentation.CreateToolbarButton(
+                    "在项目中定位",
+                    "在 Project 中定位内容源资产",
+                    () =>
+                    {
+                        Selection.activeObject = content.Source;
+                        EditorGUIUtility.PingObject(content.Source);
+                    });
+                locate.style.height = 28f;
+                locate.style.marginTop = 5f;
+                root.Add(locate);
+            }
+
+            Label readiness = new Label(CanUsePaletteItem(content, out string reason)
+                ? "可用 · 当前内容可以拖入 2D 或 3D 世界视口。"
+                : "当前不可用 · " + reason);
+            readiness.style.whiteSpace = WhiteSpace.Normal;
+            readiness.style.marginTop = 10f;
+            readiness.style.paddingTop = 7f;
+            readiness.style.borderTopWidth = 1f;
+            readiness.style.borderTopColor = ESEditorPresentation.DividerColor;
+            readiness.style.color = CanUsePaletteItem(content, out _)
+                ? ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Ready)
+                : ESEditorPresentation.GetStatusAccent(0, ESStatusKind.Warning);
+            root.Add(readiness);
+            return root;
+        }
+
+        private static void AddWorldContentInspectorLine(VisualElement root, string label, string value)
+        {
+            var line = new VisualElement();
+            line.style.flexDirection = FlexDirection.Row;
+            line.style.marginBottom = 4f;
+            Label key = new Label(label);
+            key.style.width = 72f;
+            key.style.flexShrink = 0f;
+            key.style.color = ESEditorPresentation.SectionMutedTextColor;
+            Label text = new Label(value ?? string.Empty);
+            text.style.flexGrow = 1f;
+            text.style.minWidth = 0f;
+            text.style.whiteSpace = WhiteSpace.Normal;
+            text.tooltip = text.text;
+            line.Add(key);
+            line.Add(text);
+            root.Add(line);
+        }
+
+        private static string ResolveWorldContentPrimaryAction(ESWorkbenchObjectDescriptor content)
+        {
+            switch (content.ContentKind)
+            {
+                case ESWorkbenchContentKind.Brush: return "设为当前笔刷";
+                case ESWorkbenchContentKind.RegionTemplate: return "设为当前区域模板";
+                case ESWorkbenchContentKind.SceneTemplate: return "准备应用场景";
+                default: return "设为当前放置内容";
+            }
+        }
+
+        private void ActivateWorldPaletteItem(ESWorkbenchObjectDescriptor content)
+        {
+            if (content == null) return;
+            activeWorldContentId = content.BaseObjectId;
+            activeWorldContentPresetId = content.PresetId;
+            if (content.Payload is WorldBrushPaletteTemplate brush)
+            {
+                authoringBrushHeight = brush.NormalizedHeight;
+                authoringBrushMode = brush.Mode;
+                if (brush.Strength >= 0f) authoringBrushStrength = brush.Strength;
+                authoringTool = ESWorldAuthoringTool.Terrain;
+                ESWorkbench_Actions?.Tools.Activate("world.terrain");
+                ESWorkbench_SetStatus("当前笔刷：" + brush.DisplayName + "。拖入视口或在视口点击以绘制。", MessageType.Info);
+                return;
+            }
+            if (content.Payload is WorldRegionPaletteTemplate region)
+            {
+                authoringTool = ESWorldAuthoringTool.Region;
+                ESWorkbench_Actions?.Tools.Activate("world.region");
+                ESWorkbench_SetStatus("当前区域模板：" + region.DisplayName + "。拖入视口创建实例。", MessageType.Info);
+                return;
+            }
+            if (content.ContentKind == ESWorkbenchContentKind.Prefab)
+            {
+                authoringTool = ESWorldAuthoringTool.Prefab;
+                ESWorkbench_Actions?.Tools.Activate("world.prefab");
+                ESWorkbench_SetStatus("当前放置内容：" + content.DisplayName + "。拖入视口或在视口点击放置。", MessageType.Info);
+                return;
+            }
+            ESWorkbench_SetStatus("场景模板已选中。拖入 2D 或 3D 世界视口后才会写入草稿。", MessageType.Info);
+        }
+
+        private ESWorkbenchObjectDescriptor ResolveActiveWorldContent()
+        {
+            if (!string.IsNullOrWhiteSpace(activeWorldContentId))
+            {
+                ESWorkbenchObjectDescriptor active = ESWorkbench_Objects.FirstOrDefault(value =>
+                    value != null && string.Equals(value.BaseObjectId, activeWorldContentId, StringComparison.Ordinal));
+                active ??= QueryWorldPalette().FirstOrDefault(value =>
+                    value != null && string.Equals(value.BaseObjectId, activeWorldContentId, StringComparison.Ordinal));
+                if (active != null)
+                    return string.IsNullOrWhiteSpace(activeWorldContentPresetId)
+                        ? active
+                        : active.CreatePresetVariant(activeWorldContentPresetId);
+                activeWorldContentId = string.Empty;
+                activeWorldContentPresetId = string.Empty;
+            }
+            return ESWorkbench_Selection.Current?.Payload as ESWorkbenchObjectDescriptor;
+        }
+
         private static void AddWorldInspectorFields(VisualElement root, SerializedProperty target, string kind)
         {
             if (root == null || target == null) return;
@@ -1795,22 +3691,18 @@ namespace ES
             {
                 AddWorldInspectorSection(root, "概览", target,
                     "regionId", "displayName", "semanticTag", "priority");
-                AddWorldInspectorSection(root, "空间范围", target, "min", "max");
                 return;
             }
             if (kind == "world.poi")
             {
                 AddWorldInspectorSection(root, "概览", target,
                     "poiId", "displayName", "category", "regionId", "discoverable");
-                AddWorldInspectorSection(root, "空间位置", target, "position");
                 return;
             }
             if (kind == "world.prefab")
             {
                 AddWorldInspectorSection(root, "概览", target,
                     "placementId", "prefabKey", "editorPrefabGuid", "regionId", "enabled");
-                AddWorldInspectorSection(root, "Transform", target,
-                    "position", "rotationEuler", "scale");
                 return;
             }
             int childDepth = target.depth + 1;
@@ -1852,10 +3744,54 @@ namespace ES
             {
                 SerializedProperty property = target.FindPropertyRelative(propertyNames[i]);
                 if (property == null) continue;
-                var field = new PropertyField(property.Copy());
+                var field = new PropertyField(
+                    property.Copy(),
+                    ResolveWorldInspectorPropertyLabel(property.name));
                 field.style.minWidth = 0f;
                 field.style.marginBottom = 3f;
                 root.Add(field);
+            }
+        }
+
+        internal static string ResolveWorldInspectorPropertyLabel(string propertyName)
+        {
+            switch (propertyName)
+            {
+                case "mapId": return "地图 ID";
+                case "sourceMode": return "来源模式";
+                case "generatorKey": return "生成器 Key";
+                case "generatorVersion": return "生成器版本";
+                case "seed": return "种子";
+                case "sceneAssetKey": return "场景资源 Key";
+                case "layoutAssetKey": return "布局资源 Key";
+                case "prefabSetKey": return "Prefab 集合 Key";
+                case "worldMin": return "世界最小坐标";
+                case "worldMax": return "世界最大坐标";
+                case "chunkSize": return "区块尺寸";
+                case "terrainMode": return "地形模式";
+                case "terrainDataAssetPath": return "TerrainData 资产路径";
+                case "heightmapAssetKey": return "高度图资源 Key";
+                case "terrainHeightScale": return "地形高度缩放";
+                case "maxWalkableSlope": return "最大可行走坡度";
+                case "build": return "构建设置";
+                case "ugcLimits": return "UGC 配额";
+                case "regionId": return "区域 ID";
+                case "displayName": return "显示名称";
+                case "semanticTag": return "语义标签";
+                case "priority": return "优先级";
+                case "min": return "最小坐标";
+                case "max": return "最大坐标";
+                case "poiId": return "POI ID";
+                case "category": return "分类";
+                case "discoverable": return "可发现";
+                case "position": return "位置";
+                case "placementId": return "放置 ID";
+                case "prefabKey": return "Prefab Key";
+                case "editorPrefabGuid": return "编辑器 Prefab GUID";
+                case "enabled": return "启用";
+                case "rotationEuler": return "旋转角";
+                case "scale": return "缩放";
+                default: return ObjectNames.NicifyVariableName(propertyName ?? string.Empty);
             }
         }
 
@@ -1922,6 +3858,12 @@ namespace ES
         private static bool IsWorldPrefabSelection(ESWorkbenchSelection selection)
         {
             return selection != null && !selection.IsEmpty && selection.Kind == "world.prefab";
+        }
+
+        private static bool IsWorldScalableSelection(ESWorkbenchSelection selection)
+        {
+            return selection != null && !selection.IsEmpty
+                && (selection.Kind == "world.prefab" || selection.Kind == "world.region");
         }
 
         private ESWorkbenchMutationResult DuplicateWorldSelectionMutation(ESWorkbenchMutationContext context)
@@ -2034,14 +3976,31 @@ namespace ES
         private ESWorkbenchMutationResult ScaleWorldSelectionMutation(ESWorkbenchMutationContext context)
         {
             ESWorkbenchSelection selection = context?.Selection;
-            if (!IsWorldPrefabSelection(selection) || editSession?.Draft?.Definition == null)
+            if (!IsWorldScalableSelection(selection) || editSession?.Draft?.Definition == null)
                 return ESWorkbenchMutationResult.Failure("当前选择不支持缩放。");
             string id = selection.Payload as string;
-            ESWorldMapPrefabPlacement placement = editSession.Draft.Definition.prefabPlacements?
-                .Find(value => value != null && value.placementId == id);
-            if (placement == null) return ESWorkbenchMutationResult.Failure("所选 Prefab 放置已经不存在。");
             Vector3 value = context.Scale;
             if (!IsFinite(value)) return ESWorkbenchMutationResult.Failure("缩放值包含无效数字。");
+            if (selection.Kind == "world.region")
+            {
+                ESWorldMapDefinition definition = editSession.Draft.Definition;
+                ESWorldMapRegionDefinition region = definition.regions?
+                    .Find(item => item != null && item.regionId == id);
+                if (region == null) return ESWorkbenchMutationResult.Failure("所选区域已经不存在。");
+                Vector2 center = (region.min + region.max) * 0.5f;
+                ResizeRegionWithinWorld(
+                    center,
+                    new Vector2(value.x, value.z),
+                    definition.worldMin,
+                    definition.worldMax,
+                    out region.min,
+                    out region.max);
+                return ESWorkbenchMutationResult.Success(
+                    "已精确调整世界区域尺寸。", selection, "definition.regions");
+            }
+            ESWorldMapPrefabPlacement placement = editSession.Draft.Definition.prefabPlacements?
+                .Find(item => item != null && item.placementId == id);
+            if (placement == null) return ESWorkbenchMutationResult.Failure("所选 Prefab 放置已经不存在。");
             placement.scale = new Vector3(
                 Mathf.Max(0.01f, value.x),
                 Mathf.Max(0.01f, value.y),
@@ -2078,13 +4037,18 @@ namespace ES
             if (editSession == null) return;
 
             editSession.SynchronizeDraftAfterUndoRedo();
+            bool externalConflict = editSession.RefreshExternalConflict();
             ESWorkbench_SetDirtyStateWithoutNotification(
                 editSession.IsDirty,
                 "world.undo-redo",
                 ESWorkbenchDirtyFlags.Authoring);
             ESWorkbench_SetStatus(
-                editSession.IsDirty ? "撤销/重做已同步，世界草稿仍有未提交变更。" : "撤销/重做已同步，世界草稿与基线一致。",
-                editSession.IsDirty ? MessageType.Warning : MessageType.Info);
+                externalConflict
+                    ? "撤销/重做已同步，但正式地图已发生外部变化，请先检查冲突。"
+                    : editSession.IsDirty
+                        ? "撤销/重做已同步，世界草稿仍有未提交变更。"
+                        : "撤销/重做已同步，世界草稿与基线一致。",
+                externalConflict || editSession.IsDirty ? MessageType.Warning : MessageType.Info);
         }
 
         private void NotifyWorldDraftChanged(string path, bool hierarchyChanged)
@@ -2128,16 +4092,39 @@ namespace ES
 
         private void OpenBrushPopup(ESWorkbenchActionContext actions)
         {
-            var request = new ESWorkbenchPopupRequest("地形笔刷", new Vector2(320f, 150f), _ =>
+            var request = new ESWorkbenchPopupRequest("地形笔刷", new Vector2(360f, 250f), _ =>
             {
                 var content = new VisualElement();
                 Label title = new Label("地形笔刷");
                 title.AddToClassList("es-brand-title");
                 title.style.unityFontStyleAndWeight = FontStyle.Bold;
                 content.Add(title);
-                var slider = new Slider("目标高度", 0f, 1f) { value = authoringBrushHeight, showInputField = true };
-                slider.RegisterValueChangedCallback(evt => authoringBrushHeight = evt.newValue);
-                content.Add(slider);
+                var mode = new EnumField("笔刷模式", authoringBrushMode);
+                mode.RegisterValueChangedCallback(evt =>
+                {
+                    authoringBrushMode = (ESWorldTerrainBrushMode)evt.newValue;
+                    Repaint();
+                });
+                content.Add(mode);
+                if (authoringBrushMode == ESWorldTerrainBrushMode.Flatten)
+                {
+                    var slider = new Slider("目标高度", 0f, 1f) { value = authoringBrushHeight, showInputField = true };
+                    slider.RegisterValueChangedCallback(evt => { authoringBrushHeight = evt.newValue; Repaint(); });
+                    content.Add(slider);
+                }
+                var radius = new Slider("笔刷半径（米）", 0.5f, 64f) { value = authoringBrushRadius, showInputField = true };
+                radius.RegisterValueChangedCallback(evt => { authoringBrushRadius = Mathf.Clamp(evt.newValue, 0.5f, 64f); Repaint(); });
+                content.Add(radius);
+                var strength = new Slider("笔刷强度", 0.05f, 1f) { value = authoringBrushStrength, showInputField = true };
+                strength.RegisterValueChangedCallback(evt => { authoringBrushStrength = Mathf.Clamp01(evt.newValue); Repaint(); });
+                content.Add(strength);
+                if (authoringBrushMode != ESWorldTerrainBrushMode.Smooth)
+                {
+                    var falloff = new Slider("边缘衰减", 0f, 1f) { value = authoringBrushFalloff, showInputField = true };
+                    falloff.RegisterValueChangedCallback(evt => { authoringBrushFalloff = Mathf.Clamp01(evt.newValue); Repaint(); });
+                    content.Add(falloff);
+                }
+                content.Add(new Label("抬高、降低、平整、平滑均写入同一份 Draft；2D/3D 按住左键连续绘制，一次拖动只产生一条 Undo 记录。"));
                 return content;
             });
             Rect anchor = new Rect(position.center, Vector2.one);
@@ -2197,6 +4184,28 @@ namespace ES
             resultMax = resultMin + size;
         }
 
+        internal static void ResizeRegionWithinWorld(
+            Vector2 center,
+            Vector2 requestedSize,
+            Vector2 worldMin,
+            Vector2 worldMax,
+            out Vector2 resultMin,
+            out Vector2 resultMax)
+        {
+            Vector2 orderedWorldMin = Vector2.Min(worldMin, worldMax);
+            Vector2 orderedWorldMax = Vector2.Max(worldMin, worldMax);
+            Vector2 worldSize = orderedWorldMax - orderedWorldMin;
+            Vector2 size = new Vector2(
+                Mathf.Clamp(Mathf.Abs(requestedSize.x), 0f, worldSize.x),
+                Mathf.Clamp(Mathf.Abs(requestedSize.y), 0f, worldSize.y));
+            Vector2 half = size * 0.5f;
+            Vector2 clampedCenter = new Vector2(
+                Mathf.Clamp(center.x, orderedWorldMin.x + half.x, orderedWorldMax.x - half.x),
+                Mathf.Clamp(center.y, orderedWorldMin.y + half.y, orderedWorldMax.y - half.y));
+            resultMin = clampedCenter - half;
+            resultMax = clampedCenter + half;
+        }
+
         private void ValidateMap()
         {
             if (mapAsset == null) return;
@@ -2215,6 +4224,25 @@ namespace ES
             ESWorkbench_BindAsset(asset);
             Selection.activeObject = asset;
             ESWorkbench_SetStatus("已创建空白地图基线；可按需填充默认配置或显式加载示例内容。", MessageType.Info);
+        }
+
+        private static void EnsureAssetFolder(string folderPath)
+        {
+            string normalized = (folderPath ?? string.Empty).Replace('\\', '/').TrimEnd('/');
+            if (string.IsNullOrWhiteSpace(normalized)
+                || !normalized.StartsWith("Assets/", StringComparison.Ordinal))
+                throw new ArgumentException("验证资产目录必须位于 Assets/ 下。", nameof(folderPath));
+            if (AssetDatabase.IsValidFolder(normalized)) return;
+
+            string[] segments = normalized.Split('/');
+            string current = segments[0];
+            for (int i = 1; i < segments.Length; i++)
+            {
+                string next = current + "/" + segments[i];
+                if (!AssetDatabase.IsValidFolder(next))
+                    AssetDatabase.CreateFolder(current, segments[i]);
+                current = next;
+            }
         }
     }
 }

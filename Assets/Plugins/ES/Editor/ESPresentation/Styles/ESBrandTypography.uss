@@ -23,3 +23,211 @@
 .es-brand-typography .es-compact-choice-badge {
     -unity-font: resource("ESPresentation/Fonts/ESBrandSansSC");
 }
+
+/* Shared geometry for every ES Presentation-bound UI Toolkit window. */
+.es-presentation-controls .unity-button,
+.es-presentation-controls .unity-toolbar,
+.es-presentation-controls .unity-toolbar-button,
+.es-presentation-controls .unity-toolbar-menu,
+.es-presentation-controls .unity-base-field,
+.es-presentation-controls .unity-base-text-field,
+.es-presentation-controls .unity-base-field__input,
+.es-presentation-controls .unity-base-text-field__input,
+.es-presentation-controls .unity-text-input,
+.es-presentation-controls .unity-search-field,
+.es-presentation-controls .unity-search-field__text-input,
+.es-presentation-controls .unity-object-field__input,
+.es-presentation-controls .unity-base-popup-field,
+.es-presentation-controls .unity-popup-field,
+.es-presentation-controls .unity-base-popup-field__input,
+.es-presentation-controls .unity-popup-field__input,
+.es-presentation-controls .unity-enum-field,
+.es-presentation-controls .unity-tag-field,
+.es-presentation-controls .unity-layer-field,
+.es-presentation-controls .unity-mask-field,
+.es-presentation-controls .unity-object-field,
+.es-presentation-controls .unity-slider,
+.es-presentation-controls .unity-min-max-slider,
+.es-presentation-controls .unity-toggle,
+.es-presentation-controls .unity-foldout,
+.es-presentation-controls .unity-toggle__input,
+.es-presentation-controls .unity-foldout__toggle,
+.es-presentation-controls .unity-toolbar__dropdown,
+.es-presentation-controls .unity-toolbar__button,
+.es-presentation-controls .unity-object-field__selector,
+.es-presentation-controls .unity-base-popup-field__arrow,
+.es-presentation-controls .unity-base-slider__tracker,
+.es-presentation-controls .unity-base-slider__dragger,
+.es-presentation-controls .unity-slider__tracker,
+.es-presentation-controls .unity-property-field__input,
+.es-presentation-controls .unity-foldout__content {
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.es-presentation-controls .unity-help-box,
+.es-presentation-controls .unity-box,
+.es-presentation-controls .unity-scroll-view,
+.es-presentation-controls .unity-scroll-view__content-viewport,
+.es-presentation-controls .unity-list-view,
+.es-presentation-controls .unity-list-view__item,
+.es-presentation-controls .unity-tree-view,
+.es-presentation-controls .unity-tree-view__item,
+.es-presentation-controls .unity-collection-view,
+.es-presentation-controls .unity-collection-view__item,
+.es-presentation-controls .unity-tab,
+.es-presentation-controls .unity-tab-view__content,
+.es-presentation-controls .unity-tab__content,
+.es-presentation-controls .unity-property-field,
+.es-presentation-controls .unity-inspector-element,
+.es-presentation-controls .unity-two-pane-split-view,
+.es-presentation-controls .unity-two-pane-split-view__content-container,
+.es-presentation-controls .unity-split-view,
+.es-presentation-controls .unity-progress-bar,
+.es-presentation-controls .unity-progress-bar__background,
+.es-presentation-controls .unity-scroller,
+.es-presentation-controls .unity-scroll-view__horizontal-scroller,
+.es-presentation-controls .unity-scroll-view__vertical-scroller {
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.es-presentation-controls .unity-foldout__content,
+.es-presentation-controls .unity-popup-window,
+.es-presentation-controls .unity-dropdown,
+.es-presentation-controls .unity-base-popup-field__input,
+.es-presentation-controls .unity-popup-field__input,
+.es-presentation-controls .unity-scroller__low-button,
+.es-presentation-controls .unity-scroller__high-button,
+.es-presentation-controls .unity-split-view__dragline,
+.es-presentation-controls .unity-two-pane-split-view__dragline,
+.es-presentation-controls #ESWindowShell,
+.es-presentation-controls #ESWindowHeader,
+.es-presentation-controls #ESWindowContent,
+.es-presentation-controls #ESWindowStatusBar {
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.es-presentation-controls .unity-progress-bar__progress,
+.es-presentation-controls .unity-scroller__slider {
+    border-top-left-radius: 999px;
+    border-top-right-radius: 999px;
+    border-bottom-left-radius: 999px;
+    border-bottom-right-radius: 999px;
+}
+
+.es-presentation-controls .unity-base-slider__tracker,
+.es-presentation-controls .unity-min-max-slider__tracker,
+.es-presentation-controls .unity-slider__tracker {
+    border-top-left-radius: 999px;
+    border-top-right-radius: 999px;
+    border-bottom-left-radius: 999px;
+    border-bottom-right-radius: 999px;
+}
+
+/* Extended surface coverage. These selectors cover nested Unity containers
+   and ES-owned cards so the visual language remains coherent beyond buttons. */
+.es-presentation-controls .unity-inspector-element__header,
+.es-presentation-controls .unity-base-field__input-container,
+.es-presentation-controls .unity-base-slider,
+.es-presentation-controls .unity-min-max-slider__dragger,
+.es-presentation-controls .unity-toggle__checkmark,
+.es-presentation-controls .unity-foldout__content-container,
+.es-presentation-controls .unity-tab__header,
+.es-presentation-controls .unity-tab-view__header,
+.es-presentation-controls .unity-dropdown-menu,
+.es-presentation-controls .unity-notification,
+.es-presentation-controls .unity-editor-toolbar-element {
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
+
+.es-presentation-controls .es-window-surface,
+.es-presentation-controls .es-window-header,
+.es-presentation-controls .es-window-toolbar,
+.es-presentation-controls .es-window-content,
+.es-presentation-controls .es-window-status,
+.es-presentation-controls .es-dialog-content,
+.es-presentation-controls .es-dialog-body,
+.es-presentation-controls .es-dialog-summary,
+.es-presentation-controls .es-dialog-field,
+.es-presentation-controls .es-dialog-multichoice,
+.es-presentation-controls .es-dialog-recommendation,
+.es-presentation-controls .es-dialog-validation,
+.es-presentation-controls .es-dialog-footer,
+.es-presentation-controls .es-dialog-busy-card {
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.es-presentation-controls .es-dialog-branded .es-dialog-identity-strip {
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
+    border-bottom-left-radius: 7px;
+    border-bottom-right-radius: 7px;
+}
+
+.es-presentation-controls .es-dialog-brand-mark {
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    -unity-font-style: bold;
+}
+
+.es-presentation-controls .es-dialog-actions,
+.es-presentation-controls .es-dialog-decision-actions,
+.es-presentation-controls .es-window-header-actions {
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.es-presentation-controls .es-dialog-busy-overlay {
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+.es-presentation-controls .es-window-opening-gate,
+.es-presentation-controls .es-window-opening-gate-content {
+    border-top-left-radius: 11px;
+    border-top-right-radius: 11px;
+    border-bottom-left-radius: 11px;
+    border-bottom-right-radius: 11px;
+    overflow: hidden;
+}
+
+.es-presentation-controls .es-empty-state,
+.es-presentation-controls .es-error-state,
+.es-presentation-controls .es-panel-section,
+.es-presentation-controls .es-functional-section,
+.es-presentation-controls .es-panel-notice,
+.es-presentation-controls .es-progress-task {
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.es-presentation-controls .es-functional-section-header,
+.es-presentation-controls .es-functional-section-actions,
+.es-presentation-controls .es-progress-header {
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}

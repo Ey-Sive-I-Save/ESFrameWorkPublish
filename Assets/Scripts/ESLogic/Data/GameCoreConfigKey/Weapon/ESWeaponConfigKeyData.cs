@@ -26,6 +26,11 @@ namespace ES
     public sealed class ESWeaponRuntimeData : ESGameCoreRuntimeData
     {
         private readonly ItemWeaponSharedData ownedDefaultSharedData = new ItemWeaponSharedData();
+        [NonSerialized] private ItemWeaponSharedData preparedSharedData;
+        [NonSerialized] private ItemWeaponVariableData preparedDefaultVariableData;
+        [NonSerialized] private ESAssetIdentity preparedPrefabIdentity;
+        [NonSerialized] private int preparedItemRuntimeKey;
+        [NonSerialized] private bool hasPreparedData;
 
         public string keyName;
         public string displayName;
@@ -35,6 +40,99 @@ namespace ES
         public ItemWeaponSharedData sharedData;
         public ItemWeaponVariableData defaultVariableData;
         public ESAssetReferPrefabConfigKey prefabKey;
+
+        internal ItemWeaponSharedData PreparedSharedData => hasPreparedData
+            ? preparedSharedData
+            : null;
+
+        internal ItemWeaponVariableData PreparedDefaultVariableData => hasPreparedData
+            ? preparedDefaultVariableData
+            : default;
+
+        internal bool TryGetPreparedPrefabIdentity(out ESAssetIdentity identity)
+        {
+            identity = preparedPrefabIdentity;
+            return hasPreparedData && identity.IsValid;
+        }
+
+        internal bool TryGetPreparedItemRuntimeKey(out int runtimeKey)
+        {
+            runtimeKey = preparedItemRuntimeKey;
+            return hasPreparedData && runtimeKey > 0;
+        }
+
+        internal bool Internal_TryPrepare(int enumKey, string stringKey, out string error)
+        {
+            Internal_ClearPrepared();
+            if (sharedData == null)
+            {
+                error = "WeaponDefinition 不能为空。";
+                return false;
+            }
+            if (!sharedData.ValidateDefinition(out error)
+                || !sharedData.ValidateInitialState(defaultVariableData, out error))
+                return false;
+            if (!ESWeaponConfigKeyTable.TryValidatePrefabIdentity(prefabKey, out error))
+                return false;
+
+            preparedSharedData = sharedData.Internal_CreatePreparedCopy();
+            preparedDefaultVariableData = defaultVariableData;
+            preparedPrefabIdentity = new ESAssetIdentity(prefabKey.guid, prefabKey.localFileId);
+            if (!TryResolveItemProjection(enumKey, stringKey, out preparedItemRuntimeKey, out error))
+            {
+                Internal_ClearPrepared();
+                return false;
+            }
+            hasPreparedData = true;
+            error = null;
+            return true;
+        }
+
+        private bool TryResolveItemProjection(
+            int enumKey,
+            string stringKey,
+            out int itemRuntimeKey,
+            out string error)
+        {
+            itemRuntimeKey = 0;
+            if (soSource == null)
+            {
+                error = null;
+                return true;
+            }
+
+            ESItemConfigKey itemKey = soSource.itemKey;
+            if (itemKey == null
+                || !itemKey.IsConfigured
+                || !ESRuntimeDataGameCore.Items.TryGetRuntimeKey(itemKey, out itemRuntimeKey)
+                || !ESRuntimeDataGameCore.Items.TryGet(itemRuntimeKey, out ESItemRuntimeData itemData)
+                || itemData == null
+                || !itemData.Ready
+                || itemData.kind != ItemKind.Weapon
+                || itemData.weaponKey == null
+                || !ESConfigKeyMatch.Matches(
+                    itemData.weaponKey.EnumKeyInt,
+                    itemData.weaponKey.StringKey,
+                    enumKey,
+                    stringKey))
+            {
+                itemRuntimeKey = 0;
+                error = "WeaponDefinition 无法冻结匹配的 Item 投影身份。";
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        internal void Internal_ClearPrepared()
+        {
+            hasPreparedData = false;
+            preparedSharedData = null;
+            preparedDefaultVariableData = default;
+            preparedPrefabIdentity = default;
+            preparedItemRuntimeKey = 0;
+        }
 
         internal ItemWeaponSharedData PrepareDefaultSharedData()
         {
@@ -47,6 +145,7 @@ namespace ES
 
         protected override void ReleaseRuntimePayload()
         {
+            Internal_ClearPrepared();
             soSource = null;
             sharedData = null;
             defaultVariableData = default;
@@ -70,6 +169,18 @@ namespace ES
             out int runtimeKey,
             string debugName = null)
             => TryCommitRetained((ESWeaponConfigKey)key, data, out runtimeKey, debugName);
+
+        protected override bool CanRegisterRetainedData(
+            int enumKey,
+            string stringKey,
+            ESWeaponRuntimeData data)
+        {
+            if (data != null && data.Internal_TryPrepare(enumKey, stringKey, out _))
+                return true;
+
+            AbandonRetained(data);
+            return false;
+        }
 
         /// <summary>注入现成权威 Weapon 定义；Table 不修改也不回收 SharedData。</summary>
         public int InjectWith(
@@ -254,6 +365,28 @@ namespace ES
             runtimeData.defaultVariableData = defaultVariableData;
             runtimeData.prefabKey = prefabKey;
             return runtimeData;
+        }
+
+        internal static bool TryValidatePrefabIdentity(
+            ESAssetReferPrefabConfigKey prefabKey,
+            out string error)
+        {
+            if (prefabKey == null || !prefabKey.IsConfigured || !prefabKey.HasGuid)
+            {
+                error = "WeaponDefinition 必须冻结完整 Prefab GUID 资产身份。";
+                return false;
+            }
+            if (!string.Equals(
+                    prefabKey.assetTypeName,
+                    typeof(GameObject).FullName,
+                    StringComparison.Ordinal))
+            {
+                error = "WeaponDefinition 的 Prefab Key 资产类型必须为 UnityEngine.GameObject。";
+                return false;
+            }
+
+            error = null;
+            return true;
         }
 
         private static void ResolveDefaults(

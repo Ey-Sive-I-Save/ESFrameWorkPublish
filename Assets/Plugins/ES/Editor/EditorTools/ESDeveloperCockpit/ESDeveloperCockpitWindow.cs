@@ -26,6 +26,7 @@ namespace ES
         {
             return new GUIContent("ES 开发者驾驶舱", "观察同帧角色控制快照与开发者事件流");
         }
+        public override string ESWindow_PresentationShortTitle => "驾驶舱";
 
         protected override string ESWindow_Subtitle => "ContextSnapshot 与 Frame-Aligned Observation";
         protected override Vector2 ESWindow_MinSize => new Vector2(560f, 360f);

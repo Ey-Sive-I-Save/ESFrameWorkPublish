@@ -7,6 +7,6 @@ namespace ES.EditorInternal
         AgentSkillOnly = 2,
         MindMapPaired = 3,
         SceneScanReview = 4,
-        AISkillMultiPortWorkflow = 5
+        SceneQualityReview = 5
     }
 }

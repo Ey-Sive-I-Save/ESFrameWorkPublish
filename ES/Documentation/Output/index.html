@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="ESFrameWorkPublish 的本地代码分析文档。">
+  <title>快速开始 | ESFrameWorkPublish</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f7f8f8;
+      --surface: #ffffff;
+      --surface-soft: #f1f4f4;
+      --surface-strong: #e7ecec;
+      --ink: #172223;
+      --ink-soft: #526062;
+      --ink-faint: #7b898b;
+      --line: #dce3e3;
+      --line-strong: #c6d0d0;
+      --accent: #006f6d;
+      --accent-soft: #e1f2f0;
+      --accent-ink: #005452;
+      --blue: #1769aa;
+      --blue-soft: #e5f1fa;
+      --code-bg: #172326;
+      --code-ink: #dce8e8;
+      --shadow: 0 12px 34px rgba(23, 34, 35, .07);
+    }
+
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --canvas: #121919;
+      --surface: #192222;
+      --surface-soft: #202b2b;
+      --surface-strong: #293535;
+      --ink: #e8eeee;
+      --ink-soft: #acbcbc;
+      --ink-faint: #809393;
+      --line: #304040;
+      --line-strong: #415151;
+      --accent: #51b9b4;
+      --accent-soft: #173d3b;
+      --accent-ink: #9ce3df;
+      --blue: #76b7e8;
+      --blue-soft: #17364b;
+      --code-bg: #0d1516;
+      --code-ink: #e1eeee;
+      --shadow: 0 12px 34px rgba(0, 0, 0, .22);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      min-width: 320px;
+      margin: 0;
+      color: var(--ink);
+      background-color: var(--canvas);
+      background-image: linear-gradient(rgba(82, 96, 98, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(82, 96, 98, .035) 1px, transparent 1px);
+      background-size: 24px 24px;
+      font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    button, input { font: inherit; }
+    button { color: inherit; }
+    a { color: inherit; text-decoration: none; }
+    code, pre, .path { font-family: "Cascadia Code", Consolas, "SFMono-Regular", monospace; }
+
+    .app-shell { min-height: 100vh; }
+    .sidebar {
+      position: fixed;
+      z-index: 20;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      display: flex;
+      width: 262px;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      background: color-mix(in srgb, var(--surface) 94%, transparent);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 67px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand-mark {
+      display: grid;
+      width: 31px;
+      height: 31px;
+      place-items: center;
+      border: 1px solid #0a7774;
+      border-radius: 6px;
+      color: #fff;
+      background: #0b7673;
+      font-family: Georgia, serif;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .brand-name { font-size: 16px; font-weight: 700; }
+    .brand-kind { color: var(--ink-faint); font-size: 11px; }
+
+    .repository {
+      margin: 17px 14px 11px;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface-soft);
+    }
+    .repository-label { display: block; margin-bottom: 3px; color: var(--ink-faint); font-size: 10px; font-weight: 700; }
+    .repository-name { display: block; overflow: hidden; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+
+    .docs-nav { flex: 1; overflow-y: auto; padding: 3px 10px 24px; }
+    .nav-group { margin-top: 17px; }
+    .nav-heading { padding: 0 9px 6px; color: var(--ink-faint); font-size: 10px; font-weight: 750; }
+    .nav-link {
+      display: flex;
+      align-items: center;
+      min-height: 33px;
+      padding: 5px 9px;
+      border-radius: 5px;
+      color: var(--ink-soft);
+      font-size: 13px;
+      transition: color .15s ease, background .15s ease;
+    }
+    .nav-link:hover { color: var(--ink); background: var(--surface-strong); }
+    .nav-link.active { color: var(--accent-ink); background: var(--accent-soft); font-weight: 700; }
+    .nav-link.indented { padding-left: 22px; }
+
+    .sidebar-foot { padding: 13px 16px 16px; border-top: 1px solid var(--line); }
+    .analysis-meta { color: var(--ink-faint); font-size: 11px; line-height: 1.5; }
+    .analysis-meta strong { color: var(--ink-soft); font-weight: 650; }
+
+    .page-frame { margin-left: 262px; }
+    .topbar {
+      position: sticky;
+      z-index: 10;
+      top: 0;
+      display: flex;
+      align-items: center;
+      min-height: 67px;
+      gap: 16px;
+      padding: 0 32px;
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--canvas) 87%, transparent);
+      backdrop-filter: blur(12px);
+    }
+    .crumbs { min-width: 0; flex: 1; overflow: hidden; color: var(--ink-faint); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .crumbs strong { color: var(--ink-soft); font-weight: 650; }
+    .top-actions { display: flex; align-items: center; gap: 7px; }
+    .icon-button {
+      display: grid;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: var(--surface);
+      cursor: pointer;
+      font-size: 17px;
+      line-height: 1;
+    }
+    .icon-button:hover { border-color: var(--line-strong); background: var(--surface-soft); }
+    .mobile-nav-button { display: none; }
+
+    .document-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 790px) 194px;
+      gap: 48px;
+      width: min(1088px, calc(100% - 64px));
+      margin: 0 auto;
+      padding: 48px 0 94px;
+    }
+    .article { min-width: 0; }
+    .article-header { padding-bottom: 32px; border-bottom: 1px solid var(--line); }
+    .eyebrow { margin: 0 0 10px; color: var(--accent); font-size: 11px; font-weight: 800; }
+    h1, h2, h3 { letter-spacing: 0; line-height: 1.25; }
+    h1 { margin: 0; font-size: 34px; font-weight: 760; }
+    h2 { margin: 58px 0 17px; padding-top: 5px; font-size: 23px; font-weight: 750; scroll-margin-top: 90px; }
+    h3 { margin: 28px 0 10px; font-size: 16px; font-weight: 750; scroll-margin-top: 90px; }
+    p { margin: 0 0 15px; color: var(--ink-soft); }
+    .lead { max-width: 706px; margin-top: 15px; color: var(--ink-soft); font-size: 17px; line-height: 1.72; }
+    .article strong { color: var(--ink); }
+
+    .stat-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 23px; }
+    .stat { padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-soft); background: var(--surface); font-size: 11px; }
+    .stat b { color: var(--ink); font-weight: 750; }
+
+    .source-ref {
+      display: inline-flex;
+      align-items: center;
+      max-width: 100%;
+      margin: 3px 0 18px;
+      padding: 5px 8px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--blue);
+      background: var(--blue-soft);
+      cursor: pointer;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 11px;
+      text-align: left;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .source-ref:hover { border-color: var(--blue); }
+
+    .callout {
+      margin: 23px 0;
+      padding: 15px 17px;
+      border-left: 3px solid var(--accent);
+      border-radius: 0 5px 5px 0;
+      background: var(--accent-soft);
+    }
+    .callout-title { display: block; margin-bottom: 4px; color: var(--accent-ink); font-size: 12px; font-weight: 800; }
+    .callout p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+
+    .steps { display: grid; gap: 13px; margin: 21px 0 23px; counter-reset: step; }
+    .step { position: relative; padding: 0 0 0 39px; counter-increment: step; }
+    .step::before { position: absolute; left: 0; top: 1px; display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--accent-ink); background: var(--surface); content: counter(step); font-size: 11px; font-weight: 750; }
+    .step:not(:last-child)::after { position: absolute; top: 29px; bottom: -9px; left: 12px; border-left: 1px dashed var(--line-strong); content: ""; }
+    .step-title { display: block; padding-top: 1px; color: var(--ink); font-size: 14px; font-weight: 750; }
+    .step p { margin: 3px 0 0; font-size: 13px; }
+
+    pre {
+      margin: 18px 0 24px;
+      padding: 17px 19px;
+      overflow-x: auto;
+      border: 1px solid #26373a;
+      border-radius: 6px;
+      color: var(--code-ink);
+      background: var(--code-bg);
+      box-shadow: var(--shadow);
+      font-size: 12px;
+      line-height: 1.68;
+    }
+    code.inline { padding: 2px 5px; border: 1px solid var(--line); border-radius: 3px; color: var(--accent-ink); background: var(--surface-soft); font-size: .88em; }
+    .code-comment { color: #8da7a8; }
+    .code-keyword { color: #9fd6d2; }
+    .code-type { color: #83b9ef; }
+    .code-string { color: #e2b77d; }
+
+    .architecture {
+      display: grid;
+      gap: 12px;
+      margin: 24px 0 25px;
+      padding: 19px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+    }
+    .architecture-caption { margin: 0 0 3px; color: var(--ink-faint); font-size: 11px; font-weight: 750; }
+    .architecture-root { display: flex; justify-content: center; }
+    .architecture-branches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .arch-node {
+      min-height: 60px;
+      padding: 11px;
+      border: 1px solid var(--line-strong);
+      border-radius: 5px;
+      background: var(--surface);
+      text-align: center;
+    }
+    .arch-node.primary { min-width: 180px; border-color: #52aaa6; background: var(--accent-soft); }
+    .arch-node-title { display: block; color: var(--ink); font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; font-weight: 750; }
+    .arch-node-note { display: block; margin-top: 3px; color: var(--ink-faint); font-size: 10px; }
+    .arch-connector { height: 15px; margin: -3px 18% 0; border-top: 1px solid var(--line-strong); border-left: 1px solid var(--line-strong); border-right: 1px solid var(--line-strong); }
+
+    .module-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 20px 0 25px; }
+    .module-entry { min-height: 106px; padding: 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+    .module-entry h3 { margin: 0 0 6px; color: var(--ink); font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; }
+    .module-entry p { margin: 0; font-size: 12px; line-height: 1.55; }
+    .module-tag { display: inline-block; margin-bottom: 7px; padding: 1px 5px; border-radius: 3px; color: var(--accent-ink); background: var(--accent-soft); font-size: 10px; font-weight: 700; }
+
+    .data-table { width: 100%; margin: 20px 0 26px; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; border-spacing: 0; background: var(--surface); font-size: 12px; }
+    .data-table th, .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .data-table th { color: var(--ink-faint); background: var(--surface-soft); font-size: 10px; font-weight: 800; }
+    .data-table tr:last-child td { border-bottom: 0; }
+    .data-table code { color: var(--accent-ink); font-size: 11px; }
+
+    .checklist { padding: 0; list-style: none; }
+    .checklist li { position: relative; margin: 8px 0; padding-left: 23px; color: var(--ink-soft); font-size: 13px; }
+    .checklist li::before { position: absolute; left: 0; top: 4px; width: 12px; height: 7px; border-bottom: 2px solid var(--accent); border-left: 2px solid var(--accent); content: ""; transform: rotate(-45deg); }
+
+    .toc { position: sticky; top: 95px; align-self: start; border-left: 1px solid var(--line); padding-left: 17px; }
+    .toc-title { display: block; margin: 0 0 8px; color: var(--ink-faint); font-size: 10px; font-weight: 800; }
+    .toc a { display: block; margin: 5px 0; color: var(--ink-faint); font-size: 11px; line-height: 1.45; }
+    .toc a:hover, .toc a.active { color: var(--accent-ink); }
+    .toc a.sub { padding-left: 9px; }
+
+    .article-footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: 11px; }
+    .article-footer .path { display: inline-block; margin-top: 7px; color: var(--ink-soft); }
+
+    .search-layer {
+      position: fixed;
+      z-index: 40;
+      inset: 0;
+      display: none;
+      padding: min(16vh, 140px) 18px 18px;
+      background: rgba(13, 23, 23, .48);
+      backdrop-filter: blur(3px);
+    }
+    .search-layer.open { display: block; }
+    .search-panel { width: min(585px, 100%); margin: 0 auto; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); box-shadow: 0 24px 70px rgba(0, 0, 0, .24); }
+    .search-field { width: 100%; height: 52px; padding: 0 16px; border: 0; border-bottom: 1px solid var(--line); outline: none; color: var(--ink); background: var(--surface); font-size: 15px; }
+    .search-results { max-height: 342px; overflow-y: auto; padding: 6px; }
+    .search-result { display: block; width: 100%; padding: 10px; border: 0; border-radius: 4px; color: var(--ink-soft); background: transparent; cursor: pointer; text-align: left; }
+    .search-result:hover, .search-result:focus { color: var(--ink); background: var(--surface-soft); outline: 0; }
+    .search-result strong { display: block; color: var(--ink); font-size: 13px; }
+    .search-result span { display: block; margin-top: 1px; color: var(--ink-faint); font-size: 11px; }
+    .search-empty { padding: 19px 10px; color: var(--ink-faint); font-size: 12px; text-align: center; }
+
+    .toast { position: fixed; z-index: 50; right: 20px; bottom: 20px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: 5px; color: var(--ink); background: var(--surface); box-shadow: var(--shadow); font-size: 12px; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .18s ease, transform .18s ease; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 1020px) {
+      .document-layout { grid-template-columns: minmax(0, 760px); width: min(760px, calc(100% - 52px)); }
+      .toc { display: none; }
+    }
+    @media (max-width: 760px) {
+      .sidebar { width: 270px; box-shadow: var(--shadow); transform: translateX(-102%); transition: transform .18s ease; }
+      .sidebar.open { transform: translateX(0); }
+      .page-frame { margin-left: 0; }
+      .topbar { min-height: 58px; padding: 0 16px; gap: 10px; }
+      .mobile-nav-button { display: grid; }
+      .crumbs { font-size: 11px; }
+      .document-layout { width: min(100% - 32px, 760px); padding: 31px 0 58px; }
+      h1 { font-size: 28px; }
+      h2 { margin-top: 44px; font-size: 21px; }
+      .lead { font-size: 16px; }
+      .architecture-branches { grid-template-columns: 1fr; }
+      .arch-connector { display: none; }
+      .arch-node.primary { min-width: 0; }
+      .module-grid { grid-template-columns: 1fr; }
+      .data-table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="文档导航">
+      <a class="brand" href="#overview" aria-label="ESFrameWorkPublish 文档首页">
+        <span class="brand-mark">ES</span>
+        <span><span class="brand-name">ESFrameWork</span><span class="brand-kind">本地代码文档</span></span>
+      </a>
+      <div class="repository">
+        <span class="repository-label">ANALYZED REPOSITORY</span>
+        <span class="repository-name">ESFrameWorkPublish</span>
+      </div>
+      <nav class="docs-nav">
+        <div class="nav-group">
+          <div class="nav-heading">开始</div>
+          <a class="nav-link active" href="#overview">快速开始</a>
+          <a class="nav-link" href="#entry">框架入口</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-heading">架构</div>
+          <a class="nav-link" href="#domains">Core / Domain / Module</a>
+          <a class="nav-link" href="#modules">默认运行模块</a>
+          <a class="nav-link indented" href="#runtime-data">运行时数据</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-heading">运行时</div>
+          <a class="nav-link" href="#state">状态系统</a>
+          <a class="nav-link" href="#tags">标签集合</a>
+          <a class="nav-link" href="#physics">物理查询</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-heading">参考</div>
+          <a class="nav-link" href="#scope">分析范围</a>
+          <a class="nav-link" href="#sources">关键源码</a>
+        </div>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="analysis-meta"><strong>本地静态分析</strong><br>422 C# 文件 · 80,768 行</div>
+      </div>
+    </aside>
+
+    <div class="page-frame">
+      <header class="topbar">
+        <button class="icon-button mobile-nav-button" id="nav-toggle" type="button" aria-label="打开文档导航" title="文档导航">☰</button>
+        <div class="crumbs"><strong>ESFrameWorkPublish</strong> <span>/</span> Assets <span>/</span> Scripts <span>/</span> ESLogic</div>
+        <div class="top-actions">
+          <button class="icon-button" id="search-toggle" type="button" aria-label="搜索文档" title="搜索">⌕</button>
+          <button class="icon-button" id="theme-toggle" type="button" aria-label="切换颜色模式" title="切换颜色模式">◐</button>
+        </div>
+      </header>
+
+      <main class="document-layout">
+        <article class="article">
+          <header class="article-header" id="overview">
+            <p class="eyebrow">QUICK START</p>
+            <h1>ESFrameWork 快速开始</h1>
+            <p class="lead">ESFrameWorkPublish 是一个面向 Unity 的模块化游戏框架。它以 <strong>ESGameManager</strong> 为全局 Core，按系统、流程、世界三个 Domain 收纳模块，并为常用运行时能力建立默认模块。</p>
+            <div class="stat-row" aria-label="分析统计">
+              <span class="stat"><b>422</b> C# 文件</span>
+              <span class="stat"><b>80,768</b> 代码行</span>
+              <span class="stat"><b>15</b> Runtime 目录</span>
+              <span class="stat"><b>3</b> 模块 Domain</span>
+            </div>
+          </header>
+
+          <section id="entry">
+            <h2>从 ESGameManager 启动</h2>
+            <p>在启动场景创建一个 <code class="inline">ESGameManager</code> 组件。它以较早的 Unity 执行顺序运行，建立单例并可选择跨场景保留；随后注册三个 Domain，再按 Inspector 开关取得默认模块。</p>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\GameManager\-GameManager_Core\ESGameManager.cs" data-lines="6-100">ESGameManager.cs · L6-L100</button>
+
+            <div class="steps">
+              <div class="step"><span class="step-title">创建全局管理器</span><p>在首个场景放置一个空对象并添加 <code class="inline">ESGameManager</code>。重复实例会在 <code class="inline">Awake</code> 中被销毁。</p></div>
+              <div class="step"><span class="step-title">决定持久化策略</span><p>默认 <code class="inline">dontDestroyOnLoad = true</code>，场景切换后管理器继续保留。</p></div>
+              <div class="step"><span class="step-title">检查默认模块开关</span><p>命令、输入、运行时数据、对象池、物理查询与 LOD 模块都由管理器的布尔配置控制。</p></div>
+            </div>
+
+            <pre><code><span class="code-comment">// 场景中只需要一个 ESGameManager</span>
+<span class="code-keyword">using</span> ES;
+
+<span class="code-keyword">public sealed class</span> <span class="code-type">GameBootstrap</span> : MonoBehaviour
+{
+    [SerializeField] <span class="code-keyword">private</span> <span class="code-type">ESGameManager</span> gameManager;
+
+    <span class="code-keyword">private void</span> Awake()
+    {
+        <span class="code-comment">// ESGameManager 自身会在 Awake 中注册 Domain 与默认模块。</span>
+        Debug.Assert(gameManager != <span class="code-keyword">null</span>);
+    }
+}</code></pre>
+
+            <div class="callout"><span class="callout-title">启动时序</span><p><code class="inline">OnBeforeAwakeRegister</code> 会发送全局唤醒事件；<code class="inline">OnAwakeRegisterOnly</code> 注册 Domain；<code class="inline">OnAfterAwakeRegister</code> 再按开关创建默认模块。</p></div>
+          </section>
+
+          <section id="domains">
+            <h2>Core / Domain / Module</h2>
+            <p>框架把全局能力按职责分层。<strong>Core</strong> 持有全局生命周期，<strong>Domain</strong> 限定模块类别，<strong>Module</strong> 则承载具体运行能力。这个边界由泛型基类表达，而不是只依赖目录命名。</p>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\GameManager\-GameManager_Core\ESGameManager.Domains.cs" data-lines="6-21">ESGameManager.Domains.cs · L6-L21</button>
+
+            <div class="architecture" role="img" aria-label="ESGameManager 通过三个 Domain 管理对应类别的模块">
+              <p class="architecture-caption">ESGameManager 的模块边界</p>
+              <div class="architecture-root"><div class="arch-node primary"><span class="arch-node-title">ESGameManager : Core</span><span class="arch-node-note">全局单例与生命周期入口</span></div></div>
+              <div class="arch-connector"></div>
+              <div class="architecture-branches">
+                <div class="arch-node"><span class="arch-node-title">ESSystemDomain</span><span class="arch-node-note">ESSystemModule</span></div>
+                <div class="arch-node"><span class="arch-node-title">ESFlowDomain</span><span class="arch-node-note">ESFlowModule / ESRuntimeModule</span></div>
+                <div class="arch-node"><span class="arch-node-title">ESWorldDomain</span><span class="arch-node-note">ESWorldModule / ESPlayerModule</span></div>
+              </div>
+            </div>
+
+            <p><code class="inline">ESSystemModule</code>、<code class="inline">ESFlowModule</code> 与 <code class="inline">ESWorldModule</code> 都提供 <code class="inline">Game</code> 访问器以及 <code class="inline">TryGetModule</code>、<code class="inline">GetOrCreateModule</code> 辅助方法。运行时模块继承自流程模块，玩家模块继承自世界模块。</p>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\GameManager\-GameManager_Core\ESGameManager.ModuleBase.cs" data-lines="6-78">ESGameManager.ModuleBase.cs · L6-L78</button>
+          </section>
+
+          <section id="modules">
+            <h2>默认运行模块</h2>
+            <p>新建管理器时，以下模块默认由 <code class="inline">OnAfterAwakeRegister</code> 按配置取得。模块之间通过管理器的泛型查找接口协作，避免在业务脚本中维护平行的全局单例。</p>
+            <div class="module-grid">
+              <div class="module-entry"><span class="module-tag">Runtime</span><h3>ESCommandModule</h3><p>在 <code class="inline">Update</code> 中驱动全局命令播放器，并在销毁时清空播放器集合。</p></div>
+              <div class="module-entry"><span class="module-tag">System</span><h3>ESInputModule</h3><p>管理输入系统来源、虚拟输入来源和输入方案解析。</p></div>
+              <div class="module-entry"><span class="module-tag">System</span><h3>ESRuntimeDataModule</h3><p>构建 GameCore 与资产配置表，并初始化资源加载服务。</p></div>
+              <div class="module-entry"><span class="module-tag">Runtime</span><h3>ESGameObjectPoolModule</h3><p>提供游戏对象复用能力，减少高频创建与销毁。</p></div>
+              <div class="module-entry"><span class="module-tag">Runtime</span><h3>ESPhysicsQueryModule</h3><p>集中 LayerMask、NonAlloc 查询缓冲区与查询统计。</p></div>
+              <div class="module-entry"><span class="module-tag">Runtime</span><h3>ESLODModule</h3><p>维护全局 LOD 策略和运行时级别控制。</p></div>
+            </div>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\GameManager\Modules\Runtime\MODULE_ESCommandModule.cs" data-lines="7-26">MODULE_ESCommandModule.cs · L7-L26</button>
+          </section>
+
+          <section id="runtime-data">
+            <h2>运行时数据与资源桥接</h2>
+            <p><code class="inline">ESRuntimeDataGameCore</code> 为 Buff、Shot、Monster、NPC、Weapon 和 Skill 各保留一张运行时 Key 表。<code class="inline">ESRuntimeDataAsset</code> 则建立 Prefab、Sprite、音频、动画、场景等资产类型表，并在全量重建前检查构建状态与未完成加载。</p>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\GameManager\Modules\Runtime\MODULE_ESRuntimeDataModule.cs" data-lines="14-165">MODULE_ESRuntimeDataModule.cs · L14-L165</button>
+
+            <table class="data-table">
+              <thead><tr><th>数据层</th><th>代表表</th><th>职责</th></tr></thead>
+              <tbody>
+                <tr><td>GameCore</td><td><code>ESBuffConfigKeyTable</code></td><td>为战斗和游戏配置建立运行时查找表。</td></tr>
+                <tr><td>Asset</td><td><code>ESAssetConfigKeyTable&lt;T&gt;</code></td><td>按资源类型登记并协调异步加载状态。</td></tr>
+                <tr><td>Bootstrap</td><td><code>ESRuntimeDataBootstrapBridge</code></td><td>在场景加载前登记初始化回调，也支持动态程序集加载后的显式登记。</td></tr>
+              </tbody>
+            </table>
+
+            <p>发布资源启动桥会在资源初始化时确保管理器和运行时数据模块存在；如果二者均未建立，它会创建名为 <code class="inline">ESGameManager</code> 的对象，然后异步初始化资源加载。</p>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\GameManager\Modules\Runtime\ESRuntimeDataBootstrapBridge.cs" data-lines="8-30">ESRuntimeDataBootstrapBridge.cs · L8-L30</button>
+          </section>
+
+          <section id="state">
+            <h2>状态系统</h2>
+            <p><code class="inline">StateBase</code> 是状态本体的 partial 类型入口，具体职责拆分为 Core、Pooling、Animation、Progress、IK、MatchTarget 和 Debug 文件。状态机负责驱动进入、更新和退出；业务侧要与状态严格同步时，应复用 <code class="inline">StateLifecycleTracker</code>，而非重复实现布尔生命周期守卫。</p>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\State\Core\StateBase\StateBase.cs" data-lines="3-49">StateBase.cs · L3-L49</button>
+
+            <h3>绑定与运行时缓存</h3>
+            <p><code class="inline">BindHostMachine</code> 绑定宿主状态机后刷新共享数据缓存。实现明确将配置引用与特性标记缓存到字段，使每帧 Update 热路径读取缓存；缺少动画配置或 Calculator 时会降级为无动画，避免空引用。</p>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\State\Core\StateBase\StateBase.Core.cs" data-lines="60-187">StateBase.Core.cs · L60-L187</button>
+          </section>
+
+          <section id="tags">
+            <h2>标签集合</h2>
+            <p><code class="inline">ESTagCollection</code> 是与 Entity 和业务权限解耦的通用运行时标签容器。它维护引用计数、热标签位掩码、稀疏标签、快照与变更事件。外部系统可通过 <code class="inline">Acquire</code> 获得 <code class="inline">ESTagLease</code>；宿主自身则可用 <code class="inline">SetTag</code> 管理自己的单一贡献。</p>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\Tag\ESTagCollection.cs" data-lines="7-220">ESTagCollection.cs · L7-L220</button>
+            <div class="callout"><span class="callout-title">所有权约定</span><p>源码明确区分宿主的无句柄写入与外部系统的 Lease/LeaseSet 写入。这样关闭宿主标签时，只会移除宿主自己的增量，不会影响其他贡献者。</p></div>
+          </section>
+
+          <section id="physics">
+            <h2>物理查询</h2>
+            <p>物理模块集中定义项目 Layer 与组合查询掩码，并以 <code class="inline">RaycastNonAlloc</code>、<code class="inline">SphereCastNonAlloc</code> 和 Overlap NonAlloc API 执行查询。它维护共享 Raycast/Collider 缓冲区、计数器和容量溢出记录。</p>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\GameManager\Modules\Runtime\MODULE_ESPhysicsQueryModule.cs" data-lines="11-448">MODULE_ESPhysicsQueryModule.cs · L11-L448</button>
+            <ul class="checklist">
+              <li>通过 <code class="inline">ESPhysicsLayers</code> 集中复用移动、地面探测、飞行物命中、交互和 AI 掩码。</li>
+              <li>启动时创建指定容量的共享缓冲区；配置变更后按需重新分配。</li>
+              <li>当返回数量达到缓存容量时，记录 <code class="inline">overflowCount</code>，用于发现缓冲区不足。</li>
+            </ul>
+          </section>
+
+          <section id="scope">
+            <h2>分析范围</h2>
+            <p>此文档只统计并解读项目业务框架目录 <code class="inline">Assets/Scripts/ESLogic</code>。第三方代码、供应商插件与示例工程未被作为 ESFrameWork 核心的一部分，以避免把 Cinemachine、Odin Inspector、RootMotion 等外部依赖误归属到本框架。</p>
+            <table class="data-table">
+              <thead><tr><th>Runtime 子目录</th><th>文件数</th><th>主要内容</th></tr></thead>
+              <tbody>
+                <tr><td>State</td><td>102</td><td>状态、动画、IK、MatchTarget 与运行时层。</td></tr>
+                <tr><td>Developer</td><td>79</td><td>开发组件、值入口、工具和示例支持。</td></tr>
+                <tr><td>Operation</td><td>38</td><td>操作模型与运行时服务。</td></tr>
+                <tr><td>Data</td><td>36</td><td>GameCore、输入和资源的配置数据。</td></tr>
+                <tr><td>Entity</td><td>32</td><td>实体域、状态、Buff、AI 与基础模块。</td></tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section id="sources">
+            <h2>关键源码</h2>
+            <p>以下引用均指向本机工作树。点击引用即可复制完整路径，便于在编辑器中直接定位；行号来自本次静态扫描。</p>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\GameManager\-GameManager_Core\ESGameManager.cs" data-lines="6-100">ESGameManager.cs · L6-L100</button><br>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\GameManager\-GameManager_Core\ESGameManager.ModuleBase.cs" data-lines="6-78">ESGameManager.ModuleBase.cs · L6-L78</button><br>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\State\Core\StateBase\StateBase.cs" data-lines="3-49">StateBase.cs · L3-L49</button><br>
+            <button class="source-ref" type="button" data-path="F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic\Runtime\Tag\ESTagCollection.cs" data-lines="7-220">ESTagCollection.cs · L7-L220</button>
+          </section>
+
+          <footer class="article-footer">
+            生成于本机静态扫描，未上传源码。分析根目录：<br>
+            <span class="path">F:\aaProject\ESFrameWorkPublish\Assets\Scripts\ESLogic</span>
+          </footer>
+        </article>
+
+        <aside class="toc" aria-label="本页目录">
+          <span class="toc-title">ON THIS PAGE</span>
+          <a class="active" href="#overview">快速开始</a>
+          <a href="#entry">框架入口</a>
+          <a href="#domains">Core / Domain / Module</a>
+          <a href="#modules">默认运行模块</a>
+          <a class="sub" href="#runtime-data">运行时数据</a>
+          <a href="#state">状态系统</a>
+          <a href="#tags">标签集合</a>
+          <a href="#physics">物理查询</a>
+          <a href="#scope">分析范围</a>
+          <a href="#sources">关键源码</a>
+        </aside>
+      </main>
+    </div>
+  </div>
+
+  <div class="search-layer" id="search-layer" aria-hidden="true">
+    <div class="search-panel" role="dialog" aria-modal="true" aria-label="搜索文档">
+      <input class="search-field" id="search-input" type="search" placeholder="搜索文档" autocomplete="off">
+      <div class="search-results" id="search-results"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite">已复制源码路径</div>
+
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const sidebar = document.getElementById('sidebar');
+      const navToggle = document.getElementById('nav-toggle');
+      const themeToggle = document.getElementById('theme-toggle');
+      const searchToggle = document.getElementById('search-toggle');
+      const searchLayer = document.getElementById('search-layer');
+      const searchInput = document.getElementById('search-input');
+      const searchResults = document.getElementById('search-results');
+      const toast = document.getElementById('toast');
+
+      const pages = [
+        ['overview', '快速开始', '框架概览、分析统计和默认结构'],
+        ['entry', '框架入口', 'ESGameManager、Awake、默认模块'],
+        ['domains', 'Core / Domain / Module', '模块边界、System、Flow、World Domain'],
+        ['modules', '默认运行模块', 'Command、Input、RuntimeData、Pool、Physics、LOD'],
+        ['runtime-data', '运行时数据与资源桥接', 'GameCore、Asset 表和 Bootstrap'],
+        ['state', '状态系统', 'StateBase、生命周期、动画、IK'],
+        ['tags', '标签集合', 'ESTagCollection、Lease、引用计数'],
+        ['physics', '物理查询', 'LayerMask、NonAlloc、共享缓冲区'],
+        ['scope', '分析范围', 'ESLogic、目录统计与外部依赖排除'],
+        ['sources', '关键源码', '本地路径和精确行号']
+      ];
+
+      const savedTheme = (() => { try { return localStorage.getItem('es-docs-theme'); } catch (_) { return null; } })();
+      if (savedTheme === 'dark') root.dataset.theme = 'dark';
+
+      function setTheme(theme) {
+        root.dataset.theme = theme;
+        try { localStorage.setItem('es-docs-theme', theme); } catch (_) { }
+      }
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add('show');
+        window.setTimeout(() => toast.classList.remove('show'), 1600);
+      }
+
+      async function copyText(value) {
+        try {
+          await navigator.clipboard.writeText(value);
+          showToast('已复制源码路径');
+        } catch (_) {
+          window.prompt('复制此源码路径', value);
+        }
+      }
+
+      function closeSearch() {
+        searchLayer.classList.remove('open');
+        searchLayer.setAttribute('aria-hidden', 'true');
+      }
+
+      function openSearch() {
+        searchLayer.classList.add('open');
+        searchLayer.setAttribute('aria-hidden', 'false');
+        searchInput.value = '';
+        renderSearch('');
+        window.setTimeout(() => searchInput.focus(), 0);
+      }
+
+      function renderSearch(query) {
+        const normalized = query.trim().toLowerCase();
+        const matches = normalized ? pages.filter((page) => (page[1] + page[2]).toLowerCase().includes(normalized)) : pages.slice(0, 6);
+        searchResults.innerHTML = '';
+        if (!matches.length) {
+          searchResults.innerHTML = '<div class="search-empty">没有匹配的章节</div>';
+          return;
+        }
+        for (const [id, title, description] of matches) {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'search-result';
+          item.innerHTML = '<strong></strong><span></span>';
+          item.querySelector('strong').textContent = title;
+          item.querySelector('span').textContent = description;
+          item.addEventListener('click', () => {
+            closeSearch();
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+          searchResults.appendChild(item);
+        }
+      }
+
+      navToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+      themeToggle.addEventListener('click', () => setTheme(root.dataset.theme === 'dark' ? 'light' : 'dark'));
+      searchToggle.addEventListener('click', openSearch);
+      searchInput.addEventListener('input', (event) => renderSearch(event.target.value));
+      searchLayer.addEventListener('click', (event) => { if (event.target === searchLayer) closeSearch(); });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') { closeSearch(); sidebar.classList.remove('open'); }
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); openSearch(); }
+      });
+
+      document.querySelectorAll('.sidebar a').forEach((link) => link.addEventListener('click', () => sidebar.classList.remove('open')));
+      document.querySelectorAll('.source-ref').forEach((reference) => reference.addEventListener('click', () => copyText(reference.dataset.path + '  (L' + reference.dataset.lines + ')')));
+
+      const sections = pages.map(([id]) => document.getElementById(id)).filter(Boolean);
+      const navigationLinks = [...document.querySelectorAll('.nav-link, .toc a')];
+      const observer = new IntersectionObserver((entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        navigationLinks.forEach((link) => link.classList.toggle('active', link.getAttribute('href') === '#' + visible.target.id));
+      }, { rootMargin: '-23% 0px -68% 0px', threshold: [0, .1, .2] });
+      sections.forEach((section) => observer.observe(section));
+    })();
+  </script>
+</body>
+</html>

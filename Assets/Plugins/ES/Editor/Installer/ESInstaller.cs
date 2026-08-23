@@ -27,6 +27,7 @@ namespace ES.EditorInternal.Installer
     /// </summary>
     public class ESInstaller : ESSinglePageIMGUIWindow<ESInstaller>
     {
+        public override string ESWindow_PresentationShortTitle => "安装";
         #region 静态初始化
 
         internal static void RegisterStartupCheck()
@@ -44,21 +45,108 @@ namespace ES.EditorInternal.Installer
             await CheckAndShowInstallerIfNeededAsync();
         }
 
-        public static ESInstaller installer;
+        private static ESInstaller installer;
+
+        private sealed class DependencyCheckWindowLease : IDisposable
+        {
+            private readonly int generation;
+            private bool disposed;
+
+            internal DependencyCheckWindowLease(ESInstaller instance, int generation)
+            {
+                Instance = instance;
+                this.generation = generation;
+            }
+
+            internal ESInstaller Instance { get; }
+
+            public void Dispose()
+            {
+                if (disposed)
+                    return;
+                disposed = true;
+                ReleaseCheckInstance(Instance, generation);
+            }
+        }
+
+        private static ESInstaller temporaryCheckInstance;
+        private static int dependencyCheckLeaseCount;
+        private static int dependencyCheckGeneration;
+        private static bool dependencyCheckInProgress;
+
+        private static bool TryBeginDependencyCheck()
+        {
+            if (dependencyCheckInProgress)
+                return false;
+            dependencyCheckInProgress = true;
+            return true;
+        }
+
+        private static void EndDependencyCheck()
+        {
+            dependencyCheckInProgress = false;
+        }
+
+        private static DependencyCheckWindowLease AcquireCheckInstance()
+        {
+            if (installer == null)
+            {
+                installer = EditorWindow.CreateInstance<ESInstaller>();
+                installer.hideFlags = HideFlags.HideAndDontSave;
+                temporaryCheckInstance = installer;
+                dependencyCheckLeaseCount = 0;
+                dependencyCheckGeneration++;
+            }
+
+            dependencyCheckLeaseCount++;
+            return new DependencyCheckWindowLease(installer, dependencyCheckGeneration);
+        }
+
+        private static void ReleaseCheckInstance(ESInstaller checkInstance, int generation)
+        {
+            if (generation != dependencyCheckGeneration)
+                return;
+
+            dependencyCheckLeaseCount = Math.Max(0, dependencyCheckLeaseCount - 1);
+            if (dependencyCheckLeaseCount > 0
+                || !ReferenceEquals(temporaryCheckInstance, checkInstance))
+                return;
+
+            temporaryCheckInstance = null;
+            if (ReferenceEquals(installer, checkInstance))
+                installer = null;
+            if (checkInstance != null)
+                DestroyImmediate(checkInstance);
+        }
+
+        private static ESInstaller GetOrPromoteInstallerWindow()
+        {
+            ESInstaller window = installer;
+            if (window == null)
+            {
+                window = GetWindow<ESInstaller>("ES 安装管理器");
+                installer = window;
+                temporaryCheckInstance = null;
+                dependencyCheckLeaseCount = 0;
+                dependencyCheckGeneration++;
+            }
+            else if (ReferenceEquals(temporaryCheckInstance, window))
+            {
+                temporaryCheckInstance = null;
+                window.hideFlags = HideFlags.None;
+            }
+
+            return window;
+        }
 
         private static async Task CheckAndShowInstallerIfNeededAsync()
         {
-            ESInstaller checkInstance = installer;
-            bool createdTemporaryInstance = false;
+            if (!TryBeginDependencyCheck())
+                return;
             try
             {
-                // 创建临时实例来检查配置
-                if (checkInstance == null)
-                {
-                    checkInstance = EditorWindow.CreateInstance<ESInstaller>();
-                    installer = checkInstance;
-                    createdTemporaryInstance = true;
-                }
+                using DependencyCheckWindowLease lease = AcquireCheckInstance();
+                ESInstaller checkInstance = lease.Instance;
                 if (checkInstance.currentProfile == null)
                 {
                     checkInstance.InitializePaths();
@@ -81,13 +169,7 @@ namespace ES.EditorInternal.Installer
 
                 // 如果有未安装的必需依赖，显示安装器
                 if (hasUninstalledRequiredDependencies)
-                {
                     ShowInstallerWithWarning();
-                    ShowInstaller(); // 直接打开安装器窗口
-                }
-
-                // 清理临时实例
-                // DestroyImmediate(tempInstance);
             }
             catch (Exception e)
             {
@@ -95,12 +177,7 @@ namespace ES.EditorInternal.Installer
             }
             finally
             {
-                if (createdTemporaryInstance && checkInstance != null)
-                {
-                    if (installer == checkInstance)
-                        installer = null;
-                    DestroyImmediate(checkInstance);
-                }
+                EndDependencyCheck();
             }
         }
 
@@ -256,15 +333,22 @@ namespace ES.EditorInternal.Installer
 
         private static async Task QuickCheckAndShowResultAsync()
         {
-            ESInstaller tempInstance = null;
+            if (!TryBeginDependencyCheck())
+            {
+                EditorUtility.DisplayDialog(
+                    "依赖检查进行中",
+                    "已有一次依赖检查正在运行，请等待当前检查结束。",
+                    "确定");
+                return;
+            }
             try
             {
-                // 创建临时实例来检查配置
-                tempInstance = EditorWindow.CreateInstance<ESInstaller>();
-                if (tempInstance.currentProfile == null)
+                using DependencyCheckWindowLease lease = AcquireCheckInstance();
+                ESInstaller checkInstance = lease.Instance;
+                if (checkInstance.currentProfile == null)
                 {
-                    tempInstance.InitializePaths();
-                    tempInstance.LoadConfiguration();
+                    checkInstance.InitializePaths();
+                    checkInstance.LoadConfiguration();
                 }
 
                 // 检查是否有未安装的必需依赖
@@ -273,7 +357,7 @@ namespace ES.EditorInternal.Installer
                 int installedRequired = 0;
 
                 // 检查Unity官方包
-                foreach (var dependency in tempInstance.currentProfile.mainPackage.unityDependencies.Where(d => d.isRequired))
+                foreach (var dependency in checkInstance.currentProfile.mainPackage.unityDependencies.Where(d => d.isRequired))
                 {
                     totalRequired++;
                     if (await CheckUnityPackageInstalledAsync(dependency))
@@ -287,7 +371,7 @@ namespace ES.EditorInternal.Installer
                 }
 
                 // 检查Git包
-                foreach (var dependency in tempInstance.currentProfile.mainPackage.gitDependencies.Where(d => d.isRequired))
+                foreach (var dependency in checkInstance.currentProfile.mainPackage.gitDependencies.Where(d => d.isRequired))
                 {
                     totalRequired++;
                     if (await CheckGitPackageInstalledAsync(dependency))
@@ -301,7 +385,7 @@ namespace ES.EditorInternal.Installer
                 }
 
                 // 检查用户包
-                foreach (var dependency in tempInstance.currentProfile.mainPackage.userDependencies.Where(d => d.isRequired))
+                foreach (var dependency in checkInstance.currentProfile.mainPackage.userDependencies.Where(d => d.isRequired))
                 {
                     totalRequired++;
                     if (await CheckUserPackageInstalledAsync(dependency))
@@ -349,8 +433,7 @@ namespace ES.EditorInternal.Installer
             }
             finally
             {
-                if (tempInstance != null)
-                    DestroyImmediate(tempInstance);
+                EndDependencyCheck();
             }
         }
 
@@ -405,46 +488,21 @@ namespace ES.EditorInternal.Installer
 
         private static void ShowInstallerWithWarning()
         {
-            // 检查安装器窗口是否已经打开
-            if (HasOpenInstances<ESInstaller>())
+            if (installer != null && !ReferenceEquals(installer, temporaryCheckInstance))
             {
-                // 窗口已经打开，不重复显示警告对话框
+                installer.Focus();
                 return;
             }
 
-            // 显示警告对话框
             bool showInstaller = EditorUtility.DisplayDialog(
                 "ES框架依赖检查",
                 "检测到ES框架有未安装的必需依赖项。\n\n是否现在打开安装管理器来解决依赖问题？",
                 "打开安装器",
-                "稍后提醒"
+                "稍后处理"
             );
 
             if (showInstaller)
-            {
                 ShowInstaller();
-            }
-            else
-            {
-                // 设置一个延迟提醒
-                EditorApplication.delayCall += () =>
-                {
-                    if (EditorUtility.DisplayDialog(
-                        "ES框架提醒",
-                        "ES框架依赖项尚未完全安装，建议运行安装管理器。",
-                        "现在安装",
-                        "忽略"
-                    ))
-                    {
-                        ShowInstaller();
-                    }
-                };
-            }
-        }
-
-        private static new bool HasOpenInstances<T>() where T : EditorWindow
-        {
-            return Resources.FindObjectsOfTypeAll<T>().Length > 0;
         }
 
         #endregion
@@ -767,7 +825,7 @@ namespace ES.EditorInternal.Installer
         [MenuItem(MenuItemPathDefine.INSTALL_DEPENDENCY_PATH + "打开安装管理器", false, 0)]
         static void ShowInstaller()
         {
-            installer = GetWindow<ESInstaller>("ES 安装管理器");
+            installer = GetOrPromoteInstallerWindow();
             installer.minSize = new Vector2(600, 500);
             installer.Show();
             installer.Focus();
@@ -2380,6 +2438,14 @@ namespace ES.EditorInternal.Installer
             AssetDatabase.importPackageCompleted -= OnTrustedImportCompleted;
             AssetDatabase.importPackageCancelled -= OnTrustedImportCancelled;
             AssetDatabase.importPackageFailed -= OnTrustedImportFailed;
+            if (installer == this)
+                installer = null;
+            if (ReferenceEquals(temporaryCheckInstance, this))
+            {
+                temporaryCheckInstance = null;
+                dependencyCheckLeaseCount = 0;
+                dependencyCheckGeneration++;
+            }
 
             // 只有在有未保存的更改时才询问用户是否保存
             if (isConfigModified)

@@ -17,10 +17,13 @@ namespace ES.EditorInternal
         private const string WindowMenuPath
             = MenuItemPathDefine.VALIDATION_EDITOR_HEALTH_PATH + "打开 ES 编辑器健康检查";
         private const string BoundaryRootName = "ES 边界测试层级";
+        private static readonly Vector2 MaximumWindowSize = new Vector2(1400f, 1000f);
 
         private readonly List<HealthCheck> checks = new List<HealthCheck>(6);
         private Vector2 scrollPosition;
         private double lastRefreshTime;
+        private bool hostActive;
+        private bool refreshQueued;
 
         [MenuItem(WindowMenuPath, false, 20)]
         private static void Open()
@@ -28,6 +31,7 @@ namespace ES.EditorInternal
             var window = GetWindow<ESEditorHealthWindow>();
             window.titleContent = new GUIContent("ES 健康检查");
             window.minSize = new Vector2(500f, 420f);
+            window.maxSize = MaximumWindowSize;
             window.Show();
         }
 
@@ -35,6 +39,7 @@ namespace ES.EditorInternal
         {
             return new GUIContent("ES 健康检查", "只读检查编辑器主题、缓存与绘制基础状态");
         }
+        public override string ESWindow_PresentationShortTitle => "健康";
 
         protected override string ESWindow_Subtitle => "编辑器 Presentation 与工具链健康状态";
         protected override Vector2 ESWindow_MinSize => new Vector2(500f, 420f);
@@ -61,7 +66,18 @@ namespace ES.EditorInternal
 
         protected override void ESWindow_OnHostEnable()
         {
+            hostActive = true;
+            refreshQueued = false;
+            UnqueueRefresh();
+            minSize = ESWindow_MinSize;
+            maxSize = MaximumWindowSize;
             RefreshChecks();
+        }
+
+        protected override void ESWindow_OnHostDisable()
+        {
+            hostActive = false;
+            UnqueueRefresh();
         }
 
         private void OnFocus()
@@ -176,7 +192,7 @@ namespace ES.EditorInternal
                     if (GUILayout.Button(check.ActionLabel, GUILayout.MinWidth(112f), GUILayout.Height(23f)))
                     {
                         check.Action();
-                        EditorApplication.delayCall += RefreshChecks;
+                        QueueRefresh();
                     }
                 }
                 finally
@@ -195,6 +211,7 @@ namespace ES.EditorInternal
         private void RefreshChecks()
         {
             checks.Clear();
+            AddWindowFoundationCheck();
             AddThemeCheck();
             AddTypeCatalogCheck();
             AddPolymorphicRendererCheck();
@@ -202,6 +219,95 @@ namespace ES.EditorInternal
             AddBoundaryFixtureCheck();
             lastRefreshTime = EditorApplication.timeSinceStartup;
             Repaint();
+        }
+
+        private void QueueRefresh()
+        {
+            if (!hostActive || refreshQueued || this == null)
+                return;
+
+            refreshQueued = true;
+            EditorApplication.delayCall -= HandleDelayedRefresh;
+            EditorApplication.delayCall += HandleDelayedRefresh;
+        }
+
+        private void HandleDelayedRefresh()
+        {
+            // Remove the delegate even when Unity invokes delayCall more than once during
+            // a reload/inspector update boundary. This keeps the global event from retaining
+            // this window instance after the one-shot refresh has completed.
+            EditorApplication.delayCall -= HandleDelayedRefresh;
+            refreshQueued = false;
+            if (!hostActive || this == null)
+                return;
+
+            RefreshChecks();
+        }
+
+        private void UnqueueRefresh()
+        {
+            EditorApplication.delayCall -= HandleDelayedRefresh;
+            refreshQueued = false;
+        }
+
+        private void AddWindowFoundationCheck()
+        {
+            ESWindowPresentationHealthSnapshot snapshot =
+                ESEditorPresentation.CaptureWindowHealthSnapshot();
+            ESStatusKind status = snapshot.HasIssues
+                ? ESStatusKind.Warning
+                : snapshot.LiveWindowCount > 0
+                    ? ESStatusKind.Ready
+                    : ESStatusKind.Info;
+            string summary = snapshot.LiveWindowCount == 0
+                ? "当前没有活动的 ES Presentation 窗口。"
+                : "活动 " + snapshot.LiveWindowCount
+                    + " · 支持休眠 " + snapshot.SleepSupportedCount
+                    + " · 已收起 " + snapshot.SleepingCount
+                    + " · 过渡中 " + snapshot.TransitioningCount
+                    + " · 重复实例 " + snapshot.DuplicateWindowInstanceCount
+                    + " · 待绑定父窗口 " + snapshot.PendingOwnerCount;
+            string nextStep;
+            if (snapshot.DuplicateWindowInstanceCount > 0)
+            {
+                nextStep = "发现 " + snapshot.DuplicateWindowInstanceCount
+                    + " 个同具体类型的额外窗口实例；首个问题："
+                    + snapshot.FirstIssueWindowType
+                    + "。健康检查不会猜测关闭对象；应关闭多余实例并修复其打开入口。";
+            }
+            else if (snapshot.MissingSystemHostCount > 0)
+            {
+                nextStep = "有 " + snapshot.MissingSystemHostCount
+                    + " 个支持休眠的窗口未声明 System 动作宿主；首个问题："
+                    + snapshot.FirstIssueWindowType + "。应修复窗口接入，禁止回退为覆盖式按钮。";
+            }
+            else if (snapshot.GeometryMismatchCount > 0)
+            {
+                nextStep = "有 " + snapshot.GeometryMismatchCount
+                    + " 个已稳定休眠窗口的原生尺寸与视觉状态不一致；首个问题："
+                    + snapshot.FirstIssueWindowType + "。应执行 ReloadDomain 与真实窗口恢复验收。";
+            }
+            else if (snapshot.StaleEntryCount > 0)
+            {
+                nextStep = "发现 " + snapshot.StaleEntryCount
+                    + " 个失效绑定或父窗口待绑定记录；首个问题："
+                    + snapshot.FirstIssueWindowType + "。应检查解绑和窗口销毁路径。";
+            }
+            else
+            {
+                nextStep = snapshot.BindingSlotCount == 0
+                    ? "打开任意采用 ES 新版底层的窗口后再次刷新即可查看其生命周期状态。"
+                    : "无需处理；该检查只读取当前绑定表，不扫描全部 EditorWindow。";
+            }
+
+            checks.Add(new HealthCheck(
+                "ES 窗口生命周期",
+                status,
+                summary,
+                nextStep,
+                null,
+                null,
+                null));
         }
 
         private void AddThemeCheck()

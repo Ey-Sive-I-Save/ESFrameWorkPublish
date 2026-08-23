@@ -225,7 +225,79 @@ namespace ES
             SetProperty(data, "requiresDepthTexture", true);
             SetProperty(data, "requiresColorTexture", true);
             SetProperty(data, "renderPostProcessing", false);
+            camera.renderingPath = RenderingPath.Forward;
+            SetEnumProperty(data, "renderType", "Base");
             return true;
+        }
+
+        public static void EnsureParticleRendererMaterials(GameObject root, Material fallbackMaterial)
+        {
+            if (root == null || fallbackMaterial == null)
+                return;
+
+            ParticleSystemRenderer[] renderers = root.GetComponentsInChildren<ParticleSystemRenderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                ParticleSystemRenderer renderer = renderers[i];
+                if (renderer == null)
+                    continue;
+
+                Material[] materials = renderer.sharedMaterials;
+                if (materials == null || materials.Length == 0)
+                {
+                    renderer.sharedMaterial = fallbackMaterial;
+                    continue;
+                }
+
+                bool changed = false;
+                for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
+                {
+                    if (materials[materialIndex] == null
+                        || materials[materialIndex].shader == null
+                        || !materials[materialIndex].shader.isSupported)
+                    {
+                        materials[materialIndex] = fallbackMaterial;
+                        changed = true;
+                    }
+                }
+
+                if (changed)
+                    renderer.sharedMaterials = materials;
+            }
+        }
+
+        /// <summary>
+        /// 统一配置预览辅助材质。辅助几何必须从上、下两面可见，且在 URP/内置管线
+        /// 下都保持透明混合；调用方不再猜测某一套 Shader 的单个属性。
+        /// </summary>
+        public static void ConfigureDoubleSidedTransparent(Material material, Color color)
+        {
+            if (material == null)
+                return;
+
+            material.color = color;
+            material.renderQueue = 3000;
+            material.SetOverrideTag("RenderType", "Transparent");
+            material.SetOverrideTag("Queue", "Transparent");
+            if (material.HasProperty("_Surface")) material.SetFloat("_Surface", 1f);
+            if (material.HasProperty("_Blend")) material.SetFloat("_Blend", 0f);
+            if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
+            if (material.HasProperty("_Color")) material.SetColor("_Color", color);
+            if (material.HasProperty("_SrcBlend")) material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            if (material.HasProperty("_DstBlend")) material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            if (material.HasProperty("_ZWrite")) material.SetInt("_ZWrite", 0);
+            if (material.HasProperty("_ZWriteControl")) material.SetFloat("_ZWriteControl", 0f);
+            if (material.HasProperty("_AlphaClip")) material.SetFloat("_AlphaClip", 0f);
+            if (material.HasProperty("_Cull")) material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+            if (material.HasProperty("_CullMode")) material.SetInt("_CullMode", (int)UnityEngine.Rendering.CullMode.Off);
+            if (material.HasProperty("_RenderFace")) material.SetFloat("_RenderFace", 0f);
+            if (material.HasProperty("_EmissionColor")) material.SetColor("_EmissionColor", color * 0.18f);
+            material.doubleSidedGI = true;
+            material.EnableKeyword("_DOUBLESIDED_ON");
+            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            material.DisableKeyword("_ALPHATEST_ON");
+            material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            material.SetShaderPassEnabled("ShadowCaster", false);
         }
 
         public static Bounds CalculateBounds(GameObject root)
@@ -281,7 +353,12 @@ namespace ES
                 if (behaviour == null)
                     continue;
 
-                if (behaviour is Animator || behaviour is Animation || behaviour is Light || behaviour is Camera)
+                // 这里仅隔离业务 Behaviour；ParticleSystem 由预览会话直接调用 Simulate，
+                // 不属于该组件筛选路径。Animator/Light/Camera 则由预览底座保留。
+                if (behaviour is Animator
+                    || behaviour is Animation
+                    || behaviour is Light
+                    || behaviour is Camera)
                     continue;
 
                 if (behaviour is EditorPreviewGameObjectSign)
@@ -360,6 +437,26 @@ namespace ES
             try
             {
                 property.SetValue(target, value);
+            }
+            catch
+            {
+            }
+        }
+
+        private static void SetEnumProperty(object target, string propertyName, string valueName)
+        {
+            if (target == null)
+                return;
+
+            PropertyInfo property = target.GetType().GetProperty(
+                propertyName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (property == null || !property.CanWrite || !property.PropertyType.IsEnum)
+                return;
+
+            try
+            {
+                property.SetValue(target, Enum.Parse(property.PropertyType, valueName));
             }
             catch
             {

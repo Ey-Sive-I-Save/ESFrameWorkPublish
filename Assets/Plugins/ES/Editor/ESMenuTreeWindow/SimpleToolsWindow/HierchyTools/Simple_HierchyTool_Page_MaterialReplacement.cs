@@ -307,10 +307,10 @@ namespace ES
         [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
         {
-            DrawMaterialWorkbench();
+            DrawMaterialTool();
         }
 
-        private void DrawMaterialWorkbench()
+        private void DrawMaterialTool()
         {
             DrawMaterialHeader();
             DrawMaterialModeTabs();

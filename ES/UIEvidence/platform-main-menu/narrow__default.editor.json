@@ -1,0 +1,642 @@
+{
+  "schemaVersion": 1,
+  "command": "editor.snapshot",
+  "panelId": "platform-main-menu",
+  "profileId": "narrow",
+  "stateId": "default",
+  "captureKey": "platform-main-menu.narrow.default",
+  "contractSha256": "ee933c302d104dab3734a7863b972364d701d51ebbb16ffb4a8c708284c302ad",
+  "specHash": "ee933c302d104dab3734a7863b972364d701d51ebbb16ffb4a8c708284c302ad",
+  "runId": "09f840a4b1ce4dec8bec25718b19f581",
+  "sceneGeneration": 1,
+  "rootPath": "Canvas/PlatformMainMenu",
+  "viewport": {
+    "width": 1080,
+    "height": 1920,
+    "orientation": "portrait"
+  },
+  "canvas": {
+    "renderMode": "ScreenSpaceCamera",
+    "scaler": {
+      "uiScaleMode": "ScaleWithScreenSize",
+      "referenceResolution": [
+        1920.0,
+        1080.0
+      ],
+      "screenMatchMode": "MatchWidthOrHeight",
+      "match": 0.5
+    }
+  },
+  "elements": [
+    {
+      "path": "Canvas/PlatformMainMenu",
+      "parentPath": "Canvas",
+      "active": true,
+      "siblingIndex": 0,
+      "anchorMin": [
+        0.0,
+        0.0
+      ],
+      "anchorMax": [
+        1.0,
+        1.0
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "anchoredPosition": [
+        0.0,
+        0.0
+      ],
+      "sizeDelta": [
+        0.0,
+        0.0
+      ],
+      "screenRect": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 1080.0,
+        "height": 1920.0
+      },
+      "text": null,
+      "componentType": null,
+      "visualVariant": "default",
+      "assetSlots": [],
+      "numericValue": null,
+      "tokenRoles": [
+        "surface",
+        "text",
+        "accent"
+      ],
+      "assets": [],
+      "components": [
+        {
+          "type": "RectTransform",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "CanvasRenderer",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "Image",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "ESUIAdaptiveLayout",
+          "enabled": true,
+          "properties": {}
+        }
+      ],
+      "layout": null
+    },
+    {
+      "path": "Canvas/PlatformMainMenu/frame",
+      "parentPath": "Canvas/PlatformMainMenu",
+      "active": true,
+      "siblingIndex": 0,
+      "anchorMin": [
+        0.12,
+        0.12
+      ],
+      "anchorMax": [
+        0.88,
+        0.88
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "anchoredPosition": [
+        0.0,
+        0.0
+      ],
+      "sizeDelta": [
+        0.0,
+        0.0
+      ],
+      "screenRect": {
+        "x": 129.599976,
+        "y": 230.400024,
+        "width": 820.800049,
+        "height": 1459.2
+      },
+      "text": null,
+      "componentType": "frame",
+      "visualVariant": "default",
+      "assetSlots": [
+        "frame"
+      ],
+      "numericValue": null,
+      "tokenRoles": null,
+      "assets": [],
+      "components": [
+        {
+          "type": "RectTransform",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "ESUIComponentSemantic",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "LayoutElement",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "CanvasRenderer",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "Image",
+          "enabled": true,
+          "properties": {}
+        }
+      ],
+      "layout": null
+    },
+    {
+      "path": "Canvas/PlatformMainMenu/logo",
+      "parentPath": "Canvas/PlatformMainMenu",
+      "active": true,
+      "siblingIndex": 1,
+      "anchorMin": [
+        0.3,
+        0.7
+      ],
+      "anchorMax": [
+        0.7,
+        0.86
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "anchoredPosition": [
+        0.0,
+        0.0
+      ],
+      "sizeDelta": [
+        0.0,
+        0.0
+      ],
+      "screenRect": {
+        "x": 324.0,
+        "y": 1344.0,
+        "width": 432.0,
+        "height": 307.2002
+      },
+      "text": null,
+      "componentType": "image",
+      "visualVariant": "default",
+      "assetSlots": [
+        "logo"
+      ],
+      "numericValue": null,
+      "tokenRoles": null,
+      "assets": [],
+      "components": [
+        {
+          "type": "RectTransform",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "ESUIComponentSemantic",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "LayoutElement",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "CanvasRenderer",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "Image",
+          "enabled": true,
+          "properties": {}
+        }
+      ],
+      "layout": null
+    },
+    {
+      "path": "Canvas/PlatformMainMenu/content-frame",
+      "parentPath": "Canvas/PlatformMainMenu",
+      "active": true,
+      "siblingIndex": 2,
+      "anchorMin": [
+        0.2,
+        0.2
+      ],
+      "anchorMax": [
+        0.8,
+        0.78
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "anchoredPosition": [
+        0.0,
+        0.0
+      ],
+      "sizeDelta": [
+        0.0,
+        0.0
+      ],
+      "screenRect": {
+        "x": 216.0,
+        "y": 384.0,
+        "width": 648.0,
+        "height": 1113.6
+      },
+      "text": null,
+      "componentType": "frame",
+      "visualVariant": "default",
+      "assetSlots": [],
+      "numericValue": null,
+      "tokenRoles": null,
+      "assets": [],
+      "components": [
+        {
+          "type": "RectTransform",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "ESUIComponentSemantic",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "LayoutElement",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "CanvasRenderer",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "Image",
+          "enabled": true,
+          "properties": {}
+        }
+      ],
+      "layout": null
+    },
+    {
+      "path": "Canvas/PlatformMainMenu/navigation",
+      "parentPath": "Canvas/PlatformMainMenu",
+      "active": true,
+      "siblingIndex": 3,
+      "anchorMin": [
+        0.3,
+        0.28
+      ],
+      "anchorMax": [
+        0.7,
+        0.66
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "anchoredPosition": [
+        0.0,
+        0.0
+      ],
+      "sizeDelta": [
+        0.0,
+        0.0
+      ],
+      "screenRect": {
+        "x": 324.0,
+        "y": 537.6,
+        "width": 432.0,
+        "height": 729.6001
+      },
+      "text": null,
+      "componentType": "list",
+      "visualVariant": "default",
+      "assetSlots": [],
+      "numericValue": null,
+      "tokenRoles": null,
+      "assets": [],
+      "components": [
+        {
+          "type": "RectTransform",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "ESUIComponentSemantic",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "LayoutElement",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "VerticalLayoutGroup",
+          "enabled": true,
+          "properties": {}
+        }
+      ],
+      "layout": {
+        "type": "VerticalLayoutGroup",
+        "padding": [
+          16,
+          16,
+          16,
+          16
+        ],
+        "childAlignment": "UpperLeft",
+        "directChildren": [
+          "navigation/start",
+          "navigation/settings"
+        ],
+        "spacing": 12.0,
+        "controlChildWidth": true,
+        "controlChildHeight": true,
+        "forceChildExpandWidth": true,
+        "forceChildExpandHeight": false
+      }
+    },
+    {
+      "path": "Canvas/PlatformMainMenu/navigation/start",
+      "parentPath": "Canvas/PlatformMainMenu/navigation",
+      "active": true,
+      "siblingIndex": 0,
+      "anchorMin": [
+        0.0,
+        1.0
+      ],
+      "anchorMax": [
+        0.0,
+        1.0
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "anchoredPosition": [
+        216.0,
+        -44.0
+      ],
+      "sizeDelta": [
+        400.0,
+        56.0
+      ],
+      "screenRect": {
+        "x": 340.0,
+        "y": 1195.20007,
+        "width": 400.0,
+        "height": 56.0
+      },
+      "text": null,
+      "componentType": "button",
+      "visualVariant": "default",
+      "assetSlots": [],
+      "numericValue": null,
+      "tokenRoles": null,
+      "assets": [],
+      "components": [
+        {
+          "type": "RectTransform",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "ESUIComponentSemantic",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "LayoutElement",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "CanvasRenderer",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "Image",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "Button",
+          "enabled": true,
+          "properties": {}
+        }
+      ],
+      "layout": null
+    },
+    {
+      "path": "Canvas/PlatformMainMenu/navigation/start/Label",
+      "parentPath": "Canvas/PlatformMainMenu/navigation/start",
+      "active": true,
+      "siblingIndex": 0,
+      "anchorMin": [
+        0.0,
+        0.0
+      ],
+      "anchorMax": [
+        1.0,
+        1.0
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "anchoredPosition": [
+        0.0,
+        0.0
+      ],
+      "sizeDelta": [
+        0.0,
+        0.0
+      ],
+      "screenRect": {
+        "x": 340.0,
+        "y": 1195.20007,
+        "width": 400.0,
+        "height": 56.0
+      },
+      "text": "Start Game",
+      "componentType": null,
+      "visualVariant": null,
+      "assetSlots": [],
+      "numericValue": null,
+      "tokenRoles": null,
+      "assets": [],
+      "components": [
+        {
+          "type": "RectTransform",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "CanvasRenderer",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "TextMeshProUGUI",
+          "enabled": true,
+          "properties": {}
+        }
+      ],
+      "layout": null
+    },
+    {
+      "path": "Canvas/PlatformMainMenu/navigation/settings",
+      "parentPath": "Canvas/PlatformMainMenu/navigation",
+      "active": true,
+      "siblingIndex": 1,
+      "anchorMin": [
+        0.0,
+        1.0
+      ],
+      "anchorMax": [
+        0.0,
+        1.0
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "anchoredPosition": [
+        216.0,
+        -112.0
+      ],
+      "sizeDelta": [
+        400.0,
+        56.0
+      ],
+      "screenRect": {
+        "x": 340.0,
+        "y": 1127.20007,
+        "width": 400.0,
+        "height": 56.0
+      },
+      "text": null,
+      "componentType": "button",
+      "visualVariant": "default",
+      "assetSlots": [],
+      "numericValue": null,
+      "tokenRoles": null,
+      "assets": [],
+      "components": [
+        {
+          "type": "RectTransform",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "ESUIComponentSemantic",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "LayoutElement",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "CanvasRenderer",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "Image",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "Button",
+          "enabled": true,
+          "properties": {}
+        }
+      ],
+      "layout": null
+    },
+    {
+      "path": "Canvas/PlatformMainMenu/navigation/settings/Label",
+      "parentPath": "Canvas/PlatformMainMenu/navigation/settings",
+      "active": true,
+      "siblingIndex": 0,
+      "anchorMin": [
+        0.0,
+        0.0
+      ],
+      "anchorMax": [
+        1.0,
+        1.0
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "anchoredPosition": [
+        0.0,
+        0.0
+      ],
+      "sizeDelta": [
+        0.0,
+        0.0
+      ],
+      "screenRect": {
+        "x": 340.0,
+        "y": 1127.20007,
+        "width": 400.0,
+        "height": 56.0
+      },
+      "text": "Settings",
+      "componentType": null,
+      "visualVariant": null,
+      "assetSlots": [],
+      "numericValue": null,
+      "tokenRoles": null,
+      "assets": [],
+      "components": [
+        {
+          "type": "RectTransform",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "CanvasRenderer",
+          "enabled": true,
+          "properties": {}
+        },
+        {
+          "type": "TextMeshProUGUI",
+          "enabled": true,
+          "properties": {}
+        }
+      ],
+      "layout": null
+    }
+  ],
+  "maxHierarchyDepth": 16
+}

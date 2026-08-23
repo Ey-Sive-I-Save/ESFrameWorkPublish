@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Threading;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace ES.Tests.UI
 {
@@ -151,6 +152,10 @@ namespace ES.Tests.UI
             {
                 { ESUI.MainRootKey, root }
             };
+            Dictionary<string, int> registrationGenerations = new Dictionary<string, int>
+            {
+                { ESUI.MainRootKey, 1 }
+            };
             ESUIRootLease registration = (ESUIRootLease)Activator.CreateInstance(
                 typeof(ESUIRootLease),
                 BindingFlags.Instance | BindingFlags.NonPublic,
@@ -161,6 +166,7 @@ namespace ES.Tests.UI
             try
             {
                 SetField(module, "roots", roots);
+                SetField(module, "rootRegistrationGenerations", registrationGenerations);
                 SetField(root, "rootRegistration", registration);
                 InvokePrivate(root, "GetLifetimeCancellationToken");
                 CancellationTokenSource first = GetField<CancellationTokenSource>(root, "lifetimeCancellation");
@@ -182,6 +188,200 @@ namespace ES.Tests.UI
             }
         }
 
+        [Test]
+        public void RootRegistration_StaleLeaseCannotUnregisterNewGeneration()
+        {
+            GameObject rootObject = new GameObject("UI Root Registration Generation Test");
+            ESUIRootCoordinator root = rootObject.AddComponent<ESUIRootCoordinator>();
+            ESUIWindowModule module = new ESUIWindowModule();
+            Dictionary<string, ESUIRootCoordinator> roots = new Dictionary<string, ESUIRootCoordinator>
+            {
+                { ESUI.MainRootKey, root }
+            };
+            Dictionary<string, int> registrationGenerations = new Dictionary<string, int>
+            {
+                { ESUI.MainRootKey, 2 }
+            };
+            ESUIRootLease staleLease = CreateRootLease(module, root, ESUI.MainRootKey, 1);
+            ESUIRootLease currentLease = CreateRootLease(module, root, ESUI.MainRootKey, 2);
+
+            try
+            {
+                SetField(module, "roots", roots);
+                SetField(module, "rootRegistrationGenerations", registrationGenerations);
+
+                Assert.That(staleLease.IsValid, Is.False);
+                staleLease.Dispose();
+
+                Assert.That(roots.ContainsKey(ESUI.MainRootKey), Is.True);
+                Assert.That(registrationGenerations[ESUI.MainRootKey], Is.EqualTo(2));
+                Assert.That(currentLease.IsValid, Is.True);
+
+                currentLease.Dispose();
+                Assert.That(roots.ContainsKey(ESUI.MainRootKey), Is.False);
+                Assert.That(registrationGenerations.ContainsKey(ESUI.MainRootKey), Is.False);
+            }
+            finally
+            {
+                staleLease.Dispose();
+                currentLease.Dispose();
+                UnityEngine.Object.DestroyImmediate(rootObject);
+            }
+        }
+
+        [Test]
+        public void Pool_ExplicitRegistrationRejectsCrossOwnerPrefabGroup()
+        {
+            const string uiPoolKey = "ui:window-pool:ui:catalog-test";
+            GameObject prefab = new GameObject("UI Pool Registration Test");
+            ESGameObjectPoolModule pool = new ESGameObjectPoolModule();
+            try
+            {
+                Assert.That(pool.TryRegister(prefab, uiPoolKey, out string error), Is.True, error);
+                Assert.That(pool.TryRegister(prefab, "vfx:shared-prefab", out error), Is.False);
+                StringAssert.Contains(uiPoolKey, error);
+                LogAssert.ignoreFailingMessages = true;
+                try
+                {
+                    Assert.That(pool.GetInPool(prefab, Vector3.zero, Quaternion.identity), Is.Null);
+                }
+                finally
+                {
+                    LogAssert.ignoreFailingMessages = false;
+                }
+                Assert.That(pool.TryGetStats(uiPoolKey, out ESGameObjectPoolStats stats), Is.True);
+                Assert.That(stats.totalCount, Is.Zero);
+                Assert.That(pool.ClearAndRelease(uiPoolKey), Is.True);
+                Assert.That(pool.TryGetStats(uiPoolKey, out _), Is.False);
+            }
+            finally
+            {
+                pool.ClearAll();
+                UnityEngine.Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Pool_DetachedInstanceCanSafelyRejoinItsDedicatedGroup()
+        {
+            const string uiPoolKey = "ui:window-pool:ui:detach-test";
+            GameObject prefab = new GameObject("UI Pool Detach Test");
+            ESGameObjectPoolModule pool = new ESGameObjectPoolModule();
+            try
+            {
+                Assert.That(pool.TryRegister(prefab, uiPoolKey, out string error), Is.True, error);
+                GameObject instance = pool.GetInPool(uiPoolKey, Vector3.zero, Quaternion.identity);
+                Assert.That(instance, Is.Not.Null);
+
+                Assert.That(pool.DetachPooledInstance(instance), Is.True);
+                Assert.That(pool.TryGetStats(uiPoolKey, out ESGameObjectPoolStats detachedStats), Is.True);
+                Assert.That(detachedStats.activeCount, Is.Zero);
+                Assert.That(detachedStats.inactiveCount, Is.Zero);
+                Assert.That(detachedStats.createdCount, Is.Zero);
+                Assert.That(instance.GetComponent<ESPooledGameObject>().PoolKey, Is.Null);
+
+                Assert.That(pool.TryAttachInactiveInstance(prefab, uiPoolKey, instance), Is.True);
+                Assert.That(pool.TryGetStats(uiPoolKey, out ESGameObjectPoolStats returnedStats), Is.True);
+                Assert.That(returnedStats.activeCount, Is.Zero);
+                Assert.That(returnedStats.inactiveCount, Is.EqualTo(1));
+                Assert.That(returnedStats.createdCount, Is.EqualTo(1));
+
+                GameObject reused = pool.GetInPool(uiPoolKey, Vector3.zero, Quaternion.identity);
+                Assert.That(reused, Is.SameAs(instance));
+                Assert.That(pool.PushToPool(reused), Is.True);
+            }
+            finally
+            {
+                pool.ClearAll();
+                UnityEngine.Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Pool_DestroyPooledInstanceClosesItsActiveAccounting()
+        {
+            const string uiPoolKey = "ui:window-pool:ui:destroy-test";
+            GameObject prefab = new GameObject("UI Pool Destroy Test");
+            ESGameObjectPoolModule pool = new ESGameObjectPoolModule();
+            try
+            {
+                Assert.That(pool.TryRegister(prefab, uiPoolKey, out string error), Is.True, error);
+                GameObject instance = pool.GetInPool(uiPoolKey, Vector3.zero, Quaternion.identity);
+                Assert.That(instance, Is.Not.Null);
+
+                Assert.That(pool.DestroyPooledInstance(instance), Is.True);
+                Assert.That(pool.TryGetStats(uiPoolKey, out ESGameObjectPoolStats stats), Is.True);
+                Assert.That(stats.activeCount, Is.Zero);
+                Assert.That(stats.inactiveCount, Is.Zero);
+                Assert.That(stats.createdCount, Is.Zero);
+            }
+            finally
+            {
+                pool.ClearAll();
+                UnityEngine.Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Pool_DestroyedInactiveInstanceDoesNotConsumeReplacementCapacity()
+        {
+            const string uiPoolKey = "ui:window-pool:ui:inactive-destroy-test";
+            GameObject prefab = new GameObject("UI Pool Inactive Destroy Test");
+            ESGameObjectPoolModule pool = new ESGameObjectPoolModule();
+            ESGameObjectPoolConfig config = new ESGameObjectPoolConfig
+            {
+                maxTotalCount = 1,
+                allowExpand = true
+            };
+            try
+            {
+                Assert.That(pool.TryRegister(prefab, uiPoolKey, out string error, config), Is.True, error);
+                GameObject first = pool.GetInPool(uiPoolKey, Vector3.zero, Quaternion.identity);
+                Assert.That(first, Is.Not.Null);
+                Assert.That(pool.PushToPool(first), Is.True);
+
+                UnityEngine.Object.DestroyImmediate(first);
+
+                GameObject replacement = pool.GetInPool(uiPoolKey, Vector3.zero, Quaternion.identity);
+                Assert.That(replacement, Is.Not.Null);
+                Assert.That(pool.TryGetStats(uiPoolKey, out ESGameObjectPoolStats stats), Is.True);
+                Assert.That(stats.activeCount, Is.EqualTo(1));
+                Assert.That(stats.createdCount, Is.EqualTo(1));
+                Assert.That(pool.PushToPool(replacement), Is.True);
+            }
+            finally
+            {
+                pool.ClearAll();
+                UnityEngine.Object.DestroyImmediate(prefab);
+            }
+        }
+
+        [Test]
+        public void Pool_ExternallyDestroyedActiveInstanceCanCloseItsAccounting()
+        {
+            const string uiPoolKey = "ui:window-pool:ui:active-destroy-test";
+            GameObject prefab = new GameObject("UI Pool Active Destroy Test");
+            ESGameObjectPoolModule pool = new ESGameObjectPoolModule();
+            try
+            {
+                Assert.That(pool.TryRegister(prefab, uiPoolKey, out string error), Is.True, error);
+                GameObject instance = pool.GetInPool(uiPoolKey, Vector3.zero, Quaternion.identity);
+                Assert.That(instance, Is.Not.Null);
+
+                UnityEngine.Object.DestroyImmediate(instance);
+
+                Assert.That(pool.NotifyPooledInstanceDestroyed(uiPoolKey, instance), Is.True);
+                Assert.That(pool.TryGetStats(uiPoolKey, out ESGameObjectPoolStats stats), Is.True);
+                Assert.That(stats.activeCount, Is.Zero);
+                Assert.That(stats.createdCount, Is.Zero);
+            }
+            finally
+            {
+                pool.ClearAll();
+                UnityEngine.Object.DestroyImmediate(prefab);
+            }
+        }
+
         private static ESUIWindowDefinition CreateDefinition(ESUIWindowId id, string key)
         {
             ESUIWindowDefinition definition = ScriptableObject.CreateInstance<ESUIWindowDefinition>();
@@ -199,6 +399,20 @@ namespace ES.Tests.UI
             ESUIWindowCatalog catalog = ScriptableObject.CreateInstance<ESUIWindowCatalog>();
             SetField(catalog, "definitions", new List<ESUIWindowDefinition>(definitions));
             return catalog;
+        }
+
+        private static ESUIRootLease CreateRootLease(
+            ESUIWindowModule module,
+            ESUIRootCoordinator root,
+            string rootKey,
+            int registrationGeneration)
+        {
+            return (ESUIRootLease)Activator.CreateInstance(
+                typeof(ESUIRootLease),
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                null,
+                new object[] { module, root, rootKey, registrationGeneration },
+                null);
         }
 
         private static void DestroyCatalog(ESUIWindowCatalog catalog, params ESUIWindowDefinition[] definitions)

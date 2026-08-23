@@ -79,7 +79,8 @@ namespace ES
     /// <summary>一次工作台打开过程中的注入上下文；不把委托或 Editor 对象序列化到资产。</summary>
     public sealed class ESWorkbenchContributionContext
     {
-        private readonly Action<ESWorkbenchPageDefinition> registerPage;
+        private readonly Action<ESWorkbenchDocumentDefinition> registerDocument;
+        private readonly Action<ESWorkbenchAuthoringModeDefinition> registerAuthoringMode;
         private readonly Action<ESWorkbenchAssetRegistrationSlot> registerAssetSlot;
         private readonly Action<ESWorkbenchContributionEntry> registerEntry;
         private readonly Action<ESWorkbenchViewportDescriptor> registerViewport;
@@ -99,7 +100,8 @@ namespace ES
         internal ESWorkbenchContributionContext(
             string workbenchId,
             object window,
-            Action<ESWorkbenchPageDefinition> registerPage,
+            Action<ESWorkbenchDocumentDefinition> registerDocument,
+            Action<ESWorkbenchAuthoringModeDefinition> registerAuthoringMode,
             Action<ESWorkbenchAssetRegistrationSlot> registerAssetSlot,
             Action<ESWorkbenchContributionEntry> registerEntry,
             Action<ESWorkbenchViewportDescriptor> registerViewport,
@@ -118,7 +120,8 @@ namespace ES
         {
             WorkbenchId = workbenchId;
             Window = window;
-            this.registerPage = registerPage;
+            this.registerDocument = registerDocument;
+            this.registerAuthoringMode = registerAuthoringMode;
             this.registerAssetSlot = registerAssetSlot;
             this.registerEntry = registerEntry;
             this.registerViewport = registerViewport;
@@ -139,9 +142,14 @@ namespace ES
         public string WorkbenchId { get; }
         public object Window { get; }
 
-        public void RegisterPage(ESWorkbenchPageDefinition page)
+        public void RegisterDocument(ESWorkbenchDocumentDefinition document)
         {
-            if (page != null) registerPage?.Invoke(page);
+            if (document != null) registerDocument?.Invoke(document);
+        }
+
+        public void RegisterAuthoringMode(ESWorkbenchAuthoringModeDefinition mode)
+        {
+            if (mode != null) registerAuthoringMode?.Invoke(mode);
         }
 
         public void RegisterAssetSlot(ESWorkbenchAssetRegistrationSlot slot)
@@ -241,14 +249,48 @@ namespace ES
         }
     }
 
+    /// <summary>单个贡献的临时注册缓冲。Inject 成功后才提交到窗口会话，避免异常留下半成品。</summary>
+    internal sealed class ESWorkbenchContributionBuffer
+    {
+        internal readonly List<ESWorkbenchDocumentDefinition> Documents = new List<ESWorkbenchDocumentDefinition>();
+        internal readonly List<ESWorkbenchAuthoringModeDefinition> AuthoringModes =
+            new List<ESWorkbenchAuthoringModeDefinition>();
+        internal readonly List<ESWorkbenchAssetRegistrationSlot> AssetSlots = new List<ESWorkbenchAssetRegistrationSlot>();
+        internal readonly List<ESWorkbenchContributionEntry> Entries = new List<ESWorkbenchContributionEntry>();
+        internal readonly List<ESWorkbenchViewportDescriptor> Viewports = new List<ESWorkbenchViewportDescriptor>();
+        internal readonly List<ESWorkbenchObjectDescriptor> Objects = new List<ESWorkbenchObjectDescriptor>();
+        internal readonly List<ESWorkbenchCollectionSource<ESWorkbenchObjectDescriptor>> ObjectSources =
+            new List<ESWorkbenchCollectionSource<ESWorkbenchObjectDescriptor>>();
+        internal readonly List<ESWorkbenchHierarchyDescriptor> Hierarchy = new List<ESWorkbenchHierarchyDescriptor>();
+        internal readonly List<ESWorkbenchCollectionSource<ESWorkbenchHierarchyDescriptor>> HierarchySources =
+            new List<ESWorkbenchCollectionSource<ESWorkbenchHierarchyDescriptor>>();
+        internal readonly List<ESWorkbenchAuthoringAdapterDescriptor> AuthoringAdapters =
+            new List<ESWorkbenchAuthoringAdapterDescriptor>();
+        internal readonly List<ESWorkbenchInspectorDescriptor> Inspectors = new List<ESWorkbenchInspectorDescriptor>();
+        internal readonly List<ESWorkbenchToolDescriptor> Tools = new List<ESWorkbenchToolDescriptor>();
+        internal readonly List<ESWorkbenchCommandDescriptor> Commands = new List<ESWorkbenchCommandDescriptor>();
+        internal readonly List<ESWorkbenchCollectionSource<ESWorkbenchIssueDescriptor>> IssueSources =
+            new List<ESWorkbenchCollectionSource<ESWorkbenchIssueDescriptor>>();
+        internal readonly List<ESWorkbenchHostPresentationDescriptor> Presentations =
+            new List<ESWorkbenchHostPresentationDescriptor>();
+        internal readonly List<ESWorkbenchBottomPanelDescriptor> BottomPanels =
+            new List<ESWorkbenchBottomPanelDescriptor>();
+        internal readonly List<string> Diagnostics = new List<string>();
+    }
+
     public sealed class ESWorkbenchContributionSession<TModule> : IDisposable where TModule : struct, Enum
     {
         private readonly List<IDisposable> releases;
+        private readonly List<ESWorkbenchContributionDescriptor<TModule>> activeDescriptors;
+        private bool disposed;
 
         internal ESWorkbenchContributionSession(
             string workbenchId,
             IReadOnlyList<ESWorkbenchContributionDescriptor<TModule>> descriptors,
+            List<ESWorkbenchContributionDescriptor<TModule>> activeDescriptors,
             List<IDisposable> releases,
+            List<ESWorkbenchDocumentDefinition> documents,
+            List<ESWorkbenchAuthoringModeDefinition> authoringModes,
             IReadOnlyDictionary<string, ESWorkbenchAssetRegistrationSlot> assetSlots,
             List<ESWorkbenchContributionEntry> entries,
             List<ESWorkbenchViewportDescriptor> viewports,
@@ -267,7 +309,10 @@ namespace ES
         {
             WorkbenchId = workbenchId;
             Descriptors = descriptors;
+            this.activeDescriptors = activeDescriptors;
             this.releases = releases;
+            Documents = documents;
+            AuthoringModes = authoringModes;
             AssetSlots = assetSlots;
             Entries = entries;
             Viewports = viewports;
@@ -287,7 +332,12 @@ namespace ES
 
         public string WorkbenchId { get; }
         public IReadOnlyList<ESWorkbenchContributionDescriptor<TModule>> Descriptors { get; }
+        /// <summary>本次会话实际成功执行 Inject 的贡献；被禁用、依赖失败或注入异常的描述不会进入。</summary>
+        public IReadOnlyList<ESWorkbenchContributionDescriptor<TModule>> ActiveDescriptors => activeDescriptors;
+        public bool IsDisposed => disposed;
         public IReadOnlyList<ESWorkbenchContributionEntry> Entries { get; }
+        public IReadOnlyList<ESWorkbenchDocumentDefinition> Documents { get; }
+        public IReadOnlyList<ESWorkbenchAuthoringModeDefinition> AuthoringModes { get; }
         public IReadOnlyDictionary<string, ESWorkbenchAssetRegistrationSlot> AssetSlots { get; }
         public IReadOnlyList<ESWorkbenchViewportDescriptor> Viewports { get; }
         public IReadOnlyList<ESWorkbenchObjectDescriptor> Objects { get; }
@@ -305,12 +355,36 @@ namespace ES
 
         public void Dispose()
         {
+            if (disposed) return;
+            disposed = true;
             for (int i = releases.Count - 1; i >= 0; i--)
             {
                 try { releases[i]?.Dispose(); }
                 catch (Exception exception) { UnityEngine.Debug.LogException(exception); }
             }
             releases.Clear();
+            activeDescriptors.Clear();
+            ClearProjection(Documents);
+            ClearProjection(AuthoringModes);
+            if (AssetSlots is IDictionary<string, ESWorkbenchAssetRegistrationSlot> slots) slots.Clear();
+            ClearProjection(Entries);
+            ClearProjection(Viewports);
+            ClearProjection(Objects);
+            ClearProjection(ObjectSources);
+            ClearProjection(Hierarchy);
+            ClearProjection(HierarchySources);
+            ClearProjection(AuthoringAdapters);
+            ClearProjection(Inspectors);
+            ClearProjection(Tools);
+            ClearProjection(Commands);
+            ClearProjection(IssueSources);
+            ClearProjection(Presentations);
+            ClearProjection(BottomPanels);
+        }
+
+        private static void ClearProjection<T>(IReadOnlyList<T> values)
+        {
+            if (values is IList<T> mutable) mutable.Clear();
         }
     }
 
@@ -367,7 +441,8 @@ namespace ES
             string workbenchId,
             IEnumerable<TModule> modules,
             object window,
-            Action<ESWorkbenchPageDefinition> registerPage,
+            Action<ESWorkbenchDocumentDefinition> registerDocument,
+            Action<ESWorkbenchAuthoringModeDefinition> registerAuthoringMode,
             Action<ESWorkbenchAssetRegistrationSlot> registerAssetSlot,
             Action<ESWorkbenchContributionEntry> registerEntry,
             Action<ESWorkbenchViewportDescriptor> registerViewport,
@@ -397,7 +472,10 @@ namespace ES
                 .ToArray();
             var available = new HashSet<string>(ordered.Select(value => value.ContributionId), StringComparer.Ordinal);
             var injected = new HashSet<string>(StringComparer.Ordinal);
+            var activeDescriptors = new List<ESWorkbenchContributionDescriptor<TModule>>();
             var releases = new List<IDisposable>();
+            var documents = new List<ESWorkbenchDocumentDefinition>();
+            var authoringModes = new List<ESWorkbenchAuthoringModeDefinition>();
             var assetSlots = new Dictionary<string, ESWorkbenchAssetRegistrationSlot>(StringComparer.Ordinal);
             var entries = new List<ESWorkbenchContributionEntry>();
             var viewports = new List<ESWorkbenchViewportDescriptor>();
@@ -409,6 +487,8 @@ namespace ES
             var inspectors = new List<ESWorkbenchInspectorDescriptor>();
             var tools = new List<ESWorkbenchToolDescriptor>();
             var commands = new List<ESWorkbenchCommandDescriptor>();
+            var documentIds = new HashSet<string>(StringComparer.Ordinal);
+            var authoringModeIds = new HashSet<string>(StringComparer.Ordinal);
             var viewportIds = new HashSet<string>(StringComparer.Ordinal);
             var objectIds = new HashSet<string>(StringComparer.Ordinal);
             var objectSourceIds = new HashSet<string>(StringComparer.Ordinal);
@@ -424,12 +504,29 @@ namespace ES
             var bottomPanelIds = new HashSet<string>(StringComparer.Ordinal);
             var bottomPanels = new List<ESWorkbenchBottomPanelDescriptor>();
             var diagnostics = new List<string>();
+            ESWorkbenchContributionBuffer activeBuffer = null;
             var context = new ESWorkbenchContributionContext(
                 workbenchId,
                 window,
-                registerPage,
+                document =>
+                {
+                    if (activeBuffer != null) activeBuffer.Documents.Add(document);
+                    else RegisterUnique(document?.documentId, document, documentIds, documents, registerDocument,
+                        diagnostics, reportDiagnostic, "文档");
+                },
+                mode =>
+                {
+                    if (activeBuffer != null) activeBuffer.AuthoringModes.Add(mode);
+                    else RegisterUnique(mode?.ModeId, mode, authoringModeIds, authoringModes, registerAuthoringMode,
+                        diagnostics, reportDiagnostic, "作者模式");
+                },
                 slot =>
                 {
+                    if (activeBuffer != null)
+                    {
+                        activeBuffer.AssetSlots.Add(slot);
+                        return;
+                    }
                     if (assetSlots.ContainsKey(slot.slotId))
                     {
                         string message = "资源注册槽位冲突：" + slot.slotId + "，已保留首次声明。";
@@ -440,20 +537,79 @@ namespace ES
                     assetSlots.Add(slot.slotId, slot);
                     registerAssetSlot?.Invoke(slot);
                 },
-                entry => { entries.Add(entry); registerEntry?.Invoke(entry); },
-                viewport => RegisterUnique(viewport?.ViewportId, viewport, viewportIds, viewports, registerViewport, diagnostics, reportDiagnostic, "视口"),
-                item => RegisterUnique(item?.ObjectId, item, objectIds, objects, registerObject, diagnostics, reportDiagnostic, "对象"),
-                source => RegisterUnique(source?.SourceId, source, objectSourceIds, objectSources, registerObjectSource, diagnostics, reportDiagnostic, "对象源"),
-                item => RegisterUnique(item?.ItemId, item, hierarchyIds, hierarchy, registerHierarchy, diagnostics, reportDiagnostic, "层级项"),
-                source => RegisterUnique(source?.SourceId, source, hierarchySourceIds, hierarchySources, registerHierarchySource, diagnostics, reportDiagnostic, "层级源"),
-                adapter => RegisterUnique(adapter?.AdapterId, adapter, authoringAdapterIds, authoringAdapters, registerAuthoringAdapter, diagnostics, reportDiagnostic, "作者适配器"),
-                inspector => RegisterUnique(inspector?.InspectorId, inspector, inspectorIds, inspectors, registerInspector, diagnostics, reportDiagnostic, "Inspector"),
-                tool => RegisterUnique(tool?.ToolId, tool, toolIds, tools, registerTool, diagnostics, reportDiagnostic, "工具"),
-                command => RegisterUnique(command?.CommandId, command, commandIds, commands, registerCommand, diagnostics, reportDiagnostic, "命令"),
-                source => RegisterUnique(source?.SourceId, source, issueSourceIds, issueSources, registerIssueSource, diagnostics, reportDiagnostic, "问题源"),
+                entry =>
+                {
+                    if (activeBuffer != null) activeBuffer.Entries.Add(entry);
+                    else { entries.Add(entry); registerEntry?.Invoke(entry); }
+                },
+                viewport =>
+                {
+                    if (activeBuffer != null) activeBuffer.Viewports.Add(viewport);
+                    else RegisterUnique(viewport?.ViewportId, viewport, viewportIds, viewports, registerViewport,
+                        diagnostics, reportDiagnostic, "视口");
+                },
+                item =>
+                {
+                    if (activeBuffer != null) activeBuffer.Objects.Add(item);
+                    else RegisterUnique(item?.ObjectId, item, objectIds, objects, registerObject,
+                        diagnostics, reportDiagnostic, "对象");
+                },
+                source =>
+                {
+                    if (activeBuffer != null) activeBuffer.ObjectSources.Add(source);
+                    else RegisterUnique(source?.SourceId, source, objectSourceIds, objectSources, registerObjectSource,
+                        diagnostics, reportDiagnostic, "对象源");
+                },
+                item =>
+                {
+                    if (activeBuffer != null) activeBuffer.Hierarchy.Add(item);
+                    else RegisterUnique(item?.ItemId, item, hierarchyIds, hierarchy, registerHierarchy,
+                        diagnostics, reportDiagnostic, "层级项");
+                },
+                source =>
+                {
+                    if (activeBuffer != null) activeBuffer.HierarchySources.Add(source);
+                    else RegisterUnique(source?.SourceId, source, hierarchySourceIds, hierarchySources, registerHierarchySource,
+                        diagnostics, reportDiagnostic, "层级源");
+                },
+                adapter =>
+                {
+                    if (activeBuffer != null) activeBuffer.AuthoringAdapters.Add(adapter);
+                    else RegisterUnique(adapter?.AdapterId, adapter, authoringAdapterIds, authoringAdapters,
+                        registerAuthoringAdapter, diagnostics, reportDiagnostic, "作者适配器");
+                },
+                inspector =>
+                {
+                    if (activeBuffer != null) activeBuffer.Inspectors.Add(inspector);
+                    else RegisterUnique(inspector?.InspectorId, inspector, inspectorIds, inspectors, registerInspector,
+                        diagnostics, reportDiagnostic, "Inspector");
+                },
+                tool =>
+                {
+                    if (activeBuffer != null) activeBuffer.Tools.Add(tool);
+                    else RegisterUnique(tool?.ToolId, tool, toolIds, tools, registerTool,
+                        diagnostics, reportDiagnostic, "工具");
+                },
+                command =>
+                {
+                    if (activeBuffer != null) activeBuffer.Commands.Add(command);
+                    else RegisterUnique(command?.CommandId, command, commandIds, commands, registerCommand,
+                        diagnostics, reportDiagnostic, "命令");
+                },
+                source =>
+                {
+                    if (activeBuffer != null) activeBuffer.IssueSources.Add(source);
+                    else RegisterUnique(source?.SourceId, source, issueSourceIds, issueSources, registerIssueSource,
+                        diagnostics, reportDiagnostic, "问题源");
+                },
                 value =>
                 {
                     if (value == null) return;
+                    if (activeBuffer != null)
+                    {
+                        activeBuffer.Presentations.Add(value);
+                        return;
+                    }
                     if (presentations.Count > 0)
                     {
                         string message = "展示合同冲突：" + value.PresentationId
@@ -465,8 +621,38 @@ namespace ES
                     presentations.Add(value);
                     registerPresentation?.Invoke(value);
                 },
-                panel => RegisterUnique(panel?.PanelId, panel, bottomPanelIds, bottomPanels, registerBottomPanel, diagnostics, reportDiagnostic, "底部面板"),
-                message => { diagnostics.Add(message); reportDiagnostic?.Invoke(message); });
+                panel =>
+                {
+                    if (activeBuffer != null) activeBuffer.BottomPanels.Add(panel);
+                    else RegisterUnique(panel?.PanelId, panel, bottomPanelIds, bottomPanels, registerBottomPanel,
+                        diagnostics, reportDiagnostic, "底部面板");
+                },
+                message =>
+                {
+                    if (activeBuffer != null) activeBuffer.Diagnostics.Add(message);
+                    else { diagnostics.Add(message); reportDiagnostic?.Invoke(message); }
+                });
+
+            Action<ESWorkbenchContributionBuffer> commitBuffer = buffer =>
+            {
+                for (int i = 0; i < buffer.Documents.Count; i++) context.RegisterDocument(buffer.Documents[i]);
+                for (int i = 0; i < buffer.AuthoringModes.Count; i++) context.RegisterAuthoringMode(buffer.AuthoringModes[i]);
+                for (int i = 0; i < buffer.AssetSlots.Count; i++) context.RegisterAssetSlot(buffer.AssetSlots[i]);
+                for (int i = 0; i < buffer.Entries.Count; i++) context.RegisterEntry(buffer.Entries[i]);
+                for (int i = 0; i < buffer.Viewports.Count; i++) context.RegisterViewport(buffer.Viewports[i]);
+                for (int i = 0; i < buffer.Objects.Count; i++) context.RegisterObject(buffer.Objects[i]);
+                for (int i = 0; i < buffer.ObjectSources.Count; i++) context.RegisterObjectSource(buffer.ObjectSources[i]);
+                for (int i = 0; i < buffer.Hierarchy.Count; i++) context.RegisterHierarchy(buffer.Hierarchy[i]);
+                for (int i = 0; i < buffer.HierarchySources.Count; i++) context.RegisterHierarchySource(buffer.HierarchySources[i]);
+                for (int i = 0; i < buffer.AuthoringAdapters.Count; i++) context.RegisterAuthoringAdapter(buffer.AuthoringAdapters[i]);
+                for (int i = 0; i < buffer.Inspectors.Count; i++) context.RegisterInspector(buffer.Inspectors[i]);
+                for (int i = 0; i < buffer.Tools.Count; i++) context.RegisterTool(buffer.Tools[i]);
+                for (int i = 0; i < buffer.Commands.Count; i++) context.RegisterCommand(buffer.Commands[i]);
+                for (int i = 0; i < buffer.IssueSources.Count; i++) context.RegisterIssueSource(buffer.IssueSources[i]);
+                for (int i = 0; i < buffer.Presentations.Count; i++) context.RegisterPresentation(buffer.Presentations[i]);
+                for (int i = 0; i < buffer.BottomPanels.Count; i++) context.RegisterBottomPanel(buffer.BottomPanels[i]);
+                for (int i = 0; i < buffer.Diagnostics.Count; i++) context.ReportDiagnostic(buffer.Diagnostics[i]);
+            };
 
             var pending = new List<ESWorkbenchContributionDescriptor<TModule>>(ordered);
             while (pending.Count > 0)
@@ -485,8 +671,34 @@ namespace ES
                         progressed = true;
                         continue;
                     }
-                    if (descriptor.IsEnabled != null && !descriptor.IsEnabled(context))
+                    var buffer = new ESWorkbenchContributionBuffer();
+                    bool enabled = true;
+                    try
                     {
+                        activeBuffer = buffer;
+                        enabled = descriptor.IsEnabled == null || descriptor.IsEnabled(context);
+                    }
+                    catch (Exception exception)
+                    {
+                        enabled = false;
+                        string message = "贡献 " + descriptor.ContributionId
+                            + " 可用性检查失败：" + exception.Message;
+                        diagnostics.Add(message);
+                        reportDiagnostic?.Invoke(message);
+                        UnityEngine.Debug.LogException(exception);
+                    }
+                    finally
+                    {
+                        activeBuffer = null;
+                    }
+                    if (!enabled)
+                    {
+                        for (int diagnosticIndex = 0; diagnosticIndex < buffer.Diagnostics.Count; diagnosticIndex++)
+                        {
+                            string diagnostic = buffer.Diagnostics[diagnosticIndex];
+                            diagnostics.Add(diagnostic);
+                            reportDiagnostic?.Invoke(diagnostic);
+                        }
                         pending.RemoveAt(i--);
                         progressed = true;
                         continue;
@@ -497,9 +709,13 @@ namespace ES
 
                     try
                     {
+                        activeBuffer = buffer;
                         IDisposable release = descriptor.Inject(context);
+                        activeBuffer = null;
                         if (release != null) releases.Add(release);
+                        commitBuffer(buffer);
                         injected.Add(descriptor.ContributionId);
+                        activeDescriptors.Add(descriptor);
                         entries.Add(new ESWorkbenchContributionEntry(
                             descriptor.ContributionId,
                             descriptor.DisplayName,
@@ -512,6 +728,10 @@ namespace ES
                         diagnostics.Add(message);
                         reportDiagnostic?.Invoke(message);
                         UnityEngine.Debug.LogException(exception);
+                    }
+                    finally
+                    {
+                        activeBuffer = null;
                     }
                     pending.RemoveAt(i--);
                     progressed = true;
@@ -530,7 +750,8 @@ namespace ES
                 }
             }
 
-            return new ESWorkbenchContributionSession<TModule>(workbenchId, ordered, releases, assetSlots, entries,
+            return new ESWorkbenchContributionSession<TModule>(workbenchId, ordered, activeDescriptors, releases,
+                documents, authoringModes, assetSlots, entries,
                 viewports, objects, objectSources, hierarchy, hierarchySources, authoringAdapters,
                 inspectors, tools, commands, issueSources, presentations, bottomPanels, diagnostics);
         }

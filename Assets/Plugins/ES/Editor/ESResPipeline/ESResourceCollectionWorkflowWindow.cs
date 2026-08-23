@@ -934,6 +934,7 @@ namespace ES
         {
             return new GUIContent("ES 收集与 Key", "统一完成资源注册、稳定 Key、ResourcePlan 与构建前检查");
         }
+        public override string ESWindow_PresentationShortTitle => "收集";
 
         protected override string ESWindow_Subtitle => "资源注册、稳定 Key 与管线检查";
         protected override Vector2 ESWindow_MinSize => new Vector2(640f, 520f);

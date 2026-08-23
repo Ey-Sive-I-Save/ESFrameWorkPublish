@@ -1,5 +1,6 @@
 using System;
 using Sirenix.OdinInspector;
+using UnityEngine;
 
 namespace ES
 {
@@ -13,6 +14,13 @@ namespace ES
     public sealed class EntityEquipmentDomain : Domain<Entity, EntityEquipmentModuleBase>
     {
         [NonSerialized] private StateMachine subscribedStateMachine;
+        [NonSerialized] private bool configuredWeaponItemsReady;
+        [NonSerialized] private string configuredWeaponPreparationError;
+        [NonSerialized] private float nextConfiguredWeaponPreparationAt;
+        private const float ConfiguredWeaponPreparationRetryInterval = 0.5f;
+
+        public bool ConfiguredWeaponItemsReady => configuredWeaponItemsReady;
+        public string ConfiguredWeaponPreparationError => configuredWeaponPreparationError ?? string.Empty;
 
         [field: NonSerialized]
         public event Action<
@@ -41,6 +49,15 @@ namespace ES
         protected override void Update()
         {
             base.Update();
+            if (!configuredWeaponItemsReady
+                && Time.unscaledTime >= nextConfiguredWeaponPreparationAt)
+            {
+                configuredWeaponItemsReady = TryPrepareConfiguredWeaponItems(
+                    out configuredWeaponPreparationError);
+                if (!configuredWeaponItemsReady)
+                    nextConfiguredWeaponPreparationAt = Time.unscaledTime
+                        + ConfiguredWeaponPreparationRetryInterval;
+            }
             EntityEquipmentAttachmentModule attachment = Attachment;
             if (attachment != null
                 && attachment.TryAbortInvalidOrExpired(
@@ -62,6 +79,11 @@ namespace ES
             Slots?.OnPoolSpawned();
             Effects?.OnPoolSpawned();
             Attachment?.OnPoolSpawned();
+            configuredWeaponItemsReady = TryPrepareConfiguredWeaponItems(
+                out configuredWeaponPreparationError);
+            nextConfiguredWeaponPreparationAt = configuredWeaponItemsReady
+                ? 0f
+                : Time.unscaledTime + ConfiguredWeaponPreparationRetryInterval;
         }
 
         public void NotifyPoolDespawned()
@@ -70,7 +92,33 @@ namespace ES
             Effects?.OnPoolDespawned();
             Slots?.OnPoolDespawned();
             Inventory?.OnPoolDespawned();
+            configuredWeaponItemsReady = false;
+            configuredWeaponPreparationError = null;
+            nextConfiguredWeaponPreparationAt = 0f;
             UnbindAnimationEvents();
+        }
+
+        public bool TryPrepareConfiguredWeaponItems(out string error)
+        {
+            EntityEquipmentSlotModule slots = Slots;
+            if (slots == null || slots.WeaponSlotCount == 0)
+            {
+                error = null;
+                return true;
+            }
+
+            for (int index = 0; index < slots.WeaponSlotCount; index++)
+            {
+                if (slots.TryGetBoundItem(index, out _))
+                    continue;
+                if (!slots.TryGetWeaponSlotDefinition(index, out _, out error))
+                    return false;
+                if (!TryCreateAndEquipWeapon(index, out _, out error))
+                    return false;
+            }
+
+            error = null;
+            return true;
         }
 
         protected override void OnDestroy()
@@ -125,10 +173,15 @@ namespace ES
                 error = "Equipment slot " + equipmentSlot + " is already occupied.";
                 return false;
             }
-            if (!slots.TryGetWeaponSlot(equipmentSlot, out _, out error))
+            if (!slots.TryEnsureRuntimeWeaponView(
+                    equipmentSlot,
+                    out bool acquiredView,
+                    out error))
                 return false;
             if (!inventory.TryEquipItem(inventorySlot, equipmentSlot, out handle))
             {
+                if (acquiredView)
+                    slots.Internal_ReleaseRuntimeWeaponView(equipmentSlot);
                 error = "Inventory item cannot enter equipment slot " + equipmentSlot + ".";
                 return false;
             }
@@ -137,6 +190,59 @@ namespace ES
 
             if (!inventory.TryStoreItemAt(handle, inventorySlot))
                 error += " Rollback failed; item relation requires immediate repair.";
+            if (acquiredView)
+                slots.Internal_ReleaseRuntimeWeaponView(equipmentSlot);
+            handle = default;
+            return false;
+        }
+
+        public bool TryCreateAndEquipWeapon(
+            int equipmentSlot,
+            out ESInstanceHandle handle,
+            out string error)
+        {
+            handle = default;
+            EntityEquipmentInventoryModule inventory = Inventory;
+            EntityEquipmentSlotModule slots = Slots;
+            if (inventory == null || slots == null)
+            {
+                error = inventory == null
+                    ? "EntityEquipmentInventoryModule is missing."
+                    : "EntityEquipmentSlotModule is missing.";
+                return false;
+            }
+            if (!slots.TryGetWeaponSlotDefinition(
+                    equipmentSlot,
+                    out EntityEquipmentWeaponSlot slot,
+                    out error))
+                return false;
+            if (!ESRuntimeDataGameCore.Weapons.TryGet(
+                    slot.weaponKey,
+                    out ESWeaponRuntimeData weaponData)
+                || weaponData == null
+                || !weaponData.Ready
+                || weaponData.PreparedSharedData == null
+                || !weaponData.TryGetPreparedItemRuntimeKey(out int itemRuntimeKey))
+            {
+                error = "Weapon slot cannot resolve its prepared Item projection.";
+                return false;
+            }
+
+            var request = new ESItemInstanceCreateRequest(
+                itemRuntimeKey,
+                inventory.OwnerId,
+                weaponData.runtimeKey,
+                1,
+                ESItemInstanceLocation.Inventory);
+            if (!inventory.TryCreateItem(request, out handle, out int inventorySlot))
+            {
+                error = "Inventory cannot create the Weapon Item instance.";
+                return false;
+            }
+            if (TryEquipInventoryItem(inventorySlot, equipmentSlot, out handle, out error))
+                return true;
+
+            inventory.TryRemoveItem(inventorySlot, out _);
             handle = default;
             return false;
         }

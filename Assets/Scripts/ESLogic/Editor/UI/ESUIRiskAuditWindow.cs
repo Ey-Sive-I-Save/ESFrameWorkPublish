@@ -43,6 +43,7 @@ namespace ES.Editor
         {
             return new GUIContent("ES UI 风险体检", "显式扫描指定 UI Root 的结构与性能风险");
         }
+        public override string ESWindow_PresentationShortTitle => "UI审计";
 
         protected override string ESWindow_Subtitle => "指定 UI Root 的只读风险审计";
         protected override Vector2 ESWindow_MinSize => new Vector2(560f, 400f);

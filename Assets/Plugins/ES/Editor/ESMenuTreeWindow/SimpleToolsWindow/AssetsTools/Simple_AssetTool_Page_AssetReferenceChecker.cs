@@ -272,12 +272,12 @@ namespace ES
         [OnInspectorGUI, PropertyOrder(100)]
         private void DrawCustomLists()
         {
-            DrawAssetReferenceWorkbench();
+            DrawAssetReferenceTool();
         }
 
-        private void DrawAssetReferenceWorkbench()
+        private void DrawAssetReferenceTool()
         {
-            DrawWorkbenchHeader();
+            DrawToolHeader();
             DrawTargetSnapshot();
             DrawWorkflowActions();
             DrawResultDashboard();
@@ -285,7 +285,7 @@ namespace ES
             DrawCommercialResultLists();
         }
 
-        private void DrawWorkbenchHeader()
+        private void DrawToolHeader()
         {
             SimpleToolsPanelUtility.DrawToolHeader(
                 "资源引用体检台",

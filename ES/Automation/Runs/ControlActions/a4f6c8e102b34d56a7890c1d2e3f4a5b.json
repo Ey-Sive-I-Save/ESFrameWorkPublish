@@ -1,0 +1,20 @@
+{
+  "protocolVersion": 1,
+  "requestId": "a4f6c8e102b34d56a7890c1d2e3f4a5b",
+  "runId": "",
+  "actorId": "codex.local",
+  "action": "getUnityCompilationState",
+  "capability": "EditorCompilation.Read",
+  "requiresHumanApproval": false,
+  "inputSha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "approvalId": "",
+  "approvalPlanFingerprint": "",
+  "approvalDecisionActor": "",
+  "executionRequestId": "",
+  "approvalInvalidationReason": "",
+  "status": "Completed",
+  "createdUtc": "2026-08-20T13:12:25.9055635+00:00",
+  "updatedUtc": "2026-08-20T13:12:25.9229760+00:00",
+  "resultSha256": "4ffe329aa9b6215451e194f99bae30d8c3cd73db5d728cbcf164005cdbb64581",
+  "error": ""
+}

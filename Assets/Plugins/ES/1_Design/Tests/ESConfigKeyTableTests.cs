@@ -44,6 +44,25 @@ namespace ES.Tests
             };
         }
 
+        private static ESAssetReferPrefabConfigKey CreateShotPrefabKey(string stringKey)
+        {
+            return new ESAssetReferPrefabConfigKey
+            {
+                stringKey = stringKey,
+                guid = "guid-" + stringKey,
+                assetTypeName = typeof(GameObject).FullName
+            };
+        }
+
+        private static T GetPreparedProperty<T>(object target, string propertyName)
+        {
+            System.Reflection.PropertyInfo property = target.GetType().GetProperty(
+                propertyName,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(property, Is.Not.Null, propertyName);
+            return (T)property.GetValue(target);
+        }
+
         private sealed class TestAssetLoader : IESAssetConfigTableLoader<TestAssetConfigData, GameObject>, System.IDisposable
         {
             private System.Action<GameObject, string> pending;
@@ -200,7 +219,7 @@ namespace ES.Tests
             try
             {
                 Assert.That(ESAssetPage.DetermineKind(asset), Is.EqualTo(ESAssetReferKind.Raw));
-                Assert.That(ESGlobalResToolsSupportConfig.DetermineAssetCategory(asset), Is.EqualTo(ESAssetCategory.Raw));
+                Assert.That(ESAssetCategoryUtility.Determine(asset), Is.EqualTo(ESAssetCategory.Raw));
             }
             finally
             {
@@ -1566,6 +1585,7 @@ namespace ES.Tests
         public void WeaponDefinitionSchema_RejectsInvalidFormalFireData_BeforeTableCommit()
         {
             var shared = ItemWeaponSharedData.Default;
+            shared.deliveryMode = WeaponAttackDeliveryMode.HitScan;
             shared.fire.enabled = true;
             shared.fire.interval = 0f;
 
@@ -1581,10 +1601,372 @@ namespace ES.Tests
             Assert.That(table.TryGet(key, out _), Is.False);
         }
 
+        [TestCase(WeaponFirePolicy.Automatic)]
+        [TestCase(WeaponFirePolicy.Burst)]
+        [TestCase(WeaponFirePolicy.Charge)]
+        [TestCase(WeaponFirePolicy.Continuous)]
+        public void WeaponDefinitionSchema_ActionRejectsWeaponFirePolicies(WeaponFirePolicy policy)
+        {
+            ItemWeaponSharedData shared = ItemWeaponSharedData.Default;
+            shared.deliveryMode = WeaponAttackDeliveryMode.Action;
+            shared.firePolicy = policy;
+
+            Assert.That(shared.ValidateDefinition(out string error), Is.False);
+            Assert.That(error, Does.Contain("Action"));
+            Assert.That(error, Does.Contain("Single"));
+        }
+
+        [TestCase(WeaponAttackDeliveryMode.HitScan, WeaponFirePolicy.Single)]
+        [TestCase(WeaponAttackDeliveryMode.HitScan, WeaponFirePolicy.Automatic)]
+        [TestCase(WeaponAttackDeliveryMode.HitScan, WeaponFirePolicy.Burst)]
+        [TestCase(WeaponAttackDeliveryMode.HitScan, WeaponFirePolicy.Charge)]
+        [TestCase(WeaponAttackDeliveryMode.Shot, WeaponFirePolicy.Automatic)]
+        [TestCase(WeaponAttackDeliveryMode.Beam, WeaponFirePolicy.Continuous)]
+        public void WeaponDefinitionSchema_AcceptsSupportedDeliveryAndPolicyMatrix(
+            WeaponAttackDeliveryMode deliveryMode,
+            WeaponFirePolicy policy)
+        {
+            ItemWeaponSharedData shared = ItemWeaponSharedData.Default;
+            shared.weaponKind = ItemWeaponKind.Magic;
+            shared.deliveryMode = deliveryMode;
+            shared.firePolicy = policy;
+            shared.fire.enabled = true;
+            if (deliveryMode == WeaponAttackDeliveryMode.Shot)
+                shared.defaultShot = "tests.shot.policy-matrix";
+
+            Assert.That(shared.ValidateDefinition(out string error), Is.True, error);
+        }
+
+        [Test]
+        public void WeaponDefinitionSchema_BeamRejectsNonContinuousPolicy()
+        {
+            ItemWeaponSharedData shared = ItemWeaponSharedData.Default;
+            shared.deliveryMode = WeaponAttackDeliveryMode.Beam;
+            shared.firePolicy = WeaponFirePolicy.Automatic;
+            shared.fire.enabled = true;
+
+            Assert.That(shared.ValidateDefinition(out string error), Is.False);
+            Assert.That(error, Does.Contain("Continuous"));
+        }
+
+        [Test]
+        public void ShotDefinitionSchema_RequiresValidDefinitionAndPrefabBeforeCommit()
+        {
+            var table = new ESShotConfigKeyTable(4);
+            var key = new ESShotConfigKey { stringKey = "tests.shot.validated" };
+            ItemShotSharedData shared = ItemShotSharedData.Default;
+
+            System.InvalidOperationException missingPrefab = Assert.Throws<System.InvalidOperationException>(() =>
+                table.InjectWith(key, shared, ItemShotVariableData.Default));
+            Assert.That(missingPrefab.Message, Does.Contain("Prefab Key"));
+            Assert.That(table.TryGet(key, out _), Is.False);
+
+            shared.lifeTime = 0f;
+            System.InvalidOperationException invalidDefinition = Assert.Throws<System.InvalidOperationException>(() =>
+                table.InjectWith(
+                    key,
+                    shared,
+                    ItemShotVariableData.Default,
+                    prefabKey: CreateShotPrefabKey("tests.prefab.shot")));
+            Assert.That(invalidDefinition.Message, Does.Contain("ShotDefinition 校验失败"));
+            Assert.That(table.TryGet(key, out _), Is.False);
+        }
+
+        [Test]
+        public void ShotDefinitionSchema_RejectsStringOnlyPrefabIdentityBeforeCommit()
+        {
+            var table = new ESShotConfigKeyTable(4);
+            var key = new ESShotConfigKey { stringKey = "tests.shot.string-only-prefab" };
+
+            System.InvalidOperationException exception = Assert.Throws<System.InvalidOperationException>(() =>
+                table.InjectWith(
+                    key,
+                    ItemShotSharedData.Default,
+                    ItemShotVariableData.Default,
+                    prefabKey: new ESAssetReferPrefabConfigKey
+                    {
+                        stringKey = "tests.prefab.shot.string-only"
+                    }));
+
+            Assert.That(exception.Message, Does.Contain("GUID"));
+            Assert.That(table.TryGet(key, out _), Is.False);
+        }
+
+        [Test]
+        public void ShotDefinitionSchema_RejectsNonPrefabAssetTypeBeforeCommit()
+        {
+            var table = new ESShotConfigKeyTable(4);
+            var key = new ESShotConfigKey { stringKey = "tests.shot.wrong-prefab-type" };
+            ESAssetReferPrefabConfigKey prefabKey = CreateShotPrefabKey("tests.prefab.shot.wrong-type");
+            prefabKey.assetTypeName = typeof(Texture2D).FullName;
+
+            System.InvalidOperationException exception = Assert.Throws<System.InvalidOperationException>(() =>
+                table.InjectWith(
+                    key,
+                    ItemShotSharedData.Default,
+                    ItemShotVariableData.Default,
+                    prefabKey: prefabKey));
+
+            Assert.That(exception.Message, Does.Contain("UnityEngine.GameObject"));
+            Assert.That(table.TryGet(key, out _), Is.False);
+        }
+
+        [Test]
+        public void ShotRawInject_RejectsInvalidRuntimeDataBeforeReady()
+        {
+            var table = new ESShotConfigKeyTable(4);
+            var data = new ESShotRuntimeData
+            {
+                sharedData = ItemShotSharedData.Default,
+                defaultVariableData = ItemShotVariableData.Default,
+                prefabKey = CreateShotPrefabKey("tests.prefab.shot.raw-invalid")
+            };
+            data.sharedData.speed = float.NaN;
+
+            System.InvalidOperationException exception = Assert.Throws<System.InvalidOperationException>(() =>
+                table.Inject(ESShotEnumKey.Custom, data));
+
+            Assert.That(exception.Message, Does.Contain("未冻结 RuntimeData"));
+            Assert.That(data.Ready, Is.False);
+            Assert.That(data.sharedData, Is.Null);
+            Assert.That(data.prefabKey, Is.Null);
+            Assert.That(table.TryGet((int)ESShotEnumKey.Custom, out _), Is.False);
+        }
+
+        [Test]
+        public void ShotRawTryInject_RejectsMustHitBypassBeforeReady()
+        {
+            var table = new ESShotConfigKeyTable(4);
+            ItemShotSharedData shared = ItemShotSharedData.Default;
+            shared.allowMustHit = false;
+            ItemShotVariableData variable = ItemShotVariableData.Default;
+            variable.forceMustHit = true;
+            var data = new ESShotRuntimeData
+            {
+                sharedData = shared,
+                defaultVariableData = variable,
+                prefabKey = CreateShotPrefabKey("tests.prefab.shot.raw-must-hit")
+            };
+
+            Assert.That(
+                table.TryInject(ESShotEnumKey.Custom, data, out int runtimeKey),
+                Is.False);
+            Assert.That(runtimeKey, Is.Zero);
+            Assert.That(data.Ready, Is.False);
+            Assert.That(data.sharedData, Is.Null);
+            Assert.That(data.prefabKey, Is.Null);
+            Assert.That(table.TryGet((int)ESShotEnumKey.Custom, out _), Is.False);
+        }
+
+        [Test]
+        public void ShotInheritedInject_RejectsMissingPrefabBeforeReady()
+        {
+            var table = new ESShotConfigKeyTable(4);
+            var key = new ESShotConfigKey { stringKey = "tests.shot.raw-generic" };
+            var data = new ESShotRuntimeData
+            {
+                sharedData = ItemShotSharedData.Default,
+                defaultVariableData = ItemShotVariableData.Default
+            };
+
+            Assert.Throws<System.InvalidOperationException>(() => table.Inject(key, data));
+
+            Assert.That(data.Ready, Is.False);
+            Assert.That(data.sharedData, Is.Null);
+            Assert.That(table.TryGet(key, out _), Is.False);
+        }
+
+        [Test]
+        public void ShotBaseStringKeyInject_RejectsInvalidRuntimeDataBeforeReady()
+        {
+            var table = new ESShotConfigKeyTable(4);
+            ESConfigKeyTable<ESShotRuntimeData> compatibilityTable = table;
+            var data = new ESShotRuntimeData
+            {
+                sharedData = ItemShotSharedData.Default,
+                defaultVariableData = ItemShotVariableData.Default,
+                prefabKey = CreateShotPrefabKey("tests.prefab.shot.raw-string")
+            };
+            data.defaultVariableData.speedMultiplier = float.PositiveInfinity;
+
+            Assert.Throws<System.InvalidOperationException>(() =>
+                compatibilityTable.Inject("tests.shot.raw-string", data));
+
+            Assert.That(data.Ready, Is.False);
+            Assert.That(data.sharedData, Is.Null);
+            Assert.That(data.prefabKey, Is.Null);
+            Assert.That(compatibilityTable.TryGetByStringKey("tests.shot.raw-string", out _), Is.False);
+        }
+
+        [Test]
+        public void ShotRegisterAndUpsert_RejectIncompletePrefabIdentityBeforeReady()
+        {
+            var table = new ESShotConfigKeyTable(4);
+            var registerKey = new ESShotConfigKey { stringKey = "tests.shot.raw-register" };
+            var registerData = new ESShotRuntimeData
+            {
+                sharedData = ItemShotSharedData.Default,
+                defaultVariableData = ItemShotVariableData.Default,
+                prefabKey = new ESAssetReferPrefabConfigKey
+                {
+                    stringKey = "tests.prefab.shot.raw-register"
+                }
+            };
+            var upsertKey = new ESShotConfigKey { stringKey = "tests.shot.raw-upsert" };
+            var upsertData = new ESShotRuntimeData
+            {
+                sharedData = ItemShotSharedData.Default,
+                defaultVariableData = ItemShotVariableData.Default,
+                prefabKey = new ESAssetReferPrefabConfigKey
+                {
+                    stringKey = "tests.prefab.shot.raw-upsert"
+                }
+            };
+
+            table.BeginBuild();
+            try
+            {
+                Assert.That(table.Register(registerKey, registerData), Is.False);
+                Assert.That(table.Upsert(upsertKey, upsertData), Is.False);
+            }
+            finally
+            {
+                table.EndBuild();
+            }
+
+            Assert.That(registerData.Ready, Is.False);
+            Assert.That(registerData.sharedData, Is.Null);
+            Assert.That(upsertData.Ready, Is.False);
+            Assert.That(upsertData.sharedData, Is.Null);
+            Assert.That(table.TryGet(registerKey, out _), Is.False);
+            Assert.That(table.TryGet(upsertKey, out _), Is.False);
+        }
+
+        [Test]
+        public void ShotRawInject_ValidRuntimeDataBecomesPreparedAndReady()
+        {
+            var table = new ESShotConfigKeyTable(4);
+            var data = new ESShotRuntimeData
+            {
+                sharedData = ItemShotSharedData.Default,
+                defaultVariableData = ItemShotVariableData.Default,
+                prefabKey = CreateShotPrefabKey("tests.prefab.shot.raw-valid")
+            };
+
+            int runtimeKey = table.Inject(ESShotEnumKey.Custom, data);
+
+            Assert.That(runtimeKey, Is.EqualTo((int)ESShotEnumKey.Custom));
+            Assert.That(data.Ready, Is.True);
+            Assert.That(data.runtimeKey, Is.EqualTo(runtimeKey));
+            Assert.That(data.sharedData.hitTagEligibility.IsPrepared, Is.True);
+            Assert.That(table.TryGet(runtimeKey, out ESShotRuntimeData current), Is.True);
+            Assert.That(current, Is.SameAs(data));
+        }
+
+        [Test]
+        public void ShotPreparedData_RemainsFrozenAfterAuthorDataMutation()
+        {
+            var table = new ESShotConfigKeyTable(4);
+            ItemShotSharedData shared = ItemShotSharedData.Default;
+            shared.speed = 42f;
+            shared.impact.bounceCount = 3;
+            ItemShotVariableData variable = ItemShotVariableData.Default;
+            variable.speedMultiplier = 1.5f;
+            var data = new ESShotRuntimeData
+            {
+                sharedData = shared,
+                defaultVariableData = variable,
+                prefabKey = CreateShotPrefabKey("tests.prefab.shot.frozen")
+            };
+
+            table.Inject(ESShotEnumKey.Custom, data);
+            ItemShotSharedData prepared = GetPreparedProperty<ItemShotSharedData>(
+                data,
+                "PreparedSharedData");
+            ItemShotVariableData preparedVariable = GetPreparedProperty<ItemShotVariableData>(
+                data,
+                "PreparedDefaultVariableData");
+
+            shared.speed = 1f;
+            shared.impact.bounceCount = 0;
+            data.defaultVariableData.speedMultiplier = 9f;
+
+            Assert.That(prepared, Is.Not.SameAs(shared));
+            Assert.That(prepared.hitTagEligibility, Is.Not.SameAs(shared.hitTagEligibility));
+            Assert.That(prepared.hitTagEligibility.IsPrepared, Is.True);
+            Assert.That(prepared.impact, Is.Not.SameAs(shared.impact));
+            Assert.That(prepared.speed, Is.EqualTo(42f));
+            Assert.That(prepared.impact.bounceCount, Is.EqualTo(3));
+            Assert.That(preparedVariable.speedMultiplier, Is.EqualTo(1.5f));
+        }
+
+        [Test]
+        public void WeaponRawInject_RejectsInvalidRuntimeDataBeforeReady()
+        {
+            var table = new ESWeaponConfigKeyTable(4);
+            ItemWeaponSharedData shared = ItemWeaponSharedData.Default;
+            shared.deliveryMode = WeaponAttackDeliveryMode.HitScan;
+            shared.fire.enabled = true;
+            ItemWeaponVariableData variable = ItemWeaponVariableData.Default;
+            variable.durability = float.NaN;
+            var data = new ESWeaponRuntimeData
+            {
+                sharedData = shared,
+                defaultVariableData = variable,
+                prefabKey = CreateShotPrefabKey("tests.prefab.weapon.raw-invalid")
+            };
+
+            Assert.Throws<System.InvalidOperationException>(() =>
+                table.Inject(ESWeaponEnumKey.Custom, data));
+
+            Assert.That(data.Ready, Is.False);
+            Assert.That(data.sharedData, Is.Null);
+            Assert.That(data.prefabKey, Is.Null);
+            Assert.That(table.TryGet((int)ESWeaponEnumKey.Custom, out _), Is.False);
+        }
+
+        [Test]
+        public void WeaponPreparedData_RemainsFrozenAfterAuthorDataMutation()
+        {
+            var table = new ESWeaponConfigKeyTable(4);
+            ItemWeaponSharedData shared = ItemWeaponSharedData.Default;
+            shared.deliveryMode = WeaponAttackDeliveryMode.HitScan;
+            shared.fire.enabled = true;
+            shared.fire.damage = 25f;
+            shared.recoil.baseMagnitude = 0.75f;
+            ItemWeaponVariableData variable = ItemWeaponVariableData.Default;
+            variable.ammo = 17;
+
+            int runtimeKey = table.InjectWith(
+                new ESWeaponConfigKey { stringKey = "tests.weapon.frozen" },
+                shared,
+                variable,
+                prefabKey: CreateShotPrefabKey("tests.prefab.weapon.frozen"));
+            Assert.That(table.TryGet(runtimeKey, out ESWeaponRuntimeData data), Is.True);
+            ItemWeaponSharedData prepared = GetPreparedProperty<ItemWeaponSharedData>(
+                data,
+                "PreparedSharedData");
+            ItemWeaponVariableData preparedVariable = GetPreparedProperty<ItemWeaponVariableData>(
+                data,
+                "PreparedDefaultVariableData");
+
+            shared.fire.damage = 1f;
+            shared.recoil.baseMagnitude = 9f;
+            data.defaultVariableData.ammo = 0;
+
+            Assert.That(prepared, Is.Not.SameAs(shared));
+            Assert.That(prepared.fire, Is.Not.SameAs(shared.fire));
+            Assert.That(prepared.recoil, Is.Not.SameAs(shared.recoil));
+            Assert.That(prepared.fire.damage, Is.EqualTo(25f));
+            Assert.That(prepared.recoil.baseMagnitude, Is.EqualTo(0.75f));
+            Assert.That(preparedVariable.ammo, Is.EqualTo(17));
+        }
+
         [Test]
         public void WeaponDefinitionSchema_CommitsFormalData_WithoutLegacyCombatParameters()
         {
             var shared = ItemWeaponSharedData.Default;
+            shared.deliveryMode = WeaponAttackDeliveryMode.HitScan;
             shared.fire.enabled = true;
             shared.fire.interval = 0.2f;
             shared.fire.distance = 80f;
@@ -1593,7 +1975,11 @@ namespace ES.Tests
 
             var table = new ESWeaponConfigKeyTable(4);
             var key = new ESWeaponConfigKey { stringKey = "tests.weapon.formal" };
-            int runtimeKey = table.InjectWith(key, shared, ItemWeaponVariableData.Default);
+            int runtimeKey = table.InjectWith(
+                key,
+                shared,
+                ItemWeaponVariableData.Default,
+                prefabKey: CreateShotPrefabKey("tests.prefab.weapon.formal"));
 
             Assert.That(runtimeKey, Is.Not.Zero);
             Assert.That(table.TryGet(key, out ESWeaponRuntimeData data), Is.True);
@@ -1611,6 +1997,7 @@ namespace ES.Tests
 
             int runtimeKey = table.InjectWithDefaults(
                 key,
+                prefabKey: CreateShotPrefabKey("tests.prefab.weapon.action"),
                 weaponKind: ItemWeaponKind.Melee,
                 primaryAttackAction: actionKey);
 

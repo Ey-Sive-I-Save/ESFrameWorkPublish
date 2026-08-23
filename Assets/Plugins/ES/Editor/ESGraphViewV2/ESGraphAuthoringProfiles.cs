@@ -1112,21 +1112,31 @@ namespace ES.EditorInternal
             string summary = BuildSummary(errors);
             if (!ESGraphAuthoringRegistry.CanForceContinue(errors))
             {
-                EditorUtility.DisplayDialog("当前操作无法继续",
+                ESDialog.InfoModal(
+                    "es.graph.force-continue.invalid",
+                    "当前操作无法继续",
                     (string.IsNullOrWhiteSpace(actionName) ? "该操作" : actionName)
                     + "需要一份可稳定构造的图合同，但当前仍有结构、身份、路径或授权错误：\n\n"
                     + summary
                     + "\n这些问题不能通过风险确认绕过。请返回图中修复后重试。",
-                    "返回修复");
+                    "返回修复",
+                    tone: ESDialogTone.Danger,
+                    host: ESDialogHost.Editor,
+                    allowMainWorkspaceFallback: true);
                 return false;
             }
 
-            return EditorUtility.DisplayDialog("检测到质量风险",
+            return ESDialog.ConfirmModal(
+                "es.graph.force-continue.warning",
+                "检测到质量风险",
                 (string.IsNullOrWhiteSpace(actionName) ? "该操作" : actionName)
                 + "检测到以下质量错误：\n\n" + summary
                 + "\n建议先返回修复。你仍可承担风险强制继续，但产物可能偏离目标、遗漏要求或增加返工。"
                 + "人工批准、目标路径和 SHA-256 绑定仍会继续生效，不会因本次确认而放宽。",
-                "仍然继续", "返回修复");
+                "仍然继续", "返回修复",
+                tone: ESDialogTone.Warning,
+                host: ESDialogHost.Editor,
+                allowMainWorkspaceFallback: true);
         }
 
         private static string BuildSummary(IReadOnlyList<ESGraphValidationIssue> errors)

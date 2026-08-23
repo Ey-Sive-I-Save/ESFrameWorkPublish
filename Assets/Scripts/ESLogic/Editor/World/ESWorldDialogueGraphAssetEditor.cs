@@ -34,7 +34,7 @@ namespace ES
             }
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("打开对话工作台", GUILayout.Height(26f))) ESWorldDialogueWorkbenchWindow.OpenFor((ESWorldDialogueGraphAsset)target);
+                if (GUILayout.Button("打开对话编辑器", GUILayout.Height(26f))) ESWorldDialogueEditorWindow.OpenFor((ESWorldDialogueGraphAsset)target);
                 if (GUILayout.Button("验证", GUILayout.Height(26f)))
                 {
                     ESWorldDialogueGraphAsset asset = (ESWorldDialogueGraphAsset)target;

@@ -1,0 +1,7 @@
+{
+  "protocolVersion": 1,
+  "requestId": "a31f62c904e84b73a6fb51ad94a8c201",
+  "actorId": "codex.local",
+  "action": "getUnityCompilationState",
+  "payload": {}
+}

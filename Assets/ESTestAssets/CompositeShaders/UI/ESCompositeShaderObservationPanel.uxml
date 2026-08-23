@@ -1,0 +1,41 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:VisualElement name="observation-root" class="observation-root">
+        <ui:VisualElement name="panel" class="observation-panel">
+            <ui:VisualElement name="header" class="panel-header">
+                <ui:Label name="eyebrow" text="ES COMPOSITE SHADER LAB" class="eyebrow" />
+                <ui:Label name="scene-title" class="scene-title" />
+                <ui:Button name="collapse-button" text="−" class="collapse-button" />
+                <ui:Label name="status" class="status" />
+            </ui:VisualElement>
+            <ui:VisualElement name="panel-body" class="panel-body">
+                <ui:VisualElement class="divider" />
+                <ui:VisualElement class="section-heading case-heading">
+                    <ui:Label text="案例" class="section-title" />
+                    <ui:Label text="选择独立效果进行观察" class="section-subtitle" />
+                    <ui:Button name="baseline-button" text="◇ 无效果基准" class="accent-button" />
+                </ui:VisualElement>
+                <ui:ScrollView name="case-list" class="case-list" mode="Vertical" />
+                <ui:Label name="selected-case" class="selected-case" />
+                <ui:VisualElement class="section-heading">
+                    <ui:Label text="参数" class="section-title" />
+                    <ui:Label text="拖动后接管当前值，单项可回正" class="section-subtitle" />
+                </ui:VisualElement>
+                <ui:ScrollView name="control-list" class="control-list" mode="Vertical" />
+                <ui:VisualElement class="toggle-row">
+                    <ui:Toggle name="auto-toggle" label="自动演示" />
+                    <ui:Toggle name="solo-toggle" label="单独观察" />
+                </ui:VisualElement>
+                <ui:VisualElement class="action-row">
+                    <ui:Button name="reset-selected" text="↺ 当前回正" class="action-button" />
+                    <ui:Button name="reset-all" text="↺ 全部回正" class="action-button" />
+                    <ui:Button name="overview-button" text="⌂ 返回总览" class="action-button accent-button" />
+                </ui:VisualElement>
+                <ui:VisualElement class="section-heading scene-heading">
+                    <ui:Label text="场景" class="section-title" />
+                    <ui:Label text="Shader / 材质组" class="section-subtitle" />
+                </ui:VisualElement>
+                <ui:VisualElement name="scene-nav" class="scene-nav" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

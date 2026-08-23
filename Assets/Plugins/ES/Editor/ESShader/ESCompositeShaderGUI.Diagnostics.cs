@@ -24,6 +24,26 @@ namespace ES.EditorInternal
         private static readonly GUIContent LocateUrpAssetButtonContent = new GUIContent("定位 URP 资源");
         private static readonly GUIContent FixQualityButtonContent = new GUIContent("修正质量档");
         private static readonly GUIContent ConfigureParticleStreamsButtonContent = new GUIContent("配置顶点流");
+        private static readonly string[] SharedSingleSampleEffects =
+        {
+            "_EnableShadow", "_EnableSmoke", "_EnableFlame", "_EnablePalette",
+            "_EnableTextureLayer1", "_EnableTextureLayer2", "_EnableFlowMap",
+            "_EnableFullAlphaDissolve", "_EnableSourceAlphaDissolve",
+            "_EnableSourceGlowDissolve", "_EnableDirectionalAlphaFade",
+            "_EnableDirectionalGlowFade", "_EnableFullGlowDissolve"
+        };
+
+        private static readonly string[] SharedMaskedEffectPairs =
+        {
+            "_EnableUVDistort", "_UVDistortMaskToggle",
+            "_EnableAddColor", "_AddColorMaskToggle",
+            "_EnableStrongTint", "_StrongTintMaskToggle",
+            "_EnableRecolorRGB", "_RecolorRGBMaskToggle",
+            "_EnableRecolorRGBYCP", "_RecolorRGBYCPMaskToggle",
+            "_EnableAddHue", "_AddHueMaskToggle",
+            "_EnableSineGlow", "_SineGlowMaskToggle",
+            "_EnableMetal", "_MetalMaskToggle"
+        };
 
         private static readonly List<ParticleSystemVertexStream> RequiredParticleStreams = new List<ParticleSystemVertexStream>
         {
@@ -54,6 +74,12 @@ namespace ES.EditorInternal
 
         private static void DrawEnvironmentDiagnostics(MaterialEditor editor, MaterialProperty[] properties, string shaderName)
         {
+            DrawTextureSampleBudgetDiagnostics(editor, shaderName);
+            if (shaderName == "ES/3D/Lit Composite URP")
+            {
+                DrawLitResourceDiagnostics(editor);
+                return;
+            }
             if (shaderName != "ES/3D/VFX Composite URP") return;
 
             DiagnosticWarnings.Clear();
@@ -187,6 +213,391 @@ namespace ES.EditorInternal
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space(4f);
             ClearEnvironmentDiagnosticCaches();
+        }
+
+        private static void DrawLitResourceDiagnostics(MaterialEditor editor)
+        {
+            int dynamicHighQualityCount = 0;
+            for (int i = 0; i < editor.targets.Length; i++)
+            {
+                Material material = editor.targets[i] as Material;
+                if (material == null || material.shader == null
+                    || material.shader.name != "ES/3D/Lit Composite URP") continue;
+
+                bool highQuality = material.HasProperty("_QualityTier")
+                    && material.GetFloat("_QualityTier") > 1.5f;
+                bool dynamicResources = !material.HasProperty("_ResourceProfile")
+                    || material.GetFloat("_ResourceProfile") < 0.5f;
+                if (highQuality && dynamicResources) dynamicHighQualityCount++;
+            }
+
+            DiagnosticWarnings.Clear();
+            if (dynamicHighQualityCount > 0)
+                DiagnosticWarnings.Add(
+                    dynamicHighQualityCount + " 个 Lit 材质同时使用“高质量 + 动态完整”资源配置。"
+                    + "若移动端运行时不通过 MaterialPropertyBlock 切换效果，建议改用“材质优化”并在改动开关后刷新资源配置。");
+            if (DiagnosticWarnings.Count == 0) return;
+
+            EditorGUILayout.BeginVertical(ESEditorPresentation.SurfaceStyle);
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label("移动端资源预算", ESEditorPresentation.HeaderStyle);
+            GUILayout.FlexibleSpace();
+            GUILayout.Label(DiagnosticWarnings.Count + " 项需要确认", ESEditorPresentation.MetaStyle);
+            EditorGUILayout.EndHorizontal();
+            for (int i = 0; i < DiagnosticWarnings.Count; i++)
+                EditorGUILayout.HelpBox(DiagnosticWarnings[i], MessageType.Warning);
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(4f);
+            DiagnosticWarnings.Clear();
+        }
+
+        private static void DrawTextureSampleBudgetDiagnostics(MaterialEditor editor, string shaderName)
+        {
+            int materialCount = 0;
+            int highestTotalSamples = 0;
+            int highestBaseSamples = 0;
+            int highestAdditionalSamples = 0;
+            int elevatedMaterialCount = 0;
+            for (int i = 0; i < editor.targets.Length; i++)
+            {
+                Material material = editor.targets[i] as Material;
+                if (material == null || material.shader == null || material.shader.name != shaderName) continue;
+                materialCount++;
+                int baseSamples = EstimateBaseTextureSamples(material, shaderName);
+                int additionalSamples = EstimateAdditionalTextureSamples(material, shaderName);
+                int totalSamples = baseSamples + additionalSamples;
+                if (totalSamples > highestTotalSamples)
+                {
+                    highestTotalSamples = totalSamples;
+                    highestBaseSamples = baseSamples;
+                    highestAdditionalSamples = additionalSamples;
+                }
+                if (totalSamples >= 12) elevatedMaterialCount++;
+            }
+            if (materialCount == 0) return;
+
+            string panelKey = "ES.Composite.Diagnostics.SampleBudget." + shaderName;
+            bool elevated = highestTotalSamples >= 12;
+            bool expanded = elevated || SessionState.GetBool(panelKey, false);
+            EditorGUILayout.BeginVertical(ESEditorPresentation.SurfaceStyle);
+            EditorGUILayout.BeginHorizontal();
+            bool nextExpanded = EditorGUILayout.Foldout(expanded, "静态采样预算", true);
+            if (nextExpanded != expanded)
+            {
+                expanded = nextExpanded;
+                SessionState.SetBool(panelKey, expanded);
+            }
+            GUILayout.FlexibleSpace();
+            GUILayout.Label("最高约 " + highestTotalSamples + " 次/片元", ESEditorPresentation.MetaStyle);
+            EditorGUILayout.EndHorizontal();
+            if (expanded)
+            {
+                GUILayout.Label(
+                    "主颜色 Pass 基础最高约 " + highestBaseSamples + " 次 + 当前效果附加最高约 "
+                    + highestAdditionalSamples + " 次。" + GetTextureSamplePassDescription(shaderName),
+                    ESEditorPresentation.SubtitleStyle);
+                if (elevatedMaterialCount > 0)
+                    EditorGUILayout.HelpBox(
+                        elevatedMaterialCount + " 个材质的静态估算达到 12 次/片元以上。"
+                        + "请在目标 GLES3/Vulkan 设备上用 GPU Profiler 核对；该数字不包含缓存命中、分支一致性、带宽、寄存器和 Overdraw。",
+                        highestTotalSamples >= 20 ? MessageType.Warning : MessageType.Info);
+                else
+                    GUILayout.Label(
+                        "这是按当前质量档与开关计算的保守估算，不是 GPU Profiler 实测。",
+                        ESEditorPresentation.SubtitleStyle);
+            }
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(4f);
+        }
+
+        private static int EstimateBaseTextureSamples(Material material, string shaderName)
+        {
+            if (shaderName == "ES/2D/Composite URP")
+            {
+                int samples = 2; // Main texture plus the Universal2D mask texture.
+                if (UsesEtc1ExternalAlpha(material)) samples++;
+                return samples;
+            }
+            return 1;
+        }
+
+        private static string GetTextureSamplePassDescription(string shaderName)
+        {
+            if (shaderName == "ES/2D/Composite URP")
+                return " 2D 按 Universal2D 主颜色 Pass 估算；Forward 回退少 1 次，Normals Pass 另读 NormalMap。"
+                    + "ETC1_EXTERNAL_ALPHA 变体的每次主纹理读取还会同步读取 AlphaTex。";
+            if (shaderName == "ES/3D/Lit Composite URP")
+                return " Lit 按 Forward/GBuffer 表面纹理估算；不含 URP 光照、阴影、GI 和反射探针读取。";
+            return " 不含管线额外读取和 Overdraw。";
+        }
+
+        private static int EstimateAdditionalTextureSamples(Material material, string shaderName)
+        {
+            int quality = material.HasProperty("_QualityTier")
+                ? Mathf.Clamp(Mathf.RoundToInt(material.GetFloat("_QualityTier")), 0, 2)
+                : 2;
+            bool high = quality >= 2;
+            bool standard = quality >= 1;
+            bool exactContract = IsEnabledValue(material, "_SSUStatusContract");
+            int mainTextureTapSamples = UsesEtc1ExternalAlpha(material) ? 2 : 1;
+            int samples = 0;
+
+            bool blurActive = IsPositiveEffect(material, "_EnableBlur", "_BlurIntensity")
+                && IsPositiveValue(material, "_BlurRadius");
+            bool sharpenActive = IsPositiveEffect(material, "_EnableSharpen", "_SharpenFade")
+                && IsPositiveValue(material, "_SharpenAmount");
+            bool chromaticActive = IsPositiveEffect(material, "_EnableChromatic", "_ChromaticIntensity")
+                && HasNonZeroValue(material, "_ChromaticOffset");
+
+            if (shaderName == "ES/2D/Composite URP" || shaderName == "ES/UI/Composite URP")
+            {
+                if (blurActive && high)
+                    samples += (material.HasProperty("_BlurMode") && material.GetFloat("_BlurMode") > 0.5f ? 8 : 4)
+                        * mainTextureTapSamples;
+                if (sharpenActive && high) samples += 4 * mainTextureTapSamples;
+                if (chromaticActive && standard) samples += 2 * mainTextureTapSamples;
+                if (IsEffectEnabledForQuality(material, shaderName, quality, "_EnableUVDistort")) samples += 1;
+                if (IsEffectEnabledForQuality(material, shaderName, quality, "_EnableFullDistortion")) samples += 2;
+                samples += EstimateFadeSamples(material, shaderName);
+                samples += EstimateOutlineSamples(material, shaderName, quality, mainTextureTapSamples);
+                if (exactContract)
+                {
+                    if (IsEffectEnabledForQuality(material, shaderName, quality, "_EnableHologram")) samples += 2;
+                    if (IsEffectEnabledForQuality(material, shaderName, quality, "_EnableGlitch")) samples += 4;
+                }
+                samples += EstimateStatusSamples(material, shaderName, exactContract, high);
+                samples += EstimateSurfaceEffectSamples(material);
+            }
+            else if (shaderName == "ES/3D/Lit Composite URP")
+            {
+                if (blurActive) samples += 4;
+                if (sharpenActive && high) samples += 4;
+                if (chromaticActive) samples += 2;
+                if (IsEnabledValue(material, "_UseNormalMap")) samples += 1;
+                if (IsEnabledValue(material, "_UseMetallicMap")) samples += 1;
+                if (IsEnabledValue(material, "_UseOcclusionMap")) samples += 1;
+                if (IsEnabledValue(material, "_UseEmission") && material.HasProperty("_EmissionMap")) samples += 1;
+                if (IsEffectEnabledForQuality(material, shaderName, quality, "_EnableUVDistort")) samples += 1;
+                if (IsEffectEnabledForQuality(material, shaderName, quality, "_EnableFullDistortion")) samples += 2;
+                if (standard && material.HasProperty("_DissolveMode")
+                    && material.GetFloat("_DissolveMode") > 0.5f
+                    && material.GetFloat("_DissolveMode") < 1.5f) samples++;
+                samples += EstimateFadeSamples(material, shaderName);
+                samples += EstimateOutlineSamples(material, shaderName, quality, 1);
+                if (high && exactContract && IsEnabledValue(material, "_EnableHologram")) samples += 2;
+                if (high && IsEnabledValue(material, "_EnableGlitch")) samples += 4;
+                samples += EstimateStatusSamples(material, shaderName, exactContract, high);
+                samples += EstimateSurfaceEffectSamples(material);
+            }
+            else if (shaderName == "ES/3D/VFX Composite URP")
+            {
+                if (blurActive && high) samples += 4;
+                if (chromaticActive && standard) samples += 2;
+                if (standard && (HasNonZeroValue(material, "_Distortion")
+                    || HasPositiveMode(material, "_DissolveMode"))) samples += 1;
+                if (IsEffectEnabledForQuality(material, shaderName, quality, "_EnableFlowMap")) samples += 1;
+                if (high && exactContract)
+                {
+                    if (IsEnabledValue(material, "_EnableHologram")) samples += 2;
+                    if (IsEnabledValue(material, "_EnableGlitch")) samples += 4;
+                }
+                if (IsEnabledValue(material, "_EnableSoftParticles")
+                    || IsEnabledValue(material, "_EnableDepthIntersection")) samples += 1;
+                return samples;
+            }
+
+            for (int i = 0; i < SharedSingleSampleEffects.Length; i++)
+                if (IsEffectEnabledForQuality(material, shaderName, quality, SharedSingleSampleEffects[i]))
+                    samples += SharedSingleSampleEffects[i] == "_EnableShadow" ? mainTextureTapSamples : 1;
+
+            for (int i = 0; i + 1 < SharedMaskedEffectPairs.Length; i += 2)
+                if (IsEffectEnabledForQuality(material, shaderName, quality, SharedMaskedEffectPairs[i])
+                    && IsEnabledValue(material, SharedMaskedEffectPairs[i + 1])) samples++;
+            return samples;
+        }
+
+        private static int EstimateFadeSamples(Material material, string shaderName)
+        {
+            int samples = 0;
+            float fadeMode = material.HasProperty("_FadeMode") ? material.GetFloat("_FadeMode") : 0f;
+            if (fadeMode > 0.5f)
+            {
+                bool textureMask = fadeMode > 1.5f && fadeMode < 2.5f;
+                if (shaderName == "ES/3D/Lit Composite URP")
+                {
+                    samples++; // Lit always reads fade noise while a Fade mode is active.
+                }
+                else
+                {
+                    bool noiseMode = (fadeMode > 2.5f && fadeMode < 3.5f)
+                        || (fadeMode > 4.5f && fadeMode < 5.5f);
+                    if (noiseMode || IsPositiveValue(material, "_FadeNoiseFactor")) samples++;
+                }
+                if (textureMask) samples++;
+            }
+            if (IsEnabledValue(material, "_EnableCustomFade")) samples += 2;
+            if (IsEnabledValue(material, "_EnableDirectionalDistortion")) samples += 3;
+            return samples;
+        }
+
+        private static int EstimateSurfaceEffectSamples(Material material)
+        {
+            int samples = 0;
+            if (IsEnabledValue(material, "_EnableInkSpread")) samples++;
+            if (IsEnabledValue(material, "_EnableCamouflage"))
+                samples += IsEnabledValue(material, "_CamouflageAnimationToggle") ? 3 : 2;
+            if (IsEnabledValue(material, "_EnableMetal")) samples += 2;
+            if (IsEnabledValue(material, "_EnableEnchanted")) samples += 2;
+            return samples;
+        }
+
+        private static int EstimateStatusSamples(
+            Material material,
+            string shaderName,
+            bool exactContract,
+            bool high)
+        {
+            if (exactContract)
+            {
+                int exactSamples = 0;
+                if (shaderName == "ES/2D/Composite URP"
+                    && IsEnabledValue(material, "_EnableDistortion")) exactSamples++;
+                if (IsEnabledValue(material, "_EnableFrozen")) exactSamples += 3;
+                if (IsEnabledValue(material, "_EnableBurn")) exactSamples += 3;
+                if (IsEnabledValue(material, "_EnableRainbow")) exactSamples++;
+                if (IsEnabledValue(material, "_EnablePoison")) exactSamples++;
+                if (IsEnabledValue(material, "_EnableShine")
+                    && IsEnabledValue(material, "_ShineMaskToggle")) exactSamples++;
+                return exactSamples;
+            }
+
+            bool frozen = IsEnabledValue(material, "_EnableFrozen");
+            bool burn = IsEnabledValue(material, "_EnableBurn");
+            bool poison = IsEnabledValue(material, "_EnablePoison");
+            if (shaderName == "ES/2D/Composite URP")
+                return IsEnabledValue(material, "_EnableDistortion") || frozen || burn || poison ? 1 : 0;
+            if (shaderName == "ES/UI/Composite URP")
+                return frozen || burn || poison ? 1 : 0;
+            if (shaderName == "ES/3D/Lit Composite URP")
+                return (frozen || poison ? 1 : 0) + (high && burn ? 1 : 0);
+            return 0;
+        }
+
+        private static int EstimateOutlineSamples(
+            Material material,
+            string shaderName,
+            int quality,
+            int mainTextureTapSamples)
+        {
+            if (shaderName == "ES/UI/Composite URP"
+                && (IsEnabledValue(material, "_EnableTMPCompatibility") || IsEnabledValue(material, "_EnableSDF")))
+                return 0;
+
+            bool exactContract = IsEnabledValue(material, "_SSUStatusContract");
+            if (!exactContract)
+            {
+                if (shaderName == "ES/3D/Lit Composite URP")
+                    return quality >= 2 ? EstimateLitLegacyOutlineSamples(material) : 0;
+
+                int legacySamples = 0;
+                if (IsEnabledValue(material, "_EnableInnerOutline"))
+                    legacySamples += 2 * mainTextureTapSamples;
+                if (IsEnabledValue(material, "_EnableOuterOutline")
+                    || IsEnabledValue(material, "_EnablePixelOutline"))
+                    legacySamples += 4 * mainTextureTapSamples;
+                return legacySamples;
+            }
+
+            int exactMinimumQuality = shaderName == "ES/UI/Composite URP" ? 1 : 2;
+            if (quality < exactMinimumQuality) return 0;
+            int samples = 0;
+            if (IsEnabledValue(material, "_EnableInnerOutline"))
+            {
+                samples += 8 * mainTextureTapSamples;
+                if (IsEnabledValue(material, "_InnerOutlineDistortionToggle")) samples++;
+                if (IsEnabledValue(material, "_InnerOutlineTextureToggle")) samples++;
+            }
+            if (IsEnabledValue(material, "_EnableOuterOutline"))
+            {
+                samples += 8 * mainTextureTapSamples;
+                if (IsEnabledValue(material, "_OuterOutlineDistortionToggle")) samples++;
+                if (IsEnabledValue(material, "_OuterOutlineTextureToggle")) samples++;
+            }
+            if (IsEnabledValue(material, "_EnablePixelOutline"))
+            {
+                samples += 4 * mainTextureTapSamples;
+                if (IsEnabledValue(material, "_PixelOutlineTextureToggle")) samples++;
+            }
+            return samples;
+        }
+
+        private static int EstimateLitLegacyOutlineSamples(Material material)
+        {
+            int samples = 0;
+            if (IsEnabledValue(material, "_EnableInnerOutline"))
+            {
+                samples += 8;
+                if (IsEnabledValue(material, "_InnerOutlineDistortionToggle")) samples++;
+                if (IsEnabledValue(material, "_InnerOutlineTextureToggle")) samples++;
+            }
+
+            bool pixel = IsEnabledValue(material, "_EnablePixelOutline");
+            bool outer = IsEnabledValue(material, "_EnableOuterOutline");
+            if (!pixel && !outer) return samples;
+            samples += 8;
+            if (pixel)
+            {
+                if (IsEnabledValue(material, "_PixelOutlineTextureToggle")) samples++;
+            }
+            else
+            {
+                if (IsEnabledValue(material, "_OuterOutlineDistortionToggle")) samples++;
+                if (IsEnabledValue(material, "_OuterOutlineTextureToggle")) samples++;
+            }
+            return samples;
+        }
+
+        private static bool UsesEtc1ExternalAlpha(Material material)
+        {
+            return material != null
+                && material.shader != null
+                && material.shader.name == "ES/2D/Composite URP"
+                && material.IsKeywordEnabled("ETC1_EXTERNAL_ALPHA");
+        }
+
+        private static bool IsEffectEnabledForQuality(
+            Material material,
+            string shaderName,
+            int quality,
+            string toggleProperty)
+        {
+            return IsEnabledValue(material, toggleProperty)
+                && quality >= GetMinimumQualityTier(shaderName, toggleProperty);
+        }
+
+        private static bool IsPositiveEffect(Material material, string toggleProperty, string valueProperty)
+        {
+            return IsEnabledValue(material, toggleProperty) && IsPositiveValue(material, valueProperty);
+        }
+
+        private static bool IsEnabledValue(Material material, string propertyName)
+        {
+            return material.HasProperty(propertyName) && material.GetFloat(propertyName) > 0.5f;
+        }
+
+        private static bool IsPositiveValue(Material material, string propertyName)
+        {
+            return material.HasProperty(propertyName) && material.GetFloat(propertyName) > 0.0001f;
+        }
+
+        private static bool HasNonZeroValue(Material material, string propertyName)
+        {
+            return material.HasProperty(propertyName) && Mathf.Abs(material.GetFloat(propertyName)) > 0.000001f;
+        }
+
+        private static bool HasPositiveMode(Material material, string propertyName)
+        {
+            return material.HasProperty(propertyName) && material.GetFloat(propertyName) > 0.5f;
         }
 
         private static void ClearEnvironmentDiagnosticCaches()
@@ -485,13 +896,17 @@ namespace ES.EditorInternal
             int renderersLosingStreams;
             string removedStreams;
             GetParticleStreamReplacementImpact(renderers, out renderersLosingStreams, out removedStreams);
-            if (renderersLosingStreams > 0 && !EditorUtility.DisplayDialog(
+            if (renderersLosingStreams > 0 && !ESDialog.ConfirmModal(
+                    "es.composite.particle-streams.replace",
                     "替换粒子顶点流？",
                     "此操作会按 ES 合同整体替换并重排 " + renderers.Count + " 个 Renderer 的顶点流列表。\n\n"
                     + renderersLosingStreams + " 个 Renderer 将移除额外通道：" + removedStreams + "。\n\n"
                     + "顶点流顺序会影响 TEXCOORD 通道打包。是否继续？",
                     "替换",
-                    "取消"))
+                    "取消",
+                    tone: ESDialogTone.Warning,
+                    host: ESDialogHost.Editor,
+                    allowMainWorkspaceFallback: true))
                 return;
             UnityEngine.Object[] targets = new UnityEngine.Object[renderers.Count];
             for (int i = 0; i < renderers.Count; i++) targets[i] = renderers[i];

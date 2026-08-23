@@ -1,0 +1,110 @@
+{
+    "schemaVersion":  1,
+    "reportId":  "es-editor-commercial-static.v1",
+    "generatedUtc":  "2026-08-22T17:07:24.2842590Z",
+    "scope":  "ES editor framework static evidence",
+    "status":  "passed-with-not-run-runtime",
+    "checks":  [
+                   {
+                       "id":  "required-editor-contracts",
+                       "status":  "passed",
+                       "message":  "All editor dialog, presentation, Section and contract test anchors exist.",
+                       "sources":  [
+                                       "Assets/Plugins/ES/0_Stand/BaseDefine_Law/ESDialog.cs",
+                                       "Assets/Plugins/ES/Editor/EditorTools/ESAdvancedDialog/ESAdvancedDialog.cs",
+                                       "Assets/Plugins/ES/Editor/ESPresentation/Core/ESEditorPresentationCore.cs",
+                                       "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESEditorSectionAttributeProcessor.cs",
+                                       "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESEditorSectionNavigatorDrawer.cs",
+                                       "Assets/Plugins/ES/0_Stand/Tests/Dialog/ESDialogContractTests.cs"
+                                   ]
+                   },
+                   {
+                       "id":  "composite-shader-no-native-dialog",
+                       "status":  "passed",
+                       "message":  "CompositeShader production path has no direct native dialog call.",
+                       "sources":  [
+                                       "Assets/Plugins/ES/Editor/ESShader"
+                                   ]
+                   },
+                   {
+                       "id":  "dialog-migration-inventory",
+                       "status":  "passed",
+                       "message":  "Generated inventory: 523 matches across 82 files; categories are explicit and require per-item disposition.",
+                       "sources":  [
+                                       "ES/Output/EditorDialogMigrationInventory.json"
+                                   ]
+                   },
+                   {
+                       "id":  "window-lifecycle-static-contract",
+                       "status":  "passed",
+                       "message":  "Sleep contract references=8; GetWindow references=2; runtime reload/PlayMode behavior remains unproven.",
+                       "sources":  [
+                                       "Assets/Plugins/ES/Editor/ESPresentation/Core/ESEditorPresentationCore.cs"
+                                   ]
+                   },
+                   {
+                       "id":  "section-projection-static-contract",
+                       "status":  "passed",
+                       "message":  "Section contract markers: ConditionalWeakTable, SessionState, PropertyTree",
+                       "sources":  [
+                                       "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESEditorSectionNavigatorDrawer.cs"
+                                   ]
+                   },
+                   {
+                       "id":  "serialized-object-authority-static-signal",
+                       "status":  "passed",
+                       "message":  "Editor SerializedObject usage files=31; static presence does not prove every Section path is correctly rebound.",
+                       "sources":  [
+                                       "Assets/Plugins/ES/Editor"
+                                   ]
+                   },
+                   {
+                       "id":  "dialog-contract-static-tests",
+                       "status":  "passed",
+                       "message":  "Dialog test markers: InfoModal, AllowMainWorkspaceFallback, Presenter",
+                       "sources":  [
+                                       "Assets/Plugins/ES/0_Stand/Tests/Dialog/ESDialogContractTests.cs"
+                                   ]
+                   },
+                   {
+                       "id":  "es-editor-build",
+                       "status":  "not-run",
+                       "message":  "Build omitted; rerun with -BuildEditor.",
+                       "sources":  [
+                                       "ES_Editor.csproj"
+                                   ]
+                   },
+                   {
+                       "id":  "test-project-ES.MenuTree.Editor.Tests.csproj",
+                       "status":  "passed",
+                       "message":  "Test project declares a discoverable test framework; runtime execution remains separate.",
+                       "sources":  [
+                                       "ES.MenuTree.Editor.Tests.csproj"
+                                   ]
+                   },
+                   {
+                       "id":  "test-project-ES.CompositeShader.Editor.Tests.csproj",
+                       "status":  "passed",
+                       "message":  "Test project declares a discoverable test framework; runtime execution remains separate.",
+                       "sources":  [
+                                       "ES.CompositeShader.Editor.Tests.csproj"
+                                   ]
+                   }
+               ],
+    "runtimeNotRun":  [
+                          "es-editor-build",
+                          "Unity ReloadDomain",
+                          "Unity PlayMode",
+                          "Unity multi-display/high-DPI",
+                          "Unity Test Runner runtime execution"
+                      ],
+    "nativeDialogSummary":  {
+                                "matches":  523,
+                                "files":  82,
+                                "inventory":  "ES/Output/EditorDialogMigrationInventory.json"
+                            },
+    "limitations":  [
+                        "Static checks do not prove Unity Editor runtime behavior.",
+                        "Native dialog inventory requires per-entry migration or approved exception disposition."
+                    ]
+}

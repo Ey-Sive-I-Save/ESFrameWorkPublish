@@ -34,6 +34,112 @@ namespace ES.EditorInternal
             this.notifyModelChanged = notifyModelChanged;
         }
 
+        internal static bool TryValidateStableIdentities(GraphAsset asset, out string error)
+        {
+            if (asset == null)
+            {
+                error = "图资产不存在。";
+                return false;
+            }
+            if (asset.Nodes == null || asset.Edges == null)
+            {
+                error = "图资产的节点或关系容器不存在。";
+                return false;
+            }
+
+            var nodeIds = new HashSet<string>(StringComparer.Ordinal);
+            var portIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < asset.Nodes.Count; i++)
+            {
+                ESGraphNodeRecord node = asset.Nodes[i];
+                if (node == null || !ESGraphIdentity.IsValid(node.nodeId)
+                    || !nodeIds.Add(node.nodeId))
+                {
+                    error = "图中存在空节点、非法或重复 NodeId。";
+                    return false;
+                }
+                if (node.ports == null)
+                {
+                    error = "节点端点容器不存在：" + node.nodeId;
+                    return false;
+                }
+                for (int p = 0; p < node.ports.Count; p++)
+                {
+                    ESGraphPortRecord port = node.ports[p];
+                    if (port == null || !ESGraphIdentity.IsValid(port.portId)
+                        || !portIds.Add(port.portId))
+                    {
+                        error = "图中存在空端点、非法或重复 PortId。";
+                        return false;
+                    }
+                }
+            }
+
+            var edgeIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < asset.Edges.Count; i++)
+            {
+                ESGraphEdgeRecord edge = asset.Edges[i];
+                if (edge == null || !ESGraphIdentity.IsValid(edge.edgeId)
+                    || !edgeIds.Add(edge.edgeId))
+                {
+                    error = "图中存在空关系、非法或重复 EdgeId。";
+                    return false;
+                }
+                if (!ESGraphIdentity.IsValid(edge.outputPortId)
+                    || !ESGraphIdentity.IsValid(edge.inputPortId)
+                    || !portIds.Contains(edge.outputPortId)
+                    || !portIds.Contains(edge.inputPortId))
+                {
+                    error = "图关系引用了非法或不存在的端点身份：" + edge.edgeId;
+                    return false;
+                }
+            }
+            error = string.Empty;
+            return true;
+        }
+
+        internal static bool TryResolveNodePositionTargets(GraphAsset asset,
+            IReadOnlyDictionary<string, Vector2> positions,
+            out List<KeyValuePair<ESGraphNodeRecord, Vector2>> targets, out string error)
+        {
+            targets = null;
+            if (!TryValidateStableIdentities(asset, out error))
+                return false;
+            if (positions == null || positions.Count == 0)
+            {
+                error = "没有需要更新的节点位置。";
+                return false;
+            }
+
+            var nodesById = new Dictionary<string, ESGraphNodeRecord>(StringComparer.Ordinal);
+            for (int i = 0; i < asset.Nodes.Count; i++)
+                nodesById.Add(asset.Nodes[i].nodeId, asset.Nodes[i]);
+            targets = new List<KeyValuePair<ESGraphNodeRecord, Vector2>>(positions.Count);
+            foreach (KeyValuePair<string, Vector2> pair in positions)
+            {
+                if (!ESGraphIdentity.IsValid(pair.Key)
+                    || !nodesById.TryGetValue(pair.Key, out ESGraphNodeRecord node))
+                {
+                    targets = null;
+                    error = "节点位置目标不存在或身份非法：" + (pair.Key ?? string.Empty);
+                    return false;
+                }
+                if (!IsFinite(pair.Value))
+                {
+                    targets = null;
+                    error = "节点位置目标包含非有限坐标：" + pair.Key;
+                    return false;
+                }
+                targets.Add(new KeyValuePair<ESGraphNodeRecord, Vector2>(node, pair.Value));
+            }
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool IsFinite(Vector2 position)
+            => !float.IsNaN(position.x) && !float.IsInfinity(position.x)
+                && !float.IsNaN(position.y) && !float.IsInfinity(position.y);
+
         public ESGraphEditResult CreateNode(
             GraphAsset asset,
             IESGraphNodeDefinition definition,
@@ -385,24 +491,22 @@ namespace ES.EditorInternal
             IReadOnlyDictionary<string, Vector2> positions,
             string undoName)
         {
-            if (asset == null || positions == null || positions.Count == 0)
-                return Fail("没有需要更新的节点位置。");
-            var changedPositions = new List<KeyValuePair<string, Vector2>>(positions.Count);
-            foreach (KeyValuePair<string, Vector2> pair in positions)
-            {
-                ESGraphNodeRecord node = asset.FindNode(pair.Key);
-                if (node != null && node.position != pair.Value)
-                    changedPositions.Add(pair);
-            }
+            if (!TryResolveNodePositionTargets(asset, positions,
+                    out List<KeyValuePair<ESGraphNodeRecord, Vector2>> targets, out string error))
+                return Fail(error);
+            var changedPositions = new List<KeyValuePair<ESGraphNodeRecord, Vector2>>(targets.Count);
+            for (int i = 0; i < targets.Count; i++)
+                if (targets[i].Key.position != targets[i].Value)
+                    changedPositions.Add(targets[i]);
             if (changedPositions.Count == 0)
                 return new ESGraphEditResult();
             Undo.RecordObject(asset, undoName);
             var changedNodeIds = new List<string>(changedPositions.Count);
             for (int i = 0; i < changedPositions.Count; i++)
             {
-                KeyValuePair<string, Vector2> pair = changedPositions[i];
-                asset.SetNodePosition(pair.Key, pair.Value);
-                changedNodeIds.Add(pair.Key);
+                KeyValuePair<ESGraphNodeRecord, Vector2> pair = changedPositions[i];
+                pair.Key.position = pair.Value;
+                changedNodeIds.Add(pair.Key.nodeId);
             }
             var result = new ESGraphEditResult
             {

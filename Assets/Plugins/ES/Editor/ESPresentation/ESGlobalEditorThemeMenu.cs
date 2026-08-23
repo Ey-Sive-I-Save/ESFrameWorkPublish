@@ -1,11 +1,15 @@
+using Sirenix.OdinInspector.Editor;
 using UnityEditor;
 using UnityEngine;
 
 namespace ES.EditorInternal
 {
     /// <summary>
-    /// Explicit project actions for the shared ES editor theme. Opening an inspector never creates
-    /// this asset implicitly; a missing asset simply falls back to the in-memory default palette.
+    /// Static menu registrar for explicit project actions on the shared ES editor theme. This is
+    /// not an EditorWindow lifecycle owner: the EditorWindow references below are transient reads
+    /// of the focused window for menu commands only. It must not receive window binding, sleep,
+    /// reload, or close callbacks. Opening an inspector never creates this asset implicitly; a
+    /// missing asset simply falls back to the in-memory default palette.
     /// </summary>
     internal static class ESGlobalEditorThemeMenu
     {
@@ -208,6 +212,52 @@ namespace ES.EditorInternal
                 AssetDatabase.CreateFolder("Assets/ESNormalAssets/Data", "GlobalData");
             if (!AssetDatabase.IsValidFolder(ThemeFolder))
                 AssetDatabase.CreateFolder("Assets/ESNormalAssets/Data/GlobalData", "EditorTheme");
+        }
+    }
+
+    [CustomEditor(typeof(ESGlobalEditorTheme))]
+    internal sealed class ESGlobalEditorThemeInspector : OdinEditor
+    {
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            Undo.undoRedoPerformed -= HandleUndoRedo;
+            Undo.undoRedoPerformed += HandleUndoRedo;
+        }
+
+        protected override void OnDisable()
+        {
+            Undo.undoRedoPerformed -= HandleUndoRedo;
+            base.OnDisable();
+        }
+
+        public override void OnInspectorGUI()
+        {
+            EditorGUI.BeginChangeCheck();
+            base.OnInspectorGUI();
+            if (EditorGUI.EndChangeCheck())
+                ESGlobalEditorThemeChangeBridge.NotifyThemeChanged(
+                    target as ESGlobalEditorTheme);
+        }
+
+        private void HandleUndoRedo()
+        {
+            serializedObject?.UpdateIfRequiredOrScript();
+            ESGlobalEditorThemeChangeBridge.NotifyThemeChanged(
+                target as ESGlobalEditorTheme);
+            Repaint();
+        }
+    }
+
+    internal static class ESGlobalEditorThemeChangeBridge
+    {
+        internal static void NotifyThemeChanged(ESGlobalEditorTheme changedTheme)
+        {
+            if (changedTheme == null)
+                return;
+
+            ESEditorPresentation.InvalidateTheme();
+            UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
         }
     }
 }

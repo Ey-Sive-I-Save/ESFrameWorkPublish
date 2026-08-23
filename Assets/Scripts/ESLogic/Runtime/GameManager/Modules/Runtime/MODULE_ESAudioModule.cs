@@ -466,7 +466,7 @@ namespace ES
         private readonly Dictionary<ESAudioCategory, float> categoryVolumes = new Dictionary<ESAudioCategory, float>();
         private readonly HashSet<ESAudioCategory> mutedCategories = new HashSet<ESAudioCategory>();
         private readonly Dictionary<string, float> lastFailureLogTimeByKey = new Dictionary<string, float>();
-        private readonly Queue<ESAudioFailureDiagnostic> recentFailures = new Queue<ESAudioFailureDiagnostic>(FailureCapacity);
+        private readonly ESRingBuffer<ESAudioFailureDiagnostic> recentFailures = new ESRingBuffer<ESAudioFailureDiagnostic>(FailureCapacity);
         private readonly TerminalVoiceRecord[] terminalVoiceHistory = new TerminalVoiceRecord[TerminalVoiceHistoryCapacity];
         private readonly ESVfxAudioEmitter[] autoPlayQueue = new ESVfxAudioEmitter[AutoPlayQueueCapacity];
         private readonly ESVfxAudioEmitter[] autoPlayWaitingQueue = new ESVfxAudioEmitter[AutoPlayWaitingQueueCapacity];
@@ -786,13 +786,11 @@ namespace ES
                                      + "，执行队列=" + autoPlayQueueCount
                                      + "，等待队列=" + autoPlayWaitingQueueCount
                                      + "，示例来源=" + sourceSummary;
-            if (recentFailures.Count >= FailureCapacity)
-                recentFailures.Dequeue();
-            recentFailures.Enqueue(new ESAudioFailureDiagnostic(
+            recentFailures.EnqueueOverwrite(new ESAudioFailureDiagnostic(
                 "OnEnableAutoPlay",
                 ESAudioVoiceEndReason.None,
                 ESAudioFailureCode.AutoPlayQueueCapacityExceeded,
-                technicalDetail));
+                technicalDetail), out _);
 
             Debug.LogError(
                 "[ESAudio] OnEnable 自动播放队列超过 1536 条容量；"
@@ -1362,7 +1360,10 @@ namespace ES
                 throw new ArgumentNullException(nameof(destination));
 
             destination.Clear();
-            destination.AddRange(recentFailures);
+            if (destination.Capacity < recentFailures.Count)
+                destination.Capacity = recentFailures.Count;
+            for (int i = 0; i < recentFailures.Count; i++)
+                destination.Add(recentFailures[i]);
         }
 
         /// <summary>
@@ -2844,9 +2845,7 @@ namespace ES
             ESAudioFailureCode code,
             string message)
         {
-            if (recentFailures.Count >= FailureCapacity)
-                recentFailures.Dequeue();
-            recentFailures.Enqueue(new ESAudioFailureDiagnostic(cueKey, reason, code, message));
+            recentFailures.EnqueueOverwrite(new ESAudioFailureDiagnostic(cueKey, reason, code, message), out _);
 
             string logKey = cueKey + "|" + reason + "|" + code + "|" + message;
             if (!lastFailureLogTimeByKey.ContainsKey(logKey) && lastFailureLogTimeByKey.Count >= FailureLogKeyCapacity)

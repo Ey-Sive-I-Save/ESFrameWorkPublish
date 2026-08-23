@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "mode": "link-only",
+  "status": "reserved",
+  "allowRuntimeLogic": false,
+  "bridgeId": "ui.inventory-panel.bridge",
+  "visualContractId": "inventory-panel",
+  "visualContractSha256": null,
+  "references": [
+    {"id":"window-authority","routeKey":"runtime-ui-window","kind":"runtime-contract","status":"reserved","ref":null},
+    {"id":"input-authority","routeKey":"input-action","kind":"input-contract","status":"reserved","ref":null},
+    {"id":"command-authority","routeKey":"command","kind":"command-contract","status":"reserved","ref":null},
+    {"id":"navigation-authority","routeKey":"navigation","kind":"navigation-contract","status":"reserved","ref":null},
+    {"id":"data-authority","routeKey":"data-provider","kind":"data-contract","status":"reserved","ref":null},
+    {"id":"resource-authority","routeKey":"resource-pipeline","kind":"resource-contract","status":"reserved","ref":null},
+    {"id":"telemetry-authority","routeKey":"telemetry","kind":"telemetry-contract","status":"reserved","ref":null}
+  ],
+  "slots": [
+    {"slotId":"inventory.root","path":"Canvas/InventoryPanel","kind":"root","role":"panel-root"},
+    {"slotId":"inventory.title","path":"Canvas/InventoryPanel/title","kind":"header","role":"title"},
+    {"slotId":"inventory.summary","path":"Canvas/InventoryPanel/summary","kind":"text","role":"capacity-summary"},
+    {"slotId":"inventory.items","path":"Canvas/InventoryPanel/item-grid","kind":"content","role":"item-collection"},
+    {"slotId":"inventory.primary-action","path":"Canvas/InventoryPanel/confirm","kind":"action","role":"primary-action"}
+  ],
+  "stateLinks": [
+    {"visualStateId":"default","runtimeStateRef":null,"sourceOfTruth":"fixture","status":"reserved"},
+    {"visualStateId":"selected","runtimeStateRef":null,"sourceOfTruth":"fixture","status":"reserved"}
+  ],
+  "intentLinks": [
+    {"intentId":"inventory.primary-action.activate","slotId":"inventory.primary-action","zoneId":"confirm","action":"click","commandRef":null,"status":"reserved"}
+  ],
+  "navigationLinks": [],
+  "dataLinks": [
+    {"dataLinkId":"inventory.capacity","slotId":"inventory.summary","role":"display","sourceRef":null,"status":"reserved"},
+    {"dataLinkId":"inventory.items","slotId":"inventory.items","role":"collection","sourceRef":null,"status":"reserved"}
+  ],
+  "resourceLinks": [
+    {"resourceLinkId":"inventory.item-icons","assetRole":"item-icons","resourceRef":null,"ownerRef":null,"status":"reserved"}
+  ],
+  "telemetryLinks": [
+    {"telemetryId":"inventory.primary-action.clicked","triggerIntentId":"inventory.primary-action.activate","eventRef":null,"status":"reserved"}
+  ]
+}

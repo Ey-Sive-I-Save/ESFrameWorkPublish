@@ -12,6 +12,7 @@ namespace ES
         {
             var request = new ESAdvancedDialogRequest
             {
+                dialogId = "examples.dialog.configuration",
                 title = "创建 ES 功能面板",
                 subtitle = "统一输入、校验、键盘操作与反馈动效",
                 message = "配置一个无业务副作用的演示面板。",
@@ -20,6 +21,8 @@ namespace ES
                 cancelText = "取消",
                 tone = ESDialogTone.Success,
                 preferredSize = new Vector2(600f, 620f),
+                owner = null,
+                allowMainWorkspaceFallback = true,
             };
             request.AddText("panelName", "面板名称", "新版测试面板", true).help =
                 "必填；清空后会立即显示阻断原因。";
@@ -74,7 +77,9 @@ namespace ES
                     + "\n布局：" + result.values.GetString("layout")
                     + "\n能力：" + string.Join("、", result.values.GetSelections("capabilities"))
                     + "\n推荐程度：" + result.values.GetRecommendation("recommendation") + " / 5"
-                    + "\n固定工具动作：" + result.values.GetToggle("pinToolbar"));
+                    + "\n固定工具动作：" + result.values.GetToggle("pinToolbar"),
+                    owner: null,
+                    allowMainWorkspaceFallback: true);
             };
             ESAdvancedDialogWindow.Show(request);
         }
@@ -93,14 +98,18 @@ namespace ES
                 "这是危险语义的视觉与键盘交互演示，不会执行任何业务操作。",
                 "确认演示",
                 detail: "原因：验证危险强调色。影响：无。恢复：直接关闭演示窗口。",
-                host: ESDialogHost.Editor);
+                host: ESDialogHost.Editor,
+                owner: null,
+                allowMainWorkspaceFallback: true);
             if (accepted)
             {
                 await ESDialog.InfoAsync(
                     "examples.dialog.danger.completed",
                     "演示完成",
                     "确认结果已回传，但没有执行任何修改。",
-                    host: ESDialogHost.Editor);
+                    host: ESDialogHost.Editor,
+                    owner: null,
+                    allowMainWorkspaceFallback: true);
             }
         }
 
@@ -119,6 +128,8 @@ namespace ES
                 initialFocusFieldId = "taskName",
                 preferredSize = new Vector2(590f, 520f),
                 asyncValidationDelayMs = 220,
+                owner = null,
+                allowMainWorkspaceFallback = true,
             };
             request.AddText("taskName", "任务名称", "商业级窗口检查", true);
             request.AddRecommendation("priority", "执行优先级", 3, 1, 5, "普通", "最高");
@@ -151,6 +162,7 @@ namespace ES
                     {
                         dialogId = "es.dialog.example.child",
                         owner = ESAdvancedDialogWindow.focusedWindow,
+                        allowMainWorkspaceFallback = true,
                         title = "子对话框",
                         message = "父窗口关闭时，本窗口会随父窗口安全取消。",
                         showCancel = false,
@@ -205,7 +217,9 @@ namespace ES
                 "该入口返回 Task<bool>，适合替换能够改为异步控制流的原生确认框。",
                 "继续",
                 "取消",
-                host: ESDialogHost.Editor);
+                host: ESDialogHost.Editor,
+                owner: null,
+                allowMainWorkspaceFallback: true);
             if (!accepted)
                 return;
 
@@ -216,7 +230,9 @@ namespace ES
                 "异步迁移",
                 "保留同步",
                 "取消",
-                host: ESDialogHost.Editor);
+                host: ESDialogHost.Editor,
+                owner: null,
+                allowMainWorkspaceFallback: true);
             Debug.Log("[ES Dialog Migration] choice=" + choice);
         }
     }

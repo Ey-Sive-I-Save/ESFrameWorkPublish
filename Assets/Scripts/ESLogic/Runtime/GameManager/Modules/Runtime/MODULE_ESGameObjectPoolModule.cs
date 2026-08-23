@@ -83,6 +83,30 @@ namespace ES
             genericLife = ESGenericLife.EnsureForPooledRoot(gameObject);
         }
 
+        internal bool IsBoundTo(ESGameObjectPoolModule ownerModule)
+        {
+            return ReferenceEquals(owner, ownerModule);
+        }
+
+        internal bool HasPoolOwner => owner != null;
+
+        internal MonoBehaviour PoolRootLifecycleComponent =>
+            genericLife != null ? genericLife.PoolRootLifecycleComponent : null;
+
+        /// <summary>
+        /// Ends this bridge's relationship with a pool after that pool has completed its
+        /// Despawn edge and removed the instance from its accounting. A detached object is no
+        /// longer allowed to request a return through a stale pool owner.
+        /// </summary>
+        internal void UnbindFromPool()
+        {
+            MarkPushToPool();
+            owner = null;
+            PoolKey = null;
+            SourcePrefab = null;
+            dispatchingPoolSpawn = false;
+        }
+
         public void MarkGetInPool(bool autoReturn, float delay)
         {
             IsSpawned = true;
@@ -175,6 +199,7 @@ namespace ES
         public int spawnDispatchDepth;
         public bool isTerminating;
         public bool clearRequested;
+        public bool releaseWhenCleared;
         public bool destroyActiveWhenExclusiveRequested;
 
         public readonly Dictionary<object, int> prewarmSources = new Dictionary<object, int>(4);
@@ -183,6 +208,7 @@ namespace ES
         public int InactiveCount => inactive.Count;
         public int TotalCount => active.Count + inactive.Count;
         public int PrewarmSourceCount => prewarmSources.Count;
+        public bool requiresExplicitKey;
     }
 
     public struct ESGameObjectPoolStats
@@ -333,7 +359,8 @@ namespace ES
             if (prefab == null || isClearingAll || clearAllRequested)
                 return null;
 
-            ESGameObjectPoolGroup group = GetOrCreateGroup(prefab, null, null);
+            if (!TryGetAccessibleGroup(prefab, null, null, out ESGameObjectPoolGroup group))
+                return null;
             return GetFromGroup(
                 group,
                 position,
@@ -348,8 +375,34 @@ namespace ES
             if (prefab == null || isClearingAll || clearAllRequested)
                 return null;
 
-            ESGameObjectPoolGroup group = GetOrCreateGroup(prefab, null, null);
+            if (!TryGetAccessibleGroup(prefab, null, null, out ESGameObjectPoolGroup group))
+                return null;
             return GetFromGroup(group, position, rotation, parent, autoReturn, autoReturnDelay);
+        }
+
+        internal GameObject Internal_GetInPool(
+            GameObject prefab,
+            Vector3 position,
+            Quaternion rotation,
+            Transform parent,
+            bool autoReturn,
+            float autoReturnDelay,
+            out MonoBehaviour poolRootLifecycle)
+        {
+            poolRootLifecycle = null;
+            if (prefab == null || isClearingAll || clearAllRequested)
+                return null;
+
+            if (!TryGetAccessibleGroup(prefab, null, null, out ESGameObjectPoolGroup group))
+                return null;
+            return GetFromGroup(
+                group,
+                position,
+                rotation,
+                parent,
+                autoReturn,
+                autoReturnDelay,
+                out poolRootLifecycle);
         }
 
         public GameObject GetInPool(string key, Vector3 position, Quaternion rotation, Transform parent = null)
@@ -379,7 +432,57 @@ namespace ES
             if (prefab == null || isClearingAll || clearAllRequested)
                 return;
 
-            GetOrCreateGroup(prefab, key, config);
+            TryGetAccessibleGroup(prefab, key, config, out _);
+        }
+
+        /// <summary>
+        /// Registers a prefab under one explicit owner key without silently joining a group
+        /// already owned by another subsystem. Use this when the caller later clears/releases
+        /// the group as part of its own lifecycle.
+        /// </summary>
+        public bool TryRegister(GameObject prefab, string key, out string error, ESGameObjectPoolConfig config = null)
+        {
+            if (prefab == null)
+            {
+                error = "对象池注册缺少 Prefab。";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                error = "对象池显式注册需要非空 Key。";
+                return false;
+            }
+
+            if (isClearingAll || clearAllRequested)
+            {
+                error = "对象池正在清理，不能注册新组。";
+                return false;
+            }
+
+            if (groupsByPrefab.TryGetValue(prefab, out ESGameObjectPoolGroup groupByPrefab)
+                && (!groupByPrefab.requiresExplicitKey
+                    || !string.Equals(groupByPrefab.key, key, StringComparison.Ordinal)))
+            {
+                error = groupByPrefab.requiresExplicitKey
+                    ? "Prefab 已属于对象池组 '" + groupByPrefab.key + "'，不能再以 '" + key + "' 注册。"
+                    : "Prefab 已被未隔离的对象池组 '" + groupByPrefab.key + "' 使用，不能转为 UI 等独占组。";
+                return false;
+            }
+
+            if (groupsByKey.TryGetValue(key, out ESGameObjectPoolGroup groupByKey)
+                && (!ReferenceEquals(groupByKey.prefab, prefab) || !groupByKey.requiresExplicitKey))
+            {
+                error = ReferenceEquals(groupByKey.prefab, prefab)
+                    ? "对象池 Key 已被未隔离组使用，不能接管为独占组：" + key
+                    : "对象池 Key 已属于其他 Prefab：" + key;
+                return false;
+            }
+
+            ESGameObjectPoolGroup group = GetOrCreateGroup(prefab, key, config);
+            group.requiresExplicitKey = true;
+            error = null;
+            return true;
         }
 
         public bool TryGetStats(string key, out ESGameObjectPoolStats stats)
@@ -411,7 +514,8 @@ namespace ES
             if (prefab == null || count <= 0 || isClearingAll || clearAllRequested)
                 return;
 
-            ESGameObjectPoolGroup group = GetOrCreateGroup(prefab, key, config);
+            if (!TryGetAccessibleGroup(prefab, key, config, out ESGameObjectPoolGroup group))
+                return;
             CreateInactive(group, count);
         }
 
@@ -419,7 +523,8 @@ namespace ES
         {
             if (prefab == null || count <= 0 || source == null || isClearingAll || clearAllRequested)
                 return;
-            ESGameObjectPoolGroup group = GetOrCreateGroup(prefab, key, config);
+            if (!TryGetAccessibleGroup(prefab, key, config, out ESGameObjectPoolGroup group))
+                return;
             if (IsGroupTerminationPending(group))
                 return;
 
@@ -748,10 +853,109 @@ namespace ES
             return true;
         }
 
+        /// <summary>
+        /// Terminates one borrowed instance while preserving Pool bookkeeping and its Despawn
+        /// lifecycle. It is the safe per-instance counterpart to destroying a pooled object
+        /// directly.
+        /// </summary>
+        public bool DestroyPooledInstance(GameObject instance)
+        {
+            if (!TryResolveActivePooledInstance(instance, out ESGameObjectPoolGroup group, out _))
+                return false;
+
+            TerminateActiveInstance(group, instance);
+            return true;
+        }
+
+        /// <summary>
+        /// Transfers one borrowed instance out of the pool after a normal Despawn reset. The
+        /// caller becomes responsible for the object and may later reattach it through
+        /// <see cref="TryAttachInactiveInstance"/>.
+        /// </summary>
+        public bool DetachPooledInstance(GameObject instance)
+        {
+            if (!TryResolveActivePooledInstance(instance, out ESGameObjectPoolGroup group, out ESPooledGameObject pooled))
+                return false;
+
+            group.active.Remove(instance);
+            if (!ResetInstanceForReturn(group, instance, pooled) || instance == null)
+            {
+                group.createdCount = Mathf.Max(0, group.createdCount - 1);
+                if (instance != null)
+                    DiscardInstance(group, instance, false);
+                return false;
+            }
+
+            group.createdCount = Mathf.Max(0, group.createdCount - 1);
+            pooled.UnbindFromPool();
+            return true;
+        }
+
+        /// <summary>
+        /// Reattaches an instance previously detached by <see cref="DetachPooledInstance"/> as
+        /// an inactive member of the exact prefab/key group. This does not borrow the object or
+        /// invoke a Spawn edge; it only restores the Pool's ownership for a future reuse.
+        /// </summary>
+        public bool TryAttachInactiveInstance(GameObject prefab, string key, GameObject instance)
+        {
+            if (ReferenceEquals(instance, null)
+                || !TryRegister(prefab, key, out _)
+                || !groupsByKey.TryGetValue(key, out ESGameObjectPoolGroup group)
+                || !ReferenceEquals(group.prefab, prefab))
+            {
+                return false;
+            }
+
+            ESPooledGameObject pooled = instance.GetComponent<ESPooledGameObject>();
+            if (pooled == null || pooled.IsSpawned || pooled.HasPoolOwner)
+                return false;
+
+            pooled.Bind(this, group.key, group.prefab);
+            group.createdCount++;
+            if (!ResetInstanceForReturn(group, instance, pooled) || instance == null)
+            {
+                if (instance != null)
+                    DiscardInstance(group, instance);
+                else
+                    group.createdCount = Mathf.Max(0, group.createdCount - 1);
+                return false;
+            }
+
+            return StoreNewInactive(group, instance);
+        }
+
+        /// <summary>
+        /// Closes the accounting record for an object Unity has already destroyed externally.
+        /// No lifecycle callback is attempted because the instance is no longer a valid
+        /// execution target.
+        /// </summary>
+        public bool NotifyPooledInstanceDestroyed(string key, GameObject instance)
+        {
+            if (string.IsNullOrEmpty(key)
+                || ReferenceEquals(instance, null)
+                || !groupsByKey.TryGetValue(key, out ESGameObjectPoolGroup group)
+                || !group.active.Remove(instance))
+            {
+                return false;
+            }
+
+            group.createdCount = Mathf.Max(0, group.createdCount - 1);
+            return true;
+        }
+
         public void Clear(GameObject prefab)
         {
             if (prefab == null || !groupsByPrefab.TryGetValue(prefab, out ESGameObjectPoolGroup group))
                 return;
+
+            if (group.requiresExplicitKey)
+            {
+                Debug.LogError(
+                    "[ESGameObjectPool] Explicit pool group '" + group.key
+                    + "' must be cleared by its exact key.",
+                    prefab);
+                return;
+            }
 
             ClearGroup(group);
         }
@@ -762,6 +966,31 @@ namespace ES
                 return;
 
             ClearGroup(group);
+        }
+
+        /// <summary>
+        /// Terminates and removes one explicitly owned group so the pool no longer retains its
+        /// Prefab or Pool root. It is reserved for a lifecycle owner that registered the group
+        /// with <see cref="TryRegister"/>.
+        /// </summary>
+        public bool ClearAndRelease(string key)
+        {
+            if (string.IsNullOrEmpty(key) || !groupsByKey.TryGetValue(key, out ESGameObjectPoolGroup group))
+                return false;
+
+            if (!group.requiresExplicitKey || group.PrewarmSourceCount > 0)
+                return false;
+
+            if (group.spawnDispatchDepth > 0)
+            {
+                group.clearRequested = true;
+                group.releaseWhenCleared = true;
+                return true;
+            }
+
+            ClearGroup(group);
+            RemoveGroupIfUnused(group);
+            return !groupsByKey.ContainsKey(key);
         }
 
         public void ClearAll()
@@ -878,12 +1107,43 @@ namespace ES
 
         private GameObject GetFromGroup(ESGameObjectPoolGroup group, Vector3 position, Quaternion rotation, Transform parent, bool autoReturn, float autoReturnDelay)
         {
+            return GetFromGroup(
+                group,
+                position,
+                rotation,
+                parent,
+                autoReturn,
+                autoReturnDelay,
+                out _);
+        }
+
+        private GameObject GetFromGroup(
+            ESGameObjectPoolGroup group,
+            Vector3 position,
+            Quaternion rotation,
+            Transform parent,
+            bool autoReturn,
+            float autoReturnDelay,
+            out MonoBehaviour poolRootLifecycle)
+        {
+            poolRootLifecycle = null;
             if (group == null || IsGroupTerminationPending(group) || isClearingAll || clearAllRequested)
                 return null;
 
             GameObject instance = null;
             while (group.inactive.Count > 0 && instance == null)
-                instance = group.inactive.Dequeue();
+            {
+                GameObject candidate = group.inactive.Dequeue();
+                if (candidate == null)
+                {
+                    // Unity may have destroyed an inactive object externally. It is no longer a
+                    // member of the group, so its capacity must not keep blocking replacement.
+                    group.createdCount = Mathf.Max(0, group.createdCount - 1);
+                    continue;
+                }
+
+                instance = candidate;
+            }
 
             if (instance == null)
             {
@@ -950,6 +1210,7 @@ namespace ES
                 if (!pooled.IsSpawned || !group.active.Contains(instance))
                     return null;
 
+                poolRootLifecycle = pooled.PoolRootLifecycleComponent;
                 handedToCaller = true;
                 group.rentCount++;
                 return instance;
@@ -985,6 +1246,66 @@ namespace ES
 
             Debug.LogError("[ESGameObjectPool] Pool Despawn or return reset failed; the instance was discarded and will not be reused.", instance);
             DiscardInstance(group, instance);
+        }
+
+        private bool TryResolveActivePooledInstance(
+            GameObject instance,
+            out ESGameObjectPoolGroup group,
+            out ESPooledGameObject pooled)
+        {
+            group = null;
+            pooled = null;
+            if (instance == null)
+                return false;
+
+            pooled = instance.GetComponent<ESPooledGameObject>();
+            if (pooled == null
+                || !pooled.IsSpawned
+                || !pooled.IsBoundTo(this)
+                || string.IsNullOrEmpty(pooled.PoolKey)
+                || !groupsByKey.TryGetValue(pooled.PoolKey, out group)
+                || !group.active.Contains(instance))
+            {
+                group = null;
+                pooled = null;
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool TryGetAccessibleGroup(
+            GameObject prefab,
+            string key,
+            ESGameObjectPoolConfig config,
+            out ESGameObjectPoolGroup group)
+        {
+            if (!string.IsNullOrEmpty(key)
+                && groupsByKey.TryGetValue(key, out ESGameObjectPoolGroup groupByKey)
+                && !ReferenceEquals(groupByKey.prefab, prefab))
+            {
+                Debug.LogError(
+                    "[ESGameObjectPool] Pool key '" + key
+                    + "' already belongs to another prefab and cannot be shared implicitly.",
+                    prefab);
+                group = null;
+                return false;
+            }
+
+            if (groupsByPrefab.TryGetValue(prefab, out group)
+                && group.requiresExplicitKey
+                && !string.Equals(group.key, key, StringComparison.Ordinal))
+            {
+                Debug.LogError(
+                    "[ESGameObjectPool] This prefab belongs to explicit pool group '"
+                    + group.key + "'. Borrow or configure it with that exact key.",
+                    prefab);
+                group = null;
+                return false;
+            }
+
+            group = GetOrCreateGroup(prefab, key, config);
+            return true;
         }
 
         private ESGameObjectPoolGroup GetOrCreateGroup(GameObject prefab, string key, ESGameObjectPoolConfig config)
@@ -1154,18 +1475,20 @@ namespace ES
             DiscardInstance(group, instance);
         }
 
-        private void StoreNewInactive(ESGameObjectPoolGroup group, GameObject instance)
+        private bool StoreNewInactive(ESGameObjectPoolGroup group, GameObject instance)
         {
             try
             {
                 instance.SetActive(false);
                 instance.transform.SetParent(group.poolRoot, false);
                 group.inactive.Enqueue(instance);
+                return true;
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception, instance);
                 DiscardInstance(group, instance);
+                return false;
             }
         }
 
@@ -1543,6 +1866,11 @@ namespace ES
             if (group.clearRequested)
             {
                 ClearGroup(group);
+                if (group.releaseWhenCleared)
+                {
+                    group.releaseWhenCleared = false;
+                    RemoveGroupIfUnused(group);
+                }
                 return true;
             }
 

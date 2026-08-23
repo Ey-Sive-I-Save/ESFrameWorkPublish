@@ -193,7 +193,7 @@ namespace ES
 
     /// <summary>
     /// Durable evidence for the one short-lived Bootstrap process currently associated with a
-    /// workbench tab. It is deliberately separate from the Codex session identity: after a
+    /// console tab. It is deliberately separate from the Codex session identity: after a
     /// domain reload we consume this operation's immutable result, or reconcile its exact
     /// request with the Registry/mailbox. We never replay an uncertain input operation.
     /// </summary>
@@ -429,7 +429,7 @@ namespace ES
                 }
             }
             if (lastException != null)
-                UnityEngine.Debug.LogWarning("[ESCmdAgent] 本地工作台状态读取失败，已使用空状态：" + lastException.Message);
+                    UnityEngine.Debug.LogWarning("[ESCmdAgent] 本地 Agent 控制台状态读取失败，已使用空状态：" + lastException.Message);
             return new ESCmdAgentWorkspaceState();
         }
 
@@ -454,11 +454,11 @@ namespace ES
                     // Windows transfers ownership when a prior writer dies. Re-read the on-disk
                     // revision while holding that ownership instead of assuming its write completed.
                     mutexAcquired = true;
-                    UnityEngine.Debug.LogWarning("[ESCmdAgent] 检测到已放弃的工作台状态写锁；将按当前磁盘版本重新校验。");
+                    UnityEngine.Debug.LogWarning("[ESCmdAgent] 检测到已放弃的 Agent 控制台状态写锁；将按当前磁盘版本重新校验。");
                 }
                 if (!mutexAcquired)
                 {
-                    UnityEngine.Debug.LogWarning("[ESCmdAgent] 本地工作台状态保存超时：另一实例仍在提交状态。");
+                    UnityEngine.Debug.LogWarning("[ESCmdAgent] 本地 Agent 控制台状态保存超时：另一实例仍在提交状态。");
                     return false;
                 }
 
@@ -467,7 +467,7 @@ namespace ES
                 int persistedRevision = ReadPersistedRevision();
                 if (state.revision != persistedRevision)
                 {
-                    UnityEngine.Debug.LogWarning("[ESCmdAgent] 本地工作台状态已被其他实例更新；已拒绝覆盖。请重新打开工作台以加载最新状态。");
+                    UnityEngine.Debug.LogWarning("[ESCmdAgent] 本地 Agent 控制台状态已被其他实例更新；已拒绝覆盖。请重新打开控制台以加载最新状态。");
                     return false;
                 }
 
@@ -497,14 +497,14 @@ namespace ES
                     File.Move(temporaryPath, StatePath);
                 }
                 if (ReadPersistedRevision() != nextRevision)
-                    throw new InvalidDataException("工作台状态提交后版本校验失败，已拒绝继续使用该内存版本。");
+                    throw new InvalidDataException("Agent 控制台状态提交后版本校验失败，已拒绝继续使用该内存版本。");
                 committed = true;
                 return true;
             }
             catch (Exception exception)
             {
                 state.revision = originalRevision;
-                UnityEngine.Debug.LogWarning("[ESCmdAgent] 本地工作台状态保存失败：" + exception.Message);
+                UnityEngine.Debug.LogWarning("[ESCmdAgent] 本地 Agent 控制台状态保存失败：" + exception.Message);
                 return false;
             }
             finally
@@ -530,7 +530,7 @@ namespace ES
             string json = StrictUtf8.GetString(File.ReadAllBytes(StatePath));
             ESCmdAgentWorkspaceState persisted = JsonUtility.FromJson<ESCmdAgentWorkspaceState>(json);
             if (persisted == null || persisted.version < 2 || persisted.version > CurrentSchemaVersion)
-                throw new InvalidDataException("现有本地工作台状态版本不受支持，已拒绝覆盖。");
+                throw new InvalidDataException("现有本地 Agent 控制台状态版本不受支持，已拒绝覆盖。");
             return Math.Max(0, persisted.revision);
         }
     }
@@ -1790,8 +1790,9 @@ namespace ES
         }
     }
 
-    public sealed class ESCmdAgentWindow : EditorWindow
+    public sealed class ESCmdAgentWindow : EditorWindow, IESWindowPresentationShortTitle
     {
+        public string ESWindow_PresentationShortTitle => "Agent";
         private sealed class AIWarningsReferenceSnapshot
         {
             public string fullPath;
@@ -1938,7 +1939,6 @@ namespace ES
         private bool settingsVisible;
         private bool contextManuallyHidden;
         private string ambientContextSignature = string.Empty;
-        private string requestedSessionId = string.Empty;
         private string lastExternalEditorWindowType = string.Empty;
         private string selectedPresentationSignature = string.Empty;
         private int sharedMessageCount = -1;
@@ -1967,7 +1967,7 @@ namespace ES
         private bool selectedSessionSaveQueued;
 
         [MenuItem(MenuItemPathDefine.AGENT_WORKBENCH_WINDOW_PATH, false, 10)]
-        [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "Agent 工作台", false, -960)]
+        [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "Agent 控制台", false, -960)]
         public static void OpenFromMenu()
         {
             ESWindowCommandRegistry.RecordOpened("cmd_agent");
@@ -1983,25 +1983,6 @@ namespace ES
             if (!alreadyOpen && !window.docked)
                 PlaceInitialWindow(window);
             window.Show();
-            window.Focus();
-            PlayFeedback(ESEditorFeedbackSoundKind.Open);
-        }
-
-        private static void OpenDetachedWindow()
-        {
-            OpenDetachedWindow(string.Empty);
-        }
-
-        private static void OpenDetachedWindow(string sessionId)
-        {
-            ESCmdAgentWindow window = CreateInstance<ESCmdAgentWindow>();
-            window.requestedSessionId = sessionId ?? string.Empty;
-            window.titleContent = new GUIContent("ES AI 工作台");
-            window.minSize = MinimumWindowSize;
-            PlaceInitialWindow(window);
-            window.Show();
-            Rect source = window.position;
-            window.position = new Rect(source.x + 36f, source.y + 28f, DefaultWindowSize.x, DefaultWindowSize.y);
             window.Focus();
             PlayFeedback(ESEditorFeedbackSoundKind.Open);
         }
@@ -2032,7 +2013,7 @@ namespace ES
             window.Focus();
             message = window.selectedSession.running
                 ? "当前会话正在执行，内容已保存为草稿，未发送。"
-                : "内容已放入受控工作台输入框，等待人工确认发送。";
+                : "内容已放入受控控制台输入框，等待人工确认发送。";
             return true;
         }
 
@@ -2304,7 +2285,7 @@ namespace ES
                     ResetInterruptedLocalBridgeOperation(session);
                     session.status = "窗口已关闭；下次打开会刷新受管会话状态";
                     AppendMessage(session, ESCmdAgentMessageRole.System,
-                        "工作台已关闭；不会杀死或猜测受管 Codex 会话，重新打开后请查看受管状态。", string.Empty);
+                        "Agent 控制台已关闭；不会杀死或猜测受管 Codex 会话，重新打开后请查看受管状态。", string.Empty);
                 }
             }
             SaveState();
@@ -3048,7 +3029,7 @@ namespace ES
                 actionContract,
                 "全局",
                 "ESWindowGlobalActions",
-                "跨会话、跨当前选择的工作台动作");
+                "跨会话、跨当前选择的 Agent 控制台动作");
             headerWindowActions = CreateAgentActionScopeRow(
                 actionContract,
                 "窗口",
@@ -3059,13 +3040,14 @@ namespace ES
             AddHeaderAction(headerWindowActions, headerWindowActionButtons, contextToggleButton);
             stopButton = CreateHeaderButton("结束会话", "按精确会话 ID 结束当前受管会话；不会停止或猜测未知 CMD 的输入。", StopCurrentSession);
             stopButton.AddToClassList("danger");
+            EditorInternal.ESWindowPresentation.SetButtonPresentationState(
+                stopButton,
+                EditorInternal.ESEditorPresentation.ESPresentationState.Error);
             AddHeaderAction(headerWindowActions, headerWindowActionButtons, stopButton);
             AddHeaderAction(headerWindowActions, headerWindowActionButtons, CreateHeaderButton("恢复会话", "按精确会话 ID 恢复受管 CMD；不会向已有终端注入或模拟输入。",
                 ReconnectCurrentSession));
             AddHeaderAction(headerGlobalActions, headerGlobalActionButtons,
-                CreateHeaderButton("工作台设置", "显示 Codex 命令、工程路径和本地工作台的配置。", ToggleSettings));
-            AddHeaderAction(headerGlobalActions, headerGlobalActionButtons,
-                CreateHeaderButton("新窗口查看", "在另一个 ES Agent 工作台窗口打开，用于并行查看会话，不会复制或分叉当前会话。", OpenDetachedWindow));
+                CreateHeaderButton("控制台设置", "显示 Codex 命令、工程路径和 Agent 控制台配置。", ToggleSettings));
             AddHeaderAction(headerGlobalActions, headerGlobalActionButtons,
                 CreateHeaderButton("新对话", "创建独立的受管 Codex 会话，并等待可验证的接收回执。", CreateNewSession));
 
@@ -3136,11 +3118,10 @@ namespace ES
             {
                 name = "ESAgentGlobalActionOverflow",
                 text = "更多",
-                tooltip = "Agent 工作台全局操作"
+                tooltip = "Agent 控制台全局操作"
             };
             menu.AddToClassList("es-agent-header-button");
-            menu.menu.AppendAction("工作台设置", _ => ToggleSettings());
-            menu.menu.AppendAction("新窗口查看", _ => OpenDetachedWindow());
+            menu.menu.AppendAction("控制台设置", _ => ToggleSettings());
             menu.menu.AppendAction("新对话", _ => CreateNewSession());
             return menu;
         }
@@ -3159,7 +3140,7 @@ namespace ES
             heading.AddToClassList("es-agent-section-heading");
             heading.Add(new Label("会话"));
             Button resume = new Button(ShowResumeDialog) { text = "恢复会话" };
-            resume.tooltip = "输入精确会话 ID，或选择当前工作台已保存的受管会话。";
+            resume.tooltip = "输入精确会话 ID，或选择当前控制台已保存的受管会话。";
             resume.AddToClassList("es-agent-link-button");
             heading.Add(resume);
             panel.Add(heading);
@@ -3234,7 +3215,7 @@ namespace ES
             liveActivityTitle = new Label("等待精确受管会话");
             liveActivityTitle.AddToClassList("es-agent-live-activity-title");
             copy.Add(liveActivityTitle);
-            liveActivityDetail = new Label("工作台只显示已验证的会话回执、AI 声明和可见工具事件。");
+            liveActivityDetail = new Label("Agent 控制台只显示已验证的会话回执、AI 声明和可见工具事件。");
             liveActivityDetail.AddToClassList("es-agent-live-activity-detail");
             copy.Add(liveActivityDetail);
             liveActivityEvidence = new Label("来源：等待同步");
@@ -3275,7 +3256,7 @@ namespace ES
             Label title = new Label("建立受管 Codex 会话");
             title.AddToClassList("es-agent-empty-title");
             content.Add(title);
-            Label description = new Label("附加当前选择、场景和 ES 工程信息，建立或投递受管任务。任务正文在受管 CMD 中执行，工作台只展示精确身份、投递回执和可验证进度。Ctrl+Enter 发送。");
+            Label description = new Label("附加当前选择、场景和 ES 工程信息，建立或投递受管任务。任务正文在受管 CMD 中执行，控制台只展示精确身份、投递回执和可验证进度。Ctrl+Enter 发送。");
             description.AddToClassList("es-agent-empty-copy");
             content.Add(description);
             VisualElement features = new VisualElement();
@@ -3366,8 +3347,13 @@ namespace ES
             aiWarnings.AddToClassList("es-agent-secondary-button");
             aiWarnings.AddToClassList("es-agent-aiwarnings-button");
             actions.Add(aiWarnings);
-            aiCommandPickerButton = new Button(ShowAICommandPicker) { text = "选择 AICommand" };
-            aiCommandPickerButton.tooltip = "选择一份任务合同。只发送路径、摘要和实时 Hash；AI 必须自行读取原文。";
+            aiCommandPickerButton = new EditorInternal.ESPresentationButton(
+                ShowAICommandPicker,
+                EditorInternal.ESEditorPresentation.ESPresentationRole.Control)
+            {
+                text = "选择 AICommand",
+                tooltip = "选择一份任务合同。只发送路径、摘要和实时 Hash；AI 必须自行读取原文。"
+            };
             aiCommandPickerButton.AddToClassList("es-agent-secondary-button");
             actions.Add(aiCommandPickerButton);
             Button bindResponsibility = new Button(RequestResponsibilityBinding) { text = "设为职责会话" };
@@ -3377,7 +3363,12 @@ namespace ES
             Label hint = new Label("Ctrl+Enter 发送 · Ctrl+Alt+R 同步 · Ctrl+Alt+T 打开真实 CMD");
             hint.AddToClassList("es-agent-shortcut-hint");
             actions.Add(hint);
-            sendButton = new Button(() => DispatchComposer()) { text = "发送" };
+            sendButton = new EditorInternal.ESPresentationButton(
+                () => DispatchComposer(),
+                EditorInternal.ESEditorPresentation.ESPresentationRole.PrimaryAction)
+            {
+                text = "发送"
+            };
             sendButton.AddToClassList("es-agent-primary-button");
             actions.Add(sendButton);
             panel.Add(actions);
@@ -3396,7 +3387,13 @@ namespace ES
             VisualElement heading = new VisualElement();
             heading.AddToClassList("es-agent-section-heading");
             heading.Add(new Label("ES 工程现场"));
-            mcpConnectButton = new Button(ConnectMcpAsync) { text = "连接 MCP", tooltip = "确保 Codex 已配置 unityMCP，并启动 UnityMCP Bridge。" };
+            mcpConnectButton = new EditorInternal.ESPresentationButton(
+                ConnectMcpAsync,
+                EditorInternal.ESEditorPresentation.ESPresentationRole.Control)
+            {
+                text = "连接 MCP",
+                tooltip = "确保 Codex 已配置 unityMCP，并启动 UnityMCP Bridge。"
+            };
             mcpConnectButton.AddToClassList("es-agent-mcp-connect-button");
             heading.Add(mcpConnectButton);
             Button refreshMcp = new Button(RefreshMcpContext) { text = "刷新 MCP", tooltip = "重新读取 Codex MCP 配置、Unity 桥接与工具注册状态。" };
@@ -3484,7 +3481,7 @@ namespace ES
             refreshSession.AddToClassList("es-agent-secondary-button");
             runActions.Add(refreshSession);
             Button probeBroker = new Button(ProbeCurrentBroker) { text = "检测投递通道" };
-            probeBroker.tooltip = "检测受管邮箱与已有 CMD 的可用能力；工作台不会向未知终端注入输入。";
+            probeBroker.tooltip = "检测受管邮箱与已有 CMD 的可用能力；控制台不会向未知终端注入输入。";
             probeBroker.AddToClassList("es-agent-secondary-button");
             runActions.Add(probeBroker);
             Button focusTerminal = new Button(FocusCurrentManagedTerminal) { text = "打开受管 CMD" };
@@ -3537,7 +3534,7 @@ namespace ES
             if (panel == null)
                 return;
             panel.Clear();
-            Label heading = new Label("工作台设置");
+            Label heading = new Label("控制台设置");
             heading.AddToClassList("es-agent-mini-heading");
             panel.Add(heading);
 
@@ -3565,7 +3562,7 @@ namespace ES
                 panel.Bind(serializedAgent);
             }
 
-            Button locate = new Button(() =>
+            Button locate = new EditorInternal.ESPresentationButton(() =>
             {
                 if (agent == null || usingTransientAgentConfig)
                 {
@@ -3574,12 +3571,14 @@ namespace ES
                 }
                 Selection.activeObject = agent;
                 EditorGUIUtility.PingObject(agent);
-            })
+            }, EditorInternal.ESEditorPresentation.ESPresentationRole.Control)
             {
                 text = "定位配置资产",
                 tooltip = usingTransientAgentConfig ? "当前为内存默认配置，请先显式创建项目配置资产。" : "在 Project 中定位配置资产。"
             };
-            locate.SetEnabled(!usingTransientAgentConfig);
+            EditorInternal.ESWindowPresentation.SetButtonEnabled(
+                locate,
+                !usingTransientAgentConfig);
             locate.AddToClassList("es-agent-secondary-button");
             panel.Add(locate);
             Button openState = new Button(() =>
@@ -3600,7 +3599,7 @@ namespace ES
             {
                 "enableAgent" => "允许新建、恢复与投递",
                 "workspacePath" => "工作目录",
-                "restoreWorkspaceOnOpen" => "打开时恢复工作台",
+                "restoreWorkspaceOnOpen" => "打开时恢复控制台",
                 "maxMessagesPerSession" => "每个会话消息上限",
                 _ => property.displayName
             };
@@ -3625,7 +3624,13 @@ namespace ES
 
         private static Button CreateHeaderButton(string text, string tooltip, Action action)
         {
-            Button button = new Button(action) { text = text, tooltip = tooltip };
+            Button button = new EditorInternal.ESPresentationButton(
+                action,
+                EditorInternal.ESEditorPresentation.ESPresentationRole.Control)
+            {
+                text = text,
+                tooltip = tooltip
+            };
             button.AddToClassList("es-agent-header-button");
             return button;
         }
@@ -3930,7 +3935,7 @@ namespace ES
             Label title = new Label("连接已有 CMD");
             title.AddToClassList("es-agent-dialog-title");
             dialog.Add(title);
-            dialog.Add(new Label("正在发现最近激活终端中的 CMD。选择目标后，工作台会生成一次性回签命令；必须在同一个 CMD 中执行，才会建立只读连接。"));
+                dialog.Add(new Label("正在发现最近激活终端中的 CMD。选择目标后，控制台会生成一次性回签命令；必须在同一个 CMD 中执行，才会建立只读连接。"));
             var content = new ScrollView(ScrollViewMode.Vertical);
             content.AddToClassList("es-agent-claim-candidate-list");
             dialog.Add(content);
@@ -3979,7 +3984,7 @@ namespace ES
                 if (task.IsFaulted || task.IsCanceled)
                 {
                     content.Clear();
-                    content.Add(new Label("发现已有 CMD 失败。请切到目标 CMD，再回到工作台重试。"));
+                    content.Add(new Label("发现已有 CMD 失败。请切到目标 CMD，再回到控制台重试。"));
                     return;
                 }
                 RenderExternalCmdDiscovery(content, task.Result);
@@ -3993,7 +3998,7 @@ namespace ES
             content.Clear();
             if (discovery == null || !discovery.Succeeded)
             {
-                Label failure = new Label(discovery?.failure ?? "没有可用的 CMD 发现结果。请先切到目标 CMD，再立即回到工作台重试。");
+            Label failure = new Label(discovery?.failure ?? "没有可用的 CMD 发现结果。请先切到目标 CMD，再立即回到控制台重试。");
                 failure.AddToClassList("es-agent-settings-notice");
                 content.Add(failure);
                 return;
@@ -4038,7 +4043,7 @@ namespace ES
             dialog.Add(title);
             dialog.Add(new Label(expired
                 ? "该认领命令已过期，不能继续完成。请重新生成一次性命令。"
-                : "工作台可以把这条一次性命令直接写入所选 CMD 的输入缓冲，并自动核验回签。仅当目标仍是同一 PID/启动时间且处于 Shell 提示符时才会写入；若正在运行 Codex 或其他命令，会拒绝投递。"));
+                : "控制台可以把这条一次性命令直接写入所选 CMD 的输入缓冲，并自动核验回签。仅当目标仍是同一 PID/启动时间且处于 Shell 提示符时才会写入；若正在运行 Codex 或其他命令，会拒绝投递。"));
             TextField command = new TextField("一次性 CMD 命令") { value = session.externalClaimCommand, multiline = true };
             command.isReadOnly = true;
             command.AddToClassList("es-agent-dialog-input");
@@ -4447,7 +4452,7 @@ namespace ES
                 return;
             if (agent == null || !agent.enableAgent)
             {
-                session.status = "工作台已关闭受管写操作，职责键保持未修改。";
+                session.status = "控制台已关闭受管写操作，职责键保持未修改。";
                 AppendProgress(session, "职责键绑定已阻止", session.status);
                 UpdateSessionPresentation(session, false);
                 return;
@@ -4979,13 +4984,13 @@ namespace ES
             string evidence = "邮箱：" + (mailbox ? "可用" : "不可用")
                 + "；本机 Hook：" + (automaticDelivery ? "至少一页已观察" : "未观察")
                 + "；App Server：" + (appServerProbed ? "已探测" : "未证实")
-                + "；既有 TUI 注入协议：" + (directControl ? "已发现（当前工作台未启用）" : "未证实") + "。";
+                + "；既有 TUI 注入协议：" + (directControl ? "已发现（当前控制台未启用）" : "未证实") + "。";
             if (!directControl && !string.IsNullOrWhiteSpace(directReason))
                 evidence += " 原因：" + FirstLine(directReason, 260);
             AppendProgress(session, "通道核验", evidence);
             AppendMessage(session, ESCmdAgentMessageRole.System,
                     "通道核验完成。\n" + evidence
-                + "\n工作台不会把 CMD/TUI 的可见性、PID 或窗口标题当作可写双向连接，也不会向既有 TUI 注入输入。", string.Empty);
+                + "\n控制台不会把 CMD/TUI 的可见性、PID 或窗口标题当作可写双向连接，也不会向既有 TUI 注入输入。", string.Empty);
         }
 
         private void ApplyTerminalFocusResult(ESCmdAgentSession session, JToken result)
@@ -5048,7 +5053,7 @@ namespace ES
                 if (firstReceipt)
                     AppendMessage(session, ESCmdAgentMessageRole.System,
                         "本次消息已交给受管会话通道。状态：" + stateText + "。\n投递计划：" + plan
-                        + "。\n工作台只显示受管状态证据，不显示或伪造隐藏思考过程。", string.Empty);
+                        + "。\n控制台只显示受管状态证据，不显示或伪造隐藏思考过程。", string.Empty);
             }
 
             switch (stateText)
@@ -5894,7 +5899,7 @@ namespace ES
             {
                 selectedSession.draft = visiblePrompt;
                 SaveState();
-                return Reject("受管会话的新建、恢复与投递当前已在工作台设置中关闭；需求已保留在输入框。");
+                return Reject("受管会话的新建、恢复与投递当前已在控制台设置中关闭；需求已保留在输入框。");
             }
             if (!string.IsNullOrWhiteSpace(selectedSession.sessionId) && !selectedSession.contextAccepted)
             {
@@ -5967,7 +5972,7 @@ namespace ES
                 selectedSession.draft = visiblePrompt;
                 selectedSession.status = "启动失败";
                 UpdateSessionPresentation(selectedSession, true);
-                return Reject("受管会话桥接器不可用，请重新打开 Agent 工作台后重试。");
+                return Reject("受管会话桥接器不可用，请重新打开 Agent 控制台后重试。");
             }
             if (!bootstrapHost.TryStart(selectedSession, kind, request,
                     out ESCmdAgentManagedOperation operation, out string error))
@@ -6139,7 +6144,7 @@ namespace ES
                 case "help":
                 case "?":
                     AppendMessage(selectedSession, ESCmdAgentMessageRole.System,
-                        "快捷语义：/新会话、/停止、/恢复 <SessionId>、/标识、/上下文、/AIWarnings、/MCP、/日志、/分离、/引用、/帮助。", string.Empty);
+                        "快捷语义：/新会话、/停止、/恢复 <SessionId>、/标识、/上下文、/AIWarnings、/MCP、/日志、/引用、/帮助。", string.Empty);
                     selectedSession.status = "已显示快捷语义";
                     RefreshConversation();
                     RefreshSessionList();
@@ -6199,11 +6204,6 @@ namespace ES
                 case "log":
                     OpenCurrentRunLog();
                     result = new ESCmdAgentPromptDispatchResult(ESCmdAgentPromptDispatchState.Sent, "已打开当前运行日志。");
-                    return true;
-                case "分离":
-                case "detach":
-                    OpenDetachedWindow();
-                    result = new ESCmdAgentPromptDispatchResult(ESCmdAgentPromptDispatchState.Sent, "已打开协作窗口。");
                     return true;
                 case "引用":
                 case "协作":
@@ -6350,7 +6350,7 @@ namespace ES
             }
             if (agent == null || !agent.enableAgent)
             {
-                session.status = "受管会话恢复已在工作台设置中关闭。";
+                session.status = "受管会话恢复已在控制台设置中关闭。";
                 AppendProgress(session, "重新连接已阻止", "启用“允许新建、恢复与投递”后，才能按精确 SessionId 提交 Resume。");
                 UpdateSessionPresentation(session, false);
                 return;
@@ -6386,8 +6386,7 @@ namespace ES
                 return;
             }
             string sessionScopedSelection = SessionState.GetString(SelectedSessionStateKey, string.Empty);
-            ESCmdAgentSession initial = state.sessions.FirstOrDefault(item => item.localId == requestedSessionId)
-                ?? state.sessions.FirstOrDefault(item => item.localId == sessionScopedSelection)
+            ESCmdAgentSession initial = state.sessions.FirstOrDefault(item => item.localId == sessionScopedSelection)
                 ?? state.sessions.FirstOrDefault(item => item.localId == state.selectedSessionId)
                 ?? state.sessions.FirstOrDefault();
             if (initial == null)
@@ -6653,10 +6652,6 @@ namespace ES
             Button remove = new Button(() => DeleteSession(session)) { text = "×", tooltip = "删除本地会话记录" };
             remove.AddToClassList("es-agent-icon-button");
             row.Add(remove);
-            Button detach = new Button(() => OpenDetachedWindow(session.localId))
-            { text = "↗", tooltip = "在新窗口打开此会话" };
-            detach.AddToClassList("es-agent-icon-button");
-            row.Add(detach);
             return row;
         }
 
@@ -7311,7 +7306,10 @@ namespace ES
             if (mcpConnectInProgress)
             {
                 mcpConnectButton.text = "连接中…";
-                mcpConnectButton.SetEnabled(false);
+                EditorInternal.ESWindowPresentation.SetButtonPresentationState(
+                    mcpConnectButton,
+                    EditorInternal.ESEditorPresentation.ESPresentationState.Busy);
+                EditorInternal.ESWindowPresentation.SetButtonEnabled(mcpConnectButton, false);
                 return;
             }
             bool available = snapshot?.packageLoaded == true;
@@ -7324,7 +7322,12 @@ namespace ES
                 : configured
                     ? "启动 UnityMCP Bridge。其他服务器由 Codex 回合启动时握手。"
                     : "确认后由 MCP for Unity 配置 Codex，并启动 Unity Bridge。";
-            mcpConnectButton.SetEnabled(available);
+            EditorInternal.ESWindowPresentation.SetButtonPresentationState(
+                mcpConnectButton,
+                ready
+                    ? EditorInternal.ESEditorPresentation.ESPresentationState.Selected
+                    : EditorInternal.ESEditorPresentation.ESPresentationState.Normal);
+            EditorInternal.ESWindowPresentation.SetButtonEnabled(mcpConnectButton, available);
             mcpConnectButton.EnableInClassList("ready", ready);
         }
 
@@ -7446,8 +7449,14 @@ namespace ES
                                     : EditorInternal.ESStatusKind.None;
                     EditorInternal.ESWindowPresentation.StyleStatusPill(statusPill, semanticStatus);
                 }
-                if (stopButton != null) stopButton.SetEnabled(session.running
-                    || (!IsClaimedExternalSession(session) && !string.IsNullOrWhiteSpace(session.sessionId)));
+                if (stopButton != null)
+                {
+                    EditorInternal.ESWindowPresentation.SetButtonEnabled(
+                        stopButton,
+                        session.running
+                        || (!IsClaimedExternalSession(session)
+                            && !string.IsNullOrWhiteSpace(session.sessionId)));
+                }
                 if (sendButton != null)
                 {
                     bool isClaimedExternal = IsClaimedExternalSession(session);
@@ -7463,13 +7472,20 @@ namespace ES
                         : waitingForManagedIdentity
                             ? "受管 CMD 已启动，正在等待 Bootstrap 返回精确 SessionId。请刷新会话状态或等待接收回执，避免重复新建。"
                         : !managedDispatchEnabled
-                        ? "工作台设置已关闭新建、恢复与投递。现有会话仍可同步状态或关闭。"
+                        ? "控制台设置已关闭新建、恢复与投递。现有会话仍可同步状态或关闭。"
                         : isNewSession
                             ? "创建新的受管 Codex 会话，并等待上下文验收回执。"
                             : session.contextAccepted
                                 ? "将消息投递到受管邮箱；不等同于直接输入既有 CMD/TUI。"
                                 : "等待 contextAccepted 回执后才能投递消息。可先同步状态或重新连接。";
-                    sendButton.SetEnabled(canDispatch);
+                    EditorInternal.ESWindowPresentation.SetButtonPresentationState(
+                        sendButton,
+                        isClaimedExternal
+                            ? EditorInternal.ESEditorPresentation.ESPresentationState.ReadOnly
+                            : session.running || waitingForManagedIdentity
+                                ? EditorInternal.ESEditorPresentation.ESPresentationState.Busy
+                                : EditorInternal.ESEditorPresentation.ESPresentationState.Normal);
+                    EditorInternal.ESWindowPresentation.SetButtonEnabled(sendButton, canDispatch);
                 }
                 if (threadValue != null) threadValue.text = string.IsNullOrWhiteSpace(session.sessionId)
                     ? "尚未建立" : ShortId(session.sessionId);
@@ -7537,9 +7553,9 @@ namespace ES
             if (session.running)
             {
                 title = string.IsNullOrWhiteSpace(session.activeCommand)
-                    ? "工作台正在执行受管请求" : session.activeCommand;
+                    ? "控制台正在执行受管请求" : session.activeCommand;
                 detail = "正在等待 Bootstrap 的精确结果；这不等于 AI 已开始执行。";
-                source = "工作台受管操作";
+                source = "控制台受管操作";
                 observedAtUtc = session.activeStartedAtUtc;
             }
             else if (!string.IsNullOrWhiteSpace(session.visibleTranscriptActivity)
@@ -7591,7 +7607,7 @@ namespace ES
             {
                 title = "等待建立受管会话";
                 detail = "发送后会先获得精确 SessionId 和上下文验收回执，再显示可观察执行流。";
-                source = "工作台本地状态";
+                source = "控制台本地状态";
                 observedAtUtc = session.updatedAtUtc;
             }
 
@@ -7657,7 +7673,7 @@ namespace ES
 
         private void UpdateWindowTitle(ESCmdAgentSession session)
         {
-            string title = string.IsNullOrWhiteSpace(session?.title) ? "工作台" : FirstLine(session.title, 18);
+            string title = string.IsNullOrWhiteSpace(session?.title) ? "Agent 控制台" : FirstLine(session.title, 18);
             string sessionId = string.IsNullOrWhiteSpace(session?.sessionId) ? "尚未建立受管会话" : session.sessionId;
             titleContent = new GUIContent("ES AI · " + title, "受管 Codex SessionId：" + sessionId);
         }
@@ -7916,7 +7932,7 @@ namespace ES
                 || string.IsNullOrWhiteSpace(selectedSession.aiCommandPath))
             {
                 aiCommandSelectionLabel.text = "AICommand：未选择 · 将按普通需求发送";
-                aiCommandPickerButton?.SetEnabled(true);
+                EditorInternal.ESWindowPresentation.SetButtonEnabled(aiCommandPickerButton, true);
                 return;
             }
             string state = string.IsNullOrWhiteSpace(selectedSession.aiCommandSha256)
@@ -7924,7 +7940,7 @@ namespace ES
                 ? "状态不完整，发送会阻止"
                 : "发送前重新验签";
             aiCommandSelectionLabel.text = "AICommand：" + selectedSession.aiCommandId + " · " + state;
-            aiCommandPickerButton?.SetEnabled(true);
+            EditorInternal.ESWindowPresentation.SetButtonEnabled(aiCommandPickerButton, true);
         }
 
         private static string WriteModeDisplayName(string writeMode)
@@ -8310,7 +8326,7 @@ namespace ES
         {
             if (selectedSession == null || selectedSession.running)
                 return;
-            if (!EditorUtility.DisplayDialog("清空本地记录", "只清空工作台中的本地任务与回执记录，不删除 Codex Thread。继续吗？", "清空", "取消"))
+            if (!EditorUtility.DisplayDialog("清空本地记录", "只清空控制台中的本地任务与回执记录，不删除 Codex Thread。继续吗？", "清空", "取消"))
                 return;
             selectedSession.messages.Clear();
             selectedSession.status = "本地消息已清空";
@@ -8385,7 +8401,15 @@ namespace ES
             bool wide = width >= 1060f;
             bool showContext = settingsVisible || (wide ? !contextManuallyHidden : contextManuallyHidden);
             contextPanel.style.display = showContext ? DisplayStyle.Flex : DisplayStyle.None;
-            contextToggleButton?.EnableInClassList("active", showContext);
+            if (contextToggleButton != null)
+            {
+                contextToggleButton.EnableInClassList("active", showContext);
+                EditorInternal.ESWindowPresentation.SetButtonPresentationState(
+                    contextToggleButton,
+                    showContext
+                        ? EditorInternal.ESEditorPresentation.ESPresentationState.Selected
+                        : EditorInternal.ESEditorPresentation.ESPresentationState.Normal);
+            }
             sidebar.style.width = width >= 920f ? 248f : 208f;
         }
 
@@ -8399,7 +8423,7 @@ namespace ES
             Label title = new Label("恢复受管 Codex 会话");
             title.AddToClassList("es-agent-dialog-title");
             dialog.Add(title);
-            dialog.Add(new Label("使用精确 SessionId。工作台不会按标题、PID 或模糊候选恢复会话。"));
+            dialog.Add(new Label("使用精确 SessionId。控制台不会按标题、PID 或模糊候选恢复会话。"));
             TextField input = new TextField("SessionId");
             input.AddToClassList("es-agent-dialog-input");
             dialog.Add(input);
@@ -8417,7 +8441,7 @@ namespace ES
                 .OrderByDescending(item => ParseUtc(item.updatedAtUtc)).Take(8).ToList();
             if (known.Count > 0)
             {
-                Label knownTitle = new Label("工作台中的最近会话");
+                Label knownTitle = new Label("控制台中的最近会话");
                 knownTitle.AddToClassList("es-agent-mini-heading");
                 dialog.Add(knownTitle);
                 foreach (ESCmdAgentSession session in known)
@@ -8590,12 +8614,7 @@ namespace ES
         {
             if (!(evt.ctrlKey || evt.commandKey))
                 return;
-            if (evt.shiftKey && evt.keyCode == KeyCode.N)
-            {
-                OpenDetachedWindow();
-                evt.StopImmediatePropagation();
-            }
-            else if (evt.altKey && !evt.shiftKey && evt.keyCode == KeyCode.R)
+            if (evt.altKey && !evt.shiftKey && evt.keyCode == KeyCode.R)
             {
                 RefreshCurrentManagedSession();
                 evt.StopImmediatePropagation();
@@ -8703,7 +8722,7 @@ namespace ES
             string path = selectedSession?.lastRunDirectory;
             if (!IsManagedOperationDirectory(path))
             {
-                Reject("当前操作证据目录不在本机受管工作台目录内。");
+                Reject("当前操作证据目录不在本机受管控制台目录内。");
                 return;
             }
             string result = Path.Combine(path, "result.json");
@@ -8870,7 +8889,7 @@ namespace ES
             ambientContextDirty = true;
             selectedPresentationSignature = string.Empty;
             progressPresentationSignature = string.Empty;
-            ShowNotification(new GUIContent("本地工作台状态发生并发冲突；未提交修改已拒绝并回载最新状态。"));
+            ShowNotification(new GUIContent("本地控制台状态发生并发冲突；未提交修改已拒绝并回载最新状态。"));
             return false;
         }
 

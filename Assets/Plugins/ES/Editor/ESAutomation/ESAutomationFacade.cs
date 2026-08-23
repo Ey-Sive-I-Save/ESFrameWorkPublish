@@ -19,6 +19,19 @@ namespace ES
         {
             if (endpoint == null || endpoint.Descriptor == null) throw new ArgumentNullException(nameof(endpoint));
             endpoint.Descriptor.Validate();
+            if (ESAutomationTaskRegistry.TryGet(endpoint.Descriptor.taskId, endpoint.Descriptor.taskVersion,
+                    out ESAutomationTaskContract contract))
+            {
+                if (!string.Equals(contract.taskId, endpoint.Descriptor.taskId, StringComparison.Ordinal)
+                    || contract.version != endpoint.Descriptor.taskVersion)
+                    throw new InvalidOperationException("Automation Descriptor 与 TaskContract 身份/版本不一致。");
+                if (!string.IsNullOrWhiteSpace(contract.inputSchemaHash)
+                    && !string.Equals(contract.inputSchemaHash, endpoint.Descriptor.inputSchemaHash,
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Automation Descriptor 与 TaskContract InputSchemaHash 不一致。");
+                if (!(endpoint is IESAutomationContractBoundEndpoint))
+                    throw new InvalidOperationException("已注册 TaskContract 的 Endpoint 必须绑定 IESAutomationContractBoundEndpoint。");
+            }
             string key = Key(endpoint.Descriptor.taskId, endpoint.Descriptor.taskVersion);
             if (endpoints.ContainsKey(key)) throw new InvalidOperationException("重复注册 Automation Facade Endpoint：" + key);
             endpoints.Add(key, endpoint);
@@ -49,6 +62,9 @@ namespace ES
             if (!string.IsNullOrWhiteSpace(invocation.invocationId)
                 && !Guid.TryParseExact(invocation.invocationId, "N", out _))
                 return ESAutomationTaskInvocationResult.Rejected("InvocationId 必须为空或为 N 格式 GUID。");
+            if (invocation.fromAi
+                && !ESAIBrainCoordinator.TryConsumeAuthorization(invocation, out string brainReason))
+                return ESAutomationTaskInvocationResult.Rejected(brainReason);
             if (!endpoints.TryGetValue(Key(invocation.taskId, invocation.taskVersion), out IESAutomationTaskEndpoint endpoint))
                 return ESAutomationTaskInvocationResult.Rejected("未注册或不支持的任务：" + invocation.taskId + "@" + invocation.taskVersion);
             if (!ESAutomationTaskRegistry.TryGet(invocation.taskId, invocation.taskVersion,
@@ -69,11 +85,57 @@ namespace ES
                 ESAutomationCapability declared = contract.ResolveCapabilities();
                 if ((requirements.requiredCapabilities & ~declared) != ESAutomationCapability.None)
                     return ESAutomationTaskInvocationResult.Rejected("调用要求的能力超出 TaskContract：" + requirements.requiredCapabilities);
+                if (contract.capabilityEnvelope != null
+                    && !contract.capabilityEnvelope.AllowsInvocation(
+                        invocation, requirements.requiredCapabilities, out string capabilityReason))
+                    return ESAutomationTaskInvocationResult.Blocked(
+                        "CapabilityEnvelope 拒绝本次调用：" + capabilityReason
+                        + " required=" + requirements.requiredCapabilities
+                        + ", effective=" + contract.capabilityEnvelope.EffectiveCapability());
                 if (requirements.dryRun && !contract.supportsDryRun)
                     return ESAutomationTaskInvocationResult.Blocked("该 TaskContract 未声明支持 DryRun。");
                 if (!string.IsNullOrWhiteSpace(requirements.inputManifestHash)
                     && !ESAutomationWorkerRegistration.IsSha256(requirements.inputManifestHash))
                     return ESAutomationTaskInvocationResult.Rejected("调用输入 Manifest Hash 无效。");
+                bool strictSnapshotBinding = contract.acceptanceCriteria?.freshnessPolicy
+                    ?.requireExecutionSnapshotBinding == true;
+                if (strictSnapshotBinding && invocation.executionSnapshot == null)
+                    return ESAutomationTaskInvocationResult.Blocked(
+                        "严格快照绑定合同要求本次 Invocation 携带 ExecutionSnapshot。");
+                if (strictSnapshotBinding && invocation.executionSnapshot != null)
+                {
+                    try
+                    {
+                        invocation.executionSnapshot.Validate();
+                    }
+                    catch (Exception snapshotException)
+                    {
+                        return ESAutomationTaskInvocationResult.Blocked(
+                            "严格快照绑定的 ExecutionSnapshot 无效：" + snapshotException.Message);
+                    }
+                    if (!ESAutomationGovernance.MatchesTaskContract(
+                        contract, invocation.executionSnapshot, out string strictContractReason))
+                        return ESAutomationTaskInvocationResult.Blocked(
+                            "严格快照绑定的 TaskContract 校验失败：" + strictContractReason);
+                    if (!ESAutomationGovernance.MatchesInputManifest(
+                        requirements.inputManifestHash, invocation.executionSnapshot,
+                        out string strictInputReason))
+                        return ESAutomationTaskInvocationResult.Blocked(strictInputReason);
+                }
+                if (requirements.executionSnapshot != null)
+                {
+                    if (invocation.executionSnapshot == null)
+                        return ESAutomationTaskInvocationResult.Blocked("缺少绑定的 ExecutionSnapshot。");
+                    if (!ESAutomationGovernance.MatchesSnapshot(
+                        requirements.executionSnapshot, invocation.executionSnapshot, out string snapshotReason))
+                        return ESAutomationTaskInvocationResult.Blocked("ExecutionSnapshot 校验失败：" + snapshotReason);
+                    if (!ESAutomationGovernance.MatchesTaskContract(
+                        contract, invocation.executionSnapshot, out string contractReason))
+                        return ESAutomationTaskInvocationResult.Blocked("ExecutionSnapshot 合同校验失败：" + contractReason);
+                    if (!ESAutomationGovernance.MatchesInputManifest(
+                        requirements.inputManifestHash, invocation.executionSnapshot, out string inputReason))
+                        return ESAutomationTaskInvocationResult.Blocked(inputReason);
+                }
                 foreach (string path in requirements.readPaths ?? new List<string>())
                     ESAutomationPathPolicy.EnsureWorkerReadAllowed(path, contract.readRoots);
                 foreach (string path in requirements.writePaths ?? new List<string>())
@@ -162,6 +224,7 @@ namespace ES
         public List<string> readPaths = new List<string>();
         public List<string> writePaths = new List<string>();
         public string inputManifestHash = string.Empty;
+        public ESAutomationExecutionSnapshot executionSnapshot;
     }
 
     public interface IESAutomationContractBoundEndpoint
@@ -337,6 +400,13 @@ namespace ES
         /// 并拒绝同一身份对应不同输入；为空时保持普通交互入口的原有行为。
         /// </summary>
         public string invocationId = string.Empty;
+        /// <summary>
+        /// AI 调用的 AIBrain 计划指纹。Facade 会原子消费与完整 Invocation 绑定的一次性许可。
+        /// </summary>
+        public string brainPlanHash = string.Empty;
+        /// <summary>副作用重试和恢复使用的稳定幂等键；旧调用可为空以保持兼容。</summary>
+        public string idempotencyKey = string.Empty;
+        public ESAutomationExecutionSnapshot executionSnapshot;
         public string taskId = string.Empty;
         public int taskVersion;
         public string preset = string.Empty;

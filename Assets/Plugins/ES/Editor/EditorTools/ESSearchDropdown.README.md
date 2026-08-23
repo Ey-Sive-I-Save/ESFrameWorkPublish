@@ -42,6 +42,7 @@ var entry = ESSearchDropdown.Entry.Item(
 - `groupPath`：使用 `/` 创建多级目录。
 - `subtitle`：紧邻主名称显示类型、Key 或路径摘要。
 - `keywords`：加入显示与搜索文本，适合中文别名和英文术语。
+- `tooltip`：转发到原生条目的悬停提示，适合完整路径、诊断原因等不应挤进可见标题的信息。
 - `badge`：显示快捷键、状态或资源身份。
 - `selected`：使用 `✓` 标识当前项。
 
@@ -73,6 +74,18 @@ new ESSearchDropdown.Entry(label, icon, callback, groupPath);
 ```
 
 现有调用方不需要迁移即可继续使用。
+
+由已接入 ES Presentation 的窗口打开时，应传入明确宿主，使下拉窗口存活期间暂停宿主自动半休眠：
+
+```csharp
+ESSearchDropdown.Open(
+    rect,
+    "选择资源",
+    entries,
+    hostWindow: this);
+```
+
+UI Toolkit 入口会从锚点面板解析宿主；Rect/IMGUI 入口不猜测宿主，避免把原生 Inspector 或第三方窗口隐式接入 ES 生命周期。
 
 ## 顶部工具栏
 

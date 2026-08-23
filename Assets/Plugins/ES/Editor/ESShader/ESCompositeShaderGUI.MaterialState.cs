@@ -31,20 +31,40 @@ namespace ES.EditorInternal
             }
         }
 
-        private static bool SyncMaterialKeywords(Material material)
+        internal static bool SyncMaterialKeywords(Material material)
         {
             bool changed = false;
             string shaderName = material.shader != null ? material.shader.name : string.Empty;
             if (shaderName == "ES/2D/Composite URP")
+            {
                 changed |= DisableLegacyKeywords(material, Legacy2DKeywords);
+                changed |= ES2DCompositeURPProperties.RefreshResourceProfile(material);
+            }
             else if (shaderName == "ES/3D/Lit Composite URP")
+            {
                 changed |= DisableLegacyKeywords(material, LegacyLitKeywords);
+                changed |= ES3DLitCompositeURPProperties.RefreshResourceProfile(material);
+            }
+            else if (shaderName == "ES/UI/Composite URP")
+            {
+                changed |= ESUICompositeURPProperties.RefreshResourceProfile(material);
+            }
 
             if (material.HasProperty("_QualityTier"))
             {
                 int tier = Mathf.Clamp(Mathf.RoundToInt(material.GetFloat("_QualityTier")), 0, 2);
-                changed |= SetKeyword(material, "_ES_QUALITY_STANDARD", tier == 1);
-                changed |= SetKeyword(material, "_ES_QUALITY_HIGH", tier >= 2);
+                if (shaderName == "ES/2D/Composite URP")
+                {
+                    changed |= SetKeyword(material, "_ES_QUALITY_BASIC", tier == 0);
+                    changed |= SetKeyword(material, "_ES_QUALITY_STANDARD", tier == 1);
+                    changed |= SetKeyword(material, "_ES_QUALITY_HIGH", false);
+                }
+                else
+                {
+                    changed |= SetKeyword(material, "_ES_QUALITY_BASIC", false);
+                    changed |= SetKeyword(material, "_ES_QUALITY_STANDARD", tier == 1);
+                    changed |= SetKeyword(material, "_ES_QUALITY_HIGH", tier >= 2);
+                }
             }
 
             if (material.HasProperty("_ReceiveShadows"))
@@ -53,12 +73,26 @@ namespace ES.EditorInternal
                 changed |= SetKeyword(material, "_RECEIVE_SHADOWS_OFF", !receiveShadows);
             }
 
+            if (shaderName == "ES/3D/Lit Composite URP" && material.HasProperty("_Surface"))
+                changed |= SyncLitRenderState(material);
+
             if (material.HasProperty("_UseUIAlphaClip"))
                 changed |= SetKeyword(material, "UNITY_UI_ALPHACLIP", material.GetFloat("_UseUIAlphaClip") > 0.5f);
 
-            if (material.shader != null
-                && material.shader.name == "ES/3D/VFX Composite URP"
-                && material.HasProperty("_BlendMode"))
+            if (shaderName == "ES/UI/Composite URP" && material.HasProperty("_EnableTMPCompatibility"))
+            {
+                bool tmpEnabled = material.GetFloat("_EnableTMPCompatibility") > 0.5f;
+                bool underlayEnabled = tmpEnabled && material.HasProperty("_EnableUnderlay")
+                    && material.GetFloat("_EnableUnderlay") > 0.5f;
+                bool outlineEnabled = tmpEnabled && material.HasProperty("_OutlineWidth")
+                    && material.GetFloat("_OutlineWidth") > 0.0001f;
+                changed |= SetKeyword(material, "UNDERLAY_ON", underlayEnabled);
+                changed |= SetKeyword(material, "OUTLINE_ON", outlineEnabled);
+            }
+
+            if (material.HasProperty("_BlendMode")
+                && material.HasProperty("_SrcBlend")
+                && material.HasProperty("_DstBlend"))
             {
                 int blendMode = Mathf.Clamp(Mathf.RoundToInt(material.GetFloat("_BlendMode")), 0, 3);
                 float sourceBlend;
@@ -86,6 +120,10 @@ namespace ES.EditorInternal
                 changed |= SetMaterialFloat(material, "_SrcBlend", sourceBlend);
                 changed |= SetMaterialFloat(material, "_DstBlend", destinationBlend);
                 changed |= SetMaterialFloat(material, "_BlendOp", (float)UnityEngine.Rendering.BlendOp.Add);
+            }
+
+            if (shaderName == "ES/3D/VFX Composite URP")
+            {
                 string renderType = material.GetTag("RenderType", false, string.Empty);
                 if (!string.Equals(renderType, "Transparent", StringComparison.Ordinal))
                 {
@@ -104,6 +142,63 @@ namespace ES.EditorInternal
                 }
             }
             return changed;
+        }
+
+        private static bool SyncLitRenderState(Material material)
+        {
+            bool changed = false;
+            bool transparent = material.GetFloat("_Surface") > 0.5f;
+            bool alphaClip = material.HasProperty("_AlphaClip") && material.GetFloat("_AlphaClip") > 0.5f;
+            int queueOffset = material.HasProperty("_QueueOffset")
+                ? Mathf.Clamp(Mathf.RoundToInt(material.GetFloat("_QueueOffset")), -50, 50)
+                : 0;
+            if (material.HasProperty("_Cull"))
+                changed |= SetMaterialFloat(material, "_Cull", Mathf.Clamp(Mathf.RoundToInt(material.GetFloat("_Cull")), 0, 2));
+            if (material.HasProperty("_QueueOffset"))
+                changed |= SetMaterialFloat(material, "_QueueOffset", queueOffset);
+
+            changed |= SetMaterialFloat(material, "_SrcBlend", transparent
+                ? (float)UnityEngine.Rendering.BlendMode.SrcAlpha
+                : (float)UnityEngine.Rendering.BlendMode.One);
+            changed |= SetMaterialFloat(material, "_DstBlend", transparent
+                ? (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha
+                : (float)UnityEngine.Rendering.BlendMode.Zero);
+            changed |= SetMaterialFloat(material, "_ZWrite", transparent ? 0f : 1f);
+
+            string renderType = transparent ? "Transparent" : (alphaClip ? "TransparentCutout" : "Opaque");
+            if (!string.Equals(material.GetTag("RenderType", false, string.Empty), renderType, StringComparison.Ordinal))
+            {
+                material.SetOverrideTag("RenderType", renderType);
+                changed = true;
+            }
+
+            int baseQueue = transparent
+                ? (int)UnityEngine.Rendering.RenderQueue.Transparent
+                : (alphaClip
+                    ? (int)UnityEngine.Rendering.RenderQueue.AlphaTest
+                    : (int)UnityEngine.Rendering.RenderQueue.Geometry);
+            int renderQueue = baseQueue + queueOffset;
+            if (material.renderQueue != renderQueue)
+            {
+                material.renderQueue = renderQueue;
+                changed = true;
+            }
+
+            bool opaquePasses = !transparent;
+            changed |= SetShaderPassEnabled(material, "GBuffer", opaquePasses);
+            changed |= SetShaderPassEnabled(material, "ShadowCaster", opaquePasses);
+            changed |= SetShaderPassEnabled(material, "DepthOnly", opaquePasses);
+            changed |= SetShaderPassEnabled(material, "DepthNormals", opaquePasses);
+            changed |= SetShaderPassEnabled(material, "Meta", opaquePasses);
+            return changed;
+        }
+
+        private static bool SetShaderPassEnabled(Material material, string passName, bool enabled)
+        {
+            if (material.GetShaderPassEnabled(passName) == enabled)
+                return false;
+            material.SetShaderPassEnabled(passName, enabled);
+            return true;
         }
 
         private static bool DisableLegacyKeywords(Material material, string[] keywords)
@@ -173,6 +268,7 @@ namespace ES.EditorInternal
             CachedActiveParticleStreams.Clear();
             CachedDepthCameras.Clear();
             DiagnosticWarnings.Clear();
+            InvalidateTextureImportSnapshot();
             particleConfigurationTarget = null;
             cachedParticleSelectionSignature = int.MinValue;
             cachedParticleSelectionTime = 0d;

@@ -10,11 +10,12 @@ using ES.EditorInternal;
 namespace ES
 {
     /// <summary>
-    /// 世界工作台的对话图与空间放置工具。
+    /// 世界对话编辑器的对话图与空间放置工具。
     /// 图资产负责节点/边权威数据，地图资产负责放置记录，Scene 只保存 3D 锚点投影。
     /// </summary>
-    public sealed class ESWorldDialogueWorkbenchWindow : EditorWindow
+    public sealed class ESWorldDialogueEditorWindow : EditorWindow, IESWindowPresentationShortTitle
     {
+        public string ESWindow_PresentationShortTitle => "对话";
         private enum ViewMode : byte { Graph, Map2D, Scene3D }
 
         private const string GraphGuidSessionKey = "ES.WorldDialogueWorkbench.GraphGuid";
@@ -33,10 +34,10 @@ namespace ES
         private bool sceneHooked;
         private bool mapDragUndoRecorded;
 
-        [MenuItem("【ES】/内容制作/世界/对话工作台", false, 122)]
+        [MenuItem("【ES】/内容制作/世界/对话编辑器", false, 122)]
         private static void Open()
         {
-            ESWorldDialogueWorkbenchWindow window = GetWindow<ESWorldDialogueWorkbenchWindow>("ES 世界对话工作台");
+            ESWorldDialogueEditorWindow window = GetWindow<ESWorldDialogueEditorWindow>("ES 世界对话编辑器");
             window.minSize = new Vector2(920f, 620f);
             window.Show();
             window.Focus();
@@ -44,7 +45,7 @@ namespace ES
 
         public static void OpenFor(ESWorldMapAsset asset, EditorWindow owner = null)
         {
-            ESWorldDialogueWorkbenchWindow window = GetWindow<ESWorldDialogueWorkbenchWindow>("ES 世界对话工作台");
+            ESWorldDialogueEditorWindow window = GetWindow<ESWorldDialogueEditorWindow>("ES 世界对话编辑器");
             window.minSize = new Vector2(920f, 620f);
             window.BindMap(asset);
             window.Show();
@@ -53,7 +54,7 @@ namespace ES
 
         public static void OpenFor(ESWorldDialogueGraphAsset asset, ESWorldMapAsset map = null, EditorWindow owner = null)
         {
-            ESWorldDialogueWorkbenchWindow window = GetWindow<ESWorldDialogueWorkbenchWindow>("ES 世界对话工作台");
+            ESWorldDialogueEditorWindow window = GetWindow<ESWorldDialogueEditorWindow>("ES 世界对话编辑器");
             window.minSize = new Vector2(920f, 620f);
             window.BindGraph(asset);
             if (map != null) window.BindMap(map);
@@ -63,6 +64,9 @@ namespace ES
 
         private void OnEnable()
         {
+            ESWindowFoundation.BindWithStandardSystemHost(
+                this,
+                ESWindowFoundation.EnsureStandardSystemActionBar(this));
             if (!sceneHooked)
             {
                 SceneView.duringSceneGui += OnSceneGUI;
@@ -73,6 +77,7 @@ namespace ES
 
         private void OnDisable()
         {
+            ESWindowFoundation.Unbind(this, true);
             if (sceneHooked)
             {
                 SceneView.duringSceneGui -= OnSceneGUI;
@@ -107,7 +112,7 @@ namespace ES
                 EditorGUI.DrawRect(new Rect(rect.x, rect.y, 4f, rect.height), ESEditorPresentation.GetDepthAccent(0));
                 ESEditorPresentation.DrawFrame(rect, ESEditorPresentation.GetStatusFrameColor(0, ESStatusKind.None));
             }
-            GUI.Label(new Rect(rect.x + 14f, rect.y + 8f, rect.width - 20f, 24f), "ES 世界对话工作台", ESEditorPresentation.HeaderStyle);
+            GUI.Label(new Rect(rect.x + 14f, rect.y + 8f, rect.width - 20f, 24f), "ES 世界对话编辑器", ESEditorPresentation.HeaderStyle);
             GUI.Label(new Rect(rect.x + 14f, rect.y + 34f, rect.width - 20f, 18f), "Graph 数据流 · 2D 地图放置 · 3D Scene 拖放 · 稳定资产保存", ESEditorPresentation.MetaStyle);
         }
 
@@ -149,7 +154,7 @@ namespace ES
         {
             using (new EditorGUILayout.VerticalScope(ESEditorPresentation.SurfaceStyle))
             {
-                GUILayout.Label("对话工作台尚未绑定内容", ESEditorPresentation.HeaderStyle);
+                GUILayout.Label("对话编辑器尚未绑定内容", ESEditorPresentation.HeaderStyle);
                 EditorGUILayout.HelpBox("先创建或拖入 ESWorldDialogueGraphAsset；要把入口放进地图，还需要绑定 ESWorldMapAsset。", MessageType.Info);
                 if (GUILayout.Button("创建对话图资产", GUILayout.Height(30f))) CreateGraphAsset();
             }

@@ -28,6 +28,8 @@
 - [ES_SCENE_VALIDATION_GUIDE_STANDARD.md](ES_SCENE_VALIDATION_GUIDE_STANDARD.md)：测试场景导视、诊断、路线与输入说明的复用边界；Unity / PlayMode / Profiler 验收待完成。
 - [SKILL_OPERATION_LIFECYCLE.md](SKILL_OPERATION_LIFECYCLE.md)：Skill Operation 默认无 Stop、按需清理及运行时所有权规则。
 - [ES_EDITOR_TOOL_WORKBENCH_STANDARD.md](ES_EDITOR_TOOL_WORKBENCH_STANDARD.md)：SimpleTools 的目录分组、页面状态、配置目录、按钮层级、安全与迁移验收规范；每个工具迁移仍须补 Unity 视觉和真实操作验证。
+- [ES_EDITOR_WINDOW_PRODUCTION_STANDARD.md](ES_EDITOR_WINDOW_PRODUCTION_STANDARD.md)：全局 ES 编辑器窗口、Inspector、Section、Dialog、Popup 与工作台的制作准则、商业级视觉/交互边界、验证矩阵和当前窗口治理缺口；静态通过不替代 Unity 实机与 Profiler 证据。
+- [ES_UGC_WORKBENCH_COMMERCIAL_STANDARD.md](ES_UGC_WORKBENCH_COMMERCIAL_STANDARD.md)：UGC / World 专业工作台的贡献合同、首屏信息架构、响应式、高 DPI、视觉、状态、生命周期和商业验收矩阵；当前实现仍须完成真实窗口交互、截图与 Profiler 验收。
 - [../ES/Documentation/Guides/ESWorkbench_ContributionAndModuleGuide.md](../ES/Documentation/Guides/ESWorkbench_ContributionAndModuleGuide.md)：ES 工作台贡献注册、模块枚举模板、调整钩子、依赖/冲突诊断与窗口注入指引；当前为源码级实现指引，Unity 实机编译和交互验收待完成。
 - [ES_INSTALLER_SIGNED_UNITYPACKAGE_STANDARD.md](ES_INSTALLER_SIGNED_UNITYPACKAGE_STANDARD.md)：`Assets/Plugins/ES + .unitypackage + 旧 ESInstaller` 唯一安装发布主链、AI 快速升级步骤、签名门禁与当前恢复缺口。
 
@@ -96,6 +98,7 @@
 ### UI 与动态图集
 
 - `ES_UI_AUTHORING_WORKFLOW.md`：UI 组件选择、资源/输入/生命周期权威链、动态图集最短用法和 UI 风险专项计划；已通过 Unity BatchMode 脚本编译与 EditMode 10/10，仍待 PlayMode、Frame Debugger、Profiler、Player/IL2CPP 与目标平台复验。
+- `AI_UI_BUILD_SYSTEM_PLAN.md`：AI 直接驱动 Unity UI 工具的视觉设计、线性执行计划、量化指标、证据闭环、恢复和扩展门禁；当前为 `Planned / Not Accepted`。
 
 ### AI 测试与自动化
 

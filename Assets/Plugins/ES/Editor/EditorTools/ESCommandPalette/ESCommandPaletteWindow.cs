@@ -331,8 +331,10 @@ namespace ES
         }
     }
 
-    public sealed class ESCommandPaletteWindow : EditorWindow
+    [ES.ESWindowSleepContract(ES.ESWindowSleepMode.Transient, "短生命周期命令面板")]
+    public sealed class ESCommandPaletteWindow : EditorWindow, IESWindowPresentationShortTitle
     {
+        public string ESWindow_PresentationShortTitle => "命令";
         private const double SearchDebounceSeconds = 0.18d;
         private const float RowHeight = 50f;
         private const float MinDetailWidth = 760f;

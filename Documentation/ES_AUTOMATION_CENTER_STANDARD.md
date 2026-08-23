@@ -24,7 +24,7 @@ ESAutomationCenter（C# Editor）
 
 - 只建立任务协议、Worker 注册、路径权限、运行记录、报告和门禁模型。
 - 不创建散落的 `audit.py`、`upload.py`、`cleanup.py`。
-- 不实现发布上传、删除、清理或 Unity 资产修改任务。
+- 不实现发布上传、删除、清理或通用 Unity 资产修改任务。当前 Active Scene 的受管修改仅作为固定 C# 控制面例外存在：不经过 Worker，且必须遵守本标准的 dry-run、人工一次性批准、Undo 和审计合同。
 - 首个注册 Worker 为 `es.scene.scan@1`：它只分析 C# Editor 导出的当前场景快照，写入 RunId 临时目录；不解析 `.unity` YAML，不修改场景或 `Assets/`，也不具备发布能力。
 
 ## TaskContract 最低字段
@@ -76,6 +76,45 @@ outputs: [result.json, audit.md]
 11. 受管进程登记到全局生命周期注册表，`ReloadDomain` 前统一终止；同一 `RunId` 不得并发启动第二个 Worker。句柄只有在终止确认后才允许注销和释放。
 12. Automation 的全局初始化统一走 ES `EditorInvoker_Level0`/AssemblyStream；不得新增 Unity 原生 `[InitializeOnLoad]` 作为普通任务、AI Bridge、编译控制或进程清理入口。
 
+## CompletionDecision 分层语义
+
+`CompletionDecision` 保留既有 `Accepted/Blocked` 字段和状态机，同时提供可解释的分层结论：
+
+| decisionStatus | 含义 | 是否表示业务已交付 |
+| --- | --- | --- |
+| `Unverified` | 没有足够收据证明完成 | 否 |
+| `PartiallyDone` | 已完成部分验收项，仍有项未完成 | 否 |
+| `StaticReviewComplete` | 静态代码/合同审查完成，但运行时尚未证明 | 否；仅表示静态范围 |
+| `Accepted` | 外部 Verifier 确认全部必需项、权限、来源和 Trace 均满足 | 是（限当前合同范围） |
+| `Blocked` | 静态代码、静态合同、静态边界或安全条件存在硬阻断 | 否 |
+
+`blockingLayer` 用 `static-code`、`static-contract`、`static-boundary`、`evidence`、`runtime` 或 `none` 指出下一步责任层。静态审查完成不能绕过 Runtime 要求；缺失或过期收据应报告为 `Unverified/evidence`，而不是伪装成源码缺陷。`claimsNotProven` 必须列出当前结论尚未证明的声明，`nextAction` 只提供推进建议，不授予新的权限。
+
+旧 Worker 未填充分层字段时，ES 按原有 `accepted`、Criterion、Freshness 和 Trace 合同判定，保证渐进迁移；新 Worker 应在提交 CompletionDecision 前调用 `RefreshDecisionSemantics()`。
+
+## CapabilityEnvelope 调用级门禁
+
+`CapabilityEnvelope` 不是独立的权限授予对象。真正执行能力必须同时满足：
+
+```text
+userAuthorization
+  ∩ taskContract
+  ∩ aiCommand
+  ∩ workerCapability
+  ∩ projectBoundary
+```
+
+并且在每次 `RunTask` 前绑定调用身份：
+
+- AI 调用必须携带有效的 AIBrain `PlanHash`，并先通过一次性 Invocation 授权消费；
+- 人工调用必须携带明确 `ActorId`；
+- 本次实际请求能力必须被 `userAuthorization` 覆盖；
+- 任何能力越界都在 `ESAutomationFacade` 工具边界返回 `Blocked`，不能由 Worker 或模型自行解释为允许。
+
+旧任务没有声明 `CapabilityEnvelope` 时保持原有兼容路径；一旦声明，必须走 `AllowsInvocation`，不能只调用无身份的 `Allows`。
+
+对于需要严格源漂移保护的生产合同，可在 `FreshnessPolicy` 开启 `requireExecutionSnapshotBinding=true`。此时每个 Criterion 的 EvidenceBinding 必须同时绑定 `snapshotId`、`inputManifestHash`、`taskContractHash`、`commandHash`、`brainPlanHash` 和 `sourceHash`；缺少任一项都不能验收。旧合同默认关闭该字段，以便按任务逐步迁移。迁移前可调用 `ESAutomationGovernance.IsStrictSnapshotBindingReady` 做无副作用预检；预检通过后再打开严格字段，不改变现有 ES Producer 的默认行为。
+
 ## 分阶段输入协议
 
 有少量人工输入需求的 Worker 不得阻塞等待 Unity 对话框。统一采用检查点恢复：
@@ -123,6 +162,32 @@ Python 环境解析顺序固定为：本机显式 `ES_AUTOMATION_PYTHON`，再�
 
 Unity 只在 Editor 主线程处理最终 `.request.json`，把结构化响应写入 `Responses/`，并归档请求。没有 HTTP 监听器、远程网络端口、任意命令执行或任意路径参数。
 
+### 固定 C# Editor 控制面
+
+下列动作是固定 `ControlActionContract`，不是可注册 Worker，也不允许通过 TaskId、脚本路径、反射方法名或任意参数扩展：
+
+- `getUnityCompilationState`：只读 Editor 编译状态；能力为 `EditorCompilation.Read`。
+- `setUnityAutoCompilation`：设置本次 Editor Session 自动编译策略；能力为 `EditorCompilation.Control`。
+- `triggerUnityCompilation`：请求 Unity 刷新/脚本编译；能力为 `EditorCompilation.Control`。
+- `modifyActiveScene`：修改当前已保存 `Assets/` Active Scene 的白名单操作；能力为 `EditorScene.Modify`。
+
+无论请求来自 Inbox 还是已由宿主鉴权的 Unity 主线程 `ExecuteJson(...)`，都必须先检查 Bridge 的当前用户授权。`ExecuteJson(...)` 不负责从后台线程切回 Editor 主线程；线程不正确或直接信封超过 128 KiB 时必须稳定拒绝。每个固定动作都先在 `ES/Automation/Runs/ControlActions/<requestId>.json` 创建不可覆盖审计，再执行；审计至少记录 requestId/runId、actor、动作、能力、输入 SHA-256、批准 ID、批准计划指纹、状态、时间、结果 SHA-256 和错误。相同 requestId 一律拒绝重放；如果最终审计写入失败，响应必须说明动作可能已经发生，不能报告成功。
+
+`setUnityAutoCompilation` 的 AI 抑制拥有者只存在于当前 `SessionState`。关闭 Bridge 时只能恢复 AI 自己设置的编译抑制，人工菜单设置不得被覆盖。
+
+`modifyActiveScene` 采用固定三段协议：
+
+```text
+AI dryRun=true
+  -> C# 验证当前 Active Scene、精确 scenePath、无歧义层级路径、Tag 与 GlobalObjectId
+  -> 返回 plan + approvalId + planFingerprint（5 分钟）
+人工在自动化中心查看后批准一次
+  -> 同 actor 用新 requestId、同一计划和 approvalId 提交 dryRun=false
+  -> C# 重验指纹/目标，消费批准，统一 Undo/Dirty/可选 Save
+```
+
+审批不直接写场景；缺少批准、计划不一致、actor 不一致、超时、人工撤销、Bridge 关闭、PlayMode 切换、Domain Reload 或批准已消费都会拒绝写入。Bridge 最多保留 32 条待批准计划，每条最多 64 个白名单操作，防止请求洪泛无限占用 Editor 会话或制造无法人工复核的批量改动。白名单目前仅为 `setActive`、`setName`、`setTag`、`setLayer`，且 `save=true` 仅保存当前 Active Scene；路径段、名称、Tag 与 Layer 都必须通过受管校验。禁止直接编辑 `.unity` YAML、隐式打开其他 Scene、修改 Prefab/其他资产或绕过自动化中心确认。
+
 ### PlayMode 暂停与受信 UnityMCP 恢复
 
 “用户授权”和“当前监听”是两层状态：进入或退出 PlayMode 时，Bridge 自动停止文件变化监听并清空内存中的尚未开始队列，但不会撤销本机授权；Inbox 中尚未处理的请求文件会留在原处，回到 EditMode 后才重新扫描并处理。
@@ -151,7 +216,7 @@ ES/Automation/
 
 ## 当前状态
 
-- C# Editor 管理骨架：已建立；共享字段命名已按 JSON Schema 对齐，未注册 Worker 时 ProcessRunner 会拒绝构造可执行命令；已提供统一受管进程执行器，并补齐任务级超时上限、Job Object/进程树回退、stdout/stderr 有界异步排空、ReloadDomain 全局清理和同 RunId 并发拒绝。Facade、分类快速任务和默认关闭的本机 AI Bridge 已有源码；C#↔Schema 自动往返与故障注入测试仍待实现。
+- C# Editor 管理骨架：已建立；共享字段命名已按 JSON Schema 对齐，未注册 Worker 时 ProcessRunner 会拒绝构造可执行命令；已提供统一受管进程执行器，并补齐任务级超时上限、Job Object/进程树回退、stdout/stderr 有界异步排空、ReloadDomain 全局清理和同 RunId 并发拒绝。Facade、分类快速任务、默认关闭的本机 AI Bridge 与固定 ControlActionContract 已有源码；控制面已接入用户授权、不可重放审计和场景一次性批准。C#↔Schema 自动往返、Bridge 场景审批交互与故障注入测试仍待实现。
 - Python 场景扫描 Worker：原型源码已实现并由固定入口指纹注册；项目受管 CPython 3.12.10 已部署，Worker 定向单测已通过。当前生成的 `ES_Logic` 与 `ES_Editor` 项目均已静态构建通过；活跃 Unity Editor 尚未刷新本轮程序集，因此 Unity 内菜单、Inbox 端到端、Test Runner 与 PlayMode 验收仍不能宣称通过。
 - PowerShell Worker：未实现、未注册、不得宣称可执行。
 - 发布物只读审计：尚未实现。

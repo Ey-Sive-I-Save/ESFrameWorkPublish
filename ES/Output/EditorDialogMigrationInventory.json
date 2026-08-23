@@ -1,0 +1,2623 @@
+{
+    "schemaVersion":  1,
+    "generatedUtc":  "2026-08-22T17:07:24.0818909Z",
+    "totalMatches":  523,
+    "fileCount":  82,
+    "items":  [
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/ESEditorGlobalSO.cs",
+                      "line":  199,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/GlobalEditorData/ESGlobalResSetting.cs",
+                      "line":  345,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/LibraryBookPage/6-SoLibrary.cs",
+                      "line":  492,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/SoTable/EditorOnly/InfoType/ESSoTableDataRule.Plan.cs",
+                      "line":  121,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/SoTable/EditorOnly/InfoType/ESSoTableDataRule.Plan.cs",
+                      "line":  147,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/SoTable/EditorOnly/InfoType/ESSoTableDataRule.Plan.cs",
+                      "line":  244,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/SoTable/EditorOnly/InfoType/ESSoTableDataRule.RowImport.cs",
+                      "line":  107,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/Stand_Tools/OnlyEditor/ESPrefabTester.cs",
+                      "line":  213,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/Stand_Tools/OnlyEditor/ESPrefabTester.cs",
+                      "line":  266,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/Stand_Tools/OnlyEditor/ESPrefabTester.cs",
+                      "line":  281,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/Stand_Tools/OnlyEditor/ESPrefabTester.cs",
+                      "line":  844,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/Stand_Tools/OnlyEditor/ESPrefabTester.cs",
+                      "line":  942,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/Stand_Tools/SimpleTools/ESEnumScriptJump.cs",
+                      "line":  179,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/0_Stand/Stand_Tools/SimpleTools/ESStandUtility.SafeEditor.cs",
+                      "line":  90,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESCommandPalette/ESCommandPaletteWindow.cs",
+                      "line":  479,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESCommandPalette/ESCommandPaletteWindow.cs",
+                      "line":  488,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESCommandPalette/ESCommandPaletteWindow.cs",
+                      "line":  495,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorFeedbackSound/ESEditorFeedbackSound.cs",
+                      "line":  1897,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorInspector/InspectorUser_AssetQuickInfo.cs",
+                      "line":  566,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorInspector/InspectorUser_AssetQuickInfo.cs",
+                      "line":  571,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorToolBar/ESEditorToolBar.cs",
+                      "line":  600,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorToolBar/ESEditorToolBar.cs",
+                      "line":  900,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorToolBar/ESEditorToolBar.cs",
+                      "line":  1004,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorToolBar/ESEditorToolBar.cs",
+                      "line":  1012,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorToolBar/ESEditorToolBar.cs",
+                      "line":  1017,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorToolBar/ESEditorToolBar.cs",
+                      "line":  1024,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorToolBar/ESEditorToolBar.cs",
+                      "line":  1038,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorToolBar/ESEditorToolBar.cs",
+                      "line":  1059,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorToolBar/ESEditorToolBar.cs",
+                      "line":  1064,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/EditorTools/ESEditorToolBar/ESEditorToolBar.cs",
+                      "line":  1071,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+                      "line":  1270,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+                      "line":  1281,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+                      "line":  1328,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+                      "line":  1330,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+                      "line":  1414,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+                      "line":  1425,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+                      "line":  1428,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+                      "line":  1437,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+                      "line":  1444,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+                      "line":  1454,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+                      "line":  1513,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationSceneScanPrototype.cs",
+                      "line":  105,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationSceneScanPrototype.cs",
+                      "line":  117,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationSceneScanPrototype.cs",
+                      "line":  133,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationSceneScanPrototype.cs",
+                      "line":  145,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationSceneScanPrototype.cs",
+                      "line":  150,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationSceneScanPrototype.cs",
+                      "line":  171,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationSceneScanPrototype.cs",
+                      "line":  699,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationSceneScanPrototype.cs",
+                      "line":  733,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationSceneScanPrototype.cs",
+                      "line":  743,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationSceneScanPrototype.cs",
+                      "line":  832,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentWindow.cs",
+                      "line":  4266,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentWindow.cs",
+                      "line":  6243,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentWindow.cs",
+                      "line":  7246,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentWindow.cs",
+                      "line":  8329,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentWindow.cs",
+                      "line":  8348,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESCmdAgent/ESCmdAgentWindow.cs",
+                      "line":  8932,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESContentRegistration/ESContentRegistrationAuthoring.cs",
+                      "line":  196,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESCollectionDrawStyleAttributeDrawer.cs",
+                      "line":  395,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESCollectionDrawStyleAttributeDrawer.cs",
+                      "line":  1638,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESGameCoreConfigKeyDrawer.cs",
+                      "line":  371,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESInputActionDefineDrawer.cs",
+                      "line":  348,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESInputSelfTestMenu.cs",
+                      "line":  16,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESInputSelfTestMenu.cs",
+                      "line":  21,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESPolymorphicReferenceDrawer.cs",
+                      "line":  1521,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESDrawer/Normal/ESPolymorphicReferenceDrawer.cs",
+                      "line":  1538,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESFontTools/ESFontBuildProfileEditor.cs",
+                      "line":  1322,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentArtifactGenerationWorkflow.cs",
+                      "line":  2746,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentArtifactGenerationWorkflow.cs",
+                      "line":  3776,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentArtifactGenerationWorkflow.cs",
+                      "line":  3787,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentArtifactGenerationWorkflow.cs",
+                      "line":  3987,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentArtifactGenerationWorkflow.cs",
+                      "line":  4075,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAgentArtifactGenerationWorkflow.cs",
+                      "line":  4100,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESAISkillExecutionWorkflow.cs",
+                      "line":  1224,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESStableGraphInspector.cs",
+                      "line":  1644,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESStableGraphViewWindow.cs",
+                      "line":  972,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESGraphViewV2/ESStableGraphViewWindow.cs",
+                      "line":  982,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/-ESMenuTreeWindow.cs",
+                      "line":  5667,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESLibraryTemplate.cs",
+                      "line":  1519,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESLibraryTemplate.cs",
+                      "line":  1558,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESLibraryTemplate.cs",
+                      "line":  1583,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESLibraryTemplate.cs",
+                      "line":  1635,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESLibraryTemplate.cs",
+                      "line":  1662,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESLibraryTemplate.cs",
+                      "line":  1690,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESLibraryTemplate.cs",
+                      "line":  1694,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESLibraryTemplate.cs",
+                      "line":  1707,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESLibraryTemplate.cs",
+                      "line":  1719,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESLibraryTemplate.cs",
+                      "line":  2226,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESLibraryTemplate.cs",
+                      "line":  2227,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESMenuTreeToolkitTestWindow.cs",
+                      "line":  1470,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/-Templates/ESMenuTreeToolkitTestWindow.cs",
+                      "line":  1515,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/ESAssetPackageBakeWindow.cs",
+                      "line":  248,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/ESAssetPackageBakeWindow.cs",
+                      "line":  916,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  1414,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  1595,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  1673,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  1685,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  1703,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  1763,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  1834,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  1841,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  1873,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  1892,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  1941,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  2016,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  2232,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  2245,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  2251,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  2255,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  2357,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  2382,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  2396,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  2474,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  2499,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/AssetPackageBakeWindow/Data/ESAssetPackageBakeData.cs",
+                      "line":  2678,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/ESLocalizationToolsWindow.cs",
+                      "line":  459,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/Page_FontBuild.cs",
+                      "line":  85,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/Page_FontBuild.cs",
+                      "line":  87,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/Page_FontBuild.cs",
+                      "line":  144,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/Page_FontBuild.cs",
+                      "line":  153,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/Page_FontBuild.cs",
+                      "line":  157,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/Page_FontBuild.cs",
+                      "line":  165,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/Page_FontBuild.cs",
+                      "line":  177,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/Page_FontBuild.cs",
+                      "line":  181,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/Page_FontBuild.cs",
+                      "line":  188,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/Page_FontBuild.cs",
+                      "line":  205,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/FontToolsWindow/Page_FontBuild.cs",
+                      "line":  207,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/SimpleToolsPanelUtility.cs",
+                      "line":  404,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/SimpleToolsPanelUtility.cs",
+                      "line":  446,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_AssetReferenceChecker.cs",
+                      "line":  211,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_AssetReferenceChecker.cs",
+                      "line":  842,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_AssetReferenceChecker.cs",
+                      "line":  891,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_AssetReferenceChecker.cs",
+                      "line":  1039,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_AssetReferenceChecker.cs",
+                      "line":  1176,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_AssetReferenceChecker.cs",
+                      "line":  1329,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_AssetReferenceChecker.cs",
+                      "line":  1342,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_AssetReferenceChecker.cs",
+                      "line":  1348,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_AssetReferenceChecker.cs",
+                      "line":  1908,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_AssetReferenceChecker.cs",
+                      "line":  1946,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_AssetReferenceChecker.cs",
+                      "line":  1953,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_AssetReferenceChecker.cs",
+                      "line":  1960,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_TextureSpriteTool.cs",
+                      "line":  343,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_TextureSpriteTool.cs",
+                      "line":  379,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_TextureSpriteTool.cs",
+                      "line":  386,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_TextureSpriteTool.cs",
+                      "line":  519,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_TextureSpriteTool.cs",
+                      "line":  594,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  540,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  550,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  556,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  560,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1031,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1036,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1085,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1097,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1102,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1123,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1136,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1142,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1150,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1158,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1182,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1191,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1201,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1219,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1230,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1238,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1244,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1254,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1306,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/AssetsTools/Simple_AssetTool_Page_UnityPackageTool.cs",
+                      "line":  1320,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_ObjectPool.cs",
+                      "line":  611,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_ObjectPool.cs",
+                      "line":  623,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_ObjectPool.cs",
+                      "line":  627,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_ObjectPool.cs",
+                      "line":  671,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_ObjectPool.cs",
+                      "line":  686,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_ObjectPool.cs",
+                      "line":  709,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_ObjectPool.cs",
+                      "line":  715,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_ObjectPool.cs",
+                      "line":  721,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_RuntimeWatch.cs",
+                      "line":  564,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_RuntimeWatch.cs",
+                      "line":  1817,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  185,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  329,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  439,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  472,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  497,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  505,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  537,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  585,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  591,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  625,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  630,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  647,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  657,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  664,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  670,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  676,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  705,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  713,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  719,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  741,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneManager.cs",
+                      "line":  797,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneTextRepair.cs",
+                      "line":  106,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneTextRepair.cs",
+                      "line":  118,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneTextRepair.cs",
+                      "line":  131,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneTextRepair.cs",
+                      "line":  142,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneTextRepair.cs",
+                      "line":  152,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneTextRepair.cs",
+                      "line":  156,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneTextRepair.cs",
+                      "line":  174,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/ESTools/Simple_ESTool_Page_SceneTextRepair.cs",
+                      "line":  205,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  681,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  700,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  738,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  743,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  775,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  981,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  994,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1043,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1051,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1097,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1120,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1144,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1198,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1247,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1254,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1270,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1288,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1294,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1366,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1420,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_AnimationBatchSetting.cs",
+                      "line":  1426,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchRename.cs",
+                      "line":  290,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchRename.cs",
+                      "line":  335,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchRename.cs",
+                      "line":  354,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchRename.cs",
+                      "line":  413,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchRename.cs",
+                      "line":  551,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchRename.cs",
+                      "line":  558,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchStaticSetting.cs",
+                      "line":  141,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchStaticSetting.cs",
+                      "line":  341,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchStaticSetting.cs",
+                      "line":  351,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchStaticSetting.cs",
+                      "line":  358,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchStaticSetting.cs",
+                      "line":  364,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchStaticSetting.cs",
+                      "line":  391,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchStaticSetting.cs",
+                      "line":  408,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchStaticSetting.cs",
+                      "line":  418,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchStaticSetting.cs",
+                      "line":  425,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchStaticSetting.cs",
+                      "line":  430,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchStaticSetting.cs",
+                      "line":  452,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_BatchStaticSetting.cs",
+                      "line":  510,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_LightingSettings.cs",
+                      "line":  247,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_LightingSettings.cs",
+                      "line":  269,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_LightingSettings.cs",
+                      "line":  319,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_LightingSettings.cs",
+                      "line":  329,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_LightingSettings.cs",
+                      "line":  350,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_LightingSettings.cs",
+                      "line":  405,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_LightingSettings.cs",
+                      "line":  415,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_LightingSettings.cs",
+                      "line":  425,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_LightingSettings.cs",
+                      "line":  469,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_LightingSettings.cs",
+                      "line":  490,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_LightingSettings.cs",
+                      "line":  529,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_LightingSettings.cs",
+                      "line":  578,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  154,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  164,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  187,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  194,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  223,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  230,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  238,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  245,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  251,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  264,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  269,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  281,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  294,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  299,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  673,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  686,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  693,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  707,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  1253,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_MaterialReplacement.cs",
+                      "line":  1405,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_ParticleSystemAdjustment.cs",
+                      "line":  2070,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_ParticleSystemAdjustment.cs",
+                      "line":  2076,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_ParticleSystemAdjustment.cs",
+                      "line":  2117,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_ParticleSystemAdjustment.cs",
+                      "line":  2382,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_ParticleSystemAdjustment.cs",
+                      "line":  2608,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_ParticleSystemAdjustment.cs",
+                      "line":  2638,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_ParticleSystemAdjustment.cs",
+                      "line":  2726,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_ParticleSystemAdjustment.cs",
+                      "line":  2734,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_ParticleSystemAdjustment.cs",
+                      "line":  2762,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_ParticleSystemAdjustment.cs",
+                      "line":  2770,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_ParticleSystemAdjustment.cs",
+                      "line":  2797,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  667,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  954,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1021,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1041,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1097,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1332,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1384,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1437,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1456,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1463,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1476,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1486,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1578,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1591,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1604,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1648,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1654,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1660,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1689,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1698,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1907,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  1918,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  2228,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PhysicsAlign.cs",
+                      "line":  2245,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  529,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  538,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  551,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  558,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  588,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  859,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  903,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  910,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  916,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  949,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  972,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  979,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  985,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  1018,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  1041,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  1048,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  1054,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  1088,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  1102,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  1109,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  1115,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  1121,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_PrefabManagement.cs",
+                      "line":  1198,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  98,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  103,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  117,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  324,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  329,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  347,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  350,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  354,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  400,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  408,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  426,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  431,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  449,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  455,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  459,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  492,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  827,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  1721,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  1728,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  1774,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  1944,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  1947,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  2466,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  2888,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  2892,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  2896,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  2931,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/Simple_HierchyTool_Page_SceneOptimization.cs",
+                      "line":  2936,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/OBSOLUTE/Simple_HierchyTool_Page_ScriptBatchAttachment_Deprecated.cs",
+                      "line":  40,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/OBSOLUTE/Simple_HierchyTool_Page_ScriptBatchAttachment_Deprecated.cs",
+                      "line":  47,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/OBSOLUTE/Simple_HierchyTool_Page_ScriptBatchAttachment_Deprecated.cs",
+                      "line":  61,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/OBSOLUTE/Simple_HierchyTool_Page_ScriptBatchAttachment_Deprecated.cs",
+                      "line":  72,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/OBSOLUTE/Simple_HierchyTool_Page_ScriptBatchAttachment_Deprecated.cs",
+                      "line":  77,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow/HierchyTools/OBSOLUTE/Simple_HierchyTool_Page_ScriptBatchAttachment_Deprecated.cs",
+                      "line":  91,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SODataInfoWindow/ESSODataInfoWindow.cs",
+                      "line":  945,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/SODataInfoWindow/ESSODataInfoWindow.cs",
+                      "line":  1101,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESMenuTreeWindow/Tests/ESMenuTreeCommercialTests.cs",
+                      "line":  693,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESCommonExampleReadMeInstaller.cs",
+                      "line":  56,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESCommonExampleReadMeInstaller.cs",
+                      "line":  194,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESCommonExampleReadMeInstaller.cs",
+                      "line":  204,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESEditorThemeWindow.cs",
+                      "line":  322,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESGlobalEditorThemeMenu.cs",
+                      "line":  121,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESGlobalEditorThemeMenu.cs",
+                      "line":  148,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESPresentationBoundaryMenu.cs",
+                      "line":  41,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESPresentationBoundaryMenu.cs",
+                      "line":  47,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESPresentationBoundaryMenu.cs",
+                      "line":  104,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESPresentationBoundaryMenu.cs",
+                      "line":  133,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESPresentationBoundaryMenu.cs",
+                      "line":  158,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESPresentation/ESPresentationBoundaryMenu.cs",
+                      "line":  206,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetPipelineContracts.cs",
+                      "line":  332,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetPipelineContracts.cs",
+                      "line":  336,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetReleaseUploadWindow.cs",
+                      "line":  236,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESAssetReleaseUploadWindow.cs",
+                      "line":  275,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESEditorResourceSessionBootstrap.cs",
+                      "line":  266,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESEditorResourceSessionBootstrap.cs",
+                      "line":  294,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESEditorResourceSessionBootstrap.cs",
+                      "line":  726,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESEditorResourceSessionBootstrap.cs",
+                      "line":  857,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESEditorResourceSessionBootstrap.cs",
+                      "line":  1050,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESLevelAssetValidationGenerator.cs",
+                      "line":  71,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ESResourceCollectionWorkflowWindow.cs",
+                      "line":  2171,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ResourcePlan/Baking/ESResourcePlanConfigKeySynchronizer.cs",
+                      "line":  49,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ResourcePlan/Baking/ESResourcePlanConfigKeySynchronizer.cs",
+                      "line":  67,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ResourcePlan/Baking/ESResourcePlanGameCoreExpansion.cs",
+                      "line":  21,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/ResourcePlan/Baking/ESResourcePlanGameCoreExpansion.cs",
+                      "line":  26,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/Windows/ESResourceRuntimeMonitorWindow.cs",
+                      "line":  332,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/Windows/ESResourceRuntimeMonitorWindow.cs",
+                      "line":  337,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/Windows/ESResourceRuntimeMonitorWindow.cs",
+                      "line":  343,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/Windows/ESResourceRuntimeMonitorWindow.cs",
+                      "line":  541,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/Windows/ESResourceRuntimeMonitorWindow.cs",
+                      "line":  571,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESResPipeline/Windows/ESResourceRuntimeMonitorWindow.cs",
+                      "line":  614,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESShader/Tests/ESCompositeShaderContractTests.cs",
+                      "line":  4850,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESShader/Tests/ESCompositeShaderContractTests.cs",
+                      "line":  4852,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESSoTable/ESSoTableDataRuleAssetMenu.cs",
+                      "line":  21,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESSoTable/ESSoTableDataRuleAssetMenu.cs",
+                      "line":  64,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESCreateSkillWindow.cs",
+                      "line":  80,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESCreateSkillWindow.cs",
+                      "line":  86,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESCreateSkillWindow.cs",
+                      "line":  92,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESCreateSkillWindow.cs",
+                      "line":  105,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.cs",
+                      "line":  1340,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.cs",
+                      "line":  3225,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.cs",
+                      "line":  4709,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.cs",
+                      "line":  4720,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.cs",
+                      "line":  4736,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.cs",
+                      "line":  6277,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindow.cs",
+                      "line":  6295,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindowHelper.cs",
+                      "line":  427,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindowHelper.cs",
+                      "line":  463,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindowHelper.cs",
+                      "line":  476,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/ESTrackView/-TrackView-Define/ESTrackViewWindowHelper.cs",
+                      "line":  492,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  338,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  404,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  418,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  428,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  497,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  1404,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  2453,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  2530,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  2538,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  2614,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  2926,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  2959,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  3972,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  4189,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  5022,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Editor/Installer/ESInstaller.cs",
+                      "line":  5056,
+                      "category":  "system-or-progress"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/AIPreview/Editor/EditorToolCollection.cs",
+                      "line":  511,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/AIPreview/Editor/EditorToolCollection.cs",
+                      "line":  515,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/AIPreview/Editor/EditorToolCollection.cs",
+                      "line":  556,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/AIPreview/Editor/ResLibraryManagementWindow.cs",
+                      "line":  485,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/AIPreview/Editor/ResLibraryManagementWindow.cs",
+                      "line":  490,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  595,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  760,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  768,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  775,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  842,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  877,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1021,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1052,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1157,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1217,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1227,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1306,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1333,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1342,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1347,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1355,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1360,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1368,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1375,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2.cs",
+                      "line":  1503,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2_Part2.cs",
+                      "line":  258,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2_Part2.cs",
+                      "line":  322,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2_Part2.cs",
+                      "line":  377,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2_Part2.cs",
+                      "line":  385,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2_Part2.cs",
+                      "line":  392,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2_Part2.cs",
+                      "line":  479,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2_Part2.cs",
+                      "line":  517,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2_Part2.cs",
+                      "line":  590,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2_Part2.cs",
+                      "line":  867,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDevManagementWindow/ESDevManagementWindow_V2_Part2.cs",
+                      "line":  879,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDocWindow/ESDocReaderWindow.cs",
+                      "line":  624,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDocWindow/ESDocReaderWindow.cs",
+                      "line":  629,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDocWindow/ESDocReaderWindow.cs",
+                      "line":  659,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDocWindow/ESDocReaderWindow.cs",
+                      "line":  667,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDocWindow/ESDocumentComponents.cs",
+                      "line":  47,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDocWindow/ESDocumentComponents.cs",
+                      "line":  176,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDocWindow/ESDocumentComponents.cs",
+                      "line":  185,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDocWindow/ESDocWindow.cs",
+                      "line":  771,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDocWindow/ESDocWindow.cs",
+                      "line":  821,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDocWindow/ESDocWindow.cs",
+                      "line":  860,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorLegacy/ESDocWindow/ESDocWindow.cs",
+                      "line":  1269,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorTools_ScriptBatchAttachment/Simple_HierchyTool_Page_ScriptBatchAttachment_Deprecated.cs",
+                      "line":  39,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorTools_ScriptBatchAttachment/Simple_HierchyTool_Page_ScriptBatchAttachment_Deprecated.cs",
+                      "line":  46,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorTools_ScriptBatchAttachment/Simple_HierchyTool_Page_ScriptBatchAttachment_Deprecated.cs",
+                      "line":  60,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/EditorTools_ScriptBatchAttachment/Simple_HierchyTool_Page_ScriptBatchAttachment_Deprecated.cs",
+                      "line":  86,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPEditorTools.cs",
+                      "line":  128,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPEditorTools.cs",
+                      "line":  145,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPEditorTools.cs",
+                      "line":  153,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPEditorTools.cs",
+                      "line":  170,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPEditorTools.cs",
+                      "line":  178,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPEditorTools.cs",
+                      "line":  189,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPEditorTools.cs",
+                      "line":  248,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPEditorTools.cs",
+                      "line":  257,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPEditorTools.cs",
+                      "line":  266,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPEditorTools.cs",
+                      "line":  311,
+                      "category":  "business-or-editor-prompt"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  297,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  303,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  310,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  314,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  330,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  338,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  349,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  355,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  362,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  403,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  409,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  423,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  430,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  436,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  443,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  447,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  529,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  535,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ESVMCP.Editor/ESVMCPTestTool.cs",
+                      "line":  547,
+                      "category":  "test"
+                  },
+                  {
+                      "path":  "Assets/Plugins/ES/Obsolete/ResourceV1/Master/Shared/ResMaster.PathAndName.cs",
+                      "line":  399,
+                      "category":  "business-or-editor-prompt"
+                  }
+              ]
+}

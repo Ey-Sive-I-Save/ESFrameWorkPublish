@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "registryId": "es-file-projection-parsers.v1",
+  "parsers": [
+    { "parserId": "json-structure", "parserVersion": "1", "extensions": [".json"], "projectionKind": "document-structure", "mode": "external-authorized" },
+    { "parserId": "binary-structure", "parserVersion": "1", "extensions": [".bytes", ".bin", ".dat"], "projectionKind": "binary-structure", "mode": "external-authorized" }
+  ]
+}

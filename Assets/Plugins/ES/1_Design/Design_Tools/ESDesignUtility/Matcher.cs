@@ -330,7 +330,7 @@ namespace ES
             #region 序列化之二进制
 
             /// <summary>
-            /// 使用 BinaryFormatter 将对象序列化为字节数组 (注意安全风险)
+            /// 旧二进制序列化签名，仅为源码兼容保留；新代码使用 ToOdinBinary。
             /// </summary>
             [Obsolete("BinaryFormatter 已禁用。该入口仅保留兼容签名，请改用 ToOdinBinary。", false)]
             public static byte[] ToBinary(object obj)
@@ -339,7 +339,7 @@ namespace ES
                 return SerializationUtility.SerializeValue(obj, DataFormat.Binary);
             }
             /// <summary>
-            /// 使用 BinaryFormatter 从字节数组反序列化为对象 (注意安全风险)
+            /// 旧 BinaryFormatter 反序列化签名，仅为源码兼容保留且始终拒绝执行。
             /// </summary>
             [Obsolete("BinaryFormatter 反序列化已禁用。请使用 ESDesignUtility.Matcher.FromOdinBinary 或显式 JSON 协议。", false)]
             public static T FromBinary<T>(byte[] data) where T : class

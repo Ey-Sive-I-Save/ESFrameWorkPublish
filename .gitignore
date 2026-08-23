@@ -75,12 +75,43 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 /ES/Releases/PublishCheckout/
+/ES/Releases/Packages/
 
 # ES resource pipeline generated build/release artifacts. They are reproducible outputs,
 # not source assets; keeping them out of Git also avoids Windows maximum-path failures.
+/ES/ResourcePipeline/Baked/
+/ES/ResourcePipeline/BuildCache/
 /ES/ResourcePipeline/BuildStaging/
+/ES/ResourcePipeline/InitialTarget/
+/ES/ResourcePipeline/Planned/
 /ES/ResourcePipeline/Published/
-/ES/Output/
+/ES/ResourcePipeline/Releases/
+/ES/Output/*
+!/ES/Output/FileProjectionParsers.json
+!/ES/Output/ESEditorCommercialStaticReport.json
+!/ES/Output/EditorDialogMigrationInventory.json
+
+# ES automation runtime state and generated evidence. Contracts, schemas and
+# deterministic worker source and explicit RunRecord audit entries remain tracked.
+/ES/Automation/Temp/
+/ES/Automation/Processing/
+/ES/Automation/Output/
+
+# Local build, test and review outputs.
+/bin/
+/Artifacts/
+/TestResult.xml
+/~/
+/trace*.txt
+
+# Unity/IDE generated project caches.
+*.csproj.lscache
+
+# Snapshot archives are not live authority. Store intentional snapshots under
+# an explicitly versioned archive/release location instead.
+/Assets/Plugins/ES/*.zip
+/ES/*.zip
+/ES/Documentation/*.zip
 
 # External editor feedback source packs are kept out of Git. Built-in WAV schemes
 # are runtime-imported from outside Assets and tracked so fresh clones get them.

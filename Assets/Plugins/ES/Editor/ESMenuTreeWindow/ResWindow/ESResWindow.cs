@@ -21,6 +21,7 @@ namespace ES
 
     public class ESResWindow : ESOdinMenuTreeWindow<ESResWindow> //OdinMenuEditorWindow
     {
+        public override string ESWindow_PresentationShortTitle => "资源";
         public override bool UseScrollView => true;
         protected override string ESWindow_MigrationId => "resource.window";
 
@@ -690,7 +691,7 @@ namespace ES
                     EditorGUILayout.HelpBox("构建与 Consumer 准备已满足；下一步执行 4. 发布资源包。", MessageType.Info);
                     return;
                 }
-                EditorGUILayout.HelpBox("本地发布已通过；第五步将打开远端发布工作台。", MessageType.Info);
+                EditorGUILayout.HelpBox("本地发布已通过；第五步将打开远端发布工具。", MessageType.Info);
             }
 
             private static bool IsResourcePipelineBusy()
@@ -1009,7 +1010,7 @@ namespace ES
                 bool stageAllowed = pipelineStageStateAvailable && currentPipelineStageState.PublishPassed;
                 using (new EditorGUI.DisabledScope(pipelineBusy || !stageAllowed))
                 {
-                    if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "5. 打开远端发布工作台", GUILayout.Height(PipelineActionButtonHeight)))
+                    if (GUILayout.Button(pipelineBusy ? "任务执行中…" : "5. 打开远端发布工具", GUILayout.Height(PipelineActionButtonHeight)))
                         ESAssetReleaseUploadWindow.Open();
                 }
             }

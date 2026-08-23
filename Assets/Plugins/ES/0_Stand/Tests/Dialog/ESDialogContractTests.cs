@@ -107,6 +107,69 @@ namespace ES.Tests
             }
         }
 
+        [Test]
+        public void InvalidStableIdentityAndRoutingCombination_IsRejectedBeforeDispatch()
+        {
+            Assert.Throws<ArgumentException>(() => new ESDialogRequest
+            {
+                DialogId = "tests dialog with spaces"
+            }.CreateSnapshot());
+
+            Assert.Throws<ArgumentException>(() => new ESDialogRequest
+            {
+                DialogId = "tests.dialog.invalid-routing",
+                DuplicatePolicy = ESDialogDuplicatePolicy.AllowParallel,
+                QueueBehindActiveDialog = true,
+            }.CreateSnapshot());
+        }
+
+        [Test]
+        public void InitialFocusMustReferenceADeclaredField()
+        {
+            var request = new ESDialogRequest
+            {
+                DialogId = "tests.dialog.invalid-focus",
+                InitialFocusFieldId = "missing",
+            };
+            Assert.Throws<ArgumentException>(() => request.CreateSnapshot());
+        }
+
+        [Test]
+        public void MainWorkspaceFallbackSurvivesRequestSnapshot()
+        {
+            var request = new ESDialogRequest
+            {
+                DialogId = "tests.dialog.fallback-snapshot",
+                Title = "Fallback",
+                AllowMainWorkspaceFallback = true,
+            };
+
+            ESDialogRequest snapshot = request.CreateSnapshot();
+
+            Assert.IsTrue(snapshot.AllowMainWorkspaceFallback);
+            Assert.IsNull(snapshot.Owner);
+        }
+
+        [Test]
+        public void InfoModal_UsesExplicitModalPresenter()
+        {
+            var presenter = new ModalTestPresenter(ESDialogHost.Editor);
+            using (ESDialog.RegisterPresenter(presenter))
+            {
+                ESDialog.InfoModal(
+                    "tests.dialog.info-modal",
+                    "Information",
+                    "The message is presented through the shared modal contract.",
+                    host: ESDialogHost.Editor,
+                    allowMainWorkspaceFallback: true);
+
+                Assert.That(presenter.ModalCount, Is.EqualTo(1));
+                Assert.That(presenter.LastModalRequest.Host, Is.EqualTo(ESDialogHost.Editor));
+                Assert.That(presenter.LastModalRequest.AllowMainWorkspaceFallback, Is.True);
+                Assert.That(presenter.LastModalRequest.ShowCancel, Is.False);
+            }
+        }
+
         private sealed class TestPresenter : IESDialogPresenter
         {
             internal int ShowCount;
@@ -135,6 +198,40 @@ namespace ES.Tests
             public void Stop(ESDialogPresenterStopReason reason)
             {
                 StopCount++;
+            }
+        }
+
+        private sealed class ModalTestPresenter : IESDialogPresenter, IESDialogModalPresenter
+        {
+            internal int ModalCount;
+            internal ESDialogRequest LastModalRequest;
+
+            internal ModalTestPresenter(ESDialogHost host)
+            {
+                Host = host;
+            }
+
+            public ESDialogHost Host { get; }
+            public ESDialogCapabilities Capabilities => ESDialogCapabilities.AllCommon;
+
+            public Task<ESDialogResult> ShowAsync(
+                ESDialogRequest request,
+                CancellationToken cancellationToken)
+            {
+                return Task.FromResult(new ESDialogResult(
+                    ESDialogCompletion.Accepted,
+                    Host));
+            }
+
+            public ESDialogResult ShowModal(ESDialogRequest request)
+            {
+                ModalCount++;
+                LastModalRequest = request;
+                return new ESDialogResult(ESDialogCompletion.Accepted, Host);
+            }
+
+            public void Stop(ESDialogPresenterStopReason reason)
+            {
             }
         }
 

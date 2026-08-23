@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
@@ -279,7 +280,7 @@ namespace ES.EditorInternal.Tests
             {
                 goal = new ESAgentGenerationGoal
                 {
-                    title = "审查字体资产工作台",
+                    title = "审查字体资产工具",
                     objective = "描述希望 AICommand 或 Agent Skill 解决的问题。",
                     successCriteria = "生成结果可读、可验证、权限边界明确，并能通过人工 Diff Review。"
                 },
@@ -296,7 +297,7 @@ namespace ES.EditorInternal.Tests
                 Is.False);
             Assert.That(templateError, Does.Contain("模板/占位"));
 
-            template.goal.objective = "审查字体资产工作台的字体导入、预览和缺失引用。";
+            template.goal.objective = "审查字体资产工具的字体导入、预览和缺失引用。";
             template.goal.successCriteria = "字体资产问题均能定位并给出修复证据。";
             template.outputs[0].artifactName = "生成_新模块实现_AI命令";
             template.outputs[0].requirements = "实现通用模块并运行编译验证。";
@@ -315,7 +316,7 @@ namespace ES.EditorInternal.Tests
                     node.typeId == ESAgentGraphStableIds.GoalNode);
                 var goalPayload = new ESAgentGoalPayload
                 {
-                    title = "审查字体资产工作台",
+                    title = "审查字体资产工具",
                     objective = "审查字体导入、预览和缺失引用。",
                     successCriteria = "字体资产问题可以定位并给出修复证据。"
                 };
@@ -828,7 +829,7 @@ namespace ES.EditorInternal.Tests
             {
                 goal = new ESAgentGenerationGoal
                 {
-                    title = "审查字体资产工作台",
+                    title = "审查字体资产工具",
                     objective = "审查字体导入、预览和缺失引用。",
                     successCriteria = "字体资产问题均能定位并给出修复证据。"
                 },
@@ -836,8 +837,8 @@ namespace ES.EditorInternal.Tests
                 {
                     new ESAgentGenerationOutput
                     {
-                        artifactName = "审查_字体资产工作台_AI命令",
-                        requirements = "检查字体资产工作台的导入与引用状态。",
+                        artifactName = "审查_字体资产工具_AI命令",
+                        requirements = "检查字体资产工具的导入与引用状态。",
                         acceptanceCriteria = "字体预览、引用和缺失问题均有真实证据。"
                     }
                 }
@@ -1708,8 +1709,8 @@ namespace ES.EditorInternal.Tests
             try
             {
                 ESAgentAuthoringGraphPreset.Populate(graph);
-                Assert.That(graph.Nodes.Count, Is.EqualTo(6));
-                Assert.That(graph.Edges.Count, Is.EqualTo(6));
+                Assert.That(graph.Nodes.Count, Is.EqualTo(9));
+                Assert.That(graph.Edges.Count, Is.EqualTo(13));
                 List<ESGraphValidationIssue> issues = graph.ValidateGraph();
                 new ESAgentAuthoringGraphProfile().Validate(graph, issues);
                 Assert.That(issues.Any(IsError), Is.False, Describe(issues));
@@ -1718,6 +1719,10 @@ namespace ES.EditorInternal.Tests
                     out IReadOnlyList<ESGraphValidationIssue> bakeIssues), Is.True, Describe(bakeIssues));
                 Assert.That(spec.outputs.Select(item => item.artifactKind),
                     Is.EquivalentTo(new[] { ESAgentArtifactKind.AICommand, ESAgentArtifactKind.AgentSkill }));
+                Assert.That(spec.branches, Has.Length.EqualTo(1));
+                Assert.That(spec.branches[0].matchedTargetNodeIds, Has.Length.EqualTo(1));
+                Assert.That(spec.branches[0].defaultTargetNodeIds, Has.Length.EqualTo(1));
+                Assert.That(spec.branches[0].failureTargetNodeIds, Has.Length.EqualTo(1));
             }
             finally { Object.DestroyImmediate(graph); }
         }
@@ -1731,8 +1736,8 @@ namespace ES.EditorInternal.Tests
             try
             {
                 ESAgentAuthoringGraphPreset.Populate(graph, presetKind);
-                Assert.That(graph.Nodes.Count, Is.EqualTo(5));
-                Assert.That(graph.Edges.Count, Is.EqualTo(4));
+                Assert.That(graph.Nodes.Count, Is.EqualTo(8));
+                Assert.That(graph.Edges.Count, Is.EqualTo(9));
                 List<ESGraphValidationIssue> issues = graph.ValidateGraph();
                 new ESAgentAuthoringGraphProfile().Validate(graph, issues);
                 Assert.That(issues.Any(IsError), Is.False, Describe(issues));
@@ -1744,6 +1749,10 @@ namespace ES.EditorInternal.Tests
                     Is.EqualTo(expectedKind == ESAgentArtifactKind.AICommand));
                 Assert.That(spec.validations.Single().validateAgentSkill,
                     Is.EqualTo(expectedKind == ESAgentArtifactKind.AgentSkill));
+                Assert.That(spec.branches, Has.Length.EqualTo(1));
+                Assert.That(spec.branches[0].matchedTargetNodeIds, Has.Length.EqualTo(1));
+                Assert.That(spec.branches[0].defaultTargetNodeIds, Has.Length.EqualTo(1));
+                Assert.That(spec.branches[0].failureTargetNodeIds, Has.Length.EqualTo(1));
             }
             finally { Object.DestroyImmediate(graph); }
         }
@@ -1780,6 +1789,20 @@ namespace ES.EditorInternal.Tests
                     ESAgentConstraintKind.Permission,
                     ESAgentConstraintKind.Quality
                 }));
+                ESAgentAICommandOutputPayload command = JsonUtility.FromJson<ESAgentAICommandOutputPayload>(
+                    graph.Nodes.Single(node => node.typeId == ESAgentGraphStableIds.AICommandOutputNode)
+                        .payloadJson);
+                Assert.That(command.expectedInputs, Does.Contain("Graph References"));
+                Assert.That(command.allowedWriteScopes, Does.Contain("Graph Constraint"));
+                Assert.That(command.blockedHandling, Does.Contain("停止副作用"));
+                Assert.That(command.requiredEvidence, Does.Contain("Graph 关系"));
+                ESAgentSkillOutputPayload skill = JsonUtility.FromJson<ESAgentSkillOutputPayload>(
+                    graph.Nodes.Single(node => node.typeId == ESAgentGraphStableIds.AISkillOutputNode)
+                        .payloadJson);
+                Assert.That(skill.nonTriggerScenarios, Is.Not.Empty);
+                Assert.That(skill.inputContract, Does.Contain("需求图"));
+                Assert.That(skill.failureRecovery, Does.Contain("停止未开始的副作用"));
+                Assert.That(skill.permissionBoundary, Does.Contain("不从 Graph 关系推导新权限"));
             }
             finally { Object.DestroyImmediate(graph); }
         }
@@ -2893,7 +2916,7 @@ namespace ES.EditorInternal.Tests
                 node.typeId == ESAgentGraphStableIds.GoalNode);
             var goalPayload = new ESAgentGoalPayload
             {
-                title = "审查字体资产工作台",
+                title = "审查字体资产工具",
                 objective = "审查字体导入、预览和缺失引用。",
                 successCriteria = "字体资产问题可以定位并给出修复证据。"
             };
@@ -3208,7 +3231,7 @@ namespace ES.EditorInternal.Tests
         [TestCase(ESAgentAuthoringPresetKind.AgentSkillOnly)]
         [TestCase(ESAgentAuthoringPresetKind.MindMapPaired)]
         [TestCase(ESAgentAuthoringPresetKind.SceneScanReview)]
-        [TestCase(ESAgentAuthoringPresetKind.AISkillMultiPortWorkflow)]
+        [TestCase(ESAgentAuthoringPresetKind.SceneQualityReview)]
         public void AgentAuthoring_AllBuiltInTemplatesBakeThroughTheirDeclaredMode(
             ESAgentAuthoringPresetKind kind)
         {
@@ -3221,7 +3244,7 @@ namespace ES.EditorInternal.Tests
                     out IESBakedGraphPlan plan, out List<ESGraphValidationIssue> issues),
                     Is.True, Describe(issues));
                 bool executionTemplate = kind == ESAgentAuthoringPresetKind.SceneScanReview
-                    || kind == ESAgentAuthoringPresetKind.AISkillMultiPortWorkflow;
+                    || kind == ESAgentAuthoringPresetKind.SceneQualityReview;
                 Assert.That(plan is ESAISkillExecutionSpec, Is.EqualTo(executionTemplate));
                 Assert.That(plan is ESAgentArtifactGenerationSpec, Is.EqualTo(!executionTemplate));
             }
@@ -3236,32 +3259,62 @@ namespace ES.EditorInternal.Tests
         [TestCase(ESAgentAuthoringPresetKind.AgentSkillOnly)]
         [TestCase(ESAgentAuthoringPresetKind.MindMapPaired)]
         [TestCase(ESAgentAuthoringPresetKind.SceneScanReview)]
-        [TestCase(ESAgentAuthoringPresetKind.AISkillMultiPortWorkflow)]
-        public void AgentAuthoring_AllBuiltInTemplatesUseAConnectedMultiEndpointNode(
+        [TestCase(ESAgentAuthoringPresetKind.SceneQualityReview)]
+        public void AgentAuthoring_AllBuiltInTemplatesUseRepresentativeRoutedOutcomes(
             ESAgentAuthoringPresetKind kind)
         {
             ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
             try
             {
                 ESAgentAuthoringGraphPreset.Populate(graph, kind);
-                ESGraphNodeRecord multiEndpointNode = graph.Nodes.FirstOrDefault(node =>
-                {
-                    ESGraphNodeTopology topology =
-                        ESGraphTopologyAnalyzer.Analyze(node, graph.Nodes, graph.Edges);
-                    if (!topology.IsMultiEndpointNode)
-                        return false;
-                    int connectedInputs = topology.Endpoints.Count(endpoint =>
-                        endpoint.Direction == ESGraphPortDirection.Input
-                        && endpoint.ConnectionCount > 0);
-                    int connectedOutputs = topology.Endpoints.Count(endpoint =>
-                        endpoint.Direction == ESGraphPortDirection.Output
-                        && endpoint.ConnectionCount > 0);
-                    return connectedInputs >= 2 || connectedOutputs >= 2;
-                });
+                bool executionTemplate = kind == ESAgentAuthoringPresetKind.SceneScanReview
+                    || kind == ESAgentAuthoringPresetKind.SceneQualityReview;
+                string ownerTypeId = executionTemplate
+                    ? ESAgentGraphStableIds.SkillTaskNode
+                    : ESAgentGraphStableIds.BranchNode;
+                string[] routeKeys = executionTemplate
+                    ? new[]
+                    {
+                        ESAgentGraphStableIds.SkillSuccessPortKey,
+                        ESAgentGraphStableIds.SkillFailurePortKey,
+                        ESAgentGraphStableIds.SkillTimeoutPortKey,
+                        ESAgentGraphStableIds.SkillCancelledPortKey
+                    }
+                    : new[]
+                    {
+                        ESAgentGraphStableIds.BranchMatchedPortKey,
+                        ESAgentGraphStableIds.BranchDefaultPortKey,
+                        ESAgentGraphStableIds.BranchFailurePortKey
+                    };
+                ESGraphNodeRecord outcomeOwner = graph.Nodes.Single(node =>
+                    node.typeId == ownerTypeId);
+                ESGraphNodeTopology topology =
+                    ESGraphTopologyAnalyzer.Analyze(outcomeOwner, graph.Nodes, graph.Edges);
+                Assert.That(topology.IsMultiEndpointNode, Is.True,
+                    kind + " 模板的业务结果节点必须拥有多个独立稳定端点。");
 
-                Assert.That(multiEndpointNode, Is.Not.Null,
-                    kind + " 模板必须实际连接同一节点上至少两个不同语义端点，"
-                    + "不能用同一 Multi 端口的多条连线冒充多端点。");
+                var routedTargetNodeIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (string routeKey in routeKeys)
+                {
+                    Assert.That(outcomeOwner.TryGetPort(routeKey,
+                        out ESGraphPortRecord routePort), Is.True,
+                        kind + " 模板缺少业务结果端点：" + routeKey);
+                    Assert.That(routePort.capacity, Is.EqualTo(executionTemplate
+                            ? ESGraphPortCapacity.Single
+                            : ESGraphPortCapacity.Multi),
+                        executionTemplate
+                            ? "互斥执行结果必须各自使用独立 Single 端点。"
+                            : "生成决策端点可以分发给多条约束，但容量不能代替独立结果端点。" );
+                    ESGraphEdgeRecord[] routes = graph.Edges.Where(edge =>
+                        edge.outputPortId == routePort.portId).ToArray();
+                    Assert.That(routes, Has.Length.EqualTo(1),
+                        kind + " 模板的每个业务结果必须且只能路由到一个明确目标：" + routeKey);
+                    Assert.That(graph.TryFindPort(routes[0].inputPortId,
+                        out ESGraphNodeRecord targetNode, out _), Is.True);
+                    routedTargetNodeIds.Add(targetNode.nodeId);
+                }
+                Assert.That(routedTargetNodeIds.Count, Is.EqualTo(routeKeys.Length),
+                    kind + " 模板不能把不同业务结果回接到同一目标来伪装多端口。");
             }
             finally
             {
@@ -3358,14 +3411,14 @@ namespace ES.EditorInternal.Tests
         }
 
         [Test]
-        public void AISkillExecution_MultiPortTemplateBakesCompleteEndpointContract()
+        public void AISkillExecution_SceneQualityReviewUsesBusinessOutcomesBeforeTopologyFeatures()
         {
             ESGraphAssetBase graph = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
             try
             {
-                ESAgentAuthoringGraphPreset.PopulateAISkillMultiPortWorkflow(graph);
+                ESAgentAuthoringGraphPreset.PopulateSceneQualityReview(graph);
                 Assert.That(graph.Nodes.Count, Is.EqualTo(10));
-                Assert.That(graph.Edges.Count, Is.EqualTo(19));
+                Assert.That(graph.Edges.Count, Is.EqualTo(18));
 
                 ESGraphNodeRecord input = graph.Nodes.Single(node =>
                     node.typeId == ESAgentGraphStableIds.SkillInputNode);
@@ -3381,34 +3434,48 @@ namespace ES.EditorInternal.Tests
                 Assert.That(taskTopology.InputEndpointCount, Is.EqualTo(2));
                 Assert.That(taskTopology.OutputEndpointCount, Is.EqualTo(5));
                 Assert.That(taskTopology.IsMultiEndpointNode, Is.True,
-                    "Task 的多个独立稳定端点是该模板的多端口事实。");
+                    "Task 的成功、失败、超时、取消和值结果是实际执行合同，不是展示性端口。");
+                Assert.That(task.TryGetPort(ESAgentGraphStableIds.SkillRunResultPortKey,
+                    out ESGraphPortRecord resultPort), Is.True);
+                Assert.That(resultPort.capacity, Is.EqualTo(ESGraphPortCapacity.Multi));
+                Assert.That(graph.Edges.Count(edge => edge.outputPortId == resultPort.portId),
+                    Is.EqualTo(8), "同一个结果端点可以服务审查与终态，这是单端口多连接。" );
 
-                ESGraphNodeRecord fanOut = graph.Nodes.Single(node =>
-                    node.typeId == ESAgentGraphStableIds.SkillFanOutNode);
-                ESGraphNodeTopology fanOutTopology =
-                    ESGraphTopologyAnalyzer.Analyze(fanOut, graph.Nodes, graph.Edges);
-                Assert.That(fanOut.ports.Single(port =>
-                    port.stableKey == ESAgentGraphStableIds.SkillFanOutPortKey).capacity,
-                    Is.EqualTo(ESGraphPortCapacity.Multi));
-                Assert.That(fanOutTopology.OutputEndpointCount, Is.EqualTo(1));
-                Assert.That(fanOutTopology.OutputConnectionCount, Is.EqualTo(2));
-                Assert.That(fanOutTopology.HasMultipleOutputEndpoints, Is.False,
-                    "FanOut 是单个 Multi 容量出口的多连接，不是多输出端口。");
-                ESGraphNodeRecord join = graph.Nodes.Single(node =>
-                    node.typeId == ESAgentGraphStableIds.SkillJoinNode);
-                ESGraphNodeTopology joinTopology =
-                    ESGraphTopologyAnalyzer.Analyze(join, graph.Nodes, graph.Edges);
-                Assert.That(join.ports.Single(port =>
-                    port.stableKey == ESGraphBuiltInPortKeys.Input).capacity,
-                    Is.EqualTo(ESGraphPortCapacity.Multi));
-                Assert.That(joinTopology.InputEndpointCount, Is.EqualTo(1));
-                Assert.That(joinTopology.InputConnectionCount, Is.EqualTo(4));
-                Assert.That(joinTopology.HasMultipleInputEndpoints, Is.False,
-                    "Join 是单个 Multi 容量入口的多连接，不是多输入端口。");
+                ESGraphNodeRecord contentReview = graph.Nodes.Single(node =>
+                    node.title == "内容完整性审查");
+                ESGraphNodeRecord evidenceReview = graph.Nodes.Single(node =>
+                    node.title == "证据完整性审查");
+                ESGraphNodeRecord contentRejected = graph.Nodes.Single(node =>
+                    node.title == "内容审查未通过的扫描结果");
+                ESGraphNodeRecord evidenceRejected = graph.Nodes.Single(node =>
+                    node.title == "证据审查未通过的扫描结果");
+                ESGraphNodeRecord completed = graph.Nodes.Single(node =>
+                    node.title == "双审通过的扫描结果");
+
+                Assert.That(contentReview.TryGetPort(ESAgentGraphStableIds.SkillApprovedPortKey,
+                    out ESGraphPortRecord contentApprovedPort), Is.True);
+                Assert.That(contentReview.TryGetPort(ESAgentGraphStableIds.SkillRejectedPortKey,
+                    out ESGraphPortRecord contentRejectedPort), Is.True);
+                Assert.That(evidenceReview.TryGetPort(ESAgentGraphStableIds.SkillApprovedPortKey,
+                    out ESGraphPortRecord evidenceApprovedPort), Is.True);
+                Assert.That(evidenceReview.TryGetPort(ESAgentGraphStableIds.SkillRejectedPortKey,
+                    out ESGraphPortRecord evidenceRejectedPort), Is.True);
+                Assert.That(graph.Edges.Single(edge => edge.outputPortId == contentApprovedPort.portId)
+                    .inputPortId, Is.EqualTo(evidenceReview.ports.Single(port =>
+                        port.stableKey == ESGraphBuiltInPortKeys.Input).portId));
+                Assert.That(graph.Edges.Single(edge => edge.outputPortId == contentRejectedPort.portId)
+                    .inputPortId, Is.EqualTo(contentRejected.ports.Single(port =>
+                        port.stableKey == ESGraphBuiltInPortKeys.Input).portId));
+                Assert.That(graph.Edges.Single(edge => edge.outputPortId == evidenceApprovedPort.portId)
+                    .inputPortId, Is.EqualTo(completed.ports.Single(port =>
+                        port.stableKey == ESGraphBuiltInPortKeys.Input).portId));
+                Assert.That(graph.Edges.Single(edge => edge.outputPortId == evidenceRejectedPort.portId)
+                    .inputPortId, Is.EqualTo(evidenceRejected.ports.Single(port =>
+                        port.stableKey == ESGraphBuiltInPortKeys.Input).portId));
 
                 ESGraphNodeRecord[] outputs = graph.Nodes.Where(node =>
                     node.typeId == ESAgentGraphStableIds.SkillOutputNode).ToArray();
-                Assert.That(outputs.Length, Is.EqualTo(4));
+                Assert.That(outputs.Length, Is.EqualTo(6));
                 Assert.That(outputs.All(node => node.ports.Count == 2
                     && node.ports.All(port => port.direction == ESGraphPortDirection.Input)),
                     Is.True, "结构化终态必须是只接收控制和值的纯输入节点。");
@@ -3423,38 +3490,16 @@ namespace ES.EditorInternal.Tests
                     Describe(executionIssues));
                 Assert.That(spec.schemaVersion,
                     Is.EqualTo(ESAISkillExecutionSpec.CurrentSchemaVersion));
-                Assert.That(spec.controlEdges.Length, Is.EqualTo(12));
-                Assert.That(spec.dataBindings.Length, Is.EqualTo(7));
-                Assert.That(spec.fanOutJoinPairs.Length, Is.EqualTo(1));
-                Assert.That(spec.fanOutJoinPairs[0].fanOutNodeId, Is.EqualTo(fanOut.nodeId));
-                Assert.That(spec.fanOutJoinPairs[0].joinNodeId, Is.EqualTo(join.nodeId));
+                Assert.That(spec.skillId, Is.EqualTo("es.skill.scene-quality-review"));
+                Assert.That(spec.controlEdges.Length, Is.EqualTo(9));
+                Assert.That(spec.dataBindings.Length, Is.EqualTo(9));
+                Assert.That(spec.fanOutJoinPairs, Is.Empty,
+                    "用户模板不应为展示 FanOut/Join 而改变审查通过与拒绝的业务语义。");
                 Assert.That(spec.steps.All(step => step.ports.Length == graph.Nodes
                     .Single(node => node.nodeId == step.nodeId).ports.Count), Is.True,
                     "Bake 必须保留每个节点的完整稳定端口合同。");
                 Assert.That(ESAISkillExecutionBaker.TryValidateSpec(spec,
                     out string validationError), Is.True, validationError);
-
-                string bakedJoinId = spec.fanOutJoinPairs[0].joinId;
-                spec.fanOutJoinPairs[0].joinId = "tampered-join";
-                Assert.That(ESAISkillExecutionBaker.TryValidateSpec(spec,
-                    out string tamperedError), Is.False);
-                Assert.That(tamperedError, Does.Contain("配对"));
-
-                spec.fanOutJoinPairs[0].joinId = bakedJoinId;
-                ESAISkillFanOutJoinPair pair = spec.fanOutJoinPairs[0];
-                spec.fanOutJoinPairs = spec.fanOutJoinPairs.Concat(new[]
-                {
-                    new ESAISkillFanOutJoinPair
-                    {
-                        fanOutNodeId = pair.fanOutNodeId,
-                        fanOutId = pair.fanOutId,
-                        joinNodeId = pair.joinNodeId,
-                        joinId = pair.joinId
-                    }
-                }).ToArray();
-                Assert.That(ESAISkillExecutionBaker.TryValidateSpec(spec,
-                    out string duplicatePairError), Is.False);
-                Assert.That(duplicatePairError, Does.Contain("配对"));
             }
             finally
             {
@@ -3753,6 +3798,432 @@ namespace ES.EditorInternal.Tests
             {
                 Object.DestroyImmediate(graph);
             }
+        }
+
+        [Test]
+        public void AISkillExecution_TaskFailureBuildsStructuredTerminalResult()
+        {
+            var record = new ESAISkillStepRunRecord
+            {
+                invocationId = "invocation-1",
+                childRunId = "run-1"
+            };
+            var source = new JObject
+            {
+                ["failureCode"] = "EnvironmentUnavailable"
+            };
+
+            JObject terminal = ESAISkillExecutionCoordinator.BuildTaskTerminalData(
+                record, "Blocked", "环境不可用", source);
+
+            Assert.That(terminal.Value<string>("status"), Is.EqualTo("Blocked"));
+            Assert.That(terminal.Value<string>("message"), Is.EqualTo("环境不可用"));
+            Assert.That(terminal.Value<string>("runId"), Is.EqualTo("run-1"));
+            Assert.That(terminal.Value<string>("invocationId"), Is.EqualTo("invocation-1"));
+            Assert.That(terminal.Value<string>("failureCode"),
+                Is.EqualTo("EnvironmentUnavailable"));
+            Assert.That(source.Property("status"), Is.Null,
+                "终态归一化不得回写 Automation 返回的原始数据对象。");
+        }
+
+        [Test]
+        public void AISkillApprovalEvidenceDetailIncludesPathsHashesAndStepIdentity()
+        {
+            var evidence = new ESAISkillApprovalEvidenceSnapshot("submission-run", 4,
+                "evidence-run", "approval-node", 2,
+                Array.Empty<ESAISkillApprovalEvidenceBindingSnapshot>(),
+                new[]
+                {
+                    new ESAISkillApprovalEvidenceItemSnapshot("evidence-run", "scene-scan-task",
+                        -1, 1, "invocation", "scene-scan-run",
+                        "2026-08-16T01:23:45.0000000Z", "F:/Reports/scene-scan.json", "hash-json"),
+                    new ESAISkillApprovalEvidenceItemSnapshot("evidence-run", "scene-scan-task",
+                        -1, 1, "invocation", "scene-scan-run",
+                        "2026-08-16T01:23:45.0000000Z", "F:/Reports/scene-scan.md", "hash-md")
+                });
+
+            string detail = ESStableGraphInspector.BuildAISkillApprovalEvidenceDetail(evidence);
+
+            Assert.That(detail, Does.Contain("F:/Reports/scene-scan.json"));
+            Assert.That(detail, Does.Contain("hash-json"));
+            Assert.That(detail, Does.Contain("F:/Reports/scene-scan.md"));
+            Assert.That(detail, Does.Contain("hash-md"));
+            Assert.That(detail, Does.Contain("scene-scan-task"));
+            Assert.That(detail, Does.Contain("scene-scan-run"));
+        }
+
+        [Test]
+        public void AISkillApprovalEvidenceDetailBoundsVisibleArtifacts()
+        {
+            var evidence = new ESAISkillApprovalEvidenceSnapshot("submission-run", 1,
+                "evidence-run", "approval-node", 1,
+                Array.Empty<ESAISkillApprovalEvidenceBindingSnapshot>(),
+                Enumerable.Range(1, 7).Select(index =>
+                    new ESAISkillApprovalEvidenceItemSnapshot("evidence-run", "bulk-task",
+                        -1, 1, string.Empty, string.Empty, string.Empty,
+                        "F:/Reports/report-" + index + ".json", "hash-" + index)));
+
+            string detail = ESStableGraphInspector.BuildAISkillApprovalEvidenceDetail(evidence);
+
+            Assert.That(detail, Does.Contain("report-5.json"));
+            Assert.That(detail, Does.Not.Contain("report-6.json"));
+            Assert.That(detail, Does.Contain("其余 2 个产物"));
+        }
+
+        [Test]
+        public void AISkillApprovalEvidenceSnapshotUsesOnlyApprovalBoundSources()
+        {
+            ESAISkillWorkflowRun run = CreateApprovalEvidenceRun(out string firstTaskId,
+                out string secondTaskId, out string approvalId);
+            try
+            {
+                run.spec.dataBindings = new[]
+                {
+                    CreateApprovalBinding(firstTaskId, approvalId, 0, ESGraphPortAggregation.Auto)
+                };
+                SetApprovalArtifact(run, firstTaskId, "bound.md", "bound");
+                SetApprovalArtifact(run, secondTaskId, "newer-unbound.md", "unbound");
+
+                Assert.That(ESAISkillExecutionCoordinator.TryCreateApprovalEvidenceSnapshot(run,
+                    out ESAISkillApprovalEvidenceSnapshot snapshot, out string error), Is.True, error);
+                Assert.That(snapshot.CanApprove, Is.True, snapshot.EvidenceError);
+                Assert.That(snapshot.Items.Select(item => Path.GetFileName(item.SourceArtifactPath)),
+                    Is.EqualTo(new[] { "bound.md" }));
+                Assert.That(snapshot.Items.All(item => item.ArtifactPath.StartsWith(
+                    Path.Combine(ESAISkillExecutionCoordinator.RunsRoot, run.runId),
+                    StringComparison.OrdinalIgnoreCase)), Is.True);
+                Assert.That(snapshot.Bindings, Has.Count.EqualTo(1));
+            }
+            finally { CleanupApprovalEvidenceTestFiles(run); }
+        }
+
+        [Test]
+        public void AISkillApprovalEvidenceSnapshotKeepsAllOrderedAggregateBindings()
+        {
+            ESAISkillWorkflowRun run = CreateApprovalEvidenceRun(out string firstTaskId,
+                out string secondTaskId, out string approvalId);
+            try
+            {
+                run.spec.dataBindings = new[]
+                {
+                    CreateApprovalBinding(secondTaskId, approvalId, 2, ESGraphPortAggregation.Named),
+                    CreateApprovalBinding(firstTaskId, approvalId, 1, ESGraphPortAggregation.Ordered)
+                };
+                SetApprovalArtifact(run, firstTaskId, "first.json", "first");
+                SetApprovalArtifact(run, secondTaskId, "second.json", "second");
+
+                Assert.That(ESAISkillExecutionCoordinator.TryCreateApprovalEvidenceSnapshot(run,
+                    out ESAISkillApprovalEvidenceSnapshot snapshot, out string error), Is.True, error);
+                Assert.That(snapshot.Bindings.Select(binding => binding.Order), Is.EqualTo(new[] { 1, 2 }));
+                Assert.That(snapshot.Items.Select(item => Path.GetFileName(item.SourceArtifactPath)),
+                    Is.EquivalentTo(new[] { "first.json", "second.json" }));
+            }
+            finally { CleanupApprovalEvidenceTestFiles(run); }
+        }
+
+        [Test]
+        public void AISkillApprovalEvidenceSnapshotUsesIterationRecordsAndFreezesGeneration()
+        {
+            ESAISkillWorkflowRun run = CreateApprovalEvidenceRun(out string firstTaskId,
+                out _, out string approvalId);
+            try
+            {
+                run.spec.dataBindings = new[]
+                {
+                    CreateApprovalBinding(firstTaskId, approvalId, 0, ESGraphPortAggregation.Auto)
+                };
+                ESAISkillStepRunRecord step = FindRunStep(run, firstTaskId);
+                string iterationPath = CreateApprovalArtifact(run, "iteration-3.md", "iteration");
+                step.artifacts = new[] { CreateApprovalArtifact(run, "stale-top-level.md", "stale") };
+                step.outputHashes = new[] { ComputeFileHash(step.artifacts[0]) };
+                step.iterations.Add(new ESAISkillIterationRunRecord
+                {
+                    index = 3,
+                    attemptCount = 2,
+                    invocationId = "iteration-invocation",
+                    artifacts = new[] { iterationPath },
+                    outputHashes = new[] { ComputeFileHash(iterationPath) }
+                });
+
+                Assert.That(ESAISkillExecutionCoordinator.TryCreateApprovalEvidenceSnapshot(run,
+                    out ESAISkillApprovalEvidenceSnapshot snapshot, out string error), Is.True, error);
+                int frozenGeneration = snapshot.SubmissionGeneration;
+                run.approvalGeneration++;
+
+                Assert.That(snapshot.SubmissionGeneration, Is.EqualTo(frozenGeneration));
+                Assert.That(snapshot.Items, Has.Count.EqualTo(1));
+                Assert.That(Path.GetFileName(snapshot.Items[0].SourceArtifactPath),
+                    Is.EqualTo("iteration-3.md"));
+                Assert.That(snapshot.Items[0].IterationIndex, Is.EqualTo(3));
+                Assert.That(snapshot.Items[0].AttemptCount, Is.EqualTo(2));
+            }
+            finally { CleanupApprovalEvidenceTestFiles(run); }
+        }
+
+        [Test]
+        public void AISkillApprovalEvidence_DataBindingExcludesDifferentControlPredecessor()
+        {
+            ESAISkillWorkflowRun run = CreateApprovalEvidenceRun(out string boundTaskId,
+                out string controlTaskId, out string approvalId);
+            try
+            {
+                run.spec.dataBindings = new[]
+                {
+                    CreateApprovalBinding(boundTaskId, approvalId, 0, ESGraphPortAggregation.Auto)
+                };
+                run.spec.controlEdges = new[] { CreateApprovalControlEdge(controlTaskId, approvalId) };
+                SetApprovalArtifact(run, boundTaskId, "bound-authority.md", "bound");
+                SetApprovalArtifact(run, controlTaskId, "control-only.md", "control");
+
+                Assert.That(ESAISkillExecutionCoordinator.TryCreateApprovalEvidenceSnapshot(run,
+                    out ESAISkillApprovalEvidenceSnapshot snapshot, out string error), Is.True, error);
+                Assert.That(snapshot.Items.Select(item => Path.GetFileName(item.SourceArtifactPath)),
+                    Is.EqualTo(new[] { "bound-authority.md" }));
+            }
+            finally { CleanupApprovalEvidenceTestFiles(run); }
+        }
+
+        [Test]
+        public void AISkillApprovalEvidence_ControlFlowFallbackRequiresExplicitMode()
+        {
+            ESAISkillWorkflowRun run = CreateApprovalEvidenceRun(out string taskId,
+                out _, out string approvalId);
+            try
+            {
+                run.spec.dataBindings = Array.Empty<ESAISkillDataBinding>();
+                run.spec.controlEdges = new[] { CreateApprovalControlEdge(taskId, approvalId) };
+                SetApprovalArtifact(run, taskId, "control.md", "control");
+
+                Assert.That(ESAISkillExecutionCoordinator.TryCreateApprovalEvidenceSnapshot(run,
+                    out ESAISkillApprovalEvidenceSnapshot blocked, out _), Is.True);
+                Assert.That(blocked.CanApprove, Is.False);
+                Assert.That(blocked.EvidenceError, Does.Contain("无绑定证据"));
+
+                FindApprovalStep(run).approval.evidenceMode =
+                    ESAISkillApprovalEvidenceMode.ControlFlowFallback;
+                Assert.That(ESAISkillExecutionCoordinator.TryCreateApprovalEvidenceSnapshot(run,
+                    out ESAISkillApprovalEvidenceSnapshot allowed, out string error), Is.True, error);
+                Assert.That(allowed.CanApprove, Is.True, allowed.EvidenceError);
+                Assert.That(Path.GetFileName(allowed.Items.Single().SourceArtifactPath),
+                    Is.EqualTo("control.md"));
+            }
+            finally { CleanupApprovalEvidenceTestFiles(run); }
+        }
+
+        [Test]
+        public void AISkillApprovalEvidence_SourceChangesBeforeCopyFailsSnapshotCapture()
+        {
+            ESAISkillWorkflowRun run = CreateApprovalEvidenceRun(out string taskId,
+                out _, out string approvalId);
+            try
+            {
+                run.spec.dataBindings = new[]
+                {
+                    CreateApprovalBinding(taskId, approvalId, 0, ESGraphPortAggregation.Auto)
+                };
+                SetApprovalArtifact(run, taskId, "changing.md", "before");
+                ESAISkillExecutionCoordinator.Internal_ApprovalEvidenceBeforeCopyTestHook =
+                    (source, _) => File.WriteAllText(source, "after", new UTF8Encoding(false));
+
+                Assert.That(ESAISkillExecutionCoordinator.TryCreateApprovalEvidenceSnapshot(run,
+                    out ESAISkillApprovalEvidenceSnapshot snapshot, out _), Is.True);
+                Assert.That(snapshot.CanApprove, Is.False);
+                Assert.That(snapshot.EvidenceError, Does.Contain("Hash"));
+            }
+            finally
+            {
+                ESAISkillExecutionCoordinator.Internal_ApprovalEvidenceBeforeCopyTestHook = null;
+                CleanupApprovalEvidenceTestFiles(run);
+            }
+        }
+
+        [TestCase("")]
+        [TestCase("not-a-sha256")]
+        public void AISkillApprovalEvidence_InvalidOutputHashBlocksApprovalButAllowsReject(string hash)
+        {
+            ESAISkillWorkflowRun run = CreateApprovalEvidenceRun(out string taskId,
+                out _, out string approvalId);
+            try
+            {
+                run.spec.dataBindings = new[]
+                {
+                    CreateApprovalBinding(taskId, approvalId, 0, ESGraphPortAggregation.Auto)
+                };
+                string path = CreateApprovalArtifact(run, "invalid-hash.md", "content");
+                FindRunStep(run, taskId).artifacts = new[] { path };
+                FindRunStep(run, taskId).outputHashes = new[] { hash };
+                Assert.That(ESAISkillExecutionCoordinator.TryCreateApprovalEvidenceSnapshot(run,
+                    out ESAISkillApprovalEvidenceSnapshot snapshot, out _), Is.True);
+                Assert.That(snapshot.CanApprove, Is.False);
+
+                ESAISkillExecutionCoordinator.Internal_RegisterApprovalTestRun(run);
+                Assert.That(ESAISkillExecutionCoordinator.TryApprove(run.runId,
+                    run.approvalGeneration, true, string.Empty, out string approveError), Is.False);
+                Assert.That(approveError, Does.Contain("证据"));
+                Assert.That(ESAISkillExecutionCoordinator.TryApprove(run.runId,
+                    run.approvalGeneration, false, "证据无效", out string rejectError),
+                    Is.True, rejectError);
+            }
+            finally
+            {
+                ESAISkillExecutionCoordinator.Internal_RemoveApprovalTestRun(run);
+                CleanupApprovalEvidenceTestFiles(run);
+            }
+        }
+
+        [Test]
+        public void AISkillApprovalEvidence_TamperedApprovalCopyFailsValidation()
+        {
+            ESAISkillWorkflowRun run = CreateApprovalEvidenceRun(out string taskId,
+                out _, out string approvalId);
+            try
+            {
+                run.spec.dataBindings = new[]
+                {
+                    CreateApprovalBinding(taskId, approvalId, 0, ESGraphPortAggregation.Auto)
+                };
+                SetApprovalArtifact(run, taskId, "evidence.md", "trusted");
+                Assert.That(ESAISkillExecutionCoordinator.TryCreateApprovalEvidenceSnapshot(run,
+                    out ESAISkillApprovalEvidenceSnapshot snapshot, out string error), Is.True, error);
+
+                File.AppendAllText(snapshot.Items.Single().ArtifactPath, "tampered",
+                    new UTF8Encoding(false));
+                Assert.That(ESAISkillExecutionCoordinator.TryValidateApprovalEvidence(run,
+                    run.approvalGeneration, out string validationError), Is.False);
+                Assert.That(validationError, Does.Contain("Hash"));
+            }
+            finally { CleanupApprovalEvidenceTestFiles(run); }
+        }
+
+        [Test]
+        public void AISkillRetryClearsTransientTopLevelEvidenceButKeepsIterationHistory()
+        {
+            var iteration = new ESAISkillIterationRunRecord
+            {
+                index = 1,
+                artifacts = new[] { "F:/Reports/iteration-history.md" },
+                outputHashes = new[] { "iteration-history-hash" }
+            };
+            var record = new ESAISkillStepRunRecord
+            {
+                exitCode = 9,
+                diagnostics = new[] { "old diagnostic" },
+                artifacts = new[] { "F:/Reports/stale-top-level.md" },
+                outputHashes = new[] { "stale-hash" },
+                iterations = new List<ESAISkillIterationRunRecord> { iteration }
+            };
+
+            ESAISkillExecutionCoordinator.ClearCurrentAttemptTransientOutput(record);
+
+            Assert.That(record.exitCode, Is.EqualTo(-1));
+            Assert.That(record.diagnostics, Is.Empty);
+            Assert.That(record.artifacts, Is.Empty);
+            Assert.That(record.outputHashes, Is.Empty);
+            Assert.That(record.iterations, Is.EqualTo(new[] { iteration }));
+            Assert.That(record.iterations[0].artifacts,
+                Is.EqualTo(new[] { "F:/Reports/iteration-history.md" }));
+            Assert.That(Newtonsoft.Json.JsonConvert.SerializeObject(
+                    new ESAISkillIterationRunRecord { index = 1 }),
+                Does.Not.Contain("\"attemptCount\""),
+                "默认尝试号必须从 JSON 与状态 Hash 输入中省略，保持旧 RunRecord 兼容。");
+        }
+
+        private static ESAISkillWorkflowRun CreateApprovalEvidenceRun(out string firstTaskId,
+            out string secondTaskId, out string approvalId)
+        {
+            firstTaskId = ESGraphIdentity.NewId();
+            secondTaskId = ESGraphIdentity.NewId();
+            approvalId = ESGraphIdentity.NewId();
+            return new ESAISkillWorkflowRun
+            {
+                runId = ESGraphIdentity.NewId(),
+                status = "WaitingApproval",
+                currentNodeId = approvalId,
+                approvalGeneration = 7,
+                spec = new ESAISkillExecutionSpec
+                {
+                    steps = new[]
+                    {
+                        new ESAISkillExecutionStep { nodeId = firstTaskId, task = new ESAISkillTaskPayload() },
+                        new ESAISkillExecutionStep { nodeId = secondTaskId, task = new ESAISkillTaskPayload() },
+                        new ESAISkillExecutionStep { nodeId = approvalId, approval = new ESAISkillApprovalPayload() }
+                    }
+                },
+                steps = new List<ESAISkillStepRunRecord>
+                {
+                    new ESAISkillStepRunRecord { nodeId = firstTaskId, status = "Completed", attemptCount = 1 },
+                    new ESAISkillStepRunRecord { nodeId = secondTaskId, status = "Completed", attemptCount = 1 },
+                    new ESAISkillStepRunRecord { nodeId = approvalId, status = "WaitingApproval" }
+                }
+            };
+        }
+
+        private static ESAISkillDataBinding CreateApprovalBinding(string sourceNodeId,
+            string approvalId, int order, ESGraphPortAggregation aggregation)
+            => new ESAISkillDataBinding
+            {
+                edgeId = ESGraphIdentity.NewId(),
+                order = order,
+                sourceNodeId = sourceNodeId,
+                sourcePortId = ESGraphIdentity.NewId(),
+                targetNodeId = approvalId,
+                targetPortId = ESGraphIdentity.NewId(),
+                targetAggregation = aggregation
+            };
+
+        private static ESAISkillStepRunRecord FindRunStep(ESAISkillWorkflowRun run, string nodeId)
+            => run.steps.Single(step => string.Equals(step.nodeId, nodeId, StringComparison.Ordinal));
+
+        private static ESAISkillExecutionStep FindApprovalStep(ESAISkillWorkflowRun run)
+            => run.spec.steps.Single(step => step.approval != null);
+
+        private static ESAISkillControlEdge CreateApprovalControlEdge(string sourceNodeId,
+            string approvalId)
+            => new ESAISkillControlEdge
+            {
+                edgeId = ESGraphIdentity.NewId(),
+                sourceNodeId = sourceNodeId,
+                sourcePortId = ESGraphIdentity.NewId(),
+                targetNodeId = approvalId,
+                targetPortId = ESGraphIdentity.NewId()
+            };
+
+        private static void SetApprovalArtifact(ESAISkillWorkflowRun run, string nodeId,
+            string fileName, string content)
+        {
+            string path = CreateApprovalArtifact(run, fileName, content);
+            ESAISkillStepRunRecord step = FindRunStep(run, nodeId);
+            step.artifacts = new[] { path };
+            step.outputHashes = new[] { ComputeFileHash(path) };
+        }
+
+        private static string CreateApprovalArtifact(ESAISkillWorkflowRun run, string fileName,
+            string content)
+        {
+            string directory = Path.Combine(ESAutomationPathPolicy.TempRoot, "Tests",
+                "ApprovalEvidence", run.runId);
+            Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory, fileName);
+            File.WriteAllText(path, content, new UTF8Encoding(false));
+            return path;
+        }
+
+        private static string ComputeFileHash(string path)
+        {
+            using (FileStream stream = File.OpenRead(path))
+            using (SHA256 sha = SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", string.Empty)
+                    .ToLowerInvariant();
+        }
+
+        private static void CleanupApprovalEvidenceTestFiles(ESAISkillWorkflowRun run)
+        {
+            if (run == null) return;
+            string sourceDirectory = Path.Combine(ESAutomationPathPolicy.TempRoot, "Tests",
+                "ApprovalEvidence", run.runId);
+            string runDirectory = Path.Combine(ESAISkillExecutionCoordinator.RunsRoot, run.runId);
+            if (Directory.Exists(sourceDirectory)) Directory.Delete(sourceDirectory, true);
+            if (Directory.Exists(runDirectory)) Directory.Delete(runDirectory, true);
         }
 
         [Test]

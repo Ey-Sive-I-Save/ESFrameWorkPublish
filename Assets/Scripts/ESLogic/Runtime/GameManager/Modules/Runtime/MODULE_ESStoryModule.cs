@@ -23,7 +23,7 @@ namespace ES
         [NonSerialized] private readonly Dictionary<string, ESStoryInstance> instances = new Dictionary<string, ESStoryInstance>(StringComparer.Ordinal);
         [NonSerialized] private readonly Dictionary<string, ESQuestRecord> questRecords = new Dictionary<string, ESQuestRecord>(StringComparer.Ordinal);
         [NonSerialized] private readonly Queue<ESStoryInstance> foregroundQueue = new Queue<ESStoryInstance>();
-        [NonSerialized] private readonly List<string> diagnostics = new List<string>(MaxDiagnostics);
+        [NonSerialized] private readonly ESRingBuffer<string> diagnostics = new ESRingBuffer<string>(MaxDiagnostics);
         [NonSerialized] private IESStoryDialoguePresenter presenter;
         [NonSerialized] private ESStoryInstance foreground;
         [NonSerialized] private int nextSessionGeneration;
@@ -635,8 +635,8 @@ namespace ES
 
         private void RecordDiagnostic(string message)
         {
-            if (diagnostics.Count == MaxDiagnostics) diagnostics.RemoveAt(0);
-            diagnostics.Add(message != null && message.Length > 256 ? message.Substring(0, 256) : message);
+            string diagnostic = message != null && message.Length > 256 ? message.Substring(0, 256) : message;
+            diagnostics.EnqueueOverwrite(diagnostic, out _);
         }
 
         public override void OnDestroy()

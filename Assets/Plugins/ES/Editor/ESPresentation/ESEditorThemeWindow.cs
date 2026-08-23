@@ -5,12 +5,13 @@ using UnityEngine;
 namespace ES.EditorInternal
 {
     /// <summary>
-    /// Project theme workbench. It edits the shared ESGlobalEditorTheme asset directly and keeps
+    /// Project theme editor. It edits the shared ESGlobalEditorTheme asset directly and keeps
     /// a small live preview beside the real configuration fields.
     /// </summary>
     public sealed class ESEditorThemeWindow : ESSinglePageIMGUIWindow<ESEditorThemeWindow>
     {
-        private const string WindowMenuPath = MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/打开主题工作台";
+        private const string WindowMenuPath = MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/打开主题设置";
+        private static readonly Vector2 MaximumWindowSize = new Vector2(1400f, 1200f);
         private static readonly Dictionary<string, GUIContent> PropertyLabels =
             new Dictionary<string, GUIContent>
             {
@@ -61,6 +62,7 @@ namespace ES.EditorInternal
             var window = GetWindow<ESEditorThemeWindow>();
             window.titleContent = new GUIContent("ES 编辑器主题");
             window.minSize = new Vector2(440f, 520f);
+            window.maxSize = MaximumWindowSize;
             window.Show();
         }
 
@@ -68,6 +70,7 @@ namespace ES.EditorInternal
         {
             return new GUIContent("ES 编辑器主题", "编辑项目共享色板、密度、字体边界与动效配置");
         }
+        public override string ESWindow_PresentationShortTitle => "主题";
 
         protected override string ESWindow_Subtitle => "项目共享 Presentation 与全局皮肤配置";
         protected override Vector2 ESWindow_MinSize => new Vector2(440f, 520f);
@@ -109,6 +112,8 @@ namespace ES.EditorInternal
 
         protected override void ESWindow_OnHostEnable()
         {
+            minSize = ESWindow_MinSize;
+            maxSize = MaximumWindowSize;
             previewFeedbackStartedAt = EditorApplication.timeSinceStartup;
             RefreshTheme();
             RefreshDeepSkinStatus();

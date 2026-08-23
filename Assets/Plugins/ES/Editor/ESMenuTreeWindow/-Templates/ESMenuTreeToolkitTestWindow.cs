@@ -3,6 +3,7 @@ using Sirenix.Utilities.Editor;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
@@ -15,6 +16,8 @@ namespace ES
     /// </summary>
     public sealed class ESMenuTreeToolkitTestWindow : ESMenuTreeWindow<ESMenuTreeToolkitTestWindow>
     {
+        public override string ESWindow_PresentationShortTitle => "测试";
+
         private const string RuntimePanelId = "runtime.injected.panel";
         private const string RuntimePanelOwnerId = "test.menu.runtime-panel";
 
@@ -1119,6 +1122,8 @@ namespace ES
     /// <summary>验证不创建菜单树时仍可使用统一 ES 页面外壳和完整生命周期。</summary>
     public sealed class ESSinglePageToolkitTestWindow : ESSinglePageWindow<ESSinglePageToolkitTestWindow>
     {
+        public override string ESWindow_PresentationShortTitle => "单页";
+
         [NonSerialized] private ESMenuTreePageContext activeContext;
         [NonSerialized] private Label lifecycleLabel;
         [NonSerialized] private Toggle advancedToggle;
@@ -1330,14 +1335,81 @@ namespace ES
         }
     }
 
-    /// <summary>显式压力测试入口：分帧打开 21 个低风险窗口并验证半休眠网格。</summary>
+    internal sealed class ESWindowSleepBenchmarkProbeWindow : EditorWindow,
+        IESWindowMultiInstanceContract
+    {
+        string IESWindowMultiInstanceContract.ESWindow_MultiInstanceCoordinatorId
+            => nameof(ESWindowSemiSleepStressTest);
+
+        [SerializeField] private int probeIndex;
+
+        internal void Configure(int index)
+        {
+            probeIndex = index;
+            titleContent = new GUIContent($"休眠探针 {index + 1:000}");
+        }
+
+        private void CreateGUI()
+        {
+            rootVisualElement.Clear();
+            rootVisualElement.style.flexDirection = FlexDirection.Column;
+            rootVisualElement.style.paddingLeft = 8f;
+            rootVisualElement.style.paddingRight = 8f;
+            rootVisualElement.style.paddingTop = 6f;
+            rootVisualElement.style.paddingBottom = 6f;
+
+            var header = new VisualElement
+            {
+                name = "ESWindowSleepBenchmarkHeader"
+            };
+            header.style.flexDirection = FlexDirection.Row;
+            header.style.alignItems = Align.Center;
+            header.Add(new Label($"窗口休眠规模探针 {probeIndex + 1:000}")
+            {
+                pickingMode = PickingMode.Ignore
+            });
+
+            var systemActions = new VisualElement
+            {
+                name = "ESWindowSleepBenchmarkSystemActions"
+            };
+            systemActions.style.flexDirection = FlexDirection.Row;
+            systemActions.style.alignItems = Align.Center;
+            systemActions.style.marginLeft = 6f;
+            header.Add(systemActions);
+            rootVisualElement.Add(header);
+            rootVisualElement.Add(new Label("仅承载 Editor update、原生位置提交与 Repaint 规模采样。")
+            {
+                pickingMode = PickingMode.Ignore
+            });
+
+            ESWindowFoundation.Bind(
+                this,
+                new ESWindowActionHosts(system: systemActions),
+                allowSemiSleep: true);
+        }
+
+        private void OnDisable()
+        {
+            ESWindowFoundation.Unbind(this);
+        }
+
+        private void OnDestroy()
+        {
+            ESWindowFoundation.Unbind(this, true);
+        }
+    }
+
+    /// <summary>显式压力测试入口：分帧打开窗口并验证半休眠网格与 update 规模。</summary>
     public static class ESWindowSemiSleepStressTest
     {
         private const int WindowCount = 21;
+        private const double BenchmarkDurationSeconds = 8d;
         private const int Columns = 5;
         private const int Rows = (WindowCount + Columns - 1) / Columns;
         private const float SleepSize = 100f;
         private const float Margin = 18f;
+        private static readonly int[] PerformanceWindowCounts = { 20, 50, 100 };
 
         private sealed class WindowSpec
         {
@@ -1363,8 +1435,8 @@ namespace ES
             new WindowSpec("ES.ESAssetPackageBakeWindow, ES_Editor", "资产包分离"),
             new WindowSpec("ES.ESMenuTreeToolkitTestWindow, ES_Editor", "Toolkit MenuTree"),
             new WindowSpec("ES.ESSinglePageToolkitTestWindow, ES_Editor", "Toolkit 单页"),
-            new WindowSpec("ES.ESFontToolsWindow, ES_Editor", "字体资产工作台"),
-            new WindowSpec("ES.ESLocalizationToolsWindow, ES_Editor", "本地化工作台"),
+            new WindowSpec("ES.ESFontToolsWindow, ES_Editor", "字体资产工具"),
+            new WindowSpec("ES.ESLocalizationToolsWindow, ES_Editor", "本地化工具"),
             new WindowSpec("ES.SimpleToolsWindow, ES_Editor", "简单工具集"),
             new WindowSpec("ES.ESAssetReleaseUploadWindow, ES_Editor", "发布计划查看"),
             new WindowSpec("ES.ESEditorFeedbackSoundSchemeWindow, ES_Editor", "编辑器音效方案"),
@@ -1377,10 +1449,18 @@ namespace ES
         };
 
         private static readonly List<EditorWindow> OpenedWindows = new List<EditorWindow>(WindowCount);
+        private static MethodInfo hasOpenInstancesMethod;
         private static int nextWindowIndex;
         private static double nextOpenAt;
+        private static int benchmarkWindowCount;
+        private static double benchmarkEndsAt;
+        private static bool benchmarkSampling;
+        private static ES.EditorInternal.ESWindowSemiSleepPerformanceSample lastPerformanceSample;
 
         internal static int ConfiguredWindowCount => WindowSpecs.Length;
+        internal static IReadOnlyList<int> ConfiguredPerformanceWindowCounts => PerformanceWindowCounts;
+        internal static ES.EditorInternal.ESWindowSemiSleepPerformanceSample LastPerformanceSample =>
+            lastPerformanceSample;
 
         [MenuItem("【ES】/验证与诊断/测试与验收/编辑器窗口/打开 21 个半休眠窗口", false, 9170)]
         private static void OpenTwentyOneSemiSleepWindows()
@@ -1392,16 +1472,165 @@ namespace ES
             }
 
             StopOpeningQueue();
-            OpenedWindows.Clear();
+            CloseOpenedWindows();
             nextWindowIndex = 0;
             nextOpenAt = 0d;
-            ES.EditorInternal.ESEditorPresentation.SetSemiSleepEnabled(true);
             EditorApplication.update -= OpenNextWindow;
             EditorApplication.update += OpenNextWindow;
             AssemblyReloadEvents.beforeAssemblyReload -= StopOpeningQueue;
             AssemblyReloadEvents.beforeAssemblyReload += StopOpeningQueue;
             EditorApplication.quitting -= StopOpeningQueue;
             EditorApplication.quitting += StopOpeningQueue;
+        }
+
+        [MenuItem("【ES】/验证与诊断/测试与验收/编辑器窗口/性能采样 20 窗口", false, 9171)]
+        private static void BenchmarkTwentyWindows()
+        {
+            BeginPerformanceBenchmark(20);
+        }
+
+        [MenuItem("【ES】/验证与诊断/测试与验收/编辑器窗口/性能采样 50 窗口", false, 9172)]
+        private static void BenchmarkFiftyWindows()
+        {
+            BeginPerformanceBenchmark(50);
+        }
+
+        [MenuItem("【ES】/验证与诊断/测试与验收/编辑器窗口/性能采样 100 窗口", false, 9173)]
+        private static void BenchmarkOneHundredWindows()
+        {
+            BeginPerformanceBenchmark(100);
+        }
+
+        [MenuItem("【ES】/验证与诊断/测试与验收/编辑器窗口/关闭窗口休眠压力测试", false, 9174)]
+        private static void CloseStressWindows()
+        {
+            StopOpeningQueue();
+            CloseOpenedWindows();
+        }
+
+        private static void BeginPerformanceBenchmark(int windowCount)
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                EditorUtility.DisplayDialog("无法开始性能采样", "请先退出 PlayMode。", "关闭");
+                return;
+            }
+            if (!PerformanceWindowCounts.Contains(windowCount))
+                throw new ArgumentOutOfRangeException(nameof(windowCount));
+
+            StopOpeningQueue();
+            CloseOpenedWindows();
+            benchmarkWindowCount = windowCount;
+            nextWindowIndex = 0;
+            nextOpenAt = 0d;
+            benchmarkEndsAt = 0d;
+            benchmarkSampling = false;
+            EditorApplication.update -= UpdatePerformanceBenchmark;
+            EditorApplication.update += UpdatePerformanceBenchmark;
+            AssemblyReloadEvents.beforeAssemblyReload -= StopOpeningQueue;
+            AssemblyReloadEvents.beforeAssemblyReload += StopOpeningQueue;
+            EditorApplication.quitting -= StopOpeningQueue;
+            EditorApplication.quitting += StopOpeningQueue;
+            Debug.Log($"[ESWindowSemiSleepStressTest] 开始 {windowCount} 窗口性能采样；"
+                      + "探针会分帧打开、完成休眠与页签晋级后自动关闭。");
+        }
+
+        private static void UpdatePerformanceBenchmark()
+        {
+            double now = EditorApplication.timeSinceStartup;
+            if (!benchmarkSampling)
+            {
+                if (now < nextOpenAt)
+                    return;
+                if (nextWindowIndex < benchmarkWindowCount)
+                {
+                    OpenNextBenchmarkWindow(nextWindowIndex++);
+                    nextOpenAt = now + 0.025d;
+                    return;
+                }
+
+                BeginBenchmarkSample(now);
+                return;
+            }
+
+            if (now < benchmarkEndsAt)
+                return;
+            CompletePerformanceBenchmark();
+        }
+
+        private static void OpenNextBenchmarkWindow(int index)
+        {
+            try
+            {
+                ESWindowSleepBenchmarkProbeWindow window =
+                    ScriptableObject.CreateInstance<ESWindowSleepBenchmarkProbeWindow>();
+                window.Configure(index);
+                window.position = BuildBenchmarkAwakeBounds(
+                    EditorGUIUtility.GetMainWindowPosition(),
+                    index,
+                    benchmarkWindowCount);
+                window.Show();
+                OpenedWindows.Add(window);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("[ESWindowSemiSleepStressTest] 探针窗口打开失败：\n" + exception);
+            }
+        }
+
+        private static void BeginBenchmarkSample(double now)
+        {
+            Rect mainBounds = EditorGUIUtility.GetMainWindowPosition();
+            OpenedWindows.RemoveAll(window => window == null);
+            for (int i = 0; i < OpenedWindows.Count; i++)
+            {
+                EditorWindow window = OpenedWindows[i];
+                TryPrepareWindowForSleep(
+                    window,
+                    BuildSleepBounds(mainBounds, i, benchmarkWindowCount),
+                    allowTestProbeOverride: true);
+            }
+
+            SceneView sceneView = SceneView.lastActiveSceneView ?? EditorWindow.GetWindow<SceneView>();
+            sceneView.Focus();
+            ES.EditorInternal.ESEditorPresentation.BeginSemiSleepPerformanceSample();
+            int sleeping = OpenedWindows.Count(window =>
+                window != null
+                && ES.EditorInternal.ESEditorPresentation.RequestWindowSemiSleep(window));
+            benchmarkSampling = true;
+            benchmarkEndsAt = now + BenchmarkDurationSeconds;
+            Debug.Log($"[ESWindowSemiSleepStressTest] {OpenedWindows.Count}/{benchmarkWindowCount} 个探针已打开，"
+                      + $"{sleeping} 个开始休眠；采样 {BenchmarkDurationSeconds:0.#} 秒。");
+        }
+
+        private static void CompletePerformanceBenchmark()
+        {
+            lastPerformanceSample =
+                ES.EditorInternal.ESEditorPresentation.EndSemiSleepPerformanceSample();
+            int requested = benchmarkWindowCount;
+            int opened = OpenedWindows.Count(window => window != null);
+            benchmarkSampling = false;
+            benchmarkWindowCount = 0;
+            benchmarkEndsAt = 0d;
+            StopOpeningQueue();
+            CloseOpenedWindows();
+
+            Debug.Log(
+                "[ESWindowSemiSleepStressTest] 性能采样完成"
+                + $" | requested={requested}"
+                + $" | opened={opened}"
+                + $" | globalBoundAtStop={lastPerformanceSample.BoundWindowCount}"
+                + $" | duration={lastPerformanceSample.SampleDurationSeconds:0.000}s"
+                + $" | updates={lastPerformanceSample.UpdateCount}"
+                + $" | bindingVisits={lastPerformanceSample.BindingVisitCount}"
+                + $" | avgUpdate={lastPerformanceSample.AverageUpdateMicroseconds:0.000}us"
+                + $" | maxUpdate={lastPerformanceSample.MaximumUpdateMicroseconds:0.000}us"
+                + $" | allocated={lastPerformanceSample.UpdateAllocatedBytes}B"
+                + $" | avgAllocated={lastPerformanceSample.AverageAllocatedBytesPerUpdate:0.000}B/update"
+                + $" | maxAllocated={lastPerformanceSample.MaximumAllocatedBytesPerUpdate}B/update"
+                + $" | nativeCommits={lastPerformanceSample.NativePositionCommitCount}"
+                + $" | repaints={lastPerformanceSample.RepaintRequestCount}"
+                + " | profilerMarker=ES.Editor.WindowSleep.Update");
         }
 
         private static void OpenNextWindow()
@@ -1426,7 +1655,16 @@ namespace ES
 
             try
             {
-                EditorWindow window = ScriptableObject.CreateInstance(windowType) as EditorWindow;
+                if (HasOpenWindowInstance(windowType))
+                {
+                    Debug.LogWarning(
+                        "[ESWindowSemiSleepStressTest] 已跳过现有窗口，禁止为测试创建同类型副本："
+                        + spec.Title);
+                    nextOpenAt = EditorApplication.timeSinceStartup + 0.08d;
+                    return;
+                }
+
+                EditorWindow window = EditorWindow.GetWindow(windowType);
                 if (window == null)
                     throw new InvalidOperationException("无法创建 EditorWindow 实例。");
                 window.titleContent = new GUIContent($"{index + 1:00} · {spec.Title}");
@@ -1446,20 +1684,90 @@ namespace ES
             StopOpeningQueue();
             Rect mainBounds = EditorGUIUtility.GetMainWindowPosition();
             OpenedWindows.RemoveAll(window => window == null);
+            int preparedWindowCount = 0;
             for (int i = 0; i < OpenedWindows.Count; i++)
             {
                 EditorWindow window = OpenedWindows[i];
-                ES.EditorInternal.ESEditorPresentation.BindWindow(window, true);
-                ES.EditorInternal.ESEditorPresentation.SetWindowPinned(window, false);
-                ES.EditorInternal.ESEditorPresentation.SetWindowSemiSleepAllowed(window, true);
-                ES.EditorInternal.ESEditorPresentation.SetWindowSemiSleepDockBounds(
-                    window,
-                    BuildSleepBounds(mainBounds, i));
+                if (TryPrepareWindowForSleep(
+                        window,
+                        BuildCommercialEdgeBounds(mainBounds, i, OpenedWindows.Count),
+                        allowTestProbeOverride: false))
+                {
+                    preparedWindowCount++;
+                }
             }
 
             SceneView sceneView = SceneView.lastActiveSceneView ?? EditorWindow.GetWindow<SceneView>();
             sceneView.Focus();
+            Debug.Log(
+                "[ESWindowSemiSleepStressTest] 商业实机环境"
+                + $" | productionHosts={preparedWindowCount}/{OpenedWindows.Count}"
+                + $" | mainBounds={mainBounds}"
+                + $" | negativeCoordinates={mainBounds.x < 0f || mainBounds.y < 0f}"
+                + $" | pixelsPerPoint={EditorGUIUtility.pixelsPerPoint:0.###}"
+                + " | edgeLayout=Left,Right,Top,Bottom"
+                + " | narrowHosts="
+                + ((OpenedWindows.Count + 3) / 4));
             EditorApplication.delayCall += RequestAllWindowsSleep;
+        }
+
+        private static bool TryPrepareWindowForSleep(
+            EditorWindow window,
+            Rect dockBounds,
+            bool allowTestProbeOverride)
+        {
+            if (window == null || !ESWindowFoundation.IsBound(window))
+            {
+                Debug.LogWarning(
+                    "[ESWindowSemiSleepStressTest] 跳过未接入 ES Presentation 的窗口："
+                    + (window == null ? "<null>" : window.GetType().FullName));
+                return false;
+            }
+            if (!ESWindowFoundation.IsWindowSleepSupported(window))
+            {
+                Debug.LogWarning(
+                    "[ESWindowSemiSleepStressTest] 跳过未声明半休眠能力的窗口："
+                    + window.GetType().FullName);
+                return false;
+            }
+            if (allowTestProbeOverride)
+            {
+                ESWindowFoundation.TrySetWindowSleepAllowed(window, true);
+                ESWindowFoundation.TrySetWindowAutoSleepEnabled(window, true);
+            }
+            else if (!ESWindowFoundation.IsWindowSemiSleepAllowed(window))
+            {
+                Debug.LogWarning(
+                    "[ESWindowSemiSleepStressTest] 跳过用户已关闭半休眠的窗口："
+                    + window.GetType().FullName);
+                return false;
+            }
+
+            return ES.EditorInternal.ESEditorPresentation.SetWindowSemiSleepDockBounds(
+                window,
+                dockBounds);
+        }
+
+        private static bool HasOpenWindowInstance(Type windowType)
+        {
+            if (windowType == null || !typeof(EditorWindow).IsAssignableFrom(windowType))
+                return false;
+            if (hasOpenInstancesMethod == null)
+            {
+                hasOpenInstancesMethod = typeof(EditorWindow)
+                    .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .FirstOrDefault(method => method.Name == nameof(EditorWindow.HasOpenInstances)
+                        && method.IsGenericMethodDefinition
+                        && method.GetParameters().Length == 0);
+            }
+            if (hasOpenInstancesMethod == null)
+                throw new MissingMethodException(
+                    typeof(EditorWindow).FullName,
+                    nameof(EditorWindow.HasOpenInstances));
+
+            return (bool)hasOpenInstancesMethod
+                .MakeGenericMethod(windowType)
+                .Invoke(null, null);
         }
 
         private static void RequestAllWindowsSleep()
@@ -1473,25 +1781,61 @@ namespace ES
 
         internal static Rect BuildSleepBounds(Rect mainBounds, int index)
         {
-            int safeIndex = Mathf.Clamp(index, 0, WindowCount - 1);
-            int column = safeIndex % Columns;
-            int row = safeIndex / Columns;
+            return BuildSleepBounds(mainBounds, index, WindowCount);
+        }
+
+        internal static Rect BuildSleepBounds(Rect mainBounds, int index, int windowCount)
+        {
+            int safeCount = Mathf.Max(1, windowCount);
+            int safeIndex = Mathf.Clamp(index, 0, safeCount - 1);
+            int columns = Mathf.Max(1, Mathf.CeilToInt(Mathf.Sqrt(safeCount)));
+            int rows = Mathf.Max(1, Mathf.CeilToInt(safeCount / (float)columns));
+            int column = safeIndex % columns;
+            int row = safeIndex / columns;
             float left = mainBounds.x + Margin;
             float top = mainBounds.y + Margin;
             float width = Mathf.Max(SleepSize, mainBounds.width - Margin * 2f);
             float height = Mathf.Max(SleepSize, mainBounds.height - Margin * 2f);
-            float x = Columns <= 1
+            float x = columns <= 1
                 ? left
-                : Mathf.Lerp(left, left + width - SleepSize, column / (float)(Columns - 1));
-            float y = Rows <= 1
+                : Mathf.Lerp(left, left + width - SleepSize, column / (float)(columns - 1));
+            float y = rows <= 1
                 ? top
-                : Mathf.Lerp(top, top + height - SleepSize, row / (float)(Rows - 1));
+                : Mathf.Lerp(top, top + height - SleepSize, row / (float)(rows - 1));
             return new Rect(x, y, SleepSize, SleepSize);
+        }
+
+        internal static Rect BuildCommercialEdgeBounds(Rect mainBounds, int index, int windowCount)
+        {
+            int safeCount = Mathf.Max(1, windowCount);
+            int safeIndex = Mathf.Clamp(index, 0, safeCount - 1);
+            int edge = safeIndex % 4;
+            int slot = safeIndex / 4;
+            int countOnEdge = Mathf.Max(1, Mathf.CeilToInt((safeCount - edge) / 4f));
+            float progress = countOnEdge <= 1 ? 0.5f : slot / (float)(countOnEdge - 1);
+            float left = mainBounds.x + Margin;
+            float right = mainBounds.xMax - Margin - SleepSize;
+            float top = mainBounds.y + Margin;
+            float bottom = mainBounds.yMax - Margin - SleepSize;
+
+            switch (edge)
+            {
+                case 0:
+                    return new Rect(left, Mathf.Lerp(top, bottom, progress), SleepSize, SleepSize);
+                case 1:
+                    return new Rect(right, Mathf.Lerp(top, bottom, progress), SleepSize, SleepSize);
+                case 2:
+                    return new Rect(Mathf.Lerp(left, right, progress), top, SleepSize, SleepSize);
+                default:
+                    return new Rect(Mathf.Lerp(left, right, progress), bottom, SleepSize, SleepSize);
+            }
         }
 
         private static Rect BuildAwakeBounds(Rect mainBounds, int index)
         {
-            float width = Mathf.Clamp(mainBounds.width * 0.44f, 620f, 920f);
+            float width = index % 4 == 0
+                ? Mathf.Min(360f, Mathf.Max(240f, mainBounds.width - Margin * 2f))
+                : Mathf.Clamp(mainBounds.width * 0.44f, 620f, 920f);
             float height = Mathf.Clamp(mainBounds.height * 0.58f, 480f, 720f);
             int column = index % Columns;
             int row = index / Columns;
@@ -1504,11 +1848,65 @@ namespace ES
                 height);
         }
 
+        private static Rect BuildBenchmarkAwakeBounds(Rect mainBounds, int index, int windowCount)
+        {
+            const float width = 360f;
+            const float height = 180f;
+            int safeCount = Mathf.Max(1, windowCount);
+            int columns = Mathf.Max(1, Mathf.CeilToInt(Mathf.Sqrt(safeCount)));
+            int rows = Mathf.Max(1, Mathf.CeilToInt(safeCount / (float)columns));
+            int column = Mathf.Clamp(index, 0, safeCount - 1) % columns;
+            int row = Mathf.Clamp(index, 0, safeCount - 1) / columns;
+            float xRange = Mathf.Max(0f, mainBounds.width - width - Margin * 2f);
+            float yRange = Mathf.Max(0f, mainBounds.height - height - Margin * 2f);
+            return new Rect(
+                mainBounds.x + Margin + xRange * column / Mathf.Max(1, columns - 1),
+                mainBounds.y + Margin + yRange * row / Mathf.Max(1, rows - 1),
+                width,
+                height);
+        }
+
         private static void StopOpeningQueue()
         {
+            bool closeBenchmarkProbes = benchmarkWindowCount > 0;
             EditorApplication.update -= OpenNextWindow;
+            EditorApplication.update -= UpdatePerformanceBenchmark;
             AssemblyReloadEvents.beforeAssemblyReload -= StopOpeningQueue;
             EditorApplication.quitting -= StopOpeningQueue;
+            if (benchmarkSampling)
+            {
+                lastPerformanceSample =
+                    ES.EditorInternal.ESEditorPresentation.EndSemiSleepPerformanceSample();
+                benchmarkSampling = false;
+            }
+            benchmarkWindowCount = 0;
+            benchmarkEndsAt = 0d;
+            if (closeBenchmarkProbes)
+                CloseBenchmarkProbeWindows();
+        }
+
+        private static void CloseOpenedWindows()
+        {
+            for (int i = OpenedWindows.Count - 1; i >= 0; i--)
+            {
+                EditorWindow window = OpenedWindows[i];
+                if (window != null)
+                    window.Close();
+            }
+            OpenedWindows.Clear();
+        }
+
+        private static void CloseBenchmarkProbeWindows()
+        {
+            ESWindowSleepBenchmarkProbeWindow[] probes =
+                Resources.FindObjectsOfTypeAll<ESWindowSleepBenchmarkProbeWindow>();
+            foreach (ESWindowSleepBenchmarkProbeWindow probe in probes)
+            {
+                if (probe != null)
+                    probe.Close();
+            }
+            OpenedWindows.RemoveAll(window =>
+                window == null || window is ESWindowSleepBenchmarkProbeWindow);
         }
     }
 }

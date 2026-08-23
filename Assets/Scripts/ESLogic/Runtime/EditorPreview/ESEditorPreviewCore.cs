@@ -25,6 +25,7 @@ namespace ES
 
     public readonly struct ESEditorPreviewCameraPose
     {
+        /// <summary>最终用于渲染的世界坐标中心。</summary>
         public readonly Vector3 Center;
         public readonly float Radius;
         public readonly float Yaw;
@@ -38,6 +39,442 @@ namespace ES
             Yaw = yaw;
             Pitch = pitch;
             Zoom = Mathf.Max(0.05f, zoom);
+        }
+    }
+
+    public enum ESEditorPreviewViewportInputResult
+    {
+        None,
+        Orbit,
+        Pan,
+        Zoom
+    }
+
+    /// <summary>
+    /// 与具体窗口无关的预览轨道视角。FocusLocal 始终位于 RenderContext 的 PreviewLocal 空间，
+    /// 不允许业务页自行叠加 GroupOrigin。
+    /// </summary>
+    public sealed class ESEditorPreviewOrbitView
+    {
+        public const float MinimumZoom = 0.05f;
+
+        public Vector3 FocusLocal { get; private set; }
+        public float Radius { get; private set; } = 2.5f;
+        public float Zoom { get; private set; } = 1f;
+        public float Yaw { get; private set; } = 35f;
+        public float Pitch { get; private set; } = 18f;
+
+        public void Reset(Vector3 focusLocal, float radius, float yaw = 35f, float pitch = 18f, float zoom = 1f)
+        {
+            FocusLocal = IsFinite(focusLocal) ? focusLocal : Vector3.zero;
+            Radius = Mathf.Max(0.05f, radius);
+            Yaw = yaw;
+            Pitch = Mathf.Clamp(pitch, -80f, 80f);
+            Zoom = Mathf.Max(0.05f, zoom);
+        }
+
+        public void ResetRecommended(Vector3 focusLocal = default, float radius = 1.6f)
+        {
+            Reset(focusLocal, radius, 45f, 22f, 1.05f);
+        }
+
+        public void FrameWorldBounds(
+            ESEditorPreviewRenderContext context,
+            Bounds worldBounds,
+            float minimumRadius = 0.5f,
+            float maximumRadius = 18f)
+        {
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+
+            FocusLocal = context.WorldToPreviewLocalPoint(worldBounds.center);
+            float normalizedMinimum = Mathf.Max(0.05f, minimumRadius);
+            float normalizedMaximum = Mathf.Max(normalizedMinimum, maximumRadius);
+            Radius = Mathf.Clamp(worldBounds.extents.magnitude * 1.05f, normalizedMinimum, normalizedMaximum);
+            ClampZoom(context.Camera != null ? context.Camera.farClipPlane : 80f);
+        }
+
+        /// <summary>根据内容的高宽比例选择稳定的三分之四推荐角度，并重置平移和缩放。</summary>
+        public void FrameRecommendedWorldBounds(
+            ESEditorPreviewRenderContext context,
+            Bounds worldBounds,
+            float minimumRadius = 0.5f,
+            float maximumRadius = 500f)
+        {
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+
+            Vector3 size = worldBounds.size;
+            float horizontal = Mathf.Max(0.01f, Mathf.Max(size.x, size.z));
+            float heightRatio = Mathf.Max(0f, size.y) / horizontal;
+            float yaw = 40f;
+            float pitch = heightRatio <= 0.45f ? 38f
+                : heightRatio >= 1.8f ? 14f
+                : Mathf.Lerp(30f, 18f, Mathf.InverseLerp(0.45f, 1.8f, heightRatio));
+            float normalizedMinimum = Mathf.Max(0.05f, minimumRadius);
+            float normalizedMaximum = Mathf.Max(normalizedMinimum, maximumRadius);
+            float radius = Mathf.Clamp(worldBounds.extents.magnitude * 1.08f,
+                normalizedMinimum, normalizedMaximum);
+            Reset(context.WorldToPreviewLocalPoint(worldBounds.center), radius, yaw, pitch, 1.04f);
+            ClampZoom(context.Camera != null ? context.Camera.farClipPlane : 80f);
+        }
+
+        public void Orbit(Vector2 pointerDelta, float sensitivity = 1f)
+        {
+            float multiplier = Mathf.Clamp(sensitivity, 0.1f, 4f);
+            Yaw += pointerDelta.x * 0.35f * multiplier;
+            Pitch = Mathf.Clamp(Pitch - pointerDelta.y * 0.25f * multiplier, -80f, 80f);
+        }
+
+        public void Pan(Vector2 pointerDelta, float sensitivity = 1f)
+        {
+            Quaternion orbit = Quaternion.Euler(Pitch, Yaw, 0f);
+            float panScale = Radius * Zoom * 0.0018f * Mathf.Clamp(sensitivity, 0.1f, 4f);
+            FocusLocal += (-(orbit * Vector3.right) * pointerDelta.x
+                + orbit * Vector3.up * pointerDelta.y) * panScale;
+        }
+
+        public void ZoomByWheel(float wheelDelta, float farClipPlane = 80f)
+        {
+            Zoom = Mathf.Clamp(
+                Zoom * Mathf.Exp(wheelDelta * 0.08f),
+                MinimumZoom,
+                GetMaximumZoom(farClipPlane));
+        }
+
+        public void ZoomByFactor(float factor, float farClipPlane = 80f)
+        {
+            if (float.IsNaN(factor) || float.IsInfinity(factor) || factor <= 0f)
+                return;
+
+            Zoom = Mathf.Clamp(
+                Zoom * factor,
+                MinimumZoom,
+                GetMaximumZoom(farClipPlane));
+        }
+
+        public void SetZoom(float zoom, float farClipPlane = 80f)
+        {
+            Zoom = Mathf.Clamp(zoom, MinimumZoom, GetMaximumZoom(farClipPlane));
+        }
+
+        public void ClampZoom(float farClipPlane = 80f)
+        {
+            Zoom = Mathf.Clamp(Zoom, MinimumZoom, GetMaximumZoom(farClipPlane));
+        }
+
+        public float GetMaximumZoom(float farClipPlane = 80f)
+        {
+            return Mathf.Clamp(
+                Mathf.Max(1.2f, farClipPlane) * 0.72f / (Mathf.Max(0.05f, Radius) * 2.8f),
+                MinimumZoom,
+                12f);
+        }
+
+        /// <summary>
+        /// 返回当前姿态下的实际相机距离。UI 可以用它显示可观察的缩放结果，
+        /// 也避免业务窗口各自重新实现 FOV/aspect 的距离计算。
+        /// </summary>
+        public float GetCameraDistance(float aspect = 1f, float fieldOfView = 30f)
+        {
+            float safeAspect = Mathf.Max(0.25f, aspect);
+            float verticalHalfFov = Mathf.Max(1f, fieldOfView * 0.5f) * Mathf.Deg2Rad;
+            float horizontalHalfFov = Mathf.Atan(Mathf.Tan(verticalHalfFov) * safeAspect);
+            float limitingHalfFov = Mathf.Max(1f * Mathf.Deg2Rad, Mathf.Min(verticalHalfFov, horizontalHalfFov));
+            float fittedDistance = Radius / Mathf.Max(0.02f, Mathf.Sin(limitingHalfFov));
+            return Mathf.Max(0.03f, fittedDistance * Zoom);
+        }
+
+        public float GetNormalizedZoom(float farClipPlane = 80f)
+        {
+            float maximumZoom = Mathf.Max(MinimumZoom, GetMaximumZoom(farClipPlane));
+            return Mathf.InverseLerp(
+                Mathf.Log(MinimumZoom),
+                Mathf.Log(maximumZoom),
+                Mathf.Log(Mathf.Clamp(Zoom, MinimumZoom, maximumZoom)));
+        }
+
+        /// <summary>
+        /// 返回符合用户直觉的放大倍率：0 表示最远，1 表示最近。
+        /// 内部 Zoom 仍表示相机距离倍率，避免破坏既有相机姿态合同。
+        /// </summary>
+        public float GetNormalizedMagnification(float farClipPlane = 80f)
+        {
+            return 1f - GetNormalizedZoom(farClipPlane);
+        }
+
+        public void SetNormalizedZoom(float normalized, float farClipPlane = 80f)
+        {
+            float maximumZoom = Mathf.Max(MinimumZoom, GetMaximumZoom(farClipPlane));
+            SetZoom(
+                Mathf.Exp(Mathf.Lerp(
+                    Mathf.Log(MinimumZoom),
+                    Mathf.Log(maximumZoom),
+                    Mathf.Clamp01(normalized))),
+                farClipPlane);
+        }
+
+        public void SetNormalizedMagnification(float normalized, float farClipPlane = 80f)
+        {
+            SetNormalizedZoom(1f - Mathf.Clamp01(normalized), farClipPlane);
+        }
+
+        public ESEditorPreviewCameraPose CreateCameraPose(ESEditorPreviewRenderContext context)
+        {
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+            return context.CreateCameraPose(FocusLocal, Radius, Yaw, Pitch, Zoom);
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return !float.IsNaN(value.x) && !float.IsInfinity(value.x)
+                && !float.IsNaN(value.y) && !float.IsInfinity(value.y)
+                && !float.IsNaN(value.z) && !float.IsInfinity(value.z);
+        }
+    }
+
+    /// <summary>共享 IMGUI 鼠标捕获；UI Toolkit 可直接复用 OrbitView 的纯数学入口。</summary>
+    public sealed class ESEditorPreviewIMGUIOrbitInput
+    {
+        private static readonly int ControlHint = "ES.EditorPreview.OrbitInput".GetHashCode();
+        private bool orbiting;
+        private bool panning;
+        private Vector2 lastPointer;
+        private int activeControlId;
+
+        public ESEditorPreviewViewportInputResult Handle(
+            Rect viewportRect,
+            ESEditorPreviewOrbitView view,
+            bool requireModifierForWheelZoom = false,
+            float orbitSensitivity = 1f,
+            float panSensitivity = 1f,
+            float farClipPlane = 80f)
+        {
+            if (view == null)
+                throw new ArgumentNullException(nameof(view));
+
+            Event current = Event.current;
+            if (current == null)
+                return ESEditorPreviewViewportInputResult.None;
+
+            bool pointerInside = viewportRect.Contains(current.mousePosition);
+            if (!pointerInside && !orbiting && !panning)
+                return ESEditorPreviewViewportInputResult.None;
+
+            int controlId = GUIUtility.GetControlID(ControlHint, FocusType.Passive, viewportRect);
+            if (current.type == EventType.ScrollWheel && pointerInside)
+            {
+                if (requireModifierForWheelZoom && !current.control && !current.alt)
+                    return ESEditorPreviewViewportInputResult.None;
+                // Event.delta.y 向下为正；向下拉远，向上靠近，和 Unity SceneView 一致。
+                view.ZoomByWheel(current.delta.y, farClipPlane);
+                current.Use();
+                return ESEditorPreviewViewportInputResult.Zoom;
+            }
+
+            if (current.type == EventType.MouseDown && pointerInside)
+            {
+                bool wantsOrbit = current.button == 1 || (current.button == 0 && current.alt);
+                bool wantsPan = current.button == 2;
+                if (!wantsOrbit && !wantsPan)
+                    return ESEditorPreviewViewportInputResult.None;
+
+                lastPointer = current.mousePosition;
+                orbiting = wantsOrbit;
+                panning = wantsPan;
+                activeControlId = controlId;
+                GUIUtility.hotControl = controlId;
+                current.Use();
+                return ESEditorPreviewViewportInputResult.None;
+            }
+
+            if (current.type == EventType.MouseDrag && (orbiting || panning))
+            {
+                Vector2 delta = current.mousePosition - lastPointer;
+                lastPointer = current.mousePosition;
+                ESEditorPreviewViewportInputResult result;
+                if (orbiting)
+                {
+                    view.Orbit(delta, orbitSensitivity);
+                    result = ESEditorPreviewViewportInputResult.Orbit;
+                }
+                else
+                {
+                    view.Pan(delta, panSensitivity);
+                    result = ESEditorPreviewViewportInputResult.Pan;
+                }
+
+                current.Use();
+                return result;
+            }
+
+            if ((current.type == EventType.MouseUp || current.type == EventType.Ignore
+                    || current.type == EventType.MouseLeaveWindow)
+                && (orbiting || panning))
+            {
+                Release();
+                if (current.type != EventType.Ignore)
+                    current.Use();
+            }
+            else if ((orbiting || panning) && GUIUtility.hotControl != activeControlId)
+            {
+                Release();
+            }
+
+            return ESEditorPreviewViewportInputResult.None;
+        }
+
+        public void Release()
+        {
+            if (activeControlId != 0 && GUIUtility.hotControl == activeControlId)
+                GUIUtility.hotControl = 0;
+            activeControlId = 0;
+            orbiting = false;
+            panning = false;
+        }
+    }
+
+    /// <summary>预览视口通用三轴辅助，保持与当前轨道视角一致。</summary>
+    public static class ESEditorPreviewGizmos
+    {
+        private static readonly GUIContent AxisX = new GUIContent("X");
+        private static readonly GUIContent AxisY = new GUIContent("Y");
+        private static readonly GUIContent AxisZ = new GUIContent("Z");
+
+        public static void DrawAxis(Rect viewportRect, ESEditorPreviewOrbitView view)
+        {
+            if (view == null || viewportRect.width < 72f || viewportRect.height < 72f)
+                return;
+            if (Event.current == null || Event.current.type != EventType.Repaint)
+                return;
+
+            Rect panelRect = new Rect(viewportRect.xMax - 82f, viewportRect.yMin + 40f, 74f, 74f);
+            EditorGUI.DrawRect(panelRect, new Color(0.035f, 0.045f, 0.055f, 0.86f));
+            EditorGUI.DrawRect(new Rect(panelRect.x, panelRect.y, panelRect.width, 1f), new Color(1f, 1f, 1f, 0.14f));
+            EditorGUI.DrawRect(new Rect(panelRect.x, panelRect.yMax - 1f, panelRect.width, 1f), new Color(0f, 0f, 0f, 0.38f));
+
+            Quaternion orbit = Quaternion.Euler(view.Pitch, view.Yaw, 0f);
+            Quaternion cameraRotation = Quaternion.LookRotation(orbit * Vector3.forward, Vector3.up);
+            DrawAxisLines(panelRect, Quaternion.Inverse(cameraRotation));
+        }
+
+        /// <summary>使用真实预览 Camera 绘制方向轴，避免 HUD 角标与实际投影脱节。</summary>
+        public static void DrawAxis(Rect viewportRect, Camera camera)
+        {
+            if (camera == null || viewportRect.width < 72f || viewportRect.height < 72f
+                || Event.current == null || Event.current.type != EventType.Repaint)
+                return;
+
+            Rect panelRect = new Rect(viewportRect.xMax - 82f, viewportRect.yMin + 40f, 74f, 74f);
+            EditorGUI.DrawRect(panelRect, new Color(0.035f, 0.045f, 0.055f, 0.86f));
+            EditorGUI.DrawRect(new Rect(panelRect.x, panelRect.y, panelRect.width, 1f), new Color(1f, 1f, 1f, 0.14f));
+            EditorGUI.DrawRect(new Rect(panelRect.x, panelRect.yMax - 1f, panelRect.width, 1f), new Color(0f, 0f, 0f, 0.38f));
+            DrawAxisLines(panelRect, Quaternion.Inverse(camera.transform.rotation));
+        }
+
+        private static void DrawAxisLines(Rect panelRect, Quaternion worldToView)
+        {
+            const float size = 27f;
+            Vector2 origin = new Vector2(panelRect.center.x, panelRect.center.y + 4f);
+            Color previousHandleColor = Handles.color;
+            Color previousGuiColor = GUI.color;
+            Handles.BeginGUI();
+            DrawAxisLine(origin, worldToView * Vector3.right, new Color(0.96f, 0.30f, 0.28f, 1f), AxisX);
+            DrawAxisLine(origin, worldToView * Vector3.up, new Color(0.36f, 0.92f, 0.44f, 1f), AxisY);
+            DrawAxisLine(origin, worldToView * Vector3.forward, new Color(0.30f, 0.60f, 1f, 1f), AxisZ);
+            Handles.EndGUI();
+            Handles.color = previousHandleColor;
+            GUI.color = previousGuiColor;
+            EditorGUI.DrawRect(new Rect(origin.x - 2f, origin.y - 2f, 4f, 4f), new Color(0.92f, 0.94f, 0.96f, 1f));
+
+            void DrawAxisLine(Vector2 start, Vector3 direction, Color color, GUIContent label)
+            {
+                Vector2 projected = new Vector2(direction.x, -direction.y);
+                if (projected.sqrMagnitude < 0.0001f)
+                    projected = Vector2.up * 0.1f;
+                Vector2 end = start + projected.normalized * Mathf.Lerp(10f, size, Mathf.Clamp01(projected.magnitude));
+                Handles.color = color;
+                Handles.DrawAAPolyLine(3f, new Vector3(start.x, start.y), new Vector3(end.x, end.y));
+                GUI.color = color;
+                GUI.Label(new Rect(end.x - 5f, end.y - 9f, 16f, 18f), label, EditorStyles.whiteMiniLabel);
+            }
+        }
+
+        /// <summary>把 PreviewScene 原点三轴投影到当前预览矩形，避免只显示屏幕角标而看不到局部坐标。</summary>
+        public static void DrawWorldAxes(Rect viewportRect, Camera camera, Vector3 origin, float size)
+        {
+            if (camera == null || viewportRect.width < 100f || viewportRect.height < 100f
+                || Event.current == null || Event.current.type != EventType.Repaint)
+                return;
+
+            float axisSize = Mathf.Clamp(size, 0.25f, 12f);
+            // 原点或任一轴端点不可完整投影时，直接切到完整的屏幕三轴，
+            // 禁止只剩一两根轴线，让用户误判局部坐标方向。
+            if (!TryProject(origin, out Vector2 projectedOrigin)
+                || !TryProject(origin + Vector3.right * axisSize, out Vector2 projectedX)
+                || !TryProject(origin + Vector3.up * axisSize, out Vector2 projectedY)
+                || !TryProject(origin + Vector3.forward * axisSize, out Vector2 projectedZ))
+            {
+                projectedOrigin = new Vector2(viewportRect.xMin + 56f, viewportRect.yMax - 42f);
+                DrawFallbackAxes(projectedOrigin, axisSize);
+                return;
+            }
+
+            Color previous = Handles.color;
+            Handles.BeginGUI();
+            DrawProjectedAxis(projectedX, new Color(0.96f, 0.30f, 0.28f, 1f), "X");
+            DrawProjectedAxis(projectedY, new Color(0.36f, 0.92f, 0.44f, 1f), "Y");
+            DrawProjectedAxis(projectedZ, new Color(0.30f, 0.60f, 1f, 1f), "Z");
+            Handles.EndGUI();
+            Handles.color = previous;
+
+            bool TryProject(Vector3 world, out Vector2 gui)
+            {
+                Vector3 viewport = camera.WorldToViewportPoint(world);
+                gui = new Vector2(
+                    viewportRect.x + viewport.x * viewportRect.width,
+                    viewportRect.yMax - viewport.y * viewportRect.height);
+                return viewport.z > camera.nearClipPlane
+                    && viewport.x >= -0.2f && viewport.x <= 1.2f
+                    && viewport.y >= -0.2f && viewport.y <= 1.2f;
+            }
+
+            void DrawProjectedAxis(Vector2 end, Color color, string label)
+            {
+                Handles.color = color;
+                Handles.DrawAAPolyLine(3f,
+                    new Vector3(projectedOrigin.x, projectedOrigin.y),
+                    new Vector3(end.x, end.y));
+                Color oldGui = GUI.color;
+                GUI.color = color;
+                GUI.Label(new Rect(end.x - 5f, end.y - 9f, 16f, 18f), label, EditorStyles.whiteMiniLabel);
+                GUI.color = oldGui;
+            }
+
+            void DrawFallbackAxes(Vector2 fallbackOrigin, float fallbackSize)
+            {
+                Color oldGui = GUI.color;
+                Color oldHandles = Handles.color;
+                Handles.BeginGUI();
+                DrawFallbackAxis(fallbackOrigin, Vector2.right, new Color(0.96f, 0.30f, 0.28f, 1f), "X", fallbackSize);
+                DrawFallbackAxis(fallbackOrigin, Vector2.down, new Color(0.36f, 0.92f, 0.44f, 1f), "Y", fallbackSize);
+                DrawFallbackAxis(fallbackOrigin, new Vector2(0.72f, -0.72f), new Color(0.30f, 0.60f, 1f, 1f), "Z", fallbackSize);
+                Handles.EndGUI();
+                GUI.color = oldGui;
+                Handles.color = oldHandles;
+            }
+
+            void DrawFallbackAxis(Vector2 start, Vector2 direction, Color color, string label, float length)
+            {
+                Handles.color = color;
+                Vector2 end = start + direction.normalized * Mathf.Clamp(length * 1.6f, 18f, 42f);
+                Handles.DrawAAPolyLine(3f,
+                    new Vector3(start.x, start.y),
+                    new Vector3(end.x, end.y));
+                GUI.color = color;
+                GUI.Label(new Rect(end.x - 5f, end.y - 9f, 18f, 18f), label, EditorStyles.whiteMiniLabel);
+            }
         }
     }
 
@@ -126,6 +563,92 @@ namespace ES
         }
     }
 
+    public readonly struct ESEditorPreviewDiagnosticsSnapshot
+    {
+        public ESEditorPreviewDiagnosticsSnapshot(
+            int activeScopeCount,
+            int activeRenderContextCount,
+            int activeResourceScopeCount,
+            int activeModelGroupCount,
+            int activeTemporaryObjectCount,
+            int activeRenderTextureCount,
+            long activeRenderTexturePixels,
+            long estimatedRenderTextureBytes,
+            int peakScopeCount,
+            int peakRenderContextCount,
+            int peakModelGroupCount,
+            int peakRenderTextureCount,
+            long peakRenderTexturePixels,
+            long peakEstimatedRenderTextureBytes,
+            long totalScopeRegistrations,
+            long totalScopeReleases,
+            int cleanupRunCount,
+            int cleanupFailureCount,
+            string lastCleanupReason,
+            int lastCleanupReleasedCount)
+        {
+            ActiveScopeCount = activeScopeCount;
+            ActiveRenderContextCount = activeRenderContextCount;
+            ActiveResourceScopeCount = activeResourceScopeCount;
+            ActiveModelGroupCount = activeModelGroupCount;
+            ActiveTemporaryObjectCount = activeTemporaryObjectCount;
+            ActiveRenderTextureCount = activeRenderTextureCount;
+            ActiveRenderTexturePixels = activeRenderTexturePixels;
+            EstimatedRenderTextureBytes = estimatedRenderTextureBytes;
+            PeakScopeCount = peakScopeCount;
+            PeakRenderContextCount = peakRenderContextCount;
+            PeakModelGroupCount = peakModelGroupCount;
+            PeakRenderTextureCount = peakRenderTextureCount;
+            PeakRenderTexturePixels = peakRenderTexturePixels;
+            PeakEstimatedRenderTextureBytes = peakEstimatedRenderTextureBytes;
+            TotalScopeRegistrations = totalScopeRegistrations;
+            TotalScopeReleases = totalScopeReleases;
+            CleanupRunCount = cleanupRunCount;
+            CleanupFailureCount = cleanupFailureCount;
+            LastCleanupReason = lastCleanupReason ?? string.Empty;
+            LastCleanupReleasedCount = lastCleanupReleasedCount;
+        }
+
+        public int ActiveScopeCount { get; }
+        public int ActiveRenderContextCount { get; }
+        public int ActiveResourceScopeCount { get; }
+        public int ActiveModelGroupCount { get; }
+        public int ActiveTemporaryObjectCount { get; }
+        public int ActiveRenderTextureCount { get; }
+        public long ActiveRenderTexturePixels { get; }
+        public long EstimatedRenderTextureBytes { get; }
+        public int PeakScopeCount { get; }
+        public int PeakRenderContextCount { get; }
+        public int PeakModelGroupCount { get; }
+        public int PeakRenderTextureCount { get; }
+        public long PeakRenderTexturePixels { get; }
+        public long PeakEstimatedRenderTextureBytes { get; }
+        public long TotalScopeRegistrations { get; }
+        public long TotalScopeReleases { get; }
+        public int CleanupRunCount { get; }
+        public int CleanupFailureCount { get; }
+        public string LastCleanupReason { get; }
+        public int LastCleanupReleasedCount { get; }
+
+        public string ToSummary()
+        {
+            return "Scope " + ActiveScopeCount
+                + " · Context " + ActiveRenderContextCount
+                + " · 模型组 " + ActiveModelGroupCount
+                + " · RT " + ActiveRenderTextureCount
+                + " / " + ActiveRenderTexturePixels.ToString("N0") + " px"
+                + " · 估算 " + FormatBytes(EstimatedRenderTextureBytes)
+                + " · 峰值 " + FormatBytes(PeakEstimatedRenderTextureBytes);
+        }
+
+        private static string FormatBytes(long bytes)
+        {
+            if (bytes < 1024L) return bytes + " B";
+            if (bytes < 1024L * 1024L) return (bytes / 1024d).ToString("0.0") + " KiB";
+            return (bytes / (1024d * 1024d)).ToString("0.0") + " MiB";
+        }
+    }
+
     /// <summary>
     /// 全局预览生命周期入口。窗口和预览模块可以注册 IDisposable，上下文重载、退出、切 PlayMode 时统一清理。
     /// </summary>
@@ -134,6 +657,20 @@ namespace ES
         private static readonly HashSet<IDisposable> ActiveScopes = new HashSet<IDisposable>();
         private static readonly List<IDisposable> DisposeBuffer = new List<IDisposable>(32);
         private static bool registered;
+        private static long totalScopeRegistrations;
+        private static long totalScopeReleases;
+        private static int cleanupRunCount;
+        private static int cleanupFailureCount;
+        private static string lastCleanupReason = string.Empty;
+        private static int lastCleanupReleasedCount;
+        private static int peakScopeCount;
+        private static int peakRenderContextCount;
+        private static int peakModelGroupCount;
+        private static int peakRenderTextureCount;
+        private static long peakRenderTexturePixels;
+        private static long peakEstimatedRenderTextureBytes;
+
+        public static int ActiveScopeCount => ActiveScopes.Count;
 
         public static void RegisterGlobalHooks()
         {
@@ -156,7 +693,11 @@ namespace ES
                 return;
 
             RegisterGlobalHooks();
-            ActiveScopes.Add(scope);
+            if (ActiveScopes.Add(scope))
+            {
+                totalScopeRegistrations++;
+                RefreshPeaks();
+            }
         }
 
         public static void UnregisterScope(IDisposable scope)
@@ -164,16 +705,34 @@ namespace ES
             if (scope == null)
                 return;
 
-            ActiveScopes.Remove(scope);
+            if (ActiveScopes.Remove(scope))
+            {
+                totalScopeReleases++;
+                RefreshPeaks();
+            }
+        }
+
+        public static ESEditorPreviewDiagnosticsSnapshot CaptureDiagnosticsSnapshot()
+        {
+            return BuildDiagnosticsSnapshot(true);
+        }
+
+        internal static void NotifyResourceChanged()
+        {
+            RefreshPeaks();
         }
 
         public static int CleanupAll(string reason, bool includeMarkedObjects = true)
         {
+            cleanupRunCount++;
+            lastCleanupReason = string.IsNullOrWhiteSpace(reason) ? "Unknown" : reason.Trim();
             DisposeBuffer.Clear();
             DisposeBuffer.AddRange(ActiveScopes);
             ActiveScopes.Clear();
+            totalScopeReleases += DisposeBuffer.Count;
 
             int disposed = 0;
+            int failures = 0;
             for (int i = DisposeBuffer.Count - 1; i >= 0; i--)
             {
                 try
@@ -183,6 +742,7 @@ namespace ES
                 }
                 catch (Exception e)
                 {
+                    failures++;
                     Debug.LogWarning("[ESEditorPreviewLifecycle] Dispose failed. reason=" + reason + " error=" + e.Message);
                 }
             }
@@ -191,7 +751,82 @@ namespace ES
             if (includeMarkedObjects)
                 disposed += ESEditorPreviewUtility.CleanupAllMarkedPreviewObjects();
 
+            cleanupFailureCount += failures;
+            lastCleanupReleasedCount = disposed;
+            RefreshPeaks();
             return disposed;
+        }
+
+        private static void RefreshPeaks()
+        {
+            BuildDiagnosticsSnapshot(true);
+        }
+
+        private static ESEditorPreviewDiagnosticsSnapshot BuildDiagnosticsSnapshot(bool updatePeaks)
+        {
+            int contextCount = 0;
+            int resourceScopeCount = 0;
+            int modelGroupCount = 0;
+            int temporaryObjectCount = 0;
+            int renderTextureCount = 0;
+            long renderTexturePixels = 0L;
+            long estimatedBytes = 0L;
+            foreach (IDisposable scope in ActiveScopes)
+            {
+                if (scope is ESEditorPreviewRenderContext context)
+                {
+                    contextCount++;
+                    modelGroupCount += context.ActiveModelGroupCount;
+                    temporaryObjectCount += context.ActiveTemporaryObjectCount;
+                    if (context.HasRenderTexture)
+                    {
+                        renderTextureCount++;
+                        Vector2Int size = context.RenderTextureSize;
+                        renderTexturePixels += (long)size.x * size.y;
+                        estimatedBytes += context.EstimatedRenderTextureBytes;
+                    }
+                }
+                else if (scope is ESEditorPreviewResourceScope resourceScope)
+                {
+                    resourceScopeCount++;
+                    temporaryObjectCount += resourceScope.RegisteredObjectCount;
+                    renderTextureCount += resourceScope.RegisteredRenderTextureCount;
+                    renderTexturePixels += resourceScope.RegisteredRenderTexturePixels;
+                    estimatedBytes += resourceScope.EstimatedRegisteredRenderTextureBytes;
+                }
+            }
+
+            if (updatePeaks)
+            {
+                peakScopeCount = Math.Max(peakScopeCount, ActiveScopes.Count);
+                peakRenderContextCount = Math.Max(peakRenderContextCount, contextCount);
+                peakModelGroupCount = Math.Max(peakModelGroupCount, modelGroupCount);
+                peakRenderTextureCount = Math.Max(peakRenderTextureCount, renderTextureCount);
+                peakRenderTexturePixels = Math.Max(peakRenderTexturePixels, renderTexturePixels);
+                peakEstimatedRenderTextureBytes = Math.Max(peakEstimatedRenderTextureBytes, estimatedBytes);
+            }
+
+            return new ESEditorPreviewDiagnosticsSnapshot(
+                ActiveScopes.Count,
+                contextCount,
+                resourceScopeCount,
+                modelGroupCount,
+                temporaryObjectCount,
+                renderTextureCount,
+                renderTexturePixels,
+                estimatedBytes,
+                peakScopeCount,
+                peakRenderContextCount,
+                peakModelGroupCount,
+                peakRenderTextureCount,
+                peakRenderTexturePixels,
+                peakEstimatedRenderTextureBytes,
+                totalScopeRegistrations,
+                totalScopeReleases,
+                cleanupRunCount,
+                cleanupFailureCount,
+                lastCleanupReason,
+                lastCleanupReleasedCount);
         }
 
         [MenuItem(MenuItemPathDefine.PREVIEW_CLEANUP_PATH + "清理全部ES预览上下文", false, -20)]
@@ -226,6 +861,8 @@ namespace ES
     {
         private const float GroupSpacing = 100f;
         private const float CameraFarClip = 80f;
+        private const float GroundSize = 25f;
+        private const float GroundThickness = 0.02f;
         private const int MaxCellProbeAttempts = 4096;
         private static readonly object AllocationLock = new object();
         private static readonly HashSet<Vector2Int> OccupiedCells = new HashSet<Vector2Int>();
@@ -243,6 +880,12 @@ namespace ES
         private GameObject cameraObject;
         private GameObject keyLightObject;
         private GameObject fillLightObject;
+        private GameObject groundPlaneObject;
+        private Material groundPlaneMaterial;
+        private GameObject scaleReferenceObject;
+        private Material scaleReferenceMaterial;
+        private Vector3 scaleReferenceLocalGroundPosition;
+        private Material fallbackParticleMaterial;
         private readonly List<ESEditorPreviewModelHandle> modelHandles = new List<ESEditorPreviewModelHandle>(4);
         private RenderTexture renderTexture;
         private int renderTextureWidth;
@@ -253,11 +896,35 @@ namespace ES
 
         public Camera Camera { get; private set; }
         public Vector3 GroupOrigin => groupOrigin;
+        public bool IsScaleReferenceVisible => scaleReferenceObject != null && scaleReferenceObject.activeSelf;
         public bool IsReady => Camera != null && (sceneMode != ESEditorPreviewSceneMode.PreviewScene || previewScene.IsValid());
+        public bool IsDisposed => disposed;
+        public ESEditorPreviewSceneMode SceneMode => sceneMode;
+        public bool PreviewSceneIsValid => sceneMode != ESEditorPreviewSceneMode.PreviewScene || previewScene.IsValid();
+        public int ActiveModelGroupCount => modelHandles.Count;
+        public int ActiveTemporaryObjectCount => (cameraObject != null ? 1 : 0)
+            + (keyLightObject != null ? 1 : 0)
+            + (fillLightObject != null ? 1 : 0)
+            + (groundPlaneObject != null ? 1 : 0)
+            + (scaleReferenceObject != null ? 1 : 0)
+            + modelHandles.Count;
+        public bool HasRenderTexture => renderTexture != null;
+        public Vector2Int RenderTextureSize => new Vector2Int(renderTextureWidth, renderTextureHeight);
+        public long EstimatedRenderTextureBytes
+        {
+            get
+            {
+                if (renderTexture == null) return 0L;
+                int samples = Math.Max(1, renderTexture.antiAliasing);
+                int depthBytes = renderTexture.depth > 0 ? 4 : 0;
+                return (long)renderTextureWidth * renderTextureHeight * (4 + depthBytes) * samples;
+            }
+        }
+        public string Owner => owner;
         public string LastStatus { get; private set; } = "Preview context not created.";
         public string LastObjectFlowStatus { get; private set; } = "Preview object flow not requested.";
         public string IsolationReport => IsReady
-            ? sceneMode + ", Layer=" + previewLayer + ", Origin=" + FormatVector(groupOrigin) + ", Cell=" + allocatedCell + ", FarClip=" + CameraFarClip.ToString("F0") + "m, " + allocationReport
+            ? sceneMode + ", Layer=" + previewLayer + ", Origin=" + FormatVector(groupOrigin) + ", Cell=" + allocatedCell + ", FarClip=" + (Camera != null ? Camera.farClipPlane : CameraFarClip).ToString("F0") + "m, " + allocationReport
             : "Preview render context not ready.";
 
         public ESEditorPreviewRenderContext(
@@ -282,6 +949,7 @@ namespace ES
             EnsurePreviewScene();
             EnsureCamera();
             EnsureLights();
+            EnsureGroundPlane();
             LastStatus = "Preview render context ready.";
         }
 
@@ -306,32 +974,173 @@ namespace ES
                 + ", Marker=" + markerStatus;
         }
 
+        /// <summary>PreviewLocal 是仅平移的米制空间：原点对应 GroupOrigin，轴向与 Unity 世界轴一致。</summary>
+        public Vector3 PreviewLocalToWorldPoint(Vector3 previewLocalPoint)
+        {
+            return groupOrigin + previewLocalPoint;
+        }
+
+        public Vector3 WorldToPreviewLocalPoint(Vector3 worldPoint)
+        {
+            return worldPoint - groupOrigin;
+        }
+
+        /// <summary>
+        /// 将预览辅助底板对齐到当前内容的局部 XZ 边界。底板属于 PreviewScene 临时对象，
+        /// 不会写入作者态或正式场景；使用 Cube 几何保证上下表面均存在。
+        /// </summary>
+        public void ConfigureGroundPlane(Vector3 localCenter, float size, float localY = 0f)
+        {
+            Ensure();
+            if (groundPlaneObject == null)
+                return;
+
+            float extent = Mathf.Clamp(size, 1f, 100000f);
+            if (!IsFinite(localCenter))
+                localCenter = Vector3.zero;
+            groundPlaneObject.transform.position = PreviewLocalToWorldPoint(
+                new Vector3(localCenter.x, localY - GroundThickness * 0.5f, localCenter.z));
+            groundPlaneObject.transform.localScale = new Vector3(extent, GroundThickness, extent);
+        }
+
+        public ESEditorPreviewCameraPose CreateCameraPose(
+            Vector3 previewLocalCenter,
+            float radius,
+            float yaw,
+            float pitch,
+            float zoom)
+        {
+            return new ESEditorPreviewCameraPose(
+                PreviewLocalToWorldPoint(previewLocalCenter),
+                radius,
+                yaw,
+                pitch,
+                zoom);
+        }
+
+        public void SetScaleReferenceVisible(bool visible, float sizeMeters = 1f)
+        {
+            if (!visible)
+            {
+                if (scaleReferenceObject != null)
+                    scaleReferenceObject.SetActive(false);
+                return;
+            }
+
+            Ensure();
+            sizeMeters = Mathf.Clamp(sizeMeters, 0.01f, 100f);
+            EnsureScaleReference();
+            if (scaleReferenceObject == null)
+                return;
+
+            // 预览原点代表地面接触点。1m 参照物严格占据 [0, 1]m，避免半个立方体
+            // 埋入地面后产生“看起来不是 1m”的误判。
+            scaleReferenceObject.transform.position = PreviewLocalToWorldPoint(
+                scaleReferenceLocalGroundPosition + Vector3.up * (sizeMeters * 0.5f));
+            scaleReferenceObject.transform.rotation = Quaternion.identity;
+            scaleReferenceObject.transform.localScale = Vector3.one * sizeMeters;
+            scaleReferenceObject.SetActive(true);
+        }
+
+        /// <summary>把 1m 参照物放到内容左侧，既保持真实米制比例，也避免错误 Pivot 拉坏推荐构图。</summary>
+        public void PositionScaleReferenceBesideWorldBounds(Bounds worldBounds, float sizeMeters = 1f, float gapMeters = 0.25f)
+        {
+            if (!IsFinite(worldBounds.center) || !IsFinite(worldBounds.extents))
+                return;
+
+            sizeMeters = Mathf.Clamp(sizeMeters, 0.01f, 100f);
+            gapMeters = Mathf.Clamp(gapMeters, 0f, 100f);
+            Vector3 localCenter = WorldToPreviewLocalPoint(worldBounds.center);
+            scaleReferenceLocalGroundPosition = new Vector3(
+                localCenter.x - worldBounds.extents.x - gapMeters - sizeMeters * 0.5f,
+                0f,
+                localCenter.z);
+            if (IsScaleReferenceVisible)
+                SetScaleReferenceVisible(true, sizeMeters);
+        }
+
+        public bool TryGetScaleReferenceBounds(out Bounds bounds)
+        {
+            bounds = default;
+            if (!IsScaleReferenceVisible)
+                return false;
+            Renderer renderer = scaleReferenceObject.GetComponent<Renderer>();
+            if (renderer == null)
+                return false;
+            bounds = renderer.bounds;
+            return true;
+        }
+
         public ESEditorPreviewModelHandle CreateModelGroup(
             GameObject source,
             string instanceName = null,
             bool samplingTarget = true,
             bool copyRendererState = true,
-            bool disableRuntimeBehaviours = true)
+            bool disableRuntimeBehaviours = true,
+            bool ensureRenderersEnabled = true,
+            bool activateInstance = true)
         {
             if (source == null)
                 return null;
 
             Ensure();
             GameObject instance = UnityEngine.Object.Instantiate(source);
-            instance.name = string.IsNullOrWhiteSpace(instanceName) ? source.name + "_ESPreview" : instanceName;
-            instance.SetActive(true);
             NormalizeTransform(instance.transform);
+            return AdoptModelGroup(
+                source,
+                instance,
+                instanceName,
+                samplingTarget,
+                copyRendererState,
+                disableRuntimeBehaviours,
+                ensureRenderersEnabled,
+                activateInstance);
+        }
+
+        /// <summary>
+        /// 接管业务已在非激活状态安全构造的预览实例。需要阻止第三方 Awake/OnEnable 的业务
+        /// 应先复制允许的组件，再通过此入口完成隔离、登记和激活。
+        /// </summary>
+        public ESEditorPreviewModelHandle AdoptModelGroup(
+            GameObject source,
+            GameObject instance,
+            string instanceName = null,
+            bool samplingTarget = true,
+            bool copyRendererState = true,
+            bool disableRuntimeBehaviours = true,
+            bool ensureRenderersEnabled = true,
+            bool activateInstance = true,
+            bool moveToGroupOrigin = true)
+        {
+            if (source == null || instance == null)
+                return null;
+
+            Ensure();
+            instance.SetActive(false);
+            instance.name = string.IsNullOrWhiteSpace(instanceName) ? source.name + "_ESPreview" : instanceName;
             PreparePreviewObject(instance, "Preview model group.", samplingTarget);
-            MoveToGroupOrigin(instance.transform);
+            if (moveToGroupOrigin)
+                MoveToGroupOrigin(instance.transform);
 
             if (copyRendererState)
                 ESEditorPreviewUtility.CopyRendererState(source, instance);
             if (disableRuntimeBehaviours)
                 ESEditorPreviewUtility.DisableRuntimeBehaviours(instance);
+            ESEditorPreviewUtility.EnsureParticleRendererMaterials(instance, EnsureFallbackParticleMaterial());
 
-            ESEditorPreviewUtility.EnsureRenderersEnabled(instance);
+            ParticleSystem[] particleSystems = instance.GetComponentsInChildren<ParticleSystem>(true);
+            for (int i = 0; i < particleSystems.Length; i++)
+            {
+                ParticleSystem.MainModule main = particleSystems[i].main;
+                main.playOnAwake = false;
+            }
+            if (ensureRenderersEnabled)
+                ESEditorPreviewUtility.EnsureRenderersEnabled(instance);
+            if (activateInstance)
+                instance.SetActive(true);
             var handle = new ESEditorPreviewModelHandle(this, source, instance);
             modelHandles.Add(handle);
+            ESEditorPreviewLifecycleHub.NotifyResourceChanged();
             return handle;
         }
 
@@ -341,6 +1150,7 @@ namespace ES
                 modelHandles[i]?.DisposeFromOwner();
 
             modelHandles.Clear();
+            ESEditorPreviewLifecycleHub.NotifyResourceChanged();
         }
 
         public bool RenderGUI(Rect rect, ESEditorPreviewCameraPose pose, ESEditorPreviewRenderOptions options)
@@ -455,7 +1265,17 @@ namespace ES
             ESEditorPreviewUtility.DestroyObject(cameraObject);
             ESEditorPreviewUtility.DestroyObject(keyLightObject);
             ESEditorPreviewUtility.DestroyObject(fillLightObject);
+            ESEditorPreviewUtility.DestroyObject(groundPlaneObject);
+            ESEditorPreviewUtility.DestroyObject(groundPlaneMaterial);
+            ESEditorPreviewUtility.DestroyObject(scaleReferenceObject);
+            ESEditorPreviewUtility.DestroyObject(scaleReferenceMaterial);
+            ESEditorPreviewUtility.DestroyObject(fallbackParticleMaterial);
             Camera = null;
+            groundPlaneObject = null;
+            groundPlaneMaterial = null;
+            scaleReferenceObject = null;
+            scaleReferenceMaterial = null;
+            fallbackParticleMaterial = null;
             ReleaseCell(allocatedCell);
 
             if (previewScene.IsValid())
@@ -463,6 +1283,7 @@ namespace ES
                 EditorSceneManager.ClosePreviewScene(previewScene);
                 previewScene = default;
             }
+            ESEditorPreviewLifecycleHub.NotifyResourceChanged();
         }
 
         private void EnsurePreviewScene()
@@ -476,7 +1297,10 @@ namespace ES
         internal void UnregisterModel(ESEditorPreviewModelHandle handle)
         {
             if (handle != null)
+            {
                 modelHandles.Remove(handle);
+                ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+            }
         }
 
         private void EnsureCamera()
@@ -491,10 +1315,13 @@ namespace ES
             Camera.enabled = false;
             Camera.fieldOfView = 30f;
             Camera.clearFlags = CameraClearFlags.Color;
-            Camera.backgroundColor = new Color(0.06f, 0.065f, 0.075f, 1f);
+            Camera.backgroundColor = new Color(0.16f, 0.18f, 0.21f, 1f);
             Camera.cullingMask = 1 << previewLayer;
             Camera.nearClipPlane = 0.01f;
             Camera.farClipPlane = CameraFarClip;
+            Camera.stereoTargetEye = StereoTargetEyeMask.None;
+            Camera.useOcclusionCulling = false;
+            Camera.depthTextureMode = DepthTextureMode.None;
             TrySetCameraScene(Camera, previewScene);
             ESEditorPreviewUtility.TryConfigureUniversalCameraData(Camera);
         }
@@ -525,14 +1352,125 @@ namespace ES
             return go;
         }
 
+        private void EnsureGroundPlane()
+        {
+            if (groundPlaneObject != null)
+                return;
+
+            // 使用有真实上下表面的薄板，而不是依赖某个 Shader 是否暴露 Cull 属性。
+            // 这样 URP、内置管线和兜底 Shader 下，从地面上下观察都能看到标尺板。
+            groundPlaneObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            groundPlaneObject.name = owner + " Preview Ground";
+            groundPlaneObject.transform.position = groupOrigin + Vector3.down * (GroundThickness * 0.5f);
+            groundPlaneObject.transform.rotation = Quaternion.identity;
+            groundPlaneObject.transform.localScale = new Vector3(GroundSize, GroundThickness, GroundSize);
+            ESEditorPreviewUtility.SetHideFlagsRecursive(
+                groundPlaneObject.transform,
+                ESEditorPreviewUtility.PreviewHideFlags);
+            ESEditorPreviewUtility.SetLayerRecursive(groundPlaneObject.transform, previewLayer);
+            MoveToContextScene(groundPlaneObject);
+
+            Collider collider = groundPlaneObject.GetComponent<Collider>();
+            if (collider != null)
+                ESEditorPreviewUtility.DestroyObject(collider);
+
+            Renderer renderer = groundPlaneObject.GetComponent<Renderer>();
+            Shader shader = Shader.Find("Universal Render Pipeline/Unlit")
+                ?? Shader.Find("Unlit/Transparent")
+                ?? Shader.Find("Legacy Shaders/Transparent/Diffuse")
+                ?? Shader.Find("Unlit/Color");
+            if (renderer != null && shader != null)
+            {
+                groundPlaneMaterial = new Material(shader)
+                {
+                    name = owner + " Preview Ground Material",
+                    hideFlags = ESEditorPreviewUtility.PreviewHideFlags,
+                    color = new Color(0.28f, 0.34f, 0.40f, 0.24f),
+                    renderQueue = 3000
+                };
+                // 底板是预览辅助几何，必须从上下两侧都可见；统一走公共材质配置。
+                ESEditorPreviewUtility.ConfigureDoubleSidedTransparent(groundPlaneMaterial, groundPlaneMaterial.color);
+                renderer.receiveShadows = false;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.sharedMaterial = groundPlaneMaterial;
+            }
+
+            ESEditorPreviewUtility.TryMarkPreviewObject(groundPlaneObject, owner, "Preview ground plane.", out _);
+            ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+        }
+
+        private void EnsureScaleReference()
+        {
+            if (scaleReferenceObject != null)
+                return;
+
+            scaleReferenceObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            scaleReferenceObject.name = owner + " 1m Scale Reference";
+            scaleReferenceObject.SetActive(false);
+            ESEditorPreviewUtility.SetHideFlagsRecursive(
+                scaleReferenceObject.transform,
+                ESEditorPreviewUtility.PreviewHideFlags);
+            Collider collider = scaleReferenceObject.GetComponent<Collider>();
+            if (collider != null)
+                ESEditorPreviewUtility.DestroyObject(collider);
+            PreparePreviewObject(scaleReferenceObject, "Optional one-meter scale reference.", samplingTarget: false);
+
+            Renderer renderer = scaleReferenceObject.GetComponent<Renderer>();
+            Shader shader = Shader.Find("Universal Render Pipeline/Unlit")
+                ?? Shader.Find("Hidden/Internal-Colored")
+                ?? Shader.Find("Unlit/Color");
+            if (renderer != null && shader != null)
+            {
+                scaleReferenceMaterial = new Material(shader)
+                {
+                    name = owner + " Scale Reference Material",
+                    hideFlags = ESEditorPreviewUtility.PreviewHideFlags,
+                    color = new Color(0.55f, 0.62f, 0.68f, 0.22f),
+                    renderQueue = 3000
+                };
+                ESEditorPreviewUtility.ConfigureDoubleSidedTransparent(scaleReferenceMaterial, scaleReferenceMaterial.color);
+                renderer.sharedMaterial = scaleReferenceMaterial;
+            }
+
+            ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+        }
+
+        private Material EnsureFallbackParticleMaterial()
+        {
+            if (fallbackParticleMaterial != null)
+                return fallbackParticleMaterial;
+
+            Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit")
+                ?? Shader.Find("Particles/Standard Unlit")
+                ?? Shader.Find("Sprites/Default")
+                ?? Shader.Find("Unlit/Color");
+            if (shader == null)
+                return null;
+
+            fallbackParticleMaterial = new Material(shader)
+            {
+                name = owner + " Particle Preview Fallback Material",
+                hideFlags = ESEditorPreviewUtility.PreviewHideFlags,
+                color = Color.white
+            };
+            return fallbackParticleMaterial;
+        }
+
         private void ApplyCameraPose(float aspect, ESEditorPreviewCameraPose pose, ESEditorPreviewQuality quality)
         {
             Camera.aspect = Mathf.Max(0.25f, aspect);
             Quaternion orbit = Quaternion.Euler(pose.Pitch, pose.Yaw, 0f);
-            float distance = Mathf.Max(1.2f, pose.Radius * 2.8f * pose.Zoom);
-            Camera.transform.position = pose.Center + orbit * new Vector3(0f, pose.Radius * 0.18f, distance);
+            float verticalHalfFov = Mathf.Max(1f, Camera.fieldOfView * 0.5f) * Mathf.Deg2Rad;
+            float horizontalHalfFov = Mathf.Atan(Mathf.Tan(verticalHalfFov) * Camera.aspect);
+            float limitingHalfFov = Mathf.Max(1f * Mathf.Deg2Rad, Mathf.Min(verticalHalfFov, horizontalHalfFov));
+            float fittedDistance = pose.Radius / Mathf.Max(0.02f, Mathf.Sin(limitingHalfFov));
+            float distance = Mathf.Max(0.03f, fittedDistance * pose.Zoom);
+            Camera.transform.position = pose.Center + orbit * Vector3.back * distance;
             Camera.transform.LookAt(pose.Center);
-            Camera.farClipPlane = CameraFarClip;
+            Camera.nearClipPlane = Mathf.Clamp(distance * 0.0025f, 0.001f, 0.05f);
+            Camera.farClipPlane = sceneMode == ESEditorPreviewSceneMode.PreviewScene
+                ? Mathf.Max(CameraFarClip, distance + pose.Radius * 2.5f)
+                : CameraFarClip;
             Camera.cullingMask = 1 << previewLayer;
             Camera.allowHDR = quality == ESEditorPreviewQuality.High;
             Camera.allowMSAA = quality != ESEditorPreviewQuality.Fast;
@@ -549,6 +1487,7 @@ namespace ES
             renderTextureHeight = height;
             renderTextureQuality = quality;
             renderTexture = ESEditorPreviewUtility.CreateRenderTexture(width, height, 24, GetAntiAliasing(quality), owner + " Preview RT");
+            ESEditorPreviewLifecycleHub.NotifyResourceChanged();
         }
 
         private bool MoveToContextScene(GameObject obj)
@@ -607,6 +1546,13 @@ namespace ES
                 default:
                     return 1;
             }
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return !float.IsNaN(value.x) && !float.IsInfinity(value.x)
+                && !float.IsNaN(value.y) && !float.IsInfinity(value.y)
+                && !float.IsNaN(value.z) && !float.IsInfinity(value.z);
         }
 
         private static Vector2Int AllocateCell(int allocationId, out string report)

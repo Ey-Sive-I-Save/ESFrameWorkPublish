@@ -45,6 +45,8 @@ namespace ES
         internal ESUIWindowDefinition definition;
         internal ESUIWindowView view;
         internal GameObject gameObject;
+        internal GameObject poolPrefab;
+        internal string poolKey;
         internal ESRuntimeModeLease runtimeModeLease;
         internal CancellationTokenSource lifetimeCancellation;
         internal ESUIWindowContext context;

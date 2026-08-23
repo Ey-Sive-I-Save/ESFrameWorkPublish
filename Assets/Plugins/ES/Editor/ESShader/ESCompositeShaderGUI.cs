@@ -18,8 +18,11 @@ namespace ES.EditorInternal
             Material material = materialEditor.target as Material;
             string shaderName = material != null && material.shader != null ? material.shader.name : string.Empty;
             InspectorViewLevel viewLevel = DrawStatus(materialEditor, properties, shaderName);
+            DrawMaterialMigrationPanel(materialEditor);
             DrawPresetPanel(materialEditor, properties, shaderName);
+            DrawProductionTools(materialEditor);
             DrawEnvironmentDiagnostics(materialEditor, properties, shaderName);
+            DrawTextureImportDiagnostics(materialEditor, properties, shaderName);
             string effectFilter = DrawEffectNavigator(shaderName, properties);
             int propertySignatureBeforeDraw = GetMaterialPropertyValueSignature(properties);
             DrawPropertyStream(materialEditor, properties, shaderName, effectFilter, viewLevel);

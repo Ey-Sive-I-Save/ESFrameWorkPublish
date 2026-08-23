@@ -5,61 +5,11 @@ using ES;
 namespace ES.Editor
 {
     /// <summary>
-    /// 资产收集功能测试工具
+    /// Library 作者态与统一内容注册入口测试工具。
     /// </summary>
     public static class AssetCollectionDebugTest
     {
-        [MenuItem(MenuItemPathDefine.DEBUG_PATH + "资源收集/测试资源收集配置", false, 9100)]
-        public static void TestAssetCollectionConfig()
-        {
-            Debug.Log("===== 资产收集配置测试 =====");
-            
-            // 查找第一个ESAssetLibrary进行测试
-            var libraries = ESEditorSO.GetGroupOfType<ESAssetLibrary>();
-            if (libraries == null || libraries.Count == 0)
-            {
-                Debug.LogWarning("未找到任何ESAssetLibrary资产");
-                return;
-            }
-            
-            var testLibrary = libraries[0];
-            
-            if (testLibrary == null)
-            {
-                Debug.LogError("无法加载ESAssetLibrary");
-                return;
-            }
-            
-            Debug.Log($"测试Library: {testLibrary.Name}");
-            
-            // 测试配置访问
-            Debug.Log("\n--- 测试1: 访问配置 ---");
-            var config = testLibrary.collectionConfig;
-            Debug.Log($"总体优先级: {config.overallPriority}");
-            
-            // 测试设置优先级
-            Debug.Log("\n--- 测试2: 设置优先级 ---");
-            config.SetPriority(ESAssetCategory.Texture, ESAssetCollectionPriority.Highest);
-            Debug.Log($"纹理优先级已设为: {config.GetPriority(ESAssetCategory.Texture)}");
-            
-            config.SetPriority(ESAssetCategory.Audio, ESAssetCollectionPriority.Medium);
-            Debug.Log($"音频优先级已设为: {config.GetPriority(ESAssetCategory.Audio)}");
-            
-            // 测试资产类型判断
-            Debug.Log("\n--- 测试3: 资产类型判断 ---");
-            var testTexture = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Editor Default Resources/Gaskellgames/FolderSystem/Editor/Icons/Folder_01.png");
-            if (testTexture != null)
-            {
-                var category = ESGlobalResToolsSupportConfig.DetermineAssetCategory(testTexture);
-                Debug.Log($"测试纹理判断结果: {category}");
-            }
-            
-            EditorUtility.SetDirty(testLibrary);
-            Debug.Log("\n===== 测试完成 =====");
-        }
-        
-        
-        [MenuItem(MenuItemPathDefine.DEBUG_PATH + "资源收集/测试 Book 去重功能", false, 9110)]
+        [MenuItem(MenuItemPathDefine.DEBUG_PATH + "内容注册/测试 Book 去重功能", false, 9110)]
         public static void TestBookDuplication()
         {
             Debug.Log("===== Book去重功能测试 =====");
@@ -71,7 +21,7 @@ namespace ES.Editor
             Debug.Log("===== 测试说明完成 =====");
         }
         
-        [MenuItem(MenuItemPathDefine.DEBUG_PATH + "资源收集/测试默认 Book 类别匹配", false, 9120)]
+        [MenuItem(MenuItemPathDefine.DEBUG_PATH + "内容注册/测试默认 Book 类别匹配", false, 9120)]
         public static void TestDefaultBookCategoryMatching()
         {
             Debug.Log("===== DefaultBook类别匹配测试 =====");
@@ -106,13 +56,13 @@ namespace ES.Editor
             Debug.Log("\n===== 测试完成 =====");
         }
         
-        [MenuItem("Assets/【ES】/资源与发布/收集到推荐 Library", true)]
+        [MenuItem("Assets/【ES】/资源与发布/注册到 Library", true)]
         public static bool ValidateCollectAsset()
         {
             return Selection.objects != null && Selection.objects.Length > 0;
         }
         
-        [MenuItem("Assets/【ES】/资源与发布/收集到推荐 Library")]
+        [MenuItem("Assets/【ES】/资源与发布/注册到 Library")]
         public static void CollectSelectedAsset()
         {
             var assets = Selection.objects;

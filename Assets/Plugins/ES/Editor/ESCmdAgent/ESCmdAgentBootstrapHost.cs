@@ -33,7 +33,7 @@ namespace ES
     {
         public string mode = string.Empty;
         // This never routes a Codex conversation. It only reconnects a durable operation
-        // directory to the already-persisted local workbench tab after reload/crash.
+        // directory to the already-persisted local console tab after reload/crash.
         public string localSessionId = string.Empty;
         public string projectPath = string.Empty;
         public string sessionId = string.Empty;

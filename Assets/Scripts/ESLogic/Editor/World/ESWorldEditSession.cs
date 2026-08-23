@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEditor;
@@ -41,6 +42,101 @@ namespace ES
         }
     }
 
+    internal readonly struct ESWorldEditSessionConsistencySnapshot
+    {
+        public ESWorldEditSessionConsistencySnapshot(
+            string ownerSessionId,
+            string conflictOwnerSessionId,
+            string[] activeOwnerSessionIds,
+            string baselineHash,
+            string draftHash,
+            string actualDraftHash,
+            string currentSourceHash,
+            int changeCount,
+            bool isDirty,
+            bool hasExternalConflict,
+            bool memoryDraftHashMatches,
+            bool dirtyMatchesHashes,
+            bool changeSetMatchesDirty,
+            bool persistedBaselineMatches,
+            bool persistedDraftMatches,
+            bool persistedChangeSetMatches,
+            bool conflictMatchesSource)
+        {
+            OwnerSessionId = ownerSessionId ?? string.Empty;
+            ConflictOwnerSessionId = conflictOwnerSessionId ?? string.Empty;
+            ActiveOwnerSessionIds = activeOwnerSessionIds ?? Array.Empty<string>();
+            BaselineHash = baselineHash ?? string.Empty;
+            DraftHash = draftHash ?? string.Empty;
+            ActualDraftHash = actualDraftHash ?? string.Empty;
+            CurrentSourceHash = currentSourceHash ?? string.Empty;
+            ChangeCount = changeCount;
+            IsDirty = isDirty;
+            HasExternalConflict = hasExternalConflict;
+            MemoryDraftHashMatches = memoryDraftHashMatches;
+            DirtyMatchesHashes = dirtyMatchesHashes;
+            ChangeSetMatchesDirty = changeSetMatchesDirty;
+            PersistedBaselineMatches = persistedBaselineMatches;
+            PersistedDraftMatches = persistedDraftMatches;
+            PersistedChangeSetMatches = persistedChangeSetMatches;
+            ConflictMatchesSource = conflictMatchesSource;
+        }
+
+        public string OwnerSessionId { get; }
+        public string ConflictOwnerSessionId { get; }
+        public IReadOnlyList<string> ActiveOwnerSessionIds { get; }
+        public string BaselineHash { get; }
+        public string DraftHash { get; }
+        public string ActualDraftHash { get; }
+        public string CurrentSourceHash { get; }
+        public int ChangeCount { get; }
+        public bool IsDirty { get; }
+        public bool HasExternalConflict { get; }
+        public bool MemoryDraftHashMatches { get; }
+        public bool DirtyMatchesHashes { get; }
+        public bool ChangeSetMatchesDirty { get; }
+        public bool PersistedBaselineMatches { get; }
+        public bool PersistedDraftMatches { get; }
+        public bool PersistedChangeSetMatches { get; }
+        public bool ConflictMatchesSource { get; }
+        public bool Passed => MemoryDraftHashMatches
+            && DirtyMatchesHashes
+            && ChangeSetMatchesDirty
+            && PersistedBaselineMatches
+            && PersistedDraftMatches
+            && PersistedChangeSetMatches
+            && ConflictMatchesSource;
+
+        public string Summary => Passed
+            ? "Draft、ChangeSet、Dirty、SessionState 与 Source 冲突状态一致"
+            : "会话状态存在不一致，提交前必须重新载入或修复";
+
+        public string ToDiagnosticText()
+        {
+            var builder = new StringBuilder(512);
+            builder.AppendLine("ES World 会话一致性诊断");
+            builder.AppendLine("Owner=" + OwnerSessionId);
+            builder.AppendLine("ActiveOwners=" + string.Join(",", ActiveOwnerSessionIds));
+            builder.AppendLine("ConflictOwner=" + ConflictOwnerSessionId);
+            builder.AppendLine("BaselineHash=" + BaselineHash);
+            builder.AppendLine("DraftHash=" + DraftHash);
+            builder.AppendLine("ActualDraftHash=" + ActualDraftHash);
+            builder.AppendLine("CurrentSourceHash=" + CurrentSourceHash);
+            builder.AppendLine("ChangeCount=" + ChangeCount);
+            builder.AppendLine("Dirty=" + IsDirty);
+            builder.AppendLine("ExternalConflict=" + HasExternalConflict);
+            builder.AppendLine("MemoryDraftHashMatches=" + MemoryDraftHashMatches);
+            builder.AppendLine("DirtyMatchesHashes=" + DirtyMatchesHashes);
+            builder.AppendLine("ChangeSetMatchesDirty=" + ChangeSetMatchesDirty);
+            builder.AppendLine("PersistedBaselineMatches=" + PersistedBaselineMatches);
+            builder.AppendLine("PersistedDraftMatches=" + PersistedDraftMatches);
+            builder.AppendLine("PersistedChangeSetMatches=" + PersistedChangeSetMatches);
+            builder.AppendLine("ConflictMatchesSource=" + ConflictMatchesSource);
+            builder.Append("Passed=" + Passed);
+            return builder.ToString();
+        }
+    }
+
     /// <summary>
     /// Owns one isolated authoring draft. UI and preview code must edit Draft only; Source is
     /// mutated exclusively by TryCommit after the baseline drift guard succeeds.
@@ -53,13 +149,21 @@ namespace ES
         private const string DraftSuffix = ".Draft";
         private const string ChangeSetSuffix = ".ChangeSet";
 
+        private static readonly Dictionary<string, HashSet<ESWorldEditSession>> ActiveSessions =
+            new Dictionary<string, HashSet<ESWorldEditSession>>(StringComparer.Ordinal);
+
+        private readonly string sourceIdentity;
         private readonly string identity;
+        private readonly string ownerSessionId;
         private string baselineJson;
         private string baselineHash;
         private string draftHash;
         private bool externalConflict;
+        private string conflictOwnerSessionId = string.Empty;
         private bool disposed;
         private readonly HashSet<string> changedPaths = new HashSet<string>(StringComparer.Ordinal);
+        private ESWorldMapAsset baselineSnapshot;
+        private SerializedObject serializedBaseline;
 
         public ESWorldMapAsset Source { get; }
         public ESWorldMapAsset Draft { get; private set; }
@@ -67,13 +171,24 @@ namespace ES
         public bool HasExternalConflict => externalConflict;
         public bool IsDirty => !string.Equals(baselineHash, draftHash, StringComparison.Ordinal);
         public string BaselineHash => baselineHash;
+        public string DraftHash => draftHash;
+        public string CurrentSourceHash => Source == null ? string.Empty : ComputeStateHash(Source);
+        public bool HasUntrackedDraftMutation => Draft != null
+            && !string.Equals(ComputeStateHash(Draft), draftHash, StringComparison.Ordinal);
+        public string OwnerSessionId => ownerSessionId;
+        public string ConflictOwnerSessionId => conflictOwnerSessionId;
         public IReadOnlyCollection<string> ChangedPaths => changedPaths;
         public int ChangeCount => changedPaths.Count;
 
-        private ESWorldEditSession(ESWorldMapAsset source)
+        private ESWorldEditSession(ESWorldMapAsset source, string ownerSessionId)
         {
             Source = source != null ? source : throw new ArgumentNullException(nameof(source));
-            identity = ResolveIdentity(source);
+            Source.EnsureAuthoringContainers();
+            sourceIdentity = ResolveIdentity(source);
+            this.ownerSessionId = NormalizeOwnerSessionId(ownerSessionId);
+            identity = string.IsNullOrEmpty(this.ownerSessionId)
+                ? sourceIdentity
+                : sourceIdentity + ".Owner." + ComputeHash(this.ownerSessionId).Substring(0, 16);
             string currentJson = Serialize(source);
             string currentHash = ComputeHash(currentJson);
             string storedBaseline = SessionState.GetString(SessionPrefix + identity + BaselineSuffix, string.Empty);
@@ -99,15 +214,22 @@ namespace ES
             }
 
             draftHash = ComputeStateHash(Draft);
-            if (!string.Equals(baselineHash, draftHash, StringComparison.Ordinal) && changedPaths.Count == 0)
-                changedPaths.Add("definition");
-            externalConflict = !string.Equals(baselineHash, currentHash, StringComparison.Ordinal);
             SerializedDraft = new SerializedObject(Draft);
+            CreateOrUpdateBaselineSnapshot();
+            RebuildChangedPaths("definition");
+            externalConflict = !string.Equals(baselineHash, currentHash, StringComparison.Ordinal);
+            RegisterActiveSession();
+            Persist();
         }
 
         public static ESWorldEditSession Open(ESWorldMapAsset source)
         {
-            return source == null ? null : new ESWorldEditSession(source);
+            return Open(source, null);
+        }
+
+        public static ESWorldEditSession Open(ESWorldMapAsset source, string ownerSessionId)
+        {
+            return source == null ? null : new ESWorldEditSession(source, ownerSessionId);
         }
 
         public void NotifyDraftChanged(string changePath = "definition")
@@ -117,7 +239,7 @@ namespace ES
             EditorUtility.SetDirty(Draft);
             string draftJson = Serialize(Draft);
             draftHash = ComputeHash(draftJson);
-            if (!string.IsNullOrWhiteSpace(changePath)) changedPaths.Add(changePath.Trim());
+            RebuildChangedPaths(changePath);
             Persist(draftJson);
         }
 
@@ -125,12 +247,10 @@ namespace ES
         {
             ThrowIfDisposed();
             SerializedDraft.UpdateIfRequiredOrScript();
+            Draft.EnsureAuthoringContainers();
             string draftJson = Serialize(Draft);
             draftHash = ComputeHash(draftJson);
-            if (string.Equals(baselineHash, draftHash, StringComparison.Ordinal))
-                changedPaths.Clear();
-            else if (changedPaths.Count == 0)
-                changedPaths.Add("definition");
+            RebuildChangedPaths("definition");
             Persist(draftJson);
         }
 
@@ -139,6 +259,7 @@ namespace ES
             ThrowIfDisposed();
             Undo.RecordObject(Draft, "回退世界草稿");
             EditorJsonUtility.FromJsonOverwrite(baselineJson, Draft);
+            Draft.EnsureAuthoringContainers();
             SerializedDraft.Update();
             draftHash = baselineHash;
             changedPaths.Clear();
@@ -148,12 +269,16 @@ namespace ES
         public void ReloadFromSource()
         {
             ThrowIfDisposed();
+            Source.EnsureAuthoringContainers();
             baselineJson = Serialize(Source);
             baselineHash = ComputeHash(baselineJson);
             externalConflict = false;
+            conflictOwnerSessionId = string.Empty;
             Undo.RecordObject(Draft, "重新载入世界资产");
             EditorJsonUtility.FromJsonOverwrite(baselineJson, Draft);
+            Draft.EnsureAuthoringContainers();
             SerializedDraft.Update();
+            CreateOrUpdateBaselineSnapshot();
             draftHash = baselineHash;
             changedPaths.Clear();
             Persist(baselineJson);
@@ -194,11 +319,14 @@ namespace ES
             baselineJson = Serialize(Source);
             baselineHash = ComputeHash(baselineJson);
             externalConflict = false;
+            conflictOwnerSessionId = string.Empty;
             EditorJsonUtility.FromJsonOverwrite(baselineJson, Draft);
             SerializedDraft.Update();
+            CreateOrUpdateBaselineSnapshot();
             draftHash = baselineHash;
             changedPaths.Clear();
             Persist(baselineJson);
+            NotifyOtherSessionsSourceCommitted();
             return new ESWorldEditCommitResult(true, false,
                 save.contentChanged ? "草稿已提交，地图内容签名已更新。" : "草稿已提交。");
         }
@@ -207,10 +335,15 @@ namespace ES
         {
             if (disposed) return;
             disposed = true;
+            UnregisterActiveSession();
             SerializedDraft?.Dispose();
             SerializedDraft = null;
             if (Draft != null) UnityEngine.Object.DestroyImmediate(Draft);
             Draft = null;
+            serializedBaseline?.Dispose();
+            serializedBaseline = null;
+            if (baselineSnapshot != null) UnityEngine.Object.DestroyImmediate(baselineSnapshot);
+            baselineSnapshot = null;
         }
 
         internal void ClearRecoveryState()
@@ -230,7 +363,63 @@ namespace ES
         {
             ThrowIfDisposed();
             externalConflict = !string.Equals(baselineHash, ComputeStateHash(Source), StringComparison.Ordinal);
+            if (!externalConflict) conflictOwnerSessionId = string.Empty;
             return externalConflict;
+        }
+
+        internal static int GetActiveSessionCount(ESWorldMapAsset source)
+        {
+            if (source == null) return 0;
+            string key = ResolveIdentity(source);
+            return ActiveSessions.TryGetValue(key, out HashSet<ESWorldEditSession> sessions)
+                ? sessions.Count : 0;
+        }
+
+        internal ESWorldEditSessionConsistencySnapshot CaptureConsistencySnapshot()
+        {
+            ThrowIfDisposed();
+            string actualDraftJson = Serialize(Draft);
+            string actualDraftHash = ComputeHash(actualDraftJson);
+            string sourceHash = ComputeStateHash(Source);
+            bool actualDirty = !string.Equals(baselineHash, actualDraftHash, StringComparison.Ordinal);
+            bool actualConflict = !string.Equals(baselineHash, sourceHash, StringComparison.Ordinal);
+            string persistedBaseline = SessionState.GetString(
+                SessionPrefix + identity + BaselineSuffix, string.Empty);
+            string persistedBaselineHash = SessionState.GetString(
+                SessionPrefix + identity + BaselineHashSuffix, string.Empty);
+            string persistedDraft = SessionState.GetString(
+                SessionPrefix + identity + DraftSuffix, string.Empty);
+            string persistedChangeSet = SessionState.GetString(
+                SessionPrefix + identity + ChangeSetSuffix, string.Empty);
+            string[] persistedPaths = persistedChangeSet
+                .Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToArray();
+            string[] memoryPaths = changedPaths
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToArray();
+            string[] activeOwners = GetActiveOwnerSessionIds();
+
+            return new ESWorldEditSessionConsistencySnapshot(
+                ownerSessionId,
+                conflictOwnerSessionId,
+                activeOwners,
+                baselineHash,
+                draftHash,
+                actualDraftHash,
+                sourceHash,
+                changedPaths.Count,
+                IsDirty,
+                externalConflict,
+                string.Equals(draftHash, actualDraftHash, StringComparison.Ordinal),
+                IsDirty == actualDirty,
+                actualDirty ? changedPaths.Count > 0 : changedPaths.Count == 0,
+                string.Equals(persistedBaseline, baselineJson, StringComparison.Ordinal)
+                    && string.Equals(persistedBaselineHash, baselineHash, StringComparison.Ordinal)
+                    && string.Equals(ComputeHash(persistedBaseline), persistedBaselineHash, StringComparison.Ordinal),
+                string.Equals(ComputeHash(persistedDraft), actualDraftHash, StringComparison.Ordinal),
+                persistedPaths.SequenceEqual(memoryPaths, StringComparer.Ordinal),
+                externalConflict == actualConflict);
         }
 
         private void Persist(string draftJson = null)
@@ -238,7 +427,120 @@ namespace ES
             SessionState.SetString(SessionPrefix + identity + BaselineSuffix, baselineJson ?? string.Empty);
             SessionState.SetString(SessionPrefix + identity + BaselineHashSuffix, baselineHash ?? string.Empty);
             SessionState.SetString(SessionPrefix + identity + DraftSuffix, draftJson ?? Serialize(Draft));
-            SessionState.SetString(SessionPrefix + identity + ChangeSetSuffix, string.Join("\n", changedPaths));
+            SessionState.SetString(
+                SessionPrefix + identity + ChangeSetSuffix,
+                string.Join("\n", changedPaths.OrderBy(value => value, StringComparer.Ordinal)));
+        }
+
+        private void CreateOrUpdateBaselineSnapshot()
+        {
+            if (baselineSnapshot == null)
+            {
+                baselineSnapshot = CreateDraft(Source, baselineJson);
+                baselineSnapshot.name = Source.name + " (Baseline Snapshot)";
+                serializedBaseline = new SerializedObject(baselineSnapshot);
+                return;
+            }
+
+            EditorJsonUtility.FromJsonOverwrite(baselineJson, baselineSnapshot);
+            serializedBaseline.UpdateIfRequiredOrScript();
+        }
+
+        private void RebuildChangedPaths(string fallbackPath)
+        {
+            changedPaths.Clear();
+            if (string.Equals(baselineHash, draftHash, StringComparison.Ordinal)) return;
+            if (SerializedDraft == null || serializedBaseline == null)
+            {
+                AddFallbackPath(fallbackPath);
+                return;
+            }
+
+            SerializedDraft.UpdateIfRequiredOrScript();
+            serializedBaseline.UpdateIfRequiredOrScript();
+            SerializedProperty property = SerializedDraft.GetIterator();
+            bool enterChildren = true;
+            while (property.Next(enterChildren))
+            {
+                enterChildren = false;
+                if (IsUnityObjectMetadata(property)) continue;
+                if (property.propertyType == SerializedPropertyType.Generic
+                    && property.hasVisibleChildren)
+                {
+                    enterChildren = true;
+                    continue;
+                }
+                SerializedProperty baselineProperty = serializedBaseline.FindProperty(property.propertyPath);
+                if (baselineProperty == null || !SerializedProperty.DataEquals(property, baselineProperty))
+                    changedPaths.Add(property.propertyPath);
+            }
+
+            if (changedPaths.Count == 0) AddFallbackPath(fallbackPath);
+        }
+
+        private static bool IsUnityObjectMetadata(SerializedProperty property)
+        {
+            if (property == null || property.depth != 0) return false;
+            switch (property.propertyPath)
+            {
+                case "m_ObjectHideFlags":
+                case "m_CorrespondingSourceObject":
+                case "m_PrefabInstance":
+                case "m_PrefabAsset":
+                case "m_GameObject":
+                case "m_Enabled":
+                case "m_EditorHideFlags":
+                case "m_Script":
+                case "m_Name":
+                case "m_EditorClassIdentifier":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private void AddFallbackPath(string fallbackPath)
+        {
+            changedPaths.Add(string.IsNullOrWhiteSpace(fallbackPath) ? "definition" : fallbackPath.Trim());
+        }
+
+        private void RegisterActiveSession()
+        {
+            if (!ActiveSessions.TryGetValue(sourceIdentity, out HashSet<ESWorldEditSession> sessions))
+            {
+                sessions = new HashSet<ESWorldEditSession>();
+                ActiveSessions.Add(sourceIdentity, sessions);
+            }
+            sessions.Add(this);
+        }
+
+        private string[] GetActiveOwnerSessionIds()
+        {
+            if (!ActiveSessions.TryGetValue(sourceIdentity, out HashSet<ESWorldEditSession> sessions))
+                return Array.Empty<string>();
+            return sessions
+                .Where(session => session != null && !session.disposed)
+                .Select(session => session.ownerSessionId)
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        private void UnregisterActiveSession()
+        {
+            if (!ActiveSessions.TryGetValue(sourceIdentity, out HashSet<ESWorldEditSession> sessions)) return;
+            sessions.Remove(this);
+            if (sessions.Count == 0) ActiveSessions.Remove(sourceIdentity);
+        }
+
+        private void NotifyOtherSessionsSourceCommitted()
+        {
+            if (!ActiveSessions.TryGetValue(sourceIdentity, out HashSet<ESWorldEditSession> sessions)) return;
+            foreach (ESWorldEditSession session in sessions)
+            {
+                if (session == null || ReferenceEquals(session, this) || session.disposed) continue;
+                session.externalConflict = true;
+                session.conflictOwnerSessionId = ownerSessionId;
+            }
         }
 
         private static ESWorldMapAsset CreateDraft(ESWorldMapAsset source, string json)
@@ -247,6 +549,7 @@ namespace ES
             draft.name = source.name + " (Draft)";
             draft.hideFlags = HideFlags.HideAndDontSave;
             if (!string.IsNullOrEmpty(json)) EditorJsonUtility.FromJsonOverwrite(json, draft);
+            draft.EnsureAuthoringContainers();
             return draft;
         }
 
@@ -255,6 +558,11 @@ namespace ES
             string path = AssetDatabase.GetAssetPath(source);
             string guid = string.IsNullOrEmpty(path) ? string.Empty : AssetDatabase.AssetPathToGUID(path);
             return string.IsNullOrEmpty(guid) ? "Instance." + source.GetInstanceID() : "Guid." + guid;
+        }
+
+        private static string NormalizeOwnerSessionId(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
         }
 
         private static string Serialize(ESWorldMapAsset asset)

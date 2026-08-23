@@ -2,6 +2,7 @@ Shader "ES/3D/VFX Composite URP"
 {
     Properties
     {
+        [HideInInspector] _ESMaterialVersion ("ES Material Version", Float) = 1
         // Base Input
         [MainTexture] _MainTex ("主纹理", 2D) = "white" {}
         [MainColor] _Color ("基础颜色", Color) = (1,1,1,1)
@@ -11,7 +12,12 @@ Shader "ES/3D/VFX Composite URP"
         _MainTexScaleOffset ("主纹理缩放/偏移", Vector) = (1,1,0,0)
         [Enum(SceneTime,0,UnscaledTime,1,CustomTime,2)] _TimeMode ("时间来源", Float) = 0
         _CustomTime ("自定义时间", Float) = 0
-        _TimeScale ("时间倍率", Range(0,4)) = 1
+        _TimeScale ("时间倍率", Range(-4,4)) = 1
+        [Toggle] _EnableTimeFPS ("启用时间帧率量化", Float) = 0
+        _TimeFPS ("时间帧率", Range(0.01,240)) = 5
+        [Toggle] _EnableTimeFrequency ("启用周期时间", Float) = 0
+        _TimeFrequency ("时间周期频率", Float) = 2
+        _TimeRange ("时间周期范围", Float) = 0.5
 
         // Particle Input - Sequence
         [Toggle] _EnableSequence ("启用序列帧", Float) = 0
@@ -47,6 +53,7 @@ Shader "ES/3D/VFX Composite URP"
         _NoiseScale ("噪声缩放", Vector) = (1,1,0,0)
         _NoiseSpeed ("噪声速度", Vector) = (0,0,0,0)
         _Distortion ("扰动强度", Range(0,0.2)) = 0
+        _DistortionDirection ("扰动方向与轴强度", Vector) = (1,1,0,0)
 
         [Toggle] _EnableFlow ("启用纹理流动", Float) = 0
         _FlowSpeed ("流动速度", Vector) = (0,0,0,0)
@@ -63,6 +70,8 @@ Shader "ES/3D/VFX Composite URP"
         _ShineSpeed ("扫光速度", Float) = 1
         _ShineWidth ("扫光宽度", Range(0.001,1)) = 0.15
         _ShineIntensity ("扫光强度", Range(0,8)) = 1
+        [Enum(CompatibleDefault,0,LocalUV,1,WorldProjection,2)] _ShineSpace ("扫光空间", Float) = 0
+        _ShineDirection ("扫光方向", Vector) = (0,1,0,0)
         [Toggle] _EnableSparkle ("启用亮晶晶", Float) = 0
         [HDR] _SparkleColor ("亮晶晶颜色", Color) = (1,1,1,1)
         _SparkleScale ("亮晶晶密度", Range(1,128)) = 24
@@ -98,6 +107,17 @@ Shader "ES/3D/VFX Composite URP"
         _HologramGap ("全息线间隔", Range(0,1)) = 0.35
         _HologramSpeed ("全息速度", Float) = 1
         _HologramMinAlpha ("全息最低透明度", Range(0,1)) = 0.2
+        _HologramFade ("SSU 全息淡入", Range(0,1)) = 1
+        _HologramContrast ("SSU 全息对比度", Float) = 1
+        [Enum(LocalUV,0,WorldProjection,1)] _HologramSpace ("全息扫描空间", Float) = 1
+        _HologramDirection ("全息扫描方向", Vector) = (0,1,0,0)
+        _HologramLineFrequency ("SSU 全息线频率", Float) = 60
+        _HologramLineGap ("SSU 全息线间隔", Float) = 0.35
+        _HologramDistortionOffset ("SSU 全息扰动偏移", Float) = 0.5
+        _HologramDistortionDirection ("全息扰动方向", Vector) = (1,0,0,0)
+        _HologramDistortionSpeed ("SSU 全息扰动速度", Float) = 2
+        _HologramDistortionDensity ("SSU 全息扰动密度", Float) = 0.5
+        _HologramDistortionScale ("SSU 全息扰动缩放", Float) = 10
 
         // Dynamic Effects - Rim
         [Toggle] _EnableRim ("启用边缘光", Float) = 0
@@ -117,6 +137,19 @@ Shader "ES/3D/VFX Composite URP"
         [Toggle] _EnableGlitch ("启用故障", Float) = 0
         _GlitchAmount ("故障偏移", Range(0,0.2)) = 0.02
         _GlitchSpeed ("故障速度", Float) = 3
+        _GlitchScanDirection ("故障条带方向", Vector) = (0,1,0,0)
+        _GlitchFade ("SSU 故障淡入", Range(0,1)) = 1
+        _GlitchMaskMin ("SSU 故障遮罩下限", Range(0,1)) = 0.4
+        _GlitchMaskScale ("SSU 故障遮罩缩放", Vector) = (0,0.2,0,0)
+        _GlitchMaskSpeed ("SSU 故障遮罩速度", Vector) = (0,4,0,0)
+        _GlitchHueSpeed ("SSU 故障色相速度", Float) = 0.5
+        _GlitchBrightness ("SSU 故障亮度", Float) = 2
+        _GlitchNoiseScale ("SSU 故障噪声缩放", Vector) = (0,3,0,0)
+        _GlitchNoiseSpeed ("SSU 故障噪声速度", Vector) = (0,1,0,0)
+        _GlitchDistortion ("SSU 故障位移", Vector) = (0.1,0,0,0)
+        _GlitchDistortionScale ("SSU 故障位移缩放", Vector) = (0,3,0,0)
+        _GlitchDistortionSpeed ("SSU 故障位移速度", Vector) = (0,1,0,0)
+        [Toggle] _SSUStatusContract ("使用 SSU 精确全息/故障合同", Float) = 0
         [HDR] _EmissionColor ("自发光颜色", Color) = (0,0,0,1)
 
         // Depth Interaction
@@ -131,7 +164,7 @@ Shader "ES/3D/VFX Composite URP"
         // Output And Quality
         [Toggle] _AlphaClip ("启用透明裁剪", Float) = 0
         _Cutoff ("透明裁剪阈值", Range(0,1)) = 0.01
-        [Enum(Basic,0,Standard,1,High,2)] _QualityTier ("效果质量档位", Float) = 1
+        [Enum(Basic,0,Standard,1,High,2)] _QualityTier ("效果质量档位", Float) = 0
 
         // Render State
         [Enum(Alpha,0,Additive,1,Premultiply,2,Multiply,3)] _BlendMode ("混合模式", Float) = 0

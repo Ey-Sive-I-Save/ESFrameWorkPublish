@@ -1,3 +1,126 @@
+/* Native controls that are not bound to ES Presentation still receive the
+   same restrained geometry when the opt-in deep skin is enabled. Keep the
+   radius smaller for rows than for framed surfaces so dense editor lists do
+   not turn into a stack of pills. */
+.es-global-editor-skin .unity-button,
+.es-global-editor-skin .unity-toolbar,
+.es-global-editor-skin .unity-toolbar__contents-container,
+.es-global-editor-skin .unity-toolbar-button,
+.es-global-editor-skin .unity-toolbar-menu,
+.es-global-editor-skin .unity-base-field,
+.es-global-editor-skin .unity-base-text-field,
+.es-global-editor-skin .unity-base-field__input,
+.es-global-editor-skin .unity-base-text-field__input,
+.es-global-editor-skin .unity-text-input,
+.es-global-editor-skin .unity-search-field,
+.es-global-editor-skin .unity-search-field__text-input,
+.es-global-editor-skin .unity-object-field,
+.es-global-editor-skin .unity-object-field__input,
+.es-global-editor-skin .unity-base-popup-field,
+.es-global-editor-skin .unity-base-popup-field__input,
+.es-global-editor-skin .unity-popup-field,
+.es-global-editor-skin .unity-popup-field__input,
+.es-global-editor-skin .unity-enum-field,
+.es-global-editor-skin .unity-tag-field,
+.es-global-editor-skin .unity-layer-field,
+.es-global-editor-skin .unity-mask-field,
+.es-global-editor-skin .unity-slider,
+.es-global-editor-skin .unity-min-max-slider,
+.es-global-editor-skin .unity-toggle,
+.es-global-editor-skin .unity-foldout,
+.es-global-editor-skin .unity-toggle__input,
+.es-global-editor-skin .unity-foldout__toggle,
+.es-global-editor-skin .unity-toolbar__dropdown,
+.es-global-editor-skin .unity-toolbar__button,
+.es-global-editor-skin .unity-object-field__selector,
+.es-global-editor-skin .unity-base-popup-field__arrow,
+.es-global-editor-skin .unity-base-slider__tracker,
+.es-global-editor-skin .unity-base-slider__dragger,
+.es-global-editor-skin .unity-slider__tracker,
+.es-global-editor-skin .unity-property-field__input,
+.es-global-editor-skin .unity-foldout__content {
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.es-global-editor-skin .unity-list-view,
+.es-global-editor-skin .unity-tree-view,
+.es-global-editor-skin .unity-collection-view,
+.es-global-editor-skin .unity-scroll-view,
+.es-global-editor-skin .unity-scroll-view__content-viewport,
+.es-global-editor-skin .unity-scroll-view__content-container,
+.es-global-editor-skin .unity-tab,
+.es-global-editor-skin .unity-tab-view__content,
+.es-global-editor-skin .unity-tab__content,
+.es-global-editor-skin .unity-help-box,
+.es-global-editor-skin .unity-box,
+.es-global-editor-skin .unity-property-field,
+.es-global-editor-skin .unity-inspector-element,
+.es-global-editor-skin .unity-two-pane-split-view,
+.es-global-editor-skin .unity-two-pane-split-view__content-container,
+.es-global-editor-skin .unity-split-view,
+.es-global-editor-skin .unity-progress-bar,
+.es-global-editor-skin .unity-progress-bar__background,
+.es-global-editor-skin .unity-scroller,
+.es-global-editor-skin .unity-scroll-view__horizontal-scroller,
+.es-global-editor-skin .unity-scroll-view__vertical-scroller {
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+/* Secondary surfaces used by inspectors, popups and split workspaces. These
+   are deliberately separate from the control radius so nested panels read as
+   framed surfaces instead of a row of unrelated pills. */
+.es-global-editor-skin .unity-foldout__content,
+.es-global-editor-skin .unity-popup-window,
+.es-global-editor-skin .unity-dropdown,
+.es-global-editor-skin .unity-base-popup-field__input,
+.es-global-editor-skin .unity-popup-field__input,
+.es-global-editor-skin .unity-scroller__low-button,
+.es-global-editor-skin .unity-scroller__high-button,
+.es-global-editor-skin .unity-split-view__dragline,
+.es-global-editor-skin .unity-two-pane-split-view__dragline,
+.es-global-editor-skin #ESWindowShell,
+.es-global-editor-skin #ESWindowHeader,
+.es-global-editor-skin #ESWindowContent,
+.es-global-editor-skin #ESWindowStatusBar {
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.es-global-editor-skin .unity-list-view__item,
+.es-global-editor-skin .unity-tree-view__item,
+.es-global-editor-skin .unity-collection-view__item {
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    border-bottom-left-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+
+.es-global-editor-skin .unity-progress-bar__progress,
+.es-global-editor-skin .unity-scroller__slider,
+.es-global-editor-skin .unity-slider__dragger {
+    border-top-left-radius: 999px;
+    border-top-right-radius: 999px;
+    border-bottom-left-radius: 999px;
+    border-bottom-right-radius: 999px;
+}
+
+.es-global-editor-skin .unity-base-slider__tracker,
+.es-global-editor-skin .unity-min-max-slider__tracker,
+.es-global-editor-skin .unity-slider__tracker {
+    border-top-left-radius: 999px;
+    border-top-right-radius: 999px;
+    border-bottom-left-radius: 999px;
+    border-bottom-right-radius: 999px;
+}
+
 .es-global-editor-skin--dark .unity-list-view,
 .es-global-editor-skin--dark .unity-tree-view,
 .es-global-editor-skin--dark .unity-collection-view,
@@ -236,4 +359,106 @@
 
 .es-global-editor-skin--light .unity-help-box__message {
     color: rgb(37, 51, 60);
+}
+
+/* Extended surface coverage. These selectors cover nested Unity containers
+   and ES-owned cards so the visual language remains coherent beyond buttons. */
+.es-global-editor-skin .unity-inspector-element__header,
+.es-global-editor-skin .unity-base-field__input-container,
+.es-global-editor-skin .unity-base-slider,
+.es-global-editor-skin .unity-min-max-slider__dragger,
+.es-global-editor-skin .unity-toggle__checkmark,
+.es-global-editor-skin .unity-foldout__content-container,
+.es-global-editor-skin .unity-tab__header,
+.es-global-editor-skin .unity-tab-view__header,
+.es-global-editor-skin .unity-dropdown-menu,
+.es-global-editor-skin .unity-notification,
+.es-global-editor-skin .unity-editor-toolbar-element {
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
+
+.es-global-editor-skin .es-window-surface,
+.es-global-editor-skin .es-window-header,
+.es-global-editor-skin .es-window-toolbar,
+.es-global-editor-skin .es-window-content,
+.es-global-editor-skin .es-window-status,
+.es-global-editor-skin .es-dialog-content,
+.es-global-editor-skin .es-dialog-body,
+.es-global-editor-skin .es-dialog-summary,
+.es-global-editor-skin .es-dialog-field,
+.es-global-editor-skin .es-dialog-multichoice,
+.es-global-editor-skin .es-dialog-recommendation,
+.es-global-editor-skin .es-dialog-validation,
+.es-global-editor-skin .es-dialog-footer,
+.es-global-editor-skin .es-dialog-busy-card {
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.es-global-editor-skin .es-dialog-branded .es-dialog-identity-strip {
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
+    border-bottom-left-radius: 7px;
+    border-bottom-right-radius: 7px;
+}
+
+.es-global-editor-skin .es-dialog-brand-mark {
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    -unity-font-style: bold;
+}
+
+.es-global-editor-skin .es-dialog-actions,
+.es-global-editor-skin .es-dialog-decision-actions,
+.es-global-editor-skin .es-window-header-actions {
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.es-global-editor-skin .es-dialog-busy-overlay {
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+/* ES-owned content surfaces. These are explicit component contracts, so the
+   skin can cover real panels and states without rounding every label or row. */
+.es-global-editor-skin .es-window-opening-gate,
+.es-global-editor-skin .es-window-opening-gate-content {
+    border-top-left-radius: 11px;
+    border-top-right-radius: 11px;
+    border-bottom-left-radius: 11px;
+    border-bottom-right-radius: 11px;
+    overflow: hidden;
+}
+
+.es-global-editor-skin .es-empty-state,
+.es-global-editor-skin .es-error-state,
+.es-global-editor-skin .es-panel-section,
+.es-global-editor-skin .es-functional-section,
+.es-global-editor-skin .es-panel-notice,
+.es-global-editor-skin .es-progress-task {
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.es-global-editor-skin .es-functional-section-header,
+.es-global-editor-skin .es-functional-section-actions,
+.es-global-editor-skin .es-progress-header {
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
 }

@@ -401,7 +401,7 @@ namespace ES
         {
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("打开字体资产工作台"))
+                if (GUILayout.Button("打开字体资产工具"))
                     ESFontToolsWindow.TryOpenWindow();
                 if (GUILayout.Button(targets != null && targets.Length > 1 ? "验证所选目录" : "验证当前目录"))
                     ValidateTargets();
@@ -613,7 +613,7 @@ namespace ES
         {
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button("打开本地化工作台"))
+                if (GUILayout.Button("打开本地化工具"))
                     ESLocalizationToolsWindow.TryOpenWindow();
 
                 string validationLabel = targets != null && targets.Length > 1

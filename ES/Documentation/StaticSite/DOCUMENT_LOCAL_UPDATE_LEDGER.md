@@ -486,6 +486,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：未运行 Unity Editor、ReloadDomain、真实 Worker、外部适配器或端到端验收；不得将静态合同描述为运行时完成。
 - **HTML 目标**：后续在 `#ai-governance` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260823-003：工程实现、测试资产与协作归档
+
+- **源码路径**：`Assets`、`Documentation`、`ES`、`ProjectSettings`、工程根配置与 `Boundary`。
+- **规范与证据**：编辑器、运行时、Shader、测试资产、UI 证据、Automation、备份和交接记录按用户授权版本化；缓存、临时目录和 trace 保持在本地工作树。
+- **完成分析**：工程实现和关联资产以当前工作树快照进入可追踪提交，避免测试资产或协作证据脱离对应源码。
+- **回归状态**：隔离 Git 索引检查排除路径，台账门禁校验暂存范围；不运行 Unity 运行时验证。
+- **已知缺口**：未运行 Unity Editor、ReloadDomain、Test Runner、PlayMode、Profiler、Player 或 IL2CPP；已保存的证据不代表本轮新鲜验收。
+- **HTML 目标**：后续在 `#runtime-overview`、`#editor-overview`、`#editor-verification` 与 `#ai-governance` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

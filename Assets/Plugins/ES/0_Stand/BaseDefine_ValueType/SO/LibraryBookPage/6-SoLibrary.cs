@@ -36,9 +36,8 @@ namespace ES
     }
     public abstract class LibrarySoBase<Book> : ESSO, IESLibrary
     {
-        [Title("资产收集配置")]
-        [LabelText("收集优先级配置")]
-        [HideLabel]
+        [HideInInspector]
+        [Obsolete("旧自动收集优先级仅保留序列化兼容；统一内容注册不读取该字段。")]
         public LibraryCollectionConfig collectionConfig = new LibraryCollectionConfig();
 
         [LabelText("Library名字")]
@@ -65,7 +64,8 @@ namespace ES
         }
         
         /// <summary>
-        /// 拖入资产到Books时自动分配到合适的DefaultBook
+        /// 拖入资产到 Books 时按资产类别分配到合适的 DefaultBook。
+        /// ESAssetLibrary 会覆写此入口并要求改走统一内容注册事务。
         /// </summary>
         public virtual void EditorOnly_DragAssetsToBooks(UnityEngine.Object[] assets)
         {
@@ -78,7 +78,7 @@ namespace ES
                 if (asset == null) continue;
 
                 // 判断资产类型
-                var category = ESGlobalResToolsSupportConfig.DetermineAssetCategory(asset);
+                var category = ESAssetCategoryUtility.Determine(asset);
                 
                 // 获取对应的DefaultBook
                 var targetBook = GetDefaultBookByCategory(category);
@@ -342,8 +342,8 @@ namespace ES
         public bool WritableDefaultMessageOnEditor=true;
         
         /// <summary>
-        /// 推荐资产类别 - DefaultBook专用
-        /// 用于资产自动收集功能，标识此Book适合存放哪类资产
+        /// 推荐资产类别 - DefaultBook 专用。
+        /// 用于作者态分类和统一内容注册目标 Book 匹配，不代表自动写入能力。
         /// </summary>
         [LabelText("推荐资产类别")]
         public ESAssetCategory PreferredAssetCategory = ESAssetCategory.Other;        
@@ -450,7 +450,7 @@ namespace ES
                 UnityEngine.Object assetToAdd = obj;
                 
                 // 检测是否为子资产
-                if (ESGlobalResToolsSupportConfig.IsSubAsset(obj, out var mainAsset))
+                if (TryGetMainAsset(obj, out var mainAsset))
                 {
                     UnityEngine.Debug.LogWarning(
                         $"[BookBase] 检测到子资产 [{obj.name}]，自动退化为主资产 [{mainAsset.name}]",
@@ -532,6 +532,20 @@ namespace ES
         }
         
 #if UNITY_EDITOR
+        private static bool TryGetMainAsset(UnityEngine.Object asset, out UnityEngine.Object mainAsset)
+        {
+            mainAsset = null;
+            if (asset == null)
+                return false;
+
+            string assetPath = UnityEditor.AssetDatabase.GetAssetPath(asset);
+            if (string.IsNullOrEmpty(assetPath))
+                return false;
+
+            mainAsset = UnityEditor.AssetDatabase.LoadMainAssetAtPath(assetPath);
+            return mainAsset != null && mainAsset != asset;
+        }
+
         /// <summary>
         /// 递归展开文件夹，获取所有子资源（排除文件夹本身）
         /// </summary>

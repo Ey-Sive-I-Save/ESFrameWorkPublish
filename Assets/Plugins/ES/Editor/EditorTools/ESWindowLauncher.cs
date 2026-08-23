@@ -157,8 +157,8 @@ namespace ES
             Register(new ESWindowCommand { Id = "runtime_watch", DisplayName = "RuntimeWatch", Category = "验证与诊断", MenuPath = MenuItemPathDefine.RUNTIME_WATCH_WINDOW_PATH, Shortcut = "Ctrl+Shift+W", Keywords = "运行时 观察 监控 调试" });
             Register(new ESWindowCommand { Id = "track_editor", DisplayName = "轨道编辑器", Category = "内容制作", MenuPath = MenuItemPathDefine.TRACK_EDITOR_WINDOW_PATH, Keywords = "技能 Timeline Clip" });
             Register(new ESWindowCommand { Id = "stable_graph_v2", DisplayName = "稳定图编辑器 V2", Category = "内容制作", MenuPath = MenuItemPathDefine.STABLE_GRAPH_WINDOW_PATH, Keywords = "Graph 流程 行为树 AICommand Agent Skill" });
-            Register(new ESWindowCommand { Id = "font_workbench", DisplayName = "字体资产工作台", Category = "内容制作", MenuPath = MenuItemPathDefine.FONT_WORKBENCH_WINDOW_PATH, Keywords = "TMP 字符集 Fallback" });
-            Register(new ESWindowCommand { Id = "cmd_agent", DisplayName = "Agent 工作台", Category = "自动化与开发", MenuPath = MenuItemPathDefine.AGENT_WORKBENCH_WINDOW_PATH, Keywords = "命令 AI Codex 自动化 Agent" });
+            Register(new ESWindowCommand { Id = "font_workbench", DisplayName = "字体资产工具", Category = "内容制作", MenuPath = MenuItemPathDefine.FONT_WORKBENCH_WINDOW_PATH, Keywords = "TMP 字符集 Fallback" });
+            Register(new ESWindowCommand { Id = "cmd_agent", DisplayName = "Agent 控制台", Category = "自动化与开发", MenuPath = MenuItemPathDefine.AGENT_WORKBENCH_WINDOW_PATH, Keywords = "命令 AI Codex 自动化 Agent" });
             Register(new ESWindowCommand { Id = "command_palette", DisplayName = "ES 命令面板", Category = "自动化与开发", MenuPath = MenuItemPathDefine.COMMAND_PALETTE_WINDOW_PATH, Keywords = "Command Palette 快速命令 搜索" });
         }
 
@@ -170,7 +170,7 @@ namespace ES
             RegisterPeripheral("resource_runtime_monitor", "资源运行时监视器", "验证与诊断", MenuItemPathDefine.VALIDATION_RUNTIME_MONITORING_PATH + "资源系统/打开资源运行时监视器", "Scope Registry Provider Cache 资源 监视");
             RegisterPeripheral("automation_center", "自动化中心", "自动化与开发", MenuItemPathDefine.AUTOMATION_CENTER_PATH + "打开自动化中心", "Automation Task Preset 自动任务");
             RegisterPeripheral("developer_cockpit", "开发者驾驶舱", "验证与诊断", MenuItemPathDefine.VALIDATION_DIAGNOSTICS_PATH + "开发者驾驶舱/打开开发者驾驶舱", "Developer Cockpit Trace Observation 诊断");
-            RegisterPeripheral("editor_theme", "编辑器主题", "项目配置", MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/打开主题工作台", "Presentation 颜色 字体 动效 皮肤");
+            RegisterPeripheral("editor_theme", "编辑器主题", "项目配置", MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/打开主题设置", "Presentation 颜色 字体 动效 皮肤");
             RegisterPeripheral("editor_health", "ES 编辑器健康检查", "验证与诊断", MenuItemPathDefine.VALIDATION_EDITOR_HEALTH_PATH + "打开 ES 编辑器健康检查", "Presentation 缓存 Drawer 健康 只读");
             RegisterPeripheral("feedback_sound_scheme", "编辑器音效方案", "项目配置", MenuItemPathDefine.PROJECT_CONFIGURATION_PATH + "编辑器体验/反馈音效/切换音效方案...", "Sound Audio Feedback 音效 方案");
             RegisterPeripheral("installer", "安装管理器", "自动化与开发", MenuItemPathDefine.INSTALL_DEPENDENCY_PATH + "打开安装管理器", "Installer Dependency 依赖 安装");
@@ -253,18 +253,16 @@ namespace ES
 
         [MenuItem(MenuItemPathDefine.WINDOW_LAUNCHER_PATH, false, 0)]
         [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "工具启动器 %#e", false, -1100)]
-        public static new void OpenWindow()
+        private static void OpenFromMenu()
         {
-            var window = GetWindow<ESWindowLauncher>(false, "ES 工具启动器", true);
-            window.minSize = new Vector2(620f, 420f);
-            window.Show();
-            window.Focus();
+            OpenWindow();
         }
 
         public override GUIContent ESWindow_GetWindowGUIContent()
         {
             return new GUIContent("ES 工具启动器", "搜索、收藏并打开常用 ES 功能窗口");
         }
+        public override string ESWindow_PresentationShortTitle => "启动器";
 
         protected override string ESWindow_Subtitle => "常用功能统一入口";
         protected override Vector2 ESWindow_MinSize => new Vector2(620f, 420f);
@@ -407,7 +405,7 @@ namespace ES
                             selected: ESWindowCommandRegistry.IsFavorite(command.Id)));
                 if (entries.Count == 0) entries.Add(ESSearchDropdown.Entry.Disabled("没有匹配的 ES 窗口"));
                 return entries;
-            }, minimumWindowSize: new Vector2(560f, 360f));
+            }, minimumWindowSize: new Vector2(560f, 360f), hostWindow: this);
         }
     }
 }

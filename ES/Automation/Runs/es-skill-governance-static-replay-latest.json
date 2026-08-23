@@ -1,0 +1,275 @@
+{
+    "schemaVersion":  1,
+    "validator":  "es-static-deep-replay",
+    "skillName":  "es-skill-governance",
+    "case":  "StaticDeepReplay",
+    "status":  "passed",
+    "evidenceLevel":  "S1",
+    "receiptPath":  "ES/Automation/Runs/es-skill-governance-static-replay-latest.json",
+    "sourceRefs":  [
+                       ".agents/skills/es-skill-governance/agents/openai.yaml",
+                       ".agents/skills/es-skill-governance/governance.json",
+                       ".agents/skills/es-skill-governance/references/aibrain-contract.md",
+                       ".agents/skills/es-skill-governance/references/capability-mode-registry.json",
+                       ".agents/skills/es-skill-governance/references/command-binding-registry.json",
+                       ".agents/skills/es-skill-governance/references/commercial-controls.md",
+                       ".agents/skills/es-skill-governance/references/evidence-and-acceptance.md",
+                       ".agents/skills/es-skill-governance/references/evidence-receipt-contract.md",
+                       ".agents/skills/es-skill-governance/references/performance-controls.md",
+                       ".agents/skills/es-skill-governance/references/resource-index-contract.md",
+                       ".agents/skills/es-skill-governance/references/runtime-authorization-contract.md",
+                       ".agents/skills/es-skill-governance/references/scale-patterns.md",
+                       ".agents/skills/es-skill-governance/references/static-replay-adapter.md",
+                       ".agents/skills/es-skill-governance/references/static-specialized-acceptance.md",
+                       ".agents/skills/es-skill-governance/references/tier-matrix.md",
+                       ".agents/skills/es-skill-governance/references/verification-semantics.md",
+                       ".agents/skills/es-skill-governance/scripts/Test-ESRuntimeAuthorization.ps1",
+                       ".agents/skills/es-skill-governance/scripts/Test-ESRuntimeAuthorizationContract.ps1",
+                       ".agents/skills/es-skill-governance/scripts/Test-ESSkillContract.ps1",
+                       ".agents/skills/es-skill-governance/scripts/Test-ESSkillEvidence.ps1",
+                       ".agents/skills/es-skill-governance/scripts/Test-es-skill-governance-StaticReplay.ps1",
+                       ".agents/skills/es-skill-governance/scripts/Test-ESSkillVerificationSemantics.ps1",
+                       ".agents/skills/es-skill-governance/scripts/Test-ESStrictEvidenceReceipt.ps1",
+                       ".agents/skills/es-skill-governance/SKILL.md",
+                       ".agents/skills/es-skill-governance/static-replay.manifest.json"
+                   ],
+    "sourceRefHashes":  {
+                            ".agents/skills/es-skill-governance/agents/openai.yaml":  "381fd906710223483c30c9c6ac1ee48f9581ac69c4cc67e7883a634beb22a101",
+                            ".agents/skills/es-skill-governance/governance.json":  "f13e9e0f74fd861970aecec77f3a44190785322734037b90c26065c83f699330",
+                            ".agents/skills/es-skill-governance/references/aibrain-contract.md":  "3dcb611b5297a6d5a3dca7cd564c91173cdd355c1ff54d7b490eb58c9c7ae826",
+                            ".agents/skills/es-skill-governance/references/capability-mode-registry.json":  "5f522626590fa967b1033c8e46db54ca9214711607f585dc604a519a585082df",
+                            ".agents/skills/es-skill-governance/references/command-binding-registry.json":  "d859333b02c31b5f30e01e5ba8eb60a620f9cd006b823811612893d3fc478885",
+                            ".agents/skills/es-skill-governance/references/commercial-controls.md":  "ddb24159116e49b20fd9517316b3b3416f1e12247747ee7f1f0ecb79a1ce94a4",
+                            ".agents/skills/es-skill-governance/references/evidence-and-acceptance.md":  "de24f72d7baadc9b8c4bbd393810ca37049b717911475a2572b032f0a629824c",
+                            ".agents/skills/es-skill-governance/references/evidence-receipt-contract.md":  "316be0b6ca77daca05dc4e823043ef5f203f3a821e34c9123e34ed533c2df173",
+                            ".agents/skills/es-skill-governance/references/performance-controls.md":  "a83420ccb429dea42826ff7dab7f3cbfbc4575624b2246da402f45bfe6ca6519",
+                            ".agents/skills/es-skill-governance/references/resource-index-contract.md":  "014b0b35a66aa78323877a1772254c7052e9b4509884938d44c83b3d4c0b9aa8",
+                            ".agents/skills/es-skill-governance/references/runtime-authorization-contract.md":  "438a282d2a75977e723de605191c7e2af6219a387aa797e5e6e3c564aed1bd76",
+                            ".agents/skills/es-skill-governance/references/scale-patterns.md":  "c9d8dab8b6c9c8cbc0fd55ef2c247e65c3e696d546f48239f528c7f048a3a4f4",
+                            ".agents/skills/es-skill-governance/references/static-replay-adapter.md":  "17f51e0902e3573b2c6ce49881e8cacdfd04c68e86be94da51a34fba597458df",
+                            ".agents/skills/es-skill-governance/references/static-specialized-acceptance.md":  "4f526a61882a3199ed289d03cbbccc754e4dabfdcabbcd636a0f4dd93f92e066",
+                            ".agents/skills/es-skill-governance/references/tier-matrix.md":  "07296724e75a895135a6fa1ac9a6eff36733ed11ab2105afa24a3bbe56baa821",
+                            ".agents/skills/es-skill-governance/references/verification-semantics.md":  "8ab170ebd501d73998d8e550cc75094e59aa08d55a4223b43fb31cffc87ec32d",
+                            ".agents/skills/es-skill-governance/scripts/Test-ESRuntimeAuthorization.ps1":  "acda697aa38c43eb06e6ea003eb926056e2e2f6ec32a7397be045000a30a73dd",
+                            ".agents/skills/es-skill-governance/scripts/Test-ESRuntimeAuthorizationContract.ps1":  "ff970b2dc54c1359bddf64a8f4d471444aed23a7b39dd8e82c13b15fb793faaf",
+                            ".agents/skills/es-skill-governance/scripts/Test-ESSkillContract.ps1":  "600ac229aa87f4e7417551e07e3eeb689c5d5286be52b3fb05f24dd0ec934885",
+                            ".agents/skills/es-skill-governance/scripts/Test-ESSkillEvidence.ps1":  "517812931891e035004f5807932a277cb50538ea60f2ccf81ff7d929fb377909",
+                            ".agents/skills/es-skill-governance/scripts/Test-es-skill-governance-StaticReplay.ps1":  "6be2fc4f94bf8fdc1681d491e757f37ef8d9ff87b9c37422d9e628d9336cdb07",
+                            ".agents/skills/es-skill-governance/scripts/Test-ESSkillVerificationSemantics.ps1":  "0831caacc8e51036e68f9a699f05a5f4d1716fdb9982acf2e2f1e8a9c2501ad3",
+                            ".agents/skills/es-skill-governance/scripts/Test-ESStrictEvidenceReceipt.ps1":  "8f1ba22bc4b4f67cef98409b9d5c6a8ed83f7161ae681e6e3c71c6e0e880e72b",
+                            ".agents/skills/es-skill-governance/SKILL.md":  "bec209f4476b87ceb7ee14fa50edc394e5cc1cc45ab3949495d2cbcc08670e05",
+                            ".agents/skills/es-skill-governance/static-replay.manifest.json":  "b25fc19f9cfc57182fa2340e7cf9ecfddea01f77bd27036d1f1e6f7f9a16d980"
+                        },
+    "toolId":  "es-static-deep-replay",
+    "unityVersion":  "not-run",
+    "capturedUtc":  "2026-08-23T11:17:22.2788482Z",
+    "planHash":  "bf75fb4dd10163f5988466c4b48420c43a54c002a2207a1225f042a750a105ff",
+    "profile":  "StaticReview",
+    "responsibilityProfile":  "governance",
+    "responsibilityChecks":  [
+                                 "authority-routing",
+                                 "permission-boundary",
+                                 "deterministic-replay",
+                                 "evidence-contract"
+                             ],
+    "staticStatus":  "static-passed",
+    "runtimeStatus":  "runtime-not-run",
+    "overallVerdict":  "StaticDeepReplayComplete",
+    "claimsNotProven":  [
+                            "Unity/editor/process behavior",
+                            "timing and visual behavior",
+                            "Profiler/Player/IL2CPP/release behavior"
+                        ],
+    "nextAction":  "Do not start Runtime unless the declared escalation is authorized.",
+    "cases":  [
+                  {
+                      "id":  "normal-input",
+                      "status":  "passed",
+                      "assertion":  "source roots and required Skill files are present"
+                  },
+                  {
+                      "id":  "invalid-input",
+                      "status":  "passed",
+                      "assertion":  "invalid input is rejected by the declared contract"
+                  },
+                  {
+                      "id":  "denied-expansion",
+                      "status":  "passed",
+                      "assertion":  "permission or path expansion is denied"
+                  },
+                  {
+                      "id":  "repeat-idempotency",
+                      "status":  "passed",
+                      "assertion":  "repeat execution is idempotent"
+                  },
+                  {
+                      "id":  "hash-change-cache-invalidation",
+                      "status":  "passed",
+                      "assertion":  "hash or cache changes invalidate stale state"
+                  },
+                  {
+                      "id":  "interruption-recovery",
+                      "status":  "passed",
+                      "assertion":  "interruption and recovery are declared"
+                  },
+                  {
+                      "id":  "deterministic-output",
+                      "status":  "passed",
+                      "assertion":  "deterministic output and stable ordering are declared"
+                  }
+              ],
+    "customCheckResults":  [
+                               {
+                                   "id":  "authority-routing",
+                                   "status":  "passed",
+                                   "detail":  "governance routeKeys and requiredAuthorityRefs are declared"
+                               },
+                               {
+                                   "id":  "permission-boundary",
+                                   "status":  "passed",
+                                   "detail":  "direct execution is denied and plan binding is required"
+                               },
+                               {
+                                   "id":  "deterministic-replay",
+                                   "status":  "passed",
+                                   "detail":  "deterministic claim and source hashes exist"
+                               },
+                               {
+                                   "id":  "evidence-contract",
+                                   "status":  "passed",
+                                   "detail":  "Skill declares evidence/receipt/acceptance boundary"
+                               }
+                           ],
+    "specializedAcceptance":  [
+                                  {
+                                      "id":  "metadata-completeness",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "authority-ref-closure",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "permission-denial",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "profile-weight",
+                                      "status":  "passed"
+                                  },
+                                  {
+                                      "id":  "stale-governance-hash",
+                                      "status":  "passed"
+                                  }
+                              ],
+    "sourceHashes":  [
+                         {
+                             "path":  ".agents/skills/es-skill-governance/agents/openai.yaml",
+                             "sha256":  "381fd906710223483c30c9c6ac1ee48f9581ac69c4cc67e7883a634beb22a101"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/governance.json",
+                             "sha256":  "f13e9e0f74fd861970aecec77f3a44190785322734037b90c26065c83f699330"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/aibrain-contract.md",
+                             "sha256":  "3dcb611b5297a6d5a3dca7cd564c91173cdd355c1ff54d7b490eb58c9c7ae826"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/capability-mode-registry.json",
+                             "sha256":  "5f522626590fa967b1033c8e46db54ca9214711607f585dc604a519a585082df"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/command-binding-registry.json",
+                             "sha256":  "d859333b02c31b5f30e01e5ba8eb60a620f9cd006b823811612893d3fc478885"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/commercial-controls.md",
+                             "sha256":  "ddb24159116e49b20fd9517316b3b3416f1e12247747ee7f1f0ecb79a1ce94a4"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/evidence-and-acceptance.md",
+                             "sha256":  "de24f72d7baadc9b8c4bbd393810ca37049b717911475a2572b032f0a629824c"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/evidence-receipt-contract.md",
+                             "sha256":  "316be0b6ca77daca05dc4e823043ef5f203f3a821e34c9123e34ed533c2df173"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/performance-controls.md",
+                             "sha256":  "a83420ccb429dea42826ff7dab7f3cbfbc4575624b2246da402f45bfe6ca6519"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/resource-index-contract.md",
+                             "sha256":  "014b0b35a66aa78323877a1772254c7052e9b4509884938d44c83b3d4c0b9aa8"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/runtime-authorization-contract.md",
+                             "sha256":  "438a282d2a75977e723de605191c7e2af6219a387aa797e5e6e3c564aed1bd76"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/scale-patterns.md",
+                             "sha256":  "c9d8dab8b6c9c8cbc0fd55ef2c247e65c3e696d546f48239f528c7f048a3a4f4"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/static-replay-adapter.md",
+                             "sha256":  "17f51e0902e3573b2c6ce49881e8cacdfd04c68e86be94da51a34fba597458df"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/static-specialized-acceptance.md",
+                             "sha256":  "4f526a61882a3199ed289d03cbbccc754e4dabfdcabbcd636a0f4dd93f92e066"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/tier-matrix.md",
+                             "sha256":  "07296724e75a895135a6fa1ac9a6eff36733ed11ab2105afa24a3bbe56baa821"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/references/verification-semantics.md",
+                             "sha256":  "8ab170ebd501d73998d8e550cc75094e59aa08d55a4223b43fb31cffc87ec32d"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/scripts/Test-ESRuntimeAuthorization.ps1",
+                             "sha256":  "acda697aa38c43eb06e6ea003eb926056e2e2f6ec32a7397be045000a30a73dd"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/scripts/Test-ESRuntimeAuthorizationContract.ps1",
+                             "sha256":  "ff970b2dc54c1359bddf64a8f4d471444aed23a7b39dd8e82c13b15fb793faaf"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/scripts/Test-ESSkillContract.ps1",
+                             "sha256":  "600ac229aa87f4e7417551e07e3eeb689c5d5286be52b3fb05f24dd0ec934885"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/scripts/Test-ESSkillEvidence.ps1",
+                             "sha256":  "517812931891e035004f5807932a277cb50538ea60f2ccf81ff7d929fb377909"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/scripts/Test-es-skill-governance-StaticReplay.ps1",
+                             "sha256":  "6be2fc4f94bf8fdc1681d491e757f37ef8d9ff87b9c37422d9e628d9336cdb07"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/scripts/Test-ESSkillVerificationSemantics.ps1",
+                             "sha256":  "0831caacc8e51036e68f9a699f05a5f4d1716fdb9982acf2e2f1e8a9c2501ad3"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/scripts/Test-ESStrictEvidenceReceipt.ps1",
+                             "sha256":  "8f1ba22bc4b4f67cef98409b9d5c6a8ed83f7161ae681e6e3c71c6e0e880e72b"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/SKILL.md",
+                             "sha256":  "bec209f4476b87ceb7ee14fa50edc394e5cc1cc45ab3949495d2cbcc08670e05"
+                         },
+                         {
+                             "path":  ".agents/skills/es-skill-governance/static-replay.manifest.json",
+                             "sha256":  "b25fc19f9cfc57182fa2340e7cf9ecfddea01f77bd27036d1f1e6f7f9a16d980"
+                         }
+                     ],
+    "issues":  [
+
+               ],
+    "runtimeEscalation":  {
+                              "required":  false,
+                              "reason":  "Only external execution can prove the declared runtime claims."
+                          },
+    "generatedUtc":  "2026-08-23T11:17:22.2788482Z"
+}

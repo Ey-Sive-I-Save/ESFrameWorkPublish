@@ -22,15 +22,15 @@ namespace ES
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("placementSpace"), new GUIContent("空间模式"));
             }
             serializedObject.ApplyModifiedProperties();
-            if (GUILayout.Button("打开对话工作台", GUILayout.Height(28f)))
+            if (GUILayout.Button("打开对话编辑器", GUILayout.Height(28f)))
             {
                 ESWorldDialogueAnchor anchor = (ESWorldDialogueAnchor)target;
                 string path = AssetDatabase.GUIDToAssetPath(anchor.mapAssetGuid);
                 ESWorldMapAsset map = string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<ESWorldMapAsset>(path);
                 string graphPath = AssetDatabase.GUIDToAssetPath(anchor.dialogueGraphAssetGuid);
                 ESWorldDialogueGraphAsset graph = string.IsNullOrEmpty(graphPath) ? null : AssetDatabase.LoadAssetAtPath<ESWorldDialogueGraphAsset>(graphPath);
-                if (graph != null) ESWorldDialogueWorkbenchWindow.OpenFor(graph, map);
-                else ESWorldDialogueWorkbenchWindow.OpenFor(map);
+                if (graph != null) ESWorldDialogueEditorWindow.OpenFor(graph, map);
+                else ESWorldDialogueEditorWindow.OpenFor(map);
             }
         }
     }

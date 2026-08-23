@@ -1,5 +1,7 @@
 # ES AIWarnings 协作入口
 
+> AIBrain 统一入口：`Documentation/AIKnowledge/AIBRAIN_ENTRY.md`。需要编排时使用 `listCapabilities -> planTask -> runTask`；本入口仍是 P0 与规则路由权威。
+
 本目录保存 ESFramework 的长期项目约束、架构事实、验收标准和历史交接。它不是产品文档，也不替代当前源码、Unity 验证或工作树检查。
 
 ## 阅读顺序
@@ -63,6 +65,7 @@ README
 - GameCore 只能被内容层引用，禁止反向直接引用 Prefab、GameObject 或场景内容。
 - 普通编辑器初始化优先 AssemblyStream；禁止在域重载路径中做全盘扫描和重资源操作。
 - 核心热路径在初始化阶段验证依赖，运行时避免重复判空、字符串、LINQ、反射和临时集合。
+- Shot、Projectile、HitScan、Beam、Fire、Tick 和命中解析默认属于热路径：必须先完成 Prepare/Running 冻结合同、静态门禁和调用链分配清单，再扩展特殊弹道或武器玩法；没有 Profiler 不得宣称 0 GC 或商业级签收。
 - 测试场景的操作引导、验收路线、运行态诊断、键位说明和区域导视，优先复用 `ESSceneValidationGuide`；它只属于测试场景，禁止以一次性 OnGUI 或测试 MonoBehaviour 污染正式角色、载具、相机与技能 Prefab。具体路由见 `50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/测试场景导视与诊断复用_AI协作警告.md`。
 - 测试场景布局以官方构建器为唯一权威；刷新前必须审计 Prefab override，并将变更前基线归档到项目内 `ES/Bak/Local`（机器回滚、忽略）或 `ES/Bak/Reviewed`（可审阅、默认跟踪），禁止把 `C:\Users\asus` 等项目外目录作为正式备份。具体门禁见 `50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/场景构建器权威_覆盖审计与项目内备份分层_AI协作警告.md`。
 - 多来源申请、集中决策、单点执行的领域必须遵守 `ES 活跃请求仲裁协议`：`Request -> Lease -> Active Set -> Arbitration -> Commit -> Executor`。统一协议不等于建立万能管理器；Camera 的 Director 首切片已存在，但仍待 Unity/PlayMode/Profiler 验收，不能按已交付使用。

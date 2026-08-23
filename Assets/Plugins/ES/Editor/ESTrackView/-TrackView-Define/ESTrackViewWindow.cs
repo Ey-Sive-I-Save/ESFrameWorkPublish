@@ -13,8 +13,9 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using Cursor = UnityEngine.UIElements.Cursor;
 
-public class ESTrackViewWindow : OdinEditorWindow
+    public class ESTrackViewWindow : OdinEditorWindow, ES.IESWindowPresentationShortTitle
 {
+    public string ESWindow_PresentationShortTitle => "轨道";
     internal const string SleepOwnerKey = "ES.TrackView.Window";
     private static readonly Vector2 s_MinWindowSize = new Vector2(600f, 420f);
     private const string LastTimelineGuidPrefKey = "ES.TrackView.LastTimelineGuid";
@@ -484,12 +485,20 @@ public class ESTrackViewWindow : OdinEditorWindow
         ESWindowCommandRegistry.RecordOpened("track_editor");
         window = GetWindow<ESTrackViewWindow>();
         window.titleContent = new GUIContent("【轨道】编辑器");
-        window.minSize = s_MinWindowSize;
+        // OnEnable establishes the minimum size for a newly created window.
+        // Do not write minSize here: a content refresh may happen while the
+        // existing instance is in ES Presentation's 80x80/32x32 sleep state.
     }
 
     public static void InitNewSequenceAndOpenWindow()
     {
-        OpenWindow();
+        // This method is also used by selection-follow and asset-refresh paths.
+        // Reusing the live instance avoids GetWindow's focus/show side effects,
+        // which would otherwise interrupt an active sleep transition.
+        if (window == null)
+            OpenWindow();
+        else
+            window.titleContent = new GUIContent("【轨道】编辑器");
         if (TrackContainer != null)
             window.RememberTrackContainer(TrackContainer);
         //简单更新
@@ -4834,7 +4843,7 @@ public class ESTrackViewWindow : OdinEditorWindow
     public void ShowEntitySelectMenu()
     {
         var menu = new GenericMenu();
-        Entity[] entities = FindObjectsOfType<Entity>();
+        Entity[] entities = UnityEngine.Object.FindObjectsByType<Entity>(FindObjectsSortMode.None);
         Array.Sort(entities, (a, b) => string.CompareOrdinal(GetEntityMenuPath(a), GetEntityMenuPath(b)));
 
         int addedCount = 0;

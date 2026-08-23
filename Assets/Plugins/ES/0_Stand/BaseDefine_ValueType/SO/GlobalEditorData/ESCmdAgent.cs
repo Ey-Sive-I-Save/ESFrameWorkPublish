@@ -3,13 +3,13 @@ using UnityEngine;
 
 namespace ES
 {
-    [ESOnlyEditorSO("ESCmdAgent 只保存编辑器内受管 Codex 工作台配置，不应进入运行时构建或 AB 资源包。")]
+    [ESOnlyEditorSO("ESCmdAgent 只保存编辑器内受管 Agent 控制台配置，不应进入运行时构建或 AB 资源包。")]
     [CreateAssetMenu(fileName = "ESCmdAgent", menuName = MenuItemPathDefine.ASSET_GLOBAL_SO_PATH + "ES Cmd Agent")]
     public class ESCmdAgent : ESEditorGlobalSo<ESCmdAgent>
     {
         [Title("ES Cmd Agent")]
         [LabelText("允许新建、恢复与投递")]
-        [InfoBox("关闭后，工作台仍可查看、同步和关闭已有受管会话；不会新建、恢复或投递 AI 任务。")]
+        [InfoBox("关闭后，Agent 控制台仍可查看、同步和关闭已有受管会话；不会新建、恢复或投递 AI 任务。")]
         public bool enableAgent = true;
 
         // Kept only to preserve existing assets. The workspace always uses the project bootstrap registry.
@@ -20,7 +20,7 @@ namespace ES
         [FolderPath(AbsolutePath = true)]
         public string workspacePath = "";
 
-        [LabelText("打开时恢复工作台")]
+        [LabelText("打开时恢复 Agent 控制台")]
         public bool restoreWorkspaceOnOpen = true;
 
         // Preserved only so existing configuration assets deserialize without data loss.

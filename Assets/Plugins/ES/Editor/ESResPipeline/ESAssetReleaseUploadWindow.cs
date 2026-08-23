@@ -35,8 +35,9 @@ namespace ES
         {
             return new GUIContent("ES 远端发布", "上传第四步生成并验证的 Release 产物");
         }
+        public override string ESWindow_PresentationShortTitle => "发布";
 
-        protected override string ESWindow_Subtitle => "第五步：远端发布工作台";
+        protected override string ESWindow_Subtitle => "第五步：远端发布工具";
         protected override Vector2 ESWindow_MinSize => new Vector2(640f, 440f);
         protected override Vector2 ESWindow_DefaultSize => new Vector2(900f, 720f);
         protected override string ESWindow_PageStableId => "resource.release-upload";
@@ -124,7 +125,7 @@ namespace ES
         private void DrawHeader()
         {
             EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField("第五步：远端发布工作台", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("第五步：远端发布工具", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
                 "此步骤只上传第四步已经生成并校验的 Release。所有版本化文件先上传，ESAssetReleaseManifest.json 必须最后上传；它是客户端发现新版本的唯一开关。",
                 MessageType.Info);

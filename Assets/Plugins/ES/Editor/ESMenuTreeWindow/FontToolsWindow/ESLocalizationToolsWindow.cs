@@ -9,7 +9,7 @@ using UnityEngine.UIElements;
 namespace ES
 {
     /// <summary>
-    /// 本地化作者工作台。只编辑 ESLocalizationCatalog，不复制生成、发布或运行时解析管线。
+    /// 本地化工具。只编辑 ESLocalizationCatalog，不复制生成、发布或运行时解析管线。
     /// </summary>
     public sealed class ESLocalizationToolsWindow : ESMenuTreeWindow<ESLocalizationToolsWindow>
     {
@@ -39,7 +39,7 @@ namespace ES
         private int selectedIndex = -1;
 
         [MenuItem(MenuItemPathDefine.LOCALIZATION_WORKBENCH_WINDOW_PATH, false, 21)]
-        [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "本地化工作台", false, -944)]
+        [MenuItem(MenuItemPathDefine.QUICK_WINDOWS_PATH + "本地化工具", false, -944)]
         public static void TryOpenWindow()
         {
             ESWindowCommandRegistry.RecordOpened("localization_workbench");
@@ -47,7 +47,8 @@ namespace ES
         }
 
         public override GUIContent ESWindow_GetWindowGUIContent() =>
-            new GUIContent("ES 本地化工作台", "管理 TextKey、Locale、缺失翻译与预览。");
+            new GUIContent("ES 本地化工具", "管理 TextKey、Locale、缺失翻译与预览。");
+        public override string ESWindow_PresentationShortTitle => "本地化";
 
         protected override string ESWindow_Subtitle => "TextKey、语言目录、翻译审查与运行时预览";
         protected override Vector2 ESWindow_MinSize => new Vector2(820f, 560f);

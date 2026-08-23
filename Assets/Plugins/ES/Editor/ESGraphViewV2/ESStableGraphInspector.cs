@@ -1092,36 +1092,110 @@ namespace ES.EditorInternal
 
         private void OpenAISkillApprovalDialog(ESAISkillWorkflowRun run)
         {
+            if (!ESAISkillExecutionCoordinator.TryCreateApprovalEvidenceSnapshot(run,
+                    out ESAISkillApprovalEvidenceSnapshot evidence, out string snapshotError))
+            {
+                report?.Invoke(snapshotError);
+                evidence = new ESAISkillApprovalEvidenceSnapshot(run.runId,
+                    run.approvalGeneration, run.runId, run.currentNodeId,
+                    run.approvalGeneration,
+                    Array.Empty<ESAISkillApprovalEvidenceBindingSnapshot>(),
+                    Array.Empty<ESAISkillApprovalEvidenceItemSnapshot>(),
+                    canApprove: false, evidenceError: snapshotError);
+            }
+            string submissionRunId = evidence.SubmissionRunId;
+            int submissionGeneration = evidence.SubmissionGeneration;
             var request = new ESAdvancedDialogRequest
             {
-                dialogId = "es.ai-skill.approval." + run.runId + "." + run.approvalGeneration,
+                dialogId = "es.ai-skill.approval." + submissionRunId + "." + submissionGeneration,
                 title = "技能审批",
-                subtitle = "Run " + run.runId,
+                subtitle = "Run " + submissionRunId,
                 message = run.message,
+                detail = BuildAISkillApprovalEvidenceDetail(evidence),
                 confirmText = "批准并继续",
                 cancelText = "返回",
                 preferredSize = new Vector2(560f, 400f),
-                tone = ESDialogTone.Warning
+                tone = ESDialogTone.Warning,
+                owner = hostWindow
             };
+            if (!evidence.CanApprove)
+                request.validate = _ => string.IsNullOrWhiteSpace(evidence.EvidenceError)
+                    ? "审批证据不可验证；可以拒绝，但不能批准。"
+                    : evidence.EvidenceError;
             request.AddMultilineText("comment", "审查意见");
+            if (evidence.Items.Count > 0)
+            {
+                string reportPath = evidence.Items.Select(item => item.ArtifactPath)
+                    .FirstOrDefault(path => string.Equals(Path.GetExtension(path), ".md",
+                        StringComparison.OrdinalIgnoreCase))
+                    ?? evidence.Items[0].ArtifactPath;
+                request.AddAuxiliaryAction("open-evidence", "打开审批证据", _ =>
+                {
+                    if (!ESAISkillExecutionCoordinator.TryValidateApprovalEvidence(
+                            submissionRunId, submissionGeneration, out string validationError))
+                        report?.Invoke("审批证据完整性校验失败：" + validationError);
+                    else if (File.Exists(reportPath))
+                        EditorUtility.OpenWithDefaultApp(reportPath);
+                    else
+                        report?.Invoke("审批副本已不存在：" + reportPath);
+                }, "使用系统默认应用打开冻结在本次审批快照中的任务证据。");
+            }
             request.AddAuxiliaryAction("reject", "拒绝并走失败分支", values =>
             {
-                if (!ESAISkillExecutionCoordinator.TryApprove(run.runId, run.approvalGeneration,
+                if (!ESAISkillExecutionCoordinator.TryApprove(submissionRunId, submissionGeneration,
                         false, values.GetString("comment"), out string error))
                     report?.Invoke(error);
                 else
-                    report?.Invoke("已拒绝并继续执行拒绝分支。RunId：" + run.runId);
+                    report?.Invoke("已拒绝并继续执行拒绝分支。RunId：" + submissionRunId);
                 ForceValidation();
             }, role: ESAdvancedDialogActionRole.Danger, closeDialogAfterExecution: true);
             ESAdvancedDialogResult result = ESDialogService.ShowModal(request);
             if (result == null || !result.accepted)
                 return;
-            if (!ESAISkillExecutionCoordinator.TryApprove(run.runId, run.approvalGeneration,
+            if (!ESAISkillExecutionCoordinator.TryApprove(submissionRunId, submissionGeneration,
                     true, result.values?.GetString("comment"), out string approvalError))
                 report?.Invoke(approvalError);
             else
-                report?.Invoke("已批准并继续执行。运行编号：" + run.runId);
+                report?.Invoke("已批准并继续执行。运行编号：" + submissionRunId);
             ForceValidation();
+        }
+
+        internal static string BuildAISkillApprovalEvidenceDetail(
+            ESAISkillApprovalEvidenceSnapshot evidence)
+        {
+            if (evidence == null)
+                return "当前审批没有可直接打开的任务产物；请先查看工作流运行记录。";
+            if (!string.IsNullOrWhiteSpace(evidence.EvidenceError))
+                return "审批证据不可用：" + evidence.EvidenceError
+                    + "\n拒绝操作仍然可用；批准已禁用。";
+            if (evidence.Items.Count == 0)
+                return "当前审批没有可直接打开的任务产物；请先查看工作流运行记录。";
+            var lines = new List<string>
+            {
+                "审批证据：",
+                "审批节点：" + evidence.ApprovalNodeId,
+                "证据 RunId：" + evidence.EvidenceRunId
+            };
+            if (evidence.Bindings.Count > 0)
+                lines.Add("直接绑定：" + evidence.Bindings.Count + " 条");
+            const int maximumVisibleArtifacts = 5;
+            int visibleArtifactCount = Math.Min(evidence.Items.Count, maximumVisibleArtifacts);
+            for (int i = 0; i < visibleArtifactCount; i++)
+            {
+                ESAISkillApprovalEvidenceItemSnapshot item = evidence.Items[i];
+                lines.Add((i + 1) + ". " + item.ArtifactPath);
+                lines.Add("   Hash: " + (string.IsNullOrWhiteSpace(item.OutputHash)
+                    ? "未提供" : item.OutputHash));
+                lines.Add("   来源：" + item.SourceNodeId
+                    + (item.IterationIndex >= 0 ? " / 迭代 " + item.IterationIndex : string.Empty)
+                    + " / 尝试 " + item.AttemptCount);
+                if (!string.IsNullOrWhiteSpace(item.ChildRunId))
+                    lines.Add("   Task RunId：" + item.ChildRunId);
+            }
+            if (evidence.Items.Count > visibleArtifactCount)
+                lines.Add("其余 " + (evidence.Items.Count - visibleArtifactCount)
+                    + " 个产物请在工作流运行记录中查看。");
+            return string.Join("\n", lines);
         }
 
         private static string AISkillLatestRunKey(string graphId)
@@ -2122,7 +2196,7 @@ namespace ES.EditorInternal
             if (hasSingleCommand)
             {
                 entries.Add(ESSearchDropdown.Entry.Item(
-                    "受控工作台草稿 · Command",
+                    "受控草稿 · Command",
                     () => StageSingleUseAgentArtifact(ESAgentArtifactKind.AICommand),
                     groupPath: "会话执行",
                     subtitle: "只填入输入框，人工确认后再发送",
@@ -2141,7 +2215,7 @@ namespace ES.EditorInternal
             if (hasSingleSkill)
             {
                 entries.Add(ESSearchDropdown.Entry.Item(
-                    "受控工作台草稿 · Skill",
+                    "受控草稿 · Skill",
                     () => StageSingleUseAgentArtifact(ESAgentArtifactKind.AgentSkill),
                     groupPath: "会话执行",
                     subtitle: "只填入输入框，人工确认后再发送",
@@ -2174,7 +2248,7 @@ namespace ES.EditorInternal
                 .Any(item => item != null && item.artifactKind == ESAgentArtifactKind.AgentSkill);
             if (hasCommand)
             {
-                entries.Add(ESSearchDropdown.Entry.Item("工作台草稿 · 命令候选",
+                entries.Add(ESSearchDropdown.Entry.Item("受控草稿 · 命令候选",
                     () => StageAgentGenerationRequest(ESAgentArtifactKind.AICommand),
                     groupPath: "候选生成", subtitle: "创建隔离请求，只把生成指令放入输入框",
                     badge: "不自动发送"));
@@ -2185,7 +2259,7 @@ namespace ES.EditorInternal
             }
             if (hasSkill)
             {
-                entries.Add(ESSearchDropdown.Entry.Item("工作台草稿 · 技能候选",
+                entries.Add(ESSearchDropdown.Entry.Item("受控草稿 · 技能候选",
                     () => StageAgentGenerationRequest(ESAgentArtifactKind.AgentSkill),
                     groupPath: "候选生成", subtitle: "创建隔离请求，只把生成指令放入输入框",
                     badge: "不自动发送"));
@@ -2196,7 +2270,7 @@ namespace ES.EditorInternal
             }
             if (hasCommand && hasSkill)
             {
-                entries.Add(ESSearchDropdown.Entry.Item("工作台草稿 · 全部候选",
+                entries.Add(ESSearchDropdown.Entry.Item("受控草稿 · 全部候选",
                     StageAgentGenerationRequest,
                     groupPath: "候选生成", subtitle: "全部 Output 建立同一请求，等待人工发送",
                     badge: "不自动发送"));
@@ -2222,14 +2296,14 @@ namespace ES.EditorInternal
 
         private void StageSingleUseAgentArtifact(ESAgentArtifactKind artifactKind)
         {
-            if (!TryBakeAgentSpec("准备工作台草稿", out ESAgentArtifactGenerationSpec spec))
+            if (!TryBakeAgentSpec("准备受控草稿", out ESAgentArtifactGenerationSpec spec))
                 return;
             if (!ESAgentArtifactGenerationWorkspace.TryCreateArtifactView(spec, artifactKind,
                     out ESAgentArtifactGenerationSpec artifactView, out string error)
                 || artifactView.outputs == null || artifactView.outputs.Length != 1)
             {
                 report?.Invoke(string.IsNullOrWhiteSpace(error)
-                    ? "工作台草稿必须对应唯一 Output。" : error);
+                    ? "受控草稿必须对应唯一 Output。" : error);
                 return;
             }
             ESAgentGenerationOutput output = artifactView.outputs[0];
@@ -2244,7 +2318,7 @@ namespace ES.EditorInternal
                 : ESAgentArtifactGenerationWorkspace.BuildTemporarySkillExecutionPrompt(artifactView, draftId);
             if (!ESCmdAgentWindow.OpenAndStagePrompt(prompt, out string message))
             {
-                report?.Invoke("准备工作台草稿失败：" + message);
+                report?.Invoke("准备受控草稿失败：" + message);
                 return;
             }
             report?.Invoke(message);
@@ -2281,7 +2355,7 @@ namespace ES.EditorInternal
             }
             if (!ESCmdAgentWindow.OpenAndStagePrompt(prompt, out string message))
             {
-                report?.Invoke(displayName + "候选请求已创建，但工作台草稿准备失败：" + message
+                report?.Invoke(displayName + "候选请求已创建，但受控草稿准备失败：" + message
                     + "；请求目录仍保留在 " + request.requestDirectory);
                 return;
             }

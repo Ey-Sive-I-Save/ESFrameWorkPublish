@@ -32,6 +32,7 @@ namespace ES
         {
             return new GUIContent("Entity 属性监视器", "观察运行时属性、最终值与 Modifier 明细");
         }
+        public override string ESWindow_PresentationShortTitle => "属性";
 
         protected override string ESWindow_Subtitle => "运行时属性与 Modifier 诊断";
         protected override Vector2 ESWindow_MinSize => new Vector2(620f, 380f);

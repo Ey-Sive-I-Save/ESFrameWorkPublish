@@ -1,0 +1,7 @@
+{
+  "protocolVersion": 1,
+  "requestId": "b7e3a47ed51a4af0bf8fd1d83720f47d",
+  "actorId": "codex.entity-transform-migration",
+  "action": "getUnityCompilationState",
+  "payload": {}
+}

@@ -205,7 +205,7 @@ namespace ES
         }
 
         [OnInspectorGUI, PropertyOrder(100)]
-        private void DrawRenameWorkbench()
+        private void DrawRenameTool()
         {
             int selectedCount = Selection.gameObjects != null ? Selection.gameObjects.Length : 0;
             SimpleToolsPanelUtility.DrawToolHeader(

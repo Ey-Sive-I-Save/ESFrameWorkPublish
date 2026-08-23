@@ -263,7 +263,7 @@ namespace ES
                         EditorGUILayout.HelpBox("正式发布后修改此短码会让该 Library 的 BundleKey 全部变化。", MessageType.Warning);
                 }
 
-                DrawActiveCollectLibraryPanel();
+                DrawContentRegistrationTargetPanel();
 
                 EditorGUILayout.LabelField("↓库描述↓");
                 var newDesc = EditorGUILayout.TextArea(library.Desc, GUILayout.Height(50));
@@ -272,12 +272,6 @@ namespace ES
                     Undo.RecordObject(library, "Edit Library Description");
                     library.Desc = newDesc;
                     MarkDirtyDeferred();
-                }
-
-                // 收集配置按钮
-                if (GUILayout.Button("收集配置", GUILayout.Height(25)))
-                {
-                    ShowCollectionConfigMenu();
                 }
 
                 bookAreaWidth = EditorGUILayout.GetControlRect().width;
@@ -292,8 +286,10 @@ namespace ES
                 // 绘制默认Books（合并到同一个竖直列表）
                 DrawDefaultBooksInline();
 
-                // 在Books列表下方添加拖拽区域提示
-                GUILayout.Label("↓ 拖入资产到此处自动分配到合适的DefaultBook ↓", EditorStyles.centeredGreyMiniLabel);
+                string dragHint = library is ESAssetLibrary
+                    ? "↓ 拖入资产以打开统一内容注册 ↓"
+                    : "↓ 拖入资产并按类别分配到 DefaultBook ↓";
+                GUILayout.Label(dragHint, EditorStyles.centeredGreyMiniLabel);
                 dragAtForBooks.normalColor.a = 0.02f;
                 if (dragAtForBooks.Update(out var booksAssets, area.TargetArea, Event.current))
                 {
@@ -312,7 +308,7 @@ namespace ES
                 area.UpdateAtLast();
             }
 
-            private void DrawActiveCollectLibraryPanel()
+            private void DrawContentRegistrationTargetPanel()
             {
                 if (library is not ESAssetLibrary resLibrary)
                 {
@@ -324,11 +320,11 @@ namespace ES
 
                 SirenixEditorGUI.BeginBox();
                 SirenixEditorGUI.BeginBoxHeader();
-                EditorGUILayout.LabelField("自动收集目标", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("统一内容注册默认目标", EditorStyles.boldLabel);
                 SirenixEditorGUI.EndBoxHeader();
 
                 EditorGUILayout.BeginHorizontal(GUILayout.Height(24));
-                EditorGUILayout.LabelField("当前收集Library", GUILayout.Width(110), GUILayout.Height(22));
+                EditorGUILayout.LabelField("当前 Library", GUILayout.Width(110), GUILayout.Height(22));
 
                 var previousColor = GUI.color;
                 GUI.color = isActive ? new Color(0.25f, 1f, 0.45f, 1f) : new Color(1f, 0.45f, 0.3f, 1f);
@@ -342,9 +338,7 @@ namespace ES
                     if (GUILayout.Button(isActive ? "已是当前" : "设为当前", GUILayout.Width(90), GUILayout.Height(20)))
                     {
                         ESGlobalResToolsSupportConfig.SetActiveCollectLibrary(resLibrary);
-                        config.preferActiveLibrary = true;
-                        EditorUtility.SetDirty(config);
-                        Debug.Log($"[资产收集] 当前收集Library已设置为: {resLibrary.Name}", resLibrary);
+                        Debug.Log($"[内容注册] 默认目标 Library 已设置为: {resLibrary.Name}", resLibrary);
                     }
                 }
 
@@ -352,9 +346,9 @@ namespace ES
 
                 if (isActive)
                 {
-                    SirenixEditorGUI.InfoMessageBox("ESAssetRefer 自动收集会优先进入此 Library。");
+                    SirenixEditorGUI.InfoMessageBox("统一内容注册窗口会把此 Library 作为默认目标；实际写入仍需预检和显式提交。");
                 }
-                else if (config != null && config.preferActiveLibrary && config.activeCollectLibrary != null)
+                else if (config != null && config.activeCollectLibrary != null)
                 {
                     EditorGUILayout.LabelField("当前目标", config.activeCollectLibrary.Name);
                 }
@@ -517,7 +511,10 @@ namespace ES
 
                 // 绘制分隔线和标题
                 GUILayout.Space(5);
-                EditorGUILayout.LabelField("默认Books【自动收集，不可删改】", EditorStyles.boldLabel);
+                string defaultBooksTitle = library is ESAssetLibrary
+                    ? "默认 Books【统一内容注册分类，不可删改】"
+                    : "默认 Books【按类别分配，不可删改】";
+                EditorGUILayout.LabelField(defaultBooksTitle, EditorStyles.boldLabel);
 
                 foreach (var b in library.DefaultBooks)
                 {
@@ -1356,107 +1353,6 @@ namespace ES
                 MarkDirtyDeferred();  // 单个Page移动使用延迟保存
                 Debug.Log($"已将Page [{page.Name}] 从 [{sourceBook.Name}] 移动到 [{targetBook.Name}]");
             }
-
-            /// <summary>
-            /// 显示收集配置菜单
-            /// </summary>
-            private void ShowCollectionConfigMenu()
-            {
-                if (library == null)
-                {
-                    Debug.LogError("[CollectionConfig] Library为null，无法显示配置菜单");
-                    return;
-                }
-
-                var menu = new GenericMenu();
-
-                // 获取所有资产类别（除了All）
-                var categories = System.Enum.GetValues(typeof(ESAssetCategory)).Cast<ESAssetCategory>().Where(c => c != ESAssetCategory.All).ToArray();
-
-                // "总体优先级"菜单项
-                AddPriorityMenuItems(menu, "总体优先级", ESAssetCategory.All);
-
-                menu.AddSeparator("");
-
-                // 为每个资产类别添加菜单项
-                foreach (var category in categories)
-                {
-                    string categoryName = GetCategoryDisplayName(category);
-                    AddPriorityMenuItems(menu, categoryName, category);
-                }
-
-                menu.ShowAsContext();
-            }
-
-            /// <summary>
-            /// 为指定类别添加优先级菜单项
-            /// </summary>
-            private void AddPriorityMenuItems(GenericMenu menu, string categoryName, ESAssetCategory category)
-            {
-                var priorities = System.Enum.GetValues(typeof(ESAssetCollectionPriority)).Cast<ESAssetCollectionPriority>().ToArray();
-                var currentPriority = library.collectionConfig.GetPriority(category);
-
-                foreach (var priority in priorities)
-                {
-                    string priorityName = GetPriorityDisplayName(priority);
-                    string menuPath = $"{categoryName}/{priorityName}";
-                    bool isSelected = (priority == currentPriority);
-
-                    menu.AddItem(new GUIContent(menuPath), isSelected, () =>
-                    {
-                        Undo.RecordObject(library, $"Set Collection Priority: {library.Name} - {category} - {priority}");
-                        library.collectionConfig.SetPriority(category, priority);
-                        EditorUtility.SetDirty(library);
-                        AssetDatabase.SaveAssets();
-                        Debug.Log($"[CollectionConfig] 设置 [{library.Name}] 的 [{categoryName}] 优先级为 [{priorityName}]");
-                    });
-                }
-
-                menu.AddSeparator($"{categoryName}/");
-            }
-
-            /// <summary>
-            /// 获取资产类别显示名称
-            /// </summary>
-            private string GetCategoryDisplayName(ESAssetCategory category)
-            {
-                switch (category)
-                {
-                    case ESAssetCategory.All: return "总体";
-                    case ESAssetCategory.Prefab: return "预制体";
-                    case ESAssetCategory.Scene: return "场景";
-                    case ESAssetCategory.Material: return "材质";
-                    case ESAssetCategory.Texture: return "纹理";
-                    case ESAssetCategory.Model: return "模型";
-                    case ESAssetCategory.Audio: return "音频";
-                    case ESAssetCategory.Animation: return "动画";
-                    case ESAssetCategory.Script: return "SO";
-                    case ESAssetCategory.Shader: return "着色器";
-                    case ESAssetCategory.Font: return "字体";
-                    case ESAssetCategory.Video: return "视频";
-                    case ESAssetCategory.Raw: return "Raw 二进制";
-                    case ESAssetCategory.Other: return "其他";
-                    default: return category.ToString();
-                }
-            }
-
-            /// <summary>
-            /// 获取优先级显示名称
-            /// </summary>
-            private string GetPriorityDisplayName(ESAssetCollectionPriority priority)
-            {
-                switch (priority)
-                {
-                    case ESAssetCollectionPriority.Disabled: return "❌ 禁用";
-                    case ESAssetCollectionPriority.Lowest: return "1. 最低";
-                    case ESAssetCollectionPriority.Low: return "2. 较低";
-                    case ESAssetCollectionPriority.Medium: return "3. 中等";
-                    case ESAssetCollectionPriority.High: return "4. 较高";
-                    case ESAssetCollectionPriority.Highest: return "5. 最高";
-                    default: return priority.ToString();
-                }
-            }
-
             #endregion
 
             #region 延迟保存和缓存管理

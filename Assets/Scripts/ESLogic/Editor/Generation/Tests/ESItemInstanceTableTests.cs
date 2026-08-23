@@ -8,6 +8,16 @@ namespace ES.Tests
     [Parallelizable(ParallelScope.None)]
     public sealed class ESItemInstanceTableTests
     {
+        private static ESAssetReferPrefabConfigKey CreateWeaponPrefabKey(string key)
+        {
+            return new ESAssetReferPrefabConfigKey
+            {
+                stringKey = key,
+                guid = "guid-" + key,
+                assetTypeName = typeof(GameObject).FullName
+            };
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -142,11 +152,13 @@ namespace ES.Tests
                 ESRuntimeDataGameCore.Weapons.InjectWith(
                     dummyWeaponKey,
                     ItemWeaponSharedData.Default,
-                    ItemWeaponVariableData.Default);
+                    ItemWeaponVariableData.Default,
+                    prefabKey: CreateWeaponPrefabKey("tests.prefab.weapon.padding"));
                 weaponRuntimeKey = ESRuntimeDataGameCore.Weapons.InjectWith(
                     weaponKey,
                     ItemWeaponSharedData.Default,
-                    ItemWeaponVariableData.Default);
+                    ItemWeaponVariableData.Default,
+                    prefabKey: CreateWeaponPrefabKey("tests.prefab.weapon.long-bar"));
                 itemRuntimeKey = ESRuntimeDataGameCore.Items.InjectWith(
                     itemKey,
                     ItemKind.Weapon,
@@ -196,7 +208,8 @@ namespace ES.Tests
                 weaponRuntimeKey = ESRuntimeDataGameCore.Weapons.InjectWith(
                     weaponKey,
                     definition,
-                    initialState);
+                    initialState,
+                    prefabKey: CreateWeaponPrefabKey("tests.prefab.weapon.instance-state"));
             }
             finally
             {
@@ -307,6 +320,61 @@ namespace ES.Tests
         }
 
         [Test]
+        public void ShotHitSolver_SaturatedQueryKeepsItsPreallocatedBuffer()
+        {
+            Vector3 origin = new Vector3(16000f, 16000f, 16000f);
+            var colliders = new GameObject[4];
+            try
+            {
+                for (int index = 0; index < colliders.Length; index++)
+                {
+                    GameObject candidate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                    candidate.name = "SaturatedShotHit_" + index;
+                    candidate.layer = ESPhysicsLayers.Sensor;
+                    candidate.transform.position = origin + new Vector3(0f, 0f, 1f + index * 1.5f);
+                    colliders[index] = candidate;
+                }
+                Physics.SyncTransforms();
+
+                var solver = new ItemShotPhysicsHitSolver(2);
+                var results = new ShotHitCandidate[2];
+                var query = new ItemShotHitQuery
+                {
+                    from = origin,
+                    to = origin + new Vector3(0f, 0f, 10f),
+                    radius = 0f,
+                    hitLayers = ESPhysicsLayers.SensorMask,
+                    triggerInteraction = QueryTriggerInteraction.Ignore
+                };
+                System.Reflection.FieldInfo bufferField = typeof(ItemShotPhysicsHitSolver).GetField(
+                    "_hitBuffer",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.That(bufferField, Is.Not.Null);
+                var warmedBuffer = (RaycastHit[])bufferField.GetValue(solver);
+
+                int count = solver.Query(query, results, results.Length);
+
+                Assert.That(count, Is.EqualTo(2));
+                Assert.That(solver.IsOverflow, Is.True);
+                Assert.That(results[0].collider.gameObject, Is.EqualTo(colliders[0]),
+                    "饱和回退必须保留路径上的最近命中。");
+                Assert.That(results[1].collider.gameObject, Is.EqualTo(colliders[1]),
+                    "饱和回退必须按距离返回固定容量内的最近候选。");
+                Assert.That(results[0].distance, Is.LessThan(results[1].distance));
+                Assert.That(bufferField.GetValue(solver), Is.SameAs(warmedBuffer),
+                    "命中饱和不得在 Shot 热路径扩容或替换查询数组。");
+            }
+            finally
+            {
+                for (int index = 0; index < colliders.Length; index++)
+                {
+                    if (colliders[index] != null)
+                        Object.DestroyImmediate(colliders[index]);
+                }
+            }
+        }
+
+        [Test]
         public void ScanShot_RespectsLaunchDelayAndWarmupBeforeArriving()
         {
             GameObject shotObject = new GameObject("DelayedScanShot");
@@ -319,6 +387,7 @@ namespace ES.Tests
                 item.RegisterDomain(item.basicDomain);
                 ItemShotModule shot = item.GetMoudle<ItemShotModule>();
                 item.basicDomain.MyModules.ApplyBuffers(true);
+                shot.Start();
                 shot.aimMode = ShotAimMode.Scan;
                 shot.hitLayers = ESPhysicsLayers.SensorMask;
                 shot.config = ShotMotionConfig.Straight(10f, 1f);
@@ -362,6 +431,55 @@ namespace ES.Tests
         }
 
         [Test]
+        public void ShotTickPolicy_AccumulatesSkippedDeltaTimeBeforeNextStep()
+        {
+            var shotObject = new GameObject("DecimatedShot");
+            Vector3 origin = new Vector3(17000f, 17000f, 17000f);
+            shotObject.transform.position = origin;
+
+            try
+            {
+                Item item = shotObject.AddComponent<Item>();
+                item.basicDomain._Editor_RegisterAllButOnlyCreateRelationship(item);
+                item.RegisterDomain(item.basicDomain);
+                ItemShotModule shot = item.GetMoudle<ItemShotModule>();
+                item.basicDomain.MyModules.ApplyBuffers(true);
+                shot.Start();
+                shot.SetTickPolicy(new EverySecondShotTickPolicy());
+                shot.aimMode = ShotAimMode.Free;
+                shot.hitLayers = ESPhysicsLayers.SensorMask;
+                shot.castRadius = 0f;
+                shot.config = ShotMotionConfig.Straight(10f, 2f);
+                shot.state = new ShotMotionState
+                {
+                    previousPosition = origin,
+                    currentPosition = origin,
+                    currentRotation = shotObject.transform.rotation,
+                    velocity = Vector3.forward * 10f,
+                    direction = Vector3.forward,
+                    launched = true
+                };
+
+                System.Reflection.MethodInfo tick = typeof(ItemShotModule).GetMethod(
+                    "Tick",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.That(tick, Is.Not.Null);
+
+                tick.Invoke(shot, new object[] { 0.1f });
+                Assert.That(shot.state.elapsedTime, Is.Zero);
+                Assert.That(shot.state.currentPosition, Is.EqualTo(origin));
+
+                tick.Invoke(shot, new object[] { 0.1f });
+                Assert.That(shot.state.elapsedTime, Is.EqualTo(0.2f).Within(0.0001f));
+                Assert.That(shot.state.currentPosition.z, Is.EqualTo(origin.z + 2f).Within(0.0001f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(shotObject);
+            }
+        }
+
+        [Test]
         public void WeaponRaycast_SkipsOwnerColliderAndSelectsNearestExternalHit()
         {
             GameObject ownerObject = new GameObject("WeaponRayOwner");
@@ -383,6 +501,7 @@ namespace ES.Tests
                 owner.RegisterDomain(domain);
                 var combat = new EntityBasicCombatModule();
                 domain.TryAddModuleRuntime(combat);
+                combat.Start();
 
                 System.Reflection.MethodInfo resolveRaycast = typeof(EntityBasicCombatModule).GetMethod(
                     "TryResolveWeaponRaycast",
@@ -412,6 +531,204 @@ namespace ES.Tests
         }
 
         [Test]
+        public void WeaponRaycast_SaturatedBufferUsesNearestExternalFallbackWithoutReplacingBuffer()
+        {
+            GameObject ownerObject = new GameObject("SaturatedWeaponOwner");
+            GameObject ownerColliderObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            GameObject targetObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            GameObject farTargetObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Vector3 origin = new Vector3(15100f, 15100f, 15100f);
+            ownerColliderObject.transform.SetParent(ownerObject.transform, false);
+            ownerColliderObject.transform.localPosition = new Vector3(0f, 0f, 1f);
+            targetObject.transform.position = origin + new Vector3(0f, 0f, 3f);
+            farTargetObject.transform.position = origin + new Vector3(0f, 0f, 5f);
+            ownerObject.transform.position = origin;
+            Physics.SyncTransforms();
+
+            try
+            {
+                Entity owner = ownerObject.AddComponent<Entity>();
+                owner.EnsureEntityStructure();
+                EntityBasicDomain domain = owner.basicDomain;
+                domain._Editor_RegisterAllButOnlyCreateRelationship(owner);
+                owner.RegisterDomain(domain);
+                var combat = new EntityBasicCombatModule
+                {
+                    weaponFireHitBufferCapacity = 1
+                };
+                domain.TryAddModuleRuntime(combat);
+                combat.Start();
+
+                System.Reflection.FieldInfo bufferField = typeof(EntityBasicCombatModule).GetField(
+                    "_weaponFireHits",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                System.Reflection.MethodInfo resolveRaycast = typeof(EntityBasicCombatModule).GetMethod(
+                    "TryResolveWeaponRaycast",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.That(bufferField, Is.Not.Null);
+                Assert.That(resolveRaycast, Is.Not.Null);
+                var warmedBuffer = (RaycastHit[])bufferField.GetValue(combat);
+                object[] arguments =
+                {
+                    origin,
+                    Vector3.forward,
+                    10f,
+                    (LayerMask)Physics.DefaultRaycastLayers,
+                    QueryTriggerInteraction.Ignore,
+                    default(RaycastHit)
+                };
+
+                Assert.That((bool)resolveRaycast.Invoke(combat, arguments), Is.True);
+                var hit = (RaycastHit)arguments[5];
+                Assert.That(hit.collider, Is.Not.Null);
+                Assert.That(hit.collider.gameObject, Is.EqualTo(targetObject));
+                Assert.That(combat.weaponFireHitOverflowCount, Is.EqualTo(1));
+                Assert.That(combat.weaponFireFallbackTruncationCount, Is.Zero);
+                Assert.That(bufferField.GetValue(combat), Is.SameAs(warmedBuffer));
+            }
+            finally
+            {
+                Object.DestroyImmediate(ownerColliderObject);
+                Object.DestroyImmediate(ownerObject);
+                Object.DestroyImmediate(targetObject);
+                Object.DestroyImmediate(farTargetObject);
+            }
+        }
+
+        [Test]
+        public void ShotResolvedColliderCapacity_StopsWithoutGrowingThePreparedSet()
+        {
+            GameObject shotObject = new GameObject("ResolvedColliderCapacityShot");
+            GameObject firstTarget = new GameObject("ResolvedColliderTargetA");
+            GameObject secondTarget = new GameObject("ResolvedColliderTargetB");
+            Collider firstCollider = firstTarget.AddComponent<BoxCollider>();
+            Collider secondCollider = secondTarget.AddComponent<BoxCollider>();
+
+            try
+            {
+                Item item = shotObject.AddComponent<Item>();
+                item.basicDomain._Editor_RegisterAllButOnlyCreateRelationship(item);
+                item.RegisterDomain(item.basicDomain);
+                ItemShotModule shot = item.GetMoudle<ItemShotModule>();
+                item.basicDomain.MyModules.ApplyBuffers(true);
+                shot.resolvedColliderCapacity = 1;
+                shot.Start();
+                shot.state = new ShotMotionState { launched = true };
+
+                System.Reflection.FieldInfo contextField = typeof(ItemShotModule).GetField(
+                    "_launchContext",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                System.Reflection.FieldInfo resolvedIdsField = typeof(ItemShotModule).GetField(
+                    "_resolvedColliderIds",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                System.Reflection.MethodInfo resolveHit = typeof(ItemShotModule).GetMethod(
+                    "ResolveHit",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.That(contextField, Is.Not.Null);
+                Assert.That(resolvedIdsField, Is.Not.Null);
+                Assert.That(resolveHit, Is.Not.Null);
+                contextField.SetValue(shot, new ESShotLaunchContext(
+                    1,
+                    null,
+                    default,
+                    null,
+                    default,
+                    hitResolver: AlwaysPierceHitResolver.Instance));
+                var preparedIds = (int[])resolvedIdsField.GetValue(shot);
+                var result = new ShotMotionResult
+                {
+                    kind = ShotMotionKind.Moving,
+                    currentPosition = Vector3.forward,
+                    velocity = Vector3.forward
+                };
+
+                object[] firstArguments =
+                {
+                    new ShotHitCandidate { collider = firstCollider, point = Vector3.forward },
+                    result
+                };
+                Assert.That((bool)resolveHit.Invoke(shot, firstArguments), Is.True);
+
+                object[] secondArguments =
+                {
+                    new ShotHitCandidate { collider = secondCollider, point = Vector3.forward * 2f },
+                    firstArguments[1]
+                };
+                Assert.That((bool)resolveHit.Invoke(shot, secondArguments), Is.False,
+                    "去重容量耗尽时必须确定性停止，不能扩容或继续产生重复命中。");
+                Assert.That(shot.state.launched, Is.False);
+                Assert.That(shot.resolvedColliderOverflowCount, Is.EqualTo(1));
+                Assert.That(resolvedIdsField.GetValue(shot), Is.SameAs(preparedIds));
+            }
+            finally
+            {
+                Object.DestroyImmediate(shotObject);
+                Object.DestroyImmediate(firstTarget);
+                Object.DestroyImmediate(secondTarget);
+            }
+        }
+
+        [Test]
+        public void ShotQueryOverflow_StopsAtTheLastKnownBoundaryAfterPierce()
+        {
+            GameObject shotObject = new GameObject("OverflowBoundaryShot");
+            GameObject targetObject = new GameObject("OverflowBoundaryTarget");
+            Collider targetCollider = targetObject.AddComponent<BoxCollider>();
+
+            try
+            {
+                Item item = shotObject.AddComponent<Item>();
+                item.basicDomain._Editor_RegisterAllButOnlyCreateRelationship(item);
+                item.RegisterDomain(item.basicDomain);
+                ItemShotModule shot = item.GetMoudle<ItemShotModule>();
+                item.basicDomain.MyModules.ApplyBuffers(true);
+                shot.Start();
+                shot.SetHitSolver(new SaturatedPierceHitSolver(targetCollider));
+                shot.state = new ShotMotionState { launched = true };
+
+                System.Reflection.FieldInfo contextField = typeof(ItemShotModule).GetField(
+                    "_launchContext",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                System.Reflection.MethodInfo buildHit = typeof(ItemShotModule).GetMethod(
+                    "TryBuildHitCandidate",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.That(contextField, Is.Not.Null);
+                Assert.That(buildHit, Is.Not.Null);
+                contextField.SetValue(shot, new ESShotLaunchContext(
+                    1,
+                    null,
+                    default,
+                    null,
+                    default,
+                    hitResolver: AlwaysPierceHitResolver.Instance));
+                object[] arguments =
+                {
+                    new ShotMotionResult
+                    {
+                        kind = ShotMotionKind.Moving,
+                        previousPosition = Vector3.zero,
+                        currentPosition = Vector3.forward * 10f,
+                        velocity = Vector3.forward
+                    }
+                };
+
+                buildHit.Invoke(shot, arguments);
+
+                var result = (ShotMotionResult)arguments[0];
+                Assert.That(shot.state.launched, Is.False);
+                Assert.That(result.kind, Is.EqualTo(ShotMotionKind.Blocked));
+                Assert.That(result.currentPosition, Is.EqualTo(Vector3.forward * 2f));
+                Assert.That(shot.hitOverflowCount, Is.EqualTo(1));
+                Assert.That(shot.hitOverflowStopCount, Is.EqualTo(1));
+            }
+            finally
+            {
+                Object.DestroyImmediate(shotObject);
+                Object.DestroyImmediate(targetObject);
+            }
+        }
+
+        [Test]
         public void MustHit_DoesNotSynthesizeTargetAfterPhysicalTargetHit()
         {
             GameObject shotObject = new GameObject("MustHitShot");
@@ -426,6 +743,7 @@ namespace ES.Tests
                 item.RegisterDomain(item.basicDomain);
                 ItemShotModule shot = item.GetMoudle<ItemShotModule>();
                 item.basicDomain.MyModules.ApplyBuffers(true);
+                shot.Start();
                 shot.sharedData = ItemShotSharedData.Default;
                 shot.sharedData.blockMode = ShotBlockMode.WorldOnly;
                 shot.aimMode = ShotAimMode.MustHit;
@@ -496,6 +814,7 @@ namespace ES.Tests
             wall.layer = ESPhysicsLayers.Wall;
             ItemShotSharedData definition = ItemShotSharedData.Default;
             definition.blockMode = ShotBlockMode.WorldOnly;
+            Assert.That(definition.ValidateDefinition(out string definitionError), Is.True, definitionError);
             var context = new ESShotLaunchContext(
                 1,
                 null,
@@ -545,6 +864,7 @@ namespace ES.Tests
             wall.layer = ESPhysicsLayers.Wall;
             ItemShotSharedData definition = ItemShotSharedData.Default;
             definition.blockMode = ShotBlockMode.None;
+            Assert.That(definition.ValidateDefinition(out string definitionError), Is.True, definitionError);
             var context = new ESShotLaunchContext(
                 1,
                 null,
@@ -586,7 +906,12 @@ namespace ES.Tests
         public void TargetedShotSpawner_RejectsMissingTargetBeforePoolAccess()
         {
             var shotKey = new ESShotConfigKey { stringKey = "tests.shot.target.required" };
-            var prefabKey = new ESAssetReferPrefabConfigKey { stringKey = "tests.shot.target.prefab" };
+            var prefabKey = new ESAssetReferPrefabConfigKey
+            {
+                stringKey = "tests.shot.target.prefab",
+                guid = "guid-tests-shot-target-prefab",
+                assetTypeName = typeof(GameObject).FullName
+            };
             ItemShotSharedData definition = ItemShotSharedData.Default;
             definition.aimMode = ShotAimMode.MustHit;
 
@@ -618,7 +943,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void ShotSpawner_UsesRuntimePrefabLeaseAndReleasesItAfterPoolReturn()
+        public void ShotSpawner_BorrowsActivePlanPrefabWithoutPerShotLease()
         {
             const string prefabBusinessKey = "tests.shot.prefab.runtime";
             var runtimeMap = ScriptableObject.CreateInstance<ESGlobalAssetRuntimeMap>();
@@ -632,10 +957,18 @@ namespace ES.Tests
             var prefab = new GameObject("RuntimeShotPrefab");
             GameObject managerObject = null;
             ItemShotModule spawnedShot = null;
+            var prefabIdentity = new ESAssetIdentity("guid-tests-shot-runtime-prefab");
+            bool activePlanRegistered = false;
             bool loadingDisposed = false;
             var lifecycle = new List<ESShotLifecycleKind>();
             var shotKey = new ESShotConfigKey { stringKey = "tests.shot.runtime.spawn" };
-            var prefabKey = new ESAssetReferPrefabConfigKey { stringKey = prefabBusinessKey };
+            var prefabKey = new ESAssetReferPrefabConfigKey
+            {
+                stringKey = prefabBusinessKey,
+                guid = prefabIdentity.Guid,
+                localFileId = prefabIdentity.LocalFileId,
+                assetTypeName = typeof(GameObject).FullName
+            };
 
             catalog.assets.Add(new ESRuntimeCatalogEntry
             {
@@ -657,7 +990,7 @@ namespace ES.Tests
                 prefabItem.RegisterDomain(prefabItem.basicDomain);
                 ItemShotModule prefabShot = prefabItem.GetMoudle<ItemShotModule>();
                 prefabItem.basicDomain.MyModules.ApplyBuffers(true);
-                Assert.That(prefabShot, Is.Not.Null);
+                Assert.That(prefabShot, Is.Not.Null, "测试 Shot Prefab 没有创建 ItemShotModule。");
                 Assert.That(prefabItem.basicDomain.FindMyModule<ItemShotModule>(), Is.SameAs(prefabShot));
 
                 InitializeAssetLoadingForTest(
@@ -665,6 +998,8 @@ namespace ES.Tests
                     provider,
                     () => ESRuntimeDataAsset.RebuildAssetConfigTablesFromCatalogs(new[] { catalog }));
                 SetLoadedPrefabForTest(prefabBusinessKey, prefab);
+                ESAssets.RegisterActivePlanAsset(prefabIdentity, prefab);
+                activePlanRegistered = true;
 
                 ItemShotSharedData definition = ItemShotSharedData.Default;
                 definition.enabled = true;
@@ -686,9 +1021,28 @@ namespace ES.Tests
                 }
 
                 managerObject = new GameObject("ShotSpawnerRuntimeManager");
-                managerObject.AddComponent<ESGameManager>();
-                Assert.That(ESGameManager.RuntimeData, Is.Not.Null);
-                Assert.That(ESGameManager.PoolModule, Is.Not.Null);
+                ESGameManager manager = managerObject.AddComponent<ESGameManager>();
+                manager.dontDestroyOnLoad = false;
+                manager.autoCreateCommandModule = false;
+                manager.autoCreateInputModule = false;
+                manager.autoCreateAudioModule = false;
+                manager.autoCreateVfxModule = false;
+                manager.autoCreateCameraModule = false;
+                manager.autoCreatePhysicsQueryModule = false;
+                manager.autoCreateLODModule = false;
+                manager.autoCreateWorldMapModule = false;
+                InvokeAwakeForEditModeTest(manager);
+                Assert.That(
+                    ESGameManager.TryGetModule(out ESRuntimeDataModule runtimeDataModule),
+                    Is.True,
+                    "测试 GameManager 没有注册 RuntimeData 模块。");
+                Assert.That(runtimeDataModule, Is.Not.Null);
+                Assert.That(
+                    ESGameManager.TryGetModule(out ESGameObjectPoolModule poolModule),
+                    Is.True,
+                    "测试 GameManager 没有注册 Pool 模块。");
+                Assert.That(poolModule, Is.Not.Null);
+                int assetReaderCountBeforeSpawn = ESRuntimeDataAsset.ActiveAssetConfigReaderCount;
 
                 var context = new ESShotLaunchContext(
                     701,
@@ -708,17 +1062,26 @@ namespace ES.Tests
                     Is.True,
                     error);
 
-                Assert.That(spawnedShot, Is.Not.Null);
-                Assert.That(spawnedShot.sharedData, Is.SameAs(definition));
+                Assert.That(spawnedShot, Is.Not.Null, "ShotSpawner 成功返回但 Shot 模块为空。");
+                Assert.That(spawnedShot.sharedData, Is.Not.SameAs(definition));
+                Assert.That(spawnedShot.sharedData.speed, Is.EqualTo(definition.speed));
                 Assert.That(spawnedShot.RuntimeInstanceHandle.IsValid, Is.True);
+                spawnedShot.Start();
+                Assert.That(spawnedShot.sharedData, Is.Not.SameAs(definition),
+                    "Shot 必须持有提交时冻结的 Prepared RuntimeData，而不是作者对象。");
+                Assert.That(spawnedShot.RuntimeInstanceHandle.IsValid, Is.True,
+                    "首次池化实例的 Start 不得终止已发射的 Shot 生命周期。");
                 Assert.That(ESRuntimeDataModule.ShotInstanceTable.Count, Is.EqualTo(1));
                 Assert.That(ESRuntimeDataModule.ShotInstanceTable.TryGetInstance(
                     spawnedShot.RuntimeInstanceHandle,
                     out Item registeredItem), Is.True);
                 Assert.That(registeredItem, Is.SameAs(spawnedShot.MyCore));
                 Assert.That(lifecycle, Is.EqualTo(new[] { ESShotLifecycleKind.Launched }));
-                Assert.That(ESRuntimeDataAsset.ActiveAssetConfigReaderCount, Is.EqualTo(1));
-                Assert.That(ESGameManager.PoolModule.TryGetStats(prefab, out ESGameObjectPoolStats activeStats), Is.True);
+                Assert.That(
+                    ESRuntimeDataAsset.ActiveAssetConfigReaderCount,
+                    Is.EqualTo(assetReaderCountBeforeSpawn),
+                    "每发 Shot 不得取得独立 AssetConfig PayloadLease。");
+                Assert.That(poolModule.TryGetStats(prefab, out ESGameObjectPoolStats activeStats), Is.True);
                 Assert.That(activeStats.activeCount, Is.EqualTo(1));
 
                 spawnedShot.Internal_Stop();
@@ -730,8 +1093,10 @@ namespace ES.Tests
                     ESShotLifecycleKind.Despawned
                 }));
                 Assert.That(ESRuntimeDataModule.ShotInstanceTable.Count, Is.Zero);
-                Assert.That(ESRuntimeDataAsset.ActiveAssetConfigReaderCount, Is.Zero);
-                Assert.That(ESGameManager.PoolModule.TryGetStats(prefab, out ESGameObjectPoolStats returnedStats), Is.True);
+                Assert.That(
+                    ESRuntimeDataAsset.ActiveAssetConfigReaderCount,
+                    Is.EqualTo(assetReaderCountBeforeSpawn));
+                Assert.That(poolModule.TryGetStats(prefab, out ESGameObjectPoolStats returnedStats), Is.True);
                 Assert.That(returnedStats.activeCount, Is.Zero);
 
                 lifecycle.Clear();
@@ -745,7 +1110,8 @@ namespace ES.Tests
                         out error),
                     Is.True,
                     error);
-                Assert.That(ESGameManager.PoolModule.PushToPool(spawnedShot.MyCore.gameObject), Is.True);
+                ESAssets.UnregisterActivePlanAsset(prefabIdentity);
+                activePlanRegistered = false;
                 Assert.That(lifecycle, Is.EqualTo(new[]
                 {
                     ESShotLifecycleKind.Launched,
@@ -753,7 +1119,9 @@ namespace ES.Tests
                     ESShotLifecycleKind.Despawned
                 }));
                 Assert.That(ESRuntimeDataModule.ShotInstanceTable.Count, Is.Zero);
-                Assert.That(ESRuntimeDataAsset.ActiveAssetConfigReaderCount, Is.Zero);
+                Assert.That(
+                    ESRuntimeDataAsset.ActiveAssetConfigReaderCount,
+                    Is.EqualTo(assetReaderCountBeforeSpawn));
 
                 loadingService.Dispose();
                 loadingDisposed = true;
@@ -766,6 +1134,8 @@ namespace ES.Tests
                     spawnedShot.Internal_Stop(false);
                 if (managerObject != null)
                     Object.DestroyImmediate(managerObject);
+                if (activePlanRegistered)
+                    ESAssets.UnregisterActivePlanAsset(prefabIdentity);
                 if (!loadingDisposed && loadingService.IsInitialized
                     && ESRuntimeDataAsset.ActiveAssetConfigReaderCount == 0)
                     loadingService.Dispose();
@@ -787,7 +1157,8 @@ namespace ES.Tests
                 int existingRuntimeKey = ESRuntimeDataGameCore.Weapons.InjectWith(
                     weaponKey,
                     ItemWeaponSharedData.Default,
-                    ItemWeaponVariableData.Default);
+                    ItemWeaponVariableData.Default,
+                    prefabKey: CreateWeaponPrefabKey("tests.prefab.weapon.rollback"));
                 Assert.That(
                     ESRuntimeDataGameCore.Weapons.TryGet(existingRuntimeKey, out existingWeapon),
                     Is.True);
@@ -826,7 +1197,8 @@ namespace ES.Tests
                     ESRuntimeDataGameCore.Weapons.InjectWith(
                         new ESWeaponConfigKey { stringKey = "tests.weapon.release.padding" },
                         ItemWeaponSharedData.Default,
-                        ItemWeaponVariableData.Default);
+                        ItemWeaponVariableData.Default,
+                        prefabKey: CreateWeaponPrefabKey("tests.prefab.weapon.release-padding"));
                 }
                 finally
                 {
@@ -882,6 +1254,59 @@ namespace ES.Tests
             }
         }
 
+        private sealed class EverySecondShotTickPolicy : IItemShotTickPolicy
+        {
+            private int _calls;
+
+            public bool ShouldTick(in ShotMotionState state, int frameCount)
+            {
+                _calls++;
+                return (_calls & 1) == 0;
+            }
+        }
+
+        private sealed class AlwaysPierceHitResolver : IESShotHitResolver
+        {
+            public static readonly AlwaysPierceHitResolver Instance = new AlwaysPierceHitResolver();
+
+            public ESShotHitDecision Resolve(
+                in ESShotLaunchContext context,
+                ItemShotSharedData definition,
+                in ShotHitCandidate candidate)
+            {
+                return ESShotHitDecision.Pierce;
+            }
+        }
+
+        private sealed class SaturatedPierceHitSolver : IItemShotHitSolver
+        {
+            private readonly Collider _collider;
+
+            public SaturatedPierceHitSolver(Collider collider)
+            {
+                _collider = collider;
+            }
+
+            public bool IsOverflow => true;
+
+            public int Query(in ItemShotHitQuery query, ShotHitCandidate[] results, int maxResults)
+            {
+                if (_collider == null || results == null || maxResults <= 0)
+                    return 0;
+
+                results[0] = new ShotHitCandidate
+                {
+                    collider = _collider,
+                    point = Vector3.forward * 2f,
+                    normal = Vector3.back,
+                    distance = 2f,
+                    layer = _collider.gameObject.layer,
+                    isTrigger = _collider.isTrigger
+                };
+                return 1;
+            }
+        }
+
         private static ItemDataInfo CreateWeaponInfo(
             ESItemConfigKey itemKey,
             ESWeaponConfigKey weaponKey)
@@ -889,6 +1314,7 @@ namespace ES.Tests
             ItemDataInfo info = ScriptableObject.CreateInstance<ItemDataInfo>();
             info.itemKey = itemKey;
             info.baseConfig.kind = ItemKind.Weapon;
+            info.baseConfig.prefabKey = CreateWeaponPrefabKey("tests.prefab." + weaponKey.StringKey);
             info.EnsureActiveKindData();
             ItemWeaponDataBlock weapon = (ItemWeaponDataBlock)info.kindData;
             weapon.key = weaponKey;
@@ -936,11 +1362,50 @@ namespace ES.Tests
             object pending = initialize.Invoke(
                 loadingService,
                 new object[] { provider, rebuildTables, CancellationToken.None });
-            System.Reflection.MethodInfo asTask = pending?.GetType().GetMethod("AsTask", System.Type.EmptyTypes);
+            System.Type pendingType = pending?.GetType();
+            System.Type extensionsType = pendingType?.Assembly.GetType(
+                "Cysharp.Threading.Tasks.UniTaskExtensions");
+            System.Reflection.MethodInfo asTask = null;
+            System.Reflection.MethodInfo[] extensionMethods = extensionsType?.GetMethods(
+                System.Reflection.BindingFlags.Static
+                | System.Reflection.BindingFlags.Public)
+                ?? System.Array.Empty<System.Reflection.MethodInfo>();
+            for (int index = 0; index < extensionMethods.Length; index++)
+            {
+                System.Reflection.MethodInfo candidate = extensionMethods[index];
+                System.Reflection.ParameterInfo[] parameters = candidate.GetParameters();
+                if (candidate.Name == "AsTask"
+                    && !candidate.IsGenericMethod
+                    && parameters.Length == 1
+                    && parameters[0].ParameterType == pendingType)
+                {
+                    asTask = candidate;
+                    break;
+                }
+            }
             Assert.That(asTask, Is.Not.Null, "RuntimeData 资产加载服务没有返回可等待的 UniTask。");
-            var task = asTask.Invoke(pending, null) as System.Threading.Tasks.Task;
-            Assert.That(task, Is.Not.Null);
-            task.GetAwaiter().GetResult();
+            object task = asTask.Invoke(null, new[] { pending });
+            Assert.That(task, Is.Not.Null, "UniTask.AsTask 反射调用返回了空对象。");
+            System.Reflection.MethodInfo getAwaiter = task.GetType().GetMethod(
+                "GetAwaiter",
+                System.Type.EmptyTypes);
+            Assert.That(getAwaiter, Is.Not.Null, "UniTask.AsTask 返回值没有可等待入口。");
+            object awaiter = getAwaiter.Invoke(task, null);
+            System.Reflection.MethodInfo getResult = awaiter?.GetType().GetMethod(
+                "GetResult",
+                System.Type.EmptyTypes);
+            Assert.That(getResult, Is.Not.Null, "Task awaiter 没有 GetResult 入口。");
+            getResult.Invoke(awaiter, null);
+        }
+
+        private static void InvokeAwakeForEditModeTest(ESGameManager manager)
+        {
+            System.Reflection.MethodInfo awake = typeof(ESGameManager).GetMethod(
+                "Awake",
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(awake, Is.Not.Null, "ESGameManager 没有可供 EditMode 测试调用的 Awake 生命周期入口。");
+            awake.Invoke(manager, null);
         }
 
         private static void SetLoadedPrefabForTest(string businessKey, GameObject prefab)

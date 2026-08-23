@@ -26,11 +26,80 @@
     "capabilities": {
       "type": "array",
       "uniqueItems": true,
-      "items": { "type": "string", "enum": ["ReadArtifacts", "WriteReports", "WriteTemp", "WriteAssets", "Delete", "Upload", "Publish"] }
+      "items": { "type": "string", "enum": ["ReadArtifacts", "WriteReports", "WriteTemp", "WriteAssets", "WriteUiAssets", "Delete", "Upload", "Publish"] }
     },
     "timeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 7200 },
     "supportsDryRun": { "type": "boolean" },
     "supportsRetry": { "type": "boolean", "default": false },
-    "outputs": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+    "outputs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "inputSchemaHash": { "anyOf": [ { "const": "" }, { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" } ] },
+    "performanceBudget": {
+      "anyOf": [ { "type": "null" }, {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxDurationSeconds", "maxOutputBytes", "maxRetryCount", "maxFindingCount"],
+      "properties": {
+        "maxDurationSeconds": { "type": "integer", "minimum": 1, "maximum": 7200 },
+        "maxOutputBytes": { "type": "integer", "minimum": 1 },
+        "maxRetryCount": { "type": "integer", "minimum": 0 },
+        "maxFindingCount": { "type": "integer", "minimum": 0 }
+      } } ]
+    },
+    "acceptanceCriteria": {
+      "anyOf": [ { "type": "null" }, {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "criteria"],
+      "properties": {
+        "schemaVersion": { "type": "integer", "const": 1 },
+        "freshnessPolicy": {
+          "anyOf": [ { "type": "null" }, {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxAgeHours", "requireSourceHash", "allowRuntimeNotRun"],
+          "properties": {
+            "maxAgeHours": { "type": "integer", "minimum": 1, "maximum": 8760 },
+            "requireSourceHash": { "type": "boolean" },
+            "allowRuntimeNotRun": { "type": "boolean" },
+            "requireExecutionSnapshotBinding": { "type": "boolean", "default": false }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "requireExecutionSnapshotBinding": { "const": true } } },
+              "then": { "properties": { "requireSourceHash": { "const": true } } }
+            }
+          ] } ]
+        },
+        "criteria": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/acceptanceCriterion" } }
+      } } ]
+    },
+    "capabilityEnvelope": {
+      "anyOf": [ { "type": "null" }, {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["userAuthorization", "taskContract", "aiCommand", "workerCapability", "projectBoundary"],
+      "properties": {
+        "userAuthorization": { "type": "integer", "minimum": 0 },
+        "taskContract": { "type": "integer", "minimum": 0 },
+        "aiCommand": { "type": "integer", "minimum": 0 },
+        "workerCapability": { "type": "integer", "minimum": 0 },
+        "projectBoundary": { "type": "integer", "minimum": 0 }
+      } } ]
+    }
+  },
+  "$defs": {
+    "acceptanceCriterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criterionId", "verifierId", "description", "required", "runtimeRequired", "forbiddenConditions"],
+      "properties": {
+        "criterionId": { "type": "string", "minLength": 1 },
+        "verifierId": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "required": { "type": "boolean" },
+        "runtimeRequired": { "type": "boolean" },
+        "forbiddenConditions": { "type": "array", "items": { "type": "string" } }
+      }
+    }
   }
 }

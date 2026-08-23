@@ -1,0 +1,43 @@
+schemaVersion: 1
+inventoryId: es-aiwarnings-domain-inventory
+authority: AIWarnings
+generatedFrom: Assets/Plugins/ES/AIWarnings
+excludes: ["*.meta"]
+domains:
+  - domain: start
+    directory: 00_开始阅读（Start）
+    markdownFiles: 3
+    routeKeys: [aiwarnings, startup, context]
+  - domain: p0-guardrails
+    directory: 10_P0最高约束（P0Guardrails）
+    markdownFiles: 29
+    routeKeys: [aiwarnings, p0, guardrail, authority]
+  - domain: architecture
+    directory: 20_架构现状（Architecture）
+    markdownFiles: 22
+    routeKeys: [aiwarnings, architecture, semantics, boundary]
+  - domain: runtime
+    directory: 30_运行时专项（RuntimeOperations）
+    markdownFiles: 11
+    routeKeys: [aiwarnings, runtime, worker, evidence]
+  - domain: editor-tooling
+    directory: 40_编辑器与工具（EditorTooling）
+    markdownFiles: 16
+    routeKeys: [aiwarnings, editor, tooling, unity]
+  - domain: validation-release
+    directory: 50_验证与发布（ValidationRelease）
+    markdownFiles: 5
+    routeKeys: [aiwarnings, validation, release, acceptance]
+  - domain: handover
+    directory: 80_交接与复盘（Handover）
+    markdownFiles: 5
+    routeKeys: [aiwarnings, handover, recovery, continuity]
+  - domain: archive
+    directory: 90_提案与废止（Archive）
+    markdownFiles: 4
+    routeKeys: [aiwarnings, archive, proposal, retirement]
+totals:
+  markdownFiles: 95
+  sourceFilesIncludingMeta: 241
+refreshRule: Rebuild when RuleIndex, CurrentStatus, any domain directory, or any markdown SourceRef changes.
+nonAuthority: This inventory is navigation only; P0 and source warning documents remain authoritative.

@@ -833,9 +833,22 @@ namespace ES.Tests
             ESStoryModule story = new ESStoryModule();
             ESGameSaveApplyResult replay = InvokeStoryReplay(story, GetCurrentCandidate(save));
             Assert.That(replay.Success, Is.False);
-            List<string> diagnostics = GetPrivateList<string>(story, "diagnostics");
+            ESRingBuffer<string> diagnostics = GetPrivateField<ESRingBuffer<string>>(story, "diagnostics");
             Assert.That(diagnostics.Count, Is.EqualTo(1));
             Assert.That(diagnostics[0], Does.Contain("晚注册 StoryModule 重放失败"));
+        }
+
+        [Test]
+        public void StoryModule_DiagnosticsKeepOnlyNewestEntriesInOrder()
+        {
+            var story = new ESStoryModule();
+            for (int i = 0; i < 35; i++)
+                InvokeStoryDiagnostic(story, "diagnostic-" + i);
+
+            ESRingBuffer<string> diagnostics = GetPrivateField<ESRingBuffer<string>>(story, "diagnostics");
+            Assert.That(diagnostics.Count, Is.EqualTo(32));
+            Assert.That(diagnostics[0], Is.EqualTo("diagnostic-3"));
+            Assert.That(diagnostics[31], Is.EqualTo("diagnostic-34"));
         }
 
         private static ESStoryDefinitionDataInfo CreateDialogueDefinition()
@@ -982,6 +995,13 @@ namespace ES.Tests
             return (ESGameSaveApplyResult)method.Invoke(story, new object[] { candidate });
         }
 
+        private static void InvokeStoryDiagnostic(ESStoryModule story, string message)
+        {
+            MethodInfo method = typeof(ESStoryModule).GetMethod("RecordDiagnostic", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(story, new object[] { message });
+        }
+
         private static void InvokeStoryLocalizationSubscription(ESStoryModule story)
         {
             MethodInfo method = typeof(ESStoryModule).GetMethod("SubscribeLocalizationEvents", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -1039,11 +1059,11 @@ namespace ES.Tests
             return (int)dictionary.GetType().GetProperty("Count").GetValue(dictionary);
         }
 
-        private static List<T> GetPrivateList<T>(ESStoryModule story, string fieldName)
+        private static T GetPrivateField<T>(ESStoryModule story, string fieldName)
         {
             FieldInfo field = typeof(ESStoryModule).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(field, Is.Not.Null);
-            return (List<T>)field.GetValue(story);
+            return (T)field.GetValue(story);
         }
 
         private static void SetPrivateField(ESStoryModule story, string fieldName, object value)

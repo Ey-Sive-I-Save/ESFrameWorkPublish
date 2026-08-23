@@ -7,45 +7,147 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: ES3D_VFX_基础_序列帧
+  m_Name: "ES3D_VFX_\u57FA\u7840_\u5E8F\u5217\u5E27"
   m_Shader: {fileID: 4800000, guid: 4e8b2c6d0f1a3b5c7d9e2f4a6c8b0d12, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
+  m_ValidKeywords:
+  - _ES_QUALITY_STANDARD
+  m_InvalidKeywords:
+  - _ENABLEPOLARUV_ON
+  - _ENABLESEQUENCE_ON
   m_LightmapFlags: 0
   m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: 3000
   stringTagMap:
+    ESMaterialVersion: 1
     RenderType: Transparent
   disabledShaderPasses: []
+  m_LockedProperties:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - _FlowMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _MainTex:
+        m_Texture: {fileID: 2800000, guid: 8a1880e31b473c541bbd179563864e8d, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NoiseTex:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _EnableSequence: 1
-    - _SequencePlayback: 0
-    - _SequenceColumns: 4
-    - _SequenceRows: 4
-    - _SequenceFrame: 0
-    - _SequenceSpeed: 8
-    - _VertexColorStrength: 1
-    - _QualityTier: 0
+    - _AlphaClip: 0
     - _BlendMode: 0
-    - _ZWriteMode: 0
-    - _ZTest: 4
-    - _Cull: 0
-    - _QueueOffset: 0
-    - _SrcBlend: 5
-    - _DstBlend: 10
     - _BlendOp: 0
+    - _BlurIntensity: 0.45
+    - _BlurRadius: 0.002
+    - _ChromaticAngle: 0
+    - _ChromaticEdgeOnly: 0.5
+    - _ChromaticIntensity: 1
+    - _ChromaticOffset: 0.002
+    - _Cull: 0
+    - _CustomTime: 0
+    - _Cutoff: 0.01
+    - _DepthIntersectionDistance: 0.18
+    - _DepthIntersectionIntensity: 2
+    - _DissolveMode: 0
+    - _DissolveProgress: 0
+    - _DissolveWidth: 0.1
+    - _Distortion: 0
+    - _DstBlend: 10
+    - _ESMaterialVersion: 1
+    - _EnableBlur: 0
+    - _EnableChromatic: 0
+    - _EnableDepthIntersection: 1
+    - _EnableFlow: 0
+    - _EnableFlowMap: 0
+    - _EnableFresnelMask: 1
+    - _EnableGlitch: 0
+    - _EnableHologram: 1
+    - _EnablePolarUV: 0
+    - _EnableRadialMask: 0
+    - _EnableRim: 1
+    - _EnableSequence: 1
+    - _EnableShine: 0
+    - _EnableSoftParticles: 0
+    - _EnableSparkle: 0
+    - _EnableVertexAnimation: 0
+    - _EnableVertexStreams: 0
+    - _FlowMapStrength: 0.03
+    - _FlowStrength: 0.19
+    - _FresnelAlphaInfluence: 0.85
+    - _FresnelIntensity: 0
+    - _FresnelMax: 1
+    - _FresnelMin: 0
+    - _FresnelPower: 2.8
+    - _GlitchAmount: 0.02
+    - _GlitchSpeed: 3
+    - _HologramFrequency: 60
+    - _HologramGap: 0.35
+    - _HologramMinAlpha: 0.2
+    - _HologramSpeed: 1
+    - _PolarAngularScale: 1
+    - _PolarRadialScale: 1
+    - _PolarRotationSpeed: 0
+    - _QualityTier: 1
+    - _QueueOffset: 0
+    - _RadialMaskInvert: 0
+    - _RadialMaskRadius: 0.5
+    - _RadialMaskSoftness: 0.1
+    - _RimIntensity: 2.1
+    - _RimPower: 3.8
+    - _SequenceColumns: 4
+    - _SequenceFrame: 0
+    - _SequencePlayback: 0
+    - _SequenceRows: 4
+    - _SequenceSpeed: 8
+    - _ShineIntensity: 1.8
+    - _ShineSpeed: 1
+    - _ShineWidth: 0.455
+    - _SoftParticleFar: 1
+    - _SoftParticleNear: 0
+    - _SparkleDensity: 0.16
+    - _SparkleIntensity: 1
+    - _SparkleScale: 25
+    - _SparkleSharpness: 6
+    - _SparkleSpeed: 4.97
+    - _SrcBlend: 5
+    - _TimeMode: 0
+    - _TimeScale: 1
+    - _VertexAnimationAmplitude: 0.1
+    - _VertexAnimationFrequency: 2
+    - _VertexAnimationMask: 0
+    - _VertexAnimationSpeed: 1
+    - _VertexColorStrength: 1
+    - _VertexStreamDissolveStrength: 1
+    - _VertexStreamEmissionStrength: 1
+    - _VertexStreamFrameStrength: 1
+    - _VertexStreamUVStrength: 1
+    - _ZTest: 4
+    - _ZWriteMode: 0
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _DepthIntersectionColor: {r: 0.1, g: 0.9, b: 2.4, a: 1}
+    - _DissolveColor: {r: 1, g: 0.1, b: 0.01, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _FlowMapScale: {r: 1, g: 1, b: 0, a: 0}
+    - _FlowMapSpeed: {r: 0, g: 0, b: 0, a: 0}
+    - _FlowSpeed: {r: 0, g: -0.65, b: 0, a: 0}
+    - _FresnelColor: {r: 0.1, g: 0.6, b: 1, a: 1}
+    - _HologramColor: {r: 0.1, g: 0.8, b: 1, a: 1}
     - _MainTexScaleOffset: {r: 1, g: 1, b: 0, a: 0}
+    - _NoiseScale: {r: 1, g: 1, b: 0, a: 0}
+    - _NoiseSpeed: {r: 0, g: 0, b: 0, a: 0}
+    - _PolarCenter: {r: 0.5, g: 0.5, b: 0, a: 0}
+    - _RadialMaskCenter: {r: 0.5, g: 0.5, b: 0, a: 0}
+    - _RimColor: {r: 0.05, g: 0.85, b: 2.2, a: 1}
+    - _ShineColor: {r: 1, g: 0.87706995, b: 0, a: 1}
+    - _SparkleColor: {r: 1, g: 0.7430804, b: 0, a: 1}
+    - _VertexAnimationDirection: {r: 0, g: 1, b: 0, a: 0}
   m_BuildTextureStacks: []

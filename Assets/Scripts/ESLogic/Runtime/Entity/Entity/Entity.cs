@@ -18,13 +18,29 @@ namespace ES
         public Animator animator;
 
         [NonSerialized] private EntityTransformMapping _transformMapping;
+        [NonSerialized] private List<Collider> _shotHitColliders;
+        [NonSerialized] private bool _shotHitCollidersPrepared;
         [NonSerialized] private int lifecycleGeneration = 1;
+        [NonSerialized] private EntityBasicHealthModule runtimeBasicHealth;
 
         /// <summary>
         /// 角色稳定挂点的运行时入口。首次绑定后只读取缓存，不允许业务代码在热路径重新 Find 层级。
         /// </summary>
         public EntityTransformMapping TransformMapping => EnsureTransformMapping();
         public int LifecycleGeneration => lifecycleGeneration;
+        internal EntityBasicHealthModule Internal_BasicHealth => runtimeBasicHealth;
+
+        internal void Internal_BindBasicHealth(EntityBasicHealthModule health)
+        {
+            if (health != null)
+                runtimeBasicHealth = health;
+        }
+
+        internal void Internal_UnbindBasicHealth(EntityBasicHealthModule health)
+        {
+            if (ReferenceEquals(runtimeBasicHealth, health))
+                runtimeBasicHealth = null;
+        }
 
         internal void BindTransformMapping(EntityTransformMapping mapping)
         {
@@ -194,12 +210,12 @@ namespace ES
         /// </summary>
         public void OnPoolDespawned()
         {
+            Internal_UnregisterShotHitColliders();
             AdvanceLifecycleGeneration();
             kcc?.ResetMotionInfluences();
             ESActionPoolLifecycleDiagnostics.RecordDespawn();
             basicDomain?.NotifyPoolDespawned();
             equipmentDomain?.NotifyPoolDespawned();
-            EnsureTransformMapping()?.ClearDynamic();
             ESActionPoolLifecycleDiagnostics.Record("Entity.CameraRelease");
             ESGameManager.Camera?.ReleaseOwnedBy(this);
             ESActionPoolLifecycleDiagnostics.Record("Entity.DefaultCameraRelease");
@@ -225,8 +241,9 @@ namespace ES
             AdvanceLifecycleGeneration();
             ESActionPoolLifecycleDiagnostics.RecordSpawn();
             EnsureEntityStructure();
-            basicDomain?.NotifyPoolSpawned();
+            Internal_ReRegisterShotHitColliders();
             equipmentDomain?.NotifyPoolSpawned();
+            basicDomain?.NotifyPoolSpawned();
             CaptureAuthoringMotionBaseline();
             EnsureEntityOpSupport();
             Tags.Warmup();
@@ -275,6 +292,8 @@ namespace ES
 
         protected override void OnDestroy()
         {
+            Internal_UnregisterShotHitColliders();
+            _shotHitCollidersPrepared = false;
             equipmentDomain?.NotifyPoolDespawned();
             kcc?.ResetMotionInfluences();
             ESGameManager.Camera?.ReleaseOwnedBy(this);
@@ -298,6 +317,46 @@ namespace ES
             opSupport = null;
         }
 
+        private void Internal_RegisterShotHitColliders()
+        {
+            if (_shotHitCollidersPrepared)
+                return;
+
+            _shotHitColliders ??= new List<Collider>(8);
+            ESShotColliderOwnerRegistry.Internal_Unregister(this, _shotHitColliders);
+            _shotHitColliders.Clear();
+            GetComponentsInChildren(true, _shotHitColliders);
+            int writeIndex = 0;
+            for (int readIndex = 0; readIndex < _shotHitColliders.Count; readIndex++)
+            {
+                Collider collider = _shotHitColliders[readIndex];
+                if (collider == null || collider.GetComponentInParent<Entity>() != this)
+                    continue;
+
+                _shotHitColliders[writeIndex++] = collider;
+            }
+            if (writeIndex < _shotHitColliders.Count)
+                _shotHitColliders.RemoveRange(writeIndex, _shotHitColliders.Count - writeIndex);
+            ESShotColliderOwnerRegistry.Internal_Register(this, _shotHitColliders);
+            _shotHitCollidersPrepared = true;
+        }
+
+        private void Internal_UnregisterShotHitColliders()
+        {
+            ESShotColliderOwnerRegistry.Internal_Unregister(this, _shotHitColliders);
+        }
+
+        private void Internal_ReRegisterShotHitColliders()
+        {
+            if (!_shotHitCollidersPrepared)
+            {
+                Internal_RegisterShotHitColliders();
+                return;
+            }
+
+            ESShotColliderOwnerRegistry.Internal_Register(this, _shotHitColliders);
+        }
+
         #endregion
 
         #region KCC API
@@ -317,6 +376,7 @@ namespace ES
             stateDomain ??= new EntityStateDomain();
             stateDomain.stateMachine ??= new StateMachine();
             kcc ??= new EntityKCCData();
+            Internal_RegisterShotHitColliders();
         }
 
         public void EnsureEntityOpSupport()

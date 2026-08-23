@@ -61,6 +61,7 @@ namespace ES
         {
             return new GUIContent("音频 Cue 预览", "试听 Cue 变体及其裁剪播放窗口");
         }
+        public override string ESWindow_PresentationShortTitle => "音频";
 
         protected override string ESWindow_Subtitle => "播放窗口与变体试听";
         protected override Vector2 ESWindow_MinSize => new Vector2(MinimumWidth, MinimumHeight);

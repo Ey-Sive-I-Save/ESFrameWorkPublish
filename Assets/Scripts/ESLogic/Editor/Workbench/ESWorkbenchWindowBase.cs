@@ -21,11 +21,12 @@ namespace ES
         All = ~0
     }
 
-    public sealed class ESWorkbenchPageDefinition
+    public sealed class ESWorkbenchDocumentDefinition
     {
-        public readonly string pageId;
+        public readonly string documentId;
         public readonly string title;
         public readonly string tooltip;
+        public readonly bool hostsAuthoringViewport;
         public readonly ESWorkbenchDirtyFlags dirtyFlags;
         public readonly string dirtyKey;
         public readonly Func<bool> isAvailable;
@@ -41,19 +42,21 @@ namespace ES
         public readonly Action drawFooter;
         public readonly Func<ESWorkbenchActionContext, VisualElement> createView;
 
-        public ESWorkbenchPageDefinition(string pageId, string title, string tooltip,
-            ESWorkbenchDirtyFlags dirtyFlags, Action draw, Func<bool> isAvailable = null,
+        public ESWorkbenchDocumentDefinition(string documentId, string title, string tooltip,
+            bool hostsAuthoringViewport, ESWorkbenchDirtyFlags dirtyFlags, Action draw = null,
+            Func<bool> isAvailable = null,
             Action refresh = null, Action release = null, string dirtyKey = null,
             Action drawHeader = null, Action drawToolbar = null, Action drawCanvas = null,
             Action drawInspector = null, Action drawPreview = null, Action drawDiagnostics = null,
             Action drawFooter = null, Func<ESWorkbenchActionContext, VisualElement> createView = null)
         {
-            if (string.IsNullOrWhiteSpace(pageId)) throw new ArgumentException("pageId 不能为空。", nameof(pageId));
-            this.pageId = pageId;
-            this.title = title ?? pageId;
+            if (string.IsNullOrWhiteSpace(documentId)) throw new ArgumentException("documentId 不能为空。", nameof(documentId));
+            this.documentId = documentId;
+            this.title = title ?? documentId;
             this.tooltip = tooltip ?? string.Empty;
+            this.hostsAuthoringViewport = hostsAuthoringViewport;
             this.dirtyFlags = dirtyFlags;
-            this.dirtyKey = string.IsNullOrWhiteSpace(dirtyKey) ? pageId : dirtyKey;
+            this.dirtyKey = string.IsNullOrWhiteSpace(dirtyKey) ? documentId : dirtyKey;
             this.draw = draw;
             this.isAvailable = isAvailable;
             this.refresh = refresh;
@@ -67,6 +70,55 @@ namespace ES
             this.drawFooter = drawFooter;
             this.createView = createView;
         }
+    }
+
+    public sealed class ESWorkbenchAuthoringModeDefinition
+    {
+        public ESWorkbenchAuthoringModeDefinition(
+            string modeId,
+            string title,
+            string tooltip,
+            IEnumerable<string> toolIds = null,
+            IEnumerable<ESWorkbenchContentKind> contentKinds = null,
+            string defaultToolId = null,
+            int priority = 0,
+            bool primary = false,
+            Func<ESWorkbenchActionContext, bool> isAvailable = null,
+            Action<ESWorkbenchActionContext> activate = null,
+            Action<ESWorkbenchActionContext> deactivate = null,
+            Func<ESWorkbenchActionContext, VisualElement> createInspector = null)
+        {
+            if (string.IsNullOrWhiteSpace(modeId)) throw new ArgumentException("modeId 不能为空。", nameof(modeId));
+            ModeId = modeId.Trim();
+            Title = string.IsNullOrWhiteSpace(title) ? ModeId : title.Trim();
+            Tooltip = tooltip ?? string.Empty;
+            ToolIds = (toolIds ?? Enumerable.Empty<string>())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            ContentKinds = (contentKinds ?? Enumerable.Empty<ESWorkbenchContentKind>()).Distinct().ToArray();
+            DefaultToolId = defaultToolId ?? string.Empty;
+            Priority = priority;
+            Primary = primary;
+            IsAvailable = isAvailable;
+            Activate = activate;
+            Deactivate = deactivate;
+            CreateInspector = createInspector;
+        }
+
+        public string ModeId { get; }
+        public string Title { get; }
+        public string Tooltip { get; }
+        public IReadOnlyList<string> ToolIds { get; }
+        public IReadOnlyList<ESWorkbenchContentKind> ContentKinds { get; }
+        public string DefaultToolId { get; }
+        public int Priority { get; }
+        public bool Primary { get; }
+        public Func<ESWorkbenchActionContext, bool> IsAvailable { get; }
+        public Action<ESWorkbenchActionContext> Activate { get; }
+        public Action<ESWorkbenchActionContext> Deactivate { get; }
+        public Func<ESWorkbenchActionContext, VisualElement> CreateInspector { get; }
     }
 
     /// <summary>
@@ -83,8 +135,9 @@ namespace ES
         protected string ESWorkbench_Status { get; private set; } = "请选择资产。";
         protected MessageType ESWorkbench_StatusType { get; private set; } = MessageType.Info;
         protected ESWorkbenchDirtyFlags ESWorkbench_DirtyFlags { get; private set; }
-        private readonly List<ESWorkbenchPageDefinition> pages = new List<ESWorkbenchPageDefinition>();
-        private string selectedPageId = string.Empty;
+        private readonly List<ESWorkbenchDocumentDefinition> documents = new List<ESWorkbenchDocumentDefinition>();
+        private readonly List<ESWorkbenchAuthoringModeDefinition> authoringModes = new List<ESWorkbenchAuthoringModeDefinition>();
+        private string selectedWorkbenchDocumentId = string.Empty;
         [SerializeField] private string workbenchInstanceKey;
         [SerializeField] private ESWorkbenchLayoutState workbenchLayout = new ESWorkbenchLayoutState();
         private readonly HashSet<string> dirtyKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -113,17 +166,23 @@ namespace ES
         private ESWorkbenchContributionSession<TModule> contributionSession;
         private int contributionLoadCount;
         private ESWorkbenchUIToolkitHost toolkitHost;
+        private ESWindowActionHosts workbenchActionHosts;
         private ESWorkbenchActionContext actionContext;
         private IVisualElementScheduledItem pendingDataRefresh;
         private bool suppressSelectionPersistence;
         private bool presentationRegistered;
         private ESWorkbenchHostPresentationDescriptor presentation;
         private Vector2 standardContentScroll;
+        private bool workbenchHostSessionActive;
         private const string AssetGuidPrefix = "ES.Workbench.AssetGuid.";
-        private const string PagePrefix = "ES.Workbench.Page.";
+        private const string DocumentPrefix = "ES.Workbench.Document.";
 
         protected virtual IESWorkbenchPersistenceAdapter<TAsset> ESWorkbench_PersistenceAdapter => null;
-        protected virtual string ESWorkbench_WorkbenchId => GetType().FullName;
+        /// <summary>
+        /// 生产工作台必须显式声明稳定身份。不得回退到类型全名，否则重命名窗口会
+        /// 静默改变贡献注册、活动记录和恢复快照的权威键。
+        /// </summary>
+        protected abstract string ESWorkbench_WorkbenchId { get; }
         protected virtual string ESWorkbench_BrandTitle => "ES 内容工作台";
         protected virtual ESWorkbenchHostPresentationDescriptor ESWorkbench_DefaultPresentation =>
             new ESWorkbenchHostPresentationDescriptor(
@@ -131,15 +190,33 @@ namespace ES
                 ESWorkbench_BrandTitle,
                 ESWorkbench_AssetLabel);
         protected sealed override bool ESWindow_AnimateOpeningFrame => false;
+        protected sealed override bool ESWindow_UseCompactHostChrome => true;
         protected virtual bool ESWorkbench_IncludeDefaultViewports => true;
         protected virtual bool ESWorkbench_IncludeDefaultTools => true;
+        /// <summary>工作台级视口手感合同；领域只覆写配置，不复制输入状态机。</summary>
+        protected virtual ESWorkbenchViewportFeelSettings ESWorkbench_ViewportFeel =>
+            ESWorkbenchViewportFeelSettings.Standard;
         protected virtual void ESWorkbench_RegisterDomainContributions()
         {
         }
         protected virtual void ESWorkbench_BeforeLoadContributions()
         {
         }
+        /// <summary>
+        /// 工作台把 ES 基础层的系统/全局/窗口动作迁入自己的商业命令区。
+        /// 派生领域只向既有宿主追加控件，不得复制半休眠状态机。
+        /// </summary>
+        protected sealed override void ESWindow_BuildActionHosts(ESWindowActionHosts hosts)
+        {
+            workbenchActionHosts = hosts;
+            ESWorkbench_BuildActionHosts(hosts);
+        }
+
+        protected virtual void ESWorkbench_BuildActionHosts(ESWindowActionHosts hosts)
+        {
+        }
         protected IReadOnlyList<ESWorkbenchContributionEntry> ESWorkbench_ContributionEntries => contributionEntries;
+        protected int ESWorkbench_ActiveContributionCount => contributionSession?.ActiveDescriptors.Count ?? 0;
         protected int ESWorkbench_ContributionLoadCount => contributionLoadCount;
         protected IReadOnlyList<TModule> ESWorkbench_ActiveModules => activeModules;
         protected ESWorkbenchSelectionService ESWorkbench_Selection => selection;
@@ -263,12 +340,20 @@ namespace ES
             else ESWorkbench_SetStatus("上次绑定资产已不存在或无法恢复：" + guid, MessageType.Warning);
         }
 
-        protected void ESWorkbench_RegisterPage(ESWorkbenchPageDefinition definition)
+        protected void ESWorkbench_RegisterDocument(ESWorkbenchDocumentDefinition definition)
         {
             if (definition == null) return;
-            for (int i = 0; i < pages.Count; i++)
-                if (pages[i].pageId == definition.pageId) { pages[i] = definition; return; }
-            pages.Add(definition);
+            for (int i = 0; i < documents.Count; i++)
+                if (documents[i].documentId == definition.documentId) { documents[i] = definition; return; }
+            documents.Add(definition);
+        }
+
+        protected void ESWorkbench_RegisterAuthoringMode(ESWorkbenchAuthoringModeDefinition definition)
+        {
+            if (definition == null) return;
+            for (int i = 0; i < authoringModes.Count; i++)
+                if (authoringModes[i].ModeId == definition.ModeId) { authoringModes[i] = definition; return; }
+            authoringModes.Add(definition);
         }
 
         protected void ESWorkbench_RegisterViewport(ESWorkbenchViewportDescriptor descriptor)
@@ -309,7 +394,9 @@ namespace ES
 
         protected void ESWorkbench_RegisterTool(ESWorkbenchToolDescriptor descriptor)
         {
-            if (descriptor != null && !tools.Exists(value => value.ToolId == descriptor.ToolId)) tools.Add(descriptor);
+            if (descriptor == null || tools.Exists(value => value.ToolId == descriptor.ToolId)) return;
+            tools.Add(descriptor);
+            toolState.RegisterCapabilities(descriptor.ToolId, descriptor.Capabilities);
         }
 
         protected void ESWorkbench_RegisterCommand(ESWorkbenchCommandDescriptor descriptor)
@@ -335,47 +422,56 @@ namespace ES
                 bottomPanels.Add(descriptor);
         }
 
-        protected IReadOnlyList<ESWorkbenchPageDefinition> ESWorkbench_Pages => pages;
-        protected string ESWorkbench_SelectedPageId => selectedPageId;
+        protected IReadOnlyList<ESWorkbenchDocumentDefinition> ESWorkbench_Documents => documents;
+        protected IReadOnlyList<ESWorkbenchAuthoringModeDefinition> ESWorkbench_AuthoringModes => authoringModes;
+        protected string ESWorkbench_SelectedDocumentId => selectedWorkbenchDocumentId;
+        protected string ESWorkbench_SelectedAuthoringModeId => workbenchLayout?.activeAuthoringModeId ?? string.Empty;
 
-        protected void ESWorkbench_SelectPage(string pageId)
+        protected void ESWorkbench_SelectAuthoringMode(string modeId)
         {
-            if (string.IsNullOrEmpty(pageId)) return;
-            for (int i = 0; i < pages.Count; i++)
-                if (pages[i].pageId == pageId && (pages[i].isAvailable == null || pages[i].isAvailable()))
+            toolkitHost?.SelectAuthoringMode(modeId);
+        }
+
+        protected void ESWorkbench_SelectDocument(string documentId)
+        {
+            if (string.IsNullOrEmpty(documentId)) return;
+            for (int i = 0; i < documents.Count; i++)
+                if (documents[i].documentId == documentId
+                    && (documents[i].isAvailable == null || documents[i].isAvailable()))
                 {
-                    if (selectedPageId != pageId)
+                    if (selectedWorkbenchDocumentId != documentId)
                     {
-                        ESWorkbench_ReleaseCurrentPage();
-                        selectedPageId = pageId;
-                        SessionState.SetString(ESWorkbench_StateKey(PagePrefix), pageId);
-                        pages[i].refresh?.Invoke();
+                        ESWorkbench_ReleaseCurrentDocument();
+                        selectedWorkbenchDocumentId = documentId;
+                        SessionState.SetString(ESWorkbench_StateKey(DocumentPrefix), documentId);
+                        documents[i].refresh?.Invoke();
                     }
                     return;
                 }
         }
 
-        private void ESWorkbench_ReleaseCurrentPage()
+        private void ESWorkbench_ReleaseCurrentDocument()
         {
-            if (string.IsNullOrEmpty(selectedPageId)) return;
-            string releasingPageId = selectedPageId;
-            selectedPageId = string.Empty;
-            ESWorkbenchPageDefinition page = pages.FirstOrDefault(value => value.pageId == releasingPageId);
-            if (page?.release == null) return;
-            try { page.release(); }
+            if (string.IsNullOrEmpty(selectedWorkbenchDocumentId)) return;
+            string releasingDocumentId = selectedWorkbenchDocumentId;
+            selectedWorkbenchDocumentId = string.Empty;
+            ESWorkbenchDocumentDefinition document = documents.FirstOrDefault(
+                value => value.documentId == releasingDocumentId);
+            if (document?.release == null) return;
+            try { document.release(); }
             catch (Exception exception) { Debug.LogException(exception); }
         }
 
-        protected void ESWorkbench_RestoreSelectedPage()
+        protected void ESWorkbench_RestoreSelectedDocument()
         {
-            string saved = SessionState.GetString(ESWorkbench_StateKey(PagePrefix), string.Empty);
+            string saved = SessionState.GetString(ESWorkbench_StateKey(DocumentPrefix), string.Empty);
             if (!string.IsNullOrEmpty(saved))
             {
-                ESWorkbench_SelectPage(saved);
-                if (!string.IsNullOrEmpty(selectedPageId)) return;
+                ESWorkbench_SelectDocument(saved);
+                if (!string.IsNullOrEmpty(selectedWorkbenchDocumentId)) return;
             }
-            for (int i = 0; i < pages.Count && string.IsNullOrEmpty(selectedPageId); i++)
-                ESWorkbench_SelectPage(pages[i].pageId);
+            for (int i = 0; i < documents.Count && string.IsNullOrEmpty(selectedWorkbenchDocumentId); i++)
+                ESWorkbench_SelectDocument(documents[i].documentId);
         }
 
         protected void ESWorkbench_MarkDirty(ESWorkbenchDirtyFlags flags)
@@ -457,12 +553,12 @@ namespace ES
             return string.Join("、", dirtyKeys);
         }
 
-        protected void ESWorkbench_MarkSelectedPageDirty()
+        protected void ESWorkbench_MarkSelectedDocumentDirty()
         {
-            for (int i = 0; i < pages.Count; i++)
-                if (pages[i].pageId == selectedPageId)
+            for (int i = 0; i < documents.Count; i++)
+                if (documents[i].documentId == selectedWorkbenchDocumentId)
                 {
-                    ESWorkbench_MarkDirty(pages[i].dirtyKey, pages[i].dirtyFlags);
+                    ESWorkbench_MarkDirty(documents[i].dirtyKey, documents[i].dirtyFlags);
                     return;
                 }
         }
@@ -506,7 +602,8 @@ namespace ES
                 typeof(TAsset),
                 () => ESWorkbench_Asset,
                 value => ESWorkbench_BindAsset(value as TAsset),
-                () => pages,
+                () => documents,
+                () => authoringModes,
                 () => viewports,
                 () => resolvedObjects,
                 () => resolvedHierarchy,
@@ -514,13 +611,15 @@ namespace ES
                 () => tools,
                 () => commands,
                 workbenchLayout,
-                CreatePageView,
-                ESWorkbench_SelectPage,
-                () => selectedPageId,
+                CreateDocumentView,
+                ESWorkbench_SelectDocument,
+                () => selectedWorkbenchDocumentId,
                 () => resolvedIssues,
                 () => ESWorkbench_IsDirty,
                 () => bottomPanels,
-                presentation);
+                presentation,
+                workbenchActionHosts,
+                ESWorkbench_ViewportFeel);
             content.style.paddingLeft = 0f;
             content.style.paddingRight = 0f;
             content.style.paddingTop = 0f;
@@ -533,22 +632,22 @@ namespace ES
 
         /// <summary>
         /// 兼容旧工作台的 IMGUI 总绘制入口。新底座不再直接调用它；派生窗口应逐步把能力注册为
-        /// Page、Viewport、Object、Hierarchy、Inspector、Tool 或 Command。
+        /// Document、AuthoringMode、Viewport、Object、Hierarchy、Inspector、Tool 或 Command。
         /// </summary>
         protected virtual void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
         }
 
-        private VisualElement CreatePageView(ESWorkbenchPageDefinition page)
+        private VisualElement CreateDocumentView(ESWorkbenchDocumentDefinition document)
         {
-            if (page == null) return null;
-            if (page.createView != null) return page.createView(actionContext);
-            var scroll = new ScrollView(ScrollViewMode.Vertical) { name = "ESWorkbenchLegacyPageScroll" };
+            if (document == null) return null;
+            if (document.createView != null) return document.createView(actionContext);
+            var scroll = new ScrollView(ScrollViewMode.Vertical) { name = "ESWorkbenchDocumentScroll" };
             scroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
             scroll.style.flexGrow = 1f;
             scroll.style.minWidth = 0f;
             scroll.style.minHeight = 0f;
-            var container = new IMGUIContainer(() => DrawLegacyPage(page)) { name = "ESWorkbenchLegacyPage" };
+            var container = new IMGUIContainer(() => DrawDocument(document)) { name = "ESWorkbenchDocument" };
             container.style.flexGrow = 1f;
             container.style.minWidth = 0f;
             container.style.paddingLeft = 10f;
@@ -559,23 +658,23 @@ namespace ES
             return scroll;
         }
 
-        private void DrawLegacyPage(ESWorkbenchPageDefinition page)
+        private void DrawDocument(ESWorkbenchDocumentDefinition document)
         {
-            if (page == null || (page.isAvailable != null && !page.isAvailable())) return;
+            if (document == null || (document.isAvailable != null && !document.isAvailable())) return;
             try
             {
                 ESWorkbench_SerializedAsset?.Update();
-                page.drawHeader?.Invoke();
-                page.drawToolbar?.Invoke();
-                page.drawCanvas?.Invoke();
-                page.draw?.Invoke();
-                page.drawInspector?.Invoke();
-                page.drawPreview?.Invoke();
-                page.drawDiagnostics?.Invoke();
-                page.drawFooter?.Invoke();
+                document.drawHeader?.Invoke();
+                document.drawToolbar?.Invoke();
+                document.drawCanvas?.Invoke();
+                document.draw?.Invoke();
+                document.drawInspector?.Invoke();
+                document.drawPreview?.Invoke();
+                document.drawDiagnostics?.Invoke();
+                document.drawFooter?.Invoke();
                 bool changed = ESWorkbench_SerializedAsset != null && ESWorkbench_SerializedAsset.hasModifiedProperties;
                 ESWorkbench_SerializedAsset?.ApplyModifiedProperties();
-                if (changed) ESWorkbench_MarkDirty(page.dirtyKey, page.dirtyFlags);
+                if (changed) ESWorkbench_MarkDirty(document.dirtyKey, document.dirtyFlags);
             }
             catch (ExitGUIException)
             {
@@ -631,7 +730,8 @@ namespace ES
                 ESWorkbench_WorkbenchId,
                 activeModules,
                 this,
-                ESWorkbench_RegisterPage,
+                ESWorkbench_RegisterDocument,
+                ESWorkbench_RegisterAuthoringMode,
                 slot =>
                 {
                     if (!contributionSlots.ContainsKey(slot.slotId)) contributionSlots.Add(slot.slotId, slot);
@@ -655,7 +755,7 @@ namespace ES
             EnsureActiveTool();
             toolkitHost?.UpdatePresentation(presentation);
             toolkitHost?.RefreshRegistrations();
-            ESWorkbench_RestoreSelectedPage();
+            ESWorkbench_RestoreSelectedDocument();
         }
 
         private void ResolveDynamicCollections()
@@ -780,48 +880,63 @@ namespace ES
 
             ESWorkbench_RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "core.undo", "撤销", _ => Undo.PerformUndo(), "撤销上一步作者操作",
-                EditorGUIUtility.IconContent("d_Animation.PrevKey").image, 120,
-                new ESWorkbenchShortcut(KeyCode.Z, EventModifiers.Control),
-                iconOnly: true));
+                priority: 120,
+                shortcut: new ESWorkbenchShortcut(KeyCode.Z, EventModifiers.Control),
+                iconOnly: true,
+                role: ESWorkbenchCommandRole.History,
+                visibility: ESWorkbenchCommandVisibility.Pinned,
+                unityIconName: "d_Animation.PrevKey"));
             ESWorkbench_RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "core.redo", "重做", _ => Undo.PerformRedo(), "重做上一步作者操作",
-                EditorGUIUtility.IconContent("d_Animation.NextKey").image, 110,
-                new ESWorkbenchShortcut(KeyCode.Y, EventModifiers.Control),
-                iconOnly: true));
+                priority: 110,
+                shortcut: new ESWorkbenchShortcut(KeyCode.Y, EventModifiers.Control),
+                iconOnly: true,
+                role: ESWorkbenchCommandRole.History,
+                visibility: ESWorkbenchCommandVisibility.Pinned,
+                unityIconName: "d_Animation.NextKey"));
             ESWorkbench_RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "core.save", "保存", _ => ESWorkbench_Save(), "保存当前工作台资产",
-                EditorGUIUtility.IconContent("d_SaveAs").image, 100,
-                new ESWorkbenchShortcut(KeyCode.S, EventModifiers.Control),
-                _ => ESWorkbench_Asset != null));
+                priority: 100,
+                shortcut: new ESWorkbenchShortcut(KeyCode.S, EventModifiers.Control),
+                canExecute: _ => ESWorkbench_Asset != null,
+                role: ESWorkbenchCommandRole.Primary,
+                visibility: ESWorkbenchCommandVisibility.Pinned,
+                unityIconName: "d_SaveAs"));
             ESWorkbench_RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "core.locate", "定位", _ => ESWorkbench_Locate(), "在 Project 中定位当前资产",
-                EditorGUIUtility.IconContent("d_Project").image, 90,
+                priority: 90,
                 canExecute: _ => ESWorkbench_Asset != null,
-                showInContextMenu: true));
+                showInContextMenu: true,
+                unityIconName: "d_Project"));
             ESWorkbench_RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "core.refresh", "刷新", context => context.Refresh(), "刷新对象、层级、Inspector 与当前视口",
-                EditorGUIUtility.IconContent("d_Refresh").image, 80,
-                new ESWorkbenchShortcut(KeyCode.R, EventModifiers.Control)));
+                priority: 80,
+                shortcut: new ESWorkbenchShortcut(KeyCode.R, EventModifiers.Control),
+                unityIconName: "d_Refresh"));
             ESWorkbench_RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "core.duplicate", "复制所选", context =>
                 {
                     context.Authoring.TryDuplicate(context.Selection.Current, out _);
                 }, "复制当前作者对象",
-                EditorGUIUtility.IconContent("TreeEditor.Duplicate").image, 70,
-                new ESWorkbenchShortcut(KeyCode.D, EventModifiers.Control),
-                context => context.Authoring.CanDuplicate(context.Selection.Current),
+                priority: 70,
+                shortcut: new ESWorkbenchShortcut(KeyCode.D, EventModifiers.Control),
+                canExecute: context => context.Authoring.CanDuplicate(context.Selection.Current),
                 showInToolbar: false,
-                showInContextMenu: true));
+                showInContextMenu: true,
+                role: ESWorkbenchCommandRole.Authoring,
+                unityIconName: "TreeEditor.Duplicate"));
             ESWorkbench_RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "core.delete", "删除所选", context =>
                 {
                     context.Authoring.TryDelete(context.Selection.Current, out _);
                 }, "删除当前作者对象",
-                EditorGUIUtility.IconContent("TreeEditor.Trash").image, 60,
-                new ESWorkbenchShortcut(KeyCode.Delete),
-                context => context.Authoring.CanDelete(context.Selection.Current),
+                priority: 60,
+                shortcut: new ESWorkbenchShortcut(KeyCode.Delete),
+                canExecute: context => context.Authoring.CanDelete(context.Selection.Current),
                 showInToolbar: false,
-                showInContextMenu: true));
+                showInContextMenu: true,
+                role: ESWorkbenchCommandRole.Dangerous,
+                unityIconName: "TreeEditor.Trash"));
 
             if (ESWorkbench_Asset != null)
             {
@@ -889,8 +1004,9 @@ namespace ES
         protected void ESWorkbench_ReleaseContributions()
         {
             toolkitHost?.ReleaseContributedContent();
-            ESWorkbench_ReleaseCurrentPage();
-            pages.Clear();
+            ESWorkbench_ReleaseCurrentDocument();
+            documents.Clear();
+            authoringModes.Clear();
             contributionSession?.Dispose();
             contributionSession = null;
             contributionEntries.Clear();
@@ -905,6 +1021,7 @@ namespace ES
             authoringAdapters.Clear();
             inspectors.Clear();
             tools.Clear();
+            toolState.ClearRegisteredCapabilities();
             commands.Clear();
             issueSources.Clear();
             resolvedIssues.Clear();
@@ -945,13 +1062,40 @@ namespace ES
 
         protected override void ESWindow_OnHostEnable()
         {
+            if (workbenchHostSessionActive) return;
+            ESWorkbench_ValidateStableIdentity();
             base.ESWindow_OnHostEnable();
-            workbenchLayout ??= new ESWorkbenchLayoutState();
-            selection.Changed -= PersistStableSelection;
-            selection.Changed += PersistStableSelection;
-            ESWorkbench_RegisterDomainContributions();
-            ESWorkbench_BeforeLoadContributions();
-            ESWorkbench_LoadContributions();
+            workbenchHostSessionActive = true;
+            try
+            {
+                workbenchLayout ??= new ESWorkbenchLayoutState();
+                selection.Changed -= PersistStableSelection;
+                selection.Changed += PersistStableSelection;
+                ESWorkbench_RegisterDomainContributions();
+                ESWorkbench_BeforeLoadContributions();
+                ESWorkbench_LoadContributions();
+            }
+            catch
+            {
+                ESWindow_OnHostDisable();
+                throw;
+            }
+        }
+
+        private void ESWorkbench_ValidateStableIdentity()
+        {
+            string workbenchId = ESWorkbench_WorkbenchId;
+            if (string.IsNullOrWhiteSpace(workbenchId))
+                throw new InvalidOperationException(
+                    GetType().Name + " 必须声明非空的稳定 ESWorkbench_WorkbenchId。" );
+
+            if (string.Equals(workbenchId.Trim(), GetType().FullName, StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    GetType().Name + " 不得使用类型全名作为 ESWorkbench_WorkbenchId；请声明稳定产品身份。" );
+
+            if (workbenchId.Any(char.IsWhiteSpace))
+                throw new InvalidOperationException(
+                    GetType().Name + " 的 ESWorkbench_WorkbenchId 不得包含空白字符。" );
         }
 
         protected bool ESWorkbench_TryGetContributionSlot(string slotId, out ESWorkbenchAssetRegistrationSlot slot)
@@ -961,17 +1105,25 @@ namespace ES
 
         protected override void ESWindow_OnHostDisable()
         {
-            pendingDataRefresh?.Pause();
+            if (!workbenchHostSessionActive) return;
+            workbenchHostSessionActive = false;
+            try { pendingDataRefresh?.Pause(); }
+            catch (Exception exception) { Debug.LogException(exception); }
             pendingDataRefresh = null;
-            ESWorkbench_ReleaseContributions();
-            toolkitHost?.Dispose();
+            try { ESWorkbench_ReleaseContributions(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            try { toolkitHost?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
             toolkitHost = null;
-            authoringService.Unbind();
+            try { authoringService.Unbind(); }
+            catch (Exception exception) { Debug.LogException(exception); }
             actionContext = null;
             selection.Changed -= PersistStableSelection;
             Undo.undoRedoPerformed -= OnWorkbenchUndoRedo;
-            ESWorkbench_OnHostCleanup();
-            base.ESWindow_OnHostDisable();
+            try { ESWorkbench_OnHostCleanup(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            try { base.ESWindow_OnHostDisable(); }
+            catch (Exception exception) { Debug.LogException(exception); }
         }
 
         protected ESWorkbenchAssetRegistrationState ESWorkbench_GetRegistrationState(string slotId)
@@ -1258,61 +1410,61 @@ namespace ES
             }
         }
 
-        protected bool ESWorkbench_DrawRegisteredPage()
+        protected bool ESWorkbench_DrawRegisteredDocument()
         {
-            for (int i = 0; i < pages.Count; i++)
-                if (pages[i].pageId == selectedPageId)
+            for (int i = 0; i < documents.Count; i++)
+                if (documents[i].documentId == selectedWorkbenchDocumentId)
                 {
-                    ESWorkbench_DrawPageContent(pages[i]);
+                    ESWorkbench_DrawDocumentContent(documents[i]);
                     return true;
                 }
             return false;
         }
 
-        private static void ESWorkbench_DrawPageContent(ESWorkbenchPageDefinition page)
+        private static void ESWorkbench_DrawDocumentContent(ESWorkbenchDocumentDefinition document)
         {
-            page.drawHeader?.Invoke();
-            page.drawToolbar?.Invoke();
-            page.drawCanvas?.Invoke();
-            page.draw?.Invoke();
+            document.drawHeader?.Invoke();
+            document.drawToolbar?.Invoke();
+            document.drawCanvas?.Invoke();
+            document.draw?.Invoke();
         }
 
-        protected void ESWorkbench_DrawCurrentPageInspector()
+        protected void ESWorkbench_DrawCurrentDocumentInspector()
         {
-            for (int i = 0; i < pages.Count; i++)
-                if (pages[i].pageId == selectedPageId)
+            for (int i = 0; i < documents.Count; i++)
+                if (documents[i].documentId == selectedWorkbenchDocumentId)
                 {
-                    pages[i].drawInspector?.Invoke();
+                    documents[i].drawInspector?.Invoke();
                     return;
                 }
         }
 
-        protected void ESWorkbench_DrawCurrentPagePreview()
+        protected void ESWorkbench_DrawCurrentDocumentPreview()
         {
-            for (int i = 0; i < pages.Count; i++)
-                if (pages[i].pageId == selectedPageId)
+            for (int i = 0; i < documents.Count; i++)
+                if (documents[i].documentId == selectedWorkbenchDocumentId)
                 {
-                    pages[i].drawPreview?.Invoke();
+                    documents[i].drawPreview?.Invoke();
                     return;
                 }
         }
 
-        protected void ESWorkbench_DrawCurrentPageDiagnostics()
+        protected void ESWorkbench_DrawCurrentDocumentDiagnostics()
         {
-            for (int i = 0; i < pages.Count; i++)
-                if (pages[i].pageId == selectedPageId)
+            for (int i = 0; i < documents.Count; i++)
+                if (documents[i].documentId == selectedWorkbenchDocumentId)
                 {
-                    pages[i].drawDiagnostics?.Invoke();
+                    documents[i].drawDiagnostics?.Invoke();
                     return;
                 }
         }
 
-        protected void ESWorkbench_DrawCurrentPageFooter()
+        protected void ESWorkbench_DrawCurrentDocumentFooter()
         {
-            for (int i = 0; i < pages.Count; i++)
-                if (pages[i].pageId == selectedPageId)
+            for (int i = 0; i < documents.Count; i++)
+                if (documents[i].documentId == selectedWorkbenchDocumentId)
                 {
-                    pages[i].drawFooter?.Invoke();
+                    documents[i].drawFooter?.Invoke();
                     return;
                 }
         }
@@ -1324,27 +1476,27 @@ namespace ES
                 using (new EditorGUILayout.VerticalScope(GUILayout.Width(position.width < 1120f ? 150f : navigationWidth)))
                 {
                     GUILayout.Label("工作区导航", ESEditorPresentation.HeaderStyle);
-                    for (int i = 0; i < ESWorkbench_Pages.Count; i++)
+                    for (int i = 0; i < ESWorkbench_Documents.Count; i++)
                     {
-                        ESWorkbenchPageDefinition item = ESWorkbench_Pages[i];
+                        ESWorkbenchDocumentDefinition item = ESWorkbench_Documents[i];
                         if (item.isAvailable != null && !item.isAvailable()) continue;
-                        ESWorkbench_DrawNavigationButton(item.title, item.pageId == ESWorkbench_SelectedPageId,
-                            () => ESWorkbench_SelectPage(item.pageId), item.tooltip);
+                        ESWorkbench_DrawNavigationButton(item.title, item.documentId == ESWorkbench_SelectedDocumentId,
+                            () => ESWorkbench_SelectDocument(item.documentId), item.tooltip);
                     }
                 }
                 using (new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true)))
                 {
                     standardContentScroll = EditorGUILayout.BeginScrollView(standardContentScroll);
-                    ESWorkbench_DrawRegisteredPage();
+                    ESWorkbench_DrawRegisteredDocument();
                     EditorGUILayout.EndScrollView();
                 }
                 using (new EditorGUILayout.VerticalScope(GUILayout.Width(position.width < 1120f ? 215f : inspectorWidth)))
                 {
                     drawInspector?.Invoke();
-                    ESWorkbench_DrawCurrentPageInspector();
-                    ESWorkbench_DrawCurrentPagePreview();
-                    ESWorkbench_DrawCurrentPageDiagnostics();
-                    ESWorkbench_DrawCurrentPageFooter();
+                    ESWorkbench_DrawCurrentDocumentInspector();
+                    ESWorkbench_DrawCurrentDocumentPreview();
+                    ESWorkbench_DrawCurrentDocumentDiagnostics();
+                    ESWorkbench_DrawCurrentDocumentFooter();
                 }
             }
         }

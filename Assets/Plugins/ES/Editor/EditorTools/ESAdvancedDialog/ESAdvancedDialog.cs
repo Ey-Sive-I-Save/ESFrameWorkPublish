@@ -210,6 +210,10 @@ namespace ES
         public Vector2 minSize = new Vector2(460f, 260f);
         public Vector2 preferredSize = new Vector2(560f, 440f);
         public ESAdvancedDialogPositionMode positionMode = ESAdvancedDialogPositionMode.CenterOwner;
+        // CustomScreenPosition 是“对话框左上角”的桌面坐标，不是点击控件的中心点，
+        // 也不是一个可以让服务自行猜测方向的锚点。调用方必须先按触发控件和可用屏幕空间
+        // 计算好最终方向。特别是从右侧停靠 Inspector 的按钮触发大型独立窗口时，默认应优先
+        // 放在按钮左侧或左上方；禁止把按钮右上/右下坐标直接当作对话框左上角，再依赖越界钳制补救。
         public Vector2 customScreenPosition;
         public Vector2 positionOffset;
         public ESDialogTone tone = ESDialogTone.Info;
@@ -218,6 +222,11 @@ namespace ES
         public bool closeOnEscape = true;
         public bool allowOperationCancellation = true;
         public bool queueBehindActiveDialog;
+        /// <summary>
+        /// 允许没有可靠 EditorWindow owner 的调用落到主编辑器工作区。
+        /// 这是显式例外，不是 owner 缺失时的隐式猜测；调用方必须说明原因。
+        /// </summary>
+        public bool allowMainWorkspaceFallback;
         public int asyncValidationDelayMs = 180;
         public string initialFocusFieldId = string.Empty;
         public EditorWindow owner;
@@ -953,6 +962,8 @@ namespace ES
         }
     }
 
+    [ESWindowSleepContract(ESWindowSleepMode.Transient, "跨任务全局进度聚合面不参与自动半休眠")]
+    [ESWindowPresentationShortTitle("进度")]
     public sealed class ESProgressCenterWindow : EditorWindow
     {
         private VisualElement content;
@@ -961,7 +972,10 @@ namespace ES
         internal static ESProgressCenterWindow OpenAtBottomRight()
         {
             EditorWindow previous = focusedWindow;
-            var result = CreateInstance<ESProgressCenterWindow>();
+            var result = GetWindow<ESProgressCenterWindow>(
+                true,
+                "ES 任务进度",
+                false);
             result.titleContent = new GUIContent("ES 任务进度");
             result.minSize = new Vector2(320f, 120f);
             Rect main = EditorGUIUtility.GetMainWindowPosition();
@@ -987,6 +1001,7 @@ namespace ES
             rootVisualElement.style.backgroundColor =
                 ES.EditorInternal.ESEditorPresentation.WindowSurfaceColor;
             var header = new VisualElement();
+            header.AddToClassList("es-progress-header");
             header.style.flexDirection = FlexDirection.Row;
             header.style.alignItems = Align.Center;
             header.style.paddingLeft = 10f;
@@ -1007,6 +1022,7 @@ namespace ES
                 horizontalScrollerVisibility = ScrollerVisibility.Hidden,
                 verticalScrollerVisibility = ScrollerVisibility.Auto,
             };
+            content.AddToClassList("es-progress-content");
             content.style.flexGrow = 1f;
             content.style.minWidth = 0f;
             rootVisualElement.Add(content);
@@ -1027,6 +1043,7 @@ namespace ES
         private VisualElement CreateTaskRow(ESProgressSnapshot snapshot)
         {
             var block = new VisualElement();
+            block.AddToClassList("es-progress-task");
             block.style.marginLeft = 8f;
             block.style.marginRight = 8f;
             block.style.marginBottom = 7f;
@@ -1036,6 +1053,11 @@ namespace ES
             block.style.paddingBottom = 7f;
             block.style.backgroundColor =
                 ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor;
+            ES.EditorInternal.ESEditorPresentation.ApplyRoundedSurface(
+                block,
+                ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor,
+                ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Card,
+                ES.EditorInternal.ESEditorPresentation.DividerColor);
             var top = new VisualElement();
             top.style.flexDirection = FlexDirection.Row;
             top.style.alignItems = Align.Center;
@@ -1109,6 +1131,7 @@ namespace ES
             new List<PendingDialog>();
         private static bool openingReplacement;
         private static bool shuttingDown;
+        private static bool ownerLifetimeMonitorInstalled;
 
         internal static void InitializeLifecycle()
         {
@@ -1116,12 +1139,73 @@ namespace ES
             AssemblyReloadEvents.beforeAssemblyReload += Shutdown;
             EditorApplication.quitting -= Shutdown;
             EditorApplication.quitting += Shutdown;
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+            UnityEditor.Compilation.CompilationPipeline.compilationFinished -= OnCompilationFinished;
+            UnityEditor.Compilation.CompilationPipeline.compilationFinished += OnCompilationFinished;
+            if (!ownerLifetimeMonitorInstalled)
+            {
+                EditorApplication.update -= MonitorOwnerLifetime;
+                EditorApplication.update += MonitorOwnerLifetime;
+                ownerLifetimeMonitorInstalled = true;
+            }
+        }
+
+        private static void MonitorOwnerLifetime()
+        {
+            if (shuttingDown)
+                return;
+
+            for (int i = pendingDialogs.Count - 1; i >= 0; i--)
+            {
+                PendingDialog pending = pendingDialogs[i];
+                if (pending?.request == null || !IsOwnerInvalid(pending.request))
+                    continue;
+                pendingDialogs.RemoveAt(i);
+                pending.Complete(CancelledResult());
+            }
+
+            ESAdvancedDialogWindow[] invalidWindows = activeWindows
+                .Where(window => IsLive(window) && window.HasInvalidOwner)
+                .ToArray();
+            for (int i = 0; i < invalidWindows.Length; i++)
+                invalidWindows[i].CancelAndClose();
+        }
+
+        private static void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            if (state == PlayModeStateChange.ExitingEditMode
+                || state == PlayModeStateChange.EnteredPlayMode)
+            {
+                // Dialogs own editor focus, async validation and sometimes a
+                // nested modal loop. None of those resources may survive into
+                // PlayMode; cancel active and queued requests at the boundary.
+                Shutdown();
+            }
+            else if (state == PlayModeStateChange.EnteredEditMode)
+            {
+                // Shutdown is a boundary cancellation, not a permanent
+                // service disable. New requests are valid again in EditMode.
+                shuttingDown = false;
+            }
+        }
+
+        private static void OnCompilationFinished(object context)
+        {
+            // beforeAssemblyReload also fires for a compile that Unity later
+            // rejects. In that case this AppDomain survives and the presenter
+            // must be usable again instead of remaining permanently shut down.
+            if (!EditorApplication.isPlayingOrWillChangePlaymode
+                && !EditorApplication.isCompiling)
+                shuttingDown = false;
         }
 
         public static ESAdvancedDialogWindow Show(ESAdvancedDialogRequest request)
         {
             ValidateServiceRequest(request);
-            request = SnapshotRequest(request);
+            if (shuttingDown)
+                return null;
+            request = PrepareRequest(request);
             PendingDialog pendingDuplicate = FindPendingDuplicate(request.dialogId);
             if (pendingDuplicate != null)
             {
@@ -1166,7 +1250,13 @@ namespace ES
             CancellationToken cancellationToken = default)
         {
             ValidateServiceRequest(request);
-            request = SnapshotRequest(request);
+            if (shuttingDown)
+                return Task.FromResult(new ESAdvancedDialogResult
+                {
+                    accepted = false,
+                    cancelled = true,
+                });
+            request = PrepareRequest(request);
             var completion = new TaskCompletionSource<ESAdvancedDialogResult>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             SynchronizationContext editorContext = SynchronizationContext.Current
@@ -1270,10 +1360,15 @@ namespace ES
         public static ESAdvancedDialogResult ShowModal(ESAdvancedDialogRequest request)
         {
             ValidateServiceRequest(request);
-            request = SnapshotRequest(request);
+            if (shuttingDown)
+                throw new InvalidOperationException(
+                    "ES 对话框当前处于 ReloadDomain、PlayMode 或退出阶段，不能打开模态窗口。");
+            request = PrepareRequest(request);
             if (request.queueBehindActiveDialog
                 || request.duplicatePolicy == ESDialogDuplicatePolicy.Queue)
                 throw new InvalidOperationException("ShowModal 不支持队列策略；请使用 ShowAsync。");
+            if (request.duplicatePolicy == ESDialogDuplicatePolicy.AllowParallel)
+                throw new InvalidOperationException("ShowModal 不允许并行实例；请使用稳定 dialogId 的 ShowAsync。");
             if (FindDuplicate(request.dialogId) != null)
                 throw new InvalidOperationException("同 ID 对话框已经打开；ShowModal 不会阻塞等待已有窗口。");
             if (FindPendingDuplicate(request.dialogId) != null)
@@ -1285,6 +1380,12 @@ namespace ES
                 TaskCreationOptions.RunContinuationsAsynchronously);
             OpenNow(request, completion, true);
             return completion.Task.GetAwaiter().GetResult();
+        }
+
+        private static ESAdvancedDialogRequest PrepareRequest(ESAdvancedDialogRequest request)
+        {
+            ESAdvancedDialogRequest snapshot = SnapshotRequest(request);
+            return snapshot;
         }
 
         internal static void NotifyClosed(
@@ -1308,6 +1409,13 @@ namespace ES
                 return;
             EditorApplication.delayCall += () =>
             {
+                // ReloadDomain/PlayMode can run this callback after Shutdown has
+                // already cancelled the request. Never resurrect a stale dialog.
+                if (shuttingDown)
+                {
+                    next?.completion?.TrySetResult(CancelledResult());
+                    return;
+                }
                 if (next?.completion?.Task.IsCanceled == true)
                 {
                     OpenNextQueued();
@@ -1320,19 +1428,59 @@ namespace ES
 
         internal static Rect ResolveOwnerBounds(ESAdvancedDialogRequest request)
         {
-            EditorWindow owner = request?.owner;
-            if (IsLive(owner))
+            EditorWindow owner = ResolveOwner(request);
+            if (IsLive(owner) && IsUsableBounds(owner.position))
                 return owner.position;
-            EditorWindow focused = EditorWindow.focusedWindow;
-            if (IsLive(focused) && !(focused is ESAdvancedDialogWindow))
-                return focused.position;
-            return EditorGUIUtility.GetMainWindowPosition();
+            Rect main = EditorGUIUtility.GetMainWindowPosition();
+            return IsUsableBounds(main) ? main : new Rect(80f, 80f, 1280f, 800f);
+        }
+
+        internal static EditorWindow ResolveOwner(ESAdvancedDialogRequest request)
+        {
+            return IsLive(request?.owner) ? request.owner : null;
+        }
+
+        internal static Rect ResolvePlacementWorkArea(Rect ownerBounds)
+        {
+            try
+            {
+                Rect desktop = UnityEditorInternal.InternalEditorUtility
+                    .GetBoundsOfDesktopAtPoint(ownerBounds.center);
+                if (IsUsableBounds(desktop))
+                    return desktop;
+            }
+            catch (Exception)
+            {
+            }
+            try
+            {
+                Rect main = EditorGUIUtility.GetMainWindowPosition();
+                if (IsUsableBounds(main))
+                    return main;
+            }
+            catch (Exception)
+            {
+            }
+            Vector2 fallbackSize = new Vector2(
+                Mathf.Max(1024f, ownerBounds.width),
+                Mathf.Max(720f, ownerBounds.height));
+            return new Rect(ownerBounds.center - fallbackSize * 0.5f, fallbackSize);
+        }
+
+        private static bool IsUsableBounds(Rect bounds)
+        {
+            return bounds.width > 1f
+                && bounds.height > 1f
+                && !float.IsNaN(bounds.x)
+                && !float.IsNaN(bounds.y)
+                && !float.IsInfinity(bounds.x)
+                && !float.IsInfinity(bounds.y);
         }
 
         internal static int ResolveOwnerDepth(ESAdvancedDialogRequest request)
         {
             int depth = 0;
-            EditorWindow current = request?.owner;
+            EditorWindow current = ResolveOwner(request);
             var visited = new HashSet<int>();
             while (current is ESAdvancedDialogWindow dialog && depth < 8)
             {
@@ -1360,6 +1508,11 @@ namespace ES
             TaskCompletionSource<ESAdvancedDialogResult> completion,
             bool modal)
         {
+            if (IsOwnerInvalid(request))
+            {
+                completion?.TrySetResult(CancelledResult());
+                return null;
+            }
             activeWindows.RemoveAll(item => !IsLive(item));
             if (activeWindows.Count >= MaximumActiveDialogs)
                 throw new InvalidOperationException(
@@ -1416,6 +1569,11 @@ namespace ES
                 pendingDialogs.RemoveAt(0);
                 if (next?.completion?.Task.IsCanceled == true)
                     continue;
+                if (next?.request == null || IsOwnerInvalid(next.request))
+                {
+                    next?.Complete(CancelledResult());
+                    continue;
+                }
                 return next;
             }
             return null;
@@ -1434,6 +1592,14 @@ namespace ES
         }
 
         private static bool IsLive(EditorWindow window) => window != null;
+
+        private static bool IsOwnerInvalid(ESAdvancedDialogRequest request)
+        {
+            return request != null
+                && !request.allowMainWorkspaceFallback
+                && !ReferenceEquals(request.owner, null)
+                && request.owner == null;
+        }
 
         private static ESAdvancedDialogResult CancelledResult()
         {
@@ -1478,6 +1644,7 @@ namespace ES
                 closeOnEscape = source.closeOnEscape,
                 allowOperationCancellation = source.allowOperationCancellation,
                 queueBehindActiveDialog = source.queueBehindActiveDialog,
+                allowMainWorkspaceFallback = source.allowMainWorkspaceFallback,
                 asyncValidationDelayMs = source.asyncValidationDelayMs,
                 initialFocusFieldId = source.initialFocusFieldId,
                 owner = source.owner,
@@ -1563,8 +1730,13 @@ namespace ES
         }
     }
 
-    public sealed class ESAdvancedDialogWindow : EditorWindow
+    [ESWindowSleepContract(ESWindowSleepMode.Transient, "对话框由集中服务治理")]
+    [ESWindowPresentationShortTitle("对话框")]
+    public sealed class ESAdvancedDialogWindow : EditorWindow, IESWindowMultiInstanceContract
     {
+        string IESWindowMultiInstanceContract.ESWindow_MultiInstanceCoordinatorId
+            => nameof(ESDialogService);
+
         private ESAdvancedDialogRequest request;
         private string validationMessage = string.Empty;
         private bool initialized;
@@ -1597,13 +1769,52 @@ namespace ES
         private bool asyncValidationPending;
         private bool customContentReleased;
         private bool resultPublished;
+        private bool initialPositionReapplyUpdateSubscribed;
+        private bool initialPositionReapplyDelayScheduled;
+        private IVisualElementScheduledItem initialPositionReapplySchedule;
+        private bool initialPositionReappliedAfterAttach;
+        private int initialPositionReapplyPasses;
+        private double initialPositionReapplyDeadline;
+        private bool hasInitialScreenPosition;
+        private Rect initialScreenPosition;
+        private bool openingAnimationStarted;
+        private bool modalMode;
         private ESAdvancedDialogResult lastResult;
+        private const int InitialPositionReapplyMaxPasses = 48;
+        private const double InitialPositionReapplyDurationSeconds = 0.75d;
         private readonly List<TaskCompletionSource<ESAdvancedDialogResult>> completionObservers =
             new List<TaskCompletionSource<ESAdvancedDialogResult>>();
 
         internal string DialogId => request?.dialogId?.Trim() ?? string.Empty;
         internal EditorWindow Owner => request?.owner;
+        internal bool HasInvalidOwner
+            => request != null
+                && !request.allowMainWorkspaceFallback
+                && !ReferenceEquals(request.owner, null)
+                && request.owner == null;
         internal ESAdvancedDialogResult LastResult => lastResult;
+
+        // Dialogs deliberately use a dedicated mint-green surface family so they remain
+        // visually distinct from ordinary ES tool windows. Semantic warning/error colors
+        // still win for validation, danger actions and tone indicators.
+        private static Color DialogBaseSurface => ES.EditorInternal.ESEditorPresentation.IsProSkin
+            ? new Color(0.070f, 0.125f, 0.095f, 1f)
+            : new Color(0.875f, 0.955f, 0.895f, 1f);
+        private static Color DialogRaisedSurface => ES.EditorInternal.ESEditorPresentation.IsProSkin
+            ? new Color(0.095f, 0.165f, 0.120f, 1f)
+            : new Color(0.925f, 0.975f, 0.940f, 1f);
+        private static Color DialogInsetSurface => ES.EditorInternal.ESEditorPresentation.IsProSkin
+            ? new Color(0.050f, 0.105f, 0.078f, 1f)
+            : new Color(0.825f, 0.925f, 0.855f, 1f);
+        private static Color DialogControlSurface => ES.EditorInternal.ESEditorPresentation.IsProSkin
+            ? new Color(0.115f, 0.205f, 0.145f, 1f)
+            : new Color(0.790f, 0.905f, 0.825f, 1f);
+        private static Color DialogBorderColor => ES.EditorInternal.ESEditorPresentation.IsProSkin
+            ? new Color(0.275f, 0.510f, 0.355f, 0.82f)
+            : new Color(0.390f, 0.635f, 0.455f, 0.88f);
+        private static Color DialogIdentityAccent => ES.EditorInternal.ESEditorPresentation.IsProSkin
+            ? new Color(0.315f, 0.720f, 0.455f, 1f)
+            : new Color(0.175f, 0.545f, 0.285f, 1f);
 
         internal void AddCompletionObserver(
             TaskCompletionSource<ESAdvancedDialogResult> completion)
@@ -1659,32 +1870,183 @@ namespace ES
             if (completion != null)
                 window.completionObservers.Add(completion);
             window.Initialize(request);
-            window.titleContent = new GUIContent(request.title);
+            window.titleContent = new GUIContent(BuildNativeTitle(request.title));
             window.ApplyInitialPosition();
             return window;
         }
 
         internal void Open(bool modal)
         {
+            modalMode = modal;
+            titleContent = new GUIContent(
+                BuildNativeTitle(request?.title, modalMode, request?.tone ?? ESDialogTone.Info));
+            initialPositionReappliedAfterAttach = false;
+            ScheduleInitialPositionReapply();
             if (modal)
             {
-                if (request.animateOpening)
-                {
-                    EditorApplication.delayCall += () =>
-                    {
-                        if (this == null)
-                            return;
-                        Focus();
-                        ES.EditorInternal.ESWindowFrameActivation.Play(this, position);
-                    };
-                }
+                // Apply once before entering Unity's native modal host as well as
+                // during the bounded post-attach repair window. Some Unity versions
+                // keep the modal call on a nested loop and do not dispatch Editor.update
+                // until that loop yields.
+                ReapplyInitialPosition(false);
                 ShowModalUtility();
+                // ShowModalUtility pumps a nested editor loop and may return only after
+                // the user closes the window. The update loop above is the actual
+                // opening guard; this final write also covers a host that returns while
+                // the native window is still live.
+                ReapplyInitialPosition(false);
+                StopInitialPositionReapplyLoop();
                 return;
             }
             ShowUtility();
+            ReapplyInitialPosition(false);
             Focus();
-            if (request.animateOpening)
-                ES.EditorInternal.ESWindowFrameActivation.Play(this, position);
+        }
+
+        private void ScheduleInitialPositionReapply()
+        {
+            if (!hasInitialScreenPosition || initialPositionReapplyUpdateSubscribed)
+                return;
+            initialPositionReapplyPasses = 0;
+            initialPositionReapplyDeadline =
+                EditorApplication.timeSinceStartup + InitialPositionReapplyDurationSeconds;
+            initialPositionReapplyUpdateSubscribed = true;
+            EditorApplication.update -= ReapplyInitialPositionOnEditorUpdate;
+            EditorApplication.update += ReapplyInitialPositionOnEditorUpdate;
+            initialPositionReapplyDelayScheduled = true;
+            EditorApplication.delayCall -= ReapplyInitialPositionOnDelayCall;
+            EditorApplication.delayCall += ReapplyInitialPositionOnDelayCall;
+
+            // ShowModalUtility can enter Unity's nested native loop before the
+            // outer EditorApplication.update stream gets a turn. A bounded
+            // UI Toolkit schedule is attached to this window as a second,
+            // local repair path so the native host gets the target position
+            // after the panel is mounted without leaving a global callback.
+            initialPositionReapplySchedule?.Pause();
+            initialPositionReapplySchedule = rootVisualElement.schedule
+                .Execute(ReapplyInitialPositionOnScheduledLayout)
+                .Every(16);
+        }
+
+        private void ReapplyInitialPositionOnDelayCall()
+        {
+            initialPositionReapplyDelayScheduled = false;
+            if (this == null || !hasInitialScreenPosition)
+                return;
+            try
+            {
+                ReapplyInitialPosition(false);
+                initialPositionReapplyPasses++;
+                // Unity's native utility host can perform one more geometry pass
+                // after ShowUtility/ShowModalUtility. Keep a tiny delay-call tail
+                // so that pass cannot leave a valid dialog stranded at (0, 0).
+                if (initialPositionReapplyPasses < 3
+                    && EditorApplication.timeSinceStartup < initialPositionReapplyDeadline)
+                {
+                    initialPositionReapplyDelayScheduled = true;
+                    EditorApplication.delayCall -= ReapplyInitialPositionOnDelayCall;
+                    EditorApplication.delayCall += ReapplyInitialPositionOnDelayCall;
+                }
+            }
+            catch (MissingReferenceException)
+            {
+                StopInitialPositionReapplyLoop();
+            }
+            catch (NullReferenceException)
+            {
+                StopInitialPositionReapplyLoop();
+            }
+        }
+
+        private void ReapplyInitialPositionOnScheduledLayout()
+        {
+            if (this == null || !hasInitialScreenPosition)
+            {
+                StopInitialPositionReapplyLoop();
+                return;
+            }
+
+            try
+            {
+                ReapplyInitialPosition(false);
+                initialPositionReapplyPasses++;
+                if (initialPositionReapplyPasses >= InitialPositionReapplyMaxPasses
+                    || EditorApplication.timeSinceStartup >= initialPositionReapplyDeadline)
+                    CompleteInitialPositionReapply();
+            }
+            catch (MissingReferenceException)
+            {
+                StopInitialPositionReapplyLoop();
+            }
+            catch (NullReferenceException)
+            {
+                StopInitialPositionReapplyLoop();
+            }
+        }
+
+        private void ReapplyInitialPositionOnEditorUpdate()
+        {
+            if (this == null || !hasInitialScreenPosition)
+            {
+                StopInitialPositionReapplyLoop();
+                return;
+            }
+
+            try
+            {
+                ReapplyInitialPosition(false);
+                initialPositionReapplyPasses++;
+                if (initialPositionReapplyPasses >= InitialPositionReapplyMaxPasses
+                    || EditorApplication.timeSinceStartup >= initialPositionReapplyDeadline)
+                    CompleteInitialPositionReapply();
+            }
+            catch (MissingReferenceException)
+            {
+                StopInitialPositionReapplyLoop();
+            }
+            catch (NullReferenceException)
+            {
+                StopInitialPositionReapplyLoop();
+            }
+        }
+
+        private void ReapplyInitialPosition(bool finalizeOpening)
+        {
+            if (this == null || !hasInitialScreenPosition)
+                return;
+            position = initialScreenPosition;
+            if (finalizeOpening)
+                CompleteInitialPositionReapply();
+        }
+
+        private void CompleteInitialPositionReapply()
+        {
+            StopInitialPositionReapplyLoop();
+            if (this == null || !hasInitialScreenPosition)
+                return;
+
+            position = initialScreenPosition;
+            if (request?.animateOpening == true && !openingAnimationStarted)
+            {
+                ES.EditorInternal.ESWindowFrameActivation.Stop(this, true);
+                openingAnimationStarted = true;
+                Focus();
+                ES.EditorInternal.ESWindowFrameActivation.Play(this, initialScreenPosition);
+            }
+        }
+
+        private void StopInitialPositionReapplyLoop()
+        {
+            if (initialPositionReapplyUpdateSubscribed)
+                EditorApplication.update -= ReapplyInitialPositionOnEditorUpdate;
+            if (initialPositionReapplyDelayScheduled)
+                EditorApplication.delayCall -= ReapplyInitialPositionOnDelayCall;
+            initialPositionReapplyUpdateSubscribed = false;
+            initialPositionReapplyDelayScheduled = false;
+            initialPositionReapplySchedule?.Pause();
+            initialPositionReapplySchedule = null;
+            initialPositionReapplyPasses = 0;
+            initialPositionReapplyDeadline = 0d;
         }
 
         private void Initialize(ESAdvancedDialogRequest value)
@@ -1706,7 +2068,7 @@ namespace ES
             fieldControls.Clear();
             rootVisualElement.style.flexGrow = 1f;
             rootVisualElement.style.minWidth = 0f;
-            rootVisualElement.style.backgroundColor = ES.EditorInternal.ESEditorPresentation.WindowSurfaceColor;
+            rootVisualElement.style.backgroundColor = DialogBaseSurface;
 
             if (!initialized || request == null)
             {
@@ -1715,14 +2077,27 @@ namespace ES
                 return;
             }
 
+            Texture titleIcon = ES.EditorInternal.ESEditorPresentation.ResolveDefaultWindowIcon(
+                this,
+                request.title,
+                null);
             shell = new ES.EditorInternal.ESWindowShell(
                 request.title,
                 request.subtitle,
-                false);
+                false,
+                titleIcon);
+            shell.Root.AddToClassList("es-dialog-window");
+            shell.Root.AddToClassList("es-dialog-branded");
+            shell.Root.AddToClassList(GetToneClass(request.tone));
+            ApplyDialogPalette();
+            BuildDialogIdentityStrip();
             shell.Toolbar.style.display = DisplayStyle.None;
             shell.Content.style.flexDirection = FlexDirection.Column;
-            shell.HeaderToolbar.Add(ES.EditorInternal.ESWindowPresentation.CreateHeaderIconButton(
-                "×",
+            Texture closeIcon = LoadFirstUnityIcon(
+                "d_winbtn_win_close", "winbtn_win_close", "d_CloseButton", "CloseButton");
+            shell.HeaderToolbar.Add(ES.EditorInternal.ESWindowPresentation.CreateHeaderActionButton(
+                closeIcon,
+                closeIcon == null ? "×" : string.Empty,
                 "关闭对话框",
                 () =>
                 {
@@ -1732,11 +2107,13 @@ namespace ES
             rootVisualElement.Add(shell.Root);
 
             dialogContent = new VisualElement { name = "ESDialogContent" };
+            dialogContent.AddToClassList("es-dialog-content");
             dialogContent.style.flexGrow = 1f;
             dialogContent.style.flexShrink = 1f;
             dialogContent.style.minWidth = 0f;
             dialogContent.style.minHeight = 0f;
             dialogContent.style.flexDirection = FlexDirection.Column;
+            dialogContent.style.backgroundColor = DialogBaseSurface;
             shell.Content.Add(dialogContent);
 
             bodyScroll = new ScrollView(ScrollViewMode.Vertical)
@@ -1745,10 +2122,13 @@ namespace ES
                 horizontalScrollerVisibility = ScrollerVisibility.Hidden,
                 verticalScrollerVisibility = ScrollerVisibility.Auto,
             };
+            bodyScroll.AddToClassList("es-dialog-body");
             bodyScroll.style.flexGrow = 1f;
             bodyScroll.style.flexShrink = 1f;
             bodyScroll.style.minWidth = 0f;
             bodyScroll.style.minHeight = 0f;
+            bodyScroll.style.backgroundColor = DialogBaseSurface;
+            bodyScroll.contentContainer.style.backgroundColor = DialogBaseSurface;
             bodyScroll.contentContainer.style.paddingLeft = 18f;
             bodyScroll.contentContainer.style.paddingRight = 18f;
             bodyScroll.contentContainer.style.paddingTop = 16f;
@@ -1764,9 +2144,136 @@ namespace ES
             BuildBusyOverlay(shell.Content);
 
             rootVisualElement.RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
+            rootVisualElement.RegisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
             ES.EditorInternal.ESEditorPresentation.BindWindow(this, allowSemiSleep: false);
             RefreshValidation();
             ScheduleInitialFocus();
+        }
+
+        private void ApplyDialogPalette()
+        {
+            if (shell == null)
+                return;
+
+            shell.Root.style.backgroundColor = DialogBaseSurface;
+            shell.Header.style.backgroundColor = DialogRaisedSurface;
+            shell.Header.style.borderBottomColor = DialogBorderColor;
+            shell.Toolbar.style.backgroundColor = DialogRaisedSurface;
+            shell.Content.style.backgroundColor = DialogBaseSurface;
+            shell.StatusBar.style.backgroundColor = DialogRaisedSurface;
+            shell.StatusBar.style.borderTopColor = DialogBorderColor;
+        }
+
+        private void BuildDialogIdentityStrip()
+        {
+            if (shell?.Header == null)
+                return;
+
+            Color accent = DialogIdentityAccent;
+            var identity = new VisualElement { name = "ESDialogIdentityStrip" };
+            identity.AddToClassList("es-dialog-identity-strip");
+            identity.style.flexDirection = FlexDirection.Row;
+            identity.style.flexWrap = Wrap.Wrap;
+            identity.style.alignItems = Align.Center;
+            identity.style.minWidth = 0f;
+            identity.style.marginBottom = 7f;
+            identity.style.paddingLeft = 8f;
+            identity.style.paddingRight = 8f;
+            identity.style.paddingTop = 5f;
+            identity.style.paddingBottom = 5f;
+            identity.style.minHeight = 46f;
+            identity.style.backgroundColor = new Color(accent.r, accent.g, accent.b, 0.22f);
+            identity.style.borderTopWidth = 1f;
+            identity.style.borderTopColor = accent;
+            identity.style.borderBottomWidth = 1f;
+            identity.style.borderBottomColor = new Color(accent.r, accent.g, accent.b, 0.55f);
+            identity.style.borderLeftWidth = 4f;
+            identity.style.borderLeftColor = accent;
+
+            var brandMark = new Label("ES") { name = "ESDialogBrandMark" };
+            brandMark.AddToClassList("es-dialog-brand-mark");
+            brandMark.style.width = 30f;
+            brandMark.style.height = 30f;
+            brandMark.style.minWidth = 30f;
+            brandMark.style.unityTextAlign = TextAnchor.MiddleCenter;
+            brandMark.style.unityFontStyleAndWeight = FontStyle.Bold;
+            brandMark.style.color = GetReadableActionTextColor(accent);
+            brandMark.style.backgroundColor = accent;
+            brandMark.style.marginRight = 8f;
+            identity.Add(brandMark);
+
+            var layer = new Label("对话交互层") { name = "ESDialogLayerLabel" };
+            layer.AddToClassList("es-dialog-layer-label");
+            layer.style.unityFontStyleAndWeight = FontStyle.Bold;
+            layer.style.color = ES.EditorInternal.ESEditorPresentation.SectionSelectedTextColor;
+            layer.style.marginRight = 10f;
+            identity.Add(layer);
+
+            var badge = new Label("ES 对话框") { name = "ESDialogIdentityBadge" };
+            badge.AddToClassList("es-dialog-identity-badge");
+            badge.style.unityFontStyleAndWeight = FontStyle.Bold;
+            badge.style.color = accent;
+            badge.style.marginRight = 8f;
+            identity.Add(badge);
+
+            var mode = new Label(modalMode ? "模态" : "非模态") { name = "ESDialogModeBadge" };
+            mode.AddToClassList("es-dialog-mode-badge");
+            mode.style.color = GetReadableActionTextColor(accent);
+            mode.style.backgroundColor = accent;
+            mode.style.paddingLeft = 6f;
+            mode.style.paddingRight = 6f;
+            mode.style.paddingTop = 2f;
+            mode.style.paddingBottom = 2f;
+            mode.style.marginRight = 8f;
+            identity.Add(mode);
+
+            var tone = new Label(GetToneLabel(request.tone)) { name = "ESDialogToneBadge" };
+            tone.AddToClassList("es-dialog-tone-badge");
+            tone.style.color = ES.EditorInternal.ESEditorPresentation.SectionMutedTextColor;
+            tone.style.overflow = Overflow.Hidden;
+            tone.style.textOverflow = TextOverflow.Ellipsis;
+            identity.Add(tone);
+
+            var policy = new Label("仅输入 / 确认") { name = "ESDialogPolicyBadge" };
+            policy.AddToClassList("es-dialog-policy-badge");
+            policy.style.color = ES.EditorInternal.ESEditorPresentation.SectionMutedTextColor;
+            policy.style.marginLeft = 8f;
+            policy.text = request.allowMainWorkspaceFallback
+                ? "仅输入 / 确认 · 主工作区"
+                : "仅输入 / 确认 · 有 owner";
+            policy.tooltip = "ES 对话框只收集输入并返回结果；写资产、发布、删除、保存等业务权限仍由调用方正式入口执行。";
+            identity.Add(policy);
+
+            var idLabel = new Label("ID: " + request.dialogId)
+            {
+                name = "ESDialogStableId",
+                tooltip = request.dialogId,
+            };
+            idLabel.AddToClassList("es-dialog-stable-id");
+            idLabel.style.minWidth = 0f;
+            idLabel.style.maxWidth = Length.Percent(100f);
+            idLabel.style.flexShrink = 1f;
+            idLabel.style.color = ES.EditorInternal.ESEditorPresentation.SectionMutedTextColor;
+            idLabel.style.overflow = Overflow.Hidden;
+            idLabel.style.textOverflow = TextOverflow.Ellipsis;
+            idLabel.style.marginLeft = 8f;
+            identity.Add(idLabel);
+            shell.Header.Insert(0, identity);
+        }
+
+        private void OnRootGeometryChanged(GeometryChangedEvent evt)
+        {
+            if (initialPositionReappliedAfterAttach
+                || !hasInitialScreenPosition
+                || position.width <= 0f
+                || position.height <= 0f)
+                return;
+
+            // The native utility host can overwrite the position between CreateGUI
+            // and later layout passes. Restore the clamped screen-space target here;
+            // the bounded Editor update loop continues to cover subsequent host writes.
+            initialPositionReappliedAfterAttach = true;
+            position = initialScreenPosition;
         }
 
         private void BuildCustomContent(VisualElement parent)
@@ -1787,6 +2294,7 @@ namespace ES
         private void BuildBusyOverlay(VisualElement parent)
         {
             busyOverlay = new VisualElement { name = "ESDialogBusyOverlay" };
+            busyOverlay.AddToClassList("es-dialog-busy-overlay");
             busyOverlay.style.position = Position.Absolute;
             busyOverlay.style.left = 0f;
             busyOverlay.style.right = 0f;
@@ -1795,9 +2303,12 @@ namespace ES
             busyOverlay.style.display = DisplayStyle.None;
             busyOverlay.style.justifyContent = Justify.Center;
             busyOverlay.style.alignItems = Align.Center;
-            busyOverlay.style.backgroundColor = new Color(0.035f, 0.045f, 0.055f, 0.90f);
+            busyOverlay.style.backgroundColor = ES.EditorInternal.ESEditorPresentation.IsProSkin
+                ? new Color(0.025f, 0.075f, 0.048f, 0.92f)
+                : new Color(0.255f, 0.420f, 0.300f, 0.72f);
 
             var panel = new VisualElement();
+            panel.AddToClassList("es-dialog-busy-card");
             panel.style.width = 320f;
             panel.style.maxWidth = Length.Percent(86f);
             panel.style.paddingLeft = 16f;
@@ -1806,9 +2317,9 @@ namespace ES
             panel.style.paddingBottom = 14f;
             ES.EditorInternal.ESEditorPresentation.ApplyRoundedSurface(
                 panel,
-                ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor,
+                DialogRaisedSurface,
                 ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Overlay,
-                ES.EditorInternal.ESEditorPresentation.DividerColor);
+                DialogBorderColor);
             busyLabel = new Label("正在处理");
             busyLabel.style.whiteSpace = WhiteSpace.Normal;
             busyLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -1848,6 +2359,9 @@ namespace ES
 
             Color accent = GetToneAccent(request.tone);
             VisualElement summary = new VisualElement { name = "ESDialogSummary" };
+            summary.AddToClassList("es-dialog-summary");
+            summary.style.flexDirection = FlexDirection.Row;
+            summary.style.alignItems = Align.FlexStart;
             summary.style.minWidth = 0f;
             summary.style.marginBottom = request.fields.Count > 0 ? 14f : 4f;
             summary.style.paddingLeft = 12f;
@@ -1856,11 +2370,42 @@ namespace ES
             summary.style.paddingBottom = 10f;
             ES.EditorInternal.ESEditorPresentation.ApplyRoundedSurface(
                 summary,
-                ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor,
+                DialogRaisedSurface,
                 ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Section,
-                ES.EditorInternal.ESEditorPresentation.DividerColor);
+                DialogBorderColor);
             summary.style.borderLeftWidth = 3f;
             summary.style.borderLeftColor = accent;
+
+            Texture toneIcon = ResolveToneIcon(request.tone);
+            if (toneIcon != null)
+            {
+                VisualElement iconSurface = new VisualElement { name = "ESDialogToneIconSurface" };
+                iconSurface.style.width = 34f;
+                iconSurface.style.height = 34f;
+                iconSurface.style.minWidth = 34f;
+                iconSurface.style.marginRight = 10f;
+                iconSurface.style.justifyContent = Justify.Center;
+                iconSurface.style.alignItems = Align.Center;
+                ES.EditorInternal.ESEditorPresentation.ApplyRoundedSurface(
+                    iconSurface,
+                    new Color(accent.r, accent.g, accent.b, 0.14f),
+                    ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Card,
+                    new Color(accent.r, accent.g, accent.b, 0.48f));
+                Image icon = new Image
+                {
+                    image = toneIcon,
+                    scaleMode = ScaleMode.ScaleToFit,
+                    pickingMode = PickingMode.Ignore,
+                };
+                icon.style.width = 19f;
+                icon.style.height = 19f;
+                iconSurface.Add(icon);
+                summary.Add(iconSurface);
+            }
+
+            VisualElement summaryText = new VisualElement { name = "ESDialogSummaryText" };
+            summaryText.style.flexGrow = 1f;
+            summaryText.style.minWidth = 0f;
 
             if (!string.IsNullOrWhiteSpace(request.message))
             {
@@ -1869,7 +2414,7 @@ namespace ES
                 message.style.fontSize = 13f;
                 message.style.unityFontStyleAndWeight = FontStyle.Bold;
                 message.style.color = ES.EditorInternal.ESEditorPresentation.SectionSelectedTextColor;
-                summary.Add(message);
+                summaryText.Add(message);
             }
 
             if (!string.IsNullOrWhiteSpace(request.detail))
@@ -1879,8 +2424,10 @@ namespace ES
                 detail.style.marginTop = string.IsNullOrWhiteSpace(request.message) ? 0f : 6f;
                 detail.style.fontSize = 11f;
                 detail.style.color = ES.EditorInternal.ESEditorPresentation.SectionMutedTextColor;
-                summary.Add(detail);
+                summaryText.Add(detail);
             }
+
+            summary.Add(summaryText);
 
             parent.Add(summary);
         }
@@ -1888,8 +2435,18 @@ namespace ES
         private void BuildField(VisualElement parent, ESAdvancedDialogField field)
         {
             VisualElement block = new VisualElement { name = "ESDialogField-" + field.id };
+            block.AddToClassList("es-dialog-field");
             block.style.minWidth = 0f;
             block.style.marginBottom = 11f;
+            block.style.paddingLeft = 10f;
+            block.style.paddingRight = 10f;
+            block.style.paddingTop = 8f;
+            block.style.paddingBottom = 8f;
+            ES.EditorInternal.ESEditorPresentation.ApplyRoundedSurface(
+                block,
+                DialogInsetSurface,
+                ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Card,
+                DialogBorderColor);
 
             Label label = new Label(field.label + (field.required ? " *" : string.Empty));
             label.style.marginBottom = 4f;
@@ -2002,6 +2559,7 @@ namespace ES
         private VisualElement CreateMultiChoiceField(ESAdvancedDialogField field)
         {
             VisualElement group = new VisualElement { name = "ESDialogMultiChoice-" + field.id };
+            group.AddToClassList("es-dialog-multichoice");
             group.style.minWidth = 0f;
             group.style.paddingLeft = 8f;
             group.style.paddingRight = 8f;
@@ -2009,9 +2567,9 @@ namespace ES
             group.style.paddingBottom = 5f;
             ES.EditorInternal.ESEditorPresentation.ApplyRoundedSurface(
                 group,
-                ES.EditorInternal.ESEditorPresentation.ControlSurfaceColor,
+                DialogControlSurface,
                 ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Card,
-                ES.EditorInternal.ESEditorPresentation.DividerColor);
+                DialogBorderColor);
 
             Label selectionStatus = new Label();
             selectionStatus.style.marginBottom = 4f;
@@ -2081,6 +2639,7 @@ namespace ES
         private VisualElement CreateRecommendationField(ESAdvancedDialogField field)
         {
             VisualElement group = new VisualElement();
+            group.AddToClassList("es-dialog-recommendation");
             group.style.minWidth = 0f;
 
             Label valueLabel = new Label();
@@ -2183,7 +2742,7 @@ namespace ES
             List<Button> buttons)
         {
             Color selectedBackground = Color.Lerp(
-                ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor,
+                DialogRaisedSurface,
                 ES.EditorInternal.ESEditorPresentation.PrimaryActionColor,
                 0.90f);
             for (int i = 0; i < buttons.Count; i++)
@@ -2193,10 +2752,10 @@ namespace ES
                 bool selected = level == field.intValue;
                 Color background = selected
                     ? selectedBackground
-                    : ES.EditorInternal.ESEditorPresentation.ControlSurfaceColor;
+                    : DialogControlSurface;
                 Color border = selected
                     ? ES.EditorInternal.ESEditorPresentation.GetSemanticAccent(2)
-                    : ES.EditorInternal.ESEditorPresentation.DividerColor;
+                    : DialogBorderColor;
                 button.style.backgroundColor = background;
                 ES.EditorInternal.ESEditorPresentation.ApplyCornerRadius(
                     button,
@@ -2260,7 +2819,7 @@ namespace ES
             browse.style.flexShrink = 0f;
             browse.style.marginLeft = 6f;
             browse.style.marginRight = 0f;
-            browse.SetEnabled(!field.readOnly);
+            ES.EditorInternal.ESWindowPresentation.SetButtonEnabled(browse, !field.readOnly);
             row.Add(browse);
             return row;
         }
@@ -2281,6 +2840,7 @@ namespace ES
         private void BuildValidation(VisualElement parent)
         {
             validationPanel = new VisualElement { name = "ESDialogValidation" };
+            validationPanel.AddToClassList("es-dialog-validation");
             validationPanel.style.display = DisplayStyle.None;
             validationPanel.style.marginTop = 2f;
             validationPanel.style.paddingLeft = 10f;
@@ -2306,6 +2866,7 @@ namespace ES
         private void BuildFooter(VisualElement parent)
         {
             VisualElement footer = new VisualElement { name = "ESDialogFooter" };
+            footer.AddToClassList("es-dialog-footer");
             footer.style.flexShrink = 0f;
             footer.style.flexDirection = FlexDirection.Row;
             footer.style.flexWrap = Wrap.Wrap;
@@ -2315,11 +2876,16 @@ namespace ES
             footer.style.paddingRight = 14f;
             footer.style.paddingTop = 9f;
             footer.style.paddingBottom = 9f;
-            footer.style.backgroundColor = ES.EditorInternal.ESEditorPresentation.WindowRaisedSurfaceColor;
+            footer.style.backgroundColor = DialogRaisedSurface;
             footer.style.borderTopWidth = 1f;
-            footer.style.borderTopColor = ES.EditorInternal.ESEditorPresentation.DividerColor;
+            footer.style.borderTopColor = DialogBorderColor;
+            ES.EditorInternal.ESEditorPresentation.ApplyCornerRadius(
+                footer,
+                ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Section,
+                ES.EditorInternal.ESEditorPresentation.ESCornerMask.Top);
 
             auxiliaryActions = new VisualElement { name = "ESDialogAuxiliaryActions" };
+            auxiliaryActions.AddToClassList("es-dialog-actions");
             auxiliaryActions.style.flexDirection = FlexDirection.Row;
             auxiliaryActions.style.flexWrap = Wrap.Wrap;
             auxiliaryActions.style.alignItems = Align.Center;
@@ -2331,13 +2897,15 @@ namespace ES
                 Button button = ES.EditorInternal.ESWindowPresentation.CreateToolbarButton(
                     action.text,
                     string.IsNullOrWhiteSpace(action.tooltip) ? action.text : action.tooltip,
-                    () => ExecuteAuxiliaryAction(action));
+                    () => ExecuteAuxiliaryAction(action),
+                    action.role == ESAdvancedDialogActionRole.Primary);
                 ApplyActionRole(button, action.role);
                 auxiliaryActions.Add(button);
             }
             footer.Add(auxiliaryActions);
 
             decisionActions = new VisualElement { name = "ESDialogDecisionActions" };
+            decisionActions.AddToClassList("es-dialog-decision-actions");
             decisionActions.style.flexDirection = FlexDirection.Row;
             decisionActions.style.alignItems = Align.Center;
             decisionActions.style.flexShrink = 0f;
@@ -2491,8 +3059,8 @@ namespace ES
             cancelBusyButton.style.display = request.allowOperationCancellation
                 ? DisplayStyle.Flex
                 : DisplayStyle.None;
-            decisionActions?.SetEnabled(false);
-            auxiliaryActions?.SetEnabled(false);
+            ES.EditorInternal.ESWindowPresentation.SetElementEnabled(decisionActions, false);
+            ES.EditorInternal.ESWindowPresentation.SetElementEnabled(auxiliaryActions, false);
             busyRefreshSchedule?.Pause();
             busyRefreshSchedule = rootVisualElement.schedule.Execute(RefreshBusyOverlay).Every(100);
         }
@@ -2513,7 +3081,7 @@ namespace ES
         {
             operationCancellation?.Cancel();
             activeProgress?.RequestCancel();
-            cancelBusyButton?.SetEnabled(false);
+            ES.EditorInternal.ESWindowPresentation.SetButtonEnabled(cancelBusyButton, false);
             if (busyLabel != null)
                 busyLabel.text = "正在取消";
         }
@@ -2524,9 +3092,9 @@ namespace ES
             busyRefreshSchedule?.Pause();
             busyRefreshSchedule = null;
             busyOverlay.style.display = DisplayStyle.None;
-            cancelBusyButton?.SetEnabled(true);
-            decisionActions?.SetEnabled(true);
-            auxiliaryActions?.SetEnabled(true);
+            ES.EditorInternal.ESWindowPresentation.SetButtonEnabled(cancelBusyButton, true);
+            ES.EditorInternal.ESWindowPresentation.SetElementEnabled(decisionActions, true);
+            ES.EditorInternal.ESWindowPresentation.SetElementEnabled(auxiliaryActions, true);
             activeProgress = null;
             operationCancellation?.Dispose();
             operationCancellation = null;
@@ -2537,20 +3105,22 @@ namespace ES
         {
             if (button == null)
                 return;
-            Color background;
             if (role == ESAdvancedDialogActionRole.Danger)
-                background = ES.EditorInternal.ESEditorPresentation.ErrorColor;
+            {
+                ES.EditorInternal.ESWindowPresentation.SetButtonPresentationState(
+                    button,
+                    ES.EditorInternal.ESEditorPresentation.ESPresentationState.Error);
+            }
             else if (role == ESAdvancedDialogActionRole.Primary)
-                background = ES.EditorInternal.ESEditorPresentation.PrimaryActionColor;
+            {
+                ES.EditorInternal.ESWindowPresentation.SetButtonPresentationState(
+                    button,
+                    ES.EditorInternal.ESEditorPresentation.ESPresentationState.Normal);
+            }
             else
                 return;
 
-            button.style.backgroundColor = background;
-            button.style.color = GetReadableActionTextColor(background);
             button.style.unityFontStyleAndWeight = FontStyle.Bold;
-            ES.EditorInternal.ESEditorPresentation.ApplyCornerRadius(
-                button,
-                ES.EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Control);
         }
 
         internal static Color GetReadableActionTextColor(Color background)
@@ -2575,9 +3145,15 @@ namespace ES
 
         private void BuildExpiredView()
         {
+            Texture titleIcon = ES.EditorInternal.ESEditorPresentation.ResolveDefaultWindowIcon(
+                this,
+                "ES 对话框已失效",
+                null);
             var expiredShell = new ES.EditorInternal.ESWindowShell(
                 "ES 对话框已失效",
-                "Domain Reload 已清除本次临时输入上下文");
+                "Domain Reload 已清除本次临时输入上下文",
+                false,
+                titleIcon);
             expiredShell.Toolbar.style.display = DisplayStyle.None;
             expiredShell.SetStatus("请关闭并从原功能重新打开", ES.EditorInternal.ESStatusKind.Warning);
             expiredShell.Content.Add(ES.EditorInternal.ESWindowPresentation.CreateErrorState(
@@ -2635,7 +3211,11 @@ namespace ES
         private void ApplyInitialPosition()
         {
             Vector2 requestedMin = request.minSize;
-            Rect main = ESDialogService.ResolveOwnerBounds(request);
+            Rect ownerBounds = ESDialogService.ResolveOwnerBounds(request);
+            Rect placementAnchor = request.positionMode == ESAdvancedDialogPositionMode.CustomScreenPosition
+                ? new Rect(request.customScreenPosition, Vector2.one)
+                : ownerBounds;
+            Rect workArea = ESDialogService.ResolvePlacementWorkArea(placementAnchor);
             float estimatedHeight = 250f;
             for (int i = 0; i < request.fields.Count; i++)
             {
@@ -2651,7 +3231,8 @@ namespace ES
             }
 
             Rect centered = CalculatePosition(
-                main,
+                ownerBounds,
+                workArea,
                 requestedMin,
                 request.preferredSize,
                 estimatedHeight,
@@ -2661,9 +3242,13 @@ namespace ES
             minSize = new Vector2(
                 Mathf.Min(Mathf.Max(360f, requestedMin.x), centered.width),
                 Mathf.Min(Mathf.Max(240f, requestedMin.y), centered.height));
-            position = ESDialogService.OffsetChildDialog(
-                centered,
-                ESDialogService.ResolveOwnerDepth(request));
+            int ownerDepth = request.positionMode == ESAdvancedDialogPositionMode.CustomScreenPosition
+                ? 0
+                : ESDialogService.ResolveOwnerDepth(request);
+            Rect offsetPosition = ESDialogService.OffsetChildDialog(centered, ownerDepth);
+            initialScreenPosition = OffsetAndClamp(offsetPosition, workArea, Vector2.zero);
+            hasInitialScreenPosition = true;
+            position = initialScreenPosition;
         }
 
         internal static Rect CalculateCenteredPosition(
@@ -2700,24 +3285,56 @@ namespace ES
             Vector2 customScreenPosition,
             Vector2 positionOffset)
         {
-            Rect centered = CalculateCenteredPosition(owner, requestedMin, preferred, estimatedHeight);
+            return CalculatePosition(
+                owner,
+                owner,
+                requestedMin,
+                preferred,
+                estimatedHeight,
+                mode,
+                customScreenPosition,
+                positionOffset);
+        }
+
+        internal static Rect CalculatePosition(
+            Rect owner,
+            Rect workArea,
+            Vector2 requestedMin,
+            Vector2 preferred,
+            float estimatedHeight,
+            ESAdvancedDialogPositionMode mode,
+            Vector2 customScreenPosition,
+            Vector2 positionOffset)
+        {
+            // 这里的 position 语义是“最终窗口矩形”，不是按钮锚点矩形。
+            // CustomScreenPosition 传入的是窗口左上角；OffsetAndClamp 只负责防止窗口越出
+            // 当前显示器工作区，不能替代调用方的布局方向选择。右侧 Inspector 场景尤其不能
+            // 先向屏幕右边放置、再指望钳制把窗口推回合理位置，否则会产生跳位和错误视觉归属。
+            Rect sized = CalculateCenteredPosition(
+                workArea,
+                requestedMin,
+                preferred,
+                estimatedHeight);
+            Rect centered = new Rect(
+                owner.center - sized.size * 0.5f,
+                sized.size);
             if (mode == ESAdvancedDialogPositionMode.CenterOwner)
-                return OffsetAndClamp(centered, owner, positionOffset);
+                return OffsetAndClamp(centered, workArea, positionOffset);
 
             Vector2 point;
             switch (mode)
             {
                 case ESAdvancedDialogPositionMode.OwnerTopLeft:
-                    point = new Vector2(owner.xMin, owner.yMax - centered.height);
-                    break;
-                case ESAdvancedDialogPositionMode.OwnerTopRight:
-                    point = new Vector2(owner.xMax - centered.width, owner.yMax - centered.height);
-                    break;
-                case ESAdvancedDialogPositionMode.OwnerBottomLeft:
                     point = new Vector2(owner.xMin, owner.yMin);
                     break;
-                case ESAdvancedDialogPositionMode.OwnerBottomRight:
+                case ESAdvancedDialogPositionMode.OwnerTopRight:
                     point = new Vector2(owner.xMax - centered.width, owner.yMin);
+                    break;
+                case ESAdvancedDialogPositionMode.OwnerBottomLeft:
+                    point = new Vector2(owner.xMin, owner.yMax - centered.height);
+                    break;
+                case ESAdvancedDialogPositionMode.OwnerBottomRight:
+                    point = new Vector2(owner.xMax - centered.width, owner.yMax - centered.height);
                     break;
                 case ESAdvancedDialogPositionMode.CustomScreenPosition:
                     point = customScreenPosition;
@@ -2726,29 +3343,17 @@ namespace ES
                     point = centered.position;
                     break;
             }
-            // CustomScreenPosition is already expressed in screen coordinates. A ShaderGUI
-            // button normally lives inside a narrow docked Inspector, so clamping against
-            // that owner would force a wide dialog to the Inspector's upper-left corner.
-            // Clamp explicit screen positions against the Unity main window instead.
-            Rect clampBounds = owner;
-            if (mode == ESAdvancedDialogPositionMode.CustomScreenPosition)
-            {
-                try
-                {
-                    Rect main = EditorGUIUtility.GetMainWindowPosition();
-                    if (main.width > 0f && main.height > 0f)
-                        clampBounds = main;
-                }
-                catch (Exception)
-                {
-                    // Keep the resolved owner bounds as a safe fallback for older Unity versions.
-                }
-            }
-            return OffsetAndClamp(new Rect(point + positionOffset, centered.size), clampBounds, Vector2.zero);
+            return OffsetAndClamp(
+                new Rect(point + positionOffset, centered.size),
+                workArea,
+                Vector2.zero);
         }
 
         private static Rect OffsetAndClamp(Rect position, Rect bounds, Vector2 offset)
         {
+            // 这是最后一道安全边界，不是正常放置策略。调用方若从 Inspector 按钮触发大型
+            // 独立对话框，应在进入这里之前把目标放到按钮左侧/左上方（右侧停靠时），
+            // 而不是故意放到右侧后让这里整体反推。
             position.position += offset;
             float minX = bounds.xMin + 12f;
             float maxX = Mathf.Max(minX, bounds.xMax - position.width - 12f);
@@ -2757,6 +3362,32 @@ namespace ES
             position.x = Mathf.Clamp(position.x, minX, maxX);
             position.y = Mathf.Clamp(position.y, minY, maxY);
             return position;
+        }
+
+        private static Texture ResolveToneIcon(ESDialogTone tone)
+        {
+            switch (tone)
+            {
+                case ESDialogTone.Success:
+                    return LoadFirstUnityIcon("TestPassed", "d_TestPassed", "d_console.infoicon");
+                case ESDialogTone.Warning:
+                    return LoadFirstUnityIcon("d_console.warnicon", "console.warnicon");
+                case ESDialogTone.Danger:
+                    return LoadFirstUnityIcon("d_console.erroricon", "console.erroricon");
+                default:
+                    return LoadFirstUnityIcon("d_console.infoicon", "console.infoicon");
+            }
+        }
+
+        private static Texture LoadFirstUnityIcon(params string[] iconNames)
+        {
+            for (int i = 0; i < iconNames.Length; i++)
+            {
+                Texture icon = ES.EditorInternal.ESEditorPresentation.LoadUnityIcon(iconNames[i]);
+                if (icon != null)
+                    return icon;
+            }
+            return null;
         }
 
         private Color GetToneAccent(ESDialogTone tone)
@@ -2801,7 +3432,9 @@ namespace ES
                 validationPanel.style.display = valid ? DisplayStyle.None : DisplayStyle.Flex;
             if (validationLabel != null)
                 validationLabel.text = valid ? string.Empty : "无法继续：" + validationMessage;
-            confirmButton?.SetEnabled(valid && !busy && !asyncValidationPending);
+            ES.EditorInternal.ESWindowPresentation.SetButtonEnabled(
+                confirmButton,
+                valid && !busy && !asyncValidationPending);
             if (shell != null)
             {
                 shell.SetStatus(
@@ -2822,7 +3455,7 @@ namespace ES
             validationCancellation = new CancellationTokenSource();
             CancellationToken token = validationCancellation.Token;
             asyncValidationPending = true;
-            confirmButton?.SetEnabled(false);
+            ES.EditorInternal.ESWindowPresentation.SetButtonEnabled(confirmButton, false);
             shell?.SetStatus("正在校验输入...", ES.EditorInternal.ESStatusKind.Info);
             try
             {
@@ -2843,7 +3476,9 @@ namespace ES
                         validationPanel.style.display = valid ? DisplayStyle.None : DisplayStyle.Flex;
                     if (validationLabel != null)
                         validationLabel.text = valid ? string.Empty : "无法继续：" + validationMessage;
-                    confirmButton?.SetEnabled(valid && !busy);
+                    ES.EditorInternal.ESWindowPresentation.SetButtonEnabled(
+                        confirmButton,
+                        valid && !busy);
                     shell?.SetStatus(
                         valid ? "异步校验通过，可以继续" : validationMessage,
                         valid
@@ -2865,7 +3500,7 @@ namespace ES
                     invalidFieldId = string.Empty;
                     validationPanel.style.display = DisplayStyle.Flex;
                     validationLabel.text = "无法继续：" + validationMessage;
-                    confirmButton?.SetEnabled(false);
+                    ES.EditorInternal.ESWindowPresentation.SetButtonEnabled(confirmButton, false);
                     shell?.SetStatus(validationMessage, ES.EditorInternal.ESStatusKind.Error);
                     Debug.LogException(exception);
                 };
@@ -3023,6 +3658,8 @@ namespace ES
 
         private void OnDisable()
         {
+            StopInitialPositionReapplyLoop();
+            rootVisualElement.UnregisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
             rootVisualElement.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
             busyRefreshSchedule?.Pause();
             busyRefreshSchedule = null;
@@ -3072,20 +3709,75 @@ namespace ES
         internal static void ValidateRequest(ESAdvancedDialogRequest request)
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
+            string dialogId = request.dialogId?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(dialogId))
+                throw new ArgumentException("对话框必须提供稳定、非空的 dialogId。", nameof(request));
+            if (dialogId.Length > 128 || !IsStableDialogId(dialogId))
+                throw new ArgumentException(
+                    "dialogId 只能包含字母、数字、点、短横线、下划线、冒号或斜线，长度不能超过 128。",
+                    nameof(request));
+            if (!string.Equals(request.dialogId, dialogId, StringComparison.Ordinal))
+                request.dialogId = dialogId;
             if (string.IsNullOrWhiteSpace(request.title)) throw new ArgumentException("对话框标题不能为空。", nameof(request));
+            if (request.title.Trim().Length > 160)
+                throw new ArgumentException("对话框标题长度不能超过 160 个字符。", nameof(request));
+            if (!Enum.IsDefined(typeof(ESDialogTone), request.tone))
+                throw new ArgumentException("对话框语义类型无效。", nameof(request));
+            if (!Enum.IsDefined(typeof(ESDialogDuplicatePolicy), request.duplicatePolicy))
+                throw new ArgumentException("对话框去重策略无效。", nameof(request));
+            if (request.queueBehindActiveDialog
+                && request.duplicatePolicy == ESDialogDuplicatePolicy.AllowParallel)
+                throw new ArgumentException("队列策略不能与允许并行同时启用。", nameof(request));
             if (string.IsNullOrWhiteSpace(request.confirmText)) throw new ArgumentException("确认按钮文本不能为空。", nameof(request));
             if (request.showCancel && string.IsNullOrWhiteSpace(request.cancelText)) throw new ArgumentException("取消按钮文本不能为空。", nameof(request));
             if (request.fields == null) throw new ArgumentException("高级对话框字段集合不能为空。", nameof(request));
             if (request.auxiliaryActions == null) throw new ArgumentException("高级对话框辅助动作集合不能为空。", nameof(request));
             if (request.asyncValidationDelayMs < 0)
                 throw new ArgumentException("异步校验延迟不能小于 0。", nameof(request));
+            if (!IsFinitePositiveSize(request.minSize)
+                || !IsFinitePositiveSize(request.preferredSize)
+                || request.minSize.x > 4096f
+                || request.minSize.y > 4096f
+                || request.preferredSize.x > 4096f
+                || request.preferredSize.y > 4096f)
+                throw new ArgumentException("对话框尺寸必须是有限、正数且不超过 4096。", nameof(request));
+            if (request.preferredSize.x < request.minSize.x
+                || request.preferredSize.y < request.minSize.y)
+                throw new ArgumentException("preferredSize 不能小于 minSize。", nameof(request));
+            if (!Enum.IsDefined(typeof(ESAdvancedDialogPositionMode), request.positionMode))
+                throw new ArgumentException("对话框位置模式无效。", nameof(request));
+            if (!IsFinite(request.positionOffset)
+                || request.positionMode == ESAdvancedDialogPositionMode.CustomScreenPosition
+                    && !IsFinite(request.customScreenPosition))
+                throw new ArgumentException("对话框位置必须是有限坐标。", nameof(request));
+            if (!ReferenceEquals(request.owner, null) && request.owner == null)
+                throw new ArgumentException("对话框 owner 已关闭，不能继续提交请求。", nameof(request));
+            if (request.owner == null && !request.allowMainWorkspaceFallback)
+                throw new ArgumentException(
+                    "Editor 对话框必须提供显式 owner；确实无法取得 owner 时，必须显式设置 allowMainWorkspaceFallback。",
+                    nameof(request));
+
+            string initialFocusFieldId = request.initialFocusFieldId?.Trim() ?? string.Empty;
+            if (!string.Equals(request.initialFocusFieldId, initialFocusFieldId, StringComparison.Ordinal))
+                request.initialFocusFieldId = initialFocusFieldId;
+            if (initialFocusFieldId.Length > 128 || !string.IsNullOrEmpty(initialFocusFieldId)
+                && !IsStableDialogId(initialFocusFieldId))
+                throw new ArgumentException("初始焦点字段 ID 必须是稳定标识。", nameof(request));
 
             var ids = new HashSet<string>(StringComparer.Ordinal);
             foreach (ESAdvancedDialogField field in request.fields)
             {
                 if (field == null || string.IsNullOrWhiteSpace(field.id) || string.IsNullOrWhiteSpace(field.label))
                     throw new ArgumentException("每个输入字段都必须具备稳定 ID 和显示名称。", nameof(request));
-                if (!ids.Add(field.id)) throw new ArgumentException("高级对话框存在重复字段 ID：" + field.id, nameof(request));
+                string fieldId = field.id.Trim();
+                if (!string.Equals(field.id, fieldId, StringComparison.Ordinal)
+                    || !IsStableDialogId(fieldId))
+                    throw new ArgumentException("字段 ID 必须是无空白的稳定标识：" + field.id, nameof(request));
+                if (!ids.Add(fieldId)) throw new ArgumentException("高级对话框存在重复字段 ID：" + field.id, nameof(request));
+                if (!Enum.IsDefined(typeof(ESAdvancedDialogFieldKind), field.kind))
+                    throw new ArgumentException("字段类型无效：" + field.id, nameof(request));
+                if (field.label.Trim().Length > 160 || (field.help?.Length ?? 0) > 1000)
+                    throw new ArgumentException("字段显示文本过长：" + field.id, nameof(request));
                 if (field.kind == ESAdvancedDialogFieldKind.Choice
                     || field.kind == ESAdvancedDialogFieldKind.MultiChoice)
                 {
@@ -3095,7 +3787,9 @@ namespace ES
                     var choiceValueIds = new HashSet<string>(StringComparer.Ordinal);
                     foreach (string value in field.choiceValues)
                     {
-                        if (string.IsNullOrWhiteSpace(value) || !choiceValueIds.Add(value))
+                        if (string.IsNullOrWhiteSpace(value)
+                            || !string.Equals(value, value.Trim(), StringComparison.Ordinal)
+                            || !choiceValueIds.Add(value))
                             throw new ArgumentException("选择字段包含空或重复稳定值：" + field.id, nameof(request));
                     }
                     if (field.kind == ESAdvancedDialogFieldKind.Choice
@@ -3134,6 +3828,11 @@ namespace ES
                     throw new ArgumentException("Object 字段必须指定 UnityEngine.Object 类型：" + field.id, nameof(request));
             }
 
+            if (!string.IsNullOrEmpty(initialFocusFieldId) && !ids.Contains(initialFocusFieldId))
+                throw new ArgumentException(
+                    "initialFocusFieldId 未对应任何已声明字段：" + initialFocusFieldId,
+                    nameof(request));
+
             var actionIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (ESAdvancedDialogAction action in request.auxiliaryActions)
             {
@@ -3144,6 +3843,83 @@ namespace ES
                     throw new ArgumentException("每个辅助动作都必须具备稳定 ID、显示名称和回调。", nameof(request));
                 if (!actionIds.Add(action.id))
                     throw new ArgumentException("高级对话框存在重复辅助动作 ID：" + action.id, nameof(request));
+                if (!string.Equals(action.id, action.id.Trim(), StringComparison.Ordinal)
+                    || !IsStableDialogId(action.id.Trim()))
+                    throw new ArgumentException("辅助动作 ID 必须是无空白的稳定标识：" + action.id, nameof(request));
+                if (!Enum.IsDefined(typeof(ESAdvancedDialogActionRole), action.role))
+                    throw new ArgumentException("辅助动作语义角色无效：" + action.id, nameof(request));
+                if (action.text.Trim().Length > 96)
+                    throw new ArgumentException("辅助动作文本过长：" + action.id, nameof(request));
+            }
+        }
+
+        private static bool IsStableDialogId(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
+                if (char.IsLetterOrDigit(c) || c == '.' || c == '-' || c == '_'
+                    || c == ':' || c == '/')
+                    continue;
+                return false;
+            }
+            return true;
+        }
+
+        private static bool IsFinite(Vector2 value)
+        {
+            return !float.IsNaN(value.x) && !float.IsInfinity(value.x)
+                && !float.IsNaN(value.y) && !float.IsInfinity(value.y);
+        }
+
+        private static bool IsFinitePositiveSize(Vector2 value)
+        {
+            return IsFinite(value) && value.x > 0f && value.y > 0f;
+        }
+
+        private static string BuildNativeTitle(string title)
+        {
+            return BuildNativeTitle(title, false, ESDialogTone.Info);
+        }
+
+        private static string BuildNativeTitle(
+            string title,
+            bool modal,
+            ESDialogTone tone)
+        {
+            string value = (title ?? string.Empty).Trim();
+            const string existingPrefix = "ES 对话框 · ";
+            if (value.StartsWith(existingPrefix, StringComparison.Ordinal))
+                value = value.Substring(existingPrefix.Length).Trim();
+            if (string.IsNullOrWhiteSpace(value))
+                value = "未命名请求";
+            return "ES 对话框 · "
+                + (modal ? "模态" : "非模态")
+                + " · " + GetToneLabel(tone)
+                + " · " + value;
+        }
+
+        private static string GetToneClass(ESDialogTone tone)
+        {
+            switch (tone)
+            {
+                case ESDialogTone.Success: return "es-dialog-tone-success";
+                case ESDialogTone.Warning: return "es-dialog-tone-warning";
+                case ESDialogTone.Danger: return "es-dialog-tone-danger";
+                default: return "es-dialog-tone-info";
+            }
+        }
+
+        private static string GetToneLabel(ESDialogTone tone)
+        {
+            switch (tone)
+            {
+                case ESDialogTone.Success: return "成功";
+                case ESDialogTone.Warning: return "警告";
+                case ESDialogTone.Danger: return "危险操作";
+                default: return "信息确认";
             }
         }
     }

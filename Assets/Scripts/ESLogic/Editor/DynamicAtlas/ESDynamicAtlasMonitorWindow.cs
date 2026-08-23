@@ -28,6 +28,7 @@ namespace ES.Editor
         {
             return new GUIContent("ES 动态图集", "只读观察动态图集页面、条目、上传和 GPU 隔离状态");
         }
+        public override string ESWindow_PresentationShortTitle => "图集";
 
         protected override string ESWindow_Subtitle => "运行时页面与上传诊断";
         protected override Vector2 ESWindow_MinSize => new Vector2(620f, 420f);

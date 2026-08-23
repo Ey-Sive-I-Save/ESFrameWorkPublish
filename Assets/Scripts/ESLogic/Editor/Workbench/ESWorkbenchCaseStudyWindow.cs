@@ -28,6 +28,7 @@ namespace ES
 
         public override GUIContent ESWindow_GetWindowGUIContent()
             => new GUIContent("ES 编辑器表现案例工作台", "验证 ES 工作台的商业级信息层级、状态表达、失败恢复和窄窗口布局。");
+        public override string ESWindow_PresentationShortTitle => "案例";
 
         protected override string ESWindow_Subtitle => "ES 编辑器体验验收 · 不写入项目资产";
         protected override Vector2 ESWindow_MinSize => new Vector2(820f, 560f);

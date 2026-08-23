@@ -163,17 +163,13 @@ namespace ES
             if (data == null || source == null)
                 return null;
 
-            if (UsingWindow != null)
-            {
-                TWindow previous = UsingWindow;
-                UsingWindow = null;
-                previous.Close();
-            }
-
-            TWindow window = CreateInstance<TWindow>();
+            bool alreadyOpen = HasOpenInstances<TWindow>();
+            TWindow window = GetWindow<TWindow>(true, title, false);
             UsingWindow = window;
             try
             {
+                if (alreadyOpen && window.configured)
+                    window.InvokeCloseActionOnce();
                 window.ESWindow_SetSleepOwnerOverride(sleepOwner);
                 if (!window.Configure(data, source, stableTargetKey, title, page))
                 {
@@ -185,8 +181,9 @@ namespace ES
                 window.MenuWidth = 0f;
                 window.ShowUtility();
                 window.Focus();
-                window.ApplyDefaultWindowBounds();
-                // CreateInstance 会先触发 OnEnable；此时显式 owner 可能尚未存在，
+                if (!alreadyOpen)
+                    window.ApplyDefaultWindowBounds();
+                // GetWindow 首次创建时会先触发 OnEnable；此时显式 owner 可能尚未存在，
                 // 或窗口声明的动态 getter 仍指向另一实例。窗口真正显示并完成
                 // Presentation 绑定后，再提交一次显式关系，确保 OpenFor(..., owner)
                 // 的参数成为唯一生效的父窗口身份，并清掉可能残留的 Pending 记录。

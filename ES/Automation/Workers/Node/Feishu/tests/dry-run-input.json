@@ -1,0 +1,16 @@
+{
+  "protocolVersion": 1,
+  "taskId": "es.feishu.read",
+  "taskVersion": 1,
+  "runId": "00000000000000000000000000000001",
+  "workerType": "Other",
+  "workerId": "es.feishu.node",
+  "workerVersion": "0.1.0",
+  "entrypointHash": "16b419b0452b9761e9d8f08acbf1e65ff815d8ac3043773df3e146786a4c887e",
+  "dryRun": true,
+  "operation": "auth-status",
+  "query": "",
+  "spaceId": "",
+  "documentId": "",
+  "pageSize": 20
+}

@@ -7,7 +7,8 @@ namespace ES
 {
     /// <summary>
     /// Serializable identity map with an enum hot path and an ordinal string extension path.
-    /// The entry list is authoritative; runtime indexes are disposable mirrors.
+    /// The entry list is authoritative for both authoring and runtime mutation; runtime indexes are disposable mirrors.
+    /// Runtime changes affect the current object instance and persist only when its Unity host is explicitly saved.
     /// </summary>
     [Serializable]
     public class ESEnumStringMirrorMap<TEnum, TValue> : ISerializationCallbackReceiver

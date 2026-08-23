@@ -1,6 +1,6 @@
 # ES Automation AI Bridge
 
-这是本机受信 AI 到 Unity Editor 的受管请求入口。它只分发 C# 已注册的 Task/Content Endpoint；不会执行 AI 提供的 Python、命令行、解释器或任意路径。
+这是本机受信 AI 到 Unity Editor 的受管请求入口。它只分发 C# 已注册的 Task/Content Endpoint 或固定 Editor 控制动作；不会执行 AI 提供的 Python、命令行、解释器或任意路径。
 
 ## 启用
 
@@ -14,7 +14,7 @@ ES/Automation/AI/
 └─ Responses/   # Unity 写出的 <RequestId>.response.json
 ```
 
-AI 必须先写同目录 `.tmp` 文件，再原子重命名为 `<32位GUID>.request.json`。不要直接写最终文件，也不要重用 RequestId。单个请求上限 128 KiB。
+AI 必须先写同目录 `.tmp` 文件，再原子重命名为 `<32位GUID>.request.json`。不要直接写最终文件，也不要重用 RequestId。单个请求上限 128 KiB，且必须是严格 UTF-8；稳定但空、过大或编码非法的请求会被拒绝并归档，不会无限留在 Inbox 重试。
 
 ## PlayMode 行为
 
@@ -28,9 +28,9 @@ ESAutomationAiBridge.TrySetTrustedPlayModeListening(true, out string reason);
 
 如果 UnityMCP 只支持 `ExecuteMenuItem`，可执行 `【ES】/自动化与开发/AI 控制/PlayMode 临时恢复收件箱监听`；暂停菜单位于同一路径。这个 API 和菜单都不能开启首次用户授权、不能由 Inbox 请求调用，并会在退出 PlayMode 后自动失效。即使监听恢复，只有注册描述中明确 `allowInPlayMode = true` 的任务可启动；当前场景扫描不允许在 PlayMode 执行。
 
-## 直接调用场景扫描
+## 受 AIBrain 门禁的任务调用
 
-`requestId` 必须替换为新的 32 位十六进制 GUID：
+`runTask` 不接受旧的“只给 taskId/taskVersion”直达格式。`requestId` 必须替换为新的 32 位十六进制 GUID；调用者还必须明确声明本次目标、定向 `routeKeys`、已选择的 AICommand、正式项目 Skill（或已烘焙的 Graph Workflow）以及已注册的 TaskContract：
 
 ```json
 {
@@ -39,6 +39,10 @@ ESAutomationAiBridge.TrySetTrustedPlayModeListening(true, out string reason);
   "actorId": "codex.local",
   "action": "runTask",
   "payload": {
+    "objective": "读取当前项目的场景扫描结果",
+    "routeKeys": ["editor", "scene-validation"],
+    "commandId": "scene.scan.review",
+    "skillNames": ["es-editor-tooling"],
     "taskId": "es.scene.scan",
     "taskVersion": 1,
     "preset": "default",
@@ -46,6 +50,12 @@ ESAutomationAiBridge.TrySetTrustedPlayModeListening(true, out string reason);
   }
 }
 ```
+
+`commandId`、`skillNames` 和 `taskId@taskVersion` 必须分别命中当前 AICommand 目录、项目 `.agents/skills` 正式目录和 ESAutomationFacade 注册表；示例中的身份只用于说明字段合同，不能当作项目中已注册的能力。若任务尚未有匹配 AICommand、正式 Skill 或 Graph Workflow，AIBrain 必须返回阻断，调用者不得改用无关合同绕过。
+
+Feishu 第一阶段只读任务的结构相同，例如 `taskId: "es.feishu.read"`、`taskVersion: 1`，并将 `input` 限制在已注册的 `operation`（`auth-status`、`knowledge-search`、`document-pull`）及其 Schema 内。它仍必须先经过 AIBrain、ESAutomationFacade 和 Feishu TaskContract；不得把 Node Worker 路径或凭据放入请求。
+
+`dryRun` 是可选布尔字段，默认 `false`。对于声明支持 DryRun 的任务（例如 `es.feishu.read`），它会沿 AI Bridge 传递到 TaskContract；不支持 DryRun 的任务会由 Facade 拒绝。
 
 默认预设会直接启动：不包含未激活对象、摘要模式、组件 Top 10；不会弹人类对话框。响应中的 `runId` 可继续用于：
 
@@ -72,6 +82,10 @@ ESAutomationAiBridge.TrySetTrustedPlayModeListening(true, out string reason);
   "actorId": "codex.local",
   "action": "runTask",
   "payload": {
+    "objective": "以交互预设读取场景扫描结果",
+    "routeKeys": ["editor", "scene-validation"],
+    "commandId": "scene.scan.review",
+    "skillNames": ["es-editor-tooling"],
     "taskId": "es.scene.scan",
     "taskVersion": 1,
     "preset": "interactive",
@@ -123,14 +137,32 @@ AI 只能逐字段按该 Schema 提交，随后由同一 `RunId` 继续 Python �
 
 ## Unity Editor 受管控制
 
-Bridge 另外提供三个固定的 Editor 主线程动作；它们不是任意命令执行，也不能在 PlayMode 写入场景：
+Bridge 提供四个固定的 Editor 主线程动作。它们不是 Worker、任意命令执行或任意场景/资产写入入口：
 
 - `getUnityCompilationState`：读取自动编译、脚本编译、Editor 更新和 PlayMode 状态。
-- `setUnityAutoCompilation`：用 `{ "enabled": true|false }` 开启或关闭本次 Editor 会话的自动刷新/程序集 Reload 锁。状态保存在 `SessionState`，不会伪造 Unity 全局设置。
+- `setUnityAutoCompilation`：用 `{ "enabled": true|false }` 设置本次 Editor 会话的自动刷新/程序集 Reload 锁。若 AI 曾关闭自动编译，用户关闭 Bridge 时只恢复该 AI 持有的抑制；人工菜单设置不会被误恢复。
 - `triggerUnityCompilation`：用 `{ "forceRefresh": true|false }` 请求 AssetDatabase 刷新和脚本编译；自动编译关闭时明确返回阻断。
-- `modifyActiveScene`：只允许当前已加载 Active Scene，使用显式 `scenePath`、`operations`、`save`、`dryRun`。操作白名单为 `setActive`、`setName`、`setTag`、`setLayer`，每项带 `targetPath` 和 `value`；真实修改经过 Undo、标记 Dirty，并仅在 `save=true` 时保存场景。
+- `modifyActiveScene`：只允许当前已加载、已保存于 `Assets/` 的 Active Scene，白名单操作为 `setActive`、`setName`、`setTag`、`setLayer`。
 
-示例：
+Inbox 请求和受信宿主在 Unity 主线程调用的 `ExecuteJson(...)` 都必须先通过“授权本机 AI 请求收件箱”门禁。`ExecuteJson(...)` 不会代为切线程：后台线程调用会返回 `Rejected`，直接请求同样受 128 KiB 上限约束。固定控制动作还会以 `requestId` 在以下位置预写不可覆盖审计；同一 `requestId` 再次提交会被拒绝：
+
+```text
+ES/Automation/Runs/ControlActions/<requestId>.json
+```
+
+审计记录包含 actor、固定能力、输入 SHA-256、批准 ID/计划指纹、状态、时间、结果 SHA-256 和错误。审计无法完成时，Bridge 不会把可能已经发生的控制动作报告为成功。
+
+### 场景计划的人工批准
+
+`modifyActiveScene` 必须分两次请求，不能直接使用 `dryRun=false` 写场景：
+
+1. AI 用 `dryRun=true` 提交精确 `scenePath`、`operations` 与 `save`。Bridge 解析无歧义层级路径、项目 Tag、已定义 Layer 和目标 `GlobalObjectId`，只返回计划、`approvalId`、指纹和 5 分钟到期时间，不修改场景。
+2. 人工在 `【ES】/自动化与开发/自动化中心/打开自动化中心` 查看 actor、场景、每个目标和值后点击“批准一次”或拒绝。批准本身不修改场景。
+3. 同一 actor 用**新的** `requestId`、完全相同的计划和返回的 `approvalId` 提交 `dryRun=false`。Bridge 再次解析目标，核对计划指纹和 Active Scene，并一次性消费批准后才在同一 Undo Group 内应用、标记 Dirty；仅 `save=true` 时保存当前场景。
+
+以下任一事件都会使未消费批准失效：批准到期、人工撤销、Bridge 关闭、PlayMode 切换、Domain Reload 或已执行一次。Bridge 同时最多保留 32 条待批准计划，每个计划最多 64 个白名单操作；超过上限必须拆分为新的 dry-run 和批准。AI 不能复用批准 ID，也不能借目标路径重名、`..`、路径分隔符、临时场景、包内场景、未定义 Tag 或未定义 Layer 扩大写入范围。
+
+dry-run 示例：
 
 ```json
 {
@@ -146,9 +178,11 @@ Bridge 另外提供三个固定的 Editor 主线程动作；它们不是任意�
       "value": true
     }],
     "save": true,
-    "dryRun": false
+    "dryRun": true
   }
 }
 ```
 
-`dryRun=true` 只验证对象和操作计划，不写场景；`save=true` 不等于允许任意资产写入，只保存当前 Active Scene。AI 仍必须通过本机已授权 Inbox，Unity 实际导入、编译、ReloadDomain 和场景运行结果需要另外取得 Unity 验收证据。
+批准后，将同一 `scenePath`、`operations` 与 `save` 保持不变，改为 `"dryRun": false` 并增加 `"approvalId": "<dry-run 返回值>"`。`save=true` 不等于允许任意资产写入，只保存当前 Active Scene。
+
+当前文档描述的是源码合同。Unity 实际导入、编译、ReloadDomain、审批交互、Undo/保存和场景运行结果仍需要单独取得 Unity 验收证据。

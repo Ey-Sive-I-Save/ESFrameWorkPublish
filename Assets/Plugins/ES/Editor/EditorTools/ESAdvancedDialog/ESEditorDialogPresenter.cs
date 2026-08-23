@@ -63,7 +63,8 @@ namespace ES
                 queueBehindActiveDialog = request.QueueBehindActiveDialog,
                 initialFocusFieldId = request.InitialFocusFieldId,
                 asyncValidationDelayMs = request.AsyncValidationDelayMs,
-                owner = options?.Owner,
+                owner = ResolveExplicitOwner(request, options),
+                allowMainWorkspaceFallback = request.AllowMainWorkspaceFallback,
                 preferredSize = options?.PreferredSize ?? new Vector2(560f, 440f),
             };
             for (int i = 0; i < request.Fields.Count; i++)
@@ -91,6 +92,21 @@ namespace ES
                         token));
             }
             return mapped;
+        }
+
+        private static EditorWindow ResolveExplicitOwner(
+            ESDialogRequest request,
+            ESEditorDialogOptions options)
+        {
+            if (options?.Owner != null)
+                return options.Owner;
+            if (request?.Owner == null)
+                return null;
+            if (request.Owner is EditorWindow owner)
+                return owner;
+            throw new ArgumentException(
+                "ES Editor 对话框 owner 必须是显式的 EditorWindow。",
+                nameof(request));
         }
 
         internal static ESDialogResult MapResult(

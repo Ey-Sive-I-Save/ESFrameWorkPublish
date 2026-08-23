@@ -192,13 +192,14 @@ namespace ES.Tests
                     var hitEligibility = new ESHitTagEligibility();
                     hitEligibility.attackerCondition.required.Add(ESTagStableReference.From((ESGameTag)12));
                     hitEligibility.targetCondition.required.Add(ESTagStableReference.From((ESGameTag)12));
+                    Assert.That(hitEligibility.TryPrepare(out string prepareError), Is.True, prepareError);
                     using (ESTagLease attackerHitLease = entity.Tags.Acquire((ESGameTag)12, new object()))
                     {
                         Assert.That(hitEligibility.TryAllows(entity, nextEntity, out ESHitTagEligibilityResult hitResult, out string hitError), Is.True, hitError);
                         Assert.That(hitResult, Is.EqualTo(ESHitTagEligibilityResult.Allowed));
                         using ESTagLease targetBlockedLease = nextEntity.Tags.Acquire((ESGameTag)13, new object());
                         hitEligibility.targetCondition.forbidden.Add(ESTagStableReference.From((ESGameTag)13));
-                        hitEligibility.targetCondition.InvalidateRuntime();
+                        Assert.That(hitEligibility.TryPrepare(out prepareError), Is.True, prepareError);
                         Assert.That(hitEligibility.TryAllows(entity, nextEntity, out hitResult, out hitError), Is.True, hitError);
                         Assert.That(hitResult, Is.EqualTo(ESHitTagEligibilityResult.TargetTagDenied));
                     }

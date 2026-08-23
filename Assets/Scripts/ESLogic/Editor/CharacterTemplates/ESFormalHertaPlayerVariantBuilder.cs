@@ -381,6 +381,7 @@ namespace ES
             climb.ClimbJump_StateName = "攀爬跳跃";
 
             EntityBasicCombatModule combat = GetOrAddBasicModule(entity, () => new EntityBasicCombatModule());
+            GetOrAddBasicModule(entity, () => new EntityBasicHealthModule());
             GetOrAddEquipmentModule(
                 entity,
                 () => new EntityEquipmentInventoryModule());

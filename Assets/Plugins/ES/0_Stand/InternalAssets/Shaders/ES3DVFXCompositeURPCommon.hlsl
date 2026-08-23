@@ -3,6 +3,8 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+#include "ESCompositeColorTransform.hlsl"
+#include "ESCompositeGenerated.hlsl"
 
 // Texture Resources
 TEXTURE2D(_MainTex); SAMPLER(sampler_MainTex);
@@ -18,6 +20,11 @@ CBUFFER_START(UnityPerMaterial)
     float _TimeMode;
     float _CustomTime;
     float _TimeScale;
+    float _EnableTimeFPS;
+    float _TimeFPS;
+    float _EnableTimeFrequency;
+    float _TimeFrequency;
+    float _TimeRange;
     float _VertexColorStrength;
 
     float _EnableSequence;
@@ -49,6 +56,7 @@ CBUFFER_START(UnityPerMaterial)
     float4 _NoiseScale;
     float4 _NoiseSpeed;
     float _Distortion;
+    float4 _DistortionDirection;
     float _EnableFlow;
     float4 _FlowSpeed;
     float _FlowStrength;
@@ -62,6 +70,8 @@ CBUFFER_START(UnityPerMaterial)
     float _ShineSpeed;
     float _ShineWidth;
     float _ShineIntensity;
+    float _ShineSpace;
+    float4 _ShineDirection;
     float _EnableSparkle;
     half4 _SparkleColor;
     float _SparkleScale;
@@ -94,6 +104,17 @@ CBUFFER_START(UnityPerMaterial)
     float _HologramGap;
     float _HologramSpeed;
     float _HologramMinAlpha;
+    float _HologramFade;
+    float _HologramContrast;
+    float _HologramSpace;
+    float4 _HologramDirection;
+    float _HologramLineFrequency;
+    float _HologramLineGap;
+    float _HologramDistortionOffset;
+    float4 _HologramDistortionDirection;
+    float _HologramDistortionSpeed;
+    float _HologramDistortionDensity;
+    float _HologramDistortionScale;
     float _EnableRim;
     half4 _RimColor;
     float _RimPower;
@@ -110,6 +131,19 @@ CBUFFER_START(UnityPerMaterial)
     float _EnableGlitch;
     float _GlitchAmount;
     float _GlitchSpeed;
+    float4 _GlitchScanDirection;
+    float _GlitchFade;
+    float _GlitchMaskMin;
+    float4 _GlitchMaskScale;
+    float4 _GlitchMaskSpeed;
+    float _GlitchHueSpeed;
+    float _GlitchBrightness;
+    float4 _GlitchNoiseScale;
+    float4 _GlitchNoiseSpeed;
+    float4 _GlitchDistortion;
+    float4 _GlitchDistortionScale;
+    float4 _GlitchDistortionSpeed;
+    float _SSUStatusContract;
     half4 _EmissionColor;
     float _EnableSoftParticles;
     float _SoftParticleNear;
@@ -122,6 +156,12 @@ CBUFFER_START(UnityPerMaterial)
     float _Cutoff;
     float _BlendMode;
 CBUFFER_END
+
+// VFX reuses its authored noise resource for the shared SSU contract so the
+// exact path adds no sampler and remains compatible with particle materials.
+#define _UberNoiseTexture _NoiseTex
+#define sampler_UberNoiseTexture sampler_NoiseTex
+#include "ESCompositeSSUStylizedEffects.hlsl"
 
 float _ESUnscaledTime;
 float _ESUnscaledTimeValid;
@@ -157,7 +197,15 @@ float ESGetTime()
     float baseTime = _TimeMode > 1.5
         ? _CustomTime
         : (_TimeMode > 0.5 ? (_ESUnscaledTimeValid > 0.5 ? _ESUnscaledTime : _Time.y) : _Time.y);
-    return baseTime * max(0.0, _TimeScale);
+    float timeValue = baseTime * _TimeScale;
+    if (_EnableTimeFPS > 0.5)
+    {
+        float fps = max(abs(_TimeFPS), 0.01);
+        timeValue = floor(timeValue * fps) / fps;
+    }
+    if (_EnableTimeFrequency > 0.5)
+        timeValue = sin(timeValue * _TimeFrequency) * _TimeRange + 100.0;
+    return timeValue;
 }
 
 float ESRandom(float2 value)
@@ -232,6 +280,13 @@ float2 ESWrapSequenceUV(float2 uv, float4 atlasBounds)
     return atlasBounds.xy + frac((uv - atlasBounds.xy) / cellSize) * cellSize;
 }
 
+float2 ESSequenceLocalCoordinate(float2 uv, float4 atlasBounds)
+{
+    if (_EnableSequence < 0.5) return uv;
+    float2 cellSize = max(atlasBounds.zw - atlasBounds.xy, _MainTex_TexelSize.xy);
+    return (uv - atlasBounds.xy) / cellSize;
+}
+
 float2 ESClampSequenceSample(float2 uv, float4 atlasBounds)
 {
     if (_EnableSequence < 0.5) return uv;
@@ -263,10 +318,10 @@ float ESCalculateDepthGap(ESVaryings input)
     return sceneEyeDepth - fragmentEyeDepth;
 }
 
-half4 ESBlurSample(float2 uv, float4 atlasBounds)
+half4 ESBlurSample(float2 uv, float4 atlasBounds, half4 center)
 {
     float2 delta = _MainTex_TexelSize.xy * (_BlurRadius * 512.0);
-    half4 result = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, ESClampSequenceSample(uv, atlasBounds)) * 0.4h;
+    half4 result = center * 0.4h;
     result += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, ESClampSequenceSample(uv + float2(delta.x, 0.0), atlasBounds)) * 0.15h;
     result += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, ESClampSequenceSample(uv - float2(delta.x, 0.0), atlasBounds)) * 0.15h;
     result += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, ESClampSequenceSample(uv + float2(0.0, delta.y), atlasBounds)) * 0.15h;
@@ -316,34 +371,75 @@ half4 ES3DVFXFragment(ESVaryings input) : SV_Target
     {
         float2 noiseUV = input.positionWS.xz * _NoiseScale.xy + _NoiseScale.zw + _NoiseSpeed.xy * timeValue;
         noise = SAMPLE_TEXTURE2D(_NoiseTex, sampler_NoiseTex, noiseUV).r;
-        uv += (noise - 0.5) * _Distortion;
+        uv += (noise - 0.5) * _Distortion * _DistortionDirection.xy;
     }
-#endif
-
-#if defined(_ES_QUALITY_HIGH)
-    if (_EnableGlitch > 0.5)
-        uv.x += (ESRandom(float2(floor(input.positionWS.y * _GlitchSpeed + timeValue), 0.0)) - 0.5) * _GlitchAmount;
 #endif
 
     if (_EnableFlow > 0.5)
         uv += _FlowSpeed.xy * timeValue * _FlowStrength;
     uv = ESApplyFlowMap(uv, timeValue);
+
+    float2 stylizedCoordinate = ESSequenceLocalCoordinate(uv, atlasBounds);
+    float hologramCoordinate = 0.0;
+#if defined(_ES_QUALITY_HIGH)
+    if (_SSUStatusContract > 0.5)
+    {
+        if (_EnableHologram > 0.5)
+        {
+            hologramCoordinate = ESCompositeResolveSSUHologramCoordinate(
+                stylizedCoordinate,
+                input.positionWS);
+            uv = ESCompositeApplySSUHologramUV(
+                uv,
+                hologramCoordinate,
+                _MainTex_TexelSize.z,
+                timeValue);
+        }
+        if (_EnableGlitch > 0.5)
+            uv = ESCompositeApplySSUGlitchUV(uv, stylizedCoordinate, timeValue);
+    }
+    else if (_EnableGlitch > 0.5)
+    {
+        float glitchScanCoordinate = ESCompositeDirectionalCoordinate3D(
+            input.positionWS,
+            _GlitchScanDirection.xyz,
+            float3(0.0, 1.0, 0.0));
+        float glitch = ESRandom(float2(
+            floor(glitchScanCoordinate * _GlitchSpeed + timeValue),
+            0.0)) - 0.5;
+        float2 glitchDirection = _GlitchDistortion.xy;
+        float glitchDirectionLength = length(glitchDirection);
+        glitchDirection = glitchDirectionLength > 0.0001
+            ? glitchDirection / glitchDirectionLength
+            : float2(1.0, 0.0);
+        uv += glitchDirection * glitch * _GlitchAmount;
+    }
+#endif
     uv = ESWrapSequenceUV(uv, atlasBounds);
 
-    half4 source = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, ESClampSequenceSample(uv, atlasBounds)) * input.color;
+    half4 sourceTexture = SAMPLE_TEXTURE2D(
+        _MainTex,
+        sampler_MainTex,
+        ESClampSequenceSample(uv, atlasBounds));
+    half4 source = sourceTexture * input.color;
 #if defined(_ES_QUALITY_HIGH)
-    if (_EnableBlur > 0.5)
-        source = lerp(source, ESBlurSample(uv, atlasBounds) * input.color, saturate(_BlurIntensity));
+    if (_EnableBlur > 0.5 && _BlurIntensity > 0.0001 && _BlurRadius > 0.0001)
+        source = lerp(
+            source,
+            ESBlurSample(uv, atlasBounds, sourceTexture) * input.color,
+            saturate(_BlurIntensity));
 #endif
 
     float alpha = source.a;
     float3 color = source.rgb;
 
 #if defined(_ES_QUALITY_STANDARD) || defined(_ES_QUALITY_HIGH)
-    if (_EnableChromatic > 0.5)
+    if (_EnableChromatic > 0.5
+        && _ChromaticIntensity > 0.0001
+        && abs(_ChromaticOffset) > 0.000001)
     {
         float2 chromaticDirection = float2(cos(radians(_ChromaticAngle)), sin(radians(_ChromaticAngle)));
-        float edgeFactor = saturate(length(frac(uv) - 0.5) * 2.0);
+        float edgeFactor = saturate(length(frac(stylizedCoordinate) - 0.5) * 2.0);
         float amount = _ChromaticOffset * lerp(1.0, edgeFactor, _ChromaticEdgeOnly);
         float3 chromaticColor = color;
         chromaticColor.r = SAMPLE_TEXTURE2D(
@@ -355,6 +451,23 @@ half4 ES3DVFXFragment(ESVaryings input) : SV_Target
             sampler_MainTex,
             ESClampSequenceSample(uv - chromaticDirection * amount, atlasBounds)).b * input.color.b;
         color = lerp(color, chromaticColor, saturate(_ChromaticIntensity));
+    }
+#endif
+
+#if defined(_ES_QUALITY_HIGH)
+    if (_SSUStatusContract > 0.5)
+    {
+        if (_EnableHologram > 0.5)
+        {
+            half4 hologramSource = ESCompositeApplySSUHologramColor(
+                half4(color, alpha),
+                hologramCoordinate,
+                timeValue);
+            color = hologramSource.rgb;
+            alpha = hologramSource.a;
+        }
+        if (_EnableGlitch > 0.5)
+            color = ESCompositeApplySSUGlitchColor(color, stylizedCoordinate, timeValue);
     }
 #endif
 
@@ -397,7 +510,16 @@ half4 ES3DVFXFragment(ESVaryings input) : SV_Target
 
     if (_EnableShine > 0.5)
     {
-        float shine = 1.0 - smoothstep(0.0, _ShineWidth, abs(frac(input.positionWS.y + timeValue * _ShineSpeed) - 0.5));
+        float shineCoordinate = _ShineSpace > 0.5 && _ShineSpace < 1.5
+            ? ESCompositeShineCoordinate2D(
+                stylizedCoordinate,
+                _ShineDirection.xy,
+                90.0)
+            : ESCompositeShineCoordinate3D(
+                input.positionWS,
+                _ShineDirection.xyz,
+                float3(0.0, 1.0, 0.0));
+        float shine = 1.0 - smoothstep(0.0, _ShineWidth, abs(frac(shineCoordinate + timeValue * _ShineSpeed) - 0.5));
         color += _ShineColor.rgb * shine * _ShineIntensity;
     }
 
@@ -422,21 +544,36 @@ half4 ES3DVFXFragment(ESVaryings input) : SV_Target
     if (_EnableSparkle > 0.5)
     {
         float sparkleScale = max(1.0, _SparkleScale);
-        float2 sparkleCell = floor(uv * sparkleScale);
+        float2 sparkleCell = floor(stylizedCoordinate * sparkleScale);
         float sparkleSeed = ESRandom(sparkleCell);
         float sparkleWave = 0.5 + 0.5 * sin(timeValue * _SparkleSpeed + sparkleSeed * 6.2831853);
-        float2 sparkleLocal = frac(uv * sparkleScale) - 0.5;
+        float2 sparkleLocal = frac(stylizedCoordinate * sparkleScale) - 0.5;
         float sparkleRadial = saturate(1.0 - length(sparkleLocal) * 2.0);
         float sparkleCross = max(saturate(1.0 - abs(sparkleLocal.x) * 8.0), saturate(1.0 - abs(sparkleLocal.y) * 8.0));
         float sparkleShape = saturate(sparkleRadial * 0.35 + sparkleCross * 0.65);
         float sparkle = step(1.0 - _SparkleDensity, sparkleSeed) * pow(saturate(sparkleWave * sparkleShape), max(1.0, _SparkleSharpness));
         color += _SparkleColor.rgb * sparkle * _SparkleIntensity;
     }
-    if (_EnableHologram > 0.5)
+    if (_SSUStatusContract <= 0.5 && _EnableHologram > 0.5)
     {
-        float line = step(_HologramGap, frac(input.positionWS.y * _HologramFrequency + timeValue * _HologramSpeed));
-        color = lerp(color, _HologramColor.rgb, 0.6);
-        alpha *= max(_HologramMinAlpha, line);
+        float2 legacyLocalDirection = _HologramDirection.xy;
+        float legacyLocalDirectionLength = length(legacyLocalDirection);
+        legacyLocalDirection = legacyLocalDirectionLength > 0.0001
+            ? legacyLocalDirection / legacyLocalDirectionLength
+            : float2(0.0, 1.0);
+        float3 legacyWorldDirection = _HologramDirection.xyz;
+        float legacyWorldDirectionLength = length(legacyWorldDirection);
+        legacyWorldDirection = legacyWorldDirectionLength > 0.0001
+            ? legacyWorldDirection / legacyWorldDirectionLength
+            : float3(0.0, 1.0, 0.0);
+        float legacyHologramCoordinate = _HologramSpace < 0.5
+            ? dot(stylizedCoordinate, legacyLocalDirection)
+            : dot(input.positionWS, legacyWorldDirection);
+        float hologramLine = step(
+            _HologramGap,
+            frac(legacyHologramCoordinate * _HologramFrequency + timeValue * _HologramSpeed));
+        color = lerp(color, _HologramColor.rgb, saturate((half)_HologramFade) * 0.6h);
+        alpha *= lerp(1.0, max(_HologramMinAlpha, hologramLine), saturate(_HologramFade));
     }
 #endif
 

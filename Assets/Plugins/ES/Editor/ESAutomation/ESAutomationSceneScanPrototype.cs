@@ -10,6 +10,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Debug = UnityEngine.Debug;
+using EditorUtility = ES.ESDesignUtility.SafeEditor;
 
 namespace ES
 {
@@ -189,6 +190,7 @@ namespace ES
                         enabled = true,
                     },
                     inputs = new List<string> { "scene-snapshot.json", "input-response.json" },
+                    inputSchemaHash = OptionsSchemaHash,
                     readRoots = new List<string> { "ES/Automation/Temp" },
                     writeRoots = new List<string> { "ES/Automation/Temp" },
                     capabilities = new List<string> { "ReadArtifacts", "WriteTemp" },
@@ -196,6 +198,32 @@ namespace ES
                     supportsDryRun = true,
                     supportsRetry = false,
                     outputs = new List<string> { "scene-scan.json", "scene-scan.md", "result.json" },
+                    acceptanceCriteria = new ESAutomationAcceptanceCriteria
+                    {
+                        freshnessPolicy = new ESAutomationFreshnessPolicy { maxAgeHours = 168, requireSourceHash = true, allowRuntimeNotRun = true },
+                        criteria = new List<ESAutomationAcceptanceCriterion>
+                        {
+                            new ESAutomationAcceptanceCriterion
+                            {
+                                criterionId = "scene-scan.report-json",
+                                verifierId = "es.scene.scan.promoted-output-hash",
+                                description = "Promoted JSON report hash is fresh and bound to this run.",
+                            },
+                            new ESAutomationAcceptanceCriterion
+                            {
+                                criterionId = "scene-scan.report-markdown",
+                                verifierId = "es.scene.scan.promoted-output-hash",
+                                description = "Promoted Markdown report hash is fresh and bound to this run.",
+                            },
+                        },
+                    },
+                    performanceBudget = new ESAutomationPerformanceBudget
+                    {
+                        maxDurationSeconds = WorkerTimeoutSeconds,
+                        maxOutputBytes = MaxPromotedReportBytes,
+                        maxRetryCount = 0,
+                        maxFindingCount = 5000,
+                    },
                 });
             }
             else
@@ -204,6 +232,29 @@ namespace ES
                     throw new InvalidOperationException("已有同 TaskId 的场景扫描 Contract 与受信身份不一致。");
                 if (!existingContract.worker.enabled)
                     throw new InvalidOperationException("已有同 TaskId 的场景扫描 Contract 未被本机 C# 注册表启用。");
+                if (existingContract.acceptanceCriteria == null)
+                {
+                    existingContract.acceptanceCriteria = new ESAutomationAcceptanceCriteria
+                    {
+                        criteria = new List<ESAutomationAcceptanceCriterion>
+                        {
+                            new ESAutomationAcceptanceCriterion { criterionId = "scene-scan.report-json", verifierId = "es.scene.scan.promoted-output-hash" },
+                            new ESAutomationAcceptanceCriterion { criterionId = "scene-scan.report-markdown", verifierId = "es.scene.scan.promoted-output-hash" },
+                        },
+                    };
+                }
+                existingContract.acceptanceCriteria.Validate();
+                if (existingContract.performanceBudget == null)
+                {
+                    existingContract.performanceBudget = new ESAutomationPerformanceBudget
+                    {
+                        maxDurationSeconds = WorkerTimeoutSeconds,
+                        maxOutputBytes = MaxPromotedReportBytes,
+                        maxRetryCount = 0,
+                        maxFindingCount = 5000,
+                    };
+                }
+                existingContract.performanceBudget.Validate();
             }
             if (!ESAutomationProcessRunner.IsAdapterRegistered(WorkerType, WorkerId))
                 ESAutomationProcessRunner.RegisterAdapter(new ESAutomationSceneScanPythonAdapter());
@@ -327,7 +378,8 @@ namespace ES
             {
                 "protocolVersion", "taskId", "taskVersion", "runId", "workerType", "workerId",
                 "workerVersion", "entrypointHash", "status", "exitCode", "startedAtUtc",
-                "finishedAtUtc", "inputManifestHash", "outputs", "outputHashes", "findings", "errors",
+                "retryCount", "finishedAtUtc", "inputManifestHash", "outputs", "outputHashes", "findings", "errors",
+                "idempotencyKey", "executionSnapshot", "completionDecision", "traceReconciliation",
             }, "场景扫描最终结果");
             ESAutomationRunResult result = root.ToObject<ESAutomationRunResult>();
             result.Validate();
@@ -768,11 +820,14 @@ namespace ES
 
             var request = new ESAdvancedDialogRequest
             {
+                dialogId = "es.automation.scene-scan.options",
                 title = "场景扫描报告选项",
                 message = "Python 将只分析 Unity 已导出的场景快照，不会读取 .unity YAML、修改场景或写入 Assets。",
                 detail = "RunId: " + session.runId + "\n确认后会写入规范化 InputResponse.json，并启动一个新的 Python 阶段。",
                 confirmText = "生成报告",
                 cancelText = "取消扫描",
+                owner = null,
+                allowMainWorkspaceFallback = true,
             };
             request.AddToggle("includeInactive", "包含未激活对象", false).help = "关闭时，报告会排除 activeInHierarchy 为 false 的对象。";
             request.AddChoiceOptions("detailMode", "报告粒度", new[]
@@ -838,6 +893,7 @@ namespace ES
             if (Directory.Exists(reportsDirectory)) throw new IOException("报告 RunId 已存在，拒绝覆盖：" + session.runId);
             if (Directory.Exists(promotionDirectory)) throw new IOException("报告临时提升目录已存在，拒绝覆盖：" + promotionDirectory);
 
+            VerifySceneSnapshotUnchanged(session);
             string jsonReport = RequireWorkerOutputFile(session, "scene-scan.json");
             string markdownReport = RequireWorkerOutputFile(session, "scene-scan.md");
             ESAutomationPathPolicy.EnsureWorkerDirectory(promotionDirectory, new[] { ESAutomationPathPolicy.TempRoot });
@@ -855,6 +911,7 @@ namespace ES
                     ComputeFileSha256(promotedJsonPath),
                     ComputeFileSha256(promotedMarkdownPath),
                 };
+                string completionCapturedAtUtc = DateTimeOffset.UtcNow.ToString("O");
                 var finalResult = new ESAutomationRunResult
                 {
                     protocolVersion = ProtocolVersion,
@@ -868,13 +925,58 @@ namespace ES
                     status = session.dryRun ? "DryRun" : "Passed",
                     exitCode = 0,
                     startedAtUtc = session.createdAtUtc,
-                    finishedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                    finishedAtUtc = completionCapturedAtUtc,
                     inputManifestHash = ComputeFileSha256(session.stageInputPath),
                     outputs = new List<string> { "scene-scan.json", "scene-scan.md" },
                     outputHashes = outputHashes,
                     findings = new List<string> { session.dryRun ? "场景扫描 DryRun 报告已由 C# 校验后提升。" : "场景扫描报告已由 C# 校验后提升。" },
                     errors = new List<string>(),
                 };
+                finalResult.idempotencyKey = ESAutomationGovernance.ComputeIdempotencyKey(
+                    TaskId, TaskVersion, finalResult.inputManifestHash, session.invocationHash);
+                finalResult.completionDecision = new ESAutomationCompletionDecision
+                {
+                    runId = session.runId,
+                    executionStatus = finalResult.status,
+                    freshnessPolicy = new ESAutomationFreshnessPolicy { maxAgeHours = 168, requireSourceHash = true, allowRuntimeNotRun = true },
+                    traceReconciled = true,
+                    criterionResults = new List<ESAutomationCriterionResult>
+                    {
+                        new ESAutomationCriterionResult
+                        {
+                            criterionId = "scene-scan.report-json",
+                            verifierId = "es.scene.scan.promoted-output-hash",
+                            passed = ESAutomationWorkerRegistration.IsSha256(outputHashes[0]),
+                            evidenceState = ESAutomationEvidenceState.Fresh,
+                            evidenceHash = outputHashes[0],
+                            evidenceBinding = new ESAutomationClaimEvidenceBinding
+                            {
+                                claimId = "scene-scan.report-json",
+                                criterionId = "scene-scan.report-json",
+                                evidenceHash = outputHashes[0],
+                                sourceHash = WorkerEntrypointHash,
+                                capturedAtUtc = completionCapturedAtUtc,
+                            },
+                        },
+                        new ESAutomationCriterionResult
+                        {
+                            criterionId = "scene-scan.report-markdown",
+                            verifierId = "es.scene.scan.promoted-output-hash",
+                            passed = ESAutomationWorkerRegistration.IsSha256(outputHashes[1]),
+                            evidenceState = ESAutomationEvidenceState.Fresh,
+                            evidenceHash = outputHashes[1],
+                            evidenceBinding = new ESAutomationClaimEvidenceBinding
+                            {
+                                claimId = "scene-scan.report-markdown",
+                                criterionId = "scene-scan.report-markdown",
+                                evidenceHash = outputHashes[1],
+                                sourceHash = WorkerEntrypointHash,
+                                capturedAtUtc = completionCapturedAtUtc,
+                            },
+                        },
+                    },
+                };
+                finalResult.completionDecision.accepted = finalResult.completionDecision.CanAccept();
                 finalResult.Validate();
                 WriteJsonAtomic(Path.Combine(promotionDirectory, "result.json"), finalResult);
                 ESAutomationPathPolicy.EnsureWorkerDirectory(ESAutomationPathPolicy.ReportsRoot, new[] { ESAutomationPathPolicy.ProjectRoot });
@@ -887,6 +989,26 @@ namespace ES
                 // 失败时保留 RunId 临时证据，禁止用清理操作掩盖错误或误删其他运行记录。
                 throw;
             }
+        }
+
+        private static void VerifySceneSnapshotUnchanged(ESAutomationSceneScanSession session)
+        {
+            if (session == null) throw new ArgumentNullException(nameof(session));
+            JObject root = ReadStrictObject(session.stageInputPath, new[]
+            {
+                "protocolVersion", "runId", "generation", "taskId", "taskVersion", "workerType", "workerId",
+                "workerVersion", "entrypointHash", "stepId", "optionsSchemaHash", "dryRun", "sceneSnapshotPath",
+                "sceneSnapshotHash", "inputResponsePath", "workerOutputDirectory",
+            }, "SceneScan StageInput");
+            string expectedHash = root.Value<string>("sceneSnapshotHash") ?? string.Empty;
+            string snapshotPath = root.Value<string>("sceneSnapshotPath") ?? string.Empty;
+            if (!ESAutomationWorkerRegistration.IsSha256(expectedHash))
+                throw new InvalidDataException("SceneScan StageInput snapshot hash is invalid.");
+            ESAutomationPathPolicy.EnsureWorkerReadAllowed(snapshotPath, new[] { ESAutomationPathPolicy.TempRoot });
+            if (!File.Exists(snapshotPath)) throw new FileNotFoundException("SceneScan snapshot is missing.", snapshotPath);
+            string actualHash = ComputeFileSha256(snapshotPath);
+            if (!HashEquals(expectedHash, actualHash))
+                throw new InvalidDataException("SceneScan source snapshot drift detected; report promotion blocked.");
         }
 
         private static string RequireWorkerOutputFile(ESAutomationSceneScanSession session, string fileName)
@@ -1096,6 +1218,16 @@ namespace ES
                 || !HashEquals(result.outputHashes[0], jsonHash)
                 || !HashEquals(result.outputHashes[1], markdownHash))
                 throw new InvalidDataException("报告最终目录哈希与结果记录不一致：" + reportsDirectory);
+            if (ESAutomationTaskRegistry.TryGet(result.taskId, result.taskVersion, out ESAutomationTaskContract contract)
+                && contract.performanceBudget != null)
+            {
+                long outputBytes = new FileInfo(Path.Combine(reportsDirectory, "scene-scan.json")).Length
+                    + new FileInfo(Path.Combine(reportsDirectory, "scene-scan.md")).Length;
+                if (outputBytes > contract.performanceBudget.maxOutputBytes)
+                    throw new InvalidDataException("Scene scan outputs exceed PerformanceBudget maxOutputBytes.");
+            }
+            if (result.completionDecision == null || !result.completionDecision.CanAccept())
+                throw new InvalidDataException("Scene scan report lacks a valid CompletionDecision.");
         }
 
         private static string ComputeFileSha256(string path)

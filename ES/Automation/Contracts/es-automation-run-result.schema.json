@@ -22,6 +22,152 @@
     "outputs": { "type": "array", "items": { "type": "string" } },
     "outputHashes": { "type": "array", "items": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" } },
     "findings": { "type": "array", "items": { "type": "string" } },
-    "errors": { "type": "array", "items": { "type": "string" } }
+    "errors": { "type": "array", "items": { "type": "string" } },
+    "retryCount": { "type": "integer", "minimum": 0 },
+    "idempotencyKey": { "anyOf": [ { "const": "" }, { "type": "string", "pattern": "^[A-Za-z0-9._:-]+$" } ] },
+    "executionSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["snapshotId", "inputManifestHash", "sourceHash", "taskContractHash", "commandHash", "brainPlanHash"],
+      "properties": {
+        "snapshotId": { "type": "string", "minLength": 1 },
+        "inputManifestHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "sourceHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "taskContractHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "commandHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "brainPlanHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+      }
+    },
+    "traceReconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["traceId", "expectedToolCalls", "observedToolCalls", "unauthorizedToolCalls", "duplicateToolCalls", "reconciled"],
+      "properties": {
+        "traceId": { "type": "string", "minLength": 1 },
+        "expectedToolCalls": { "type": "integer", "minimum": 0 },
+        "observedToolCalls": { "type": "integer", "minimum": 0 },
+        "unauthorizedToolCalls": { "type": "integer", "minimum": 0 },
+        "duplicateToolCalls": { "type": "integer", "minimum": 0 },
+        "reconciled": { "type": "boolean" }
+      }
+    },
+    "completionDecision": {
+      "anyOf": [ { "type": "null" }, {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisionId", "runId", "accepted", "executionStatus", "criterionResults"],
+      "properties": {
+        "decisionId": { "type": "string", "pattern": "^[a-fA-F0-9]{32}$" },
+        "runId": { "type": "string", "pattern": "^[a-fA-F0-9]{32}$" },
+        "accepted": { "type": "boolean" },
+        "executionStatus": { "type": "string", "enum": ["", "Passed", "Failed", "Blocked", "Cancelled", "DryRun"] },
+        "freshnessPolicy": { "$ref": "#/$defs/freshnessPolicyOrNull" },
+        "criterionResults": { "type": "array", "items": { "$ref": "#/$defs/criterionResult" } },
+        "forbiddenConditions": { "type": "array", "items": { "type": "string" } },
+        "unauthorizedToolCalls": { "type": "boolean" },
+        "staleEvidence": { "type": "boolean" },
+        "contradictoryEvidence": { "type": "boolean" },
+        "sourceDrift": { "type": "boolean" },
+        "budgetViolation": { "type": "boolean" },
+        "traceReconciled": { "type": "boolean" },
+        "traceReconciliation": { "anyOf": [ { "type": "null" }, { "$ref": "#/$defs/traceReconciliation" } ] },
+        "decisionStatus": { "type": "string", "enum": ["", "Unverified", "PartiallyDone", "StaticReviewComplete", "Accepted", "Blocked"] },
+        "blockingLayer": { "type": "string", "enum": ["", "none", "static-code", "static-contract", "static-boundary", "evidence", "runtime"] },
+        "staticCodeStatus": { "type": "string", "enum": ["", "passed", "blocked", "partial", "not-run"] },
+        "staticContractStatus": { "type": "string", "enum": ["", "passed", "blocked", "partial", "not-run"] },
+        "staticBoundaryStatus": { "type": "string", "enum": ["", "passed", "blocked", "partial", "not-run"] },
+        "evidenceStatus": { "type": "string", "enum": ["", "passed", "fresh", "missing", "stale", "invalid", "contradictory", "missing-or-stale", "evidence-pending", "not-evaluated", "not-requested"] },
+        "runtimeStatus": { "type": "string", "enum": ["", "passed", "failed", "blocked", "runtime-not-run", "not-run", "unverified"] },
+        "claimsNotProven": { "type": "array", "items": { "type": "string" } },
+        "nextAction": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "accepted": { "const": true } } },
+          "then": { "required": ["decisionStatus", "executionStatus"], "properties": { "decisionStatus": { "const": "Accepted" }, "executionStatus": { "const": "Passed" } } }
+        },
+        {
+          "if": { "properties": { "decisionStatus": { "const": "Accepted" } } },
+          "then": { "required": ["accepted", "executionStatus"], "properties": { "accepted": { "const": true }, "executionStatus": { "const": "Passed" } } }
+        },
+        {
+          "if": { "properties": { "decisionStatus": { "const": "Blocked" } } },
+          "then": { "required": ["accepted"], "properties": { "accepted": { "const": false } } }
+        }
+      ] } ]
+    }
+  },
+  "$defs": {
+    "freshnessPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxAgeHours", "requireSourceHash", "allowRuntimeNotRun"],
+      "properties": {
+        "maxAgeHours": { "type": "integer", "minimum": 1, "maximum": 8760 },
+        "requireSourceHash": { "type": "boolean" },
+        "allowRuntimeNotRun": { "type": "boolean" },
+        "requireExecutionSnapshotBinding": { "type": "boolean", "default": false }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "requireExecutionSnapshotBinding": { "const": true } } },
+          "then": { "properties": { "requireSourceHash": { "const": true } } }
+        }
+      ]
+    },
+    "freshnessPolicyOrNull": { "anyOf": [ { "type": "null" }, { "$ref": "#/$defs/freshnessPolicy" } ] },
+    "evidenceBinding": {
+      "anyOf": [ { "type": "null" }, {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claimId", "criterionId", "evidenceHash", "sourceHash", "capturedAtUtc"],
+        "properties": {
+          "claimId": { "type": "string", "minLength": 1 },
+          "criterionId": { "type": "string", "minLength": 1 },
+          "evidenceHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+            "sourceHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+            "capturedAtUtc": { "type": "string", "format": "date-time" },
+            "snapshotId": { "type": "string" },
+            "inputManifestHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+            "taskContractHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+            "commandHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+            "brainPlanHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+        }
+      } ]
+    },
+    "criterionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criterionId", "verifierId", "passed", "evidenceState", "evidenceHash", "message", "evidenceBinding"],
+      "properties": {
+        "criterionId": { "type": "string", "minLength": 1 },
+        "verifierId": { "type": "string", "minLength": 1 },
+        "passed": { "type": "boolean" },
+        "evidenceState": { "type": "string", "enum": ["Missing", "Fresh", "Stale", "Contradictory", "RuntimeNotRun", "Invalid"] },
+        "evidenceScope": { "type": "string", "enum": ["Static", "Runtime"], "default": "Static" },
+        "evidenceHash": { "type": "string" },
+        "message": { "type": "string" },
+        "evidenceBinding": { "$ref": "#/$defs/evidenceBinding" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "passed": { "const": true } } },
+          "then": { "properties": { "evidenceHash": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }, "evidenceState": { "const": "Fresh" } } }
+        }
+      ]
+    },
+    "traceReconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["traceId", "expectedToolCalls", "observedToolCalls", "unauthorizedToolCalls", "duplicateToolCalls", "reconciled"],
+      "properties": {
+        "traceId": { "type": "string", "minLength": 1 },
+        "expectedToolCalls": { "type": "integer", "minimum": 0 },
+        "observedToolCalls": { "type": "integer", "minimum": 0 },
+        "unauthorizedToolCalls": { "type": "integer", "minimum": 0 },
+        "duplicateToolCalls": { "type": "integer", "minimum": 0 },
+        "reconciled": { "type": "boolean" }
+      }
+    }
   }
 }

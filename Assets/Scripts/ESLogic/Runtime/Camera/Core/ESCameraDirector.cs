@@ -138,6 +138,9 @@ namespace ES
             {
                 RecomputeWinner(view);
                 ComposeModifiers(view);
+                // Look authorization needs the current winner immediately, but this is not the
+                // adapter commit boundary. Preserve dirty so LateTick still applies the new rig.
+                view.dirty = true;
             }
 
             if (!view.hasWinner || !ReferenceEquals(slot.request.owner, view.winner.request.owner))

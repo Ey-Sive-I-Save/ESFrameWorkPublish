@@ -1556,8 +1556,6 @@ namespace ES
 
     public sealed class ESEditorFeedbackSoundSchemeWindow : ESSinglePageIMGUIWindow<ESEditorFeedbackSoundSchemeWindow>
     {
-        protected override bool ESWindow_SupportsSemiSleep => false;
-
         private string newSchemeName = "MyScheme";
         private string auditionSchemeId;
         private ESEditorFeedbackSoundKind auditionKind =
@@ -1581,6 +1579,7 @@ namespace ES
         {
             return new GUIContent("ES 编辑器音效方案", "配置、试听并管理编辑器交互反馈音效");
         }
+        public override string ESWindow_PresentationShortTitle => "音效";
 
         protected override string ESWindow_Subtitle => "编辑器反馈音效与分类型音量";
         protected override Vector2 ESWindow_MinSize => new Vector2(420f, 300f);

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es.feishu.task.monitor@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operation"],
+  "properties": {
+    "operation": { "enum": ["tasklist-list", "tasklist-get", "task-list", "task-get"] },
+    "tasklistGuid": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "taskGuid": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "pageSize": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 },
+    "pageToken": { "type": "string", "maxLength": 512 },
+    "completed": { "type": ["boolean", "null"] }
+  }
+}

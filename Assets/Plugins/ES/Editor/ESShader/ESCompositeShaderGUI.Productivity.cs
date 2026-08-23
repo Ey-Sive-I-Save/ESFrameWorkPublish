@@ -127,6 +127,23 @@ namespace ES.EditorInternal
             "_EnableFlowMap", "_FlowMap", "_FlowMapScale", "_FlowMapSpeed", "_FlowMapStrength",
             "_EnableVertexAnimation", "_VertexAnimationDirection", "_VertexAnimationAmplitude", "_VertexAnimationFrequency", "_VertexAnimationSpeed", "_VertexAnimationMask",
             "_EnableChromatic", "_ChromaticOffset", "_ChromaticIntensity", "_ChromaticEdgeOnly", "_ChromaticAngle",
+            "_EnablePalette", "_PaletteTex", "_PaletteRow", "_PaletteStrength",
+            "_EnableHalftone", "_HalftoneScale", "_HalftoneAngle", "_HalftoneStrength",
+            "_TilingMode", "_WorldTilingScale", "_WorldTilingOffset", "_WorldTilingPixelsPerUnit",
+            "_ScreenTilingScale", "_ScreenTilingOffset", "_ScreenTilingPixelsPerUnit",
+            "_UberNoiseTexture", "_EnableFlame", "_FlameBrightness", "_FlameSmooth", "_FlameRadius", "_FlameSpeed",
+            "_FlameNoiseFactor", "_FlameNoiseHeightFactor", "_FlameNoiseScale",
+            "_EnableSmoke", "_SmokeAlpha", "_SmokeSmoothness", "_SmokeNoiseScale", "_SmokeNoiseFactor", "_SmokeDarkEdge", "_SmokeVertexSeed",
+            "_EnableWind", "_WindDirection", "_WindAmplitude", "_WindFrequency", "_WindSpeed", "_WindAnchor", "_WindGlobalInfluence",
+            "_EnableSquish", "_SquishAmount", "_SquishSpeed",
+            "_EnableWiggle", "_WiggleAmplitude", "_WiggleFrequency", "_WiggleSpeed",
+            "_EnableVibrate", "_VibrateAmplitude", "_VibrateSpeed",
+            "_EnableSqueeze", "_SqueezeFade", "_SqueezeScale", "_SqueezePower", "_SqueezeCenter",
+            "_EnableSineRotate", "_SineRotateFade", "_SineRotateAngle", "_SineRotateFrequency", "_SineRotatePivot",
+            "_EnableSineMove", "_SineMoveFade", "_SineMoveOffset", "_SineMoveFrequency",
+            "_EnableSineScale", "_SineScaleFrequency", "_SineScaleFactor",
+            "_EnableCustomFade", "_CustomFadeFadeMask", "_CustomFadeSmoothness", "_CustomFadeNoiseScale", "_CustomFadeNoiseFactor", "_CustomFadeAlpha",
+            "_EnableFullGlowDissolve", "_FullGlowDissolveFade", "_FullGlowDissolveWidth", "_FullGlowDissolveEdgeColor", "_FullGlowDissolveNoiseScale",
             "_EnableRadialMask", "_RadialMaskCenter", "_RadialMaskRadius", "_RadialMaskSoftness", "_RadialMaskInvert",
             "_EnableFresnelMask", "_FresnelPower", "_FresnelMin", "_FresnelMax", "_FresnelAlphaInfluence", "_FresnelColor", "_FresnelIntensity",
             "_EnableSoftParticles", "_SoftParticleNear", "_SoftParticleFar",
@@ -139,8 +156,25 @@ namespace ES.EditorInternal
             "_EnableVertexStreams", "_VertexStreamUVStrength", "_VertexStreamFrameStrength", "_VertexStreamDissolveStrength", "_VertexStreamEmissionStrength",
             "_EnableBlur", "_BlurRadius", "_BlurIntensity",
             "_EnableSparkle", "_SparkleColor", "_SparkleScale", "_SparkleSpeed", "_SparkleDensity", "_SparkleSharpness", "_SparkleIntensity",
+            "_EnableCamouflage", "_CamouflageFade", "_CamouflageBaseColor", "_CamouflageContrast",
+            "_CamouflageColorA", "_CamouflageDensityA", "_CamouflageSmoothnessA", "_CamouflageNoiseScaleA",
+            "_CamouflageColorB", "_CamouflageDensityB", "_CamouflageSmoothnessB", "_CamouflageNoiseScaleB",
+            "_CamouflageAnimationToggle", "_CamouflageDistortionSpeed", "_CamouflageDistortionIntensity", "_CamouflageDistortionScale",
+            "_EnableMetal", "_MetalFade", "_MetalColor", "_MetalContrast", "_MetalHighlightColor", "_MetalHighlightDensity",
+            "_MetalHighlightContrast", "_MetalNoiseScale", "_MetalNoiseSpeed", "_MetalNoiseDistortionScale",
+            "_MetalNoiseDistortionSpeed", "_MetalNoiseDistortion", "_MetalMaskToggle", "_MetalMask",
+            "_EnableEnchanted", "_EnchantedFade", "_EnchantedSpeed", "_EnchantedScale", "_EnchantedBrightness",
+            "_EnchantedContrast", "_EnchantedReduce", "_EnchantedRainbowToggle", "_EnchantedRainbowSpeed",
+            "_EnchantedRainbowDensity", "_EnchantedRainbowSaturation", "_EnchantedLowColor", "_EnchantedHighColor", "_EnchantedLerpToggle",
+            "_EnableShifting", "_ShiftingFade", "_ShiftingSpeed", "_ShiftingDensity", "_ShiftingBrightness",
+            "_ShiftingContrast", "_ShiftingRainbowToggle", "_ShiftingSaturation", "_ShiftingColorA", "_ShiftingColorB",
             "_EnableHologram", "_HologramColor", "_HologramFrequency", "_HologramLineFrequency", "_HologramGap", "_HologramLineGap", "_HologramSpeed", "_HologramMinAlpha",
-            "_EnableGlitch", "_GlitchAmount", "_GlitchIntensity", "_GlitchSpeed",
+            "_HologramFade", "_HologramContrast", "_HologramSpace", "_HologramDistortionOffset",
+            "_HologramDistortionSpeed", "_HologramDistortionDensity", "_HologramDistortionScale",
+            "_EnableGlitch", "_GlitchAmount", "_GlitchIntensity", "_GlitchSpeed", "_GlitchFade",
+            "_GlitchMaskMin", "_GlitchMaskScale", "_GlitchMaskSpeed", "_GlitchHueSpeed",
+            "_GlitchBrightness", "_GlitchNoiseScale", "_GlitchNoiseSpeed", "_GlitchDistortion",
+            "_GlitchDistortionScale", "_GlitchDistortionSpeed", "_SSUStatusContract",
             "_BlendMode", "_ZWriteMode", "_ZTest", "_Cull", "_QueueOffset"
         };
 
@@ -152,6 +186,7 @@ namespace ES.EditorInternal
                 new PresetAssignment("_ShineColor", new Color(1.8f, 1.5f, 0.65f, 1f)),
                 new PresetAssignment("_ShineSpeed", 1.2f),
                 new PresetAssignment("_ShineWidth", 0.14f),
+                new PresetAssignment("_ShineDirection", new Vector4(0.8660254f, 0.5f, 0f, 0f)),
                 new PresetAssignment("_ShineIntensity", 1.35f)),
             new CompositePreset(
                 "2d.dissolve", "2D 噪声消散", "以噪声边缘消散图片，进度可继续交给动画或业务代码。", "ES/2D/Composite URP",
@@ -160,6 +195,37 @@ namespace ES.EditorInternal
                 new PresetAssignment("_FadeWidth", 0.09f),
                 new PresetAssignment("_FadeNoiseFactor", 0.25f),
                 new PresetAssignment("_DissolveEdgeColor", new Color(2.2f, 0.18f, 0.02f, 1f))),
+            new CompositePreset(
+                "2d.shadow-tint", "2D 阴影暗部", "用单次偏移阴影和冷色暗部染色增强精灵层次，不改变亮部主色。", "ES/2D/Composite URP",
+                new PresetAssignment("_EnableShadow", 1f),
+                new PresetAssignment("_ShadowFade", 0.68f),
+                new PresetAssignment("_ShadowOffset", new Vector4(0.08f, -0.08f, 0f, 0f)),
+                new PresetAssignment("_ShadowColor", new Color(0.035f, 0.045f, 0.08f, 1f)),
+                new PresetAssignment("_EnableBlackTint", 1f),
+                new PresetAssignment("_BlackTintFade", 0.32f),
+                new PresetAssignment("_BlackTintColor", new Color(0.03f, 0.08f, 0.22f, 1f)),
+                new PresetAssignment("_BlackTintPower", 4f)),
+            new CompositePreset(
+                "2d.camouflage", "2D 林地迷彩", "以静态三色噪声覆盖原图明度，适合潜行状态和环境伪装。", "ES/2D/Composite URP",
+                new PresetAssignment("_EnableCamouflage", 1f),
+                new PresetAssignment("_CamouflageFade", 0.9f),
+                new PresetAssignment("_CamouflageBaseColor", new Color(0.36f, 0.42f, 0.24f, 1f)),
+                new PresetAssignment("_CamouflageColorA", new Color(0.18f, 0.24f, 0.12f, 1f)),
+                new PresetAssignment("_CamouflageColorB", new Color(0.52f, 0.48f, 0.28f, 1f)),
+                new PresetAssignment("_CamouflageDensityA", 0.42f),
+                new PresetAssignment("_CamouflageDensityB", 0.56f),
+                new PresetAssignment("_CamouflageNoiseScaleA", new Vector4(0.22f, 0.22f, 0f, 0f)),
+                new PresetAssignment("_CamouflageNoiseScaleB", new Vector4(0.38f, 0.38f, 0f, 0f))),
+            new CompositePreset(
+                "2d.metal", "2D 流动金属", "以暖色 HDR 高光和缓慢噪声流动塑造金属表面。", "ES/2D/Composite URP",
+                new PresetAssignment("_EnableMetal", 1f),
+                new PresetAssignment("_MetalFade", 0.82f),
+                new PresetAssignment("_MetalColor", new Color(1.6f, 0.72f, 0.12f, 1f)),
+                new PresetAssignment("_MetalContrast", 1.8f),
+                new PresetAssignment("_MetalHighlightColor", new Color(3.2f, 2.1f, 0.45f, 1f)),
+                new PresetAssignment("_MetalHighlightDensity", 0.72f),
+                new PresetAssignment("_MetalHighlightContrast", 2.4f),
+                new PresetAssignment("_MetalNoiseSpeed", new Vector4(0.04f, 0.08f, 0f, 0f))),
             new CompositePreset(
                 "lit.rim", "Lit 轮廓强调", "保持 URP Lit 光照，并用冷色边缘光强化角色或交互物轮廓。", "ES/3D/Lit Composite URP",
                 new PresetAssignment("_EnableRim", 1f),
@@ -183,7 +249,37 @@ namespace ES.EditorInternal
                 new PresetAssignment("_ShineColor", new Color(1.7f, 1.45f, 0.7f, 1f)),
                 new PresetAssignment("_ShineSpeed", 1.1f),
                 new PresetAssignment("_ShineWidth", 0.13f),
+                new PresetAssignment("_ShineDirection", new Vector4(0.8660254f, 0.5f, 0f, 0f)),
                 new PresetAssignment("_ShineIntensity", 1.25f)),
+            new CompositePreset(
+                "ui.sine-glow", "UI 呼吸辉光", "按统一时间源周期叠加青色辉光，适合可交互提示与冷却完成反馈。", "ES/UI/Composite URP",
+                new PresetAssignment("_EnableSineGlow", 1f),
+                new PresetAssignment("_SineGlowFade", 0.72f),
+                new PresetAssignment("_SineGlowColor", new Color(0.08f, 1.2f, 2.4f, 1f)),
+                new PresetAssignment("_SineGlowContrast", 1.15f),
+                new PresetAssignment("_SineGlowFrequency", 3.2f),
+                new PresetAssignment("_SineGlowMin", 0f),
+                new PresetAssignment("_SineGlowMax", 0.65f)),
+            new CompositePreset(
+                "ui.enchanted", "UI 附魔流光", "双色滚动流光用于稀有卡牌、装备与奖励强调。", "ES/UI/Composite URP",
+                new PresetAssignment("_EnableEnchanted", 1f),
+                new PresetAssignment("_EnchantedFade", 0.72f),
+                new PresetAssignment("_EnchantedSpeed", new Vector4(0.12f, 0.75f, 0f, 0f)),
+                new PresetAssignment("_EnchantedScale", new Vector4(0.18f, 0.18f, 0f, 0f)),
+                new PresetAssignment("_EnchantedBrightness", 1.25f),
+                new PresetAssignment("_EnchantedContrast", 0.72f),
+                new PresetAssignment("_EnchantedLowColor", new Color(0.45f, 0.05f, 1.8f, 1f)),
+                new PresetAssignment("_EnchantedHighColor", new Color(0.02f, 1.7f, 2.8f, 1f))),
+            new CompositePreset(
+                "ui.shifting", "UI 彩虹流变", "随明度连续流变的彩虹色，用于限时、传奇或可升级状态。", "ES/UI/Composite URP",
+                new PresetAssignment("_EnableShifting", 1f),
+                new PresetAssignment("_ShiftingFade", 0.68f),
+                new PresetAssignment("_ShiftingSpeed", 0.38f),
+                new PresetAssignment("_ShiftingDensity", 1.35f),
+                new PresetAssignment("_ShiftingBrightness", 1.1f),
+                new PresetAssignment("_ShiftingContrast", 0.65f),
+                new PresetAssignment("_ShiftingRainbowToggle", 1f),
+                new PresetAssignment("_ShiftingSaturation", 0.82f)),
             new CompositePreset(
                 "ui.hologram", "UI 全息故障", "扫描线与轻微故障组合，用于终端、投影和科技感界面。", "ES/UI/Composite URP",
                 new PresetAssignment("_EnableHologram", 1f),
@@ -191,7 +287,8 @@ namespace ES.EditorInternal
                 new PresetAssignment("_HologramFrequency", 64f),
                 new PresetAssignment("_HologramSpeed", 1.25f),
                 new PresetAssignment("_EnableGlitch", 1f),
-                new PresetAssignment("_GlitchAmount", 0.018f)),
+                new PresetAssignment("_GlitchAmount", 0.018f),
+                new PresetAssignment("_QualityTier", 1f)),
             new CompositePreset(
                 "vfx.energy-flow", "能量流动", "沿 UV 持续流动并叠加青色边缘光，适合能量管线与技能轨迹。", "ES/3D/VFX Composite URP",
                 new PresetAssignment("_EnableFlow", 1f),
@@ -252,14 +349,32 @@ namespace ES.EditorInternal
                 new PresetAssignment("_QualityTier", 1f)),
             new CompositePreset(
                 "vfx.hologram", "全息故障", "高质量扫描线、轻微故障与色差组合，适合投影和数字替身。", "ES/3D/VFX Composite URP",
+                new PresetAssignment("_SSUStatusContract", 1f),
                 new PresetAssignment("_EnableHologram", 1f),
                 new PresetAssignment("_HologramColor", new Color(0.05f, 1.1f, 2.2f, 1f)),
-                new PresetAssignment("_HologramFrequency", 72f),
-                new PresetAssignment("_HologramGap", 0.32f),
+                new PresetAssignment("_HologramFade", 0.9f),
+                new PresetAssignment("_HologramContrast", 1.2f),
+                new PresetAssignment("_HologramSpace", 1f),
+                new PresetAssignment("_HologramLineFrequency", 72f),
+                new PresetAssignment("_HologramLineGap", 3f),
                 new PresetAssignment("_HologramSpeed", 1.4f),
+                new PresetAssignment("_HologramMinAlpha", 0.2f),
+                new PresetAssignment("_HologramDistortionOffset", 0.18f),
+                new PresetAssignment("_HologramDistortionSpeed", 2f),
+                new PresetAssignment("_HologramDistortionDensity", 0.5f),
+                new PresetAssignment("_HologramDistortionScale", 10f),
                 new PresetAssignment("_EnableGlitch", 1f),
-                new PresetAssignment("_GlitchAmount", 0.018f),
-                new PresetAssignment("_GlitchSpeed", 3.5f),
+                new PresetAssignment("_GlitchFade", 0.65f),
+                new PresetAssignment("_GlitchMaskMin", 0.4f),
+                new PresetAssignment("_GlitchMaskScale", new Vector4(0f, 0.2f, 0f, 0f)),
+                new PresetAssignment("_GlitchMaskSpeed", new Vector4(0f, 4f, 0f, 0f)),
+                new PresetAssignment("_GlitchHueSpeed", 0.35f),
+                new PresetAssignment("_GlitchBrightness", 2f),
+                new PresetAssignment("_GlitchNoiseScale", new Vector4(0f, 3f, 0f, 0f)),
+                new PresetAssignment("_GlitchNoiseSpeed", new Vector4(0f, 1f, 0f, 0f)),
+                new PresetAssignment("_GlitchDistortion", new Vector4(0.018f, 0f, 0f, 0f)),
+                new PresetAssignment("_GlitchDistortionScale", new Vector4(0f, 3f, 0f, 0f)),
+                new PresetAssignment("_GlitchDistortionSpeed", new Vector4(0f, 3.5f, 0f, 0f)),
                 new PresetAssignment("_EnableChromatic", 1f),
                 new PresetAssignment("_ChromaticOffset", 0.0025f),
                 new PresetAssignment("_ChromaticIntensity", 0.7f),
@@ -347,6 +462,7 @@ namespace ES.EditorInternal
 
         private static void DrawPresetPanel(MaterialEditor editor, MaterialProperty[] properties, string shaderName)
         {
+            DrawSharedPresetPanel(editor, shaderName);
             CompositePreset[] presets = GetPresets(shaderName);
             if (presets.Length == 0) return;
 
@@ -463,6 +579,84 @@ namespace ES.EditorInternal
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space(4f);
+        }
+
+        private static void DrawSharedPresetPanel(MaterialEditor editor, string shaderName)
+        {
+            string sessionKey = "ES.Composite.SharedPreset." + shaderName;
+            string assetGuid = SessionState.GetString(sessionKey, string.Empty);
+            ESCompositeShaderPreset preset = string.IsNullOrEmpty(assetGuid)
+                ? null
+                : AssetDatabase.LoadAssetAtPath<ESCompositeShaderPreset>(AssetDatabase.GUIDToAssetPath(assetGuid));
+
+            EditorGUILayout.BeginVertical(ESEditorPresentation.SurfaceStyle);
+            EditorGUILayout.LabelField("共享预设资产", EditorStyles.boldLabel);
+            ESCompositeShaderPreset next = (ESCompositeShaderPreset)EditorGUILayout.ObjectField(
+                "预设",
+                preset,
+                typeof(ESCompositeShaderPreset),
+                false);
+            if (next != preset)
+            {
+                preset = next;
+                string path = preset == null ? string.Empty : AssetDatabase.GetAssetPath(preset);
+                SessionState.SetString(sessionKey, string.IsNullOrEmpty(path) ? string.Empty : AssetDatabase.AssetPathToGUID(path));
+            }
+
+            Material source = editor.target as Material;
+            bool compatible = preset != null && source != null && preset.IsCompatible(source);
+            if (preset != null && !compatible)
+                EditorGUILayout.HelpBox("该预设属于 " + preset.ShaderName + "，与当前 Shader 不兼容。", MessageType.Warning);
+            else if (preset != null && !string.IsNullOrWhiteSpace(preset.Description))
+                GUILayout.Label(preset.Description, ESEditorPresentation.SubtitleStyle);
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("新建并捕获"))
+                preset = CreateSharedPreset(source, sessionKey);
+            using (new EditorGUI.DisabledScope(!compatible))
+            {
+                if (GUILayout.Button("重新捕获"))
+                {
+                    Undo.RecordObject(preset, "捕获 ES Composite Shader 预设");
+                    preset.CaptureFrom(source);
+                    EditorUtility.SetDirty(preset);
+                }
+                if (GUILayout.Button("应用到所选"))
+                {
+                    var materials = new List<Material>();
+                    for (int i = 0; i < editor.targets.Length; i++)
+                    {
+                        Material material = editor.targets[i] as Material;
+                        if (preset.IsCompatible(material)) materials.Add(material);
+                    }
+                    Undo.RecordObjects(materials.ToArray(), "应用 ES Composite Shader 共享预设");
+                    for (int i = 0; i < materials.Count; i++) preset.ApplyTo(materials[i]);
+                    editor.PropertiesChanged();
+                }
+            }
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(4f);
+        }
+
+        private static ESCompositeShaderPreset CreateSharedPreset(Material source, string sessionKey)
+        {
+            if (source == null) return null;
+            string path = EditorUtility.SaveFilePanelInProject(
+                "新建 ES Composite Shader 预设",
+                source.name + " Preset",
+                "asset",
+                "选择共享预设资产的保存位置。");
+            if (string.IsNullOrEmpty(path)) return null;
+
+            var preset = ScriptableObject.CreateInstance<ESCompositeShaderPreset>();
+            preset.name = System.IO.Path.GetFileNameWithoutExtension(path);
+            preset.CaptureFrom(source);
+            AssetDatabase.CreateAsset(preset, path);
+            AssetDatabase.SaveAssetIfDirty(preset);
+            SessionState.SetString(sessionKey, AssetDatabase.AssetPathToGUID(path));
+            Selection.activeObject = preset;
+            return preset;
         }
 
         private static CompositePreset[] GetPresets(string shaderName)

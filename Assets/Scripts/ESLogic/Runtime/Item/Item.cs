@@ -45,6 +45,11 @@ namespace ES
         [HideLabel, SerializeReference]
         public ItemBasicDomain basicDomain = new ItemBasicDomain();
 
+        [NonSerialized] private ItemShotModule pooledShotModule;
+        [NonSerialized] private ItemMotionModule pooledMotionModule;
+
+        internal ItemShotModule Internal_ShotModule => ResolvePooledShotModule();
+
         protected override void OnBeforeAwakeRegister()
         {
             EnsureItemOpSupport();
@@ -70,8 +75,8 @@ namespace ES
 
         protected override void OnDestroy()
         {
-            basicDomain?.FindMyModule<ItemShotModule>()?.OnPoolDespawned();
-            basicDomain?.FindMyModule<ItemMotionModule>()?.ResetMotionInfluences();
+            ResolvePooledShotModule()?.OnPoolDespawned();
+            ResolvePooledMotionModule()?.ResetMotionInfluences();
             ResetItemAttributesForLifecycleEnd();
             UnsubscribeFromAttributeCatalog();
             UnsubscribeFromTagCatalog();
@@ -92,8 +97,8 @@ namespace ES
         /// <summary>Called before the pooled Item is deactivated; ends the current Tag lifetime.</summary>
         public void OnPoolDespawned()
         {
-            basicDomain?.FindMyModule<ItemShotModule>()?.OnPoolDespawned();
-            basicDomain?.FindMyModule<ItemMotionModule>()?.ResetMotionInfluences();
+            ResolvePooledShotModule()?.OnPoolDespawned();
+            ResolvePooledMotionModule()?.ResetMotionInfluences();
             ResetItemAttributesForLifecycleEnd();
             UnsubscribeFromAttributeCatalog();
             itemAttributeDefinition = null;
@@ -138,10 +143,26 @@ namespace ES
         /// <summary>Called while inactive before the pooled Item is activated again.</summary>
         public void OnPoolSpawned()
         {
+            if (basicDomain == null || basicDomain.Core_Base != this || !domains.Contains(basicDomain))
+                _DoAwake();
             EnsureItemOpSupport();
             EnsureItemAttributes();
             TryBindPrefabDefinition();
-            basicDomain?.FindMyModule<ItemShotModule>()?.OnPoolSpawned();
+            ResolvePooledShotModule()?.OnPoolSpawned();
+        }
+
+        private ItemShotModule ResolvePooledShotModule()
+        {
+            if (pooledShotModule == null)
+                pooledShotModule = basicDomain?.FindMyModule<ItemShotModule>();
+            return pooledShotModule;
+        }
+
+        private ItemMotionModule ResolvePooledMotionModule()
+        {
+            if (pooledMotionModule == null)
+                pooledMotionModule = basicDomain?.FindMyModule<ItemMotionModule>();
+            return pooledMotionModule;
         }
 
         /// <summary>Binds the ItemDataInfo that is the sole authority for this Item's birth Tags.</summary>

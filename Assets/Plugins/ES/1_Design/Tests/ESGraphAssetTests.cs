@@ -1350,6 +1350,104 @@ namespace ES.Tests
             }
         }
 
+        [UnityTest]
+        public IEnumerator StableGraph_RectangleSelectionSupportsModesAndGestureIsolationOnRealPanel()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            ESGraphPanelHostWindow window = null;
+            ESStableGraphView view = null;
+            try
+            {
+                ESGraphNodeRecord first = graph.AddNode("test.source", "A",
+                    new Vector2(180f, 180f), DefaultPorts);
+                ESGraphNodeRecord second = graph.AddNode("test.source", "B",
+                    new Vector2(500f, 180f), DefaultPorts);
+                ESGraphNodeRecord outside = graph.AddNode("test.source", "C",
+                    new Vector2(820f, 470f), DefaultPorts);
+                string serializedBeforeSelection = EditorJsonUtility.ToJson(graph);
+
+                window = ScriptableObject.CreateInstance<ESGraphPanelHostWindow>();
+                window.position = new Rect(120f, 120f, 1180f, 820f);
+                view = new ESStableGraphView(null, null,
+                    new ESGraphEditService(null, null, null));
+                view.style.flexGrow = 1f;
+                window.rootVisualElement.Add(view);
+                window.Show();
+                view.SetAsset(graph);
+                window.Repaint();
+                yield return null;
+                yield return null;
+
+                Assert.That(view.panel, Is.Not.Null, "测试必须运行在真实 UI Toolkit Panel。 ");
+                ESStableGraphNodeView firstView = FindNodeView(view, first.nodeId);
+                ESStableGraphNodeView secondView = FindNodeView(view, second.nodeId);
+                ESStableGraphNodeView outsideView = FindNodeView(view, outside.nodeId);
+
+                view.AddToSelection(outsideView);
+                Rect firstPairBounds = Union(firstView.worldBound, secondView.worldBound);
+                SendMarquee(view, Expand(firstPairBounds, 12f), EventModifiers.None,
+                    assertActiveAfterMove: true);
+
+                Assert.That(view.selection.Contains(firstView), Is.True);
+                Assert.That(view.selection.Contains(secondView), Is.True);
+                Assert.That(view.selection.Contains(outsideView), Is.False,
+                    "普通框选必须替换旧选择，并排除框外节点。 ");
+                Assert.That(view.Internal_SelectedNodeIds,
+                    Is.EqualTo(new[] { first.nodeId, second.nodeId }.OrderBy(id => id).ToArray()));
+                Assert.That(view.SelectedNodeCount, Is.EqualTo(2));
+                Assert.That(view.SelectedEdgeCount, Is.Zero);
+
+                SendMarquee(view, Expand(outsideView.worldBound, 12f), EventModifiers.Shift);
+                Assert.That(view.selection.Contains(firstView), Is.True);
+                Assert.That(view.selection.Contains(secondView), Is.True);
+                Assert.That(view.selection.Contains(outsideView), Is.True,
+                    "Shift 框选必须追加，不得清除原选择。 ");
+
+                SendMarquee(view, Expand(secondView.worldBound, 12f), EventModifiers.Control);
+                Assert.That(view.selection.Contains(firstView), Is.True);
+                Assert.That(view.selection.Contains(secondView), Is.False,
+                    "动作键框选必须切换命中项。 ");
+                Assert.That(view.selection.Contains(outsideView), Is.True);
+
+                Port port = FindPortView(view, Output(first));
+                SendMouseDown(port, port.worldBound.center);
+                Assert.That(view.Internal_IsRectangleSelectionActive, Is.False,
+                    "端口按下不能启动框选。 ");
+                SendMouseUp(port, port.worldBound.center);
+                view.EndPointerInteraction();
+
+                view.ClearSelection();
+                view.AddToSelection(firstView);
+                Rect cancelBounds = Expand(outsideView.worldBound, 12f);
+                VisualElement startTarget = view.panel.Pick(cancelBounds.min) ?? view;
+                SendMouseDown(startTarget, cancelBounds.min);
+                SendMouseMove(view, cancelBounds.max);
+                Assert.That(view.Internal_IsRectangleSelectionActive, Is.True);
+                Assert.That(view.Internal_RectangleSelectionCandidateCount, Is.EqualTo(3));
+                Assert.That(view.HasPendingEdgeReconnect, Is.False);
+                Assert.That(view.HasPortDragPreview, Is.False);
+                Assert.That(view.IsEndpointReconnectActive, Is.False);
+                view.ReleaseMouse();
+
+                Assert.That(view.Internal_IsRectangleSelectionActive, Is.False,
+                    "MouseCaptureOut 必须取消框选状态。 ");
+                Assert.That(view.Internal_RectangleSelectionCandidateCount, Is.Zero);
+                Assert.That(view.selection.Contains(firstView), Is.True);
+                Assert.That(view.selection.Contains(outsideView), Is.False,
+                    "取消框选不得提交半成品选择。 ");
+                Assert.That(view.HasCanvasPointerInteraction, Is.False);
+                Assert.That(EditorJsonUtility.ToJson(graph), Is.EqualTo(serializedBeforeSelection),
+                    "框选只属于当前 View，不得修改作者资产或产生序列化漂移。 ");
+            }
+            finally
+            {
+                view?.Dispose();
+                if (window != null)
+                    window.Close();
+                Object.DestroyImmediate(graph);
+            }
+        }
+
         [Test]
         public void StableGraph_VisitedEdgesShareExactlyOneEndpointHandlePair()
         {
@@ -2827,6 +2925,467 @@ namespace ES.Tests
             }
         }
 
+        [Test]
+        public void StableGraph_OrganizeSelectionWithNoNodesIsAStrictNoOp()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            ESStableGraphView view = null;
+            try
+            {
+                Undo.ClearAll();
+                ESGraphNodeRecord node = graph.AddNode("test.node", "A",
+                    new Vector2(47f, 91f), DefaultPorts);
+                string before = EditorJsonUtility.ToJson(graph);
+                string report = null;
+                view = new ESStableGraphView(null, message => report = message,
+                    new ESGraphEditService(null, null, null));
+                view.SetAsset(graph);
+                EditorUtility.ClearDirty(graph);
+                int undoGroup = Undo.GetCurrentGroup();
+
+                view.OrganizeSelection();
+
+                Assert.That(EditorJsonUtility.ToJson(graph), Is.EqualTo(before));
+                Assert.That(graph.FindNode(node.nodeId).position, Is.EqualTo(new Vector2(47f, 91f)));
+                Assert.That(EditorUtility.IsDirty(graph), Is.False);
+                Assert.That(Undo.GetCurrentGroup(), Is.EqualTo(undoGroup));
+                Assert.That(report, Does.Contain("不会修改整张图"));
+            }
+            finally
+            {
+                view?.Dispose();
+                Undo.ClearAll();
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_OrganizeSingleSelectionSnapsOnlyThatNodeAndKeepsSelection()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            ESStableGraphView view = null;
+            try
+            {
+                Undo.ClearAll();
+                ESGraphNodeRecord selected = graph.AddNode("test.node", "Selected",
+                    new Vector2(47f, 91f), DefaultPorts);
+                ESGraphNodeRecord stationary = graph.AddNode("test.node", "Stationary",
+                    new Vector2(32f, 96f), DefaultPorts);
+                Vector2 stationaryBefore = stationary.position;
+                view = new ESStableGraphView(null, null,
+                    new ESGraphEditService(null, null, null));
+                view.SetAsset(graph);
+                view.AddToSelection(FindNodeView(view, selected.nodeId));
+
+                view.OrganizeSelection();
+
+                Assert.That(graph.FindNode(selected.nodeId).position,
+                    Is.EqualTo(new Vector2(32f, 288f)),
+                    "单节点先吸附网格；目标槽位被未选节点占用时，应移动到确定的相邻空槽。 ");
+                Assert.That(graph.FindNode(stationary.nodeId).position, Is.EqualTo(stationaryBefore));
+                Assert.That(view.Internal_SelectedNodeIds, Is.EqualTo(new[] { selected.nodeId }));
+            }
+            finally
+            {
+                view?.Dispose();
+                Undo.ClearAll();
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_OrganizeSelectionUsesFullTopologyButMovesOnlySelectedNodes()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            ESStableGraphView view = null;
+            try
+            {
+                Undo.ClearAll();
+                ESGraphNodeRecord externalSource = graph.AddNode("test.source", "External Source",
+                    new Vector2(-640f, -360f), DefaultPorts);
+                ESGraphNodeRecord first = graph.AddNode("test.node", "First",
+                    new Vector2(140f, 360f), DefaultPorts);
+                ESGraphNodeRecord second = graph.AddNode("test.node", "Second",
+                    new Vector2(-220f, -140f), DefaultPorts);
+                ESGraphNodeRecord externalSink = graph.AddNode("test.sink", "External Sink",
+                    new Vector2(940f, 520f), DefaultPorts);
+                Assert.That(graph.TryAddEdge(Output(externalSource), Input(first), out _,
+                    out string firstError), Is.True, firstError);
+                Assert.That(graph.TryAddEdge(Output(first), Input(second), out _,
+                    out string secondError), Is.True, secondError);
+                Assert.That(graph.TryAddEdge(Output(second), Input(externalSink), out _,
+                    out string thirdError), Is.True, thirdError);
+
+                Vector2 sourceBefore = externalSource.position;
+                Vector2 firstBefore = first.position;
+                Vector2 secondBefore = second.position;
+                Vector2 sinkBefore = externalSink.position;
+                view = new ESStableGraphView(null, null,
+                    new ESGraphEditService(null, null, null));
+                view.SetAsset(graph);
+                view.AddToSelection(FindNodeView(view, first.nodeId));
+                view.AddToSelection(FindNodeView(view, second.nodeId));
+
+                view.OrganizeSelection();
+
+                Vector2 firstArranged = graph.FindNode(first.nodeId).position;
+                Vector2 secondArranged = graph.FindNode(second.nodeId).position;
+                Assert.That(firstArranged, Is.Not.EqualTo(firstBefore));
+                Assert.That(secondArranged, Is.Not.EqualTo(secondBefore));
+                Assert.That(graph.FindNode(externalSource.nodeId).position, Is.EqualTo(sourceBefore));
+                Assert.That(graph.FindNode(externalSink.nodeId).position, Is.EqualTo(sinkBefore));
+                Assert.That(view.Internal_SelectedNodeIds,
+                    Is.EqualTo(new[] { first.nodeId, second.nodeId }.OrderBy(id => id).ToArray()));
+
+                view.OrganizeSelection();
+                Assert.That(graph.FindNode(first.nodeId).position, Is.EqualTo(firstArranged));
+                Assert.That(graph.FindNode(second.nodeId).position, Is.EqualTo(secondArranged));
+                Assert.That(graph.FindNode(externalSource.nodeId).position, Is.EqualTo(sourceBefore));
+                Assert.That(graph.FindNode(externalSink.nodeId).position, Is.EqualTo(sinkBefore));
+
+                Undo.FlushUndoRecordObjects();
+                Undo.PerformUndo();
+                view.Rebuild();
+                Assert.That(graph.FindNode(first.nodeId).position, Is.EqualTo(firstBefore));
+                Assert.That(graph.FindNode(second.nodeId).position, Is.EqualTo(secondBefore));
+                Assert.That(graph.FindNode(externalSource.nodeId).position, Is.EqualTo(sourceBefore));
+                Assert.That(graph.FindNode(externalSink.nodeId).position, Is.EqualTo(sinkBefore));
+                Assert.That(view.Internal_SelectedNodeIds,
+                    Is.EqualTo(new[] { first.nodeId, second.nodeId }.OrderBy(id => id).ToArray()));
+
+                Undo.PerformRedo();
+                view.Rebuild();
+                Assert.That(graph.FindNode(first.nodeId).position, Is.EqualTo(firstArranged));
+                Assert.That(graph.FindNode(second.nodeId).position, Is.EqualTo(secondArranged));
+                Assert.That(graph.FindNode(externalSource.nodeId).position, Is.EqualTo(sourceBefore));
+                Assert.That(graph.FindNode(externalSink.nodeId).position, Is.EqualTo(sinkBefore));
+            }
+            finally
+            {
+                view?.Dispose();
+                Undo.ClearAll();
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_OrganizeAllMovesEveryTopologyLayerDeterministically()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            ESStableGraphView view = null;
+            try
+            {
+                ESGraphNodeRecord first = graph.AddNode("test.source", "First",
+                    new Vector2(820f, 140f), DefaultPorts);
+                ESGraphNodeRecord second = graph.AddNode("test.node", "Second",
+                    new Vector2(-420f, 530f), DefaultPorts);
+                ESGraphNodeRecord third = graph.AddNode("test.sink", "Third",
+                    new Vector2(180f, -260f), DefaultPorts);
+                Assert.That(graph.TryAddEdge(Output(first), Input(second), out _,
+                    out string firstError), Is.True, firstError);
+                Assert.That(graph.TryAddEdge(Output(second), Input(third), out _,
+                    out string secondError), Is.True, secondError);
+                Vector2[] before = graph.Nodes.Select(node => node.position).ToArray();
+                view = new ESStableGraphView(null, null,
+                    new ESGraphEditService(null, null, null));
+                view.SetAsset(graph);
+
+                view.OrganizeAll();
+
+                Vector2[] arranged = graph.Nodes.Select(node => node.position).ToArray();
+                Assert.That(arranged, Is.Not.EqualTo(before));
+                Assert.That(arranged[0].x, Is.LessThan(arranged[1].x));
+                Assert.That(arranged[1].x, Is.LessThan(arranged[2].x));
+                view.OrganizeAll();
+                Assert.That(graph.Nodes.Select(node => node.position).ToArray(), Is.EqualTo(arranged));
+            }
+            finally
+            {
+                view?.Dispose();
+                Undo.ClearAll();
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_DenseSelectionOrganizeUsesBoundedCollisionQueries()
+        {
+            const int SelectedCount = 128;
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            ESStableGraphView view = null;
+            try
+            {
+                var selectedIds = new HashSet<string>(StringComparer.Ordinal);
+                for (int i = 0; i < SelectedCount; i++)
+                {
+                    ESGraphNodeRecord selected = graph.AddNode("test.selected", "Selected " + i,
+                        new Vector2(47f, i * 180f), DefaultPorts);
+                    selectedIds.Add(selected.nodeId);
+                    graph.AddNode("test.stationary", "Stationary " + i,
+                        new Vector2(47f, i * 180f), DefaultPorts);
+                }
+                var stationaryBefore = graph.Nodes
+                    .Where(node => !selectedIds.Contains(node.nodeId))
+                    .ToDictionary(node => node.nodeId, node => node.position, StringComparer.Ordinal);
+                view = new ESStableGraphView(null, null,
+                    new ESGraphEditService(null, null, null));
+                view.SetAsset(graph);
+                List<ESStableGraphNodeView> nodeViewList = view.Query<ESStableGraphNodeView>().ToList();
+                for (int i = 0; i < nodeViewList.Count; i++)
+                    if (selectedIds.Contains(nodeViewList[i].NodeId))
+                        view.AddToSelection(nodeViewList[i]);
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                view.OrganizeSelection();
+                stopwatch.Stop();
+
+                Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(5)),
+                    "密集局部整理必须保持有界，不能退化为逐节点扫描整图的多层循环。 ");
+                foreach (KeyValuePair<string, Vector2> pair in stationaryBefore)
+                    Assert.That(graph.FindNode(pair.Key).position, Is.EqualTo(pair.Value), pair.Key);
+                Assert.That(view.Internal_SelectedNodeIds.Count, Is.EqualTo(SelectedCount));
+            }
+            finally
+            {
+                view?.Dispose();
+                Undo.ClearAll();
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_OrganizeRejectsNonFiniteCoordinatesWithoutMutation()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            ESStableGraphView view = null;
+            try
+            {
+                ESGraphNodeRecord node = graph.AddNode("test.node", "Invalid Position",
+                    new Vector2(64f, 96f), DefaultPorts);
+                string report = null;
+                view = new ESStableGraphView(null, message => report = message,
+                    new ESGraphEditService(null, null, null));
+                view.SetAsset(graph);
+                node.position = new Vector2(float.NaN, 96f);
+                EditorUtility.ClearDirty(graph);
+
+                Assert.DoesNotThrow(() => view.OrganizeAll());
+
+                Assert.That(float.IsNaN(node.position.x), Is.True);
+                Assert.That(node.position.y, Is.EqualTo(96f));
+                Assert.That(EditorUtility.IsDirty(graph), Is.False);
+                Assert.That(report, Does.Contain("非有限节点坐标"));
+            }
+            finally
+            {
+                view?.Dispose();
+                Undo.ClearAll();
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_OrganizeSingleSelectionRejectsDuplicateNodeIdAsStrictNoOp()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            ESStableGraphView view = null;
+            try
+            {
+                Undo.ClearAll();
+                ESGraphNodeRecord selected = graph.AddNode("test.node", "Selected",
+                    new Vector2(47f, 91f), DefaultPorts);
+                ESGraphNodeRecord duplicate = graph.AddNode("test.node", "Duplicate",
+                    new Vector2(320f, 180f), DefaultPorts);
+                string report = null;
+                int notifyCount = 0;
+                view = new ESStableGraphView(null, message => report = message,
+                    new ESGraphEditService(null, null, _ => notifyCount++));
+                view.SetAsset(graph);
+                view.AddToSelection(FindNodeView(view, selected.nodeId));
+                duplicate.nodeId = selected.nodeId;
+                string before = EditorJsonUtility.ToJson(graph);
+                Vector2 selectedBefore = selected.position;
+                Vector2 duplicateBefore = duplicate.position;
+                EditorUtility.ClearDirty(graph);
+                int undoGroup = Undo.GetCurrentGroup();
+
+                view.OrganizeSelection();
+
+                Assert.That(EditorJsonUtility.ToJson(graph), Is.EqualTo(before));
+                Assert.That(selected.position, Is.EqualTo(selectedBefore));
+                Assert.That(duplicate.position, Is.EqualTo(duplicateBefore));
+                Assert.That(EditorUtility.IsDirty(graph), Is.False);
+                Assert.That(Undo.GetCurrentGroup(), Is.EqualTo(undoGroup));
+                Assert.That(notifyCount, Is.Zero);
+                Assert.That(report, Does.Contain("重复 NodeId"));
+            }
+            finally
+            {
+                view?.Dispose();
+                Undo.ClearAll();
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_OrganizeAllRejectsDuplicatePortIdAsStrictNoOp()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            ESStableGraphView view = null;
+            try
+            {
+                Undo.ClearAll();
+                ESGraphNodeRecord first = graph.AddNode("test.node", "First",
+                    new Vector2(47f, 91f), DefaultPorts);
+                ESGraphNodeRecord second = graph.AddNode("test.node", "Second",
+                    new Vector2(420f, 291f), DefaultPorts);
+                view = new ESStableGraphView(null, null,
+                    new ESGraphEditService(null, null, null));
+                view.SetAsset(graph);
+                second.ports[0].portId = first.ports[0].portId;
+                string before = EditorJsonUtility.ToJson(graph);
+                EditorUtility.ClearDirty(graph);
+                int undoGroup = Undo.GetCurrentGroup();
+
+                view.OrganizeAll();
+
+                Assert.That(EditorJsonUtility.ToJson(graph), Is.EqualTo(before));
+                Assert.That(EditorUtility.IsDirty(graph), Is.False);
+                Assert.That(Undo.GetCurrentGroup(), Is.EqualTo(undoGroup));
+            }
+            finally
+            {
+                view?.Dispose();
+                Undo.ClearAll();
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_OrganizeAllRejectsDuplicateEdgeIdAsStrictNoOp()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            ESStableGraphView view = null;
+            try
+            {
+                Undo.ClearAll();
+                ESGraphNodeRecord sourceA = graph.AddNode("test.source", "Source A",
+                    new Vector2(420f, 291f), DefaultPorts);
+                ESGraphNodeRecord sinkA = graph.AddNode("test.sink", "Sink A",
+                    new Vector2(-120f, 91f), DefaultPorts);
+                ESGraphNodeRecord sourceB = graph.AddNode("test.source", "Source B",
+                    new Vector2(720f, 491f), DefaultPorts);
+                ESGraphNodeRecord sinkB = graph.AddNode("test.sink", "Sink B",
+                    new Vector2(120f, -91f), DefaultPorts);
+                Assert.That(graph.TryAddEdge(Output(sourceA), Input(sinkA), out ESGraphEdgeRecord first,
+                    out string firstError), Is.True, firstError);
+                Assert.That(graph.TryAddEdge(Output(sourceB), Input(sinkB), out ESGraphEdgeRecord second,
+                    out string secondError), Is.True, secondError);
+                view = new ESStableGraphView(null, null,
+                    new ESGraphEditService(null, null, null));
+                view.SetAsset(graph);
+                second.edgeId = first.edgeId;
+                string before = EditorJsonUtility.ToJson(graph);
+                EditorUtility.ClearDirty(graph);
+                int undoGroup = Undo.GetCurrentGroup();
+
+                view.OrganizeAll();
+
+                Assert.That(EditorJsonUtility.ToJson(graph), Is.EqualTo(before));
+                Assert.That(EditorUtility.IsDirty(graph), Is.False);
+                Assert.That(Undo.GetCurrentGroup(), Is.EqualTo(undoGroup));
+            }
+            finally
+            {
+                view?.Dispose();
+                Undo.ClearAll();
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_SetNodePositionsRejectsIncompleteOrNonFiniteTargetsAsStrictNoOp()
+        {
+            ESTestGraphAsset graph = ScriptableObject.CreateInstance<ESTestGraphAsset>();
+            try
+            {
+                Undo.ClearAll();
+                ESGraphNodeRecord node = graph.AddNode("test.node", "Node",
+                    new Vector2(47f, 91f), DefaultPorts);
+                int notifyCount = 0;
+                int dirtyCount = 0;
+                int saveCount = 0;
+                var service = new ESGraphEditService(_ => dirtyCount++, () => saveCount++,
+                    _ => notifyCount++);
+                var invalidTargets = new IReadOnlyDictionary<string, Vector2>[]
+                {
+                    new Dictionary<string, Vector2>
+                    {
+                        { ESGraphIdentity.NewId(), new Vector2(32f, 64f) }
+                    },
+                    new Dictionary<string, Vector2>
+                    {
+                        { node.nodeId, new Vector2(float.NaN, 64f) }
+                    },
+                    new Dictionary<string, Vector2>
+                    {
+                        { node.nodeId, new Vector2(32f, float.PositiveInfinity) }
+                    }
+                };
+
+                for (int i = 0; i < invalidTargets.Length; i++)
+                {
+                    string before = EditorJsonUtility.ToJson(graph);
+                    EditorUtility.ClearDirty(graph);
+                    int undoGroup = Undo.GetCurrentGroup();
+                    ESGraphEditResult result = service.SetNodePositions(graph,
+                        invalidTargets[i], "测试非法布局");
+
+                    Assert.That(result.changed, Is.False, "invalid target " + i);
+                    Assert.That(EditorJsonUtility.ToJson(graph), Is.EqualTo(before), "invalid target " + i);
+                    Assert.That(EditorUtility.IsDirty(graph), Is.False, "invalid target " + i);
+                    Assert.That(Undo.GetCurrentGroup(), Is.EqualTo(undoGroup), "invalid target " + i);
+                    Assert.That(notifyCount, Is.Zero, "invalid target " + i);
+                    Assert.That(dirtyCount, Is.Zero, "invalid target " + i);
+                    Assert.That(saveCount, Is.Zero, "invalid target " + i);
+                }
+            }
+            finally
+            {
+                Undo.ClearAll();
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void StableGraph_OrganizeToolbarExposesExplicitAllAndSelectionCommands()
+        {
+            ESStableGraphViewWindow window = null;
+            try
+            {
+                window = ScriptableObject.CreateInstance<ESStableGraphViewWindow>();
+                var menu = new DropdownMenu();
+                System.Reflection.MethodInfo appendActions = typeof(ESStableGraphViewWindow)
+                    .GetMethod("AppendOrganizeActions",
+                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.That(appendActions, Is.Not.Null);
+                appendActions.Invoke(window, new object[] { menu, string.Empty });
+
+                string[] actions = menu.MenuItems()
+                    .OfType<DropdownMenuAction>()
+                    .Select(action => action.name)
+                    .ToArray();
+                Assert.That(actions, Does.Contain("整理全部"));
+                Assert.That(actions, Does.Contain("整理选中"));
+                Assert.That(actions, Does.Not.Contain("自动布局选中节点"));
+            }
+            finally
+            {
+                if (window != null)
+                    Object.DestroyImmediate(window);
+            }
+        }
+
         private static ESGraphNodeRecord CreateCardNode(string payloadJson, string nodeTypeId = null)
         {
             return new ESGraphNodeRecord
@@ -2906,6 +3465,12 @@ namespace ES.Tests
                 string.Equals(candidate.userData as string, edgeId, StringComparison.Ordinal));
         }
 
+        private static ESStableGraphNodeView FindNodeView(ESStableGraphView view, string nodeId)
+        {
+            return view.Query<ESStableGraphNodeView>().ToList().Single(candidate =>
+                string.Equals(candidate.NodeId, nodeId, StringComparison.Ordinal));
+        }
+
         private static Port FindPortView(ESStableGraphView view, string portId)
         {
             return view.Query<Port>().ToList().Single(candidate =>
@@ -2939,35 +3504,71 @@ namespace ES.Tests
             return bounds.center;
         }
 
-        private static void SendMouseDown(VisualElement target, Vector2 panelPosition)
+        private static void SendMarquee(ESStableGraphView view, Rect panelRect,
+            EventModifiers modifiers, bool assertActiveAfterMove = false)
+        {
+            VisualElement startTarget = view.panel.Pick(panelRect.min) ?? view;
+            SendMouseDown(startTarget, panelRect.min, modifiers);
+            SendMouseMove(view, panelRect.max, modifiers);
+            if (assertActiveAfterMove)
+                Assert.That(view.Internal_IsRectangleSelectionActive, Is.True);
+            SendMouseUp(view, panelRect.max, modifiers);
+            Assert.That(view.Internal_IsRectangleSelectionActive, Is.False);
+        }
+
+        private static Rect Union(Rect left, Rect right)
+        {
+            return Rect.MinMaxRect(
+                Mathf.Min(left.xMin, right.xMin),
+                Mathf.Min(left.yMin, right.yMin),
+                Mathf.Max(left.xMax, right.xMax),
+                Mathf.Max(left.yMax, right.yMax));
+        }
+
+        private static Rect Expand(Rect rect, float amount)
+        {
+            return Rect.MinMaxRect(
+                rect.xMin - amount,
+                rect.yMin - amount,
+                rect.xMax + amount,
+                rect.yMax + amount);
+        }
+
+        private static void SendMouseDown(VisualElement target, Vector2 panelPosition,
+            EventModifiers modifiers = EventModifiers.None)
         {
             using (MouseDownEvent evt = MouseDownEvent.GetPooled(new Event
                    {
                        type = EventType.MouseDown,
                        button = 0,
-                       mousePosition = panelPosition
+                       mousePosition = panelPosition,
+                       modifiers = modifiers
                    }))
                 target.SendEvent(evt);
         }
 
-        private static void SendMouseMove(VisualElement target, Vector2 panelPosition)
+        private static void SendMouseMove(VisualElement target, Vector2 panelPosition,
+            EventModifiers modifiers = EventModifiers.None)
         {
             using (MouseMoveEvent evt = MouseMoveEvent.GetPooled(new Event
                    {
                        type = EventType.MouseMove,
                        button = 0,
-                       mousePosition = panelPosition
+                       mousePosition = panelPosition,
+                       modifiers = modifiers
                    }))
                 target.SendEvent(evt);
         }
 
-        private static void SendMouseUp(VisualElement target, Vector2 panelPosition)
+        private static void SendMouseUp(VisualElement target, Vector2 panelPosition,
+            EventModifiers modifiers = EventModifiers.None)
         {
             using (MouseUpEvent evt = MouseUpEvent.GetPooled(new Event
                    {
                        type = EventType.MouseUp,
                        button = 0,
-                       mousePosition = panelPosition
+                       mousePosition = panelPosition,
+                       modifiers = modifiers
                    }))
                 target.SendEvent(evt);
         }

@@ -32,6 +32,7 @@ namespace ES
         {
             return new GUIContent("ES 资源诊断", "观察资源 Bootstrap、Provider、Scope 与 ResourcePlan 状态");
         }
+        public override string ESWindow_PresentationShortTitle => "资源";
 
         protected override string ESWindow_Subtitle => "资源运行时观察与安全点验收";
         protected override Vector2 ESWindow_MinSize => new Vector2(560f, 480f);

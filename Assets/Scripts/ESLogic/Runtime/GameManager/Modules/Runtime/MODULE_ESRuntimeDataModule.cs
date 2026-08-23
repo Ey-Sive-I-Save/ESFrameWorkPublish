@@ -1408,6 +1408,12 @@ namespace ES
         public ESRuntimeDataAssetLoadingService ExistingAssetLoadingService => assetLoadingService;
         public ESRuntimeDataAssetLoadingService AssetLoadingService => assetLoadingService ??= new ESRuntimeDataAssetLoadingService();
 
+        [ESHotPath]
+        protected override void Update()
+        {
+            ESShotSimulationBatch.Internal_Tick(Time.deltaTime);
+        }
+
         public void InitializeAssetLoading(ESGlobalAssetRuntimeMap manifest, IESRuntimeAssetBundleProvider provider, ESRuntimeRetryPolicy retryPolicy)
         {
             DisposeConsumerStartupAssets();
@@ -1747,7 +1753,7 @@ namespace ES
                 if (consumerLocalizationCatalog != null && !ReferenceEquals(consumerLocalizationCatalog, localization))
                     throw new InvalidOperationException("[ESRes][Resident] 同一 Consumer 不能加载多个 ESLocalizationCatalog。");
                 if (localization.Validate().Count > 0)
-                    throw new InvalidOperationException("[ESRes][Resident] ESLocalizationCatalog 验证失败。请在本地化工作台修复后重新发布。");
+                    throw new InvalidOperationException("[ESRes][Resident] ESLocalizationCatalog 验证失败。请在本地化工具中修复后重新发布。");
                 if (ESLocalizationRuntime.Provider == null)
                 {
                     if (!ESLocalizationRuntime.RegisterProvider(localization))
@@ -1767,7 +1773,7 @@ namespace ES
                 if (consumerFontCatalog != null && !ReferenceEquals(consumerFontCatalog, fontCatalog))
                     throw new InvalidOperationException("[ESRes][Resident] 同一 Consumer 不能加载多个 ESRuntimeFontCatalog。");
                 if (fontCatalog.Validate().Count > 0)
-                    throw new InvalidOperationException("[ESRes][Resident] ESRuntimeFontCatalog 验证失败。请在字体工作台修复后重新发布。");
+                    throw new InvalidOperationException("[ESRes][Resident] ESRuntimeFontCatalog 验证失败。请在字体资产工具中修复后重新发布。");
                 if (ESFontRuntime.Catalog == null)
                 {
                     if (!ESFontRuntime.RegisterCatalog(fontCatalog))

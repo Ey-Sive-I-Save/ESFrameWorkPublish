@@ -44,8 +44,9 @@ namespace ES.EditorInternal
         AgentMindMap
     }
 
-    public sealed class ESStableGraphViewWindow : EditorWindow
+    public sealed class ESStableGraphViewWindow : EditorWindow, IESWindowPresentationShortTitle
     {
+        public string ESWindow_PresentationShortTitle => "图";
         private const string DefaultGraphFolder = "Assets/ESNormalAssets/Data/Graphs";
         private const string OnboardingPreferencePrefix = "ES.StableGraphV2.OnboardingCompleted.";
         private const string EdgeFlowPreferenceKey = "ES.StableGraphV2.EdgeFlowEnabled";
@@ -336,18 +337,19 @@ namespace ES.EditorInternal
         private ToolbarMenu CreateOrganizeMenu()
         {
             ToolbarMenu menu = new ToolbarMenu { text = "整理" };
-            menu.tooltip = "自动布局、对齐、等距分布或吸附网格；批量操作只产生一次撤销记录。";
+            menu.tooltip = "整理整张图或仅整理选中节点，也可对齐、等距分布或吸附网格；每次批量操作只产生一次撤销记录。";
             AppendOrganizeActions(menu.menu, string.Empty);
             return menu;
         }
 
         private void AppendOrganizeActions(DropdownMenu menu, string prefix)
         {
-            menu.AppendAction(prefix + "自动布局整张图", _ => graphView?.AutoLayout(),
+            menu.AppendAction(prefix + "整理全部", _ => graphView?.OrganizeAll(),
                 _ => graphView?.Asset != null && graphView.Asset.Nodes.Count > 0
                     ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
-            menu.AppendAction(prefix + "自动布局选中节点", _ => graphView?.AutoLayoutSelection(),
-                _ => HasSelectedNodes(2) ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
+            menu.AppendAction(prefix + "整理选中", _ => graphView?.OrganizeSelection(),
+                _ => HasSelectedNodes(1) ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
+            menu.AppendSeparator(prefix);
             menu.AppendAction(prefix + "左对齐", _ => graphView?.AlignSelection(ESGraphNodeAlignment.Left),
                 _ => SelectionStatus(2));
             menu.AppendAction(prefix + "水平居中对齐", _ => graphView?.AlignSelection(ESGraphNodeAlignment.HorizontalCenter),
@@ -1257,6 +1259,58 @@ namespace ES.EditorInternal
         }
     }
 
+    internal enum ESGraphSelectionMode
+    {
+        Replace,
+        Add,
+        Toggle
+    }
+
+    [Flags]
+    internal enum ESGraphSelectionScope
+    {
+        None = 0,
+        Nodes = 1 << 0,
+        Edges = 1 << 1,
+        All = Nodes | Edges
+    }
+
+    internal enum ESGraphSelectionKind
+    {
+        Node,
+        Edge
+    }
+
+    internal enum ESGraphLayoutScope
+    {
+        All,
+        Selection
+    }
+
+    internal readonly struct ESGraphSelectionCandidate
+    {
+        public readonly string StableId;
+        public readonly ESGraphSelectionKind Kind;
+        public readonly GraphElement Element;
+
+        public ESGraphSelectionCandidate(string stableId, ESGraphSelectionKind kind,
+            GraphElement element)
+        {
+            StableId = stableId ?? string.Empty;
+            Kind = kind;
+            Element = element;
+        }
+
+        public static int CompareStable(ESGraphSelectionCandidate left,
+            ESGraphSelectionCandidate right)
+        {
+            int kindComparison = left.Kind.CompareTo(right.Kind);
+            return kindComparison != 0
+                ? kindComparison
+                : StringComparer.Ordinal.Compare(left.StableId, right.StableId);
+        }
+    }
+
     internal sealed class ESStableGraphView : GraphView, IDisposable
     {
         private static readonly FieldInfo EdgeRenderPointsField = typeof(EdgeControl).GetField(
@@ -1273,6 +1327,12 @@ namespace ES.EditorInternal
         private const float EndpointHandleEdgeOffset = 14f;
         private const float LayoutHorizontalSpacing = 310f;
         private const float LayoutVerticalSpacing = 180f;
+        private const float LayoutMinimumNodeWidth = 250f;
+        private const float LayoutMinimumNodeHeight = 120f;
+        private const float LayoutCollisionPadding = 24f;
+        private const float LayoutCollisionStep = 192f;
+        private const float LayoutCollisionCellSize = 256f;
+        private const float LayoutMaximumNodeExtent = 4096f;
         private const float PositionGridSize = 32f;
         private const float PointerDragThreshold = 4f;
         private const float SnapGuideThreshold = 8f;
@@ -1318,6 +1378,7 @@ namespace ES.EditorInternal
         private readonly ESGraphEditService editService;
         private readonly ESStableGraphNodeSearchProvider searchProvider;
         private readonly ESStableGraphEdgeConnectorListener edgeConnectorListener;
+        private readonly ESGraphRectangleSelectionManipulator rectangleSelectionManipulator;
         private readonly VisualElement emptyState;
         private readonly Label onboardingBody;
         private readonly MiniMap miniMap;
@@ -1347,6 +1408,9 @@ namespace ES.EditorInternal
         private readonly HashSet<string> rebuildChangedNodeIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<string> rebuildStaleEdgeIds = new List<string>();
         private readonly List<GraphElement> graphElementRemovalBuffer = new List<GraphElement>();
+        private readonly List<GraphElement> rectangleSelectionMatchBuffer = new List<GraphElement>();
+        private readonly List<string> selectedNodeIds = new List<string>();
+        private readonly List<string> selectedEdgeIds = new List<string>();
         private readonly HashSet<string> activeNodeIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<string> staleAdjacencyNodeIds = new List<string>();
         private readonly Stack<List<string>> adjacencyListPool = new Stack<List<string>>();
@@ -1435,6 +1499,23 @@ namespace ES.EditorInternal
             }
         }
         public bool HasSelection => selection.Count > 0;
+        public int SelectedEdgeCount
+        {
+            get
+            {
+                int count = 0;
+                for (int i = 0; i < selection.Count; i++)
+                    if (selection[i] is Edge edge && edge.userData is string edgeId
+                        && !string.IsNullOrEmpty(edgeId))
+                        count++;
+                return count;
+            }
+        }
+        internal IReadOnlyList<string> Internal_SelectedNodeIds => selectedNodeIds;
+        internal IReadOnlyList<string> Internal_SelectedEdgeIds => selectedEdgeIds;
+        internal ESGraphSelectionScope Internal_RectangleSelectionScope { get; set; }
+            = ESGraphSelectionScope.All;
+        internal Predicate<ESGraphSelectionCandidate> Internal_RectangleSelectionFilter { get; set; }
         public bool EdgeFlowEnabled => edgeFlowEnabled && edgeFlowGeometryAvailable;
         public bool SupportsEdgeFlow => edgeFlowGeometryAvailable;
         internal bool IsEditingInteractionActive => pressedMouseButtons != 0
@@ -1444,7 +1525,8 @@ namespace ES.EditorInternal
             || !string.IsNullOrEmpty(activeDragPortId)
             || pendingEdgeReconnect != null
             || edgeReconnectTriggered
-            || endpointReconnectEdge != null;
+            || endpointReconnectEdge != null
+            || rectangleSelectionManipulator?.IsActive == true;
         public event Action<IEnumerable<ISelectable>> SelectionChanged;
 
         public ESStableGraphView(ESStableGraphViewWindow ownerWindow, Action<string> report,
@@ -1469,7 +1551,8 @@ namespace ES.EditorInternal
             Insert(0, new GridBackground());
             this.AddManipulator(new ContentDragger());
             this.AddManipulator(new SelectionDragger());
-            this.AddManipulator(new RectangleSelector());
+            rectangleSelectionManipulator = new ESGraphRectangleSelectionManipulator(this);
+            this.AddManipulator(rectangleSelectionManipulator);
             edgeFlowOverlay = new VisualElement
             {
                 name = "es-stable-graph-edge-flow-overlay",
@@ -1594,6 +1677,9 @@ namespace ES.EditorInternal
             CancelViewAnimation();
             CancelEdgeReconnect();
             CancelEndpointReconnect();
+            rectangleSelectionManipulator?.Cancel();
+            if (rectangleSelectionManipulator != null)
+                this.RemoveManipulator(rectangleSelectionManipulator);
             CancelNudgeBatch();
             ClearSnapGrids();
             ClearSnapGridPool();
@@ -2645,9 +2731,10 @@ namespace ES.EditorInternal
                 _ => HasSelection ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
             evt.menu.AppendAction("选择/复制选中    Ctrl/Cmd+D", _ => DuplicateSelection(),
                 _ => GetSelectionStatus(1));
-            evt.menu.AppendAction("整理/自动布局整张图", _ => AutoLayout());
-            evt.menu.AppendAction("整理/自动布局选中节点", _ => AutoLayoutSelection(),
-                _ => GetSelectionStatus(2));
+            evt.menu.AppendAction("整理/整理全部", _ => OrganizeAll());
+            evt.menu.AppendAction("整理/整理选中", _ => OrganizeSelection(),
+                _ => GetSelectionStatus(1));
+            evt.menu.AppendSeparator("整理/");
             evt.menu.AppendAction("整理/左对齐", _ => AlignSelection(ESGraphNodeAlignment.Left),
                 _ => GetSelectionStatus(2));
             evt.menu.AppendAction("整理/水平居中对齐", _ => AlignSelection(ESGraphNodeAlignment.HorizontalCenter),
@@ -2944,6 +3031,15 @@ namespace ES.EditorInternal
             if (Asset == null || evt.altKey)
                 return;
             if (evt.keyCode == KeyCode.Escape
+                && rectangleSelectionManipulator?.IsActive == true)
+            {
+                rectangleSelectionManipulator.Cancel();
+                EndPointerInteraction();
+                evt.PreventDefault();
+                evt.StopImmediatePropagation();
+                return;
+            }
+            if (evt.keyCode == KeyCode.Escape
                 && (pendingEdgeReconnect != null || edgeReconnectTriggered
                     || endpointReconnectEdge != null))
             {
@@ -3091,6 +3187,7 @@ namespace ES.EditorInternal
             if (evt.relatedTarget is VisualElement next
                 && (next == this || next.GetFirstAncestorOfType<ESStableGraphView>() == this))
                 return;
+            rectangleSelectionManipulator?.Cancel();
             EndPointerInteraction();
         }
 
@@ -3264,6 +3361,10 @@ namespace ES.EditorInternal
         internal bool HasPendingEdgeReconnect => pendingEdgeReconnect != null || edgeReconnectTriggered;
         internal bool HasCanvasPointerInteraction => mouseButtonPressed || pointerDragging;
         internal bool HasPortDragPreview => !string.IsNullOrEmpty(previewDragPortId);
+        internal bool Internal_IsRectangleSelectionActive =>
+            rectangleSelectionManipulator?.IsActive == true;
+        internal int Internal_RectangleSelectionCandidateCount =>
+            rectangleSelectionManipulator?.Internal_CandidateCount ?? 0;
 
         internal bool BeginEndpointReconnect(ESStableGraphEdgeView edge, bool movingOutput,
             Vector2 pointerPosition)
@@ -3473,6 +3574,141 @@ namespace ES.EditorInternal
                 element = element.parent;
             }
             return false;
+        }
+
+        internal bool Internal_CanBeginRectangleSelection(IEventHandler eventTarget)
+        {
+            if (Asset == null
+                || pendingEdgeReconnect != null
+                || edgeReconnectTriggered
+                || endpointReconnectEdge != null
+                || !string.IsNullOrEmpty(activeDragPortId)
+                || !string.IsNullOrEmpty(previewDragPortId))
+            {
+                return false;
+            }
+
+            VisualElement element = eventTarget as VisualElement;
+            while (element != null && element != this)
+            {
+                if (element == emptyState
+                    || element is GraphElement
+                    || element is Port
+                    || element is ESStableGraphEndpointHandle
+                    || element is Button
+                    || element is TextField
+                    || element is Toggle
+                    || element is PopupField<string>)
+                {
+                    return false;
+                }
+                element = element.parent;
+            }
+            return element == this;
+        }
+
+        internal void Internal_CaptureRectangleSelectionCandidates(
+            List<ESGraphSelectionCandidate> candidates)
+        {
+            candidates.Clear();
+            if (Asset == null)
+                return;
+
+            if ((Internal_RectangleSelectionScope & ESGraphSelectionScope.Nodes) != 0)
+            {
+                foreach (KeyValuePair<string, ESStableGraphNodeView> pair in nodeViews)
+                {
+                    if (pair.Value != null && pair.Value.IsSelectable())
+                    {
+                        candidates.Add(new ESGraphSelectionCandidate(
+                            pair.Key, ESGraphSelectionKind.Node, pair.Value));
+                    }
+                }
+            }
+
+            if ((Internal_RectangleSelectionScope & ESGraphSelectionScope.Edges) != 0)
+            {
+                foreach (KeyValuePair<string, Edge> pair in edgeViews)
+                {
+                    if (pair.Value != null && pair.Value.IsSelectable())
+                    {
+                        candidates.Add(new ESGraphSelectionCandidate(
+                            pair.Key, ESGraphSelectionKind.Edge, pair.Value));
+                    }
+                }
+            }
+            candidates.Sort(ESGraphSelectionCandidate.CompareStable);
+        }
+
+        internal void Internal_ApplyRectangleSelection(Rect selectionRect,
+            ESGraphSelectionMode mode, List<ESGraphSelectionCandidate> candidates)
+        {
+            if (Asset == null || candidates == null)
+                return;
+
+            rectangleSelectionMatchBuffer.Clear();
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                ESGraphSelectionCandidate candidate = candidates[i];
+                if (!Internal_IsCurrentRectangleSelectionCandidate(candidate)
+                    || (Internal_RectangleSelectionFilter != null
+                        && !Internal_RectangleSelectionFilter(candidate)))
+                {
+                    continue;
+                }
+
+                Rect candidateLocalRect = this.ChangeCoordinatesTo(
+                    candidate.Element, selectionRect);
+                if (!candidate.Element.Overlaps(candidateLocalRect))
+                    continue;
+
+                rectangleSelectionMatchBuffer.Add(candidate.Element);
+            }
+
+            if (mode == ESGraphSelectionMode.Replace)
+                ClearSelection();
+
+            for (int i = 0; i < rectangleSelectionMatchBuffer.Count; i++)
+            {
+                GraphElement element = rectangleSelectionMatchBuffer[i];
+                bool selected = selection.Contains(element);
+                if (mode == ESGraphSelectionMode.Toggle && selected)
+                    RemoveFromSelection(element);
+                else if (!selected)
+                    AddToSelection(element);
+            }
+
+            NotifySelectionChanged(true);
+            edgeFlowOverlay?.MarkDirtyRepaint();
+            report?.Invoke("框选完成：命中 " + rectangleSelectionMatchBuffer.Count + " 项，当前 "
+                + SelectedNodeCount + " 个节点 / " + SelectedEdgeCount + " 条连线（"
+                + GetSelectionModeLabel(mode) + "）。");
+            rectangleSelectionMatchBuffer.Clear();
+        }
+
+        private bool Internal_IsCurrentRectangleSelectionCandidate(
+            ESGraphSelectionCandidate candidate)
+        {
+            if (candidate.Element == null || candidate.Element.panel != panel)
+                return false;
+            if (candidate.Kind == ESGraphSelectionKind.Node)
+            {
+                return nodeViews.TryGetValue(candidate.StableId,
+                    out ESStableGraphNodeView nodeView)
+                    && ReferenceEquals(nodeView, candidate.Element);
+            }
+            return edgeViews.TryGetValue(candidate.StableId, out Edge edge)
+                && ReferenceEquals(edge, candidate.Element);
+        }
+
+        private static string GetSelectionModeLabel(ESGraphSelectionMode mode)
+        {
+            switch (mode)
+            {
+                case ESGraphSelectionMode.Add: return "追加";
+                case ESGraphSelectionMode.Toggle: return "切换";
+                default: return "替换";
+            }
         }
 
         public void SelectAllNodes()
@@ -3761,27 +3997,89 @@ namespace ES.EditorInternal
             NotifySelectionChanged();
         }
 
+        public void OrganizeAll()
+        {
+            if (!TryValidateOrganizeIdentity())
+                return;
+            OrganizeNodes(null, ESGraphLayoutScope.All);
+        }
+
+        public void OrganizeSelection()
+        {
+            var selectedIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < selection.Count; i++)
+            {
+                if (selection[i] is ESStableGraphNodeView view && !string.IsNullOrEmpty(view.NodeId))
+                    selectedIds.Add(view.NodeId);
+            }
+            if (selectedIds.Count == 0)
+            {
+                report?.Invoke("请先选择一个或多个需要整理的节点；未选择时不会修改整张图。");
+                return;
+            }
+            if (!TryValidateOrganizeIdentity())
+                return;
+            if (selectedIds.Count == 1)
+            {
+                OrganizeSingleSelectedNode(selectedIds.First());
+                return;
+            }
+            OrganizeNodes(selectedIds, ESGraphLayoutScope.Selection);
+        }
+
+        private bool TryValidateOrganizeIdentity()
+        {
+            if (ESGraphEditService.TryValidateStableIdentities(Asset, out string error))
+                return true;
+            report?.Invoke("图稳定身份无效，本次整理未产生修改：" + error);
+            return false;
+        }
+
         public void AutoLayout()
         {
-            AutoLayoutNodes(null, false);
+            OrganizeAll();
         }
 
         public void AutoLayoutSelection()
         {
-            var selectedIds = new HashSet<string>(
-                selection.OfType<ESStableGraphNodeView>().Select(view => view.NodeId), StringComparer.Ordinal);
-            if (selectedIds.Count < 2)
-            {
-                report?.Invoke("请至少选择两个节点，再整理选中内容。");
-                return;
-            }
-            AutoLayoutNodes(selectedIds, true);
+            OrganizeSelection();
         }
 
-        private void AutoLayoutNodes(HashSet<string> restrictedNodeIds, bool selectionOnly)
+        private void OrganizeSingleSelectedNode(string nodeId)
+        {
+            if (Asset == null || string.IsNullOrEmpty(nodeId))
+                return;
+            ESGraphNodeRecord node = Asset.FindNode(nodeId);
+            if (node == null)
+            {
+                report?.Invoke("选中的节点已失效，未修改图资产。");
+                return;
+            }
+            if (!IsFiniteLayoutPosition(node.position))
+            {
+                report?.Invoke("选中节点的位置数据非法，请先修复资产；本次整理未产生修改。");
+                return;
+            }
+
+            var selectedIds = new HashSet<string>(StringComparer.Ordinal) { nodeId };
+            var positions = new Dictionary<string, Vector2>(StringComparer.Ordinal)
+            {
+                {
+                    nodeId,
+                    new Vector2(
+                        Mathf.Round(node.position.x / PositionGridSize) * PositionGridSize,
+                        Mathf.Round(node.position.y / PositionGridSize) * PositionGridSize)
+                }
+            };
+            ResolveSelectionCollisions(positions, selectedIds);
+            ApplyNodePositions(positions, "整理选中节点", "已整理 1 个选中节点；其他节点位置保持不变。");
+        }
+
+        private void OrganizeNodes(HashSet<string> selectedNodeIds, ESGraphLayoutScope scope)
         {
             if (Asset == null || Asset.Nodes.Count == 0)
                 return;
+            bool selectionOnly = scope == ESGraphLayoutScope.Selection;
             var nodeByPort = new Dictionary<string, string>(StringComparer.Ordinal);
             var nodesById = new Dictionary<string, ESGraphNodeRecord>(StringComparer.Ordinal);
             var outgoing = new Dictionary<string, List<string>>(StringComparer.Ordinal);
@@ -3790,20 +4088,24 @@ namespace ES.EditorInternal
             var depth = new Dictionary<string, int>(StringComparer.Ordinal);
             foreach (ESGraphNodeRecord node in Asset.Nodes)
             {
-                if (node == null || string.IsNullOrEmpty(node.nodeId)
-                    || restrictedNodeIds != null && !restrictedNodeIds.Contains(node.nodeId))
+                if (node == null || string.IsNullOrEmpty(node.nodeId))
                     continue;
-                nodesById[node.nodeId] = node;
-                outgoing[node.nodeId] = new List<string>();
-                incoming[node.nodeId] = new List<string>();
-                indegree[node.nodeId] = 0;
-                depth[node.nodeId] = 0;
+                if (!IsFiniteLayoutPosition(node.position))
+                {
+                    report?.Invoke("图中存在非有限节点坐标，请先修复资产；本次整理未产生修改。");
+                    return;
+                }
+                nodesById.Add(node.nodeId, node);
+                outgoing.Add(node.nodeId, new List<string>());
+                incoming.Add(node.nodeId, new List<string>());
+                indegree.Add(node.nodeId, 0);
+                depth.Add(node.nodeId, 0);
                 if (node.ports != null)
                     for (int p = 0; p < node.ports.Count; p++)
                     {
                         ESGraphPortRecord port = node.ports[p];
                         if (port != null && !string.IsNullOrEmpty(port.portId))
-                            nodeByPort[port.portId] = node.nodeId;
+                            nodeByPort.Add(port.portId, node.nodeId);
                     }
             }
             foreach (ESGraphEdgeRecord edge in Asset.Edges)
@@ -3877,28 +4179,235 @@ namespace ES.EditorInternal
                 layers[i].Sort(layoutComparer);
             OptimizeLayerOrdering(layers, incoming, outgoing, depth, nodesById);
 
-            float originX = nodesById.Values.Min(node => node.position.x);
-            float verticalCenter = (nodesById.Values.Min(node => node.position.y)
-                + nodesById.Values.Max(node => node.position.y)) * 0.5f;
-            var positions = new Dictionary<string, Vector2>(StringComparer.Ordinal);
+            var layoutLayers = new List<List<string>>(layers.Count);
             for (int layerIndex = 0; layerIndex < layers.Count; layerIndex++)
             {
-                List<string> ids = layers[layerIndex];
+                List<string> sourceLayer = layers[layerIndex];
+                var targetLayer = new List<string>(sourceLayer.Count);
+                for (int i = 0; i < sourceLayer.Count; i++)
+                {
+                    string nodeId = sourceLayer[i];
+                    if (!selectionOnly || selectedNodeIds.Contains(nodeId))
+                        targetLayer.Add(nodeId);
+                }
+                if (targetLayer.Count > 0)
+                    layoutLayers.Add(targetLayer);
+            }
+            if (layoutLayers.Count == 0)
+            {
+                report?.Invoke(selectionOnly
+                    ? "选中的节点已失效，未修改图资产。"
+                    : "图中没有可整理的有效节点。");
+                return;
+            }
+
+            float originX = float.MaxValue;
+            float minimumY = float.MaxValue;
+            float maximumY = float.MinValue;
+            for (int layerIndex = 0; layerIndex < layoutLayers.Count; layerIndex++)
+            {
+                List<string> ids = layoutLayers[layerIndex];
+                for (int i = 0; i < ids.Count; i++)
+                {
+                    Vector2 position = nodesById[ids[i]].position;
+                    originX = Mathf.Min(originX, position.x);
+                    minimumY = Mathf.Min(minimumY, position.y);
+                    maximumY = Mathf.Max(maximumY, position.y);
+                }
+            }
+            float verticalCenter = (minimumY + maximumY) * 0.5f;
+            var positions = new Dictionary<string, Vector2>(StringComparer.Ordinal);
+            for (int layerIndex = 0; layerIndex < layoutLayers.Count; layerIndex++)
+            {
+                List<string> ids = layoutLayers[layerIndex];
                 float totalHeight = Math.Max(0, ids.Count - 1) * LayoutVerticalSpacing;
                 for (int i = 0; i < ids.Count; i++)
-                    positions[ids[i]] = new Vector2(originX + layerIndex * LayoutHorizontalSpacing,
+                {
+                    Vector2 target = new Vector2(originX + layerIndex * LayoutHorizontalSpacing,
                         verticalCenter + i * LayoutVerticalSpacing - totalHeight * 0.5f);
+                    if (!IsFiniteLayoutPosition(target))
+                    {
+                        report?.Invoke("整理结果超出安全坐标范围，本次未修改图资产。");
+                        return;
+                    }
+                    positions[ids[i]] = target;
+                }
             }
+            if (selectionOnly)
+                ResolveSelectionCollisions(positions, selectedNodeIds);
 
             string cycleNote = cycleBreakCount > 0
                 ? " 检测到循环，已仅拆分布局约束，所有真实连线保持不变。" : string.Empty;
-            if (!ApplyNodePositions(positions, selectionOnly ? "自动布局选中节点" : "自动布局图节点",
-                    "已稳定整理 " + nodesById.Count + " 个节点，并优化连线交叉。" + cycleNote))
+            if (!ApplyNodePositions(positions, selectionOnly ? "整理选中节点" : "整理全部节点",
+                    selectionOnly
+                        ? "已整理 " + positions.Count + " 个选中节点；其他节点位置保持不变，并已优化局部连线交叉。" + cycleNote
+                        : "已整理全部 " + positions.Count + " 个节点，并优化连线交叉。" + cycleNote))
                 return;
             if (selectionOnly)
                 SmoothFrameSelection();
             else
                 SmoothFrameAll();
+        }
+
+        private void ResolveSelectionCollisions(Dictionary<string, Vector2> positions,
+            HashSet<string> selectedNodeIds)
+        {
+            if (positions == null || positions.Count == 0 || selectedNodeIds == null)
+                return;
+
+            var stationaryNodes = new List<ESGraphNodeRecord>();
+            for (int i = 0; i < Asset.Nodes.Count; i++)
+            {
+                ESGraphNodeRecord node = Asset.Nodes[i];
+                if (node != null && !string.IsNullOrEmpty(node.nodeId)
+                    && !selectedNodeIds.Contains(node.nodeId))
+                    stationaryNodes.Add(node);
+            }
+            stationaryNodes.Sort((left, right) =>
+                StringComparer.Ordinal.Compare(left.nodeId, right.nodeId));
+
+            var occupiedGrid = new Dictionary<long, List<Rect>>();
+            float occupiedBottom = float.MinValue;
+            for (int i = 0; i < stationaryNodes.Count; i++)
+            {
+                ESGraphNodeRecord node = stationaryNodes[i];
+                Rect occupiedRect = ExpandLayoutRect(GetLayoutNodeRect(node.nodeId, node.position));
+                AddLayoutOccupiedRect(occupiedGrid, occupiedRect);
+                occupiedBottom = Mathf.Max(occupiedBottom, occupiedRect.yMax);
+            }
+
+            List<string> orderedNodeIds = positions.Keys.ToList();
+            orderedNodeIds.Sort((left, right) =>
+            {
+                int result = positions[left].x.CompareTo(positions[right].x);
+                if (result == 0)
+                    result = positions[left].y.CompareTo(positions[right].y);
+                return result != 0 ? result : StringComparer.Ordinal.Compare(left, right);
+            });
+
+            for (int i = 0; i < orderedNodeIds.Count; i++)
+            {
+                string nodeId = orderedNodeIds[i];
+                Vector2 basePosition = positions[nodeId];
+                Rect accepted = default;
+                bool found = false;
+                int ringCount = (stationaryNodes.Count + positions.Count) * 2 + 3;
+                for (int ring = 0; ring < ringCount; ring++)
+                {
+                    int signedStep = ring == 0 ? 0
+                        : (ring & 1) == 1 ? (ring + 1) / 2 : -ring / 2;
+                    Vector2 candidatePosition = basePosition
+                        + Vector2.up * (signedStep * LayoutCollisionStep);
+                    Rect candidate = ExpandLayoutRect(GetLayoutNodeRect(nodeId, candidatePosition));
+                    if (OverlapsLayoutOccupiedRect(candidate, occupiedGrid))
+                        continue;
+                    accepted = candidate;
+                    positions[nodeId] = candidatePosition;
+                    found = true;
+                    break;
+                }
+
+                if (!found)
+                {
+                    float nextY = Mathf.Max(basePosition.y,
+                        occupiedBottom + LayoutCollisionPadding);
+                    Vector2 fallbackPosition = new Vector2(basePosition.x, nextY);
+                    accepted = ExpandLayoutRect(GetLayoutNodeRect(nodeId, fallbackPosition));
+                    positions[nodeId] = fallbackPosition;
+                }
+                AddLayoutOccupiedRect(occupiedGrid, accepted);
+                occupiedBottom = Mathf.Max(occupiedBottom, accepted.yMax);
+            }
+        }
+
+        private Rect GetLayoutNodeRect(string nodeId, Vector2 position)
+        {
+            Vector2 size = new Vector2(LayoutMinimumNodeWidth, LayoutMinimumNodeHeight);
+            if (nodeViews.TryGetValue(nodeId, out ESStableGraphNodeView view) && view != null)
+            {
+                Rect viewRect = view.GetPosition();
+                if (!float.IsNaN(viewRect.width) && !float.IsInfinity(viewRect.width))
+                    size.x = Mathf.Clamp(viewRect.width, size.x, LayoutMaximumNodeExtent);
+                if (!float.IsNaN(viewRect.height) && !float.IsInfinity(viewRect.height))
+                    size.y = Mathf.Clamp(viewRect.height, size.y, LayoutMaximumNodeExtent);
+            }
+            return new Rect(position, size);
+        }
+
+        private static bool IsFiniteLayoutPosition(Vector2 position)
+        {
+            return !float.IsNaN(position.x) && !float.IsInfinity(position.x)
+                && !float.IsNaN(position.y) && !float.IsInfinity(position.y);
+        }
+
+        private static Rect ExpandLayoutRect(Rect rect)
+        {
+            return new Rect(
+                rect.x - LayoutCollisionPadding,
+                rect.y - LayoutCollisionPadding,
+                rect.width + LayoutCollisionPadding * 2f,
+                rect.height + LayoutCollisionPadding * 2f);
+        }
+
+        private static void AddLayoutOccupiedRect(Dictionary<long, List<Rect>> grid, Rect rect)
+        {
+            int minX = Mathf.FloorToInt(rect.xMin / LayoutCollisionCellSize);
+            int maxX = Mathf.FloorToInt(rect.xMax / LayoutCollisionCellSize);
+            int minY = Mathf.FloorToInt(rect.yMin / LayoutCollisionCellSize);
+            int maxY = Mathf.FloorToInt(rect.yMax / LayoutCollisionCellSize);
+            for (int x = minX; ; x++)
+            {
+                for (int y = minY; ; y++)
+                {
+                    long key = LayoutCellKey(x, y);
+                    if (!grid.TryGetValue(key, out List<Rect> entries))
+                    {
+                        entries = new List<Rect>();
+                        grid[key] = entries;
+                    }
+                    entries.Add(rect);
+                    if (y == maxY)
+                        break;
+                }
+                if (x == maxX)
+                    break;
+            }
+        }
+
+        private static bool OverlapsLayoutOccupiedRect(Rect candidate,
+            Dictionary<long, List<Rect>> grid)
+        {
+            int minX = Mathf.FloorToInt(candidate.xMin / LayoutCollisionCellSize);
+            int maxX = Mathf.FloorToInt(candidate.xMax / LayoutCollisionCellSize);
+            int minY = Mathf.FloorToInt(candidate.yMin / LayoutCollisionCellSize);
+            int maxY = Mathf.FloorToInt(candidate.yMax / LayoutCollisionCellSize);
+            for (int x = minX; ; x++)
+            {
+                for (int y = minY; ; y++)
+                {
+                    if (!grid.TryGetValue(LayoutCellKey(x, y), out List<Rect> entries))
+                    {
+                        if (y == maxY)
+                            break;
+                        continue;
+                    }
+                    for (int i = 0; i < entries.Count; i++)
+                    {
+                        if (candidate.Overlaps(entries[i]))
+                            return true;
+                    }
+                    if (y == maxY)
+                        break;
+                }
+                if (x == maxX)
+                    break;
+            }
+            return false;
+        }
+
+        private static long LayoutCellKey(int x, int y)
+        {
+            return ((long)x << 32) ^ (uint)y;
         }
 
         private static string FindStableCycleEntry(Dictionary<string, ESGraphNodeRecord> nodesById,
@@ -4215,11 +4724,18 @@ namespace ES.EditorInternal
         {
             if (Asset == null || positions == null || positions.Count == 0)
                 return false;
-            bool hasChanges = false;
-            foreach (KeyValuePair<string, Vector2> pair in positions)
+            if (!ESGraphEditService.TryResolveNodePositionTargets(Asset, positions,
+                    out List<KeyValuePair<ESGraphNodeRecord, Vector2>> targets,
+                    out string targetError))
             {
-                ESGraphNodeRecord node = Asset.FindNode(pair.Key);
-                if (node != null && (node.position - pair.Value).sqrMagnitude > 0.01f)
+                report?.Invoke("节点位置更新失败：" + targetError);
+                return false;
+            }
+            bool hasChanges = false;
+            for (int i = 0; i < targets.Count; i++)
+            {
+                KeyValuePair<ESGraphNodeRecord, Vector2> pair = targets[i];
+                if ((pair.Key.position - pair.Value).sqrMagnitude > 0.01f)
                 {
                     hasChanges = true;
                     break;
@@ -5032,30 +5548,30 @@ namespace ES.EditorInternal
 
         private void NotifySelectionChanged(bool force = false)
         {
-            int hash = 0;
-            int count = 0;
+            selectedNodeIds.Clear();
+            selectedEdgeIds.Clear();
             for (int i = 0; i < selection.Count; i++)
             {
-                string stableId;
-                int kindSalt;
                 if (selection[i] is ESStableGraphNodeView nodeView)
-                {
-                    stableId = nodeView.NodeId;
-                    kindSalt = 0x2f6e2b1;
-                }
+                    selectedNodeIds.Add(nodeView.NodeId);
                 else if (selection[i] is Edge edge && edge.userData is string edgeId)
-                {
-                    stableId = edgeId;
-                    kindSalt = 0x56d72c3;
-                }
-                else
-                {
-                    continue;
-                }
-                if (string.IsNullOrEmpty(stableId))
-                    continue;
-                hash ^= StringComparer.Ordinal.GetHashCode(stableId) ^ kindSalt;
-                count++;
+                    selectedEdgeIds.Add(edgeId);
+            }
+            selectedNodeIds.RemoveAll(string.IsNullOrEmpty);
+            selectedEdgeIds.RemoveAll(string.IsNullOrEmpty);
+            selectedNodeIds.Sort(StringComparer.Ordinal);
+            selectedEdgeIds.Sort(StringComparer.Ordinal);
+
+            int count = selectedNodeIds.Count + selectedEdgeIds.Count;
+            int hash = 17;
+            unchecked
+            {
+                for (int i = 0; i < selectedNodeIds.Count; i++)
+                    hash = (hash * 31) ^ StringComparer.Ordinal.GetHashCode(selectedNodeIds[i]);
+                hash = (hash * 31) ^ 0x2f6e2b1;
+                for (int i = 0; i < selectedEdgeIds.Count; i++)
+                    hash = (hash * 31) ^ StringComparer.Ordinal.GetHashCode(selectedEdgeIds[i]);
+                hash = (hash * 31) ^ 0x56d72c3;
             }
             if (!force && count == lastSelectionCount && hash == lastSelectionHash)
                 return;
@@ -5126,6 +5642,159 @@ namespace ES.EditorInternal
         private static bool ContainsIgnoreCase(string value, string query)
         {
             return !string.IsNullOrEmpty(value) && value.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+    }
+
+    internal sealed class ESGraphRectangleSelectionManipulator : MouseManipulator
+    {
+        private const float DragThreshold = 4f;
+
+        private readonly ESStableGraphView graphView;
+        private readonly VisualElement selectionRectangle;
+        private readonly List<ESGraphSelectionCandidate> candidates =
+            new List<ESGraphSelectionCandidate>();
+        private Vector2 startPosition;
+        private Vector2 currentPosition;
+        private ESGraphSelectionMode mode;
+        private bool active;
+
+        public bool IsActive => active;
+        internal int Internal_CandidateCount => candidates.Count;
+
+        public ESGraphRectangleSelectionManipulator(ESStableGraphView graphView)
+        {
+            this.graphView = graphView ?? throw new ArgumentNullException(nameof(graphView));
+
+            Color selectionColor = ESEditorPresentation.SelectionColor;
+            selectionRectangle = new VisualElement
+            {
+                name = "es-graph-rectangle-selection",
+                pickingMode = PickingMode.Ignore
+            };
+            selectionRectangle.style.position = Position.Absolute;
+            selectionRectangle.style.display = DisplayStyle.None;
+            selectionRectangle.style.borderLeftWidth = 1f;
+            selectionRectangle.style.borderRightWidth = 1f;
+            selectionRectangle.style.borderTopWidth = 1f;
+            selectionRectangle.style.borderBottomWidth = 1f;
+            selectionRectangle.style.borderLeftColor = selectionColor;
+            selectionRectangle.style.borderRightColor = selectionColor;
+            selectionRectangle.style.borderTopColor = selectionColor;
+            selectionRectangle.style.borderBottomColor = selectionColor;
+            selectionRectangle.style.backgroundColor = new Color(
+                selectionColor.r, selectionColor.g, selectionColor.b, 0.12f);
+        }
+
+        protected override void RegisterCallbacksOnTarget()
+        {
+            target.RegisterCallback<MouseDownEvent>(OnMouseDown);
+            target.RegisterCallback<MouseMoveEvent>(OnMouseMove);
+            target.RegisterCallback<MouseUpEvent>(OnMouseUp);
+            target.RegisterCallback<MouseCaptureOutEvent>(OnMouseCaptureOut);
+        }
+
+        protected override void UnregisterCallbacksFromTarget()
+        {
+            Cancel();
+            target.UnregisterCallback<MouseDownEvent>(OnMouseDown);
+            target.UnregisterCallback<MouseMoveEvent>(OnMouseMove);
+            target.UnregisterCallback<MouseUpEvent>(OnMouseUp);
+            target.UnregisterCallback<MouseCaptureOutEvent>(OnMouseCaptureOut);
+            selectionRectangle.RemoveFromHierarchy();
+        }
+
+        public void Cancel()
+        {
+            active = false;
+            candidates.Clear();
+            selectionRectangle.style.display = DisplayStyle.None;
+            if (target?.HasMouseCapture() == true)
+                target.ReleaseMouse();
+        }
+
+        private void OnMouseDown(MouseDownEvent evt)
+        {
+            if (active)
+            {
+                evt.StopImmediatePropagation();
+                return;
+            }
+            if (evt.button != (int)MouseButton.LeftMouse
+                || evt.altKey
+                || !graphView.Internal_CanBeginRectangleSelection(evt.target))
+            {
+                return;
+            }
+
+            mode = ResolveMode(evt);
+            startPosition = evt.localMousePosition;
+            currentPosition = startPosition;
+            graphView.Internal_CaptureRectangleSelectionCandidates(candidates);
+            active = true;
+            target.CaptureMouse();
+            evt.StopImmediatePropagation();
+        }
+
+        private void OnMouseMove(MouseMoveEvent evt)
+        {
+            if (!active)
+                return;
+            currentPosition = evt.localMousePosition;
+            if ((currentPosition - startPosition).sqrMagnitude >= DragThreshold * DragThreshold)
+                UpdateRectangleVisual();
+            evt.StopImmediatePropagation();
+        }
+
+        private void OnMouseUp(MouseUpEvent evt)
+        {
+            if (!active || evt.button != (int)MouseButton.LeftMouse)
+                return;
+
+            currentPosition = evt.localMousePosition;
+            Rect selectionRect = BuildSelectionRect(startPosition, currentPosition);
+            active = false;
+            selectionRectangle.style.display = DisplayStyle.None;
+            graphView.Internal_ApplyRectangleSelection(selectionRect, mode, candidates);
+            candidates.Clear();
+            if (target.HasMouseCapture())
+                target.ReleaseMouse();
+            evt.PreventDefault();
+            evt.StopImmediatePropagation();
+        }
+
+        private void OnMouseCaptureOut(MouseCaptureOutEvent evt)
+        {
+            if (active)
+                Cancel();
+        }
+
+        private void UpdateRectangleVisual()
+        {
+            Rect rect = BuildSelectionRect(startPosition, currentPosition);
+            if (selectionRectangle.parent == null)
+                graphView.hierarchy.Add(selectionRectangle);
+            selectionRectangle.style.left = rect.xMin;
+            selectionRectangle.style.top = rect.yMin;
+            selectionRectangle.style.width = rect.width;
+            selectionRectangle.style.height = rect.height;
+            selectionRectangle.style.display = DisplayStyle.Flex;
+            selectionRectangle.BringToFront();
+        }
+
+        private static ESGraphSelectionMode ResolveMode(MouseDownEvent evt)
+        {
+            if (evt.actionKey)
+                return ESGraphSelectionMode.Toggle;
+            return evt.shiftKey ? ESGraphSelectionMode.Add : ESGraphSelectionMode.Replace;
+        }
+
+        private static Rect BuildSelectionRect(Vector2 start, Vector2 end)
+        {
+            return Rect.MinMaxRect(
+                Mathf.Min(start.x, end.x),
+                Mathf.Min(start.y, end.y),
+                Mathf.Max(start.x, end.x),
+                Mathf.Max(start.y, end.y));
         }
     }
 

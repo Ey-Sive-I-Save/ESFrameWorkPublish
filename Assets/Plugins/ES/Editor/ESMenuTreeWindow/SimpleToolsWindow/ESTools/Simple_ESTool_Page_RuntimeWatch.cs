@@ -1013,7 +1013,8 @@ namespace ES
                 anchorRect,
                 "选择" + label + "筛选",
                 entries,
-                minimumWindowSize: new Vector2(320f, 300f));
+                minimumWindowSize: new Vector2(320f, 300f),
+                hostWindow: SimpleToolsWindow.UsingWindow);
         }
 
         private int CountRuntimeWatchFilterMatches(RuntimeWatchDropdownFilter filter, string value)
@@ -1574,7 +1575,8 @@ namespace ES
                 anchorRect,
                 "快速跳转 RuntimeWatch 观察项",
                 options,
-                minimumWindowSize: new Vector2(480f, 400f));
+                minimumWindowSize: new Vector2(480f, 400f),
+                hostWindow: SimpleToolsWindow.UsingWindow);
         }
 
         private void FocusWatchEntry(WatchEntry entry)
@@ -1649,7 +1651,8 @@ namespace ES
                 anchorRect,
                 "按 GameObject 跳转 RuntimeWatch",
                 options,
-                minimumWindowSize: new Vector2(460f, 390f));
+                minimumWindowSize: new Vector2(460f, 390f),
+                hostWindow: SimpleToolsWindow.UsingWindow);
         }
 
         private void FocusWatchGameObject(GameObject sceneObject, string gameObjectPath)

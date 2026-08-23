@@ -944,39 +944,17 @@ namespace ES.EditorInternal
             Action<CollectionTarget, int> mutation,
             out string error)
         {
-            error = null;
-            var undoTargets = new UnityEngine.Object[targets.Count];
-            for (int index = 0; index < targets.Count; index++)
-                undoTargets[index] = targets[index].Target;
-
-            Undo.IncrementCurrentGroup();
-            int undoGroup = Undo.GetCurrentGroup();
-            Undo.SetCurrentGroupName(undoName);
-            Undo.RecordObjects(undoTargets, undoName);
-            try
-            {
-                for (int index = 0; index < targets.Count; index++)
-                {
-                    CollectionTarget target = targets[index];
-                    mutation(target, index);
-                    target.SerializedObject.ApplyModifiedProperties();
-                    EditorUtility.SetDirty(target.Target);
-                    if (PrefabUtility.IsPartOfPrefabInstance(target.Target))
-                        PrefabUtility.RecordPrefabInstancePropertyModifications(target.Target);
-                }
-
-                Undo.CollapseUndoOperations(undoGroup);
-                RefreshSerializedTree();
+            bool changed = ESEditorSerializedMutation.TryApply(
+                targets,
+                undoName,
+                target => target.Target,
+                target => target.SerializedObject,
+                mutation,
+                RefreshSerializedTree,
+                out error);
+            if (changed)
                 GUI.changed = true;
-                return true;
-            }
-            catch (Exception exception)
-            {
-                Undo.RevertAllDownToGroup(undoGroup);
-                RefreshSerializedTree();
-                error = exception.GetType().Name + "：" + exception.Message;
-                return false;
-            }
+            return changed;
         }
 
         internal bool AllowDuplicateItems => Attribute.AllowDuplicateItems;

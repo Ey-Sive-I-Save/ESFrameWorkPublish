@@ -8,13 +8,72 @@ using UnityEngine.UIElements;
 
 namespace ES
 {
+    public enum ESWorkbenchLayoutPreset : byte
+    {
+        Authoring,
+        Focus,
+        Content,
+        Diagnostics,
+        Production,
+        Custom = byte.MaxValue
+    }
+
+    public enum ESWorkbenchContentViewMode : byte
+    {
+        List,
+        Grid
+    }
+
+    public enum ESWorkbenchContentSortMode : byte
+    {
+        Recommended,
+        Priority,
+        Name,
+        Recent,
+        MostUsed,
+        Type
+    }
+
+    public enum ESWorkbenchContentScope : byte
+    {
+        All,
+        Favorites,
+        Recent,
+        Recommended
+    }
+
+    /// <summary>底部生产通道的内容密度。宿主据此分配高度，不把空状态当成完整生产面板。</summary>
+    public enum ESWorkbenchBottomPanelDensity : byte
+    {
+        Empty,
+        Compact,
+        Normal,
+        Expanded
+    }
+
+    [Serializable]
+    public sealed class ESWorkbenchContentPresetSelectionState
+    {
+        public string objectId = string.Empty;
+        public string presetId = string.Empty;
+    }
+
     [Serializable]
     public sealed class ESWorkbenchLayoutState
     {
-        public float leftPaneWidth = 245f;
-        public float inspectorPaneWidth = 310f;
+        public int layoutSchemaVersion = 6;
+        public ESWorkbenchLayoutPreset layoutPreset = ESWorkbenchLayoutPreset.Authoring;
+        public float leftPaneWidth = 320f;
+        public float inspectorPaneWidth = 320f;
         public string activeLeftTab = "objects";
-        public string activeDocument = "viewport";
+        public string activeContentKind = "all";
+        public string activeContentCategory = "全部";
+        public ESWorkbenchContentViewMode contentViewMode = ESWorkbenchContentViewMode.List;
+        public ESWorkbenchContentSortMode contentSortMode = ESWorkbenchContentSortMode.Type;
+        public ESWorkbenchContentScope contentScope = ESWorkbenchContentScope.All;
+        public float contentBatchSpacing = 4f;
+        public string activeDocument = "authoring";
+        public string activeAuthoringModeId = "terrain";
         public string activeViewportId = string.Empty;
         public string activeToolId = string.Empty;
         public string selectedStableId = string.Empty;
@@ -22,15 +81,20 @@ namespace ES
         public string selectedAssetGuid = string.Empty;
         public bool leftPaneVisible = true;
         public bool inspectorPaneVisible = true;
-        public string compactSidePane = "inspector";
+        public string compactSidePane = "left";
         public bool responsiveLayoutInitialized;
         public bool hierarchyExpansionInitialized;
-        public bool bottomDrawerExpanded = true;
-        public float bottomDrawerHeight = 210f;
+        public bool bottomDrawerExpanded;
+        public float bottomDrawerHeight = 220f;
+        public bool bottomDrawerUserSized;
         public string activeBottomTab = "problems";
         public List<string> expandedHierarchyIds = new List<string>();
         public List<string> hiddenHierarchyIds = new List<string>();
         public List<string> lockedHierarchyIds = new List<string>();
+        public List<string> selectedContentIds = new List<string>();
+        public List<string> expandedContentCategoryPaths = new List<string>();
+        public List<ESWorkbenchContentPresetSelectionState> contentPresetSelections =
+            new List<ESWorkbenchContentPresetSelectionState>();
         public List<ESWorkbenchViewportLayoutState> viewportStates = new List<ESWorkbenchViewportLayoutState>();
 
         internal ESWorkbenchViewportLayoutState GetOrCreateViewportState(string viewportId)
@@ -45,7 +109,446 @@ namespace ES
         }
     }
 
-    /// <summary>工作台外壳的展示合同。稳定 ID 用于冲突判定，展示文案可以由领域贡献覆盖。</summary>
+    public enum ESWorkbenchResponsiveTier : byte
+    {
+        Wide,
+        Compact,
+        Narrow
+    }
+
+    /// <summary>统一内容目录中的作者内容类型。它决定发现和交互语义，不替代领域稳定身份。</summary>
+    public enum ESWorkbenchContentKind : byte
+    {
+        General,
+        Prefab,
+        Brush,
+        SceneTemplate,
+        RegionTemplate,
+        Terrain,
+        Material,
+        Vegetation,
+        WaterWeather,
+        Navigation,
+        Collision,
+        Streaming,
+        Gameplay
+    }
+
+    /// <summary>内容从目录拖入作者视口时的默认动作。视口仍必须执行领域预检。</summary>
+    public enum ESWorkbenchContentDragMode : byte
+    {
+        Place,
+        ActivateTool,
+        ApplyTemplate,
+        CreateRegion,
+        InspectOnly
+    }
+
+    public enum ESWorkbenchVisualTheme : byte
+    {
+        Light,
+        Dark
+    }
+
+    public readonly struct ESWorkbenchVisualEnvironment
+    {
+        public ESWorkbenchVisualEnvironment(
+            float windowWidth,
+            float windowHeight,
+            float centerWidth,
+            float pixelsPerPoint,
+            ESWorkbenchVisualTheme theme,
+            bool longChineseContent = false)
+        {
+            WindowWidth = windowWidth;
+            WindowHeight = windowHeight;
+            CenterWidth = centerWidth;
+            PixelsPerPoint = pixelsPerPoint;
+            Theme = theme;
+            LongChineseContent = longChineseContent;
+        }
+
+        public float WindowWidth { get; }
+        public float WindowHeight { get; }
+        public float CenterWidth { get; }
+        public float PixelsPerPoint { get; }
+        public ESWorkbenchVisualTheme Theme { get; }
+        public bool LongChineseContent { get; }
+    }
+
+    public readonly struct ESWorkbenchVisualValidationResult
+    {
+        public ESWorkbenchVisualValidationResult(
+            ESWorkbenchResponsiveTier tier,
+            bool windowMinimumSatisfied,
+            bool centerProtected,
+            bool highDpiSupported,
+            string summary)
+        {
+            Tier = tier;
+            WindowMinimumSatisfied = windowMinimumSatisfied;
+            CenterProtected = centerProtected;
+            HighDpiSupported = highDpiSupported;
+            Summary = summary ?? string.Empty;
+        }
+
+        public ESWorkbenchResponsiveTier Tier { get; }
+        public bool WindowMinimumSatisfied { get; }
+        public bool CenterProtected { get; }
+        public bool HighDpiSupported { get; }
+        public bool LayoutContractPassed => WindowMinimumSatisfied && CenterProtected && HighDpiSupported;
+        public string Summary { get; }
+    }
+
+    /// <summary>当前真实窗口与一条视觉验收场景的匹配结果；不负责切换主题、DPI 或窗口尺寸。</summary>
+    public readonly struct ESWorkbenchVisualScenarioMatch
+    {
+        public ESWorkbenchVisualScenarioMatch(bool passed, string summary)
+        {
+            Passed = passed;
+            Summary = summary ?? string.Empty;
+        }
+
+        public bool Passed { get; }
+        public string Summary { get; }
+    }
+
+    public sealed class ESWorkbenchVisualValidationScenario
+    {
+        public ESWorkbenchVisualValidationScenario(
+            string scenarioId,
+            float width,
+            float height,
+            float pixelsPerPoint,
+            ESWorkbenchVisualTheme theme,
+            bool longChineseContent,
+            ESWorkbenchResponsiveTier expectedTier)
+        {
+            ScenarioId = scenarioId ?? string.Empty;
+            Width = width;
+            Height = height;
+            PixelsPerPoint = pixelsPerPoint;
+            Theme = theme;
+            LongChineseContent = longChineseContent;
+            ExpectedTier = expectedTier;
+        }
+
+        public string ScenarioId { get; }
+        public float Width { get; }
+        public float Height { get; }
+        public float PixelsPerPoint { get; }
+        public ESWorkbenchVisualTheme Theme { get; }
+        public bool LongChineseContent { get; }
+        public ESWorkbenchResponsiveTier ExpectedTier { get; }
+    }
+
+    /// <summary>工作台外壳的响应式约束。领域可覆盖参数，但布局降级与功能保留由底座统一执行。</summary>
+    public sealed class ESWorkbenchResponsiveLayoutPolicy
+    {
+        public ESWorkbenchResponsiveLayoutPolicy(
+            float minimumWindowWidth = 980f,
+            float minimumWindowHeight = 640f,
+            float wideBreakpoint = 1180f,
+            float narrowBreakpoint = 980f,
+            float minimumCenterWidth = 600f,
+            float minimumCenterHeight = 340f,
+            float minimumLeftPaneWidth = 280f,
+            float minimumInspectorPaneWidth = 280f,
+            float maximumLeftPaneRatio = 0.30f,
+            float maximumInspectorPaneRatio = 0.28f,
+            float maximumBottomDrawerRatio = 0.34f,
+            float preferredLeftPaneWidth = 320f,
+            float maximumLeftPaneWidth = 420f,
+            float preferredInspectorPaneWidth = 320f,
+            float maximumInspectorPaneWidth = 420f,
+            float collapsedBottomDrawerHeight = 32f,
+            float compactBottomDrawerHeight = 96f,
+            float minimumBottomDrawerHeight = 112f,
+            float preferredBottomDrawerHeight = 220f,
+            float maximumBottomDrawerHeight = 320f,
+            float minimumUsableWindowWidth = 560f,
+            float minimumUsableWindowHeight = 360f,
+            float floatingWindowSafeInset = 8f)
+        {
+            MinimumCenterWidth = Mathf.Max(280f, minimumCenterWidth);
+            MinimumCenterHeight = Mathf.Max(220f, minimumCenterHeight);
+            MinimumLeftPaneWidth = Mathf.Max(160f, minimumLeftPaneWidth);
+            MinimumInspectorPaneWidth = Mathf.Max(200f, minimumInspectorPaneWidth);
+            MaximumLeftPaneWidth = Mathf.Max(MinimumLeftPaneWidth, maximumLeftPaneWidth);
+            MaximumInspectorPaneWidth = Mathf.Max(MinimumInspectorPaneWidth, maximumInspectorPaneWidth);
+            PreferredLeftPaneWidth = Mathf.Clamp(
+                preferredLeftPaneWidth, MinimumLeftPaneWidth, MaximumLeftPaneWidth);
+            PreferredInspectorPaneWidth = Mathf.Clamp(
+                preferredInspectorPaneWidth, MinimumInspectorPaneWidth, MaximumInspectorPaneWidth);
+            CollapsedBottomDrawerHeight = Mathf.Clamp(collapsedBottomDrawerHeight, 30f, 48f);
+            CompactBottomDrawerHeight = Mathf.Clamp(
+                compactBottomDrawerHeight,
+                Mathf.Max(72f, CollapsedBottomDrawerHeight + 24f),
+                144f);
+            MinimumBottomDrawerHeight = Mathf.Max(CompactBottomDrawerHeight, minimumBottomDrawerHeight);
+            MaximumBottomDrawerHeight = Mathf.Max(
+                MinimumBottomDrawerHeight, maximumBottomDrawerHeight);
+            PreferredBottomDrawerHeight = Mathf.Clamp(
+                preferredBottomDrawerHeight, MinimumBottomDrawerHeight, MaximumBottomDrawerHeight);
+            MaximumLeftPaneRatio = Mathf.Clamp(maximumLeftPaneRatio, 0.18f, 0.4f);
+            MaximumInspectorPaneRatio = Mathf.Clamp(maximumInspectorPaneRatio, 0.22f, 0.45f);
+            MaximumBottomDrawerRatio = Mathf.Clamp(maximumBottomDrawerRatio, 0.24f, 0.48f);
+            MinimumWindowWidth = Mathf.Max(
+                680f,
+                minimumWindowWidth,
+                MinimumCenterWidth + Mathf.Min(MinimumLeftPaneWidth, MinimumInspectorPaneWidth) + 12f);
+            MinimumWindowHeight = Mathf.Max(
+                480f,
+                minimumWindowHeight,
+                MinimumCenterHeight + MinimumBottomDrawerHeight + 60f);
+            MinimumUsableWindowWidth = Mathf.Clamp(
+                minimumUsableWindowWidth,
+                420f,
+                MinimumWindowWidth);
+            MinimumUsableWindowHeight = Mathf.Clamp(
+                minimumUsableWindowHeight,
+                320f,
+                MinimumWindowHeight);
+            FloatingWindowSafeInset = Mathf.Clamp(floatingWindowSafeInset, 0f, 32f);
+            NarrowBreakpoint = Mathf.Max(560f, narrowBreakpoint);
+            WideBreakpoint = Mathf.Max(
+                NarrowBreakpoint + 120f,
+                wideBreakpoint,
+                MinimumCenterWidth + MinimumLeftPaneWidth + MinimumInspectorPaneWidth + 12f);
+        }
+
+        public float MinimumWindowWidth { get; }
+        public float MinimumWindowHeight { get; }
+        /// <summary>高 DPI 或小屏环境仍须保持主路径可达的降级下限；不是理想商业尺寸。</summary>
+        public float MinimumUsableWindowWidth { get; }
+        public float MinimumUsableWindowHeight { get; }
+        public float FloatingWindowSafeInset { get; }
+        public float WideBreakpoint { get; }
+        public float NarrowBreakpoint { get; }
+        public float MinimumCenterWidth { get; }
+        public float MinimumCenterHeight { get; }
+        public float MinimumLeftPaneWidth { get; }
+        public float MinimumInspectorPaneWidth { get; }
+        public float PreferredLeftPaneWidth { get; }
+        public float MaximumLeftPaneWidth { get; }
+        public float PreferredInspectorPaneWidth { get; }
+        public float MaximumInspectorPaneWidth { get; }
+        public float CollapsedBottomDrawerHeight { get; }
+        public float CompactBottomDrawerHeight { get; }
+        public float MinimumBottomDrawerHeight { get; }
+        public float PreferredBottomDrawerHeight { get; }
+        public float MaximumBottomDrawerHeight { get; }
+        public float MaximumLeftPaneRatio { get; }
+        public float MaximumInspectorPaneRatio { get; }
+        public float MaximumBottomDrawerRatio { get; }
+
+        public ESWorkbenchResponsiveTier ResolveTier(float width)
+        {
+            if (width >= WideBreakpoint) return ESWorkbenchResponsiveTier.Wide;
+            return width >= NarrowBreakpoint
+                ? ESWorkbenchResponsiveTier.Compact
+                : ESWorkbenchResponsiveTier.Narrow;
+        }
+
+        /// <summary>
+        /// 根据 Unity 主窗口的逻辑点工作区解析当前机器可达的最小窗口尺寸。
+        /// 理想最小值不会反向撑破可用区；极小工作区仍保留一个可交互的安全下限。
+        /// </summary>
+        public Vector2 ResolveAdaptiveMinimum(Rect availableArea)
+        {
+            float availableWidth = Mathf.Max(320f, availableArea.width - FloatingWindowSafeInset * 2f);
+            float availableHeight = Mathf.Max(260f, availableArea.height - FloatingWindowSafeInset * 2f);
+            return new Vector2(
+                Mathf.Min(MinimumWindowWidth, availableWidth),
+                Mathf.Min(MinimumWindowHeight, availableHeight));
+        }
+
+        /// <summary>把浮动窗口夹取到 Unity 主窗口可用区；停靠窗口不应调用本方法。</summary>
+        public Rect ClampFloatingWindow(Rect current, Rect availableArea)
+        {
+            Vector2 minimum = ResolveAdaptiveMinimum(availableArea);
+            float safeWidth = Mathf.Max(320f, availableArea.width - FloatingWindowSafeInset * 2f);
+            float safeHeight = Mathf.Max(260f, availableArea.height - FloatingWindowSafeInset * 2f);
+            float width = Mathf.Min(Mathf.Max(current.width, minimum.x), safeWidth);
+            float height = Mathf.Min(Mathf.Max(current.height, minimum.y), safeHeight);
+            float minX = availableArea.xMin + FloatingWindowSafeInset;
+            float minY = availableArea.yMin + FloatingWindowSafeInset;
+            float maxX = Mathf.Max(minX, availableArea.xMax - FloatingWindowSafeInset - width);
+            float maxY = Mathf.Max(minY, availableArea.yMax - FloatingWindowSafeInset - height);
+            return new Rect(
+                Mathf.Clamp(current.x, minX, maxX),
+                Mathf.Clamp(current.y, minY, maxY),
+                width,
+                height);
+        }
+
+        public float ResolveProtectedCenterWidth(float width)
+        {
+            float safeWidth = Mathf.Max(1f, width);
+            ESWorkbenchResponsiveTier tier = ResolveTier(safeWidth);
+            float ratio = tier == ESWorkbenchResponsiveTier.Wide ? 0.5f
+                : tier == ESWorkbenchResponsiveTier.Compact ? 0.68f : 0.72f;
+            float target = Mathf.Max(MinimumCenterWidth, safeWidth * ratio);
+            return Mathf.Min(target, Mathf.Max(280f, safeWidth - MinimumLeftPaneWidth));
+        }
+
+        public int ResolveVisibleCommandCount(float width)
+        {
+            float safeWidth = Mathf.Max(1f, width);
+            if (safeWidth >= NarrowBreakpoint + 300f) return 8;
+            if (safeWidth >= NarrowBreakpoint + 120f) return 6;
+            return safeWidth >= NarrowBreakpoint ? 4 : 2;
+        }
+
+        public int ResolveVisibleDocumentCount(float centerWidth)
+        {
+            return Mathf.Clamp(Mathf.FloorToInt((Mathf.Max(1f, centerWidth) - 96f) / 104f), 2, 6);
+        }
+
+        public int ResolveVisibleBottomPanelCount(float width)
+        {
+            return Mathf.Clamp(Mathf.FloorToInt((Mathf.Max(1f, width) - 112f) / 96f), 2, 8);
+        }
+
+        public int ResolveVisibleViewportStatusCount(float centerWidth)
+        {
+            return Mathf.Clamp(Mathf.FloorToInt((Mathf.Max(1f, centerWidth) - 280f) / 132f), 1, 5);
+        }
+
+        public ESWorkbenchVisualValidationResult EvaluateVisualEnvironment(
+            ESWorkbenchVisualEnvironment environment)
+        {
+            ESWorkbenchResponsiveTier tier = ResolveTier(environment.WindowWidth);
+            bool windowMinimumSatisfied = environment.WindowWidth >=
+                    (tier == ESWorkbenchResponsiveTier.Narrow
+                        ? MinimumUsableWindowWidth
+                        : MinimumWindowWidth)
+                && environment.WindowHeight >=
+                    (tier == ESWorkbenchResponsiveTier.Narrow
+                        ? MinimumUsableWindowHeight
+                        : MinimumWindowHeight);
+            bool centerProtected = environment.CenterWidth >=
+                ResolveProtectedCenterWidth(environment.WindowWidth);
+            bool highDpiSupported = environment.PixelsPerPoint >= 1f
+                && environment.PixelsPerPoint <= 3f;
+            string summary = (windowMinimumSatisfied && centerProtected && highDpiSupported
+                    ? "布局保护合同通过"
+                    : "布局保护合同未通过")
+                + " · " + tier
+                + " · " + environment.WindowWidth.ToString("0") + "×" + environment.WindowHeight.ToString("0")
+                + " · " + environment.PixelsPerPoint.ToString("0.##") + "x"
+                + " · " + (environment.Theme == ESWorkbenchVisualTheme.Dark ? "深色" : "浅色")
+                + (environment.LongChineseContent ? " · 长中文" : string.Empty);
+            return new ESWorkbenchVisualValidationResult(
+                tier,
+                windowMinimumSatisfied,
+                centerProtected,
+                highDpiSupported,
+                summary);
+        }
+
+        public ESWorkbenchVisualScenarioMatch EvaluateScenario(
+            ESWorkbenchVisualEnvironment environment,
+            ESWorkbenchVisualValidationScenario scenario)
+        {
+            if (scenario == null)
+                return new ESWorkbenchVisualScenarioMatch(false, "未选择视觉验收场景。\n恢复：先选择一条矩阵场景。\n影响：不会写入截图证据。");
+
+            ESWorkbenchResponsiveTier actualTier = ResolveTier(environment.WindowWidth);
+            bool tierMatches = actualTier == scenario.ExpectedTier;
+            bool themeMatches = environment.Theme == scenario.Theme;
+            bool scaleMatches = Mathf.Abs(environment.PixelsPerPoint - scenario.PixelsPerPoint) < 0.01f;
+            bool chineseMatches = environment.LongChineseContent == scenario.LongChineseContent;
+            float widthTolerance = Mathf.Max(8f, scenario.Width * 0.02f);
+            float heightTolerance = Mathf.Max(8f, scenario.Height * 0.02f);
+            bool widthMatches = Mathf.Abs(environment.WindowWidth - scenario.Width) <= widthTolerance;
+            bool heightMatches = Mathf.Abs(environment.WindowHeight - scenario.Height) <= heightTolerance;
+            bool passed = tierMatches && themeMatches && scaleMatches && chineseMatches
+                && widthMatches && heightMatches;
+            string summary = (passed ? "场景匹配" : "场景不匹配")
+                + " · 期望 " + scenario.ScenarioId
+                + " · 实际 " + actualTier.ToString().ToLowerInvariant()
+                + " / " + (environment.Theme == ESWorkbenchVisualTheme.Dark ? "dark" : "light")
+                + " / " + Mathf.RoundToInt(environment.PixelsPerPoint * 100f) + "%"
+                + (environment.LongChineseContent ? " / long-cn" : " / normal")
+                + (passed ? string.Empty : "\n恢复：调整窗口尺寸、主题、系统缩放或长中文压力标记后重试。\n影响：当前截图不会被记录为该矩阵场景的有效证据。");
+            return new ESWorkbenchVisualScenarioMatch(passed, summary);
+        }
+
+        public IReadOnlyList<ESWorkbenchVisualValidationScenario> CreateCommercialVisualMatrix()
+        {
+            float wideWidth = Mathf.Max(WideBreakpoint + 240f, MinimumWindowWidth);
+            float compactWidth = Mathf.Max(MinimumWindowWidth, (WideBreakpoint + NarrowBreakpoint) * 0.5f);
+            float narrowWidth = Mathf.Max(
+                MinimumUsableWindowWidth,
+                Mathf.Min(MinimumWindowWidth, NarrowBreakpoint - 40f));
+            float wideHeight = Mathf.Max(MinimumWindowHeight, 680f);
+            float compactHeight = Mathf.Max(MinimumWindowHeight, 640f);
+            var tiers = new[]
+            {
+                (id: "wide", width: wideWidth, height: wideHeight),
+                (id: "compact", width: compactWidth, height: compactHeight),
+                (id: "narrow", width: narrowWidth, height: MinimumUsableWindowHeight)
+            };
+            var themes = new[]
+            {
+                (id: "dark", value: ESWorkbenchVisualTheme.Dark),
+                (id: "light", value: ESWorkbenchVisualTheme.Light)
+            };
+            float[] scales = { 1f, 1.25f, 1.5f, 2f };
+            var scenarios = new List<ESWorkbenchVisualValidationScenario>(48);
+            for (int tierIndex = 0; tierIndex < tiers.Length; tierIndex++)
+            for (int themeIndex = 0; themeIndex < themes.Length; themeIndex++)
+            for (int scaleIndex = 0; scaleIndex < scales.Length; scaleIndex++)
+            for (int chineseIndex = 0; chineseIndex < 2; chineseIndex++)
+            {
+                bool longChinese = chineseIndex == 1;
+                float scale = scales[scaleIndex];
+                string scenarioId = tiers[tierIndex].id
+                    + "-" + themes[themeIndex].id
+                    + "-" + Mathf.RoundToInt(scale * 100f)
+                    + (longChinese ? "-long-cn" : string.Empty);
+                scenarios.Add(new ESWorkbenchVisualValidationScenario(
+                    scenarioId,
+                    tiers[tierIndex].width,
+                    tiers[tierIndex].height,
+                    scale,
+                    themes[themeIndex].value,
+                    longChinese,
+                    ResolveTier(tiers[tierIndex].width)));
+            }
+            return scenarios;
+        }
+    }
+
+    /// <summary>无作者资产时的商业启动面合同；命令仍由正式贡献注册表提供。</summary>
+    public sealed class ESWorkbenchEmptyStateDescriptor
+    {
+        public ESWorkbenchEmptyStateDescriptor(
+            string title,
+            string description,
+            string primaryCommandId = null,
+            string secondaryCommandId = null,
+            string footnote = null,
+            bool blocksAuthoringViewport = true)
+        {
+            Title = string.IsNullOrWhiteSpace(title) ? "尚未开始创作" : title.Trim();
+            Description = description ?? string.Empty;
+            PrimaryCommandId = primaryCommandId ?? string.Empty;
+            SecondaryCommandId = secondaryCommandId ?? string.Empty;
+            Footnote = footnote ?? string.Empty;
+            BlocksAuthoringViewport = blocksAuthoringViewport;
+        }
+
+        public string Title { get; }
+        public string Description { get; }
+        public string PrimaryCommandId { get; }
+        public string SecondaryCommandId { get; }
+        public string Footnote { get; }
+        public bool BlocksAuthoringViewport { get; }
+    }
+
+    /// <summary>工作台外壳的展示合同。稳定 ID 用于冲突判定，展示文案和布局政策可以由领域贡献覆盖。</summary>
     public sealed class ESWorkbenchHostPresentationDescriptor
     {
         public ESWorkbenchHostPresentationDescriptor(
@@ -54,7 +557,11 @@ namespace ES
             string assetFieldLabel = "资产",
             string viewportDocumentTitle = "场景",
             string viewportDocumentTooltip = "二维 / 三维可视作者区域",
-            string inspectorTitle = "检查器")
+            string inspectorTitle = "检查器",
+            ESWorkbenchResponsiveLayoutPolicy layoutPolicy = null,
+            string leftPanelTitle = "内容与结构",
+            string workspaceTitle = "作者场景",
+            ESWorkbenchEmptyStateDescriptor emptyState = null)
         {
             if (string.IsNullOrWhiteSpace(presentationId))
                 throw new ArgumentException("展示合同 ID 不能为空。", nameof(presentationId));
@@ -64,6 +571,10 @@ namespace ES
             ViewportDocumentTitle = string.IsNullOrWhiteSpace(viewportDocumentTitle) ? "场景" : viewportDocumentTitle.Trim();
             ViewportDocumentTooltip = viewportDocumentTooltip ?? string.Empty;
             InspectorTitle = string.IsNullOrWhiteSpace(inspectorTitle) ? "检查器" : inspectorTitle.Trim();
+            LayoutPolicy = layoutPolicy ?? new ESWorkbenchResponsiveLayoutPolicy();
+            LeftPanelTitle = string.IsNullOrWhiteSpace(leftPanelTitle) ? "内容与结构" : leftPanelTitle.Trim();
+            WorkspaceTitle = string.IsNullOrWhiteSpace(workspaceTitle) ? "作者场景" : workspaceTitle.Trim();
+            EmptyState = emptyState;
         }
 
         public string PresentationId { get; }
@@ -72,6 +583,10 @@ namespace ES
         public string ViewportDocumentTitle { get; }
         public string ViewportDocumentTooltip { get; }
         public string InspectorTitle { get; }
+        public ESWorkbenchResponsiveLayoutPolicy LayoutPolicy { get; }
+        public string LeftPanelTitle { get; }
+        public string WorkspaceTitle { get; }
+        public ESWorkbenchEmptyStateDescriptor EmptyState { get; }
 
         public static ESWorkbenchHostPresentationDescriptor CreateDefault(string brandTitle = null)
         {
@@ -105,12 +620,25 @@ namespace ES
         private Action release;
 
         public ESWorkbenchBottomPanelContent(VisualElement root, Action release = null)
+            : this(root, ESWorkbenchBottomPanelDensity.Normal, 0f, release)
+        {
+        }
+
+        public ESWorkbenchBottomPanelContent(
+            VisualElement root,
+            ESWorkbenchBottomPanelDensity density,
+            float preferredHeight = 0f,
+            Action release = null)
         {
             Root = root ?? throw new ArgumentNullException(nameof(root));
+            Density = density;
+            PreferredHeight = Mathf.Max(0f, preferredHeight);
             this.release = release;
         }
 
         public VisualElement Root { get; }
+        public ESWorkbenchBottomPanelDensity Density { get; }
+        public float PreferredHeight { get; }
 
         public void Dispose()
         {
@@ -159,6 +687,14 @@ namespace ES
         public float moveSnap = 1f;
         public float rotationSnap = 15f;
         public float scaleSnap = 0.1f;
+        // 业务视口可持久化自己的稳定模式，不保存 Unity 对象或临时相机引用。
+        public string previewCameraMode = string.Empty;
+        // 3D 视口只保存可重建的轨道相机状态，不保存 Camera、PreviewScene 或 Unity 对象引用。
+        public Vector3 cameraFocus;
+        public float cameraDistance = 8f;
+        public float cameraYaw = 35f;
+        public float cameraPitch = 25f;
+        public bool cameraInitialized;
     }
 
     public enum ESWorkbenchViewportKind : byte
@@ -327,10 +863,26 @@ namespace ES
 
     public sealed class ESWorkbenchToolStateService
     {
+        private readonly Dictionary<string, ESWorkbenchToolCapabilities> capabilities =
+            new Dictionary<string, ESWorkbenchToolCapabilities>(StringComparer.Ordinal);
         private string activeToolId = string.Empty;
 
         public string ActiveToolId => activeToolId;
+        public ESWorkbenchToolCapabilities ActiveCapabilities =>
+            capabilities.TryGetValue(activeToolId, out ESWorkbenchToolCapabilities declared)
+                ? ESWorkbenchToolCapabilityResolver.Resolve(activeToolId, declared)
+                : ESWorkbenchToolCapabilityResolver.Resolve(activeToolId);
         public event Action<string> Changed;
+
+        internal void RegisterCapabilities(string toolId, ESWorkbenchToolCapabilities value)
+        {
+            if (!string.IsNullOrWhiteSpace(toolId)) capabilities[toolId.Trim()] = value;
+        }
+
+        internal void ClearRegisteredCapabilities()
+        {
+            capabilities.Clear();
+        }
 
         public bool IsActive(string toolId)
         {
@@ -468,6 +1020,18 @@ namespace ES
         public Vector3 WorldPosition { get; }
         public Vector3 RotationEuler => WorldPosition;
         public Vector3 Scale => WorldPosition;
+    }
+
+    public readonly struct ESWorkbenchCreateRequest
+    {
+        public ESWorkbenchCreateRequest(ESWorkbenchObjectDescriptor item, Vector3 worldPosition)
+        {
+            Item = item;
+            WorldPosition = worldPosition;
+        }
+
+        public ESWorkbenchObjectDescriptor Item { get; }
+        public Vector3 WorldPosition { get; }
     }
 
     public sealed class ESWorkbenchMutationResult
@@ -616,6 +1180,132 @@ namespace ES
 
         public bool TryCreate(ESWorkbenchObjectDescriptor item, Vector3 worldPosition, out string message) =>
             Execute(ESWorkbenchMutationKind.Create, ESWorkbenchSelection.Empty, item, worldPosition, out message);
+
+        public bool CanCreateBatch(IReadOnlyList<ESWorkbenchCreateRequest> requests, out string message)
+        {
+            message = string.Empty;
+            if (actions == null) { message = "作者服务尚未绑定工作台。"; return false; }
+            if (requests == null || requests.Count == 0) { message = "没有可批量放置的内容。"; return false; }
+            for (int i = 0; i < requests.Count; i++)
+            {
+                ESWorkbenchObjectDescriptor item = requests[i].Item;
+                if (item == null) { message = "批量放置第 " + (i + 1) + " 项为空。"; return false; }
+                if (!IsMutationAllowed(ESWorkbenchMutationKind.Create, ESWorkbenchSelection.Empty, item, out message))
+                    return false;
+                ESWorkbenchAuthoringAdapterDescriptor adapter = ResolveForCreate(item);
+                if (adapter?.Create == null)
+                {
+                    message = "内容“" + item.DisplayName + "”没有注册批量放置所需的创建能力。";
+                    return false;
+                }
+                var context = new ESWorkbenchMutationContext(
+                    actions, adapter, ESWorkbenchMutationKind.Create, ESWorkbenchSelection.Empty,
+                    item, requests[i].WorldPosition);
+                UnityEngine.Object[] targets = adapter.ResolveUndoTargets?.Invoke(context)?
+                    .Where(value => value != null)
+                    .Distinct()
+                    .ToArray() ?? Array.Empty<UnityEngine.Object>();
+                if (targets.Length == 0)
+                {
+                    message = "内容“" + item.DisplayName + "”的作者适配器没有声明 Undo 目标。";
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public bool TryCreateBatch(IReadOnlyList<ESWorkbenchCreateRequest> requests, out string message)
+        {
+            message = string.Empty;
+            LastOperationCommittedWithPostCommitFailure = false;
+            if (!CanCreateBatch(requests, out message))
+            {
+                actions?.SetStatus(message, MessageType.Warning);
+                return false;
+            }
+
+            var contexts = new List<ESWorkbenchMutationContext>(requests.Count);
+            var targets = new List<UnityEngine.Object>();
+            for (int i = 0; i < requests.Count; i++)
+            {
+                ESWorkbenchCreateRequest request = requests[i];
+                ESWorkbenchAuthoringAdapterDescriptor adapter = ResolveForCreate(request.Item);
+                var context = new ESWorkbenchMutationContext(
+                    actions, adapter, ESWorkbenchMutationKind.Create, ESWorkbenchSelection.Empty,
+                    request.Item, request.WorldPosition);
+                contexts.Add(context);
+                targets.AddRange(adapter.ResolveUndoTargets(context).Where(value => value != null));
+            }
+
+            const string undoName = "批量放置工作台内容";
+            Undo.IncrementCurrentGroup();
+            int undoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName(undoName);
+            var results = new List<ESWorkbenchMutationResult>(contexts.Count);
+            try
+            {
+                UnityEngine.Object[] distinctTargets = targets.Distinct().ToArray();
+                Undo.RegisterCompleteObjectUndo(distinctTargets, undoName);
+                for (int i = 0; i < contexts.Count; i++)
+                {
+                    ESWorkbenchMutationContext context = contexts[i];
+                    ESWorkbenchMutationResult result = context.Adapter.Create(context)
+                        ?? ESWorkbenchMutationResult.Failure("作者操作没有返回结果。");
+                    if (!result.Succeeded)
+                    {
+                        Undo.RevertAllDownToGroup(undoGroup);
+                        message = "批量放置在第 " + (i + 1) + " 项失败：" + result.Message;
+                        actions.SetStatus(message + "（全部作者数据已回滚）", MessageType.Error);
+                        return false;
+                    }
+                    results.Add(result);
+                }
+                Undo.CollapseUndoOperations(undoGroup);
+            }
+            catch (Exception exception)
+            {
+                Undo.RevertAllDownToGroup(undoGroup);
+                Debug.LogException(exception);
+                message = undoName + "失败：" + exception.Message;
+                actions.SetStatus(message + "（全部作者数据已回滚）", MessageType.Error);
+                return false;
+            }
+
+            try
+            {
+                ESWorkbenchSelection finalSelection = null;
+                ESWorkbenchRefreshReason refreshReason = ESWorkbenchRefreshReason.DataChanged;
+                var dirty = new Dictionary<string, ESWorkbenchDirtyFlags>(StringComparer.Ordinal);
+                for (int i = 0; i < contexts.Count; i++)
+                {
+                    ESWorkbenchMutationContext context = contexts[i];
+                    ESWorkbenchMutationResult result = results[i];
+                    context.Adapter.Committed?.Invoke(context, result);
+                    if (result.Selection != null) finalSelection = result.Selection;
+                    if (!string.IsNullOrWhiteSpace(result.DirtyKey))
+                    {
+                        dirty.TryGetValue(result.DirtyKey, out ESWorkbenchDirtyFlags flags);
+                        dirty[result.DirtyKey] = flags | result.DirtyFlags;
+                    }
+                    if ((int)result.RefreshReason > (int)refreshReason) refreshReason = result.RefreshReason;
+                }
+                foreach (KeyValuePair<string, ESWorkbenchDirtyFlags> pair in dirty)
+                    actions.MarkDirty(pair.Key, pair.Value);
+                if (finalSelection != null) actions.Selection.Select(finalSelection);
+                actions.Refresh(refreshReason);
+                message = "已批量放置 " + requests.Count + " 项内容；Undo 将作为一个整体回退。";
+                actions.SetStatus(message, MessageType.Info);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                LastOperationCommittedWithPostCommitFailure = true;
+                message = undoName + "已提交，但提交后同步失败：" + exception.Message;
+                actions.SetStatus(message + "（请刷新工作台并检查持久化状态）", MessageType.Error);
+                return true;
+            }
+        }
 
         public bool TryMove(ESWorkbenchSelection selection, Vector3 worldPosition, out string message) =>
             Execute(ESWorkbenchMutationKind.Move, selection, null, worldPosition, out message);
@@ -855,7 +1545,8 @@ namespace ES
             Texture icon = null,
             int priority = 0,
             Func<ESWorkbenchActionContext, bool> isAvailable = null,
-            ESWorkbenchShortcut? shortcut = null)
+            ESWorkbenchShortcut? shortcut = null,
+            ESWorkbenchToolCapabilities capabilities = ESWorkbenchToolCapabilities.Auto)
         {
             if (string.IsNullOrWhiteSpace(toolId)) throw new ArgumentException("工具 ID 不能为空。", nameof(toolId));
             ToolId = toolId.Trim();
@@ -866,6 +1557,7 @@ namespace ES
             Activate = activate ?? throw new ArgumentNullException(nameof(activate));
             IsAvailable = isAvailable;
             Shortcut = shortcut;
+            Capabilities = capabilities;
         }
 
         public string ToolId { get; }
@@ -876,6 +1568,24 @@ namespace ES
         public Action<ESWorkbenchActionContext> Activate { get; }
         public Func<ESWorkbenchActionContext, bool> IsAvailable { get; }
         public ESWorkbenchShortcut? Shortcut { get; }
+        public ESWorkbenchToolCapabilities Capabilities { get; }
+    }
+
+    public enum ESWorkbenchCommandRole : byte
+    {
+        Primary,
+        History,
+        Validation,
+        Authoring,
+        Build,
+        Dangerous,
+        Utility
+    }
+
+    public enum ESWorkbenchCommandVisibility : byte
+    {
+        Adaptive,
+        Pinned
     }
 
     public sealed class ESWorkbenchCommandDescriptor
@@ -891,7 +1601,10 @@ namespace ES
             Func<ESWorkbenchActionContext, bool> canExecute = null,
             bool showInToolbar = true,
             bool showInContextMenu = false,
-            bool iconOnly = false)
+            bool iconOnly = false,
+            ESWorkbenchCommandRole role = ESWorkbenchCommandRole.Utility,
+            ESWorkbenchCommandVisibility visibility = ESWorkbenchCommandVisibility.Adaptive,
+            string unityIconName = null)
         {
             if (string.IsNullOrWhiteSpace(commandId)) throw new ArgumentException("命令 ID 不能为空。", nameof(commandId));
             CommandId = commandId.Trim();
@@ -905,6 +1618,9 @@ namespace ES
             ShowInToolbar = showInToolbar;
             ShowInContextMenu = showInContextMenu;
             IconOnly = iconOnly;
+            Role = role;
+            Visibility = visibility;
+            UnityIconName = unityIconName?.Trim() ?? string.Empty;
         }
 
         public string CommandId { get; }
@@ -918,6 +1634,191 @@ namespace ES
         public bool ShowInToolbar { get; }
         public bool ShowInContextMenu { get; }
         public bool IconOnly { get; }
+        public ESWorkbenchCommandRole Role { get; }
+        public ESWorkbenchCommandVisibility Visibility { get; }
+        public string UnityIconName { get; }
+        public bool HasIcon => Icon != null || !string.IsNullOrEmpty(UnityIconName);
+    }
+
+    public sealed class ESWorkbenchContentPresetDescriptor
+    {
+        public ESWorkbenchContentPresetDescriptor(
+            string presetId,
+            string displayName,
+            string tooltip = null,
+            object payload = null,
+            bool overridePayload = false,
+            Texture icon = null,
+            string subtitle = null,
+            string badge = null)
+        {
+            if (string.IsNullOrWhiteSpace(presetId))
+                throw new ArgumentException("内容预设 ID 不能为空。", nameof(presetId));
+            PresetId = presetId.Trim();
+            DisplayName = string.IsNullOrWhiteSpace(displayName) ? PresetId : displayName.Trim();
+            Tooltip = tooltip ?? string.Empty;
+            Payload = payload;
+            OverridePayload = overridePayload;
+            Icon = icon;
+            Subtitle = subtitle ?? string.Empty;
+            Badge = badge ?? string.Empty;
+        }
+
+        public string PresetId { get; }
+        public string DisplayName { get; }
+        public string Tooltip { get; }
+        public object Payload { get; }
+        public bool OverridePayload { get; }
+        public Texture Icon { get; }
+        public string Subtitle { get; }
+        public string Badge { get; }
+    }
+
+    [Serializable]
+    public sealed class ESWorkbenchContentUsageRecord
+    {
+        public string objectId = string.Empty;
+        public bool favorite;
+        public long lastUsedUtcTicks;
+        public int useCount;
+    }
+
+    /// <summary>
+    /// 内容中心的轻量本地偏好。只持久化 WorkbenchId + ObjectId + 时间/次数，
+    /// 不保存 Unity 对象、描述器、Payload 或 InstanceId。
+    /// </summary>
+    internal sealed class ESWorkbenchContentUsageStore
+    {
+        [Serializable]
+        private sealed class UsageDocument
+        {
+            public int schemaVersion = 1;
+            public List<ESWorkbenchContentUsageRecord> entries = new List<ESWorkbenchContentUsageRecord>();
+        }
+
+        private const int MaximumEntryCount = 256;
+        private const string KeyPrefix = "ES.Workbench.ContentUsage.v1.";
+        private readonly string preferencesKey;
+        private readonly Dictionary<string, ESWorkbenchContentUsageRecord> records =
+            new Dictionary<string, ESWorkbenchContentUsageRecord>(StringComparer.Ordinal);
+
+        public ESWorkbenchContentUsageStore(string workbenchId)
+        {
+            string stableWorkbenchId = string.IsNullOrWhiteSpace(workbenchId) ? "unknown" : workbenchId.Trim();
+            preferencesKey = KeyPrefix + Hash128.Compute(stableWorkbenchId).ToString();
+            Load();
+        }
+
+        public ESWorkbenchContentUsageRecord Get(string objectId)
+        {
+            string stableId = NormalizeObjectId(objectId);
+            return records.TryGetValue(stableId, out ESWorkbenchContentUsageRecord record)
+                ? record
+                : null;
+        }
+
+        public bool IsFavorite(string objectId) => Get(objectId)?.favorite == true;
+
+        public bool ToggleFavorite(string objectId)
+        {
+            ESWorkbenchContentUsageRecord record = GetOrCreate(objectId);
+            record.favorite = !record.favorite;
+            Save();
+            return record.favorite;
+        }
+
+        public void RecordUse(string objectId)
+        {
+            ESWorkbenchContentUsageRecord record = GetOrCreate(objectId);
+            record.lastUsedUtcTicks = DateTime.UtcNow.Ticks;
+            if (record.useCount < int.MaxValue) record.useCount++;
+            Save();
+        }
+
+        internal IReadOnlyList<ESWorkbenchContentUsageRecord> Snapshot()
+        {
+            return records.Values
+                .OrderByDescending(value => value.favorite)
+                .ThenByDescending(value => value.lastUsedUtcTicks)
+                .ThenByDescending(value => value.useCount)
+                .ThenBy(value => value.objectId, StringComparer.Ordinal)
+                .Select(Clone)
+                .ToArray();
+        }
+
+        private ESWorkbenchContentUsageRecord GetOrCreate(string objectId)
+        {
+            string stableId = NormalizeObjectId(objectId);
+            if (string.IsNullOrEmpty(stableId))
+                throw new ArgumentException("内容稳定 ID 不能为空。", nameof(objectId));
+            if (records.TryGetValue(stableId, out ESWorkbenchContentUsageRecord existing)) return existing;
+            var created = new ESWorkbenchContentUsageRecord { objectId = stableId };
+            records.Add(stableId, created);
+            return created;
+        }
+
+        private void Load()
+        {
+            records.Clear();
+            string json = EditorPrefs.GetString(preferencesKey, string.Empty);
+            if (string.IsNullOrWhiteSpace(json)) return;
+            try
+            {
+                UsageDocument document = JsonUtility.FromJson<UsageDocument>(json);
+                if (document?.entries == null) return;
+                foreach (ESWorkbenchContentUsageRecord entry in document.entries)
+                {
+                    if (entry == null) continue;
+                    string stableId = NormalizeObjectId(entry.objectId);
+                    if (string.IsNullOrEmpty(stableId) || records.ContainsKey(stableId)) continue;
+                    entry.objectId = stableId;
+                    entry.useCount = Mathf.Max(0, entry.useCount);
+                    entry.lastUsedUtcTicks = Math.Max(0L, entry.lastUsedUtcTicks);
+                    records.Add(stableId, entry);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[ESWorkbench] 内容使用记录读取失败，将使用空状态：" + exception.Message);
+                records.Clear();
+            }
+        }
+
+        private void Save()
+        {
+            ESWorkbenchContentUsageRecord[] retained = records.Values
+                .Where(value => value != null && (!string.IsNullOrWhiteSpace(value.objectId)))
+                .OrderByDescending(value => value.favorite)
+                .ThenByDescending(value => value.lastUsedUtcTicks)
+                .ThenByDescending(value => value.useCount)
+                .ThenBy(value => value.objectId, StringComparer.Ordinal)
+                .Take(MaximumEntryCount)
+                .Select(Clone)
+                .ToArray();
+            records.Clear();
+            foreach (ESWorkbenchContentUsageRecord entry in retained) records.Add(entry.objectId, entry);
+            var document = new UsageDocument { entries = retained.ToList() };
+            EditorPrefs.SetString(preferencesKey, JsonUtility.ToJson(document));
+        }
+
+        private static string NormalizeObjectId(string objectId)
+        {
+            if (string.IsNullOrWhiteSpace(objectId)) return string.Empty;
+            string trimmed = objectId.Trim();
+            int presetIndex = trimmed.IndexOf("::preset::", StringComparison.Ordinal);
+            return presetIndex > 0 ? trimmed.Substring(0, presetIndex) : trimmed;
+        }
+
+        private static ESWorkbenchContentUsageRecord Clone(ESWorkbenchContentUsageRecord value)
+        {
+            return new ESWorkbenchContentUsageRecord
+            {
+                objectId = value.objectId,
+                favorite = value.favorite,
+                lastUsedUtcTicks = value.lastUsedUtcTicks,
+                useCount = value.useCount
+            };
+        }
     }
 
     public sealed class ESWorkbenchObjectDescriptor
@@ -932,7 +1833,13 @@ namespace ES
             string tooltip = null,
             int priority = 0,
             string subtitle = null,
-            string badge = null)
+            string badge = null,
+            ESWorkbenchContentKind contentKind = ESWorkbenchContentKind.General,
+            ESWorkbenchContentDragMode dragMode = ESWorkbenchContentDragMode.Place,
+            string selectionKind = null,
+            IReadOnlyList<ESWorkbenchContentPresetDescriptor> presets = null,
+            string baseObjectId = null,
+            string presetId = null)
         {
             if (string.IsNullOrWhiteSpace(objectId)) throw new ArgumentException("对象 ID 不能为空。", nameof(objectId));
             ObjectId = objectId.Trim();
@@ -945,6 +1852,19 @@ namespace ES
             Priority = priority;
             Subtitle = subtitle ?? string.Empty;
             Badge = badge ?? string.Empty;
+            ContentKind = contentKind;
+            DragMode = dragMode;
+            SelectionKind = string.IsNullOrWhiteSpace(selectionKind)
+                ? "palette-object"
+                : selectionKind.Trim();
+            BaseObjectId = string.IsNullOrWhiteSpace(baseObjectId) ? ObjectId : baseObjectId.Trim();
+            PresetId = presetId?.Trim() ?? string.Empty;
+            Presets = presets == null
+                ? Array.Empty<ESWorkbenchContentPresetDescriptor>()
+                : presets.Where(value => value != null)
+                    .GroupBy(value => value.PresetId, StringComparer.Ordinal)
+                    .Select(value => value.First())
+                    .ToArray();
         }
 
         public string ObjectId { get; }
@@ -957,7 +1877,74 @@ namespace ES
         public int Priority { get; }
         public string Subtitle { get; }
         public string Badge { get; }
-        public ESWorkbenchSelection ToSelection() => new ESWorkbenchSelection(ObjectId, "palette-object", Source, Payload ?? this);
+        public ESWorkbenchContentKind ContentKind { get; }
+        public ESWorkbenchContentDragMode DragMode { get; }
+        public string SelectionKind { get; }
+        public string BaseObjectId { get; }
+        public string PresetId { get; }
+        public IReadOnlyList<ESWorkbenchContentPresetDescriptor> Presets { get; }
+        public bool HasPresets => Presets.Count > 0;
+        public bool CanDrag => DragMode != ESWorkbenchContentDragMode.InspectOnly;
+        public ESWorkbenchSelection ToSelection() => new ESWorkbenchSelection(BaseObjectId, SelectionKind, Source, this);
+
+        public ESWorkbenchObjectDescriptor CreatePresetVariant(string presetId)
+        {
+            if (string.IsNullOrWhiteSpace(presetId) || Presets.Count == 0) return this;
+            ESWorkbenchContentPresetDescriptor preset = Presets.FirstOrDefault(value =>
+                string.Equals(value.PresetId, presetId, StringComparison.Ordinal));
+            if (preset == null) return this;
+            string effectiveObjectId = BaseObjectId + "::preset::" + preset.PresetId;
+            return new ESWorkbenchObjectDescriptor(
+                effectiveObjectId,
+                DisplayName,
+                Category,
+                Source,
+                preset.OverridePayload ? preset.Payload : Payload,
+                preset.Icon ?? Icon,
+                string.IsNullOrWhiteSpace(preset.Tooltip) ? Tooltip : preset.Tooltip,
+                Priority,
+                string.IsNullOrWhiteSpace(preset.Subtitle) ? Subtitle : preset.Subtitle,
+                string.IsNullOrWhiteSpace(preset.Badge) ? Badge : preset.Badge,
+                ContentKind,
+                DragMode,
+                SelectionKind,
+                Presets,
+                BaseObjectId,
+                preset.PresetId);
+        }
+
+        public string ContentKindDisplayName
+        {
+            get
+            {
+                switch (ContentKind)
+                {
+                    case ESWorkbenchContentKind.Prefab: return "预制件";
+                    case ESWorkbenchContentKind.Brush: return "笔刷";
+                    case ESWorkbenchContentKind.SceneTemplate: return "场景";
+                    case ESWorkbenchContentKind.RegionTemplate: return "区域";
+                    case ESWorkbenchContentKind.Terrain: return "地形";
+                    case ESWorkbenchContentKind.Vegetation: return "植被";
+                    case ESWorkbenchContentKind.Gameplay: return "玩法";
+                    default: return "通用";
+                }
+            }
+        }
+
+        public string DefaultDragHint
+        {
+            get
+            {
+                switch (DragMode)
+                {
+                    case ESWorkbenchContentDragMode.ActivateTool: return "拖入使用";
+                    case ESWorkbenchContentDragMode.ApplyTemplate: return "拖入应用";
+                    case ESWorkbenchContentDragMode.CreateRegion: return "拖入创建";
+                    case ESWorkbenchContentDragMode.InspectOnly: return "仅查看";
+                    default: return "可拖放";
+                }
+            }
+        }
     }
 
     public sealed class ESWorkbenchHierarchyDescriptor
@@ -1081,6 +2068,106 @@ namespace ES
         public Rect ViewportRect { get; }
     }
 
+    public sealed class ESWorkbenchBatchDropContext
+    {
+        internal ESWorkbenchBatchDropContext(
+            ESWorkbenchActionContext actionContext,
+            IReadOnlyList<ESWorkbenchObjectDescriptor> items,
+            Vector2 localPosition,
+            Rect viewportRect,
+            float spacing)
+        {
+            Actions = actionContext;
+            Items = items ?? Array.Empty<ESWorkbenchObjectDescriptor>();
+            LocalPosition = localPosition;
+            ViewportRect = viewportRect;
+            Spacing = Mathf.Max(0.25f, spacing);
+        }
+
+        public ESWorkbenchActionContext Actions { get; }
+        public IReadOnlyList<ESWorkbenchObjectDescriptor> Items { get; }
+        public Vector2 LocalPosition { get; }
+        public Rect ViewportRect { get; }
+        public float Spacing { get; }
+    }
+
+    /// <summary>
+    /// 拖放目标的公共视觉状态。它只表达预检结果，不代表正式提交结果；
+    /// 所有视口都应使用同一接受/拒绝语义和原因文本。
+    /// </summary>
+    public readonly struct ESWorkbenchDropPreviewState
+    {
+        public ESWorkbenchDropPreviewState(bool accepted, string reason = null)
+        {
+            Accepted = accepted;
+            Reason = reason ?? string.Empty;
+        }
+
+        public bool Accepted { get; }
+        public string Reason { get; }
+        public bool Rejected => !Accepted;
+
+        public static ESWorkbenchDropPreviewState Allowed =>
+            new ESWorkbenchDropPreviewState(true);
+
+        public static ESWorkbenchDropPreviewState RejectedBy(string reason) =>
+            new ESWorkbenchDropPreviewState(false, reason);
+
+        public string ShortReason(int maximumCharacters = 48)
+        {
+            int limit = Mathf.Clamp(maximumCharacters, 8, 256);
+            if (Reason.Length <= limit) return Reason;
+            return Reason.Substring(0, limit) + "…";
+        }
+    }
+
+    /// <summary>拖放悬停期间的只读预览请求。预览不得写作者数据或注册 Undo。</summary>
+    public sealed class ESWorkbenchDropPreviewContext
+    {
+        internal ESWorkbenchDropPreviewContext(
+            ESWorkbenchActionContext actions,
+            ESWorkbenchObjectDescriptor primaryItem,
+            IReadOnlyList<ESWorkbenchObjectDescriptor> items,
+            Vector2 localPosition,
+            Rect viewportRect,
+            float spacing,
+            bool accepted,
+            string reason,
+            Vector3 resolvedWorldPosition = default,
+            bool hasResolvedWorldPosition = false)
+        {
+            Actions = actions;
+            PrimaryItem = primaryItem;
+            Items = items ?? Array.Empty<ESWorkbenchObjectDescriptor>();
+            LocalPosition = localPosition;
+            ViewportRect = viewportRect;
+            Spacing = Mathf.Max(0.25f, spacing);
+            Accepted = accepted;
+            Reason = reason ?? string.Empty;
+            ResolvedWorldPosition = resolvedWorldPosition;
+            HasResolvedWorldPosition = hasResolvedWorldPosition;
+        }
+
+        public ESWorkbenchActionContext Actions { get; }
+        public ESWorkbenchObjectDescriptor PrimaryItem { get; }
+        public IReadOnlyList<ESWorkbenchObjectDescriptor> Items { get; }
+        public Vector2 LocalPosition { get; }
+        public Rect ViewportRect { get; }
+        public float Spacing { get; }
+        public bool Accepted { get; }
+        public string Reason { get; }
+        /// <summary>
+        /// 宿主在本次拖动事件中已经通过正式落点合同解析出的世界位置。
+        /// 预览可以直接复用它，避免同一事件内因高度场、相机或边缘平移
+        /// 状态变化而重复解析出不同落点。
+        /// </summary>
+        public Vector3 ResolvedWorldPosition { get; }
+        public bool HasResolvedWorldPosition { get; }
+        public ESWorkbenchDropPreviewState State =>
+            new ESWorkbenchDropPreviewState(Accepted, Reason);
+        public bool IsBatch => Items.Count > 1;
+    }
+
     public sealed class ESWorkbenchViewportContext
     {
         internal ESWorkbenchViewportContext(
@@ -1090,7 +2177,10 @@ namespace ES
             ESWorkbenchViewportLayoutState layout,
             Func<IReadOnlyList<ESWorkbenchHierarchyDescriptor>> getHierarchy = null,
             Func<string, bool> isHierarchyVisible = null,
-            Func<string, bool> isHierarchyLocked = null)
+            Func<string, bool> isHierarchyLocked = null,
+            Action statusChanged = null,
+            ESWorkbenchViewportFeelSettings feel = null,
+            ESWorkbenchPointerInteractionCoordinator pointerCoordinator = null)
         {
             Window = window;
             Actions = actions;
@@ -1099,6 +2189,9 @@ namespace ES
             GetHierarchy = getHierarchy;
             IsHierarchyVisible = isHierarchyVisible ?? (_ => true);
             IsHierarchyLocked = isHierarchyLocked ?? (_ => false);
+            StatusChanged = statusChanged;
+            Feel = feel ?? ESWorkbenchViewportFeelSettings.Standard;
+            PointerCoordinator = pointerCoordinator ?? new ESWorkbenchPointerInteractionCoordinator();
         }
 
         public EditorWindow Window { get; }
@@ -1108,6 +2201,12 @@ namespace ES
         public Func<IReadOnlyList<ESWorkbenchHierarchyDescriptor>> GetHierarchy { get; }
         public Func<string, bool> IsHierarchyVisible { get; }
         public Func<string, bool> IsHierarchyLocked { get; }
+        /// <summary>视口状态发生高频变化（例如指针坐标）时通知宿主刷新状态栏。</summary>
+        public Action StatusChanged { get; }
+        /// <summary>当前工作台统一的视口手感合同；贡献视口不得各自重新定义默认响应曲线。</summary>
+        public ESWorkbenchViewportFeelSettings Feel { get; }
+        /// <summary>宿主共享的主指针仲裁器；所有贡献视口必须复用此实例。</summary>
+        public ESWorkbenchPointerInteractionCoordinator PointerCoordinator { get; }
         public IReadOnlyList<ESWorkbenchHierarchyDescriptor> Hierarchy =>
             GetHierarchy?.Invoke() ?? Array.Empty<ESWorkbenchHierarchyDescriptor>();
         public ESWorkbenchSelectionService Selection => Actions.Selection;
@@ -1144,6 +2243,77 @@ namespace ES
         void Refresh(ESWorkbenchRefreshReason reason);
         bool CanAccept(ESWorkbenchObjectDescriptor item);
         bool TryAccept(ESWorkbenchDropContext context, out string message);
+    }
+
+    /// <summary>
+    /// 可选的当前手势取消合同。外部内容拖放接管主指针时优先调用它，
+    /// 只清理临时手势/预览，不通过停用再激活视口触发无关重建。
+    /// </summary>
+    public interface IESWorkbenchCancelableViewport
+    {
+        void CancelInteraction();
+    }
+
+    /// <summary>可选的拖放预检诊断合同；预检只解释可接受性，不得修改作者数据。</summary>
+    public interface IESWorkbenchViewportDropDiagnostics
+    {
+        bool CanAccept(ESWorkbenchObjectDescriptor item, out string reason);
+    }
+
+    /// <summary>
+    /// 可选的拖放位置预检合同。内容类型可用并不等于当前指针位置可提交；
+    /// 视口应在这里复用正式落点解析，但不得修改作者数据；成功时同时返回
+    /// 本次预检得到的世界落点，供预览直接复用，避免重复投影造成漂移。
+    /// </summary>
+    public interface IESWorkbenchViewportDropPositionDiagnostics
+    {
+        bool TryResolveDropPosition(
+            ESWorkbenchObjectDescriptor item,
+            Vector2 localPosition,
+            out Vector3 worldPosition,
+            out string reason);
+    }
+
+    /// <summary>
+    /// 可选的统一空间投影合同。调用方必须声明投影意图，不能用一组布尔参数
+    /// 猜测“严格命中、地形绘制、拖放夹取、边缘平移”之间的边界。
+    /// </summary>
+    public interface IESWorkbenchViewportProjection
+    {
+        bool TryResolveProjection(
+            Vector2 localPosition,
+            ESWorkbenchViewportProjectionRequest request,
+            out Vector3 worldPosition);
+    }
+
+    /// <summary>
+    /// 可选的批量放置合同。实现方必须先完整预检，再以一个 Undo 事务提交或整体回滚。
+    /// </summary>
+    public interface IESWorkbenchBatchViewport
+    {
+        bool CanAcceptBatch(IReadOnlyList<ESWorkbenchObjectDescriptor> items, out string reason);
+        bool TryAcceptBatch(ESWorkbenchBatchDropContext context, out string message);
+    }
+
+    /// <summary>可选的实时拖放预览合同；离开、取消、切换视口和释放时必须清理预览资源。</summary>
+    public interface IESWorkbenchDropPreviewViewport
+    {
+        void UpdateDropPreview(ESWorkbenchDropPreviewContext context);
+        void ClearDropPreview();
+    }
+
+    /// <summary>
+    /// 可选的视口边缘平移能力。宿主只在外部拖放期间调度，视口自行拥有导航状态和重绘。
+    /// </summary>
+    public interface IESWorkbenchEdgePannableViewport
+    {
+        bool TryEdgePan(Vector2 localPosition, float deltaTime);
+    }
+
+    /// <summary>可选的键盘微调能力；宿主负责快捷键优先级，视口负责目标和正式事务。</summary>
+    public interface IESWorkbenchNudgeableViewport
+    {
+        bool TryNudge(KeyCode keyCode, bool shift, bool controlOrCommand, out string message);
     }
 
     public interface IESWorkbenchFrameableViewport

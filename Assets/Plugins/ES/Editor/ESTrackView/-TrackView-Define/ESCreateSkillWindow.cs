@@ -3,6 +3,8 @@ using ES;
 using UnityEditor;
 using UnityEngine;
 
+ [ES.ESWindowSleepContract(ES.ESWindowSleepMode.Transient, "短生命周期创建窗口")]
+ [ES.ESWindowPresentationShortTitle("技能")]
 public sealed class ESCreateSkillWindow : EditorWindow
 {
     private const string DefaultSkillFolder = "Assets/ESNormalAssets/Data/Skill";

@@ -216,7 +216,7 @@ namespace ES
                 discovery.observation = observation;
                 if (observation == null)
                 {
-                    discovery.failure = "无法读取最近激活的 CMD。请先切换到目标 CMD，再回到工作台重试。";
+                    discovery.failure = "无法读取最近激活的 CMD。请先切换到目标 CMD，再回到 Agent 控制台重试。";
                     return discovery;
                 }
 
@@ -264,7 +264,7 @@ namespace ES
 
                 if (discovery.candidates.Count == 0)
                 {
-                    discovery.failure = "未发现可回签的 CMD。请先切到目标 CMD，再立即回到工作台重新发现。";
+                    discovery.failure = "未发现可回签的 CMD。请先切到目标 CMD，再立即回到 Agent 控制台重新发现。";
                     return discovery;
                 }
 

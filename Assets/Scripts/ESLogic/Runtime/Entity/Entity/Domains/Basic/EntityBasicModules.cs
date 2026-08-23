@@ -372,6 +372,11 @@ namespace ES
     [Serializable, TypeRegistryItem("基础战斗模块")]
     public class EntityBasicCombatModule : EntityBasicModuleBase
     {
+        private static readonly Unity.Profiling.ProfilerMarker WeaponFireMarker =
+            new Unity.Profiling.ProfilerMarker("ES.Weapon.Fire");
+        private static readonly Unity.Profiling.ProfilerMarker PrimaryHitConsumeMarker =
+            new Unity.Profiling.ProfilerMarker("ES.Weapon.Hit.Consume");
+
         [Title("瞄准状态管理")]
         [LabelText("瞄准状态键")]
         public string aimStateKey = "瞄准";
@@ -422,6 +427,9 @@ namespace ES
         [Tooltip("没有活动武器槽位时，允许角色使用独立的徒手 Action。活动槽位缺 Key 属于配置错误，不会回退徒手。")]
         public bool allowUnarmedPrimaryAttack = true;
 
+        [MinValue(0f), LabelText("徒手基础伤害")]
+        public float unarmedPrimaryAttackDamage = 10f;
+
         [LabelText("徒手普攻 Action")]
         public ESActionConfigKey unarmedPrimaryAttackAction = "melee.attack";
 
@@ -449,8 +457,41 @@ namespace ES
         [NonSerialized]
         private ESActionPresentationBridge actionPresentationBridge;
 
-        [field: NonSerialized]
-        public event Action<EntityPrimaryAttackEvent> PrimaryAttackEvent;
+        [NonSerialized]
+        private Action<EntityPrimaryAttackEvent> _primaryAttackEvent;
+
+        [NonSerialized]
+        private Action<ESShotLifecycleEvent> _shotLifecycleObserver;
+
+        [NonSerialized]
+        private Delegate[] _primaryAttackEventSnapshot = Array.Empty<Delegate>();
+
+        public event Action<EntityPrimaryAttackEvent> PrimaryAttackEvent
+        {
+            add
+            {
+                if (value == null)
+                    return;
+                _primaryAttackEvent += value;
+                _primaryAttackEventSnapshot = _primaryAttackEvent.GetInvocationList();
+            }
+            remove
+            {
+                if (value == null || _primaryAttackEvent == null)
+                    return;
+
+                Action<EntityPrimaryAttackEvent> before = _primaryAttackEvent;
+                Action<EntityPrimaryAttackEvent> after =
+                    (Action<EntityPrimaryAttackEvent>)Delegate.Remove(before, value);
+                if (ReferenceEquals(before, after))
+                    return;
+
+                _primaryAttackEvent = after;
+                _primaryAttackEventSnapshot = after != null
+                    ? after.GetInvocationList()
+                    : Array.Empty<Delegate>();
+            }
+        }
 
         [NonSerialized]
         private Dictionary<int, PendingPrimaryAttack> _pendingPrimaryAttacks;
@@ -473,12 +514,19 @@ namespace ES
             poolSpawnCount++;
             BindEquipmentTransitionEvents();
             if (HasStart)
+            {
+                Internal_PrepareWeaponFireHotPath();
+                Internal_PrepareShotLifecycleObserver();
                 InitializeWeaponFusionRuntime();
+            }
+            Internal_ResetShotPatternDiagnostics();
         }
 
         public void OnPoolDespawned()
         {
             poolDespawnCount++;
+            Internal_CancelPrimaryAttack();
+            FinishActiveShotPatterns();
             ClearPendingEquipmentTransition();
             ESActionPoolLifecycleDiagnostics.Record("Combat.BridgeDispose");
             actionPresentationBridge?.Dispose();
@@ -486,7 +534,8 @@ namespace ES
             FinishPendingPrimaryAttacks();
             actionRuntime?.ResetForLifecycle();
             actionRuntime = null;
-            PrimaryAttackEvent = null;
+            _primaryAttackEvent = null;
+            _primaryAttackEventSnapshot = Array.Empty<Delegate>();
         }
 
         [LabelText("Refresh Parent Snapshot Every Frame")]
@@ -580,6 +629,8 @@ namespace ES
             ResolvePeekState();
             _aimLifecycle.SetTarget(_sm, _aimState, GetAimStateKeyForLifecycle(_aimState));
             _peekLifecycle.SetTarget(_sm, _peekState, GetPeekStateKeyForLifecycle(_peekState));
+            Internal_PrepareWeaponFireHotPath();
+            Internal_PrepareShotLifecycleObserver();
             InitializeWeaponFusionRuntime();
         }
 
@@ -647,19 +698,43 @@ namespace ES
         public Vector3 lastFireHitPoint;
 
         [ShowInInspector, ReadOnly, LabelText("最近命中物")]
-        public string lastFireHitName;
+        public Collider lastFireHitCollider;
+
+        [LabelText("武器射线命中缓存容量")]
+        [MinValue(1), MaxValue(MaximumWeaponFireHitCapacity)]
+        public int weaponFireHitBufferCapacity = DefaultWeaponFireHitCapacity;
+
+        [ShowInInspector, ReadOnly, LabelText("武器射线缓存溢出次数")]
+        public int weaponFireHitOverflowCount;
+
+        [ShowInInspector, ReadOnly, LabelText("武器射线回退截断次数")]
+        public int weaponFireFallbackTruncationCount;
 
         [NonSerialized] private float _lastRecoilWarnTime = -999f;
         [NonSerialized] private float _lastWeaponDefinitionWarnTime = -999f;
         [NonSerialized] private RaycastHit[] _weaponFireHits;
+        [NonSerialized] private RaycastHit[] _weaponPatternHits;
+        [NonSerialized] private ItemShotModule[] _shotPatternRollback;
+        [NonSerialized] private ActiveShotPattern[] _activeShotPatterns;
+        [NonSerialized] private int _activeShotPatternCount;
+        [NonSerialized] private int _shotPatternHighWatermark;
+        [NonSerialized] private int _shotPatternCapacityRejectCount;
         [NonSerialized] private bool _weaponTriggerHeld;
+        [NonSerialized] private int _activeBeamAttackId;
+        [NonSerialized] private ESWeaponConfigKey _activeBeamWeaponKey;
+        [NonSerialized] private EntityPrimaryAttackSelection _activeBeamSelection;
         [NonSerialized] private bool _chargeReleaseReady;
         [NonSerialized] private float _chargeStartedAt = -1f;
         [NonSerialized] private int _pendingBurstShots;
         [NonSerialized] private float _nextPolicyFireAt = -1f;
+        [NonSerialized] private ESWeaponUseFailure _lastWeaponUseFailure;
         [NonSerialized] private int _recoilBurstShotCount;
         [NonSerialized] private int _recoilBurstWeaponIndex = int.MinValue;
         [NonSerialized] private float _recoilBurstLastShotTime = -999f;
+
+        public int ActiveShotPatternCount => _activeShotPatternCount;
+        public int ShotPatternHighWatermark => _shotPatternHighWatermark;
+        public int ShotPatternCapacityRejectCount => _shotPatternCapacityRejectCount;
         private List<EntityEquipmentWeaponSlot> weaponSlots =>
             ResolveEquipmentDomain()?.Slots?.weaponSlots;
 
@@ -752,8 +827,18 @@ namespace ES
         public string lastPrimaryAttackFailureReason;
 
         private const float RecoilWarnInterval = 2f;
-        private const int InitialWeaponFireHitCapacity = 16;
+        private const int DefaultWeaponFireHitCapacity = 32;
         private const int MaximumWeaponFireHitCapacity = 256;
+        private const int MinimumWeaponFireOverflowSteps = 32;
+        private const int MaximumActiveShotPatterns = 256;
+
+        private struct ActiveShotPattern
+        {
+            public int attackId;
+            public int remainingMembers;
+            public EntityPrimaryAttackSelection selection;
+            public ESWeaponConfigKey weaponKey;
+        }
 
         public void TriggerAttack()
         {
@@ -781,12 +866,13 @@ namespace ES
         {
             bool wasHeld = _weaponTriggerHeld;
             _weaponTriggerHeld = false;
+            bool endedBeam = FinishBeamSession();
             float chargeStartedAt = _chargeStartedAt;
             _chargeStartedAt = -1f;
             if (!wasHeld
                 || !TryResolveCurrentWeaponDefinition(out ItemWeaponSharedData definition)
                 || definition.firePolicy != WeaponFirePolicy.Charge)
-                return false;
+                return endedBeam;
 
             float heldTime = chargeStartedAt >= 0f ? Time.time - chargeStartedAt : 0f;
             if (heldTime < Mathf.Max(0f, definition.fire.chargeTime))
@@ -802,6 +888,7 @@ namespace ES
 
         public void Internal_CancelPrimaryAttack()
         {
+            FinishBeamSession();
             _weaponTriggerHeld = false;
             _chargeReleaseReady = false;
             _chargeStartedAt = -1f;
@@ -818,6 +905,7 @@ namespace ES
             return TryExecutePrimaryAttack(false);
         }
 
+        [ESHotPath]
         private bool TryExecutePrimaryAttack(bool policyTick)
         {
             lastAttackTime = Time.time;
@@ -909,7 +997,12 @@ namespace ES
                         return false;
                     }
 
-                    int attackId = NextPrimaryAttackId();
+                    bool continuingBeam = lastPrimaryAttackRoute == EntityPrimaryAttackRoute.Beam
+                        && policyTick
+                        && _activeBeamAttackId > 0;
+                    int attackId = continuingBeam
+                        ? _activeBeamAttackId
+                        : NextPrimaryAttackId();
                     if (TryFireWeapon(
                             attackId,
                             selection,
@@ -917,13 +1010,20 @@ namespace ES
                             definition,
                             policyTick))
                     {
+                        if (lastPrimaryAttackRoute == EntityPrimaryAttackRoute.Beam
+                            && !continuingBeam)
+                        {
+                            _activeBeamAttackId = attackId;
+                            _activeBeamWeaponKey = currentWeaponKey;
+                            _activeBeamSelection = selection;
+                        }
                         lastPrimaryAttackId = attackId;
                         ScheduleWeaponPolicy(definition, policyTick);
                         return true;
                     }
 
                     if (string.IsNullOrEmpty(lastPrimaryAttackFailureReason))
-                        lastPrimaryAttackFailureReason = selection.route + " 已选中，但武器运行时拒绝本次请求。";
+                        lastPrimaryAttackFailureReason = "当前武器运行时拒绝本次主攻击请求。";
                     return false;
 
                 default:
@@ -1048,7 +1148,6 @@ namespace ES
 
             if (!ESRuntimeDataModule.ItemInstanceTable.TryConsumeWeaponUse(
                     itemHandle,
-                    definition,
                     Time.time,
                     out _,
                     out ESWeaponUseFailure failure))
@@ -1340,6 +1439,7 @@ namespace ES
             return fired;
         }
 
+        [ESHotPath]
         private bool TryFireWeapon(
             int attackId,
             EntityPrimaryAttackSelection selection,
@@ -1347,6 +1447,9 @@ namespace ES
             ItemWeaponSharedData weaponDefinition,
             bool policyTick)
         {
+            using (WeaponFireMarker.Auto())
+            {
+            _lastWeaponUseFailure = ESWeaponUseFailure.None;
             if (!enableGunFire || MyCore == null)
                 return false;
 
@@ -1356,6 +1459,10 @@ namespace ES
             if (!selection.IsValid
                 || selection.route == EntityPrimaryAttackRoute.Action
                 || weaponDefinition == null)
+                return false;
+
+            if (selection.route == EntityPrimaryAttackRoute.Shot
+                && _shotLifecycleObserver == null)
                 return false;
 
             WeaponFireDefinitionData fireDefinition = weaponDefinition.fire;
@@ -1387,33 +1494,63 @@ namespace ES
             Vector3 visualOrigin;
             ResolveFireRay(distance, hitMask, triggerInteraction, out rayOrigin, out rayDirection, out visualOrigin);
 
+            ESShotPreparedSpawn preparedShot = default;
+            ItemShotVariableData baseShotVariable = default;
+            Transform shotTarget = null;
+            if (selection.route == EntityPrimaryAttackRoute.Shot)
+            {
+                if (!ESShotSpawner.Internal_TryPrepareSpawn(
+                        weaponDefinition.defaultShot,
+                        out preparedShot,
+                        out string prepareError))
+                {
+                    lastPrimaryAttackFailureReason = prepareError;
+                    return false;
+                }
+
+                baseShotVariable = preparedShot.runtimeData.PreparedDefaultVariableData;
+                if (preparedShot.RequiresTarget(baseShotVariable))
+                {
+                    shotTarget = defaultAimTarget;
+                    if (shotTarget == null)
+                    {
+                        lastPrimaryAttackFailureReason = "Target/MustHit Shot 必须提供有效目标。";
+                        return false;
+                    }
+                }
+            }
+
             float cooldownOverride = ResolvePolicyCooldown(weaponDefinition, policyTick);
             if (!ESRuntimeDataModule.ItemInstanceTable.TryConsumeWeaponUse(
                     itemHandle,
-                    weaponDefinition,
                     Time.time,
                     out ItemWeaponVariableData consumedState,
                     out ESWeaponUseFailure useFailure,
                     cooldownOverride))
             {
-                lastPrimaryAttackFailureReason = "武器实例拒绝消耗：" + useFailure;
+                _lastWeaponUseFailure = useFailure;
+                lastPrimaryAttackFailureReason = GetWeaponUseFailureReason(useFailure);
                 return false;
             }
 
             RaycastHit hit = default;
             bool hasHit = false;
             bool persistentShot = false;
+            int patternHitCount = 0;
+            int pelletCount = fireDefinition.pelletCount;
             Vector3 endPoint = rayOrigin + rayDirection * distance;
             if (selection.route == EntityPrimaryAttackRoute.Shot)
             {
-                Transform target = null;
-                if (ESRuntimeDataGameCore.Shots.TryGet(
-                        weaponDefinition.defaultShot,
-                        out ESShotRuntimeData shotData)
-                    && shotData?.sharedData != null
-                    && (shotData.sharedData.aimMode == ShotAimMode.Target
-                        || shotData.sharedData.aimMode == ShotAimMode.MustHit))
-                    target = defaultAimTarget;
+                if (!TryRegisterShotPattern(
+                        attackId,
+                        pelletCount,
+                        selection,
+                        primaryWeaponKey))
+                {
+                    ESRuntimeDataModule.ItemInstanceTable.Internal_TrySetWeaponState(itemHandle, previousState);
+                    lastPrimaryAttackFailureReason = "Shot 图案容量不足，已拒绝发射。";
+                    return false;
+                }
 
                 var launchContext = new ESShotLaunchContext(
                     attackId,
@@ -1421,39 +1558,77 @@ namespace ES
                     itemHandle,
                     primaryWeaponKey,
                     selection,
-                    target,
+                    shotTarget,
                     null,
-                    HandleShotLifecycle);
-                if (!ESShotSpawner.TrySpawn(
-                        weaponDefinition.defaultShot,
-                        visualOrigin,
-                        rayDirection,
-                        launchContext,
-                        out _,
-                        out string spawnError))
+                    _shotLifecycleObserver,
+                    false);
+                int spawnedCount = 0;
+                for (int pelletIndex = 0; pelletIndex < pelletCount; pelletIndex++)
                 {
+                    ItemShotVariableData shotVariable = baseShotVariable;
+                    shotVariable.logicSeed = consumedState.logicSeed + pelletIndex * 48611;
+                    shotVariable.spreadAngle = Mathf.Max(
+                        shotVariable.spreadAngle,
+                        fireDefinition.spreadAngle);
+                    if (ESShotSpawner.Internal_TrySpawnPrepared(
+                            preparedShot,
+                            visualOrigin,
+                            rayDirection,
+                            shotVariable,
+                            launchContext,
+                            out ItemShotModule spawnedShot,
+                            out string spawnError))
+                    {
+                        _shotPatternRollback[spawnedCount++] = spawnedShot;
+                        continue;
+                    }
+
+                    for (int rollbackIndex = 0; rollbackIndex < spawnedCount; rollbackIndex++)
+                    {
+                        _shotPatternRollback[rollbackIndex]?.Internal_Stop(false);
+                        _shotPatternRollback[rollbackIndex] = null;
+                    }
+                    CancelShotPattern(attackId);
                     ESRuntimeDataModule.ItemInstanceTable.Internal_TrySetWeaponState(itemHandle, previousState);
-                    lastPrimaryAttackFailureReason = "Shot 生成失败：" + spawnError;
+                    lastPrimaryAttackFailureReason = spawnError;
                     return false;
                 }
+                for (int clearIndex = 0; clearIndex < spawnedCount; clearIndex++)
+                    _shotPatternRollback[clearIndex] = null;
                 persistentShot = true;
             }
             else
             {
-                hasHit = TryResolveWeaponRaycast(
-                    rayOrigin,
-                    rayDirection,
-                    distance,
-                    hitMask,
-                    triggerInteraction,
-                    out hit);
-                endPoint = hasHit ? hit.point : endPoint;
+                for (int pelletIndex = 0; pelletIndex < pelletCount; pelletIndex++)
+                {
+                    Vector3 pelletDirection = ApplyWeaponPatternSpread(
+                        rayDirection,
+                        fireDefinition.spreadAngle,
+                        consumedState.logicSeed,
+                        pelletIndex);
+                    if (!TryResolveWeaponRaycast(
+                            rayOrigin,
+                            pelletDirection,
+                            distance,
+                            hitMask,
+                            triggerInteraction,
+                            out RaycastHit patternHit))
+                        continue;
+
+                    if (!hasHit)
+                    {
+                        hit = patternHit;
+                        endPoint = patternHit.point;
+                        hasHit = true;
+                    }
+                    _weaponPatternHits[patternHitCount++] = patternHit;
+                }
             }
 
             lastFireTime = Time.time;
             fireCount++;
             lastFireHitPoint = endPoint;
-            lastFireHitName = hasHit && hit.collider != null ? hit.collider.name : string.Empty;
+            lastFireHitCollider = hasHit ? hit.collider : null;
 
             SetActionPhase(4);
             TryActivateTransitionState(
@@ -1474,22 +1649,26 @@ namespace ES
 
             if (debugFireLog)
             {
-                string hitName = hasHit && hit.collider != null ? hit.collider.name : "<none>";
+                string hitName = lastFireHitCollider != null ? lastFireHitCollider.name : "<none>";
                 Debug.Log(
                     $"[EntityBasicCombatModule] Fire #{fireCount} | Origin={rayOrigin} | Dir={rayDirection} | Hit={hitName} | Point={endPoint}",
                     MyCore);
             }
 
-            PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
-                EntityPrimaryAttackEventKind.Started,
-                attackId,
-                selection,
-                null,
-                primaryWeaponKey,
-                null));
-
-            if (!persistentShot && hasHit)
+            if (selection.route != EntityPrimaryAttackRoute.Beam || !policyTick)
             {
+                PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
+                    EntityPrimaryAttackEventKind.Started,
+                    attackId,
+                    selection,
+                    null,
+                    primaryWeaponKey,
+                    null));
+            }
+
+            for (int hitIndex = 0; !persistentShot && hitIndex < patternHitCount; hitIndex++)
+            {
+                RaycastHit patternHit = _weaponPatternHits[hitIndex];
                 PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
                     EntityPrimaryAttackEventKind.HitResolved,
                     attackId,
@@ -1497,12 +1676,13 @@ namespace ES
                     null,
                     primaryWeaponKey,
                     null,
-                    hit.collider,
-                    hit.point,
+                    patternHit.collider,
+                    patternHit.point,
                     true));
+                _weaponPatternHits[hitIndex] = default;
             }
 
-            if (!persistentShot)
+            if (!persistentShot && selection.route != EntityPrimaryAttackRoute.Beam)
             {
                 PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
                     EntityPrimaryAttackEventKind.Finished,
@@ -1513,6 +1693,50 @@ namespace ES
                     null));
             }
 
+            return true;
+            }
+        }
+
+        [ESHotPath]
+        private static string GetWeaponUseFailureReason(ESWeaponUseFailure failure)
+        {
+            switch (failure)
+            {
+                case ESWeaponUseFailure.InvalidHandle:
+                    return "武器实例拒绝消耗：实例句柄无效。";
+                case ESWeaponUseFailure.MissingWeaponDefinition:
+                    return "武器实例拒绝消耗：冻结 WeaponDefinition 缺失。";
+                case ESWeaponUseFailure.Cooldown:
+                    return "武器实例拒绝消耗：冷却尚未结束。";
+                case ESWeaponUseFailure.Ammo:
+                    return "武器实例拒绝消耗：弹药不足。";
+                case ESWeaponUseFailure.Durability:
+                    return "武器实例拒绝消耗：耐久不足。";
+                case ESWeaponUseFailure.Overheated:
+                    return "武器实例拒绝消耗：武器过热。";
+                default:
+                    return "武器实例拒绝消耗：未知状态。";
+            }
+        }
+
+        private bool FinishBeamSession()
+        {
+            if (_activeBeamAttackId <= 0)
+                return false;
+
+            int attackId = _activeBeamAttackId;
+            EntityPrimaryAttackSelection selection = _activeBeamSelection;
+            ESWeaponConfigKey weaponKey = _activeBeamWeaponKey;
+            _activeBeamAttackId = 0;
+            _activeBeamWeaponKey = null;
+            _activeBeamSelection = default;
+            PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
+                EntityPrimaryAttackEventKind.Finished,
+                attackId,
+                selection,
+                null,
+                weaponKey,
+                null));
             return true;
         }
 
@@ -1559,6 +1783,7 @@ namespace ES
             }
         }
 
+        [ESHotPath]
         private void TickWeaponFirePolicy()
         {
             if (Time.time < _nextPolicyFireAt)
@@ -1568,7 +1793,7 @@ namespace ES
             {
                 if (!TryExecutePrimaryAttack(true))
                 {
-                    if (lastPrimaryAttackFailureReason.IndexOf("Cooldown", StringComparison.Ordinal) >= 0)
+                    if (_lastWeaponUseFailure == ESWeaponUseFailure.Cooldown)
                         _nextPolicyFireAt = Time.time + 0.01f;
                     else
                         _pendingBurstShots = 0;
@@ -1583,13 +1808,19 @@ namespace ES
                 return;
 
             if (!TryExecutePrimaryAttack(true))
+            {
+                if (definition.deliveryMode == WeaponAttackDeliveryMode.Beam
+                    && _lastWeaponUseFailure != ESWeaponUseFailure.Cooldown)
+                    FinishBeamSession();
                 _nextPolicyFireAt = Time.time + Mathf.Max(
                     0.01f,
                     definition.firePolicy == WeaponFirePolicy.Continuous
                         ? definition.fire.continuousInterval
                         : definition.fire.interval);
+            }
         }
 
+        [ESHotPath]
         private void HandleShotLifecycle(ESShotLifecycleEvent evt)
         {
             if (evt.context.owner != MyCore)
@@ -1615,6 +1846,15 @@ namespace ES
                 || evt.kind == ESShotLifecycleKind.Expired
                 || evt.kind == ESShotLifecycleKind.Stopped)
             {
+                if (TryCompleteShotPatternMember(evt.context.attackId, out bool patternFinished))
+                {
+                    if (!patternFinished)
+                        return;
+                }
+                else if (!evt.context.publishesAttackFinish)
+                {
+                    return;
+                }
                 PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
                     EntityPrimaryAttackEventKind.Finished,
                     evt.context.attackId,
@@ -1781,30 +2021,34 @@ namespace ES
         private bool TryResolveCurrentWeaponDefinition(out ItemWeaponSharedData definition)
         {
             definition = null;
-
-            ESWeaponConfigKey key = ResolveCurrentWeaponKey();
-            if (key == null)
+            if (!TryGetWeaponSlot(_activeWeaponSlot, out EntityEquipmentWeaponSlot slot))
             {
-                TryWarnWeaponDefinition("武器攻击必须配置当前 Weapon Slot 的 Weapon Key。");
+                TryWarnWeaponDefinition("武器攻击必须配置有效的当前 Weapon Slot。");
                 return false;
             }
 
-            if (!ESWeaponGameCoreTable.Table.TryGet(key, out ESWeaponRuntimeData runtimeData)
-                || runtimeData == null
-                || runtimeData.sharedData == null)
+            ESWeaponConfigKey key = slot.weaponKey;
+            ESWeaponRuntimeData runtimeData = slot.runtimeWeaponDefinition;
+            if (runtimeData == null || !runtimeData.Ready)
             {
-                TryWarnWeaponDefinition("已配置的 Weapon Key 未在 GameCore Weapon Table 解析："
-                                        + ESConfigKeyMatch.Describe(key.EnumKeyInt, key.StringKey));
+                if (!ESWeaponGameCoreTable.Table.TryGet(key, out runtimeData))
+                {
+                    TryWarnWeaponDefinition("已配置的 Weapon Key 未在 GameCore Weapon Table 解析："
+                                            + ESConfigKeyMatch.Describe(key.EnumKeyInt, key.StringKey));
+                    return false;
+                }
+                slot.runtimeWeaponDefinition = runtimeData;
+            }
+
+            if (runtimeData == null
+                || !runtimeData.Ready
+                || runtimeData.PreparedSharedData == null)
+            {
+                TryWarnWeaponDefinition("Weapon RuntimeData 尚未完成 Prepared 冻结。 ");
                 return false;
             }
 
-            definition = runtimeData.sharedData;
-            if (!definition.ValidateDefinition(out string validationError))
-            {
-                TryWarnWeaponDefinition("WeaponDefinition 无效：" + validationError);
-                return false;
-            }
-
+            definition = runtimeData.PreparedSharedData;
             return true;
         }
 
@@ -1966,13 +2210,13 @@ namespace ES
             }
         }
 
+        [ESHotPath]
         private void PublishPrimaryAttackEvent(in EntityPrimaryAttackEvent evt)
         {
-            Action<EntityPrimaryAttackEvent> handlers = PrimaryAttackEvent;
-            if (handlers == null)
-                return;
+            if (evt.kind == EntityPrimaryAttackEventKind.HitResolved)
+                Internal_ConsumePrimaryAttackHit(evt);
 
-            Delegate[] invocationList = handlers.GetInvocationList();
+            Delegate[] invocationList = _primaryAttackEventSnapshot;
             for (int i = 0; i < invocationList.Length; i++)
             {
                 try
@@ -1984,6 +2228,73 @@ namespace ES
                     Debug.LogException(exception, MyCore);
                 }
             }
+        }
+
+        [ESHotPath]
+        private void Internal_ConsumePrimaryAttackHit(in EntityPrimaryAttackEvent evt)
+        {
+            using (PrimaryHitConsumeMarker.Auto())
+            {
+                if (!TryResolveDamageTarget(evt.target, out Entity target, out Collider hitCollider)
+                    || target == null
+                    || target == MyCore)
+                    return;
+
+                EntityBasicHealthModule health = target.Internal_BasicHealth;
+                if (health == null)
+                    return;
+
+                float damage = unarmedPrimaryAttackDamage;
+                float impactStrength = 1f;
+                ESWeaponConfigKey weaponKey = evt.primaryWeaponKey;
+                if (weaponKey != null
+                    && weaponKey.IsConfigured
+                    && ESRuntimeDataGameCore.Weapons.TryGet(
+                        weaponKey,
+                        out ESWeaponRuntimeData weaponData)
+                    && weaponData != null
+                    && weaponData.Ready
+                    && weaponData.PreparedSharedData?.fire != null)
+                {
+                    WeaponFireDefinitionData fire = weaponData.PreparedSharedData.fire;
+                    damage = fire.damage;
+                    impactStrength = fire.impactStrength;
+                }
+                if (evt.actionHitResult.IsValid
+                    && evt.actionHitResult.damageMultiplier > 0f)
+                    damage *= evt.actionHitResult.damageMultiplier;
+
+                Vector3 point = evt.hasHitPoint
+                    ? evt.hitPoint
+                    : target.transform.position;
+                Vector3 direction = target.transform.position
+                    - (MyCore != null ? MyCore.transform.position : point);
+                var request = new ESEntityDamageRequest(
+                    MyCore,
+                    damage,
+                    impactStrength,
+                    hitCollider,
+                    point,
+                    direction,
+                    evt.attackId);
+                health.TryApplyDamage(request, out _);
+            }
+        }
+
+        private static bool TryResolveDamageTarget(
+            UnityEngine.Object value,
+            out Entity entity,
+            out Collider collider)
+        {
+            collider = value as Collider;
+            if (collider != null)
+                return ESShotColliderOwnerRegistry.TryResolveEntity(collider, out entity);
+
+            entity = value as Entity;
+            if (entity != null)
+                return true;
+
+            return false;
         }
 
         private void CacheStateMachine()
@@ -2042,6 +2353,39 @@ namespace ES
             }
         }
 
+        [ESHotPath]
+        private static Vector3 ApplyWeaponPatternSpread(
+            Vector3 direction,
+            float spreadAngle,
+            int seed,
+            int pelletIndex)
+        {
+            Vector3 normalized = direction.sqrMagnitude > 0.0001f
+                ? direction.normalized
+                : Vector3.forward;
+            if (spreadAngle <= 0f)
+                return normalized;
+
+            uint value = unchecked((uint)(seed + pelletIndex * 48611));
+            value ^= 0x9E3779B9u;
+            value ^= value >> 16;
+            value *= 0x7FEB352Du;
+            value ^= value >> 15;
+            float yaw = ((value & 0xFFFFu) / 65535f * 2f - 1f) * spreadAngle;
+            value *= 0x846CA68Bu;
+            value ^= value >> 16;
+            float pitch = ((value & 0xFFFFu) / 65535f * 2f - 1f) * spreadAngle;
+
+            Vector3 up = Mathf.Abs(Vector3.Dot(normalized, Vector3.up)) > 0.98f
+                ? Vector3.right
+                : Vector3.up;
+            Vector3 right = Vector3.Cross(up, normalized).normalized;
+            return (Quaternion.AngleAxis(yaw, up)
+                    * Quaternion.AngleAxis(pitch, right)
+                    * normalized).normalized;
+        }
+
+        [ESHotPath]
         private bool TryResolveWeaponRaycast(
             Vector3 origin,
             Vector3 direction,
@@ -2054,24 +2398,24 @@ namespace ES
             if (direction.sqrMagnitude <= 0.0001f || distance <= 0f)
                 return false;
 
-            _weaponFireHits ??= new RaycastHit[InitialWeaponFireHitCapacity];
-            int count;
-            while (true)
+            Vector3 normalizedDirection = direction.normalized;
+            int count = Physics.RaycastNonAlloc(
+                origin,
+                normalizedDirection,
+                _weaponFireHits,
+                distance,
+                hitMask,
+                triggerInteraction);
+            if (count >= _weaponFireHits.Length)
             {
-                count = Physics.RaycastNonAlloc(
+                weaponFireHitOverflowCount++;
+                return TryResolveWeaponRaycastOverflow(
                     origin,
-                    direction.normalized,
-                    _weaponFireHits,
+                    normalizedDirection,
                     distance,
                     hitMask,
-                    triggerInteraction);
-                if (count < _weaponFireHits.Length
-                    || _weaponFireHits.Length >= MaximumWeaponFireHitCapacity)
-                    break;
-
-                Array.Resize(
-                    ref _weaponFireHits,
-                    Mathf.Min(_weaponFireHits.Length * 2, MaximumWeaponFireHitCapacity));
+                    triggerInteraction,
+                    out nearestHit);
             }
 
             float nearestDistance = float.PositiveInfinity;
@@ -2086,6 +2430,165 @@ namespace ES
                 nearestHit = candidate;
             }
             return !float.IsPositiveInfinity(nearestDistance);
+        }
+
+        [ESHotPath]
+        private bool TryResolveWeaponRaycastOverflow(
+            Vector3 origin,
+            Vector3 direction,
+            float distance,
+            LayerMask hitMask,
+            QueryTriggerInteraction triggerInteraction,
+            out RaycastHit nearestHit)
+        {
+            nearestHit = default;
+            float travelled = 0f;
+            int maximumSteps = Mathf.Min(
+                MaximumWeaponFireHitCapacity,
+                Mathf.Max(MinimumWeaponFireOverflowSteps, _weaponFireHits.Length * 2));
+            for (int step = 0; step < maximumSteps && travelled < distance; step++)
+            {
+                float remainingDistance = distance - travelled;
+                if (!Physics.Raycast(
+                        origin,
+                        direction,
+                        out RaycastHit candidate,
+                        remainingDistance,
+                        hitMask,
+                        triggerInteraction))
+                    return false;
+
+                if (candidate.collider != null && !IsOwnedWeaponCollider(candidate.collider))
+                {
+                    nearestHit = candidate;
+                    return true;
+                }
+
+                float advance = Mathf.Max(0.001f, candidate.distance + 0.001f);
+                travelled += advance;
+                origin += direction * advance;
+            }
+
+            if (travelled < distance)
+                weaponFireFallbackTruncationCount++;
+            return false;
+        }
+
+        private void Internal_PrepareWeaponFireHotPath()
+        {
+            int capacity = Mathf.Clamp(
+                weaponFireHitBufferCapacity,
+                1,
+                MaximumWeaponFireHitCapacity);
+            if (_weaponFireHits == null || _weaponFireHits.Length != capacity)
+                _weaponFireHits = new RaycastHit[capacity];
+            _weaponPatternHits ??= new RaycastHit[64];
+            _shotPatternRollback ??= new ItemShotModule[64];
+            _activeShotPatterns ??= new ActiveShotPattern[MaximumActiveShotPatterns];
+        }
+
+        [ESHotPath]
+        private bool TryRegisterShotPattern(
+            int attackId,
+            int memberCount,
+            in EntityPrimaryAttackSelection selection,
+            ESWeaponConfigKey weaponKey)
+        {
+            if (attackId <= 0 || memberCount <= 0)
+                return false;
+            if (_activeShotPatterns == null)
+            {
+                _shotPatternCapacityRejectCount++;
+                return false;
+            }
+            for (int index = 0; index < _activeShotPatterns.Length; index++)
+            {
+                if (_activeShotPatterns[index].attackId != 0)
+                    continue;
+                _activeShotPatterns[index] = new ActiveShotPattern
+                {
+                    attackId = attackId,
+                    remainingMembers = memberCount,
+                    selection = selection,
+                    weaponKey = weaponKey
+                };
+                _activeShotPatternCount++;
+                if (_activeShotPatternCount > _shotPatternHighWatermark)
+                    _shotPatternHighWatermark = _activeShotPatternCount;
+                return true;
+            }
+
+            _shotPatternCapacityRejectCount++;
+            return false;
+        }
+
+        [ESHotPath]
+        private bool TryCompleteShotPatternMember(int attackId, out bool patternFinished)
+        {
+            patternFinished = false;
+            if (attackId <= 0 || _activeShotPatterns == null)
+                return false;
+            for (int index = 0; index < _activeShotPatterns.Length; index++)
+            {
+                ref ActiveShotPattern pattern = ref _activeShotPatterns[index];
+                if (pattern.attackId != attackId)
+                    continue;
+                pattern.remainingMembers--;
+                if (pattern.remainingMembers <= 0)
+                {
+                    pattern = default;
+                    _activeShotPatternCount = Mathf.Max(0, _activeShotPatternCount - 1);
+                    patternFinished = true;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        private void CancelShotPattern(int attackId)
+        {
+            if (attackId <= 0 || _activeShotPatterns == null)
+                return;
+            for (int index = 0; index < _activeShotPatterns.Length; index++)
+            {
+                if (_activeShotPatterns[index].attackId != attackId)
+                    continue;
+                _activeShotPatterns[index] = default;
+                _activeShotPatternCount = Mathf.Max(0, _activeShotPatternCount - 1);
+                return;
+            }
+        }
+
+        private void FinishActiveShotPatterns()
+        {
+            if (_activeShotPatterns == null || _activeShotPatternCount == 0)
+                return;
+            for (int index = 0; index < _activeShotPatterns.Length; index++)
+            {
+                ActiveShotPattern pattern = _activeShotPatterns[index];
+                if (pattern.attackId == 0)
+                    continue;
+                _activeShotPatterns[index] = default;
+                PublishPrimaryAttackEvent(new EntityPrimaryAttackEvent(
+                    EntityPrimaryAttackEventKind.Finished,
+                    pattern.attackId,
+                    pattern.selection,
+                    null,
+                    pattern.weaponKey,
+                    null));
+            }
+            _activeShotPatternCount = 0;
+        }
+
+        private void Internal_ResetShotPatternDiagnostics()
+        {
+            _shotPatternHighWatermark = _activeShotPatternCount;
+            _shotPatternCapacityRejectCount = 0;
+        }
+
+        private void Internal_PrepareShotLifecycleObserver()
+        {
+            _shotLifecycleObserver ??= HandleShotLifecycle;
         }
 
         private bool IsOwnedWeaponCollider(Collider collider)

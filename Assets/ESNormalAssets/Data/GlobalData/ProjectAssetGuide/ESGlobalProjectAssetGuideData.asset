@@ -67,7 +67,7 @@ MonoBehaviour:
     savedUtcTicks: 639206504545544325
     expandedTransformPaths: []
   - sceneGuid: 6bd32f5e9a6645199c104bf1d0f2095a
-    scenePath: Assets/Plugins/ES/0_Stand/_Res/Bootstrap/ESBootstrap.unity
+    scenePath: Assets/Plugins/ES/0_Stand/InternalAssets/ResourceBootstrap/ESBootstrap.unity
     savedUtcTicks: 639206775090675748
     expandedTransformPaths: []
   - sceneGuid: 99c9720ab356a0642a771bea13969a05
@@ -95,9 +95,8 @@ MonoBehaviour:
     - '%E2%98%85%20ESRuntimeWatch%20%C2%B7%20%E4%BA%A7%E5%93%81%E5%B1%95%E7%A4%BA#0@14'
   - sceneGuid: f2b890ffbb8c33a4d8e67502c4c7a63a
     scenePath: Assets/Scenes/Tests/ESPlayerControllerTest.unity
-    savedUtcTicks: 639221414063558242
-    expandedTransformPaths:
-    - ES%20Player%20Controller%20Test#0@0
+    savedUtcTicks: 639227856739771739
+    expandedTransformPaths: []
   - sceneGuid: 2b30ed531afa9e64187c177b148988bd
     scenePath: Assets/InitTestScene639217618548923744.unity
     savedUtcTicks: 639217330562292188
@@ -123,6 +122,32 @@ MonoBehaviour:
     savedUtcTicks: 639218904496333153
     expandedTransformPaths:
     - GameObject#0@2
+  - sceneGuid: 0bc3b8ebcc805994498bdfe7f586e9dd
+    scenePath: Assets/ESTestAssets/CompositeShaders/Generated/Scenes/00_CompositeShader_TestOverview.unity
+    savedUtcTicks: 639228403119499990
+    expandedTransformPaths:
+    - Composite%20Shader%20Test%20Overview#0@0
+    - Composite%20Shader%20Test%20Overview#0@0/Diagnostics#0@13/ES%20Scene%20Validation%20Overlay#0@0
+  - sceneGuid: b4f26835a01911d45823a1d3cde1000f
+    scenePath: Assets/ESTestAssets/CompositeShaders/Generated/Scenes/01_CompositeShader_2D_Cases.unity
+    savedUtcTicks: 639227855273432512
+    expandedTransformPaths: []
+  - sceneGuid: 56b71f36d8040a44ebdacf759edc04ca
+    scenePath: Assets/ESTestAssets/CompositeShaders/Generated/Scenes/02_CompositeShader_UI_Cases.unity
+    savedUtcTicks: 639227855280144431
+    expandedTransformPaths: []
+  - sceneGuid: 6b375c60c399eee48bcc8c14f94b7d14
+    scenePath: Assets/ESTestAssets/CompositeShaders/Generated/Scenes/03_CompositeShader_3D_Lit_Cases.unity
+    savedUtcTicks: 639227855287002411
+    expandedTransformPaths: []
+  - sceneGuid: 787772480ae01dd4a82bca8ba7f2d89f
+    scenePath: Assets/ESTestAssets/CompositeShaders/Generated/Scenes/04_CompositeShader_3D_VFX_Cases.unity
+    savedUtcTicks: 639227855293574674
+    expandedTransformPaths: []
+  - sceneGuid: c583a1ba42f1fcf4dbf72cbeaf17df55
+    scenePath: Assets/ESTestAssets/CompositeShaders/Generated/Scenes/05_CompositeShader_ProductionRecipes.unity
+    savedUtcTicks: 639227855300448036
+    expandedTransformPaths: []
   displayTitleFontSize: 22
   displayHintFontSize: 14
   displayTitleColor: {r: 1, g: 0.82, b: 0.28, a: 1}

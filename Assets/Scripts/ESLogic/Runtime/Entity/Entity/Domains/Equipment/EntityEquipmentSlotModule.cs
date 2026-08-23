@@ -22,6 +22,8 @@ namespace ES
 
         [NonSerialized] internal EntityWeaponBinding runtimeBinding;
         [NonSerialized] internal ESInstanceHandle itemHandle;
+        [NonSerialized] internal ESWeaponRuntimeData runtimeWeaponDefinition;
+        [NonSerialized] internal GameObject runtimeOwnedView;
     }
 
     [Serializable, TypeRegistryItem("装备槽位模块")]
@@ -42,15 +44,20 @@ namespace ES
 
         public void OnPoolSpawned()
         {
+            ReleaseRuntimeViews();
             ResetRuntimeState();
         }
 
         public void OnPoolDespawned()
         {
+            ReleaseRuntimeViews();
             ResetRuntimeState();
         }
 
-        public bool TryGetWeaponSlot(int index, out EntityEquipmentWeaponSlot slot, out string error)
+        internal bool TryGetWeaponSlotDefinition(
+            int index,
+            out EntityEquipmentWeaponSlot slot,
+            out string error)
         {
             if (weaponSlots == null || (uint)index >= (uint)weaponSlots.Count)
             {
@@ -60,7 +67,21 @@ namespace ES
             }
 
             slot = weaponSlots[index];
-            if (slot == null || slot.weaponRoot == null)
+            if (slot == null || slot.weaponKey == null || !slot.weaponKey.IsConfigured)
+            {
+                error = "Weapon slot " + index + " has no configured Weapon Key.";
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        public bool TryGetWeaponSlot(int index, out EntityEquipmentWeaponSlot slot, out string error)
+        {
+            if (!TryGetWeaponSlotDefinition(index, out slot, out error))
+                return false;
+            if (slot.weaponRoot == null)
             {
                 error = "Weapon slot " + index + " has no authored weapon root.";
                 return false;
@@ -82,6 +103,118 @@ namespace ES
 
             error = null;
             return true;
+        }
+
+        internal bool TryEnsureRuntimeWeaponView(
+            int index,
+            out bool acquired,
+            out string error)
+        {
+            acquired = false;
+            if (!TryGetWeaponSlotDefinition(index, out EntityEquipmentWeaponSlot slot, out error))
+                return false;
+            if (slot.weaponRoot != null)
+            {
+                acquired = slot.runtimeOwnedView != null;
+                return TryGetWeaponSlot(index, out _, out error);
+            }
+
+            if (!ESRuntimeDataGameCore.Weapons.TryGet(
+                    slot.weaponKey,
+                    out ESWeaponRuntimeData weaponData)
+                || weaponData == null
+                || !weaponData.Ready
+                || weaponData.PreparedSharedData == null
+                || !weaponData.TryGetPreparedPrefabIdentity(out ESAssetIdentity prefabIdentity))
+            {
+                error = "Weapon slot " + index + " cannot resolve a prepared Weapon Prefab.";
+                return false;
+            }
+            if (!ESAssets.TryGetActivePlanAsset(prefabIdentity, out GameObject prefab))
+            {
+                error = "Weapon Prefab is not borrowed by the active ResourcePlan.";
+                return false;
+            }
+            if (!ESGameManager.TryGetModule(out ESGameObjectPoolModule pool) || pool == null)
+            {
+                error = "GameObject Pool module is unavailable.";
+                return false;
+            }
+
+            GameObject instance = pool.GetInPool(
+                prefab,
+                MyCore != null ? MyCore.transform.position : Vector3.zero,
+                Quaternion.identity,
+                MyCore != null ? MyCore.transform : null,
+                false,
+                0f);
+            if (instance == null)
+            {
+                error = "GameObject Pool rejected the Weapon Prefab request.";
+                return false;
+            }
+
+            Item item = instance.GetComponent<Item>();
+            EntityWeaponBinding binding = instance.GetComponent<EntityWeaponBinding>();
+            if (item == null
+                || binding == null
+                || !binding.ValidateReferences(out error)
+                || !weaponData.TryGetPreparedItemRuntimeKey(out int preparedItemRuntimeKey)
+                || item.prefabDefinition == null
+                || !ESRuntimeDataGameCore.Items.TryGetRuntimeKey(
+                    item.prefabDefinition.itemKey,
+                    out int prefabItemRuntimeKey)
+                || prefabItemRuntimeKey != preparedItemRuntimeKey)
+            {
+                if (string.IsNullOrEmpty(error))
+                    error = "Weapon Prefab root must contain the prepared Item projection and one EntityWeaponBinding.";
+                pool.PushToPool(instance);
+                return false;
+            }
+
+            slot.runtimeOwnedView = instance;
+            slot.weaponRoot = instance.transform;
+            slot.runtimeBinding = binding;
+            slot.runtimeWeaponDefinition = weaponData;
+            acquired = true;
+            AdvanceRevision();
+            error = null;
+            return true;
+        }
+
+        internal void Internal_ReleaseRuntimeWeaponView(int index)
+        {
+            if (weaponSlots == null || (uint)index >= (uint)weaponSlots.Count)
+                return;
+
+            EntityEquipmentWeaponSlot slot = weaponSlots[index];
+            if (slot == null || slot.runtimeOwnedView == null)
+                return;
+
+            GameObject view = slot.runtimeOwnedView;
+            slot.runtimeOwnedView = null;
+            slot.weaponRoot = null;
+            slot.runtimeBinding = null;
+            slot.runtimeWeaponDefinition = null;
+            bool released = ESGameManager.TryGetModule(out ESGameObjectPoolModule pool)
+                && pool != null
+                && (pool.PushToPool(view) || pool.DestroyPooledInstance(view));
+            if (!released && view != null)
+            {
+                if (Application.isPlaying)
+                    UnityEngine.Object.Destroy(view);
+                else
+                    UnityEngine.Object.DestroyImmediate(view);
+            }
+            AdvanceRevision();
+        }
+
+        private void ReleaseRuntimeViews()
+        {
+            if (weaponSlots == null)
+                return;
+            for (int index = 0; index < weaponSlots.Count; index++)
+                Internal_ReleaseRuntimeWeaponView(index);
         }
 
         public int FindNextValidWeaponIndex(int from, int direction)
@@ -199,6 +332,7 @@ namespace ES
                 || current != expectedHandle)
                 return false;
             weaponSlots[index].itemHandle = default;
+            Internal_ReleaseRuntimeWeaponView(index);
             AdvanceRevision();
             return true;
         }
@@ -230,6 +364,7 @@ namespace ES
                     continue;
                 slot.runtimeBinding = null;
                 slot.itemHandle = default;
+                slot.runtimeWeaponDefinition = null;
             }
         }
 

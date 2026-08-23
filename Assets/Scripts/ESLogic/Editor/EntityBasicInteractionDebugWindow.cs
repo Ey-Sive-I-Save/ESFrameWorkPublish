@@ -28,6 +28,7 @@ namespace ES
         {
             return new GUIContent("交互运行时面板", "观察当前 Entity 的基础交互与 IK 写入状态");
         }
+        public override string ESWindow_PresentationShortTitle => "交互";
 
         protected override string ESWindow_Subtitle => "Entity 交互诊断";
         protected override Vector2 ESWindow_MinSize => new Vector2(420f, 300f);

@@ -1,0 +1,21 @@
+{
+    "panelId": "platform-main-menu",
+    "prefabPath": "Assets/UI/Prefabs/Generated/PlatformMainMenu.prefab",
+    "fixtureScenePath": "Assets/UI/Scenes/Generated/PlatformMainMenuFixture.unity",
+    "status": "Completed",
+    "elementCount": 4,
+    "profiles": [
+        "wide",
+        "narrow"
+    ],
+    "states": [
+        "default",
+        "selected"
+    ],
+    "outputs": [
+        "F:/aaProject/ESFrameWorkPublish/ES/UIEvidence/platform-main-menu/wide__default.png",
+        "F:/aaProject/ESFrameWorkPublish/ES/UIEvidence/platform-main-menu/narrow__default.png",
+        "F:/aaProject/ESFrameWorkPublish/ES/UIEvidence/platform-main-menu/wide__selected.png",
+        "F:/aaProject/ESFrameWorkPublish/ES/UIEvidence/platform-main-menu/narrow__selected.png"
+    ]
+}

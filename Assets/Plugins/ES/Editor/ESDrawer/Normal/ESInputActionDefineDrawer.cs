@@ -272,8 +272,13 @@ namespace ES.EditorInternal
             }
         }
 
+        [ESWindowSleepContract(
+            ESWindowSleepMode.Transient,
+            "Unity 原生 InputAction 导入器由调用方控制生命周期")]
         private sealed class ESInputActionImportWindow : ESSinglePageIMGUIWindow<ESInputActionImportWindow>
         {
+            // Native InputAction importer is a modal utility surface. It is
+            // owner-scoped and must not acquire an independent sleep slot.
             protected override bool ESWindow_SupportsSemiSleep => false;
 
             private SerializedObject targetObject;
@@ -288,7 +293,11 @@ namespace ES.EditorInternal
                 if (targetObject == null || string.IsNullOrEmpty(actionPropertyPath))
                     return;
 
-                ESInputActionImportWindow window = CreateInstance<ESInputActionImportWindow>();
+                ESInputActionImportWindow window = GetWindow<ESInputActionImportWindow>(
+                    true,
+                    "InputAction 绑定辅助",
+                    true);
+                window.ReleaseTemporaryInputAction();
                 window.titleContent = new GUIContent("InputAction 绑定辅助");
                 window.minSize = new Vector2(640f, 440f);
                 window.targetObject = targetObject;
@@ -359,6 +368,11 @@ namespace ES.EditorInternal
             }
 
             protected override void ESWindow_OnHostDisable()
+            {
+                ReleaseTemporaryInputAction();
+            }
+
+            private void ReleaseTemporaryInputAction()
             {
                 if (holder != null)
                 {

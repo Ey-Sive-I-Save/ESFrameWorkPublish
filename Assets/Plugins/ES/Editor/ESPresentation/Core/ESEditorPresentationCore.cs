@@ -35,11 +35,80 @@ namespace ES
         Window
     }
 
+    /// <summary>
+    /// 窗口参与 ES Presentation 的生命周期分类。Full 窗口拥有完整休眠状态机；
+    /// Transient 窗口仍可接入解绑与生命周期清理，但不得拥有独立休眠状态。
+    /// </summary>
+    public enum ESWindowSleepMode : byte
+    {
+        Full,
+        Transient
+    }
+
+    /// <summary>
+    /// 直接 EditorWindow 的休眠例外合同。未声明的窗口默认是 Full；
+    /// 只有确实不应独立休眠的短生命周期窗口才声明 Transient。
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class, Inherited = true, AllowMultiple = false)]
+    public sealed class ESWindowSleepContractAttribute : Attribute
+    {
+        public ESWindowSleepContractAttribute(ESWindowSleepMode mode, string reason = null)
+        {
+            Mode = mode;
+            Reason = string.IsNullOrWhiteSpace(reason) ? string.Empty : reason.Trim();
+        }
+
+        public ESWindowSleepMode Mode { get; }
+        public string Reason { get; }
+    }
+
     /// <summary>可选的 ES 窗口展示元数据。只返回当前页面的轻量标题与图标。</summary>
     public interface IESWindowPresentationMetadata
     {
         string ESWindow_PresentationTitle { get; }
         Texture ESWindow_PresentationIcon { get; }
+    }
+
+    /// <summary>
+    /// 可选的半休眠页签短标题。窗口可以为自己声明一个稳定、可扫描的短文本，
+    /// 例如“世界”或“工作台”；未声明时由基础层从完整标题生成保守回退值。
+    /// </summary>
+    public interface IESWindowPresentationShortTitle
+    {
+        string ESWindow_PresentationShortTitle { get; }
+    }
+
+    /// <summary>
+    /// 声明窗口在半休眠页签上的稳定短标签。它是 IESWindowPresentationShortTitle
+    /// 的低摩擦替代方案，适合不需要额外逻辑的窗口；显式接口实现仍优先。
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class, Inherited = true, AllowMultiple = false)]
+    public sealed class ESWindowPresentationShortTitleAttribute : Attribute
+    {
+        public ESWindowPresentationShortTitleAttribute(string title)
+        {
+            Title = title ?? string.Empty;
+        }
+
+        public string Title { get; }
+    }
+
+    /// <summary>
+    /// 供窗口基类使用的低摩擦页签标签契约。它只影响半休眠页签/方块上的可见文案，
+    /// 不改变窗口标题、菜单路径或稳定身份；为空时继续使用默认语义推导。
+    /// </summary>
+    public interface IESWindowPresentationTabLabel
+    {
+        string ESWindow_PresentationTabLabel { get; }
+    }
+
+    /// <summary>
+    /// 同一具体 EditorWindow 类型确需并行时的显式例外合同。
+    /// 协调器负责数量上限、稳定业务身份、关闭与 ReloadDomain 收口。
+    /// </summary>
+    public interface IESWindowMultiInstanceContract
+    {
+        string ESWindow_MultiInstanceCoordinatorId { get; }
     }
 
     /// <summary>
@@ -156,6 +225,8 @@ namespace ES
     /// <summary>所有 ES EditorWindow 接入共享 Presentation 与三域动作合同的公开入口。</summary>
     public static class ESWindowFoundation
     {
+        internal const string StandardSystemActionHostName = "ESWindowStandardSystemActionHost";
+
         public static void Bind(
             EditorWindow window,
             ESWindowActionHosts actionHosts = null,
@@ -163,8 +234,179 @@ namespace ES
         {
             if (window == null)
                 throw new ArgumentNullException(nameof(window));
-            actionHosts?.ValidateOwnership(window.rootVisualElement);
+            ValidateDeclaredSleepContract(window, allowSemiSleep);
             EditorInternal.ESEditorPresentation.BindWindow(window, allowSemiSleep, actionHosts);
+        }
+
+        /// <summary>显式绑定完整休眠窗口。</summary>
+        public static void BindFullSleep(
+            EditorWindow window,
+            ESWindowActionHosts actionHosts = null)
+        {
+            Bind(window, actionHosts, true);
+        }
+
+        /// <summary>显式绑定短生命周期窗口；仍保留解绑与恢复清理，但不启用独立休眠。</summary>
+        public static void BindTransient(
+            EditorWindow window,
+            ESWindowActionHosts actionHosts = null)
+        {
+            Bind(window, actionHosts, false);
+        }
+
+        public static ESWindowSleepMode? GetDeclaredSleepMode(EditorWindow window)
+        {
+            if (window == null)
+                return null;
+            ESWindowSleepContractAttribute contract =
+                (ESWindowSleepContractAttribute)Attribute.GetCustomAttribute(
+                    window.GetType(),
+                    typeof(ESWindowSleepContractAttribute),
+                    true);
+            return contract?.Mode;
+        }
+
+        internal static void ValidateDeclaredSleepContract(
+            EditorWindow window,
+            bool allowSemiSleep)
+        {
+            ESWindowSleepMode? declared = GetDeclaredSleepMode(window);
+            if (!declared.HasValue)
+                return;
+            ESWindowSleepContractAttribute contract =
+                (ESWindowSleepContractAttribute)Attribute.GetCustomAttribute(
+                    window.GetType(),
+                    typeof(ESWindowSleepContractAttribute),
+                    true);
+            if (declared.Value != ESWindowSleepMode.Full
+                && declared.Value != ESWindowSleepMode.Transient)
+            {
+                throw new InvalidOperationException(
+                    "ES 窗口休眠合同使用了未知模式：" + window.GetType().FullName);
+            }
+            if (declared.Value == ESWindowSleepMode.Transient
+                && string.IsNullOrWhiteSpace(contract?.Reason))
+            {
+                throw new InvalidOperationException(
+                    "Transient ES 窗口必须登记不参与独立休眠的原因："
+                    + window.GetType().FullName);
+            }
+            bool expectedFull = declared.Value == ESWindowSleepMode.Full;
+            if (expectedFull == allowSemiSleep)
+                return;
+
+            string reason = contract?.Reason;
+            throw new InvalidOperationException(
+                "ES 窗口休眠合同与绑定模式不一致：" + window.GetType().FullName
+                + "，声明=" + declared.Value
+                + "，绑定=" + (allowSemiSleep ? "Full" : "Transient")
+                + (string.IsNullOrEmpty(reason) ? string.Empty : "，原因=" + reason));
+        }
+
+        /// <summary>
+        /// 在调用方明确指定的工具栏中创建或复用标准 System 宿主并完成绑定。
+        /// 该入口不猜测标题栏、不绝对定位，也不会接管 Global/Window 业务动作布局。
+        /// </summary>
+        public static ESWindowActionHosts BindWithStandardSystemHost(
+            EditorWindow window,
+            VisualElement systemActionBar,
+            VisualElement globalActionHost = null,
+            VisualElement windowActionHost = null,
+            bool allowSemiSleep = true)
+        {
+            if (window == null)
+                throw new ArgumentNullException(nameof(window));
+            if (systemActionBar == null)
+                throw new ArgumentNullException(nameof(systemActionBar));
+
+            ValidateActionBarOwnership(window.rootVisualElement, systemActionBar);
+            VisualElement systemHost = EnsureStandardSystemActionHost(systemActionBar);
+
+            var hosts = new ESWindowActionHosts(
+                systemHost,
+                globalActionHost,
+                windowActionHost);
+            Bind(window, hosts, allowSemiSleep);
+            return hosts;
+        }
+
+        /// <summary>
+        /// Creates or reuses a normal-flow System action bar owned by the window
+        /// root. This is the explicit host entry point for long-lived IMGUI
+        /// windows; it never uses absolute positioning or a hidden fallback.
+        /// </summary>
+        public static VisualElement EnsureStandardSystemActionBar(
+            EditorWindow window,
+            string name = null)
+        {
+            if (window == null)
+                throw new ArgumentNullException(nameof(window));
+            VisualElement root = window.rootVisualElement
+                ?? throw new InvalidOperationException("EditorWindow 尚未提供 rootVisualElement。");
+            string resolvedName = string.IsNullOrWhiteSpace(name)
+                ? "ESWindowStandardSystemActionBar"
+                : name.Trim();
+            VisualElement bar = root.Q<VisualElement>(resolvedName);
+            if (bar == null)
+            {
+                bar = new Toolbar { name = resolvedName };
+                bar.tooltip = "ES 系统动作：窗口生命周期与休眠控制";
+                bar.AddToClassList("es-window-explicit-system-actions");
+                bar.style.flexShrink = 0f;
+                bar.style.minWidth = 0f;
+                bar.style.minHeight = 28f;
+                bar.style.flexDirection = FlexDirection.Row;
+                bar.style.flexWrap = Wrap.Wrap;
+                bar.style.alignItems = Align.Center;
+                bar.style.justifyContent = Justify.FlexEnd;
+                bar.style.paddingLeft = 8f;
+                bar.style.paddingRight = 8f;
+                bar.style.paddingTop = 3f;
+                bar.style.paddingBottom = 3f;
+                EditorInternal.ESEditorPresentation.ApplyPresentationStyle(
+                    bar,
+                    EditorInternal.ESEditorPresentation.ESPresentationRole.Toolbar,
+                    radius: EditorInternal.ESEditorPresentation.ESCornerRadiusToken.Card,
+                borderWidth: 1f);
+                root.Insert(0, bar);
+            }
+            else if (bar.parent == null)
+            {
+                root.Insert(0, bar);
+            }
+            EnsureStandardSystemActionHost(bar);
+            return bar;
+        }
+
+        private static VisualElement EnsureStandardSystemActionHost(VisualElement bar)
+        {
+            VisualElement host = bar?.Q<VisualElement>(StandardSystemActionHostName);
+            if (host != null)
+                return host;
+            host = new VisualElement
+            {
+                name = StandardSystemActionHostName,
+                tooltip = "ES 系统动作：窗口生命周期与休眠控制"
+            };
+            host.style.flexDirection = FlexDirection.Row;
+            host.style.alignItems = Align.Center;
+            host.style.flexGrow = 1f;
+            host.style.flexShrink = 1f;
+            host.style.minWidth = 0f;
+            host.style.overflow = Overflow.Hidden;
+            bar.Add(host);
+            return host;
+        }
+
+        private static void ValidateActionBarOwnership(
+            VisualElement root,
+            VisualElement actionBar)
+        {
+            for (VisualElement current = actionBar; current != null; current = current.parent)
+                if (current == root)
+                    return;
+            throw new InvalidOperationException(
+                "标准 System 动作栏必须属于当前 EditorWindow.rootVisualElement。");
         }
 
         public static void Unbind(EditorWindow window, bool windowClosing = false)
@@ -196,6 +438,84 @@ namespace ES
         public static bool IsWindowSemiSleepAllowed(EditorWindow window)
         {
             return EditorInternal.ESEditorPresentation.IsWindowSemiSleepAllowed(window);
+        }
+
+        /// <summary>查询窗口契约是否支持独立半休眠。</summary>
+        public static bool IsWindowSleepSupported(EditorWindow window)
+        {
+            return EditorInternal.ESEditorPresentation.IsWindowSemiSleepSupported(window);
+        }
+
+        /// <summary>
+        /// 查询窗口类型是否违反默认的单实例边界。未显式实现
+        /// IESWindowMultiInstanceContract 的具体类型默认只能有一个活动实例。
+        /// </summary>
+        public static bool IsWindowSingleInstanceViolation(EditorWindow window)
+        {
+            return EditorInternal.ESEditorPresentation.IsWindowSingleInstanceViolation(window);
+        }
+
+        /// <summary>查询窗口此刻是否满足立即休眠的硬条件，不受全局自动开关影响。</summary>
+        public static bool CanWindowSleep(EditorWindow window)
+        {
+            return EditorInternal.ESEditorPresentation.CanWindowEnterSemiSleep(window);
+        }
+
+        /// <summary>
+        /// 返回阻止窗口立即休眠的硬资格原因；空字符串表示满足硬条件。
+        /// automatic=true 时额外检查全局自动开关与窗口级自动模式，
+        /// 不包含焦点、指针悬停或剩余等待时间等瞬时状态。
+        /// </summary>
+        public static string GetWindowSleepBlockReason(
+            EditorWindow window,
+            bool automatic = false)
+        {
+            return EditorInternal.ESEditorPresentation.GetWindowSemiSleepBlockReason(
+                window,
+                automatic);
+        }
+
+        /// <summary>设置窗口是否参与半休眠；窗口未绑定或不支持时返回 false。</summary>
+        public static bool TrySetWindowSleepAllowed(EditorWindow window, bool allowed)
+        {
+            if (!IsWindowSleepSupported(window))
+                return false;
+            EditorInternal.ESEditorPresentation.SetWindowSemiSleepAllowed(window, allowed);
+            return true;
+        }
+
+        /// <summary>
+        /// 设置窗口级自动休眠模式。该设置不会修改全局自动半休眠开关。
+        /// 窗口未绑定或不支持时返回 false。
+        /// </summary>
+        public static bool TrySetWindowAutoSleepEnabled(EditorWindow window, bool enabled)
+        {
+            if (!IsWindowSleepSupported(window))
+                return false;
+            EditorInternal.ESEditorPresentation.SetWindowPinned(window, !enabled);
+            return true;
+        }
+
+        /// <summary>查询窗口级自动休眠模式；全局自动开关需单独查询。</summary>
+        public static bool IsWindowAutoSleepEnabled(EditorWindow window)
+        {
+            return IsWindowSleepSupported(window)
+                && !EditorInternal.ESEditorPresentation.IsWindowPinned(window);
+        }
+
+        /// <summary>读取半休眠页签短标题；持久化覆盖优先，其次使用窗口契约和默认推导。</summary>
+        public static string GetPresentationShortTitle(EditorWindow window)
+        {
+            return EditorInternal.ESEditorPresentation.GetWindowPresentationShortTitle(window);
+        }
+
+        /// <summary>
+        /// 设置当前窗口类型的页签短标题。传入空值会清除覆盖并恢复默认推导，
+        /// 只保存字符串，不保存窗口引用；窗口尚未显式绑定时返回 false。
+        /// </summary>
+        public static bool TrySetPresentationShortTitle(EditorWindow window, string shortTitle)
+        {
+            return EditorInternal.ESEditorPresentation.TrySetWindowPresentationShortTitle(window, shortTitle);
         }
 
         /// <summary>
@@ -526,7 +846,12 @@ namespace ES.EditorInternal
                     || running.Window == null
                     || running.Root == null
                     || running.Root.panel == null)
+                {
+                    if (Running.TryGetValue(running.WindowId, out current)
+                        && ReferenceEquals(current, running))
+                        Complete(running, true);
                     return;
+                }
                 running.Schedule = running.Root.schedule
                     .Execute(() => Update(running))
                     .Every(16);
@@ -547,9 +872,14 @@ namespace ES.EditorInternal
 
         internal static void Stop(EditorWindow window, bool restoreWindow = true)
         {
-            if (window == null)
+            if (ReferenceEquals(window, null))
                 return;
-            if (Running.TryGetValue(window.GetInstanceID(), out RunningAnimation running))
+            Stop(window.GetInstanceID(), restoreWindow);
+        }
+
+        internal static void Stop(int windowId, bool restoreWindow = true)
+        {
+            if (Running.TryGetValue(windowId, out RunningAnimation running))
                 Complete(running, restoreWindow);
         }
 
@@ -645,6 +975,7 @@ namespace ES.EditorInternal
                 focusable = true,
                 viewDataKey = null
             };
+            gate.AddToClassList("es-window-opening-gate");
             gate.style.position = Position.Absolute;
             gate.style.left = 0f;
             gate.style.right = 0f;
@@ -655,6 +986,7 @@ namespace ES.EditorInternal
             gate.style.backgroundColor = ESEditorPresentation.WindowSurfaceColor;
 
             var content = new VisualElement { name = "ESWindowOpeningGateContent" };
+            content.AddToClassList("es-window-opening-gate-content");
             content.style.alignItems = Align.Center;
             content.style.justifyContent = Justify.Center;
             content.style.width = Length.Percent(100f);
@@ -872,8 +1204,16 @@ namespace ES.EditorInternal
                 StartedAt = EditorApplication.timeSinceStartup
             };
             Running[root] = running;
-            root.RegisterCallback<DetachFromPanelEvent>(OnRootDetached);
-            running.Schedule = host.schedule.Execute(() => Update(running)).Every(16);
+            try
+            {
+                root.RegisterCallback<DetachFromPanelEvent>(OnRootDetached);
+                running.Schedule = host.schedule.Execute(() => Update(running)).Every(16);
+            }
+            catch
+            {
+                Complete(running);
+                throw;
+            }
         }
 
         internal static void Stop(VisualElement root)
@@ -948,10 +1288,13 @@ namespace ES.EditorInternal
             catch (NullReferenceException)
             {
             }
-            running.Schedule = null;
-            running.Beam = null;
-            running.Host = null;
-            running.Root = null;
+            finally
+            {
+                running.Schedule = null;
+                running.Beam = null;
+                running.Host = null;
+                running.Root = null;
+            }
         }
 
         private static void AddSweepBand(VisualElement beam, float alpha, float width)
@@ -1096,8 +1439,308 @@ namespace ES.EditorInternal
         void DetachSleepOwnerAfterOwnerClose();
     }
 
+    internal readonly struct ESWindowSemiSleepPerformanceSample
+    {
+        internal ESWindowSemiSleepPerformanceSample(
+            int boundWindowCount,
+            long updateCount,
+            long bindingVisitCount,
+            long nativePositionCommitCount,
+            long repaintRequestCount,
+            long updateElapsedTicks,
+            long updateAllocatedBytes,
+            long maximumUpdateElapsedTicks,
+            long maximumAllocatedBytesPerUpdate,
+            double sampleDurationSeconds)
+        {
+            BoundWindowCount = boundWindowCount;
+            UpdateCount = updateCount;
+            BindingVisitCount = bindingVisitCount;
+            NativePositionCommitCount = nativePositionCommitCount;
+            RepaintRequestCount = repaintRequestCount;
+            UpdateElapsedTicks = updateElapsedTicks;
+            UpdateAllocatedBytes = updateAllocatedBytes;
+            MaximumUpdateElapsedTicks = maximumUpdateElapsedTicks;
+            MaximumAllocatedBytesPerUpdate = maximumAllocatedBytesPerUpdate;
+            SampleDurationSeconds = sampleDurationSeconds;
+        }
+
+        internal int BoundWindowCount { get; }
+        internal long UpdateCount { get; }
+        internal long BindingVisitCount { get; }
+        internal long NativePositionCommitCount { get; }
+        internal long RepaintRequestCount { get; }
+        internal long UpdateElapsedTicks { get; }
+        internal long UpdateAllocatedBytes { get; }
+        internal long MaximumUpdateElapsedTicks { get; }
+        internal long MaximumAllocatedBytesPerUpdate { get; }
+        internal double SampleDurationSeconds { get; }
+
+        internal double AverageUpdateMicroseconds => UpdateCount <= 0
+            ? 0d
+            : UpdateElapsedTicks * 1000000d
+                / System.Diagnostics.Stopwatch.Frequency
+                / UpdateCount;
+
+        internal double MaximumUpdateMicroseconds => MaximumUpdateElapsedTicks <= 0L
+            ? 0d
+            : MaximumUpdateElapsedTicks * 1000000d
+                / System.Diagnostics.Stopwatch.Frequency;
+
+        internal double AverageAllocatedBytesPerUpdate => UpdateCount <= 0
+            ? 0d
+            : UpdateAllocatedBytes / (double)UpdateCount;
+    }
+
+    internal readonly struct ESWindowPresentationHealthSnapshot
+    {
+        internal ESWindowPresentationHealthSnapshot(
+            int bindingSlotCount,
+            int liveWindowCount,
+            int sleepSupportedCount,
+            int sleepingCount,
+            int transitioningCount,
+            int duplicateWindowInstanceCount,
+            int missingSystemHostCount,
+            int geometryMismatchCount,
+            int pendingOwnerCount,
+            int staleEntryCount,
+            string firstIssueWindowType)
+        {
+            BindingSlotCount = bindingSlotCount;
+            LiveWindowCount = liveWindowCount;
+            SleepSupportedCount = sleepSupportedCount;
+            SleepingCount = sleepingCount;
+            TransitioningCount = transitioningCount;
+            DuplicateWindowInstanceCount = duplicateWindowInstanceCount;
+            MissingSystemHostCount = missingSystemHostCount;
+            GeometryMismatchCount = geometryMismatchCount;
+            PendingOwnerCount = pendingOwnerCount;
+            StaleEntryCount = staleEntryCount;
+            FirstIssueWindowType = firstIssueWindowType;
+        }
+
+        internal int BindingSlotCount { get; }
+        internal int LiveWindowCount { get; }
+        internal int SleepSupportedCount { get; }
+        internal int SleepingCount { get; }
+        internal int TransitioningCount { get; }
+        internal int DuplicateWindowInstanceCount { get; }
+        internal int MissingSystemHostCount { get; }
+        internal int GeometryMismatchCount { get; }
+        internal int PendingOwnerCount { get; }
+        internal int StaleEntryCount { get; }
+        internal string FirstIssueWindowType { get; }
+        internal bool HasIssues => DuplicateWindowInstanceCount > 0
+            || MissingSystemHostCount > 0
+            || GeometryMismatchCount > 0
+            || StaleEntryCount > 0;
+    }
+
     internal static class ESEditorPresentation
     {
+        private const int MaximumPresentationShortTitleLength = 8;
+
+        // These are semantic fallbacks for windows that have not yet declared the
+        // short-title contract.  Keep the list small and stable: it is evaluated
+        // only while binding a window, never from the semi-sleep update loop.
+        private static readonly KeyValuePair<string, string>[] PreferredShortTitles =
+        {
+            new KeyValuePair<string, string>("世界构建", "世界构建"),
+            new KeyValuePair<string, string>("世界编辑器", "世界"),
+            new KeyValuePair<string, string>("世界工作台", "世界"),
+            new KeyValuePair<string, string>("Workbench", "工作台"),
+            new KeyValuePair<string, string>("工作台", "工作台"),
+            new KeyValuePair<string, string>("World", "世界"),
+            new KeyValuePair<string, string>("世界", "世界"),
+            new KeyValuePair<string, string>("Terrain", "地形"),
+            new KeyValuePair<string, string>("地形", "地形"),
+            new KeyValuePair<string, string>("Scene", "场景"),
+            new KeyValuePair<string, string>("场景", "场景"),
+            new KeyValuePair<string, string>("Hierarchy", "层级"),
+            new KeyValuePair<string, string>("层级", "层级"),
+            new KeyValuePair<string, string>("Object", "对象"),
+            new KeyValuePair<string, string>("对象", "对象"),
+            new KeyValuePair<string, string>("Prefab", "Prefab"),
+            new KeyValuePair<string, string>("预制体", "Prefab"),
+            new KeyValuePair<string, string>("对话", "对话"),
+            new KeyValuePair<string, string>("空间", "空间"),
+            new KeyValuePair<string, string>("Codex", "Agent"),
+            new KeyValuePair<string, string>("Agent", "Agent"),
+            new KeyValuePair<string, string>("Graph", "图"),
+            new KeyValuePair<string, string>("图", "图"),
+            new KeyValuePair<string, string>("Track", "轨道"),
+            new KeyValuePair<string, string>("轨道", "轨道"),
+            new KeyValuePair<string, string>("Command", "命令"),
+            new KeyValuePair<string, string>("命令", "命令"),
+            new KeyValuePair<string, string>("Font", "字体"),
+            new KeyValuePair<string, string>("字体", "字体"),
+            new KeyValuePair<string, string>("Localization", "本地化"),
+            new KeyValuePair<string, string>("本地化", "本地化"),
+            new KeyValuePair<string, string>("Resource", "资源"),
+            new KeyValuePair<string, string>("资源", "资源"),
+            new KeyValuePair<string, string>("Package", "资产包"),
+            new KeyValuePair<string, string>("资产包", "资产包"),
+            new KeyValuePair<string, string>("Collection", "收集"),
+            new KeyValuePair<string, string>("收集", "收集"),
+            new KeyValuePair<string, string>("Release", "发布"),
+            new KeyValuePair<string, string>("发布", "发布"),
+            new KeyValuePair<string, string>("Data", "数据"),
+            new KeyValuePair<string, string>("数据", "数据"),
+            new KeyValuePair<string, string>("Launcher", "启动器"),
+            new KeyValuePair<string, string>("启动器", "启动器"),
+            new KeyValuePair<string, string>("Automation", "自动化"),
+            new KeyValuePair<string, string>("自动化", "自动化"),
+            new KeyValuePair<string, string>("Health", "健康"),
+            new KeyValuePair<string, string>("健康", "健康"),
+            new KeyValuePair<string, string>("Theme", "主题"),
+            new KeyValuePair<string, string>("主题", "主题"),
+            new KeyValuePair<string, string>("Cockpit", "驾驶舱"),
+            new KeyValuePair<string, string>("驾驶舱", "驾驶舱"),
+            new KeyValuePair<string, string>("Camera", "相机"),
+            new KeyValuePair<string, string>("相机", "相机"),
+            new KeyValuePair<string, string>("Audio", "音频"),
+            new KeyValuePair<string, string>("音频", "音频"),
+            new KeyValuePair<string, string>("Sound", "音效"),
+            new KeyValuePair<string, string>("音效", "音效"),
+            new KeyValuePair<string, string>("Interaction", "交互"),
+            new KeyValuePair<string, string>("交互", "交互"),
+            new KeyValuePair<string, string>("Property", "属性"),
+            new KeyValuePair<string, string>("属性", "属性"),
+            new KeyValuePair<string, string>("Installer", "安装"),
+            new KeyValuePair<string, string>("安装", "安装"),
+            new KeyValuePair<string, string>("Material", "材质"),
+            new KeyValuePair<string, string>("材质", "材质"),
+            new KeyValuePair<string, string>("Migration", "迁移"),
+            new KeyValuePair<string, string>("迁移", "迁移"),
+            new KeyValuePair<string, string>("Preview", "预览"),
+            new KeyValuePair<string, string>("预览", "预览"),
+            new KeyValuePair<string, string>("Diagnostic", "诊断"),
+            new KeyValuePair<string, string>("诊断", "诊断"),
+            new KeyValuePair<string, string>("Runtime", "运行时"),
+            new KeyValuePair<string, string>("运行时", "运行时"),
+            new KeyValuePair<string, string>("Monitor", "监视"),
+            new KeyValuePair<string, string>("监视", "监视"),
+            new KeyValuePair<string, string>("Risk", "风险"),
+            new KeyValuePair<string, string>("风险", "风险"),
+            new KeyValuePair<string, string>("Progress", "进度"),
+            new KeyValuePair<string, string>("进度", "进度"),
+            new KeyValuePair<string, string>("Dialog", "对话框"),
+            new KeyValuePair<string, string>("对话框", "对话框"),
+            new KeyValuePair<string, string>("InputAction", "输入"),
+            new KeyValuePair<string, string>("Test", "测试"),
+            new KeyValuePair<string, string>("测试", "测试"),
+            new KeyValuePair<string, string>("Input", "输入"),
+            new KeyValuePair<string, string>("输入", "输入"),
+            new KeyValuePair<string, string>("GameCore", "核心"),
+            new KeyValuePair<string, string>("Core", "核心"),
+            new KeyValuePair<string, string>("核心", "核心"),
+            new KeyValuePair<string, string>("Skill", "技能"),
+            new KeyValuePair<string, string>("技能", "技能"),
+            new KeyValuePair<string, string>("Candidate", "候选"),
+            new KeyValuePair<string, string>("候选", "候选"),
+            new KeyValuePair<string, string>("Review", "审查"),
+            new KeyValuePair<string, string>("审查", "审查")
+        };
+
+        internal static string BuildDefaultPresentationShortTitle(string fullTitle)
+        {
+            string normalized = string.IsNullOrWhiteSpace(fullTitle)
+                ? "ES"
+                : fullTitle.Trim();
+            int separator = normalized.LastIndexOf('/');
+            if (separator >= 0 && separator + 1 < normalized.Length)
+                normalized = normalized.Substring(separator + 1).Trim();
+
+            for (int i = 0; i < PreferredShortTitles.Length; i++)
+            {
+                KeyValuePair<string, string> preferred = PreferredShortTitles[i];
+                if (normalized.IndexOf(preferred.Key, StringComparison.OrdinalIgnoreCase) >= 0)
+                    return preferred.Value;
+            }
+
+            char[] compact = new char[Mathf.Min(4, normalized.Length)];
+            int count = 0;
+            for (int i = 0; i < normalized.Length && count < compact.Length; i++)
+            {
+                char current = normalized[i];
+                if (char.IsWhiteSpace(current)
+                    || current == '【'
+                    || current == '】'
+                    || current == '-'
+                    || current == '_'
+                    || current == ':')
+                    continue;
+                compact[count++] = current;
+            }
+            return count == 0 ? "ES" : new string(compact, 0, count);
+        }
+
+        private static string ResolveWindowPresentationTitle(EditorWindow window)
+        {
+            if (window is ES.IESWindowPresentationMetadata metadata
+                && !string.IsNullOrWhiteSpace(metadata.ESWindow_PresentationTitle))
+                return metadata.ESWindow_PresentationTitle.Trim();
+            return string.IsNullOrWhiteSpace(window?.titleContent?.text)
+                ? "ES 功能窗口"
+                : window.titleContent.text.Trim();
+        }
+
+        private static string ResolveWindowPresentationShortTitle(EditorWindow window)
+        {
+            if (window is ES.IESWindowPresentationTabLabel tabLabel
+                && !string.IsNullOrWhiteSpace(tabLabel.ESWindow_PresentationTabLabel))
+                return NormalizePresentationShortTitle(tabLabel.ESWindow_PresentationTabLabel);
+
+            if (window is ES.IESWindowPresentationShortTitle shortTitle
+                && !string.IsNullOrWhiteSpace(shortTitle.ESWindow_PresentationShortTitle))
+                return NormalizePresentationShortTitle(shortTitle.ESWindow_PresentationShortTitle);
+
+            ES.ESWindowPresentationShortTitleAttribute attribute =
+                window?.GetType().GetCustomAttribute<ES.ESWindowPresentationShortTitleAttribute>(true);
+            if (attribute != null && !string.IsNullOrWhiteSpace(attribute.Title))
+                return NormalizePresentationShortTitle(attribute.Title);
+            return BuildDefaultPresentationShortTitle(ResolveWindowPresentationTitle(window));
+        }
+
+        internal static string GetWindowPresentationShortTitle(EditorWindow window)
+        {
+            if (window == null)
+                return "ES";
+            if (windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding)
+                && binding != null
+                && !string.IsNullOrWhiteSpace(binding.presentationShortTitle))
+                return binding.presentationShortTitle;
+            return ResolveWindowPresentationShortTitle(window);
+        }
+
+        internal static bool TrySetWindowPresentationShortTitle(EditorWindow window, string shortTitle)
+        {
+            if (window == null)
+                return false;
+            if (!windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding)
+                || binding == null)
+                return false;
+
+            string normalized = NormalizePresentationShortTitle(shortTitle);
+            binding.presentationShortTitle = normalized;
+            SaveSemiSleepPreferences(binding);
+            ApplySemiSleepOverlayState(binding);
+            RefreshSemiSleepControls(binding);
+            window.Repaint();
+            return true;
+        }
+
+        private static string NormalizePresentationShortTitle(string shortTitle)
+        {
+            string normalized = string.IsNullOrWhiteSpace(shortTitle)
+                ? string.Empty
+                : shortTitle.Trim();
+            return normalized.Length > MaximumPresentationShortTitleLength
+                ? normalized.Substring(0, MaximumPresentationShortTitleLength)
+                : normalized;
+        }
+
         internal enum ESCornerRadiusToken : byte
         {
             None,
@@ -1131,6 +1774,166 @@ namespace ES.EditorInternal
             Bottom
         }
 
+        private enum SemiSleepBlockReason : byte
+        {
+            None,
+            InvalidBinding,
+            Unsupported,
+            DuplicateInstance,
+            NotAllowed,
+            OwnedSurface,
+            Busy,
+            FocusMode,
+            Docked,
+            PanelUnavailable,
+            GlobalAutoDisabled,
+            Pinned
+        }
+
+        internal enum ESPresentationRole : byte
+        {
+            WindowSurface,
+            RaisedSurface,
+            InsetSurface,
+            CanvasSurface,
+            Toolbar,
+            Control,
+            PrimaryAction,
+            Status
+        }
+
+        internal enum ESPresentationState : byte
+        {
+            Normal,
+            Selected,
+            Busy,
+            Inactive,
+            Disabled,
+            ReadOnly,
+            Warning,
+            Error
+        }
+
+        internal enum ESPresentationInteraction : byte
+        {
+            Rest,
+            Hover,
+            Pressed,
+            Focused
+        }
+
+        internal readonly struct ESPresentationStyle
+        {
+            internal ESPresentationStyle(
+                Color backgroundColor,
+                Color textColor,
+                Color borderColor,
+                float opacity = 1f)
+            {
+                BackgroundColor = backgroundColor;
+                TextColor = textColor;
+                BorderColor = borderColor;
+                Opacity = Mathf.Clamp01(opacity);
+            }
+
+            internal Color BackgroundColor { get; }
+            internal Color TextColor { get; }
+            internal Color BorderColor { get; }
+            internal float Opacity { get; }
+        }
+
+        /// <summary>
+        /// 当前主题的只读语义快照。它只持有标量和颜色，不持有资产、窗口或 UI 引用。
+        /// </summary>
+        internal sealed class ESPresentationThemeSnapshot
+        {
+            internal ESPresentationThemeSnapshot(
+                int themeGeneration,
+                int skinGeneration,
+                bool proSkin,
+                float density,
+                bool motionEnabled,
+                Color windowSurface,
+                Color raisedSurface,
+                Color insetSurface,
+                Color canvasSurface,
+                Color toolbarSurface,
+                Color controlSurface,
+                Color selectedSurface,
+                Color inactiveActionSurface,
+                Color primaryActionSurface,
+                Color activeActionSurface,
+                Color warningActionSurface,
+                Color errorActionSurface,
+                Color text,
+                Color strongText,
+                Color mutedText,
+                Color actionText,
+                Color divider,
+                Color selection,
+                Color active,
+                Color disabled,
+                Color warning,
+                Color error)
+            {
+                ThemeGeneration = themeGeneration;
+                SkinGeneration = skinGeneration;
+                ProSkin = proSkin;
+                Density = density;
+                MotionEnabled = motionEnabled;
+                WindowSurface = windowSurface;
+                RaisedSurface = raisedSurface;
+                InsetSurface = insetSurface;
+                CanvasSurface = canvasSurface;
+                ToolbarSurface = toolbarSurface;
+                ControlSurface = controlSurface;
+                SelectedSurface = selectedSurface;
+                InactiveActionSurface = inactiveActionSurface;
+                PrimaryActionSurface = primaryActionSurface;
+                ActiveActionSurface = activeActionSurface;
+                WarningActionSurface = warningActionSurface;
+                ErrorActionSurface = errorActionSurface;
+                Text = text;
+                StrongText = strongText;
+                MutedText = mutedText;
+                ActionText = actionText;
+                Divider = divider;
+                Selection = selection;
+                Active = active;
+                Disabled = disabled;
+                Warning = warning;
+                Error = error;
+            }
+
+            internal int ThemeGeneration { get; }
+            internal int SkinGeneration { get; }
+            internal bool ProSkin { get; }
+            internal float Density { get; }
+            internal bool MotionEnabled { get; }
+            internal Color WindowSurface { get; }
+            internal Color RaisedSurface { get; }
+            internal Color InsetSurface { get; }
+            internal Color CanvasSurface { get; }
+            internal Color ToolbarSurface { get; }
+            internal Color ControlSurface { get; }
+            internal Color SelectedSurface { get; }
+            internal Color InactiveActionSurface { get; }
+            internal Color PrimaryActionSurface { get; }
+            internal Color ActiveActionSurface { get; }
+            internal Color WarningActionSurface { get; }
+            internal Color ErrorActionSurface { get; }
+            internal Color Text { get; }
+            internal Color StrongText { get; }
+            internal Color MutedText { get; }
+            internal Color ActionText { get; }
+            internal Color Divider { get; }
+            internal Color Selection { get; }
+            internal Color Active { get; }
+            internal Color Disabled { get; }
+            internal Color Warning { get; }
+            internal Color Error { get; }
+        }
+
         private static bool skinInitialized;
         private static bool skinCleanupRegistered;
         private static bool cachedProSkin;
@@ -1158,15 +1961,38 @@ namespace ES.EditorInternal
         private static ESGlobalEditorTheme theme;
         private static bool themeInitialized;
         private static int themeGeneration;
+        private static ESPresentationThemeSnapshot presentationThemeSnapshot;
         private static readonly Dictionary<int, WindowBinding> windowBindings =
             new Dictionary<int, WindowBinding>(32);
         private static readonly Dictionary<VisualElement, WindowBinding> windowBindingsByRoot =
             new Dictionary<VisualElement, WindowBinding>(32);
+        private static readonly Dictionary<Type, string> windowHealthCoordinatorScratch =
+            new Dictionary<Type, string>(16);
+        // Editor 主线程专用工作区。清空后复用，避免批量休眠时逐窗口创建临时集合。
+        private static readonly HashSet<int> semiSleepUsedSlotScratch =
+            new HashSet<int>(32);
         private static readonly Dictionary<string, Texture> esBrandIconCache =
             new Dictionary<string, Texture>(StringComparer.Ordinal);
+        private static readonly Unity.Profiling.ProfilerMarker SemiSleepUpdateProfilerMarker =
+            new Unity.Profiling.ProfilerMarker("ES.Editor.WindowSleep.Update");
+        private static readonly Unity.Profiling.ProfilerMarker SemiSleepNativePositionProfilerMarker =
+            new Unity.Profiling.ProfilerMarker("ES.Editor.WindowSleep.NativePositionCommit");
+        private static readonly Unity.Profiling.ProfilerMarker SemiSleepRepaintProfilerMarker =
+            new Unity.Profiling.ProfilerMarker("ES.Editor.WindowSleep.Repaint");
+        private static bool semiSleepPerformanceSampleActive;
+        private static double semiSleepPerformanceSampleStartedAt;
+        private static long semiSleepPerformanceUpdateCount;
+        private static long semiSleepPerformanceBindingVisitCount;
+        private static long semiSleepPerformanceNativePositionCommitCount;
+        private static long semiSleepPerformanceRepaintRequestCount;
+        private static long semiSleepPerformanceUpdateElapsedTicks;
+        private static long semiSleepPerformanceUpdateAllocatedBytes;
+        private static long semiSleepPerformanceMaximumUpdateElapsedTicks;
+        private static long semiSleepPerformanceMaximumAllocatedBytesPerUpdate;
         private const string BrandFontResourcePath = "ESPresentation/Fonts/ESBrandSansSC";
         private const string BrandTypographyStyleSheetPath =
             "Assets/Plugins/ES/Editor/ESPresentation/Styles/ESBrandTypography.uss";
+        private const string PresentationControlsClass = "es-presentation-controls";
         private static Font brandFont;
         private static bool brandFontLoadAttempted;
         private static StyleSheet brandTypographyStyleSheet;
@@ -1182,14 +2008,20 @@ namespace ES.EditorInternal
             public Label semiSleepMonogram;
             public Image semiSleepIcon;
             public Label semiSleepTitleLabel;
+            public string presentationShortTitle;
+            public string multiInstanceCoordinatorId;
             public VisualElement semiSleepPromotionProgress;
             public VisualElement semiSleepDockProgress;
+            public bool diagnosticBarsHidden = true;
+            public float diagnosticPromotionProgress = -1f;
+            public bool diagnosticPromotionComplete;
             public VisualElement semiSleepControls;
             public ES.ESWindowActionHosts actionHosts;
+            // Explicit hosts belong to the window's own panel. Lifecycle
+            // recovery must wait for the caller to provide them again instead
+            // of silently creating a second standard System bar.
+            public bool actionHostsWereExplicit;
             public Button semiSleepToggleButton;
-            public Button semiSleepAllowedButton;
-            public Button semiSleepPinButton;
-            public Button semiSleepGlobalButton;
             public ToolbarMenu semiSleepOverflowMenu;
             public IVisualElementScheduledItem animation;
             public bool activationPending;
@@ -1198,6 +2030,10 @@ namespace ES.EditorInternal
             public float pulseDuration;
             public bool allowSemiSleep;
             public bool supportsSemiSleep;
+            // 同一具体 EditorWindow 类型的第二实例不会参与休眠状态机；
+            // 这样不会让两个窗口竞争同一个按类型保存的 EditorPrefs 几何键。
+            public bool singleInstanceViolation;
+            public int singleInstanceOwnerId;
             public ESWindowVisualState visualState;
             public ESWindowVisualState transitionTargetState;
             public bool semiSleeping;
@@ -1250,6 +2086,10 @@ namespace ES.EditorInternal
             public bool ownedSurfacePreviousSupports;
             public bool ownedSurfacePreviousAllow;
             public bool restorePersistedSleepOnBind;
+            public bool restorePersistedSleepScheduled;
+            public VisualElement pendingPanelRoot;
+            public double persistedSleepGeometryVerifyUntil = -1d;
+            public bool persistedSleepGeometryRepairScheduled;
         }
 
         private sealed class PendingSleepOwner
@@ -1261,6 +2101,10 @@ namespace ES.EditorInternal
 
         private static readonly List<PendingSleepOwner> pendingSleepOwners =
             new List<PendingSleepOwner>(8);
+        private static readonly List<WindowBinding> sameTypeBindingScratch =
+            new List<WindowBinding>(4);
+        private static readonly HashSet<Type> singleInstanceWarnings =
+            new HashSet<Type>();
 
         private const float GlobalAccentLineHeight = 2f;
         private const float GlobalSweepDuration = 0.52f;
@@ -1281,9 +2125,11 @@ namespace ES.EditorInternal
         private const float EdgeTabPointerIntentDistance = 3f;
         private const float EdgeTabHoverExitGrace = 0.22f;
         private const float TransientInteractionGrace = 1.5f;
+        private const double PersistedSleepGeometryVerificationDuration = 1.25d;
         private const float SemiSleepTrayGap = 8f;
         private const float SemiSleepTrayMargin = 12f;
         private const float SemiSleepDragThreshold = 6f;
+        private const int SemiSleepPreferenceSchemaVersion = 1;
         private const string SemiSleepPreferenceKey = "ES.EditorPresentation.SemiSleep.Enabled";
         private const string SemiSleepWindowPreferencePrefix = "ES.EditorPresentation.SemiSleep.Window.";
         private static bool globalEditorAdaptersInstalled;
@@ -1295,7 +2141,167 @@ namespace ES.EditorInternal
         private static double nextSemiSleepIdleCheckAt;
         private static bool windowLifecycleHooksInstalled;
         private static bool domainReloadInProgress;
+        private static bool failedCompilationRecoveryScheduled;
+        private static bool resumeBindingsRetryScheduled;
+        private static bool resumeBindingsRetryRequested;
         private static bool editorQuitting;
+        // Play Mode temporarily restores native editor frames so Unity can run
+        // without ES overlay controls. Keep the pre-play sleep preference alive
+        // across both ExitingEditMode and EnteredPlayMode notifications; the
+        // latter must not overwrite it with the already-awake frame.
+        private static bool playModeBindingsSuspended;
+        // Root detachment can run before the subscribed beforeAssemblyReload
+        // callback. Capture once so that a later restore cannot overwrite the
+        // user's sleeping preference with the temporary awake frame.
+        private static bool assemblyReloadPreferencesCaptured;
+
+        internal static int BoundWindowCount => windowBindings.Count;
+
+        internal static ESWindowPresentationHealthSnapshot CaptureWindowHealthSnapshot()
+        {
+            int liveWindowCount = 0;
+            int sleepSupportedCount = 0;
+            int sleepingCount = 0;
+            int transitioningCount = 0;
+            int duplicateWindowInstanceCount = 0;
+            int missingSystemHostCount = 0;
+            int geometryMismatchCount = 0;
+            int staleEntryCount = 0;
+            string firstIssueWindowType = null;
+            windowHealthCoordinatorScratch.Clear();
+
+            foreach (WindowBinding binding in windowBindings.Values)
+            {
+                if (binding?.window == null)
+                {
+                    staleEntryCount++;
+                    firstIssueWindowType ??= "失效窗口绑定槽";
+                    continue;
+                }
+
+                liveWindowCount++;
+                Type concreteType = binding.window.GetType();
+                if (!windowHealthCoordinatorScratch.TryGetValue(
+                        concreteType,
+                        out string expectedCoordinatorId))
+                {
+                    windowHealthCoordinatorScratch.Add(
+                        concreteType,
+                        binding.multiInstanceCoordinatorId);
+                }
+                else if (string.IsNullOrEmpty(expectedCoordinatorId)
+                    || string.IsNullOrEmpty(binding.multiInstanceCoordinatorId)
+                    || !string.Equals(
+                        expectedCoordinatorId,
+                        binding.multiInstanceCoordinatorId,
+                        StringComparison.Ordinal))
+                {
+                    duplicateWindowInstanceCount++;
+                    firstIssueWindowType ??= concreteType.FullName;
+                    // Once a type has mixed or missing coordinator identities, every
+                    // additional instance remains unsafe for this snapshot.
+                    windowHealthCoordinatorScratch[concreteType] = null;
+                }
+                if (binding.supportsSemiSleep)
+                {
+                    sleepSupportedCount++;
+                    if (FindDeclaredSystemActionHost(binding) == null)
+                    {
+                        missingSystemHostCount++;
+                        firstIssueWindowType ??= binding.window.GetType().FullName;
+                    }
+                }
+
+                if (IsSleepingOrTargetingSleep(binding))
+                    sleepingCount++;
+                if (binding.semiSleepAnimating)
+                    transitioningCount++;
+                if (HasSettledSemiSleepGeometryMismatch(binding))
+                {
+                    geometryMismatchCount++;
+                    firstIssueWindowType ??= binding.window.GetType().FullName;
+                }
+            }
+
+            int pendingOwnerCount = 0;
+            for (int i = 0; i < pendingSleepOwners.Count; i++)
+            {
+                PendingSleepOwner pending = pendingSleepOwners[i];
+                if (pending?.child == null)
+                {
+                    staleEntryCount++;
+                    firstIssueWindowType ??= "失效 PendingFollowOwner";
+                    continue;
+                }
+                pendingOwnerCount++;
+            }
+
+            return new ESWindowPresentationHealthSnapshot(
+                windowBindings.Count,
+                liveWindowCount,
+                sleepSupportedCount,
+                sleepingCount,
+                transitioningCount,
+                duplicateWindowInstanceCount,
+                missingSystemHostCount,
+                geometryMismatchCount,
+                pendingOwnerCount,
+                staleEntryCount,
+                firstIssueWindowType);
+        }
+
+        internal static void BeginSemiSleepPerformanceSample()
+        {
+            semiSleepPerformanceSampleActive = true;
+            semiSleepPerformanceSampleStartedAt = EditorApplication.timeSinceStartup;
+            semiSleepPerformanceUpdateCount = 0L;
+            semiSleepPerformanceBindingVisitCount = 0L;
+            semiSleepPerformanceNativePositionCommitCount = 0L;
+            semiSleepPerformanceRepaintRequestCount = 0L;
+            semiSleepPerformanceUpdateElapsedTicks = 0L;
+            semiSleepPerformanceUpdateAllocatedBytes = 0L;
+            semiSleepPerformanceMaximumUpdateElapsedTicks = 0L;
+            semiSleepPerformanceMaximumAllocatedBytesPerUpdate = 0L;
+        }
+
+        internal static ESWindowSemiSleepPerformanceSample EndSemiSleepPerformanceSample()
+        {
+            double duration = semiSleepPerformanceSampleActive
+                ? Math.Max(0d, EditorApplication.timeSinceStartup - semiSleepPerformanceSampleStartedAt)
+                : 0d;
+            semiSleepPerformanceSampleActive = false;
+            return new ESWindowSemiSleepPerformanceSample(
+                windowBindings.Count,
+                semiSleepPerformanceUpdateCount,
+                semiSleepPerformanceBindingVisitCount,
+                semiSleepPerformanceNativePositionCommitCount,
+                semiSleepPerformanceRepaintRequestCount,
+                semiSleepPerformanceUpdateElapsedTicks,
+                semiSleepPerformanceUpdateAllocatedBytes,
+                semiSleepPerformanceMaximumUpdateElapsedTicks,
+                semiSleepPerformanceMaximumAllocatedBytesPerUpdate,
+                duration);
+        }
+
+        private static void CommitSemiSleepWindowPosition(WindowBinding binding, Rect position)
+        {
+            if (binding?.window == null)
+                return;
+            using (SemiSleepNativePositionProfilerMarker.Auto())
+                binding.window.position = position;
+            if (semiSleepPerformanceSampleActive)
+                semiSleepPerformanceNativePositionCommitCount++;
+        }
+
+        private static void RequestSemiSleepRepaint(WindowBinding binding)
+        {
+            if (binding?.window == null)
+                return;
+            using (SemiSleepRepaintProfilerMarker.Auto())
+                binding.window.Repaint();
+            if (semiSleepPerformanceSampleActive)
+                semiSleepPerformanceRepaintRequestCount++;
+        }
 
         private const string WorkspaceSessionKeyPrefix = "ES.EditorPresentation.Workspace.";
         private static int focusModeWindowId;
@@ -1322,6 +2328,8 @@ namespace ES.EditorInternal
         [Serializable]
         private sealed class SemiSleepWindowPreferences
         {
+            public int schemaVersion;
+            public string presentationShortTitle;
             public bool allowSemiSleep = true;
             public bool pinned;
             public bool sleeping;
@@ -1397,17 +2405,21 @@ namespace ES.EditorInternal
         /// </summary>
         public static void InstallGlobalEditorAdapters()
         {
-            if (!globalEditorAdapterLifecycleInstalled)
-            {
-                EditorApplication.playModeStateChanged -= OnGlobalPlayModeStateChanged;
-                EditorApplication.playModeStateChanged += OnGlobalPlayModeStateChanged;
-                globalEditorAdapterLifecycleInstalled = true;
-            }
+            EnsurePlayModeLifecycleHook();
 
             if (!GlobalEditorShellEnabled || EditorApplication.isPlayingOrWillChangePlaymode)
                 return;
 
             InstallGlobalEditorAdapterCallbacks();
+            // A PlayMode transition can finish while the global ES shell is
+            // disabled. In that case EnteredEditMode deliberately leaves the
+            // dormant binding slots intact, so re-enabling the shell must
+            // rebuild their visual hosts and persisted sleep state here.
+            // Avoid competing with the lifecycle callbacks while a compile is
+            // still tearing down or reconstructing editor panels.
+            if (!domainReloadInProgress
+                && !EditorApplication.isCompiling)
+                ResumeWindowBindings();
             QueueDeepSkinSynchronization();
         }
 
@@ -1446,6 +2458,14 @@ namespace ES.EditorInternal
             EditorApplication.delayCall -= SynchronizeDeepSkinWithTheme;
             deepSkinSyncQueued = false;
             ESGlobalEditorSkinExperiment.Restore();
+            playModeBindingsSuspended = false;
+            assemblyReloadPreferencesCaptured = false;
+            domainReloadInProgress = false;
+            failedCompilationRecoveryScheduled = false;
+            EditorApplication.delayCall -= ResumeWindowBindingsRetry;
+            resumeBindingsRetryScheduled = false;
+            resumeBindingsRetryRequested = false;
+            EditorApplication.delayCall -= RecoverSemiSleepAfterFailedCompilation;
             UnbindAllWindowBindings();
         }
 
@@ -1472,7 +2492,10 @@ namespace ES.EditorInternal
             if (state == PlayModeStateChange.EnteredEditMode)
             {
                 InstallGlobalEditorAdapters();
-                ResumeWindowBindings();
+                // InstallGlobalEditorAdapters owns the single resume attempt.
+                // Do not call ResumeWindowBindings a second time in the same
+                // lifecycle callback: a panel can be rebuilt between the two
+                // calls, which would create an avoidable detach/attach race.
                 EditorApplication.RepaintHierarchyWindow();
                 EditorApplication.RepaintProjectWindow();
                 SceneView.RepaintAll();
@@ -1504,15 +2527,20 @@ namespace ES.EditorInternal
         private static void UnbindAllWindowBindings()
         {
             if (windowBindings.Count == 0)
+            {
+                windowBindingsByRoot.Clear();
+                pendingSleepOwners.Clear();
+                RefreshSemiSleepUpdateSubscription();
                 return;
+            }
 
-            List<EditorWindow> windows = new List<EditorWindow>(windowBindings.Count);
-            foreach (WindowBinding binding in windowBindings.Values)
-                if (binding != null && binding.window != null)
-                    windows.Add(binding.window);
-
-            for (int i = 0; i < windows.Count; i++)
-                UnbindWindow(windows[i]);
+            var bindings = new List<KeyValuePair<int, WindowBinding>>(windowBindings);
+            for (int i = 0; i < bindings.Count; i++)
+                UnbindWindowBinding(bindings[i].Key, bindings[i].Value, false, false);
+            windowBindings.Clear();
+            windowBindingsByRoot.Clear();
+            pendingSleepOwners.Clear();
+            RefreshSemiSleepUpdateSubscription();
         }
 
         private static void UnregisterWindowCallbacks(WindowBinding binding)
@@ -1529,6 +2557,7 @@ namespace ES.EditorInternal
             binding.root.UnregisterCallback<KeyDownEvent>(OnWindowKeyDown, TrickleDown.TrickleDown);
             binding.root.UnregisterCallback<GeometryChangedEvent>(OnWindowGeometryChanged);
             binding.root.UnregisterCallback<DetachFromPanelEvent>(OnWindowRootDetached);
+            binding.root.UnregisterCallback<AttachToPanelEvent>(OnWindowRootAttached);
             binding.semiSleepOverlay?.UnregisterCallback<PointerDownEvent>(OnSemiSleepOverlayPointerDown);
             binding.semiSleepOverlay?.UnregisterCallback<PointerEnterEvent>(OnSemiSleepOverlayPointerEnter);
             binding.semiSleepOverlay?.UnregisterCallback<PointerLeaveEvent>(OnSemiSleepOverlayPointerLeave);
@@ -1539,39 +2568,341 @@ namespace ES.EditorInternal
             windowBindingsByRoot.Remove(binding.root);
         }
 
-        private static void SuspendWindowBindings()
+        private static void UnregisterPendingPanelAttach(WindowBinding binding)
         {
+            if (binding?.pendingPanelRoot == null)
+                return;
+            binding.pendingPanelRoot.UnregisterCallback<AttachToPanelEvent>(OnWindowRootAttached);
+            binding.pendingPanelRoot = null;
+        }
+
+        private static void QueueResumeOnPanelAttach(WindowBinding binding)
+        {
+            if (binding?.window == null)
+                return;
+            VisualElement root = binding.window.rootVisualElement;
+            if (root == null || root.panel != null)
+                return;
+            if (binding.pendingPanelRoot != null
+                && !ReferenceEquals(binding.pendingPanelRoot, root))
+                binding.pendingPanelRoot.UnregisterCallback<AttachToPanelEvent>(OnWindowRootAttached);
+            root.UnregisterCallback<AttachToPanelEvent>(OnWindowRootAttached);
+            root.RegisterCallback<AttachToPanelEvent>(OnWindowRootAttached);
+            binding.pendingPanelRoot = root;
+        }
+
+        private static void OnWindowRootAttached(AttachToPanelEvent evt)
+        {
+            VisualElement root = evt.currentTarget as VisualElement;
+            if (root == null)
+                return;
+            root.UnregisterCallback<AttachToPanelEvent>(OnWindowRootAttached);
             foreach (WindowBinding binding in windowBindings.Values)
             {
-                if (binding == null)
+                if (binding == null || !ReferenceEquals(binding.pendingPanelRoot, root))
                     continue;
-                RestoreSemiSleep(binding, true);
-                binding.animation?.Pause();
-                ESWindowFrameActivation.Stop(binding.window);
-                ESWindowOpeningSweep.Stop(binding.root);
-                UnregisterWindowCallbacks(binding);
-                binding.host?.RemoveFromHierarchy();
-                binding.semiSleepOverlay?.RemoveFromHierarchy();
-                RemoveSemiSleepControls(binding);
-                RemoveBrandTypography(binding.root);
-                binding.root = null;
+                binding.pendingPanelRoot = null;
+                QueueResumeWindowBindingsRetry();
+                break;
             }
+        }
+
+        private static void StopTransientWindowVisuals(
+            WindowBinding binding,
+            bool restoreOpeningFrame)
+        {
+            if (binding == null)
+                return;
+            if (binding.window != null)
+                ESWindowFrameActivation.Stop(binding.window, restoreOpeningFrame);
+            ESWindowOpeningSweep.Stop(binding.root);
+        }
+
+        private static void StopTransientWindowVisuals(bool restoreOpeningFrame)
+        {
+            foreach (WindowBinding binding in windowBindings.Values)
+                StopTransientWindowVisuals(binding, restoreOpeningFrame);
+        }
+
+        private static void CapturePlayModePreferences()
+        {
+            if (playModeBindingsSuspended)
+                return;
+            foreach (WindowBinding binding in windowBindings.Values)
+                SaveSemiSleepPreferences(binding);
+            playModeBindingsSuspended = true;
+        }
+
+        private static void CaptureAssemblyReloadPreferences()
+        {
+            if (assemblyReloadPreferencesCaptured)
+                return;
+
+            // PlayMode has already captured the user's sleeping state and
+            // deliberately restored native editor frames. A compile/reload
+            // notification can still arrive while PlayMode is active; never
+            // replace that snapshot with the temporary awake geometry.
+            if (playModeBindingsSuspended)
+            {
+                assemblyReloadPreferencesCaptured = true;
+                return;
+            }
+
+            foreach (WindowBinding binding in windowBindings.Values)
+                SaveSemiSleepPreferences(binding);
+            assemblyReloadPreferencesCaptured = true;
+        }
+
+        private static void SuspendWindowBindings()
+        {
+            // Save only on the first play-mode notification. Unity emits both
+            // ExitingEditMode and EnteredPlayMode; saving after the first restore
+            // would replace the user's sleeping state with the awake frame.
+            CapturePlayModePreferences();
+
+            foreach (WindowBinding binding in windowBindings.Values)
+                SuspendWindowBinding(binding);
             semiSleepAnyAnimating = false;
             RefreshSemiSleepUpdateSubscription();
         }
 
-        private static void ResumeWindowBindings()
+        /// <summary>
+        /// Temporarily detaches ES-owned visuals while retaining the binding
+        /// record. Unity may call an EditorWindow's OnDisable during PlayMode
+        /// transitions; deleting the record there makes EnteredEditMode unable
+        /// to restore the window's persisted sleep state.
+        /// </summary>
+        private static void SuspendWindowBinding(WindowBinding binding)
+        {
+            if (binding == null)
+                return;
+            StopTransientWindowVisuals(binding, true);
+            RestoreSemiSleep(binding, true, true);
+            binding.animation?.Pause();
+            binding.animation = null;
+            UnregisterPendingPanelAttach(binding);
+            UnregisterWindowCallbacks(binding);
+            binding.host?.RemoveFromHierarchy();
+            if (binding.semiSleepOverlay != null)
+            {
+                binding.semiSleepOverlay.userData = null;
+                binding.semiSleepOverlay.RemoveFromHierarchy();
+            }
+            RemoveSemiSleepControls(binding);
+            RemoveBrandTypography(binding.root);
+            binding.host = null;
+            binding.accentLine = null;
+            binding.sweep = null;
+            binding.semiSleepOverlay = null;
+            binding.semiSleepMonogram = null;
+            binding.semiSleepIcon = null;
+            binding.semiSleepTitleLabel = null;
+            binding.semiSleepPromotionProgress = null;
+            binding.semiSleepDockProgress = null;
+            binding.root = null;
+            // Action hosts belong to the detached panel just like the ES overlay.
+            // Retaining them lets a later BindWindow attach controls to a dead
+            // VisualElement when Unity rebuilds the root on the same window
+            // instance. The next resume either receives fresh caller-owned hosts
+            // or creates the normal-flow standard System host.
+            binding.actionHosts = null;
+        }
+
+        private static void PruneDeadWindowBindings()
+        {
+            List<KeyValuePair<int, WindowBinding>> dead = null;
+            foreach (KeyValuePair<int, WindowBinding> pair in windowBindings)
+            {
+                if (pair.Value?.window != null)
+                    continue;
+                dead ??= new List<KeyValuePair<int, WindowBinding>>();
+                dead.Add(pair);
+            }
+            if (dead == null)
+                return;
+            for (int i = 0; i < dead.Count; i++)
+                UnbindWindowBinding(dead[i].Key, dead[i].Value, true);
+        }
+
+        private static bool ResumeWindowBindings()
         {
             if (!GlobalEditorShellEnabled)
-                return;
+                return false;
 
+            // EnteredEditMode can be reported before compilation and panel
+            // reconstruction have settled. Do not create a second visual layer
+            // during that transient turn; the delayed retry will run after the
+            // lifecycle owner is stable.
+            if (domainReloadInProgress || EditorApplication.isCompiling)
+            {
+                QueueResumeWindowBindingsRetry();
+                return false;
+            }
+
+            // A window can be closed while PlayMode is active. Its OnDisable
+            // intentionally leaves a dormant binding so lifecycle restoration
+            // remains possible; remove that binding once Unity reports the
+            // object as destroyed before rebuilding the live set.
+            PruneDeadWindowBindings();
+            bool needsPanelRetry = false;
+            bool waitingForPanel = false;
+            bool awaitingExplicitHosts = false;
             foreach (WindowBinding binding in windowBindings.Values)
             {
-                if (binding == null || binding.window == null || binding.window.rootVisualElement == null)
+                if (binding == null || binding.window == null)
                     continue;
-                AttachWindowOverlay(binding);
+                if (binding.window.rootVisualElement == null)
+                {
+                    // During a domain-reload-disabled compile Unity can keep the
+                    // native EditorWindow alive while temporarily clearing its
+                    // UI Toolkit root. Treat that as an incomplete restore, not
+                    // as a successful no-op that would consume the snapshot.
+                    QueueResumeWindowBindingsRetry();
+                    waitingForPanel = true;
+                    continue;
+                }
+                if (binding.window.rootVisualElement.panel == null)
+                {
+                    // EnteredEditMode and a domain-reload-disabled compile can
+                    // report completion before UI Toolkit has attached the new
+                    // panel. Do not register callbacks or create controls on a
+                    // detached root; the window's CreateGUI/next editor turn
+                    // will provide a valid host.
+                    QueueResumeOnPanelAttach(binding);
+                    waitingForPanel = true;
+                    continue;
+                }
+                try
+                {
+                    if (binding.actionHosts != null)
+                    {
+                        try
+                        {
+                            binding.actionHosts.ValidateOwnership(binding.window.rootVisualElement);
+                        }
+                        catch (InvalidOperationException)
+                        {
+                            // The window rebuilt its root while Unity kept the
+                            // same native instance. Recreate a normal-flow
+                            // standard host; a later explicit BindWindow call may
+                            // replace it with the window's business hosts.
+                            binding.actionHosts = null;
+                        }
+                    }
+                    if (binding.allowSemiSleep
+                        && (binding.actionHosts == null || binding.actionHosts.System == null)
+                        && binding.actionHostsWereExplicit)
+                    {
+                        // A custom title/action layout is an explicit caller
+                        // contract. Wait for its next BindWindow call rather
+                        // than injecting a duplicate standard toolbar.
+                        awaitingExplicitHosts = true;
+                        continue;
+                    }
+                    if (binding.allowSemiSleep
+                        && (binding.actionHosts == null || binding.actionHosts.System == null))
+                    {
+                        VisualElement bar = ES.ESWindowFoundation.EnsureStandardSystemActionBar(
+                            binding.window);
+                        binding.actionHosts = new ES.ESWindowActionHosts(
+                            bar.Q<VisualElement>(ES.ESWindowFoundation.StandardSystemActionHostName));
+                    }
+                    VisualElement currentRoot = binding.window.rootVisualElement;
+                    bool overlayNeedsRebuild = !ReferenceEquals(binding.root, currentRoot)
+                        || binding.host == null
+                        || binding.host.parent == null
+                        || binding.semiSleepOverlay == null
+                        || binding.semiSleepOverlay.parent == null;
+                    if (overlayNeedsRebuild)
+                        AttachWindowOverlay(binding);
+                    else if (binding.supportsSemiSleep && binding.semiSleepControls == null)
+                        AttachSemiSleepControls(binding);
+                    LoadSemiSleepPreferences(binding);
+                    if (binding.restorePersistedSleepOnBind
+                        && binding.allowSemiSleep
+                        && !binding.window.docked)
+                        SchedulePersistedSemiSleepGeometryRestore(binding);
+                }
+                catch (Exception exception) when (
+                    exception is ArgumentException
+                    || exception is InvalidOperationException
+                    || exception is MissingReferenceException
+                    || exception is NullReferenceException)
+                {
+                    // Panel teardown can race the first EnteredEditMode turn.
+                    // Return the binding to a clean dormant state and retry from
+                    // the next editor turn instead of losing the whole restore.
+                    SuspendWindowBinding(binding);
+                    needsPanelRetry = true;
+                }
+            }
+            if (needsPanelRetry)
+                QueueResumeWindowBindingsRetry();
+            else
+            {
+                if (!awaitingExplicitHosts && !waitingForPanel)
+                    resumeBindingsRetryRequested = false;
+                // Keep the one-shot PlayMode snapshot alive until a real resume
+                // succeeds. This prevents a compile/panel race from allowing a
+                // later callback to capture the temporary awake frame again.
+                if (!awaitingExplicitHosts
+                    && !waitingForPanel
+                    && !EditorApplication.isPlayingOrWillChangePlaymode
+                    && !EditorApplication.isCompiling
+                    && !domainReloadInProgress)
+                {
+                    bool completedPlayModeRestore = playModeBindingsSuspended;
+                    playModeBindingsSuspended = false;
+                    if (completedPlayModeRestore)
+                    {
+                        // A compile/reload inside PlayMode can mark assembly
+                        // capture as handled without writing a second snapshot.
+                        // Clear it only after the original PlayMode snapshot has
+                        // been mounted successfully, including delayed retries.
+                        assemblyReloadPreferencesCaptured = false;
+                    }
+                    else
+                    {
+                        // A failed compile may keep this AppDomain alive. Once
+                        // the panel is actually rebound, the previous reload
+                        // capture is no longer needed and the next reload must
+                        // be allowed to capture a fresh stable state.
+                        assemblyReloadPreferencesCaptured = false;
+                    }
+                }
             }
             RefreshSemiSleepUpdateSubscription();
+            return !needsPanelRetry && !waitingForPanel && !awaitingExplicitHosts;
+        }
+
+        private static void QueueResumeWindowBindingsRetry()
+        {
+            resumeBindingsRetryRequested = true;
+            if (resumeBindingsRetryScheduled
+                || editorQuitting
+                || domainReloadInProgress
+                || EditorApplication.isCompiling)
+                return;
+
+            resumeBindingsRetryScheduled = true;
+            EditorApplication.delayCall -= ResumeWindowBindingsRetry;
+            EditorApplication.delayCall += ResumeWindowBindingsRetry;
+        }
+
+        private static void ResumeWindowBindingsRetry()
+        {
+            EditorApplication.delayCall -= ResumeWindowBindingsRetry;
+            resumeBindingsRetryScheduled = false;
+            if (editorQuitting
+                || EditorApplication.isPlayingOrWillChangePlaymode
+                || !GlobalEditorShellEnabled)
+                return;
+            if (domainReloadInProgress || EditorApplication.isCompiling)
+                return;
+            if (!resumeBindingsRetryRequested)
+                return;
+            resumeBindingsRetryRequested = false;
+            ResumeWindowBindings();
         }
 
         private static void DrawGlobalInspectorHeader(UnityEditor.Editor editor)
@@ -1951,21 +3282,51 @@ namespace ES.EditorInternal
             bool allowSemiSleep = true,
             ES.ESWindowActionHosts actionHosts = null)
         {
-            if (!GlobalEditorShellEnabled || window == null || window.rootVisualElement == null)
+            if (window == null || window.rootVisualElement == null)
+                return;
+
+            ES.ESWindowFoundation.ValidateDeclaredSleepContract(window, allowSemiSleep);
+
+            // During PlayMode or an assembly compile the ES overlay must stay
+            // detached, but the binding itself still has to be registered. A
+            // domain reload in PlayMode reconstructs EditorWindows while the
+            // global shell is disabled; dropping these registrations would make
+            // EnteredEditMode unable to resume presentation or persisted sleep.
+            bool lifecycleSuspended = EditorApplication.isPlayingOrWillChangePlaymode
+                || domainReloadInProgress
+                || EditorApplication.isCompiling;
+            if (!GlobalEditorShellEnabled && !lifecycleSuspended)
                 return;
             EnsureWindowLifecycleHooks();
-            actionHosts?.ValidateOwnership(window.rootVisualElement);
+            bool callerProvidedActionHosts = actionHosts != null;
+            if (actionHosts != null)
+            {
+                try
+                {
+                    actionHosts.ValidateOwnership(window.rootVisualElement);
+                }
+                catch (InvalidOperationException) when (lifecycleSuspended)
+                {
+                    // The caller may still hold hosts from the previous panel.
+                    // They are not valid during PlayMode/compile suspension;
+                    // discard them and let the next CreateGUI bind fresh hosts.
+                    actionHosts = null;
+                }
+            }
 
             int id = window.GetInstanceID();
-            WindowBinding binding;
-            if (!windowBindings.TryGetValue(id, out binding) || binding == null || binding.window != window)
+            bool hadBindingSlot = windowBindings.TryGetValue(id, out WindowBinding binding);
+            if (!hadBindingSlot || binding == null || binding.window != window)
             {
                 if (binding != null)
-                    UnbindWindow(binding.window);
+                    UnbindWindowBinding(id, binding, false, false);
+                else if (hadBindingSlot)
+                    RemoveNullWindowBindingRoots();
 
                 binding = new WindowBinding
                 {
                     window = window,
+                    multiInstanceCoordinatorId = ResolveMultiInstanceCoordinatorId(window),
                     allowSemiSleep = allowSemiSleep,
                     supportsSemiSleep = allowSemiSleep,
                     visualState = ESWindowVisualState.ActivePanel,
@@ -1973,7 +3334,8 @@ namespace ES.EditorInternal
                     lastInteractionAt = EditorApplication.timeSinceStartup,
                     activationPending = true,
                     pulseStatus = ESStatusKind.None,
-                    pulseDuration = GlobalSweepDuration
+                    pulseDuration = GlobalSweepDuration,
+                    actionHostsWereExplicit = callerProvidedActionHosts
                 };
                 LoadSemiSleepPreferences(binding);
                 if (!binding.allowSemiSleep || window.docked)
@@ -1987,6 +3349,12 @@ namespace ES.EditorInternal
             }
             else
             {
+                // Once a window has declared custom hosts, keep that contract
+                // until it is explicitly rebound with fresh hosts. A later
+                // parameterless BindWindow must not silently introduce a
+                // second standard System bar beside the custom toolbar.
+                if (callerProvidedActionHosts)
+                    binding.actionHostsWereExplicit = true;
                 bool wasSupported = binding.supportsSemiSleep;
                 binding.supportsSemiSleep = allowSemiSleep;
                 if (wasSupported && !allowSemiSleep)
@@ -1994,6 +3362,77 @@ namespace ES.EditorInternal
                     binding.allowSemiSleep = false;
                     RestoreSemiSleep(binding, true);
                 }
+                else if (!wasSupported && allowSemiSleep)
+                {
+                    // A temporary opt-out (OwnedSurface/dialog-like phase) must not leave
+                    // the window permanently disabled when its standard host returns.
+                    // Restore the user's persisted choice when present; otherwise the
+                    // standard base-class default remains enabled.
+                    binding.allowSemiSleep = true;
+                    LoadSemiSleepPreferences(binding);
+                }
+            }
+
+            bool rootChanged = !ReferenceEquals(binding.root, window.rootVisualElement);
+
+            // Keep the dormant binding and its caller-owned action hosts. All
+            // visual elements are attached by ResumeWindowBindings after
+            // EnteredEditMode, when Unity has finished rebuilding the panel.
+            if (lifecycleSuspended)
+            {
+                StopTransientWindowVisuals(binding, true);
+                RestoreSemiSleep(binding, true, true);
+                binding.animation?.Pause();
+                binding.animation = null;
+                UnregisterWindowCallbacks(binding);
+                binding.host?.RemoveFromHierarchy();
+                binding.semiSleepOverlay?.RemoveFromHierarchy();
+                RemoveSemiSleepControls(binding);
+                RemoveBrandTypography(binding.root);
+                binding.host = null;
+                binding.accentLine = null;
+                binding.sweep = null;
+                binding.semiSleepOverlay = null;
+                binding.semiSleepMonogram = null;
+                binding.semiSleepIcon = null;
+                binding.semiSleepTitleLabel = null;
+                binding.semiSleepPromotionProgress = null;
+                binding.semiSleepDockProgress = null;
+                binding.root = null;
+                // Keep an explicit host only when it already belongs to the
+                // currently attached root. Stale hosts from the previous panel
+                // are discarded; ResumeWindowBindings will then wait for the
+                // caller's next explicit binding instead of duplicating it.
+                binding.actionHosts = actionHosts != null
+                    && window.rootVisualElement.panel != null
+                    ? actionHosts
+                    : null;
+                return;
+            }
+
+            if (rootChanged)
+            {
+                // A normal UI Toolkit panel rebuild does not necessarily pass
+                // through AssemblyReloadEvents. Re-read the last stable scalar
+                // snapshot before attaching the new root so a sleeping window
+                // cannot become visually awake with a stale in-memory target.
+                binding.actionHosts = null;
+                LoadSemiSleepPreferences(binding);
+            }
+
+            // A complete-sleep binding always has a normal-flow System host.
+            // Keep compatibility for older callers by creating that host via
+            // the explicit standard-bar factory, never through an absolute
+            // overlay fallback.
+            if (allowSemiSleep
+                && (actionHosts == null || actionHosts.System == null)
+                && !binding.actionHostsWereExplicit)
+            {
+                VisualElement bar = ES.ESWindowFoundation.EnsureStandardSystemActionBar(window);
+                actionHosts = new ES.ESWindowActionHosts(
+                    bar.Q<VisualElement>(ES.ESWindowFoundation.StandardSystemActionHostName),
+                    actionHosts?.Global,
+                    actionHosts?.Window);
             }
 
             if (actionHosts != null && binding.actionHosts != actionHosts)
@@ -2001,33 +3440,119 @@ namespace ES.EditorInternal
                 RemoveSemiSleepControls(binding);
                 binding.actionHosts = actionHosts;
             }
-
-            if (binding.host == null || binding.host.parent == null)
+            // Unity may replace rootVisualElement while retaining the same
+            // EditorWindow instance (notably during panel recreation and some
+            // PlayMode/ReloadDomain transitions). A non-null old host is not
+            // evidence that it belongs to the current root.
+            if (!ReferenceEquals(binding.root, window.rootVisualElement)
+                || binding.host == null
+                || binding.host.parent == null)
                 AttachWindowOverlay(binding);
             else if (binding.supportsSemiSleep && binding.semiSleepControls == null)
                 AttachSemiSleepControls(binding);
             else if (!binding.supportsSemiSleep)
                 RemoveSemiSleepControls(binding);
+            RefreshSingleInstanceSafetyForType(window.GetType());
             RefreshSemiSleepControls(binding);
             RefreshSemiSleepUpdateSubscription();
             if (binding.semiSleepTarget && binding.allowSemiSleep && !binding.window.docked)
+                SchedulePersistedSemiSleepGeometryRestore(binding);
+
+            if (callerProvidedActionHosts
+                && !lifecycleSuspended
+                && (playModeBindingsSuspended || resumeBindingsRetryRequested))
+                ResumeWindowBindings();
+        }
+
+        private static string ResolveMultiInstanceCoordinatorId(EditorWindow window)
+        {
+            if (!(window is ES.IESWindowMultiInstanceContract contract))
+                return null;
+            string coordinatorId = contract.ESWindow_MultiInstanceCoordinatorId;
+            return string.IsNullOrWhiteSpace(coordinatorId)
+                ? null
+                : coordinatorId.Trim();
+        }
+
+        private static void RefreshSingleInstanceSafetyForType(Type concreteType)
+        {
+            if (concreteType == null)
+                return;
+
+            sameTypeBindingScratch.Clear();
+            foreach (WindowBinding candidate in windowBindings.Values)
+                if (candidate?.window != null && candidate.window.GetType() == concreteType)
+                    sameTypeBindingScratch.Add(candidate);
+
+            sameTypeBindingScratch.Sort(CompareWindowBindings);
+            string coordinatorId = sameTypeBindingScratch.Count > 0
+                ? sameTypeBindingScratch[0].multiInstanceCoordinatorId
+                : null;
+            bool governed = !string.IsNullOrEmpty(coordinatorId);
+            for (int i = 1; governed && i < sameTypeBindingScratch.Count; i++)
             {
-                // CreateGUI normally has a live panel already. Restore the native frame
-                // before the first repaint so ReloadDomain cannot expose a large frame
-                // underneath the sleep overlay.
-                if (binding.root.panel != null && CanEnterSemiSleep(binding, false))
-                    RestorePersistedSemiSleepGeometry(binding);
-                else
-                    binding.root.schedule.Execute(() =>
-                    {
-                        if (binding.window != null
-                            && binding.root != null
-                            && binding.root.panel != null
-                            && binding.restorePersistedSleepOnBind
-                            && CanEnterSemiSleep(binding, false))
-                            RestorePersistedSemiSleepGeometry(binding);
-                    });
+                governed = string.Equals(
+                    coordinatorId,
+                    sameTypeBindingScratch[i].multiInstanceCoordinatorId,
+                    StringComparison.Ordinal);
             }
+            int ownerId = sameTypeBindingScratch.Count > 0
+                ? sameTypeBindingScratch[0].window.GetInstanceID()
+                : 0;
+            for (int i = 0; i < sameTypeBindingScratch.Count; i++)
+            {
+                WindowBinding candidate = sameTypeBindingScratch[i];
+                bool violation = !governed && i > 0;
+                if (candidate.singleInstanceViolation == violation
+                    && candidate.singleInstanceOwnerId == (violation ? ownerId : 0))
+                    continue;
+                candidate.singleInstanceViolation = violation;
+                candidate.singleInstanceOwnerId = violation ? ownerId : 0;
+                if (violation)
+                {
+                    RestoreSemiSleep(candidate, true);
+                    candidate.restorePersistedSleepOnBind = false;
+                    candidate.restorePersistedSleepScheduled = false;
+                }
+                RefreshSemiSleepControls(candidate);
+            }
+
+            if (!governed && sameTypeBindingScratch.Count > 1
+                && singleInstanceWarnings.Add(concreteType))
+            {
+                Debug.LogError(
+                    "[ES Window] 同一 EditorWindow 具体类型出现多个实例："
+                    + concreteType.FullName
+                    + "。仅首个实例参与 ES 休眠与持久化；额外实例必须关闭，"
+                    + "或由确有并行需求的窗口显式实现 IESWindowMultiInstanceContract，"
+                    + "并让同类型所有实例返回同一个稳定、非空协调器 ID。");
+            }
+            else if (sameTypeBindingScratch.Count <= 1)
+            {
+                singleInstanceWarnings.Remove(concreteType);
+            }
+        }
+
+        private static void SchedulePersistedSemiSleepGeometryRestore(WindowBinding binding)
+        {
+            if (binding?.window == null
+                || binding.root == null
+                || !binding.restorePersistedSleepOnBind
+                || binding.restorePersistedSleepScheduled)
+                return;
+
+            int bindingId = binding.window.GetInstanceID();
+            binding.restorePersistedSleepScheduled = true;
+            binding.root.schedule.Execute(() =>
+            {
+                binding.restorePersistedSleepScheduled = false;
+                if (!windowBindings.TryGetValue(bindingId, out WindowBinding current)
+                    || !ReferenceEquals(current, binding)
+                    || !binding.restorePersistedSleepOnBind)
+                    return;
+                TryRestorePersistedSemiSleepGeometry(binding);
+                RefreshSemiSleepUpdateSubscription();
+            }).StartingIn(1);
         }
 
         /// <summary>运行时调整当前 ES 窗口是否参与半休眠，不需要重建窗口内容。</summary>
@@ -2056,10 +3581,7 @@ namespace ES.EditorInternal
             if (window == null || bounds.width < 1f || bounds.height < 1f)
                 return false;
             if (!windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding))
-            {
-                BindWindow(window);
-                windowBindings.TryGetValue(window.GetInstanceID(), out binding);
-            }
+                return false;
             if (binding == null)
                 return false;
             binding.hasSemiSleepDockBounds = true;
@@ -2091,9 +3613,26 @@ namespace ES.EditorInternal
         /// <summary>查询窗口此刻是否满足立即休眠的硬条件；不受全局自动开关和固定策略影响。</summary>
         public static bool CanWindowEnterSemiSleep(EditorWindow window)
         {
-            return window != null
-                && windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding)
-                && CanEnterSemiSleep(binding, false);
+            if (window == null
+                || !windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding))
+                return false;
+            return EvaluateSemiSleepBlockReason(binding, false) == SemiSleepBlockReason.None;
+        }
+
+        /// <summary>
+        /// 返回当前休眠阻塞原因。该入口只读取已绑定状态，不扫描窗口或资产。
+        /// </summary>
+        public static string GetWindowSemiSleepBlockReason(
+            EditorWindow window,
+            bool requireAutomaticPolicy = false)
+        {
+            if (window == null)
+                return "窗口为空。";
+            if (!windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding)
+                || binding == null)
+                return "窗口尚未接入 ES Presentation。";
+            return GetSemiSleepBlockReasonText(
+                EvaluateSemiSleepBlockReason(binding, requireAutomaticPolicy));
         }
 
         /// <summary>显式唤醒当前休眠窗口；不会改动参与资格、固定状态或全局自动策略。</summary>
@@ -2101,8 +3640,16 @@ namespace ES.EditorInternal
         {
             if (window == null
                 || !windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding)
-                || !binding.semiSleeping && !binding.semiSleepAnimating)
+                || !IsSleepingOrTargetingSleep(binding))
                 return false;
+            if (binding.restorePersistedSleepOnBind)
+            {
+                CancelPersistedSemiSleepRestore(binding);
+                window.Focus();
+                RefreshSemiSleepControls(binding);
+                RefreshSemiSleepUpdateSubscription();
+                return true;
+            }
             binding.semiSleepManualHold = false;
             window.Focus();
             BeginSemiSleepTransition(binding, false);
@@ -2160,7 +3707,13 @@ namespace ES.EditorInternal
                 return false;
             if (!windowBindings.TryGetValue(child.GetInstanceID(), out WindowBinding childBinding)
                 || childBinding == null)
-                BindWindow(child, mode != ES.ESWindowSleepLinkMode.OwnedSurface);
+            {
+                // OwnedSurface is a relationship-level opt-out. Establish the
+                // binding expected by the type contract first, then the
+                // relationship below removes the independent sleep surface.
+                ESWindowSleepMode? declared = ESWindowFoundation.GetDeclaredSleepMode(child);
+                BindWindow(child, declared != ESWindowSleepMode.Transient);
+            }
             if (!windowBindings.TryGetValue(child.GetInstanceID(), out childBinding)
                 || childBinding == null)
                 return false;
@@ -2196,13 +3749,20 @@ namespace ES.EditorInternal
             // 才移除此前因宿主尚未恢复而登记的 PendingFollowOwner；被拒绝的
             // 非法绑定不能破坏原有可恢复意图。
             ClearPendingSleepOwner(child);
+            ES.ESWindowSleepLinkMode previousMode = childBinding.sleepLinkMode;
             childBinding.sleepOwner = owner;
-            childBinding.sleepLinkMode = mode;
             childBinding.sleepOwnerForcedSleep = false;
             if (mode == ES.ESWindowSleepLinkMode.OwnedSurface)
             {
-                childBinding.ownedSurfacePreviousSupports = childBinding.supportsSemiSleep;
-                childBinding.ownedSurfacePreviousAllow = childBinding.allowSemiSleep;
+                // OnEnable/CreateGUI can register the same relationship more than
+                // once while Unity rebuilds a panel. Preserve the type capability
+                // and user preference from before the first OwnedSurface bind.
+                if (previousMode != ES.ESWindowSleepLinkMode.OwnedSurface)
+                {
+                    childBinding.ownedSurfacePreviousSupports = childBinding.supportsSemiSleep;
+                    childBinding.ownedSurfacePreviousAllow = childBinding.allowSemiSleep;
+                }
+                childBinding.sleepLinkMode = mode;
                 childBinding.supportsSemiSleep = false;
                 childBinding.allowSemiSleep = false;
                 RestoreSemiSleep(childBinding, true);
@@ -2210,9 +3770,16 @@ namespace ES.EditorInternal
             }
             else
             {
-                childBinding.supportsSemiSleep = true;
-                childBinding.allowSemiSleep = true;
-                if (childBinding.semiSleepControls == null)
+                // Leaving OwnedSurface restores exactly what it temporarily hid.
+                // A normal FollowOwner bind must not promote Transient windows or
+                // overwrite a Full window's user-controlled participation flag.
+                if (previousMode == ES.ESWindowSleepLinkMode.OwnedSurface)
+                {
+                    childBinding.supportsSemiSleep = childBinding.ownedSurfacePreviousSupports;
+                    childBinding.allowSemiSleep = childBinding.ownedSurfacePreviousAllow;
+                }
+                childBinding.sleepLinkMode = mode;
+                if (childBinding.supportsSemiSleep && childBinding.semiSleepControls == null)
                     AttachSemiSleepControls(childBinding);
             }
             RefreshSemiSleepControls(childBinding);
@@ -2266,10 +3833,12 @@ namespace ES.EditorInternal
 
         public static void ClearPendingSleepOwner(EditorWindow child)
         {
-            if (child == null)
+            if (ReferenceEquals(child, null))
                 return;
             for (int i = pendingSleepOwners.Count - 1; i >= 0; i--)
-                if (pendingSleepOwners[i] == null || pendingSleepOwners[i].child == child)
+                if (pendingSleepOwners[i] == null
+                    || pendingSleepOwners[i].child == null
+                    || ReferenceEquals(pendingSleepOwners[i].child, child))
                     pendingSleepOwners.RemoveAt(i);
         }
 
@@ -2300,6 +3869,8 @@ namespace ES.EditorInternal
                 binding.sleepLinkMode = ES.ESWindowSleepLinkMode.Independent;
                 binding.supportsSemiSleep = binding.ownedSurfacePreviousSupports;
                 binding.allowSemiSleep = binding.ownedSurfacePreviousAllow;
+                binding.ownedSurfacePreviousSupports = false;
+                binding.ownedSurfacePreviousAllow = false;
                 if (binding.supportsSemiSleep)
                     AttachSemiSleepControls(binding);
             }
@@ -2327,6 +3898,23 @@ namespace ES.EditorInternal
                 && binding.allowSemiSleep;
         }
 
+        public static bool IsWindowSemiSleepSupported(EditorWindow window)
+        {
+            return window != null
+                && windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding)
+                && binding != null
+                && binding.supportsSemiSleep
+                && binding.sleepLinkMode != ES.ESWindowSleepLinkMode.OwnedSurface;
+        }
+
+        public static bool IsWindowSingleInstanceViolation(EditorWindow window)
+        {
+            return window != null
+                && windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding)
+                && binding != null
+                && binding.singleInstanceViolation;
+        }
+
         public static bool IsWindowBound(EditorWindow window)
         {
             return window != null
@@ -2335,17 +3923,16 @@ namespace ES.EditorInternal
                 && binding.window == window;
         }
 
-        /// <summary>进入忙碌状态。支持嵌套 Lease，Dispose 顺序不影响最终状态。</summary>
+        /// <summary>
+        /// 进入忙碌状态。支持嵌套 Lease，Dispose 顺序不影响最终状态。
+        /// 目标窗口必须已经通过 ESWindowFoundation.Bind 显式接入；未知窗口返回空 Lease，
+        /// 不会因为一次业务调用而隐式创建 ES Presentation、系统动作宿主或半休眠能力。
+        /// </summary>
         public static IDisposable BeginWindowBusy(EditorWindow window, string message = null, string pageId = null)
         {
             if (window == null)
                 return EmptyWindowLease.Instance;
             if (!windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding) || binding == null)
-            {
-                BindWindow(window);
-                windowBindings.TryGetValue(window.GetInstanceID(), out binding);
-            }
-            if (binding == null)
                 return EmptyWindowLease.Instance;
             binding.busyCount++;
             binding.activityState = ESWindowActivityState.Busy;
@@ -2379,7 +3966,10 @@ namespace ES.EditorInternal
             return new WindowInteractionLease(window);
         }
 
-        /// <summary>向窗口和可选页面上下文发送一次结果提示，并唤醒目标窗口。</summary>
+        /// <summary>
+        /// 向窗口和可选页面上下文发送一次结果提示，并唤醒目标窗口。
+        /// 目标窗口必须已经显式接入 ES Presentation；未知窗口不会被隐式绑定。
+        /// </summary>
         public static void NotifyWindow(
             EditorWindow window,
             string message,
@@ -2390,8 +3980,6 @@ namespace ES.EditorInternal
         {
             if (window == null)
                 return;
-            if (!windowBindings.ContainsKey(window.GetInstanceID()))
-                BindWindow(window);
             if (!windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding) || binding == null)
                 return;
             binding.activityState = status == ESStatusKind.Error || status == ESStatusKind.Warning
@@ -2592,46 +4180,87 @@ namespace ES.EditorInternal
             try
             {
                 SemiSleepWindowPreferences saved = JsonUtility.FromJson<SemiSleepWindowPreferences>(json);
-                if (saved == null)
-                    return;
-                binding.allowSemiSleep = binding.supportsSemiSleep && saved.allowSemiSleep;
-                binding.pinned = saved.pinned;
-                binding.semiSleepTarget = saved.sleeping;
-                binding.restorePersistedSleepOnBind = saved.sleeping;
-                if (saved.edge >= 0 && saved.edge <= (int)ESWindowEdge.Bottom)
-                    binding.edge = (ESWindowEdge)saved.edge;
-                binding.edgeOffset = saved.edgeOffset;
-                if (saved.visualState == (int)ESWindowVisualState.EdgeTab
-                    || saved.visualState == (int)ESWindowVisualState.EdgeTabHover)
-                    binding.transitionTargetState = ESWindowVisualState.EdgeTab;
-                binding.awakeBounds = saved.awakeBounds;
-                binding.hasSemiSleepDockBounds = saved.hasDockBounds;
-                binding.semiSleepDockBounds = saved.dockBounds;
+                TryApplySemiSleepPreferences(binding, saved);
             }
             catch (ArgumentException)
             {
             }
         }
 
+        private static bool TryApplySemiSleepPreferences(
+            WindowBinding binding,
+            SemiSleepWindowPreferences saved)
+        {
+            if (binding?.window == null
+                || saved == null
+                || saved.schemaVersion < 0
+                || saved.schemaVersion > SemiSleepPreferenceSchemaVersion)
+                return false;
+
+            binding.allowSemiSleep = binding.supportsSemiSleep && saved.allowSemiSleep;
+            binding.pinned = saved.pinned;
+            binding.presentationShortTitle = NormalizePresentationShortTitle(
+                saved.presentationShortTitle);
+            binding.edge = saved.edge >= 0 && saved.edge <= (int)ESWindowEdge.Bottom
+                ? (ESWindowEdge)saved.edge
+                : ESWindowEdge.Left;
+            binding.edgeOffset = IsFinite(saved.edgeOffset) ? saved.edgeOffset : 0f;
+
+            Rect currentBounds = binding.window.position;
+            bool hasSavedAwakeBounds = IsUsableWindowBounds(saved.awakeBounds);
+            if (hasSavedAwakeBounds)
+                binding.awakeBounds = saved.awakeBounds;
+            else if (IsUsableWindowBounds(currentBounds))
+                binding.awakeBounds = currentBounds;
+            bool restoreSavedSleep = saved.sleeping && hasSavedAwakeBounds;
+            binding.semiSleepTarget = restoreSavedSleep;
+            binding.restorePersistedSleepOnBind = restoreSavedSleep;
+            binding.transitionTargetState = restoreSavedSleep
+                && (saved.visualState == (int)ESWindowVisualState.EdgeTab
+                    || saved.visualState == (int)ESWindowVisualState.EdgeTabHover)
+                        ? ESWindowVisualState.EdgeTab
+                        : ESWindowVisualState.ActivePanel;
+
+            binding.hasSemiSleepDockBounds = saved.hasDockBounds
+                && IsUsableWindowBounds(saved.dockBounds);
+            binding.semiSleepDockBounds = binding.hasSemiSleepDockBounds
+                ? saved.dockBounds
+                : default;
+            return true;
+        }
+
         private static void SaveSemiSleepPreferences(WindowBinding binding)
         {
-            if (binding?.window == null)
+            if (binding?.window == null || binding.singleInstanceViolation)
                 return;
+            bool sleeping = IsSleepingOrTargetingSleep(binding);
+            Rect awakeBounds = IsUsableWindowBounds(binding.awakeBounds)
+                ? binding.awakeBounds
+                : !sleeping && IsUsableWindowBounds(binding.window.position)
+                    ? binding.window.position
+                    : default;
+            sleeping = sleeping && IsUsableWindowBounds(awakeBounds);
+            bool hasDockBounds = binding.hasSemiSleepDockBounds
+                && IsUsableWindowBounds(binding.semiSleepDockBounds);
             var saved = new SemiSleepWindowPreferences
             {
+                schemaVersion = SemiSleepPreferenceSchemaVersion,
+                presentationShortTitle = binding.presentationShortTitle ?? string.Empty,
                 allowSemiSleep = binding.allowSemiSleep,
                 pinned = binding.pinned,
-                sleeping = binding.semiSleeping || binding.semiSleepAnimating && binding.semiSleepTarget,
-                visualState = (int)(binding.semiSleepTarget
+                sleeping = sleeping,
+                visualState = (int)(sleeping
                     ? (binding.transitionTargetState == ESWindowVisualState.ActivePanel
                         ? binding.visualState
                         : binding.transitionTargetState)
                     : ESWindowVisualState.ActivePanel),
-                edge = (int)binding.edge,
-                edgeOffset = binding.edgeOffset,
-                awakeBounds = binding.awakeBounds.width > 1f ? binding.awakeBounds : binding.window.position,
-                dockBounds = binding.semiSleepDockBounds,
-                hasDockBounds = binding.hasSemiSleepDockBounds
+                edge = (int)binding.edge >= 0 && (int)binding.edge <= (int)ESWindowEdge.Bottom
+                    ? (int)binding.edge
+                    : (int)ESWindowEdge.Left,
+                edgeOffset = IsFinite(binding.edgeOffset) ? binding.edgeOffset : 0f,
+                awakeBounds = awakeBounds,
+                dockBounds = hasDockBounds ? binding.semiSleepDockBounds : default,
+                hasDockBounds = hasDockBounds
             };
             EditorPrefs.SetString(GetSemiSleepPreferenceKey(binding.window), JsonUtility.ToJson(saved));
         }
@@ -2661,27 +4290,79 @@ namespace ES.EditorInternal
         /// </summary>
         public static void UnbindWindow(EditorWindow window, bool windowClosing = false)
         {
-            if (window == null)
+            if (ReferenceEquals(window, null))
                 return;
-
-            ESWindowFrameActivation.Stop(window, !windowClosing);
 
             int id = window.GetInstanceID();
-            WindowBinding binding;
-            if (!windowBindings.TryGetValue(id, out binding))
+            if (!windowBindings.TryGetValue(id, out WindowBinding binding))
+            {
+                ESWindowFrameActivation.Stop(id, !windowClosing);
+                ClearPendingSleepOwner(window);
                 return;
+            }
+
+            UnbindWindowBinding(id, binding, windowClosing);
+            RefreshSemiSleepUpdateSubscription();
+        }
+
+        private static void UnbindWindowBinding(
+            int id,
+            WindowBinding binding,
+            bool windowClosing,
+            bool preserveLifecycle = true)
+        {
+            if (binding == null)
+            {
+                windowBindings.Remove(id);
+                RemoveNullWindowBindingRoots();
+                return;
+            }
+
+            EditorWindow window = binding.window;
+            bool lifecycleReset = EditorApplication.isPlayingOrWillChangePlaymode
+                || domainReloadInProgress
+                || EditorApplication.isCompiling
+                || editorQuitting;
+            // OnDisable ordering is not stable across Unity versions. Capture
+            // before removing the binding so a reload cannot lose the last
+            // sleeping preference when OnDisable precedes beforeAssemblyReload.
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                CapturePlayModePreferences();
+            else if (domainReloadInProgress || EditorApplication.isCompiling)
+                CaptureAssemblyReloadPreferences();
+
+            // OnDisable can arrive before the global PlayMode callback. Keep
+            // the dormant binding in that case; removing it loses the only
+            // in-memory route back to the persisted sleep state. Explicit
+            // shutdown paths (UnbindAllWindowBindings) opt out via the last
+            // parameter, and EnteredEditMode prunes windows actually destroyed
+            // while the editor was running.
+            if (preserveLifecycle
+                && lifecycleReset
+                && !editorQuitting)
+            {
+                SuspendWindowBinding(binding);
+                RefreshSemiSleepUpdateSubscription();
+                return;
+            }
+
+            ESWindowFrameActivation.Stop(id, !windowClosing);
 
             ClearPendingSleepOwner(window);
+            UnregisterPendingPanelAttach(binding);
 
-            RestoreSemiSleep(binding, true);
-            if (binding.animation != null)
-                binding.animation.Pause();
+            RestoreSemiSleep(binding, true, lifecycleReset);
+            binding.animation?.Pause();
+            binding.animation = null;
             ESWindowOpeningSweep.Stop(binding.root);
             UnregisterWindowCallbacks(binding);
             RemoveBrandTypography(binding.root);
             foreach (WindowBinding child in windowBindings.Values)
             {
-                if (child == null || child == binding || child.sleepOwner != window)
+                if (child == null
+                    || child == binding
+                    || ReferenceEquals(window, null)
+                    || !ReferenceEquals(child.sleepOwner, window))
                     continue;
                 bool ownerForcedSleep = child.sleepOwnerForcedSleep;
                 if (windowClosing
@@ -2699,35 +4380,189 @@ namespace ES.EditorInternal
                     RestoreSemiSleep(child, true);
                 RefreshSemiSleepControls(child);
             }
-            if (binding.host != null)
+            binding.host?.RemoveFromHierarchy();
+            if (binding.semiSleepOverlay != null)
             {
-                binding.host.RemoveFromHierarchy();
+                binding.semiSleepOverlay.userData = null;
+                binding.semiSleepOverlay.RemoveFromHierarchy();
             }
-            binding.semiSleepOverlay?.RemoveFromHierarchy();
-            binding.semiSleepOverlay = null;
             RemoveSemiSleepControls(binding);
             if (focusModeWindowId == id)
                 ExitFocusMode();
             if (lastFocusedWindowId == id)
                 lastFocusedWindowId = 0;
             windowBindings.Remove(id);
-            RefreshSemiSleepUpdateSubscription();
+            RefreshSingleInstanceSafetyForType(window?.GetType());
+            ReleaseWindowBindingReferences(binding);
+        }
+
+        private static void RemoveNullWindowBindingRoots()
+        {
+            List<VisualElement> staleRoots = null;
+            foreach (KeyValuePair<VisualElement, WindowBinding> pair in windowBindingsByRoot)
+            {
+                if (pair.Value != null)
+                    continue;
+                if (staleRoots == null)
+                    staleRoots = new List<VisualElement>();
+                staleRoots.Add(pair.Key);
+            }
+
+            if (staleRoots == null)
+                return;
+            for (int i = 0; i < staleRoots.Count; i++)
+                windowBindingsByRoot.Remove(staleRoots[i]);
+        }
+
+        private static void ReleaseWindowBindingReferences(WindowBinding binding)
+        {
+            if (binding == null)
+                return;
+
+            binding.animation?.Pause();
+            binding.animation = null;
+            UnregisterPendingPanelAttach(binding);
+            if (binding.semiSleepOverlay != null)
+                binding.semiSleepOverlay.userData = null;
+            binding.window = null;
+            binding.root = null;
+            binding.host = null;
+            binding.accentLine = null;
+            binding.sweep = null;
+            binding.semiSleepOverlay = null;
+            binding.semiSleepMonogram = null;
+            binding.semiSleepIcon = null;
+            binding.semiSleepTitleLabel = null;
+            binding.semiSleepPromotionProgress = null;
+            binding.semiSleepDockProgress = null;
+            binding.diagnosticBarsHidden = true;
+            binding.diagnosticPromotionProgress = -1f;
+            binding.diagnosticPromotionComplete = false;
+            binding.actionHosts = null;
+            binding.multiInstanceCoordinatorId = null;
+            binding.sleepOwner = null;
+            binding.activityMessage = null;
+            binding.activityPageId = null;
+            binding.activityContext = null;
         }
 
         private static void EnsureWindowLifecycleHooks()
         {
             if (windowLifecycleHooksInstalled)
+            {
+                EnsurePlayModeLifecycleHook();
                 return;
+            }
             windowLifecycleHooksInstalled = true;
             AssemblyReloadEvents.beforeAssemblyReload -= HandleBeforeAssemblyReload;
             AssemblyReloadEvents.beforeAssemblyReload += HandleBeforeAssemblyReload;
             EditorApplication.quitting -= HandleEditorQuitting;
             EditorApplication.quitting += HandleEditorQuitting;
+            UnityEditor.Compilation.CompilationPipeline.compilationFinished -= OnCompilationFinished;
+            UnityEditor.Compilation.CompilationPipeline.compilationFinished += OnCompilationFinished;
+            EnsurePlayModeLifecycleHook();
+        }
+
+        private static void EnsurePlayModeLifecycleHook()
+        {
+            if (globalEditorAdapterLifecycleInstalled)
+                return;
+            EditorApplication.playModeStateChanged -= OnGlobalPlayModeStateChanged;
+            EditorApplication.playModeStateChanged += OnGlobalPlayModeStateChanged;
+            globalEditorAdapterLifecycleInstalled = true;
         }
 
         private static void HandleBeforeAssemblyReload()
         {
             domainReloadInProgress = true;
+            // This handler is registered before the semi-sleep update callback.
+            // Capture before Unity detaches roots so DetachFromPanel cannot
+            // turn a sleeping window into an "awake" preference on reload.
+            StopTransientWindowVisuals(true);
+            CaptureAssemblyReloadPreferences();
+            // Do not rely on the optional semi-sleep update subscription or on
+            // Unity's root-detach ordering. Restore every bound window now so
+            // the native editor frame is stable throughout the reload.
+            RestoreAllSemiSleepWindows();
+        }
+
+        private static void OnCompilationFinished(object context)
+        {
+            // A failed compile can leave Unity in the previous AppDomain. In that
+            // case beforeAssemblyReload already restored the native frame, but no
+            // new BindWindow call will run to restore the persisted sleep state.
+            // Clear the transient guard and repair the live bindings on the next
+            // editor turn; successful compilation normally replaces this domain.
+            domainReloadInProgress = true;
+            if (failedCompilationRecoveryScheduled
+                || editorQuitting)
+                return;
+
+            failedCompilationRecoveryScheduled = true;
+            EditorApplication.delayCall -= RecoverSemiSleepAfterFailedCompilation;
+            EditorApplication.delayCall += RecoverSemiSleepAfterFailedCompilation;
+        }
+
+        private static void RecoverSemiSleepAfterFailedCompilation()
+        {
+            EditorApplication.delayCall -= RecoverSemiSleepAfterFailedCompilation;
+            domainReloadInProgress = false;
+            if (editorQuitting)
+            {
+                failedCompilationRecoveryScheduled = false;
+                return;
+            }
+            if (EditorApplication.isCompiling)
+            {
+                domainReloadInProgress = true;
+                EditorApplication.delayCall += RecoverSemiSleepAfterFailedCompilation;
+                return;
+            }
+
+            failedCompilationRecoveryScheduled = false;
+            domainReloadInProgress = false;
+            PruneDeadWindowBindings();
+            // A successful compile may finish without replacing this domain. In
+            // that case beforeAssemblyReload either did not run (domain reload
+            // disabled) or already restored the native frame. Re-apply the
+            // persisted sleep snapshot when the editor is still in EditMode;
+            // this is deliberately skipped while PlayMode owns the native
+            // frame.
+            bool playModeSuspended = playModeBindingsSuspended
+                || EditorApplication.isPlayingOrWillChangePlaymode;
+            if (playModeSuspended)
+            {
+                assemblyReloadPreferencesCaptured = false;
+                return;
+            }
+
+            // With Domain Reload disabled (and after a failed compile), Unity may
+            // keep the same EditorWindow instance and never call CreateGUI again.
+            // Reuse the normal panel-aware resume path so a rebuilt root is
+            // reattached, while a detached root is deferred until its panel is
+            // available instead of leaving a dormant binding permanently inert.
+            bool resumed = ResumeWindowBindings();
+
+            foreach (WindowBinding binding in windowBindings.Values)
+            {
+                if (binding?.window == null)
+                    continue;
+
+                LoadSemiSleepPreferences(binding);
+                if (binding.restorePersistedSleepOnBind
+                    && binding.allowSemiSleep
+                    && !binding.window.docked
+                    && binding.root != null
+                    && binding.root.panel != null)
+                {
+                    TryRestorePersistedSemiSleepGeometry(binding);
+                }
+                RefreshSemiSleepControls(binding);
+            }
+
+            if (resumed)
+                assemblyReloadPreferencesCaptured = false;
+            RefreshSemiSleepUpdateSubscription();
         }
 
         private static void HandleEditorQuitting()
@@ -2737,19 +4572,16 @@ namespace ES.EditorInternal
 
         /// <summary>
         /// 播放一次统一 ES 操作反馈。只在反馈持续期间请求当前窗口局部刷新。
+        /// 目标窗口必须已经显式接入 ES Presentation；未知窗口不会被隐式绑定。
         /// </summary>
         public static void PulseWindow(EditorWindow window, ESStatusKind status = ESStatusKind.Modified)
         {
             if (window == null || !GlobalEditorShellEnabled || !MotionEnabled)
                 return;
 
-            WindowBinding binding;
-            if (!windowBindings.TryGetValue(window.GetInstanceID(), out binding) || binding == null)
-            {
-                BindWindow(window);
-                if (!windowBindings.TryGetValue(window.GetInstanceID(), out binding) || binding == null)
-                    return;
-            }
+            if (!windowBindings.TryGetValue(window.GetInstanceID(), out WindowBinding binding)
+                || binding == null)
+                return;
 
             BeginWindowPulse(binding, status);
         }
@@ -2952,8 +4784,19 @@ namespace ES.EditorInternal
             WindowBinding binding = FindBindingByRoot(evt.currentTarget as VisualElement);
             if (binding == null)
                 return;
-            RestoreSemiSleep(binding, true);
-            ESWindowOpeningSweep.Stop(binding.root);
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                CapturePlayModePreferences();
+            else if (domainReloadInProgress || EditorApplication.isCompiling)
+                CaptureAssemblyReloadPreferences();
+
+            // Detach is also emitted during ordinary UI Toolkit panel rebuilds,
+            // not only during ReloadDomain. Keeping the old root in
+            // windowBindingsByRoot leaves callbacks and scheduled items attached
+            // to a dead panel; the next BindWindow call then has to compete with
+            // stale visual state. Reuse the same deterministic teardown used by
+            // PlayMode suspension while retaining the logical binding slot and
+            // its persisted sleep preference.
+            SuspendWindowBinding(binding);
         }
 
         internal static Rect EvaluateSemiSleepTarget(Rect awakeBounds)
@@ -3257,6 +5100,9 @@ namespace ES.EditorInternal
 
         private static VisualElement CreateSemiSleepOverlay(WindowBinding binding)
         {
+            binding.diagnosticBarsHidden = true;
+            binding.diagnosticPromotionProgress = -1f;
+            binding.diagnosticPromotionComplete = false;
             var overlay = new VisualElement
             {
                 name = "ESSemiSleepOverlay",
@@ -3328,6 +5174,7 @@ namespace ES.EditorInternal
             overlay.Add(binding.semiSleepTitleLabel);
             binding.semiSleepPromotionProgress = CreateSemiSleepDiagnosticBar("ESPromotionProgress");
             binding.semiSleepDockProgress = CreateSemiSleepDiagnosticBar("ESDockProgress");
+            binding.semiSleepPromotionProgress.style.display = DisplayStyle.None;
             binding.semiSleepDockProgress.style.display = DisplayStyle.None;
             overlay.Add(binding.semiSleepPromotionProgress);
             overlay.Add(binding.semiSleepDockProgress);
@@ -3367,9 +5214,8 @@ namespace ES.EditorInternal
                 if (metadata.ESWindow_PresentationIcon != null)
                     return metadata.ESWindow_PresentationIcon;
             }
-            Texture titleIcon = window?.titleContent?.image;
-            if (titleIcon != null)
-                return titleIcon;
+            // 只有 Presentation metadata 才能声明标题图标；普通窗口的
+            // titleContent.image 可能是遗留宿主图标，不能覆盖当前业务语义。
             return ResolveDefaultWindowIcon(window, metadataTitle ?? window?.titleContent?.text, null);
         }
 
@@ -3378,14 +5224,21 @@ namespace ES.EditorInternal
             string title,
             string pagePath)
         {
-            Texture brandIcon = LoadESBrandIcon(
-                ResolveESBrandIconResourceName(window?.GetType(), title, pagePath));
+            string brandResourceName = ResolveESBrandIconResourceName(
+                window?.GetType(), title, pagePath);
+            // These two legacy placeholders are visually empty rounded squares.
+            // Keep their semantic names available to callers, but do not present
+            // an empty shape as a product icon when Unity has a precise fallback.
+            Texture brandIcon = brandResourceName == "workbench"
+                || brandResourceName == "inspector"
+                ? null
+                : LoadESBrandIcon(brandResourceName);
             if (brandIcon != null)
                 return brandIcon;
             string iconName = ResolveDefaultWindowIconName(window?.GetType(), title, pagePath);
             return LoadUnityIcon(iconName)
-                ?? LoadUnityIcon("d_Folder Icon")
-                ?? EditorGUIUtility.Load("Icons/DefaultAsset Icon.png") as Texture;
+                ?? LoadUnityIcon("d_UnityEditor.ConsoleWindow")
+                ?? LoadUnityIcon("d_console.infoicon");
         }
 
         internal static string ResolveDefaultWindowIconName(
@@ -3397,72 +5250,125 @@ namespace ES.EditorInternal
             // 否则测试程序集、Window/Inspector 等技术后缀会污染真正的业务图标。
             string semanticKey = ((title ?? string.Empty) + " " + (pagePath ?? string.Empty))
                 .ToLowerInvariant();
-            string resolved = ResolveDefaultWindowIconNameFromKey(semanticKey);
+            string resolved = ResolveDefaultWindowIconNameFromKey(semanticKey, false);
             if (!string.IsNullOrEmpty(resolved))
                 return resolved;
             string typeKey = (windowType?.Name ?? string.Empty).ToLowerInvariant();
-            return ResolveDefaultWindowIconNameFromKey(typeKey) ?? "d_Folder Icon";
+            return ResolveDefaultWindowIconNameFromKey(typeKey, true)
+                ?? "d_UnityEditor.ConsoleWindow";
         }
 
-        private static string ResolveDefaultWindowIconNameFromKey(string key)
+        private static string ResolveDefaultWindowIconNameFromKey(string key, bool typeFallback)
         {
+            // Concrete asset/tool semantics must win over broad host words such
+            // as Graph or Window. This keeps Shader Graph, particle and authoring
+            // pages from inheriting a generic workflow icon.
+            if (ContainsAny(key, "shadergraph", "shader graph", "着色器图"))
+                return "d_Shader Icon";
+            if (ContainsAny(key, "material", "材质"))
+                return "d_Material Icon";
+            if (ContainsAny(key, "shader", "着色器"))
+                return "d_Shader Icon";
+            if (ContainsAny(key, "particle", "particlesystem", "vfx", "effect", "粒子", "特效"))
+                return "d_ParticleSystem Icon";
+            if (ContainsAny(key, "prefab", "预制体"))
+                return "d_Prefab Icon";
+            if (ContainsAny(key, "model", "mesh", "模型", "网格"))
+                return "d_Mesh Icon";
+            if (ContainsAny(key, "hierarchy", "层级"))
+                return "d_UnityEditor.SceneHierarchyWindow";
             if (ContainsAny(key, "font", "字体"))
                 return "d_Font Icon";
             if (ContainsAny(key, "audio", "sound", "音频", "音效"))
                 return "d_AudioClip Icon";
+            if (ContainsAny(key, "graph", "node", "flow", "图表", "节点", "流程"))
+                return "d_AnimatorController Icon";
             if (ContainsAny(key, "track", "timeline", "animation", "动作", "轨道"))
                 return "d_AnimationClip Icon";
-            if (ContainsAny(key, "scene", "world", "environment", "场景", "环境"))
-                return "d_UnityEditor.SceneView";
             if (ContainsAny(key, "camera", "相机"))
                 return "d_Camera Icon";
+            if (ContainsAny(key, "scene", "world", "map", "environment", "场景", "地图", "环境"))
+                return "d_UnityEditor.SceneView";
             if (ContainsAny(key, "build", "bake", "release", "publish", "构建", "发布"))
                 return "d_BuildSettings.Editor.Small";
             if (ContainsAny(key, "package", "installer", "dependency", "安装", "依赖"))
                 return "d_Package Manager";
+            if (ContainsAny(key, "health", "diagnostic", "validation", "test", "progress", "验证", "诊断", "测试", "进度"))
+                return "d_console.infoicon";
             if (ContainsAny(key, "agent", "automation", "command", "协作", "自动化"))
                 return "d_UnityEditor.ConsoleWindow";
-            if (ContainsAny(key, "health", "diagnostic", "validation", "test", "health", "验证", "诊断", "测试"))
-                return "d_console.infoicon";
             if (ContainsAny(key, "settings", "config", "theme", "设置", "配置", "主题"))
                 return "d_Settings Icon";
             if (ContainsAny(key, "inspector", "drawer", "property", "检查器", "属性"))
                 return "d_UnityEditor.InspectorWindow";
-            if (ContainsAny(key, "data", "so", "table", "catalog", "数据", "表", "目录"))
+            if (ContainsAny(key, "data", "table", "catalog", "数据", "数据表", "目录")
+                || typeFallback && ContainsAny(key, "sodata", "scriptableobject"))
                 return "d_ScriptableObject Icon";
-            if (ContainsAny(key, "asset", "resource", "res", "资源", "资产"))
+            if (ContainsAny(key, "asset", "resource", "资源", "资产")
+                || typeFallback && ContainsAny(key, "esreswindow", "resourcewindow"))
                 return "d_Project";
             return null;
         }
 
         /// <summary>
-        /// 返回 ES 品牌语义图标的项目内资源名。资源不存在时返回 null，
-        /// 调用方继续走 Unity 内置图标回退，不影响旧窗口。
+        /// 返回 ES 品牌语义图标的项目内资源名。没有明确语义时使用中性的
+        /// workbench 图标，避免把未知编辑器窗口误标成资源文件夹。
         /// </summary>
         internal static string ResolveESBrandIconResourceName(
             Type windowType,
             string title,
             string pagePath)
         {
-            string key = ((windowType?.FullName ?? string.Empty) + " "
-                + (title ?? string.Empty) + " " + (pagePath ?? string.Empty))
+            string displayKey = ((title ?? string.Empty) + " " + (pagePath ?? string.Empty))
                 .ToLowerInvariant();
+            // 相机有明确的 Unity 原生语义图标；不要拿场景品牌图标冒充相机。
+            if (ContainsAny(displayKey, "camera", "相机"))
+                return null;
+            // Concrete Unity asset icons are more precise than an ES host brand.
+            // Returning null here deliberately lets ResolveDefaultWindowIcon use
+            // the matching built-in icon instead of the generic workbench mark.
+            if (ContainsAny(displayKey,
+                    "shadergraph", "shader graph", "shader", "着色器",
+                    "material", "材质", "particle", "particlesystem", "vfx",
+                    "effect", "粒子", "特效", "prefab", "预制体",
+                    "model", "mesh", "模型", "网格", "hierarchy", "层级"))
+                return null;
+            string resolved = ResolveESBrandIconResourceNameFromKey(displayKey, false);
+            if (!string.IsNullOrEmpty(resolved))
+                return resolved;
+            string typeKey = (windowType?.FullName ?? string.Empty).ToLowerInvariant();
+            return ResolveESBrandIconResourceNameFromKey(typeKey, true);
+        }
+
+        private static string ResolveESBrandIconResourceNameFromKey(
+            string key,
+            bool typeFallback)
+        {
+            if (ContainsAny(key, "camera", "相机"))
+                return null;
+            // 先命中用户真正操作的业务对象，再处理宿主/技术名词。
+            if (ContainsAny(key, "graph", "track", "timeline", "animation", "node", "flow",
+                    "图表", "节点", "流程", "动作", "轨道")) return "graph";
             if (ContainsAny(key, "agent", "协作")) return "agent";
             if (ContainsAny(key, "automation", "自动化", "command")) return "automation";
-            if (ContainsAny(key, "diagnostic", "validation", "test", "验证", "诊断", "测试")) return "diagnostics";
+            if (ContainsAny(key, "diagnostic", "validation", "test", "health", "progress",
+                    "验证", "诊断", "测试", "健康", "进度")) return "diagnostics";
             if (ContainsAny(key, "font", "字体")) return "font";
             if (ContainsAny(key, "audio", "sound", "音频", "音效")) return "audio";
-            if (ContainsAny(key, "track", "timeline", "animation", "动作", "轨道")) return "graph";
-            if (ContainsAny(key, "scene", "world", "environment", "场景", "环境")) return "scene";
-            if (ContainsAny(key, "camera", "相机")) return "scene";
+            if (ContainsAny(key, "scene", "world", "map", "environment", "场景", "地图", "环境")) return "scene";
             if (ContainsAny(key, "build", "bake", "release", "publish", "构建", "发布")) return "build";
             if (ContainsAny(key, "package", "installer", "dependency", "安装", "依赖")) return "package";
-            if (ContainsAny(key, "settings", "config", "theme", "设置", "配置", "主题")) return "settings";
+            if (ContainsAny(key, "theme", "settings", "设置", "主题")) return "settings";
+            if (ContainsAny(key, "config", "配置")) return "config";
             if (ContainsAny(key, "inspector", "drawer", "property", "检查器", "属性")) return "inspector";
-            if (ContainsAny(key, "data", "so", "table", "catalog", "数据", "表", "目录")) return "data";
-            if (ContainsAny(key, "asset", "resource", "res", "资源", "资产")) return "assets";
-            if (ContainsAny(key, "workbench", "工作台", "window", "窗口")) return "workbench";
-            return null;
+            if (ContainsAny(key, "content", "gameplay", "character", "skill", "item",
+                    "内容", "角色", "技能", "物品")) return "content";
+            if (ContainsAny(key, "data", "table", "catalog", "数据", "数据表", "目录")
+                || typeFallback && ContainsAny(key, "sodata", "scriptableobject")) return "data";
+            if (ContainsAny(key, "asset", "resource", "资源", "资产")
+                || typeFallback && ContainsAny(key, "esreswindow", "resourcewindow")) return "assets";
+            if (ContainsAny(key, "workbench", "dialog", "popup", "工作台", "对话框", "弹窗")) return "workbench";
+            return "workbench";
         }
 
         internal static Texture LoadESBrandIcon(string resourceName)
@@ -3489,7 +5395,7 @@ namespace ES.EditorInternal
             return false;
         }
 
-        private static Texture LoadUnityIcon(string iconName)
+        internal static Texture LoadUnityIcon(string iconName)
         {
             if (string.IsNullOrWhiteSpace(iconName))
                 return null;
@@ -3511,6 +5417,9 @@ namespace ES.EditorInternal
             // A user gesture owns the native frame. In particular, invalidate a
             // domain-reload recovery callback before it can write the old frame back.
             binding.restorePersistedSleepOnBind = false;
+            binding.restorePersistedSleepScheduled = false;
+            binding.persistedSleepGeometryVerifyUntil = -1d;
+            binding.persistedSleepGeometryRepairScheduled = false;
             if (binding.semiSleepAnimating
                 && binding.transitionTargetState == ESWindowVisualState.SleepTile)
             {
@@ -3709,7 +5618,7 @@ namespace ES.EditorInternal
                     Rect dockBounds = ClampSemiSleepDockBounds(
                         binding.window.position,
                         GetSemiSleepTrayBounds(binding.awakeBounds));
-                    binding.window.position = dockBounds;
+                    CommitSemiSleepWindowPosition(binding, dockBounds);
                     binding.semiSleepToBounds = dockBounds;
                     binding.semiSleepDockBounds = dockBounds;
                     binding.hasSemiSleepDockBounds = true;
@@ -3838,7 +5747,7 @@ namespace ES.EditorInternal
                     Rect dockBounds = ClampSemiSleepDockBounds(
                         binding.window.position,
                         GetSemiSleepTrayBounds(binding.awakeBounds));
-                    binding.window.position = dockBounds;
+                    CommitSemiSleepWindowPosition(binding, dockBounds);
                     binding.semiSleepToBounds = dockBounds;
                     binding.semiSleepDockBounds = dockBounds;
                     binding.hasSemiSleepDockBounds = true;
@@ -3867,7 +5776,7 @@ namespace ES.EditorInternal
             binding.hasSemiSleepDragPendingBounds = false;
             if (!IsFinite(target.position) || !IsFinite(target.size))
                 return;
-            binding.window.position = target;
+            CommitSemiSleepWindowPosition(binding, target);
             binding.semiSleepToBounds = target;
             if (binding.semiSleepDragStartState == ESWindowVisualState.EdgeTab
                 || binding.semiSleepDragStartState == ESWindowVisualState.EdgeTabHover)
@@ -3902,40 +5811,32 @@ namespace ES.EditorInternal
                 tooltip = "系统：窗口生命周期与休眠控制"
             };
             controls.style.flexDirection = FlexDirection.Row;
+            controls.style.flexWrap = Wrap.Wrap;
             controls.style.alignItems = Align.Center;
-            controls.style.flexShrink = 0f;
+            controls.style.flexShrink = 1f;
+            controls.style.minWidth = 0f;
+            controls.style.overflow = Overflow.Visible;
 
-            binding.semiSleepAllowedButton = ESWindowPresentation.CreateHeaderActionButton(
-                null,
-                "允许",
-                "允许此窗口参与休眠；关闭后立即恢复并禁用休眠命令。",
-                () => SetWindowSemiSleepAllowed(binding.window, !binding.allowSemiSleep));
             binding.semiSleepToggleButton = ESWindowPresentation.CreateHeaderActionButton(
                 null,
                 "休眠",
                 "立即收起到休眠托盘；休眠后单击恢复，拖动可修改下次收纳位置。",
                 () => ToggleSemiSleepFromHeader(binding));
-            binding.semiSleepPinButton = ESWindowPresentation.CreateHeaderActionButton(
-                null,
-                "自动",
-                "自动：失去焦点后休眠。固定：保持展开且不会自动休眠。",
-                () => ToggleSemiSleepPinFromHeader(binding));
-            binding.semiSleepGlobalButton = ESWindowPresentation.CreateHeaderActionButton(
-                null,
-                "全局",
-                "切换所有 ES 浮动窗口的自动半休眠总开关；不会重建窗口内容。",
-                () => SetSemiSleepEnabled(!SemiSleepEnabled));
-            controls.Add(binding.semiSleepAllowedButton);
             controls.Add(binding.semiSleepToggleButton);
-            controls.Add(binding.semiSleepPinButton);
-            controls.Add(binding.semiSleepGlobalButton);
             binding.semiSleepOverflowMenu = CreateSemiSleepOverflowMenu(binding);
             controls.Add(binding.semiSleepOverflowMenu);
 
             controls.style.marginRight = 4f;
             VisualElement systemActions = toolbar.Q<VisualElement>("ESMenuTreeSystemActions");
             if (systemActions != null)
+            {
+                systemActions.style.flexGrow = 1f;
+                systemActions.style.flexShrink = 1f;
+                systemActions.style.minWidth = 0f;
+                systemActions.style.flexWrap = Wrap.Wrap;
+                systemActions.style.overflow = Overflow.Visible;
                 systemActions.Add(controls);
+            }
             else
                 toolbar.Insert(0, controls);
 
@@ -3968,24 +5869,23 @@ namespace ES.EditorInternal
 
         internal static bool ShouldCompactSystemActions(float rootWidth)
         {
-            return rootWidth > 0f && rootWidth < 760f;
+            // Geometry 在窗口首次绑定时可能暂时为 0；此时先隐藏主按钮，
+            // 由稳定的系统菜单承载全部配置动作。
+            return rootWidth <= 0f || rootWidth < 960f;
+        }
+
+        internal static bool ShouldShowPrimarySystemAction(float rootWidth)
+        {
+            return rootWidth <= 0f || rootWidth >= 560f;
         }
 
         private static ToolbarMenu CreateSemiSleepOverflowMenu(WindowBinding binding)
         {
-            var menu = new ToolbarMenu
-            {
-                name = "ESWindowSystemActionsOverflow",
-                text = "窗口",
-                tooltip = "窗口生命周期与休眠控制"
-            };
-            menu.AddToClassList("es-window-header-action-button");
-            menu.style.height = 26f;
-            menu.style.minHeight = 26f;
-            menu.style.minWidth = 52f;
-            menu.style.marginLeft = 2f;
-            menu.style.color = SectionSelectedTextColor;
-            menu.style.backgroundColor = ControlSurfaceColor;
+            ToolbarMenu menu = ESWindowPresentation.CreateHeaderOverflowMenu(
+                "ESWindowSystemActionsOverflow",
+                "系统",
+                "系统设置：窗口休眠、自动模式与全局策略",
+                52f);
             menu.menu.AppendAction(
                 "允许参与休眠",
                 _ => SetWindowSemiSleepAllowed(binding.window, !binding.allowSemiSleep),
@@ -4026,13 +5926,16 @@ namespace ES.EditorInternal
 
         private static bool CanUseSleepCommand(WindowBinding binding)
         {
-            return binding?.window != null && binding.allowSemiSleep && !binding.window.docked;
+            return binding?.window != null
+                && EvaluateSemiSleepBlockReason(binding, false) == SemiSleepBlockReason.None;
         }
 
         private static bool IsSleepingOrTargetingSleep(WindowBinding binding)
         {
             return binding != null
-                && (binding.semiSleeping || binding.semiSleepAnimating && binding.semiSleepTarget);
+                && (binding.restorePersistedSleepOnBind
+                    || binding.semiSleeping
+                    || binding.semiSleepAnimating && binding.semiSleepTarget);
         }
 
         private static DropdownMenuAction.Status GetPinModeStatus(
@@ -4052,10 +5955,7 @@ namespace ES.EditorInternal
                 return;
             binding.semiSleepControls?.RemoveFromHierarchy();
             binding.semiSleepControls = null;
-            binding.semiSleepAllowedButton = null;
             binding.semiSleepToggleButton = null;
-            binding.semiSleepPinButton = null;
-            binding.semiSleepGlobalButton = null;
             binding.semiSleepOverflowMenu = null;
         }
 
@@ -4072,14 +5972,41 @@ namespace ES.EditorInternal
                 if (binding.supportsSemiSleep && binding.semiSleepControls == null)
                     AttachSemiSleepControls(binding);
                 RefreshSemiSleepControls(binding);
+                ScheduleSettledSemiSleepGeometryRepair(binding);
             }
+        }
+
+        private static void ScheduleSettledSemiSleepGeometryRepair(WindowBinding binding)
+        {
+            if (binding?.window == null
+                || binding.root == null
+                || binding.persistedSleepGeometryRepairScheduled
+                || !binding.semiSleeping
+                || binding.semiSleepAnimating
+                || binding.semiSleepDragging
+                || binding.semiSleepDragPointerId >= 0
+                || binding.visualState != ESWindowVisualState.SleepTile
+                    && binding.visualState != ESWindowVisualState.EdgeTab
+                    && binding.visualState != ESWindowVisualState.EdgeTabHover)
+                return;
+
+            int bindingId = binding.window.GetInstanceID();
+            binding.persistedSleepGeometryRepairScheduled = true;
+            binding.root.schedule.Execute(() =>
+            {
+                if (!windowBindings.TryGetValue(bindingId, out WindowBinding current)
+                    || !ReferenceEquals(current, binding))
+                    return;
+                binding.persistedSleepGeometryRepairScheduled = false;
+                RepairSettledSemiSleepGeometry(binding);
+            }).StartingIn(1);
         }
 
         private static void ToggleSemiSleepFromHeader(WindowBinding binding)
         {
             if (binding?.window == null)
                 return;
-            if (binding.semiSleeping || binding.semiSleepAnimating && binding.semiSleepTarget)
+            if (IsSleepingOrTargetingSleep(binding))
             {
                 RequestWindowWake(binding.window);
             }
@@ -4108,42 +6035,31 @@ namespace ES.EditorInternal
         {
             if (binding?.semiSleepControls == null)
                 return;
-            bool sleeping = binding.semiSleeping || binding.semiSleepAnimating && binding.semiSleepTarget;
+            TryNormalizeUnexpectedAwakeGeometry(binding);
+            bool sleeping = IsSleepingOrTargetingSleep(binding);
             bool visible = binding.supportsSemiSleep && binding.window != null;
             binding.semiSleepControls.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
             if (!visible)
                 return;
+            if (sleeping)
+                ApplySemiSleepOverlayState(binding);
             bool docked = binding.window.docked;
             bool commandsEnabled = binding.allowSemiSleep && !docked;
-            bool compact = ShouldCompactSystemActions(binding.root?.resolvedStyle.width ?? 0f);
-            binding.semiSleepAllowedButton.style.display = compact ? DisplayStyle.None : DisplayStyle.Flex;
-            binding.semiSleepToggleButton.style.display = compact ? DisplayStyle.None : DisplayStyle.Flex;
-            binding.semiSleepPinButton.style.display = compact ? DisplayStyle.None : DisplayStyle.Flex;
-            if (binding.semiSleepGlobalButton != null)
-                binding.semiSleepGlobalButton.style.display = compact ? DisplayStyle.None : DisplayStyle.Flex;
+            float hostWidth = binding.actionHosts?.System?.resolvedStyle.width ?? 0f;
+            float rootWidth = binding.root?.resolvedStyle.width ?? 0f;
+            float availableWidth = hostWidth > 0f ? hostWidth : rootWidth;
+            bool showPrimary = ShouldShowPrimarySystemAction(availableWidth);
+            binding.semiSleepToggleButton.style.display = showPrimary ? DisplayStyle.Flex : DisplayStyle.None;
             if (binding.semiSleepOverflowMenu != null)
             {
-                binding.semiSleepOverflowMenu.style.display = compact
-                    ? DisplayStyle.Flex
-                    : DisplayStyle.None;
+                // Keep configuration in one stable menu at every width. This avoids
+                // settings moving between buttons and the overflow menu on resize.
+                binding.semiSleepOverflowMenu.style.display = DisplayStyle.Flex;
                 binding.semiSleepOverflowMenu.tooltip = docked
                     ? "停靠窗口保持展开；拖出后可使用休眠控制。"
                     : sleeping
                         ? "窗口正在休眠；打开菜单可立即唤醒或调整模式。"
-                        : "窗口生命周期与休眠控制";
-            }
-
-            if (binding.semiSleepAllowedButton != null)
-            {
-                SetHeaderActionButtonText(
-                    binding.semiSleepAllowedButton,
-                    binding.allowSemiSleep ? "休眠:允许" : "休眠:禁用");
-                binding.semiSleepAllowedButton.tooltip = binding.allowSemiSleep
-                    ? "此窗口允许参与休眠。单击禁用并立即恢复窗口。"
-                    : "此窗口已禁用休眠。单击重新允许休眠命令与自动策略。";
-                binding.semiSleepAllowedButton.style.backgroundColor = binding.allowSemiSleep
-                    ? ControlSurfaceColor
-                    : InactiveActionColor;
+                        : "系统设置：窗口休眠、自动模式与全局策略";
             }
 
             if (binding.semiSleepToggleButton != null)
@@ -4151,53 +6067,19 @@ namespace ES.EditorInternal
                 SetHeaderActionButtonText(
                     binding.semiSleepToggleButton,
                     docked ? "停靠" : sleeping ? "唤醒" : "收起");
-                binding.semiSleepToggleButton.SetEnabled(commandsEnabled);
+                ESWindowPresentation.SetButtonEnabled(
+                    binding.semiSleepToggleButton,
+                    commandsEnabled);
                 binding.semiSleepToggleButton.tooltip = !binding.allowSemiSleep
-                    ? "此窗口已禁用休眠；先使用“禁用”按钮重新允许。"
+                    ? "此窗口已禁用休眠；打开“系统”菜单可重新允许。"
                     : docked
                     ? "停靠窗口保持展开；拖出为浮动窗口后可使用休眠模式。"
                     : sleeping
                     ? "恢复窗口；也可单击休眠块恢复，拖动休眠块修改收纳位置。"
                     : "立即收起到休眠托盘；休眠后单击恢复，拖动可修改下次收纳位置。";
-                binding.semiSleepToggleButton.style.backgroundColor = sleeping
-                    ? ActiveColor
-                    : ControlSurfaceColor;
-            }
-            if (binding.semiSleepPinButton != null)
-            {
-                string modeText = binding.pinned ? "固定" : "自动";
-                SetHeaderActionButtonText(binding.semiSleepPinButton, modeText);
-                binding.semiSleepPinButton.SetEnabled(commandsEnabled);
-                if (!binding.allowSemiSleep)
-                    binding.semiSleepPinButton.tooltip = "此窗口已禁用休眠；自动策略暂不可用。";
-                else if (docked)
-                    binding.semiSleepPinButton.tooltip = "停靠窗口不参与半休眠。";
-                else if (!SemiSleepEnabled)
-                    binding.semiSleepPinButton.tooltip = binding.pinned
-                        ? "固定模式；全局自动休眠当前关闭。单击解除固定，不会改动全局开关。"
-                        : "自动模式已就绪，但全局自动休眠当前关闭。此按钮不会改动全局开关。";
-                else if (binding.pinned)
-                    binding.semiSleepPinButton.tooltip = "固定模式：窗口不会自动休眠。单击切换为自动。";
-                else
-                    binding.semiSleepPinButton.tooltip = "自动模式：失去焦点后进入休眠。单击固定窗口。";
-                binding.semiSleepPinButton.style.backgroundColor = binding.pinned
-                    ? GetStatusAccent(0, ESStatusKind.Warning)
-                    : ControlSurfaceColor;
-            }
-            if (binding.semiSleepGlobalButton != null)
-            {
-                SetHeaderActionButtonText(
-                    binding.semiSleepGlobalButton,
-                    SemiSleepEnabled ? "全局:开" : "全局:关");
-                // 全局开关不是当前窗口的休眠命令；即使当前窗口停靠，也必须保持可操作，
-                // 否则用户会误以为“停靠”把全局自动策略一起禁用了。
-                binding.semiSleepGlobalButton.SetEnabled(true);
-                binding.semiSleepGlobalButton.tooltip = SemiSleepEnabled
-                    ? "全局自动半休眠已开启。单击关闭；不会重建窗口内容。"
-                    : "全局自动半休眠已关闭。单击开启；窗口级“自动”模式将开始生效。";
-                binding.semiSleepGlobalButton.style.backgroundColor = SemiSleepEnabled
-                    ? ActiveColor
-                    : InactiveActionColor;
+                ESWindowPresentation.SetButtonPresentationState(
+                    binding.semiSleepToggleButton,
+                    sleeping ? ESPresentationState.Selected : ESPresentationState.Normal);
             }
         }
 
@@ -4238,17 +6120,18 @@ namespace ES.EditorInternal
         {
             foreach (WindowBinding binding in windowBindings.Values)
                 if (binding != null
-                    && binding.allowSemiSleep
                     && binding.window != null
-                    && (binding.semiSleepAnimating
-                        || binding.semiSleepDragPointerId >= 0
-                        || binding.hasSemiSleepDragPendingBounds
-                        || binding.visualState == ESWindowVisualState.ActivePanel
-                        || binding.visualState == ESWindowVisualState.SleepTile
-                        || binding.visualState == ESWindowVisualState.EdgeTabHover
-                        || (binding.visualState == ESWindowVisualState.EdgeTab
-                            && binding.pointerInside)
-                        || binding.sleepLinkMode == ES.ESWindowSleepLinkMode.FollowOwner))
+                    && (HasPersistedSleepRuntimeState(binding)
+                        || binding.allowSemiSleep
+                            && (binding.semiSleepAnimating
+                                || binding.semiSleepDragPointerId >= 0
+                                || binding.hasSemiSleepDragPendingBounds
+                                || binding.visualState == ESWindowVisualState.ActivePanel
+                                || binding.visualState == ESWindowVisualState.SleepTile
+                                || binding.visualState == ESWindowVisualState.EdgeTabHover
+                                || (binding.visualState == ESWindowVisualState.EdgeTab
+                                    && binding.pointerInside)
+                                || binding.sleepLinkMode == ES.ESWindowSleepLinkMode.FollowOwner)))
                     return true;
             return false;
         }
@@ -4257,7 +6140,8 @@ namespace ES.EditorInternal
         {
             foreach (WindowBinding binding in windowBindings.Values)
                 if (binding != null
-                    && (binding.semiSleepAnimating
+                    && (HasPersistedSleepRuntimeState(binding)
+                        || binding.semiSleepAnimating
                         || binding.semiSleepDragPointerId >= 0
                         || binding.hasSemiSleepDragPendingBounds
                         || binding.visualState == ESWindowVisualState.SleepTile
@@ -4269,11 +6153,22 @@ namespace ES.EditorInternal
             return false;
         }
 
+        private static bool HasPersistedSleepRuntimeState(WindowBinding binding)
+        {
+            return binding != null
+                && (binding.restorePersistedSleepOnBind
+                    || binding.restorePersistedSleepScheduled
+                    || binding.persistedSleepGeometryVerifyUntil >= 0d);
+        }
+
         private static bool ShouldEvaluateSemiSleepBinding(WindowBinding binding)
         {
             if (binding == null)
                 return false;
-            if (binding.semiSleepAnimating
+            if (binding.restorePersistedSleepOnBind
+                || binding.restorePersistedSleepScheduled
+                || binding.persistedSleepGeometryVerifyUntil >= 0d
+                || binding.semiSleepAnimating
                 || binding.semiSleepDragging
                 || binding.semiSleepDragPointerId >= 0)
                 return true;
@@ -4302,23 +6197,95 @@ namespace ES.EditorInternal
 
         private static bool CanEnterSemiSleep(WindowBinding binding, bool requireAutomaticPolicy)
         {
-            if (binding == null
+            return EvaluateSemiSleepBlockReason(binding, requireAutomaticPolicy)
+                == SemiSleepBlockReason.None;
+        }
+
+        private static SemiSleepBlockReason EvaluateSemiSleepBlockReason(
+            WindowBinding binding,
+            bool requireAutomaticPolicy)
+        {
+            if (binding == null || binding.window == null)
+                return SemiSleepBlockReason.InvalidBinding;
+            if (!binding.supportsSemiSleep)
+                return SemiSleepBlockReason.Unsupported;
+            if (binding.singleInstanceViolation)
+                return SemiSleepBlockReason.DuplicateInstance;
+            if (!binding.allowSemiSleep)
+                return SemiSleepBlockReason.NotAllowed;
+            if (binding.sleepLinkMode == ES.ESWindowSleepLinkMode.OwnedSurface)
+                return SemiSleepBlockReason.OwnedSurface;
+            if (binding.busyCount > 0)
+                return SemiSleepBlockReason.Busy;
+            if (focusModeWindowId == binding.window.GetInstanceID())
+                return SemiSleepBlockReason.FocusMode;
+            if (binding.window.docked)
+                return SemiSleepBlockReason.Docked;
+            if (binding.root == null || binding.root.panel == null)
+                return SemiSleepBlockReason.PanelUnavailable;
+            if (requireAutomaticPolicy && !SemiSleepEnabled)
+                return SemiSleepBlockReason.GlobalAutoDisabled;
+            if (requireAutomaticPolicy && binding.pinned)
+                return SemiSleepBlockReason.Pinned;
+            return SemiSleepBlockReason.None;
+        }
+
+        private static string GetSemiSleepBlockReasonText(SemiSleepBlockReason reason)
+        {
+            switch (reason)
+            {
+                case SemiSleepBlockReason.None: return string.Empty;
+                case SemiSleepBlockReason.InvalidBinding: return "窗口绑定已失效。";
+                case SemiSleepBlockReason.Unsupported: return "窗口契约未启用半休眠。";
+                case SemiSleepBlockReason.DuplicateInstance:
+                    return "同一窗口类型存在额外实例；仅首个实例允许参与休眠与持久化。";
+                case SemiSleepBlockReason.NotAllowed: return "当前窗口已关闭半休眠。";
+                case SemiSleepBlockReason.OwnedSurface: return "当前内容由父窗口承载，不独立休眠。";
+                case SemiSleepBlockReason.Busy: return "窗口正在执行任务。";
+                case SemiSleepBlockReason.FocusMode: return "窗口处于专注模式。";
+                case SemiSleepBlockReason.Docked: return "停靠窗口不参与半休眠。";
+                case SemiSleepBlockReason.PanelUnavailable: return "窗口界面尚未完成挂载。";
+                case SemiSleepBlockReason.GlobalAutoDisabled: return "全局自动半休眠已关闭。";
+                case SemiSleepBlockReason.Pinned: return "当前窗口已固定展开。";
+                default: return "窗口当前不能进入半休眠。";
+            }
+        }
+
+        private static bool IsPersistedSleepRestorePermanentlyBlocked(WindowBinding binding)
+        {
+            return binding == null
+                || binding.window == null
                 || !binding.supportsSemiSleep
                 || !binding.allowSemiSleep
                 || binding.sleepLinkMode == ES.ESWindowSleepLinkMode.OwnedSurface
-                || binding.busyCount > 0
-                || binding.window == null
-                || focusModeWindowId == binding.window.GetInstanceID()
-                || binding.window.docked
-                || binding.root == null
-                || binding.root.panel == null)
+                || binding.window.docked;
+        }
+
+        private static bool TryRestorePersistedSemiSleepGeometry(WindowBinding binding)
+        {
+            if (binding == null || !binding.restorePersistedSleepOnBind)
                 return false;
-            if (requireAutomaticPolicy && (!SemiSleepEnabled || binding.pinned))
+            if (IsPersistedSleepRestorePermanentlyBlocked(binding))
+            {
+                CancelPersistedSemiSleepRestore(binding);
                 return false;
-            string typeName = binding.window.GetType().Name;
-            return typeName.IndexOf("Dialog", StringComparison.OrdinalIgnoreCase) < 0
-                && typeName.IndexOf("Popup", StringComparison.OrdinalIgnoreCase) < 0
-                && typeName.IndexOf("Picker", StringComparison.OrdinalIgnoreCase) < 0;
+            }
+            if (!CanEnterSemiSleep(binding, false))
+                return false;
+            RestorePersistedSemiSleepGeometry(binding);
+            return true;
+        }
+
+        private static void CancelPersistedSemiSleepRestore(WindowBinding binding)
+        {
+            if (binding == null)
+                return;
+            binding.restorePersistedSleepOnBind = false;
+            binding.restorePersistedSleepScheduled = false;
+            binding.persistedSleepGeometryVerifyUntil = -1d;
+            binding.persistedSleepGeometryRepairScheduled = false;
+            RestoreSemiSleep(binding, true);
+            SaveSemiSleepPreferences(binding);
         }
 
         private static bool IsTransientFocusWindow(EditorWindow window)
@@ -4393,13 +6360,49 @@ namespace ES.EditorInternal
 
         private static void UpdateSemiSleepWindows()
         {
+            using (SemiSleepUpdateProfilerMarker.Auto())
+            {
+                bool sampling = semiSleepPerformanceSampleActive;
+                long startedAt = sampling ? System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
+                long allocatedAt = sampling ? GC.GetAllocatedBytesForCurrentThread() : 0L;
+                try
+                {
+                    UpdateSemiSleepWindowsCore();
+                }
+                finally
+                {
+                    if (sampling)
+                    {
+                        semiSleepPerformanceUpdateCount++;
+                        long elapsedTicks =
+                            System.Diagnostics.Stopwatch.GetTimestamp() - startedAt;
+                        semiSleepPerformanceUpdateElapsedTicks += elapsedTicks;
+                        if (elapsedTicks > semiSleepPerformanceMaximumUpdateElapsedTicks)
+                            semiSleepPerformanceMaximumUpdateElapsedTicks = elapsedTicks;
+                        long allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedAt;
+                        if (allocated > 0L)
+                        {
+                            semiSleepPerformanceUpdateAllocatedBytes += allocated;
+                            if (allocated > semiSleepPerformanceMaximumAllocatedBytesPerUpdate)
+                                semiSleepPerformanceMaximumAllocatedBytesPerUpdate = allocated;
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void UpdateSemiSleepWindowsCore()
+        {
             double now = EditorApplication.timeSinceStartup;
             if (!semiSleepAnyAnimating && now < nextSemiSleepIdleCheckAt)
                 return;
 
             bool hasAnimation = false;
+            bool subscriptionStateChanged = false;
             foreach (WindowBinding binding in windowBindings.Values)
             {
+                if (semiSleepPerformanceSampleActive)
+                    semiSleepPerformanceBindingVisitCount++;
                 SyncSleepOwnerState(binding);
                 if (!ShouldEvaluateSemiSleepBinding(binding))
                     continue;
@@ -4414,9 +6417,19 @@ namespace ES.EditorInternal
                     hasAnimation = true;
                     continue;
                 }
+                if (binding.restorePersistedSleepOnBind)
+                {
+                    bool wasPending = binding.restorePersistedSleepOnBind;
+                    TryRestorePersistedSemiSleepGeometry(binding);
+                    subscriptionStateChanged = subscriptionStateChanged
+                        || wasPending != binding.restorePersistedSleepOnBind;
+                    if (binding.restorePersistedSleepOnBind)
+                        continue;
+                }
                 if (!CanEnterSemiSleep(binding, false))
                 {
                     RestoreSemiSleep(binding, true);
+                    subscriptionStateChanged = true;
                     continue;
                 }
 
@@ -4476,10 +6489,20 @@ namespace ES.EditorInternal
                 {
                     RepairSettledSemiSleepGeometry(binding);
                 }
+                if (binding.persistedSleepGeometryVerifyUntil >= 0d
+                    && now >= binding.persistedSleepGeometryVerifyUntil)
+                {
+                    // Keep the final repair in this tick, then return a settled tab to
+                    // its event-driven path instead of retaining a permanent update loop.
+                    binding.persistedSleepGeometryVerifyUntil = -1d;
+                    subscriptionStateChanged = true;
+                }
             }
 
             semiSleepAnyAnimating = hasAnimation;
             nextSemiSleepIdleCheckAt = now + (hasAnimation ? 0.016d : 0.10d);
+            if (subscriptionStateChanged)
+                RefreshSemiSleepUpdateSubscription();
         }
 
         private static void SyncSleepOwnerState(WindowBinding child)
@@ -4502,10 +6525,10 @@ namespace ES.EditorInternal
             if (!windowBindings.TryGetValue(owner.GetInstanceID(), out WindowBinding ownerBinding)
                 || ownerBinding == null)
             {
-                BindWindow(owner);
-                if (!windowBindings.TryGetValue(owner.GetInstanceID(), out ownerBinding)
-                    || ownerBinding == null)
-                    return;
+                // Owner binding is established by its own window lifecycle or the
+                // explicit SetWindowSleepOwner path. Mutating windowBindings while
+                // UpdateSemiSleepWindowsCore enumerates it would invalidate the pass.
+                return;
             }
 
             bool ownerSleeping = ownerBinding.semiSleeping
@@ -4578,14 +6601,101 @@ namespace ES.EditorInternal
             else
                 return;
             Rect current = binding.window.position;
+            if (TryNormalizeUnexpectedAwakeGeometry(binding, current, expected))
+                return;
             if (Mathf.Abs(current.x - expected.x) > 1f
                 || Mathf.Abs(current.y - expected.y) > 1f
                 || Mathf.Abs(current.width - expected.width) > 1f
                 || Mathf.Abs(current.height - expected.height) > 1f)
             {
-                binding.window.position = expected;
+                CommitSemiSleepWindowPosition(binding, expected);
                 binding.semiSleepToBounds = expected;
             }
+        }
+
+        private static bool TryNormalizeUnexpectedAwakeGeometry(WindowBinding binding)
+        {
+            if (binding?.window == null
+                || !binding.semiSleeping
+                || binding.semiSleepAnimating
+                || binding.semiSleepDragging
+                || binding.semiSleepDragPointerId >= 0)
+                return false;
+
+            Rect expected;
+            Rect workArea = GetSemiSleepTrayBounds(binding.awakeBounds);
+            if (binding.visualState == ESWindowVisualState.SleepTile)
+            {
+                expected = binding.hasSemiSleepDockBounds
+                    ? ClampSemiSleepDockBounds(binding.semiSleepDockBounds, workArea)
+                    : EvaluateSemiSleepTarget(workArea, binding.semiSleepSlot);
+            }
+            else if (binding.visualState == ESWindowVisualState.EdgeTab
+                || binding.visualState == ESWindowVisualState.EdgeTabHover)
+            {
+                expected = EvaluateEdgeTabBounds(
+                    workArea,
+                    binding.edge,
+                    binding.edgeOffset,
+                    binding.visualState == ESWindowVisualState.EdgeTabHover ? 1f : 0f);
+            }
+            else
+            {
+                return false;
+            }
+            return TryNormalizeUnexpectedAwakeGeometry(
+                binding,
+                binding.window.position,
+                expected);
+        }
+
+        private static bool TryNormalizeUnexpectedAwakeGeometry(
+            WindowBinding binding,
+            Rect actual,
+            Rect expected)
+        {
+            if (binding == null
+                || binding.persistedSleepGeometryVerifyUntil >= EditorApplication.timeSinceStartup
+                || !IsClearlyAwakeGeometry(actual, expected, binding.awakeBounds))
+                return false;
+
+            binding.semiSleeping = false;
+            binding.semiSleepTarget = false;
+            binding.semiSleepAnimating = false;
+            binding.restorePersistedSleepOnBind = false;
+            binding.restorePersistedSleepScheduled = false;
+            binding.persistedSleepGeometryVerifyUntil = -1d;
+            binding.persistedSleepGeometryRepairScheduled = false;
+            binding.visualState = ESWindowVisualState.ActivePanel;
+            binding.transitionTargetState = ESWindowVisualState.ActivePanel;
+            binding.semiSleepManualHold = false;
+            binding.semiSleepSlot = -1;
+            binding.focusLostAt = -1d;
+            binding.sleepTileIdleStartedAt = -1d;
+            binding.edgeTabFullyExpandedAt = -1d;
+            binding.awakeBounds = actual;
+            binding.window.minSize = binding.awakeMinSize;
+            binding.window.maxSize = binding.awakeMaxSize;
+            ShowSemiSleepOverlay(binding, false, 0f);
+            SaveSemiSleepPreferences(binding);
+            return true;
+        }
+
+        internal static bool IsClearlyAwakeGeometry(
+            Rect actual,
+            Rect expectedSleep,
+            Rect awakeBounds)
+        {
+            bool substantiallyLarger = actual.width >= Mathf.Max(320f, expectedSleep.width + 160f)
+                && actual.height >= Mathf.Max(220f, expectedSleep.height + 100f);
+            if (!substantiallyLarger)
+                return false;
+            if (awakeBounds.width <= 1f || awakeBounds.height <= 1f)
+                return true;
+            float widthTolerance = Mathf.Max(32f, awakeBounds.width * 0.20f);
+            float heightTolerance = Mathf.Max(32f, awakeBounds.height * 0.20f);
+            return Mathf.Abs(actual.width - awakeBounds.width) <= widthTolerance
+                && Mathf.Abs(actual.height - awakeBounds.height) <= heightTolerance;
         }
 
         private static void RestorePersistedSemiSleepGeometry(WindowBinding binding)
@@ -4594,6 +6704,7 @@ namespace ES.EditorInternal
                 return;
 
             binding.restorePersistedSleepOnBind = false;
+            binding.restorePersistedSleepScheduled = false;
             if (binding.awakeBounds.width <= 1f || binding.awakeBounds.height <= 1f)
                 binding.awakeBounds = binding.window.position;
             // Unity restores the original frame constraints before CreateGUI. Capture
@@ -4626,7 +6737,7 @@ namespace ES.EditorInternal
 
             binding.semiSleepFromBounds = target;
             binding.semiSleepToBounds = target;
-            binding.window.position = target;
+            CommitSemiSleepWindowPosition(binding, target);
             binding.visualState = state;
             binding.transitionTargetState = state;
             binding.semiSleeping = true;
@@ -4637,6 +6748,8 @@ namespace ES.EditorInternal
                 ? EditorApplication.timeSinceStartup
                 : -1d;
             binding.edgeTabFullyExpandedAt = -1d;
+            binding.persistedSleepGeometryVerifyUntil =
+                EditorApplication.timeSinceStartup + PersistedSleepGeometryVerificationDuration;
             ShowSemiSleepOverlay(binding, true, 1f);
             ApplySemiSleepOverlayState(binding, state);
             RefreshSemiSleepControls(binding);
@@ -4657,6 +6770,44 @@ namespace ES.EditorInternal
                 && Mathf.Abs(actual.y - expected.y) <= 1f
                 && Mathf.Abs(actual.width - expected.width) <= 1f
                 && Mathf.Abs(actual.height - expected.height) <= 1f;
+        }
+
+        private static bool HasSettledSemiSleepGeometryMismatch(WindowBinding binding)
+        {
+            if (binding?.window == null
+                || !binding.semiSleeping
+                || binding.semiSleepAnimating
+                || binding.semiSleepDragging
+                || binding.semiSleepDragPointerId >= 0)
+                return false;
+
+            Rect workArea = GetSemiSleepTrayBounds(binding.awakeBounds);
+            Rect expected;
+            if (binding.visualState == ESWindowVisualState.SleepTile)
+            {
+                expected = binding.semiSleepDockBounds.width > 1f
+                    && binding.semiSleepDockBounds.height > 1f
+                        ? ClampSemiSleepDockBounds(binding.semiSleepDockBounds, workArea)
+                        : EvaluateSemiSleepTarget(workArea, binding.semiSleepSlot);
+            }
+            else if (binding.visualState == ESWindowVisualState.EdgeTab
+                || binding.visualState == ESWindowVisualState.EdgeTabHover)
+            {
+                expected = EvaluateEdgeTabBounds(
+                    workArea,
+                    binding.edge,
+                    binding.edgeOffset,
+                    binding.visualState == ESWindowVisualState.EdgeTabHover ? 1f : 0f);
+            }
+            else
+            {
+                return true;
+            }
+
+            return !IsVisualStateGeometryConsistent(
+                binding.visualState,
+                binding.window.position,
+                expected);
         }
 
         private static void UpdateVisualStateIdle(
@@ -4888,7 +7039,7 @@ namespace ES.EditorInternal
                 bool edgeToActive = binding.transitionTargetState == ESWindowVisualState.ActivePanel
                     && (binding.visualState == ESWindowVisualState.EdgeTab
                         || binding.visualState == ESWindowVisualState.EdgeTabHover);
-                binding.window.position = edgeToTile
+                CommitSemiSleepWindowPosition(binding, edgeToTile
                     ? EvaluateEdgeTabToTileFrame(
                         binding.semiSleepFromBounds,
                         binding.semiSleepToBounds,
@@ -4911,13 +7062,13 @@ namespace ES.EditorInternal
                         binding.semiSleepToBounds,
                         progress,
                         binding.transitionTargetState == ESWindowVisualState.ActivePanel,
-                        MotionIntensity);
+                        MotionIntensity));
                 float overlayOpacity;
                 overlayOpacity = binding.transitionTargetState == ESWindowVisualState.ActivePanel
                     ? 1f - Mathf.Clamp01(progress / 0.55f)
                     : 1f;
                 ShowSemiSleepOverlay(binding, true, overlayOpacity);
-                binding.window.Repaint();
+                RequestSemiSleepRepaint(binding);
                 if (progress >= 1f)
                     CompleteSemiSleepTransition(binding);
             }
@@ -4934,7 +7085,7 @@ namespace ES.EditorInternal
         {
             if (binding?.window == null)
                 return;
-            binding.window.position = binding.semiSleepToBounds;
+            CommitSemiSleepWindowPosition(binding, binding.semiSleepToBounds);
             binding.visualState = binding.transitionTargetState;
             binding.semiSleeping = binding.visualState != ESWindowVisualState.ActivePanel;
             binding.semiSleepTarget = binding.semiSleeping;
@@ -5015,32 +7166,55 @@ namespace ES.EditorInternal
             RefreshSemiSleepOverlayMetadata(binding);
             ESWindowVisualState state = stateOverride ?? binding.visualState;
             bool tile = state == ESWindowVisualState.SleepTile;
-            bool verticalTab = binding.edge == ESWindowEdge.Top
-                || binding.edge == ESWindowEdge.Bottom;
-            binding.semiSleepOverlay.style.flexDirection = tile || verticalTab
+            bool verticalEdgeTab = !tile
+                && (binding.edge == ESWindowEdge.Top || binding.edge == ESWindowEdge.Bottom);
+            bool expandedTab = state == ESWindowVisualState.EdgeTabHover;
+            binding.semiSleepOverlay.style.flexDirection = tile || verticalEdgeTab
                 ? FlexDirection.Column
                 : FlexDirection.Row;
+            if (binding.semiSleepIcon != null)
+            {
+                float iconSize = tile ? 22f : 18f;
+                binding.semiSleepIcon.style.width = iconSize;
+                binding.semiSleepIcon.style.height = iconSize;
+                binding.semiSleepIcon.style.marginRight = !tile && !verticalEdgeTab ? 5f : 0f;
+                binding.semiSleepIcon.style.marginBottom = verticalEdgeTab ? 2f : 0f;
+            }
             if (binding.semiSleepMonogram != null)
             {
                 binding.semiSleepMonogram.style.fontSize = tile ? 20f : 13f;
-                binding.semiSleepMonogram.style.marginRight = tile ? 0f : 5f;
+                binding.semiSleepMonogram.style.marginRight = !tile && !verticalEdgeTab ? 5f : 0f;
+                binding.semiSleepMonogram.style.marginBottom = verticalEdgeTab ? 2f : 0f;
             }
             if (binding.semiSleepTitleLabel != null)
             {
-                string currentTitle = binding.window is ES.IESWindowPresentationMetadata metadata
-                    ? metadata.ESWindow_PresentationTitle
-                    : binding.window?.titleContent?.text;
-                if (!string.IsNullOrWhiteSpace(currentTitle))
-                    binding.semiSleepTitleLabel.text = currentTitle.Trim();
+                string currentTitle = ResolveWindowPresentationTitle(binding.window);
+                string shortTitle = GetWindowPresentationShortTitle(binding.window);
+                binding.semiSleepTitleLabel.text = tile || expandedTab
+                    ? currentTitle
+                    : shortTitle;
+                binding.semiSleepTitleLabel.tooltip = currentTitle;
                 binding.semiSleepTitleLabel.style.display = DisplayStyle.Flex;
-                binding.semiSleepTitleLabel.style.marginTop = tile ? 3f : 0f;
+                binding.semiSleepTitleLabel.style.marginTop = tile || verticalEdgeTab ? 3f : 0f;
+                binding.semiSleepTitleLabel.style.whiteSpace = verticalEdgeTab
+                    ? WhiteSpace.Normal
+                    : WhiteSpace.NoWrap;
+                binding.semiSleepTitleLabel.style.textOverflow = verticalEdgeTab
+                    ? TextOverflow.Clip
+                    : TextOverflow.Ellipsis;
+                binding.semiSleepTitleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
                 binding.semiSleepTitleLabel.style.maxWidth = tile
                     ? 82f
-                    : verticalTab
-                        ? 30f
-                        : state == ESWindowVisualState.EdgeTabHover
+                    : verticalEdgeTab
+                        ? 36f
+                        : expandedTab
                         ? 164f
                         : 30f;
+                binding.semiSleepTitleLabel.style.maxHeight = tile
+                    ? 18f
+                    : verticalEdgeTab
+                        ? expandedTab ? 156f : 30f
+                        : 18f;
             }
             RefreshSemiSleepDiagnosticBars(binding, EditorApplication.timeSinceStartup);
         }
@@ -5055,28 +7229,43 @@ namespace ES.EditorInternal
                 && binding.transitionTargetState == ESWindowVisualState.SleepTile;
             if (!tile)
             {
-                binding.semiSleepPromotionProgress.style.width = 0f;
-                binding.semiSleepDockProgress.style.width = 0f;
-                binding.semiSleepPromotionProgress.style.display = DisplayStyle.None;
-                binding.semiSleepDockProgress.style.display = DisplayStyle.None;
+                if (!binding.diagnosticBarsHidden)
+                {
+                    binding.semiSleepPromotionProgress.style.width = 0f;
+                    binding.semiSleepDockProgress.style.width = 0f;
+                    binding.semiSleepPromotionProgress.style.display = DisplayStyle.None;
+                    binding.semiSleepDockProgress.style.display = DisplayStyle.None;
+                    binding.diagnosticBarsHidden = true;
+                    binding.diagnosticPromotionProgress = -1f;
+                    binding.diagnosticPromotionComplete = false;
+                }
                 return;
             }
 
             // 只保留一条底部晋级进度条。停靠判定继续参与状态机，但不再以第二条
             // 诊断色带或 tooltip 占用休眠块的视觉注意力。
-            binding.semiSleepPromotionProgress.style.display = DisplayStyle.Flex;
-            binding.semiSleepDockProgress.style.display = DisplayStyle.None;
+            if (binding.diagnosticBarsHidden)
+            {
+                binding.semiSleepPromotionProgress.style.display = DisplayStyle.Flex;
+                binding.semiSleepDockProgress.style.display = DisplayStyle.None;
+                binding.diagnosticBarsHidden = false;
+            }
 
             double started = binding.sleepTileIdleStartedAt;
             float progress = started < 0d
                 ? 0f
                 : Mathf.Clamp01((float)((now - started) / SleepTileToEdgeTabDelay));
-            binding.semiSleepPromotionProgress.style.width = 82f * progress;
-            binding.semiSleepPromotionProgress.style.backgroundColor = progress >= 1f
-                ? GetStatusAccent(0, ESStatusKind.Ready)
-                : SectionMutedTextColor;
-            binding.semiSleepPromotionProgress.tooltip = null;
-            binding.semiSleepDockProgress.tooltip = null;
+            bool complete = progress >= 1f;
+            if (Mathf.Abs(progress - binding.diagnosticPromotionProgress) >= 0.001f
+                || complete != binding.diagnosticPromotionComplete)
+            {
+                binding.semiSleepPromotionProgress.style.width = 82f * progress;
+                binding.semiSleepPromotionProgress.style.backgroundColor = complete
+                    ? GetStatusAccent(0, ESStatusKind.Ready)
+                    : SectionMutedTextColor;
+                binding.diagnosticPromotionProgress = progress;
+                binding.diagnosticPromotionComplete = complete;
+            }
         }
 
         private static Rect SelectMoreEdgeAlignedTileBounds(
@@ -5132,11 +7321,13 @@ namespace ES.EditorInternal
             }
             if (binding.semiSleepTitleLabel != null)
             {
-                string title = binding.window is ES.IESWindowPresentationMetadata metadata
-                    ? metadata.ESWindow_PresentationTitle
-                    : binding.window?.titleContent?.text;
-                if (!string.IsNullOrWhiteSpace(title))
-                    binding.semiSleepTitleLabel.text = title.Trim();
+                string title = ResolveWindowPresentationTitle(binding.window);
+                bool tile = binding.visualState == ESWindowVisualState.SleepTile;
+                bool expandedTab = binding.visualState == ESWindowVisualState.EdgeTabHover;
+                binding.semiSleepTitleLabel.text = tile || expandedTab
+                    ? title
+                    : GetWindowPresentationShortTitle(binding.window);
+                binding.semiSleepTitleLabel.tooltip = title;
             }
         }
 
@@ -5153,13 +7344,17 @@ namespace ES.EditorInternal
                 binding.semiSleepOverlay.BringToFront();
         }
 
-        private static void RestoreSemiSleep(WindowBinding binding, bool restoreBounds)
+        private static void RestoreSemiSleep(
+            WindowBinding binding,
+            bool restoreBounds,
+            bool forceLifecycleReset = false)
         {
             if (binding == null)
                 return;
             // A cancelled/closing lifecycle must not interrupt an active pointer
             // gesture and restore the pre-drag awake rectangle mid-frame.
-            if (binding.semiSleepDragging || binding.semiSleepDragPointerId >= 0)
+            if (!forceLifecycleReset
+                && (binding.semiSleepDragging || binding.semiSleepDragPointerId >= 0))
                 return;
             bool hadState = binding.semiSleeping || binding.semiSleepAnimating;
             VisualElement dragOverlay = binding.semiSleepOverlay;
@@ -5171,6 +7366,10 @@ namespace ES.EditorInternal
             binding.semiSleeping = false;
             binding.semiSleepAnimating = false;
             binding.semiSleepTarget = false;
+            binding.restorePersistedSleepOnBind = false;
+            binding.restorePersistedSleepScheduled = false;
+            binding.persistedSleepGeometryVerifyUntil = -1d;
+            binding.persistedSleepGeometryRepairScheduled = false;
             binding.visualState = ESWindowVisualState.ActivePanel;
             binding.transitionTargetState = ESWindowVisualState.ActivePanel;
             binding.semiSleepManualHold = false;
@@ -5191,7 +7390,7 @@ namespace ES.EditorInternal
                 binding.window.minSize = binding.awakeMinSize;
                 binding.window.maxSize = binding.awakeMaxSize;
                 if (restoreBounds && !binding.window.docked)
-                    binding.window.position = binding.awakeBounds;
+                    CommitSemiSleepWindowPosition(binding, binding.awakeBounds);
             }
             catch (Exception exception) when (
                 exception is MissingReferenceException
@@ -5203,8 +7402,16 @@ namespace ES.EditorInternal
 
         private static void RestoreAllSemiSleepWindows()
         {
+            if (!assemblyReloadPreferencesCaptured)
+            {
+                StopTransientWindowVisuals(true);
+                CaptureAssemblyReloadPreferences();
+            }
             foreach (WindowBinding binding in windowBindings.Values)
-                RestoreSemiSleep(binding, true);
+            {
+                StopTransientWindowVisuals(binding, true);
+                RestoreSemiSleep(binding, true, true);
+            }
             semiSleepAnyAnimating = false;
         }
 
@@ -5218,15 +7425,15 @@ namespace ES.EditorInternal
 
         private static int AcquireSemiSleepSlot(WindowBinding requested)
         {
-            var used = new HashSet<int>();
+            semiSleepUsedSlotScratch.Clear();
             foreach (WindowBinding binding in windowBindings.Values)
                 if (binding != null
                     && binding != requested
                     && (binding.semiSleeping || binding.semiSleepAnimating && binding.semiSleepTarget)
                     && binding.semiSleepSlot >= 0)
-                    used.Add(binding.semiSleepSlot);
+                    semiSleepUsedSlotScratch.Add(binding.semiSleepSlot);
             int slot = 0;
-            while (used.Contains(slot))
+            while (semiSleepUsedSlotScratch.Contains(slot))
                 slot++;
             return slot;
         }
@@ -5285,12 +7492,22 @@ namespace ES.EditorInternal
             return ClampSemiSleepDockBounds(target, trayBounds);
         }
 
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
         private static bool IsFinite(Vector2 value)
         {
-            return !float.IsNaN(value.x)
-                && !float.IsInfinity(value.x)
-                && !float.IsNaN(value.y)
-                && !float.IsInfinity(value.y);
+            return IsFinite(value.x) && IsFinite(value.y);
+        }
+
+        private static bool IsUsableWindowBounds(Rect bounds)
+        {
+            return IsFinite(bounds.position)
+                && IsFinite(bounds.size)
+                && bounds.width > 1f
+                && bounds.height > 1f;
         }
 
         private static Rect GetSemiSleepTrayBounds(Rect fallback)
@@ -5665,10 +7882,15 @@ namespace ES.EditorInternal
             get
             {
                 EnsureSkin();
-                return cachedProSkin
-                    ? new Color(0.30f, 0.32f, 0.35f, 0.98f)
-                    : new Color(0.20f, 0.22f, 0.25f, 1f);
+                return GetPrimaryActionColor(cachedProSkin);
             }
+        }
+
+        private static Color GetPrimaryActionColor(bool proSkin)
+        {
+            return proSkin
+                ? new Color(0.30f, 0.32f, 0.35f, 0.98f)
+                : new Color(0.20f, 0.22f, 0.25f, 1f);
         }
 
         /// <summary>
@@ -5685,6 +7907,50 @@ namespace ES.EditorInternal
                     WindowInsetSurfaceColor,
                     cachedProSkin ? 0.58f : 0.42f);
             }
+        }
+
+        /// <summary>
+        /// 激活操作控件的承载面。它保留状态强调色的辨识度，但不会直接把高亮强调色
+        /// 铺成按钮背景，确保浅色文字在深色与浅色编辑器皮肤下都保持清晰。
+        /// </summary>
+        public static Color ActiveActionColor
+        {
+            get
+            {
+                EnsureSkin();
+                return GetActiveActionColor(cachedProSkin, ActiveColor);
+            }
+        }
+
+        public static Color GetActiveActionColor(bool proSkin, Color activeAccent)
+        {
+            return GetActionSurfaceColor(proSkin, activeAccent);
+        }
+
+        public static Color WarningActionColor
+        {
+            get
+            {
+                EnsureSkin();
+                return GetActionSurfaceColor(cachedProSkin, WarningColor);
+            }
+        }
+
+        private static Color GetActionSurfaceColor(bool proSkin, Color accent)
+        {
+            const float maximumAccentChannel = 0.70f;
+            Color actionSurface = GetPrimaryActionColor(proSkin);
+            Color boundedAccent = new Color(
+                Mathf.Min(accent.r, maximumAccentChannel),
+                Mathf.Min(accent.g, maximumAccentChannel),
+                Mathf.Min(accent.b, maximumAccentChannel),
+                1f);
+            Color result = Color.Lerp(
+                actionSurface,
+                boundedAccent,
+                proSkin ? 0.18f : 0.12f);
+            result.a = 1f;
+            return result;
         }
 
         public static Color PrimaryActionTextColor => new Color(0.98f, 0.99f, 1f, 1f);
@@ -6152,6 +8418,7 @@ namespace ES.EditorInternal
                 brandTypographyStyleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(BrandTypographyStyleSheetPath);
             if (brandTypographyStyleSheet != null && !root.styleSheets.Contains(brandTypographyStyleSheet))
                 root.styleSheets.Add(brandTypographyStyleSheet);
+            root.AddToClassList(PresentationControlsClass);
             root.EnableInClassList("es-brand-typography", BrandTypographyEnabled);
         }
 
@@ -6159,6 +8426,7 @@ namespace ES.EditorInternal
         {
             if (root == null)
                 return;
+            root.RemoveFromClassList(PresentationControlsClass);
             root.RemoveFromClassList("es-brand-typography");
             if (brandTypographyStyleSheet != null && root.styleSheets.Contains(brandTypographyStyleSheet))
                 root.styleSheets.Remove(brandTypographyStyleSheet);
@@ -6180,7 +8448,23 @@ namespace ES.EditorInternal
             else
             {
                 UninstallGlobalEditorAdapterCallbacks();
-                UnbindAllWindowBindings();
+                // PlayMode and compilation are temporary presentation
+                // suspensions. Do not discard the binding records here: the
+                // corresponding lifecycle callback needs them to restore the
+                // user's persisted sleep state after Unity rebuilds panels.
+                bool lifecycleSuspended = EditorApplication.isPlayingOrWillChangePlaymode
+                    || domainReloadInProgress
+                    || EditorApplication.isCompiling;
+                if (lifecycleSuspended)
+                {
+                    if (EditorApplication.isPlayingOrWillChangePlaymode)
+                        CapturePlayModePreferences();
+                    else
+                        CaptureAssemblyReloadPreferences();
+                    SuspendWindowBindings();
+                }
+                else
+                    UnbindAllWindowBindings();
             }
             QueueDeepSkinSynchronization();
             foreach (WindowBinding binding in windowBindings.Values)
@@ -6218,6 +8502,252 @@ namespace ES.EditorInternal
                 }
 
                 return theme;
+            }
+        }
+
+        internal static ESPresentationThemeSnapshot CurrentPresentationTheme
+        {
+            get
+            {
+                _ = CurrentTheme;
+                EnsureSkin();
+                int currentSkinGeneration = SkinGeneration;
+                if (presentationThemeSnapshot == null
+                    || presentationThemeSnapshot.ThemeGeneration != themeGeneration
+                    || presentationThemeSnapshot.SkinGeneration != currentSkinGeneration)
+                {
+                    presentationThemeSnapshot = BuildPresentationThemeSnapshot();
+                }
+
+                return presentationThemeSnapshot;
+            }
+        }
+
+        internal static ESPresentationThemeSnapshot BuildPresentationThemeSnapshot()
+        {
+            _ = CurrentTheme;
+            EnsureSkin();
+            return new ESPresentationThemeSnapshot(
+                themeGeneration,
+                SkinGeneration,
+                cachedProSkin,
+                Density,
+                MotionEnabled,
+                WindowSurfaceColor,
+                WindowRaisedSurfaceColor,
+                WindowInsetSurfaceColor,
+                CanvasSurfaceColor,
+                ToolbarSurfaceColor,
+                ControlSurfaceColor,
+                SelectedSurfaceColor,
+                InactiveActionColor,
+                PrimaryActionColor,
+                ActiveActionColor,
+                WarningActionColor,
+                GetActionSurfaceColor(cachedProSkin, ErrorColor),
+                SectionTextColor,
+                SectionSelectedTextColor,
+                SectionMutedTextColor,
+                PrimaryActionTextColor,
+                DividerColor,
+                SelectionColor,
+                ActiveColor,
+                DisabledColor,
+                WarningColor,
+                ErrorColor);
+        }
+
+        internal static ESPresentationStyle ResolvePresentationStyle(
+            ESPresentationRole role,
+            ESPresentationState state = ESPresentationState.Normal,
+            ESPresentationInteraction interaction = ESPresentationInteraction.Rest)
+        {
+            ESPresentationThemeSnapshot snapshot = CurrentPresentationTheme;
+            Color background;
+            Color text;
+            Color border = snapshot.Divider;
+            float opacity = 1f;
+
+            switch (role)
+            {
+                case ESPresentationRole.WindowSurface:
+                    background = snapshot.WindowSurface;
+                    text = snapshot.Text;
+                    break;
+                case ESPresentationRole.RaisedSurface:
+                    background = snapshot.RaisedSurface;
+                    text = snapshot.Text;
+                    break;
+                case ESPresentationRole.InsetSurface:
+                    background = snapshot.InsetSurface;
+                    text = snapshot.Text;
+                    break;
+                case ESPresentationRole.CanvasSurface:
+                    background = snapshot.CanvasSurface;
+                    text = snapshot.Text;
+                    break;
+                case ESPresentationRole.Toolbar:
+                    background = snapshot.ToolbarSurface;
+                    text = snapshot.StrongText;
+                    break;
+                case ESPresentationRole.Control:
+                    background = snapshot.ControlSurface;
+                    text = snapshot.StrongText;
+                    break;
+                case ESPresentationRole.PrimaryAction:
+                    background = snapshot.PrimaryActionSurface;
+                    text = snapshot.ActionText;
+                    border = snapshot.PrimaryActionSurface;
+                    break;
+                case ESPresentationRole.Status:
+                    background = snapshot.InsetSurface;
+                    text = snapshot.Active;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(role), role, null);
+            }
+
+            bool actionRole = role == ESPresentationRole.Control
+                || role == ESPresentationRole.PrimaryAction;
+            switch (state)
+            {
+                case ESPresentationState.Selected:
+                    if (role == ESPresentationRole.Status)
+                    {
+                        text = snapshot.Selection;
+                        border = snapshot.Selection;
+                    }
+                    else if (actionRole)
+                    {
+                        background = snapshot.ActiveActionSurface;
+                        text = snapshot.ActionText;
+                        border = snapshot.Active;
+                    }
+                    else
+                    {
+                        background = snapshot.SelectedSurface;
+                        text = snapshot.StrongText;
+                        border = snapshot.Selection;
+                    }
+                    break;
+                case ESPresentationState.Busy:
+                    if (actionRole)
+                    {
+                        background = snapshot.ActiveActionSurface;
+                        text = snapshot.ActionText;
+                    }
+                    else
+                    {
+                        text = snapshot.Active;
+                    }
+                    border = snapshot.Active;
+                    break;
+                case ESPresentationState.Inactive:
+                    if (actionRole)
+                        background = snapshot.InactiveActionSurface;
+                    text = snapshot.MutedText;
+                    border = snapshot.Divider;
+                    break;
+                case ESPresentationState.Disabled:
+                    if (actionRole)
+                        background = snapshot.InactiveActionSurface;
+                    text = snapshot.MutedText;
+                    border = snapshot.Disabled;
+                    opacity = 0.58f;
+                    break;
+                case ESPresentationState.ReadOnly:
+                    if (actionRole)
+                        background = snapshot.InactiveActionSurface;
+                    text = snapshot.Disabled;
+                    border = snapshot.Disabled;
+                    opacity = 0.86f;
+                    break;
+                case ESPresentationState.Warning:
+                    if (actionRole)
+                    {
+                        background = snapshot.WarningActionSurface;
+                        text = snapshot.ActionText;
+                    }
+                    else
+                    {
+                        text = snapshot.Warning;
+                    }
+                    border = snapshot.Warning;
+                    break;
+                case ESPresentationState.Error:
+                    if (actionRole)
+                    {
+                        background = snapshot.ErrorActionSurface;
+                        text = snapshot.ActionText;
+                    }
+                    else
+                    {
+                        text = snapshot.Error;
+                    }
+                    border = snapshot.Error;
+                    break;
+            }
+
+            switch (interaction)
+            {
+                case ESPresentationInteraction.Hover:
+                    background = Color.Lerp(background, text, 0.07f);
+                    break;
+                case ESPresentationInteraction.Pressed:
+                    background = Color.Lerp(background, text, 0.12f);
+                    break;
+                case ESPresentationInteraction.Focused:
+                    if (state != ESPresentationState.Warning && state != ESPresentationState.Error)
+                        border = snapshot.Selection;
+                    break;
+            }
+            background.a = Mathf.Clamp01(background.a);
+
+            return new ESPresentationStyle(background, text, border, opacity);
+        }
+
+        internal static void ApplyPresentationStyle(
+            VisualElement element,
+            ESPresentationRole role,
+            ESPresentationState state = ESPresentationState.Normal,
+            ESPresentationInteraction interaction = ESPresentationInteraction.Rest,
+            ESCornerRadiusToken radius = ESCornerRadiusToken.None,
+            float? borderWidth = 1f)
+        {
+            if (element == null)
+                return;
+
+            ESPresentationStyle style = ResolvePresentationStyle(role, state, interaction);
+            element.style.backgroundColor = style.BackgroundColor;
+            element.style.color = style.TextColor;
+            element.style.opacity = style.Opacity;
+            ApplyCornerRadius(element, radius);
+            if (borderWidth.HasValue)
+            {
+                ApplyBorder(element, style.BorderColor, borderWidth.Value);
+            }
+            else
+            {
+                element.style.borderLeftColor = style.BorderColor;
+                element.style.borderRightColor = style.BorderColor;
+                element.style.borderTopColor = style.BorderColor;
+                element.style.borderBottomColor = style.BorderColor;
+            }
+            if (element is Button)
+            {
+                element.Query<Label>().ForEach(label => label.style.color = style.TextColor);
+            }
+        }
+
+        internal static ESPresentationState GetPresentationState(ESStatusKind status)
+        {
+            switch (status)
+            {
+                case ESStatusKind.Warning: return ESPresentationState.Warning;
+                case ESStatusKind.Error: return ESPresentationState.Error;
+                case ESStatusKind.ReadOnly: return ESPresentationState.ReadOnly;
+                case ESStatusKind.Modified: return ESPresentationState.Selected;
+                default: return ESPresentationState.Normal;
             }
         }
 
@@ -6463,6 +8993,100 @@ namespace ES.EditorInternal
         }
     }
 
+    /// <summary>只在控件自身事件上解析交互态，不订阅全局更新。</summary>
+    internal sealed class ESPresentationButton : Button
+    {
+        private readonly ESEditorPresentation.ESPresentationRole role;
+        private ESEditorPresentation.ESPresentationState semanticState;
+        private bool hovered;
+        private bool pressed;
+        private bool focused;
+
+        internal ESPresentationButton(
+            Action action,
+            ESEditorPresentation.ESPresentationRole role,
+            ESEditorPresentation.ESPresentationState state =
+                ESEditorPresentation.ESPresentationState.Normal)
+            : base(action)
+        {
+            this.role = role;
+            semanticState = state;
+            RegisterCallback<MouseEnterEvent>(_ =>
+            {
+                hovered = true;
+                RefreshPresentationStyle();
+            });
+            RegisterCallback<MouseLeaveEvent>(_ =>
+            {
+                hovered = false;
+                pressed = false;
+                RefreshPresentationStyle();
+            });
+            RegisterCallback<MouseDownEvent>(evt =>
+            {
+                if (evt.button != 0)
+                    return;
+                pressed = true;
+                RefreshPresentationStyle();
+            });
+            RegisterCallback<MouseUpEvent>(evt =>
+            {
+                if (evt.button != 0)
+                    return;
+                pressed = false;
+                RefreshPresentationStyle();
+            });
+            RegisterCallback<MouseCaptureOutEvent>(_ =>
+            {
+                pressed = false;
+                RefreshPresentationStyle();
+            });
+            RegisterCallback<FocusInEvent>(_ =>
+            {
+                focused = true;
+                RefreshPresentationStyle();
+            });
+            RegisterCallback<FocusOutEvent>(_ =>
+            {
+                focused = false;
+                pressed = false;
+                RefreshPresentationStyle();
+            });
+            RefreshPresentationStyle();
+        }
+
+        internal void SetPresentationState(ESEditorPresentation.ESPresentationState state)
+        {
+            semanticState = state;
+            RefreshPresentationStyle();
+        }
+
+        internal void RefreshPresentationStyle()
+        {
+            bool enabled = enabledInHierarchy;
+            if (!enabled)
+                pressed = false;
+            ESEditorPresentation.ESPresentationState state = enabled
+                ? semanticState
+                : ESEditorPresentation.ESPresentationState.Disabled;
+            ESEditorPresentation.ESPresentationInteraction interaction = enabled
+                ? pressed
+                    ? ESEditorPresentation.ESPresentationInteraction.Pressed
+                    : hovered
+                        ? ESEditorPresentation.ESPresentationInteraction.Hover
+                        : focused
+                            ? ESEditorPresentation.ESPresentationInteraction.Focused
+                            : ESEditorPresentation.ESPresentationInteraction.Rest
+                : ESEditorPresentation.ESPresentationInteraction.Rest;
+            ESEditorPresentation.ApplyPresentationStyle(
+                this,
+                role,
+                state,
+                interaction,
+                ESEditorPresentation.ESCornerRadiusToken.Control);
+        }
+    }
+
     /// <summary>
     /// Small UI Toolkit shell shared by ES windows. It intentionally owns only presentation
     /// elements; the content area remains under the caller's scroll and data lifecycle.
@@ -6478,30 +9102,52 @@ namespace ES.EditorInternal
         internal readonly Label StatusLabel;
 
         private ESStatusKind status;
-        internal ESWindowShell(string title, string subtitle, bool animateOnAttach = true)
+        internal ESWindowShell(
+            string title,
+            string subtitle,
+            bool animateOnAttach = true,
+            Texture titleIcon = null)
         {
             Root = new VisualElement { name = "ESWindowShell" };
+            Root.AddToClassList("es-window-surface");
             Root.style.flexGrow = 1f;
+            Root.style.flexShrink = 1f;
+            Root.style.minWidth = 0f;
+            Root.style.minHeight = 0f;
             Root.style.flexDirection = FlexDirection.Column;
-            Root.style.backgroundColor = ESEditorPresentation.WindowSurfaceColor;
+            ESEditorPresentation.ApplyPresentationStyle(
+                Root,
+                ESEditorPresentation.ESPresentationRole.WindowSurface,
+                radius: ESEditorPresentation.ESCornerRadiusToken.Overlay,
+                borderWidth: 0f);
+            Root.style.overflow = Overflow.Hidden;
             Root.style.transformOrigin = new TransformOrigin(
                 Length.Percent(50f),
                 Length.Percent(50f),
                 0f);
 
             Header = new VisualElement { name = "ESWindowHeader" };
+            Header.AddToClassList("es-window-header");
             Header.style.flexShrink = 0f;
+            Header.style.minWidth = 0f;
             Header.style.paddingLeft = 14f;
             Header.style.paddingRight = 14f;
             Header.style.paddingTop = 10f;
             Header.style.paddingBottom = 8f;
-            Header.style.backgroundColor = ESEditorPresentation.WindowRaisedSurfaceColor;
+            ESEditorPresentation.ApplyPresentationStyle(
+                Header,
+                ESEditorPresentation.ESPresentationRole.RaisedSurface,
+                radius: ESEditorPresentation.ESCornerRadiusToken.Section,
+                borderWidth: 0f);
             Header.style.borderBottomWidth = 1f;
             Header.style.borderBottomColor = ESEditorPresentation.DividerColor;
 
             VisualElement titleRow = new VisualElement { name = "ESWindowTitleRow" };
             titleRow.style.flexDirection = FlexDirection.Row;
+            titleRow.style.flexWrap = Wrap.Wrap;
             titleRow.style.alignItems = Align.Center;
+            titleRow.style.minWidth = 0f;
+            titleRow.style.width = Length.Percent(100f);
             Label titleLabel = new Label(title ?? "ES 窗口") { name = "ESWindowTitle" };
             titleLabel.AddToClassList("es-brand-title");
             titleLabel.style.flexGrow = 1f;
@@ -6512,15 +9158,36 @@ namespace ES.EditorInternal
             titleLabel.style.whiteSpace = WhiteSpace.NoWrap;
             titleLabel.style.overflow = Overflow.Hidden;
             titleLabel.style.textOverflow = TextOverflow.Ellipsis;
+            if (titleIcon != null)
+            {
+                Image image = new Image
+                {
+                    name = "ESWindowTitleIcon",
+                    image = titleIcon,
+                    scaleMode = ScaleMode.ScaleToFit,
+                    pickingMode = PickingMode.Ignore,
+                };
+                image.style.width = 20f;
+                image.style.height = 20f;
+                image.style.marginRight = 7f;
+                image.style.flexShrink = 0f;
+                titleRow.Add(image);
+            }
             titleRow.Add(titleLabel);
 
             HeaderToolbar = new VisualElement { name = "ESWindowHeaderToolbar" };
-            HeaderToolbar.style.flexShrink = 0f;
+            HeaderToolbar.AddToClassList("es-window-header-actions");
+            HeaderToolbar.style.flexShrink = 1f;
+            HeaderToolbar.style.flexGrow = 0f;
             HeaderToolbar.style.flexDirection = FlexDirection.Row;
+            HeaderToolbar.style.flexWrap = Wrap.Wrap;
             HeaderToolbar.style.alignItems = Align.Center;
             HeaderToolbar.style.justifyContent = Justify.FlexEnd;
             HeaderToolbar.style.marginLeft = 10f;
             HeaderToolbar.style.minHeight = 26f;
+            HeaderToolbar.style.minWidth = 0f;
+            HeaderToolbar.style.maxWidth = Length.Percent(100f);
+            HeaderToolbar.style.overflow = Overflow.Visible;
             titleRow.Add(HeaderToolbar);
             Header.Add(titleRow);
 
@@ -6539,7 +9206,9 @@ namespace ES.EditorInternal
             Root.Add(Header);
 
             Toolbar = new VisualElement { name = "ESWindowToolbar" };
+            Toolbar.AddToClassList("es-window-toolbar");
             Toolbar.style.flexShrink = 0f;
+            Toolbar.style.minWidth = 0f;
             Toolbar.style.flexDirection = FlexDirection.Row;
             Toolbar.style.flexWrap = Wrap.Wrap;
             Toolbar.style.alignItems = Align.Center;
@@ -6547,26 +9216,42 @@ namespace ES.EditorInternal
             Toolbar.style.paddingRight = 10f;
             Toolbar.style.paddingTop = 5f;
             Toolbar.style.paddingBottom = 5f;
-            Toolbar.style.backgroundColor = ESEditorPresentation.ToolbarSurfaceColor;
+            ESEditorPresentation.ApplyPresentationStyle(
+                Toolbar,
+                ESEditorPresentation.ESPresentationRole.Toolbar,
+                radius: ESEditorPresentation.ESCornerRadiusToken.Card,
+                borderWidth: 0f);
             Toolbar.style.borderBottomWidth = 1f;
             Toolbar.style.borderBottomColor = ESEditorPresentation.DividerColor;
             Root.Add(Toolbar);
 
             Content = new VisualElement { name = "ESWindowContent" };
+            Content.AddToClassList("es-window-content");
             Content.style.flexGrow = 1f;
             Content.style.flexShrink = 1f;
             Content.style.minWidth = 0f;
             Content.style.minHeight = 0f;
+            ESEditorPresentation.ApplyPresentationStyle(
+                Content,
+                ESEditorPresentation.ESPresentationRole.CanvasSurface,
+                radius: ESEditorPresentation.ESCornerRadiusToken.Card,
+                borderWidth: 0f);
             Root.Add(Content);
 
             StatusBar = new VisualElement { name = "ESWindowStatusBar" };
+            StatusBar.AddToClassList("es-window-status");
             StatusBar.style.flexShrink = 0f;
+            StatusBar.style.minWidth = 0f;
             StatusBar.style.flexDirection = FlexDirection.Row;
             StatusBar.style.alignItems = Align.Center;
             StatusBar.style.minHeight = 24f;
             StatusBar.style.paddingLeft = 10f;
             StatusBar.style.paddingRight = 10f;
-            StatusBar.style.backgroundColor = ESEditorPresentation.WindowInsetSurfaceColor;
+            ESEditorPresentation.ApplyPresentationStyle(
+                StatusBar,
+                ESEditorPresentation.ESPresentationRole.Status,
+                radius: ESEditorPresentation.ESCornerRadiusToken.Section,
+                borderWidth: 0f);
             StatusBar.style.borderTopWidth = 1f;
             StatusBar.style.borderTopColor = ESEditorPresentation.DividerColor;
             StatusLabel = new Label { name = "ESWindowStatus" };
@@ -6578,13 +9263,48 @@ namespace ES.EditorInternal
             SetStatus("就绪", ESStatusKind.Ready);
         }
 
+        internal void ApplyCompactHostChrome()
+        {
+            Label title = Header.Q<Label>("ESWindowTitle");
+            if (title != null) title.style.display = DisplayStyle.None;
+            Label subtitle = Header.Q<Label>("ESWindowSubtitle");
+            if (subtitle != null) subtitle.style.display = DisplayStyle.None;
+            VisualElement titleRow = Header.Q<VisualElement>("ESWindowTitleRow");
+            if (titleRow != null)
+            {
+                titleRow.style.flexGrow = 1f;
+                titleRow.style.width = Length.Percent(100f);
+                titleRow.style.minHeight = 24f;
+                titleRow.style.justifyContent = Justify.FlexEnd;
+            }
+
+            Header.style.paddingLeft = 6f;
+            Header.style.paddingRight = 6f;
+            Header.style.paddingTop = 3f;
+            Header.style.paddingBottom = 3f;
+            Header.style.minHeight = 30f;
+            Header.style.maxHeight = StyleKeyword.None;
+            HeaderToolbar.style.minHeight = 24f;
+            HeaderToolbar.style.marginLeft = 0f;
+            Toolbar.style.display = DisplayStyle.None;
+            StatusBar.style.display = DisplayStyle.None;
+        }
+
         internal void SetStatus(string message, ESStatusKind nextStatus)
         {
             status = nextStatus;
             StatusLabel.text = string.IsNullOrWhiteSpace(message) ? "就绪" : message.Trim();
-            StatusLabel.style.color = ESEditorPresentation.GetStatusAccent(0, status);
+            ESEditorPresentation.ESPresentationStyle style =
+                ESEditorPresentation.ResolvePresentationStyle(
+                    ESEditorPresentation.ESPresentationRole.Status,
+                    ESEditorPresentation.GetPresentationState(status));
+            Color accent = ESEditorPresentation.GetStatusAccent(0, status);
+            StatusBar.style.backgroundColor = style.BackgroundColor;
+            StatusBar.style.opacity = style.Opacity;
+            StatusLabel.style.color = accent;
+            StatusBar.style.borderTopColor = ESEditorPresentation.DividerColor;
             StatusBar.style.borderLeftWidth = status == ESStatusKind.Error || status == ESStatusKind.Warning ? 3f : 0f;
-            StatusBar.style.borderLeftColor = ESEditorPresentation.GetStatusAccent(0, status);
+            StatusBar.style.borderLeftColor = accent;
         }
     }
 
@@ -6592,7 +9312,15 @@ namespace ES.EditorInternal
     {
         internal static Button CreateToolbarButton(string text, string tooltip, Action action, bool primary = false)
         {
-            Button button = new Button(action) { text = text ?? string.Empty, tooltip = tooltip ?? string.Empty };
+            var button = new ESPresentationButton(
+                action,
+                primary
+                    ? ESEditorPresentation.ESPresentationRole.PrimaryAction
+                    : ESEditorPresentation.ESPresentationRole.Control)
+            {
+                text = text ?? string.Empty,
+                tooltip = tooltip ?? string.Empty
+            };
             button.AddToClassList("es-window-toolbar-button");
             if (primary)
                 button.AddToClassList("primary");
@@ -6601,23 +9329,15 @@ namespace ES.EditorInternal
             button.style.marginBottom = 2f;
             button.style.paddingLeft = 10f;
             button.style.paddingRight = 10f;
-            button.style.color = primary
-                ? ESEditorPresentation.PrimaryActionTextColor
-                : ESEditorPresentation.SectionSelectedTextColor;
-            button.style.backgroundColor = primary
-                ? ESEditorPresentation.PrimaryActionColor
-                : ESEditorPresentation.ControlSurfaceColor;
-            ESEditorPresentation.ApplyCornerRadius(
-                button, ESEditorPresentation.ESCornerRadiusToken.Control);
-            ESEditorPresentation.ApplyBorder(
-                button,
-                primary ? ESEditorPresentation.PrimaryActionColor : ESEditorPresentation.DividerColor);
+            button.RefreshPresentationStyle();
             return button;
         }
 
         internal static Button CreateHeaderIconButton(string symbol, string tooltip, Action action)
         {
-            Button button = new Button(action)
+            var button = new ESPresentationButton(
+                action,
+                ESEditorPresentation.ESPresentationRole.Control)
             {
                 text = symbol ?? string.Empty,
                 tooltip = tooltip ?? string.Empty
@@ -6632,12 +9352,7 @@ namespace ES.EditorInternal
             button.style.paddingRight = 0f;
             button.style.unityTextAlign = TextAnchor.MiddleCenter;
             button.style.fontSize = 14f;
-            button.style.color = ESEditorPresentation.SectionSelectedTextColor;
-            ESEditorPresentation.ApplyRoundedSurface(
-                button,
-                ESEditorPresentation.ControlSurfaceColor,
-                ESEditorPresentation.ESCornerRadiusToken.Control,
-                ESEditorPresentation.DividerColor);
+            button.RefreshPresentationStyle();
             return button;
         }
 
@@ -6647,23 +9362,23 @@ namespace ES.EditorInternal
             string tooltip,
             Action action)
         {
-            Button button = new Button(action) { tooltip = tooltip ?? string.Empty };
+            var button = new ESPresentationButton(
+                action,
+                ESEditorPresentation.ESPresentationRole.Control)
+            {
+                tooltip = tooltip ?? string.Empty
+            };
             button.AddToClassList("es-window-header-action-button");
             button.style.height = 26f;
             button.style.minHeight = 26f;
             button.style.minWidth = string.IsNullOrEmpty(text) ? 26f : 32f;
+            button.style.flexShrink = 1f;
             button.style.flexDirection = FlexDirection.Row;
             button.style.alignItems = Align.Center;
             button.style.justifyContent = Justify.Center;
             button.style.marginLeft = 2f;
             button.style.paddingLeft = 6f;
             button.style.paddingRight = 6f;
-            button.style.color = ESEditorPresentation.SectionSelectedTextColor;
-            ESEditorPresentation.ApplyRoundedSurface(
-                button,
-                ESEditorPresentation.ControlSurfaceColor,
-                ESEditorPresentation.ESCornerRadiusToken.Control,
-                ESEditorPresentation.DividerColor);
 
             if (icon != null)
             {
@@ -6684,15 +9399,91 @@ namespace ES.EditorInternal
                 Label label = new Label(text) { pickingMode = PickingMode.Ignore };
                 label.style.marginLeft = icon == null ? 0f : 4f;
                 label.style.whiteSpace = WhiteSpace.NoWrap;
+                label.style.minWidth = 0f;
+                label.style.flexShrink = 1f;
+                label.style.overflow = Overflow.Hidden;
+                label.style.textOverflow = TextOverflow.Ellipsis;
                 label.style.color = ESEditorPresentation.SectionSelectedTextColor;
                 button.Add(label);
             }
+            button.RefreshPresentationStyle();
             return button;
+        }
+
+        internal static ToolbarMenu CreateHeaderOverflowMenu(
+            string name,
+            string text,
+            string tooltip,
+            float minWidth = 48f,
+            float maxWidth = 0f)
+        {
+            var menu = new ToolbarMenu
+            {
+                name = name ?? string.Empty,
+                text = text ?? string.Empty,
+                tooltip = tooltip ?? string.Empty
+            };
+            menu.AddToClassList("es-window-header-action-button");
+            menu.style.height = 26f;
+            menu.style.minHeight = 26f;
+            menu.style.minWidth = Mathf.Max(26f, minWidth);
+            if (maxWidth > 0f)
+                menu.style.maxWidth = Mathf.Max(minWidth, maxWidth);
+            menu.style.marginLeft = 2f;
+            menu.style.paddingLeft = 6f;
+            menu.style.paddingRight = 4f;
+            menu.style.color = ESEditorPresentation.SectionSelectedTextColor;
+            ESEditorPresentation.ApplyRoundedSurface(
+                menu,
+                ESEditorPresentation.ControlSurfaceColor,
+                ESEditorPresentation.ESCornerRadiusToken.Control,
+                ESEditorPresentation.DividerColor);
+            return menu;
+        }
+
+        internal static void SetButtonPresentationState(
+            Button button,
+            ESEditorPresentation.ESPresentationState state)
+        {
+            if (button is ESPresentationButton presentationButton)
+            {
+                presentationButton.SetPresentationState(state);
+                return;
+            }
+
+            ESEditorPresentation.ApplyPresentationStyle(
+                button,
+                ESEditorPresentation.ESPresentationRole.Control,
+                state,
+                radius: ESEditorPresentation.ESCornerRadiusToken.Control);
+        }
+
+        internal static void SetButtonEnabled(Button button, bool enabled)
+        {
+            if (button == null)
+                return;
+
+            button.SetEnabled(enabled);
+            if (button is ESPresentationButton presentationButton)
+                presentationButton.RefreshPresentationStyle();
+        }
+
+        internal static void SetElementEnabled(VisualElement element, bool enabled)
+        {
+            if (element == null)
+                return;
+
+            element.SetEnabled(enabled);
+            if (element is ESPresentationButton presentationButton)
+                presentationButton.RefreshPresentationStyle();
+            element.Query<ESPresentationButton>().ForEach(button =>
+                button.RefreshPresentationStyle());
         }
 
         internal static VisualElement CreateEmptyState(string title, string detail, string actionText, Action action)
         {
             VisualElement empty = new VisualElement { name = "ESEmptyState" };
+            empty.AddToClassList("es-empty-state");
             empty.style.flexGrow = 1f;
             empty.style.alignItems = Align.Center;
             empty.style.justifyContent = Justify.Center;
@@ -6742,6 +9533,7 @@ namespace ES.EditorInternal
             Action action)
         {
             VisualElement error = new VisualElement { name = "ESErrorState" };
+            error.AddToClassList("es-error-state");
             error.style.flexGrow = 1f;
             error.style.alignItems = Align.Center;
             error.style.justifyContent = Justify.Center;
@@ -6810,42 +9602,53 @@ namespace ES.EditorInternal
             if (root == null)
                 return;
 
-            root.style.backgroundColor = ESEditorPresentation.WindowSurfaceColor;
-            root.style.color = ESEditorPresentation.SectionTextColor;
-            StyleClass(root, "es-agent-header", ESEditorPresentation.WindowRaisedSurfaceColor,
+            ESEditorPresentation.ApplyPresentationStyle(
+                root,
+                ESEditorPresentation.ESPresentationRole.WindowSurface,
+                borderWidth: 0f);
+            StyleClass(root, "es-agent-header",
+                ESEditorPresentation.ESPresentationRole.RaisedSurface,
                 ESEditorPresentation.ESCornerRadiusToken.None);
-            StyleClass(root, "es-agent-sidebar", ESEditorPresentation.WindowInsetSurfaceColor,
+            StyleClass(root, "es-agent-sidebar",
+                ESEditorPresentation.ESPresentationRole.InsetSurface,
                 ESEditorPresentation.ESCornerRadiusToken.None);
-            StyleClass(root, "es-agent-conversation", ESEditorPresentation.WindowSurfaceColor,
+            StyleClass(root, "es-agent-conversation",
+                ESEditorPresentation.ESPresentationRole.WindowSurface,
                 ESEditorPresentation.ESCornerRadiusToken.None);
-            StyleClass(root, "es-agent-context-panel", ESEditorPresentation.WindowRaisedSurfaceColor,
+            StyleClass(root, "es-agent-context-panel",
+                ESEditorPresentation.ESPresentationRole.RaisedSurface,
                 ESEditorPresentation.ESCornerRadiusToken.Section);
-            StyleClass(root, "es-agent-composer-shell", ESEditorPresentation.WindowInsetSurfaceColor,
+            StyleClass(root, "es-agent-composer-shell",
+                ESEditorPresentation.ESPresentationRole.InsetSurface,
                 ESEditorPresentation.ESCornerRadiusToken.Card);
-            StyleClass(root, "es-agent-empty", ESEditorPresentation.CanvasSurfaceColor,
+            StyleClass(root, "es-agent-empty",
+                ESEditorPresentation.ESPresentationRole.CanvasSurface,
                 ESEditorPresentation.ESCornerRadiusToken.Section);
-            StyleClass(root, "es-agent-header-button", ESEditorPresentation.ControlSurfaceColor,
+            StyleClass(root, "es-agent-header-button",
+                ESEditorPresentation.ESPresentationRole.Control,
                 ESEditorPresentation.ESCornerRadiusToken.Control);
-            StyleClass(root, "es-agent-secondary-button", ESEditorPresentation.ControlSurfaceColor,
+            StyleClass(root, "es-agent-secondary-button",
+                ESEditorPresentation.ESPresentationRole.Control,
                 ESEditorPresentation.ESCornerRadiusToken.Control);
 
             VisualElement brandMark = FindClass(root, "es-agent-brand-mark");
             if (brandMark != null)
             {
-                brandMark.style.backgroundColor = ESEditorPresentation.ControlSurfaceColor;
-                SetBorderColor(brandMark, ESEditorPresentation.SelectionColor);
-                brandMark.style.color = ESEditorPresentation.SectionSelectedTextColor;
-                ESEditorPresentation.ApplyCornerRadius(
-                    brandMark, ESEditorPresentation.ESCornerRadiusToken.Card);
+                ESEditorPresentation.ApplyPresentationStyle(
+                    brandMark,
+                    ESEditorPresentation.ESPresentationRole.RaisedSurface,
+                    ESEditorPresentation.ESPresentationState.Selected,
+                    radius: ESEditorPresentation.ESCornerRadiusToken.Card,
+                    borderWidth: null);
             }
 
             root.Query<VisualElement>(className: "es-agent-primary-button").ForEach(primary =>
             {
-                primary.style.backgroundColor = ESEditorPresentation.PrimaryActionColor;
-                SetBorderColor(primary, ESEditorPresentation.PrimaryActionColor);
-                primary.style.color = ESEditorPresentation.PrimaryActionTextColor;
-                ESEditorPresentation.ApplyCornerRadius(
-                    primary, ESEditorPresentation.ESCornerRadiusToken.Control);
+                ESEditorPresentation.ApplyPresentationStyle(
+                    primary,
+                    ESEditorPresentation.ESPresentationRole.PrimaryAction,
+                    radius: ESEditorPresentation.ESCornerRadiusToken.Control,
+                    borderWidth: null);
             });
 
             root.Query<VisualElement>(className: "es-agent-link-button").ForEach(link =>
@@ -6858,21 +9661,23 @@ namespace ES.EditorInternal
                 ESEditorPresentation.ApplyCornerRadius(
                     composer, ESEditorPresentation.ESCornerRadiusToken.Card);
             }
+
+            root.Query<ESPresentationButton>().ForEach(button =>
+                button.RefreshPresentationStyle());
         }
 
         internal static void StyleStatusPill(VisualElement pill, ESStatusKind status)
         {
             if (pill == null)
                 return;
-            Color accent = ESEditorPresentation.GetStatusAccent(0, status);
-            Color surface = accent;
-            surface.a = EditorGUIUtility.isProSkin ? 0.18f : 0.12f;
-            ESEditorPresentation.ApplyRoundedSurface(
+            ESEditorPresentation.ApplyPresentationStyle(
                 pill,
-                surface,
-                ESEditorPresentation.ESCornerRadiusToken.Pill,
-                accent);
+                ESEditorPresentation.ESPresentationRole.Status,
+                ESEditorPresentation.GetPresentationState(status),
+                radius: ESEditorPresentation.ESCornerRadiusToken.Pill);
+            Color accent = ESEditorPresentation.GetStatusAccent(0, status);
             pill.style.color = accent;
+            ESEditorPresentation.ApplyBorder(pill, accent);
         }
 
         private static VisualElement FindClass(VisualElement root, string className)
@@ -6883,15 +9688,16 @@ namespace ES.EditorInternal
         private static void StyleClass(
             VisualElement root,
             string className,
-            Color background,
+            ESEditorPresentation.ESPresentationRole role,
             ESEditorPresentation.ESCornerRadiusToken radius)
         {
             root.Query<VisualElement>(className: className).ForEach(element =>
             {
-                element.style.backgroundColor = background;
-                SetBorderColor(element, ESEditorPresentation.DividerColor);
-                element.style.color = ESEditorPresentation.SectionTextColor;
-                ESEditorPresentation.ApplyCornerRadius(element, radius);
+                ESEditorPresentation.ApplyPresentationStyle(
+                    element,
+                    role,
+                    radius: radius,
+                    borderWidth: null);
             });
         }
 

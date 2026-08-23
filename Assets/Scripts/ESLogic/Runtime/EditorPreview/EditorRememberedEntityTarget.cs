@@ -91,7 +91,7 @@ namespace ES
 
         private static Entity ResolveSingleActiveSceneEntity()
         {
-            Entity[] entities = Object.FindObjectsOfType<Entity>();
+            Entity[] entities = Object.FindObjectsByType<Entity>(FindObjectsSortMode.None);
             Entity result = null;
             for (int i = 0; i < entities.Length; i++)
             {

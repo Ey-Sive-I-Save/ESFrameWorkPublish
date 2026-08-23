@@ -1,0 +1,184 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52758267bd164f04b97a1e68d0fb0bb3, type: 3}
+  m_Name: "\u57FA\u7840\u6B65\u67AA_ItemDataInfo"
+  m_EditorClassIdentifier: 
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  KeyName: weapon.ranged.basic_rifle
+  itemKey:
+    enumKey: 0
+    stringKey: item.weapon.ranged.basic_rifle
+    definitionGuid: 
+    definitionLocalFileId: 0
+    definitionTypeName: 
+  tags: []
+  floatValues: []
+  permitValues: []
+  baseConfig:
+    kind: 5
+    prefabKey:
+      enumKey: 0
+      stringKey: prefab.weapon.ranged.basic_rifle
+      guid: c1f52b26c14f8b14b95dc03df3fb330a
+      localFileId: 0
+      assetTypeName: UnityEngine.GameObject
+      address: 
+      groupName: 
+      editorPath: "Assets/ESNormalAssets/WeaponPrototypes/\u57FA\u7840\u6B65\u67AA.prefab"
+      editorOnly: 0
+      alwaysLoaded: 0
+    displayName: "\u57FA\u7840\u6B65\u67AA"
+    iconKey:
+      enumKey: 0
+      stringKey: 
+      guid: 
+      localFileId: 0
+      assetTypeName: 
+      address: 
+      groupName: 
+      editorPath: 
+      editorOnly: 0
+      alwaysLoaded: 0
+  interactConfig:
+    canInteract: 0
+    useMode: 1
+    prompt: 
+    distance: 1.5
+    requireFacing: 1
+    condition:
+      rid: -2
+  logicConfig:
+    onSpawn:
+      rid: -2
+    onUse:
+      rid: -2
+    onHit:
+      rid: -2
+    onExpire:
+      rid: -2
+    onDestroy:
+      rid: -2
+  moveConfig:
+    mode: 0
+    speed: 1
+    rotateSpeed: 90
+    amount: 1
+    points: []
+    loop: 1
+    backAndForth: 1
+    useGravity: 1
+  kindData:
+    rid: 5312548087992942636
+  references:
+    version: 2
+    RefIds:
+    - rid: -2
+      type: {class: , ns: , asm: }
+    - rid: 5312548087992942636
+      type: {class: ItemWeaponDataBlock, ns: ES, asm: ES_Logic}
+      data:
+        sharedData:
+          weaponKind: 2
+          deliveryMode: 2
+          firePolicy: 1
+          primaryAttackAction:
+            enumKey: 0
+            stringKey: 
+            definitionGuid: 
+            definitionLocalFileId: 0
+            definitionTypeName: 
+          defaultShot:
+            enumKey: 0
+            stringKey: shot.basic_rifle.round
+            definitionGuid: 
+            definitionLocalFileId: 0
+            definitionTypeName: 
+          hitRadius: 0.04
+          cooldown: 0.1
+          fire:
+            enabled: 1
+            interval: 0.1
+            distance: 150
+            hitMask:
+              serializedVersion: 2
+              m_Bits: 7936
+            triggerInteraction: 1
+            requiresAiming: 0
+            burstCount: 3
+            burstInterval: 0.08
+            chargeTime: 0.5
+            continuousInterval: 0.1
+            ammoCost: 0
+            durabilityCost: 0
+            heatPerUse: 0
+            maxHeat: 0
+            heatDissipationPerSecond: 0
+          recoil:
+            enabled: 1
+            baseMagnitude: 0.65
+            onlyWhenAiming: 0
+            burstWindow: 0.22
+            maxBurstShots: 8
+            randomJitter: 0.06
+            recoilCurve:
+              serializedVersion: 2
+              m_Curve:
+              - serializedVersion: 3
+                time: 0
+                value: 1
+                inSlope: 0
+                outSlope: 0
+                tangentMode: 0
+                weightedMode: 0
+                inWeight: 0
+                outWeight: 0
+              - serializedVersion: 3
+                time: 0.35
+                value: 1.15
+                inSlope: 0
+                outSlope: 0
+                tangentMode: 0
+                weightedMode: 0
+                inWeight: 0
+                outWeight: 0
+              - serializedVersion: 3
+                time: 1
+                value: 1.35
+                inSlope: 0
+                outSlope: 0
+                tangentMode: 0
+                weightedMode: 0
+                inWeight: 0
+                outWeight: 0
+              m_PreInfinity: 2
+              m_PostInfinity: 2
+              m_RotationOrder: 4
+        key:
+          enumKey: 0
+          stringKey: weapon.ranged.basic_rifle
+          definitionGuid: 
+          definitionLocalFileId: 0
+          definitionTypeName: 
+        initialState:
+          durability: 1
+          cooldownLeft: 0
+          ammo: 0
+          heat: 0
+          logicSeed: 0

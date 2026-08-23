@@ -113,12 +113,20 @@ namespace ES.EditorInternal
     }
 
     [Serializable]
+    public enum ESAISkillApprovalEvidenceMode : byte
+    {
+        BoundDataOnly = 0,
+        ControlFlowFallback = 1
+    }
+
+    [Serializable]
     public sealed class ESAISkillApprovalPayload
     {
         public int schemaVersion = 1;
         public string title = "需要人工确认";
         [TextArea(2, 8)] public string message = "请检查当前步骤产物后决定是否继续。";
         public bool requireCommentOnReject = true;
+        public ESAISkillApprovalEvidenceMode evidenceMode = ESAISkillApprovalEvidenceMode.BoundDataOnly;
     }
 
     [Serializable]
@@ -220,7 +228,7 @@ namespace ES.EditorInternal
     [Serializable]
     public sealed class ESAISkillExecutionSpec : IESBakedGraphPlan
     {
-        public const int CurrentSchemaVersion = 6;
+        public const int CurrentSchemaVersion = 7;
         public int schemaVersion = CurrentSchemaVersion;
         public string sourceGraphId = string.Empty;
         [JsonIgnore] public string sourceAssetGuid = string.Empty;
@@ -648,6 +656,11 @@ namespace ES.EditorInternal
                 if (payloadCount != 1 || !StepTypeMatchesPayload(step))
                     failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.StepContract",
                         "每个执行步骤必须且只能携带与 NodeType 对应的一份 Payload。", step.nodeId));
+                if (step.approval != null
+                    && step.approval.evidenceMode != ESAISkillApprovalEvidenceMode.BoundDataOnly
+                    && step.approval.evidenceMode != ESAISkillApprovalEvidenceMode.ControlFlowFallback)
+                    failures.Add(ESGraphValidationIssue.Error("AISkill.Execution.ApprovalEvidenceMode",
+                        "Approval 的证据来源模式无效；控制流回退必须显式声明。", step.nodeId));
             }
 
             ESGraphValidationIssue first = failures.FirstOrDefault(issue => issue != null
@@ -1225,6 +1238,8 @@ namespace ES.EditorInternal
     public sealed class ESAISkillIterationRunRecord
     {
         public int index;
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public int attemptCount;
         public string inputHash = string.Empty;
         public string invocationId = string.Empty;
         public string childRunId = string.Empty;
@@ -1262,7 +1277,8 @@ namespace ES.EditorInternal
     [Serializable]
     public sealed class ESAISkillWorkflowRun
     {
-        public int schemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
+        public int schemaVersion = CurrentSchemaVersion;
         public string runId = Guid.NewGuid().ToString("N");
         public string graphId = string.Empty;
         public string sourceAssetGuid = string.Empty;
@@ -1282,6 +1298,10 @@ namespace ES.EditorInternal
         public string message = string.Empty;
         public int exitCode = -1;
         public int approvalGeneration;
+        public string approvalEvidenceManifestPath = string.Empty;
+        public string approvalEvidenceManifestHash = string.Empty;
+        public string approvalEvidenceNodeId = string.Empty;
+        public int approvalEvidenceGeneration;
         public string cancellationRequestedAtUtc = string.Empty;
         public string cancellationOutcome = string.Empty;
         public string cancellationMessage = string.Empty;
@@ -1301,12 +1321,132 @@ namespace ES.EditorInternal
         public List<ESAISkillStepRunRecord> steps = new List<ESAISkillStepRunRecord>();
     }
 
+    public sealed class ESAISkillApprovalEvidenceBindingSnapshot
+    {
+        public ESAISkillApprovalEvidenceBindingSnapshot(ESAISkillDataBinding binding)
+        {
+            EdgeId = binding?.edgeId ?? string.Empty;
+            Order = binding?.order ?? 0;
+            SourceNodeId = binding?.sourceNodeId ?? string.Empty;
+            SourcePortId = binding?.sourcePortId ?? string.Empty;
+            SourcePortKey = binding?.sourcePortKey ?? string.Empty;
+            SourceMeaning = binding?.sourceMeaning ?? string.Empty;
+            TargetNodeId = binding?.targetNodeId ?? string.Empty;
+            TargetPortId = binding?.targetPortId ?? string.Empty;
+            TargetPortKey = binding?.targetPortKey ?? string.Empty;
+            TargetMeaning = binding?.targetMeaning ?? string.Empty;
+            Aggregation = binding?.targetAggregation ?? ESGraphPortAggregation.Auto;
+        }
+
+        public string EdgeId { get; }
+        public int Order { get; }
+        public string SourceNodeId { get; }
+        public string SourcePortId { get; }
+        public string SourcePortKey { get; }
+        public string SourceMeaning { get; }
+        public string TargetNodeId { get; }
+        public string TargetPortId { get; }
+        public string TargetPortKey { get; }
+        public string TargetMeaning { get; }
+        public ESGraphPortAggregation Aggregation { get; }
+    }
+
+    public sealed class ESAISkillApprovalEvidenceItemSnapshot
+    {
+        public ESAISkillApprovalEvidenceItemSnapshot(string sourceRunId, string sourceNodeId,
+            int iterationIndex, int attemptCount, string invocationId, string childRunId,
+            string finishedAtUtc, string artifactPath, string outputHash,
+            string sourceArtifactPath = "")
+        {
+            SourceRunId = sourceRunId ?? string.Empty;
+            SourceNodeId = sourceNodeId ?? string.Empty;
+            IterationIndex = iterationIndex;
+            AttemptCount = attemptCount;
+            InvocationId = invocationId ?? string.Empty;
+            ChildRunId = childRunId ?? string.Empty;
+            FinishedAtUtc = finishedAtUtc ?? string.Empty;
+            ArtifactPath = artifactPath ?? string.Empty;
+            OutputHash = outputHash ?? string.Empty;
+            SourceArtifactPath = sourceArtifactPath ?? string.Empty;
+        }
+
+        public string SourceRunId { get; }
+        public string SourceNodeId { get; }
+        public int IterationIndex { get; }
+        public int AttemptCount { get; }
+        public string InvocationId { get; }
+        public string ChildRunId { get; }
+        public string FinishedAtUtc { get; }
+        public string ArtifactPath { get; }
+        public string OutputHash { get; }
+        public string SourceArtifactPath { get; }
+    }
+
+    public sealed class ESAISkillApprovalEvidenceSnapshot
+    {
+        public ESAISkillApprovalEvidenceSnapshot(string submissionRunId, int submissionGeneration,
+            string evidenceRunId, string approvalNodeId, int evidenceGeneration,
+            IEnumerable<ESAISkillApprovalEvidenceBindingSnapshot> bindings,
+            IEnumerable<ESAISkillApprovalEvidenceItemSnapshot> items,
+            string manifestPath = "", string manifestHash = "",
+            ESAISkillApprovalEvidenceMode resolutionMode = ESAISkillApprovalEvidenceMode.BoundDataOnly,
+            bool canApprove = true, string evidenceError = "")
+        {
+            SubmissionRunId = submissionRunId ?? string.Empty;
+            SubmissionGeneration = submissionGeneration;
+            EvidenceRunId = evidenceRunId ?? string.Empty;
+            ApprovalNodeId = approvalNodeId ?? string.Empty;
+            EvidenceGeneration = evidenceGeneration;
+            Bindings = Array.AsReadOnly((bindings
+                    ?? Array.Empty<ESAISkillApprovalEvidenceBindingSnapshot>())
+                .Where(item => item != null).ToArray());
+            Items = Array.AsReadOnly((items
+                    ?? Array.Empty<ESAISkillApprovalEvidenceItemSnapshot>())
+                .Where(item => item != null).ToArray());
+            ManifestPath = manifestPath ?? string.Empty;
+            ManifestHash = manifestHash ?? string.Empty;
+            ResolutionMode = resolutionMode;
+            CanApprove = canApprove;
+            EvidenceError = evidenceError ?? string.Empty;
+        }
+
+        public string SubmissionRunId { get; }
+        public int SubmissionGeneration { get; }
+        public string EvidenceRunId { get; }
+        public string ApprovalNodeId { get; }
+        public int EvidenceGeneration { get; }
+        public IReadOnlyList<ESAISkillApprovalEvidenceBindingSnapshot> Bindings { get; }
+        public IReadOnlyList<ESAISkillApprovalEvidenceItemSnapshot> Items { get; }
+        public string ManifestPath { get; }
+        public string ManifestHash { get; }
+        public ESAISkillApprovalEvidenceMode ResolutionMode { get; }
+        public bool CanApprove { get; }
+        public string EvidenceError { get; }
+    }
+
     public static class ESAISkillExecutionCoordinator
     {
         internal const int MaximumSkillCallDepth = 8;
         private const string ActiveRunsSessionKey = "ES.AISkillGraph.ActiveRuns.v1";
         private static readonly Dictionary<string, ESAISkillWorkflowRun> Active =
             new Dictionary<string, ESAISkillWorkflowRun>(StringComparer.Ordinal);
+#if UNITY_INCLUDE_TESTS
+        internal static Action<string, string> Internal_ApprovalEvidenceBeforeCopyTestHook;
+
+        internal static void Internal_RegisterApprovalTestRun(ESAISkillWorkflowRun run)
+        {
+            if (run == null || Active.ContainsKey(run.runId))
+                throw new InvalidOperationException("测试 Run 为空或 RunId 已注册。");
+            Active.Add(run.runId, run);
+        }
+
+        internal static void Internal_RemoveApprovalTestRun(ESAISkillWorkflowRun run)
+        {
+            if (run != null && Active.TryGetValue(run.runId, out ESAISkillWorkflowRun current)
+                && ReferenceEquals(current, run))
+                Active.Remove(run.runId);
+        }
+#endif
 
         internal static void InitializeForEditor()
         {
@@ -1445,22 +1585,511 @@ namespace ES.EditorInternal
             return TryLoad(runId, out run, out _);
         }
 
+        internal static bool TryCreateApprovalEvidenceSnapshot(ESAISkillWorkflowRun submissionRun,
+            out ESAISkillApprovalEvidenceSnapshot snapshot, out string error)
+        {
+            snapshot = null;
+            if (submissionRun == null || submissionRun.status != "WaitingApproval"
+                || !ESGraphIdentity.IsValid(submissionRun.runId)
+                || submissionRun.approvalGeneration <= 0)
+            {
+                error = "Run 不存在或当前未等待人工确认。";
+                return false;
+            }
+
+            ESAISkillWorkflowRun evidenceRun = submissionRun;
+            var projectedRuns = new HashSet<string>(StringComparer.Ordinal);
+            while (true)
+            {
+                if (!projectedRuns.Add(evidenceRun.runId))
+                {
+                    error = "子 AISkill 审批投影形成循环，拒绝生成证据快照。";
+                    return false;
+                }
+                ESAISkillExecutionStep current = FindStep(evidenceRun, evidenceRun.currentNodeId);
+                if (current?.skillCall == null)
+                    break;
+                ESAISkillStepRunRecord callRecord = FindStepRecord(evidenceRun, current.nodeId);
+                if (!TryGet(callRecord?.childRunId, out ESAISkillWorkflowRun child)
+                    || !IsProjectedChildApprovalCurrent(callRecord, child))
+                {
+                    error = "子 AISkill 的审批投影已过期，请刷新后重试。";
+                    return false;
+                }
+                evidenceRun = child;
+            }
+
+            ESAISkillExecutionStep approval = FindStep(evidenceRun, evidenceRun.currentNodeId);
+            if (approval?.approval == null || !ESGraphIdentity.IsValid(approval.nodeId))
+            {
+                error = "当前审批上下文没有精确对应的 Approval 节点。";
+                return false;
+            }
+            ESAISkillApprovalEvidenceMode evidenceMode = approval.approval.evidenceMode;
+            if (evidenceMode != ESAISkillApprovalEvidenceMode.BoundDataOnly
+                && evidenceMode != ESAISkillApprovalEvidenceMode.ControlFlowFallback)
+            {
+                error = "Approval 的证据来源模式无效。";
+                return false;
+            }
+
+            ESAISkillDataBinding[] directBindings = (evidenceRun.spec?.dataBindings
+                    ?? Array.Empty<ESAISkillDataBinding>())
+                .Where(binding => binding != null
+                    && string.Equals(binding.targetNodeId, approval.nodeId, StringComparison.Ordinal))
+                .OrderBy(binding => binding.order)
+                .ThenBy(binding => binding.edgeId, StringComparer.Ordinal)
+                .ToArray();
+            var bindings = directBindings
+                .Select(binding => new ESAISkillApprovalEvidenceBindingSnapshot(binding)).ToArray();
+            var items = new List<ESAISkillApprovalEvidenceItemSnapshot>();
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < directBindings.Length; i++)
+                CollectApprovalEvidence(evidenceRun, directBindings[i].sourceNodeId, visited, items,
+                    allowControlFlowTraversal: false);
+
+            if (directBindings.Length == 0
+                && evidenceMode == ESAISkillApprovalEvidenceMode.ControlFlowFallback)
+            {
+                ESAISkillControlEdge[] controlSources = (evidenceRun.spec?.controlEdges
+                        ?? Array.Empty<ESAISkillControlEdge>())
+                    .Where(edge => edge != null
+                        && string.Equals(edge.targetNodeId, approval.nodeId, StringComparison.Ordinal))
+                    .OrderBy(edge => edge.order)
+                    .ThenBy(edge => edge.edgeId, StringComparer.Ordinal)
+                    .ToArray();
+                for (int i = 0; i < controlSources.Length; i++)
+                    CollectApprovalEvidence(evidenceRun, controlSources[i].sourceNodeId, visited, items,
+                        allowControlFlowTraversal: true);
+            }
+
+            string evidenceError = string.Empty;
+            if (directBindings.Length == 0
+                && evidenceMode == ESAISkillApprovalEvidenceMode.BoundDataOnly)
+                evidenceError = "无绑定证据：Approval 未连接“审查数据”，且未显式启用控制流回退。";
+            else if (items.Count == 0)
+                evidenceError = "审批来源没有产生可固化的任务产物。";
+
+            return TryPersistApprovalEvidenceSnapshot(submissionRun, evidenceRun, approval.nodeId,
+                evidenceMode, bindings, items, evidenceError, out snapshot, out error);
+        }
+
+        private static void CollectApprovalEvidence(ESAISkillWorkflowRun run, string nodeId,
+            HashSet<string> visited, List<ESAISkillApprovalEvidenceItemSnapshot> items,
+            bool allowControlFlowTraversal)
+        {
+            if (run == null || string.IsNullOrWhiteSpace(nodeId)
+                || !visited.Add(run.runId + ":" + nodeId))
+                return;
+
+            ESAISkillStepRunRecord record = FindStepRecord(run, nodeId);
+            bool collected = false;
+            ESAISkillIterationRunRecord[] iterations = (record?.iterations
+                    ?? new List<ESAISkillIterationRunRecord>())
+                .Where(item => item != null && item.artifacts != null
+                    && item.artifacts.Length > 0)
+                .OrderBy(item => item.index).ToArray();
+            for (int i = 0; i < iterations.Length; i++)
+            {
+                ESAISkillIterationRunRecord iteration = iterations[i];
+                AddApprovalEvidenceItems(items, run.runId, nodeId, iteration.index,
+                    iteration.attemptCount, iteration.invocationId, iteration.childRunId,
+                    iteration.finishedAtUtc, iteration.artifacts, iteration.outputHashes);
+                collected = true;
+            }
+
+            // ForEach 的顶层字段是最后一次迭代的工作缓冲；只要存在迭代记录就绝不读取它。
+            if ((record?.iterations?.Count ?? 0) == 0
+                && record?.artifacts != null && record.artifacts.Length > 0)
+            {
+                AddApprovalEvidenceItems(items, run.runId, nodeId, -1, record.attemptCount,
+                    record.invocationId, record.childRunId, record.finishedAtUtc,
+                    record.artifacts, record.outputHashes);
+                collected = true;
+            }
+            if (collected)
+                return;
+
+            ESAISkillDataBinding[] dataSources = (run.spec?.dataBindings
+                    ?? Array.Empty<ESAISkillDataBinding>())
+                .Where(binding => binding != null
+                    && string.Equals(binding.targetNodeId, nodeId, StringComparison.Ordinal))
+                .OrderBy(binding => binding.order)
+                .ThenBy(binding => binding.edgeId, StringComparer.Ordinal).ToArray();
+            for (int i = 0; i < dataSources.Length; i++)
+                CollectApprovalEvidence(run, dataSources[i].sourceNodeId, visited, items,
+                    allowControlFlowTraversal: false);
+
+            if (!allowControlFlowTraversal)
+                return;
+
+            ESAISkillControlEdge[] controlSources = (run.spec?.controlEdges
+                    ?? Array.Empty<ESAISkillControlEdge>())
+                .Where(edge => edge != null
+                    && string.Equals(edge.targetNodeId, nodeId, StringComparison.Ordinal))
+                .OrderBy(edge => edge.order)
+                .ThenBy(edge => edge.edgeId, StringComparer.Ordinal).ToArray();
+            for (int i = 0; i < controlSources.Length; i++)
+            {
+                ESAISkillStepRunRecord sourceRecord = FindStepRecord(run, controlSources[i].sourceNodeId);
+                if (sourceRecord != null && !string.Equals(sourceRecord.status, "Pending",
+                        StringComparison.Ordinal))
+                    CollectApprovalEvidence(run, controlSources[i].sourceNodeId, visited, items,
+                        allowControlFlowTraversal: true);
+            }
+        }
+
+        private static void AddApprovalEvidenceItems(
+            List<ESAISkillApprovalEvidenceItemSnapshot> items, string runId, string nodeId,
+            int iterationIndex, int attemptCount, string invocationId, string childRunId,
+            string finishedAtUtc, IReadOnlyList<string> artifacts, IReadOnlyList<string> hashes)
+        {
+            for (int i = 0; i < (artifacts?.Count ?? 0); i++)
+            {
+                if (string.IsNullOrWhiteSpace(artifacts[i])) continue;
+                items.Add(new ESAISkillApprovalEvidenceItemSnapshot(runId, nodeId,
+                    iterationIndex, attemptCount, invocationId, childRunId, finishedAtUtc,
+                    artifacts[i], hashes != null && i < hashes.Count ? hashes[i] : string.Empty));
+            }
+        }
+
+        private static bool TryPersistApprovalEvidenceSnapshot(
+            ESAISkillWorkflowRun submissionRun,
+            ESAISkillWorkflowRun evidenceRun,
+            string approvalNodeId,
+            ESAISkillApprovalEvidenceMode evidenceMode,
+            IReadOnlyList<ESAISkillApprovalEvidenceBindingSnapshot> bindings,
+            IReadOnlyList<ESAISkillApprovalEvidenceItemSnapshot> sourceItems,
+            string initialEvidenceError,
+            out ESAISkillApprovalEvidenceSnapshot snapshot,
+            out string error)
+        {
+            snapshot = null;
+            string runRoot = RunDirectory(submissionRun.runId);
+            string approvalRoot = Path.Combine(runRoot, "approvals",
+                submissionRun.approvalGeneration.ToString(CultureInfo.InvariantCulture)
+                + "-" + approvalNodeId);
+            string filesRoot = Path.Combine(approvalRoot, "files");
+            var capturedItems = new List<ESAISkillApprovalEvidenceItemSnapshot>();
+            string evidenceError = initialEvidenceError ?? string.Empty;
+            if (string.IsNullOrEmpty(evidenceError))
+            {
+                for (int i = 0; i < (sourceItems?.Count ?? 0); i++)
+                {
+                    if (!TryCaptureApprovalEvidenceFile(sourceItems[i], filesRoot, runRoot,
+                            out ESAISkillApprovalEvidenceItemSnapshot captured, out evidenceError))
+                        break;
+                    capturedItems.Add(captured);
+                }
+            }
+
+            bool canApprove = string.IsNullOrEmpty(evidenceError) && capturedItems.Count > 0;
+            JObject manifest = BuildApprovalEvidenceManifest(submissionRun, evidenceRun,
+                approvalNodeId, evidenceMode, bindings, capturedItems, canApprove, evidenceError);
+            string manifestJson = manifest.ToString(Formatting.None);
+            string manifestHash = ComputeUtf8Hash(manifestJson);
+            string manifestPath = Path.Combine(approvalRoot, "manifests", manifestHash + ".json");
+            try
+            {
+                if (File.Exists(manifestPath))
+                {
+                    if (!string.Equals(ComputeFileSha256(manifestPath), manifestHash,
+                            StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("审批 manifest 的既有内容与内容寻址文件名不一致。");
+                }
+                else
+                {
+                    ES.ESAutomationPathPolicy.WriteWorkerTextAtomic(manifestPath, manifestJson,
+                        new[] { runRoot });
+                }
+
+                submissionRun.approvalEvidenceManifestPath = manifestPath;
+                submissionRun.approvalEvidenceManifestHash = manifestHash;
+                submissionRun.approvalEvidenceNodeId = approvalNodeId;
+                submissionRun.approvalEvidenceGeneration = submissionRun.approvalGeneration;
+                Save(submissionRun);
+                snapshot = new ESAISkillApprovalEvidenceSnapshot(submissionRun.runId,
+                    submissionRun.approvalGeneration, evidenceRun.runId, approvalNodeId,
+                    evidenceRun.approvalGeneration, bindings, capturedItems, manifestPath,
+                    manifestHash, evidenceMode, canApprove, evidenceError);
+                error = string.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = "无法固化审批证据 manifest：" + exception.Message;
+                return false;
+            }
+        }
+
+        private static bool TryCaptureApprovalEvidenceFile(
+            ESAISkillApprovalEvidenceItemSnapshot sourceItem,
+            string filesRoot,
+            string runRoot,
+            out ESAISkillApprovalEvidenceItemSnapshot captured,
+            out string error)
+        {
+            captured = null;
+            string temporaryPath = string.Empty;
+            try
+            {
+                if (sourceItem == null
+                    || !ES.ESAutomationWorkerRegistration.IsSha256(sourceItem.OutputHash))
+                    throw new InvalidDataException("审批证据缺少有效的 SHA-256 OutputHash。来源节点："
+                        + (sourceItem?.SourceNodeId ?? "<unknown>"));
+                string sourcePath = ES.ESAutomationPathPolicy.Normalize(sourceItem.ArtifactPath);
+                if (!ES.ESAutomationPathPolicy.IsWithin(sourcePath,
+                        new[] { ES.ESAutomationPathPolicy.ProjectRoot }))
+                    throw new UnauthorizedAccessException("审批证据必须位于项目目录内：" + sourcePath);
+                if (!File.Exists(sourcePath))
+                    throw new FileNotFoundException("审批证据原产物不存在。", sourcePath);
+
+                ES.ESAutomationPathPolicy.EnsureWorkerDirectory(filesRoot, new[] { runRoot });
+                temporaryPath = Path.Combine(filesRoot, ".capture-" + Guid.NewGuid().ToString("N") + ".tmp");
+                using (var source = new FileStream(sourcePath, FileMode.Open, FileAccess.Read,
+                           FileShare.ReadWrite))
+                using (var temporary = new FileStream(temporaryPath, FileMode.CreateNew,
+                           FileAccess.Write, FileShare.None))
+                {
+#if UNITY_INCLUDE_TESTS
+                    Internal_ApprovalEvidenceBeforeCopyTestHook?.Invoke(sourcePath, temporaryPath);
+#endif
+                    source.CopyTo(temporary);
+                    temporary.Flush(true);
+                }
+
+                string actualHash = ComputeFileSha256(temporaryPath);
+                if (!string.Equals(actualHash, sourceItem.OutputHash,
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("审批证据副本 Hash 与 RunRecord OutputHash 不一致。来源："
+                        + sourcePath);
+
+                string extension = GetSafeApprovalEvidenceExtension(sourcePath);
+                string destinationPath = Path.Combine(filesRoot, actualHash + extension);
+                if (File.Exists(destinationPath))
+                {
+                    if (!string.Equals(ComputeFileSha256(destinationPath), actualHash,
+                            StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("内容寻址审批副本已存在但内容 Hash 不一致。");
+                    ES.ESAutomationPathPolicy.DeleteWorkerFile(temporaryPath, new[] { runRoot });
+                    temporaryPath = string.Empty;
+                }
+                else
+                {
+                    try
+                    {
+                        File.Move(temporaryPath, destinationPath);
+                        temporaryPath = string.Empty;
+                    }
+                    catch (IOException) when (File.Exists(destinationPath))
+                    {
+                        if (!string.Equals(ComputeFileSha256(destinationPath), actualHash,
+                                StringComparison.OrdinalIgnoreCase))
+                            throw;
+                        ES.ESAutomationPathPolicy.DeleteWorkerFile(temporaryPath, new[] { runRoot });
+                        temporaryPath = string.Empty;
+                    }
+                }
+
+                captured = new ESAISkillApprovalEvidenceItemSnapshot(sourceItem.SourceRunId,
+                    sourceItem.SourceNodeId, sourceItem.IterationIndex, sourceItem.AttemptCount,
+                    sourceItem.InvocationId, sourceItem.ChildRunId, sourceItem.FinishedAtUtc,
+                    destinationPath, actualHash, sourcePath);
+                error = string.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                if (!string.IsNullOrEmpty(temporaryPath) && File.Exists(temporaryPath))
+                {
+                    try { ES.ESAutomationPathPolicy.DeleteWorkerFile(temporaryPath, new[] { runRoot }); }
+                    catch { }
+                }
+                error = exception.Message;
+                return false;
+            }
+        }
+
+        private static JObject BuildApprovalEvidenceManifest(
+            ESAISkillWorkflowRun submissionRun,
+            ESAISkillWorkflowRun evidenceRun,
+            string approvalNodeId,
+            ESAISkillApprovalEvidenceMode evidenceMode,
+            IReadOnlyList<ESAISkillApprovalEvidenceBindingSnapshot> bindings,
+            IReadOnlyList<ESAISkillApprovalEvidenceItemSnapshot> items,
+            bool canApprove,
+            string evidenceError)
+        {
+            return new JObject
+            {
+                ["schemaVersion"] = 1,
+                ["submissionRunId"] = submissionRun.runId,
+                ["submissionGeneration"] = submissionRun.approvalGeneration,
+                ["evidenceRunId"] = evidenceRun.runId,
+                ["evidenceGeneration"] = evidenceRun.approvalGeneration,
+                ["approvalNodeId"] = approvalNodeId,
+                ["resolutionMode"] = evidenceMode.ToString(),
+                ["canApprove"] = canApprove,
+                ["evidenceError"] = evidenceError ?? string.Empty,
+                ["bindings"] = new JArray((bindings
+                    ?? Array.Empty<ESAISkillApprovalEvidenceBindingSnapshot>()).Select(binding =>
+                    new JObject
+                    {
+                        ["edgeId"] = binding.EdgeId,
+                        ["order"] = binding.Order,
+                        ["sourceNodeId"] = binding.SourceNodeId,
+                        ["sourcePortId"] = binding.SourcePortId,
+                        ["targetNodeId"] = binding.TargetNodeId,
+                        ["targetPortId"] = binding.TargetPortId,
+                        ["aggregation"] = binding.Aggregation.ToString()
+                    })),
+                ["items"] = new JArray((items
+                    ?? Array.Empty<ESAISkillApprovalEvidenceItemSnapshot>()).Select(item =>
+                    new JObject
+                    {
+                        ["sourceRunId"] = item.SourceRunId,
+                        ["sourceNodeId"] = item.SourceNodeId,
+                        ["iterationIndex"] = item.IterationIndex,
+                        ["attemptCount"] = item.AttemptCount,
+                        ["invocationId"] = item.InvocationId,
+                        ["childRunId"] = item.ChildRunId,
+                        ["finishedAtUtc"] = item.FinishedAtUtc,
+                        ["sourceArtifactPath"] = item.SourceArtifactPath,
+                        ["artifactPath"] = item.ArtifactPath,
+                        ["sha256"] = item.OutputHash
+                    }))
+            };
+        }
+
+        private static string GetSafeApprovalEvidenceExtension(string path)
+        {
+            string extension = Path.GetExtension(path) ?? string.Empty;
+            return extension.Length <= 16 && Regex.IsMatch(extension, @"^\.[A-Za-z0-9]+$")
+                ? extension.ToLowerInvariant() : string.Empty;
+        }
+
+        private static string ComputeFileSha256(string path)
+        {
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (SHA256 sha = SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", string.Empty)
+                    .ToLowerInvariant();
+        }
+
+        private static bool TryValidateApprovalEvidenceManifest(ESAISkillWorkflowRun run,
+            int generation, out string error)
+        {
+            if (run == null || generation != run.approvalEvidenceGeneration
+                || string.IsNullOrWhiteSpace(run.approvalEvidenceNodeId)
+                || !ES.ESAutomationWorkerRegistration.IsSha256(run.approvalEvidenceManifestHash)
+                || string.IsNullOrWhiteSpace(run.approvalEvidenceManifestPath))
+            {
+                error = "当前审批没有绑定完整的证据 manifest。";
+                return false;
+            }
+            try
+            {
+                string manifestPath = ES.ESAutomationPathPolicy.Normalize(
+                    run.approvalEvidenceManifestPath);
+                string approvalRoot = Path.Combine(RunDirectory(run.runId), "approvals",
+                    generation.ToString(CultureInfo.InvariantCulture) + "-"
+                    + run.approvalEvidenceNodeId);
+                string manifestRoot = Path.Combine(approvalRoot, "manifests");
+                if (!ES.ESAutomationPathPolicy.IsWithin(manifestPath, new[] { manifestRoot })
+                    || !File.Exists(manifestPath))
+                    throw new InvalidDataException("审批 manifest 不存在或越出当前审批目录。");
+                string manifestHash = ComputeFileSha256(manifestPath);
+                if (!string.Equals(manifestHash, run.approvalEvidenceManifestHash,
+                        StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(Path.GetFileNameWithoutExtension(manifestPath), manifestHash,
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("审批 manifest 内容 Hash 或内容寻址文件名不匹配。");
+
+                JObject manifest = JObject.Parse(File.ReadAllText(manifestPath,
+                    new UTF8Encoding(false, true)));
+                if (manifest.Value<int?>("schemaVersion") != 1
+                    || !string.Equals(manifest.Value<string>("submissionRunId"), run.runId,
+                        StringComparison.Ordinal)
+                    || manifest.Value<int?>("submissionGeneration") != generation
+                    || !string.Equals(manifest.Value<string>("approvalNodeId"),
+                        run.approvalEvidenceNodeId, StringComparison.Ordinal)
+                    || manifest.Value<bool?>("canApprove") != true)
+                    throw new InvalidDataException(manifest.Value<string>("evidenceError")
+                        ?? "审批 manifest 与当前 Run、代际或 Approval 节点不匹配。");
+
+                JArray items = manifest["items"] as JArray;
+                if (items == null || items.Count == 0)
+                    throw new InvalidDataException("审批 manifest 没有可验证的证据副本。");
+                string filesRoot = Path.Combine(approvalRoot, "files");
+                foreach (JToken token in items)
+                {
+                    string artifactPath = token?.Value<string>("artifactPath") ?? string.Empty;
+                    string expectedHash = token?.Value<string>("sha256") ?? string.Empty;
+                    if (!ES.ESAutomationWorkerRegistration.IsSha256(expectedHash))
+                        throw new InvalidDataException("审批 manifest 含有非法副本 Hash。");
+                    string normalized = ES.ESAutomationPathPolicy.Normalize(artifactPath);
+                    if (!ES.ESAutomationPathPolicy.IsWithin(normalized, new[] { filesRoot })
+                        || !File.Exists(normalized)
+                        || !string.Equals(ComputeFileSha256(normalized), expectedHash,
+                            StringComparison.OrdinalIgnoreCase)
+                        || !Path.GetFileName(normalized).StartsWith(expectedHash,
+                            StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("审批证据副本不存在、越界或内容 Hash 已变化："
+                            + artifactPath);
+                }
+                error = string.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                return false;
+            }
+        }
+
+        internal static bool TryValidateApprovalEvidence(string runId, int generation,
+            out string error)
+        {
+            if (!TryGet(runId, out ESAISkillWorkflowRun run) || run.status != "WaitingApproval"
+                || run.approvalGeneration != generation)
+            {
+                error = "Run 不存在、已离开审批状态或审批代际已过期。";
+                return false;
+            }
+            return TryValidateApprovalEvidenceManifest(run, generation, out error);
+        }
+
+        internal static bool TryValidateApprovalEvidence(ESAISkillWorkflowRun run, int generation,
+            out string error)
+            => TryValidateApprovalEvidenceManifest(run, generation, out error);
+
         public static bool TryApprove(string runId, int generation, bool approved, string comment,
             out string error)
+            => TryApproveCore(runId, generation, approved, comment,
+                requireEvidenceValidation: true, out error);
+
+        private static bool TryApproveCore(string runId, int generation, bool approved, string comment,
+            bool requireEvidenceValidation, out string error)
         {
             if (!TryGet(runId, out ESAISkillWorkflowRun run) || run.status != "WaitingApproval")
             {
                 error = "Run 不存在或当前未等待人工确认。";
                 return false;
             }
-            if (!TryValidateCurrentSource(run, out string sourceError))
-            {
-                error = "当前 Graph 或执行合同已变化，拒绝批准旧 Run：" + sourceError;
-                return false;
-            }
             if (generation != run.approvalGeneration)
             {
                 error = "人工确认代际已过期，请刷新后重试。";
+                return false;
+            }
+            if (approved && requireEvidenceValidation
+                && !TryValidateApprovalEvidenceManifest(run, generation, out string evidenceError))
+            {
+                error = "审批证据完整性校验失败：" + evidenceError;
+                return false;
+            }
+            if (approved && !TryValidateCurrentSource(run, out string sourceError))
+            {
+                error = "当前 Graph 或执行合同已变化，拒绝批准旧 Run：" + sourceError;
                 return false;
             }
             ESAISkillExecutionStep step = FindStep(run, run.currentNodeId);
@@ -1478,8 +2107,8 @@ namespace ES.EditorInternal
                     error = "子 AISkill 的人工确认代际已变化，请刷新后重试。";
                     return false;
                 }
-                if (!TryApprove(child.runId, callRecord.childApprovalGeneration,
-                        approved, comment, out error))
+                if (!TryApproveCore(child.runId, callRecord.childApprovalGeneration,
+                        approved, comment, requireEvidenceValidation: false, out error))
                     return false;
                 run.status = "Running";
                 run.message = "子 AISkill 的人工确认已提交。";
@@ -1646,6 +2275,7 @@ namespace ES.EditorInternal
                     BeginStep(run, step.nodeId);
                     run.status = "WaitingApproval";
                     run.approvalGeneration++;
+                    ClearApprovalEvidenceBinding(run);
                     run.message = step.approval.title + "：" + step.approval.message;
                     Save(run);
                     return;
@@ -1701,9 +2331,19 @@ namespace ES.EditorInternal
                 if (!TryApplyInputBindings(run, step.nodeId, step.task.inputBindings,
                         input, out string bindingError))
                     return HandleTaskFailure(run, step, "Failed", bindingError);
-                ES.ESAutomationTaskInvocationResult result = ES.ESAutomationFacade.RunTask(
-                    new ES.ESAutomationTaskInvocation
+                ES.ESAutomationTaskInvocationResult result = ES.ESAIBrainCoordinator.Run(
+                    new ES.ESAIBrainRequest
                     {
+                        objective = "执行 AISkill Graph 步骤：" + run.skillId + "/" + step.nodeId,
+                        routeKeys = new List<string> { "aibrain", "orchestration" },
+                        commandId = "aiskill.graph.execute",
+                        skillNames = new List<string>(),
+                        workflow = new ES.ESAIBrainWorkflowAuthority
+                        {
+                            workflowId = run.skillId,
+                            contentHash = run.executionSpecHash,
+                            sourceAssetGuid = run.sourceAssetGuid,
+                        },
                         invocationId = record.invocationId,
                         taskId = step.task.taskId,
                         taskVersion = step.task.taskVersion,
@@ -1726,7 +2366,7 @@ namespace ES.EditorInternal
                             "Automation 返回运行中状态但未提供有效 RunId。" );
                     return true;
                 }
-                return HandleTaskFailure(run, step, result.status, result.message);
+                return HandleTaskFailure(run, step, result.status, result.message, result.data);
             }
 
             ES.ESAutomationTaskInvocationResult current = ES.ESAutomationFacade.GetRun(record.childRunId, false);
@@ -1766,7 +2406,7 @@ namespace ES.EditorInternal
             }
             if (IsSuccessfulTaskStatus(current.status))
                 return HandleTaskTerminal(run, step, current);
-            return HandleTaskFailure(run, step, current.status, current.message);
+            return HandleTaskFailure(run, step, current.status, current.message, current.data);
         }
 
         private static bool PollOrStartSkillCall(ESAISkillWorkflowRun run,
@@ -1988,6 +2628,7 @@ namespace ES.EditorInternal
             {
                 checked { parent.approvalGeneration++; }
                 callRecord.childApprovalGeneration = child.approvalGeneration;
+                ClearApprovalEvidenceBinding(parent);
             }
             parent.status = "WaitingApproval";
             parent.message = "子 AISkill 等待人工确认：" + child.message;
@@ -1998,6 +2639,15 @@ namespace ES.EditorInternal
             => callRecord != null && child != null && child.status == "WaitingApproval"
                 && callRecord.childApprovalGeneration > 0
                 && callRecord.childApprovalGeneration == child.approvalGeneration;
+
+        private static void ClearApprovalEvidenceBinding(ESAISkillWorkflowRun run)
+        {
+            if (run == null) return;
+            run.approvalEvidenceManifestPath = string.Empty;
+            run.approvalEvidenceManifestHash = string.Empty;
+            run.approvalEvidenceNodeId = string.Empty;
+            run.approvalEvidenceGeneration = 0;
+        }
 
         private static bool HandleSkillCallFailure(ESAISkillWorkflowRun run,
             ESAISkillExecutionStep step, string status, string message)
@@ -2063,12 +2713,14 @@ namespace ES.EditorInternal
         private static bool HandleTaskTerminal(ESAISkillWorkflowRun run, ESAISkillExecutionStep step,
             ES.ESAutomationTaskInvocationResult result)
         {
-            JToken taskData = result.data?.DeepClone() ?? new JObject();
+            ESAISkillStepRunRecord record = FindStepRecord(run, step.nodeId);
+            JObject taskData = BuildTaskTerminalData(record, result.status,
+                result.message, result.data);
             if (!TryPublishDataOutputs(run, step.nodeId,
                     ESAgentGraphStableIds.SkillRunResultPortKey, taskData,
                     out string publishError))
                 return HandleSkillDataPublicationFailure(run, step, publishError);
-            CompleteStep(run, step.nodeId, "Completed", result.message, result.data);
+            CompleteStep(run, step.nodeId, "Completed", result.message, taskData);
             if (string.Equals(run.iterationTaskNodeId, step.nodeId, StringComparison.Ordinal))
             {
                 run.iterationIndex++;
@@ -2096,7 +2748,7 @@ namespace ES.EditorInternal
         }
 
         private static bool HandleTaskFailure(ESAISkillWorkflowRun run, ESAISkillExecutionStep step,
-            string status, string message)
+            string status, string message, JObject taskData = null)
         {
             status = NormalizeTaskFailureStatus(status);
             ESAISkillStepRunRecord record = FindStepRecord(run, step.nodeId);
@@ -2107,6 +2759,7 @@ namespace ES.EditorInternal
                 record.invocationId = string.Empty;
                 record.status = "Retrying";
                 record.message = message ?? status;
+                ClearCurrentAttemptTransientOutput(record);
                 record.currentAttemptStartedAtUtc = string.Empty;
                 record.retryAvailableAtUtc = DateTimeOffset.UtcNow
                     .AddSeconds(step.task.retryDelaySeconds)
@@ -2114,7 +2767,14 @@ namespace ES.EditorInternal
                 Save(run);
                 return true;
             }
-            CompleteStep(run, step.nodeId, status ?? "Failed", message);
+            JObject terminalData = BuildTaskTerminalData(record, status, message, taskData);
+            if (!TryPublishDataOutputs(run, step.nodeId,
+                    ESAgentGraphStableIds.SkillRunResultPortKey, terminalData,
+                    out string publicationError))
+            {
+                message = (message ?? status) + "；终态结果发布失败：" + publicationError;
+            }
+            CompleteStep(run, step.nodeId, status ?? "Failed", message, terminalData);
             if (ShouldStopFanOutOnFailure(run))
             {
                 Fail(run, "FanOut 分支失败，已按 stopOnFailure 终止：" + (message ?? status));
@@ -2132,6 +2792,17 @@ namespace ES.EditorInternal
                 : ESAgentGraphStableIds.SkillFailurePortKey;
             Move(run, step.nodeId, route);
             return false;
+        }
+
+        internal static JObject BuildTaskTerminalData(ESAISkillStepRunRecord record,
+            string status, string message, JObject taskData = null)
+        {
+            JObject terminalData = taskData?.DeepClone() as JObject ?? new JObject();
+            terminalData["status"] = status ?? "Failed";
+            terminalData["message"] = message ?? string.Empty;
+            terminalData["runId"] = record?.childRunId ?? string.Empty;
+            terminalData["invocationId"] = record?.invocationId ?? string.Empty;
+            return terminalData;
         }
 
         private static bool IsTaskInProgress(string status)
@@ -2571,6 +3242,7 @@ namespace ES.EditorInternal
             if (iteration != null)
             {
                 iteration.status = "Running";
+                iteration.attemptCount = record.currentAttemptCount;
                 iteration.startedAtUtc = record.currentAttemptStartedAtUtc;
                 iteration.invocationId = record.invocationId;
             }
@@ -2616,6 +3288,17 @@ namespace ES.EditorInternal
             record.retryAvailableAtUtc = string.Empty;
             record.startedAtUtc = string.Empty;
             record.finishedAtUtc = string.Empty;
+            record.message = string.Empty;
+            ClearCurrentAttemptTransientOutput(record);
+        }
+
+        internal static void ClearCurrentAttemptTransientOutput(ESAISkillStepRunRecord record)
+        {
+            if (record == null) return;
+            record.exitCode = -1;
+            record.diagnostics = Array.Empty<string>();
+            record.artifacts = Array.Empty<string>();
+            record.outputHashes = Array.Empty<string>();
         }
 
         private static ESAISkillIterationRunRecord GetOrCreateCurrentIteration(
@@ -2858,6 +3541,7 @@ namespace ES.EditorInternal
 
         private static void Save(ESAISkillWorkflowRun run)
         {
+            run.schemaVersion = ESAISkillWorkflowRun.CurrentSchemaVersion;
             run.updatedAtUtc = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
             run.runStateHash = ComputeRunStateHash(run);
             ES.ESAutomationPathPolicy.WriteWorkerTextAtomic(RunPath(run.runId),
@@ -2913,7 +3597,9 @@ namespace ES.EditorInternal
             {
                 run = JsonConvert.DeserializeObject<ESAISkillWorkflowRun>(File.ReadAllText(path,
                     new System.Text.UTF8Encoding(false, true)));
-                if (run == null || run.schemaVersion != 1 || run.spec == null
+                if (run == null
+                    || run.schemaVersion != ESAISkillWorkflowRun.CurrentSchemaVersion
+                    || run.spec == null
                     || run.spec.schemaVersion != ESAISkillExecutionSpec.CurrentSchemaVersion
                     || !string.Equals(run.graphId, run.spec.sourceGraphId, StringComparison.Ordinal)
                     || !string.Equals(run.contentSignature, run.spec.sourceContentSignature, StringComparison.Ordinal))
@@ -3103,6 +3789,22 @@ namespace ES.EditorInternal
             if (!allowedStatuses.Contains(run.status, StringComparer.Ordinal))
             {
                 error = "Run 状态不在允许状态机中。";
+                return false;
+            }
+            bool hasApprovalEvidenceBinding = !string.IsNullOrWhiteSpace(
+                run.approvalEvidenceManifestPath)
+                || !string.IsNullOrWhiteSpace(run.approvalEvidenceManifestHash)
+                || !string.IsNullOrWhiteSpace(run.approvalEvidenceNodeId)
+                || run.approvalEvidenceGeneration != 0;
+            if (hasApprovalEvidenceBinding
+                && (string.IsNullOrWhiteSpace(run.approvalEvidenceManifestPath)
+                    || !ES.ESAutomationWorkerRegistration.IsSha256(
+                        run.approvalEvidenceManifestHash)
+                    || !ESGraphIdentity.IsValid(run.approvalEvidenceNodeId)
+                    || run.approvalEvidenceGeneration <= 0
+                    || run.approvalEvidenceGeneration > run.approvalGeneration))
+            {
+                error = "审批证据 manifest 绑定字段不完整或代际无效。";
                 return false;
             }
             var specNodeIds = new HashSet<string>(run.spec.steps.Where(step => step != null)

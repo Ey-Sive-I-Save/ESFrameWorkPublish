@@ -10,8 +10,9 @@ using ES.EditorInternal;
 namespace ES
 {
     /// <summary>Draft-first UI Toolkit world authoring surface. Formal assets are changed only by CommitDraft.</summary>
-    public sealed class ESWorldMapSpaceEditorWindow : EditorWindow
+    public sealed class ESWorldMapSpaceEditorWindow : EditorWindow, IESWindowPresentationShortTitle
     {
+        public string ESWindow_PresentationShortTitle => "空间";
         private sealed class HierarchyItem
         {
             public ESWorldAuthoringSelectionKind kind;
@@ -71,6 +72,7 @@ namespace ES
 
         private void OnDisable()
         {
+            ESWindowFoundation.Unbind(this, true);
             pendingViewportRefresh?.Pause();
             pendingViewportRefresh = null;
             viewport?.Dispose();
@@ -92,7 +94,7 @@ namespace ES
         public void CreateGUI()
         {
             rootVisualElement.Clear();
-            shell = new ESWindowShell("ES 世界作者工作台", "草稿、可视编辑、验证与提交共用一个作者态会话");
+            shell = new ESWindowShell("ES 世界空间编辑器", "草稿、可视编辑、验证与提交共用一个作者态会话");
             rootVisualElement.Add(shell.Root);
             BuildHeader();
             BuildToolBar();

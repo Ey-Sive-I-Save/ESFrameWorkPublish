@@ -1,0 +1,244 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &7348953000152349526
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6547868992450225239}
+  - component: {fileID: 1330925764349081980}
+  m_Layer: 0
+  m_Name: "\u57FA\u7840\u6B65\u67AA\u5F39\u4E38"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6547868992450225239
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7348953000152349526}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 6993746259762985135}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1330925764349081980
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7348953000152349526}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 479388a509d04c3ab27f72f718283b76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  prefabDefinition: {fileID: 11400000, guid: ec573939a0199b6409d41898fee69d06, type: 2}
+  basicDomain:
+    rid: 5312548087992942633
+  references:
+    version: 2
+    RefIds:
+    - rid: 5312548087992942633
+      type: {class: ItemBasicDomain, ns: ES, asm: ES_Logic}
+      data:
+        myCore: {fileID: 1330925764349081980}
+        MyModules:
+          ValuesNow:
+          - rid: 5312548087992942634
+          - rid: 5312548087992942635
+          MayHasAddingElement: 1
+    - rid: 5312548087992942634
+      type: {class: ItemMotionModule, ns: ES, asm: ES_Logic}
+      data:
+        _enableSelf: 1
+        driverKind: 0
+        fixedUpdateForRigidbody: 1
+        maxCombinedInfluenceAcceleration: 80
+        maxCombinedInfluenceVelocityDelta: 30
+        sweepTransformInfluences: 1
+        transformSweepRadius: 0.1
+        transformSweepSkin: 0.01
+        transformSweepMask:
+          serializedVersion: 2
+          m_Bits: 4294967291
+        currentPosition: {x: 0, y: 0, z: 0}
+        currentRotation: {x: 0, y: 0, z: 0, w: 0}
+        currentVelocity: {x: 0, y: 0, z: 0}
+    - rid: 5312548087992942635
+      type: {class: ItemShotModule, ns: ES, asm: ES_Logic}
+      data:
+        _enableSelf: 1
+        sharedData:
+          enabled: 1
+          aimMode: 0
+          blockMode: 2
+          launchDelay: 0
+          warmupTime: 0
+          speed: 30
+          acceleration: 120
+          maxSpeed: 30
+          trackingStartTime: 0
+          trackingDuration: -1
+          turnSpeed: 720
+          lifeTime: 5
+          radius: 0.05
+          hitLayers:
+            serializedVersion: 2
+            m_Bits: 7936
+          useGravity: 0
+          orientToVelocity: 1
+          allowMustHit: 1
+          hitTagEligibility:
+            attackerCondition:
+              required: []
+              requiredAny: []
+              forbidden: []
+              requiredCore: 
+              requiredAnyCore: 
+              forbiddenCore: 
+              requiredExtensions: []
+              requiredAnyExtensions: []
+              forbiddenExtensions: []
+            targetCondition:
+              required: []
+              requiredAny: []
+              forbidden: []
+              requiredCore: 
+              requiredAnyCore: 
+              forbiddenCore: 
+              requiredExtensions: []
+              requiredAnyExtensions: []
+              forbiddenExtensions: []
+        variableData:
+          logicSeed: 0
+          speedMultiplier: 1
+          lifeTimeMultiplier: 1
+          radiusMultiplier: 1
+          forceMustHit: 0
+          overrideLaunchDelay: 0
+          launchDelay: 0
+          overrideTrackingStartTime: 0
+          trackingStartTime: 0
+          targetOffset: {x: 0, y: 0, z: 0}
+          spreadAngle: 0
+        aimMode: 0
+        blockMode: 2
+        config:
+          speed: 30
+          acceleration: 120
+          maxSpeed: 30
+          maxLifetime: 5
+          launchDelay: 0
+          warmupTime: 0
+          arriveDistance: 0.1
+          drag: 0
+          turnSpeedDegrees: 720
+          trackingStartTime: 0
+          trackingDuration: -1
+          gravity: {x: 0, y: -9.81, z: 0}
+          flags: 12
+        hitLayers:
+          serializedVersion: 2
+          m_Bits: 7936
+        castRadius: 0.05
+        hitBufferCapacity: 8
+        resolvedColliderCapacity: 32
+        hitOverflowCount: 0
+        hitOverflowStopCount: 0
+        resolvedColliderOverflowCount: 0
+--- !u!1 &8188029482587165649
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6993746259762985135}
+  - component: {fileID: 5401256056801691984}
+  - component: {fileID: 2969884494837470591}
+  m_Layer: 0
+  m_Name: "\u5F39\u4E38\u6A21\u578B"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6993746259762985135
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8188029482587165649}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.08, y: 0.08, z: 0.08}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6547868992450225239}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!33 &5401256056801691984
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8188029482587165649}
+  m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!23 &2969884494837470591
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8188029482587165649}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_AdditionalVertexStreams: {fileID: 0}

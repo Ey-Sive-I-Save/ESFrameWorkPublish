@@ -1,0 +1,20 @@
+{
+  "protocolVersion": 1,
+  "requestId": "be74d0c18f624fa68d21b530780a61ef",
+  "action": "triggerUnityCompilation",
+  "status": "Completed",
+  "message": "已请求 Unity 脚本编译。",
+  "runId": "",
+  "receiptId": "",
+  "data": {
+    "autoCompilationEnabled": true,
+    "autoCompilationSuppressed": false,
+    "isCompiling": true,
+    "isUpdating": false,
+    "isPlaying": false,
+    "reloadLockHeldByEs": false,
+    "aiSuppressionOwner": "",
+    "triggered": true,
+    "forceRefresh": true
+  }
+}

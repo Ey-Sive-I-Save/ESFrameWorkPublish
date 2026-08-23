@@ -1,9 +1,11 @@
 ﻿# ES AI Commands
 
+> AIBrain 统一入口：`Assets/Plugins/ES/Editor/ESAutomation/ESAutomationAiBridge.cs` 的 `listCapabilities -> planTask -> runTask`。功能区与 Skill 路由见 `Documentation/AIKnowledge/AIBRAIN_ENTRY.md`。
+
 ## 在 Unity 中直接使用
 
 ```text
-1. 打开【ES】/自动化与开发/Agent 与协作/打开 Agent 工作台。
+1. 打开【ES】/自动化与开发/Agent 与协作/打开 Agent 控制台。
 2. 在输入区点击“选择 AICommand”，按标题、用途、关键词、风险和写入模式筛选。
 3. 选择后，工作台只附加合同 ID、项目路径、短摘要和 SHA-256；不会把完整正文重复塞进消息。
 4. 填写“本次需求”，按需拖入 Unity 资产、文件或截图，再点击“发送”。

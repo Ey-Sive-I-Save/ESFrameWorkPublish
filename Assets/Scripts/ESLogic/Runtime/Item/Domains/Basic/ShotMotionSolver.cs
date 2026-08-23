@@ -4,6 +4,7 @@ namespace ES
 {
     public static class ShotMotionSolver
     {
+        [ESHotPath]
         public static ShotMotionResult Step(
             ref ShotMotionState state,
             in ShotMotionConfig config,
@@ -96,6 +97,7 @@ namespace ES
             return config.trackingDuration < 0f || elapsedTime <= start + config.trackingDuration;
         }
 
+        [ESHotPath]
         private static Quaternion StepRotation(Quaternion currentRotation, Vector3 velocity, in ShotMotionConfig config, float deltaTime)
         {
             if ((config.flags & ShotMotionFlags.OrientToVelocity) == 0 || velocity.sqrMagnitude <= 0.0001f)

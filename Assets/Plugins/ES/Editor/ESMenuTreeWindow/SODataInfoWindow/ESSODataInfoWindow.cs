@@ -30,6 +30,7 @@ namespace ES
                 var content = new GUIContent("ES数据窗口", "用于创建、查询与维护SO数据（Info/Group/高级Pack/常规SO）");
                 return content;
             }
+            public override string ESWindow_PresentationShortTitle => "数据";
             public override void ESWindow_OnOpen()
             {
                 base.ESWindow_OnOpen();

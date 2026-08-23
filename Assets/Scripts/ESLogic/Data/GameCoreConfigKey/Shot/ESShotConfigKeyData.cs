@@ -26,6 +26,11 @@ namespace ES
     public sealed class ESShotRuntimeData : ESGameCoreRuntimeData
     {
         private readonly ItemShotSharedData ownedDefaultSharedData = new ItemShotSharedData();
+        [NonSerialized] private ItemShotSharedData preparedSharedData;
+        [NonSerialized] private ItemShotVariableData preparedDefaultVariableData;
+        [NonSerialized] private ESAssetIdentity preparedPrefabIdentity;
+        [NonSerialized] private int preparedItemRuntimeKey;
+        [NonSerialized] private bool hasPreparedData;
 
         public string keyName;
         public string displayName;
@@ -35,6 +40,112 @@ namespace ES
         public ItemShotSharedData sharedData;
         public ItemShotVariableData defaultVariableData;
         public ESAssetReferPrefabConfigKey prefabKey;
+
+        internal ItemShotSharedData PreparedSharedData => hasPreparedData
+            ? preparedSharedData
+            : null;
+
+        internal ItemShotVariableData PreparedDefaultVariableData => hasPreparedData
+            ? preparedDefaultVariableData
+            : default;
+
+        internal bool TryGetPreparedPrefabIdentity(out ESAssetIdentity identity)
+        {
+            identity = preparedPrefabIdentity;
+            return hasPreparedData && identity.IsValid;
+        }
+
+        internal bool TryGetPreparedItemRuntimeKey(out int runtimeKey)
+        {
+            runtimeKey = preparedItemRuntimeKey;
+            return hasPreparedData && runtimeKey > 0;
+        }
+
+        internal bool Internal_TryPrepare(int enumKey, string stringKey, out string error)
+        {
+            Internal_ClearPrepared();
+            if (!TryValidatePreparedSource(out error)
+                || !sharedData.Internal_TryCreatePreparedCopy(
+                    out preparedSharedData,
+                    out error))
+            {
+                return false;
+            }
+
+            preparedDefaultVariableData = defaultVariableData;
+            preparedPrefabIdentity = new ESAssetIdentity(prefabKey.guid, prefabKey.localFileId);
+            if (!TryResolveItemProjection(enumKey, stringKey, out preparedItemRuntimeKey, out error))
+            {
+                Internal_ClearPrepared();
+                return false;
+            }
+            hasPreparedData = true;
+            error = null;
+            return true;
+        }
+
+        private bool TryResolveItemProjection(
+            int enumKey,
+            string stringKey,
+            out int itemRuntimeKey,
+            out string error)
+        {
+            itemRuntimeKey = 0;
+            if (soSource == null)
+            {
+                error = null;
+                return true;
+            }
+
+            ESItemConfigKey itemKey = soSource.itemKey;
+            if (itemKey == null
+                || !itemKey.IsConfigured
+                || !ESRuntimeDataGameCore.Items.TryGetRuntimeKey(itemKey, out itemRuntimeKey)
+                || !ESRuntimeDataGameCore.Items.TryGet(itemRuntimeKey, out ESItemRuntimeData itemData)
+                || itemData == null
+                || !itemData.Ready
+                || itemData.kind != ItemKind.Shot
+                || itemData.shotKey == null
+                || !ESConfigKeyMatch.Matches(
+                    itemData.shotKey.EnumKeyInt,
+                    itemData.shotKey.StringKey,
+                    enumKey,
+                    stringKey))
+            {
+                itemRuntimeKey = 0;
+                error = "ShotDefinition 无法冻结匹配的 Item 投影身份。";
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        private bool TryValidatePreparedSource(out string error)
+        {
+            if (sharedData == null)
+            {
+                error = "ShotDefinition 不能为空。";
+                return false;
+            }
+            if (!defaultVariableData.ValidateDefinition(out error))
+                return false;
+            if (defaultVariableData.forceMustHit && !sharedData.allowMustHit)
+            {
+                error = "ShotVariable 要求必中，但 ShotDefinition 禁止必中。";
+                return false;
+            }
+            return ESShotConfigKeyTable.TryValidatePrefabIdentity(prefabKey, out error);
+        }
+
+        internal void Internal_ClearPrepared()
+        {
+            hasPreparedData = false;
+            preparedSharedData = null;
+            preparedDefaultVariableData = default;
+            preparedPrefabIdentity = default;
+            preparedItemRuntimeKey = 0;
+        }
 
         internal ItemShotSharedData PrepareDefaultSharedData()
         {
@@ -47,6 +158,7 @@ namespace ES
 
         protected override void ReleaseRuntimePayload()
         {
+            Internal_ClearPrepared();
             soSource = null;
             sharedData = null;
             defaultVariableData = default;
@@ -62,14 +174,40 @@ namespace ES
         public ESShotConfigKeyTable(int capacity = 128) : base(capacity, "GameCore.Shot") { }
 
         public int Inject(ESShotEnumKey key, ESShotRuntimeData data, string debugName = null)
-            => CommitRetained((ESShotConfigKey)key, data, debugName);
+        {
+            ValidateRuntimeDataOrThrow(data, nameof(Inject));
+            return CommitRetained((ESShotConfigKey)key, data, debugName);
+        }
 
         public bool TryInject(
             ESShotEnumKey key,
             ESShotRuntimeData data,
             out int runtimeKey,
             string debugName = null)
-            => TryCommitRetained((ESShotConfigKey)key, data, out runtimeKey, debugName);
+        {
+            runtimeKey = 0;
+            if (!TryValidateRuntimeData(data, out _))
+            {
+                AbandonRetained(data);
+                return false;
+            }
+
+            return TryCommitRetained((ESShotConfigKey)key, data, out runtimeKey, debugName);
+        }
+
+        protected override bool CanRegisterRetainedData(
+            int enumKey,
+            string stringKey,
+            ESShotRuntimeData data)
+        {
+            if (data != null && data.Internal_TryPrepare(enumKey, stringKey, out _))
+                return true;
+
+            // Public compatibility entry points inherited from the generic table still pass
+            // through this cold-path hook. Roll back invalid payloads before refusing them.
+            AbandonRetained(data);
+            return false;
+        }
 
         /// <summary>注入现成权威 Shot 定义；Table 不修改也不回收 SharedData。</summary>
         public int InjectWith(
@@ -280,12 +418,11 @@ namespace ES
             string sourcePackage,
             string version)
         {
-            if (!sharedData.ValidateDefinition(out string validationError))
-                throw new InvalidOperationException("ShotDefinition 校验失败：" + validationError);
-            if (!defaultVariableData.ValidateDefinition(out string variableValidationError))
-                throw new InvalidOperationException("ShotVariable 校验失败：" + variableValidationError);
-            if (prefabKey == null || !prefabKey.IsConfigured)
-                throw new InvalidOperationException("ShotDefinition 必须配置有效 Prefab Key。");
+            ValidateDefinitionOrThrow(
+                sharedData,
+                defaultVariableData,
+                prefabKey,
+                nameof(CreateRuntimeData));
 
             string keyName = ESConfigKeyMatch.Describe(key.EnumKeyInt, key.StringKey);
             runtimeData.keyName = keyName;
@@ -296,6 +433,97 @@ namespace ES
             runtimeData.defaultVariableData = defaultVariableData;
             runtimeData.prefabKey = prefabKey;
             return runtimeData;
+        }
+
+        private void ValidateRuntimeDataOrThrow(ESShotRuntimeData data, string api)
+        {
+            if (!TryValidateRuntimeData(data, out string error))
+            {
+                AbandonRetained(data);
+                throw new InvalidOperationException("Shot " + api + " 拒绝未冻结 RuntimeData：" + error);
+            }
+        }
+
+        private static bool TryValidateRuntimeData(ESShotRuntimeData data, out string error)
+        {
+            if (data == null)
+            {
+                error = "RuntimeData 不能为空。";
+                return false;
+            }
+
+            return TryValidateDefinition(
+                data.sharedData,
+                data.defaultVariableData,
+                data.prefabKey,
+                out error);
+        }
+
+        private static void ValidateDefinitionOrThrow(
+            ItemShotSharedData sharedData,
+            in ItemShotVariableData defaultVariableData,
+            ESAssetReferPrefabConfigKey prefabKey,
+            string api)
+        {
+            if (!TryValidateDefinition(sharedData, defaultVariableData, prefabKey, out string error))
+                throw new InvalidOperationException("Shot " + api + " 校验失败：" + error);
+        }
+
+        private static bool TryValidateDefinition(
+            ItemShotSharedData sharedData,
+            in ItemShotVariableData defaultVariableData,
+            ESAssetReferPrefabConfigKey prefabKey,
+            out string error)
+        {
+            if (sharedData == null)
+            {
+                error = "ShotDefinition 不能为空。";
+                return false;
+            }
+            if (!sharedData.ValidateDefinition(out string definitionError))
+            {
+                error = "ShotDefinition 校验失败：" + definitionError;
+                return false;
+            }
+            if (!defaultVariableData.ValidateDefinition(out string variableError))
+            {
+                error = "ShotVariable 校验失败：" + variableError;
+                return false;
+            }
+            if (defaultVariableData.forceMustHit && !sharedData.allowMustHit)
+            {
+                error = "ShotVariable 要求必中，但 ShotDefinition 禁止必中。";
+                return false;
+            }
+            if (!TryValidatePrefabIdentity(prefabKey, out error))
+                return false;
+
+            error = null;
+            return true;
+        }
+
+        internal static bool TryValidatePrefabIdentity(
+            ESAssetReferPrefabConfigKey prefabKey,
+            out string error)
+        {
+            if (prefabKey == null || !prefabKey.IsConfigured)
+            {
+                error = "ShotDefinition 必须配置有效 Prefab Key。";
+                return false;
+            }
+            if (!prefabKey.HasGuid)
+            {
+                error = "ShotDefinition 的 Prefab Key 必须冻结完整 GUID 资产身份。";
+                return false;
+            }
+            if (!string.Equals(prefabKey.assetTypeName, typeof(GameObject).FullName, StringComparison.Ordinal))
+            {
+                error = "ShotDefinition 的 Prefab Key 资产类型必须为 UnityEngine.GameObject。";
+                return false;
+            }
+
+            error = null;
+            return true;
         }
 
         private static void ResolveDefaults(

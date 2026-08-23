@@ -30,15 +30,58 @@ namespace ES
         {
             this.owner = string.IsNullOrEmpty(owner) ? "EditorPreview" : owner;
             this.note = note;
+            ESEditorPreviewLifecycleHub.RegisterScope(this);
+        }
+
+        public bool IsDisposed => disposed;
+        public int RegisteredObjectCount => unityObjects.Count;
+        public int RegisteredDisposerCount => customDisposers.Count;
+        public int RegisteredRenderTextureCount
+        {
+            get
+            {
+                int count = 0;
+                for (int i = 0; i < unityObjects.Count; i++)
+                    if (unityObjects[i] is RenderTexture texture && texture != null) count++;
+                return count;
+            }
+        }
+        public long RegisteredRenderTexturePixels
+        {
+            get
+            {
+                long pixels = 0L;
+                for (int i = 0; i < unityObjects.Count; i++)
+                    if (unityObjects[i] is RenderTexture texture && texture != null)
+                        pixels += (long)texture.width * texture.height;
+                return pixels;
+            }
+        }
+        public long EstimatedRegisteredRenderTextureBytes
+        {
+            get
+            {
+                long bytes = 0L;
+                for (int i = 0; i < unityObjects.Count; i++)
+                    if (unityObjects[i] is RenderTexture texture && texture != null)
+                    {
+                        int samples = Math.Max(1, texture.antiAliasing);
+                        int depthBytes = texture.depth > 0 ? 4 : 0;
+                        bytes += (long)texture.width * texture.height * (4 + depthBytes) * samples;
+                    }
+                return bytes;
+            }
         }
 
         public T RegisterObject<T>(T obj) where T : UnityEngine.Object
         {
+            ThrowIfDisposed();
             if (obj == null)
                 return null;
 
             obj.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
             unityObjects.Add(obj);
+            ESEditorPreviewLifecycleHub.NotifyResourceChanged();
             return obj;
         }
 
@@ -49,6 +92,7 @@ namespace ES
 
         public GameObject RegisterGameObject(GameObject gameObject, bool recursiveHideFlags = false)
         {
+            ThrowIfDisposed();
             if (gameObject == null)
                 return null;
 
@@ -58,6 +102,7 @@ namespace ES
                 ESEditorPreviewUtility.SetHideFlagsRecursive(gameObject.transform, ESEditorPreviewUtility.PreviewHideFlags);
 
             unityObjects.Add(gameObject);
+            ESEditorPreviewLifecycleHub.NotifyResourceChanged();
             return gameObject;
         }
 
@@ -68,8 +113,12 @@ namespace ES
 
         public void RegisterDisposeAction(Action disposeAction)
         {
+            ThrowIfDisposed();
             if (disposeAction != null)
+            {
                 customDisposers.Add(disposeAction);
+                ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+            }
         }
 
         public void Dispose()
@@ -78,6 +127,7 @@ namespace ES
                 return;
 
             disposed = true;
+            ESEditorPreviewLifecycleHub.UnregisterScope(this);
 
             for (int i = customDisposers.Count - 1; i >= 0; i--)
             {
@@ -96,6 +146,12 @@ namespace ES
                 DestroyRegisteredObject(unityObjects[i]);
 
             unityObjects.Clear();
+            ESEditorPreviewLifecycleHub.NotifyResourceChanged();
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (disposed) throw new ObjectDisposedException(nameof(ESEditorPreviewResourceScope));
         }
 
         public static void MarkPreviewObject(GameObject obj, string owner, string note = null)

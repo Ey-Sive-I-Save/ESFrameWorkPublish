@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Knowledge Maintenance"
+  short_description: "维护定向、可回溯的 AIKnowledge 条目"
+  default_prompt: "使用 $es-knowledge-maintenance 按任务 routeKeys 建立最小可验证 Knowledge 上下文。"

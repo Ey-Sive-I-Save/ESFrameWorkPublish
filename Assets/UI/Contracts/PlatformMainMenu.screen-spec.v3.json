@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 3,
+  "screenId": "platform-main-menu",
+  "screenType": "navigation",
+  "template": "navigation",
+  "prefabPath": "Assets/UI/Prefabs/Generated/PlatformMainMenu.prefab",
+  "fixtureScenePath": "Assets/UI/Scenes/Generated/PlatformMainMenuFixture.unity",
+  "tokens": {"background":"#11131D","surface":"#1C2635","accent":"#53B8FF","text":"#F4F7FB"},
+  "profiles": [
+    {"id":"wide","width":1920,"height":1080,"orientation":"landscape"},
+    {"id":"narrow","width":1080,"height":1920,"orientation":"portrait"}
+  ],
+  "states": [
+    {"id":"default","fixture":"platform-main-menu/default"},
+    {"id":"selected","fixture":"platform-main-menu/selected"}
+  ],
+  "assets": [
+    {"id":"frame","role":"menu-frame","source":"generated-placeholder","path":"ES/UIAssets/platform-main-menu/frame.png","fallback":"frame-missing"},
+    {"id":"logo","role":"game-logo","source":"generated-placeholder","path":"ES/UIAssets/platform-main-menu/logo.png","fallback":"logo-missing"}
+  ],
+  "components": [
+    {"id":"frame","type":"frame","zone":"header","layout":{"mode":"stretch","bounds":[0.12,0.12,0.88,0.88],"minSize":[44,44]},"assetSlots":["frame"],"content":{},"stateVariants":{"default":{},"selected":{}}},
+    {"id":"logo","type":"image","zone":"header","layout":{"mode":"center","bounds":[0.30,0.70,0.70,0.86],"minSize":[120,44]},"assetSlots":["logo"],"content":{},"stateVariants":{"default":{}}},
+    {"id":"content-frame","type":"frame","zone":"content","layout":{"mode":"stretch","bounds":[0.20,0.20,0.80,0.78],"minSize":[220,44]},"content":{},"stateVariants":{"default":{}}},
+    {"id":"navigation","type":"list","zone":"navigation","layout":{"mode":"list","bounds":[0.30,0.28,0.70,0.66],"minSize":[220,44],"gap":12,"padding":[16,16,16,16]},"content":{},"children":[
+      {"id":"start","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[220,56]},"content":{"text":"Start Game"},"interaction":{"intent":"navigate-start","targetSize":[220,56]},"stateVariants":{"default":{},"selected":{}}},
+      {"id":"settings","type":"button","zone":"navigation","layout":{"mode":"stretch","bounds":[0,0,1,1],"minSize":[220,56]},"content":{"text":"Settings"},"interaction":{"intent":"navigate-settings","targetSize":[220,56]},"stateVariants":{"default":{},"selected":{}}}
+    ],"stateVariants":{"default":{},"selected":{}}}
+  ],
+  "behaviors":[{"id":"main-menu.navigation","inputs":["navigate-start","navigate-settings","cancel"],"transitions":[]}],
+  "bindings":[]
+}

@@ -3,6 +3,7 @@
     "rootNamespace": "",
     "references": [
         "ES_Editor",
+        "ES_Logic",
         "ES_Stand"
     ],
     "includePlatforms": [
@@ -11,7 +12,9 @@
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
-    "precompiledReferences": [],
+    "precompiledReferences": [
+        "Sirenix.Serialization.dll"
+    ],
     "autoReferenced": false,
     "defineConstraints": [],
     "versionDefines": [],

@@ -26,8 +26,8 @@ namespace ES.EditorInternal
         public static void CreateMindMapFromAssetsMenu() { TryCreateAsset(ESAgentAuthoringPresetKind.MindMapPaired, out _, out _); }
         [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTENT_CONTEXT_PATH + "图与流程/智能助手编排/AISkill 执行模板（场景扫描与人工审查）", false, 205)]
         public static void CreateSceneScanReviewFromAssetsMenu() { TryCreateAsset(ESAgentAuthoringPresetKind.SceneScanReview, out _, out _); }
-        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTENT_CONTEXT_PATH + "图与流程/智能助手编排/AISkill 多端口与多连接完整执行模板", false, 206)]
-        public static void CreateAISkillMultiPortWorkflowFromAssetsMenu() { TryCreateAsset(ESAgentAuthoringPresetKind.AISkillMultiPortWorkflow, out _, out _); }
+        [MenuItem(MenuItemPathDefine.ASSET_CREATE_CONTENT_CONTEXT_PATH + "图与流程/智能助手编排/AISkill 执行模板（场景质量双重审查）", false, 206)]
+        public static void CreateSceneQualityReviewFromAssetsMenu() { TryCreateAsset(ESAgentAuthoringPresetKind.SceneQualityReview, out _, out _); }
 
         public static bool TryCreateAsset(out GraphAsset asset, out string error)
         {
@@ -95,9 +95,9 @@ namespace ES.EditorInternal
                 PopulateSceneScanReview(asset);
                 return;
             }
-            if (kind == ESAgentAuthoringPresetKind.AISkillMultiPortWorkflow)
+            if (kind == ESAgentAuthoringPresetKind.SceneQualityReview)
             {
-                PopulateAISkillMultiPortWorkflow(asset);
+                PopulateSceneQualityReview(asset);
                 return;
             }
             ESGraphNodeRecord goal = Add(asset, ESAgentGraphStableIds.GoalNode, new Vector2(0f, 240f));
@@ -334,13 +334,58 @@ namespace ES.EditorInternal
             }
 
             bool executionTemplate = kind == ESAgentAuthoringPresetKind.SceneScanReview
-                || kind == ESAgentAuthoringPresetKind.AISkillMultiPortWorkflow;
+                || kind == ESAgentAuthoringPresetKind.SceneQualityReview;
             if (executionTemplate != (plan is ESAISkillExecutionSpec))
                 throw new InvalidOperationException(executionTemplate
                     ? "AISkill 执行模板没有生成 ESAISkillExecutionSpec。"
                     : "产物生成模板错误生成了 AISkill 执行合同。");
             if (!executionTemplate && !(plan is ESAgentArtifactGenerationSpec))
                 throw new InvalidOperationException("产物生成模板没有生成 ESAgentArtifactGenerationSpec。");
+
+            EnsureRepresentativeOutcomeContract(asset, executionTemplate);
+        }
+
+        private static void EnsureRepresentativeOutcomeContract(GraphAsset asset,
+            bool executionTemplate)
+        {
+            string ownerTypeId = executionTemplate
+                ? ESAgentGraphStableIds.SkillTaskNode
+                : ESAgentGraphStableIds.BranchNode;
+            string[] outcomePortKeys = executionTemplate
+                ? new[]
+                {
+                    ESAgentGraphStableIds.SkillSuccessPortKey,
+                    ESAgentGraphStableIds.SkillFailurePortKey,
+                    ESAgentGraphStableIds.SkillTimeoutPortKey,
+                    ESAgentGraphStableIds.SkillCancelledPortKey
+                }
+                : new[]
+                {
+                    ESAgentGraphStableIds.BranchMatchedPortKey,
+                    ESAgentGraphStableIds.BranchDefaultPortKey,
+                    ESAgentGraphStableIds.BranchFailurePortKey
+                };
+            ESGraphNodeRecord owner = asset.Nodes.SingleOrDefault(node =>
+                string.Equals(node.typeId, ownerTypeId, StringComparison.Ordinal));
+            if (owner == null)
+                throw new InvalidOperationException("内置模板缺少代表业务结果的节点：" + ownerTypeId);
+
+            var endpointIds = new HashSet<string>(StringComparer.Ordinal);
+            var targetNodeIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string portKey in outcomePortKeys)
+            {
+                if (!owner.TryGetPort(portKey, out ESGraphPortRecord port)
+                    || port.direction != ESGraphPortDirection.Output
+                    || !endpointIds.Add(port.portId))
+                    throw new InvalidOperationException("内置模板缺少独立稳定业务结果端点：" + portKey);
+                ESGraphEdgeRecord[] routes = asset.Edges.Where(edge =>
+                    string.Equals(edge.outputPortId, port.portId, StringComparison.Ordinal)).ToArray();
+                if (routes.Length != 1 || !asset.TryFindPort(routes[0].inputPortId,
+                        out ESGraphNodeRecord target, out _))
+                    throw new InvalidOperationException("内置模板业务结果必须且只能路由到一个明确目标：" + portKey);
+                if (!targetNodeIds.Add(target.nodeId))
+                    throw new InvalidOperationException("内置模板不能把不同业务结果合并到同一目标：" + portKey);
+            }
         }
 
         private static void PopulateMindMap(GraphAsset asset)
@@ -418,8 +463,21 @@ namespace ES.EditorInternal
                 {
                     commandName = "生成_需求思路图_AI命令",
                     targetProjectPath = "Assets/Plugins/ES/AICommands/生成_需求思路图_AI命令.md",
+                    commandIntent = ESAgentCommandIntent.ControlledExecution,
+                    writeAuthorization = ESAgentWriteAuthorization.ScopedWrites,
+                    riskLevel = ESAgentRiskLevel.L2,
+                    failurePolicy = ESAgentFailurePolicy.RollbackAndReport,
                     purpose = "把完整需求思路图转换为权限、执行与验收边界明确的 AICommand。",
-                    acceptanceCriteria = "AICommand 必须覆盖需求思路图中的目标、约束、引用和验证关系。"
+                    expectedInputs = "用户目标、Graph References、Constraints、允许修改范围和验收层级。",
+                    preconditions = "需求关系可遍历，权威引用可读取，授权范围和停止条件已明确。",
+                    allowedWriteScopes = "只允许修改 Graph Constraint 明确授权的项目路径。",
+                    forbiddenOperations = "不得越过 Graph 权限关系执行 Git、删除、发布或无关项目写入。",
+                    executionOutline = "读取目标与引用\n遍历约束关系\n执行受控步骤\n运行分层验证\n交付关系映射和证据",
+                    acceptanceCriteria = "AICommand 必须覆盖需求思路图中的目标、约束、引用和验证关系。",
+                    requiredEvidence = "每个已执行步骤、改动文件和验证结果都能回溯到对应 Graph 关系。",
+                    blockedHandling = "关系缺失、形成循环或授权不明确时停止副作用并报告缺失输入。",
+                    rollbackStrategy = "只撤销本次事务产生且可安全恢复的改动，不覆盖并行工作。",
+                    requiredSections = "必须先读\n关系映射\n权限边界\n执行步骤\n验证证据\n剩余风险"
                 }), out _);
             asset.UpdateNode(skill.nodeId, skill.typeId, skill.version, skill.title,
                 JsonUtility.ToJson(new ESAgentSkillOutputPayload
@@ -427,9 +485,18 @@ namespace ES.EditorInternal
                     skillName = "es-requirement-mind-map-workflow",
                     targetProjectPath = ".agents/skills/es-requirement-mind-map-workflow/",
                     description = "Use the complete 需求思路图 to execute a repeatable ESFramework artifact workflow.",
+                    effectKind = ESAgentSkillEffectKind.ControlledMutation,
+                    idempotency = ESAgentSkillIdempotency.BestEffort,
                     triggerScenarios = "需要按需求思路图复用复杂 Agent Artifact 编排流程时使用。",
-                    workflow = "读取需求思路图关系\n执行受控步骤\n验证\n交付",
+                    nonTriggerScenarios = "单一事实查询、无 Graph 上下文或关系尚未获得用户确认时不触发修改阶段。",
+                    preconditions = "Graph 已通过统一校验，引用可读取，权限与遍历上限已明确。",
+                    requiredDependencies = "Agent Authoring Graph、项目 AIWarnings、候选生成 Skill 和工作树审计。",
+                    inputContract = "已批准的需求图、允许修改范围、目标产物和验收层级。",
+                    workflow = "读取需求思路图关系\n有界遍历目标与约束\n执行受控步骤\n运行分层验证\n交付关系映射",
                     outputContract = "输出必须逐项映射需求思路图中的目标、约束、引用和验证关系。",
+                    sideEffects = "只在当前授权范围内生成隔离候选或执行明确批准的项目写入。",
+                    failureRecovery = "停止未开始的副作用，保留已检查关系和诊断，并只恢复本次安全可撤销修改。",
+                    permissionBoundary = "Skill 不从 Graph 关系推导新权限，也不替代人工批准。",
                     defaultPrompt = "Use $es-requirement-mind-map-workflow to execute the approved requirement mind map."
                 }), out _);
             asset.UpdateNode(validation.nodeId, validation.typeId, validation.version, validation.title,
@@ -516,14 +583,14 @@ namespace ES.EditorInternal
                 JsonUtility.ToJson(new ESAISkillApprovalPayload
                 {
                     title = "确认场景扫描结果",
-                    message = "请检查结构化报告、输出路径和 Hash，再决定是否接受本次扫描结果。",
+                    message = "请打开结构化报告，核对内容、产物路径和对应 Hash，再决定是否接受本次扫描结果。",
                     requireCommentOnReject = true
                 }), out _);
-            ConfigureOutput(asset, completed, "accepted", "已批准扫描结果");
-            ConfigureOutput(asset, rejected, "rejected", "人工拒绝记录");
-            ConfigureOutput(asset, failed, "failed", "扫描失败记录");
-            ConfigureOutput(asset, timedOut, "timed-out", "扫描超时记录");
-            ConfigureOutput(asset, cancelled, "cancelled", "扫描取消记录");
+            ConfigureOutput(asset, completed, "accepted", "已批准的扫描结果");
+            ConfigureOutput(asset, rejected, "rejected", "人工未通过的扫描结果");
+            ConfigureOutput(asset, failed, "failed", "扫描执行失败");
+            ConfigureOutput(asset, timedOut, "timed-out", "扫描执行超时");
+            ConfigureOutput(asset, cancelled, "cancelled", "扫描执行取消");
 
             Connect(asset, input, ESAgentGraphStableIds.SkillNextPortKey,
                 scan, ESGraphBuiltInPortKeys.Input);
@@ -548,11 +615,11 @@ namespace ES.EditorInternal
                     output, ESAgentGraphStableIds.SkillInputPortKey);
         }
 
-        internal static void PopulateAISkillMultiPortWorkflow(GraphAsset asset)
+        internal static void PopulateSceneQualityReview(GraphAsset asset)
         {
             if (asset == null || !string.Equals(asset.DomainId, ESAgentGraphStableIds.DomainId,
                     StringComparison.Ordinal) || asset.Nodes.Count > 0 || asset.Edges.Count > 0)
-                throw new InvalidOperationException("AISkill 多端口与多连接模板只能填充空的 Agent Authoring Graph。");
+                throw new InvalidOperationException("场景质量双重审查模板只能填充空的 Agent Authoring Graph。");
 
             ESAutomationSceneScanPrototype.InitializeForEditor();
             if (!ESAutomationTaskRegistry.TryGet("es.scene.scan", 1, out _))
@@ -562,28 +629,28 @@ namespace ES.EditorInternal
                 new Vector2(0f, 260f));
             ESGraphNodeRecord scan = Add(asset, ESAgentGraphStableIds.SkillTaskNode,
                 new Vector2(280f, 260f));
-            ESGraphNodeRecord fanOut = Add(asset, ESAgentGraphStableIds.SkillFanOutNode,
-                new Vector2(580f, 180f));
             ESGraphNodeRecord contentReview = Add(asset, ESAgentGraphStableIds.SkillApprovalNode,
-                new Vector2(860f, 40f));
+                new Vector2(600f, 100f));
             ESGraphNodeRecord evidenceReview = Add(asset, ESAgentGraphStableIds.SkillApprovalNode,
-                new Vector2(860f, 300f));
-            ESGraphNodeRecord join = Add(asset, ESAgentGraphStableIds.SkillJoinNode,
-                new Vector2(1160f, 180f));
+                new Vector2(900f, 100f));
             ESGraphNodeRecord completed = Add(asset, ESAgentGraphStableIds.SkillOutputNode,
-                new Vector2(1450f, 80f));
+                new Vector2(1220f, 0f));
+            ESGraphNodeRecord contentRejected = Add(asset, ESAgentGraphStableIds.SkillOutputNode,
+                new Vector2(900f, 320f));
+            ESGraphNodeRecord evidenceRejected = Add(asset, ESAgentGraphStableIds.SkillOutputNode,
+                new Vector2(1220f, 220f));
             ESGraphNodeRecord failed = Add(asset, ESAgentGraphStableIds.SkillOutputNode,
-                new Vector2(580f, 500f));
+                new Vector2(600f, 520f));
             ESGraphNodeRecord timedOut = Add(asset, ESAgentGraphStableIds.SkillOutputNode,
-                new Vector2(860f, 500f));
+                new Vector2(900f, 520f));
             ESGraphNodeRecord cancelled = Add(asset, ESAgentGraphStableIds.SkillOutputNode,
-                new Vector2(1140f, 500f));
+                new Vector2(1220f, 520f));
 
             asset.UpdateNode(input.nodeId, input.typeId, input.version, "纯输出工作流参数入口",
                 JsonUtility.ToJson(new ESAISkillInputPayload
                 {
-                    skillId = "es.skill.multi-port-review",
-                    displayName = "多端口任务与双重审查",
+                    skillId = "es.skill.scene-quality-review",
+                    displayName = "场景质量双重审查",
                     parameters = new[]
                     {
                         new ESAISkillParameter { parameterId = "includeInactive", label = "包含未激活对象", valueType = ESAISkillValueType.Boolean, required = true, defaultValue = "false" },
@@ -606,65 +673,54 @@ namespace ES.EditorInternal
                         BoundValueBinding("topComponentCount", "topComponentCount")
                     }
                 }), out _);
-            asset.UpdateNode(fanOut.nodeId, fanOut.typeId, fanOut.version, "分发双重审查",
-                JsonUtility.ToJson(new ESAISkillFanOutPayload
-                {
-                    fanOutId = "scan-review-fan-out",
-                    stopOnFailure = true
-                }), out _);
             asset.UpdateNode(contentReview.nodeId, contentReview.typeId, contentReview.version,
                 "内容完整性审查", JsonUtility.ToJson(new ESAISkillApprovalPayload
                 {
                     title = "确认内容完整性",
-                    message = "检查扫描内容、覆盖范围和异常项后选择批准或拒绝。",
+                    message = "先检查对象层级、激活状态、组件统计和详细对象清单；通过后再进入证据完整性审查。",
                     requireCommentOnReject = true
                 }), out _);
             asset.UpdateNode(evidenceReview.nodeId, evidenceReview.typeId, evidenceReview.version,
                 "证据完整性审查", JsonUtility.ToJson(new ESAISkillApprovalPayload
                 {
                     title = "确认证据完整性",
-                    message = "检查输出路径、Hash 和执行记录后选择批准或拒绝。",
+                    message = "核对审批面板列出的产物路径、Hash 和任务运行记录后选择批准或拒绝。",
                     requireCommentOnReject = true
                 }), out _);
-            asset.UpdateNode(join.nodeId, join.typeId, join.version, "汇合双重审查",
-                JsonUtility.ToJson(new ESAISkillJoinPayload
-                {
-                    joinId = "scan-review-join",
-                    requireAll = true
-                }), out _);
-            ConfigureOutput(asset, completed, "completed", "双重审查完成");
-            ConfigureOutput(asset, failed, "failed", "扫描失败记录");
-            ConfigureOutput(asset, timedOut, "timed-out", "扫描超时记录");
-            ConfigureOutput(asset, cancelled, "cancelled", "扫描取消记录");
+            ConfigureOutput(asset, completed, "accepted", "双审通过的扫描结果");
+            ConfigureOutput(asset, contentRejected, "content-rejected", "内容审查未通过的扫描结果");
+            ConfigureOutput(asset, evidenceRejected, "evidence-rejected", "证据审查未通过的扫描结果");
+            ConfigureOutput(asset, failed, "failed", "扫描执行失败");
+            ConfigureOutput(asset, timedOut, "timed-out", "扫描执行超时");
+            ConfigureOutput(asset, cancelled, "cancelled", "扫描执行取消");
 
             Connect(asset, input, ESAgentGraphStableIds.SkillNextPortKey,
                 scan, ESGraphBuiltInPortKeys.Input);
             Connect(asset, input, ESAgentGraphStableIds.SkillParametersPortKey,
                 scan, ESAgentGraphStableIds.SkillInputPortKey);
             Connect(asset, scan, ESAgentGraphStableIds.SkillSuccessPortKey,
-                fanOut, ESGraphBuiltInPortKeys.Input);
+                contentReview, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, contentReview, ESAgentGraphStableIds.SkillApprovedPortKey,
+                evidenceReview, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, contentReview, ESAgentGraphStableIds.SkillRejectedPortKey,
+                contentRejected, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, evidenceReview, ESAgentGraphStableIds.SkillApprovedPortKey,
+                completed, ESGraphBuiltInPortKeys.Input);
+            Connect(asset, evidenceReview, ESAgentGraphStableIds.SkillRejectedPortKey,
+                evidenceRejected, ESGraphBuiltInPortKeys.Input);
             Connect(asset, scan, ESAgentGraphStableIds.SkillFailurePortKey,
                 failed, ESGraphBuiltInPortKeys.Input);
             Connect(asset, scan, ESAgentGraphStableIds.SkillTimeoutPortKey,
                 timedOut, ESGraphBuiltInPortKeys.Input);
             Connect(asset, scan, ESAgentGraphStableIds.SkillCancelledPortKey,
                 cancelled, ESGraphBuiltInPortKeys.Input);
-            Connect(asset, fanOut, ESAgentGraphStableIds.SkillFanOutPortKey,
-                contentReview, ESGraphBuiltInPortKeys.Input);
-            Connect(asset, fanOut, ESAgentGraphStableIds.SkillFanOutPortKey,
-                evidenceReview, ESGraphBuiltInPortKeys.Input);
             foreach (ESGraphNodeRecord review in new[] { contentReview, evidenceReview })
-            {
-                Connect(asset, review, ESAgentGraphStableIds.SkillApprovedPortKey,
-                    join, ESGraphBuiltInPortKeys.Input);
-                Connect(asset, review, ESAgentGraphStableIds.SkillRejectedPortKey,
-                    join, ESGraphBuiltInPortKeys.Input);
                 Connect(asset, scan, ESAgentGraphStableIds.SkillRunResultPortKey,
                     review, ESAgentGraphStableIds.SkillInputPortKey);
-            }
-            Connect(asset, join, ESAgentGraphStableIds.SkillJoinPortKey,
-                completed, ESGraphBuiltInPortKeys.Input);
-            foreach (ESGraphNodeRecord output in new[] { completed, failed, timedOut, cancelled })
+            foreach (ESGraphNodeRecord output in new[]
+                     {
+                         completed, contentRejected, evidenceRejected, failed, timedOut, cancelled
+                     })
                 Connect(asset, scan, ESAgentGraphStableIds.SkillRunResultPortKey,
                     output, ESAgentGraphStableIds.SkillInputPortKey);
         }
@@ -712,7 +768,7 @@ namespace ES.EditorInternal
                 case ESAgentAuthoringPresetKind.AgentSkillOnly: return "AISkill 能力编排图";
                 case ESAgentAuthoringPresetKind.MindMapPaired: return "AI 实战调度图";
                 case ESAgentAuthoringPresetKind.SceneScanReview: return "AISkill 场景扫描审查图";
-                case ESAgentAuthoringPresetKind.AISkillMultiPortWorkflow: return "AISkill 多端口与多连接完整执行图";
+                case ESAgentAuthoringPresetKind.SceneQualityReview: return "AISkill 场景质量双重审查图";
                 default: return "Skill 能力包编排图";
             }
         }
@@ -725,7 +781,7 @@ namespace ES.EditorInternal
                 case ESAgentAuthoringPresetKind.AgentSkillOnly: return "创建只生成 AISkill 候选文件的预设图";
                 case ESAgentAuthoringPresetKind.MindMapPaired: return "创建带三路分支、有界遍历和双产物门禁的 AI 实战调度图";
                 case ESAgentAuthoringPresetKind.SceneScanReview: return "创建参数化场景扫描、人工确认和结构化终态齐全的可执行 AISkill 图";
-                case ESAgentAuthoringPresetKind.AISkillMultiPortWorkflow: return "创建包含纯输出入口、多个独立稳定端点的任务、单端口多连接 FanOut/Join 和纯输入终态的可烘焙 AISkill 图";
+                case ESAgentAuthoringPresetKind.SceneQualityReview: return "创建先审查扫描内容、再审查证据完整性，并为两级拒绝和任务异常保留独立终态的可烘焙 AISkill 图";
                 default: return "创建由 AICommand 与 AISkill 共同组成的 Skill 能力包预设图";
             }
         }
@@ -3672,8 +3728,10 @@ namespace ES.EditorInternal
         private static string Normalize(string path) { return (path ?? string.Empty).Replace('\\', '/').TrimStart('/'); }
     }
 
-    public sealed class ESAgentArtifactCandidateReviewWindow : EditorWindow
+    public sealed class ESAgentArtifactCandidateReviewWindow : EditorWindow, IESWindowPresentationShortTitle
     {
+        public string ESWindow_PresentationShortTitle => "候选";
+
         private sealed class DiffRow
         {
             public int oldLine;
@@ -3728,6 +3786,18 @@ namespace ES.EditorInternal
             }
             EditorUtility.DisplayDialog("智能助手候选审查",
                 "当前 Graph 没有匹配其 GraphId 与内容签名的候选。请先生成或重新生成候选。", "确定");
+        }
+
+        private void OnEnable()
+        {
+            ESWindowFoundation.BindWithStandardSystemHost(
+                this,
+                ESWindowFoundation.EnsureStandardSystemActionBar(this));
+        }
+
+        private void OnDisable()
+        {
+            ESWindowFoundation.Unbind(this, true);
         }
 
         private void OnGUI()

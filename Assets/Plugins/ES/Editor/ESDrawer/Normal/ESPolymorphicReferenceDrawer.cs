@@ -1617,7 +1617,6 @@ namespace ES.EditorInternal
             }
 
             var assignments = new List<ManagedReferenceTargetAssignment>(targetCount);
-            var undoTargets = new List<UnityEngine.Object>(targetCount);
             try
             {
                 for (int i = 0; i < Property.Tree.WeakTargets.Count; i++)
@@ -1651,21 +1650,17 @@ namespace ES.EditorInternal
                         serializedObject,
                         serializedProperty,
                         targetValue));
-                    undoTargets.Add(target);
                 }
 
-                int undoGroup = Undo.GetCurrentGroup();
-                Undo.SetCurrentGroupName(undoName);
-                Undo.RecordObjects(undoTargets.ToArray(), undoName);
-                for (int i = 0; i < assignments.Count; i++)
-                {
-                    ManagedReferenceTargetAssignment assignment = assignments[i];
-                    assignment.Property.managedReferenceValue = assignment.Value;
-                    assignment.SerializedObject.ApplyModifiedProperties();
-                    EditorUtility.SetDirty(assignment.Target);
-                }
-
-                Undo.CollapseUndoOperations(undoGroup);
+                if (!ESEditorSerializedMutation.TryApply(
+                        assignments,
+                        undoName,
+                        assignment => assignment.Target,
+                        assignment => assignment.SerializedObject,
+                        (assignment, _) => assignment.Property.managedReferenceValue = assignment.Value,
+                        RefreshSerializedProjection,
+                        out error))
+                    return false;
                 GUI.changed = true;
                 return true;
             }
@@ -1674,6 +1669,12 @@ namespace ES.EditorInternal
                 error = exception.GetType().Name + "：" + exception.Message;
                 return false;
             }
+        }
+
+        private void RefreshSerializedProjection()
+        {
+            Property.Tree?.UnitySerializedObject?.Update();
+            Property.Tree?.UpdateTree();
         }
 
         private readonly struct ManagedReferenceTargetAssignment

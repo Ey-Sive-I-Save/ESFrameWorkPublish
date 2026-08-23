@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UIElements;
 using ES.EditorInternal;
 
 namespace ES
@@ -65,12 +66,16 @@ namespace ES
     }
 
     /// <summary>
-    /// 纯底座集成测试工作台：混合 World 类模块，验证多页面、多插槽、事务、预览和失败恢复。
+    /// 纯底座集成测试工作台：混合 World 类模块，验证多文档、作者模式、事务、预览和失败恢复。
     /// 该窗口只使用 HideAndDontSave 内存资产，不写入正式地图、Scene 或资源管线。
     /// </summary>
     public sealed class ESWorkbenchIntegrationTestWindow : ESWorkbenchWindowBase<ESWorkbenchIntegrationTestWindow, ESWorkbenchIntegrationTestAsset, ESWorkbenchIntegrationTestModule>
     {
         private static readonly IESWorkbenchPersistenceAdapter<ESWorkbenchIntegrationTestAsset> PersistenceAdapter = new ESWorkbenchIntegrationTestPersistenceAdapter();
+        private static readonly ESWorkbenchResponsiveLayoutPolicy IntegrationLayoutPolicy =
+            new ESWorkbenchResponsiveLayoutPolicy(
+                minimumWindowWidth: 980f,
+                minimumWindowHeight: 620f);
         private ESWorkbenchIntegrationTestAsset testAsset => ESWorkbench_Asset;
         private SerializedObject serializedAsset => ESWorkbench_SerializedAsset;
         private string[] moduleNames;
@@ -83,6 +88,14 @@ namespace ES
 
         protected override IESWorkbenchPersistenceAdapter<ESWorkbenchIntegrationTestAsset> ESWorkbench_PersistenceAdapter => PersistenceAdapter;
         protected override string ESWorkbench_WorkbenchId => "workbench.integration-test";
+        protected override ESWorkbenchHostPresentationDescriptor ESWorkbench_DefaultPresentation =>
+            new ESWorkbenchHostPresentationDescriptor(
+                "integration.presentation",
+                "ES 工作台底座测试",
+                "内存测试资产",
+                layoutPolicy: IntegrationLayoutPolicy,
+                leftPanelTitle: "测试内容与层级",
+                workspaceTitle: "底座综合验证场景");
         protected override List<ESWorkbenchIntegrationTestModule> ESWorkbench_DefaultModules => new List<ESWorkbenchIntegrationTestModule>
         {
             ESWorkbenchIntegrationTestModule.Overview,
@@ -134,8 +147,10 @@ namespace ES
             ESWorkbench_BindAsset(asset);
         }
         public override GUIContent ESWindow_GetWindowGUIContent() => new GUIContent("ES 工作台底座综合集成测试", "纯测试：模拟 World 类专业工作台的多模块编辑闭环。");
+        public override string ESWindow_PresentationShortTitle => "集成测试";
         protected override string ESWindow_Subtitle => "纯内存测试 · 地形、材质、植被、Prefab、导航、天气、流式、碰撞、UGC";
-        protected override Vector2 ESWindow_MinSize => new Vector2(980f, 620f);
+        protected override Vector2 ESWindow_MinSize => IntegrationLayoutPolicy.ResolveAdaptiveMinimum(
+            EditorGUIUtility.GetMainWindowPosition());
         protected override Vector2 ESWindow_DefaultSize => new Vector2(1280f, 820f);
         protected override string ESWindow_PageStableId => "workbench.integration-test";
         protected override string ESWindow_PageTitle => "工作台底座综合集成测试";
@@ -163,14 +178,15 @@ namespace ES
 
         internal void InitializeForTest() => ESWindow_OnHostEnable();
         internal void DisableForTest() => ESWindow_OnHostDisable();
-        internal int RegisteredContributionCountForTest => ESWorkbench_ContributionEntries.Count;
-        internal int RegisteredPageCountForTest => ESWorkbench_Pages.Count;
+        internal int RegisteredContributionCountForTest => ESWorkbench_ActiveContributionCount;
+        internal int RegisteredDocumentCountForTest => ESWorkbench_Documents.Count;
+        internal int RegisteredAuthoringModeCountForTest => ESWorkbench_AuthoringModes.Count;
 
         protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
             if (testAsset == null) return;
             serializedAsset.Update();
-            SyncActiveModuleFromPage();
+            SyncActiveModuleFromDocument();
             ESWorkbench_DrawHero(testAsset.title, "底座扩展合同测试 · 纯内存、不写入正式资产", ESWorkbench_IsDirty ? "有未提交变更" : "已提交");
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -187,34 +203,43 @@ namespace ES
 
         private static void EnsureContributionsRegistered()
         {
-            RegisterPageContribution(ESWorkbenchIntegrationTestModule.Overview, "overview", "总览", "当前测试状态与模块闭环",
-                window => new ESWorkbenchPageDefinition("overview", "总览", "当前测试状态与模块闭环", ESWorkbenchDirtyFlags.Authoring, window.DrawOverview, drawDiagnostics: window.DrawDiagnostics, drawFooter: window.DrawFooter));
-            RegisterPageContribution(ESWorkbenchIntegrationTestModule.Terrain, "terrain", "地形", "高度刷和 Unity Terrain 类预览",
-                window => new ESWorkbenchPageDefinition("terrain", "地形", "高度刷和 Unity Terrain 类预览", ESWorkbenchDirtyFlags.Authoring, window.DrawTerrain, drawPreview: window.DrawPreview, drawDiagnostics: window.DrawDiagnostics));
-            RegisterPageContribution(ESWorkbenchIntegrationTestModule.Material, "materials", "材质层", "地表层与高度/坡度规则",
-                window => new ESWorkbenchPageDefinition("materials", "材质层", "地表层与高度/坡度规则", ESWorkbenchDirtyFlags.Authoring, window.DrawMaterials));
-            RegisterPageContribution(ESWorkbenchIntegrationTestModule.Vegetation, "vegetation", "植被 / 细节", "密度与细节层",
-                window => new ESWorkbenchPageDefinition("vegetation", "植被 / 细节", "密度与细节层", ESWorkbenchDirtyFlags.Authoring, window.DrawVegetation));
-            RegisterPageContribution(ESWorkbenchIntegrationTestModule.Prefab, "prefabs", "Prefab 散布", "批量对象布局",
-                window => new ESWorkbenchPageDefinition("prefabs", "Prefab 散布", "批量对象布局", ESWorkbenchDirtyFlags.Authoring, window.DrawPrefabs, drawPreview: window.DrawPreview));
-            RegisterPageContribution(ESWorkbenchIntegrationTestModule.Navigation, "navigation", "导航 / AI", "可行走坡度和烘焙状态",
-                window => new ESWorkbenchPageDefinition("navigation", "导航 / AI", "可行走坡度和烘焙状态", ESWorkbenchDirtyFlags.Authoring, window.DrawNavigation, drawDiagnostics: window.DrawDiagnostics));
-            RegisterPageContribution(ESWorkbenchIntegrationTestModule.WaterWeather, "environment", "水体 / 天气", "环境表现组合",
-                window => new ESWorkbenchPageDefinition("environment", "水体 / 天气", "环境表现组合", ESWorkbenchDirtyFlags.Authoring, window.DrawEnvironment));
-            RegisterPageContribution(ESWorkbenchIntegrationTestModule.Streaming, "streaming", "地形块流式", "加载半径和区块预算",
-                window => new ESWorkbenchPageDefinition("streaming", "地形块流式", "加载半径和区块预算", ESWorkbenchDirtyFlags.Authoring, window.DrawStreaming));
-            RegisterPageContribution(ESWorkbenchIntegrationTestModule.Collision, "collision", "碰撞 / 物理", "碰撞策略和物理材质",
-                window => new ESWorkbenchPageDefinition("collision", "碰撞 / 物理", "碰撞策略和物理材质", ESWorkbenchDirtyFlags.Authoring, window.DrawCollision));
-            RegisterPageContribution(ESWorkbenchIntegrationTestModule.UGC, "build", "构建 / UGC", "预检、提交、失败恢复",
-                window => new ESWorkbenchPageDefinition("build", "构建 / UGC", "预检、提交、失败恢复", ESWorkbenchDirtyFlags.Build, window.DrawBuild, drawFooter: window.DrawFooter));
+            RegisterDocumentContribution(ESWorkbenchIntegrationTestModule.Overview, "overview", "世界总览",
+                "当前测试状态与模块闭环", ESWorkbenchDirtyFlags.Authoring, window => window.DrawOverview);
+            RegisterModeContribution(ESWorkbenchIntegrationTestModule.Terrain, "terrain", "地形",
+                "高度刷和 Unity Terrain 类预览", window => window.DrawTerrain,
+                new[] { ESWorkbenchContentKind.Brush, ESWorkbenchContentKind.Terrain }, true, registerAuthoringDocument: true);
+            RegisterModeContribution(ESWorkbenchIntegrationTestModule.Material, "material", "材质",
+                "地表层与高度/坡度规则", window => window.DrawMaterials,
+                new[] { ESWorkbenchContentKind.Material, ESWorkbenchContentKind.Terrain }, true);
+            RegisterModeContribution(ESWorkbenchIntegrationTestModule.Vegetation, "vegetation", "植被",
+                "密度与细节层", window => window.DrawVegetation,
+                new[] { ESWorkbenchContentKind.Vegetation }, true);
+            RegisterModeContribution(ESWorkbenchIntegrationTestModule.Prefab, "prefab", "预制件",
+                "批量对象布局", window => window.DrawPrefabs,
+                new[] { ESWorkbenchContentKind.Prefab }, true);
+            RegisterModeContribution(ESWorkbenchIntegrationTestModule.Navigation, "navigation", "导航",
+                "可行走坡度和烘焙状态", window => window.DrawNavigation,
+                new[] { ESWorkbenchContentKind.Navigation });
+            RegisterModeContribution(ESWorkbenchIntegrationTestModule.WaterWeather, "water-weather", "水体/天气",
+                "环境表现组合", window => window.DrawEnvironment,
+                new[] { ESWorkbenchContentKind.WaterWeather });
+            RegisterModeContribution(ESWorkbenchIntegrationTestModule.Streaming, "streaming", "流式检查",
+                "加载半径和区块预算", window => window.DrawStreaming,
+                new[] { ESWorkbenchContentKind.Streaming });
+            RegisterModeContribution(ESWorkbenchIntegrationTestModule.Collision, "collision", "碰撞",
+                "碰撞策略和物理材质", window => window.DrawCollision,
+                new[] { ESWorkbenchContentKind.Collision });
+            RegisterDocumentContribution(ESWorkbenchIntegrationTestModule.UGC, "production", "生产与发布",
+                "预检、提交、失败恢复", ESWorkbenchDirtyFlags.Build, window => window.DrawBuild);
         }
 
-        private static void RegisterPageContribution(
+        private static void RegisterDocumentContribution(
             ESWorkbenchIntegrationTestModule module,
             string contributionId,
             string title,
             string tooltip,
-            Func<ESWorkbenchIntegrationTestWindow, ESWorkbenchPageDefinition> createPage)
+            ESWorkbenchDirtyFlags dirtyFlags,
+            Func<ESWorkbenchIntegrationTestWindow, Action> draw)
         {
             ESWorkbenchContributionRegistry<ESWorkbenchIntegrationTestModule>.RegisterOrUpdate(
                 new ESWorkbenchContributionDescriptor<ESWorkbenchIntegrationTestModule>(
@@ -227,7 +252,8 @@ namespace ES
                     {
                         ESWorkbenchIntegrationTestWindow window = context.Window as ESWorkbenchIntegrationTestWindow;
                         if (window == null) throw new InvalidOperationException("综合 Test 贡献缺少窗口上下文：" + contributionId);
-                        context.RegisterPage(createPage(window));
+                        context.RegisterDocument(new ESWorkbenchDocumentDefinition(
+                            contributionId, title, tooltip, false, dirtyFlags, draw(window)));
                         return null;
                     },
                     tooltip,
@@ -237,6 +263,64 @@ namespace ES
                 out string message);
             if (!string.IsNullOrEmpty(message) && !message.StartsWith("忽略旧版本", StringComparison.Ordinal))
                 Debug.LogWarning("[ESWorkbench] " + message);
+        }
+
+        private static void RegisterModeContribution(
+            ESWorkbenchIntegrationTestModule module,
+            string modeId,
+            string title,
+            string tooltip,
+            Func<ESWorkbenchIntegrationTestWindow, Action> draw,
+            IEnumerable<ESWorkbenchContentKind> contentKinds,
+            bool primary = false,
+            bool registerAuthoringDocument = false)
+        {
+            string contributionId = "mode." + modeId;
+            ESWorkbenchContributionRegistry<ESWorkbenchIntegrationTestModule>.RegisterOrUpdate(
+                new ESWorkbenchContributionDescriptor<ESWorkbenchIntegrationTestModule>(
+                    "workbench.integration-test",
+                    contributionId,
+                    title,
+                    module,
+                    ESWorkbenchContributionCategory.Validation,
+                    context =>
+                    {
+                        ESWorkbenchIntegrationTestWindow window = context.Window as ESWorkbenchIntegrationTestWindow;
+                        if (window == null) throw new InvalidOperationException("综合 Test 模式缺少窗口上下文：" + modeId);
+                        if (registerAuthoringDocument)
+                            context.RegisterDocument(new ESWorkbenchDocumentDefinition(
+                                "authoring", "世界创作", "持久测试视口与作者模式",
+                                true, ESWorkbenchDirtyFlags.Authoring));
+                        context.RegisterAuthoringMode(new ESWorkbenchAuthoringModeDefinition(
+                            modeId, title, tooltip, contentKinds: contentKinds,
+                            priority: 100, primary: primary,
+                            createInspector: _ => window.CreateModeInspector(modeId, draw(window))));
+                        return null;
+                    },
+                    tooltip,
+                    "ES.Workbench.IntegrationTest",
+                    100,
+                    1),
+                out string message);
+            if (!string.IsNullOrEmpty(message) && !message.StartsWith("忽略旧版本", StringComparison.Ordinal))
+                Debug.LogWarning("[ESWorkbench] " + message);
+        }
+
+        private VisualElement CreateModeInspector(string modeId, Action draw)
+        {
+            var container = new IMGUIContainer(() =>
+            {
+                serializedAsset?.Update();
+                draw?.Invoke();
+                bool changed = serializedAsset != null && serializedAsset.hasModifiedProperties;
+                serializedAsset?.ApplyModifiedProperties();
+                if (changed) ESWorkbench_MarkDirty("integration." + modeId, ESWorkbenchDirtyFlags.Authoring);
+            });
+            container.style.flexGrow = 1f;
+            container.style.paddingLeft = 8f;
+            container.style.paddingRight = 8f;
+            container.style.paddingTop = 6f;
+            return container;
         }
 
         private void DrawInspectorPanel()
@@ -251,9 +335,7 @@ namespace ES
             int nextModule = EditorGUILayout.Popup("模块选择", selectedModule, moduleNames);
             if (nextModule != selectedModule)
             {
-                ESWorkbenchIntegrationTestModule module = ESWorkbench_ActiveModules[nextModule];
-                testAsset.activeModule = ESWorkbench_GetModuleDisplayName(module);
-                ESWorkbench_SelectPage(GetPageId(module));
+                SelectModule(ESWorkbench_ActiveModules[nextModule]);
             }
             GUILayout.Space(8f);
             if (GUILayout.Button("执行模块动作", GUILayout.Height(28f))) RunModuleAction();
@@ -389,45 +471,61 @@ namespace ES
             ESWorkbench_SetStatus("已模拟失败；请重新预检或关闭失败模拟后再提交。", MessageType.Error);
         }
 
-        private void SyncActiveModuleFromPage()
+        private void SyncActiveModuleFromDocument()
         {
-            ESWorkbenchIntegrationTestModule? module = GetModuleForPageId(ESWorkbench_SelectedPageId);
+            ESWorkbenchIntegrationTestModule? module = GetModuleForNavigation(
+                ESWorkbench_SelectedDocumentId, ESWorkbench_SelectedAuthoringModeId);
             if (module.HasValue && ESWorkbench_IsModuleEnabled(module.Value))
                 testAsset.activeModule = ESWorkbench_GetModuleDisplayName(module.Value);
         }
 
-        private static string GetPageId(ESWorkbenchIntegrationTestModule module)
+        private void SelectModule(ESWorkbenchIntegrationTestModule module)
+        {
+            testAsset.activeModule = ESWorkbench_GetModuleDisplayName(module);
+            if (module == ESWorkbenchIntegrationTestModule.Overview)
+            {
+                ESWorkbench_SelectDocument("overview");
+                return;
+            }
+            if (module == ESWorkbenchIntegrationTestModule.UGC)
+            {
+                ESWorkbench_SelectDocument("production");
+                return;
+            }
+            ESWorkbench_SelectDocument("authoring");
+            ESWorkbench_SelectAuthoringMode(GetModeId(module));
+        }
+
+        private static string GetModeId(ESWorkbenchIntegrationTestModule module)
         {
             switch (module)
             {
-                case ESWorkbenchIntegrationTestModule.Overview: return "overview";
                 case ESWorkbenchIntegrationTestModule.Terrain: return "terrain";
-                case ESWorkbenchIntegrationTestModule.Material: return "materials";
+                case ESWorkbenchIntegrationTestModule.Material: return "material";
                 case ESWorkbenchIntegrationTestModule.Vegetation: return "vegetation";
-                case ESWorkbenchIntegrationTestModule.Prefab: return "prefabs";
+                case ESWorkbenchIntegrationTestModule.Prefab: return "prefab";
                 case ESWorkbenchIntegrationTestModule.Navigation: return "navigation";
-                case ESWorkbenchIntegrationTestModule.WaterWeather: return "environment";
+                case ESWorkbenchIntegrationTestModule.WaterWeather: return "water-weather";
                 case ESWorkbenchIntegrationTestModule.Streaming: return "streaming";
                 case ESWorkbenchIntegrationTestModule.Collision: return "collision";
-                case ESWorkbenchIntegrationTestModule.UGC: return "build";
-                default: return "overview";
+                default: return "terrain";
             }
         }
 
-        private static ESWorkbenchIntegrationTestModule? GetModuleForPageId(string pageId)
+        private static ESWorkbenchIntegrationTestModule? GetModuleForNavigation(string documentId, string modeId)
         {
-            switch (pageId)
+            if (documentId == "overview") return ESWorkbenchIntegrationTestModule.Overview;
+            if (documentId == "production") return ESWorkbenchIntegrationTestModule.UGC;
+            switch (modeId)
             {
-                case "overview": return ESWorkbenchIntegrationTestModule.Overview;
                 case "terrain": return ESWorkbenchIntegrationTestModule.Terrain;
-                case "materials": return ESWorkbenchIntegrationTestModule.Material;
+                case "material": return ESWorkbenchIntegrationTestModule.Material;
                 case "vegetation": return ESWorkbenchIntegrationTestModule.Vegetation;
-                case "prefabs": return ESWorkbenchIntegrationTestModule.Prefab;
+                case "prefab": return ESWorkbenchIntegrationTestModule.Prefab;
                 case "navigation": return ESWorkbenchIntegrationTestModule.Navigation;
-                case "environment": return ESWorkbenchIntegrationTestModule.WaterWeather;
+                case "water-weather": return ESWorkbenchIntegrationTestModule.WaterWeather;
                 case "streaming": return ESWorkbenchIntegrationTestModule.Streaming;
                 case "collision": return ESWorkbenchIntegrationTestModule.Collision;
-                case "build": return ESWorkbenchIntegrationTestModule.UGC;
                 default: return null;
             }
         }

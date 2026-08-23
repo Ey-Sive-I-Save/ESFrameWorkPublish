@@ -169,10 +169,10 @@ namespace ES
         [OnInspectorGUI, PropertyOrder(100)]
         private void DrawResultPanel()
         {
-            DrawAnimatorWorkbench();
+            DrawAnimatorTool();
         }
 
-        private void DrawAnimatorWorkbench()
+        private void DrawAnimatorTool()
         {
             DrawAnimatorHeader();
             DrawAnimatorTargetPanel();

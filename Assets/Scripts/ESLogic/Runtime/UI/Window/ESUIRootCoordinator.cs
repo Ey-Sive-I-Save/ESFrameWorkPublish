@@ -195,6 +195,15 @@ namespace ES
             if (instance == null || !ReferenceEquals(instance.view, view))
                 return;
 
+            GameObject destroyedObject = instance.gameObject;
+            if (instance.isPoolManaged
+                && !string.IsNullOrEmpty(instance.poolKey)
+                && TryGetModule(out ESUIWindowModule module)
+                && module.TryGetPoolModule(out ESGameObjectPoolModule poolModule))
+            {
+                poolModule.NotifyPooledInstanceDestroyed(instance.poolKey, destroyedObject);
+            }
+
             instance.gameObject = null;
             instance.view = null;
             instance.context = null;
@@ -207,6 +216,9 @@ namespace ES
             RemoveActiveMappings(instance);
             RemoveInactiveMapping(instance);
             allInstances.Remove(instance);
+            instance.isPoolManaged = false;
+            instance.poolPrefab = null;
+            instance.poolKey = null;
             instance.state = ESUIWindowState.Closed;
         }
 
@@ -326,7 +338,7 @@ namespace ES
                 instanceGeneration = NextPositive(ref nextInstanceGeneration),
                 providerGeneration = expectedProviderGeneration,
                 operationId = NextOperationId(),
-                isPoolManaged = definition.ClosePolicy == ESUIWindowClosePolicy.PoolOnClose
+                isPoolManaged = false
             };
             ESUIWindowLease lease = null;
 
@@ -343,10 +355,18 @@ namespace ES
                 Transform host = GetLane(definition.Layer).host;
                 if (definition.ClosePolicy == ESUIWindowClosePolicy.PoolOnClose)
                 {
-                    if (!ESGameManager.TryGetModule(out ESGameObjectPoolModule poolModule) || poolModule == null)
-                        throw new InvalidOperationException("PoolOnClose 需要已启用 ESGameObjectPoolModule。");
+                    if (!TryGetModule(out ESUIWindowModule module)
+                        || !module.TryGetPoolModule(out ESGameObjectPoolModule poolModule))
+                    throw new InvalidOperationException("PoolOnClose 需要已启用 ESGameObjectPoolModule。");
 
-                    instance.gameObject = poolModule.GetInPool(prefab, Vector3.zero, Quaternion.identity, host);
+                    instance.poolPrefab = prefab;
+                    instance.poolKey = module.GetPoolKey(definition);
+                    instance.gameObject = poolModule.GetInPool(
+                        instance.poolKey,
+                        Vector3.zero,
+                        Quaternion.identity,
+                        host);
+                    instance.isPoolManaged = instance.gameObject != null;
                 }
                 else
                 {
@@ -472,6 +492,7 @@ namespace ES
 
             instance.state = ESUIWindowState.Exiting;
             Exception exitException = null;
+            bool closeEffectApplied = true;
             try
             {
                 if (instance.view != null && instance.context != null)
@@ -488,18 +509,23 @@ namespace ES
             }
             finally
             {
-                CloseInstanceImmediately(instance, effect);
+                closeEffectApplied = CloseInstanceImmediately(instance, effect);
             }
 
             if (exitException != null)
                 throw exitException;
+            if (!closeEffectApplied)
+            {
+                throw new InvalidOperationException(
+                    "窗口已终止，但请求的关闭效果无法安全完成：" + effect);
+            }
         }
 
-        private void CloseInstanceImmediately(ESUIWindowInstance instance, ESUIWindowCloseEffect effect)
+        private bool CloseInstanceImmediately(ESUIWindowInstance instance, ESUIWindowCloseEffect effect)
         {
             if (instance == null
                 || (instance.state == ESUIWindowState.Closed && !instance.isRetainedInactive))
-                return;
+                return true;
 
             InvalidateAllLeases(instance);
             ESUIWindowDefinition definition = instance.definition;
@@ -513,19 +539,29 @@ namespace ES
             instance.view?.Unbind();
             instance.context = null;
 
+            bool closeEffectApplied = true;
             bool canKeepInactive = effect == ESUIWindowCloseEffect.KeepInactive
                                    && definition != null
                                    && !definition.AllowMultipleInstances
                                    && instance.gameObject != null;
             if (canKeepInactive)
             {
-                instance.gameObject.SetActive(false);
-                instance.isRetainedInactive = true;
-                instance.state = ESUIWindowState.Closed;
-                instance.inactiveOrder = NextOperationId();
-                inactiveSingletons[definition] = instance;
-                TrimRetainedInactiveWindows();
-                return;
+                if (instance.isPoolManaged && !TryDetachPooledInstance(instance))
+                {
+                    closeEffectApplied = false;
+                    Debug.LogError("[ESUI] 窗口无法安全脱离对象池以保留为 inactive，实例将被终止。", instance.gameObject);
+                }
+
+                if (closeEffectApplied && instance.gameObject != null)
+                {
+                    instance.gameObject.SetActive(false);
+                    instance.isRetainedInactive = true;
+                    instance.state = ESUIWindowState.Closed;
+                    instance.inactiveOrder = NextOperationId();
+                    inactiveSingletons[definition] = instance;
+                    TrimRetainedInactiveWindows();
+                    return true;
+                }
             }
 
             allInstances.Remove(instance);
@@ -537,22 +573,103 @@ namespace ES
             instance.gameObject = null;
             instance.view = null;
             if (gameObject == null)
-                return;
+            {
+                ClearPoolMetadata(instance);
+                return closeEffectApplied;
+            }
 
             if (effect == ESUIWindowCloseEffect.ReturnToPool)
             {
-                if (instance.isPoolManaged
-                    && ESGameManager.TryGetModule(out ESGameObjectPoolModule poolModule)
-                    && poolModule != null
-                    && poolModule.PushToPool(gameObject))
+                if (TryReturnToPool(instance, gameObject))
                 {
-                    return;
+                    ClearPoolMetadata(instance);
+                    return closeEffectApplied;
                 }
 
                 Debug.LogError("[ESUI] 窗口无法安全归还对象池，实例将被销毁。", gameObject);
+                closeEffectApplied = false;
+            }
+            else if (effect == ESUIWindowCloseEffect.Destroy
+                     && instance.isPoolManaged)
+            {
+                if (TryDestroyPooledInstance(instance, gameObject))
+                {
+                    ClearPoolMetadata(instance);
+                    return closeEffectApplied;
+                }
+
+                Debug.LogError("[ESUI] 窗口无法通过对象池终止，实例将被直接销毁。", gameObject);
+                closeEffectApplied = false;
             }
 
             Destroy(gameObject);
+            ClearPoolMetadata(instance);
+            return closeEffectApplied;
+        }
+
+        private bool TryDetachPooledInstance(ESUIWindowInstance instance)
+        {
+            if (instance == null
+                || instance.gameObject == null
+                || !TryGetModule(out ESUIWindowModule module)
+                || !module.TryGetPoolModule(out ESGameObjectPoolModule poolModule)
+                || !poolModule.DetachPooledInstance(instance.gameObject))
+            {
+                return false;
+            }
+
+            instance.isPoolManaged = false;
+            try
+            {
+                instance.gameObject.transform.SetParent(GetLane(instance.definition.Layer).host, false);
+            }
+            catch (Exception exception)
+            {
+                // Detachment itself already succeeded. Retaining the object under the pool root
+                // is safe because this coordinator still owns and will destroy the instance.
+                Debug.LogException(exception, instance.gameObject);
+            }
+            return true;
+        }
+
+        private bool TryReturnToPool(ESUIWindowInstance instance, GameObject gameObject)
+        {
+            if (instance == null
+                || gameObject == null
+                || !TryGetModule(out ESUIWindowModule module)
+                || !module.TryGetPoolModule(out ESGameObjectPoolModule poolModule))
+            {
+                return false;
+            }
+
+            if (instance.isPoolManaged)
+                return poolModule.PushToPool(gameObject);
+
+            return instance.poolPrefab != null
+                   && !string.IsNullOrEmpty(instance.poolKey)
+                   && poolModule.TryAttachInactiveInstance(
+                       instance.poolPrefab,
+                       instance.poolKey,
+                       gameObject);
+        }
+
+        private bool TryDestroyPooledInstance(ESUIWindowInstance instance, GameObject gameObject)
+        {
+            return instance != null
+                   && gameObject != null
+                   && TryGetModule(out ESUIWindowModule module)
+                   && module.TryGetPoolModule(out ESGameObjectPoolModule poolModule)
+                   && poolModule.DestroyPooledInstance(gameObject);
+        }
+
+        private static void ClearPoolMetadata(ESUIWindowInstance instance)
+        {
+            if (instance == null)
+                return;
+
+            instance.isPoolManaged = false;
+            instance.poolPrefab = null;
+            instance.poolKey = null;
         }
 
         private static void ValidateCloseEffect(
@@ -566,17 +683,11 @@ namespace ES
                     "多实例窗口不能保留为 inactive。请使用 Destroy 或 ReturnToPool。" );
             }
 
-            if (effect == ESUIWindowCloseEffect.ReturnToPool && !instance.isPoolManaged)
+            if (effect == ESUIWindowCloseEffect.ReturnToPool
+                && (instance.poolPrefab == null || string.IsNullOrEmpty(instance.poolKey)))
             {
                 throw new InvalidOperationException(
-                    "此窗口不是从对象池借出，不能强制回池。请将 Definition 的默认关闭策略设为 PoolOnClose。");
-            }
-
-            if (instance.isPoolManaged
-                && (effect == ESUIWindowCloseEffect.Destroy || effect == ESUIWindowCloseEffect.KeepInactive))
-            {
-                throw new InvalidOperationException(
-                    "此窗口由 ESGameObjectPoolModule 持有，只能归还对象池。请使用 CloseAsync() 或 PoolOnClose。");
+                    "此窗口没有 PoolOnClose 所需的 Prefab/Pool Key，不能强制回池。");
             }
         }
 

@@ -291,8 +291,33 @@ namespace ES
         public List<ESWorldMapPrefabPlacement> prefabPlacements = new List<ESWorldMapPrefabPlacement>();
         public List<ESWorldDialoguePlacement> dialoguePlacements = new List<ESWorldDialoguePlacement>();
 
+        /// <summary>
+        /// 补齐旧资产、草稿反序列化和域重载后可能为空的作者容器。
+        /// 该方法只建立缺失容器，不重写已有内容，供编辑器会话和运行时校验共享。
+        /// </summary>
+        public void EnsureAuthoringContainers()
+        {
+            surfaces ??= new List<ESWorldMapSurfaceDefinition>();
+            materialLayers ??= new List<ESWorldMapMaterialLayer>();
+            vegetationLayers ??= new List<ESWorldMapVegetationLayer>();
+            scatterLayers ??= new List<ESWorldMapPrefabScatterLayer>();
+            navigation ??= new ESWorldMapNavigationSettings();
+            waterWeather ??= new ESWorldMapWaterWeatherSettings();
+            streaming ??= new ESWorldMapStreamingSettings();
+            collision ??= new ESWorldMapCollisionSettings();
+            build ??= new ESWorldMapBuildSettings();
+            ugcLimits ??= new ESWorldMapUgcLimits();
+            heightfield ??= new ESWorldMapHeightfield();
+            spaceTemplate ??= new ESWorldMapSpaceTemplate();
+            regions ??= new List<ESWorldMapRegionDefinition>();
+            pois ??= new List<ESWorldMapPoiDefinition>();
+            prefabPlacements ??= new List<ESWorldMapPrefabPlacement>();
+            dialoguePlacements ??= new List<ESWorldDialoguePlacement>();
+        }
+
         public bool IsValid(out string error)
         {
+            EnsureAuthoringContainers();
             error = null;
             if (string.IsNullOrWhiteSpace(mapId)) { error = "地图 mapId 不能为空。"; return false; }
             if (schemaVersion != CurrentSchemaVersion) { error = "地图 schemaVersion 不受支持：" + schemaVersion; return false; }
@@ -465,14 +490,26 @@ namespace ES
     }
 
     [CreateAssetMenu(fileName = "ESWorldMap", menuName = "【ES】/世界/地图定义", order = 120)]
-    public sealed class ESWorldMapAsset : ScriptableObject
+    public sealed partial class ESWorldMapAsset : ScriptableObject
     {
         [SerializeField] private ESWorldMapDefinition definition = new ESWorldMapDefinition();
 
         public ESWorldMapDefinition Definition => definition;
 
+        private void OnEnable()
+        {
+            EnsureAuthoringContainers();
+        }
+
+        public void EnsureAuthoringContainers()
+        {
+            definition ??= new ESWorldMapDefinition();
+            definition.EnsureAuthoringContainers();
+        }
+
         public bool Validate(out string error)
         {
+            EnsureAuthoringContainers();
             error = null;
             if (definition == null) { error = "地图资产缺少定义。"; return false; }
             return definition.IsValid(out error);

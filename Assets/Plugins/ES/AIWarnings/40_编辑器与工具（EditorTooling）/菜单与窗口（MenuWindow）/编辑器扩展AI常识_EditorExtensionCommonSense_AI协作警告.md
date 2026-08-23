@@ -358,6 +358,7 @@ Odin PropertyTree、IMGUIContainer 和 UI Toolkit 容器。
 
 - 找不到显式 System 宿主时，基础层不得在窗口右上角创建绝对定位按钮、不得 `BringToFront()` 覆盖自定义标题栏，也不得把任意 `Toolbar`、同名元素或 CSS class 当作布局授权。
 - 缺少 System 宿主时的安全行为是：不注入系统按钮、保留可诊断状态，并要求该生产窗口完成标准宿主接入；不得静默降级成 GenericMenu 或只靠全局设置入口维持功能。
+- `BeginWindowBusy`、`NotifyWindow`、`PulseWindow`、短标签设置和半休眠落点设置只能作用于已经显式接入 ES Presentation 的窗口；未绑定窗口必须返回空 Lease、`false` 或无操作。辅助状态 API 不得调用 `BindWindow`，否则原生 Inspector、SceneView、第三方窗口或尚未完成宿主布局的 ES 窗口会被静默取得系统动作与半休眠所有权。
 - 当前 `AttachSemiSleepControls` 找不到显式 System 宿主时直接返回，活跃源码不再创建 `ESWindowSystemActionsFallback`。现行测试 `SemiSleepControlsRequireDeclaredHostAndUseResponsiveOverflow` 固化了同一合同：无宿主不注入，有宿主才挂载；不得恢复旧 fallback 或复制其模式。
 - TrackView、Stable Graph 和 Agent 已有显式宿主只能证明这些接入点存在；所有生产窗口、窄屏折叠和系统动作状态同步仍须分别验收。
 
@@ -371,6 +372,24 @@ Odin PropertyTree、IMGUIContainer 和 UI Toolkit 容器。
 6. 半休眠允许状态、立即休眠、自动/固定和全局开关在按钮、菜单与持久化状态间保持一致。
 
 源码结构或反射测试只能证明合同形状；按钮位置、折叠手感、焦点、Popup、ContextMenu、ReloadDomain 和高 DPI 必须在 Unity 中实机验证。
+
+## 11.12 ES EditorWindow 单实例边界（P0）
+
+- 普通 ES 主工具窗口、MenuTree、SinglePage、自定义工作台和全局进度窗口，同一具体 `EditorWindow` 类型默认只能存在一个活动实例；正式打开入口必须使用 `GetWindow<T>()`、基类 `OpenWindow()` 或等价的显式复用路径。`CreateWindow<T>()` 与 `CreateInstance<T>()` 在该边界中同样属于直接多实例入口，不得换 API 绕过门禁。
+- 一个窗口承载多个页面、会话、资产或任务时，应在窗口内部使用稳定页面/会话身份切换，不得通过 `CreateInstance<TWindow>()` 复制完整窗口状态。Agent 控制台的多会话必须留在单一窗口实例内。
+- 独立 Inspector 同一具体类型只复用一个实例；切换目标前必须执行原目标的保存、Dirty、刷新与释放钩子，再绑定新目标。不得用“先创建第二个、稍后关闭旧窗口”的顺序制造短暂双实例。
+- Dialog、Dropdown Popup 和测试 Probe 可以作为明确例外，但必须由集中协调器约束活动实例、队列/父子关系、重复 ID、最大数量和关闭释放。普通业务窗口不得仅凭“希望并排查看”继承这些例外。
+- 参与 ES Presentation 且确需并行的类型必须实现 `IESWindowMultiInstanceContract`，返回稳定、非空的协调器 ID；该声明只供诊断豁免和职责追踪，不能替代直接创建静态门禁，也不能单独授予多实例权限。
+- Popup 若业务上只允许一个活动面，必须在创建新实例前同步关闭并释放旧实例；Domain Reload 后不得依赖旧静态引用维持唯一性。
+- `ESAssetReferKeyPickerWindow` 必须通过 `GetWindow<T>()` 复用唯一实例；`ESCompactChoicePopup` 与 `ESWorkbenchPopupWindow` 是短生命周期例外，但同一时刻仍只能保留一个活动实例，且 ReloadDomain 后上下文丢失时必须自动关闭。只有受 `ESDialogService` 队列、重复 ID、父子堆叠和数量上限共同治理的 `ESAdvancedDialogWindow` 可以按请求策略并行。
+- 同源编辑冲突、协作拒写和恢复测试应创建多个领域编辑会话，不得复制完整工作台窗口。`ESWorldBuilderWorkbenchWindow` 的协作验收使用唯一真实窗口加受管 `ESWorldEditSession`，验收会话结束后必须清理恢复状态并确定性释放。
+- 仅为读取配置而临时创建窗口实例仍须占用该类型的唯一实例槽。`ESInstaller` 的自动检查和手动快速检查必须复用当前安装器；没有活动安装器时才允许创建一个 `HideAndDontSave` 的不显示临时实例。所有并发检查必须通过带 Generation 的引用计数 Lease 共享该槽；用户打开安装器时必须把同一临时实例原地提升为真实窗口，旧 Lease 不得再销毁它。最后一个 Lease 只允许释放仍处于临时态的实例，禁止真实窗口与检查实例并存；UPM/依赖查询本身必须单飞，重复点击不得启动第二套并发检查。
+- ES 窗口是否支持半休眠必须由显式窗口合同决定；禁止根据类型名包含 `Dialog`、`Popup`、`Picker` 等字符串猜测能力。未知 Unity 临时焦点窗口的兼容识别不得反向成为 ES 窗口能力策略。
+- 禁止在 `BindWindow`、Editor update 或 ReloadDomain 中全局扫描窗口并自动关闭重复实例。唯一性必须由打开入口和静态门禁保证；发现历史重复实例时只报告结构化诊断，不得猜测保留对象并销毁其他用户窗口。
+- 测试与批量打开工具也不得通过 `ScriptableObject.CreateInstance(windowType)`、反射或其他运行时 `Type` 入口复制生产窗口来绕过泛型源码门禁。显式测试入口应先使用 Unity 的同类型存在性查询；已有实例必须跳过且不得接管、移动或关闭，没有实例时才通过 `EditorWindow.GetWindow(Type)` 创建并记录为本次测试所有。测试不得为凑数量强制把未绑定或未声明休眠能力的窗口接入 Presentation，也不得隐式修改全局自动休眠策略。
+- 窗口偏好、工作区快照和页面恢复不得用不稳定 `InstanceId` 或同类型临时排序序号作为长期身份。同类型确有受控例外时，必须由该协调器提供稳定业务身份。
+
+最低门禁：生产主窗口不得直接 `CreateInstance<自身窗口类型>`；Agent、独立 Inspector、Input 导入器、工具启动器和全局进度中心必须有源码测试锁定单实例入口。`ESWindowSleepLifetimeTests.RegularProductionWindowOpenersUseSingleInstancePaths` 与 `DirectProductionWindowCreationIsRestrictedToGovernedExceptions` 是当前静态门禁；其中高级对话框例外还必须同时锁定活动数量上限、稳定 `dialogId` 重复策略和 `ESDialogService` 集中创建顺序。Unity 实机仍须验证重复点击入口、ReloadDomain、窗口关闭重开和目标切换保存行为。
 
 ## 12. ES Presentation 全局皮肤与品牌字体边界（P0）
 

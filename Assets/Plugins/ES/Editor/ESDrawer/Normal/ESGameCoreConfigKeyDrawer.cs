@@ -889,6 +889,8 @@ namespace ES.EditorInternal
 
     internal sealed class ESGameCoreDefinitionEditorWindow : ESSinglePageIMGUIWindow<ESGameCoreDefinitionEditorWindow>
     {
+        public override string ESWindow_PresentationShortTitle => "核心";
+
         [SerializeField] private ScriptableObject target;
         [NonSerialized] private UnityEditor.Editor targetEditor;
         [NonSerialized] private string targetPath;

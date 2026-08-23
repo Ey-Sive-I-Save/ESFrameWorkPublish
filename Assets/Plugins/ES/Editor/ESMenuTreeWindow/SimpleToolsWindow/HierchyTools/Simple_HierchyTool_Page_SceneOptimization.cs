@@ -233,7 +233,7 @@ namespace ES
             $"已记录回滚: {importSettingChanges.Count}";
 
         [OnInspectorGUI, PropertyOrder(100)]
-        private void DrawSceneOptimizationWorkbench()
+        private void DrawSceneOptimizationTool()
         {
             SimpleToolsPanelUtility.DrawToolHeader(
                 "场景优化分析与执行台",

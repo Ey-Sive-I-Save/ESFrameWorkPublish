@@ -1,4 +1,4 @@
-# ES 编辑器工具工作台页面规范
+# ES 编辑器工具页面规范
 
 状态：现行规范（SimpleTools 迁移准入规则）。最后源码复核：2026-08-01。
 适用源码入口：`Assets/Plugins/ES/Editor/ESMenuTreeWindow/SimpleToolsWindow`、`SimpleToolsPanelUtility.cs`、`SimpleToolsSafetyUtility.cs`、`ESEditorSection*`。
@@ -6,7 +6,7 @@
 
 ## 1. 目的与边界
 
-SimpleTools 是 ES 的生产工具工作台，不是“按钮集合”，也不是把 Odin 默认 Inspector 包在窗口里的集合。它服务两类同一工作流中的使用者：
+SimpleTools 是 ES 的生产工具页面集合，不是“按钮集合”，也不是把 Odin 默认 Inspector 包在窗口里的集合。它服务两类同一工作流中的使用者：
 
 - 策划先确认目标范围、规则、预览和将要产生的结果；不需要理解反射、Importer 或 Prefab 内部实现。
 - 程序先确认数据源、当前状态、失败原因、可恢复性和实际执行口径；不需要从一堆彩色按钮中猜测危险程度。

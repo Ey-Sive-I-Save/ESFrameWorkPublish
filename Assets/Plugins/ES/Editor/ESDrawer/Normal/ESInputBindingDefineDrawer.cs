@@ -521,8 +521,13 @@ namespace ES.EditorInternal
             EditorUtility.SetDirty(serializedObject.targetObject);
         }
 
+        [ESWindowSleepContract(
+            ESWindowSleepMode.Transient,
+            "Unity 原生 InputAction 绑定导入器由调用方控制生命周期")]
         private sealed class ESInputActionBindingImportWindow : ESSinglePageIMGUIWindow<ESInputActionBindingImportWindow>
         {
+            // Native InputAction binding importer is a modal utility surface.
+            // Keep lifecycle cleanup, but opt out of independent sleep.
             protected override bool ESWindow_SupportsSemiSleep => false;
 
             private SerializedObject targetObject;
@@ -538,7 +543,11 @@ namespace ES.EditorInternal
                     return;
                 }
 
-                ESInputActionBindingImportWindow window = CreateInstance<ESInputActionBindingImportWindow>();
+                ESInputActionBindingImportWindow window = GetWindow<ESInputActionBindingImportWindow>(
+                    true,
+                    "导入 InputAction 绑定",
+                    true);
+                window.ReleaseTemporaryInputAction();
                 window.titleContent = new GUIContent("导入 InputAction 绑定");
                 window.minSize = new Vector2(560f, 380f);
                 window.targetObject = targetObject;
@@ -562,6 +571,11 @@ namespace ES.EditorInternal
             protected override string ESWindow_PageKeywords => "InputAction Binding 输入 导入 Composite";
 
             protected override void ESWindow_OnHostDisable()
+            {
+                ReleaseTemporaryInputAction();
+            }
+
+            private void ReleaseTemporaryInputAction()
             {
                 if (holder != null)
                 {

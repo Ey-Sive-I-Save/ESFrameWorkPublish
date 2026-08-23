@@ -2248,6 +2248,110 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260823-004",
+                        "status":  "documented",
+                        "summary":  "停止跟踪可再生成的 IDE 缓存、Automation 临时运行目录、资源构建缓存与本地发布包，并补齐对应 Git 忽略边界。",
+                        "sourcePaths":  [
+                                            ".gitignore",
+                                            "AimingRig.csproj.lscache",
+                                            "Assembly-CSharp-Editor-firstpass.csproj.lscache",
+                                            "Assembly-CSharp-Editor.csproj.lscache",
+                                            "Assembly-CSharp-firstpass.csproj.lscache",
+                                            "Assembly-CSharp.csproj.lscache",
+                                            "DOTween.Modules.csproj.lscache",
+                                            "ESInstaller.csproj.lscache",
+                                            "ESPlayer.csproj.lscache",
+                                            "ES_Design.csproj.lscache",
+                                            "ES_Logic.csproj.lscache",
+                                            "ES_Stand.csproj.lscache",
+                                            "Gaskellgames.FolderSystem.csproj.lscache",
+                                            "Gaskellgames.csproj.lscache",
+                                            "KCC.csproj.lscache",
+                                            "RootMotion.csproj.lscache",
+                                            "RootMotionEditor.csproj.lscache",
+                                            "Sirenix.OdinInspector.Modules.UnityMathematics.csproj.lscache",
+                                            "VFolders.csproj.lscache",
+                                            "VHierarchy.csproj.lscache",
+                                            "ES/Automation/Temp",
+                                            "ES/ResourcePipeline",
+                                            "ES/Releases/Packages"
+                                        ],
+                        "evidencePaths":  [
+                                              ".gitignore",
+                                              "ES/Documentation/StaticSite/DOCUMENT_LOCAL_UPDATE_LEDGER.json"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "这些路径保存 IDE 派生缓存、Automation 临时快照、资源构建中间物或本地发布包；本批只从 Git 索引移除并保留本机文件，不修改业务源码。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "git diff --cached --check 通过",
+                                                            "所有退跟踪路径均由 .gitignore 的精确规则覆盖",
+                                                            "使用 git rm --cached 保留仍存在的本机文件"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "未运行 Unity Editor、资源构建、Player 或发布验收",
+                                                             "本批不证明缓存和发布产物可在所有目标环境成功重建"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#ai-governance",
+                                                     "#release-verification"
+                                                 ]
+                                 }
+                    },
+                    {
+                        "id":  "LOCAL-20260823-003",
+                        "status":  "documented",
+                        "summary":  "集中提交编辑器、运行时、Shader、测试资产、UI 证据、Automation、备份、归档与协作记录，保留明确排除的缓存、临时目录和 trace。",
+                        "sourcePaths":  [
+                                            "Assets",
+                                            "Documentation",
+                                            "ES",
+                                            "ProjectSettings",
+                                            ".gitignore",
+                                            "AGENTS.md",
+                                            "ESFrameWorkPublish.slnx",
+                                            "Boundary"
+                                        ],
+                        "evidencePaths":  [
+                                              "Assets/ESTestAssets",
+                                              "Assets/UI",
+                                              "ES/UIEvidence",
+                                              "ES/Automation",
+                                              "ES/Bak",
+                                              "ES/AI协作历程（Codex）"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "工程实现、测试资产、视觉证据和协作归档按用户明确授权一并版本化；BuildCache、Automation/Temp、.lscache 与 trace 不进入此提交。"
+                                     },
+                        "regression":  {
+                                           "status":  "not-run",
+                                           "evidence":  [
+                                                            "隔离 Git 索引检查排除路径",
+                                                            "台账门禁校验"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "本次为版本控制归档，未运行 Unity Editor、ReloadDomain、Test Runner、PlayMode、Profiler、Player 或 IL2CPP",
+                                                             "不会将已保存的测试资产和 UI 证据表述为本轮新鲜运行验收"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#runtime-overview",
+                                                     "#editor-overview",
+                                                     "#editor-verification",
+                                                     "#ai-governance"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -2260,13 +2364,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-23T19:32:33+08:00",
-                       "head":  "f2d1d04f779f7195e56139660b028e60fdee46e2",
-                       "stagedSourcePatchSha256":  "6cfd54e038ad5c3d0eb47695358b856cb6bff34d3e17e0db800f610380f8756c",
-                       "stagedSourceManifestSha256":  "2c3b355d6f7a17bf5c187b2592652de0e1200978b5fbb88efd349168275c73b2",
-                       "stagedSourceFileCount":  585,
+                       "preparedAt":  "2026-08-23T19:38:50+08:00",
+                       "head":  "d77ef8eb7d0e83cbdb24a9c2edf0be8933a8621e",
+                       "stagedSourcePatchSha256":  "07610a215fffd1fc40eb6e84b78b1aed6b7086f8c561633cea78f975c0d3d5d0",
+                       "stagedSourceManifestSha256":  "c5bfc8da28d9de1b8b92e122f0a361a5290bfb75e8aed01def1fa2d2e92c1a6e",
+                       "stagedSourceFileCount":  759,
                        "entryIds":  [
-                                        "LOCAL-20260823-002"
+                                        "LOCAL-20260823-003"
                                     ]
                    }
 }

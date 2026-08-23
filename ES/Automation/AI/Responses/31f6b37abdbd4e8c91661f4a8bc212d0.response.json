@@ -1,0 +1,18 @@
+{
+  "protocolVersion": 1,
+  "requestId": "31f6b37abdbd4e8c91661f4a8bc212d0",
+  "action": "getUnityCompilationState",
+  "status": "Completed",
+  "message": "已返回 Unity 编译控制状态。",
+  "runId": "",
+  "receiptId": "",
+  "data": {
+    "autoCompilationEnabled": true,
+    "autoCompilationSuppressed": false,
+    "isCompiling": false,
+    "isUpdating": false,
+    "isPlaying": false,
+    "reloadLockHeldByEs": false,
+    "aiSuppressionOwner": ""
+  }
+}

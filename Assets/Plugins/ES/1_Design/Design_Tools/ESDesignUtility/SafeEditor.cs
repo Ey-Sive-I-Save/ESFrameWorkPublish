@@ -2,9 +2,13 @@ using ES;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using StackFrame = System.Diagnostics.StackFrame;
+using StackTrace = System.Diagnostics.StackTrace;
 using UnityEngine;
 using Sirenix.Utilities;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -150,12 +154,102 @@ namespace ES
             public static bool Wrap_DisplayDialog(string title, string message, string ok = "好的", string cancel = "算了")
             {
 #if UNITY_EDITOR
-
-                return EditorUtility.DisplayDialog(title, message, ok, cancel);
+                string safeTitle = title ?? string.Empty;
+                string safeMessage = message ?? string.Empty;
+                string safeOk = string.IsNullOrWhiteSpace(ok) ? "确定" : ok;
+                string safeCancel = string.IsNullOrWhiteSpace(cancel) ? "取消" : cancel;
+                string dialogId = BuildLegacyDialogId(
+                    safeTitle,
+                    safeMessage,
+                    safeOk,
+                    safeCancel,
+                    ResolveLegacyDialogScope());
+                try
+                {
+                    ESDialogRequest request = ESDialogRequest.ConfirmRequest(
+                        dialogId,
+                        safeTitle,
+                        safeMessage,
+                        safeOk,
+                        safeCancel);
+                    request.Host = ESDialogHost.Editor;
+                    // Legacy compatibility calls do not carry a trustworthy
+                    // owner. Leave it unset so ESDialog uses the main editor
+                    // work area instead of attaching to an unrelated window.
+                    request.Owner = null;
+                    request.AllowMainWorkspaceFallback = true;
+                    request.Tone = InferLegacyDialogTone(safeTitle, safeMessage);
+                    ESDialogResult result = ESDialog.ShowModal(request);
+                    if (result == null || result.Completion != ESDialogCompletion.Accepted)
+                    {
+                        if (result != null && !string.IsNullOrWhiteSpace(result.Error))
+                            Debug.LogWarning("ES legacy dialog 未显示：" + result.Error);
+                        return false;
+                    }
+                    return result.Accepted;
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                    return false;
+                }
 #else
                 return false;
 #endif
 
+            }
+
+            // Compatibility name for existing Editor call sites; the implementation
+            // remains the ESDialog route above rather than Unity's native dialog.
+            public static bool DisplayDialog(string title, string message, string ok = "好的", string cancel = "算了")
+                => Wrap_DisplayDialog(title, message, ok, cancel);
+
+            private static string BuildLegacyDialogId(
+                string title,
+                string message,
+                string ok,
+                string cancel,
+                string scope)
+            {
+                string canonical = scope + "\n" + title + "\n" + message + "\n" + ok + "\n" + cancel;
+                using (SHA256 sha = SHA256.Create())
+                {
+                    byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(canonical));
+                    return "legacy.editor.display-dialog." +
+                        BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
+                }
+            }
+
+            private static string ResolveLegacyDialogScope()
+            {
+                try
+                {
+                    StackFrame frame = new StackTrace(2, false).GetFrame(0);
+                    var method = frame?.GetMethod();
+                    string typeName = method?.DeclaringType?.FullName;
+                    string methodName = method?.Name;
+                    if (!string.IsNullOrWhiteSpace(typeName) && !string.IsNullOrWhiteSpace(methodName))
+                        return typeName + "." + methodName;
+                }
+                catch
+                {
+                }
+                return "unknown-caller";
+            }
+
+            private static ESDialogTone InferLegacyDialogTone(string title, string message)
+            {
+                string semantic = (title + " " + message).ToLowerInvariant();
+                if (semantic.Contains("错误") || semantic.Contains("失败")
+                    || semantic.Contains("无法") || semantic.Contains("不可用")
+                    || semantic.Contains("error") || semantic.Contains("failed"))
+                    return ESDialogTone.Danger;
+                if (semantic.Contains("警告") || semantic.Contains("确认")
+                    || semantic.Contains("删除") || semantic.Contains("覆盖")
+                    || semantic.Contains("清理") || semantic.Contains("warning")
+                    || semantic.Contains("confirm"))
+                    return ESDialogTone.Warning;
+                return ESDialogTone.Info;
             }
             /// <summary>
             /// 打开选择文件夹窗口(返回路径)

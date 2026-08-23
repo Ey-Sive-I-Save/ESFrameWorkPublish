@@ -82,121 +82,27 @@ namespace ES.Tests
         }
 
         [Test]
-        public void ClearDynamicOnlyEntries_PreservesStableDualAliases()
+        public void RuntimeMutation_UsesTheSameCompleteEntriesAuthority()
         {
             EntityTransformMap map = new EntityTransformMap();
-            Transform weapon = CreateTransform(EntityEquipmentSocketKeys.MainHandSocket);
-            Transform runtimeRoot = CreateTransform("RuntimeAttachmentsRoot");
-            Assert.That(map.TrySet(DefaultTransformKey.CustomA, EntityEquipmentSocketKeys.MainHandSocket, weapon, out _), Is.True);
-            Assert.That(map.TrySetDynamic("RuntimeAttachmentsRoot", runtimeRoot, out _), Is.True);
+            Transform initial = CreateTransform("RuntimeSocketA");
+            Transform replacement = CreateTransform("RuntimeSocketB");
 
-            map.ClearDynamicOnlyEntries();
-
-            Assert.That(map.Resolve(DefaultTransformKey.CustomA), Is.SameAs(weapon));
-            Assert.That(map.Resolve(EntityEquipmentSocketKeys.MainHandSocket), Is.SameAs(weapon));
-            Assert.That(map.Resolve("RuntimeAttachmentsRoot"), Is.Null);
-            Assert.That(map.Count, Is.EqualTo(1));
-        }
-
-        [Test]
-        public void DynamicWrites_RejectMissingOrUnnormalizedKeysWithoutMutation()
-        {
-            EntityTransformMap map = new EntityTransformMap();
-            Transform value = CreateTransform("DynamicSocket");
+            Assert.That(map.TrySet("RuntimeSocket", initial, out var addConflict), Is.True, addConflict.ToString());
             int generation = map.Generation;
-
-            Assert.That(map.TrySetDynamic(null, value, out var nullConflict), Is.False);
-            Assert.That(nullConflict.Kind, Is.EqualTo(EntityTransformMap.ConflictKind.MissingKey));
-            Assert.That(map.TrySetDynamic(string.Empty, value, out var emptyConflict), Is.False);
-            Assert.That(emptyConflict.Kind, Is.EqualTo(EntityTransformMap.ConflictKind.MissingKey));
-            Assert.That(map.TrySetDynamic(" invalid ", value, out var whitespaceConflict), Is.False);
-            Assert.That(whitespaceConflict.Kind, Is.EqualTo(EntityTransformMap.ConflictKind.InvalidStringKey));
-
-            Assert.That(map.Generation, Is.EqualTo(generation));
-            Assert.That(map.Count, Is.Zero);
-            Assert.That(map.TryGet(string.Empty, out _), Is.False);
-        }
-
-        [Test]
-        public void InheritedSerializedWrite_CannotCollideWithDynamicAlias()
-        {
-            EntityTransformMap map = new EntityTransformMap();
-            Transform dynamicValue = CreateTransform("DynamicSocket");
-            Transform serializedValue = CreateTransform("SerializedSocket");
-            Assert.That(map.TrySetDynamic("RuntimeSocket", dynamicValue, out _), Is.True);
-
-            var baseMap = (ESEnumStringMirrorMap<DefaultTransformKey, Transform>)map;
-            Assert.That(baseMap.TryAdd("RuntimeSocket", serializedValue, out var conflict), Is.False);
-
-            Assert.That(conflict.Kind, Is.EqualTo(EntityTransformMap.ConflictKind.DuplicateStringKey));
-            Assert.That(map.Resolve("RuntimeSocket"), Is.SameAs(dynamicValue));
-            Assert.That(map.Count, Is.Zero);
-        }
-
-        [Test]
-        public void BatchSerializedWrite_CannotCollideWithDynamicAlias()
-        {
-            EntityTransformMap map = new EntityTransformMap();
-            Transform dynamicValue = CreateTransform("DynamicSocket");
-            Transform serializedValue = CreateTransform("SerializedSocket");
-            Assert.That(map.TrySetDynamic("RuntimeSocket", dynamicValue, out _), Is.True);
-
-            var entries = new List<EntityTransformMap.Entry>
-            {
-                new EntityTransformMap.Entry("RuntimeSocket", serializedValue)
-            };
-            Assert.That(map.TryReplaceEntries(entries, out var conflict), Is.False);
-
-            Assert.That(conflict.Kind, Is.EqualTo(EntityTransformMap.ConflictKind.DuplicateStringKey));
-            Assert.That(map.Resolve("RuntimeSocket"), Is.SameAs(dynamicValue));
-            Assert.That(map.Count, Is.Zero);
-        }
-
-        [Test]
-        public void SerializedSet_AtomicallyPromotesDynamicAlias()
-        {
-            EntityTransformMap map = new EntityTransformMap();
-            Transform dynamicValue = CreateTransform("DynamicSocket");
-            Transform serializedValue = CreateTransform("SerializedSocket");
-            Assert.That(map.TrySetDynamic("RuntimeSocket", dynamicValue, out _), Is.True);
-            int generation = map.Generation;
-
-            Assert.That(map.TrySet("RuntimeSocket", serializedValue, out var conflict), Is.True, conflict.ToString());
-
-            Assert.That(map.Resolve("RuntimeSocket"), Is.SameAs(serializedValue));
             Assert.That(map.Count, Is.EqualTo(1));
+            Assert.That(map.ContainsAlias("RuntimeSocket"), Is.True);
+            Assert.That(map.ContainsKey("RuntimeSocket"), Is.True);
+            Assert.That(map.TryGetValue("RuntimeSocket", out Transform value), Is.True);
+            Assert.That(value, Is.SameAs(initial));
+            Assert.That(map.Resolve("RuntimeSocket"), Is.SameAs(initial));
+
+            Assert.That(map.TrySet("RuntimeSocket", replacement, out var setConflict), Is.True, setConflict.ToString());
             Assert.That(map.Generation, Is.GreaterThan(generation));
-            ((ISerializationCallbackReceiver)map).OnAfterDeserialize();
-            Assert.That(map.Resolve("RuntimeSocket"), Is.SameAs(serializedValue));
-        }
-
-        [Test]
-        public void FailedSerializedPromotion_RestoresDynamicAlias()
-        {
-            EntityTransformMap map = new EntityTransformMap();
-            Transform dynamicValue = CreateTransform("DynamicSocket");
-            Assert.That(map.TrySetDynamic("RuntimeSocket", dynamicValue, out _), Is.True);
-            int generation = map.Generation;
-
-            Assert.That(map.TrySet("RuntimeSocket", null, out var conflict), Is.False);
-
-            Assert.That(conflict.Kind, Is.EqualTo(EntityTransformMap.ConflictKind.NullValue));
-            Assert.That(map.Resolve("RuntimeSocket"), Is.SameAs(dynamicValue));
+            Assert.That(map.Resolve("RuntimeSocket"), Is.SameAs(replacement));
+            Assert.That(map.Remove("RuntimeSocket"), Is.True);
             Assert.That(map.Count, Is.Zero);
-            Assert.That(map.Generation, Is.EqualTo(generation));
-        }
-
-        [Test]
-        public void BaseClear_AlsoClearsDynamicState()
-        {
-            EntityTransformMap map = new EntityTransformMap();
-            Transform dynamicValue = CreateTransform("DynamicSocket");
-            Assert.That(map.TrySetDynamic("RuntimeSocket", dynamicValue, out _), Is.True);
-
-            ((ESEnumStringMirrorMap<DefaultTransformKey, Transform>)map).Clear();
-
             Assert.That(map.Resolve("RuntimeSocket"), Is.Null);
-            Assert.That(map.Count, Is.Zero);
         }
 
         [Test]
@@ -228,17 +134,17 @@ namespace ES.Tests
                 Is.True,
                 conflict.ToString());
 
-            Assert.That(mapping.TransformMappings.IsCreated, Is.True);
-            Assert.That((object)mapping.TransformMappings, Is.TypeOf<EntityTransformMapView>());
+            Assert.That(mapping.TransformMappings, Is.Not.Null);
+            Assert.That(mapping.TransformMappings, Is.TypeOf<EntityTransformMap>());
             Assert.That(mapping.Resolve(DefaultTransformKey.Camera), Is.SameAs(target));
             Assert.That(mapping.Resolve("CameraTarget"), Is.SameAs(target));
         }
 
         [Test]
-        public void ComponentField_IsConcreteAndUsesUnitySerializeField()
+        public void Component_ExposesConcreteInheritedMapAndUsesUnitySerializeField()
         {
             Assert.That(typeof(EntityTransformMap).IsSealed, Is.True);
-            Assert.That(typeof(EntityTransformMap).IsNotPublic, Is.True);
+            Assert.That(typeof(EntityTransformMap).IsPublic, Is.True);
             Assert.That(
                 typeof(EntityTransformMap).BaseType,
                 Is.EqualTo(typeof(ESEnumStringMirrorMap<DefaultTransformKey, Transform>)));
@@ -252,26 +158,28 @@ namespace ES.Tests
             Assert.That(field.IsDefined(typeof(SerializeField), false), Is.True);
             Assert.That(
                 typeof(EntityTransformMapping).GetProperty(nameof(EntityTransformMapping.TransformMappings))?.PropertyType,
-                Is.EqualTo(typeof(EntityTransformMapView)));
-            Assert.That(typeof(EntityTransformMapView).IsValueType, Is.True);
-            Assert.That(typeof(EntityTransformMapView).GetMethod("TrySet"), Is.Null);
-            Assert.That(typeof(EntityTransformMapView).GetMethod("TryAdd"), Is.Null);
-            Assert.That(typeof(EntityTransformMapView).GetMethod("Clear"), Is.Null);
+                Is.EqualTo(typeof(EntityTransformMap)));
             Assert.That(
-                typeof(EntityTransformMapView).GetProperty(
-                    "LastConflict",
-                    BindingFlags.Instance | BindingFlags.Public),
-                Is.Null);
+                typeof(EntityTransformMap).GetProperty(nameof(EntityTransformMap.Generation))?.DeclaringType,
+                Is.EqualTo(typeof(ESEnumStringMirrorMap<DefaultTransformKey, Transform>)));
             Assert.That(
-                typeof(EntityTransformMapView).GetMethod(
-                    "TryGetEntryAt",
-                    BindingFlags.Instance | BindingFlags.Public),
-                Is.Null);
+                typeof(EntityTransformMap).GetMethod(nameof(EntityTransformMap.Clear), System.Type.EmptyTypes)?.DeclaringType,
+                Is.EqualTo(typeof(ESEnumStringMirrorMap<DefaultTransformKey, Transform>)));
             Assert.That(
-                typeof(EntityTransformMapView).GetMethod(
-                    "CopyEntries",
-                    BindingFlags.Instance | BindingFlags.Public),
-                Is.Null);
+                typeof(EntityTransformMap).GetMethod(
+                    nameof(EntityTransformMap.TrySet),
+                    new[]
+                    {
+                        typeof(string),
+                        typeof(Transform),
+                        typeof(EntityTransformMap.Conflict).MakeByRefType()
+                    })?.DeclaringType,
+                Is.EqualTo(typeof(ESEnumStringMirrorMap<DefaultTransformKey, Transform>)));
+            Assert.That(
+                typeof(EntityTransformMap).GetMethod(
+                    nameof(EntityTransformMap.Remove),
+                    new[] { typeof(string) })?.DeclaringType,
+                Is.EqualTo(typeof(ESEnumStringMirrorMap<DefaultTransformKey, Transform>)));
             Assert.That(
                 typeof(EntityTransformMapping).GetMethod(
                     "Set",
@@ -283,15 +191,7 @@ namespace ES.Tests
             Assert.That(
                 typeof(EntityTransformMapping).GetMethod(
                     "SetDynamic",
-                    BindingFlags.Instance | BindingFlags.Public,
-                    null,
-                    new[]
-                    {
-                        typeof(string),
-                        typeof(Transform),
-                        typeof(EntityTransformMap.Conflict).MakeByRefType()
-                    },
-                    null),
+                    BindingFlags.Instance | BindingFlags.Public),
                 Is.Null);
 
             ESEnumStringTableAttribute table = field.GetCustomAttribute<ESEnumStringTableAttribute>();
@@ -358,7 +258,7 @@ namespace ES.Tests
             {
                 EntityTransformMapping reloaded = loaded.GetComponent<EntityTransformMapping>();
                 Assert.That(reloaded, Is.Not.Null);
-                Assert.That((object)reloaded.TransformMappings, Is.TypeOf<EntityTransformMapView>());
+                Assert.That(reloaded.TransformMappings, Is.TypeOf<EntityTransformMap>());
                 Assert.That(reloaded.TransformMappings.IsValid, Is.True);
                 Assert.That(reloaded.TransformMappings.Count, Is.EqualTo(1));
                 Assert.That(reloaded.Resolve(DefaultTransformKey.CustomA), Is.Not.Null);

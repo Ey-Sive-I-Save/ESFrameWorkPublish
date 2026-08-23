@@ -1,0 +1,324 @@
+.observation-root {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+    padding-right: 20px;
+    color: rgb(237, 245, 252);
+}
+
+.observation-panel {
+    width: 610px;
+    height: 944px;
+    flex-shrink: 0;
+    padding-left: 24px;
+    padding-right: 24px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    background-color: rgba(5, 10, 18, 0.985);
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: rgba(45, 93, 117, 0.8);
+    border-right-color: rgba(22, 43, 59, 0.9);
+    border-top-color: rgba(45, 93, 117, 0.8);
+    border-bottom-color: rgba(22, 43, 59, 0.9);
+}
+
+.observation-panel.is-collapsed {
+    height: 96px;
+}
+
+.panel-header {
+    height: 122px;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.eyebrow {
+    height: 20px;
+    color: rgb(42, 190, 224);
+    font-size: 14px;
+    -unity-font-style: bold;
+    letter-spacing: 1px;
+}
+
+.scene-title {
+    height: 34px;
+    margin-top: 2px;
+    color: rgb(238, 246, 253);
+    font-size: 22px;
+    -unity-font-style: bold;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.collapse-button {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 36px;
+    height: 32px;
+    background-color: rgb(16, 42, 57);
+    color: rgb(238, 246, 253);
+    font-size: 18px;
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: rgb(37, 92, 112);
+    border-right-color: rgb(37, 92, 112);
+    border-top-color: rgb(37, 92, 112);
+    border-bottom-color: rgb(37, 92, 112);
+}
+
+.status {
+    height: 54px;
+    margin-top: 8px;
+    color: rgb(164, 183, 201);
+    font-size: 13px;
+    white-space: normal;
+}
+
+.panel-body {
+    flex-grow: 1;
+    min-height: 0;
+}
+
+.observation-panel.is-collapsed .panel-body {
+    display: none;
+}
+
+.divider {
+    height: 1px;
+    margin-bottom: 10px;
+    background-color: rgba(47, 76, 96, 0.8);
+}
+
+.section-heading {
+    height: 30px;
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: center;
+}
+
+.case-heading {
+    position: relative;
+}
+
+.section-title {
+    width: 72px;
+    color: rgb(42, 190, 224);
+    font-size: 15px;
+    -unity-font-style: bold;
+}
+
+.section-subtitle {
+    flex-grow: 1;
+    color: rgb(154, 175, 194);
+    font-size: 12px;
+}
+
+.accent-button {
+    background-color: rgb(20, 86, 105);
+    color: rgb(238, 246, 253);
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: rgb(44, 166, 191);
+    border-right-color: rgb(44, 166, 191);
+    border-top-color: rgb(44, 166, 191);
+    border-bottom-color: rgb(44, 166, 191);
+}
+
+.case-heading .accent-button {
+    width: 166px;
+    flex-shrink: 0;
+}
+
+.case-list {
+    height: 180px;
+    flex-shrink: 0;
+    margin-bottom: 12px;
+    padding: 8px;
+    background-color: rgba(9, 20, 32, 0.98);
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: rgb(25, 52, 70);
+    border-right-color: rgb(25, 52, 70);
+    border-top-color: rgb(25, 52, 70);
+    border-bottom-color: rgb(25, 52, 70);
+}
+
+.case-button,
+.case-button-selected {
+    height: 36px;
+    margin-bottom: 4px;
+    padding-left: 12px;
+    padding-right: 8px;
+    color: rgb(216, 229, 240);
+    font-size: 13px;
+    -unity-text-align: middle-left;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.case-button {
+    background-color: rgb(9, 22, 35);
+}
+
+.case-button-selected {
+    background-color: rgb(18, 78, 96);
+    color: rgb(240, 251, 255);
+    -unity-font-style: bold;
+}
+
+.selected-case {
+    height: 42px;
+    flex-shrink: 0;
+    margin-bottom: 10px;
+    padding-left: 12px;
+    padding-top: 10px;
+    background-color: rgb(16, 38, 52);
+    color: rgb(238, 246, 253);
+    font-size: 16px;
+    -unity-font-style: bold;
+}
+
+.control-list {
+    flex-grow: 1;
+    min-height: 200px;
+    margin-bottom: 12px;
+    padding: 6px;
+    background-color: rgba(9, 20, 32, 0.98);
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: rgb(25, 52, 70);
+    border-right-color: rgb(25, 52, 70);
+    border-top-color: rgb(25, 52, 70);
+    border-bottom-color: rgb(25, 52, 70);
+}
+
+.control-row {
+    min-height: 46px;
+    margin-bottom: 4px;
+    padding-left: 10px;
+    padding-right: 8px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    flex-direction: row;
+    align-items: center;
+    background-color: rgb(7, 18, 29);
+}
+
+.control-label {
+    width: 170px;
+    flex-shrink: 0;
+    color: rgb(224, 235, 244);
+    font-size: 13px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.control-slider,
+.control-popup {
+    flex-grow: 1;
+    min-width: 120px;
+    margin-left: 8px;
+    margin-right: 8px;
+}
+
+.control-value {
+    width: 62px;
+    flex-shrink: 0;
+    color: rgb(42, 190, 224);
+    font-size: 13px;
+    -unity-text-align: middle-right;
+}
+
+.control-reset {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    background-color: rgb(14, 43, 58);
+    color: rgb(205, 239, 248);
+    font-size: 16px;
+}
+
+.toggle-row,
+.action-row,
+.scene-nav {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.toggle-row {
+    height: 34px;
+    margin-bottom: 10px;
+}
+
+.toggle-row .unity-toggle {
+    flex-grow: 1;
+    height: 34px;
+    margin-right: 8px;
+    padding-left: 8px;
+    background-color: rgb(10, 27, 41);
+    color: rgb(224, 235, 244);
+    font-size: 14px;
+}
+
+.action-row {
+    height: 40px;
+    margin-bottom: 10px;
+}
+
+.action-button {
+    flex-grow: 1;
+    height: 40px;
+    margin-right: 8px;
+    background-color: rgb(16, 34, 50);
+    color: rgb(224, 235, 244);
+    font-size: 13px;
+}
+
+.action-button:last-child {
+    margin-right: 0;
+}
+
+.scene-heading {
+    height: 28px;
+}
+
+.scene-nav {
+    height: 30px;
+}
+
+.scene-button {
+    flex-grow: 1;
+    height: 30px;
+    margin-right: 4px;
+    background-color: rgb(16, 34, 50);
+    color: rgb(204, 222, 235);
+    font-size: 12px;
+}
+
+.scene-button:last-child {
+    margin-right: 0;
+}
+
+.scene-button-current {
+    background-color: rgb(18, 78, 96);
+    color: rgb(240, 251, 255);
+    -unity-font-style: bold;
+}

@@ -12,6 +12,7 @@ using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
+using EditorUtility = ES.ESDesignUtility.SafeEditor;
 
 namespace ES
 {
@@ -26,6 +27,8 @@ namespace ES
         Upload = 1 << 4,
         Publish = 1 << 5,
         WriteTemp = 1 << 6,
+        ExternalRead = 1 << 7,
+        ExternalWrite = 1 << 8,
     }
 
     /// <summary>
@@ -114,6 +117,10 @@ namespace ES
         public List<string> writeRoots = new List<string>();
         // 与 JSON Schema 保持字符串数组一致；Flags 只在 C# 受信层按需解析。
         public List<string> capabilities = new List<string>();
+        /// <summary>
+        /// 可选的输入语义指纹。为空时保持旧 TaskContract 兼容；非空时必须与 Facade Descriptor 一致。
+        /// </summary>
+        public string inputSchemaHash = string.Empty;
         public int timeoutSeconds = 600;
         public bool supportsDryRun = true;
         /// <summary>
@@ -121,6 +128,10 @@ namespace ES
         /// </summary>
         public bool supportsRetry;
         public List<string> outputs = new List<string>();
+        public ESAutomationPerformanceBudget performanceBudget;
+        // Optional governance extensions. Kept nullable for legacy Worker compatibility.
+        public ESAutomationAcceptanceCriteria acceptanceCriteria;
+        public ESAutomationCapabilityEnvelope capabilityEnvelope;
 
         public void Validate()
         {
@@ -128,20 +139,78 @@ namespace ES
             if (string.IsNullOrWhiteSpace(taskId) || !Regex.IsMatch(taskId, "^es\\.[a-z0-9]+(?:\\.[a-z0-9-]+)+$")) throw new InvalidOperationException("TaskId 必须符合 es.<domain>.<name> 的稳定命名。");
             if (version < 1 || timeoutSeconds < 1 || timeoutSeconds > MaximumTimeoutSeconds)
                 throw new InvalidOperationException("任务版本和超时必须位于 1–7200 秒范围内。");
+            if (!string.IsNullOrWhiteSpace(inputSchemaHash) && !ESAutomationWorkerRegistration.IsSha256(inputSchemaHash))
+                throw new InvalidOperationException("TaskContract InputSchemaHash 无效。");
             if (worker == null) throw new InvalidOperationException("TaskContract 缺少 Worker 声明。");
             worker.Validate();
-
             ESAutomationCapability resolvedCapabilities = ResolveCapabilities();
+            if (acceptanceCriteria != null) acceptanceCriteria.Validate();
+            if (capabilityEnvelope != null) capabilityEnvelope.Validate();
+            if (performanceBudget != null)
+            {
+                performanceBudget.Validate();
+                if (timeoutSeconds > performanceBudget.maxDurationSeconds)
+                    throw new InvalidOperationException("TaskContract timeout exceeds PerformanceBudget.");
+                if (!supportsRetry && performanceBudget.maxRetryCount != 0)
+                    throw new InvalidOperationException("TaskContract disables retry but PerformanceBudget allows retries.");
+            }
+            if (capabilityEnvelope != null)
+            {
+                if (capabilityEnvelope.taskContract != resolvedCapabilities)
+                    throw new InvalidOperationException("CapabilityEnvelope.taskContract does not match TaskContract capabilities.");
+                if ((capabilityEnvelope.workerCapability & ~resolvedCapabilities) != ESAutomationCapability.None)
+                    throw new InvalidOperationException("CapabilityEnvelope.workerCapability exceeds TaskContract capabilities.");
+                if ((capabilityEnvelope.projectBoundary & ~resolvedCapabilities) != ESAutomationCapability.None)
+                    throw new InvalidOperationException("CapabilityEnvelope.projectBoundary exceeds TaskContract capabilities.");
+            }
+
             if ((resolvedCapabilities & ESAutomationCapability.WriteAssets) != 0)
                 throw new InvalidOperationException("受管 Worker 不得声明 Unity Assets 写权限。");
             if ((resolvedCapabilities & (ESAutomationCapability.Delete | ESAutomationCapability.Upload | ESAutomationCapability.Publish)) != 0)
                 throw new InvalidOperationException("管理骨架阶段禁止注册删除、上传或发布 Worker。");
+            if ((resolvedCapabilities & ESAutomationCapability.ExternalWrite) != 0
+                && (!supportsDryRun || capabilityEnvelope == null))
+                throw new InvalidOperationException("外部写任务必须支持 DryRun 并声明 CapabilityEnvelope。");
             if ((resolvedCapabilities & ESAutomationCapability.ReadArtifacts) != 0 && (readRoots == null || readRoots.Count == 0))
                 throw new InvalidOperationException("ReadArtifacts 任务必须声明 ReadRoots。");
             if ((resolvedCapabilities & (ESAutomationCapability.WriteReports | ESAutomationCapability.WriteTemp)) != 0 && (writeRoots == null || writeRoots.Count == 0))
                 throw new InvalidOperationException("WriteReports 或 WriteTemp 任务必须声明 WriteRoots。");
             foreach (string root in readRoots ?? Enumerable.Empty<string>()) ESAutomationPathPolicy.EnsureDeclaredReadRoot(root);
             foreach (string root in writeRoots ?? Enumerable.Empty<string>()) ESAutomationPathPolicy.EnsureDeclaredWriteRoot(root);
+            ValidateInputDeclarations();
+            ValidateOutputDeclarations();
+        }
+
+        private void ValidateInputDeclarations()
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string input in inputs ?? Enumerable.Empty<string>())
+            {
+                if (string.IsNullOrWhiteSpace(input))
+                    throw new InvalidOperationException("TaskContract inputs 不得包含空声明。");
+                string normalized = input.Replace('\\', '/').Trim();
+                if (Path.IsPathRooted(normalized) || normalized.Contains(":")
+                    || normalized.Split('/').Any(segment => segment == ".."))
+                    throw new InvalidOperationException("TaskContract inputs 必须是受管 Run 目录下的相对输入名：" + input);
+                if (!seen.Add(normalized))
+                    throw new InvalidOperationException("TaskContract inputs 包含重复声明：" + input);
+            }
+        }
+
+        private void ValidateOutputDeclarations()
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string output in outputs ?? Enumerable.Empty<string>())
+            {
+                if (string.IsNullOrWhiteSpace(output))
+                    throw new InvalidOperationException("TaskContract outputs 不得包含空声明。");
+                string normalized = output.Replace('\\', '/').Trim();
+                if (Path.IsPathRooted(normalized) || normalized.Contains(":")
+                    || normalized.Split('/').Any(segment => segment == ".."))
+                    throw new InvalidOperationException("TaskContract outputs 必须是项目 Run 目录内的相对路径：" + output);
+                if (!seen.Add(normalized))
+                    throw new InvalidOperationException("TaskContract outputs 包含重复声明：" + output);
+            }
         }
 
         public ESAutomationCapability ResolveCapabilities()
@@ -160,10 +229,48 @@ namespace ES
                     case "Upload": result |= ESAutomationCapability.Upload; break;
                     case "Publish": result |= ESAutomationCapability.Publish; break;
                     case "WriteTemp": result |= ESAutomationCapability.WriteTemp; break;
+                    case "ExternalRead": result |= ESAutomationCapability.ExternalRead; break;
+                    case "ExternalWrite": result |= ESAutomationCapability.ExternalWrite; break;
                     default: throw new InvalidOperationException("TaskContract 包含未知能力：" + capability);
                 }
             }
             return result;
+        }
+
+        /// <summary>
+        /// 计算不包含本机运行时 enabled 标志的稳定合同摘要，供 ExecutionSnapshot 绑定。
+        /// </summary>
+        public string ComputeStableHash()
+        {
+            Validate();
+            JToken normalized = Canonicalize(JsonConvert.SerializeObject(this, Formatting.None));
+            string canonical = normalized.ToString(Formatting.None);
+            using (SHA256 sha = SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(canonical)))
+                    .Replace("-", string.Empty).ToLowerInvariant();
+        }
+
+        private static JToken Canonicalize(string json)
+        {
+            return CanonicalizeToken(JToken.Parse(json));
+        }
+
+        private static JToken CanonicalizeToken(JToken token)
+        {
+            if (token is JObject obj)
+            {
+                var result = new JObject();
+                foreach (JProperty property in obj.Properties().OrderBy(item => item.Name, StringComparer.Ordinal))
+                    result.Add(property.Name, CanonicalizeToken(property.Value));
+                return result;
+            }
+            if (token is JArray array)
+            {
+                var result = new JArray();
+                foreach (JToken item in array) result.Add(CanonicalizeToken(item));
+                return result;
+            }
+            return token.DeepClone();
         }
     }
 
@@ -190,6 +297,7 @@ namespace ES
         public List<string> acceptedRiskCodes = new List<string>();
         public string status = ESAutomationRunStatus.Created;
         public int exitCode = -1;
+        public int retryCount;
         public string startedAtUtc = string.Empty;
         public string finishedAtUtc = string.Empty;
         public string lastUpdatedAtUtc = string.Empty;
@@ -203,6 +311,11 @@ namespace ES
         public List<string> outputHashes = new List<string>();
         public List<string> findings = new List<string>();
         public List<string> errors = new List<string>();
+        // Optional governance evidence; legacy records may leave these fields null.
+        public string idempotencyKey = string.Empty;
+        public ESAutomationExecutionSnapshot executionSnapshot;
+        public ESAutomationCompletionDecision completionDecision;
+        public ESAutomationTraceReconciliation traceReconciliation;
     }
 
     [Serializable]
@@ -218,6 +331,7 @@ namespace ES
         public string entrypointHash = string.Empty;
         public string status = "Blocked";
         public int exitCode = -1;
+        public int retryCount;
         public string startedAtUtc = string.Empty;
         public string finishedAtUtc = string.Empty;
         public string inputManifestHash = string.Empty;
@@ -225,6 +339,10 @@ namespace ES
         public List<string> outputHashes = new List<string>();
         public List<string> findings = new List<string>();
         public List<string> errors = new List<string>();
+        public string idempotencyKey = string.Empty;
+        public ESAutomationExecutionSnapshot executionSnapshot;
+        public ESAutomationCompletionDecision completionDecision;
+        public ESAutomationTraceReconciliation traceReconciliation;
 
         public void Validate()
         {
@@ -244,8 +362,14 @@ namespace ES
                 throw new InvalidOperationException("RunResult 的状态无效：" + status);
             if (string.IsNullOrWhiteSpace(startedAtUtc) || string.IsNullOrWhiteSpace(finishedAtUtc))
                 throw new InvalidOperationException("RunResult 必须记录开始和结束 UTC 时间。");
-            if (!DateTimeOffset.TryParse(startedAtUtc, out _) || !DateTimeOffset.TryParse(finishedAtUtc, out _))
+            if (!DateTimeOffset.TryParse(startedAtUtc, out DateTimeOffset startedAt)
+                || !DateTimeOffset.TryParse(finishedAtUtc, out DateTimeOffset finishedAt))
                 throw new InvalidOperationException("RunResult 的 UTC 时间格式无效。");
+            if (finishedAt < startedAt) throw new InvalidOperationException("RunResult 的结束时间不能早于开始时间。");
+            if (retryCount < 0) throw new InvalidOperationException("RunResult 的 retryCount 不能为负数。");
+            if (!string.IsNullOrWhiteSpace(idempotencyKey)
+                && (idempotencyKey.Length > 160 || !Regex.IsMatch(idempotencyKey, "^[A-Za-z0-9._:-]+$")))
+                throw new InvalidOperationException("RunResult 的 idempotencyKey 格式无效。");
             if (!ESAutomationWorkerRegistration.IsSha256(inputManifestHash))
                 throw new InvalidOperationException("RunResult 必须记录输入 Manifest SHA-256。");
             if (outputs == null || outputHashes == null || findings == null || errors == null)
@@ -260,7 +384,18 @@ namespace ES
             foreach (string output in outputs)
             {
                 if (string.IsNullOrWhiteSpace(output)) throw new InvalidOperationException("RunResult 包含空输出路径。");
+                string normalizedOutput = output.Replace('\\', '/').Trim();
+                if (normalizedOutput.Split('/').Any(segment => segment == ".."))
+                    throw new InvalidOperationException("RunResult 输出路径不得包含 .. 穿越：" + output);
             }
+            if (executionSnapshot != null) executionSnapshot.Validate();
+            if (completionDecision != null)
+            {
+                completionDecision.Validate();
+                if (!string.Equals(completionDecision.runId, runId, StringComparison.Ordinal))
+                    throw new InvalidOperationException("RunResult 的 CompletionDecision 必须绑定同一 RunId。");
+            }
+            if (traceReconciliation != null) traceReconciliation.Validate();
         }
     }
 
@@ -738,6 +873,18 @@ namespace ES
         public bool TerminationRequested => terminationRequested;
         public bool HasJobObject => processTreeScope != null;
 
+        /// <summary>
+        /// 受管 Worker 的宿主进程 ID，仅用于 RunRecord 观测；进程生命周期仍由本对象统一拥有。
+        /// </summary>
+        public int ProcessId
+        {
+            get
+            {
+                lock (lifecycleSync)
+                    return process == null ? 0 : process.Id;
+            }
+        }
+
         public bool HasExited
         {
             get
@@ -1057,8 +1204,10 @@ namespace ES
         public static void EnsureDeclaredWriteRoot(string root)
         {
             string normalized = Normalize(root);
-            if (!IsWithin(normalized, new[] { ReportsRoot, TempRoot, RunsRoot }))
-                throw new UnauthorizedAccessException("管理骨架阶段的 WriteRoots 只能位于 ES/Automation/Reports、Temp 或 Runs：" + normalized);
+            if (!IsWithin(normalized, new[] { ReportsRoot, TempRoot, RunsRoot,
+                    Path.Combine(ProjectRoot, "Assets", "UI"),
+                    Path.Combine(ProjectRoot, "ES", "UIEvidence") }))
+                throw new UnauthorizedAccessException("WriteRoots 必须位于 ES/Automation/Reports、Temp、Runs、Assets/UI 或 ES/UIEvidence：" + normalized);
         }
 
         private static IEnumerable<string> ProtectedWriteRoots
@@ -1105,10 +1254,61 @@ namespace ES
 
     public static class ESAutomationReportCenter
     {
+        /// <summary>
+        /// 受控读取并验证报告。恢复流程不得直接信任磁盘上的 JSON；路径、UTF-8、RunId
+        /// 目录绑定和协议字段必须全部通过后才返回结果。
+        /// </summary>
+        public static bool TryReadJson(string path, out ESAutomationRunResult result, out string reason)
+        {
+            result = null;
+            reason = string.Empty;
+            try
+            {
+                string normalized = ESAutomationPathPolicy.Normalize(path);
+                ESAutomationPathPolicy.EnsureWorkerReadAllowed(normalized,
+                    new[] { ESAutomationPathPolicy.ReportsRoot });
+                if (!File.Exists(normalized))
+                {
+                    reason = "Automation 报告不存在。";
+                    return false;
+                }
+
+                string runDirectory = Path.GetFileName(Path.GetDirectoryName(normalized));
+                if (!Guid.TryParseExact(runDirectory, "N", out _))
+                {
+                    reason = "Automation 报告目录不是有效 RunId。";
+                    return false;
+                }
+
+                string json = File.ReadAllText(normalized, new UTF8Encoding(false, true));
+                ESAutomationRunResult parsed = JsonConvert.DeserializeObject<ESAutomationRunResult>(json);
+                if (parsed == null)
+                {
+                    reason = "Automation 报告 JSON 为空。";
+                    return false;
+                }
+                parsed.Validate();
+                if (!string.Equals(parsed.runId, runDirectory, StringComparison.Ordinal))
+                {
+                    reason = "Automation 报告 RunId 与目录不一致。";
+                    return false;
+                }
+                result = parsed;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                reason = "Automation 报告读取或协议校验失败：" + exception.Message;
+                return false;
+            }
+        }
+
         public static string WriteJson(ESAutomationRunResult result)
         {
             if (result == null) throw new ArgumentNullException(nameof(result));
             result.Validate();
+            if (result.executionSnapshot != null) result.executionSnapshot.Validate();
+            if (result.completionDecision != null) result.completionDecision.Validate();
 
             string directory = Path.Combine(ESAutomationPathPolicy.ReportsRoot, result.runId);
             string temporaryDirectory = Path.Combine(ESAutomationPathPolicy.TempRoot, result.runId);
@@ -1180,11 +1380,147 @@ namespace ES
                 reason = "Automation 结果的 Worker 身份与受信注册不一致。";
                 return false;
             }
+            if (contract.outputs != null && contract.outputs.Count > 0)
+            {
+                foreach (string output in result.outputs ?? new List<string>())
+                {
+                    if (!IsDeclaredOutput(output, contract.outputs))
+                    {
+                        reason = "Automation 结果包含 TaskContract 未声明的输出：" + output;
+                        return false;
+                    }
+                }
+            }
+            if ((contract.performanceBudget != null || contract.acceptanceCriteria != null)
+                && !TryValidateOutputHashes(result, out string outputHashReason))
+            {
+                reason = "Automation 输出完整性校验失败：" + outputHashReason;
+                return false;
+            }
             if (!string.Equals(result.status, "Passed", StringComparison.OrdinalIgnoreCase)) { reason = "Automation 任务未通过：" + result.status; return false; }
             if (result.exitCode != 0) { reason = "Automation 退出码非 0。"; return false; }
             if (result.errors != null && result.errors.Count > 0) { reason = "Automation 报告包含错误。"; return false; }
+            if (contract.performanceBudget != null
+                && !contract.performanceBudget.TryValidateRunResult(result, out string budgetReason))
+            {
+                reason = "Automation PerformanceBudget 拒绝结果：" + budgetReason;
+                return false;
+            }
+            if (contract.acceptanceCriteria != null
+                && (result.completionDecision == null
+                    || !result.completionDecision.CanAccept(contract.acceptanceCriteria)))
+            {
+                reason = "Automation 缺少有效 CompletionDecision。";
+                return false;
+            }
+            ESAutomationFreshnessPolicy freshness = contract.acceptanceCriteria?.freshnessPolicy;
+            if (freshness?.requireExecutionSnapshotBinding == true && result.executionSnapshot == null)
+            {
+                reason = "严格验收要求 RunResult 携带 ExecutionSnapshot。";
+                return false;
+            }
+            if (freshness?.requireSourceHash == true
+                && result.executionSnapshot != null
+                && !EvidenceBindsToSnapshot(result.completionDecision, result.executionSnapshot,
+                    freshness.requireExecutionSnapshotBinding))
+            {
+                reason = "Automation 验收证据未绑定当前 ExecutionSnapshot 身份与源哈希。";
+                return false;
+            }
             reason = string.Empty;
             return true;
+        }
+
+        internal static bool EvidenceBindsToSnapshot(ESAutomationCompletionDecision decision,
+            ESAutomationExecutionSnapshot snapshot, bool requireFullBinding = false)
+        {
+            if (decision == null || snapshot == null || decision.criterionResults == null
+                || decision.criterionResults.Count == 0)
+                return false;
+            foreach (ESAutomationCriterionResult criterion in decision.criterionResults)
+            {
+                if (criterion == null) return false;
+                try
+                {
+                    criterion.Validate();
+                }
+                catch
+                {
+                    return false;
+                }
+                ESAutomationClaimEvidenceBinding binding = criterion?.evidenceBinding;
+                if (binding == null
+                    || !string.Equals(binding.sourceHash, snapshot.sourceHash, StringComparison.OrdinalIgnoreCase)
+                    || (requireFullBinding && !string.Equals(binding.snapshotId, snapshot.snapshotId, StringComparison.Ordinal)))
+                    return false;
+                if (requireFullBinding
+                    && (string.IsNullOrWhiteSpace(binding.inputManifestHash)
+                        || string.IsNullOrWhiteSpace(binding.taskContractHash)
+                        || string.IsNullOrWhiteSpace(binding.commandHash)
+                        || string.IsNullOrWhiteSpace(binding.brainPlanHash)))
+                    return false;
+                if (!string.IsNullOrWhiteSpace(binding.inputManifestHash)
+                    && !string.Equals(binding.inputManifestHash, snapshot.inputManifestHash, StringComparison.OrdinalIgnoreCase))
+                    return false;
+                if (!string.IsNullOrWhiteSpace(binding.taskContractHash)
+                    && !string.Equals(binding.taskContractHash, snapshot.taskContractHash, StringComparison.OrdinalIgnoreCase))
+                    return false;
+                if (!string.IsNullOrWhiteSpace(binding.commandHash)
+                    && !string.Equals(binding.commandHash, snapshot.commandHash, StringComparison.OrdinalIgnoreCase))
+                    return false;
+                if (!string.IsNullOrWhiteSpace(binding.brainPlanHash)
+                    && !string.Equals(binding.brainPlanHash, snapshot.brainPlanHash, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool TryValidateOutputHashes(ESAutomationRunResult result, out string reason)
+        {
+            reason = string.Empty;
+            if (result.outputs.Count != result.outputHashes.Count)
+            {
+                reason = "输出路径与输出哈希数量不一致。";
+                return false;
+            }
+            for (int index = 0; index < result.outputs.Count; index++)
+            {
+                string path = ESAutomationPerformanceBudget.ResolveGovernedOutputPath(
+                    result.runId, result.outputs[index]);
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    reason = "输出文件不在受管 Reports/Temp Run 目录内：" + result.outputs[index];
+                    return false;
+                }
+                string actual;
+                using (FileStream stream = File.OpenRead(path))
+                using (SHA256 sha = SHA256.Create())
+                    actual = BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", string.Empty).ToLowerInvariant();
+                if (!string.Equals(actual, result.outputHashes[index], StringComparison.OrdinalIgnoreCase))
+                {
+                    reason = "输出文件哈希不一致：" + result.outputs[index];
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        internal static bool IsDeclaredOutput(string output, IEnumerable<string> declarations)
+        {
+            if (string.IsNullOrWhiteSpace(output)) return false;
+            string normalized = output.Replace('\\', '/').Trim();
+            string fileName = Path.GetFileName(normalized);
+            foreach (string declaration in declarations ?? Enumerable.Empty<string>())
+            {
+                if (string.IsNullOrWhiteSpace(declaration)) continue;
+                string declared = declaration.Replace('\\', '/').Trim();
+                bool declarationHasDirectory = declared.IndexOf('/') >= 0;
+                if (string.Equals(normalized, declared, StringComparison.OrdinalIgnoreCase)
+                    || (!declarationHasDirectory
+                        && string.Equals(fileName, Path.GetFileName(declared), StringComparison.OrdinalIgnoreCase)))
+                    return true;
+            }
+            return false;
         }
     }
 
@@ -1199,6 +1535,7 @@ namespace ES
         {
             return new GUIContent("ES 自动化中心", "管理受信自动化任务、Worker、运行记录与 AI 调用授权");
         }
+        public override string ESWindow_PresentationShortTitle => "自动化";
 
         protected override string ESWindow_Subtitle => "受信任务、Worker 与 AI 调用门禁";
         protected override Vector2 ESWindow_MinSize => new Vector2(640f, 520f);
@@ -1307,10 +1644,107 @@ namespace ES
             EditorGUILayout.LabelField("监听状态", ESAutomationAiBridge.IsListening ? "监听中" : "未监听", EditorStyles.wordWrappedMiniLabel);
             EditorGUILayout.LabelField("AI 收件箱", ESAutomationAiBridge.InboxDirectory, EditorStyles.wordWrappedMiniLabel);
             if (GUILayout.Button("复制 AI 调用样例", GUILayout.Height(22f))) CopyAiRequestExample();
+            DrawPendingSceneModificationApprovals();
             }
             finally
             {
                 EditorGUILayout.EndScrollView();
+            }
+        }
+
+        private static void DrawPendingSceneModificationApprovals()
+        {
+            IReadOnlyList<ESAutomationSceneModificationApprovalInfo> approvals =
+                ESAutomationAiBridge.CopyPendingSceneModificationApprovals();
+            if (approvals.Count == 0) return;
+
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField("待批准的 AI 场景计划", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(
+                "待批准容量",
+                approvals.Count + " / " + ESAutomationAiBridge.PendingSceneModificationApprovalCapacity,
+                EditorStyles.wordWrappedMiniLabel);
+            EditorGUILayout.HelpBox(
+                "场景计划必须先由 AI dry-run，再由人工批准一次。批准只允许同一 actor 提交完全相同的计划；切换 PlayMode、关闭 Bridge、域重载、过期或执行一次后都会失效。",
+                MessageType.Warning);
+
+            foreach (ESAutomationSceneModificationApprovalInfo approval in approvals)
+            {
+                JObject plan = approval.CreatePlanData();
+                JArray operations = plan["operations"] as JArray ?? new JArray();
+                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                {
+                    EditorGUILayout.LabelField("计划 ID", EditorStyles.miniLabel);
+                    EditorGUILayout.SelectableLabel(approval.ApprovalId, EditorStyles.textField, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                    EditorGUILayout.LabelField("请求方", approval.ActorId, EditorStyles.wordWrappedMiniLabel);
+                    EditorGUILayout.LabelField("状态", approval.Status, EditorStyles.wordWrappedMiniLabel);
+                    EditorGUILayout.LabelField("场景", (string)plan["scenePath"] ?? string.Empty, EditorStyles.wordWrappedMiniLabel);
+                    EditorGUILayout.LabelField("保存当前场景", (bool?)plan["saveRequested"] == true ? "是" : "否", EditorStyles.wordWrappedMiniLabel);
+                    EditorGUILayout.LabelField("到期", approval.ExpiresAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss"), EditorStyles.wordWrappedMiniLabel);
+                    EditorGUILayout.LabelField("操作数", operations.Count.ToString(), EditorStyles.wordWrappedMiniLabel);
+                    foreach (JToken token in operations)
+                    {
+                        JObject operation = token as JObject;
+                        if (operation == null) continue;
+                        string operationName = (string)operation["operation"] ?? string.Empty;
+                        string targetPath = (string)operation["targetPath"] ?? string.Empty;
+                        string targetGlobalObjectId = (string)operation["targetGlobalObjectId"] ?? string.Empty;
+                        string value = operation["value"]?.ToString(Formatting.None) ?? "null";
+                        EditorGUILayout.LabelField(
+                            operationName + "  " + targetPath + " = " + value,
+                            EditorStyles.wordWrappedMiniLabel);
+                        EditorGUILayout.LabelField("目标身份  " + targetGlobalObjectId, EditorStyles.wordWrappedMiniLabel);
+                    }
+
+                    if (string.Equals(approval.Status, "AwaitingUserApproval", StringComparison.Ordinal))
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            if (GUILayout.Button("批准一次", GUILayout.Height(22f))
+                                && EditorUtility.DisplayDialog(
+                                    "批准 AI 场景计划",
+                                    "将批准当前计划的一次执行权。AI 仍需使用相同计划和新的 RequestId 提交；批准不会立即修改场景。\n\n"
+                                    + "场景：" + ((string)plan["scenePath"] ?? string.Empty)
+                                    + "\n操作数：" + operations.Count,
+                                    "批准一次",
+                                    "取消"))
+                            {
+                                if (ESAutomationAiBridge.TryApproveSceneModification(approval.ApprovalId, out string reason))
+                                    ShowNotification("已批准 AI 场景计划一次。\n" + approval.ApprovalId);
+                                else
+                                    EditorUtility.DisplayDialog("未能批准场景计划", reason, "关闭");
+                            }
+                            if (GUILayout.Button("拒绝计划", GUILayout.Height(22f))
+                                && EditorUtility.DisplayDialog(
+                                    "拒绝 AI 场景计划",
+                                    "拒绝后，该 approvalId 将立即失效，AI 必须重新提交 dry-run 计划。",
+                                    "拒绝计划",
+                                    "取消"))
+                            {
+                                if (ESAutomationAiBridge.TryRejectSceneModification(approval.ApprovalId, out string reason))
+                                    ShowNotification("已拒绝 AI 场景计划。\n" + approval.ApprovalId);
+                                else
+                                    EditorUtility.DisplayDialog("未能拒绝场景计划", reason, "关闭");
+                            }
+                        }
+                    }
+                    else if (string.Equals(approval.Status, "Approved", StringComparison.Ordinal))
+                    {
+                        if (GUILayout.Button("撤销批准", GUILayout.Height(22f))
+                            && EditorUtility.DisplayDialog(
+                                "撤销 AI 场景计划批准",
+                                "撤销后，该 approvalId 不能再执行场景写入。",
+                                "撤销批准",
+                                "取消"))
+                        {
+                            if (ESAutomationAiBridge.TryRevokeSceneModificationApproval(
+                                    approval.ApprovalId, out string reason))
+                                ShowNotification("已撤销 AI 场景计划批准。\n" + approval.ApprovalId);
+                            else
+                                EditorUtility.DisplayDialog("未能撤销场景计划批准", reason, "关闭");
+                        }
+                    }
+                }
             }
         }
 
@@ -1390,6 +1824,935 @@ namespace ES
         {
             SceneView.lastActiveSceneView?.ShowNotification(new GUIContent(message));
             Debug.Log("[ESAutomation] " + message);
+        }
+    }
+
+    /// <summary>
+    /// Optional commercial governance contracts. They extend the existing Automation
+    /// pipeline without changing legacy Worker entry points.
+    /// </summary>
+    public enum ESAutomationEvidenceState
+    {
+        Missing, Fresh, Stale, Contradictory, RuntimeNotRun, Invalid
+    }
+
+    /// <summary>
+    /// 证据来源范围。历史收据没有该字段时默认 Static，保持旧 ES
+    /// Worker 可读取；声明 runtimeRequired 的 Criterion 必须显式提交 Runtime。
+    /// </summary>
+    public enum ESAutomationEvidenceScope
+    {
+        Static,
+        Runtime
+    }
+
+    /// <summary>
+    /// CompletionDecision 的分层语义。它是对既有 Accepted/Blocked 的兼容扩展：
+    /// StaticReviewComplete 只表示静态审查完成，不等价于 Unity/Player 可用。
+    /// </summary>
+    public enum ESAutomationDecisionStatus
+    {
+        Unverified,
+        PartiallyDone,
+        StaticReviewComplete,
+        Accepted,
+        Blocked
+    }
+
+    public enum ESAutomationBlockingLayer
+    {
+        None,
+        StaticCode,
+        StaticContract,
+        StaticBoundary,
+        Evidence,
+        Runtime
+    }
+
+    [Serializable]
+    public sealed class ESAutomationPerformanceBudget
+    {
+        public int maxDurationSeconds;
+        public long maxOutputBytes;
+        public int maxRetryCount;
+        public int maxFindingCount;
+
+        public void Validate()
+        {
+            if (maxDurationSeconds < 1 || maxDurationSeconds > ESAutomationTaskContract.MaximumTimeoutSeconds)
+                throw new InvalidOperationException("PerformanceBudget maxDurationSeconds is outside the TaskContract limit.");
+            if (maxOutputBytes < 1 || maxRetryCount < 0 || maxFindingCount < 0)
+                throw new InvalidOperationException("PerformanceBudget contains an invalid limit.");
+        }
+
+        public bool TryValidateRunResult(ESAutomationRunResult result, out string reason)
+        {
+            reason = string.Empty;
+            Validate();
+            if (result == null)
+            {
+                reason = "RunResult missing.";
+                return false;
+            }
+            if (!DateTimeOffset.TryParse(result.startedAtUtc, out DateTimeOffset started)
+                || !DateTimeOffset.TryParse(result.finishedAtUtc, out DateTimeOffset finished)
+                || finished < started)
+            {
+                reason = "RunResult timestamps are invalid.";
+                return false;
+            }
+            if ((finished - started).TotalSeconds > maxDurationSeconds)
+            {
+                reason = "RunResult exceeded PerformanceBudget maxDurationSeconds.";
+                return false;
+            }
+            if (result.findings != null && result.findings.Count > maxFindingCount)
+            {
+                reason = "RunResult exceeded PerformanceBudget maxFindingCount.";
+                return false;
+            }
+            if (result.retryCount < 0 || result.retryCount > maxRetryCount)
+            {
+                reason = "RunResult exceeded PerformanceBudget maxRetryCount.";
+                return false;
+            }
+            long outputBytes = 0;
+            foreach (string declaredOutput in result.outputs ?? new List<string>())
+            {
+                if (string.IsNullOrWhiteSpace(declaredOutput))
+                {
+                    reason = "RunResult contains an empty output path.";
+                    return false;
+                }
+                string outputPath = ResolveGovernedOutputPath(result.runId, declaredOutput);
+                if (string.IsNullOrWhiteSpace(outputPath) || !File.Exists(outputPath))
+                {
+                    reason = "RunResult output cannot be verified inside the governed Run directory: " + declaredOutput;
+                    return false;
+                }
+                try
+                {
+                    outputBytes = checked(outputBytes + new FileInfo(outputPath).Length);
+                }
+                catch (Exception exception)
+                {
+                    reason = "RunResult output size cannot be read: " + exception.Message;
+                    return false;
+                }
+            }
+            if (outputBytes > maxOutputBytes)
+            {
+                reason = "RunResult exceeded PerformanceBudget maxOutputBytes.";
+                return false;
+            }
+            return true;
+        }
+
+        internal static string ResolveGovernedOutputPath(string runId, string declaredOutput)
+        {
+            if (!Guid.TryParseExact(runId, "N", out _)) return string.Empty;
+            string[] roots =
+            {
+                Path.Combine(ESAutomationPathPolicy.ReportsRoot, runId),
+                Path.Combine(ESAutomationPathPolicy.TempRoot, runId),
+            };
+            foreach (string root in roots)
+            {
+                string candidate;
+                try
+                {
+                    candidate = ESAutomationPathPolicy.Normalize(
+                        Path.IsPathRooted(declaredOutput) ? declaredOutput : Path.Combine(root, declaredOutput));
+                }
+                catch
+                {
+                    continue;
+                }
+                if (ESAutomationPathPolicy.IsWithin(candidate, new[] { root }) && File.Exists(candidate))
+                    return candidate;
+            }
+            return string.Empty;
+        }
+    }
+
+    [Serializable]
+    public sealed class ESAutomationFreshnessPolicy
+    {
+        public int maxAgeHours = 168;
+        public bool requireSourceHash = true;
+        public bool allowRuntimeNotRun = true;
+        /// <summary>严格验收时要求 EvidenceBinding 绑定完整 ExecutionSnapshot；旧合同默认关闭。</summary>
+        public bool requireExecutionSnapshotBinding;
+
+        public void Validate()
+        {
+            if (maxAgeHours < 1 || maxAgeHours > 8760)
+                throw new InvalidOperationException("FreshnessPolicy maxAgeHours is outside the supported range.");
+            if (requireExecutionSnapshotBinding && !requireSourceHash)
+                throw new InvalidOperationException(
+                    "Strict ExecutionSnapshot binding requires requireSourceHash=true.");
+        }
+    }
+
+    [Serializable]
+    public sealed class ESAutomationClaimEvidenceBinding
+    {
+        public string claimId = string.Empty;
+        public string criterionId = string.Empty;
+        public string evidenceHash = string.Empty;
+        public string sourceHash = string.Empty;
+        public string capturedAtUtc = string.Empty;
+        // Optional in protocol v1; required when FreshnessPolicy enables strict snapshot binding.
+        public string snapshotId = string.Empty;
+        public string inputManifestHash = string.Empty;
+        public string taskContractHash = string.Empty;
+        public string commandHash = string.Empty;
+        public string brainPlanHash = string.Empty;
+
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(claimId) || string.IsNullOrWhiteSpace(criterionId))
+                throw new InvalidOperationException("ClaimEvidenceBinding requires claimId and criterionId.");
+            if (!ESAutomationWorkerRegistration.IsSha256(evidenceHash)
+                || !ESAutomationWorkerRegistration.IsSha256(sourceHash))
+                throw new InvalidOperationException("ClaimEvidenceBinding requires evidence and source SHA-256.");
+            if (!DateTimeOffset.TryParse(capturedAtUtc, out _))
+                throw new InvalidOperationException("ClaimEvidenceBinding capturedAtUtc is invalid.");
+            ValidateOptionalHash(inputManifestHash, nameof(inputManifestHash));
+            ValidateOptionalHash(taskContractHash, nameof(taskContractHash));
+            ValidateOptionalHash(commandHash, nameof(commandHash));
+            ValidateOptionalHash(brainPlanHash, nameof(brainPlanHash));
+        }
+
+        private static void ValidateOptionalHash(string value, string name)
+        {
+            if (!string.IsNullOrWhiteSpace(value) && !ESAutomationWorkerRegistration.IsSha256(value))
+                throw new InvalidOperationException("ClaimEvidenceBinding " + name + " must be SHA-256 when provided.");
+        }
+    }
+
+    /// <summary>
+    /// Independent verifier identity registry. A matching string alone is not
+    /// sufficient evidence; the verifier must be registered by the application.
+    /// </summary>
+    public static class ESAutomationVerifierRegistry
+    {
+        private static readonly Dictionary<string, Func<ESAutomationCriterionResult, bool>> Verifiers =
+            new Dictionary<string, Func<ESAutomationCriterionResult, bool>>(StringComparer.Ordinal);
+
+        static ESAutomationVerifierRegistry()
+        {
+            Register("es.scene.scan.promoted-output-hash", IsFreshPassedResult);
+            Register("es.feishu.output-hash", IsFreshPassedResult);
+        }
+
+        public static void Register(string verifierId, Func<ESAutomationCriterionResult, bool> verifier)
+        {
+            if (string.IsNullOrWhiteSpace(verifierId))
+                throw new ArgumentException("VerifierId cannot be empty.", nameof(verifierId));
+            if (verifier == null) throw new ArgumentNullException(nameof(verifier));
+            string key = verifierId.Trim();
+            if (Verifiers.ContainsKey(key))
+                throw new InvalidOperationException("VerifierId is already registered and cannot be replaced: " + key);
+            Verifiers.Add(key, verifier);
+        }
+
+        public static bool IsRegistered(string verifierId)
+            => !string.IsNullOrWhiteSpace(verifierId) && Verifiers.ContainsKey(verifierId.Trim());
+
+        public static bool TryVerify(string verifierId, ESAutomationCriterionResult result, out string reason)
+        {
+            reason = string.Empty;
+            if (!IsRegistered(verifierId))
+            {
+                reason = "Verifier is not registered.";
+                return false;
+            }
+            if (!Verifiers[verifierId.Trim()](result))
+            {
+                reason = "Registered verifier rejected the criterion result.";
+                return false;
+            }
+            return true;
+        }
+
+        public static IReadOnlyCollection<string> RegisteredVerifiers => Verifiers.Keys.ToArray();
+
+        private static bool IsFreshPassedResult(ESAutomationCriterionResult result)
+            => result != null && result.passed
+                && result.evidenceState == ESAutomationEvidenceState.Fresh
+                && ESAutomationWorkerRegistration.IsSha256(result.evidenceHash);
+    }
+
+    [Serializable]
+    public sealed class ESAutomationAcceptanceCriterion
+    {
+        public string criterionId = string.Empty;
+        public string verifierId = string.Empty;
+        public string description = string.Empty;
+        public bool required = true;
+        public bool runtimeRequired;
+        public List<string> forbiddenConditions = new List<string>();
+
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(criterionId) || string.IsNullOrWhiteSpace(verifierId))
+                throw new InvalidOperationException("Acceptance criterion requires criterionId and verifierId.");
+            if ((forbiddenConditions ?? new List<string>()).Any(string.IsNullOrWhiteSpace))
+                throw new InvalidOperationException("Acceptance criterion contains an empty forbidden condition.");
+        }
+    }
+
+    [Serializable]
+    public sealed class ESAutomationAcceptanceCriteria
+    {
+        public int schemaVersion = 1;
+        public List<ESAutomationAcceptanceCriterion> criteria = new List<ESAutomationAcceptanceCriterion>();
+        public ESAutomationFreshnessPolicy freshnessPolicy;
+
+        public void Validate()
+        {
+            if (schemaVersion != 1) throw new InvalidOperationException("Unsupported AcceptanceCriteria schema version.");
+            if (freshnessPolicy != null) freshnessPolicy.Validate();
+            if (criteria == null || criteria.Count == 0)
+                throw new InvalidOperationException("AcceptanceCriteria requires at least one criterion.");
+            if (!criteria.Any(criterion => criterion != null && criterion.required))
+                throw new InvalidOperationException("AcceptanceCriteria requires at least one required criterion.");
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ESAutomationAcceptanceCriterion criterion in criteria ?? new List<ESAutomationAcceptanceCriterion>())
+            {
+                if (criterion == null) throw new InvalidOperationException("AcceptanceCriteria contains a null criterion.");
+                criterion.Validate();
+                if (!ids.Add(criterion.criterionId))
+                    throw new InvalidOperationException("Duplicate acceptance criterion: " + criterion.criterionId);
+            }
+        }
+    }
+
+    [Serializable]
+    public sealed class ESAutomationCapabilityEnvelope
+    {
+        private const ESAutomationCapability KnownCapabilities =
+            ESAutomationCapability.ReadArtifacts
+            | ESAutomationCapability.WriteReports
+            | ESAutomationCapability.WriteAssets
+            | ESAutomationCapability.Delete
+            | ESAutomationCapability.Upload
+            | ESAutomationCapability.Publish
+            | ESAutomationCapability.WriteTemp
+            | ESAutomationCapability.ExternalRead
+            | ESAutomationCapability.ExternalWrite;
+
+        public ESAutomationCapability userAuthorization;
+        public ESAutomationCapability taskContract;
+        public ESAutomationCapability aiCommand;
+        public ESAutomationCapability workerCapability;
+        public ESAutomationCapability projectBoundary;
+
+        public ESAutomationCapability EffectiveCapability()
+            => userAuthorization & taskContract & aiCommand & workerCapability & projectBoundary;
+
+        public bool Allows(ESAutomationCapability requested)
+            => (requested & ~EffectiveCapability()) == ESAutomationCapability.None;
+
+        /// <summary>
+        /// 调用级权限门禁。Envelope 仍是合同的一部分，但不能脱离调用身份单独解释：
+        /// AI 调用必须绑定已签发的 AIBrain PlanHash；人工调用必须带有明确 ActorId，
+        /// 且 userAuthorization 必须覆盖本次实际请求能力。
+        /// </summary>
+        public bool AllowsInvocation(ESAutomationTaskInvocation invocation,
+            ESAutomationCapability requested, out string reason)
+        {
+            reason = string.Empty;
+            try { Validate(); }
+            catch (Exception exception) { reason = exception.Message; return false; }
+            if (invocation == null)
+            {
+                reason = "CapabilityEnvelope 缺少调用身份。";
+                return false;
+            }
+            if (invocation.fromAi)
+            {
+                if (!ESAutomationAiBridge.IsUserAuthorized)
+                {
+                    reason = "AI CapabilityEnvelope 未获得当前用户授权。";
+                    return false;
+                }
+                if (!ESAutomationWorkerRegistration.IsSha256(invocation.brainPlanHash))
+                {
+                    reason = "AI CapabilityEnvelope 缺少有效的 AIBrain PlanHash。";
+                    return false;
+                }
+            }
+            else if (string.IsNullOrWhiteSpace(invocation.actorId))
+            {
+                reason = "人工 CapabilityEnvelope 缺少 ActorId。";
+                return false;
+            }
+            if (!Allows(requested))
+            {
+                reason = "请求能力超出 CapabilityEnvelope 有效权限交集。";
+                return false;
+            }
+            if ((requested & ~userAuthorization) != ESAutomationCapability.None)
+            {
+                reason = "本次请求能力未获得 userAuthorization 覆盖。";
+                return false;
+            }
+            return true;
+        }
+
+        public void Validate()
+        {
+            if ((userAuthorization & ~KnownCapabilities) != ESAutomationCapability.None
+                || (taskContract & ~KnownCapabilities) != ESAutomationCapability.None
+                || (aiCommand & ~KnownCapabilities) != ESAutomationCapability.None
+                || (workerCapability & ~KnownCapabilities) != ESAutomationCapability.None
+                || (projectBoundary & ~KnownCapabilities) != ESAutomationCapability.None)
+                throw new InvalidOperationException("CapabilityEnvelope contains unknown capability bits.");
+            if (EffectiveCapability() != ESAutomationCapability.None
+                && (taskContract == ESAutomationCapability.None || workerCapability == ESAutomationCapability.None))
+                throw new InvalidOperationException("CapabilityEnvelope requires TaskContract and Worker bounds.");
+        }
+    }
+
+    [Serializable]
+    public sealed class ESAutomationExecutionSnapshot
+    {
+        public string snapshotId = string.Empty;
+        public string inputManifestHash = string.Empty;
+        public string sourceHash = string.Empty;
+        public string taskContractHash = string.Empty;
+        public string commandHash = string.Empty;
+        public string brainPlanHash = string.Empty;
+
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(snapshotId)) throw new InvalidOperationException("ExecutionSnapshot requires snapshotId.");
+            ValidateHash(inputManifestHash, nameof(inputManifestHash));
+            ValidateHash(sourceHash, nameof(sourceHash));
+            ValidateHash(taskContractHash, nameof(taskContractHash));
+            ValidateHash(commandHash, nameof(commandHash));
+            ValidateHash(brainPlanHash, nameof(brainPlanHash));
+        }
+
+        private static void ValidateHash(string value, string name)
+        {
+            if (!ESAutomationWorkerRegistration.IsSha256(value))
+                throw new InvalidOperationException("ExecutionSnapshot requires SHA-256 " + name + ".");
+        }
+    }
+
+    [Serializable]
+    public sealed class ESAutomationCriterionResult
+    {
+        public string criterionId = string.Empty;
+        public string verifierId = string.Empty;
+        public bool passed;
+        public ESAutomationEvidenceState evidenceState = ESAutomationEvidenceState.Missing;
+        public ESAutomationEvidenceScope evidenceScope = ESAutomationEvidenceScope.Static;
+        public string evidenceHash = string.Empty;
+        public string message = string.Empty;
+        public ESAutomationClaimEvidenceBinding evidenceBinding;
+
+        /// <summary>
+        /// 统一的 Criterion 收据结构门禁。它只验证字段形状和身份绑定，
+        /// 不替代注册 Verifier 的业务判断，因此不会把静态合同误当成业务通过。
+        /// </summary>
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(criterionId) || string.IsNullOrWhiteSpace(verifierId))
+                throw new InvalidOperationException("CriterionResult requires criterionId and verifierId.");
+            if (!Enum.IsDefined(typeof(ESAutomationEvidenceState), evidenceState))
+                throw new InvalidOperationException("CriterionResult contains an unknown evidence state.");
+            if (!Enum.IsDefined(typeof(ESAutomationEvidenceScope), evidenceScope))
+                throw new InvalidOperationException("CriterionResult contains an unknown evidence scope.");
+            if (passed && !ESAutomationWorkerRegistration.IsSha256(evidenceHash))
+                throw new InvalidOperationException("Passed CriterionResult requires an evidence SHA-256.");
+            if (evidenceBinding != null)
+            {
+                evidenceBinding.Validate();
+                if (!string.Equals(evidenceBinding.criterionId, criterionId, StringComparison.Ordinal)
+                    || !string.Equals(evidenceBinding.evidenceHash, evidenceHash, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("CriterionResult evidence binding does not match the result.");
+            }
+        }
+    }
+
+    [Serializable]
+    public sealed class ESAutomationTraceReconciliation
+    {
+        public string traceId = string.Empty;
+        public int expectedToolCalls;
+        public int observedToolCalls;
+        public int unauthorizedToolCalls;
+        public int duplicateToolCalls;
+        public bool reconciled;
+
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(traceId)) throw new InvalidOperationException("TraceReconciliation requires traceId.");
+            if (expectedToolCalls < 0 || observedToolCalls < 0 || unauthorizedToolCalls < 0 || duplicateToolCalls < 0)
+                throw new InvalidOperationException("TraceReconciliation counters cannot be negative.");
+            if (observedToolCalls < unauthorizedToolCalls)
+                throw new InvalidOperationException("TraceReconciliation unauthorized calls exceed observed calls.");
+        }
+
+        public bool CanAccept()
+            => reconciled && expectedToolCalls == observedToolCalls
+                && unauthorizedToolCalls == 0 && duplicateToolCalls == 0;
+    }
+
+    [Serializable]
+    public sealed class ESAutomationCompletionDecision
+    {
+        public string decisionId = Guid.NewGuid().ToString("N");
+        public string runId = string.Empty;
+        public bool accepted;
+        public string executionStatus = string.Empty;
+        public ESAutomationFreshnessPolicy freshnessPolicy;
+        public List<ESAutomationCriterionResult> criterionResults = new List<ESAutomationCriterionResult>();
+        public List<string> forbiddenConditions = new List<string>();
+        public bool unauthorizedToolCalls;
+        public bool staleEvidence;
+        public bool contradictoryEvidence;
+        public bool sourceDrift;
+        public bool budgetViolation;
+        public bool traceReconciled;
+        public ESAutomationTraceReconciliation traceReconciliation;
+        // 商业级分层状态；旧 Worker 不填充时保持空值并按既有字段判断。
+        public string decisionStatus = string.Empty;
+        public string blockingLayer = string.Empty;
+        public string staticCodeStatus = string.Empty;
+        public string staticContractStatus = string.Empty;
+        public string staticBoundaryStatus = string.Empty;
+        public string evidenceStatus = string.Empty;
+        public string runtimeStatus = string.Empty;
+        public List<string> claimsNotProven = new List<string>();
+        public string nextAction = string.Empty;
+
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(runId)) throw new InvalidOperationException("CompletionDecision requires runId.");
+            if (!Guid.TryParseExact(decisionId, "N", out _))
+                throw new InvalidOperationException("CompletionDecision decisionId must be an N-format GUID.");
+            if (criterionResults == null) criterionResults = new List<ESAutomationCriterionResult>();
+            if (forbiddenConditions == null) forbiddenConditions = new List<string>();
+            if (claimsNotProven == null) claimsNotProven = new List<string>();
+            if (freshnessPolicy != null) freshnessPolicy.Validate();
+            if (traceReconciliation != null) traceReconciliation.Validate();
+            if (!string.IsNullOrWhiteSpace(decisionStatus)
+                && !Enum.IsDefined(typeof(ESAutomationDecisionStatus), decisionStatus))
+                throw new InvalidOperationException("CompletionDecision contains an unknown decisionStatus.");
+            if (!string.IsNullOrWhiteSpace(blockingLayer)
+                && !Enum.IsDefined(typeof(ESAutomationBlockingLayer), BlockingLayerToEnum(blockingLayer)))
+                throw new InvalidOperationException("CompletionDecision contains an unknown blockingLayer.");
+            if (string.Equals(decisionStatus, "Accepted", StringComparison.Ordinal)
+                && !accepted)
+                throw new InvalidOperationException("Accepted CompletionDecision must set accepted=true.");
+            if (string.Equals(decisionStatus, "Blocked", StringComparison.Ordinal)
+                && accepted)
+                throw new InvalidOperationException("Blocked CompletionDecision cannot set accepted=true.");
+            if (accepted
+                && !string.IsNullOrWhiteSpace(decisionStatus)
+                && !string.Equals(decisionStatus, "Accepted", StringComparison.Ordinal))
+                throw new InvalidOperationException("Only an Accepted CompletionDecision may set accepted=true.");
+            if (accepted && !string.Equals(executionStatus, "Passed", StringComparison.Ordinal))
+                throw new InvalidOperationException("Accepted CompletionDecision requires executionStatus=Passed.");
+            if (string.Equals(decisionStatus, "Accepted", StringComparison.Ordinal)
+                && !string.Equals(executionStatus, "Passed", StringComparison.Ordinal))
+                throw new InvalidOperationException("Accepted CompletionDecision requires executionStatus=Passed.");
+            foreach (ESAutomationCriterionResult result in criterionResults)
+            {
+                if (result == null) throw new InvalidOperationException("CompletionDecision contains an invalid Criterion result.");
+                result.Validate();
+            }
+        }
+
+        public bool CanAccept()
+        {
+            return CanAccept(null);
+        }
+
+        /// <summary>
+        /// 对照受信 TaskContract 验收清单判定收据。无参数重载保留旧调用语义；
+        /// 严格发布路径必须传入合同，确保 required Criterion 不能被收据遗漏。
+        /// </summary>
+        public bool CanAccept(ESAutomationAcceptanceCriteria contractCriteria)
+        {
+            try
+            {
+                Validate();
+                if (contractCriteria != null) contractCriteria.Validate();
+            }
+            catch
+            {
+                return false;
+            }
+            if (!string.Equals(executionStatus, "Passed", StringComparison.Ordinal)
+                || criterionResults == null || criterionResults.Count == 0)
+                return false;
+            // A governed acceptance contract opts into the commercial decision
+            // vocabulary. Legacy callers without a contract may still use the
+            // historical boolean-only compatibility path, but a release gate
+            // must never accept an unlabeled decision.
+            if (contractCriteria != null
+                && !string.Equals(decisionStatus, "Accepted", StringComparison.Ordinal))
+                return false;
+            // 新分层字段一旦明确报告静态硬阻断，旧的无参数/兼容入口也不能绕过它。
+            if (string.Equals(decisionStatus, "Blocked", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(staticCodeStatus, "blocked", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(staticContractStatus, "blocked", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(staticBoundaryStatus, "blocked", StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (!string.IsNullOrWhiteSpace(decisionStatus)
+                && !string.Equals(decisionStatus, "Accepted", StringComparison.Ordinal))
+                return false;
+            if (contractCriteria != null)
+            {
+                if (contractCriteria.freshnessPolicy != null
+                    && !HasSameFreshnessPolicy(freshnessPolicy, contractCriteria.freshnessPolicy))
+                    return false;
+                var resultIds = new HashSet<string>(StringComparer.Ordinal);
+                var contractIds = new HashSet<string>(contractCriteria.criteria.Select(item => item.criterionId), StringComparer.Ordinal);
+                foreach (ESAutomationCriterionResult result in criterionResults)
+                {
+                    if (result == null || string.IsNullOrWhiteSpace(result.criterionId)
+                        || !resultIds.Add(result.criterionId)
+                        || !contractIds.Contains(result.criterionId))
+                        return false;
+                }
+                foreach (ESAutomationAcceptanceCriterion criterion in contractCriteria.criteria)
+                {
+                    ESAutomationCriterionResult result = criterionResults.FirstOrDefault(item =>
+                        item != null && string.Equals(item.criterionId, criterion.criterionId, StringComparison.Ordinal));
+                    if (criterion.required && result == null) return false;
+                    if (result != null && !string.Equals(result.verifierId, criterion.verifierId, StringComparison.Ordinal))
+                        return false;
+                    if (result != null && criterion.runtimeRequired
+                        && result.evidenceScope != ESAutomationEvidenceScope.Runtime)
+                        return false;
+                }
+            }
+            return criterionResults.All(result => result != null && result.passed
+                && ESAutomationVerifierRegistry.TryVerify(result.verifierId, result, out _)
+                && (freshnessPolicy == null || !freshnessPolicy.requireSourceHash
+                    || IsValidEvidenceBinding(result, freshnessPolicy))
+                && result.evidenceState == ESAutomationEvidenceState.Fresh)
+                && (forbiddenConditions ?? new List<string>()).Count == 0
+                && !unauthorizedToolCalls && !staleEvidence && !contradictoryEvidence
+                && !sourceDrift && !budgetViolation
+                && (traceReconciliation == null ? traceReconciled : traceReconciliation.CanAccept());
+        }
+
+        /// <summary>
+        /// 根据外部验证器已提交的分层状态生成可解释结论。
+        /// 不执行副作用，也不把静态完成升级为 Runtime Accepted。
+        /// </summary>
+        public void RefreshDecisionSemantics()
+        {
+            if (claimsNotProven == null) claimsNotProven = new List<string>();
+            if (string.IsNullOrWhiteSpace(runtimeStatus)) runtimeStatus = "runtime-not-run";
+            if (string.IsNullOrWhiteSpace(evidenceStatus)) evidenceStatus = "not-evaluated";
+            bool codeBlocked = string.Equals(staticCodeStatus, "blocked", StringComparison.OrdinalIgnoreCase);
+            bool contractBlocked = string.Equals(staticContractStatus, "blocked", StringComparison.OrdinalIgnoreCase);
+            bool boundaryBlocked = string.Equals(staticBoundaryStatus, "blocked", StringComparison.OrdinalIgnoreCase);
+            bool evidencePending = string.Equals(evidenceStatus, "not-evaluated", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(evidenceStatus, "missing", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(evidenceStatus, "stale", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(evidenceStatus, "invalid", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(evidenceStatus, "contradictory", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(evidenceStatus, "missing-or-stale", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(evidenceStatus, "evidence-pending", StringComparison.OrdinalIgnoreCase);
+            bool runtimePending = string.Equals(runtimeStatus, "runtime-not-run", StringComparison.OrdinalIgnoreCase);
+            if (codeBlocked || contractBlocked || boundaryBlocked || unauthorizedToolCalls || sourceDrift || budgetViolation)
+            {
+                accepted = false;
+                decisionStatus = "Blocked";
+                blockingLayer = boundaryBlocked ? "static-boundary" : contractBlocked ? "static-contract" : codeBlocked ? "static-code" : "evidence";
+                return;
+            }
+            // A persisted boolean is not an external acceptance proof. If the
+            // report still has pending evidence/runtime, or lacks criterion
+            // results, clear the compatibility flag before deriving the public
+            // status so an intermediate report can never masquerade as Accepted.
+            if (accepted && (evidencePending || runtimePending
+                || criterionResults == null || criterionResults.Count == 0
+                || (forbiddenConditions ?? new List<string>()).Count > 0
+                || unauthorizedToolCalls || staleEvidence || contradictoryEvidence
+                || sourceDrift || budgetViolation))
+                accepted = false;
+            if (accepted)
+            {
+                decisionStatus = "Accepted";
+                blockingLayer = "none";
+                return;
+            }
+            if (evidencePending)
+            {
+                decisionStatus = "Unverified";
+                blockingLayer = "evidence";
+                return;
+            }
+            if (runtimePending)
+            {
+                decisionStatus = "StaticReviewComplete";
+                blockingLayer = "runtime";
+                return;
+            }
+            decisionStatus = criterionResults != null && criterionResults.Any(item => item != null && item.passed)
+                ? "PartiallyDone" : "Unverified";
+            blockingLayer = "none";
+        }
+
+        private static bool HasSameFreshnessPolicy(ESAutomationFreshnessPolicy actual,
+            ESAutomationFreshnessPolicy expected)
+        {
+            return actual != null && expected != null
+                && actual.maxAgeHours == expected.maxAgeHours
+                && actual.requireSourceHash == expected.requireSourceHash
+                && actual.allowRuntimeNotRun == expected.allowRuntimeNotRun
+                && actual.requireExecutionSnapshotBinding == expected.requireExecutionSnapshotBinding;
+        }
+
+        private static ESAutomationBlockingLayer BlockingLayerToEnum(string value)
+        {
+            switch (value ?? string.Empty)
+            {
+                case "none": return ESAutomationBlockingLayer.None;
+                case "static-code": return ESAutomationBlockingLayer.StaticCode;
+                case "static-contract": return ESAutomationBlockingLayer.StaticContract;
+                case "static-boundary": return ESAutomationBlockingLayer.StaticBoundary;
+                case "evidence": return ESAutomationBlockingLayer.Evidence;
+                case "runtime": return ESAutomationBlockingLayer.Runtime;
+                default: return (ESAutomationBlockingLayer)(-1);
+            }
+        }
+
+        private static bool IsValidEvidenceBinding(ESAutomationCriterionResult result,
+            ESAutomationFreshnessPolicy policy)
+        {
+            ESAutomationClaimEvidenceBinding binding = result?.evidenceBinding;
+            if (binding == null) return false;
+            try
+            {
+                binding.Validate();
+                if (!string.Equals(binding.criterionId, result.criterionId, StringComparison.Ordinal)
+                    || !string.Equals(binding.evidenceHash, result.evidenceHash, StringComparison.OrdinalIgnoreCase))
+                    return false;
+                if (!DateTimeOffset.TryParse(binding.capturedAtUtc, out DateTimeOffset capturedAt)) return false;
+                TimeSpan age = DateTimeOffset.UtcNow - capturedAt.ToUniversalTime();
+                return age >= TimeSpan.Zero && age <= TimeSpan.FromHours(policy.maxAgeHours);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Deterministic helpers used by Facade/Endpoint adapters during migration.
+    /// They are deliberately side-effect free so static replay can exercise them.
+    /// </summary>
+    public static class ESAutomationGovernance
+    {
+        public static bool MatchesTaskContract(ESAutomationTaskContract contract,
+            ESAutomationExecutionSnapshot snapshot, out string reason)
+        {
+            reason = string.Empty;
+            if (contract == null || snapshot == null)
+            {
+                reason = "TaskContract 或 ExecutionSnapshot 缺失。";
+                return false;
+            }
+            try
+            {
+                string actualHash = contract.ComputeStableHash();
+                if (!string.Equals(actualHash, snapshot.taskContractHash,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    reason = "TaskContract Hash 与 ExecutionSnapshot 不一致。";
+                    return false;
+                }
+                return true;
+            }
+            catch (Exception exception)
+            {
+                reason = "TaskContract Hash 无法计算：" + exception.Message;
+                return false;
+            }
+        }
+
+        public static bool MatchesInputManifest(string inputManifestHash,
+            ESAutomationExecutionSnapshot snapshot, out string reason)
+        {
+            reason = string.Empty;
+            if (string.IsNullOrWhiteSpace(inputManifestHash)) return true;
+            if (snapshot == null)
+            {
+                reason = "Invocation 输入 Manifest Hash 缺少 ExecutionSnapshot。";
+                return false;
+            }
+            if (!string.Equals(inputManifestHash, snapshot.inputManifestHash,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                reason = "Invocation 输入 Manifest Hash 与 ExecutionSnapshot 不一致。";
+                return false;
+            }
+            return true;
+        }
+
+        public static string ComputeIdempotencyKey(string taskId, int taskVersion,
+            string inputManifestHash, string brainPlanHash)
+        {
+            string canonical = (taskId ?? string.Empty).Trim() + "|" + taskVersion
+                + "|" + (inputManifestHash ?? string.Empty).Trim().ToLowerInvariant()
+                + "|" + (brainPlanHash ?? string.Empty).Trim().ToLowerInvariant();
+            using (SHA256 sha = SHA256.Create())
+            {
+                byte[] bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(canonical));
+                return BitConverter.ToString(bytes).Replace("-", string.Empty).ToLowerInvariant();
+            }
+        }
+
+        public static bool MatchesSnapshot(ESAutomationExecutionSnapshot expected,
+            ESAutomationExecutionSnapshot actual, out string reason)
+        {
+            reason = string.Empty;
+            if (expected == null || actual == null)
+            {
+                reason = "ExecutionSnapshot missing.";
+                return false;
+            }
+            try
+            {
+                expected.Validate();
+                actual.Validate();
+            }
+            catch (Exception exception)
+            {
+                reason = exception.Message;
+                return false;
+            }
+            if (!string.Equals(expected.snapshotId, actual.snapshotId, StringComparison.Ordinal)
+                || !string.Equals(expected.inputManifestHash, actual.inputManifestHash, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(expected.sourceHash, actual.sourceHash, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(expected.taskContractHash, actual.taskContractHash, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(expected.commandHash, actual.commandHash, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(expected.brainPlanHash, actual.brainPlanHash, StringComparison.OrdinalIgnoreCase))
+            {
+                reason = "ExecutionSnapshot drift detected.";
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Checks whether a RunResult is ready to opt into strict snapshot-bound
+        /// acceptance. This is a migration gate only: it does not enable strict
+        /// mode for legacy producers and it has no side effects.
+        /// </summary>
+        public static bool IsStrictSnapshotBindingReady(ESAutomationTaskContract contract,
+            ESAutomationRunResult result, out string reason)
+        {
+            reason = string.Empty;
+            if (contract == null || result == null)
+            {
+                reason = "Strict snapshot binding requires TaskContract and RunResult.";
+                return false;
+            }
+            if (result.executionSnapshot == null)
+            {
+                reason = "Strict snapshot binding requires RunResult.ExecutionSnapshot.";
+                return false;
+            }
+            try
+            {
+                contract.Validate();
+                result.Validate();
+                if (!MatchesTaskContract(contract, result.executionSnapshot, out reason)) return false;
+                if (!MatchesInputManifest(result.inputManifestHash, result.executionSnapshot, out reason)) return false;
+                if (result.completionDecision == null)
+                {
+                    reason = "Strict snapshot binding requires CompletionDecision.";
+                    return false;
+                }
+                if (!EvidenceBindsToSnapshot(result.completionDecision, result.executionSnapshot, true))
+                {
+                    reason = "Strict snapshot binding requires complete criterion evidence bindings.";
+                    return false;
+                }
+                return true;
+            }
+            catch (Exception exception)
+            {
+                reason = exception.Message;
+                return false;
+            }
+        }
+
+        public static bool TryEvaluateCompletion(ESAutomationAcceptanceCriteria criteria,
+            string runId, string executionStatus, IEnumerable<ESAutomationCriterionResult> results,
+            IEnumerable<string> forbiddenConditions, bool unauthorizedToolCalls,
+            bool sourceDrift, bool traceReconciled, out ESAutomationCompletionDecision decision,
+            out string reason)
+        {
+            decision = new ESAutomationCompletionDecision
+            {
+                runId = runId ?? string.Empty,
+                executionStatus = executionStatus ?? string.Empty,
+                unauthorizedToolCalls = unauthorizedToolCalls,
+                sourceDrift = sourceDrift,
+                traceReconciled = traceReconciled,
+                forbiddenConditions = new List<string>(forbiddenConditions ?? Enumerable.Empty<string>())
+            };
+            reason = string.Empty;
+            try
+            {
+                if (criteria == null) throw new InvalidOperationException("AcceptanceCriteria missing.");
+                criteria.Validate();
+                decision.freshnessPolicy = criteria.freshnessPolicy;
+                decision.Validate();
+                var actual = (results ?? Enumerable.Empty<ESAutomationCriterionResult>())
+                    .Where(item => item != null)
+                    .ToDictionary(item => item.criterionId, StringComparer.Ordinal);
+                foreach (ESAutomationAcceptanceCriterion criterion in criteria.criteria)
+                {
+                    if (!criterion.required) continue;
+                    if (!actual.TryGetValue(criterion.criterionId, out ESAutomationCriterionResult result))
+                    {
+                        decision.criterionResults.Add(new ESAutomationCriterionResult
+                        {
+                            criterionId = criterion.criterionId,
+                            verifierId = criterion.verifierId,
+                            passed = false,
+                            evidenceState = ESAutomationEvidenceState.Missing,
+                            message = "Required criterion result missing."
+                        });
+                        continue;
+                    }
+                    if (!string.Equals(result.verifierId, criterion.verifierId, StringComparison.Ordinal))
+                    {
+                        result.passed = false;
+                        result.evidenceState = ESAutomationEvidenceState.Invalid;
+                        result.message = "Verifier identity mismatch.";
+                    }
+                    decision.criterionResults.Add(result);
+                }
+                // 评估阶段也必须使用合同绑定重载；无参数重载仅为旧观察模式保留，
+                // 不能让 runtimeRequired、Verifier 身份或必需 Criterion 在这里被绕过。
+                decision.accepted = decision.CanAccept(criteria);
+                decision.RefreshDecisionSemantics();
+                if (!decision.accepted) reason = "CompletionDecision conditions are not satisfied.";
+                return decision.accepted;
+            }
+            catch (Exception exception)
+            {
+                reason = exception.Message;
+                decision.accepted = false;
+                return false;
+            }
         }
     }
 }

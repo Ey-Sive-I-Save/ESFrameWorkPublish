@@ -27,6 +27,7 @@
 
 | Route / 范围 | 状态 | 入口 |
 |---|---|---|
+| `runtime-hot-container` | `current`：排序、批处理、辅助工作区、容量复用和低/零 GC 声明的现行 P0 路由。 | `10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_P0_热路径容器预热与稳态GC边界_AI协作警告.md` |
 | `ui-icon-atlas` | `current`：现行 SpriteAtlas 与运行时动态图集分流规则。 | `30_运行时专项（RuntimeOperations）/UI与图集（UIAtlas）/P2_UI图标_SpriteAtlas与运行时动态图集分流_AI协作警告.md` |
 | `runtime-ui-window` | `reserved`：只预留 Runtime UI Window 的规则读取边界，不代表实现、API、AICommand 或默认启用。 | `规则索引（RuleIndex）.md` 的“预留路由”与 `AIWarningsRouteCatalog.json` |
 

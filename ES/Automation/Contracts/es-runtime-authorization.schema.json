@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/runtime-authorization/v1",
+  "title": "ES Runtime Authorization Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "taskId", "planHash", "commandId", "commandHash",
+    "taskContractRef", "taskContractHash", "targetPaths", "issuedAtUtc",
+    "expiresAtUtc", "timeBudgetSeconds", "timeoutSeconds", "stopCondition",
+    "oneTime", "developerApproval"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "taskId": { "type": "string", "minLength": 1 },
+    "planHash": { "$ref": "#/$defs/sha256" },
+    "commandId": { "type": "string", "minLength": 1 },
+    "commandHash": { "$ref": "#/$defs/sha256" },
+    "taskContractRef": {
+      "type": "string", "minLength": 1,
+      "pattern": "^(?![A-Za-z]:)(?!/)(?!\\\\)(?!.*(?:^|[/\\])\\.\\.(?:[/\\]|$)).+$"
+    },
+    "taskContractHash": { "$ref": "#/$defs/sha256" },
+    "targetPaths": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "string", "minLength": 1,
+        "pattern": "^(?![A-Za-z]:)(?!/)(?!\\\\)(?!.*(?:^|[/\\])\\.\\.(?:[/\\]|$)).+$"
+      }
+    },
+    "issuedAtUtc": { "type": "string", "format": "date-time" },
+    "expiresAtUtc": { "type": "string", "format": "date-time" },
+    "timeBudgetSeconds": { "type": "integer", "minimum": 1 },
+    "timeoutSeconds": { "type": "integer", "minimum": 1 },
+    "stopCondition": { "type": "string", "minLength": 1 },
+    "oneTime": { "type": "boolean", "const": true },
+    "developerApproval": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

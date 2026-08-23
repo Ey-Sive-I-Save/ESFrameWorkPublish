@@ -70,6 +70,7 @@ namespace ES
         {
             return new GUIContent("ES 资产包分离", "按资源包分离数据管理资产复制、分类预览和使用选择");
         }
+        public override string ESWindow_PresentationShortTitle => "资产包";
 
         protected override string ESWindow_Subtitle => "资源烘焙、分类预览、使用标记、依赖导出与链路回退";
         protected override Vector2 ESWindow_MinSize => new Vector2(1040f, 640f);
@@ -2401,6 +2402,7 @@ namespace ES
                 record != null ? "预览: " + record.assetName : "资产完整预览",
                 "查看资产包记录、复制链路和分类专属预览");
         }
+        public override string ESWindow_PresentationShortTitle => "预览";
 
         protected override string ESWindow_Subtitle => "资产包记录与完整内容预览";
         protected override Vector2 ESWindow_MinSize => new Vector2(520f, 640f);
@@ -4443,7 +4445,9 @@ namespace ES
                 sharedPreviewAudioPlaying = 0;
             }
 
-            AudioListener[] listeners = UnityEngine.Object.FindObjectsOfType<AudioListener>(true);
+            AudioListener[] listeners = UnityEngine.Object.FindObjectsByType<AudioListener>(
+                FindObjectsInactive.Include,
+                FindObjectsSortMode.InstanceID);
             for (int i = 0; i < listeners.Length; i++)
             {
                 AudioListener candidate = listeners[i];
@@ -8014,23 +8018,23 @@ namespace ES
 
     internal sealed class ESAssetPackageDynamicPreviewPlayer : IDisposable
     {
-        private readonly ESAssetPackagePreviewSceneContext previewContext = new ESAssetPackagePreviewSceneContext(usePreviewScene: false);
-        private GameObject instance;
-        private ParticleSystem[] particleSystems = Array.Empty<ParticleSystem>();
+        private ESEditorParticlePreviewSession particlePreviewSession;
+        private ParticleSystem[] sourceParticleSystems = Array.Empty<ParticleSystem>();
         private UnityEngine.Object source;
-        private bool playing;
         private bool loop = true;
         private float playbackSpeed = 1f;
-        private float currentTime;
         private float duration = 1f;
-        private double lastUpdate;
         private Action repaint;
         private string status = "未播放";
+        private Material fallbackMaterial;
+        private readonly ESEditorPreviewOrbitView previewView = new ESEditorPreviewOrbitView();
+        private readonly ESEditorPreviewIMGUIOrbitInput previewInput = new ESEditorPreviewIMGUIOrbitInput();
+        private bool showOneMeterScaleReference;
 
         public bool CanPreview(UnityEngine.Object asset)
         {
             GameObject go = ESAssetPackagePreviewWorkflow.ResolvePreviewGameObject(asset);
-            return go != null && go.GetComponentsInChildren<ParticleSystem>(true).Length > 0;
+            return go != null && go.GetComponentInChildren<ParticleSystem>(true) != null;
         }
 
         public void DrawDetail(UnityEngine.Object asset, ESAssetPackageBakeData bake, Action repaintOwner)
@@ -8038,90 +8042,281 @@ namespace ES
             if (!CanPreview(asset)) return;
             repaint = repaintOwner;
             EnsureInstance(asset, bake != null ? bake.previewFallbackMaterial : null);
-            if (instance == null) return;
             EditorGUILayout.Space(6);
             using (new EditorGUILayout.VerticalScope(ESAssetPackagePresentation.Surface))
             {
                 EditorGUILayout.LabelField("ES 动态特效预览", ESAssetPackagePresentation.Header);
+                if (particlePreviewSession == null || !particlePreviewSession.IsReady)
+                {
+                    EditorGUILayout.HelpBox(
+                        string.IsNullOrWhiteSpace(status) ? "粒子预览未能创建。" : status,
+                        MessageType.Error);
+                    return;
+                }
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button(playing ? "暂停" : "播放", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(64))) { playing = !playing; status = playing ? "播放中" : "已暂停"; if (playing) RegisterUpdate(); else UnregisterUpdate(); }
+                    if (GUILayout.Button(particlePreviewSession.IsPlaying ? "暂停" : "播放", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(64)))
+                    {
+                        if (particlePreviewSession.IsPlaying)
+                        {
+                            particlePreviewSession.Pause();
+                            status = "已暂停";
+                        }
+                        else
+                        {
+                            particlePreviewSession.SetPlayback(duration, loop, playbackSpeed);
+                            particlePreviewSession.Resume();
+                            status = "播放中";
+                        }
+                    }
                     if (GUILayout.Button("停止", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(64))) Stop();
-                    loop = GUILayout.Toggle(loop, "循环", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(52));
+                    if (GUILayout.Button("推荐视角", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(72)))
+                        ResetPreviewView();
+                    bool nextLoop = GUILayout.Toggle(loop, "循环", ESAssetPackagePresentation.ToolbarButton, GUILayout.Width(52));
+                    if (nextLoop != loop)
+                    {
+                        loop = nextLoop;
+                        particlePreviewSession.SetPlayback(duration, loop, playbackSpeed);
+                    }
+                    bool nextScaleReference = EditorGUILayout.ToggleLeft(
+                        "1m 参照",
+                        showOneMeterScaleReference,
+                        GUILayout.Width(68));
+                    if (nextScaleReference != showOneMeterScaleReference)
+                    {
+                        showOneMeterScaleReference = nextScaleReference;
+                        particlePreviewSession.RenderContext?.SetScaleReferenceVisible(showOneMeterScaleReference);
+                        ResetPreviewView();
+                    }
                     EditorGUILayout.LabelField(status, ESAssetPackagePresentation.Meta);
                 }
+                float currentTime = particlePreviewSession.CurrentTime;
                 float nextTime = EditorGUILayout.Slider("时间", currentTime, 0f, Mathf.Max(0.01f, duration));
-                if (!Mathf.Approximately(nextTime, currentTime)) { currentTime = nextTime; Simulate(currentTime); }
-                playbackSpeed = EditorGUILayout.Slider("速度", playbackSpeed, 0.1f, 3f);
-                Rect rect = GUILayoutUtility.GetRect(480f, 300f, GUILayout.ExpandWidth(true));
-                Bounds bounds = ESEditorPreviewUtility.CalculateBounds(instance);
-                previewContext.Render(rect, bounds.center, Mathf.Max(0.5f, bounds.extents.magnitude), 3f, 180f, 8f, 1f, ESAssetPackagePreviewBaselinePlatform.Desktop, 1d / 60d);
-                EditorGUILayout.LabelField("粒子系统", particleSystems.Length.ToString(), ESAssetPackagePresentation.Meta);
+                if (!Mathf.Approximately(nextTime, currentTime))
+                {
+                    particlePreviewSession.Seek(nextTime);
+                    status = particlePreviewSession.IsPlaying ? "播放中" : "已定位";
+                }
+                float nextSpeed = EditorGUILayout.Slider("速度", playbackSpeed, 0.1f, 3f);
+                if (!Mathf.Approximately(nextSpeed, playbackSpeed))
+                {
+                    playbackSpeed = nextSpeed;
+                    particlePreviewSession.SetPlayback(duration, loop, playbackSpeed);
+                }
+                Rect rect = GUILayoutUtility.GetRect(
+                    420f,
+                    300f,
+                    GUILayout.MinWidth(420f),
+                    GUILayout.MaxWidth(760f));
+                ESEditorPreviewRenderContext context = particlePreviewSession.RenderContext;
+                if (context != null)
+                {
+                    context.SetScaleReferenceVisible(showOneMeterScaleReference);
+                    context.RenderGUI(
+                        rect,
+                        previewView.CreateCameraPose(context),
+                        ESEditorPreviewRenderOptions.Balanced);
+                    DrawParticlePreviewZoomControls(rect, context);
+                    ESEditorPreviewGizmos.DrawAxis(rect, context.Camera);
+                    ESEditorPreviewGizmos.DrawWorldAxes(
+                        rect,
+                        context.Camera,
+                        context.GroupOrigin,
+                        Mathf.Clamp(previewView.Radius * 0.42f, 0.35f, 4f));
+                    // 滚轮在整个预览框都表示缩放；右键/中键仍由底层输入决定轨道和拖拽，
+                    // 不再因顶部工具条高度或布局偏移导致“滚轮失效”。
+                    ESEditorPreviewViewportInputResult inputResult = previewInput.Handle(
+                        rect,
+                        previewView,
+                        requireModifierForWheelZoom: false,
+                        farClipPlane: context.Camera != null ? context.Camera.farClipPlane : 80f);
+                    if (inputResult != ESEditorPreviewViewportInputResult.None)
+                        repaint?.Invoke();
+                    if (!particlePreviewSession.TryCalculateBounds(out _))
+                        GUI.Label(rect, "粒子边界尚未稳定", EditorStyles.centeredGreyMiniLabel);
+                }
+                else
+                {
+                    ESAssetPackagePresentation.DrawPreviewBackground(rect);
+                    GUI.Label(rect, "粒子预览暂时没有可用边界", EditorStyles.centeredGreyMiniLabel);
+                }
+                EditorGUILayout.LabelField("粒子系统", sourceParticleSystems.Length.ToString(), ESAssetPackagePresentation.Meta);
                 EditorGUILayout.LabelField("预计时长", duration.ToString("F2") + " 秒", ESAssetPackagePresentation.Meta);
+                EditorGUILayout.LabelField(
+                    "采样预算",
+                    particlePreviewSession.EffectiveSampleRate.ToString("F0") + " Hz / "
+                    + particlePreviewSession.SourceParticleCapacity.ToString("N0") + " 粒子容量",
+                    ESAssetPackagePresentation.Meta);
+                if (particlePreviewSession.UnresolvedReferenceCount > 0 ||
+                    particlePreviewSession.SkippedComponentCount > 0)
+                {
+                    EditorGUILayout.HelpBox(
+                        "已断开 " + particlePreviewSession.UnresolvedReferenceCount
+                        + " 个外部场景组件引用，并跳过 "
+                        + particlePreviewSession.SkippedComponentCount
+                        + " 个业务脚本或不安全组件。",
+                        MessageType.Warning);
+                }
+            }
+        }
+
+        private void DrawParticlePreviewZoomControls(Rect rect, ESEditorPreviewRenderContext context)
+        {
+            float farClip = context != null && context.Camera != null ? context.Camera.farClipPlane : 80f;
+            Rect zoomOutRect = new Rect(rect.xMax - 164f, rect.y + 7f, 22f, 24f);
+            Rect sliderRect = new Rect(rect.xMax - 132f, rect.y + 11f, 72f, 16f);
+            Rect zoomInRect = new Rect(rect.xMax - 56f, rect.y + 7f, 22f, 24f);
+            float aspect = rect.width / Mathf.Max(1f, rect.height);
+            float cameraDistance = previewView.GetCameraDistance(
+                aspect,
+                context != null && context.Camera != null ? context.Camera.fieldOfView : 30f);
+            GUI.Label(new Rect(rect.xMax - 218f, rect.y + 10f, 58f, 18f),
+                $"缩放 {cameraDistance:0.0}m", EditorStyles.miniLabel);
+            if (GUI.Button(zoomOutRect, new GUIContent("−", "缩小预览"), EditorStyles.miniButton))
+            {
+                previewView.ZoomByFactor(1.18f, farClip);
+                repaint?.Invoke();
+            }
+
+            float normalizedZoom = previewView.GetNormalizedMagnification(farClip);
+            float nextNormalizedZoom = GUI.HorizontalSlider(sliderRect, normalizedZoom, 0f, 1f);
+            if (!Mathf.Approximately(nextNormalizedZoom, normalizedZoom))
+            {
+                previewView.SetNormalizedMagnification(nextNormalizedZoom, farClip);
+                repaint?.Invoke();
+            }
+
+            if (GUI.Button(zoomInRect, new GUIContent("+", "放大预览"), EditorStyles.miniButton))
+            {
+                previewView.ZoomByFactor(0.84f, farClip);
+                repaint?.Invoke();
             }
         }
 
         private void EnsureInstance(UnityEngine.Object asset, Material fallback)
         {
-            if (source == asset && instance != null) return;
+            if (source == asset && particlePreviewSession != null && particlePreviewSession.IsReady) return;
             DisposeInstance();
             GameObject sourceObject = ESAssetPackagePreviewWorkflow.ResolvePreviewGameObject(asset);
             if (sourceObject == null) return;
             source = asset;
-            instance = UnityEngine.Object.Instantiate(sourceObject);
-            previewContext.PreparePreviewObject(instance);
-            instance.transform.position = previewContext.GroupOrigin;
-            instance.transform.rotation = Quaternion.identity;
-            instance.transform.localScale = Vector3.one;
-            foreach (Behaviour behaviour in instance.GetComponentsInChildren<Behaviour>(true))
-                if (!(behaviour is Animator) && !(behaviour is Animation)) behaviour.enabled = false;
-            ESAssetPackagePreviewUtility.ApplyPreviewFallbackMaterials(instance, fallback);
-            particleSystems = instance.GetComponentsInChildren<ParticleSystem>(true);
-            duration = particleSystems.Length == 0 ? 1f : particleSystems.Max(EstimateDuration);
-            currentTime = 0f;
-            Simulate(0f);
+            fallbackMaterial = fallback;
+            sourceParticleSystems = sourceObject.GetComponentsInChildren<ParticleSystem>(true);
+            duration = 1f;
+            for (int i = 0; i < sourceParticleSystems.Length; i++)
+                duration = Mathf.Max(duration, EstimateDuration(sourceParticleSystems[i]));
+
+            particlePreviewSession = new ESEditorParticlePreviewSession(
+                "ES AssetPackage Particle Preview",
+                () => repaint?.Invoke());
+            if (!particlePreviewSession.Rebuild(
+                    new[] { sourceObject },
+                    sourceParticleSystems,
+                    ConfigurePreviewParticleSystem,
+                    12345,
+                    duration,
+                    loop,
+                    out string error))
+            {
+                status = "预览失败: " + error;
+                particlePreviewSession.Dispose();
+                particlePreviewSession = null;
+                return;
+            }
+
+            duration = particlePreviewSession.Duration;
+            particlePreviewSession.SetPlayback(duration, loop, playbackSpeed);
+            particlePreviewSession.PlayFromBeginning();
+            ResetPreviewView();
+            status = "播放中";
+        }
+
+        private void ResetPreviewView()
+        {
+            ESEditorPreviewRenderContext context = particlePreviewSession?.RenderContext;
+            context?.SetScaleReferenceVisible(showOneMeterScaleReference);
+            if (context != null && particlePreviewSession.TryCalculateRepresentativeBounds(out Bounds bounds))
+            {
+                if (showOneMeterScaleReference)
+                {
+                    context.PositionScaleReferenceBesideWorldBounds(bounds);
+                    if (context.TryGetScaleReferenceBounds(out Bounds referenceBounds))
+                        bounds.Encapsulate(referenceBounds);
+                }
+                Vector3 localCenter = context.WorldToPreviewLocalPoint(bounds.center);
+                context.ConfigureGroundPlane(
+                    localCenter,
+                    Mathf.Max(25f, Mathf.Max(bounds.size.x, bounds.size.z) * 1.35f));
+                previewView.FrameRecommendedWorldBounds(context, bounds, 0.65f, 500f);
+            }
+            else
+            {
+                previewView.ResetRecommended(Vector3.zero, 1.6f);
+            }
+            repaint?.Invoke();
         }
 
         private void DisposeInstance()
         {
+            previewInput.Release();
             Stop();
-            if (instance != null)
-                UnityEngine.Object.DestroyImmediate(instance);
-            instance = null;
+            particlePreviewSession?.Dispose();
+            particlePreviewSession = null;
             source = null;
-            particleSystems = Array.Empty<ParticleSystem>();
+            sourceParticleSystems = Array.Empty<ParticleSystem>();
             duration = 1f;
-            currentTime = 0f;
+            fallbackMaterial = null;
         }
 
         private static float EstimateDuration(ParticleSystem system)
         {
             if (system == null) return 1f;
             ParticleSystem.MainModule main = system.main;
-            float life = main.startLifetime.mode == ParticleSystemCurveMode.Constant ? main.startLifetime.constant : 1f;
+            ParticleSystem.MinMaxCurve lifetime = main.startLifetime;
+            float life;
+            switch (lifetime.mode)
+            {
+                case ParticleSystemCurveMode.TwoConstants:
+                    life = lifetime.constantMax;
+                    break;
+                case ParticleSystemCurveMode.Curve:
+                case ParticleSystemCurveMode.TwoCurves:
+                    life = Mathf.Max(0f, lifetime.curveMultiplier);
+                    break;
+                default:
+                    life = lifetime.constant;
+                    break;
+            }
             return Mathf.Max(0.1f, main.duration + life);
         }
 
-        private void Simulate(float time)
+        private void ConfigurePreviewParticleSystem(
+            ParticleSystem sourceSystem,
+            ParticleSystem previewSystem,
+            bool controlled)
         {
-            foreach (ParticleSystem system in particleSystems)
-                if (system != null) system.Simulate(Mathf.Max(0f, time), true, true, true);
-            repaint?.Invoke();
+            if (previewSystem == null || fallbackMaterial == null)
+                return;
+
+            ParticleSystemRenderer renderer = previewSystem.GetComponent<ParticleSystemRenderer>();
+            if (renderer == null)
+                return;
+            if (renderer.sharedMaterial == null)
+                renderer.sharedMaterial = fallbackMaterial;
+            if (renderer.trailMaterial == null && renderer.sharedMaterial != null)
+                renderer.trailMaterial = renderer.sharedMaterial;
         }
 
-        private void RegisterUpdate() { lastUpdate = EditorApplication.timeSinceStartup; EditorApplication.update -= Update; EditorApplication.update += Update; }
-        private void UnregisterUpdate() => EditorApplication.update -= Update;
-        private void Update()
+        private void Stop()
         {
-            if (!playing || instance == null) { UnregisterUpdate(); return; }
-            double now = EditorApplication.timeSinceStartup;
-            currentTime += Mathf.Clamp((float)(now - lastUpdate), 0f, 0.1f) * playbackSpeed;
-            lastUpdate = now;
-            if (currentTime > duration) { if (loop) currentTime = 0f; else { currentTime = duration; playing = false; status = "播放完成"; UnregisterUpdate(); } }
-            Simulate(currentTime);
+            particlePreviewSession?.Stop();
+            status = "已停止";
         }
 
-        private void Stop() { playing = false; currentTime = 0f; status = "已停止"; UnregisterUpdate(); if (instance != null) Simulate(0f); }
-        public void Dispose() { DisposeInstance(); repaint = null; previewContext.Dispose(); }
+        public void Dispose()
+        {
+            DisposeInstance();
+            repaint = null;
+        }
     }
 }

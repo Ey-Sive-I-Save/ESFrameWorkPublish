@@ -4,11 +4,83 @@ using UnityEngine;
 
 namespace ES
 {
+    /// <summary>
+    /// Marks a method whose steady-state execution must satisfy the ES hot-path contract.
+    /// The attribute is an analysis boundary; it does not change runtime dispatch.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method, Inherited = false)]
+    public sealed class ESHotPathAttribute : Attribute
+    {
+    }
+
+    internal static class ESShotColliderOwnerRegistry
+    {
+        private const int InitialColliderCapacity = 1024;
+        private static readonly Dictionary<int, Entity> OwnersByColliderId =
+            new Dictionary<int, Entity>(InitialColliderCapacity);
+
+        internal static void Internal_Register(Entity owner, List<Collider> colliders)
+        {
+            if (owner == null || colliders == null)
+                return;
+
+            for (int index = 0; index < colliders.Count; index++)
+            {
+                Collider collider = colliders[index];
+                if (collider == null)
+                    continue;
+
+                OwnersByColliderId[collider.GetInstanceID()] = owner;
+            }
+        }
+
+        internal static void Internal_Unregister(Entity owner, List<Collider> colliders)
+        {
+            if (owner == null || colliders == null)
+                return;
+
+            for (int index = 0; index < colliders.Count; index++)
+            {
+                Collider collider = colliders[index];
+                if (collider == null)
+                    continue;
+
+                int colliderId = collider.GetInstanceID();
+                if (OwnersByColliderId.TryGetValue(colliderId, out Entity registered)
+                    && registered == owner)
+                    OwnersByColliderId.Remove(colliderId);
+            }
+        }
+
+        [ESHotPath]
+        internal static bool TryResolveEntity(Collider collider, out Entity entity)
+        {
+            entity = null;
+            return collider != null
+                   && OwnersByColliderId.TryGetValue(collider.GetInstanceID(), out entity)
+                   && entity != null;
+        }
+    }
+
+    public static class ESShotHotPathDiagnostics
+    {
+        public static int TagEligibilityFailureCount { get; private set; }
+
+        internal static void Internal_RecordTagEligibilityFailure()
+        {
+            unchecked
+            {
+                TagEligibilityFailureCount++;
+            }
+        }
+    }
+
     public enum ESShotHitDecision : byte
     {
         Ignore = 0,
         Stop = 1,
-        Pierce = 2
+        Pierce = 2,
+        Bounce = 3
     }
 
     public enum ESShotLifecycleKind : byte
@@ -31,6 +103,7 @@ namespace ES
         public readonly Transform target;
         public readonly IESShotHitResolver hitResolver;
         public readonly Action<ESShotLifecycleEvent> lifecycleObserver;
+        public readonly bool publishesAttackFinish;
 
         public ESShotLaunchContext(
             int attackId,
@@ -40,7 +113,8 @@ namespace ES
             EntityPrimaryAttackSelection attackSelection,
             Transform target = null,
             IESShotHitResolver hitResolver = null,
-            Action<ESShotLifecycleEvent> lifecycleObserver = null)
+            Action<ESShotLifecycleEvent> lifecycleObserver = null,
+            bool publishesAttackFinish = true)
         {
             this.attackId = attackId;
             this.owner = owner;
@@ -50,6 +124,7 @@ namespace ES
             this.target = target;
             this.hitResolver = hitResolver;
             this.lifecycleObserver = lifecycleObserver;
+            this.publishesAttackFinish = publishesAttackFinish;
         }
     }
 
@@ -93,6 +168,7 @@ namespace ES
 
         private ESDefaultShotHitResolver() { }
 
+        [ESHotPath]
         public ESShotHitDecision Resolve(
             in ESShotLaunchContext context,
             ItemShotSharedData definition,
@@ -114,8 +190,7 @@ namespace ES
                     ? ESShotHitDecision.Ignore
                     : ESShotHitDecision.Stop;
 
-            Entity target = collider.GetComponentInParent<Entity>();
-            if (target == null)
+            if (!ESShotColliderOwnerRegistry.TryResolveEntity(collider, out Entity target))
                 return blockMode == ShotBlockMode.AnyBlocker
                     ? ESShotHitDecision.Stop
                     : ESShotHitDecision.Ignore;
@@ -126,9 +201,9 @@ namespace ES
                         context.owner,
                         target,
                         out ESHitTagEligibilityResult eligibility,
-                        out string error))
+                        out _))
                 {
-                    Debug.LogError("[ItemShot] Hit Tag eligibility failed: " + error, collider);
+                    ESShotHotPathDiagnostics.Internal_RecordTagEligibilityFailure();
                     return ESShotHitDecision.Ignore;
                 }
                 if (eligibility != ESHitTagEligibilityResult.Allowed)
@@ -138,6 +213,42 @@ namespace ES
             return blockMode == ShotBlockMode.AnyBlocker
                 ? ESShotHitDecision.Stop
                 : ESShotHitDecision.Pierce;
+        }
+    }
+
+    internal readonly struct ESShotPreparedSpawn
+    {
+        internal readonly ESShotRuntimeData runtimeData;
+        internal readonly int runtimeKey;
+        internal readonly ItemShotSharedData definition;
+        internal readonly ESGameObjectPoolModule pool;
+        internal readonly GameObject prefab;
+
+        internal ESShotPreparedSpawn(
+            ESShotRuntimeData runtimeData,
+            int runtimeKey,
+            ItemShotSharedData definition,
+            ESGameObjectPoolModule pool,
+            GameObject prefab)
+        {
+            this.runtimeData = runtimeData;
+            this.runtimeKey = runtimeKey;
+            this.definition = definition;
+            this.pool = pool;
+            this.prefab = prefab;
+        }
+
+        internal bool IsValid => runtimeData != null
+                                 && runtimeKey > 0
+                                 && definition != null
+                                 && pool != null
+                                 && prefab != null;
+
+        internal bool RequiresTarget(in ItemShotVariableData variableData)
+        {
+            return definition.aimMode == ShotAimMode.Target
+                   || definition.aimMode == ShotAimMode.MustHit
+                   || (variableData.forceMustHit && definition.allowMustHit);
         }
     }
 
@@ -152,28 +263,75 @@ namespace ES
             out string error)
         {
             shot = null;
+            if (!Internal_TryPrepareSpawn(shotKey, out ESShotPreparedSpawn prepared, out error))
+                return false;
+
+            ItemShotVariableData variableData = prepared.runtimeData.PreparedDefaultVariableData;
+            if (prepared.RequiresTarget(variableData) && context.target == null)
+            {
+                error = "Target/MustHit Shot 必须提供有效目标。";
+                return false;
+            }
+
+            return Internal_TrySpawnPrepared(
+                prepared,
+                origin,
+                direction,
+                variableData,
+                context,
+                out shot,
+                out error);
+        }
+
+        public static bool TrySpawnWithVariable(
+            ESShotConfigKey shotKey,
+            Vector3 origin,
+            Vector3 direction,
+            in ItemShotVariableData variableData,
+            in ESShotLaunchContext context,
+            out ItemShotModule shot,
+            out string error)
+        {
+            shot = null;
             error = null;
+            if (!variableData.ValidateDefinition(out _))
+            {
+                error = "Shot VariableData 无效。";
+                return false;
+            }
+            if (!Internal_TryPrepareSpawn(shotKey, out ESShotPreparedSpawn prepared, out error))
+                return false;
+            if (prepared.RequiresTarget(variableData) && context.target == null)
+            {
+                error = "Target/MustHit Shot 必须提供有效目标。";
+                return false;
+            }
+
+            return Internal_TrySpawnPrepared(
+                prepared,
+                origin,
+                direction,
+                variableData,
+                context,
+                out shot,
+                out error);
+        }
+
+        [ESHotPath]
+        internal static bool Internal_TryPrepareSpawn(
+            ESShotConfigKey shotKey,
+            out ESShotPreparedSpawn prepared,
+            out string error)
+        {
+            prepared = default;
             if (shotKey == null || !shotKey.IsConfigured
                 || !ESRuntimeDataGameCore.Shots.TryGetRuntimeKey(shotKey, out int runtimeKey)
                 || !ESRuntimeDataGameCore.Shots.TryGet(runtimeKey, out ESShotRuntimeData runtimeData)
                 || runtimeData == null
                 || !runtimeData.Ready
-                || runtimeData.sharedData == null)
+                || runtimeData.PreparedSharedData == null)
             {
                 error = "Shot Key 未解析到可用的 ESShotRuntimeData。";
-                return false;
-            }
-            if (runtimeData.prefabKey == null || !runtimeData.prefabKey.IsConfigured)
-            {
-                error = "Shot RuntimeData 缺少 Prefab Key。";
-                return false;
-            }
-            bool requiresTarget = runtimeData.sharedData.aimMode == ShotAimMode.Target
-                || runtimeData.sharedData.aimMode == ShotAimMode.MustHit
-                || (runtimeData.defaultVariableData.forceMustHit && runtimeData.sharedData.allowMustHit);
-            if (requiresTarget && context.target == null)
-            {
-                error = "Target/MustHit Shot 必须提供有效目标。";
                 return false;
             }
             if (!ESGameManager.TryGetModule(out ESGameObjectPoolModule pool) || pool == null)
@@ -181,11 +339,38 @@ namespace ES
                 error = "GameObject Pool 模块不可用。";
                 return false;
             }
-            if (!ESGameManager.RuntimePrefabAssets.TryAcquireReady(
-                    runtimeData.prefabKey,
-                    out ESAssetConfigPayloadLease<GameObject> prefabLease))
+            if (!runtimeData.TryGetPreparedPrefabIdentity(out ESAssetIdentity prefabIdentity)
+                || !ESAssets.TryGetActivePlanAsset(prefabIdentity, out GameObject prefabAsset))
             {
-                error = "Shot Prefab 尚未由资源计划预热。";
+                error = "Shot Prefab 尚未由 ResourcePlan 预热或不在 ActivePlan 借用表中。";
+                return false;
+            }
+
+            prepared = new ESShotPreparedSpawn(
+                runtimeData,
+                runtimeKey,
+                runtimeData.PreparedSharedData,
+                pool,
+                prefabAsset);
+            error = null;
+            return true;
+        }
+
+        [ESHotPath]
+        internal static bool Internal_TrySpawnPrepared(
+            in ESShotPreparedSpawn prepared,
+            Vector3 origin,
+            Vector3 direction,
+            in ItemShotVariableData variableData,
+            in ESShotLaunchContext context,
+            out ItemShotModule shot,
+            out string error)
+        {
+            shot = null;
+            error = null;
+            if (!prepared.IsValid)
+            {
+                error = "Shot Prepared Spawn 上下文无效。";
                 return false;
             }
 
@@ -193,32 +378,35 @@ namespace ES
             try
             {
                 Vector3 useDirection = direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector3.forward;
-                instance = pool.GetInPool(
-                    prefabLease.Asset,
+                instance = prepared.pool.Internal_GetInPool(
+                    prepared.prefab,
                     origin,
                     Quaternion.LookRotation(useDirection, Vector3.up),
                     null,
                     false,
-                    0f);
+                    0f,
+                    out MonoBehaviour poolRootLifecycle);
                 if (instance == null)
                 {
                     error = "对象池拒绝创建 Shot 实例。";
-                    prefabLease.Dispose();
                     return false;
                 }
 
-                Item item = instance.GetComponent<Item>();
-                shot = item != null ? item.basicDomain?.FindMyModule<ItemShotModule>() : null;
+                Item item = poolRootLifecycle as Item;
+                shot = item != null ? item.Internal_ShotModule : null;
                 if (item == null || shot == null)
                 {
                     error = "Shot Prefab 必须在根节点提供 Item 和 ItemShotModule。";
-                    pool.PushToPool(instance);
-                    prefabLease.Dispose();
+                    prepared.pool.PushToPool(instance);
                     shot = null;
                     return false;
                 }
 
-                shot.Internal_InitializeSpawn(runtimeData, runtimeKey, prefabLease, context);
+                shot.Internal_InitializeSpawn(
+                    prepared.runtimeData,
+                    prepared.runtimeKey,
+                    variableData,
+                    context);
                 bool launched = context.target != null
                     ? shot.LaunchTo(context.target)
                     : shot.Launch(useDirection);
@@ -234,8 +422,7 @@ namespace ES
             {
                 error = exception.Message;
                 if (instance != null)
-                    pool.PushToPool(instance);
-                prefabLease.Dispose();
+                    prepared.pool.PushToPool(instance);
                 shot = null;
                 return false;
             }
@@ -264,6 +451,8 @@ namespace ES
 
     public sealed class ItemShotAlwaysTickPolicy : IItemShotTickPolicy
     {
+        public static readonly ItemShotAlwaysTickPolicy Instance = new ItemShotAlwaysTickPolicy();
+
         public bool ShouldTick(in ShotMotionState state, int frameCount)
         {
             return state.launched;
@@ -273,6 +462,7 @@ namespace ES
     public sealed class ItemShotPhysicsHitSolver : IItemShotHitSolver
     {
         private const int MaximumPhysicsHitCapacity = 256;
+        private const float MinimumFallbackAdvance = 0.001f;
         private RaycastHit[] _hitBuffer;
 
         public bool IsOverflow { get; private set; }
@@ -282,6 +472,7 @@ namespace ES
             EnsureCapacity(capacity);
         }
 
+        [ESHotPath]
         public int Query(in ItemShotHitQuery query, ShotHitCandidate[] results, int maxResults)
         {
             IsOverflow = false;
@@ -292,8 +483,6 @@ namespace ES
             if (maxResults <= 0)
                 return 0;
 
-            EnsureCapacity(maxResults);
-
             Vector3 delta = query.to - query.from;
             float distance = delta.magnitude;
             if (distance <= 0.0001f)
@@ -302,49 +491,53 @@ namespace ES
             LayerMask hitLayers = ESPhysicsLayers.GetShotHitMask(query.hitLayers);
             ESPhysicsQueryModule physicsQuery = ESGameManager.PhysicsQueryModule;
             int count;
-            while (true)
+            if (physicsQuery != null)
             {
-                if (physicsQuery != null)
-                {
-                    count = physicsQuery.ShotCast(
-                        query.from,
-                        query.to,
-                        query.radius,
-                        hitLayers,
-                        _hitBuffer,
-                        query.triggerInteraction);
-                }
-                else if (query.radius > 0.0001f)
-                {
-                    count = Physics.SphereCastNonAlloc(
-                        query.from,
-                        query.radius,
-                        delta / distance,
-                        _hitBuffer,
-                        distance,
-                        hitLayers,
-                        query.triggerInteraction);
-                }
-                else
-                {
-                    count = Physics.RaycastNonAlloc(
-                        query.from,
-                        delta / distance,
-                        _hitBuffer,
-                        distance,
-                        hitLayers,
-                        query.triggerInteraction);
-                }
-                if (count < _hitBuffer.Length || _hitBuffer.Length >= MaximumPhysicsHitCapacity)
-                    break;
-
-                EnsureCapacity(Mathf.Min(_hitBuffer.Length * 2, MaximumPhysicsHitCapacity));
+                count = physicsQuery.ShotCast(
+                    query.from,
+                    query.to,
+                    query.radius,
+                    hitLayers,
+                    _hitBuffer,
+                    query.triggerInteraction);
+            }
+            else if (query.radius > 0.0001f)
+            {
+                count = Physics.SphereCastNonAlloc(
+                    query.from,
+                    query.radius,
+                    delta / distance,
+                    _hitBuffer,
+                    distance,
+                    hitLayers,
+                    query.triggerInteraction);
+            }
+            else
+            {
+                count = Physics.RaycastNonAlloc(
+                    query.from,
+                    delta / distance,
+                    _hitBuffer,
+                    distance,
+                    hitLayers,
+                    query.triggerInteraction);
             }
 
             if (count <= 0)
                 return 0;
 
             IsOverflow = count > maxResults || count >= _hitBuffer.Length;
+            if (count >= _hitBuffer.Length)
+            {
+                return QuerySaturatedNearest(
+                    query,
+                    results,
+                    maxResults,
+                    delta / distance,
+                    distance,
+                    hitLayers);
+            }
+
             Array.Sort(_hitBuffer, 0, count, RaycastHitDistanceComparer.Instance);
             int written = 0;
             for (int i = 0; i < count && written < maxResults; i++)
@@ -365,6 +558,82 @@ namespace ES
             return written;
         }
 
+        [ESHotPath]
+        private static int QuerySaturatedNearest(
+            in ItemShotHitQuery query,
+            ShotHitCandidate[] results,
+            int maxResults,
+            Vector3 direction,
+            float distance,
+            LayerMask hitLayers)
+        {
+            int written = 0;
+            int stepCount = 0;
+            int maximumSteps = Mathf.Min(MaximumPhysicsHitCapacity, Mathf.Max(4, maxResults * 4));
+            float travelled = 0f;
+            Vector3 origin = query.from;
+
+            while (written < maxResults
+                   && stepCount < maximumSteps
+                   && travelled < distance)
+            {
+                float remainingDistance = distance - travelled;
+                bool hasHit = query.radius > 0.0001f
+                    ? Physics.SphereCast(
+                        origin,
+                        query.radius,
+                        direction,
+                        out RaycastHit nearest,
+                        remainingDistance,
+                        hitLayers,
+                        query.triggerInteraction)
+                    : Physics.Raycast(
+                        origin,
+                        direction,
+                        out nearest,
+                        remainingDistance,
+                        hitLayers,
+                        query.triggerInteraction);
+                if (!hasHit)
+                    break;
+
+                stepCount++;
+                Collider collider = nearest.collider;
+                int colliderId = collider != null ? collider.GetInstanceID() : 0;
+                if (colliderId != 0 && !ContainsCollider(results, written, colliderId))
+                {
+                    results[written++] = new ShotHitCandidate
+                    {
+                        collider = collider,
+                        point = nearest.point,
+                        normal = nearest.normal,
+                        incomingVelocity = Vector3.zero,
+                        distance = travelled + nearest.distance,
+                        layer = collider.gameObject.layer,
+                        isTrigger = collider.isTrigger
+                    };
+                }
+
+                float advance = Mathf.Max(MinimumFallbackAdvance, nearest.distance + MinimumFallbackAdvance);
+                travelled += advance;
+                origin += direction * advance;
+            }
+
+            return written;
+        }
+
+        private static bool ContainsCollider(ShotHitCandidate[] results, int count, int colliderId)
+        {
+            for (int index = 0; index < count; index++)
+            {
+                Collider collider = results[index].collider;
+                if (collider != null && collider.GetInstanceID() == colliderId)
+                    return true;
+            }
+
+            return false;
+        }
+
         private sealed class RaycastHitDistanceComparer : IComparer<RaycastHit>
         {
             public static readonly RaycastHitDistanceComparer Instance = new RaycastHitDistanceComparer();
@@ -375,7 +644,7 @@ namespace ES
 
         private void EnsureCapacity(int capacity)
         {
-            int useCapacity = Mathf.Max(1, capacity);
+            int useCapacity = Mathf.Clamp(capacity, 1, MaximumPhysicsHitCapacity);
             if (_hitBuffer == null || _hitBuffer.Length < useCapacity)
                 _hitBuffer = new RaycastHit[useCapacity];
         }
@@ -404,10 +673,99 @@ namespace ES
         [Tooltip("Optional facts the target must satisfy before a hit can resolve, such as 可受击 and not 无敌.")]
         public ESTagConditionConfig targetCondition = new ESTagConditionConfig();
 
+        [NonSerialized] private bool isPrepared;
+        [NonSerialized] private bool hasAttackerCondition;
+        [NonSerialized] private bool hasTargetCondition;
+        [NonSerialized] private ESTagConditionRuntime attackerRuntime;
+        [NonSerialized] private ESTagConditionRuntime targetRuntime;
+
+        public bool IsPrepared => isPrepared;
+
+        public bool TryPrepare(out string error)
+        {
+            isPrepared = false;
+            hasAttackerCondition = attackerCondition != null && !attackerCondition.IsEmpty;
+            hasTargetCondition = targetCondition != null && !targetCondition.IsEmpty;
+            attackerRuntime = default;
+            targetRuntime = default;
+
+            if (hasAttackerCondition
+                && !attackerCondition.TryCompile(out attackerRuntime, out error))
+                return false;
+
+            if (hasTargetCondition
+                && !targetCondition.TryCompile(out targetRuntime, out error))
+                return false;
+
+            error = null;
+            isPrepared = true;
+            return true;
+        }
+
+        internal bool Internal_TryCreatePreparedCopy(
+            out ESHitTagEligibility prepared,
+            out string error)
+        {
+            prepared = null;
+            bool preparedAttacker = attackerCondition != null && !attackerCondition.IsEmpty;
+            bool preparedTarget = targetCondition != null && !targetCondition.IsEmpty;
+            ESTagConditionRuntime compiledAttacker = default;
+            ESTagConditionRuntime compiledTarget = default;
+
+            if (preparedAttacker
+                && !attackerCondition.TryCompile(out compiledAttacker, out error))
+                return false;
+            if (preparedTarget
+                && !targetCondition.TryCompile(out compiledTarget, out error))
+                return false;
+
+            prepared = new ESHitTagEligibility
+            {
+                attackerCondition = new ESTagConditionConfig(),
+                targetCondition = new ESTagConditionConfig(),
+                isPrepared = true,
+                hasAttackerCondition = preparedAttacker,
+                hasTargetCondition = preparedTarget,
+                attackerRuntime = CloneRuntime(compiledAttacker),
+                targetRuntime = CloneRuntime(compiledTarget)
+            };
+            error = null;
+            return true;
+        }
+
+        private static ESTagConditionRuntime CloneRuntime(in ESTagConditionRuntime source)
+        {
+            return new ESTagConditionRuntime
+            {
+                RequiredHotMask = source.RequiredHotMask,
+                RequiredAnyHotMask = source.RequiredAnyHotMask,
+                ForbiddenHotMask = source.ForbiddenHotMask,
+                RequiredSparse = source.RequiredSparse != null
+                    ? (int[])source.RequiredSparse.Clone()
+                    : null,
+                RequiredAnySparse = source.RequiredAnySparse != null
+                    ? (int[])source.RequiredAnySparse.Clone()
+                    : null,
+                ForbiddenSparse = source.ForbiddenSparse != null
+                    ? (int[])source.ForbiddenSparse.Clone()
+                    : null,
+                SchemaHash = source.SchemaHash,
+                RuntimeLayoutHash = source.RuntimeLayoutHash
+            };
+        }
+
+        [ESHotPath]
         public bool TryAllows(Entity attacker, Entity target, out ESHitTagEligibilityResult result, out string error)
         {
             error = null;
-            if (attackerCondition != null && !attackerCondition.IsEmpty)
+            if (!isPrepared)
+            {
+                result = ESHitTagEligibilityResult.AttackerTagDenied;
+                error = "Hit Tag eligibility was not prepared before entering the hit hot path.";
+                return false;
+            }
+
+            if (hasAttackerCondition)
             {
                 if (attacker == null)
                 {
@@ -415,7 +773,7 @@ namespace ES
                     return true;
                 }
 
-                if (!attacker.Tags.TryMatches(attackerCondition, out bool attackerMatches, out error))
+                if (!attacker.Tags.TryMatches(attackerRuntime, out bool attackerMatches, out error))
                 {
                     result = ESHitTagEligibilityResult.AttackerTagDenied;
                     return false;
@@ -428,7 +786,7 @@ namespace ES
                 }
             }
 
-            if (targetCondition != null && !targetCondition.IsEmpty)
+            if (hasTargetCondition)
             {
                 if (target == null)
                 {
@@ -436,7 +794,7 @@ namespace ES
                     return true;
                 }
 
-                if (!target.Tags.TryMatches(targetCondition, out bool targetMatches, out error))
+                if (!target.Tags.TryMatches(targetRuntime, out bool targetMatches, out error))
                 {
                     result = ESHitTagEligibilityResult.TargetTagDenied;
                     return false;

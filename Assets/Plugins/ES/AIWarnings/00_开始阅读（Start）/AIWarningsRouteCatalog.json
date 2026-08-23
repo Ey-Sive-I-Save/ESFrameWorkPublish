@@ -4,6 +4,25 @@
   "description": "Machine-readable projection of selected AIWarnings routes. RuleIndex remains the human-readable routing authority during migration.",
   "routes": [
     {
+      "id": "runtime-hot-container",
+      "state": "current",
+      "match": [
+        "排序 筛选 去重 重排 批处理 索引映射",
+        "辅助工作区 临时缓存 候选副本 快照",
+        "容器预热 容量扩展 稳定复用",
+        "性能对比 分配 低GC 零GC 0GC",
+        "sorting filtering deduplication batch processing",
+        "temporary workspace scratch buffer snapshot",
+        "container warmup capacity reuse",
+        "performance comparison",
+        "allocation low GC zero GC"
+      ],
+      "mustRead": [
+        "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_P0_热路径容器预热与稳态GC边界_AI协作警告.md",
+        "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/项目最高警告_P0_AI交付声明与责任契约_AI协作警告.md"
+      ]
+    },
+    {
       "id": "ui-icon-atlas",
       "state": "current",
       "match": [

@@ -10,7 +10,7 @@ param(
 
     [string]$TaskKey = '',
 
-    [string]$ResponsibilityKey = 'engineering-acceptance',
+    [string]$ResponsibilityKey = '',
 
     [string]$TabTitle = '',
 
@@ -100,14 +100,15 @@ $archiveId = Get-ArchiveId $archiveFullPath
 $sourceSessionId = Get-SessionId $sessionFullPath
 if ($TaskKey -eq '') { $TaskKey = 'handoff-' + $archiveId }
 if ($TaskKey -notmatch '^[A-Za-z0-9._:-]{1,128}$') { throw "TaskKey 不是安全稳定标识：$TaskKey" }
-if ($ResponsibilityKey -notmatch '^[A-Za-z0-9._:-]{1,128}$') { throw "ResponsibilityKey 不是安全稳定标识：$ResponsibilityKey" }
+if (-not [string]::IsNullOrWhiteSpace($ResponsibilityKey) -and $ResponsibilityKey -notmatch '^[A-Za-z0-9._:-]{1,128}$') { throw "ResponsibilityKey 不是安全稳定标识：$ResponsibilityKey" }
 
 $coverageTool = Join-Path $projectRoot 'ES\AI协作历程（Codex）\Tools\Test-ESCodexTimelineCoverage.ps1'
+$responsibilityAssessmentTool = Join-Path $projectRoot '.agents\skills\es-codex-session-bootstrap\scripts\Get-ESCodexResponsibilityAssessment.ps1'
 $launcher = Join-Path $projectRoot '.agents\skills\es-codex-session-bootstrap\scripts\Start-ESCodexSession.ps1'
 $bootstrapSkill = Join-Path $projectRoot '.agents\skills\es-codex-session-bootstrap\SKILL.md'
 $currentStatus = Join-Path $projectRoot 'Assets\Plugins\ES\AIWarnings\00_开始阅读（Start）\当前状态（CurrentStatus）.md'
 $ruleIndex = Join-Path $projectRoot 'Assets\Plugins\ES\AIWarnings\00_开始阅读（Start）\规则索引（RuleIndex）.md'
-foreach ($required in @($coverageTool, $launcher, $bootstrapSkill, $currentStatus, $ruleIndex)) {
+foreach ($required in @($coverageTool, $responsibilityAssessmentTool, $launcher, $bootstrapSkill, $currentStatus, $ruleIndex)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "交接链路缺少必需入口：$required" }
 }
 
@@ -116,6 +117,20 @@ $coverageText = ($coverageOutput | ForEach-Object { [string]$_ }) -join "`n"
 try { $coverageResult = $coverageText | ConvertFrom-Json }
 catch { throw "历程覆盖校验没有返回合法结果；拒绝启动新窗口。" }
 if (-not [bool]$coverageResult.Passed) { throw "历程覆盖校验失败；拒绝启动新窗口。" }
+
+$assessmentOutput = @(& $responsibilityAssessmentTool -ArchivePath $archiveFullPath -ResponsibilityKey $ResponsibilityKey 2>&1)
+$assessmentText = ($assessmentOutput | ForEach-Object { [string]$_ }) -join "`n"
+try { $responsibilityAssessment = $assessmentText | ConvertFrom-Json }
+catch { throw '职责评估没有返回合法结果；拒绝启动新窗口。' }
+if ([string]$responsibilityAssessment.status -ne 'assessed') {
+    throw "交接档案的职责主题不明确（状态=$([string]$responsibilityAssessment.status)，置信度=$([string]$responsibilityAssessment.confidence)）；拒绝猜测，请缩小档案或明确职责范围。"
+}
+if ([string]::IsNullOrWhiteSpace($ResponsibilityKey)) {
+    $ResponsibilityKey = [string]$responsibilityAssessment.recommendedResponsibilityKey
+}
+if (-not [bool]$responsibilityAssessment.requestedMatchesRecommendation) {
+    throw "ResponsibilityKey '$ResponsibilityKey' 与完整历史主职责 '$([string]$responsibilityAssessment.recommendedResponsibilityKey)' 不匹配；请按职责评估结果重新交接。"
+}
 
 $handoffPaths = [Collections.Generic.List[string]]::new()
 foreach ($path in @($archiveFullPath, $bootstrapSkill, $currentStatus, $ruleIndex) + @($AdditionalHandoffPath)) {
@@ -137,11 +152,31 @@ $common = @{
     ResponsibilityKey = $ResponsibilityKey
     TerminalMode = $TerminalMode
     HandoffPath = [string[]]$handoffPaths.ToArray()
+    HandoffMode = $true
+}
+$handoffAuthorization = [Guid]::NewGuid().ToString('N')
+$common.HandoffAuthorization = $handoffAuthorization
+
+function Invoke-HandoffAuthorized([scriptblock]$Invocation, [string]$Authorization, [hashtable]$Arguments = $null) {
+    $previous = [string]$env:ES_CODEX_HANDOFF_AUTHORIZATION
+    $env:ES_CODEX_HANDOFF_AUTHORIZATION = $Authorization
+    try {
+        if ($null -eq $Arguments) { & $Invocation }
+        else { & $Invocation $Arguments }
+    }
+    finally {
+        if ([string]::IsNullOrWhiteSpace($previous)) {
+            Remove-Item Env:ES_CODEX_HANDOFF_AUTHORIZATION -ErrorAction SilentlyContinue
+        }
+        else { $env:ES_CODEX_HANDOFF_AUTHORIZATION = $previous }
+    }
 }
 if ($TabTitle -ne '') { $common.TabTitle = $TabTitle }
 if ($ForceNew) { $common.ForceNew = $true }
 
-$validationOutput = @(& $launcher -Mode Validate -ProjectPath $projectRoot -TaskPrompt $TaskPrompt -TaskKey $TaskKey -ResponsibilityKey $ResponsibilityKey -TerminalMode $TerminalMode -HandoffPath ([string[]]$handoffPaths.ToArray()) -DryRun 2>&1)
+$validationOutput = @(Invoke-HandoffAuthorized {
+    & $launcher -Mode Validate -ProjectPath $projectRoot -TaskPrompt $TaskPrompt -TaskKey $TaskKey -ResponsibilityKey $ResponsibilityKey -TerminalMode $TerminalMode -HandoffPath ([string[]]$handoffPaths.ToArray()) -HandoffMode -HandoffAuthorization $handoffAuthorization -DryRun 2>&1
+} $handoffAuthorization)
 $validation = @($validationOutput | Where-Object { $_.PSObject.Properties.Name -contains 'requiredPathsValid' } | Select-Object -Last 1)[0]
 if ($null -eq $validation -or -not [bool]$validation.requiredPathsValid) { throw "Session Bootstrap Validate 失败。" }
 
@@ -152,6 +187,12 @@ if (-not $OpenNew -or $DryRun) {
         sourceSessionId = $sourceSessionId
         taskKey = $TaskKey
         responsibilityKey = $ResponsibilityKey
+        responsibilityAssessment = [ordered]@{
+            status = [string]$responsibilityAssessment.status
+            recommendedResponsibilityKey = [string]$responsibilityAssessment.recommendedResponsibilityKey
+            confidence = [double]$responsibilityAssessment.confidence
+            nodeCount = [int]$responsibilityAssessment.nodeCount
+        }
         handoffFiles = @($handoffPaths)
         openNewRequired = $true
         closeSourceSupported = $true
@@ -161,7 +202,19 @@ if (-not $OpenNew -or $DryRun) {
     return
 }
 
-$launchOutput = & $launcher @common
+$previousLaunchAuthorization = [string]$env:ES_CODEX_HANDOFF_AUTHORIZATION
+$env:ES_CODEX_HANDOFF_AUTHORIZATION = $handoffAuthorization
+try {
+    # Keep the argument splat in this script scope so every handoff snapshot
+    # reaches Start-ESCodexSession.ps1 on the real launch path.
+    $launchOutput = & $launcher @common
+}
+finally {
+    if ([string]::IsNullOrWhiteSpace($previousLaunchAuthorization)) {
+        Remove-Item Env:ES_CODEX_HANDOFF_AUTHORIZATION -ErrorAction SilentlyContinue
+    }
+    else { $env:ES_CODEX_HANDOFF_AUTHORIZATION = $previousLaunchAuthorization }
+}
 $launchResult = @($launchOutput | Where-Object { $_.PSObject.Properties.Name -contains 'launchPhase' } | Select-Object -Last 1)[0]
 if ($null -eq $launchResult) { throw 'Session Bootstrap 未返回结构化启动结果。' }
 
@@ -189,6 +242,10 @@ $receipt = [ordered]@{
     archiveSha256 = Get-Sha256 $archiveFullPath
     taskKey = $TaskKey
     responsibilityKey = $ResponsibilityKey
+    responsibilityAssessmentStatus = [string]$responsibilityAssessment.status
+    responsibilityAssessmentKey = [string]$responsibilityAssessment.recommendedResponsibilityKey
+    responsibilityAssessmentConfidence = [double]$responsibilityAssessment.confidence
+    responsibilityAssessmentNodeCount = [int]$responsibilityAssessment.nodeCount
     targetSessionId = [string]$launchResult.sessionId
     launchToken = [string]$launchResult.launchToken
     envelopePath = [string]$launchResult.envelopePath

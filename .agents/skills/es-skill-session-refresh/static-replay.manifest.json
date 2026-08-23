@@ -3,7 +3,7 @@
   "skillName": "es-skill-session-refresh",
   "sourceRoots": [".agents/skills/es-skill-session-refresh"],
   "cases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "hash-change-cache-invalidation", "interruption-recovery", "deterministic-output"],
-  "staticClaims": ["skill-metadata-diff", "route-index-drift", "resource-hash-drift", "natural-language-refresh-routing", "deterministic-replay", "bounded-read"],
+  "staticClaims": ["skill-metadata-diff", "route-index-drift", "resource-hash-drift", "lifecycle-scoped-discovery", "natural-language-refresh-routing", "deterministic-replay", "bounded-read"],
   "runtimeClaimsNotProven": ["Unity/editor behavior", "model comprehension", "external process behavior"],
   "runtimeEscalation": {"required": false, "reason": "The Skill only compares project metadata and hashes."},
   "caseAssertions": {
@@ -22,7 +22,7 @@
     "id": "skill-session-incremental-discovery",
     "title": "Incremental Skill discovery and session invalidation",
     "requiredStaticCases": ["snapshot-identity", "metadata-delta", "resource-delta", "unrelated-change", "replan-on-bound-change"],
-    "evidenceArtifacts": ["SKILL.md", "references/session-refresh-contract.md", "scripts/Invoke-ESSkillSessionRefresh.ps1"],
+    "evidenceArtifacts": ["SKILL.md", "references/session-refresh-contract.md", "scripts/Invoke-ESSkillSessionRefresh.ps1", "../../SKILL_DISCOVERY_POLICY.json", "../../SKILL_REGISTRY.manifest.json"],
     "sourceAssertions": ["baseline", "currentSnapshotHash", "changes", "invalidatedBindings", "read-selected"],
     "runtimeBoundary": "Static checks prove metadata drift detection, not AI comprehension or execution success."
   },

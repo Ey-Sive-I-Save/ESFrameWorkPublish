@@ -64,6 +64,29 @@ def display_name(skill_dir: Path, name: str) -> str:
     return name
 
 
+def discovery_eligibility(policy: dict[str, object], maturity: str, delivery: str,
+                          registration_state: str) -> dict[str, object]:
+    states = policy.get("states", {})
+    state = states.get(maturity)
+    if not isinstance(state, dict):
+        raise ValueError(f"maturity is not registered in SKILL_DISCOVERY_POLICY.json: {maturity}")
+    result = {
+        "discoveryState": state.get("discoveryState", ""),
+        "planEligibility": state.get("planEligibility", ""),
+        "runtimeEligibility": state.get("runtimeEligibility", ""),
+    }
+    override = (policy.get("deliveryOverrides", {}) or {}).get(delivery)
+    if isinstance(override, dict):
+        for field in ("discoveryState", "planEligibility", "runtimeEligibility"):
+            if override.get(field):
+                result[field] = override[field]
+    registration = (policy.get("registrationOverrides", {}) or {}).get(registration_state)
+    result["reviewRequired"] = True if not isinstance(registration, dict) else bool(registration.get("reviewRequired", True))
+    if any(not result[field] for field in ("discoveryState", "planEligibility", "runtimeEligibility")):
+        raise ValueError(f"incomplete discovery policy result for {maturity}/{delivery}")
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project-root", required=True)
@@ -75,6 +98,10 @@ def main() -> int:
         parser.error("--write is required; catalog registration is an explicit write")
     skills_root = root / ".agents" / "skills"
     resource_index = root / ".agents" / "SKILL_RESOURCE_INDEX.yaml"
+    discovery_policy_path = root / ".agents" / "SKILL_DISCOVERY_POLICY.json"
+    if not discovery_policy_path.exists():
+        raise ValueError(f"Missing discovery policy: {discovery_policy_path}")
+    discovery_policy = yaml.safe_load(discovery_policy_path.read_text(encoding="utf-8")) or {}
     catalog_path = (root / args.catalog).resolve()
     mappings = parse_resource_index(resource_index)
     old = {}
@@ -97,6 +124,11 @@ def main() -> int:
         maturity = str(gov.get("maturity", "Draft" if is_draft else "Proposed"))
         delivery = str(gov.get("delivery", "NotReady" if is_draft else "Designed"))
         state = "Draft" if is_draft else ("Archived" if maturity == "Archived" else ("NeedsReview" if delivery != "Accepted" and delivery != "Released" else "Registered"))
+        registration_state = previous.get("registrationState", state)
+        eligibility = discovery_eligibility(discovery_policy, maturity, delivery, registration_state) if not is_draft else {
+            "discoveryState": "candidate", "planEligibility": "advisory-only",
+            "runtimeEligibility": "blocked", "reviewRequired": True,
+        }
         records.append({
             "name": name,
             "displayName": display_name(skill_dir, name),
@@ -107,7 +139,8 @@ def main() -> int:
             "tier": gov.get("tier", "Workflow"),
             "maturity": maturity,
             "delivery": delivery,
-            "registrationState": previous.get("registrationState", state),
+            "registrationState": registration_state,
+            **eligibility,
             "evidenceLevel": gov.get("evidenceLevel", "S0"),
             "riskClass": gov.get("riskClass", "unspecified"),
             "owner": gov.get("owner", "ESFramework Skill maintainers"),
@@ -127,6 +160,8 @@ def main() -> int:
         "purpose": "Classify and track lifecycle of direct-child project Skills; never grants execution permission.",
         "sourceRoot": ".agents/skills",
         "resourceIndex": ".agents/SKILL_RESOURCE_INDEX.yaml",
+        "discoveryPolicy": ".agents/SKILL_DISCOVERY_POLICY.json",
+        "registryManifest": ".agents/SKILL_REGISTRY.manifest.json",
         "registrationRule": "Every direct Skill root with SKILL.md must have exactly one catalog record before acceptance.",
         "hashRule": "skillHash and governanceHash detect stale registration; refresh the record after every Skill change.",
         "generatedAtUtc": now,

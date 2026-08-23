@@ -1,0 +1,14 @@
+{
+  "protocolVersion": 1,
+  "taskId": "es.feishu.task.monitor",
+  "taskVersion": 1,
+  "runId": "11111111111111111111111111111111",
+  "workerType": "Other",
+  "workerId": "es.feishu.task.node",
+  "workerVersion": "0.1.0",
+  "entrypointHash": "6eeeb41b0feecd36f38bc1d24453aafcc00a0aa5325dba25af741e12a17fc88b",
+  "inputSchemaHash": "e9752b11191b19f155e36629e5fefcfb3ad8900a854f94057d3d980d57c28345",
+  "dryRun": true,
+  "operation": "tasklist-list",
+  "input": { "operation": "tasklist-list", "pageSize": 20 }
+}

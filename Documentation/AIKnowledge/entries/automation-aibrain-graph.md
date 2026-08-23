@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.automation-aibrain-graph.v1`  
 `Authority`: `Source + AIWarnings`  
 `RouteKeys`: `automation`, `aibrain`, `task-contract`, `worker`, `run-record`, `graph`, `skill`, `aicommand`, `mcp`  
-`ContentHash`: `9e951bc911e25d4fb6a092f29474d9051672048fced39d6f932d22546854c047`
+`ContentHash`: `ca9f4bd1416a528ee739601ce4a0f880cb1df0a7c8db0577c6d4a90827e6c1d3`
 
 ## 分层职责
 
@@ -66,8 +66,8 @@ Graph 是工作流的确定性表示，不是权限来源；每个 Task 节点�
 - `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md` (`8213b590650bbca456ce77f2545419e695ae736d979cfc03de08d17728c01cdf`)
 - `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs` (`d1027d9905a34bc9c10215df61150eb1f4bfbb71c33fd5f83b90e9956aac296e`)
 - `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationFacade.cs` (`7f38d24a53d8f2e382821085c8d711d6fd6ba086d0493bd7d33fb355cf2d12bd`)
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`5dedd6837210742df5fc4dd252ff7153a5b63e99a936f7b601819d5dd6aec205`)
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationAiBridge.cs` (`71d48b7f46fd6068a76193fa6e158c79836594aa5d9e33d69d736032224e0062`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`9735b55bf6b2df8758050f2b84b053aabc0438ddf633c3c61ba43e4d684349d9`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationAiBridge.cs` (`42ce9f445dee210e9ff788ae20680f1b8ba5b2dda94da5d6060630d2a72441c5`)
 - `Assets/Plugins/ES/Editor/ESAutomation/ESAgentGraphAutomationEndpoint.cs` (`0bc253ebba46f4deb28cc4820677ee02a7233a070d57b682bbe91242640fd13c`)
 - `Assets/Plugins/ES/Editor/ESGraphViewV2/ESAISkillExecutionWorkflow.cs` (`7b17d81c0dc4bbf04d2e91df2c8e47e46c9b811de622dfef03c7f408476a192e`)
 

@@ -5,9 +5,11 @@ authority: derived-navigation
 purpose: Classify and track lifecycle of direct-child project Skills; never grants execution permission.
 sourceRoot: .agents/skills
 resourceIndex: .agents/SKILL_RESOURCE_INDEX.yaml
+discoveryPolicy: .agents/SKILL_DISCOVERY_POLICY.json
+registryManifest: .agents/SKILL_REGISTRY.manifest.json
 registrationRule: Every direct Skill root with SKILL.md must have exactly one catalog record before acceptance.
 hashRule: skillHash and governanceHash detect stale registration; refresh the record after every Skill change.
-generatedAtUtc: '2026-08-23T11:28:51Z'
+generatedAtUtc: '2026-08-23T11:53:38Z'
 skills:
   es-adversarial-review:
     name: es-adversarial-review
@@ -24,6 +26,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-adversarial-review maintainers
@@ -51,6 +57,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: knowledge-authority
     owner: ESFramework AIKnowledge maintainers
@@ -78,6 +88,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: aibrain-routing
     owner: ESFramework AIBrain maintainers
@@ -104,6 +118,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: task-authorization
     owner: ESFramework AICommand maintainers
@@ -131,6 +149,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: governance-rule
     owner: ESFramework AIWarnings maintainers
@@ -157,6 +179,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: api-compatibility
     owner: ESFramework API maintainers
@@ -184,6 +210,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: automation-worker
     owner: ESFramework Automation maintainers
@@ -210,6 +240,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: change-governance
     owner: ESFramework engineering maintainers
@@ -235,6 +269,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-codex-session-bootstrap maintainers
@@ -260,6 +298,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-command-authoring maintainers
@@ -286,6 +328,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: dependency-boundary
     owner: ESFramework architecture maintainers
@@ -317,6 +363,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: editor-availability-validation
     owner: ESFramework editor tooling maintainers
@@ -342,6 +392,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-editor-tooling maintainers
@@ -367,6 +421,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-entity-authoring maintainers
@@ -394,6 +452,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: entity-prefab
     owner: ESFramework Entity maintainers
@@ -416,6 +478,10 @@ skills:
     - dry-run
     - knowledge-search
     - document-pull
+    - task-monitor
+    - task-dispatch
+    - task-transition
+    - virtual-team
     - credential
     - evidence
     mcp:
@@ -424,15 +490,19 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
-    riskClass: external-read-adapter
+    riskClass: external-collaboration-adapter
     owner: ESFramework Automation maintainers
     acceptanceOwner: Feishu integration owner
     firstRegisteredUtc: '2026-08-23T07:59:55Z'
-    lastModifiedUtc: '2026-08-23T08:10:56Z'
+    lastModifiedUtc: '2026-08-23T11:44:34Z'
     lastReviewedUtc: '2026-08-23T07:59:55Z'
-    skillHash: ee065dd00cf7381404dbd7846f81ded69d32640ad795b7abb03dfde29ad7e229
-    governanceHash: a504eb9e5797ee655b45e8a56f1191182fef71b087447d55685d1776c5fc3d4c
+    skillHash: 4834f3b28f5db28ba523c93980eeec0f4711b8efc6a321ca690ff789562e184b
+    governanceHash: f17006e709c8fdaa731bbc1a6597e354061c60f15290be9c46c94cd7f30f75ef
     statusNote: Initial registration; static and runtime acceptance remain unverified
   es-first-principles-analysis:
     name: es-first-principles-analysis
@@ -449,6 +519,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-first-principles-analysis maintainers
@@ -474,6 +548,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-fix-compile-error maintainers
@@ -500,6 +578,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: gamecore-identity
     owner: ESFramework GameCore maintainers
@@ -525,6 +607,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-gamecore-integration maintainers
@@ -550,6 +636,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-generate-agent-artifacts maintainers
@@ -575,6 +665,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-input-action maintainers
@@ -604,6 +698,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: knowledge-authority
     owner: ESFramework AIKnowledge maintainers
@@ -630,6 +728,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: migration
     owner: ESFramework migration maintainers
@@ -655,6 +757,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-module-lifecycle maintainers
@@ -681,6 +787,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: observability
     owner: ESFramework automation maintainers
@@ -708,6 +818,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: performance-evidence
     owner: ESFramework performance maintainers
@@ -734,6 +848,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-publish-aitest-prompt maintainers
@@ -762,6 +880,10 @@ skills:
     maturity: Verifying
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: release-evidence
     owner: ESFramework release maintainers
@@ -788,6 +910,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: release-communication
     owner: ESFramework release documentation maintainers
@@ -814,6 +940,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: repository-scope
     owner: ESFramework engineering maintainers
@@ -839,6 +969,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-resource-pipeline maintainers
@@ -866,6 +1000,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: resource-release
     owner: ESFramework resource maintainers
@@ -893,6 +1031,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: input-security
     owner: ESFramework security maintainers
@@ -920,12 +1062,16 @@ skills:
     maturity: Verifying
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: skill-authoring
     owner: ESFramework Skill maintainers
     acceptanceOwner: designated ESFramework maintainer
     firstRegisteredUtc: '2026-08-22T01:05:22Z'
-    lastModifiedUtc: '2026-08-23T07:57:39Z'
+    lastModifiedUtc: '2026-08-23T11:53:23Z'
     lastReviewedUtc: '2026-08-22T01:05:22Z'
     skillHash: 0ebf058edef8179061ff9215b2c989357c7b89bccd43735a7af1c6d6c1ad259a
     governanceHash: c21cd92044d256af1ad32b12c03d2a69235731a58749ea9215b1656c2f6a1cc1
@@ -956,14 +1102,18 @@ skills:
     maturity: Verifying
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: governance
     owner: ESFramework AI governance maintainers
     acceptanceOwner: task requester or designated ESFramework maintainer
     firstRegisteredUtc: '2026-08-22T01:05:22Z'
-    lastModifiedUtc: '2026-08-23T09:59:05Z'
+    lastModifiedUtc: '2026-08-23T11:52:01Z'
     lastReviewedUtc: '2026-08-22T01:05:22Z'
-    skillHash: bec209f4476b87ceb7ee14fa50edc394e5cc1cc45ab3949495d2cbcc08670e05
+    skillHash: a255d84986b1f24127d00de90d61bb419b1f10d0b6edb308d08ad8b7ccf67399
     governanceHash: f13e9e0f74fd861970aecec77f3a44190785322734037b90c26065c83f699330
     statusNote: Initial catalog registration
   es-skill-session-refresh:
@@ -990,14 +1140,18 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: session-capability-drift
     owner: ESFramework AI governance maintainers
     acceptanceOwner: ESFramework acceptance owner
     firstRegisteredUtc: '2026-08-23T07:57:45Z'
-    lastModifiedUtc: '2026-08-23T08:52:16Z'
+    lastModifiedUtc: '2026-08-23T11:50:06Z'
     lastReviewedUtc: '2026-08-23T07:57:45Z'
-    skillHash: 2eebecf99aec9151f186e123c6a55572e6c2752072fd29a759442edd03a502ed
+    skillHash: 18d878c62d2ce3e49ef8d5133ed8fcb7efc760b11168bafe502e964d3f7dec0b
     governanceHash: 503b3e7da4abd56b95a29acc2cb356c5687119cd29351ca4fb0174b2a681d011
     statusNote: Initial catalog registration
   es-skill-validator:
@@ -1018,14 +1172,18 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: skill-validation
     owner: ESFramework Skill governance maintainers
     acceptanceOwner: designated ESFramework maintainer
     firstRegisteredUtc: '2026-08-22T01:22:58Z'
-    lastModifiedUtc: '2026-08-23T10:01:41Z'
+    lastModifiedUtc: '2026-08-23T11:49:08Z'
     lastReviewedUtc: '2026-08-22T01:22:58Z'
-    skillHash: 2884292200d9085269fb590731a63a59cdffa5af27c58c4c32e362cae06fe574
+    skillHash: b17fa37cdb91baf067edc3da7897a087286cee1404f0b2a96292410d66789239
     governanceHash: f9a3fda87a014d754897f34b4654377e0885e5afc4533a5c67d0b04384a570ce
     statusNote: Initial catalog registration
   es-stable-graph-authoring:
@@ -1044,6 +1202,10 @@ skills:
     maturity: Verifying
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: graph-identity
     owner: ESFramework Graph maintainers
@@ -1070,6 +1232,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-start-estest maintainers
@@ -1098,6 +1264,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: static-replay
     owner: ESFramework AI governance maintainers
@@ -1123,6 +1293,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-tag-config maintainers
@@ -1153,6 +1327,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: task-consistency
     owner: ESFramework AI governance maintainers
@@ -1179,6 +1357,10 @@ skills:
     maturity: Proposed
     delivery: Designed
     registrationState: NeedsReview
+    discoveryState: candidate
+    planEligibility: advisory-only
+    runtimeEligibility: blocked
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: test-data
     owner: ESFramework test maintainers
@@ -1207,6 +1389,10 @@ skills:
     maturity: Verifying
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: ui-prefab-authoring
     owner: ESFramework Skill maintainers
@@ -1233,6 +1419,10 @@ skills:
     maturity: Implementing
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S1
     riskClass: project-workflow
     owner: ESFramework es-unity-compile maintainers
@@ -1259,6 +1449,10 @@ skills:
     maturity: Verifying
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: authority-routing
     owner: ESFramework AICommand maintainers
@@ -1285,6 +1479,10 @@ skills:
     maturity: Verifying
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: text-integrity
     owner: ESFramework text-integrity maintainers
@@ -1311,6 +1509,10 @@ skills:
     maturity: Verifying
     delivery: Implemented-Unverified
     registrationState: NeedsReview
+    discoveryState: operational-candidate
+    planEligibility: plan-authorized
+    runtimeEligibility: not-proven
+    reviewRequired: true
     evidenceLevel: S2
     riskClass: change-boundary
     owner: ESFramework repository maintainers

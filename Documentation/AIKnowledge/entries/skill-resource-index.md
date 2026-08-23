@@ -7,14 +7,14 @@
 `EvidenceLevel`: `S1`
 `StaleWhen`: Skill 资源组合、Catalog 门禁、AIBrain 路由或 MCP/证据合同变化。
 `RouteKeys`: `skill`, `resource-index`, `catalog`, `validation`, `security`, `reference`, `script`, `mcp`, `evidence`, `knowledge-output`, `bounded-output`, `skill-performance`, `execution-cost`, `fast-path`, `deep-path`, `cache`
-`ContentHash`: `73e5f37f0287ad584d34040937c6e095ef50eae8ebfb344dfa25717995ed5d41`
+`ContentHash`: `fd2091ad8c085ab55dadb8ccfe42df818f030141f37ff53c7431ab845094affc`
 
 `SourceRefs`:
 
-- `.agents/SKILL_RESOURCE_INDEX.yaml` (`1db4ab075001c3a66465add60a6cef2b4853648a4c51713709b43bd2ca870dd9`)
-- `.agents/SKILL_CATALOG.yaml` (`58adafc6c02a8bbe9cd565982a1d0ef3c22037387dedb8a580ed1fc155148f64`)
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`5dedd6837210742df5fc4dd252ff7153a5b63e99a936f7b601819d5dd6aec205`)
-- `.agents/skills/es-skill-validator/scripts/Invoke-ESSkillValidation.ps1` (`f5f064751e58774a6dcc690105d00f6eade10b2129fda813b514cc2b1cb31fd8`)
+- `.agents/SKILL_RESOURCE_INDEX.yaml` (`dac562240b2eb1148def4f783ba4d4fdff4a119c6f620b2fdb57667a7e444a28`)
+- `.agents/SKILL_CATALOG.yaml` (`a9c59adf468c637e696059c73d5687bf31121f319d8d8aaee864d797733c6fc5`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`9735b55bf6b2df8758050f2b84b053aabc0438ddf633c3c61ba43e4d684349d9`)
+- `.agents/skills/es-skill-validator/scripts/Invoke-ESSkillValidation.ps1` (`3ef83ca3b7f5bc7af05558dcc7821b3a3ecfd1d72e01eb5119d4feb4fc4c0b0f`)
 - `.agents/skills/es-skill-validator/scripts/Test-ESSkillEvidence.ps1` (`03a581ab12344047ec74d334cc482b967877df4b9ebf976022793bc0400830ad`)
 - `.agents/skills/es-skill-validator/references/validation-rubric.md` (`60a8b2e0072c86c457787bfa013073b057f6e4cdeda274de5814afec8eba5798`)
 - `.agents/skills/es-skill-validator/references/boundary-decision-contract.md` (`650ad7003024aadcc9c3151a880e5370aa2876d198a0c98ff74808575bfa7a2c`)

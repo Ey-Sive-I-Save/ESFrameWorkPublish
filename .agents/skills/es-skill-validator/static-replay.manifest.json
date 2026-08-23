@@ -61,7 +61,10 @@
                                                             "scripts/Invoke-ESSkillValidation.ps1",
                                                             "references/validation-rubric.md",
                                                             "references/boundary-decision-contract.md",
-                                                            "references/evidence-receipt-contract.md"
+                                                            "references/evidence-receipt-contract.md",
+                                                            "../../SKILL_DISCOVERY_POLICY.json",
+                                                            "../../SKILL_REGISTRY.manifest.json",
+                                                            "../es-skill-governance/scripts/Test-ESSkillArchitecture.ps1"
                                                         ],
                                   "sourceAssertions":  [
                                                            "profile isolation",

@@ -6,16 +6,16 @@
 `Authority`: `Source + Skill contract`
 `EvidenceLevel`: `S2`
 `RouteKeys`: `skill`, `session`, `refresh`, `capability`, `delta`, `stale`, `routing`, `aibrain`, `understanding-drift`, `skill-understanding-refresh`, `capability-refresh`, `incremental-discovery`
-`ContentHash`: `30c267bea295234dfacc59e87800701f23bd1d1760cb9fab0434752f4c69c911`
+`ContentHash`: `e6174e120b8cbfdeb07c259a9ab88a8ca2507fdd200ce196adc7c5daf2b833d5`
 `StaleWhen`: Skill Catalog、Resource Index、Knowledge 路由、Skill 哈希、治理合同或当前会话 PlanHash 绑定变化。
 
 `SourceRefs`:
 
-- `.agents/skills/es-skill-session-refresh/SKILL.md` (`2eebecf99aec9151f186e123c6a55572e6c2752072fd29a759442edd03a502ed`)
+- `.agents/skills/es-skill-session-refresh/SKILL.md` (`18d878c62d2ce3e49ef8d5133ed8fcb7efc760b11168bafe502e964d3f7dec0b`)
 - `.agents/skills/es-skill-session-refresh/governance.json` (`503b3e7da4abd56b95a29acc2cb356c5687119cd29351ca4fb0174b2a681d011`)
-- `.agents/skills/es-skill-session-refresh/scripts/Invoke-ESSkillSessionRefresh.ps1` (`56e2a45a34d9a50a01a4f48ada81952602bffdfb2cf2e6c3b398969b70722906`)
+- `.agents/skills/es-skill-session-refresh/scripts/Invoke-ESSkillSessionRefresh.ps1` (`1e5237bb12445bac19a275e3c3ba9031b80ddb0007550d314db15b27de39356d`)
 - `.agents/skills/es-skill-session-refresh/references/session-refresh-contract.md` (`6fe00c95268b677c29bf21cbca2f5d9bddec77beaa2c4b8ce1c3d4316a138b29`)
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`5dedd6837210742df5fc4dd252ff7153a5b63e99a936f7b601819d5dd6aec205`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`9735b55bf6b2df8758050f2b84b053aabc0438ddf633c3c61ba43e4d684349d9`)
 
 `EvidenceRefs`: Skill StaticDeepReplay receipt；尚无 Unity 窗口内队列更新与 AIBrain 自动重新路由的 Runtime 回放证据。
 

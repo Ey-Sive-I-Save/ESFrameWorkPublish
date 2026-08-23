@@ -6,7 +6,7 @@
 `Authority`: `Derived`
 `RouteKeys`: `aibrain`, `orchestration`, `task-routing`, `evidence`
 `EvidenceLevel`: `S1`
-`ContentHash`: `66b1821d6ea2df4213f149bff970ffb24fac39f8dbf5db0a3d3c016193c46964`
+`ContentHash`: `48fe1a9afa504266c56e9e753a55a48a7025ef6dc515e96e7f479b96274f5a9d`
 
 `SourceRefs`:
 
@@ -15,8 +15,8 @@
 - `Assets/Plugins/ES/Editor/ESAutomation/ESAgentGraphAutomationEndpoint.cs` (`0bc253ebba46f4deb28cc4820677ee02a7233a070d57b682bbe91242640fd13c`)
 - `Assets/Plugins/ES/Editor/ESGraphViewV2/ESAISkillExecutionWorkflow.cs` (`7b17d81c0dc4bbf04d2e91df2c8e47e46c9b811de622dfef03c7f408476a192e`)
 - `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md` (`a33c17c739c6394096b8892bd3eb2497ff4f02b2ecd17fd86e14b4d7ce8c3306`)
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`5dedd6837210742df5fc4dd252ff7153a5b63e99a936f7b601819d5dd6aec205`)
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationAiBridge.cs` (`71d48b7f46fd6068a76193fa6e158c79836594aa5d9e33d69d736032224e0062`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`9735b55bf6b2df8758050f2b84b053aabc0438ddf633c3c61ba43e4d684349d9`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationAiBridge.cs` (`42ce9f445dee210e9ff788ae20680f1b8ba5b2dda94da5d6060630d2a72441c5`)
 
 `EvidenceRefs`: 当前源码入口和本条目的静态哈希；没有 Unity 运行证据。
 

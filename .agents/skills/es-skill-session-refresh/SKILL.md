@@ -23,7 +23,7 @@ Maintain a task-scoped capability snapshot for a long-running AI window. This Sk
 1. Treat user phrases such as “你的理解已经过时”, “刷新一下技能理解”, “重新理解当前项目提供的 Skill” or their English equivalents as an explicit refresh intent. Establish a project-relative session identity and objective; record the current AIBrain `planHash` when one exists, and never use a session snapshot as permission.
 2. Run `scripts/Invoke-ESSkillSessionRefresh.ps1 -Mode Build` to create a compact snapshot. The snapshot hashes the Resource Index, Catalog, Knowledge Index, and Skill metadata/resources without loading all documents into the model context.
 3. On a queue update, resume, or explicit refresh, run `-Mode Compare -BaselinePath <snapshot>`. Classify results as `unchanged`, `added`, `removed`, `metadata-changed`, `resource-changed`, `route-changed`, or `index-changed`.
-4. Pass objective route keys with `-RouteKeys skill,session,...` when available. The script intersects changed Skills with each Skill governance `routeKeys`; inspect changed `SKILL.md`, governance, and directly relevant references only for the intersection. Without route keys, treat all changed Skills as selected and mark the result `unscoped`.
+4. Pass objective route keys with `-RouteKeys skill,session,...` when available. The script intersects changed Skills with each Skill governance `routeKeys` and the discovery policy. Use `-DiscoveryMode Operational` for an active task, `CapabilityIndex` for candidate capability discovery, and `Audit` only for governance inspection. Without route keys, the compare result is `blocked` with `nextAction=replan`; it never selects the whole portfolio.
 5. Re-check Knowledge `requiredReads` and source hashes for any newly selected or changed Skill. Use `es-task-read-snapshot` when multiple files must be consumed consistently.
 6. Mark the prior plan or conclusion `stale` when a bound Skill, governance hash, command contract, Knowledge source, or task read snapshot changed. Request a fresh plan; do not silently merge new rules into an old authorization.
 7. Produce a refresh receipt containing the baseline hash, current snapshot hash, changed items, selected items, ignored items, and stale decisions. A receipt is evidence of discovery, not evidence that the new Skill was understood or executed.
@@ -65,6 +65,7 @@ Do not claim that a Skill was consumed merely because its hash was observed. Do 
 - Observability: record baseline hash, current hash, changed items, selected items, ignored items, and stale decisions.
 - Recovery: compare operations are deterministic and can be repeated without mutating the baseline or project assets.
 - Performance: hash metadata first and read only the objective-relevant changed Skill resources.
+- Lifecycle: candidate, blocked, deprecated and hidden Skills are not selected by Operational refresh; CapabilityIndex returns metadata only.
 - Compatibility: preserve existing ES AICommand, Knowledge, Catalog, and TaskContract contracts.
 - Supply-chain: source paths and hashes are project-relative and must be verified before they influence routing.
 

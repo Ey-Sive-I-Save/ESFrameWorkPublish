@@ -6,12 +6,12 @@
 `Authority`: `Source + Skill contract`
 `EvidenceLevel`: `S2`
 `RouteKeys`: `task`, `read`, `snapshot`, `cache`, `hash`, `stale`, `consistency`, `parser`, `projection`, `binary`
-`ContentHash`: `e346ac473570d244e36fd9195dd4766dc9adb84571afea5798963dbaed59cef1`
+`ContentHash`: `7c793cc10b7b88aa4938d56777ab01ae725bb00812d5fad7c5091a8030dcba95`
 `StaleWhen`: AIBrain 目标分类、Task Read Snapshot 合同、Parser Registry、ProjectionPacket 或缓存键/失效规则变化。
 
 `SourceRefs`:
 
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`5dedd6837210742df5fc4dd252ff7153a5b63e99a936f7b601819d5dd6aec205`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`9735b55bf6b2df8758050f2b84b053aabc0438ddf633c3c61ba43e4d684349d9`)
 - `.agents/skills/es-task-read-snapshot/SKILL.md` (`2aba9af6d3adf5d3437ab6afd893dbe2dd5fc909c5b8b3bd23864c1f43b60cea`)
 - `.agents/skills/es-task-read-snapshot/governance.json` (`024fe8412bcf7f570d8de08c214c6fc7ea32e4cb7ec58a410ba20ac01f94f29a`)
 - `.agents/skills/es-task-read-snapshot/references/task-read-snapshot-contract.md` (`b19ddfcf4ecb2eeb9af82a5b2ae6a844ca636ee26ccf83995d1f33f216cf348f`)

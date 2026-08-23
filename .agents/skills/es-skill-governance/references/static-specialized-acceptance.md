@@ -18,6 +18,7 @@ This is a responsibility-specific static acceptance plan for **es-skill-governan
 - `permission-denial`: replay the permission-denial contract from source/configuration and record pass or blocked evidence.
 - `profile-weight`: replay the profile-weight contract from source/configuration and record pass or blocked evidence.
 - `stale-governance-hash`: replay the stale-governance-hash contract from source/configuration and record pass or blocked evidence.
+- `es-entry-compatibility`: replay the ES AIBrain -> Facade -> TaskContract/Worker boundary and reject direct parallel execution entry points.
 
 ## Evidence artifacts
 
@@ -27,6 +28,7 @@ This is a responsibility-specific static acceptance plan for **es-skill-governan
 - `references/runtime-authorization-contract.md`
 - `scripts/Test-ESSkillContract.ps1`
 - `scripts/Test-ESRuntimeAuthorizationContract.ps1`
+- `scripts/Test-ESAutomationCompatibility.ps1`
 
 ## Acceptance rule
 

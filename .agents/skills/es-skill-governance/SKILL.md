@@ -51,6 +51,10 @@ Every Skill-local `Test-ESSkillEvidence.ps1` is required to delegate to `scripts
 
 Read [references/commercial-controls.md](references/commercial-controls.md) for the required controls around identity, ownership, risk, data, supply chain, observability, performance, compatibility and incident recovery. Read [references/performance-controls.md](references/performance-controls.md) for the mandatory fast-path/deep-path execution limits. Read [references/aibrain-contract.md](references/aibrain-contract.md) for the AIBrain planning and execution boundary. Read [references/resource-index-contract.md](references/resource-index-contract.md) and `.agents/SKILL_RESOURCE_INDEX.yaml` when composing a Skill from references, scripts, MCP capabilities or evidence packs.
 
+## Discovery architecture
+
+`governance.json` 的 maturity/delivery 不能直接当作可执行资格。读取 `.agents/SKILL_DISCOVERY_POLICY.json`，区分 `discoveryState`、`planEligibility` 和 `runtimeEligibility`；再使用 `.agents/SKILL_REGISTRY.manifest.json` 检查 Catalog、Resource Index、Knowledge 和 AICommand Catalog 的元数据哈希是否属于同一代。组织层检查使用 `scripts/Test-ESSkillArchitecture.ps1`，更新索引后使用 `scripts/Build-ESSkillRegistryManifest.ps1` 原子重建清单。
+
 ## Creation and upgrade workflow
 
 1. Frame the outcome, trigger phrases, inputs, outputs, side effects, non-goals and failure modes.
@@ -125,6 +129,8 @@ When the task is routed through AIBrain, use `planTask` before `runTask`. The pl
 - [references/verification-semantics.md](references/verification-semantics.md): Static/Runtime axes and verification profiles.
 - [references/runtime-authorization-contract.md](references/runtime-authorization-contract.md): one-time runtime authorization binding.
 - `scripts/Test-ESSkillContract.ps1`: read-only structural and contract checks.
+- `scripts/Test-ESSkillArchitecture.ps1`: lifecycle, route-scope and registry-manifest closure checks.
+- `scripts/Build-ESSkillRegistryManifest.ps1`: deterministic, project-relative registry snapshot builder.
 
 Run:
 

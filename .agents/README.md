@@ -63,7 +63,7 @@ ESFrameWorkPublish/
 约束：
 
 1. Skill 文件夹名只使用小写字母、数字和连字符，并统一使用 `es-` 前缀。
-2. 不在 `skills` 下增加 `base/`、`domain/` 等分类嵌套；分类、路由、状态和哈希由 `SKILL_RESOURCE_INDEX.yaml` 与 `SKILL_CATALOG.yaml` 表达。
+2. 不在 `skills` 下增加 `base/`、`domain/` 等分类嵌套；分类、路由、状态和哈希由 `SKILL_RESOURCE_INDEX.yaml`、`SKILL_CATALOG.yaml` 与 `.agents/SKILL_REGISTRY.manifest.json` 表达；发现资格由 `.agents/SKILL_DISCOVERY_POLICY.json` 统一裁决。
 3. 每个 Skill 只保留一个明确职责，不把多个领域揉成万能 Skill。
 4. `SKILL.md` 保留核心步骤；详细项目路径进入一层 `references`，避免深层引用链。
 5. 重复且需要可靠执行的流程才进入 `scripts`；脚本必须说明写入范围和证据等级。
@@ -166,3 +166,5 @@ ESFrameWorkPublish/
 - `$es-publish-aitest-prompt` 的确定性投递脚本已完成 PowerShell 语法、原子 JSON 和严格 UTF-8 代表性实跑；其他领域 Skill 目前以工作流和真实项目路径导航为主。
 - 新 Skill 通常需要从项目根重启或新开 Codex 窗口后才会进入技能选择器。
 - Skill 存在不代表 Unity、PlayMode、Profiler、IL2CPP 或真实发布已经通过。
+- Skill 的 `discoveryState`、`planEligibility` 和 `runtimeEligibility` 必须分开理解；`candidate` 或 `operational-candidate` 不是 Accepted。
+- `.agents/skills/es-skill-governance/scripts/Test-ESSkillArchitecture.ps1` 是组织架构门禁；它发现生命周期错配、通用路由污染和注册清单缺失时，Portfolio 不得报告完整通过。

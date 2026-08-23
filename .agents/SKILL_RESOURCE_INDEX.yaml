@@ -7,6 +7,8 @@ entrypoint: Documentation/AIKnowledge/AIBRAIN_ENTRY.md
 skillCatalog: .agents/SKILL_CATALOG.yaml
 composition:
   catalog: .agents/SKILL_CATALOG.yaml
+  discoveryPolicy: .agents/SKILL_DISCOVERY_POLICY.json
+  registryManifest: .agents/SKILL_REGISTRY.manifest.json
   specializedAcceptanceRegistry: .agents/skills/es-static-deep-replay/references/specialized-acceptance-registry.json
   required: [SKILL.md, agents/openai.yaml, governance.json, references/evidence-receipt-contract.md, scripts/Test-ESSkillEvidence.ps1, static-replay.manifest.json, references/static-replay-adapter.md]
   optional: [references/, scripts/, mcp/, assets/]
@@ -30,6 +32,12 @@ rules:
     statement: Every script declares parameters, read/write scope, exit codes, idempotency, failure and recovery.
   - id: skill.catalog.registration
     statement: Every direct Skill root with SKILL.md must have exactly one current record in SKILL_CATALOG.yaml before acceptance; catalog metadata is navigation and lifecycle state, not permission.
+  - id: skill.discovery.lifecycle-separation
+    statement: Skill existence, discoveryState, planEligibility and runtimeEligibility are independent; Proposed or unverified Skills may be indexed as candidates but cannot be presented as accepted execution capability.
+  - id: skill.discovery.route-scope
+    statement: Operational discovery requires a task route scope; an empty route scope must request re-planning and may not trigger whole-portfolio Skill正文读取.
+  - id: skill.discovery.registry-manifest
+    statement: Skill Catalog, Resource Index, Knowledge Index, AICommand Catalog and discovery policy are bound by the generated Skill Registry Manifest; a generation or metadata hash mismatch is stale and requires rebuild before acceptance.
   - id: skill.portfolio.gate
     statement: Before project-level acceptance or release, Test-ESSkillPortfolio.ps1 must run across every direct Skill; any contract, required-resource, hash or security block keeps the portfolio blocked.
   - id: skill.execution.performance-path

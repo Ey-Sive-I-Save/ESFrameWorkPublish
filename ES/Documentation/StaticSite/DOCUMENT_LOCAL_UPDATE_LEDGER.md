@@ -506,11 +506,11 @@ git commit -m "本批语义说明"
 
 ### LOCAL-20260823-005：Skill 发现与 AIBrain 后续漂移
 
-- **源码路径**：`.agents`、`ESAutomation`、`Documentation/AIKnowledge` 与 `ES/Automation`。
+- **源码路径**：`.agents`、`AICommands`、`ESAutomation`、`Documentation/AIKnowledge` 与 `ES/Automation`。
 - **规范与证据**：提交过程中新增的 Skill 发现治理、路由知识、Worker 与保存的验证记录按独立批次版本化。
 - **完成分析**：后续漂移与前两批区分，防止提交后产生的协议文件被遗漏或错误归属。
-- **回归状态**：隔离 Git 索引与台账门禁校验；未运行 Unity 或外部 Worker。
-- **已知缺口**：保存的运行记录不是本轮新鲜运行证据，Unity Editor、ReloadDomain、真实外部 Worker 和端到端验收均未运行。
+- **回归状态**：当前 staged 源路径通过严格 UTF-8、JSON、Node 与 PowerShell/Python 语法检查；Skill 架构门禁 0 blocked，ES Automation 兼容性门禁 11/11 通过；3 个 Feishu Worker 夹具均为无网络、无写入 DryRun。
+- **已知缺口**：52 条 Skill route/binding review 提示保留人工复核；Unity Editor、ReloadDomain、真实飞书权限/网络/写操作和端到端验收均未运行。
 - **HTML 目标**：后续在 `#ai-governance` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
 ### LOCAL-20260823-006：纠正误纳运行态与未审阅证据

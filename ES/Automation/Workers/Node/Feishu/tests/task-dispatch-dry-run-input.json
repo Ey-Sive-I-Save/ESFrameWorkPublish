@@ -1,0 +1,14 @@
+{
+  "protocolVersion": 1,
+  "taskId": "es.feishu.task.dispatch",
+  "taskVersion": 1,
+  "runId": "22222222222222222222222222222222",
+  "workerType": "Other",
+  "workerId": "es.feishu.task.node",
+  "workerVersion": "0.1.0",
+  "entrypointHash": "6eeeb41b0feecd36f38bc1d24453aafcc00a0aa5325dba25af741e12a17fc88b",
+  "inputSchemaHash": "90aafeb355a263fbcd10e91897d1f26a702767e9b0a97a5278d8114c7fc7dc8b",
+  "dryRun": true,
+  "operation": "virtual-team-fixture-create",
+  "input": { "operation": "virtual-team-fixture-create", "fixturePrefix": "ES Commercial Test" }
+}

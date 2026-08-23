@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "policyId": "esframework-skill-discovery-policy",
+  "authority": "derived-navigation-with-explicit-eligibility",
+  "defaultDiscoveryMode": "operational",
+  "genericRouteKeys": [
+    "skill",
+    "aibrain",
+    "governance",
+    "validation",
+    "evidence",
+    "runtime",
+    "test",
+    "ui",
+    "config"
+  ],
+  "states": {
+    "Proposed": {
+      "discoveryState": "candidate",
+      "planEligibility": "advisory-only",
+      "runtimeEligibility": "blocked"
+    },
+    "Scaffolded": {
+      "discoveryState": "candidate",
+      "planEligibility": "advisory-only",
+      "runtimeEligibility": "blocked"
+    },
+    "Implementing": {
+      "discoveryState": "operational-candidate",
+      "planEligibility": "plan-authorized",
+      "runtimeEligibility": "not-proven"
+    },
+    "Integrating": {
+      "discoveryState": "operational-candidate",
+      "planEligibility": "plan-authorized",
+      "runtimeEligibility": "not-proven"
+    },
+    "Verifying": {
+      "discoveryState": "operational-candidate",
+      "planEligibility": "plan-authorized",
+      "runtimeEligibility": "not-proven"
+    },
+    "Stable": {
+      "discoveryState": "operational",
+      "planEligibility": "plan-authorized",
+      "runtimeEligibility": "authorized-only"
+    },
+    "Deprecated": {
+      "discoveryState": "deprecated",
+      "planEligibility": "none",
+      "runtimeEligibility": "blocked"
+    },
+    "Archived": {
+      "discoveryState": "hidden",
+      "planEligibility": "none",
+      "runtimeEligibility": "blocked"
+    }
+  },
+  "deliveryOverrides": {
+    "Designed": {
+      "discoveryState": "candidate",
+      "planEligibility": "advisory-only",
+      "runtimeEligibility": "blocked"
+    },
+    "Blocked": {
+      "discoveryState": "blocked",
+      "planEligibility": "none",
+      "runtimeEligibility": "blocked"
+    },
+    "Failed": {
+      "discoveryState": "blocked",
+      "planEligibility": "none",
+      "runtimeEligibility": "blocked"
+    },
+    "Implemented-Unverified": {
+      "runtimeEligibility": "not-proven"
+    },
+    "Accepted": {
+      "discoveryState": "operational",
+      "planEligibility": "plan-authorized",
+      "runtimeEligibility": "authorized-only"
+    },
+    "Released": {
+      "discoveryState": "operational",
+      "planEligibility": "plan-authorized",
+      "runtimeEligibility": "authorized-only"
+    }
+  },
+  "registrationOverrides": {
+    "NeedsReview": {
+      "reviewRequired": true
+    },
+    "Accepted": {
+      "reviewRequired": false
+    }
+  },
+  "selectionModes": {
+    "Operational": ["operational", "operational-candidate"],
+    "CapabilityIndex": ["candidate", "operational-candidate", "operational", "deprecated"],
+    "Audit": ["candidate", "operational-candidate", "operational", "deprecated", "hidden", "blocked"]
+  }
+}

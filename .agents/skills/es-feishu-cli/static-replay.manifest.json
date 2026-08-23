@@ -6,6 +6,10 @@
     "Assets/Plugins/ES/AICommands/Feishu只读知识接入_AI命令.md",
     "Documentation/AIKnowledge/entries/feishu-adapter-boundary.md",
     "Assets/Plugins/ES/Editor/ESAutomation/ESFeishuReadAutomation.cs",
+    "Assets/Plugins/ES/Editor/ESAutomation/ESFeishuTaskAutomation.cs",
+    "ES/Automation/Contracts/feishu-task-monitor-v1.schema.json",
+    "ES/Automation/Contracts/feishu-task-dispatch-v1.schema.json",
+    "ES/Automation/Contracts/feishu-task-transition-v1.schema.json",
     "ES/Automation/Workers/Node/Feishu"
   ],
   "cases": [
@@ -22,6 +26,7 @@
     "governance",
     "source-hashes",
     "operation-allowlist",
+    "external-write-approval-boundary",
     "credential-boundary",
     "authority-routing",
     "evidence-contract"

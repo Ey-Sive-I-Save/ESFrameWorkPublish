@@ -54,7 +54,8 @@
                                                               "authority-ref-closure",
                                                               "permission-denial",
                                                               "profile-weight",
-                                                              "stale-governance-hash"
+                                                              "stale-governance-hash",
+                                                              "es-entry-compatibility"
                                                           ],
                                   "evidenceArtifacts":  [
                                                             "SKILL.md",
@@ -62,14 +63,19 @@
                                                             "references/verification-semantics.md",
                                                             "references/runtime-authorization-contract.md",
                                                             "scripts/Test-ESSkillContract.ps1",
-                                                            "scripts/Test-ESRuntimeAuthorizationContract.ps1"
+                                                            "scripts/Test-ESRuntimeAuthorizationContract.ps1",
+                                                            "../../SKILL_DISCOVERY_POLICY.json",
+                                                            "../../SKILL_REGISTRY.manifest.json",
+                                                            "scripts/Test-ESSkillArchitecture.ps1",
+                                                            "scripts/Test-ESAutomationCompatibility.ps1"
                                                         ],
                                   "sourceAssertions":  [
                                                            "authority refs are closed",
                                                            "runtime hard gate",
                                                            "StaticDeepReplay-first",
                                                            "permission expansion denied",
-                                                           "governance hash"
+                                                           "governance hash",
+                                                           "ES entry compatibility"
                                                        ],
                                   "runtimeBoundary":  "Runtime cannot prove authority closure; only execution authorization receipts can prove actual enforcement."
                               },

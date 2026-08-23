@@ -1335,6 +1335,79 @@ namespace ES
             return match.Success ? match.Groups["value"].Value.Trim().Trim('"', '\'') : string.Empty;
         }
 
+        private static bool TryResolveSkillEligibility(string maturity, string delivery,
+            string registrationState, out SkillEligibility eligibility, out string error)
+        {
+            eligibility = null;
+            error = string.Empty;
+            if (!TryResolveProjectPath(ProjectSkillDiscoveryPolicyPath, out string policyPath,
+                    out string pathError) || !File.Exists(policyPath))
+            {
+                error = string.IsNullOrWhiteSpace(pathError)
+                    ? "发现策略文件不存在：" + ProjectSkillDiscoveryPolicyPath : pathError;
+                return false;
+            }
+
+            JObject policy;
+            try
+            {
+                policy = JObject.Parse(File.ReadAllText(policyPath, StrictUtf8));
+            }
+            catch (Exception exception)
+            {
+                error = "发现策略不是合法 JSON：" + exception.Message;
+                return false;
+            }
+
+            if (policy.Value<int?>("schemaVersion") != 1)
+            {
+                error = "发现策略 schemaVersion 必须为 1。";
+                return false;
+            }
+
+            JObject states = policy["states"] as JObject;
+            JObject state = states == null ? null : states[maturity] as JObject;
+            if (state == null)
+            {
+                error = "maturity 未在发现策略中注册：" + maturity;
+                return false;
+            }
+
+            string discoveryState = state.Value<string>("discoveryState")?.Trim() ?? string.Empty;
+            string planEligibility = state.Value<string>("planEligibility")?.Trim() ?? string.Empty;
+            string runtimeEligibility = state.Value<string>("runtimeEligibility")?.Trim() ?? string.Empty;
+            JObject deliveryOverrides = policy["deliveryOverrides"] as JObject;
+            JObject deliveryOverride = deliveryOverrides == null ? null : deliveryOverrides[delivery] as JObject;
+            if (deliveryOverride != null)
+            {
+                discoveryState = deliveryOverride.Value<string>("discoveryState")?.Trim() ?? discoveryState;
+                planEligibility = deliveryOverride.Value<string>("planEligibility")?.Trim() ?? planEligibility;
+                runtimeEligibility = deliveryOverride.Value<string>("runtimeEligibility")?.Trim() ?? runtimeEligibility;
+            }
+
+            JObject registrationOverrides = policy["registrationOverrides"] as JObject;
+            JObject registrationOverride = registrationOverrides == null
+                ? null : registrationOverrides[registrationState] as JObject;
+            bool reviewRequired = registrationOverride == null
+                || registrationOverride.Value<bool?>("reviewRequired") != false;
+            if (string.IsNullOrWhiteSpace(discoveryState)
+                || string.IsNullOrWhiteSpace(planEligibility)
+                || string.IsNullOrWhiteSpace(runtimeEligibility))
+            {
+                error = "发现策略结果缺少 discoveryState、planEligibility 或 runtimeEligibility。";
+                return false;
+            }
+
+            eligibility = new SkillEligibility
+            {
+                discoveryState = discoveryState,
+                planEligibility = planEligibility,
+                runtimeEligibility = runtimeEligibility,
+                reviewRequired = reviewRequired,
+            };
+            return true;
+        }
+
         private static bool TryReadSkillGovernanceMetadata(string skillRoot, string skillName,
             out ESAIBrainSkillGovernanceMetadata metadata, out string governanceHash,
             out string error)
@@ -1558,6 +1631,10 @@ namespace ES
                     item.writePolicy,
                     item.family,
                     item.registrationState,
+                    item.discoveryState,
+                    item.planEligibility,
+                    item.runtimeEligibility,
+                    item.reviewRequired,
                 }),
                 workflow = plan.workflow == null
                     ? string.Empty : plan.workflow.workflowId + "@" + plan.workflow.contentHash,
@@ -1733,6 +1810,10 @@ namespace ES
         public string writePolicy = string.Empty;
         public string family = string.Empty;
         public string registrationState = string.Empty;
+        public string discoveryState = string.Empty;
+        public string planEligibility = string.Empty;
+        public string runtimeEligibility = string.Empty;
+        public bool reviewRequired;
     }
 
     [Serializable]
@@ -1740,6 +1821,14 @@ namespace ES
     {
         public string family = string.Empty;
         public string registrationState = string.Empty;
+    }
+
+    internal sealed class SkillEligibility
+    {
+        public string discoveryState = string.Empty;
+        public string planEligibility = string.Empty;
+        public string runtimeEligibility = string.Empty;
+        public bool reviewRequired;
     }
 
     [Serializable]
@@ -1895,4 +1984,53 @@ namespace ES
                     EditorGUILayout.LabelField("Skills", productionSurface.skills.Count.ToString());
                     EditorGUILayout.LabelField("CLI", productionSurface.cli.Count.ToString());
                     EditorGUILayout.LabelField("MCP", productionSurface.mcp.Count.ToString());
-              
+                    EditorGUILayout.LabelField("Knowledge", productionSurface.knowledge.Count.ToString());
+                    EditorGUILayout.LabelField("AIWarnings", productionSurface.warnings.Count.ToString());
+                    EditorGUILayout.LabelField("AICommands", productionSurface.commands.Count.ToString());
+                    if (productionSurface.blockers.Count > 0)
+                        EditorGUILayout.HelpBox(string.Join("\n", productionSurface.blockers.Take(5)), MessageType.Warning);
+                }
+
+                if (latestPlan != null)
+                {
+                    EditorGUILayout.Space(8f);
+                    EditorGUILayout.LabelField("计划状态", latestPlan.status, EditorStyles.boldLabel);
+                    DrawSelectableValue("PlanId", latestPlan.planId);
+                    DrawSelectableValue("PlanHash", latestPlan.planHash);
+                    EditorGUILayout.LabelField("Knowledge", latestPlan.knowledge.Count.ToString());
+                    EditorGUILayout.LabelField("Warnings", latestPlan.warnings.Count.ToString());
+                    EditorGUILayout.LabelField("Skills", latestPlan.skills.Count.ToString());
+                    if (latestPlan.blockers.Count > 0)
+                        EditorGUILayout.HelpBox(string.Join("\n", latestPlan.blockers), MessageType.Warning);
+                    else
+                        EditorGUILayout.HelpBox("计划已通过静态权威门禁；执行仍须由明确的用户动作触发。", MessageType.None);
+                }
+            }
+            finally
+            {
+                EditorGUILayout.EndScrollView();
+            }
+        }
+
+        private static void DrawSelectableValue(string label, string value)
+        {
+            EditorGUILayout.BeginHorizontal();
+            try
+            {
+                EditorGUILayout.PrefixLabel(label);
+                EditorGUILayout.SelectableLabel(value ?? string.Empty,
+                    EditorStyles.textField, GUILayout.MinHeight(EditorGUIUtility.singleLineHeight));
+            }
+            finally
+            {
+                EditorGUILayout.EndHorizontal();
+            }
+        }
+
+        private static List<string> Split(string value)
+        {
+            return (value ?? string.Empty).Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(item => item.Trim()).Where(item => item.Length > 0).ToList();
+        }
+    }
+}

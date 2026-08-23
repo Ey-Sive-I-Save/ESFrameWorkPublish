@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory=$true)][string]$ProjectRoot,
     [string]$SkillName,
-    [ValidateSet('Structural','Governance','VerificationSemantics','StaticDeepReplay','Catalog','Security','Semantic','Boundary','Evidence','Full')][string[]]$Profile = @('Structural','Governance','VerificationSemantics','StaticDeepReplay','Catalog','Security','Semantic','Boundary'),
+    [ValidateSet('Structural','Governance','VerificationSemantics','StaticDeepReplay','Catalog','Security','Semantic','Boundary','Architecture','Evidence','Full')][string[]]$Profile = @('Structural','Governance','VerificationSemantics','StaticDeepReplay','Catalog','Security','Semantic','Boundary','Architecture'),
     [string]$ReportPath
 )
 $ErrorActionPreference='Stop'
@@ -491,14 +491,29 @@ if($Profile -contains 'Catalog' -or $Profile -contains 'Full'){
     $ok=$ok -and ($catalogExit -eq 0)
     $results += ([pscustomobject]@{skill=if($SkillName){$SkillName}else{'*'};profile='Catalog';status=if($ok){'passed'}else{'failed'};message=$msg;source=$catalog})
 }
+if($Profile -contains 'Architecture' -or $Profile -contains 'Full'){
+    $architectureScript=Join-Path $skillsRoot 'es-skill-governance\scripts\Test-ESSkillArchitecture.ps1'
+    if(-not (Test-Path -LiteralPath $architectureScript -PathType Leaf)){
+        $results += ([pscustomobject]@{skill=if($SkillName){$SkillName}else{'*'};profile='Architecture';status='failed';message='Skill architecture validator is missing';source=$architectureScript})
+    } else {
+        $architectureOutput=(& powershell -NoProfile -ExecutionPolicy Bypass -File $architectureScript -ProjectRoot $root 2>&1 | Out-String).Trim()
+        $architectureExit=$LASTEXITCODE
+        $architectureStatus=if($architectureExit -ne 0){'blocked'}else{'passed'}
+        try{
+            $architectureJson=$architectureOutput|ConvertFrom-Json
+            if([string]$architectureJson.status -eq 'review' -and $architectureStatus -eq 'passed'){$architectureStatus='review'}
+        }catch{}
+        $results += ([pscustomobject]@{skill=if($SkillName){$SkillName}else{'*'};profile='Architecture';status=$architectureStatus;message=$architectureOutput;source=$architectureScript})
+    }
+}
 $failed=@($results | Where-Object status -in @('failed','blocked'))
 $notRun=@($results | Where-Object status -eq 'not-run')
-$staticProfiles=@('Structural','Governance','VerificationSemantics','StaticDeepReplay','Catalog','Security','Semantic','Boundary')
+$staticProfiles=@('Structural','Governance','VerificationSemantics','StaticDeepReplay','Catalog','Security','Semantic','Boundary','Architecture')
 $staticFailures=@($results | Where-Object {$_.profile -in $staticProfiles -and $_.status -in @('failed','blocked')})
 $staticNotRun=@($results | Where-Object {$_.profile -in $staticProfiles -and $_.status -eq 'not-run'})
 $staticReviews=@($results | Where-Object {$_.profile -in $staticProfiles -and $_.status -eq 'review'})
 $staticCodeProfiles=@('Structural','Security','Semantic')
-$staticContractProfiles=@('Governance','VerificationSemantics','StaticDeepReplay','Catalog')
+$staticContractProfiles=@('Governance','VerificationSemantics','StaticDeepReplay','Catalog','Architecture')
 $staticBoundaryFailures=@($results | Where-Object {$_.profile -eq 'Boundary' -and $_.status -in @('failed','blocked')})
 $staticBoundaryNotRun=@($results | Where-Object {$_.profile -eq 'Boundary' -and $_.status -eq 'not-run'})
 $staticCodeFailures=@($results | Where-Object {$_.profile -in $staticCodeProfiles -and $_.status -in @('failed','blocked')})

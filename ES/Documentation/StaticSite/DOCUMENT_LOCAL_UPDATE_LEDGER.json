@@ -2359,6 +2359,7 @@
                         "summary":  "收录提交过程中新增的 Skill 发现治理、AIBrain 路由知识、Feishu Worker 与验证运行记录。",
                         "sourcePaths":  [
                                             ".agents",
+                                            "Assets/Plugins/ES/AICommands",
                                             "Assets/Plugins/ES/Editor/ESAutomation",
                                             "Documentation/AIKnowledge",
                                             "ES/Automation"
@@ -2373,14 +2374,17 @@
                                          "notes":  "后续工作树漂移限定为 Skill 发现和 AIBrain/Automation 合同相关文件，按独立台账批次纳入，避免与前两批混淆。"
                                      },
                         "regression":  {
-                                           "status":  "not-run",
+                                           "status":  "complete",
                                            "evidence":  [
-                                                            "隔离 Git 索引范围检查",
-                                                            "台账门禁校验"
+                                                            "当前 staged 源路径未命中明确排除项",
+                                                            "严格 UTF-8、JSON 解析、Node 语法与 PowerShell AST 检查通过",
+                                                            "Skill 架构门禁 0 blocked，52 条 review 提示保留人工复核",
+                                                            "ES Automation 兼容性门禁 11 项全部通过",
+                                                            "3 个 Feishu Worker 夹具均为 DryRun，networkCalled=false 且 mutationApplied=false"
                                                         ],
                                            "knownGaps":  [
                                                              "未运行 Unity Editor、ReloadDomain、真实外部 Worker 或端到端验收",
-                                                             "运行记录仅为已保存工件，不代表本轮新鲜运行证据"
+                                                             "DryRun 不代表真实飞书权限、网络或写操作已验收"
                                                          ]
                                        },
                         "html":  {
@@ -2447,14 +2451,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-23T19:45:02+08:00",
-                       "head":  "b7e6f429e950e1587c5dc763526046fc5cde134b",
-                       "stagedSourcePatchSha256":  "9f20ea3016e36deac4117b25aea71491aef695809c6e79fa8c671c40468e5ff7",
-                       "stagedSourceManifestSha256":  "2caf9e08fea800e3b345bf4702882c112f8a7555f6bc7cf9581e46eb292dbcc7",
-                       "stagedSourceFileCount":  351,
+                       "preparedAt":  "2026-08-23T19:56:38+08:00",
+                       "head":  "023eaa0268ff447d2b74b64fb2a6345a6693c92d",
+                       "stagedSourcePatchSha256":  "fb06d81872a038da5a2bce3daa8f594138ebab24f55eac2683e26ba049950840",
+                       "stagedSourceManifestSha256":  "fe2817f259216bc1e17a0a087256ebc35f1505c7d821d0d4b1e67b61e3056c94",
+                       "stagedSourceFileCount":  45,
                        "entryIds":  [
-                                        "LOCAL-20260823-004",
-                                        "LOCAL-20260823-006"
+                                        "LOCAL-20260823-005"
                                     ]
                    }
 }

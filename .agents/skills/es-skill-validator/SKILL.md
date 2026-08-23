@@ -9,6 +9,7 @@ description: Validate ESFramework project Skills before registration, acceptance
 - **Runtime**: Unity, process, display, timing, layout-engine, or serialization behavior.
 - `runtime-not-run` means runtime evidence is absent; it does not mean Static failed. It blocks only the selected RuntimeAcceptance/ReleaseAcceptance profile.
 - Details: `.agents/skills/es-skill-governance/references/verification-semantics.md`
+- The aggregate `status=review` means the static layer has no hard failure but Evidence/Runtime remains pending. The validator may still return a non-zero process code as a CI follow-up signal; callers must read `staticStatus`, `decisionStatus`, `blockingLayer`, and `runtimeStatus` instead of translating that code into a source `Blocked` result.
 
 # ES Skill Validator
 
@@ -22,6 +23,7 @@ description: Validate ESFramework project Skills before registration, acceptance
 - `Security`：提示注入、未声明网络/凭据读取、权限绕过、危险脚本和供应链信号；命中后必须人工复核。
 - `Semantic`：ESFramework AIWarnings、AICommands、AIBrain、Knowledge、Resource Index 与 Catalog 的真实绑定关系。
 - `Boundary`：把 Skill 的实际脚本行为与 AIWarnings 拒绝语义、AICommand 写入模式、AIBrain/TaskContract 前置条件、项目根路径和证据声明做分级裁决。真实越界、越权、秘密/网络/破坏性操作和证据冒充仍 fail-closed；已绑定项目根的只读/报告路径可输出 `review`，不得伪装成无条件安全通过。
+- `Architecture`：验证生命周期发现资格、Operational/CapabilityIndex/Audit 路由范围、通用 RouteKey 污染、Catalog/Resource/Knowledge/AICommand 元数据代际和 Skill Registry Manifest 闭包。
 - `CapabilityMode`：默认按 `mutating` 处理；`.agents/skills/es-skill-governance/references/capability-mode-registry.json` 只能把明确的分析型 Skill 标成 `advisory` 或候选产物 Skill 标成 `candidate`。这两种模式不授予项目写入或外部执行权限，外部执行信号仍要求显式命令绑定。
 - `Evidence`：requiredCases、receipt、SourceRef 和验证结果是否足以支持当前交付状态。
 - `Static/Runtime`：将源码、配置、哈希和确定性脚本证据与 Unity/进程/显示器/时序等外部运行证据分轴裁决；`runtime-not-run` 不得被解释为 `static-blocked`。`Invoke-ESSkillValidation.ps1 -Profile VerificationSemantics` 会检查每个 Skill 的显式验证档案。
@@ -42,7 +44,7 @@ description: Validate ESFramework project Skills before registration, acceptance
 ## Workflow
 
 1. 读取 `.agents/README.md`、`SKILL_RESOURCE_INDEX.yaml`、`SKILL_CATALOG.yaml` 和目标 Skill。
-2. 运行 `scripts/Invoke-ESSkillValidation.ps1`，默认执行 `Structural,Governance,Catalog,Security,Semantic,Boundary`。
+2. 运行 `scripts/Invoke-ESSkillValidation.ps1`，默认执行 `Structural,Governance,Catalog,Security,Semantic,Boundary,Architecture`。
 3. 根据 `governance.json.requiredCases` 检查正向、非法输入、拒绝扩权、幂等和恢复证据。
 4. 对交付前的项目运行 `scripts/Test-ESSkillPortfolio.ps1`，把全量结果写成组合 Receipt；任何一个 Skill 的失败或安全阻断都会阻止组合通过。
 5. 只在报告明确通过且证据等级足够时，允许 `es-skill-creator` 更新生命周期状态。
@@ -76,6 +78,7 @@ description: Validate ESFramework project Skills before registration, acceptance
 - `references/validation-rubric.md`：检查矩阵和状态裁决。
 - `references/security-signals.md`：安全信号分级与人工复核规则。
 - `scripts/Invoke-ESSkillValidation.ps1`：只读验证入口。
+- `../es-skill-governance/scripts/Test-ESSkillArchitecture.ps1`：组织架构、生命周期和注册清单门禁。
 - `scripts/Test-ESSkillPortfolio.ps1`：全量 Skill 资产组合门禁与 Receipt 生成器。
 - `scripts/Test-ESSkillPortfolioEvidence.ps1`：Portfolio 聚合 Receipt 的独立哈希与子结果合同验证器。
 - `tests/Test-ESSkillValidatorRegression.ps1`：显式绑定、拒绝语义、动态路径等固定正反例回归 fixture。

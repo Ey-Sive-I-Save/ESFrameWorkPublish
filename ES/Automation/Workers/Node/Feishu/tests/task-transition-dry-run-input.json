@@ -1,0 +1,19 @@
+{
+  "protocolVersion": 1,
+  "taskId": "es.feishu.task.transition",
+  "taskVersion": 1,
+  "runId": "33333333333333333333333333333333",
+  "workerType": "Other",
+  "workerId": "es.feishu.task.node",
+  "workerVersion": "0.1.0",
+  "entrypointHash": "6eeeb41b0feecd36f38bc1d24453aafcc00a0aa5325dba25af741e12a17fc88b",
+  "inputSchemaHash": "95008f8bc2bbe84c34b4340c990fb19d0e010432bdd1625f1911e285cc2475d9",
+  "dryRun": true,
+  "operation": "task-update",
+  "input": {
+    "operation": "task-update",
+    "taskGuid": "dry-run-task-guid",
+    "expectedUpdatedAt": "0",
+    "agentTaskProgress": "DryRun progress proposal"
+  }
+}

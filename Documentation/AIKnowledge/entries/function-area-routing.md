@@ -10,10 +10,10 @@
 
 `SourceRefs`：
 
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`5dedd6837210742df5fc4dd252ff7153a5b63e99a936f7b601819d5dd6aec205`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`9735b55bf6b2df8758050f2b84b053aabc0438ddf633c3c61ba43e4d684349d9`)
 - `Documentation/AIKnowledge/AIBRAIN_ENTRY.md` (`a9d171a938841e2fab4409814b9dbcba98261269d30fef7a16304425c59ee316`)
 
-`ContentHash`: `a9e0084519daf84b501fbe5764f747c674993161cde12c93ae8d69bd12ebe6d5`
+`ContentHash`: `c98d04d36f5094ebc0ee9d67c807fbc4f6f5e575d5f05b249609eda711c6ea39`
 
 ## 路由原则
 

@@ -3,7 +3,40 @@ name: es-resource-pipeline
 description: Implement, diagnose, or audit the ESFramework resource pipeline across ESAssetLibrary, ESAssetBook, catalogs, ResourcePlan, manifests, runtime providers, ESAssetScope, downloading, and release output. Use for asset collection, preview, export, dependency analysis, runtime loading, provider changes, or resource publishing tasks.
 ---
 
+## Verification boundary
+
+- **Static**: source, configuration, contracts, hashes, and deterministic scripts.
+- **Runtime**: Unity, process, display, timing, layout-engine, or serialization behavior.
+- `runtime-not-run` means runtime evidence is absent; it does not mean Static failed. It blocks only the selected RuntimeAcceptance/ReleaseAcceptance profile.
+- Details: `.agents/skills/es-skill-governance/references/verification-semantics.md`
+
 # Work on the ES Resource Pipeline
+
+## Resource composition
+
+- Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
+- Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
+- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+
+## Specialized static acceptance
+
+- Guidance: `references/static-specialized-acceptance.md`
+- Acceptance ID: `resource-pipeline-static`
+- Required cases: `stage-manifest, provider-identity, dependency-closure, duplicate-resource, recovery-boundary`
+- Static assertions: manifest; provider; dependency; duplicate; recovery
+- This contract is responsibility-specific and remains distinct from Runtime proof.
+
+## Responsibility-specific static acceptance
+
+- Profile: `authoring`
+- Custom checks: `change-boundary, resource-projection, deterministic-replay, evidence-contract`
+- These checks are responsibility-specific static proof; they do not claim Runtime behavior.
+
+## Engineering controls
+
+- Scope and authority are checked before execution; stale or missing evidence blocks the task.
+- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
 Treat editor authoring, generated plans, release artifacts, runtime providers, and scope ownership as separate layers.
 
@@ -30,3 +63,18 @@ Treat editor authoring, generated plans, release artifacts, runtime providers, a
 ## Delivery
 
 Report the affected pipeline stage, authority chain, changed artifacts, dependency and scope checks, evidence labels, and untested publishing layers.
+
+
+## Specialized static acceptance
+
+Acceptance ID: `resource-pipeline-static`
+
+Responsibility-specific static assertions (these are source-level requirements, not Runtime claims):
+- manifest
+- provider
+- dependency
+- duplicate
+- recovery
+
+Required specialized cases: `stage-manifest, provider-identity, dependency-closure, duplicate-resource, recovery-boundary`
+Guidance: `references/static-specialized-acceptance.md`

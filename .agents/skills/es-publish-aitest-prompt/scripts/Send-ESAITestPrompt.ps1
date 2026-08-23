@@ -11,7 +11,9 @@ param(
     [ValidateRange(0, 10)]
     [double]$WaitForPickupSeconds = 2,
     [string]$ProjectRoot,
-    [string]$PersistentDataPath
+    [string]$PersistentDataPath,
+    [Parameter(Mandatory = $true)]
+    [string]$AuthorizationPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,6 +25,19 @@ if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
 else {
     $ProjectRoot = [IO.Path]::GetFullPath($ProjectRoot)
 }
+$projectRootNormalized = $ProjectRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+if ([IO.Path]::IsPathRooted($AuthorizationPath) -or $AuthorizationPath -match '(^|[\\/])\.\.([\\/]|$)') { throw 'AuthorizationPath must be project-relative.' }
+$authorizationFullPath = [IO.Path]::GetFullPath((Join-Path $projectRootNormalized $AuthorizationPath))
+if (-not $authorizationFullPath.StartsWith($projectRootNormalized + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'AuthorizationPath escapes ProjectRoot.' }
+if (-not (Test-Path -LiteralPath $authorizationFullPath -PathType Leaf)) { throw 'External prompt authorization manifest not found.' }
+$authorization = Get-Content -LiteralPath $authorizationFullPath -Raw -Encoding UTF8 | ConvertFrom-Json
+foreach ($required in @('schemaVersion','taskId','planHash','commandId','commandHash','targetPath','expiresAtUtc','timeBudgetSeconds','timeoutSeconds','stopCondition','oneTime','developerApproval')) {
+    if ($null -eq $authorization.PSObject.Properties[$required]) { throw "Authorization field missing: $required" }
+}
+foreach ($hashField in @('planHash','commandHash')) { if ([string]$authorization.$hashField -notmatch '^[0-9a-f]{64}$') { throw "Invalid authorization hash: $hashField" } }
+if ([bool]$authorization.oneTime -ne $true -or [bool]$authorization.developerApproval -ne $true) { throw 'External prompt authorization must be one-time and developer-approved.' }
+if ([int]$authorization.timeBudgetSeconds -le 0 -or [int]$authorization.timeoutSeconds -le 0) { throw 'Authorization budget and timeout must be positive.' }
+if ([DateTime]::Parse([string]$authorization.expiresAtUtc).ToUniversalTime() -le [DateTime]::UtcNow) { throw 'External prompt authorization has expired.' }
 
 $messageValue = $Message.Trim()
 $sourceValue = $Source.Trim()
@@ -52,6 +67,8 @@ if ([string]::IsNullOrWhiteSpace($PersistentDataPath)) {
 }
 
 $inboxPath = Join-Path ([IO.Path]::GetFullPath($PersistentDataPath)) 'ESAITest\prompt-inbox'
+[string]$authorizedTarget = [string]$authorization.targetPath
+if (-not [string]::IsNullOrWhiteSpace($authorizedTarget) -and [IO.Path]::GetFullPath($PersistentDataPath).TrimEnd('\','/') -ne [IO.Path]::GetFullPath($authorizedTarget).TrimEnd('\','/')) { throw 'PersistentDataPath does not match the authorized targetPath.' }
 [IO.Directory]::CreateDirectory($inboxPath) | Out-Null
 
 $promptId = [Guid]::NewGuid().ToString('N')
@@ -67,6 +84,11 @@ $envelope = [ordered]@{
     message = $messageValue
     priority = $Priority
     source = $sourceValue
+    taskId = [string]$authorization.taskId
+    planHash = [string]$authorization.planHash
+    commandId = [string]$authorization.commandId
+    commandHash = [string]$authorization.commandHash
+    authorizationPath = $AuthorizationPath.Replace('\','/')
     timeToLiveSeconds = $TimeToLiveSeconds
     createdUtcTicks = $createdUtcTicks
 }

@@ -1,0 +1,296 @@
+{
+    "schemaVersion":  1,
+    "registryId":  "es-specialized-static-acceptance",
+    "purpose":  "Every registered Skill must have responsibility-specific static acceptance guidance.",
+    "skills":  [
+                   {
+                       "skillName":  "es-module-lifecycle",
+                       "acceptanceId":  "module-lifecycle-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "session"
+                   },
+                   {
+                       "skillName":  "es-ui-prefab-authoring",
+                       "acceptanceId":  "ui-prefab-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   },
+                   {
+                       "skillName":  "es-performance-budgeting",
+                       "acceptanceId":  "performance-budget-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   },
+                   {
+                       "skillName":  "es-skill-governance",
+                       "acceptanceId":  "governance-contract",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "governance"
+                   },
+                   {
+                       "skillName":  "es-skill-creator",
+                       "acceptanceId":  "creator-pipeline",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "governance"
+                   },
+                   {
+                       "skillName":  "es-skill-validator",
+                       "acceptanceId":  "validator-profile-isolation",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "governance"
+                   },
+                   {
+                       "skillName":  "es-static-deep-replay",
+                       "acceptanceId":  "static-replay-engine",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "base"
+                   },
+                   {
+                       "skillName":  "es-knowledge-creator",
+                       "acceptanceId":  "knowledge-output-governance",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "knowledge"
+                   },
+                   {
+                       "skillName":  "es-ai-knowledge-curation",
+                       "acceptanceId":  "knowledge-curation",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "knowledge"
+                   },
+                   {
+                       "skillName":  "es-aibrain-route-authoring",
+                       "acceptanceId":  "aibrain-route-contract",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "governance"
+                   },
+                   {
+                       "skillName":  "es-aicommand-contract-authoring",
+                       "acceptanceId":  "aicommand-contract",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "governance"
+                   },
+                   {
+                       "skillName":  "es-aiwarning-authoring",
+                       "acceptanceId":  "aiwarning-route-governance",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "governance"
+                   },
+                   {
+                       "skillName":  "es-use-ai-command",
+                       "acceptanceId":  "aicommand-usage-boundary",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "governance"
+                   },
+                   {
+                       "skillName":  "es-editor-availability-validator",
+                       "acceptanceId":  "editor-availability-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "editor"
+                   },
+                   {
+                       "skillName":  "es-editor-tooling",
+                       "acceptanceId":  "editor-tooling-boundary",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "editor"
+                   },
+                   {
+                       "skillName":  "es-unity-compile",
+                       "acceptanceId":  "unity-compile-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   },
+                   {
+                       "skillName":  "es-release-acceptance",
+                       "acceptanceId":  "release-evidence-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "release"
+                   },
+                   {
+                       "skillName":  "es-task-read-snapshot",
+                       "acceptanceId":  "task-snapshot-consistency",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "session"
+                   },
+                   {
+                       "skillName":  "es-skill-session-refresh",
+                       "acceptanceId":  "skill-session-incremental-discovery",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "session"
+                   },
+                   {
+                       "skillName":  "es-worktree-audit",
+                       "acceptanceId":  "worktree-boundary",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   },
+                   {
+                       "skillName":  "es-utf8-guard",
+                       "acceptanceId":  "utf8-integrity",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   },
+                   {
+                       "skillName":  "es-resource-pipeline",
+                       "acceptanceId":  "resource-pipeline-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   },
+                   {
+                       "skillName":  "es-stable-graph-authoring",
+                       "acceptanceId":  "stable-graph-contract",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   }
+               ,
+                   {
+                       "skillName":  "es-adversarial-review",
+                       "acceptanceId":  "adversarial-review-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "governance"
+                   },
+                   {
+                       "skillName":  "es-api-contract-review",
+                       "acceptanceId":  "api-contract-review-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   },
+                   {
+                       "skillName":  "es-automation-worker-authoring",
+                       "acceptanceId":  "automation-worker-authoring-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   },
+                   {
+                       "skillName":  "es-change-risk-register",
+                       "acceptanceId":  "change-risk-register-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   },
+                   {
+                       "skillName":  "es-codex-session-bootstrap",
+                       "acceptanceId":  "codex-session-bootstrap-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "session"
+                   },
+                   {
+                       "skillName":  "es-command-authoring",
+                       "acceptanceId":  "command-authoring-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   },
+                   {
+                       "skillName":  "es-dependency-boundary-audit",
+                       "acceptanceId":  "dependency-boundary-audit-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   },
+                   {
+                       "skillName":  "es-entity-authoring",
+                       "acceptanceId":  "entity-authoring-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   },
+                   {
+                       "skillName":  "es-entity-prefab-validation",
+                       "acceptanceId":  "entity-prefab-validation-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   },
+                   {
+                       "skillName":  "es-first-principles-analysis",
+                       "acceptanceId":  "first-principles-analysis-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "governance"
+                   },
+                   {
+                       "skillName":  "es-fix-compile-error",
+                       "acceptanceId":  "fix-compile-error-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   },
+                   {
+                       "skillName":  "es-gamecore-config-authoring",
+                       "acceptanceId":  "gamecore-config-authoring-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   },
+                   {
+                       "skillName":  "es-gamecore-integration",
+                       "acceptanceId":  "gamecore-integration-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   },
+                   {
+                       "skillName":  "es-generate-agent-artifacts",
+                       "acceptanceId":  "generate-agent-artifacts-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   },
+                   {
+                       "skillName":  "es-input-action",
+                       "acceptanceId":  "input-action-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   },
+                   {
+                       "skillName":  "es-migration-planning",
+                       "acceptanceId":  "migration-planning-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   },
+                   {
+                       "skillName":  "es-observability-evidence",
+                       "acceptanceId":  "observability-evidence-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   },
+                   {
+                       "skillName":  "es-publish-aitest-prompt",
+                       "acceptanceId":  "publish-aitest-prompt-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "testing"
+                   },
+                   {
+                       "skillName":  "es-release-notes-evidence",
+                       "acceptanceId":  "release-notes-evidence-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "release"
+                   },
+                   {
+                       "skillName":  "es-repository-discovery",
+                       "acceptanceId":  "repository-discovery-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   },
+                   {
+                       "skillName":  "es-resource-publish-audit",
+                       "acceptanceId":  "resource-publish-audit-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   },
+                   {
+                       "skillName":  "es-security-input-audit",
+                       "acceptanceId":  "security-input-audit-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   },
+                   {
+                       "skillName":  "es-start-estest",
+                       "acceptanceId":  "start-estest-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "testing"
+                   },
+                   {
+                       "skillName":  "es-tag-config",
+                       "acceptanceId":  "tag-config-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   },
+                   {
+                       "skillName":  "es-test-fixture-authoring",
+                       "acceptanceId":  "test-fixture-authoring-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "engineering"
+                   }
+               ]
+}

@@ -1,0 +1,72 @@
+schemaVersion: 1
+indexId: esframework-skill-resource-index
+status: foundational
+authority: derived-navigation
+owner: ESFramework AI governance maintainers
+entrypoint: Documentation/AIKnowledge/AIBRAIN_ENTRY.md
+skillCatalog: .agents/SKILL_CATALOG.yaml
+composition:
+  catalog: .agents/SKILL_CATALOG.yaml
+  specializedAcceptanceRegistry: .agents/skills/es-static-deep-replay/references/specialized-acceptance-registry.json
+  required: [SKILL.md, agents/openai.yaml, governance.json, references/evidence-receipt-contract.md, scripts/Test-ESSkillEvidence.ps1, static-replay.manifest.json, references/static-replay-adapter.md]
+  optional: [references/, scripts/, mcp/, assets/]
+  evidence: [positive, invalid-input, denied-expansion, repeat-idempotency, interruption-recovery]
+rules:
+  - id: skill.verification.static-runtime-separation
+    statement: Static source/configuration proof and Runtime external-execution proof are independent axes. runtime-not-run is evidence absence, not static failure; the selected verification profile determines whether it blocks.
+  - id: skill.verification.static-deep-replay-first
+    statement: StaticDeepReplay is the default fast path and carries at least half of verification weight. Runtime is opt-in only with explicit developer authorization, AIBrain plan, matching AICommand/TaskContract, budget, timeout, and stop condition.
+  - id: skill.verification.static-replay-adapter
+    statement: Every direct Skill must expose a project-local static-replay.manifest.json, an adapter reference, and a named *-StaticReplay.ps1 runner that delegates to es-static-deep-replay.
+  - id: skill.verification.responsibility-specialization
+    statement: The common seven StaticDeepReplay cases are a minimum floor. At least twenty high-impact Skills must additionally declare specializedAcceptance with responsibility-specific cases, evidence artifacts, source assertions, and an explicit Runtime boundary; the registry and Validator enforce identity and completeness.
+  - id: skill.resource.no-copy
+    statement: Rules remain in AIWarnings; contracts remain in AICommands; Skills link to live authority instead of copying it.
+  - id: skill.resource.mcp-gated
+    statement: MCP is an evidence/host capability, never an implicit permission; capability status must be discovered through AIBrain.
+  - id: skill.resource.reference-depth
+    statement: SKILL.md may link one level deep to stable references; references must declare authority, scope, staleWhen and evidence.
+  - id: skill.resource.script-contract
+    statement: Every script declares parameters, read/write scope, exit codes, idempotency, failure and recovery.
+  - id: skill.catalog.registration
+    statement: Every direct Skill root with SKILL.md must have exactly one current record in SKILL_CATALOG.yaml before acceptance; catalog metadata is navigation and lifecycle state, not permission.
+  - id: skill.portfolio.gate
+    statement: Before project-level acceptance or release, Test-ESSkillPortfolio.ps1 must run across every direct Skill; any contract, required-resource, hash or security block keeps the portfolio blocked.
+  - id: skill.execution.performance-path
+    statement: Every Skill defaults to Fast Path. Full scans, uncached whole-repository hashing, complete Graph Bake, Unity validation, external network calls, bulk evidence copying/hashing and unbounded FanOut require an explicit Deep Path plan with budget, timeout, concurrency and evidence scope.
+  - id: skill.execution.cache-safety
+    statement: Caches may reduce discovery and unchanged-file work, but never replace current authorization, stable-identity, PlanHash or required evidence checks; stale or invalid cache state forces re-plan or a declared blocked/not-run result.
+  - id: skill.project.semantic-binding
+    statement: Every direct Skill must be discoverable through AIBRAIN_ENTRY, appear in at least one KnowledgeIndex relatedSkills binding with an overlapping routeKey, exist in SKILL_RESOURCE_INDEX and have matching Catalog skillHash/governanceHash; missing bindings block acceptance.
+currentSkills:
+  - {name: es-adversarial-review, family: governance, routeKeys: [review, risk, validation], mcp: [none-required]}
+  - {name: es-codex-session-bootstrap, family: session, routeKeys: [startup, session, handover], mcp: [session-host]}
+  - {name: es-command-authoring, family: project-command, routeKeys: [command, runtime, contract], mcp: [unity-editor]}
+  - {name: es-editor-tooling, family: project-editor, routeKeys: [editor, ui, graph], mcp: [unity-editor]}
+  - {name: es-editor-availability-validator, family: engineering, routeKeys: [editor, editor-window, editor-extension, reload-domain, interaction, visual, availability, validation, evidence], mcp: [none-required]}
+  - {name: es-entity-authoring, family: project-entity, routeKeys: [entity, prefab, runtime], mcp: [unity-editor]}
+  - {name: es-feishu-cli, family: project, routeKeys: [feishu, lark, external-adapter, dry-run], mcp: [none-required]}
+  - {name: es-first-principles-analysis, family: governance, routeKeys: [analysis, design, architecture], mcp: [none-required]}
+  - {name: es-fix-compile-error, family: engineering, routeKeys: [compile, diagnosis, csharp], mcp: [unity-editor]}
+  - {name: es-gamecore-integration, family: project-gamecore, routeKeys: [gamecore, config, identity], mcp: [unity-editor]}
+  - {name: es-generate-agent-artifacts, family: project-agent-authoring, routeKeys: [agent-authoring, candidate, graph], mcp: [unity-editor]}
+  - {name: es-input-action, family: project-input, routeKeys: [input, action, runtime], mcp: [unity-editor]}
+  - {name: es-module-lifecycle, family: project-lifecycle, routeKeys: [audit, maturity, lifecycle], mcp: [none-required]}
+  - {name: es-publish-aitest-prompt, family: project-test, routeKeys: [estest, prompt, test], mcp: [unity-editor]}
+  - {name: es-release-acceptance, family: project-release, routeKeys: [release, evidence, player, il2cpp], mcp: [unity-editor]}
+  - {name: es-resource-pipeline, family: project-resource, routeKeys: [resource, manifest, provider], mcp: [unity-editor]}
+  - {name: es-skill-creator, family: governance, routeKeys: [skill, creator, governance], mcp: [none-required]}
+  - {name: es-static-deep-replay, family: governance, routeKeys: [static-replay, deep-replay, deterministic, hash, cache-invalidation, evidence], mcp: [none-required]}
+  - {name: es-skill-governance, family: governance, routeKeys: [skill, governance, evidence, skill-performance, execution-cost, fast-path, deep-path, cache], mcp: [none-required]}
+  - {name: es-task-read-snapshot, family: engineering, routeKeys: [task, read, snapshot, cache, hash, stale, consistency, aibrain], mcp: [none-required]}
+  - {name: es-skill-session-refresh, family: engineering, routeKeys: [skill, session, refresh, capability, delta, stale, routing, aibrain, understanding-drift, skill-understanding-refresh, capability-refresh, incremental-discovery], mcp: [none-required]}
+  - {name: es-start-estest, family: project-test, routeKeys: [estest, test, runtime], mcp: [unity-editor]}
+  - {name: es-tag-config, family: project-identity, routeKeys: [tag, config, identity], mcp: [unity-editor]}
+  - {name: es-ui-prefab-authoring, family: project-ui, routeKeys: [ui-automation, screen-spec-v3, ui, prefab, fixture-scene, layout, responsive, visual-qa], mcp: [unity-editor]}
+  - {name: es-unity-compile, family: engineering, routeKeys: [compile, unity, reload, test], mcp: [unity-editor]}
+  - {name: es-use-ai-command, family: governance, routeKeys: [command, authorization, routing], mcp: [none-required]}
+  - {name: es-utf8-guard, family: engineering, routeKeys: [utf8, text, validation], mcp: [none-required]}
+  - {name: es-worktree-audit, family: engineering, routeKeys: [worktree, git, change-boundary], mcp: [none-required]}
+newSkills:
+  engineering: [es-repository-discovery, es-change-risk-register, es-test-fixture-authoring, es-api-contract-review, es-dependency-boundary-audit, es-performance-budgeting, es-observability-evidence, es-migration-planning, es-security-input-audit, es-release-notes-evidence]
+  project: [es-ai-knowledge-curation, es-knowledge-creator, es-skill-validator, es-aibrain-route-authoring, es-aiwarning-authoring, es-aicommand-contract-authoring, es-stable-graph-authoring, es-resource-publish-audit, es-gamecore-config-authoring, es-entity-prefab-validation, es-automation-worker-authoring]

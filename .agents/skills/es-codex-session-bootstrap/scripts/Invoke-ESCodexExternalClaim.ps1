@@ -348,7 +348,7 @@ function New-ESCodexExternalClaimPrepareResult([object]$Identity, [object]$Reque
     $stateArgument = if ([string]::IsNullOrWhiteSpace($StateRoot)) { '' } else {
         ' -StateRoot "' + (Get-ESCodexExternalClaimStateRoot).Replace('"', '""') + '"'
     }
-    $command = 'powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $claimScript.Replace('"', '""') + '" -ClaimId ' + $Identity.claimId + ' -ClaimToken ' + $Identity.claimToken + $stateArgument
+    $command = 'powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "' + $claimScript.Replace('"', '""') + '" -ClaimId ' + $Identity.claimId + ' -ClaimToken ' + $Identity.claimToken + $stateArgument
     return [pscustomobject][ordered]@{
         mode = 'PrepareExternalClaim'
         claimState = 'Prepared'

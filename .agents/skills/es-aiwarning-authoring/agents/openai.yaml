@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-aiwarning-authoring"
+  short_description: "Governed es-aiwarning-authoring workflow"
+  default_prompt: "Use es-aiwarning-authoring with AIBrain planning and project evidence."

@@ -1,0 +1,6 @@
+interface:
+  display_name: "ES Skill Creator"
+  short_description: "Create and validate project Skills"
+  icon_small: "./assets/skill-creator-small.svg"
+  icon_large: "./assets/skill-creator.png"
+  default_prompt: "Use $es-skill-creator to create or upgrade an ESFramework project Skill with references, scripts, and validation evidence."

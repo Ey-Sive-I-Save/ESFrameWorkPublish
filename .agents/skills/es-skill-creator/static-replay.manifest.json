@@ -1,0 +1,76 @@
+{
+    "schemaVersion":  1,
+    "skillName":  "es-skill-creator",
+    "sourceRoots":  [
+                        ".agents/skills/es-skill-creator"
+                    ],
+    "cases":  [
+                  "normal-input",
+                  "invalid-input",
+                  "denied-expansion",
+                  "repeat-idempotency",
+                  "hash-change-cache-invalidation",
+                  "interruption-recovery",
+                  "deterministic-output"
+              ],
+    "staticClaims":  [
+                         "structure",
+                         "governance",
+                         "source-hashes",
+                         "deterministic-replay",
+                         "boundary-contract"
+                     ],
+    "runtimeClaimsNotProven":  [
+                                   "Unity/editor/process behavior",
+                                   "timing and visual behavior",
+                                   "Profiler/Player/IL2CPP/release behavior"
+                               ],
+    "runtimeEscalation":  {
+                              "required":  false,
+                              "reason":  "Only external execution can prove the declared runtime claims."
+                          },
+    "caseAssertions":  {
+                           "normal-input":  "source roots and required Skill files are present",
+                           "invalid-input":  "invalid input is rejected by the declared contract",
+                           "denied-expansion":  "permission or path expansion is denied",
+                           "repeat-idempotency":  "repeat execution is idempotent",
+                           "hash-change-cache-invalidation":  "hash or cache changes invalidate stale state",
+                           "interruption-recovery":  "interruption and recovery are declared",
+                           "deterministic-output":  "deterministic output and stable ordering are declared"
+                       },
+    "responsibilityProfile":  "governance",
+    "responsibilityChecks":  [
+                                 "authority-routing",
+                                 "permission-boundary",
+                                 "deterministic-replay",
+                                 "evidence-contract"
+                             ],
+    "responsibilityScope":  "Custom static acceptance for governance responsibilities; common replay cases remain necessary but are not sufficient.",
+    "specializedAcceptance":  {
+                                  "id":  "creator-pipeline",
+                                  "title":  "Skill creation and registration pipeline",
+                                  "requiredStaticCases":  [
+                                                              "scaffold-contract",
+                                                              "invalid-name-rejection",
+                                                              "resource-composition",
+                                                              "registration-idempotency",
+                                                              "catalog-refresh"
+                                                          ],
+                                  "evidenceArtifacts":  [
+                                                            "SKILL.md",
+                                                            "scripts/init_skill.py",
+                                                            "scripts/Build-ESSkillCatalog.py",
+                                                            "scripts/quick_validate.py",
+                                                            "references/evidence-receipt-contract.md"
+                                                        ],
+                                  "sourceAssertions":  [
+                                                           "explicit output path",
+                                                           "registration is idempotent",
+                                                           "quick validation",
+                                                           "catalog hash refresh",
+                                                           "UTF-8"
+                                                       ],
+                                  "runtimeBoundary":  "Runtime is not required to prove scaffold structure or catalog registration."
+                              },
+    "specializedGuidanceRef":  "references/static-specialized-acceptance.md"
+}

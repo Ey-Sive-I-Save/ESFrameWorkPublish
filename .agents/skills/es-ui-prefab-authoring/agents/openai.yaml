@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES UI Prefab Authoring"
+  short_description: "Build high-fidelity Unity UI prefabs and scene layouts"
+  default_prompt: "Use $es-ui-prefab-authoring to build a high-fidelity Unity UI prefab and scene layout from a brief, with state coverage and visual validation."

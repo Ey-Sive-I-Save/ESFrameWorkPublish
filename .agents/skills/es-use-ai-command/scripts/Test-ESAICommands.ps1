@@ -48,11 +48,11 @@ if ($parserErrors.Count -gt 0) {
 
 function Add-UniqueError {
     param(
-        [Collections.Generic.List[string]]$Errors,
+        [Collections.Generic.List[string]]$Issues,
         [string]$Message
     )
-    if (-not $Errors.Contains($Message)) {
-        $Errors.Add($Message)
+    if (-not $Issues.Contains($Message)) {
+        $Issues.Add($Message)
     }
 }
 
@@ -295,30 +295,30 @@ $results = New-Object Collections.Generic.List[object]
 $files = Get-ChildItem -LiteralPath $commandRoot -Filter '*.md' -File -Recurse | Sort-Object FullName
 
 foreach ($file in $files) {
-    $errors = New-Object Collections.Generic.List[string]
+    $validationErrors = New-Object Collections.Generic.List[string]
     $relativeFile = $file.FullName.Substring($ProjectRoot.Length).TrimStart([IO.Path]::DirectorySeparatorChar).Replace([IO.Path]::DirectorySeparatorChar, '/')
     $isNavigation = $navigationFileNames -contains $file.Name
     try {
         $text = $strictUtf8.GetString([IO.File]::ReadAllBytes($file.FullName))
     }
     catch {
-        $errors.Add("Strict UTF-8 decoding failed: $($_.Exception.Message)")
+        $validationErrors.Add("Strict UTF-8 decoding failed: $($_.Exception.Message)")
         $text = ''
     }
 
     if ($text.Contains([char]0xFFFD)) {
-        $errors.Add('Contains Unicode replacement character U+FFFD.')
+        $validationErrors.Add('Contains Unicode replacement character U+FFFD.')
     }
 
     foreach ($metadata in $metadataPatterns) {
         if ($text -notmatch $metadata.pattern) {
-            Add-UniqueError $errors "Missing or invalid metadata: $($metadata.name)"
+            Add-UniqueError $validationErrors "Missing or invalid metadata: $($metadata.name)"
         }
     }
 
     if (-not $isNavigation) {
         if (-not $catalogPaths.Contains($relativeFile)) {
-            Add-UniqueError $errors 'Executable AICommand is missing from AICommandCatalog.json.'
+            Add-UniqueError $validationErrors 'Executable AICommand is missing from AICommandCatalog.json.'
         }
         elseif ($catalogByPath.ContainsKey($relativeFile)) {
             try {
@@ -328,20 +328,20 @@ foreach ($file in $files) {
                 $bodyRisk = Get-ContractMetadataValue $text (Get-UnicodeText @(39118,38505,31561,32423))
                 $expected = Get-ExpectedCatalogSemantics $commandType $defaultWrite
                 if ($bodyRisk -notmatch '^L[123](?:[/\s\u3002\uFF0C,]|$)') {
-                    Add-UniqueError $errors 'Contract risk level is missing or invalid.'
+                    Add-UniqueError $validationErrors 'Contract risk level is missing or invalid.'
                 }
                 elseif (-not $bodyRisk.StartsWith([string]$catalogEntry.riskLevel, [StringComparison]::Ordinal)) {
-                    Add-UniqueError $errors 'Catalog riskLevel differs from the contract body.'
+                    Add-UniqueError $validationErrors 'Catalog riskLevel differs from the contract body.'
                 }
                 if ([string]$catalogEntry.role -ne $expected.role) {
-                    Add-UniqueError $errors 'Catalog role differs from the contract body semantics.'
+                    Add-UniqueError $validationErrors 'Catalog role differs from the contract body semantics.'
                 }
                 if ([string]$catalogEntry.writeMode -ne $expected.writeMode) {
-                    Add-UniqueError $errors 'Catalog writeMode differs from the contract body semantics.'
+                    Add-UniqueError $validationErrors 'Catalog writeMode differs from the contract body semantics.'
                 }
             }
             catch {
-                Add-UniqueError $errors "Catalog/body semantic validation failed: $($_.Exception.Message)"
+                Add-UniqueError $validationErrors "Catalog/body semantic validation failed: $($_.Exception.Message)"
             }
         }
         # Existing strong-constraint commands may use a domain-specific middle section, but every
@@ -351,14 +351,14 @@ foreach ($file in $files) {
         $requiredRead = [string]::Concat(([int[]](24517,39035,20808,35835) | ForEach-Object { [char]$_ }))
         $delivery = [string]::Concat(([int[]](20132,20184,26684,24335) | ForEach-Object { [char]$_ }))
         if ($headingLines -notcontains $requiredRead) {
-            Add-UniqueError $errors 'Missing required section: required-reading gate.'
+            Add-UniqueError $validationErrors 'Missing required section: required-reading gate.'
         }
         if ($headingLines -notcontains $delivery) {
-            Add-UniqueError $errors 'Missing required section: delivery contract.'
+            Add-UniqueError $validationErrors 'Missing required section: delivery contract.'
         }
     }
     elseif ($catalogPaths.Contains($relativeFile)) {
-        Add-UniqueError $errors 'Navigation document must not appear in AICommandCatalog.json.'
+        Add-UniqueError $validationErrors 'Navigation document must not appear in AICommandCatalog.json.'
     }
 
     $pathMatches = [regex]::Matches($text, '(?m)^(Assets|Documentation|ES|Packages)/[^\r\n`]+')
@@ -366,15 +366,15 @@ foreach ($file in $files) {
         $relativePath = $match.Value.Trim()
         $candidate = Join-Path $ProjectRoot ($relativePath.Replace('/', [IO.Path]::DirectorySeparatorChar))
         if (-not (Test-Path -LiteralPath $candidate)) {
-            $errors.Add("Referenced path does not exist: $relativePath")
+            $validationErrors.Add("Referenced path does not exist: $relativePath")
         }
     }
 
     $results.Add([pscustomobject]@{
         file = $relativeFile
         role = if ($isNavigation) { 'navigation' } else { 'contract' }
-        valid = $errors.Count -eq 0
-        errors = $errors.ToArray()
+        valid = $validationErrors.Count -eq 0
+        errors = $validationErrors.ToArray()
     })
 }
 
@@ -487,12 +487,12 @@ if ($Json) {
 }
 else {
     "AICommands: $($report.commandCount), navigation: $($report.navigationCount), catalog: $($report.catalogCount), invalid: $($report.invalidCount)"
-    foreach ($error in $catalogErrors) {
-        "[CATALOG INVALID] $error"
+    foreach ($catalogIssue in $catalogErrors) {
+        "[CATALOG INVALID] $catalogIssue"
     }
     foreach ($item in $invalid) {
         "[INVALID] $($item.file)"
-        foreach ($error in $item.errors) { "  - $error" }
+        foreach ($itemIssue in $item.errors) { "  - $itemIssue" }
     }
 }
 

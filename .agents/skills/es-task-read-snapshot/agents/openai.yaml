@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Task Read Snapshot"
+  short_description: "Reuse task file reads safely"
+  default_prompt: "Use es-task-read-snapshot to create or verify a task read snapshot, reuse hashed file reads, and invalidate safely on drift."

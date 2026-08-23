@@ -34,7 +34,11 @@ function Find-ESCodexLaunchHistorySessionId([string]$HistoryPath, [string]$Launc
                 return [string]$row.session_id
             }
         }
-        catch { }
+        catch {
+            # History is append-only and may contain unrelated/non-JSON lines.
+            # Ignore that line deliberately, while preserving a diagnosable signal.
+            Write-Verbose ("Ignoring malformed Codex history line while resolving launch session: " + $_.Exception.Message)
+        }
     }
     return ''
 }

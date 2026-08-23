@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-stable-graph-authoring"
+  short_description: "Governed es-stable-graph-authoring workflow"
+  default_prompt: "Use es-stable-graph-authoring with AIBrain planning and project evidence."

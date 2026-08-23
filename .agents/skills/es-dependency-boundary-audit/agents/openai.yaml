@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-dependency-boundary-audit"
+  short_description: "Governed es-dependency-boundary-audit workflow"
+  default_prompt: "Use es-dependency-boundary-audit with AIBrain planning and project evidence."

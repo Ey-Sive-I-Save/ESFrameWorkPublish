@@ -3,7 +3,32 @@ name: es-adversarial-review
 description: Perform adversarial validation for ESFramework feasibility after solution design, quality validation after writing or modifying code, code review, and explicit robustness, risk, loophole, second-opinion, or critical-review requests. Load only when the current request or completed work stage matches this validation purpose. Do not load unconditionally for simple chat, trivial non-code execution, or formatting-only work.
 ---
 
+## Verification boundary
+
+- **Static**: source, configuration, contracts, hashes, and deterministic scripts.
+- **Runtime**: Unity, process, display, timing, layout-engine, or serialization behavior.
+- `runtime-not-run` means runtime evidence is absent; it does not mean Static failed. It blocks only the selected RuntimeAcceptance/ReleaseAcceptance profile.
+- Details: `.agents/skills/es-skill-governance/references/verification-semantics.md`
+
 # Run an Adversarial Review
+
+## Resource composition
+
+- Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
+- Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
+- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+
+## Responsibility-specific static acceptance
+
+- Profile: `governance`
+- Custom checks: `authority-routing, permission-boundary, deterministic-replay, evidence-contract`
+- These checks are responsibility-specific static proof; they do not claim Runtime behavior.
+
+## Engineering controls
+
+- Scope and authority are checked before execution; stale or missing evidence blocks the task.
+- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
 Challenge whether the work achieves its stated intent. The review pass is read-only: it produces findings and evidence gaps and never silently changes the target. When it runs after an authorized implementation in the same task, accepted findings may be fixed under that original authorization, then revalidated before delivery.
 

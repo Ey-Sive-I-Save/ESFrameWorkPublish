@@ -1,0 +1,4 @@
+interface:
+  display_name: "Knowledge Creator"
+  short_description: "Governed AIKnowledge output and curation"
+  default_prompt: "Use $es-knowledge-creator to produce bounded, source-grounded AIKnowledge output with route and evidence controls."

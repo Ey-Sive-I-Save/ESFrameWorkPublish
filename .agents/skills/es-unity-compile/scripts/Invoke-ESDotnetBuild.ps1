@@ -18,11 +18,20 @@ if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
 }
 
 $ProjectRoot = [IO.Path]::GetFullPath($ProjectRoot.Trim())
+$rootNormalized = $ProjectRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
 $results = New-Object Collections.Generic.List[object]
 
 foreach ($item in $Project) {
-    $projectPath = if ([IO.Path]::IsPathRooted($item)) { $item } else { Join-Path $ProjectRoot $item }
-    $projectPath = [IO.Path]::GetFullPath($projectPath)
+    if ([IO.Path]::IsPathRooted($item)) {
+        $projectPath = [IO.Path]::GetFullPath($item)
+    }
+    else {
+        if ($item -match '(^|[\\/])\.\.([\\/]|$)') { throw 'Project path cannot contain parent traversal.' }
+        $projectPath = [IO.Path]::GetFullPath((Join-Path $ProjectRoot $item))
+    }
+    if (-not ($projectPath.Equals($rootNormalized, [StringComparison]::OrdinalIgnoreCase) -or $projectPath.StartsWith($rootNormalized + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase))) {
+        throw "Project path escapes ProjectRoot: $item"
+    }
     if (-not (Test-Path -LiteralPath $projectPath -PathType Leaf)) {
         $results.Add([pscustomobject]@{ project = $item; exitCode = -1; succeeded = $false; output = 'Project file does not exist.' })
         continue

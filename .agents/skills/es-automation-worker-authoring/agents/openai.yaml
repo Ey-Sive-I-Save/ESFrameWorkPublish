@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-automation-worker-authoring"
+  short_description: "Governed es-automation-worker-authoring workflow"
+  default_prompt: "Use es-automation-worker-authoring with AIBrain planning and project evidence."

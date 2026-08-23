@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 3,
+  "screenId": "screen-id",
+  "screenType": "collection",
+  "template": "collection",
+  "prefabPath": "Assets/UI/Prefabs/Generated/screen-id.prefab",
+  "fixtureScenePath": "Assets/UI/Scenes/Generated/screen-id.unity",
+  "tokens": {
+    "surface": "#182230",
+    "text": "#F4F7FB",
+    "accent": "#53B8FF"
+  },
+  "profiles": [
+    {"id": "wide", "width": 1920, "height": 1080, "orientation": "landscape"},
+    {"id": "narrow", "width": 1080, "height": 1920, "orientation": "portrait"}
+  ],
+  "states": [
+    {"id": "default", "fixture": "screen-id/default"},
+    {"id": "selected", "fixture": "screen-id/selected"},
+    {"id": "empty", "fixture": "screen-id/empty"},
+    {"id": "loading", "fixture": "screen-id/loading"},
+    {"id": "disabled", "fixture": "screen-id/disabled"},
+    {"id": "error", "fixture": "screen-id/error"}
+  ],
+  "assets": [
+    {"id": "frame", "role": "panel-frame", "source": "generated-placeholder", "path": "ES/UIAssets/screen-id/frame.png", "fallback": "frame-missing"}
+  ],
+  "components": [
+    {
+      "id": "frame",
+      "type": "frame",
+      "zone": "header",
+      "layout": {"mode": "stretch", "bounds": [0.02, 0.02, 0.98, 0.98], "minSize": [44, 44]},
+      "assetSlots": ["frame"],
+      "content": {},
+      "stateVariants": {"default": {}, "disabled": {}}
+    },
+    {
+      "id": "content",
+      "type": "frame",
+      "zone": "content",
+      "layout": {"mode": "stretch", "bounds": [0.02, 0.10, 0.98, 0.90], "minSize": [44, 44]},
+      "content": {},
+      "stateVariants": {"default": {}, "empty": {}, "loading": {}, "error": {}}
+    }
+  ],
+  "behaviors": [],
+  "bindings": []
+}

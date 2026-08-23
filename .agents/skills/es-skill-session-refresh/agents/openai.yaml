@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill Session Refresh"
+  short_description: "Incrementally detect Skill capability and governance changes"
+  default_prompt: "Use $es-skill-session-refresh to compare the active session Skill snapshot, load only affected capabilities, and invalidate stale plans."

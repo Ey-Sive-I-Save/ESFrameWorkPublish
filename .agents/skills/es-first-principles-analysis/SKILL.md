@@ -3,7 +3,32 @@ name: es-first-principles-analysis
 description: Perform first-principles analysis for ESFramework conceptual decomposition, root-cause reasoning, complex technical analysis, and concrete design-to-implementation work. Load when the current request or work stage needs facts, assumptions, constraints, mechanisms, and a ground-up design decision. Do not load unconditionally for simple chat, trivial non-code execution, formatting-only work, routine compilation fixes, or formal module audits.
 ---
 
+## Verification boundary
+
+- **Static**: source, configuration, contracts, hashes, and deterministic scripts.
+- **Runtime**: Unity, process, display, timing, layout-engine, or serialization behavior.
+- `runtime-not-run` means runtime evidence is absent; it does not mean Static failed. It blocks only the selected RuntimeAcceptance/ReleaseAcceptance profile.
+- Details: `.agents/skills/es-skill-governance/references/verification-semantics.md`
+
 # Analyze From First Principles
+
+## Resource composition
+
+- Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
+- Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
+- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+
+## Responsibility-specific static acceptance
+
+- Profile: `governance`
+- Custom checks: `authority-routing, permission-boundary, deterministic-replay, evidence-contract`
+- These checks are responsibility-specific static proof; they do not claim Runtime behavior.
+
+## Engineering controls
+
+- Scope and authority are checked before execution; stale or missing evidence blocks the task.
+- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
 Use this skill to expose the mechanisms behind an ESFramework decision before recommending a direction. It is an analysis workflow, not a writing style and not authorization to edit.
 

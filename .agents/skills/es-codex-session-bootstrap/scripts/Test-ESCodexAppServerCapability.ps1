@@ -9,7 +9,7 @@ $OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 
 $codexCommand = Get-Command codex -ErrorAction SilentlyContinue
 if ($null -eq $codexCommand) { throw 'Codex CLI was not found on PATH.' }
-$codexCmdPath = Join-Path (Split-Path -Parent $codexCommand.Source) 'codex.cmd'
+$codexCmdPath = [IO.Path]::Combine((Split-Path -Parent $codexCommand.Source), 'codex.cmd')
 if (-not (Test-Path -LiteralPath $codexCmdPath -PathType Leaf)) { throw "Codex CMD launcher was not found: $codexCmdPath" }
 
 $startInfo = [Diagnostics.ProcessStartInfo]::new()
@@ -83,8 +83,12 @@ try {
 }
 finally {
     if ($started -and -not $process.HasExited) {
-        try { $process.StandardInput.Close() } catch { }
-        if (-not $process.WaitForExit(1000)) { try { $process.Kill() } catch { } }
+        try { $process.StandardInput.Close() }
+        catch { Write-Verbose ("Unable to close app-server stdin: " + $_.Exception.Message) }
+        if (-not $process.WaitForExit(1000)) {
+            try { $process.Kill() }
+            catch { Write-Verbose ("Unable to terminate app-server probe process: " + $_.Exception.Message) }
+        }
     }
     $process.Dispose()
 }

@@ -1,0 +1,1323 @@
+schemaVersion: 1
+catalogId: esframework-skill-catalog
+status: active
+authority: derived-navigation
+purpose: Classify and track lifecycle of direct-child project Skills; never grants execution permission.
+sourceRoot: .agents/skills
+resourceIndex: .agents/SKILL_RESOURCE_INDEX.yaml
+registrationRule: Every direct Skill root with SKILL.md must have exactly one catalog record before acceptance.
+hashRule: skillHash and governanceHash detect stale registration; refresh the record after every Skill change.
+generatedAtUtc: '2026-08-23T11:28:51Z'
+skills:
+  es-adversarial-review:
+    name: es-adversarial-review
+    displayName: es-adversarial-review
+    skillPath: .agents/skills/es-adversarial-review
+    family: governance
+    routeKeys:
+    - review
+    - risk
+    - evidence
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-adversarial-review maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: f07a4c2fe5a8f838cb66c3aa4b6a6c1eb6eede52b59556f0c40b0f5eae7cdaca
+    governanceHash: 7fcfdc02d1ddd3dbdcdc048f23336d0e81c8b00ffa7fca9698ada3ac6764fafa
+    statusNote: Initial catalog registration
+  es-ai-knowledge-curation:
+    name: es-ai-knowledge-curation
+    displayName: es-ai-knowledge-curation
+    skillPath: .agents/skills/es-ai-knowledge-curation
+    family: project
+    routeKeys:
+    - knowledge
+    - source-ref
+    - hash
+    - routing
+    - evidence
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: knowledge-authority
+    owner: ESFramework AIKnowledge maintainers
+    acceptanceOwner: knowledge owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T07:09:00Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 451e696318c63cdeebc1a76dc00455cab9d3d140b6f169ef50b50ac99ca5907a
+    governanceHash: 013d7456141ce344a4c02738839689c30e22161edb1e5721ec3ce2c65be866e8
+    statusNote: Initial catalog registration
+  es-aibrain-route-authoring:
+    name: es-aibrain-route-authoring
+    displayName: es-aibrain-route-authoring
+    skillPath: .agents/skills/es-aibrain-route-authoring
+    family: project
+    routeKeys:
+    - aibrain
+    - route
+    - knowledge
+    - mcp
+    - plan
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: aibrain-routing
+    owner: ESFramework AIBrain maintainers
+    acceptanceOwner: AI governance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:16:19Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: d847a5c06532fd10dd68ee9d9b3a8087f1f4f608091933e9ea092196dbfd9095
+    governanceHash: 151bf558bb11c6599b0c0124b0667f92f2d21974587e9f79cc441e94072fb570
+    statusNote: Initial catalog registration
+  es-aicommand-contract-authoring:
+    name: es-aicommand-contract-authoring
+    displayName: es-aicommand-contract-authoring
+    skillPath: .agents/skills/es-aicommand-contract-authoring
+    family: project
+    routeKeys:
+    - command
+    - contract
+    - authorization
+    - schema
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: task-authorization
+    owner: ESFramework AICommand maintainers
+    acceptanceOwner: AI governance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:16:19Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: a3c6f50512eac68d6887ee30de47342f0e2fa7d3b83be41ae0ee5d114bb97b97
+    governanceHash: 08e4704f2b386f0e7f94f0225503dd92399dd3ae4b6cb40b837340a2d83e0d34
+    statusNote: Initial catalog registration
+  es-aiwarning-authoring:
+    name: es-aiwarning-authoring
+    displayName: es-aiwarning-authoring
+    skillPath: .agents/skills/es-aiwarning-authoring
+    family: project
+    routeKeys:
+    - aiwarnings
+    - p0
+    - rule
+    - route
+    - evidence
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: governance-rule
+    owner: ESFramework AIWarnings maintainers
+    acceptanceOwner: AI governance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:16:19Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 233f7a3fe8b6ce5464929cc03647ddddcd2ebe59218ddb497f78af68a9063b78
+    governanceHash: 7add4b814014efdb16b9b34493ba772f85262a90aa40127151e5c1f441563562
+    statusNote: Initial catalog registration
+  es-api-contract-review:
+    name: es-api-contract-review
+    displayName: es-api-contract-review
+    skillPath: .agents/skills/es-api-contract-review
+    family: engineering
+    routeKeys:
+    - api
+    - contract
+    - compatibility
+    - review
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: api-compatibility
+    owner: ESFramework API maintainers
+    acceptanceOwner: API owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 2af795756128f58e873e9ee030983011845328b87735e16168764eec38cdc494
+    governanceHash: f57fa537ead15544f4aae420ba1ffb64d23799ea97b56813b38b59e72fd9b7b5
+    statusNote: Initial catalog registration
+  es-automation-worker-authoring:
+    name: es-automation-worker-authoring
+    displayName: es-automation-worker-authoring
+    skillPath: .agents/skills/es-automation-worker-authoring
+    family: project
+    routeKeys:
+    - automation
+    - worker
+    - task-contract
+    - runrecord
+    - mcp
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: automation-worker
+    owner: ESFramework Automation maintainers
+    acceptanceOwner: automation owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 4147850bd61c2361f1375f49e3d61317e155c2a35a0346ba9ec196fb86e984b3
+    governanceHash: e5c9d9dd82a0f877d990131daed665b49b50a4f2084d1d4bea19e00e99f2370b
+    statusNote: Initial catalog registration
+  es-change-risk-register:
+    name: es-change-risk-register
+    displayName: es-change-risk-register
+    skillPath: .agents/skills/es-change-risk-register
+    family: engineering
+    routeKeys:
+    - risk
+    - change-budget
+    - rollback
+    - evidence
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: change-governance
+    owner: ESFramework engineering maintainers
+    acceptanceOwner: designated change owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 3f78c72753e0e34855b59c8c1294bbad13468dda5f99801b80b208bba1f654e9
+    governanceHash: b29166d2f0071b3f6d493d4f606aec054402adce3858c7515fa994c667951d62
+    statusNote: Initial catalog registration
+  es-codex-session-bootstrap:
+    name: es-codex-session-bootstrap
+    displayName: es-codex-session-bootstrap
+    skillPath: .agents/skills/es-codex-session-bootstrap
+    family: session
+    routeKeys:
+    - session
+    - startup
+    - handover
+    mcp:
+    - session-host
+    tier: Workflow
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-codex-session-bootstrap maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T09:32:17Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: b41c4dc3e4feafaf9de69080e9fec731bd5a7c258d2aa51cae52b47262d69413
+    governanceHash: dc11e49a8784936283c7f0b0f88f645c933c7e1fe35cbdf23fb07ff9e52f20bd
+    statusNote: Catalog hashes synchronized after session-bootstrap governance update
+  es-command-authoring:
+    name: es-command-authoring
+    displayName: es-command-authoring
+    skillPath: .agents/skills/es-command-authoring
+    family: project-command
+    routeKeys:
+    - command
+    - contract
+    - editor
+    mcp:
+    - unity-editor
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-command-authoring maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: d0d7b883490f99b1dbdc0f18141b20dfecb7e2df0504609ab3a2418795cdf411
+    governanceHash: bb6044341864c1c8ed55407512dfe3a2e6adab08204c0349adcefbf7b9b79435
+    statusNote: Initial catalog registration
+  es-dependency-boundary-audit:
+    name: es-dependency-boundary-audit
+    displayName: es-dependency-boundary-audit
+    skillPath: .agents/skills/es-dependency-boundary-audit
+    family: engineering
+    routeKeys:
+    - dependency
+    - assembly
+    - package
+    - architecture
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: dependency-boundary
+    owner: ESFramework architecture maintainers
+    acceptanceOwner: architecture owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: ead931d6aee5aa7bb0e83dd015cd00721684087cd93c5b35f67cfb882adbc268
+    governanceHash: 336e3591f32d722ad6308a374ee2018bb472b029cd561565f87112db4da4131b
+    statusNote: Initial catalog registration
+  es-editor-availability-validator:
+    name: es-editor-availability-validator
+    displayName: es-editor-availability-validator
+    skillPath: .agents/skills/es-editor-availability-validator
+    family: engineering
+    routeKeys:
+    - editor
+    - editor-window
+    - editor-extension
+    - reload-domain
+    - interaction
+    - visual
+    - availability
+    - validation
+    - evidence
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: editor-availability-validation
+    owner: ESFramework editor tooling maintainers
+    acceptanceOwner: designated ESFramework maintainer
+    firstRegisteredUtc: '2026-08-22T11:52:00Z'
+    lastModifiedUtc: '2026-08-23T03:16:19Z'
+    lastReviewedUtc: '2026-08-22T11:52:00Z'
+    skillHash: 2dc7c936a07c6b79b4dd8e253c2364715e69ab6285df4b3babad29d95cfde135
+    governanceHash: 6119498a1b429c870bf6cd0aace32df922ab667587aa328631acafd025e78ac4
+    statusNote: Initial catalog registration
+  es-editor-tooling:
+    name: es-editor-tooling
+    displayName: es-editor-tooling
+    skillPath: .agents/skills/es-editor-tooling
+    family: project-editor
+    routeKeys:
+    - editor
+    - scene
+    - undo
+    mcp:
+    - unity-editor
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-editor-tooling maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:16:19Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 9b6f8adedc83e590f2af724af05e04b9db9b0585740a37e95b2b201bbc191f5d
+    governanceHash: a03f79bd3ee8ac895cc1d97fb336ee1f521a9b935c068d2ba1b0e01009519dd7
+    statusNote: Initial catalog registration
+  es-entity-authoring:
+    name: es-entity-authoring
+    displayName: es-entity-authoring
+    skillPath: .agents/skills/es-entity-authoring
+    family: project-entity
+    routeKeys:
+    - entity
+    - prefab
+    - lifecycle
+    mcp:
+    - unity-editor
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-entity-authoring maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 07839dfd22affbccddb879206a7537c49fa0272fb5b6696a8c6e10e39d339adf
+    governanceHash: efae3a5f09a0a394d349f0abb8e2dec8867a3e2d4c5c2119e5acce3352eb2918
+    statusNote: Initial catalog registration
+  es-entity-prefab-validation:
+    name: es-entity-prefab-validation
+    displayName: es-entity-prefab-validation
+    skillPath: .agents/skills/es-entity-prefab-validation
+    family: project
+    routeKeys:
+    - entity
+    - prefab
+    - player
+    - weapon
+    - pool
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: entity-prefab
+    owner: ESFramework Entity maintainers
+    acceptanceOwner: Entity owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 3297a75d76fd39080d047526541d83d98a03976b7ce2e4c3a0f044df36e8601a
+    governanceHash: 710045f3621d1dc33a9407115a6278235436b6595dcdecff68d2bda5c26b4c97
+    statusNote: Initial catalog registration
+  es-feishu-cli:
+    name: es-feishu-cli
+    displayName: es-feishu-cli
+    skillPath: .agents/skills/es-feishu-cli
+    family: project
+    routeKeys:
+    - feishu
+    - lark
+    - external-adapter
+    - dry-run
+    - knowledge-search
+    - document-pull
+    - credential
+    - evidence
+    mcp:
+    - none-required
+    tier: Workflow
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: external-read-adapter
+    owner: ESFramework Automation maintainers
+    acceptanceOwner: Feishu integration owner
+    firstRegisteredUtc: '2026-08-23T07:59:55Z'
+    lastModifiedUtc: '2026-08-23T08:10:56Z'
+    lastReviewedUtc: '2026-08-23T07:59:55Z'
+    skillHash: ee065dd00cf7381404dbd7846f81ded69d32640ad795b7abb03dfde29ad7e229
+    governanceHash: a504eb9e5797ee655b45e8a56f1191182fef71b087447d55685d1776c5fc3d4c
+    statusNote: Initial registration; static and runtime acceptance remain unverified
+  es-first-principles-analysis:
+    name: es-first-principles-analysis
+    displayName: es-first-principles-analysis
+    skillPath: .agents/skills/es-first-principles-analysis
+    family: governance
+    routeKeys:
+    - analysis
+    - design
+    - root-cause
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-first-principles-analysis maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 22f8a9565527bbc7c11fcc396b49ce7a5e76448ca764c9ae16024d700f1995bf
+    governanceHash: 5003c1ae6e0f4267830615cc335bfbc5b8bf8c1ee11862431ae3c98597bccf3a
+    statusNote: Initial catalog registration
+  es-fix-compile-error:
+    name: es-fix-compile-error
+    displayName: es-fix-compile-error
+    skillPath: .agents/skills/es-fix-compile-error
+    family: engineering
+    routeKeys:
+    - compile
+    - diagnosis
+    - verification
+    mcp:
+    - unity-editor
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-fix-compile-error maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 77b0fbf8eadad84b09529e908571d38be27277321bb7527fcd27969d171e5275
+    governanceHash: 5e7f8e8457edaa4d848552f086f5bedada91ebb99910a9700ce7f1eba1c327b7
+    statusNote: Initial catalog registration
+  es-gamecore-config-authoring:
+    name: es-gamecore-config-authoring
+    displayName: es-gamecore-config-authoring
+    skillPath: .agents/skills/es-gamecore-config-authoring
+    family: project
+    routeKeys:
+    - gamecore
+    - config
+    - identity
+    - runtime-data
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: gamecore-identity
+    owner: ESFramework GameCore maintainers
+    acceptanceOwner: GameCore owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 2ad1d6131d2359741745ec16cbb6ad941c93b4017594dacdc12712f770567778
+    governanceHash: 7db1117978a3ff4b8fe24539808a0774285931de5c9fb30c070d64dcf7403de0
+    statusNote: Initial catalog registration
+  es-gamecore-integration:
+    name: es-gamecore-integration
+    displayName: es-gamecore-integration
+    skillPath: .agents/skills/es-gamecore-integration
+    family: project-gamecore
+    routeKeys:
+    - gamecore
+    - integration
+    - lifecycle
+    mcp:
+    - unity-editor
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-gamecore-integration maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 99194a21c83438a3d51fb83379a554d60ce6666b1f9117dba1258300ce228e02
+    governanceHash: 90d8f96e2d7bbac99dc490686078a85cccd6991860f08e6307bec708892c4343
+    statusNote: Initial catalog registration
+  es-generate-agent-artifacts:
+    name: es-generate-agent-artifacts
+    displayName: es-generate-agent-artifacts
+    skillPath: .agents/skills/es-generate-agent-artifacts
+    family: project-agent-authoring
+    routeKeys:
+    - agent
+    - artifacts
+    - validation
+    mcp:
+    - unity-editor
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-generate-agent-artifacts maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 2962ac46089ada1a54a139b74cf9fa57f895aac955bf475b8a9f6d2cfd067e5d
+    governanceHash: 249b0bd4f7b54d652a280b0cd13c279ae05d24d3c25b2d68810646d40e5af7af
+    statusNote: Initial catalog registration
+  es-input-action:
+    name: es-input-action
+    displayName: es-input-action
+    skillPath: .agents/skills/es-input-action
+    family: project-input
+    routeKeys:
+    - input
+    - action
+    - runtime
+    mcp:
+    - unity-editor
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-input-action maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: fd6b60a701ff9a6db4726316886e45119b57f9682608ee644c148ebfead4531f
+    governanceHash: e7b628b2073f731afe48af4c72cf4079c578b389443efe30fbd7c91beb8613bf
+    statusNote: Initial catalog registration
+  es-knowledge-creator:
+    name: es-knowledge-creator
+    displayName: es-knowledge-creator
+    skillPath: .agents/skills/es-knowledge-creator
+    family: project
+    routeKeys:
+    - knowledge
+    - knowledge-output
+    - source-ref
+    - hash
+    - routing
+    - evidence
+    - bounded-output
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: knowledge-authority
+    owner: ESFramework AIKnowledge maintainers
+    acceptanceOwner: knowledge owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:16:19Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 18eb8978bce55afb1b94e7b4c43f60ca0cc962b70fb4d7105c0ba4c65ab60b47
+    governanceHash: b4fcc0c49d05399684d95ce30fada4acd6e3098e41b77e564bb62765cadf053e
+    statusNote: Initial catalog registration
+  es-migration-planning:
+    name: es-migration-planning
+    displayName: es-migration-planning
+    skillPath: .agents/skills/es-migration-planning
+    family: engineering
+    routeKeys:
+    - migration
+    - compatibility
+    - rollback
+    - preservation
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: migration
+    owner: ESFramework migration maintainers
+    acceptanceOwner: migration owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 9cf0237aed9415b243a3138e7bcde4f30f0e813f881840d02e68f29893575e55
+    governanceHash: f5685d029c9b7dec5392c6a81ee18d0f4fbbf9de160ac6f17871a712c12e2f6f
+    statusNote: Initial catalog registration
+  es-module-lifecycle:
+    name: es-module-lifecycle
+    displayName: es-module-lifecycle
+    skillPath: .agents/skills/es-module-lifecycle
+    family: project-lifecycle
+    routeKeys:
+    - module
+    - lifecycle
+    - audit
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-module-lifecycle maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:16:19Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 37db92d82e8bb9307ea9a6bdac39f4e47cd20c51ccaaa98827a0917d1aa181db
+    governanceHash: af1c0c8681d6581b5e6d5024d42e17d5ef80eef33e2dcde2cc79d67bdec4cf61
+    statusNote: Initial catalog registration
+  es-observability-evidence:
+    name: es-observability-evidence
+    displayName: es-observability-evidence
+    skillPath: .agents/skills/es-observability-evidence
+    family: engineering
+    routeKeys:
+    - evidence
+    - receipt
+    - runrecord
+    - observability
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: observability
+    owner: ESFramework automation maintainers
+    acceptanceOwner: evidence owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 00b00aa373e10c5bcd89dc849b23f52bae8cc4f04123c7065fe3b4529544c53f
+    governanceHash: b357f263fc8556b93bbbf41ee8aa54d43f1172e38eb7a43a437ab6386ea2ecf8
+    statusNote: Initial catalog registration
+  es-performance-budgeting:
+    name: es-performance-budgeting
+    displayName: es-performance-budgeting
+    skillPath: .agents/skills/es-performance-budgeting
+    family: engineering
+    routeKeys:
+    - performance
+    - profiler
+    - gc
+    - budget
+    - evidence
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: performance-evidence
+    owner: ESFramework performance maintainers
+    acceptanceOwner: performance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:16:19Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: a48e9d744529b373d7321f62bfbfbed0311521b90e9e778c420ad3453454467a
+    governanceHash: 9fdf2cb2888babb8b5f8063e0dfbf68845e3bca0a34879204e6313d7a2bf19c3
+    statusNote: Initial catalog registration
+  es-publish-aitest-prompt:
+    name: es-publish-aitest-prompt
+    displayName: es-publish-aitest-prompt
+    skillPath: .agents/skills/es-publish-aitest-prompt
+    family: project-test
+    routeKeys:
+    - aitest
+    - prompt
+    - worker
+    - evidence
+    mcp:
+    - unity-editor
+    tier: Workflow
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-publish-aitest-prompt maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T07:44:22Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: c7fb8309ff53b16d5aae09dcb26d74e9b9dba3b5ad353604843ff171f2d9e5f2
+    governanceHash: 13150a6ce8479e298ea111ded3b3c73f0b0041347889858e8d03e0eb7bcf41d9
+    statusNote: Initial catalog registration
+  es-release-acceptance:
+    name: es-release-acceptance
+    displayName: es-release-acceptance
+    skillPath: .agents/skills/es-release-acceptance
+    family: project-release
+    routeKeys:
+    - aibrain
+    - unity
+    - compile
+    - test
+    - release
+    - evidence
+    mcp:
+    - unity-editor
+    tier: Engineering
+    maturity: Verifying
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: release-evidence
+    owner: ESFramework release maintainers
+    acceptanceOwner: designated release owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T11:28:45Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 3ef346c8be19390311e3c5f6b6feb079b528ee7b191d10d834724435cac8d901
+    governanceHash: 1a26559d03af9e90cc248068f6e699cda17d0e54f34c6aa8b19e136f18e18c18
+    statusNote: Initial catalog registration
+  es-release-notes-evidence:
+    name: es-release-notes-evidence
+    displayName: es-release-notes-evidence
+    skillPath: .agents/skills/es-release-notes-evidence
+    family: engineering
+    routeKeys:
+    - release
+    - notes
+    - evidence
+    - communication
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: release-communication
+    owner: ESFramework release documentation maintainers
+    acceptanceOwner: release owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: efbb75e08ee76875edd3c37334d035ffc9675557635208180f593981155fd771
+    governanceHash: c95480bce115127ccb363956a28d2c832cefe747aa9a2e6d3c05f01b6cc32d02
+    statusNote: Initial catalog registration
+  es-repository-discovery:
+    name: es-repository-discovery
+    displayName: es-repository-discovery
+    skillPath: .agents/skills/es-repository-discovery
+    family: engineering
+    routeKeys:
+    - repository
+    - discovery
+    - architecture
+    - evidence
+    mcp:
+    - none-required
+    tier: Workflow
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: repository-scope
+    owner: ESFramework engineering maintainers
+    acceptanceOwner: task executor
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 2722544887efe087a063ef62c9830d45342bbf476c655a67bc4ed89c4b48febe
+    governanceHash: 0dad5398708caee52902bdcf098889725fad14ed4a1ef81079293adeafbe22f2
+    statusNote: Initial catalog registration
+  es-resource-pipeline:
+    name: es-resource-pipeline
+    displayName: es-resource-pipeline
+    skillPath: .agents/skills/es-resource-pipeline
+    family: project-resource
+    routeKeys:
+    - resource
+    - pipeline
+    - manifest
+    mcp:
+    - unity-editor
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-resource-pipeline maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:16:19Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: cac7f549509b0bbf6a343d39933b7e2273b3ffcff5d5d23c495f25dc90c403d3
+    governanceHash: e39b0773b776686971b4b9ea47d61a7bcb5fa4674b5379153511eb7fe1f89b58
+    statusNote: Initial catalog registration
+  es-resource-publish-audit:
+    name: es-resource-publish-audit
+    displayName: es-resource-publish-audit
+    skillPath: .agents/skills/es-resource-publish-audit
+    family: project
+    routeKeys:
+    - resource
+    - asset
+    - manifest
+    - provider
+    - release
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: resource-release
+    owner: ESFramework resource maintainers
+    acceptanceOwner: release owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 25ff4048646f56cdf3838af4e375887e7ef0419caee8e4006d7bd9700e2e9263
+    governanceHash: 516e5f265faca986c94c1e9883116a211d28cfb24cdbe3bc95936b1baa8808f8
+    statusNote: Initial catalog registration
+  es-security-input-audit:
+    name: es-security-input-audit
+    displayName: es-security-input-audit
+    skillPath: .agents/skills/es-security-input-audit
+    family: engineering
+    routeKeys:
+    - security
+    - input
+    - mcp
+    - cli
+    - path-boundary
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: input-security
+    owner: ESFramework security maintainers
+    acceptanceOwner: security owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T07:38:10Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 4b5cdce89fdaf8632b8064af6b95e0bc36630b1b4e8632b8e1fd687367aca0a5
+    governanceHash: 9b204038749f4e64ff69ecfda425010e3bf09f47fef07404df9f73f1f535be45
+    statusNote: Initial catalog registration
+  es-skill-creator:
+    name: es-skill-creator
+    displayName: es-skill-creator
+    skillPath: .agents/skills/es-skill-creator
+    family: governance
+    routeKeys:
+    - skill
+    - creator
+    - governance
+    - validation
+    - aibrain
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Verifying
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: skill-authoring
+    owner: ESFramework Skill maintainers
+    acceptanceOwner: designated ESFramework maintainer
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T07:57:39Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 0ebf058edef8179061ff9215b2c989357c7b89bccd43735a7af1c6d6c1ad259a
+    governanceHash: c21cd92044d256af1ad32b12c03d2a69235731a58749ea9215b1656c2f6a1cc1
+    statusNote: Initial catalog registration
+  es-skill-governance:
+    name: es-skill-governance
+    displayName: es-skill-governance
+    skillPath: .agents/skills/es-skill-governance
+    family: governance
+    routeKeys:
+    - skill
+    - governance
+    - creator
+    - validation
+    - evidence
+    - tier
+    - maturity
+    - delivery
+    - aibrain
+    - skill-performance
+    - execution-cost
+    - fast-path
+    - deep-path
+    - cache
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Verifying
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: governance
+    owner: ESFramework AI governance maintainers
+    acceptanceOwner: task requester or designated ESFramework maintainer
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T09:59:05Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: bec209f4476b87ceb7ee14fa50edc394e5cc1cc45ab3949495d2cbcc08670e05
+    governanceHash: f13e9e0f74fd861970aecec77f3a44190785322734037b90c26065c83f699330
+    statusNote: Initial catalog registration
+  es-skill-session-refresh:
+    name: es-skill-session-refresh
+    displayName: es-skill-session-refresh
+    skillPath: .agents/skills/es-skill-session-refresh
+    family: engineering
+    routeKeys:
+    - skill
+    - session
+    - refresh
+    - capability
+    - delta
+    - stale
+    - routing
+    - aibrain
+    - understanding-drift
+    - skill-understanding-refresh
+    - capability-refresh
+    - incremental-discovery
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: session-capability-drift
+    owner: ESFramework AI governance maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-23T07:57:45Z'
+    lastModifiedUtc: '2026-08-23T08:52:16Z'
+    lastReviewedUtc: '2026-08-23T07:57:45Z'
+    skillHash: 2eebecf99aec9151f186e123c6a55572e6c2752072fd29a759442edd03a502ed
+    governanceHash: 503b3e7da4abd56b95a29acc2cb356c5687119cd29351ca4fb0174b2a681d011
+    statusNote: Initial catalog registration
+  es-skill-validator:
+    name: es-skill-validator
+    displayName: ES Skill Validator
+    skillPath: .agents/skills/es-skill-validator
+    family: project
+    routeKeys:
+    - skill
+    - validation
+    - governance
+    - security
+    - evidence
+    - catalog
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: skill-validation
+    owner: ESFramework Skill governance maintainers
+    acceptanceOwner: designated ESFramework maintainer
+    firstRegisteredUtc: '2026-08-22T01:22:58Z'
+    lastModifiedUtc: '2026-08-23T10:01:41Z'
+    lastReviewedUtc: '2026-08-22T01:22:58Z'
+    skillHash: 2884292200d9085269fb590731a63a59cdffa5af27c58c4c32e362cae06fe574
+    governanceHash: f9a3fda87a014d754897f34b4654377e0885e5afc4533a5c67d0b04384a570ce
+    statusNote: Initial catalog registration
+  es-stable-graph-authoring:
+    name: es-stable-graph-authoring
+    displayName: es-stable-graph-authoring
+    skillPath: .agents/skills/es-stable-graph-authoring
+    family: project
+    routeKeys:
+    - graph
+    - stable-graph
+    - agent-authoring
+    - migration
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Verifying
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: graph-identity
+    owner: ESFramework Graph maintainers
+    acceptanceOwner: graph owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:16:19Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: ada9b09237cdb0301bc3aaf27c8087a8ec810d54cafa468c6dcaff6238156baa
+    governanceHash: f68e4cc2993fb178dcbf212d79fffe91c5ded9e6b5eec4e0bd3d500f051202bb
+    statusNote: Initial catalog registration
+  es-start-estest:
+    name: es-start-estest
+    displayName: es-start-estest
+    skillPath: .agents/skills/es-start-estest
+    family: project-test
+    routeKeys:
+    - estest
+    - unity
+    - test
+    - evidence
+    mcp:
+    - unity-editor
+    tier: Workflow
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-start-estest maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 0b41c79ff1d58f5fed053fb7482e92bfab6081f2515cafc4162fdbf6350631d9
+    governanceHash: 07ef1794907e3a1a965e46b77a3517e2e72f26e44aa801682404ca54f6f7dfe0
+    statusNote: Initial catalog registration
+  es-static-deep-replay:
+    name: es-static-deep-replay
+    displayName: es-static-deep-replay
+    skillPath: .agents/skills/es-static-deep-replay
+    family: governance
+    routeKeys:
+    - static-replay
+    - deep-replay
+    - deterministic
+    - hash
+    - cache-invalidation
+    - evidence
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: static-replay
+    owner: ESFramework AI governance maintainers
+    acceptanceOwner: designated maintainer
+    firstRegisteredUtc: '2026-08-22T16:24:22Z'
+    lastModifiedUtc: '2026-08-23T08:20:12Z'
+    lastReviewedUtc: '2026-08-22T16:24:22Z'
+    skillHash: 42f334a5b682ac0dfb935461b486f5ff840d4a93ba64ae8d35ce5c6ef190a169
+    governanceHash: 3b4348dda4167745ab28adf17f9cf8dda0a39f07e94d4d6f83ae93734357e10a
+    statusNote: Initial catalog registration
+  es-tag-config:
+    name: es-tag-config
+    displayName: es-tag-config
+    skillPath: .agents/skills/es-tag-config
+    family: project-identity
+    routeKeys:
+    - tag
+    - config
+    - identity
+    mcp:
+    - unity-editor
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-tag-config maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: aa34577cb7a1c7be7d76123858c38f2fc774742031225f323b1abf2d50079994
+    governanceHash: a10e5942cf39838004ba2f3f75e8706dee492bbcc4e62aa12c7763889104c0b9
+    statusNote: Initial catalog registration
+  es-task-read-snapshot:
+    name: es-task-read-snapshot
+    displayName: es-task-read-snapshot
+    skillPath: .agents/skills/es-task-read-snapshot
+    family: engineering
+    routeKeys:
+    - task
+    - read
+    - snapshot
+    - cache
+    - hash
+    - stale
+    - consistency
+    - aibrain
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: task-consistency
+    owner: ESFramework AI governance maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T04:24:35Z'
+    lastModifiedUtc: '2026-08-23T07:23:18Z'
+    lastReviewedUtc: '2026-08-22T04:24:35Z'
+    skillHash: 2aba9af6d3adf5d3437ab6afd893dbe2dd5fc909c5b8b3bd23864c1f43b60cea
+    governanceHash: 024fe8412bcf7f570d8de08c214c6fc7ea32e4cb7ec58a410ba20ac01f94f29a
+    statusNote: Initial catalog registration
+  es-test-fixture-authoring:
+    name: es-test-fixture-authoring
+    displayName: es-test-fixture-authoring
+    skillPath: .agents/skills/es-test-fixture-authoring
+    family: engineering
+    routeKeys:
+    - test
+    - fixture
+    - scene-validation
+    - evidence
+    mcp:
+    - none-required
+    tier: Engineering
+    maturity: Proposed
+    delivery: Designed
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: test-data
+    owner: ESFramework test maintainers
+    acceptanceOwner: test owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:21:03Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 02c3bf7709b10a09d91c39adcb10bba04402c72b8530d760d5dfb0624be1dfef
+    governanceHash: 3143a82aacf38d331269bd1e79a311e3cff0b48431dd727df1fd44656b09434c
+    statusNote: Initial catalog registration
+  es-ui-prefab-authoring:
+    name: es-ui-prefab-authoring
+    displayName: es-ui-prefab-authoring
+    skillPath: .agents/skills/es-ui-prefab-authoring
+    family: project-ui
+    routeKeys:
+    - skill
+    - screen-spec-v3
+    - ui
+    - prefab
+    - fixture-scene
+    - visual-qa
+    mcp:
+    - unity-editor
+    tier: Workflow
+    maturity: Verifying
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: ui-prefab-authoring
+    owner: ESFramework Skill maintainers
+    acceptanceOwner: designated ESFramework maintainer
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T08:34:59Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 3a9f45d41d00437f7484438ee0215440012f0de8b6660a1fefe2120fc429096e
+    governanceHash: 12a8bf9e0a80ec25889b1d7df90b8c0ffafab7a96ae534e2a734ff428ee9d331
+    statusNote: Initial catalog registration
+  es-unity-compile:
+    name: es-unity-compile
+    displayName: es-unity-compile
+    skillPath: .agents/skills/es-unity-compile
+    family: engineering
+    routeKeys:
+    - unity
+    - compile
+    - reload
+    - evidence
+    mcp:
+    - unity-editor
+    tier: Workflow
+    maturity: Implementing
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S1
+    riskClass: project-workflow
+    owner: ESFramework es-unity-compile maintainers
+    acceptanceOwner: ESFramework acceptance owner
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T08:22:24Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: f05e912ae34efc1f31b3e5c61fe66e397695452874e75fb6aa38148e1a3fe531
+    governanceHash: 486443efb84b896b0f882059bd137b4ea179afa23a7c3fc3f4c0281e62fe968e
+    statusNote: Initial catalog registration
+  es-use-ai-command:
+    name: es-use-ai-command
+    displayName: es-use-ai-command
+    skillPath: .agents/skills/es-use-ai-command
+    family: governance
+    routeKeys:
+    - aibrain
+    - governance
+    - command
+    - routing
+    mcp:
+    - none-required
+    tier: Workflow
+    maturity: Verifying
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: authority-routing
+    owner: ESFramework AICommand maintainers
+    acceptanceOwner: task requester
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T06:55:21Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 6620ac31b85994f293328bc030bdd4a64b65e3864274f44d41d1b51f14c599e0
+    governanceHash: 02aa9962696199cc08df0ef6388ad657bc02339c5ca3f702b651e1cc7685c68a
+    statusNote: Initial catalog registration
+  es-utf8-guard:
+    name: es-utf8-guard
+    displayName: es-utf8-guard
+    skillPath: .agents/skills/es-utf8-guard
+    family: engineering
+    routeKeys:
+    - aibrain
+    - utf8
+    - validation
+    - evidence
+    mcp:
+    - none-required
+    tier: SmallTool
+    maturity: Verifying
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: text-integrity
+    owner: ESFramework text-integrity maintainers
+    acceptanceOwner: task executor
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T03:16:19Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: a8185a77c56783d8f50a19eb6d9732bff452792f59d87556f20a44816c1b3424
+    governanceHash: b375728e9a8bd7d6fab5511870bdbdf2e7343d10dd8065b7632164cad622ab0b
+    statusNote: Initial catalog registration
+  es-worktree-audit:
+    name: es-worktree-audit
+    displayName: es-worktree-audit
+    skillPath: .agents/skills/es-worktree-audit
+    family: engineering
+    routeKeys:
+    - aibrain
+    - worktree
+    - validation
+    - evidence
+    mcp:
+    - none-required
+    tier: SmallTool
+    maturity: Verifying
+    delivery: Implemented-Unverified
+    registrationState: NeedsReview
+    evidenceLevel: S2
+    riskClass: change-boundary
+    owner: ESFramework repository maintainers
+    acceptanceOwner: task executor
+    firstRegisteredUtc: '2026-08-22T01:05:22Z'
+    lastModifiedUtc: '2026-08-23T07:05:13Z'
+    lastReviewedUtc: '2026-08-22T01:05:22Z'
+    skillHash: 51f7749d47e21de9abc52a232c114596bb33847fc85bdae9190ab4a3b3188f22
+    governanceHash: c0f9b250da53ce9d3038a09a71a85a64ddbb0658cffaa7564eb543add6cde6b7
+    statusNote: Initial catalog registration

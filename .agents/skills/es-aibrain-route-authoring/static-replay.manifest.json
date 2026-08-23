@@ -1,0 +1,76 @@
+{
+    "schemaVersion":  1,
+    "skillName":  "es-aibrain-route-authoring",
+    "sourceRoots":  [
+                        ".agents/skills/es-aibrain-route-authoring"
+                    ],
+    "cases":  [
+                  "normal-input",
+                  "invalid-input",
+                  "denied-expansion",
+                  "repeat-idempotency",
+                  "hash-change-cache-invalidation",
+                  "interruption-recovery",
+                  "deterministic-output"
+              ],
+    "staticClaims":  [
+                         "structure",
+                         "governance",
+                         "source-hashes",
+                         "deterministic-replay",
+                         "boundary-contract"
+                     ],
+    "runtimeClaimsNotProven":  [
+                                   "Unity/editor/process behavior",
+                                   "timing and visual behavior",
+                                   "Profiler/Player/IL2CPP/release behavior"
+                               ],
+    "runtimeEscalation":  {
+                              "required":  false,
+                              "reason":  "Only external execution can prove the declared runtime claims."
+                          },
+    "caseAssertions":  {
+                           "normal-input":  "source roots and required Skill files are present",
+                           "invalid-input":  "invalid input is rejected by the declared contract",
+                           "denied-expansion":  "permission or path expansion is denied",
+                           "repeat-idempotency":  "repeat execution is idempotent",
+                           "hash-change-cache-invalidation":  "hash or cache changes invalidate stale state",
+                           "interruption-recovery":  "interruption and recovery are declared",
+                           "deterministic-output":  "deterministic output and stable ordering are declared"
+                       },
+    "responsibilityProfile":  "governance",
+    "responsibilityChecks":  [
+                                 "authority-routing",
+                                 "permission-boundary",
+                                 "deterministic-replay",
+                                 "evidence-contract"
+                             ],
+    "responsibilityScope":  "Custom static acceptance for governance responsibilities; common replay cases remain necessary but are not sufficient.",
+    "specializedAcceptance":  {
+                                  "id":  "aibrain-route-contract",
+                                  "title":  "AIBrain route and capability discovery",
+                                  "requiredStaticCases":  [
+                                                              "route-key-overlap",
+                                                              "skill-discovery",
+                                                              "knowledge-binding",
+                                                              "route-collision",
+                                                              "stale-route-hash"
+                                                          ],
+                                  "evidenceArtifacts":  [
+                                                            "SKILL.md",
+                                                            "references/route-contract.md",
+                                                            "scripts/Test-ESAIBrainRoute.ps1",
+                                                            "references/evidence-receipt-contract.md",
+                                                            "governance.json"
+                                                        ],
+                                  "sourceAssertions":  [
+                                                           "AIBRAIN_ENTRY",
+                                                           "routeKeys",
+                                                           "KnowledgeIndex",
+                                                           "collision",
+                                                           "stale"
+                                                       ],
+                                  "runtimeBoundary":  "Only Runtime can prove listCapabilities behavior; static checks prove route declarations and closure."
+                              },
+    "specializedGuidanceRef":  "references/static-specialized-acceptance.md"
+}

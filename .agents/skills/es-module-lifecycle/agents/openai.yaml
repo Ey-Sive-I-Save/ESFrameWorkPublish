@@ -1,4 +1,4 @@
 interface:
   display_name: "ES 模块生命周期"
-  short_description: "仅在明确正式审计时管理模块成熟度与续接状态"
+  short_description: "审计 ES 模块成熟度、边界与续接状态 Lifecycle"
   default_prompt: "Use $es-module-lifecycle only when the user explicitly requests a formal audit, maturity matrix, checkpoint, or audit continuation."

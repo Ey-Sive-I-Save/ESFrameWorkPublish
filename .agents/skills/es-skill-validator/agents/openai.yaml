@@ -1,0 +1,3 @@
+display_name: "ES Skill Validator"
+short_description: "Validate Skill contracts, governance, hashes and evidence"
+default_prompt: "Use $es-skill-validator to validate an ESFramework project Skill before acceptance."

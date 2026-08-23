@@ -1,4 +1,4 @@
 interface:
   display_name: "ES 对抗式审查"
-  short_description: "以架构、正确性和最小性视角只读挑战 ES 方案"
+  short_description: "只读审查 ES 方案风险、证据与漏洞 Readonly"
   default_prompt: "Use $es-adversarial-review to perform a read-only adversarial review of this ESFramework design or implementation."

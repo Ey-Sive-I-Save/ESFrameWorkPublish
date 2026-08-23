@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-change-risk-register"
+  short_description: "Governed es-change-risk-register workflow"
+  default_prompt: "Use es-change-risk-register with AIBrain planning and project evidence."

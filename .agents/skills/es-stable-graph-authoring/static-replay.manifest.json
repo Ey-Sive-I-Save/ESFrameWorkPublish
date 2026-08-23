@@ -1,0 +1,76 @@
+{
+    "schemaVersion":  1,
+    "skillName":  "es-stable-graph-authoring",
+    "sourceRoots":  [
+                        ".agents/skills/es-stable-graph-authoring"
+                    ],
+    "cases":  [
+                  "normal-input",
+                  "invalid-input",
+                  "denied-expansion",
+                  "repeat-idempotency",
+                  "hash-change-cache-invalidation",
+                  "interruption-recovery",
+                  "deterministic-output"
+              ],
+    "staticClaims":  [
+                         "structure",
+                         "governance",
+                         "source-hashes",
+                         "deterministic-replay",
+                         "boundary-contract"
+                     ],
+    "runtimeClaimsNotProven":  [
+                                   "Unity/editor/process behavior",
+                                   "timing and visual behavior",
+                                   "Profiler/Player/IL2CPP/release behavior"
+                               ],
+    "runtimeEscalation":  {
+                              "required":  false,
+                              "reason":  "Only external execution can prove the declared runtime claims."
+                          },
+    "caseAssertions":  {
+                           "normal-input":  "source roots and required Skill files are present",
+                           "invalid-input":  "invalid input is rejected by the declared contract",
+                           "denied-expansion":  "permission or path expansion is denied",
+                           "repeat-idempotency":  "repeat execution is idempotent",
+                           "hash-change-cache-invalidation":  "hash or cache changes invalidate stale state",
+                           "interruption-recovery":  "interruption and recovery are declared",
+                           "deterministic-output":  "deterministic output and stable ordering are declared"
+                       },
+    "responsibilityProfile":  "authoring",
+    "responsibilityChecks":  [
+                                 "change-boundary",
+                                 "resource-projection",
+                                 "deterministic-replay",
+                                 "evidence-contract"
+                             ],
+    "responsibilityScope":  "Custom static acceptance for authoring responsibilities; common replay cases remain necessary but are not sufficient.",
+    "specializedAcceptance":  {
+                                  "id":  "stable-graph-contract",
+                                  "title":  "Stable graph authoring and deterministic projection",
+                                  "requiredStaticCases":  [
+                                                              "graph-identity",
+                                                              "node-id-stability",
+                                                              "edge-closure",
+                                                              "duplicate-node-rejection",
+                                                              "packet-hash"
+                                                          ],
+                                  "evidenceArtifacts":  [
+                                                            "SKILL.md",
+                                                            "references/graph-contract.md",
+                                                            "scripts/Test-ESStableGraphPacket.ps1",
+                                                            "references/evidence-receipt-contract.md",
+                                                            "governance.json"
+                                                        ],
+                                  "sourceAssertions":  [
+                                                           "stable graph",
+                                                           "node ID",
+                                                           "edge",
+                                                           "duplicate node",
+                                                           "packet hash"
+                                                       ],
+                                  "runtimeBoundary":  "Static graph packet proof does not claim Unity GraphView rendering."
+                              },
+    "specializedGuidanceRef":  "references/static-specialized-acceptance.md"
+}

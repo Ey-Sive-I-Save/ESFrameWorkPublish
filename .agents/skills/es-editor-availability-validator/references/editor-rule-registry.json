@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "registryId": "es-editor-window-production-rules",
+  "rules": [
+    {"ruleId":"EW-01","title":"window-kind","applicableTo":["EditorWindow","Workbench","InspectorDrawer","MenuAction","PreviewImport"],"severity":"critical","staticChecks":["target-kind","editor-entry"],"runtimeChecks":["host-reachability"]},
+    {"ruleId":"EW-02","title":"singleton-entry","applicableTo":["EditorWindow","Workbench"],"severity":"high","staticChecks":["singleton-policy","get-window-entry"],"runtimeChecks":["duplicate-window"]},
+    {"ruleId":"EW-03","title":"opening-position","applicableTo":["EditorWindow","Workbench","InspectorDrawer"],"severity":"high","staticChecks":["opening-policy","position-or-host"],"runtimeChecks":["multi-display-position"]},
+    {"ruleId":"EW-04","title":"size-bounds","applicableTo":["EditorWindow","Workbench","InspectorDrawer"],"severity":"critical","staticChecks":["minimum-size","maximum-strategy","numeric-relation"],"runtimeChecks":["narrow-wide-dpi"]},
+    {"ruleId":"EW-05","title":"first-screen-conclusion","applicableTo":["EditorWindow","Workbench","InspectorDrawer"],"severity":"high","staticChecks":["title-status-primary"],"runtimeChecks":["first-screen-screenshot"]},
+    {"ruleId":"EW-06","title":"phase-separation","applicableTo":["EditorWindow","Workbench"],"severity":"medium","staticChecks":["section-or-phase"],"runtimeChecks":["phase-navigation"]},
+    {"ruleId":"EW-07","title":"section-identity","applicableTo":["EditorWindow","Workbench","InspectorDrawer"],"severity":"high","staticChecks":["section-id","navigator-id"],"runtimeChecks":["reselection-domain-reload"]},
+    {"ruleId":"EW-08","title":"single-axis-scroll","applicableTo":["EditorWindow","Workbench","InspectorDrawer"],"severity":"high","staticChecks":["scroll-owner-or-exception"],"runtimeChecks":["horizontal-overflow"]},
+    {"ruleId":"EW-09","title":"action-host-layers","applicableTo":["EditorWindow","Workbench","InspectorDrawer","MenuAction"],"severity":"medium","staticChecks":["action-host"],"runtimeChecks":["event-routing"]},
+    {"ruleId":"EW-10","title":"phase-primary-action","applicableTo":["EditorWindow","Workbench","InspectorDrawer"],"severity":"medium","staticChecks":["primary-action"],"runtimeChecks":["primary-action-visibility"]},
+    {"ruleId":"EW-11","title":"state-failure-closure","applicableTo":["EditorWindow","Workbench","InspectorDrawer","PreviewImport","BackgroundService"],"severity":"critical","staticChecks":["state-error-empty-recovery"],"runtimeChecks":["failure-recovery"]},
+    {"ruleId":"EW-12","title":"mutation-recovery","applicableTo":["EditorWindow","Workbench","InspectorDrawer","PreviewImport"],"severity":"critical","staticChecks":["undo-dirty-write-scope"],"runtimeChecks":["undo-reopen-recovery"]},
+    {"ruleId":"EW-13","title":"target-event-isolation","applicableTo":["EditorWindow","Workbench","InspectorDrawer","MenuAction"],"severity":"high","staticChecks":["focus-stop-propagation"],"runtimeChecks":["click-scroll-drag-isolation"]},
+    {"ruleId":"EW-14","title":"owner-lifecycle","applicableTo":["EditorWindow","Workbench","InspectorDrawer"],"severity":"high","staticChecks":["owner-key-bind-unbind"],"runtimeChecks":["parent-child-close"]},
+    {"ruleId":"EW-15","title":"sleep-host-unification","applicableTo":["EditorWindow","Workbench"],"severity":"high","staticChecks":["sleep-contract"],"runtimeChecks":["sleep-wake-geometry"]},
+    {"ruleId":"EW-16","title":"reload-playmode","applicableTo":["EditorWindow","Workbench","InspectorDrawer","PreviewImport","BackgroundService"],"severity":"critical","staticChecks":["reload-unbind"],"runtimeChecks":["reload-domain-playmode"]},
+    {"ruleId":"EW-17","title":"hot-path-budget","applicableTo":["EditorWindow","Workbench","InspectorDrawer","PreviewImport","BackgroundService"],"severity":"high","staticChecks":["cache-budget-no-scan"],"runtimeChecks":["profiler-threshold"]},
+    {"ruleId":"EW-18","title":"preview-ownership","applicableTo":["PreviewImport","EditorWindow","Workbench"],"severity":"high","staticChecks":["preview-session-release"],"runtimeChecks":["rendertexture-cleanup"]},
+    {"ruleId":"EW-19","title":"es-token","applicableTo":["EditorWindow","Workbench","InspectorDrawer"],"severity":"medium","staticChecks":["es-token-theme"],"runtimeChecks":["light-dark-contrast"]},
+    {"ruleId":"EW-20","title":"long-value-accessibility","applicableTo":["EditorWindow","Workbench","InspectorDrawer","PreviewImport"],"severity":"medium","staticChecks":["long-text-path-guid-keyboard"],"runtimeChecks":["long-value-dpi"]}
+  ]
+}

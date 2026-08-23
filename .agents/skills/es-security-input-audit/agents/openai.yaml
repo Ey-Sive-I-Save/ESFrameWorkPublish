@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-security-input-audit"
+  short_description: "Governed es-security-input-audit workflow"
+  default_prompt: "Use es-security-input-audit with AIBrain planning and project evidence."

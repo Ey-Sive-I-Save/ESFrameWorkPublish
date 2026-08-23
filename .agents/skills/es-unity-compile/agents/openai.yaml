@@ -1,7 +1,7 @@
 interface:
   display_name: "ES Unity 编译验收"
-  short_description: "检查 Unity 编译、Console、程序集与验证证据等级"
-  default_prompt: "Use $es-unity-compile to verify the current ES Unity compilation state."
+  short_description: "检查 Unity CLI、编译、Console、程序集与证据等级"
+  default_prompt: "Use $es-unity-compile to verify Unity compilation or run guarded Unity CLI compile/test workflows."
 
 policy:
   allow_implicit_invocation: true

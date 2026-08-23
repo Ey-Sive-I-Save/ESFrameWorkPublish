@@ -26,6 +26,15 @@ param(
 
     [string[]]$HandoffPath = @(),
 
+    # Only Complete-ESCodexHandoff.ps1 may set this for a handoff-intent New.
+    # Direct callers must not bypass timeline coverage and handoff receipts.
+    [switch]$HandoffMode,
+
+    # Internal capability set by Complete-ESCodexHandoff.ps1 for the duration
+    # of its Validate/New calls. A public switch alone must never authorize a
+    # handoff because it would make the orchestrator optional.
+    [string]$HandoffAuthorization = '',
+
     [switch]$ForceNew,
 
     [switch]$AllSessions,
@@ -141,6 +150,37 @@ $OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($f
 . (Join-Path $PSScriptRoot 'ESCodexSessionState.ps1')
 . (Join-Path $PSScriptRoot 'ESCodexLaunchReadiness.ps1')
 
+function Test-SessionHandoffIntent([string]$ModeValue, [string]$TaskKeyValue,
+    [string]$ResponsibilityKeyValue, [string]$PromptValue) {
+    if ($ModeValue -ne 'New') { return $false }
+    $text = @($TaskKeyValue, $ResponsibilityKeyValue, $PromptValue) -join ' '
+    return $text -match '(?i)handoff|handover|\u4ea4\u63a5|\u63a5\u624b|\u79fb\u4ea4'
+}
+
+function Assert-HandoffResponsibility([string]$ResponsibilityKeyValue, [string]$TabTitleValue,
+    [object[]]$ResolvedHandoffFiles) {
+    if ($ResponsibilityKeyValue -match '(?i)handoff|handover|\u4ea4\u63a5|\u63a5\u624b|\u79fb\u4ea4|resume|fork|\u6062\u590d|\u5206\u53c9|close|\u5173\u95ed|bootstrap|\u542f\u52a8') {
+        throw 'Handoff ResponsibilityKey must identify the receiving content responsibility, not a handoff/resume/fork/bootstrap operation.'
+    }
+    if ($TabTitleValue -match '(?i)handoff|handover|\u4ea4\u63a5|\u63a5\u624b|\u79fb\u4ea4|resume|fork|\u6062\u590d|\u5206\u53c9|close|\u5173\u95ed|bootstrap|\u542f\u52a8') {
+        throw 'Handoff TabTitle must identify the receiving content responsibility, not a handoff/resume/fork/bootstrap operation.'
+    }
+    $normalized = @($ResolvedHandoffFiles | ForEach-Object { [string]$_.relativePath })
+    $archivePrefix = 'ES/' + (New-TextFromCodePoints @(0x0041, 0x0049, 0x534F, 0x4F5C, 0x5386, 0x7A0B, 0xFF08, 0x0043, 0x006F, 0x0064, 0x0065, 0x0078, 0xFF09)) + '/'
+    if (-not ($normalized | Where-Object { [string]$_ -like ($archivePrefix + '*') })) {
+        throw ('Handoff launch must carry an ES/AI collaboration archive; use Complete-ESCodexHandoff.ps1. Received: ' + ($normalized -join '; '))
+    }
+}
+
+function Assert-HandoffAuthorization([string]$AuthorizationValue) {
+    $expected = [string]$env:ES_CODEX_HANDOFF_AUTHORIZATION
+    if ([string]::IsNullOrWhiteSpace($expected) -or
+        [string]::IsNullOrWhiteSpace($AuthorizationValue) -or
+        -not [String]::Equals($AuthorizationValue, $expected, [StringComparison]::Ordinal)) {
+        throw 'HandoffMode is reserved for Complete-ESCodexHandoff.ps1; missing orchestrator authorization.'
+    }
+}
+
 function Get-Sha256([string]$Value) {
     $sha = [Security.Cryptography.SHA256]::Create()
     try {
@@ -254,7 +294,9 @@ function Find-LaunchedShellProcessId([string]$Token) {
             Select-Object -First 1
         if ($null -ne $process) { return [int]$process.ProcessId }
     }
-    catch { }
+    catch {
+        Write-Verbose ("Unable to inspect launched Codex shell process: " + $_.Exception.Message)
+    }
     return 0
 }
 
@@ -267,7 +309,9 @@ function Find-SessionId([string]$HistoryPath, [string]$Token, [long]$StartedAtUn
                 return [string]$row.session_id
             }
         }
-        catch { }
+        catch {
+            Write-Verbose ("Ignoring malformed Codex history line while resolving session: " + $_.Exception.Message)
+        }
     }
     return ''
 }
@@ -415,6 +459,17 @@ else {
         throw "ProjectPath must resolve to the fixed ESFramework root: $fixedProjectRoot"
     }
 }
+
+if ($HandoffMode -and $Mode -notin @('Validate', 'New')) {
+    throw 'HandoffMode is valid only for Validate or New.'
+}
+if ((Test-SessionHandoffIntent $Mode $TaskKey $ResponsibilityKey $TaskPrompt) -and -not $HandoffMode) {
+    throw 'Handoff intent detected. Call Complete-ESCodexHandoff.ps1 so timeline coverage, private snapshots, and the handoff receipt cannot be bypassed.'
+}
+if ($Mode -eq 'New' -and $HandoffPath.Count -gt 0 -and -not $HandoffMode) {
+    throw 'HandoffPath on a New session requires Complete-ESCodexHandoff.ps1; direct handoff delivery is prohibited.'
+}
+if ($HandoffMode) { Assert-HandoffAuthorization $HandoffAuthorization }
 
 if ($Mode -eq 'Close') {
     $closeScriptPath = Join-Path $PSScriptRoot 'Close-ESCodexSession.ps1'
@@ -849,6 +904,9 @@ $effectiveTabTitle = Get-SafeTabTitle $effectiveTabTitle
 $effectiveWindowName = Get-SafeWindowName $TerminalWindowName
 
 $handoffFiles = @(Resolve-HandoffFiles $resolvedProjectRoot $HandoffPath)
+if ($HandoffMode -and $Mode -eq 'New') {
+    Assert-HandoffResponsibility $effectiveResponsibilityKey $effectiveTabTitle $handoffFiles
+}
 $gitSnapshot = Get-GitSnapshot $resolvedProjectRoot
 $taskFingerprint = Get-Sha256 ($Mode + '|' + $resolvedProjectRoot + '|' + $effectiveTaskKey + '|' + $SessionId + '|' + $effectiveResponsibilityKey)
 $launchToken = 'CodexLaunch:' + $taskFingerprint.Substring(0, 16) + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
@@ -1023,7 +1081,11 @@ try {
                 return
             }
         }
-        catch { }
+        catch {
+            # A concurrent/partially-written registry entry is not a valid resume proof.
+            # Continue with a fresh envelope, but keep the condition observable.
+            Write-Verbose ("Ignoring unreadable existing Codex session record: " + $_.Exception.Message)
+        }
     }
 
     $envelopeName = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssfffZ') + '-' + $launchToken.Substring($launchToken.Length - 8) + '.json'
@@ -1107,7 +1169,7 @@ try {
     $commandWrapperPath = Join-Path $commandRoot ($commandBaseName + '.cmd')
     $exitMarkerPath = Join-Path $commandRoot ($commandBaseName + '.exit.json')
     $exitMarkerWriterArguments = @(
-        '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+        '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'RemoteSigned',
         '-File', $exitMarkerWriterPath,
         '-Path', $exitMarkerPath,
         '-ExpectedRoot', $commandRoot,

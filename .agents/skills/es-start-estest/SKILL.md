@@ -3,7 +3,26 @@ name: es-start-estest
 description: Start, monitor, or safely cancel the ESFramework ESAITest/ESTEST runtime through the existing Unity Editor menu, Player command line, or public bootstrap API. Use when the user says “启动 ESTEST”, “运行 ESAITest”, “直接开始 AI 测试”, “中断 ESTEST”, asks AI to launch the built-in ESTEST baseline, or supplies an ESAITest plan to execute.
 ---
 
+## Verification boundary
+
+- **Static**: source, configuration, contracts, hashes, and deterministic scripts.
+- **Runtime**: Unity, process, display, timing, layout-engine, or serialization behavior.
+- `runtime-not-run` means runtime evidence is absent; it does not mean Static failed. It blocks only the selected RuntimeAcceptance/ReleaseAcceptance profile.
+- Details: `.agents/skills/es-skill-governance/references/verification-semantics.md`
+
 # Start ES ESTEST
+
+## Resource composition
+
+- Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
+- Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
+- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+
+## Workflow controls
+
+- Scope and authority are checked before execution; stale or missing evidence blocks the task.
+- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
 Use the existing ESAITest Runner. Do not create another runner, input source, report writer, or editor initializer.
 

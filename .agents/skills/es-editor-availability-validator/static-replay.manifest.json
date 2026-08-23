@@ -1,0 +1,77 @@
+{
+    "schemaVersion":  1,
+    "skillName":  "es-editor-availability-validator",
+    "sourceRoots":  [
+                        ".agents/skills/es-editor-availability-validator"
+                    ],
+    "cases":  [
+                  "normal-input",
+                  "invalid-input",
+                  "denied-expansion",
+                  "repeat-idempotency",
+                  "hash-change-cache-invalidation",
+                  "interruption-recovery",
+                  "deterministic-output"
+              ],
+    "staticClaims":  [
+                         "structure",
+                         "governance",
+                         "source-hashes",
+                         "deterministic-replay",
+                         "boundary-contract"
+                     ],
+    "runtimeClaimsNotProven":  [
+                                   "Unity/editor/process behavior",
+                                   "timing and visual behavior",
+                                   "Profiler/Player/IL2CPP/release behavior"
+                               ],
+    "runtimeEscalation":  {
+                              "required":  true,
+                              "reason":  "Only external execution can prove the declared runtime claims."
+                          },
+    "caseAssertions":  {
+                           "normal-input":  "source roots and required Skill files are present",
+                           "invalid-input":  "invalid input is rejected by the declared contract",
+                           "denied-expansion":  "permission or path expansion is denied",
+                           "repeat-idempotency":  "repeat execution is idempotent",
+                           "hash-change-cache-invalidation":  "hash or cache changes invalidate stale state",
+                           "interruption-recovery":  "interruption and recovery are declared",
+                           "deterministic-output":  "deterministic output and stable ordering are declared"
+                       },
+    "responsibilityProfile":  "editor",
+    "responsibilityChecks":  [
+                                 "editor-layout-static",
+                                 "lifecycle-boundary",
+                                 "deterministic-replay",
+                                 "evidence-contract"
+                             ],
+    "responsibilityScope":  "Custom static acceptance for editor responsibilities; common replay cases remain necessary but are not sufficient.",
+    "specializedAcceptance":  {
+                                  "id":  "editor-availability-static",
+                                  "title":  "Editor availability, layout and lifecycle static acceptance",
+                                  "requiredStaticCases":  [
+                                                              "min-max-window-contract",
+                                                              "narrow-wide-layout",
+                                                              "dpi-boundary",
+                                                              "reload-unbind",
+                                                              "runtime-escalation-scope"
+                                                          ],
+                                  "evidenceArtifacts":  [
+                                                            "SKILL.md",
+                                                            "references/availability-matrix.md",
+                                                            "scripts/Invoke-ESEditorAvailability.ps1",
+                                                            "references/evidence-receipt-contract.md",
+                                                            "governance.json"
+                                                        ],
+                                  "sourceAssertions":  [
+                                                           "minSize",
+                                                           "maxSize",
+                                                           "narrow",
+                                                           "DPI",
+                                                           "ReloadDomain",
+                                                           "Unbind"
+                                                       ],
+                                  "runtimeBoundary":  "Window geometry, panel mounting and real interaction remain Runtime claims; static code layout proof is reported separately."
+                              },
+    "specializedGuidanceRef":  "references/static-specialized-acceptance.md"
+}

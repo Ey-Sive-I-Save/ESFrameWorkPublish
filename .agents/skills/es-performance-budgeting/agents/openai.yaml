@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-performance-budgeting"
+  short_description: "Governed es-performance-budgeting workflow"
+  default_prompt: "Use es-performance-budgeting with AIBrain planning and project evidence."

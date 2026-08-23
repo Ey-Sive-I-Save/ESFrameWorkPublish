@@ -26,6 +26,11 @@ if (-not $Path -or $Path.Count -eq 0) {
 }
 
 $textExtensions = @('.cs','.md','.txt','.json','.yaml','.yml','.xml','.uxml','.uss','.shader','.hlsl','.cginc','.asmdef','.asmref','.csv','.tsv','.ps1','.py','.js','.ts','.toml')
+$projectRootNormalized = $ProjectRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+function Test-InProjectRoot([string]$candidate) {
+    $fullCandidate = [IO.Path]::GetFullPath($candidate).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    return $fullCandidate.Equals($projectRootNormalized, [StringComparison]::OrdinalIgnoreCase) -or $fullCandidate.StartsWith($projectRootNormalized + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+}
 $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)
 $markers = @(
     ([string]([char]0x00E2) + [char]0x20AC),
@@ -39,7 +44,16 @@ $hasReview = $false
 
 foreach ($item in ($Path | Sort-Object -Unique)) {
     $fullPath = if ([IO.Path]::IsPathRooted($item)) { [IO.Path]::GetFullPath($item) } else { [IO.Path]::GetFullPath((Join-Path $ProjectRoot $item)) }
-    if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) { continue }
+    if (-not (Test-InProjectRoot $fullPath)) {
+        $hasHardFailure = $true
+        $results.Add([pscustomobject]@{ path = $item; valid = $false; issues = @('Path escapes ProjectRoot.'); review = @() })
+        continue
+    }
+    if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+        $hasHardFailure = $true
+        $results.Add([pscustomobject]@{ path = $item; valid = $false; issues = @('Target file does not exist.'); review = @() })
+        continue
+    }
     if ($textExtensions -notcontains [IO.Path]::GetExtension($fullPath).ToLowerInvariant()) { continue }
 
     $issues = New-Object Collections.Generic.List[string]

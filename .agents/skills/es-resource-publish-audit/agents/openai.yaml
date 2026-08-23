@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-resource-publish-audit"
+  short_description: "Governed es-resource-publish-audit workflow"
+  default_prompt: "Use es-resource-publish-audit with AIBrain planning and project evidence."

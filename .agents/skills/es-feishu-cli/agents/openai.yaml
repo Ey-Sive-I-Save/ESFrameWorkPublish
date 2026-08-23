@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Feishu Read"
+  short_description: "受管规划并验收飞书只读认证、搜索与文档内容拉取与证据"
+  default_prompt: "Use $es-feishu-cli to plan and validate a managed read-only Feishu operation through AIBrain and es.feishu.read@1."

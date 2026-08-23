@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-entity-prefab-validation"
+  short_description: "Governed es-entity-prefab-validation workflow"
+  default_prompt: "Use es-entity-prefab-validation with AIBrain planning and project evidence."

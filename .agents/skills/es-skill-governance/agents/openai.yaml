@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Skill Governance"
+  short_description: "Govern Skill risk, evidence, scale, and execution cost"
+  default_prompt: "Use $es-skill-governance to classify and validate an ES Skill, including its Fast Path, Deep Path, caching, and execution-performance boundaries. Route aliases: skill-performance, execution-cost, fast-path, deep-path, cache."

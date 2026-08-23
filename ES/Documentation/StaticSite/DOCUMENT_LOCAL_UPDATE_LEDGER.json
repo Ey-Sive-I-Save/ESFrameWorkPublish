@@ -2213,6 +2213,41 @@
                                                      "#editor-verification"
                                                  ]
                                  }
+                    },
+                    {
+                        "id":  "LOCAL-20260823-002",
+                        "status":  "documented",
+                        "summary":  "收口项目级 Skills、Catalog 与资源索引，建立可发现、可验证、可追踪的项目工作流边界。",
+                        "sourcePaths":  [
+                                            ".agents"
+                                        ],
+                        "evidencePaths":  [
+                                              ".agents/SKILL_CATALOG.yaml",
+                                              ".agents/SKILL_RESOURCE_INDEX.yaml",
+                                              ".agents/README.md"
+                                          ],
+                        "analysis":  {
+                                         "status":  "complete",
+                                         "notes":  "项目级 Skill 保持独立的触发、资源、治理和验证信息；Catalog 只负责发现，Skill 不扩大源码、Git、会话或外部系统权限。"
+                                     },
+                        "regression":  {
+                                           "status":  "complete",
+                                           "evidence":  [
+                                                            "项目 Skill 目录、Catalog、Resource Index 与治理文件纳入同一提交范围",
+                                                            "文本与结构性静态检查脚本随对应 Skill 保存"
+                                                        ],
+                                           "knownGaps":  [
+                                                             "未运行 Unity Editor、ReloadDomain、真实 Worker、外部适配器或完整端到端验收",
+                                                             "本批不把静态合同提升为运行时或发布证据"
+                                                         ]
+                                       },
+                        "html":  {
+                                     "status":  "deferred",
+                                     "targets":  [
+                                                     "#ai-governance",
+                                                     "#editor-verification"
+                                                 ]
+                                 }
                     }
                 ],
     "integration":  {
@@ -2225,13 +2260,13 @@
                     },
     "commitGate":  {
                        "mode":  "staged-only",
-                       "preparedAt":  "2026-08-23T16:29:09+08:00",
-                       "head":  "1d46fa4a9a0dd7ef52fe48610673327ae986066a",
-                       "stagedSourcePatchSha256":  "cf1d76460a4957420d483ae0eb03d1f09ac27b972a4aa0a4e9cd666a1ec73c06",
-                       "stagedSourceManifestSha256":  "a8c1d7019d09cb3db4d042c39ced78ea8fe6d8c4b759a9f79e3c5f0f8c6756da",
-                       "stagedSourceFileCount":  1,
+                       "preparedAt":  "2026-08-23T19:32:33+08:00",
+                       "head":  "f2d1d04f779f7195e56139660b028e60fdee46e2",
+                       "stagedSourcePatchSha256":  "6cfd54e038ad5c3d0eb47695358b856cb6bff34d3e17e0db800f610380f8756c",
+                       "stagedSourceManifestSha256":  "2c3b355d6f7a17bf5c187b2592652de0e1200978b5fbb88efd349168275c73b2",
+                       "stagedSourceFileCount":  585,
                        "entryIds":  [
-                                        "LOCAL-20260823-001"
+                                        "LOCAL-20260823-002"
                                     ]
                    }
 }

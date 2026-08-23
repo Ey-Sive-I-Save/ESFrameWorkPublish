@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Static Deep Replay"
+  short_description: "Run deterministic static replay checks for ES Skills"
+  default_prompt: "Use es-static-deep-replay and its project adapter manifest before requesting runtime execution."

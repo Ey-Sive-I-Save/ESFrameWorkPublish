@@ -79,6 +79,7 @@ $registryUpdates = 0
 $launchStateUpdates = 0
 $legacyRegistryEntries = @()
 $deadLegacyLaunchStates = @()
+$invalidLegacyLaunchStates = @()
 if (Test-Path -LiteralPath $registryPath -PathType Leaf) {
     $registry = Read-JsonFile $registryPath
     foreach ($session in @($registry.sessions)) {
@@ -102,7 +103,14 @@ if (Test-Path -LiteralPath $launchStateRoot -PathType Container) {
                 }
             }
         }
-        catch { }
+        catch {
+            # A malformed legacy state must not be silently treated as migrated.
+            # Keep migration best-effort, but surface the rejected artifact in the receipt.
+            $invalidLegacyLaunchStates += [pscustomobject]@{
+                source = $file.FullName
+                error = $_.Exception.Message
+            }
+        }
     }
 }
 
@@ -113,6 +121,7 @@ $result = [ordered]@{
     v1EnvelopeCount = $v1Envelopes.Count
     registryUpdates = $registryUpdates
     launchStateUpdates = $launchStateUpdates
+    invalidLegacyLaunchStates = @($invalidLegacyLaunchStates)
     legacyRegistryEntryCount = $legacyRegistryEntries.Count
     deadLegacyLaunchStateCount = $deadLegacyLaunchStates.Count
     dryRun = [bool]$DryRun

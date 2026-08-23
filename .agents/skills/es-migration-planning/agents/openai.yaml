@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-migration-planning"
+  short_description: "Governed es-migration-planning workflow"
+  default_prompt: "Use es-migration-planning with AIBrain planning and project evidence."

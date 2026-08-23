@@ -1,0 +1,4 @@
+interface:
+  display_name: "Editor Availability Validator"
+  short_description: "裁决 ES Unity 编辑器窗口与扩展的实际可用性"
+  default_prompt: "使用 $es-editor-availability-validator 验证目标编辑器窗口或扩展的结构、编译、ReloadDomain、交互、恢复、性能与证据状态。"

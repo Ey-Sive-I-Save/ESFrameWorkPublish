@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-test-fixture-authoring"
+  short_description: "Governed es-test-fixture-authoring workflow"
+  default_prompt: "Use es-test-fixture-authoring with AIBrain planning and project evidence."

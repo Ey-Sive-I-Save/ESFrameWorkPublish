@@ -1,4 +1,4 @@
 interface:
   display_name: "ES Codex 会话启动"
-  short_description: "管理 ES 会话、页签、职责、消息 Hook、状态与安全恢复"
-  default_prompt: "Use $es-codex-session-bootstrap to manage ESFramework Codex sessions. Require an exact SessionId for managed Resume/Fork, and require contextAccepted plus the exact receipt before reporting initialization or task delivery."
+  short_description: "管理 ES 会话启动、交接与安全恢复 Session"
+  default_prompt: "Use $es-codex-session-bootstrap to manage ESFramework Codex sessions. For handoff intent or any handoff file delivery, invoke Complete-ESCodexHandoff.ps1; never call Start-ESCodexSession.ps1 -Mode New directly. Require its short-lived authorization capability, timeline coverage, content responsibility naming, contextAccepted, and the exact handoff receipt. Require an exact SessionId for managed Resume/Fork; never report terminal creation as task delivery."

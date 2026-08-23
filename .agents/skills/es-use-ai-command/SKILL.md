@@ -3,7 +3,20 @@ name: es-use-ai-command
 description: Select, validate, and execute one ESFramework AICommand as the task authorization contract. Use when the user provides an Assets/Plugins/ES/AICommands path, asks to choose or run an AICommand, or requests an ES project task that should follow an existing command template.
 ---
 
+## Verification boundary
+
+- **Static**: source, configuration, contracts, hashes, and deterministic scripts.
+- **Runtime**: Unity, process, display, timing, layout-engine, or serialization behavior.
+- `runtime-not-run` means runtime evidence is absent; it does not mean Static failed. It blocks only the selected RuntimeAcceptance/ReleaseAcceptance profile.
+- Details: `.agents/skills/es-skill-governance/references/verification-semantics.md`
+
 # Use an ES AICommand
+
+## Resource composition
+
+- Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
+- Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
+- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
 
 Treat the selected AICommand as the project-specific task contract. Do not infer permission from the file name.
 
@@ -29,6 +42,15 @@ Treat the selected AICommand as the project-specific task contract. Do not infer
 - Never write or restore AI collaboration history unless the user explicitly requests it.
 - Report missing command references as a command-library defect; do not silently guess replacements.
 
+## Workflow controls
+
+- **Owners**: AICommand maintainers own catalog integrity; the task requester accepts the selected contract and resulting scope.
+- **Inputs/outputs**: accept one task description or exact command path; return one verified command reference, bounded execution scope and evidence report.
+- **Write boundary**: discovery and validation are read-only. Writes require the intersection of user authorization, the selected command and P0 rules; publish, delete, Git and external network remain separate permissions.
+- **Recovery/idempotency**: selection may be repeated safely. If the catalog, command hash, worktree or PlanHash changes, discard the selection and re-plan; never continue a partially authorized execution.
+- **Scale**: discovery returns at most six candidates and selects exactly one. No batch command aggregation, implicit retries or concurrent write contracts.
+- **Required cases**: verify exact-path success, missing/malformed command, denied expansion, repeated selection with stable hash, changed-hash invalidation and interrupted execution before side effects.
+
 ## Delivery
 
 Report: selected command, rules read, work performed, changed files, validation evidence, and remaining risks.
@@ -38,3 +60,18 @@ Report: selected command, rules read, work performed, changed files, validation 
 `scripts/Test-ESAICommands.ps1` validates the versioned catalog, navigation-role separation, strict UTF-8, required metadata, and project-relative references. It does not modify files.
 
 `scripts/Find-ESAICommands.ps1` is the low-model-context discovery entry. It loads only the compact discovery JSON, validates each referenced path's managed-root and reparse-point boundary, returns only scored metadata for a hard-bounded maximum of six candidates, and never reads contract Markdown bodies. It is not an authorization shortcut: the selected contract must still be read in full and hashed immediately before execution.
+
+
+## Specialized static acceptance
+
+Acceptance ID: `aicommand-usage-boundary`
+
+Responsibility-specific static assertions (these are source-level requirements, not Runtime claims):
+- AICommand
+- authority
+- target path
+- dry-run
+- developer authorization
+
+Required specialized cases: `command-discovery, authority-match, target-path-boundary, runtime-authorization, dry-run-idempotency`
+Guidance: `references/static-specialized-acceptance.md`

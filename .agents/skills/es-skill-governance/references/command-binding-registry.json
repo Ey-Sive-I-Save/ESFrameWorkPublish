@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "authority": "es-skill-governance",
+  "entries": [
+    {"skillName":"es-fix-compile-error","commandId":"compile.error.fix","commandHash":"b4668f67f2e8cf323f47df502e4bc92d9b5d335ac778122f195d286930ff9e39","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
+    {"skillName":"es-start-estest","commandId":"estest.start","commandHash":"733379e8f2879bcc16b683104f4ad4ce29f4d2a1f92bbf2936605d55086c765b","role":"controlled-execution","riskLevel":"L2","writeMode":"external-run","bodyContains":["命令类型","风险等级"]},
+    {"skillName":"es-input-action","commandId":"input-action.add.strict","commandHash":"3df5cb949398029d29f34637a936edced41312b777ec16d272c0c35f6ebf05a9","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
+    {"skillName":"es-gamecore-config-authoring","commandId":"gamecore.index.execute","commandHash":"98374391846e1c4ff1a7840484b4676176247f986057af4ebb4d2830baa2d050","role":"controlled-execution","riskLevel":"L3","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
+    {"skillName":"es-gamecore-integration","commandId":"gamecore.index.execute","commandHash":"98374391846e1c4ff1a7840484b4676176247f986057af4ebb4d2830baa2d050","role":"controlled-execution","riskLevel":"L3","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
+    {"skillName":"es-resource-pipeline","commandId":"asset-package.export.fix","commandHash":"a60f6318625ae4656b119be7aeedb7e6f411a216be8b44326d768c827099ae17","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
+    {"skillName":"es-stable-graph-authoring","commandId":"graph.single-use.execute","commandHash":"0d10c4f34b22aa652d2825932b3cca480dea61283b6166dfc83b05d42724480d","role":"controlled-execution","riskLevel":"L2","writeMode":"external-run","bodyContains":["命令类型","风险等级"]},
+    {"skillName":"es-tag-config","commandId":"tag.add","commandHash":"67b0e422da6dda6e59e57ce9cff0db1d666447b35d030e40a94367047a755ea8","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
+    {"skillName":"es-command-authoring","commandId":"command.add-runtime.strict","commandHash":"01e54672cfb162fdf13215f0e94f6ceb5bc6bae9e98a820b5793515b2e30bd05","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
+    {"skillName":"es-unity-compile","commandId":"compile.reload-memory.review","commandHash":"d69252726568fd002db596ae243a7708c1d00de2fec3a79003cfed306f9cdfda","role":"review","riskLevel":"L1","writeMode":"read-only","bodyContains":["命令类型","风险等级"]},
+    {"skillName":"es-publish-aitest-prompt","commandId":"estest.start","commandHash":"733379e8f2879bcc16b683104f4ad4ce29f4d2a1f92bbf2936605d55086c765b","role":"controlled-execution","riskLevel":"L2","writeMode":"external-run","bodyContains":["命令类型","风险等级"]},
+    {"skillName":"es-task-read-snapshot","commandId":"task.read-snapshot.write","commandHash":"7a2a960f90c6fc32e26a64806880de01fdfbb5ca31be0c85a2f3cb075a3aa5c0","role":"controlled-execution","riskLevel":"L2","writeMode":"scoped-write","bodyContains":["命令类型","风险等级"]},
+    {"skillName":"es-codex-session-bootstrap","commandId":"session.handoff.execute","commandHash":"ade969450cf1d929020e2f94b20abaa9dc78712a42861c3c444565a33bf96e55","role":"controlled-execution","riskLevel":"L3","writeMode":"external-run","bodyContains":["命令类型","风险等级"]}
+  ]
+}

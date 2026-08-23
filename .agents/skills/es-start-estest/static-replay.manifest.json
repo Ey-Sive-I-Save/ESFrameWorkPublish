@@ -1,0 +1,58 @@
+{
+    "schemaVersion":  1,
+    "skillName":  "es-start-estest",
+    "sourceRoots":  [
+                        ".agents/skills/es-start-estest"
+                    ],
+    "cases":  [
+                  "normal-input",
+                  "invalid-input",
+                  "denied-expansion",
+                  "repeat-idempotency",
+                  "hash-change-cache-invalidation",
+                  "interruption-recovery",
+                  "deterministic-output"
+              ],
+    "staticClaims":  [
+                         "structure",
+                         "governance",
+                         "source-hashes",
+                         "deterministic-replay",
+                         "boundary-contract"
+                     ],
+    "runtimeClaimsNotProven":  [
+                                   "Unity/editor/process behavior",
+                                   "timing and visual behavior",
+                                   "Profiler/Player/IL2CPP/release behavior"
+                               ],
+    "runtimeEscalation":  {
+                              "required":  true,
+                              "reason":  "Only external execution can prove the declared runtime claims."
+                          },
+    "caseAssertions":  {
+                           "normal-input":  "source roots and required Skill files are present",
+                           "invalid-input":  "invalid input is rejected by the declared contract",
+                           "denied-expansion":  "permission or path expansion is denied",
+                           "repeat-idempotency":  "repeat execution is idempotent",
+                           "hash-change-cache-invalidation":  "hash or cache changes invalidate stale state",
+                           "interruption-recovery":  "interruption and recovery are declared",
+                           "deterministic-output":  "deterministic output and stable ordering are declared"
+                       },
+    "responsibilityProfile":  "testing",
+    "responsibilityChecks":  [
+                                 "evidence-contract",
+                                 "recovery-cache",
+                                 "deterministic-replay",
+                                 "runtime-escalation"
+                             ],
+    "responsibilityScope":  "Custom static acceptance for testing responsibilities; common replay cases remain necessary but are not sufficient.",
+    "specializedAcceptance": {
+        "id": "start-estest-static",
+        "title": "start estest responsibility static gate",
+        "requiredStaticCases": ["fixture-identity", "invalid-input", "repeat-idempotency", "interruption-recovery", "evidence-freshness"],
+        "evidenceArtifacts": ["SKILL.md", "governance.json", "references/static-replay-adapter.md", "references/evidence-receipt-contract.md"],
+        "sourceAssertions": ["boundary", "deterministic", "evidence", "static", "contract"],
+        "runtimeBoundary": "Static acceptance proves source and contract structure only; external process, Unity, timing, visual, and release behavior remain Runtime claims."
+    },
+    "specializedGuidanceRef": "references/static-specialized-acceptance.md"
+}

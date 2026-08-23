@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-feishu-cli",
+  "sourceRoots": [
+    ".agents/skills/es-feishu-cli",
+    "Assets/Plugins/ES/AICommands/Feishu只读知识接入_AI命令.md",
+    "Documentation/AIKnowledge/entries/feishu-adapter-boundary.md",
+    "Assets/Plugins/ES/Editor/ESAutomation/ESFeishuReadAutomation.cs",
+    "ES/Automation/Workers/Node/Feishu"
+  ],
+  "cases": [
+    "normal-input",
+    "invalid-input",
+    "denied-expansion",
+    "repeat-idempotency",
+    "hash-change-cache-invalidation",
+    "interruption-recovery",
+    "deterministic-output"
+  ],
+  "staticClaims": [
+    "structure",
+    "governance",
+    "source-hashes",
+    "operation-allowlist",
+    "credential-boundary",
+    "authority-routing",
+    "evidence-contract"
+  ],
+  "runtimeClaimsNotProven": [
+    "Unity-managed Worker execution and Domain Reload recovery",
+    "Feishu authentication, tenant permissions and network responses",
+    "timeout, cancellation, retry, rate-limit and circuit-breaker behavior",
+    "redaction, cache freshness and incremental synchronization behavior"
+  ],
+  "runtimeEscalation": {
+    "required": true,
+    "reason": "Only a fresh authorized managed run can prove Feishu authentication, network reads and process lifecycle behavior."
+  },
+  "caseAssertions": {
+    "normal-input": "the three allowed operations route to es.feishu.read@1 through AIBrain and the facade",
+    "invalid-input": "unknown operations, malformed fields and out-of-range bounds are rejected",
+    "denied-expansion": "direct CLI, credential input, remote mutation, path expansion and Assets writes are denied",
+    "repeat-idempotency": "InvocationId reuse is accepted only for the same normalized invocation hash",
+    "hash-change-cache-invalidation": "command, task, worker, Skill or governance drift invalidates stale plans and evidence",
+    "interruption-recovery": "timeout, cancellation and Domain Reload have explicit terminal-evidence requirements",
+    "deterministic-output": "normalized results, SourceRefs and receipts use bounded fields and stable identities"
+  },
+  "responsibilityProfile": "engineering",
+  "responsibilityChecks": [
+    "authority-routing",
+    "operation-allowlist",
+    "credential-isolation",
+    "external-data-boundary",
+    "evidence-contract"
+  ],
+  "responsibilityScope": "Static acceptance of the managed Feishu read workflow; it does not prove external connectivity or Unity process behavior.",
+  "specializedAcceptance": {
+    "id": "feishu-read-workflow-static",
+    "title": "managed Feishu read workflow static gate",
+    "requiredStaticCases": [
+      "fixed-route-identity",
+      "read-operation-allowlist",
+      "credential-non-disclosure",
+      "external-authority-non-escalation",
+      "stale-hash-and-recovery-block"
+    ],
+    "evidenceArtifacts": [
+      "SKILL.md",
+      "governance.json",
+      "references/feishu-read-contract.md",
+      "references/identity-data-governance.md",
+      "references/evidence-acceptance.md",
+      "references/evidence-receipt-contract.md"
+    ],
+    "sourceAssertions": ["boundary", "identity", "read-only", "credential-isolation", "freshness", "evidence"],
+    "runtimeBoundary": "Static acceptance cannot prove Feishu credentials, tenant permissions, network I/O, managed process termination, Domain Reload or cache behavior."
+  },
+  "specializedGuidanceRef": "references/static-specialized-acceptance.md"
+}

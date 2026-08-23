@@ -17,14 +17,17 @@ $pester = [pscustomobject]@{
     failed = 0
 }
 if ($RunPester -and $pester.available) {
-    $testResult = Invoke-Pester -Script (Join-Path $skillRoot 'tests') -PassThru
+    $testsPath = [IO.Path]::Combine($skillRoot, 'tests')
+    $testResult = Invoke-Pester -Script $testsPath -PassThru
     $pester.total = [int]$testResult.TotalCount
     $pester.passed = [int]$testResult.PassedCount
     $pester.failed = [int]$testResult.FailedCount
 }
 
-$doctor = & (Join-Path $PSScriptRoot 'Get-ESCodexSessionDoctor.ps1') -ProbeAppServer:$ProbeAppServer
-$operationalSmoke = & (Join-Path $PSScriptRoot 'Test-ESCodexSessionOperationalFlow.ps1')
+$doctorScript = Join-Path $PSScriptRoot 'Get-ESCodexSessionDoctor.ps1'
+$smokeScript = Join-Path $PSScriptRoot 'Test-ESCodexSessionOperationalFlow.ps1'
+$doctor = & $doctorScript -ProbeAppServer:$ProbeAppServer
+$operationalSmoke = & $smokeScript
 $testsReady = -not $RunPester -or ($pester.available -and $pester.failed -eq 0)
 $codeReady = [bool]$doctor.codeReady -and $testsReady -and [bool]$operationalSmoke.passed
 $commercialBaselineReady = $codeReady -and [bool]$doctor.commercialBaselineReady

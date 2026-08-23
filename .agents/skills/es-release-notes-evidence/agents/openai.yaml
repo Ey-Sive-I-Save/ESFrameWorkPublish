@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-release-notes-evidence"
+  short_description: "Governed es-release-notes-evidence workflow"
+  default_prompt: "Use es-release-notes-evidence with AIBrain planning and project evidence."

@@ -180,6 +180,12 @@ function Read-ESCodexSessionRegistry([string]$Path) {
 }
 
 function Save-ESCodexSessionRegistry([string]$Path, [object]$Registry) {
+    $resolvedPath = [IO.Path]::GetFullPath($Path)
+    $root = Get-ESCodexLocalStateRoot
+    $root = [IO.Path]::GetFullPath($root)
+    if (-not $resolvedPath.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Session registry path must remain inside the approved ESFramework CodexSessions state root.'
+    }
     $parent = Split-Path -Parent $Path
     if (-not [string]::IsNullOrWhiteSpace($parent)) { [void][IO.Directory]::CreateDirectory($parent) }
     $nextRevision = [int]$Registry.revision + 1
@@ -205,7 +211,9 @@ function Save-ESCodexSessionRegistry([string]$Path, [object]$Registry) {
                 finally {
                     if (Test-Path -LiteralPath $backup -PathType Leaf) {
                         try { Remove-Item -LiteralPath $backup -Force -ErrorAction Stop }
-                        catch { }
+                        catch {
+                            Write-Warning ("Unable to remove backup state file '" + $backup + "': " + $_.Exception.Message)
+                        }
                     }
                 }
             }
@@ -226,7 +234,9 @@ function Save-ESCodexSessionRegistry([string]$Path, [object]$Registry) {
         finally {
             if (Test-Path -LiteralPath $temporary -PathType Leaf) {
                 try { Remove-Item -LiteralPath $temporary -Force -ErrorAction Stop }
-                catch { }
+                catch {
+                    Write-Warning ("Unable to remove temporary state file '" + $temporary + "': " + $_.Exception.Message)
+                }
             }
         }
     }
@@ -361,7 +371,9 @@ function Find-ESCodexSessionIdByToken([string]$HistoryPath, [string]$Token, [lon
                 return [string]$row.session_id
             }
         }
-        catch { }
+        catch {
+            Write-Verbose ("Ignoring malformed Codex history line while resolving session: " + $_.Exception.Message)
+        }
     }
     return ''
 }

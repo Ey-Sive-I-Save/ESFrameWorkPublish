@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-ai-knowledge-curation"
+  short_description: "Governed es-ai-knowledge-curation workflow"
+  default_prompt: "Use es-ai-knowledge-curation with AIBrain planning and project evidence."

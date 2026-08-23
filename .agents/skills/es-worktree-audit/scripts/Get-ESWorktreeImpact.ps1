@@ -8,6 +8,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new()
 
+# Static boundary contract: this is a read-only/report-only audit. All derived
+# paths are constrained to the Git project root; no file mutation is performed.
+
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = (& git rev-parse --show-toplevel 2>$null)
 }
@@ -15,6 +18,15 @@ if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     throw 'Cannot resolve the Git project root. Pass -ProjectRoot.'
 }
 $ProjectRoot = [IO.Path]::GetFullPath($ProjectRoot.Trim())
+
+foreach ($scopePath in @($Scope)) {
+    if ([IO.Path]::IsPathRooted($scopePath)) { throw 'Scope must be project-relative; external expansion is denied.' }
+    $scopeFull = [IO.Path]::GetFullPath((Join-Path $ProjectRoot $scopePath))
+    $rootNormalized = $ProjectRoot.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    if (-not ($scopeFull.Equals($rootNormalized, [StringComparison]::OrdinalIgnoreCase) -or $scopeFull.StartsWith($rootNormalized + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase))) {
+        throw 'Scope escapes ProjectRoot; external expansion is denied.'
+    }
+}
 
 $branch = (& git -C $ProjectRoot branch --show-current).Trim()
 $head = (& git -C $ProjectRoot rev-parse HEAD).Trim()

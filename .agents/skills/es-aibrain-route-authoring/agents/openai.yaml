@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-aibrain-route-authoring"
+  short_description: "Governed es-aibrain-route-authoring workflow"
+  default_prompt: "Use es-aibrain-route-authoring with AIBrain planning and project evidence."

@@ -477,6 +477,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：未运行 Unity Editor、ReloadDomain、Unity Test Runner、PlayMode、Profiler、Player 或 IL2CPP；静态检查不等价于实际启动与帧耗验收。
 - **HTML 目标**：后续在 `#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260823-002：项目 Skill 治理与资源索引
+
+- **源码路径**：`.agents`。
+- **规范与证据**：Skill 的触发、资源、治理与验证信息各自可追溯；Catalog 只负责发现，不授予额外权限。
+- **完成分析**：项目级 Skill Catalog、资源索引、任务读取快照、会话刷新和专项治理文件进入同一可追踪边界。
+- **回归状态**：相关静态验证器、目录与脚本一并纳入；本提交不附带构建缓存、临时任务目录或 trace。
+- **已知缺口**：未运行 Unity Editor、ReloadDomain、真实 Worker、外部适配器或端到端验收；不得将静态合同描述为运行时完成。
+- **HTML 目标**：后续在 `#ai-governance` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

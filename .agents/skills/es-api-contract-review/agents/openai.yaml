@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-api-contract-review"
+  short_description: "Governed es-api-contract-review workflow"
+  default_prompt: "Use es-api-contract-review with AIBrain planning and project evidence."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-repository-discovery"
+  short_description: "Governed es-repository-discovery workflow"
+  default_prompt: "Use es-repository-discovery with AIBrain planning and project evidence."

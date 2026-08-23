@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-ui-prefab-authoring",
+  "sourceRoots": [".agents/skills/es-ui-prefab-authoring"],
+  "cases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "hash-change-cache-invalidation", "interruption-recovery", "deterministic-output"],
+  "staticClaims": ["screen-spec-schema", "component-registry", "bounded-output", "deterministic-replay", "evidence-contract"],
+  "runtimeClaimsNotProven": ["Unity materialization", "Prefab/Fixture Scene output", "GPU screenshots", "layout and visual fidelity"],
+  "runtimeEscalation": {"required": true, "reason": "Only an authorized Unity materialization can prove generated Prefab, Fixture Scene and GPU evidence."},
+  "caseAssertions": {
+    "normal-input": "A valid ScreenSpec v3 is normalized against the registered component catalog.",
+    "invalid-input": "Malformed schema, unknown components and invalid bindings are rejected.",
+    "denied-expansion": "Unregistered component, path, asset or output expansion is denied.",
+    "repeat-idempotency": "The same normalized ScreenSpec produces the same materialization plan hash.",
+    "hash-change-cache-invalidation": "Changed schema, registry or Skill resources invalidate stale output claims.",
+    "interruption-recovery": "Interrupted materialization remains incomplete until a fresh receipt is produced.",
+    "deterministic-output": "Ordered components and bounded artifact declarations are deterministic."
+  },
+  "responsibilityProfile": "authoring",
+  "responsibilityChecks": ["authority-routing", "bounded-output", "deterministic-replay", "evidence-contract", "compatibility-boundary"],
+  "responsibilityScope": "Static acceptance of ScreenSpec v3 normalization and bounded UI materialization planning; it does not prove Unity or GPU behavior.",
+  "specializedAcceptance": {
+    "id": "ui-prefab-static",
+    "title": "ScreenSpec v3 static materialization planning",
+    "requiredStaticCases": ["schema-validation", "registry-boundary", "path-boundary", "deterministic-plan", "evidence-boundary"],
+    "evidenceArtifacts": ["SKILL.md", "references/game-ui-materializer-contract.md", "references/game-ui-screen-spec.v3.template.json"],
+    "sourceAssertions": ["ScreenSpec", "component registry", "read-only", "bounded", "evidence"],
+    "runtimeBoundary": "Static checks do not prove Unity Prefab output, Fixture Scene generation, GPU screenshots or visual fidelity."
+  },
+  "specializedGuidanceRef": "references/static-specialized-acceptance.md"
+}

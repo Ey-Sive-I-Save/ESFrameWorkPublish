@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-observability-evidence"
+  short_description: "Governed es-observability-evidence workflow"
+  default_prompt: "Use es-observability-evidence with AIBrain planning and project evidence."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-gamecore-config-authoring"
+  short_description: "Governed es-gamecore-config-authoring workflow"
+  default_prompt: "Use es-gamecore-config-authoring with AIBrain planning and project evidence."

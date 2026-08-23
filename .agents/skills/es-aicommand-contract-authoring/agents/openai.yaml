@@ -1,0 +1,4 @@
+interface:
+  display_name: "es-aicommand-contract-authoring"
+  short_description: "Governed es-aicommand-contract-authoring workflow"
+  default_prompt: "Use es-aicommand-contract-authoring with AIBrain planning and project evidence."

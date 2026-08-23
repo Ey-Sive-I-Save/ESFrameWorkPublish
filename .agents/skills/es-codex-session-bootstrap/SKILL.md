@@ -1,12 +1,37 @@
 ---
 name: es-codex-session-bootstrap
 description: >-
-  Manage ESFramework Codex conversations and the project terminal workspace: initialize or take over the project, hand work to a new window, New, Resume, Fork, Focus or Close exact visible tabs, list/status registered sessions, resolve current or responsibility-scoped routing IDs, publish optional Busy/Idle presence, wait for queryable readiness, queue and track cooperative cross-window messages, bind responsibilities, repair stale local session state, restore recent independent sessions, assign responsibility-based tab titles, prevent duplicate launches, and validate immutable handoffs. Use for semantic requests such as “交给新窗口”, “完成/重新交接并开对话”, “显示受管终端”, “打开/关闭 Codex”, “恢复/继续旧会话”, “分叉会话”, “查询当前会话 ID”, “查询某职责的唯一会话”, “绑定职责”, “等待某 AI 空闲”, “给某职责 AI 留消息并查询结果”, “查看会话状态”, “修复残留会话状态”, “接手项目”, or “恢复最近 N 小时使用的 AI 独立窗口”; users do not need to name the skill or provide its path. Do not trigger merely to write a handoff document, explain sessions, or continue work in the current conversation without a window/session operation.
+  Manage ESFramework Codex sessions and terminal workspace: initialize or take over the project, New, Resume, Fork, Focus or Close exact tabs, list and route sessions, publish Busy/Idle presence, wait for readiness, queue cross-window messages, bind responsibilities, repair stale state, restore recent independent sessions, assign responsibility titles, prevent duplicate launches, and validate immutable handoffs. Use for requests such as “交给新窗口”, “打开/关闭 Codex”, “恢复/继续旧会话”, “分叉会话”, “查询会话 ID”, “绑定职责”, “等待某 AI 空闲”, “给某职责 AI 留消息”, “查看会话状态”, “修复残留会话状态”, “接手项目”, or “恢复最近 N 小时的独立 AI 窗口”. Do not trigger merely to write a handoff document, explain sessions, or continue in the current conversation without a window/session operation.
 ---
+
+## Verification boundary
+
+- **Static**: source, configuration, contracts, hashes, and deterministic scripts.
+- **Runtime**: Unity, process, display, timing, layout-engine, or serialization behavior.
+- `runtime-not-run` means runtime evidence is absent; it does not mean Static failed. It blocks only the selected RuntimeAcceptance/ReleaseAcceptance profile.
+- Details: `.agents/skills/es-skill-governance/references/verification-semantics.md`
 
 # Bootstrap ES Codex Sessions
 
-Use the project-root launcher to cross the boundary between an existing conversation and a new interactive Codex process. The launcher also owns the ESFramework Windows Terminal workspace, short tab titles, immutable launch envelopes, and local session-to-responsibility metadata. Do not pretend that a prompt inside the current thread created a new conversation.
+## Resource composition
+
+- Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
+- Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
+- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+
+## Workflow controls
+
+- Scope and authority are checked before execution; stale or missing evidence blocks the task.
+- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
+- The short-lived `ES_CODEX_LAUNCH_TOKEN` is a non-secret session marker, never a credential; it carries only the minimum launch capability and is not persisted as user authentication.
+- External process boundaries use an exact executable allowlist and one-time argument envelope; a process name or visible terminal alone is never execution proof.
+
+Use `ES/AI协作历程（Codex）/Tools/Complete-ESCodexHandoff.ps1` as the only real handoff orchestrator when the user asks to hand work to a new window. It owns timeline coverage, source-session/archive binding, full-history responsibility assessment, bootstrap validation, private per-launch snapshots, immutable handoff receipts, and the final `Start-ESCodexSession.ps1` launch. `Start-ESCodexSession.ps1 -Mode New` remains valid for an ordinary new session, but a New request containing handoff intent or any `-HandoffPath` is hard-blocked unless it is invoked by the orchestrator with its short-lived authorization capability. `-HandoffMode` is not a user-facing bypass switch.
+
+Do not use an action as the receiving window's responsibility. `handoff`, `handover`, `resume`, `fork`, `bootstrap`, `交接`, `恢复`, `分叉`, and `启动` are operation names, not stable content responsibilities. The orchestrator assesses all formal timeline nodes and rejects a supplied key that does not match the dominant content responsibility; ambiguous history is blocked instead of guessed. Pass a stable content key such as `es-editor-foundation-governance`, `es-session-bootstrap-maintenance`, or `es-aibrain-architecture`; omit `-TabTitle` unless a content-specific title is required. The launcher rejects action-shaped keys and titles for orchestrated handoffs.
+
+Do not pretend that a prompt inside the current thread created a new conversation.
 
 Before acting, classify the request semantically rather than waiting for the exact Skill name. Read [references/trigger-routing-cases.md](references/trigger-routing-cases.md) when changing, diagnosing, or validating trigger behavior.
 
@@ -15,7 +40,8 @@ This project copy lives at `.agents/skills/es-codex-session-bootstrap/SKILL.md`.
 ## Workflow
 
 1. Run `scripts/Start-ESCodexSession.ps1 -Mode Validate -DryRun` before the first launch in an environment. Report missing CLI, project root, start files, or history paths.
-2. Interpret “打开新 Codex”, “开启新对话”, or “初始化新会话” as `-Mode New`. Launch from the fixed repository root with the minimum initialization prompt. Prefer `-TerminalMode ProjectWindow`, which reuses the named `ESFramework` Windows Terminal window and adds one responsibility-scoped tab. If the user explicitly asks for a tab beside the current conversation, use `-TerminalMode CurrentWindow`; a named project window is not proof that it is the caller's current window.
+   使用 [会话引导包验证器](scripts/Test-ESSessionBootstrapPacket.ps1) 检查 schema v2、唯一 sessions.json 权威、不可变快照哈希和 contextAccepted 证据。
+2. Interpret “打开新 Codex”, “开启新对话”, or “初始化新会话” as `-Mode New` when this is an ordinary new session. Interpret “交接到新窗口”“让新 AI 接手”“直接交接” as `Complete-ESCodexHandoff.ps1 -OpenNew`; first resolve the exact current Session JSONL and archive, run timeline coverage, and stop if either is missing. The handoff command must carry a receiving content responsibility, not a handoff action label. Prefer `-TerminalMode ProjectWindow`, which reuses the named `ESFramework` Windows Terminal window and adds one responsibility-scoped tab. If the user explicitly asks for a tab beside the current conversation, use `-TerminalMode CurrentWindow`; a named project window is not proof that it is the caller's current window.
 3. Interpret “恢复对话” or “继续旧会话” as `-Mode Resume`. Resolve and pass one exact `-SessionId`. A stable `-ResponsibilityKey` may select a session only when the local registry has exactly one match; multiple or zero matches require Status/Query/Find plus identity confirmation. Never use the official picker for a managed ES handoff: picker selection cannot append the mandatory initialization prompt, so the launcher hard-fails instead of opening an uninitialized window.
 4. Interpret “分叉会话” as `-Mode Fork`. Prefer fork when the user wants the old transcript as context but does not want to continue mutating the original conversation. An exact resume or fork restores the registered responsibility and short tab title unless the caller overrides them.
 5. When the user supplies only topic words, use `ES/AI协作历程（Codex）/Tools/Find-CodexSession.ps1` read-only. Show candidates and require identity confirmation before passing a session ID to the launcher.
@@ -24,7 +50,7 @@ This project copy lives at `.agents/skills/es-codex-session-bootstrap/SKILL.md`.
 8. Recheck Git branch, HEAD, staged/unstaged/untracked paths, relevant source, current rules, and evidence after resume. A transcript or checkpoint is navigation, not current truth.
 9. When a history archive is created or recovered, run `ES/AI协作历程（Codex）/Tools/Test-ESCodexTimelineCoverage.ps1` against the confirmed session JSONL and archive. A count mismatch, missing stage container, non-contiguous T numbering, or missing required node fields is a hard failure; do not report the history as complete.
 10. When an authorized history/recovery workflow is complete, evaluate its commercial-feasibility evidence and append the standard handoff offer once. Generate the directly copyable handoff prompt only after the user accepts; never treat the prompt as new implementation authority.
-11. To deliver a bounded task into a new session, pass it through `-TaskPrompt` and list source files with `-HandoffPath`. Every real launch copies those sources into its own create-only directory under `%LOCALAPPDATA%\ESFramework\CodexSessions\handoff-snapshots`, hashes the private copies, and records only those immutable snapshot paths in the launch envelope. Never make multiple windows validate one shared mutable handoff file. The new session must run `scripts/Test-ESCodexLaunchEnvelope.ps1` once with its exact launch token. Successful validation creates a local acceptance receipt. Snapshot drift before acceptance is a hard failure; later source-file drift is informational.
+11. To deliver a bounded task into a new session, use `Complete-ESCodexHandoff.ps1` for handoff intent. It first validates the source Session JSONL against the archive with `Test-ESCodexTimelineCoverage.ps1`, then passes the archive, Bootstrap Skill, CurrentStatus, RuleIndex, and any additional handoff files through `-HandoffPath`. Every real launch copies those sources into its own create-only directory under `%LOCALAPPDATA%\ESFramework\CodexSessions\handoff-snapshots`, hashes the private copies, and records only those immutable snapshot paths in the launch envelope. Never make multiple windows validate one shared mutable handoff file. The new session must run `scripts/Test-ESCodexLaunchEnvelope.ps1` once with its exact launch token. Successful validation creates both the launch acceptance receipt and the orchestrator's immutable handoff receipt. Snapshot drift before acceptance is a hard failure; later source-file drift is informational.
 12. New-session launch is idempotent by task fingerprint. The launcher checks a per-task mutex and a short-lived process marker before opening a window. Repeating the same task returns `alreadyRunning` instead of launching a duplicate. Use `-ForceNew` only when the user explicitly requests a second independent window. Treat `terminalStarted`, `promptObserved`, and `contextAccepted` as separate evidence: only `contextAccepted=true` with the exact create-only receipt proves initialization delivery. A visible window, process ID, history token, timeout, or `launched=true` alone must never be reported as task delivery or execution start.
 13. Pass a stable `-ResponsibilityKey` for recurring roles. The launcher maps known keys such as `engineering-acceptance`, `aitest`, `resource-pipeline`, and `graph-audit` to short tab titles. `-TabTitle` is an explicit safe override.
 14. Runtime envelopes, launch markers, and the authoritative session registry live under `%LOCALAPPDATA%\ESFramework\CodexSessions`. `sessions.json` is the unique responsibility/session authority; launch-state and Codex history are observations and recovery sources, never competing authorities or project authorization.
@@ -48,6 +74,16 @@ This project copy lives at `.agents/skills/es-codex-session-bootstrap/SKILL.md`.
 ```powershell
 # Validate without opening a terminal
 & '.\.agents\skills\es-codex-session-bootstrap\scripts\Start-ESCodexSession.ps1' -Mode Validate -DryRun
+
+# Standard handoff to a new window: timeline coverage + private snapshot + receipt
+& '.\ES\AI协作历程（Codex）\Tools\Complete-ESCodexHandoff.ps1' `
+  -SessionPath '<confirmed-rollout-jsonl>' `
+  -ArchivePath '<window-archive.md>' `
+  -TaskKey 'aibrain-protocol-audit' `
+  -ResponsibilityKey 'aibrain-protocol-audit' `
+  -TabTitle 'ES·AIBrain协议审计' `
+  -TaskPrompt '<bounded task>' `
+  -OpenNew
 
 # Open a new initialized Codex conversation
 & '.\.agents\skills\es-codex-session-bootstrap\scripts\Start-ESCodexSession.ps1' -Mode New

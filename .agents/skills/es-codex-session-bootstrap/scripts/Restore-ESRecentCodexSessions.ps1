@@ -53,7 +53,9 @@ function Get-ActiveSessionIds {
                     if (-not [string]::IsNullOrWhiteSpace([string]$state.sessionId)) { [void]$active.Add([string]$state.sessionId) }
                 }
             }
-            catch { }
+            catch {
+                Write-Verbose ("Ignoring malformed Codex launch-state file '" + $file.FullName + "': " + $_.Exception.Message)
+            }
         }
     }
     return @($active)

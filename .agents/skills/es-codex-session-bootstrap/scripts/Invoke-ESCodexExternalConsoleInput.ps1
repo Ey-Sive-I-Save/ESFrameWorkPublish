@@ -172,7 +172,7 @@ function Get-VerifiedClaimCommand([string]$NormalizedClaimId) {
         ' -StateRoot "' + $stateRootPath.Replace('"', '""') + '"'
     }
     $command = (
-        'powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+        'powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "' +
         $claimResponderPath.Replace('"', '""') + '" -ClaimId ' + $NormalizedClaimId + ' -ClaimToken ' + $token +
         $stateArgument
     )
@@ -216,7 +216,7 @@ function ConvertTo-ExternalConsoleInputArgument([string]$Value) {
 
 function Invoke-ExternalConsoleInputHelper {
     $arguments = @(
-        '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+        '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'RemoteSigned',
         '-File', $PSCommandPath,
         '-ConsoleInputHelper',
         '-ClaimId', $ClaimId,

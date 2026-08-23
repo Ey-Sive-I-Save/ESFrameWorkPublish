@@ -468,6 +468,15 @@ git commit -m "本批语义说明"
 - **已知缺口**：静态自检不等价于领域语义完备性证明；未运行 Unity Editor、ReloadDomain、Test Runner、PlayMode 或 Player；不声明运行时模块成熟度提升。
 - **HTML 目标**：后续在 `#ai-governance` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
 
+### LOCAL-20260823-001：移除编辑器全局焦点轮询
+
+- **源码路径**：`Assets/Plugins/ES/Editor/Initer/EditorInitAndUpdater.cs`。
+- **规范与证据**：保留 AssemblyStream 的 `EditorInvoker_Level0` 入口，移除无条件 `EditorApplication.update` 订阅；全仓 C# 扫描确认 `FocusedWindowTitle` 与 IMGUI Event 缓存没有消费者。
+- **完成分析**：原实现每帧读取 `EditorWindow.focusedWindow` 和标题，但结果没有被消费。当前入口不再产生永久全局轮询，窗口工作流需要焦点状态时应在自身生命周期内按需读取。
+- **回归状态**：目标文件通过严格 UTF-8、U+FFFD/典型乱码、`git diff --check` 和残留订阅扫描。
+- **已知缺口**：未运行 Unity Editor、ReloadDomain、Unity Test Runner、PlayMode、Profiler、Player 或 IL2CPP；静态检查不等价于实际启动与帧耗验收。
+- **HTML 目标**：后续在 `#editor-overview` 与 `#editor-verification` 统一整合，当前不修改正式 HTML。
+
 ## 条目模板
 
 每新增一个条目，必须同时更新 JSON 与本表。JSON 字段是门禁输入；本表是人类评审入口。

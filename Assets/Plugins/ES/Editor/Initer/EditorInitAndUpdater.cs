@@ -1,29 +1,11 @@
 using ES;
-using UnityEditor;
-using UnityEngine;
 
 public class EditorInitAndUpdater : EditorInvoker_Level0
 {
-    public static Event etc;
-    public static string FocusedWindowTitle { get; private set; }
-
     public override void InitInvoke()
     {
-        EditorApplication.update -= Update;
-        EditorApplication.update += Update;
-    }
-
-    private void Update()
-    {
-        etc = Event.current;
-        WindowFocus();
-    }
-
-    private static void WindowFocus()
-    {
-        var windowF = EditorWindow.focusedWindow;
-        if (windowF == null) return;
-        FocusedWindowTitle = windowF.titleContent.text;
+        // This Level0 entry intentionally has no permanent editor update work.
+        // Focus state belongs to the window workflow that consumes it.
     }
 }
 

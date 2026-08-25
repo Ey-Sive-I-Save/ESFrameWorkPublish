@@ -13,7 +13,9 @@ function Relative([string]$path){$prefix=$root.TrimEnd('\','/');$full=[IO.Path]:
 if(-not (Test-Path -LiteralPath $receipt -PathType Leaf)){throw "Evidence receipt not found: $EvidencePath"}
 $raw=[IO.File]::ReadAllText($receipt,(New-Object Text.UTF8Encoding($false,$true))); try{$r=$raw|ConvertFrom-Json}catch{throw 'Evidence receipt is not valid JSON'}
 if([string]$r.case -eq 'portfolio-gate'){throw 'Portfolio receipt must be validated by Test-ESSkillPortfolioEvidence.ps1'}
-foreach($p in 'skillName','case','status','evidenceLevel','receiptPath','sourceRefs','timestampUtc','skillHash','governanceHash','validatorHash','planHash','sourceRefHashes'){if($null -eq $r.PSObject.Properties[$p]){throw "Missing receipt field: $p"}}
+$timestampProperty = if($null -ne $r.PSObject.Properties['timestampUtc']) { 'timestampUtc' } elseif($null -ne $r.PSObject.Properties['capturedUtc']) { 'capturedUtc' } else { $null }
+foreach($p in 'skillName','case','status','evidenceLevel','receiptPath','sourceRefs','skillHash','governanceHash','validatorHash','planHash','sourceRefHashes'){if($null -eq $r.PSObject.Properties[$p]){throw "Missing receipt field: $p"}}
+if($null -eq $timestampProperty){throw 'Missing receipt timestampUtc/capturedUtc field'}
 if([string]$r.skillName -ne $name){throw 'Receipt skillName mismatch'}
 if([string]$r.status -notmatch '^(passed|failed|blocked|not-run)$'){throw 'Invalid receipt status'}
 if(@($r.sourceRefs).Count -eq 0){throw 'Receipt must include sourceRefs'}

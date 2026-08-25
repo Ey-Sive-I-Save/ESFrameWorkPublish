@@ -2,15 +2,16 @@
 param(
     [Parameter(Mandatory=$true)][string]$ProjectRoot,
     [string]$SkillName,
-    [ValidateSet('Structural','Governance','VerificationSemantics','StaticDeepReplay','Catalog','Security','Semantic','Boundary','Architecture','Evidence','Full')][string[]]$Profile = @('Structural','Governance','VerificationSemantics','StaticDeepReplay','Catalog','Security','Semantic','Boundary','Architecture'),
-    [string]$ReportPath
+    [ValidateSet('Structural','Governance','VerificationSemantics','StaticDeepReplay','ChangeImpact','Catalog','Security','Semantic','Boundary','Architecture','Evidence','Full')][string[]]$Profile = @('Structural','Governance','VerificationSemantics','StaticDeepReplay','ChangeImpact','Catalog','Security','Semantic','Boundary','Architecture'),
+    [string]$ReportPath,
+    [ValidateSet('CurrentUserDirect','ManagedAIBrain')][string]$AuthorizationLane='CurrentUserDirect'
 )
 $ErrorActionPreference='Stop'
 $root=(Resolve-Path -LiteralPath $ProjectRoot).Path
 $skillsRoot=Join-Path $root '.agents\skills'
-if(-not (Test-Path -LiteralPath $skillsRoot -PathType Container)){ Write-Error 'Missing .agents/skills'; exit 2 }
+if(-not (Test-Path -LiteralPath $skillsRoot -PathType Container)){ Write-Error 'Missing .agents/skills' -ErrorAction Continue; exit 2 }
 if($SkillName){
-    if($SkillName -notmatch '^es-[a-z0-9]+(?:-[a-z0-9]+)*$'){ Write-Error 'Invalid SkillName'; exit 2 }
+    if($SkillName -notmatch '^es-[a-z0-9]+(?:-[a-z0-9]+)*$'){ Write-Error 'Invalid SkillName' -ErrorAction Continue; exit 2 }
     $targets=@(Join-Path $skillsRoot $SkillName)
 } else { $targets=@(Get-ChildItem -LiteralPath $skillsRoot -Directory | ForEach-Object FullName) }
 $results=@()
@@ -42,7 +43,18 @@ function Get-KnowledgeBlocks([string]$text) {
 }
 function Add-BoundaryFinding([System.Collections.IList]$findings,[string]$code,[string]$path,[int]$line,[string]$detail,[string]$severity='blocked') {
     if($severity -notin @('blocked','review')){$severity='blocked'}
+    $managedChannelCodes=@(
+        'CommandBindingRegistryInvalid','InvalidCommandRequirement','NoExplicitCommandBinding',
+        'InvalidCommandBinding','CommandBindingMissing','CommandPathInvalid','CommandBodyMismatch',
+        'CommandBodyHashStale','CommandCatalogMismatch','AuthorityReadMissing','MissingTaskContract',
+        'permission-expansion'
+    )
+    if($AuthorizationLane -eq 'CurrentUserDirect' -and $severity -eq 'blocked' -and $managedChannelCodes -contains $code){$severity='review'}
     [void]$findings.Add([pscustomobject]@{code=$code;path=$path;line=$line;severity=$severity;detail=$detail})
+}
+function Get-ManagedChannelSeverity {
+    if($AuthorizationLane -eq 'ManagedAIBrain'){return 'blocked'}
+    return 'review'
 }
 function Test-Declaration([string]$text,[string[]]$patterns) {
     foreach($pattern in $patterns){if($text -match $pattern){return $true}}
@@ -61,6 +73,48 @@ function Test-RelativeProjectFile([string]$relative) {
     $rootNormalized=$root.TrimEnd('\','/')
     return $full.StartsWith($rootNormalized+'\',[StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $full -PathType Leaf)
 }
+function Test-NonEmptyStringArray([object]$value) {
+    if(-not ($value -is [Array]) -or @($value).Count -eq 0){return $false}
+    foreach($item in @($value)){
+        if(-not ($item -is [string]) -or [string]::IsNullOrWhiteSpace([string]$item)){return $false}
+    }
+    return $true
+}
+function Test-DirectAuthorizedPaths([object]$paths) {
+    if(-not (Test-NonEmptyStringArray $paths)){return $false}
+    $rootNormalized=$root.TrimEnd('\','/')
+    $prefix=$rootNormalized+[IO.Path]::DirectorySeparatorChar
+    foreach($authorizedPath in @($paths)){
+        $pathText=[string]$authorizedPath
+        if($pathText -ne $pathText.Trim() -or [IO.Path]::IsPathRooted($pathText) -or $pathText -match '^[a-zA-Z]:' -or $pathText -match '^[\\/]{2}'){return $false}
+        try{$fullPath=[IO.Path]::GetFullPath([IO.Path]::Combine($rootNormalized,$pathText))}catch{return $false}
+        if(-not ($fullPath.Equals($rootNormalized,[StringComparison]::OrdinalIgnoreCase) -or $fullPath.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase))){return $false}
+    }
+    return $true
+}
+function Get-ProjectRelativeEvidenceFile([object]$relative) {
+    if(-not ($relative -is [string]) -or [string]::IsNullOrWhiteSpace([string]$relative)){return $null}
+    $pathText=[string]$relative
+    if($pathText -ne $pathText.Trim() -or [IO.Path]::IsPathRooted($pathText) -or $pathText -match '^[a-zA-Z]:' -or $pathText -match '^[\\/]{2}'){return $null}
+    $rootNormalized=$root.TrimEnd('\','/')
+    try{$fullPath=[IO.Path]::GetFullPath([IO.Path]::Combine($rootNormalized,$pathText))}catch{return $null}
+    if(-not $fullPath.StartsWith($rootNormalized+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){return $null}
+    if(-not (Test-Path -LiteralPath $fullPath -PathType Leaf)){return $null}
+    return $fullPath
+}
+function Test-ReceiptAuthorization([object]$receipt) {
+    $kindProperty=$receipt.PSObject.Properties['authorizationKind']
+    $kind=if($null -eq $kindProperty){''}else{[string]$kindProperty.Value}
+    if($AuthorizationLane -eq 'ManagedAIBrain'){
+        if([string]::IsNullOrWhiteSpace($kind)){return ([string]$receipt.planHash -match '^[a-fA-F0-9]{64}$')}
+        return ($kind -ceq 'managed-aibrain' -and [string]$receipt.planHash -match '^[a-fA-F0-9]{64}$')
+    }
+    if($kind -ceq 'read-only'){return $true}
+    if($kind -cne 'current-user-direct'){return $false}
+    return ([string]$receipt.userInstructionHash -match '^[a-fA-F0-9]{64}$') -and
+        (Test-NonEmptyStringArray $receipt.authorizedOperations) -and
+        (Test-DirectAuthorizedPaths $receipt.authorizedPaths)
+}
 foreach($target in $targets){
     if(-not (Test-Path -LiteralPath $target -PathType Container)){ $results += ([pscustomobject]@{skill=$SkillName;profile='Structural';status='failed';message='Skill directory not found';source=$target}); continue }
     $name=Split-Path -Leaf $target
@@ -70,11 +124,26 @@ foreach($target in $targets){
         if($ok){ try { [IO.File]::ReadAllText($skill,(New-Object Text.UTF8Encoding($false,$true))) | Out-Null } catch { $ok=$false } }
         $results += ([pscustomobject]@{skill=$name;profile='Structural';status=if($ok){'passed'}else{'failed'};message=if($ok){'required files, name and UTF-8 readable'}else{'missing/invalid structure or UTF-8'};source=$skill})
     }
+    if($Profile -contains 'ChangeImpact' -or $Profile -contains 'Full'){
+        $impactScript=Join-Path $skillsRoot 'es-skill-governance/scripts/Get-ESSkillChangeImpact.ps1'
+        $impactStatus='failed';$impactMessage='SkillChangeImpact evaluator is missing';$impactObject=$null
+        if(Test-Path -LiteralPath $impactScript -PathType Leaf){
+            try{
+                $impactOutput=& powershell -NoProfile -File $impactScript -ProjectRoot $root -SkillPath $target 2>&1 | Out-String
+                $impactObject=$impactOutput.Trim() | ConvertFrom-Json
+                $impactClass=[string]$impactObject.skillChangeImpact
+                if($impactClass -in @('medium','major') -and [bool]$impactObject.revalidationRequired -and [bool]$impactObject.completionClaimAllowed -eq $false){$impactStatus='review';$impactMessage="Derived $impactClass change impact requires revalidation: $([string]::Join(', ', @($impactObject.requiredStages)))"}
+                elseif($impactClass -eq 'small' -and [bool]$impactObject.completionClaimAllowed){$impactStatus='passed';$impactMessage='No medium/major Skill change impact detected'}
+                else{$impactStatus='blocked';$impactMessage='Change impact output is internally inconsistent'}
+            }catch{$impactStatus='blocked';$impactMessage='SkillChangeImpact evaluator failed: '+$_.Exception.Message}
+        }
+        $results += ([pscustomobject]@{skill=$name;profile='ChangeImpact';status=$impactStatus;message=$impactMessage;source=$impactScript;impact=$impactObject})
+    }
     if($Profile -contains 'Governance' -or $Profile -contains 'Full'){
         $ok=$false; $message='governance.json valid'
         $contractScript=Join-Path $skillsRoot 'es-skill-governance/scripts/Test-ESSkillContract.ps1'
         if((Test-Path $contractScript -PathType Leaf) -and (Test-Path $target -PathType Container)){
-            $contractOutput=& powershell -NoProfile -File $contractScript -SkillPath $target -RequireGovernanceMetadata 2>&1 | Out-String
+            $contractOutput=& powershell -NoProfile -File $contractScript -SkillPath $target -RequireGovernanceMetadata -AuthorizationLane $AuthorizationLane 2>&1 | Out-String
             $ok=($LASTEXITCODE -eq 0)
             if(-not $ok){$message='project Skill governance contract failed: '+$contractOutput.Trim()}
         } elseif(-not (Test-Path $gov -PathType Leaf)) {$message='governance.json missing and project contract validator unavailable'}
@@ -122,6 +191,7 @@ foreach($target in $targets){
     }
     if($Profile -contains 'Semantic' -or $Profile -contains 'Full'){
         $issues=New-Object 'System.Collections.Generic.List[string]'
+        $managedIssues=New-Object 'System.Collections.Generic.List[string]'
         $knowledgeIndex=Join-Path $root 'Documentation/AIKnowledge/KnowledgeIndex.yaml'
         $brainEntry=Join-Path $root 'Documentation/AIKnowledge/AIBRAIN_ENTRY.md'
         $resourceIndex=Join-Path $root '.agents/SKILL_RESOURCE_INDEX.yaml'
@@ -135,25 +205,19 @@ foreach($target in $targets){
             $authorityFiles += @(Get-ChildItem -LiteralPath $startDir.FullName -File -Filter '*CurrentStatus*.md' -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object FullName)
             $authorityFiles += @(Get-ChildItem -LiteralPath $startDir.FullName -File -Filter '*RuleIndex*.md' -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object FullName)
         }
-        $declaredPathContract=$null
-        if($govBoundary -and $govBoundary.PSObject.Properties.Name -contains 'pathBoundaryContractRef'){
-            $contractPath=[string]$govBoundary.pathBoundaryContractRef
-            if(Test-RelativeProjectFile $contractPath){
-                try{$declaredPathContract=Read-StrictText (Join-Path $root ($contractPath -replace '/','\'))}catch{}
-            }else{Add-BoundaryFinding $findings 'PathContractMissing' (Get-ProjectRelativePath $gov) 1 'pathBoundaryContractRef 必须指向项目内可读合同。'}
-        }
-        if($null -eq $declaredPathContract){
-            foreach($fallbackContract in @('references/path-boundary-contract.md','references/external-unity-execution-contract.md')){
-                $fallbackPath=Join-Path $target ($fallbackContract -replace '/','\')
-                if(Test-Path -LiteralPath $fallbackPath -PathType Leaf){try{$declaredPathContract=Read-StrictText $fallbackPath}catch{};if($null -ne $declaredPathContract){break}}
-            }
-        }
-        $authorityFiles += Join-Path $root 'Assets/Plugins/ES/AICommands/README.md'
-        $authorityFiles += Join-Path $root 'Assets/Plugins/ES/AICommands/AICommandCatalog.json'
         foreach($path in $authorityFiles){
             $relative=Get-ProjectRelativePath $path
             if(-not $relative -or -not (Test-Path -LiteralPath $path -PathType Leaf)){[void]$issues.Add("missing project authority: $relative");continue}
             try{Read-StrictText $path|Out-Null}catch{[void]$issues.Add("invalid UTF-8 authority: $relative")}
+        }
+        $managedAuthorityFiles=@(
+            (Join-Path $root 'Assets/Plugins/ES/AICommands/README.md'),
+            (Join-Path $root 'Assets/Plugins/ES/AICommands/AICommandCatalog.json')
+        )
+        foreach($path in $managedAuthorityFiles){
+            $relative=Get-ProjectRelativePath $path
+            if(-not $relative -or -not (Test-Path -LiteralPath $path -PathType Leaf)){[void]$managedIssues.Add("missing managed-channel authority: $relative");continue}
+            try{Read-StrictText $path|Out-Null}catch{[void]$managedIssues.Add("invalid UTF-8 managed-channel authority: $relative")}
         }
         foreach($path in @($knowledgeIndex,$brainEntry,$resourceIndex,$catalog)){
             if(-not (Test-Path -LiteralPath $path -PathType Leaf)){[void]$issues.Add("missing project semantic index: $(Get-ProjectRelativePath $path)")}
@@ -181,23 +245,23 @@ foreach($target in $targets){
                 try{
                     $bindingRegistrySemantic=Get-Content -Raw -Encoding UTF8 $commandBindingRegistryPath|ConvertFrom-Json
                     $bindingEntries=@($bindingRegistrySemantic.entries)
-                    $duplicateBindings=@($bindingEntries|Group-Object skillName|Where-Object {$_.Name -and $_.Count -gt 1})
-                    if($duplicateBindings.Count -gt 0){[void]$issues.Add('Command binding registry contains duplicate Skill entries')}
+                    $duplicateBindings=@($bindingEntries|Group-Object {([string]$_.skillName).Trim().ToLowerInvariant()+'|'+([string]$_.commandId).Trim()}|Where-Object {$_.Name -and $_.Count -gt 1})
+                    if($duplicateBindings.Count -gt 0){[void]$managedIssues.Add('Command binding registry contains duplicate Skill/AICommand pairs')}
                     $commandCatalogSemantic=@()
                     if(Test-Path -LiteralPath (Join-Path $root 'Assets/Plugins/ES/AICommands/AICommandCatalog.json') -PathType Leaf){try{$commandCatalogSemantic=@((Get-Content -Raw -Encoding UTF8 (Join-Path $root 'Assets/Plugins/ES/AICommands/AICommandCatalog.json')|ConvertFrom-Json).commands)}catch{}}
                     foreach($bindingEntry in $bindingEntries){
                         $entrySkill=[string]$bindingEntry.skillName; $entryCommand=[string]$bindingEntry.commandId
-                        if(-not (Test-Path -LiteralPath (Join-Path $skillsRoot $entrySkill) -PathType Container)){[void]$issues.Add("Command binding Skill missing: $entrySkill")}
+                        if(-not (Test-Path -LiteralPath (Join-Path $skillsRoot $entrySkill) -PathType Container)){[void]$managedIssues.Add("Command binding Skill missing: $entrySkill")}
                         $commandMatch=@($commandCatalogSemantic|Where-Object {[string]$_.id -ceq $entryCommand})
-                        if($commandMatch.Count -ne 1){[void]$issues.Add("Command binding does not resolve uniquely: $entryCommand")}else{
+                        if($commandMatch.Count -ne 1){[void]$managedIssues.Add("Command binding does not resolve uniquely: $entryCommand")}else{
                             $commandPath=[string]$commandMatch[0].path; $commandFull=Join-Path $root $commandPath.Replace('/','\')
-                            if(-not (Test-Path -LiteralPath $commandFull -PathType Leaf)){[void]$issues.Add("Command binding body missing: $entryCommand")}
-                            elseif([string]$bindingEntry.commandHash -notmatch '^[a-fA-F0-9]{64}$' -or [string]$bindingEntry.commandHash -cne (Get-Sha256 $commandFull)){[void]$issues.Add("Command binding hash stale: $entryCommand")}
-                            foreach($property in @('role','riskLevel','writeMode')){if([string]$bindingEntry.$property -ne [string]$commandMatch[0].$property){[void]$issues.Add("Command binding $property mismatch: $entryCommand")}}
+                            if(-not (Test-Path -LiteralPath $commandFull -PathType Leaf)){[void]$managedIssues.Add("Command binding body missing: $entryCommand")}
+                            elseif([string]$bindingEntry.commandHash -notmatch '^[a-fA-F0-9]{64}$' -or [string]$bindingEntry.commandHash -cne (Get-Sha256 $commandFull)){[void]$managedIssues.Add("Command binding hash stale: $entryCommand")}
+                            foreach($property in @('role','riskLevel','writeMode')){if([string]$bindingEntry.$property -ne [string]$commandMatch[0].$property){[void]$managedIssues.Add("Command binding $property mismatch: $entryCommand")}}
                         }
                     }
-                }catch{[void]$issues.Add('Command binding registry is not parseable')}
-            }else{[void]$issues.Add('Command binding registry is missing')}
+                }catch{[void]$managedIssues.Add('Command binding registry is not parseable')}
+            }else{[void]$managedIssues.Add('Command binding registry is missing')}
             $routeKeys=@($governanceSemantic.routeKeys|ForEach-Object {[string]$_}|Where-Object {$_})
             foreach($authorityRef in @($governanceSemantic.requiredAuthorityRefs | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })){
                 if(-not (Test-RelativeProjectFile ([string]$authorityRef))){[void]$issues.Add("required authority ref missing: $authorityRef")}
@@ -240,14 +304,31 @@ foreach($target in $targets){
                     foreach($route in $routeKeys){if($block -notmatch ('(?m)^\s*-\s*'+[regex]::Escape($route)+'\s*$')){[void]$issues.Add("Catalog routeKey missing: $route")}}
                 }
             }
-            if($governanceSemantic.authorityClass -ne 'standard' -and $governanceSemantic.requiresBrainPlan -ne $true){[void]$issues.Add('Non-standard authority class must require AIBrain plan')}
+            if($governanceSemantic.authorityClass -ne 'standard' -and $governanceSemantic.requiresBrainPlan -ne $true){[void]$managedIssues.Add('Non-standard authority class must require AIBrain plan')}
         }
-        $results += ([pscustomobject]@{skill=$name;profile='Semantic';status=if($issues.Count -eq 0){'passed'}else{'blocked'};message=if($issues.Count -eq 0){'ESFramework authority, route, Knowledge, Resource Index and Catalog semantics passed'}else{"project semantic blockers ($($issues.Count))"};source=(@($issues)-join '; ')})
+        $managedSeverity=Get-ManagedChannelSeverity
+        $semanticStatus=if($issues.Count -gt 0){'blocked'}elseif($managedIssues.Count -gt 0){$managedSeverity}else{'passed'}
+        $semanticMessage=if($issues.Count -gt 0){"project semantic blockers ($($issues.Count)); managed-channel findings ($($managedIssues.Count))"}elseif($managedIssues.Count -gt 0){"managed-channel semantic findings ($($managedIssues.Count)); authorizationLane=$AuthorizationLane"}else{'ESFramework authority, route, Knowledge, Resource Index and Catalog semantics passed'}
+        $semanticSource=@($issues)+@($managedIssues)
+        $results += ([pscustomobject]@{skill=$name;profile='Semantic';status=$semanticStatus;message=$semanticMessage;source=($semanticSource-join '; ');blockingCount=$issues.Count;managedFindingCount=$managedIssues.Count})
     }
     if($Profile -contains 'Boundary' -or $Profile -contains 'Full'){
         $findings=New-Object 'System.Collections.ArrayList'
         $govBoundary=$null
         try{$govBoundary=Get-Content -Raw -Encoding UTF8 $gov|ConvertFrom-Json}catch{}
+        $declaredPathContract=$null
+        if($govBoundary -and $govBoundary.PSObject.Properties.Name -contains 'pathBoundaryContractRef'){
+            $contractPath=[string]$govBoundary.pathBoundaryContractRef
+            if(Test-RelativeProjectFile $contractPath){
+                try{$declaredPathContract=Read-StrictText (Join-Path $root ($contractPath -replace '/','\'))}catch{}
+            }else{Add-BoundaryFinding $findings 'PathContractMissing' (Get-ProjectRelativePath $gov) 1 'pathBoundaryContractRef 必须指向项目内可读合同。'}
+        }
+        if($null -eq $declaredPathContract){
+            foreach($fallbackContract in @('references/path-boundary-contract.md','references/external-unity-execution-contract.md')){
+                $fallbackPath=Join-Path $target ($fallbackContract -replace '/','\')
+                if(Test-Path -LiteralPath $fallbackPath -PathType Leaf){try{$declaredPathContract=Read-StrictText $fallbackPath}catch{};if($null -ne $declaredPathContract){break}}
+            }
+        }
         $skillBoundaryText=''; try{$skillBoundaryText=Read-StrictText $skill}catch{}
         $yamlBoundaryText=''; try{$yamlBoundaryText=Read-StrictText $yaml}catch{}
         $declaredText=($skillBoundaryText+"`n"+$yamlBoundaryText)
@@ -271,7 +352,7 @@ foreach($target in $targets){
             try{
                 $commandBindingRegistry=Get-Content -Raw -Encoding UTF8 $commandBindingRegistryPath|ConvertFrom-Json
                 $registeredBindings=@($commandBindingRegistry.entries|Where-Object {[string]$_.skillName -ceq $name})
-            }catch{Add-BoundaryFinding $findings 'CommandBindingRegistryInvalid' (Get-ProjectRelativePath $commandBindingRegistryPath) 1 '命令绑定注册表不是有效 JSON，不能授予外部能力。'}
+            }catch{Add-BoundaryFinding $findings 'CommandBindingRegistryInvalid' (Get-ProjectRelativePath $commandBindingRegistryPath) 1 '命令绑定注册表不是有效 JSON，不能支持 ManagedAIBrain 通道绑定。'}
         }
         $routeKeys=if($govBoundary){@($govBoundary.routeKeys|ForEach-Object {[string]$_}|Where-Object {$_})}else{@()}
         $commandCatalogPath=Join-Path $root 'Assets/Plugins/ES/AICommands/AICommandCatalog.json'
@@ -304,7 +385,7 @@ foreach($target in $targets){
         $bindings+=@($registeredBindings)
         $boundCommands=@()
         if($commandRequirement -notin @('none','optional','required')){Add-BoundaryFinding $findings 'InvalidCommandRequirement' (Get-ProjectRelativePath $gov) 1 'commandRequirement 必须为 none、optional 或 required。'}
-        if($commandRequirement -eq 'required' -and $bindings.Count -eq 0){Add-BoundaryFinding $findings 'NoExplicitCommandBinding' (Get-ProjectRelativePath $gov) 1 '该 Skill 声明了写入/外部能力，但没有显式 commandId -> AICommand -> TaskContract 绑定；关键词和 routeKey 不授予权限。'}
+        if($commandRequirement -eq 'required' -and $bindings.Count -eq 0){Add-BoundaryFinding $findings 'NoExplicitCommandBinding' (Get-ProjectRelativePath $gov) 1 '该 Skill 声明了 ManagedAIBrain 写入/外部能力，但没有显式 commandId -> AICommand -> TaskContract 绑定。'}
         foreach($binding in $bindings){
             $commandId=[string]$binding.commandId
             if([string]::IsNullOrWhiteSpace($commandId)){Add-BoundaryFinding $findings 'InvalidCommandBinding' (Get-ProjectRelativePath $gov) 1 'commandBindings 项缺少 commandId。';continue}
@@ -328,7 +409,7 @@ foreach($target in $targets){
             if([bool]$binding.taskContractRequired -and [string]$binding.taskContractRef -notmatch '\S'){Add-BoundaryFinding $findings 'MissingTaskContract' (Get-ProjectRelativePath $gov) 1 "AICommand '$commandId' 声明需要 TaskContract，但未提供 taskContractRef。"}
             if([string]$binding.taskContractRef -match '\S' -and -not (Test-RelativeProjectFile ([string]$binding.taskContractRef))){Add-BoundaryFinding $findings 'MissingTaskContract' (Get-ProjectRelativePath $gov) 1 "AICommand '$commandId' 的 TaskContract 不存在或越界。"}
         }
-        if($commandRequirement -eq 'required' -and $boundCommands.Count -eq 0 -and $bindings.Count -gt 0){Add-BoundaryFinding $findings 'NoExplicitCommandBinding' (Get-ProjectRelativePath $gov) 1 '所有显式 commandId 均未能解析，不能退回模糊匹配。'}
+        if($commandRequirement -eq 'required' -and $boundCommands.Count -eq 0 -and $bindings.Count -gt 0){Add-BoundaryFinding $findings 'NoExplicitCommandBinding' (Get-ProjectRelativePath $gov) 1 '所有显式 commandId 均未能解析，ManagedAIBrain 通道不能退回模糊匹配。'}
         if($writePolicy -and $boundCommands.Count -gt 0){
             $modes=@($boundCommands|ForEach-Object {[string]$_.writeMode}|Where-Object {$_})
             $widerThanReadOnly=@($modes|Where-Object {$_ -notin @('read-only','candidate-only')})
@@ -366,6 +447,20 @@ foreach($target in $targets){
         # External process launch is allowed only when the Skill declares an
         # explicit executable/argument boundary; it remains a review item.
         $hasApprovedExternalExecutionProfile=Test-Declaration $declaredText @('(?is)(external\s+process|process\s+boundary|外部进程|进程边界).{0,160}(exact\s+executable|allowlist|参数白名单|精确可执行文件|一次性)')
+        $sharedPathBoundaryReady=$false
+        if($name -eq 'es-skill-governance'){
+            $sharedPathBoundaryPath=Join-Path $target 'scripts\ESPathBoundary.Common.ps1'
+            try{
+                $sharedPathBoundaryText=Read-StrictText $sharedPathBoundaryPath
+                $sharedPathBoundaryReady=(
+                    $sharedPathBoundaryText -match '(?i)function\s+Resolve-ESContainedRelativePath' -and
+                    $sharedPathBoundaryText -match '(?i)IsPathRooted' -and
+                    $sharedPathBoundaryText -match '(?i)GetFullPath' -and
+                    $sharedPathBoundaryText -match '(?i)StartsWith' -and
+                    $sharedPathBoundaryText -match '(?i)alternate\s+data\s+stream' -and
+                    $sharedPathBoundaryText -match '(?i)ReparsePoint')
+            }catch{}
+        }
         foreach($file in $scriptFiles){
             $relative=Get-ProjectRelativePath $file.FullName; $n=0
             $fileText=''; try{$fileText=Read-StrictText $file.FullName}catch{}
@@ -379,11 +474,14 @@ foreach($target in $targets){
             $rootFromGit=($fileText -match '(?is)git\s+rev-parse\s+--show-toplevel')
             $rootDefault=($fileText -match '(?is)\$ProjectRoot\s*=\s*\(\s*Resolve-Path\s*\(\s*Join-Path\s+\$PSScriptRoot')
             $hasProjectRootBinding=((($rootFromParameter -or $rootFromScriptDirectory -or $rootFromGit) -and $rootVariable) -or $rootDefault)
-            $hasExplicitPathContainment=((($fileText -match '(?is)IsPathRooted\s*\(\s*\$[A-Za-z_][A-Za-z0-9_]*\s*\)') -or $fileText -match '(?is)GetFullPath\s*\(\s*\$(?:ProjectRoot|Root|root)') -and ($fileText -match '(?is)(escapes?\s+ProjectRoot|StartsWith\s*\(\s*\$[A-Za-z_][A-Za-z0-9_]*\s*\+|cannot escape|\b越界\b)'))
+            $usesSharedPathBoundary=($sharedPathBoundaryReady -and
+                $fileText -match '(?is)\.\s*\(\s*Join-Path\s+\$PSScriptRoot\s+[\x27\x22]ESPathBoundary\.Common\.ps1[\x27\x22]\s*\)' -and
+                $fileText -match '(?i)Resolve-ESContainedRelativePath')
+            $hasExplicitPathContainment=($usesSharedPathBoundary -or ((($fileText -match '(?is)IsPathRooted\s*\(\s*\$[A-Za-z_][A-Za-z0-9_]*\s*\)') -or $fileText -match '(?is)GetFullPath\s*\(\s*\$(?:ProjectRoot|Root|root)') -and ($fileText -match '(?is)(escapes?\s+ProjectRoot|StartsWith\s*\(\s*\$[A-Za-z_][A-Za-z0-9_]*\s*\+|cannot escape|\b越界\b)')))
             $hasDeclaredPathContract=($null -ne $declaredPathContract -and $declaredPathContract -match '(?is)(project.?relative|approved.*state root|external.*state root)' -and $declaredPathContract -match '(?is)(reject|deny|cannot escape|越界|拒绝)')
             $hasApprovedExternalProfile=($hasDeclaredPathContract -and $declaredPathContract -match '(?is)approved.*(user.?profile|LOCALAPPDATA|\.codex)')
-            $contractBoundInput=($hasProjectRootBinding -or $hasResolvedInputPath -or ($name -eq 'es-codex-session-bootstrap' -and $fileText -match '(?i)\$(?:StateRoot|localStateRoot|localStateBase)'))
             $hasResolvedInputPath=($fileText -match '(?is)Resolve-Path(?:\s+-LiteralPath)?\s+\$[A-Za-z_][A-Za-z0-9_]*')
+            $contractBoundInput=($hasProjectRootBinding -or $hasResolvedInputPath -or ($name -eq 'es-codex-session-bootstrap' -and $fileText -match '(?i)\$(?:StateRoot|localStateRoot|localStateBase)'))
             $hasTemporaryFixtureBoundary=(($fileText -match '(?is)GetTempPath\s*\(') -and ($fileText -match '(?is)Remove-Item[^\r\n]+\$tempRoot'))
             $isReplayHarness=($file.Name -match '(?i)^Test-ES.*\.ps1$' -or $file.Name -match '(?i)StaticReplay\.ps1$')
             $explicitReadOnlyContract=($fileText -match '(?is)read-only\s+(?:contract|/report-only|audit|validator)')
@@ -433,15 +531,32 @@ foreach($target in $targets){
         $results += ([pscustomobject]@{skill=$name;profile='Boundary';capabilityMode=$capabilityMode;status=$status;message=$message;source=$source;blockingCount=$blockingFindings.Count;reviewCount=$reviewFindings.Count;findings=@($findings)})
     }
     if($Profile -contains 'Evidence' -or $Profile -contains 'Full'){
-        $evidenceStatus='not-run'; $evidenceMessage='behavioral receipts not found; structural checks are not behavioral evidence'
+        $evidencePendingStatus=if($AuthorizationLane -eq 'ManagedAIBrain'){'blocked'}else{'review'}
+        $evidenceStatus=$evidencePendingStatus; $evidenceMessage="behavioral receipts missing for authorizationLane '$AuthorizationLane'; structural checks are not behavioral evidence"
+        $responsibilityProfile='base'; $expectedCases=@()
         if(Test-Path $gov -PathType Leaf){
             try {
                 $evidenceGovernance=Get-Content -Raw -Encoding UTF8 $gov | ConvertFrom-Json
                 $requiredCases=@($evidenceGovernance.requiredCases)
-                $expectedCases=@('positive','invalid-input','denied-expansion','repeat-idempotency')
-                if([string]$evidenceGovernance.tier -in @('Workflow','Engineering')){$expectedCases+='interruption-recovery'}
-                $missingCases=$expectedCases | Where-Object { $requiredCases -notcontains $_ }
-                if($missingCases.Count -gt 0){$evidenceStatus='failed';$evidenceMessage='requiredCases missing: '+($missingCases -join ', ')}
+                # The static-replay responsibility profile defines the
+                # minimum useful evidence. Historical governance files may
+                # still contain the old five-case superset; do not apply it
+                # blindly to every Skill.
+                $manifestPath=Join-Path $target 'static-replay.manifest.json'
+                if(Test-Path -LiteralPath $manifestPath -PathType Leaf){try{$responsibilityProfile=[string]((Get-Content -Raw -Encoding UTF8 $manifestPath|ConvertFrom-Json).responsibilityProfile)}catch{}}
+                $expectedCases=switch($responsibilityProfile){
+                    'release' { @('positive','invalid-input','denied-expansion','repeat-idempotency','interruption-recovery') }
+                    'session' { @('positive','invalid-input','interruption-recovery') }
+                    'governance' { @('positive','invalid-input','denied-expansion') }
+                    'knowledge' { @('positive','invalid-input','hash-change-cache-invalidation') }
+                    'editor' { @('positive','invalid-input','denied-expansion','repeat-idempotency') }
+                    'engineering' { if([string]$evidenceGovernance.writePolicy -eq 'read-only'){@('positive','invalid-input')}else{@('positive','invalid-input','repeat-idempotency')} }
+                    'authoring' { @('positive','invalid-input','denied-expansion','repeat-idempotency') }
+                    'testing' { @('positive','invalid-input','repeat-idempotency') }
+                    default { @('positive','invalid-input') }
+                }
+                $expectedCases=@($expectedCases|Where-Object {$requiredCases -contains $_})
+                if($expectedCases.Count -eq 0){$evidenceStatus='not-applicable';$evidenceMessage="no evidence cases applicable to responsibilityProfile '$responsibilityProfile'"}
                 else {
                     $receiptCandidates=@(Get-ChildItem -LiteralPath (Join-Path $root 'ES\Output') -File -Filter '*Receipt.json' -ErrorAction SilentlyContinue | ForEach-Object FullName)
                     $matching=@(); $caseNames=@(); $receiptFailures=@()
@@ -458,13 +573,15 @@ foreach($target in $targets){
                             if($j.PSObject.Properties.Name -notcontains 'capturedUtc'){$valid=$false}else{try{$capturedUtc=[DateTime]::Parse([string]$j.capturedUtc).ToUniversalTime();$maxAgeHours=if($evidenceGovernance.PSObject.Properties.Name -contains 'maxEvidenceAgeHours'){[int]$evidenceGovernance.maxEvidenceAgeHours}else{168};if(([DateTime]::UtcNow-$capturedUtc).TotalHours -gt $maxAgeHours){$valid=$false}}catch{$valid=$false}}
                             if($j.PSObject.Properties.Name -notcontains 'unityVersion' -or [string]::IsNullOrWhiteSpace([string]$j.unityVersion)){$valid=$false}
                             if([string]$j.skillHash -ne $skillHash -or [string]$j.governanceHash -ne $governanceHash -or [string]$j.validatorHash -ne $validatorHash){$valid=$false}
-                            if([string]$evidenceGovernance.requiresBrainPlan -eq 'True' -and [string]$j.planHash -notmatch '^[a-fA-F0-9]{64}$'){$valid=$false}
-                            if($j.PSObject.Properties.Name -notcontains 'sourceRefHashes'){$valid=$false}
+                            if(-not (Test-ReceiptAuthorization $j)){$valid=$false}
+                            $hashesProperty=$j.PSObject.Properties['sourceRefHashes']
+                            $hashProperties=if($null -eq $hashesProperty -or $hashesProperty.Value -is [string]){@()}else{@($hashesProperty.Value.PSObject.Properties)}
+                            if(-not (Test-NonEmptyStringArray $j.sourceRefs) -or $hashProperties.Count -eq 0){$valid=$false}
                             foreach($ref in @($j.sourceRefs)){
-                                $refPath=Join-Path $root ([string]$ref)
-                                if(-not (Test-Path -LiteralPath $refPath -PathType Leaf)){$valid=$false;continue}
-                                $hashProperty=$j.sourceRefHashes.PSObject.Properties[[string]$ref]
-                                if($null -eq $hashProperty){$hashProperty=$j.sourceRefHashes.PSObject.Properties[([string]$ref).Replace('/','_')]}
+                                $refPath=Get-ProjectRelativeEvidenceFile $ref
+                                if($null -eq $refPath){$valid=$false;continue}
+                                $hashProperty=if($null -eq $hashesProperty){$null}else{$hashesProperty.Value.PSObject.Properties[[string]$ref]}
+                                if($null -eq $hashProperty -and $null -ne $hashesProperty){$hashProperty=$hashesProperty.Value.PSObject.Properties[([string]$ref).Replace('/','_')]}
                                 $expected=if($null -eq $hashProperty){''}else{[string]$hashProperty.Value}
                                 if([string]::IsNullOrWhiteSpace($expected) -or $expected -ne (Get-Sha256 $refPath)){$valid=$false}
                             }
@@ -475,11 +592,12 @@ foreach($target in $targets){
                     if($duplicateCases.Count -gt 0){$receiptFailures += $matching}
                     $missingEvidence=$expectedCases | Where-Object { $caseNames -notcontains $_ }
                     if($matching.Count -gt 0 -and $missingEvidence.Count -eq 0 -and $receiptFailures.Count -eq 0){$evidenceStatus='passed';$evidenceMessage="all required case receipts found: $($matching.Count)"}
-                    elseif($matching.Count -gt 0){$evidenceStatus='blocked';$evidenceMessage='receipts stale/invalid; missing or unbound cases: '+($missingEvidence -join ', ')}
+                    elseif($matching.Count -gt 0){$evidenceStatus=$evidencePendingStatus;$evidenceMessage="receipts stale/invalid for authorizationLane '$AuthorizationLane'; missing or unbound cases: "+($missingEvidence -join ', ')}
+                    else {$evidenceStatus=$evidencePendingStatus;$evidenceMessage="required static evidence receipts missing for authorizationLane '$AuthorizationLane': "+($expectedCases -join ', ')}
                 }
-            } catch {$evidenceStatus='failed';$evidenceMessage='governance evidence contract could not be read'}
+            } catch {$evidenceStatus=if($AuthorizationLane -eq 'ManagedAIBrain'){'failed'}else{'review'};$evidenceMessage='governance evidence contract could not be read'}
         }
-        $results += ([pscustomobject]@{skill=$name;profile='Evidence';status=$evidenceStatus;message=$evidenceMessage;source=$gov})
+        $results += ([pscustomobject]@{skill=$name;profile='Evidence';status=$evidenceStatus;message=$evidenceMessage;source=$gov;responsibilityProfile=$responsibilityProfile;requiredCases=@($expectedCases)})
     }
 }
 if($Profile -contains 'Catalog' -or $Profile -contains 'Full'){
@@ -496,7 +614,7 @@ if($Profile -contains 'Architecture' -or $Profile -contains 'Full'){
     if(-not (Test-Path -LiteralPath $architectureScript -PathType Leaf)){
         $results += ([pscustomobject]@{skill=if($SkillName){$SkillName}else{'*'};profile='Architecture';status='failed';message='Skill architecture validator is missing';source=$architectureScript})
     } else {
-        $architectureOutput=(& powershell -NoProfile -ExecutionPolicy Bypass -File $architectureScript -ProjectRoot $root 2>&1 | Out-String).Trim()
+        $architectureOutput=(& powershell -NoProfile -ExecutionPolicy Bypass -File $architectureScript -ProjectRoot $root -AuthorizationLane $AuthorizationLane 2>&1 | Out-String).Trim()
         $architectureExit=$LASTEXITCODE
         $architectureStatus=if($architectureExit -ne 0){'blocked'}else{'passed'}
         try{
@@ -506,47 +624,84 @@ if($Profile -contains 'Architecture' -or $Profile -contains 'Full'){
         $results += ([pscustomobject]@{skill=if($SkillName){$SkillName}else{'*'};profile='Architecture';status=$architectureStatus;message=$architectureOutput;source=$architectureScript})
     }
 }
+# Keep the historical `status` field for existing callers, but expose a
+# claim-oriented status that explains *why* a result is not accepted.  This
+# prevents missing receipts from being mistaken for a source-code defect.
+foreach($result in $results){
+    $legacyStatus=[string]$result.status
+    $claimStatus='Passed'
+    if($legacyStatus -eq 'not-applicable'){$claimStatus='NotApplicable'}
+    elseif($legacyStatus -eq 'not-run'){$claimStatus=if([string]$result.profile -eq 'Evidence'){'EvidenceMissing'}else{'RuntimeNotRun'}}
+    elseif($legacyStatus -eq 'review'){
+        if([string]$result.profile -eq 'Evidence'){
+            $message=[string]$result.message
+            if($message -match '(?i)stale'){$claimStatus='EvidenceStale'}
+            elseif($message -match '(?i)unbound'){$claimStatus='EvidenceUnbound'}
+            else{$claimStatus='EvidenceMissing'}
+        }else{$claimStatus='ManualReviewRequired'}
+    }
+    elseif($legacyStatus -eq 'failed'){$claimStatus='StaticDefect'}
+    elseif($legacyStatus -eq 'blocked'){
+        if([string]$result.profile -eq 'Evidence'){
+            $message=[string]$result.message
+            if($message -match '(?i)missing or unbound'){$claimStatus='EvidenceUnbound'}
+            elseif($message -match '(?i)stale'){$claimStatus='EvidenceStale'}
+            elseif($message -match '(?i)unbound'){$claimStatus='EvidenceUnbound'}
+            else{$claimStatus='EvidenceMissing'}
+        } elseif([string]$result.profile -eq 'Boundary' -and [int]$result.blockingCount -eq 0){
+            $claimStatus='ManualReviewRequired'
+        } else {$claimStatus='StaticDefect'}
+    }
+    $result | Add-Member -NotePropertyName legacyStatus -NotePropertyValue $legacyStatus -Force
+    $result | Add-Member -NotePropertyName claimStatus -NotePropertyValue $claimStatus -Force
+    $result | Add-Member -NotePropertyName authorizationLane -NotePropertyValue $AuthorizationLane -Force
+}
+$claimStatusCounts=@($results|Group-Object claimStatus|ForEach-Object {[ordered]@{status=$_.Name;count=$_.Count}})
 $failed=@($results | Where-Object status -in @('failed','blocked'))
 $notRun=@($results | Where-Object status -eq 'not-run')
-$staticProfiles=@('Structural','Governance','VerificationSemantics','StaticDeepReplay','Catalog','Security','Semantic','Boundary','Architecture')
+$staticProfiles=@('Structural','Governance','VerificationSemantics','StaticDeepReplay','ChangeImpact','Catalog','Security','Semantic','Boundary','Architecture')
 $staticFailures=@($results | Where-Object {$_.profile -in $staticProfiles -and $_.status -in @('failed','blocked')})
 $staticNotRun=@($results | Where-Object {$_.profile -in $staticProfiles -and $_.status -eq 'not-run'})
 $staticReviews=@($results | Where-Object {$_.profile -in $staticProfiles -and $_.status -eq 'review'})
 $staticCodeProfiles=@('Structural','Security','Semantic')
-$staticContractProfiles=@('Governance','VerificationSemantics','StaticDeepReplay','Catalog','Architecture')
+$staticContractProfiles=@('Governance','VerificationSemantics','StaticDeepReplay','ChangeImpact','Catalog','Architecture')
+$managedSemanticResults=@($results | Where-Object {$_.profile -eq 'Semantic' -and [int]$_.blockingCount -eq 0 -and [int]$_.managedFindingCount -gt 0})
 $staticBoundaryFailures=@($results | Where-Object {$_.profile -eq 'Boundary' -and $_.status -in @('failed','blocked')})
 $staticBoundaryNotRun=@($results | Where-Object {$_.profile -eq 'Boundary' -and $_.status -eq 'not-run'})
-$staticCodeFailures=@($results | Where-Object {$_.profile -in $staticCodeProfiles -and $_.status -in @('failed','blocked')})
-$staticContractFailures=@($results | Where-Object {$_.profile -in $staticContractProfiles -and $_.status -in @('failed','blocked')})
+$staticCodeFailures=@($results | Where-Object {$_.profile -in $staticCodeProfiles -and $_.status -in @('failed','blocked') -and -not ($_.profile -eq 'Semantic' -and [int]$_.blockingCount -eq 0 -and [int]$_.managedFindingCount -gt 0)})
+$staticContractFailures=@($results | Where-Object {$_.profile -in $staticContractProfiles -and $_.status -in @('failed','blocked')})+@($managedSemanticResults|Where-Object {$_.status -in @('failed','blocked')})
 $staticCodeNotRun=@($results | Where-Object {$_.profile -in $staticCodeProfiles -and $_.status -eq 'not-run'})
 $staticContractNotRun=@($results | Where-Object {$_.profile -in $staticContractProfiles -and $_.status -eq 'not-run'})
-$evidenceFailures=@($results | Where-Object {$_.profile -eq 'Evidence' -and $_.status -in @('failed','blocked','not-run')})
+$staticCodeReviews=@($results | Where-Object {$_.profile -in $staticCodeProfiles -and $_.status -eq 'review' -and -not ($_.profile -eq 'Semantic' -and [int]$_.blockingCount -eq 0 -and [int]$_.managedFindingCount -gt 0)})
+$staticContractReviews=@($results | Where-Object {$_.profile -in $staticContractProfiles -and $_.status -eq 'review'})+@($managedSemanticResults|Where-Object {$_.status -eq 'review'})
+$evidenceFailures=@($results | Where-Object {$_.profile -eq 'Evidence' -and $_.status -in @('failed','blocked','not-run','review')})
 $staticStatus=if($staticFailures.Count -gt 0){'static-blocked'}elseif($staticNotRun.Count -gt 0 -or $staticReviews.Count -gt 0){'static-partial'}else{'static-passed'}
-$staticCodeStatus=if($staticCodeFailures.Count -gt 0){'blocked'}elseif($staticCodeNotRun.Count -gt 0 -or @($results | Where-Object {$_.profile -in $staticCodeProfiles -and $_.status -eq 'review'}).Count -gt 0){'partial'}else{'passed'}
-$staticContractStatus=if($staticContractFailures.Count -gt 0){'blocked'}elseif($staticContractNotRun.Count -gt 0 -or @($results | Where-Object {$_.profile -in $staticContractProfiles -and $_.status -eq 'review'}).Count -gt 0){'partial'}else{'passed'}
+$staticCodeStatus=if($staticCodeFailures.Count -gt 0){'blocked'}elseif($staticCodeNotRun.Count -gt 0 -or $staticCodeReviews.Count -gt 0){'partial'}else{'passed'}
+$staticContractStatus=if($staticContractFailures.Count -gt 0){'blocked'}elseif($staticContractNotRun.Count -gt 0 -or $staticContractReviews.Count -gt 0){'partial'}else{'passed'}
 $staticBoundaryStatus=if($staticBoundaryFailures.Count -gt 0){'blocked'}elseif($staticBoundaryNotRun.Count -gt 0 -or @($results | Where-Object {$_.profile -eq 'Boundary' -and $_.status -eq 'review'}).Count -gt 0){'partial'}else{'passed'}
 $evidenceStatus=if($evidenceFailures.Count -gt 0){'missing-or-stale'}elseif(@($results | Where-Object {$_.profile -eq 'Evidence' -and $_.status -eq 'passed'}).Count -gt 0){'passed'}else{'not-requested'}
-# This validator is deliberately read-only: it never starts Unity, a Player, or an external process.
-# Receipt presence can strengthen evidence, but cannot be reported as a Runtime execution performed here.
+# This validator never starts Unity, a Player, or domain Runtime. It may use
+# isolated PowerShell processes for read-only helper validators; those helpers
+# receive no report path unless their caller explicitly requests an artifact.
+# Receipt presence can strengthen evidence, but cannot be reported as Runtime execution performed here.
 $runtimeStatus='runtime-not-run'
 $claimsNotProven=@('Unity/editor/process behavior','display/layout/timing behavior','Profiler/Player/IL2CPP/release behavior')
 $overallVerdict=if($staticCodeStatus -eq 'blocked'){'StaticCodeBlocked'}elseif($staticContractStatus -eq 'blocked'){'StaticContractBlocked'}elseif($staticBoundaryStatus -eq 'blocked'){'StaticBoundaryBlocked'}elseif($staticReviews.Count -gt 0){'StaticReviewCompleteReviewPending'}elseif($evidenceFailures.Count -gt 0){'StaticReviewCompleteEvidencePending'}else{'StaticReviewCompleteRuntimePending'}
-$nextAction=if($staticCodeStatus -eq 'blocked'){'修复源码结构或安全代码阻断；不要以运行时收据掩盖静态代码缺陷。'}elseif($staticContractStatus -eq 'blocked'){'修复 Skill 合同、验证语义、回放或目录阻断；ES 业务代码不必因此重写。'}elseif($staticBoundaryStatus -eq 'blocked'){'收窄外部路径/进程/会话边界并补充授权合同；这不是普通业务源码失败，也不能由 Runtime 收据绕过。'}elseif($staticReviews.Count -gt 0){'逐项处理 Boundary review；这些不是已证明的越界，但仍需静态收据或人工确认。'}elseif($evidenceFailures.Count -gt 0){'补齐或刷新对应 Evidence Receipt；不要把缺失收据解释为源码失败。'}else{'如需 RuntimeAcceptance/ReleaseAcceptance，先取得绑定当前任务的开发者授权。'}
+$nextAction=if($staticCodeStatus -eq 'blocked'){'修复源码结构或安全代码阻断；不要以运行时收据掩盖静态代码缺陷。'}elseif($staticContractStatus -eq 'blocked'){'修复 Skill 合同、验证语义、回放或目录阻断；ES 业务代码不必因此重写。'}elseif($staticBoundaryStatus -eq 'blocked'){'收窄外部路径/进程/会话边界并补充授权合同；这不是普通业务源码失败，也不能由 Runtime 收据绕过。'}elseif($staticReviews.Count -gt 0){'逐项处理静态 review；CurrentUserDirect 中的受管通道绑定问题不阻断当前用户动作，选用 ManagedAIBrain 前再补齐。'}elseif($evidenceFailures.Count -gt 0){'补齐或刷新对应 Evidence Receipt；不要把缺失收据解释为源码失败。'}else{'如需 RuntimeAcceptance/ReleaseAcceptance，先取得绑定当前任务的开发者授权。'}
 $decisionStatus=if($staticCodeStatus -eq 'blocked' -or $staticContractStatus -eq 'blocked' -or $staticBoundaryStatus -eq 'blocked'){'blocked'}elseif($evidenceFailures.Count -gt 0){'evidence-pending'}elseif($runtimeStatus -eq 'runtime-not-run'){'runtime-not-run'}else{'passed'}
 $blockingLayer=if($staticCodeStatus -eq 'blocked'){'static-code'}elseif($staticContractStatus -eq 'blocked'){'static-contract'}elseif($staticBoundaryStatus -eq 'blocked'){'static-boundary'}elseif($evidenceFailures.Count -gt 0){'evidence'}elseif($runtimeStatus -eq 'runtime-not-run'){'runtime'}else{'none'}
-$summary=[pscustomobject]@{validator='es-skill-validator';timestampUtc=[DateTime]::UtcNow.ToString('o');profiles=$Profile;results=@($results);staticStatus=$staticStatus;staticCodeStatus=$staticCodeStatus;staticContractStatus=$staticContractStatus;staticBoundaryStatus=$staticBoundaryStatus;evidenceStatus=$evidenceStatus;staticReviewCount=$staticReviews.Count;runtimeStatus=$runtimeStatus;overallVerdict=$overallVerdict;claimsNotProven=$claimsNotProven;nextAction=$nextAction;decisionStatus=$decisionStatus;blockingLayer=$blockingLayer;status=if($failed.Count -eq 0){'passed'}else{'blocked'}}
+$summary=[pscustomobject]@{validator='es-skill-validator';timestampUtc=[DateTime]::UtcNow.ToString('o');authorizationLane=$AuthorizationLane;profiles=$Profile;results=@($results);claimStatusCounts=$claimStatusCounts;staticStatus=$staticStatus;staticCodeStatus=$staticCodeStatus;staticContractStatus=$staticContractStatus;staticBoundaryStatus=$staticBoundaryStatus;evidenceStatus=$evidenceStatus;staticReviewCount=$staticReviews.Count;runtimeStatus=$runtimeStatus;overallVerdict=$overallVerdict;claimsNotProven=$claimsNotProven;nextAction=$nextAction;decisionStatus=$decisionStatus;blockingLayer=$blockingLayer;status=if($failed.Count -eq 0){'passed'}else{'blocked'}}
 # A review-pending aggregate is not a green acceptance result. Keep the
 # individual profile results intact, but expose the unresolved review layer at
 # the top level so routing cannot mistake it for Accepted.
-# Evidence/Runtime not-run is a pending layer, not a static source defect. Keep the
-# process exit code as a CI signal below, but expose the user-facing aggregate as
-# review so callers do not interpret "static complete, runtime pending" as code blocked.
-$aggregateHardFailures=@($results | Where-Object {$_.status -in @('failed','blocked') -and $_.profile -ne 'Evidence'})
+# Direct evidence gaps remain review-only. Managed evidence failures are a hard
+# channel gate and must remain blocked at both the profile and aggregate levels.
+$aggregateHardFailures=@($results | Where-Object {$_.status -in @('failed','blocked') -and ($_.profile -ne 'Evidence' -or $AuthorizationLane -eq 'ManagedAIBrain')})
 $summary.status = if($aggregateHardFailures.Count -gt 0){'blocked'}elseif($staticReviews.Count -gt 0 -or $evidenceFailures.Count -gt 0 -or (($Profile -contains 'Evidence' -or $Profile -contains 'Full') -and $notRun.Count -gt 0)){'review'}else{'passed'}
 if($ReportPath){
-    if([IO.Path]::IsPathRooted($ReportPath)){Write-Error 'ReportPath must be project-relative; external expansion is denied.'; exit 2}
+    if([IO.Path]::IsPathRooted($ReportPath)){Write-Error 'ReportPath must be project-relative; external expansion is denied.' -ErrorAction Continue; exit 2}
     $report=(Join-Path $root $ReportPath); $rootNormalized=$root.TrimEnd([IO.Path]::DirectorySeparatorChar,[IO.Path]::AltDirectorySeparatorChar); $reportFull=[IO.Path]::GetFullPath($report)
-    if(-not ($reportFull.StartsWith($rootNormalized + [IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase))){Write-Error 'ReportPath escapes ProjectRoot; external expansion is denied.'; exit 2}
+    if(-not ($reportFull.StartsWith($rootNormalized + [IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase))){Write-Error 'ReportPath escapes ProjectRoot; external expansion is denied.' -ErrorAction Continue; exit 2}
     $parent=Split-Path -Parent $report; if(-not (Test-Path $parent)){New-Item -ItemType Directory -Path $parent -Force | Out-Null}; $summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $report -Encoding UTF8
 }
 $summary | ConvertTo-Json -Depth 6

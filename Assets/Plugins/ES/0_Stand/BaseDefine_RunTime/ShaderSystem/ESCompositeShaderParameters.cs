@@ -177,8 +177,8 @@ namespace ES
         public static readonly int CheckerboardDarken = Shader.PropertyToID("_CheckerboardDarken");
         public static readonly int CheckerboardTiling = Shader.PropertyToID("_CheckerboardTiling");
         public static readonly int UberNoiseTexture = Shader.PropertyToID("_UberNoiseTexture");
-        public static readonly int SSUStatusContract = Shader.PropertyToID("_SSUStatusContract");
-        public static readonly int SSUExactContract = SSUStatusContract;
+        public static readonly int ESNativeStatusContract = Shader.PropertyToID("_ESNativeStatusContract");
+        public static readonly int ESNativeExactContract = ESNativeStatusContract;
         public static readonly int FrozenFade = Shader.PropertyToID("_FrozenFade");
         public static readonly int FrozenTint = Shader.PropertyToID("_FrozenTint");
         public static readonly int FrozenContrast = Shader.PropertyToID("_FrozenContrast");
@@ -1844,7 +1844,7 @@ namespace ES
             block.SetFloat(HalftoneStrength, Mathf.Clamp01(halftoneStrength));
         }
 
-        public static void SetHalftoneSSUAlpha(
+        public static void SetHalftoneESNativeAlpha(
             MaterialPropertyBlock block,
             bool enabled,
             Vector2 position,
@@ -2219,7 +2219,7 @@ namespace ES
             block.SetFloat(RecolorRGBYCPMaskChannel, (float)maskChannel);
         }
 
-        public static void SetSSUColorTint(
+        public static void SetESNativeColorTint(
             MaterialPropertyBlock block,
             bool addEnabled,
             Color addColor,
@@ -2252,23 +2252,23 @@ namespace ES
             if (strongMask != null) block.SetTexture(StrongTintMask, strongMask);
         }
 
-        public static void SetSSUExactContract(
+        public static void SetESNativeExactContract(
             MaterialPropertyBlock block,
             bool enabled,
             Texture shineMask = null)
         {
             if (block == null) return;
-            block.SetFloat(SSUExactContract, enabled ? 1f : 0f);
+            block.SetFloat(ESNativeExactContract, enabled ? 1f : 0f);
             block.SetFloat(ShineMaskEnabled, shineMask != null ? 1f : 0f);
             if (shineMask != null) block.SetTexture(ShineMask, shineMask);
         }
 
-        public static void SetSSUStatusContract(
+        public static void SetESNativeStatusContract(
             MaterialPropertyBlock block,
             bool enabled,
             Texture shineMask = null)
         {
-            SetSSUExactContract(block, enabled, shineMask);
+            SetESNativeExactContract(block, enabled, shineMask);
         }
 
         private static Vector4 ToVector4(Vector2 value)
@@ -2318,7 +2318,7 @@ namespace ES
                 if (IsMaterialSwitchEnabled(material, "_EnableUVDistort")) mask |= 1;
                 if (GetMaterialFloat(material, "_FadeMode") > 0.5f
                     || IsMaterialSwitchEnabled(material, "_EnableCustomFade")
-                    || IsAnyMaterialSwitchEnabled(material, SsuFadeResourceSwitches)) mask |= 2;
+                    || IsAnyMaterialSwitchEnabled(material, EsNativeFadeResourceSwitches)) mask |= 2;
                 if (IsAnyMaterialSwitchEnabled(material, surfaceResourceSwitches)) mask |= 4;
                 if (IsMaterialSwitchEnabled(material, "_EnablePalette")
                     || IsMaterialSwitchEnabled(material, "_EnableTextureLayer1")
@@ -2337,7 +2337,7 @@ namespace ES
             return changed;
         }
 
-        private static readonly string[] SsuFadeResourceSwitches =
+        private static readonly string[] EsNativeFadeResourceSwitches =
         {
             "_EnableFullAlphaDissolve",
             "_EnableSourceAlphaDissolve",
@@ -2470,7 +2470,7 @@ namespace ES
         public const string ShaderName = "ES/2D/Composite URP";
         private static readonly string[] SurfaceResourceSwitches =
         {
-            "_SSUStatusContract",
+            "_ESNativeStatusContract",
             "_EnableDistortion", "_EnableFrozen", "_EnableBurn", "_EnablePoison",
             "_EnableSmoke", "_EnableFlame", "_EnableInkSpread", "_EnableCamouflage",
             "_EnableMetal", "_EnableEnchanted", "_EnableFullGlowDissolve", "_EnableFullDistortion",
@@ -2705,8 +2705,8 @@ namespace ES
         public static readonly int CheckerboardDarken = ESCompositeURPProperties.CheckerboardDarken;
         public static readonly int CheckerboardTiling = ESCompositeURPProperties.CheckerboardTiling;
         public static readonly int UberNoiseTexture = ESCompositeURPProperties.UberNoiseTexture;
-        public static readonly int SSUStatusContract = ESCompositeURPProperties.SSUStatusContract;
-        public static readonly int SSUExactContract = ESCompositeURPProperties.SSUExactContract;
+        public static readonly int ESNativeStatusContract = ESCompositeURPProperties.ESNativeStatusContract;
+        public static readonly int ESNativeExactContract = ESCompositeURPProperties.ESNativeExactContract;
         public static readonly int FlameEnabled = ESCompositeURPProperties.FlameEnabled;
         public static readonly int FlameBrightness = ESCompositeURPProperties.FlameBrightness;
         public static readonly int FlameSmooth = ESCompositeURPProperties.FlameSmooth;
@@ -3158,44 +3158,44 @@ namespace ES
 
         /// <summary>
         /// 仅写入实例属性；不会改变承载材质的质量 Keyword 或资源编译配置。
-        /// 首次为运行时实例启用精确合同，优先使用 TrySetSSUExactContract。
+        /// 首次为运行时实例启用精确合同，优先使用 TrySetESNativeExactContract。
         /// </summary>
-        public static void SetSSUExactContract(MaterialPropertyBlock block, bool enabled, Texture shineMask = null)
+        public static void SetESNativeExactContract(MaterialPropertyBlock block, bool enabled, Texture shineMask = null)
         {
-            ESCompositeURPProperties.SetSSUExactContract(block, enabled, shineMask);
+            ESCompositeURPProperties.SetESNativeExactContract(block, enabled, shineMask);
         }
 
         /// <summary>
-        /// 初始化供 MaterialPropertyBlock 动态切换 SSU 效果使用的材质。
+        /// 初始化供 MaterialPropertyBlock 动态切换 ESNative 效果使用的材质。
         /// 此方法会修改材质 Keyword，应在实例初始化或材质创建阶段调用，不应逐帧调用共享材质。
         /// </summary>
-        public static bool PrepareMaterialForDynamicSSU(Material material)
+        public static bool PrepareMaterialForDynamicESNative(Material material)
         {
-            if (material == null || !material.HasProperty(SSUExactContract)) return false;
+            if (material == null || !material.HasProperty(ESNativeExactContract)) return false;
             SetQuality(material, ESCompositeQualityTier.高质量);
             SetResourceProfile(material, ESSpriteCompositeResourceProfile.动态完整);
             return true;
         }
 
         /// <summary>
-        /// 在确认材质已进入高质量、动态完整变体后写入实例级 SSU 精确合同。
+        /// 在确认材质已进入高质量、动态完整变体后写入实例级 ESNative 精确合同。
         /// </summary>
-        public static bool TrySetSSUExactContract(
+        public static bool TrySetESNativeExactContract(
             Material material,
             MaterialPropertyBlock block,
             bool enabled,
             Texture shineMask = null)
         {
-            if (material == null || block == null || !material.HasProperty(SSUExactContract)) return false;
-            if (enabled && !PrepareMaterialForDynamicSSU(material)) return false;
-            SetSSUExactContract(block, enabled, shineMask);
+            if (material == null || block == null || !material.HasProperty(ESNativeExactContract)) return false;
+            if (enabled && !PrepareMaterialForDynamicESNative(material)) return false;
+            SetESNativeExactContract(block, enabled, shineMask);
             return true;
         }
 
-        public static void SetSSUExactContract(Material material, bool enabled, Texture shineMask = null)
+        public static void SetESNativeExactContract(Material material, bool enabled, Texture shineMask = null)
         {
-            if (material == null || !material.HasProperty(SSUExactContract)) return;
-            material.SetFloat(SSUExactContract, enabled ? 1f : 0f);
+            if (material == null || !material.HasProperty(ESNativeExactContract)) return;
+            material.SetFloat(ESNativeExactContract, enabled ? 1f : 0f);
             if (material.HasProperty(ESCompositeURPProperties.ShineMaskEnabled))
                 material.SetFloat(ESCompositeURPProperties.ShineMaskEnabled, shineMask != null ? 1f : 0f);
             if (shineMask != null && material.HasProperty(ESCompositeURPProperties.ShineMask))
@@ -3406,8 +3406,8 @@ namespace ES
     public static class ES3DLitCompositeURPProperties
     {
         public const string ShaderName = "ES/3D/Lit Composite URP";
-        public static readonly int SSUStatusContract = ESCompositeURPProperties.SSUStatusContract;
-        public static readonly int SSUExactContract = ESCompositeURPProperties.SSUExactContract;
+        public static readonly int ESNativeStatusContract = ESCompositeURPProperties.ESNativeStatusContract;
+        public static readonly int ESNativeExactContract = ESCompositeURPProperties.ESNativeExactContract;
         private const int GeometryQueue = (int)RenderQueue.Geometry;
         private const int AlphaTestQueue = (int)RenderQueue.AlphaTest;
         private const int TransparentQueue = (int)RenderQueue.Transparent;
@@ -3428,7 +3428,7 @@ namespace ES
         };
         private static readonly string[] SurfaceResourceSwitches =
         {
-            "_SSUStatusContract",
+            "_ESNativeStatusContract",
             "_EnableAddColor", "_EnableStrongTint", "_EnableAlphaTint", "_EnableColorReplace",
             "_EnableRecolorRGB", "_EnableRecolorRGBYCP", "_EnableBrightness", "_EnableContrast",
             "_EnableSaturation", "_EnableHue", "_EnableSplitToning", "_EnableBlackTint",
@@ -3988,44 +3988,44 @@ namespace ES
 
         /// <summary>
         /// 仅写入实例属性；不会改变承载材质的质量 Keyword 或资源编译配置。
-        /// 首次为运行时实例启用精确合同，优先使用 TrySetSSUExactContract。
+        /// 首次为运行时实例启用精确合同，优先使用 TrySetESNativeExactContract。
         /// </summary>
-        public static void SetSSUExactContract(MaterialPropertyBlock block, bool enabled, Texture shineMask = null)
+        public static void SetESNativeExactContract(MaterialPropertyBlock block, bool enabled, Texture shineMask = null)
         {
-            ESCompositeURPProperties.SetSSUExactContract(block, enabled, shineMask);
+            ESCompositeURPProperties.SetESNativeExactContract(block, enabled, shineMask);
         }
 
         /// <summary>
-        /// 初始化供 MaterialPropertyBlock 动态切换 SSU 效果使用的材质。
+        /// 初始化供 MaterialPropertyBlock 动态切换 ESNative 效果使用的材质。
         /// 此方法会修改材质 Keyword，应在实例初始化或材质创建阶段调用，不应逐帧调用共享材质。
         /// </summary>
-        public static bool PrepareMaterialForDynamicSSU(Material material)
+        public static bool PrepareMaterialForDynamicESNative(Material material)
         {
-            if (material == null || !material.HasProperty(SSUExactContract)) return false;
+            if (material == null || !material.HasProperty(ESNativeExactContract)) return false;
             SetQuality(material, ESCompositeQualityTier.高质量);
             SetResourceProfile(material, ES3DLitResourceProfile.动态完整);
             return true;
         }
 
         /// <summary>
-        /// 在确认材质已进入高质量、动态完整变体后写入实例级 SSU 精确合同。
+        /// 在确认材质已进入高质量、动态完整变体后写入实例级 ESNative 精确合同。
         /// </summary>
-        public static bool TrySetSSUExactContract(
+        public static bool TrySetESNativeExactContract(
             Material material,
             MaterialPropertyBlock block,
             bool enabled,
             Texture shineMask = null)
         {
-            if (material == null || block == null || !material.HasProperty(SSUExactContract)) return false;
-            if (enabled && !PrepareMaterialForDynamicSSU(material)) return false;
-            SetSSUExactContract(block, enabled, shineMask);
+            if (material == null || block == null || !material.HasProperty(ESNativeExactContract)) return false;
+            if (enabled && !PrepareMaterialForDynamicESNative(material)) return false;
+            SetESNativeExactContract(block, enabled, shineMask);
             return true;
         }
 
-        public static void SetSSUExactContract(Material material, bool enabled, Texture shineMask = null)
+        public static void SetESNativeExactContract(Material material, bool enabled, Texture shineMask = null)
         {
-            if (material == null || !material.HasProperty(SSUExactContract)) return;
-            material.SetFloat(SSUExactContract, enabled ? 1f : 0f);
+            if (material == null || !material.HasProperty(ESNativeExactContract)) return;
+            material.SetFloat(ESNativeExactContract, enabled ? 1f : 0f);
             if (material.HasProperty(ESCompositeURPProperties.ShineMaskEnabled))
                 material.SetFloat(ESCompositeURPProperties.ShineMaskEnabled, shineMask != null ? 1f : 0f);
             if (shineMask != null && material.HasProperty(ESCompositeURPProperties.ShineMask))
@@ -4525,8 +4525,8 @@ namespace ES
         public static readonly int HologramGap = Shader.PropertyToID("_HologramGap");
         public static readonly int GlitchEnabled = Shader.PropertyToID("_EnableGlitch");
         public static readonly int GlitchAmount = Shader.PropertyToID("_GlitchAmount");
-        public static readonly int SSUStatusContract = ESCompositeURPProperties.SSUStatusContract;
-        public static readonly int SSUExactContract = ESCompositeURPProperties.SSUExactContract;
+        public static readonly int ESNativeStatusContract = ESCompositeURPProperties.ESNativeStatusContract;
+        public static readonly int ESNativeExactContract = ESCompositeURPProperties.ESNativeExactContract;
         public static readonly int HologramColor = ESCompositeURPProperties.HologramColor;
         public static readonly int HologramLineFrequency = ESCompositeURPProperties.HologramLineFrequency;
         public static readonly int HologramLineGap = ESCompositeURPProperties.HologramLineGap;
@@ -4887,8 +4887,8 @@ namespace ES
                 direction.x, direction.y, direction.z, 0f));
         }
 
-        /// <summary>配置启用 SSU 精确合同时使用的完整全息参数。</summary>
-        public static void SetSSUExactHologram(
+        /// <summary>配置启用 ESNative 精确合同时使用的完整全息参数。</summary>
+        public static void SetESNativeExactHologram(
             MaterialPropertyBlock block,
             bool enabled,
             Color color,
@@ -4910,7 +4910,7 @@ namespace ES
                 distortionDensity, distortionScale);
         }
 
-        public static void SetSSUExactHologram(
+        public static void SetESNativeExactHologram(
             MaterialPropertyBlock block,
             bool enabled,
             Color color,
@@ -4964,8 +4964,8 @@ namespace ES
             ESCompositeURPProperties.SetGlitchScanDirection(block, direction);
         }
 
-        /// <summary>配置启用 SSU 精确合同时使用的完整故障参数。</summary>
-        public static void SetSSUExactGlitch(
+        /// <summary>配置启用 ESNative 精确合同时使用的完整故障参数。</summary>
+        public static void SetESNativeExactGlitch(
             MaterialPropertyBlock block,
             bool enabled,
             float fade,
@@ -4997,40 +4997,40 @@ namespace ES
 
         /// <summary>
         /// 仅写入实例属性；不会改变承载材质的质量 Keyword。
-        /// 首次为运行时实例启用精确合同，优先使用 TrySetSSUExactContract。
+        /// 首次为运行时实例启用精确合同，优先使用 TrySetESNativeExactContract。
         /// </summary>
-        public static void SetSSUExactContract(MaterialPropertyBlock block, bool enabled)
+        public static void SetESNativeExactContract(MaterialPropertyBlock block, bool enabled)
         {
-            ESCompositeURPProperties.SetSSUExactContract(block, enabled);
+            ESCompositeURPProperties.SetESNativeExactContract(block, enabled);
         }
 
         /// <summary>
-        /// 初始化供 MaterialPropertyBlock 动态切换 SSU 效果使用的 VFX 材质。
+        /// 初始化供 MaterialPropertyBlock 动态切换 ESNative 效果使用的 VFX 材质。
         /// 此方法会修改材质 Keyword，应在实例初始化或材质创建阶段调用，不应逐帧调用共享材质。
         /// </summary>
-        public static bool PrepareMaterialForDynamicSSU(Material material)
+        public static bool PrepareMaterialForDynamicESNative(Material material)
         {
-            if (material == null || !material.HasProperty(SSUExactContract)) return false;
+            if (material == null || !material.HasProperty(ESNativeExactContract)) return false;
             SetQuality(material, ESCompositeQualityTier.高质量);
             return true;
         }
 
-        public static bool TrySetSSUExactContract(
+        public static bool TrySetESNativeExactContract(
             Material material,
             MaterialPropertyBlock block,
             bool enabled)
         {
-            if (material == null || block == null || !material.HasProperty(SSUExactContract)) return false;
-            if (enabled && !PrepareMaterialForDynamicSSU(material)) return false;
-            SetSSUExactContract(block, enabled);
+            if (material == null || block == null || !material.HasProperty(ESNativeExactContract)) return false;
+            if (enabled && !PrepareMaterialForDynamicESNative(material)) return false;
+            SetESNativeExactContract(block, enabled);
             return true;
         }
 
-        public static void SetSSUExactContract(Material material, bool enabled)
+        public static void SetESNativeExactContract(Material material, bool enabled)
         {
-            if (material == null || !material.HasProperty(SSUExactContract)) return;
-            material.SetFloat(SSUExactContract, enabled ? 1f : 0f);
-            if (enabled) PrepareMaterialForDynamicSSU(material);
+            if (material == null || !material.HasProperty(ESNativeExactContract)) return;
+            material.SetFloat(ESNativeExactContract, enabled ? 1f : 0f);
+            if (enabled) PrepareMaterialForDynamicESNative(material);
         }
 
         public static void SetQuality(Material material, ESCompositeQualityTier quality)
@@ -5120,7 +5120,7 @@ namespace ES
         public static readonly int VibrateDirection = ESCompositeURPProperties.VibrateDirection;
         private static readonly string[] SurfaceResourceSwitches =
         {
-            "_SSUStatusContract",
+            "_ESNativeStatusContract",
             "_EnableFrozen", "_EnableBurn", "_EnablePoison", "_EnableSmoke", "_EnableFlame",
             "_EnableInkSpread", "_EnableCamouflage", "_EnableMetal", "_EnableEnchanted",
             "_EnableFullGlowDissolve", "_EnableFullDistortion", "_EnableAddColor", "_EnableStrongTint",
@@ -5472,8 +5472,8 @@ namespace ES
         public static readonly int CheckerboardDarken = ESCompositeURPProperties.CheckerboardDarken;
         public static readonly int CheckerboardTiling = ESCompositeURPProperties.CheckerboardTiling;
         public static readonly int UberNoiseTexture = ESCompositeURPProperties.UberNoiseTexture;
-        public static readonly int SSUStatusContract = ESCompositeURPProperties.SSUStatusContract;
-        public static readonly int SSUExactContract = ESCompositeURPProperties.SSUExactContract;
+        public static readonly int ESNativeStatusContract = ESCompositeURPProperties.ESNativeStatusContract;
+        public static readonly int ESNativeExactContract = ESCompositeURPProperties.ESNativeExactContract;
         public static readonly int FlameEnabled = ESCompositeURPProperties.FlameEnabled;
         public static readonly int FlameBrightness = ESCompositeURPProperties.FlameBrightness;
         public static readonly int FlameSmooth = ESCompositeURPProperties.FlameSmooth;
@@ -5765,44 +5765,44 @@ namespace ES
 
         /// <summary>
         /// 仅写入实例属性；不会改变承载材质的质量 Keyword 或资源编译配置。
-        /// 首次为运行时实例启用精确合同，优先使用 TrySetSSUExactContract。
+        /// 首次为运行时实例启用精确合同，优先使用 TrySetESNativeExactContract。
         /// </summary>
-        public static void SetSSUExactContract(MaterialPropertyBlock block, bool enabled, Texture shineMask = null)
+        public static void SetESNativeExactContract(MaterialPropertyBlock block, bool enabled, Texture shineMask = null)
         {
-            ESCompositeURPProperties.SetSSUExactContract(block, enabled, shineMask);
+            ESCompositeURPProperties.SetESNativeExactContract(block, enabled, shineMask);
         }
 
         /// <summary>
-        /// 初始化供 MaterialPropertyBlock 动态切换 SSU 效果使用的材质。
+        /// 初始化供 MaterialPropertyBlock 动态切换 ESNative 效果使用的材质。
         /// 此方法会修改材质 Keyword，应在实例初始化或材质创建阶段调用，不应逐帧调用共享材质。
         /// </summary>
-        public static bool PrepareMaterialForDynamicSSU(Material material)
+        public static bool PrepareMaterialForDynamicESNative(Material material)
         {
-            if (material == null || !material.HasProperty(SSUExactContract)) return false;
+            if (material == null || !material.HasProperty(ESNativeExactContract)) return false;
             SetQuality(material, ESCompositeQualityTier.高质量);
             SetResourceProfile(material, ESSpriteCompositeResourceProfile.动态完整);
             return true;
         }
 
         /// <summary>
-        /// 在确认材质已进入高质量、动态完整变体后写入实例级 SSU 精确合同。
+        /// 在确认材质已进入高质量、动态完整变体后写入实例级 ESNative 精确合同。
         /// </summary>
-        public static bool TrySetSSUExactContract(
+        public static bool TrySetESNativeExactContract(
             Material material,
             MaterialPropertyBlock block,
             bool enabled,
             Texture shineMask = null)
         {
-            if (material == null || block == null || !material.HasProperty(SSUExactContract)) return false;
-            if (enabled && !PrepareMaterialForDynamicSSU(material)) return false;
-            SetSSUExactContract(block, enabled, shineMask);
+            if (material == null || block == null || !material.HasProperty(ESNativeExactContract)) return false;
+            if (enabled && !PrepareMaterialForDynamicESNative(material)) return false;
+            SetESNativeExactContract(block, enabled, shineMask);
             return true;
         }
 
-        public static void SetSSUExactContract(Material material, bool enabled, Texture shineMask = null)
+        public static void SetESNativeExactContract(Material material, bool enabled, Texture shineMask = null)
         {
-            if (material == null || !material.HasProperty(SSUExactContract)) return;
-            material.SetFloat(SSUExactContract, enabled ? 1f : 0f);
+            if (material == null || !material.HasProperty(ESNativeExactContract)) return;
+            material.SetFloat(ESNativeExactContract, enabled ? 1f : 0f);
             if (material.HasProperty(ESCompositeURPProperties.ShineMaskEnabled))
                 material.SetFloat(ESCompositeURPProperties.ShineMaskEnabled, shineMask != null ? 1f : 0f);
             if (shineMask != null && material.HasProperty(ESCompositeURPProperties.ShineMask))

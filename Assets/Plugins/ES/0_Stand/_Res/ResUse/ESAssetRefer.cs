@@ -24,6 +24,7 @@ namespace ES
         public static Action<ESAssetLibrary> NotifyAssetLibraryChanged;
         public static Action<ScriptableObject, ESAssetLibraryConsumer> OpenGameCoreRootRegistration;
         public static Action<ESAssetLibraryConsumer> OpenConsumerSynchronization;
+        public static Action<ESAssetReferKind, ESAssetPage, Action<ESAssetPage>> OpenAssetKeyPicker;
         public static Func<bool> IsAuthoringWriteLocked;
     }
 #endif
@@ -361,7 +362,14 @@ namespace ES
             if (GUILayout.Button(current == null ? "搜索并选择 Key..." : currentLabel,
                     EditorStyles.popup))
             {
-                ESAssetReferKeyPickerWindow.Open(kind, current, ApplyKeyPage);
+                Action<ESAssetReferKind, ESAssetPage, Action<ESAssetPage>> openPicker =
+                    ESAssetReferEditorBridge.OpenAssetKeyPicker;
+                if (openPicker == null)
+                {
+                    UnityEngine.Debug.LogError("[ESAssetRefer] 资源 Key 选择器尚未完成 Editor 桥注册。");
+                    return;
+                }
+                openPicker(kind, current, ApplyKeyPage);
             }
             EditorGUILayout.EndHorizontal();
         }
@@ -951,7 +959,16 @@ namespace ES
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.PrefixLabel("Scene Key");
             if (GUILayout.Button(current == null ? "搜索并选择场景 Key..." : currentLabel, EditorStyles.popup))
-                ESAssetReferKeyPickerWindow.Open(ESAssetReferKind.Scene, current, ApplyScenePage);
+            {
+                Action<ESAssetReferKind, ESAssetPage, Action<ESAssetPage>> openPicker =
+                    ESAssetReferEditorBridge.OpenAssetKeyPicker;
+                if (openPicker == null)
+                {
+                    UnityEngine.Debug.LogError("[ESAssetRefer] 场景 Key 选择器尚未完成 Editor 桥注册。");
+                    return;
+                }
+                openPicker(ESAssetReferKind.Scene, current, ApplyScenePage);
+            }
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.LabelField(HasResolvedAssetTableKey ? "AssetTable" : "GUID Fallback",
@@ -1054,127 +1071,6 @@ namespace ES
                 detailLabels[i] = page == null ? string.Empty : "String: " + page.EffectiveStringKey + "    Enum: " + page.EnumKey + "    Page: " + page.SourceBook;
             }
             version = ESAssetRegistry.Version;
-        }
-    }
-
-    internal sealed class ESAssetReferKeyPickerWindow : EditorWindow
-    {
-        private const float RowHeight = 38f;
-        private readonly List<int> filteredIndices = new List<int>(128);
-        private ESAssetReferKeyCache cache;
-        private Action<ESAssetPage> onSelected;
-        private ESAssetPage current;
-        private Vector2 scroll;
-        private string search = string.Empty;
-        private string appliedSearch;
-        private int cacheVersion = -1;
-
-        public static void Open(ESAssetReferKind kind, ESAssetPage current, Action<ESAssetPage> onSelected)
-        {
-            ESAssetReferKeyPickerWindow window = GetWindow<ESAssetReferKeyPickerWindow>(
-                true,
-                "选择 " + kind + " Key",
-                false);
-            window.hideFlags = HideFlags.DontSave;
-            window.titleContent = new GUIContent("选择 " + kind + " Key");
-            window.minSize = new Vector2(480f, 340f);
-            window.cache = ESAssetReferKeyCache.Get(kind);
-            window.current = current;
-            window.onSelected = onSelected;
-            window.search = string.Empty;
-            window.appliedSearch = null;
-            window.scroll = Vector2.zero;
-            window.cacheVersion = -1;
-            window.RebuildFilter();
-            window.ShowAuxWindow();
-            window.Focus();
-            window.Repaint();
-        }
-
-        private void OnEnable()
-        {
-            EditorApplication.delayCall -= CloseIfContextWasLost;
-            EditorApplication.delayCall += CloseIfContextWasLost;
-        }
-
-        private void OnDisable()
-        {
-            EditorApplication.delayCall -= CloseIfContextWasLost;
-            onSelected = null;
-            cache = null;
-            current = null;
-        }
-
-        private void CloseIfContextWasLost()
-        {
-            EditorApplication.delayCall -= CloseIfContextWasLost;
-            if (this != null && cache == null)
-                Close();
-        }
-
-        private void OnGUI()
-        {
-            if (cache == null)
-            {
-                Close();
-                return;
-            }
-
-            EditorGUILayout.Space(4);
-            GUI.SetNextControlName("ESAssetReferKeySearch");
-            string nextSearch = EditorGUILayout.TextField(search, EditorStyles.toolbarSearchField);
-            if (!string.Equals(nextSearch, search, StringComparison.Ordinal))
-                search = nextSearch;
-            if (!string.Equals(appliedSearch, search, StringComparison.Ordinal) || cacheVersion != ESAssetRegistry.Version)
-            {
-                cache = ESAssetReferKeyCache.Get(cache.Kind);
-                RebuildFilter();
-            }
-
-            Rect viewport = EditorGUILayout.BeginVertical();
-            scroll = EditorGUILayout.BeginScrollView(scroll);
-            float totalHeight = filteredIndices.Count * RowHeight;
-            Rect contentRect = GUILayoutUtility.GetRect(1f, totalHeight, GUILayout.ExpandWidth(true));
-            int first = Mathf.Max(0, Mathf.FloorToInt(scroll.y / RowHeight));
-            int visible = Mathf.CeilToInt(position.height / RowHeight) + 2;
-            int last = Mathf.Min(filteredIndices.Count, first + visible);
-            for (int row = first; row < last; row++)
-            {
-                ESAssetPage page = cache.Pages[filteredIndices[row]];
-                if (page == null)
-                    continue;
-                Rect rowRect = new Rect(contentRect.x, contentRect.y + row * RowHeight, contentRect.width, RowHeight - 2f);
-                if (ReferenceEquals(page, current))
-                    EditorGUI.DrawRect(rowRect, new Color(0.20f, 0.48f, 0.72f, 0.25f));
-                if (GUI.Button(rowRect, GUIContent.none, GUIStyle.none))
-                {
-                    onSelected?.Invoke(page);
-                    Close();
-                    GUIUtility.ExitGUI();
-                }
-                Rect nameRect = new Rect(rowRect.x + 6f, rowRect.y + 2f, rowRect.width - 12f, 18f);
-                Rect keyRect = new Rect(nameRect.x, nameRect.y + 17f, nameRect.width, 16f);
-                EditorGUI.LabelField(nameRect, page.Name, EditorStyles.boldLabel);
-                EditorGUI.LabelField(keyRect, cache.DetailLabels[filteredIndices[row]], EditorStyles.miniLabel);
-            }
-            EditorGUILayout.EndScrollView();
-            EditorGUILayout.EndVertical();
-
-            if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
-                Close();
-            if (Event.current.type == EventType.Repaint && string.IsNullOrEmpty(GUI.GetNameOfFocusedControl()))
-                EditorGUI.FocusTextInControl("ESAssetReferKeySearch");
-        }
-
-        private void RebuildFilter()
-        {
-            filteredIndices.Clear();
-            string term = string.IsNullOrWhiteSpace(search) ? string.Empty : search.Trim().ToLowerInvariant();
-            for (int i = 0; i < cache.Count; i++)
-                if (term.Length == 0 || cache.SearchTexts[i].Contains(term))
-                    filteredIndices.Add(i);
-            appliedSearch = search;
-            cacheVersion = ESAssetRegistry.Version;
         }
     }
 

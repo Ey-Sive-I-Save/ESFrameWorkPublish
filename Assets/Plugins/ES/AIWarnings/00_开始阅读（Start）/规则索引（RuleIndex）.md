@@ -49,6 +49,7 @@
 | 新增或修改请求仲裁、镜头、控制权、UI 焦点或音频抢占 | `10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_ES活跃请求仲裁协议_跨领域安全标准_AI协作警告.md`；再阅读对应领域现状文档 |
 | 编写或修改具体业务逻辑、角色行为、AICommand、输入、相机、交互、视觉表现或性能，并需要判断是否真正可用 | `10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_实际可玩闭环与运行证据_AI协作警告.md`；必须补齐真实操作、表现、性能和运行验收证据 |
 | 任何 AI 交付、完成声明、可用性判断、未验证项披露或证据等级判定 | `10_P0最高约束（P0Guardrails）/项目最高警告_P0_AI交付声明与责任契约_AI协作警告.md`；必须区分源码、静态编译、Unity 实机、运行时和发布证据，主动报告未尽责任与阻断原因 |
+| 进行 AI 用户交互评价、任务收尾、提示词评分、目标清晰度、验证评分、目标漂移或下一步行为树建议 | `当前状态（CurrentStatus）.md`、`规则索引（RuleIndex）.md`、`10_P0最高约束（P0Guardrails）/项目最高警告_P0_AI交付声明与责任契约_AI协作警告.md`、`10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_AI协作历程与本地Session兜底恢复_AI协作警告.md`；评分和建议不得替代用户授权、Skill 验证或 Runtime 验收 |
 | 修改 PrimeTween、DOTween、Tween Sequence 或其迁移与生命周期 | `10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/PrimeTween_DOTween_迁移_P0_AI协作警告.md`；涉及角色权威运动时再读 Entity 与实际可玩闭环 P0 |
 | 修改音频、AudioCue、AudioSource、Voice、音频资源或音频抢占 | `20_架构现状（Architecture）/音频（Audio）/音频播放与资源边界_AI协作警告.md`；涉及请求抢占时再读上一行的 P0；涉及资源加载时再读资源运行时 P0 与 `50_验证与发布（ValidationRelease）` |
 | 修改 VFX、`ESVfxInfo`、`ESVfxGroup`、`ESVfxModule`、ParticleSystem/VFX Graph 后端、特效事件、Exposed Property、完成判定或预算 | `30_运行时专项（RuntimeOperations）/特效（VFX）/VFX运行时与制作边界_AI协作警告.md`、`10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_实际可玩闭环与运行证据_AI协作警告.md`；涉及 GameCore/稳定 Key、资源、Pool 或表现编排时再读对应 GameCore、IdentityConfig、RuntimeAssets、Pool 与 State/IK 规则 |
@@ -63,13 +64,13 @@
 | 新增、迁移或评审 public interface、公共协议、Attribute、Drawer 共用契约 | `10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_公共协议与元数据声明分层_AI协作警告.md`；涉及 Drawer 或序列化展示时再读上一行编辑器专项 |
 | 新增、迁移或调用 ESDialog、跨宿主对话框、Editor/Runtime Presenter 或对话框 Host 注册 | `10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_ESDialog跨宿主唯一合同与Presenter注册边界_AI协作警告.md`；Editor 侧使用 `ESAdvancedDialog` 时同时读取 `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAdvancedDialog通用编辑器输入边界_AI协作警告.md`，Editor 初始化还须读取 EditorLifecycle 的 AssemblyStream P0，Runtime 注册禁止恢复 Runtime AssemblyStream |
 | 修改 Stable Graph V2、图资产、`edge.order`、Branch/FanOut/Join、Agent 产物图、AISkill 执行图、消费者专属产物、BehaviorTree Program、Story Definition Snapshot，或评估恢复 Legacy Graph/NodeRunner | `40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/GraphView与NodeRunner_数据权威稳定身份与重构门禁_AI协作警告.md`、`10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md`；涉及 TaskContract、RunRecord、取消或恢复时再读 `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md`；Legacy 已删除，禁止恢复旧可变 SO Runner 方案 |
-| 修改 Agent Authoring Graph、AICommand/AISkill 候选生成、AISkill 持久化执行、TaskContract、父子 Run、RunRecord、取消或恢复 | 上一行 Graph 专项规则、`20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md`、`AgentSkills与AICommands协作边界_AI协作警告.md`、`10_P0最高约束（P0Guardrails）/项目最高警告_P0_AI交付声明与责任契约_AI协作警告.md`；候选生成只能走 `$es-generate-agent-artifacts` 与人工 Diff Review/批准，源码存在不得冒充真实运行验收 |
+| 修改 Agent Authoring Graph、AICommand/AISkill 候选生成、AISkill 持久化执行、TaskContract、父子 Run、RunRecord、取消或恢复 | 上一行 Graph 专项规则、`20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md`、`AgentSkills与AICommands协作边界_AI协作警告.md`、`10_P0最高约束（P0Guardrails）/项目最高警告_P0_AI交付声明与责任契约_AI协作警告.md`；AI 自主候选生成走 `$es-generate-agent-artifacts` 隔离目录并做 Diff Review，当前用户明确要求正式写入时可直接实施；源码存在不得冒充真实运行验收 |
 | 新建或改造测试场景的操作引导、验收路线、运行态诊断、键位说明或区域导视 | `50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/测试场景导视与诊断复用_AI协作警告.md`、`Documentation/ES_SCENE_VALIDATION_GUIDE_STANDARD.md`；优先复用 `ESSceneValidationGuide`，不得新建一次性 OnGUI 或污染正式 Prefab |
 | 刷新测试场景、核查 Prefab override、处理构建器与场景不一致或归档变更前备份 | `50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/场景构建器权威_覆盖审计与项目内备份分层_AI协作警告.md`；构建器是场景布局权威，备份统一归档到 `ES/Bak/Local` 或 `ES/Bak/Reviewed` |
 | 进行发布、IL2CPP、性能或资源生命周期验收 | `50_验证与发布（ValidationRelease）`、`10_P0最高约束（P0Guardrails）/构建与IL2CPP（BuildIL2CPP）` |
 | 用户说“审计”“审计并记录”或“继续审计”；判断模块未开始、开发中、待集成、待验收、稳定、废弃或归档；审计半成品渗透 | `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/模块成熟度与未完成实现治理_AI协作警告.md`、`Assets/Plugins/ES/AICommands/检查_模块成熟度与半成品影响_AI命令.md`、`ES/Documentation/Status/MODULE_AUDIT_STATE.md`；再按目标模块读取对应 P0、领域专项和当前源码 |
 | 选择、执行或维护 AICommand；新增、修改或调用 Agent Skill | `20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md`、`Assets/Plugins/ES/AICommands/README.md`；修改 Skill 时同时读取 UTF-8 P0，涉及 Unity 验收时再读 `50_验证与发布（ValidationRelease）` |
-| 根据 Agent Authoring Graph 生成 AICommand 或 Agent Skill 候选包 | `$es-generate-agent-artifacts`；产物只能写入隔离候选目录，仍须人工 Diff Review 与明确批准 |
+| 根据 Agent Authoring Graph 生成 AICommand 或 Agent Skill 候选包 | `$es-generate-agent-artifacts`；AI 自主运行只写隔离候选目录并做 Diff Review，当前用户明确要求正式生成或登记时无需项目内二次批准 |
 | 启动、监控或中断 ESTEST / ESAITest | `$es-start-estest` |
 | 向运行中的测试 AI 投递一次性提示 | `$es-publish-aitest-prompt` |
 | 用户说“交接一下”“直接交接”“准备交接”“生成交接文案”“交给新窗口”“让新 AI 接手”“交接后关闭当前窗口”；或定位 Codex session、恢复失联窗口、维护 AI 协作历程、完成模块审计工作流、评估治理商业可行性 | `10_P0最高约束（P0Guardrails）/总体架构（Architecture）/项目最高警告_P0_AI协作历程与本地Session兜底恢复_AI协作警告.md` 第 3.1 节、`50_验证与发布（ValidationRelease）/AI协作治理验收（AICollaborationAcceptance）/AI协作历程与模块审计_商业可行性验收标准.md`、`ES/AI协作历程（Codex）/README.md`；真实交接必须优先调用 `ES/AI协作历程（Codex）/Tools/Complete-ESCodexHandoff.ps1`，禁止用普通聊天总结静默替代 |
@@ -99,6 +100,6 @@
 | “审计”“审计并记录”“继续审计”、未开始/半成品模块状态、依赖渗透、成熟度跃迁与续接检查点 | `$es-module-lifecycle` |
 | 新建、恢复、分叉或初始化 Codex 项目会话 | `$es-codex-session-bootstrap` |
 
-领域 Skill 只负责执行工作流和导航，仍必须按上表读取对应 AIWarnings。存在匹配 AICommand 时，由用户要求与唯一选中的 AICommand 共同决定本次权限；不存在匹配合同则显式标记 `NoMatchingCommand`，不能借用无关合同扩大或缩小用户已明确授权的范围。
+领域 Skill 只负责执行工作流和导航，仍必须按上表读取对应 AIWarnings。当前用户明确指令决定本次动作授权；存在匹配 AICommand 时，它只约束所选受管通道。不存在匹配合同则显式标记 `NoMatchingCommand`，不能借用无关合同扩大或缩小用户已明确授权的范围。
 
 `80_交接与复盘（Handover）` 用于补充背景；`90_提案与废止（Archive）` 中的文件不能作为新增实现的唯一依据。

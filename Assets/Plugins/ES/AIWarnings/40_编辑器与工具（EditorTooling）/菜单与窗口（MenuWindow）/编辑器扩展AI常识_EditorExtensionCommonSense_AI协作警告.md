@@ -269,8 +269,8 @@ Odin PropertyTree、IMGUIContainer 和 UI Toolkit 容器。
 
 ### 11.10.1 绑定必须由打开方明确指定
 
-- 子窗口打开入口必须提供 `Open(EditorWindow owner)` 或
-  `OpenFor(..., EditorWindow owner)` 形式的可选父窗口参数；业务窗口打开子窗口时必须传入 `this` 或已验证的主窗口实例。
+- 子窗口公开业务入口必须使用具体 ES owner 类型，例如 `Open(ESTrackViewWindow owner)`；
+  只有 `ESWindowFoundation` 和受保护基类桥接层可以接受通用 `EditorWindow`。业务窗口打开子窗口时必须传入 `this` 或已验证的同体系主窗口实例，禁止让原生 Unity/第三方窗口进入 ES owner 图。
 - 不得只依赖 `ESWindow_SleepOwner => SomeWindow.window` 这种动态 getter 来猜测父窗口；getter 只能作为已明确契约的重载恢复兜底，不能代替打开时的 owner 传递。
 - 绑定成功必须调用 `ESWindowFoundation.SetSleepOwner(child, owner, ESWindowSleepLinkMode.FollowOwner)`。
 - `FollowOwner` 表示父窗口进入/退出半休眠时同步子窗口；`OwnedSurface` 表示内容属于宿主，不得创建独立休眠控件；`Independent` 才是完全独立窗口。
@@ -308,10 +308,12 @@ Odin PropertyTree、IMGUIContainer 和 UI Toolkit 容器。
 
 | 案例 | 打开入口 | 依赖模式 | 稳定 ownerKey | 规则级别 |
 |---|---|---|---|---|
-| `ESTrackItemTemporaryInspectorWindow` | `OpenFor(..., EditorWindow owner = null)` | `FollowOwner` | `ES.TrackView.Window` | P0 |
-| `ESTrackClipTemporaryInspectorWindow` | `OpenFor(..., EditorWindow owner = null)` | `FollowOwner` | `ES.TrackView.Window` | P0 |
-| `ESTrackSkillDataTemporaryInspectorWindow` | `OpenFor(..., EditorWindow owner = null)` | `FollowOwner` | `ES.TrackView.Window` | P0 |
-| `ESAssetPackageRecordPreviewWindow` | `Open(bake, record, EditorWindow owner)` | `FollowOwner` | `ES.AssetPackageBake.Window` | P0 |
+| `ESTrackItemTemporaryInspectorWindow` | `OpenFor(..., ESTrackViewWindow owner = null)` | `FollowOwner` | `ES.TrackView.Window` | P0 |
+| `ESTrackClipTemporaryInspectorWindow` | `OpenFor(..., ESTrackViewWindow owner = null)` | `FollowOwner` | `ES.TrackView.Window` | P0 |
+| `ESTrackSkillDataTemporaryInspectorWindow` | `OpenFor(..., ESTrackViewWindow owner = null)` | `FollowOwner` | `ES.TrackView.Window` | P0 |
+| `ESCameraTrackPreviewWindow` | `Open(ESTrackViewWindow owner = null)` | `FollowOwner` | `ES.TrackView.Window` | P0 |
+| `ESAssetPackageRecordPreviewWindow` | `Open(bake, record, ESAssetPackageBakeWindow owner)` | `FollowOwner` | `ES.AssetPackageBake.Window` | P0 |
+| `ESWorldDialogueEditorWindow` | `OpenFor(asset)` 为 `Independent`；`OpenFor(asset, ESWorldBuilderWorkbenchWindow owner)` 为 `FollowOwner` | 按重载显式拆分 | `ES.WorldBuilder.Window`（仅 `FollowOwner`） | P0 |
 | `ESIndependentInspectorWindow<TWindow>` 的其他派生窗口 | `OpenIndependent(..., owner)` | 由派生类声明；未声明时只能是 `Independent` | 由窗口契约声明 | P0 |
 
 - `owner` 为空不代表独立窗口：`FollowOwner` 必须登记 `PendingFollowOwner`，直到稳定 `ownerKey` 解析成功；不能静默降级。
@@ -383,8 +385,8 @@ Odin PropertyTree、IMGUIContainer 和 UI Toolkit 容器。
 - Popup 若业务上只允许一个活动面，必须在创建新实例前同步关闭并释放旧实例；Domain Reload 后不得依赖旧静态引用维持唯一性。
 - `ESAssetReferKeyPickerWindow` 必须通过 `GetWindow<T>()` 复用唯一实例；`ESCompactChoicePopup` 与 `ESWorkbenchPopupWindow` 是短生命周期例外，但同一时刻仍只能保留一个活动实例，且 ReloadDomain 后上下文丢失时必须自动关闭。只有受 `ESDialogService` 队列、重复 ID、父子堆叠和数量上限共同治理的 `ESAdvancedDialogWindow` 可以按请求策略并行。
 - 同源编辑冲突、协作拒写和恢复测试应创建多个领域编辑会话，不得复制完整工作台窗口。`ESWorldBuilderWorkbenchWindow` 的协作验收使用唯一真实窗口加受管 `ESWorldEditSession`，验收会话结束后必须清理恢复状态并确定性释放。
-- 仅为读取配置而临时创建窗口实例仍须占用该类型的唯一实例槽。`ESInstaller` 的自动检查和手动快速检查必须复用当前安装器；没有活动安装器时才允许创建一个 `HideAndDontSave` 的不显示临时实例。所有并发检查必须通过带 Generation 的引用计数 Lease 共享该槽；用户打开安装器时必须把同一临时实例原地提升为真实窗口，旧 Lease 不得再销毁它。最后一个 Lease 只允许释放仍处于临时态的实例，禁止真实窗口与检查实例并存；UPM/依赖查询本身必须单飞，重复点击不得启动第二套并发检查。
-- ES 窗口是否支持半休眠必须由显式窗口合同决定；禁止根据类型名包含 `Dialog`、`Popup`、`Picker` 等字符串猜测能力。未知 Unity 临时焦点窗口的兼容识别不得反向成为 ES 窗口能力策略。
+- 仅为读取配置或检查依赖不得创建窗口实例。`ESInstaller` 的窗口、启动自动检查和手动快速检查必须读取同一 canonical profile，并复用同一个无窗口依赖检查服务；只有用户显式打开安装器 UI 时才允许 `GetWindow<ESInstaller>`。禁止恢复 `HideAndDontSave` 隐藏安装器、临时窗口 Lease 或“提升为真实窗口”的第二生命周期；UPM 快照与四类必需依赖检查必须单飞，重复触发不得启动第二套并发检查。
+- ES 窗口合同必须同时声明 `ESWindowSleepMode` 与 `ESWindowSurfaceKind`：Workspace/Inspector/Preview 对应 Full，Popup/Dialog/Utility 对应带原因的 Transient；Unknown 与 mode-kind 错配必须 fail-closed。禁止根据类型名包含 `Dialog`、`Popup`、`Picker` 等字符串猜测能力；生产 `SurfaceKind.Dialog` 只能是由 `ESDialogService` 管理的 `ESAdvancedDialogWindow`，`ESConfirmPromptWindow`、`ESQuestionSheet` 等非 Dialog 后缀也不得成为第二套对话框。未知 Unity 临时焦点窗口的兼容识别不得反向成为 ES 窗口能力策略。
 - 禁止在 `BindWindow`、Editor update 或 ReloadDomain 中全局扫描窗口并自动关闭重复实例。唯一性必须由打开入口和静态门禁保证；发现历史重复实例时只报告结构化诊断，不得猜测保留对象并销毁其他用户窗口。
 - 测试与批量打开工具也不得通过 `ScriptableObject.CreateInstance(windowType)`、反射或其他运行时 `Type` 入口复制生产窗口来绕过泛型源码门禁。显式测试入口应先使用 Unity 的同类型存在性查询；已有实例必须跳过且不得接管、移动或关闭，没有实例时才通过 `EditorWindow.GetWindow(Type)` 创建并记录为本次测试所有。测试不得为凑数量强制把未绑定或未声明休眠能力的窗口接入 Presentation，也不得隐式修改全局自动休眠策略。
 - 窗口偏好、工作区快照和页面恢复不得用不稳定 `InstanceId` 或同类型临时排序序号作为长期身份。同类型确有受控例外时，必须由该协调器提供稳定业务身份。

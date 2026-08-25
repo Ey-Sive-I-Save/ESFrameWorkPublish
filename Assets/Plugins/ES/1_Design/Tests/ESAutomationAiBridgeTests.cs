@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
@@ -14,6 +15,8 @@ namespace ES.Tests
     [Parallelizable(ParallelScope.None)]
     public sealed class ESAutomationAiBridgeTests
     {
+        private static readonly DateTimeOffset AuthorizationPolicyTestUtc =
+            new DateTimeOffset(2026, 8, 24, 0, 0, 0, TimeSpan.Zero);
         private IDisposable authorizationScope;
         private IDisposable controlActionAuditScope;
         private readonly HashSet<string> testApprovalIds = new HashSet<string>(StringComparer.Ordinal);
@@ -74,6 +77,448 @@ namespace ES.Tests
             ESAutomationResponseSummary response = JsonUtility.FromJson<ESAutomationResponseSummary>(responseJson);
             Assert.That(response.status, Is.EqualTo("Rejected"));
             Assert.That(response.message, Does.Contain("未注册 unexpected"));
+        }
+
+        [Test]
+        public void ExecuteJson_PlanTaskRejectsCallerAssertedUserDirected()
+        {
+            string responseJson = ESAutomationAiBridge.ExecuteJson(@"{
+                'protocolVersion': 1,
+                'requestId': '11223344556677889900aabbccddeeff',
+                'actorId': 'codex.local',
+                'action': 'planTask',
+                'payload': {
+                    'objective': 'read local diagnostics',
+                    'routeKeys': ['aibrain'],
+                    'commandId': '',
+                    'taskId': '',
+                    'taskVersion': 1,
+                    'preset': '',
+                    'input': {},
+                    'userDirected': true
+                }
+            }");
+
+            ESAutomationResponseSummary response = JsonUtility.FromJson<ESAutomationResponseSummary>(responseJson);
+            Assert.That(response.status, Is.EqualTo("Rejected"));
+            Assert.That(response.message, Does.Contain("未注册 userDirected"));
+        }
+
+        [Test]
+        public void AIBrainAuthorizationPolicy_EnforcesTwentyFiveOneBudgetsAndTombstones()
+        {
+            WithAuthorizationPolicyStore((_, __) =>
+            {
+                ESAIBrainPlan lowRiskPlan = CreateAuthorizationPlan('a', "L1", "documentation-write");
+                ESAutomationTaskInvocation lowRisk = CreateAuthorizationInvocation(lowRiskPlan);
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    lowRisk, lowRiskPlan, true, out string registerError), Is.True, registerError);
+                for (int index = 0; index < 20; index++)
+                {
+                    lowRisk.idempotencyKey = "low-" + index;
+                    Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(lowRisk,
+                        out string consumeError), Is.True, consumeError);
+                }
+                lowRisk.idempotencyKey = "low-overflow";
+                Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(lowRisk, out _), Is.False);
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    lowRisk, lowRiskPlan, true, out string exhaustedError), Is.False);
+                Assert.That(exhaustedError, Does.Contain("终态"));
+
+                ESAIBrainPlan candidatePlan = CreateAuthorizationPlan('b', "L2", "candidate-only");
+                ESAutomationTaskInvocation candidate = CreateAuthorizationInvocation(candidatePlan);
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    candidate, candidatePlan, false, out registerError), Is.True, registerError);
+                for (int index = 0; index < 5; index++)
+                {
+                    candidate.idempotencyKey = "candidate-" + index;
+                    Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(candidate,
+                        out string consumeError), Is.True, consumeError);
+                }
+                candidate.idempotencyKey = "candidate-overflow";
+                Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(candidate, out _), Is.False);
+
+                ESAIBrainPlan highRiskPlan = CreateAuthorizationPlan('c', "L3", "external-run");
+                ESAutomationTaskInvocation highRisk = CreateAuthorizationInvocation(highRiskPlan);
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    highRisk, highRiskPlan, false, out registerError), Is.True, registerError);
+                Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(highRisk,
+                    out string highRiskError), Is.True, highRiskError);
+                Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(highRisk, out _), Is.False);
+            });
+        }
+
+        [Test]
+        public void AIBrainAuthorizationPolicy_InvalidRegistrationIdentityLeavesStoreBytesUnchanged()
+        {
+            WithAuthorizationPolicyStore((storePath, _) =>
+            {
+                ESAIBrainPlan baselinePlan = CreateAuthorizationPlan('6', "L3", "external-run");
+                ESAutomationTaskInvocation baseline = CreateAuthorizationInvocation(baselinePlan);
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    baseline, baselinePlan, false, out string baselineError), Is.True, baselineError);
+                byte[] expectedBytes = File.ReadAllBytes(storePath);
+
+                ESAIBrainPlan invalidPlanId = CreateAuthorizationPlan('7', "L3", "external-run");
+                invalidPlanId.planId = "not-a-plan-id";
+                ESAutomationTaskInvocation invalidPlanInvocation =
+                    CreateAuthorizationInvocation(invalidPlanId);
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    invalidPlanInvocation, invalidPlanId, false, out _), Is.False);
+                CollectionAssert.AreEqual(expectedBytes, File.ReadAllBytes(storePath));
+
+                ESAIBrainPlan invalidActorPlan = CreateAuthorizationPlan('8', "L3", "external-run");
+                ESAutomationTaskInvocation invalidActor =
+                    CreateAuthorizationInvocation(invalidActorPlan);
+                invalidActor.actorId = "../outside";
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    invalidActor, invalidActorPlan, false, out _), Is.False);
+                CollectionAssert.AreEqual(expectedBytes, File.ReadAllBytes(storePath));
+            });
+        }
+
+        [Test]
+        public void AIBrainAuthorizationPolicy_ConsumptionCapturesClockOnce()
+        {
+            WithAuthorizationPolicyStore((_, __) =>
+            {
+                ESAIBrainPlan plan = CreateAuthorizationPlan('9', "L3", "external-run");
+                ESAutomationTaskInvocation invocation = CreateAuthorizationInvocation(plan);
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    invocation, plan, false, out string registerError), Is.True, registerError);
+
+                int clockReads = 0;
+                ESAIBrainCoordinator.Internal_SetAuthorizationUtcNowProviderForTests(() =>
+                {
+                    clockReads++;
+                    return AuthorizationPolicyTestUtc.AddMinutes(1);
+                });
+
+                Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(invocation,
+                    out string consumeError), Is.True, consumeError);
+                Assert.That(clockReads, Is.EqualTo(1));
+            });
+        }
+
+        [Test]
+        public void AIBrainAuthorizationPolicy_TestScopeRejectsNormalizedTraversal()
+        {
+            Assert.Throws<ArgumentException>(() =>
+                ESAIBrainCoordinator.Internal_BeginAuthorizationTestScope(
+                    "ES/Output/Automation/AIBrain/Tests/../outside/authorizations.json",
+                    AuthorizationPolicyTestUtc));
+        }
+
+        [Test]
+        public void AIBrainAuthorizationPolicy_LockFailureDoesNotConsumeIdempotencyKey()
+        {
+            WithAuthorizationPolicyStore((_, lockPath) =>
+            {
+                ESAIBrainPlan plan = CreateAuthorizationPlan('d', "L1", "documentation-write");
+                ESAutomationTaskInvocation invocation = CreateAuthorizationInvocation(plan);
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    invocation, plan, true, out string registerError), Is.True, registerError);
+                invocation.idempotencyKey = "held-lock-key";
+
+                using (var heldLock = new FileStream(lockPath, FileMode.Open,
+                           FileAccess.ReadWrite, FileShare.None))
+                {
+                    Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(invocation,
+                        out string lockError), Is.False);
+                    Assert.That(lockError, Does.Contain("事务锁"));
+                }
+
+                ESAIBrainCoordinator.Internal_ResetAuthorizationCacheForTests();
+                Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(invocation,
+                    out string consumeError), Is.True, consumeError);
+                Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(invocation, out _), Is.False);
+            });
+        }
+
+        [Test]
+        public void AIBrainAuthorizationPolicy_FacadePreflightFailureDoesNotConsumeGrant()
+        {
+            WithAuthorizationPolicyStore((_, __) =>
+            {
+                ESAIBrainPlan plan = CreateAuthorizationPlan('4', "L3", "external-run");
+                ESAutomationTaskInvocation invocation = CreateAuthorizationInvocation(plan);
+                invocation.taskId = "es.tests.unregistered-authorization-task";
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    invocation, plan, false, out string registerError), Is.True, registerError);
+
+                ESAutomationTaskInvocationResult result = ESAutomationFacade.RunTask(invocation);
+                Assert.That(result.status, Is.EqualTo("Rejected"));
+                Assert.That(result.message, Does.Contain("未注册或不支持的任务"));
+                Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(invocation,
+                    out string consumeError), Is.True, consumeError);
+            });
+        }
+
+        [Test]
+        public void AIBrainAuthorizationPolicy_MissingGrantDoesNotReachEndpointDescription()
+        {
+            WithAuthorizationPolicyStore((_, __) =>
+            {
+                AuthorizationProbeEndpoint endpoint = RegisterAuthorizationProbeEndpoint();
+                ESAIBrainPlan plan = CreateAuthorizationPlan('a', "L3", "external-run");
+                ESAutomationTaskInvocation invocation = CreateAuthorizationInvocation(plan);
+                invocation.taskId = endpoint.Descriptor.taskId;
+
+                ESAutomationTaskInvocationResult result = ESAutomationFacade.RunTask(invocation);
+
+                Assert.That(result.status, Is.EqualTo("Rejected"));
+                Assert.That(result.message, Does.Contain("未签发"));
+                Assert.That(endpoint.DescribeCount, Is.Zero);
+                Assert.That(endpoint.RunCount, Is.Zero);
+            });
+        }
+
+        [Test]
+        public void AIBrainAuthorizationPolicy_AiDisabledTaskRejectsBeforeEndpointDescription()
+        {
+            WithAuthorizationPolicyStore((_, __) =>
+            {
+                AuthorizationProbeEndpoint endpoint = RegisterAuthorizationProbeEndpoint(false);
+                ESAIBrainPlan plan = CreateAuthorizationPlan('d', "L3", "external-run");
+                ESAutomationTaskInvocation invocation = CreateAuthorizationInvocation(plan);
+                invocation.taskId = endpoint.Descriptor.taskId;
+
+                ESAutomationTaskInvocationResult result = ESAutomationFacade.RunTask(invocation);
+
+                Assert.That(result.status, Is.EqualTo("Rejected"));
+                Assert.That(result.message, Does.Contain("未授权 AI"));
+                Assert.That(endpoint.DescribeCount, Is.Zero);
+                Assert.That(endpoint.RunCount, Is.Zero);
+            });
+        }
+
+        [Test]
+        public void AIBrainAuthorizationPolicy_EndpointPreflightDoesNotConsumeValidatedGrant()
+        {
+            WithAuthorizationPolicyStore((_, __) =>
+            {
+                AuthorizationProbeEndpoint endpoint = RegisterAuthorizationProbeEndpoint();
+                endpoint.RequiredCapabilities = ESAutomationCapability.Delete;
+                ESAIBrainPlan plan = CreateAuthorizationPlan('b', "L3", "external-run");
+                ESAutomationTaskInvocation invocation = CreateAuthorizationInvocation(plan);
+                invocation.taskId = endpoint.Descriptor.taskId;
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    invocation, plan, false, out string registerError), Is.True, registerError);
+
+                ESAutomationTaskInvocationResult result = ESAutomationFacade.RunTask(invocation);
+
+                Assert.That(result.status, Is.EqualTo("Rejected"));
+                Assert.That(result.message, Does.Contain("能力超出"));
+                Assert.That(endpoint.DescribeCount, Is.EqualTo(1));
+                Assert.That(endpoint.RunCount, Is.Zero);
+                Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(invocation,
+                    out string consumeError), Is.True, consumeError);
+            });
+        }
+
+        [Test]
+        public void AIBrainAuthorizationPolicy_ExpiredInvocationCannotBeResignedOrRebound()
+        {
+            DateTimeOffset baseline = AuthorizationPolicyTestUtc;
+            WithAuthorizationPolicyStore((storePath, __) =>
+            {
+                ESAIBrainPlan plan = CreateAuthorizationPlan('e', "L1", "documentation-write");
+                ESAutomationTaskInvocation invocation = CreateAuthorizationInvocation(plan);
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    invocation, plan, true, out string registerError), Is.True, registerError);
+
+                ESAIBrainCoordinator.Internal_SetAuthorizationUtcNowForTests(
+                    baseline.AddMinutes(16));
+                invocation.idempotencyKey = "after-expiry";
+                Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(invocation,
+                    out string expiredError), Is.False);
+                Assert.That(expiredError, Does.Contain("Expired"));
+                JObject expiredStore = JObject.Parse(File.ReadAllText(storePath,
+                    new UTF8Encoding(false, true)));
+                JObject expiredRecord = expiredStore["entries"].Values<JObject>().Single(item =>
+                    item.Value<string>("invocationId") == invocation.invocationId);
+                Assert.That(expiredRecord.Value<DateTimeOffset>("terminalAtUtc"),
+                    Is.EqualTo(expiredRecord.Value<DateTimeOffset>("expiresAtUtc")));
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    invocation, plan, true, out string resignError), Is.False);
+                Assert.That(resignError, Does.Contain("Expired"));
+
+                ESAIBrainPlan reboundPlan = CreateAuthorizationPlan('f', "L1", "documentation-write");
+                ESAutomationTaskInvocation rebound = CreateAuthorizationInvocation(
+                    reboundPlan, invocation.invocationId);
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    rebound, reboundPlan, true, out string rebindError), Is.False);
+                Assert.That(rebindError, Does.Contain("PlanHash"));
+            });
+        }
+
+        [Test]
+        public void AIBrainAuthorizationPolicy_LegacyAndCorruptStoresFailClosed()
+        {
+            WithAuthorizationPolicyStore((storePath, _) =>
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(storePath));
+                string legacyInvocationId = Guid.NewGuid().ToString("N");
+                string legacyPlanHash = new string('1', 64);
+                var legacy = new JObject
+                {
+                    ["schemaVersion"] = 2,
+                    ["authorizationPolicyVersion"] = 4,
+                    ["entries"] = new JArray(new JObject
+                    {
+                        ["planHash"] = legacyPlanHash,
+                        ["invocationId"] = legacyInvocationId,
+                    }),
+                };
+                File.WriteAllText(storePath,
+                    legacy.ToString(Newtonsoft.Json.Formatting.None), new UTF8Encoding(false, true));
+
+                var legacyInvocation = new ESAutomationTaskInvocation
+                {
+                    invocationId = legacyInvocationId,
+                    brainPlanHash = legacyPlanHash,
+                    taskId = "es.tests.authorization",
+                    taskVersion = 1,
+                    fromAi = true,
+                    actorId = "codex.local",
+                };
+                Assert.That(ESAIBrainCoordinator.TryConsumeAuthorization(
+                    legacyInvocation, out string legacyError), Is.False);
+                Assert.That(legacyError, Does.Contain("stale"));
+
+                ESAIBrainPlan freshPlan = CreateAuthorizationPlan('2', "L3", "external-run");
+                ESAutomationTaskInvocation freshInvocation = CreateAuthorizationInvocation(freshPlan);
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    freshInvocation, freshPlan, false, out string freshError), Is.True, freshError);
+                JObject migrated = JObject.Parse(File.ReadAllText(storePath,
+                    new UTF8Encoding(false, true)));
+                Assert.That(migrated.Value<int>("schemaVersion"), Is.EqualTo(3));
+                Assert.That(migrated.Value<int>("authorizationPolicyVersion"), Is.EqualTo(5));
+                Assert.That(migrated["entries"].Values<JObject>().Any(item =>
+                    item.Value<string>("invocationId") == legacyInvocationId), Is.False);
+                Assert.That(migrated["retiredInvocationIds"].Values<string>(),
+                    Does.Contain(legacyInvocationId));
+
+                ESAIBrainPlan reusedPlan = CreateAuthorizationPlan('5', "L3", "external-run");
+                ESAutomationTaskInvocation reusedInvocation = CreateAuthorizationInvocation(
+                    reusedPlan, legacyInvocationId);
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    reusedInvocation, reusedPlan, false, out string reuseError), Is.False);
+                Assert.That(reuseError, Does.Contain("旧策略 Invocation"));
+            });
+
+            WithAuthorizationPolicyStore((storePath, _) =>
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(storePath));
+                File.WriteAllText(storePath, "{broken", new UTF8Encoding(false, true));
+                ESAIBrainPlan plan = CreateAuthorizationPlan('3', "L3", "external-run");
+                ESAutomationTaskInvocation invocation = CreateAuthorizationInvocation(plan);
+                Assert.That(ESAIBrainCoordinator.Internal_TryRegisterAuthorizationForTests(
+                    invocation, plan, false, out _), Is.False);
+                Assert.That(File.ReadAllText(storePath,
+                    new UTF8Encoding(false, true)), Is.EqualTo("{broken"));
+            });
+        }
+
+        [Test]
+        public void AIBrainTrustedHostProof_IsInternalBoundAndExpiring()
+        {
+            DateTimeOffset baseline = AuthorizationPolicyTestUtc;
+            WithAuthorizationPolicyStore((_, __) =>
+            {
+                ESAIBrainRequest request = CreateTrustedHostRequest();
+                Assert.That(ESAIBrainCoordinator.Internal_ValidateTrustedHostProofForTests(
+                    request, out _), Is.False);
+                Assert.That(ESAIBrainCoordinator.TryBindTrustedHostProof(request,
+                    "es.tests.managed", string.Empty, false, out string bindError),
+                    Is.True, bindError);
+                Assert.That(ESAIBrainCoordinator.Internal_ValidateTrustedHostProofForTests(
+                    request, out string validationError), Is.True, validationError);
+
+                request.input["value"] = 2;
+                Assert.That(ESAIBrainCoordinator.Internal_ValidateTrustedHostProofForTests(
+                    request, out string driftError), Is.False);
+                Assert.That(driftError, Does.Contain("drifted"));
+
+                ESAIBrainRequest failedRebind = CreateTrustedHostRequest();
+                Assert.That(ESAIBrainCoordinator.TryBindTrustedHostProof(failedRebind,
+                    "es.tests.managed", string.Empty, false, out _), Is.True);
+                Assert.That(ESAIBrainCoordinator.TryBindTrustedHostProof(failedRebind,
+                    "invalid host", string.Empty, false, out _), Is.False);
+                Assert.That(ESAIBrainCoordinator.Internal_ValidateTrustedHostProofForTests(
+                    failedRebind, out string clearedError), Is.False);
+                Assert.That(clearedError, Does.Contain("missing"));
+
+                ESAIBrainRequest currentUser = CreateTrustedHostRequest();
+                Assert.That(ESAIBrainCoordinator.TryBindTrustedHostProof(currentUser,
+                    "es.tests.current-user", string.Empty, true, out _), Is.False);
+                Assert.That(ESAIBrainCoordinator.TryBindTrustedHostProof(currentUser,
+                    "es.tests.current-user", new string('4', 64), true,
+                    out bindError), Is.True, bindError);
+                ESAIBrainCoordinator.Internal_SetAuthorizationUtcNowForTests(
+                    baseline.AddMinutes(6));
+                Assert.That(ESAIBrainCoordinator.Internal_ValidateTrustedHostProofForTests(
+                    currentUser, out string expiryError), Is.False);
+                Assert.That(expiryError, Does.Contain("expired"));
+            });
+        }
+
+        [Test]
+        public void AIBrainTrustedHostProof_IsExcludedFromJsonSerialization()
+        {
+            WithAuthorizationPolicyStore((_, __) =>
+            {
+                ESAIBrainRequest request = CreateTrustedHostRequest();
+                Assert.That(ESAIBrainCoordinator.TryBindTrustedHostProof(request,
+                    "es.tests.managed", string.Empty, false, out string bindError),
+                    Is.True, bindError);
+
+                string json = JsonConvert.SerializeObject(request);
+                JObject document = JObject.FromObject(request);
+
+                Assert.That(json, Does.Not.Contain("trustedHostProof"));
+                Assert.That(json, Does.Not.Contain("\"hostId\""));
+                Assert.That(json, Does.Not.Contain("\"instructionHash\""));
+                Assert.That(document.Property("trustedHostProof"), Is.Null);
+                Assert.That(document.Property("hostId"), Is.Null);
+                Assert.That(document.Property("instructionHash"), Is.Null);
+
+                ESAIBrainRequest roundTrip = JsonConvert.DeserializeObject<ESAIBrainRequest>(json);
+                Assert.That(ESAIBrainCoordinator.Internal_ValidateTrustedHostProofForTests(
+                    roundTrip, out string validationError), Is.False);
+                Assert.That(validationError, Does.Contain("missing"));
+            });
+        }
+
+        [Test]
+        public void AIBrainApproval_ReturnsCanonicalAttemptAndPreservesCompatibilityOverload()
+        {
+            ESAIBrainRequest request = CreateTrustedHostRequest();
+            ESAIBrainPlan presentedPlan = ESAIBrainCoordinator.Plan(request);
+
+            Assert.That(ESAIBrainCoordinator.TryApprovePlan(request, presentedPlan,
+                out ESAIBrainPlan canonicalPlan, out _), Is.False);
+            Assert.That(canonicalPlan, Is.Not.Null);
+            Assert.That(canonicalPlan.planId, Is.Not.EqualTo(presentedPlan.planId));
+            Assert.That(canonicalPlan.planHash, Is.EqualTo(presentedPlan.planHash));
+            Assert.That(typeof(ESAIBrainCoordinator).GetMethod("TryApprovePlan", new[]
+            {
+                typeof(ESAIBrainRequest),
+                typeof(ESAIBrainPlan),
+                typeof(string).MakeByRefType(),
+            }), Is.Not.Null);
+        }
+
+        [Test]
+        public void AIBrainApprovalFailure_ClearsHashForMutatedFailureContent()
+        {
+            ESAIBrainPlan plan = CreateAuthorizationPlan('c', "L3", "external-run");
+
+            ESAutomationAiBridge.Internal_ApplyPlanApprovalFailureForTests(plan, "store rejected");
+
+            Assert.That(plan.status, Is.EqualTo("Blocked"));
+            Assert.That(plan.planHash, Is.Empty);
+            Assert.That(plan.blockers, Has.Some.Contains("store rejected"));
         }
 
         [Test]
@@ -1290,6 +1735,119 @@ namespace ES.Tests
             };
         }
 
+        private static void WithAuthorizationPolicyStore(Action<string, string> assertion)
+        {
+            if (assertion == null) throw new ArgumentNullException(nameof(assertion));
+            string relativeRoot = "ES/Output/Automation/AIBrain/Tests/"
+                + Guid.NewGuid().ToString("N");
+            string relativeStore = relativeRoot + "/authorizations.json";
+            IDisposable scope = ESAIBrainCoordinator.Internal_BeginAuthorizationTestScope(
+                relativeStore, AuthorizationPolicyTestUtc);
+            string storePath = string.Empty;
+            string lockPath = string.Empty;
+            string testRoot = string.Empty;
+            try
+            {
+                storePath = ESAIBrainCoordinator.Internal_AuthorizationStorePathForTests();
+                lockPath = ESAIBrainCoordinator.Internal_AuthorizationLockPathForTests();
+                testRoot = Path.GetDirectoryName(storePath);
+                assertion(storePath, lockPath);
+            }
+            finally
+            {
+                scope.Dispose();
+                if (!string.IsNullOrWhiteSpace(testRoot) && Directory.Exists(testRoot))
+                {
+                    string testsRoot = Path.GetFullPath(Path.Combine(Application.dataPath,
+                        "..", "ES", "Output", "Automation", "AIBrain", "Tests"));
+                    ESManagedFileIO.DeleteDirectory(testRoot, testsRoot);
+                }
+            }
+        }
+
+        private static ESAIBrainPlan CreateAuthorizationPlan(char hashMarker,
+            string riskLevel, string writeMode)
+        {
+            return new ESAIBrainPlan
+            {
+                contractVersion = ESAIBrainCoordinator.ContractVersion,
+                planId = Guid.NewGuid().ToString("N"),
+                planHash = new string(hashMarker, 64),
+                status = "Ready",
+                command = new ESAIBrainCommandBinding
+                {
+                    id = "es.tests.authorization",
+                    riskLevel = riskLevel,
+                    writeMode = writeMode,
+                },
+            };
+        }
+
+        private static ESAutomationTaskInvocation CreateAuthorizationInvocation(
+            ESAIBrainPlan plan, string invocationId = null)
+        {
+            if (plan == null) throw new ArgumentNullException(nameof(plan));
+            return new ESAutomationTaskInvocation
+            {
+                invocationId = string.IsNullOrWhiteSpace(invocationId)
+                    ? Guid.NewGuid().ToString("N") : invocationId,
+                brainPlanHash = plan.planHash,
+                taskId = "es.tests.authorization",
+                taskVersion = 1,
+                input = new JObject { ["value"] = 1 },
+                fromAi = true,
+                actorId = "codex.local",
+            };
+        }
+
+        private static ESAIBrainRequest CreateTrustedHostRequest()
+        {
+            return new ESAIBrainRequest
+            {
+                objective = "validate trusted-host authorization binding",
+                routeKeys = new List<string> { "aibrain", "authorization" },
+                commandId = "es.tests.authorization",
+                taskId = "es.tests.authorization",
+                taskVersion = 1,
+                input = new JObject { ["value"] = 1 },
+                fromAi = true,
+                actorId = "codex.local",
+                invocationId = Guid.NewGuid().ToString("N"),
+            };
+        }
+
+        private static AuthorizationProbeEndpoint RegisterAuthorizationProbeEndpoint(
+            bool allowAiInvoke = true)
+        {
+            string taskId = "es.tests.authorization-probe-" + Guid.NewGuid().ToString("N");
+            var worker = new ESAutomationWorkerRegistration
+            {
+                type = "Other",
+                workerId = "es.tests.authorization-probe",
+                version = "1.0.0",
+                entrypointHash = new string('d', 64),
+                enabled = true,
+            };
+            ESAutomationTaskRegistry.Register(new ESAutomationTaskContract
+            {
+                taskId = taskId,
+                version = 1,
+                worker = worker,
+            });
+            var endpoint = new AuthorizationProbeEndpoint(
+                new ESAutomationTaskDescriptor
+                {
+                    taskId = taskId,
+                    taskVersion = 1,
+                    category = "Test",
+                    displayName = "Authorization Probe",
+                    summary = "Authorization Probe",
+                    allowAiInvoke = allowAiInvoke,
+                }, worker);
+            ESAutomationFacade.Register(endpoint);
+            return endpoint;
+        }
+
         private static ESAutomationTaskContract CreateGovernedContract()
         {
             return new ESAutomationTaskContract
@@ -1493,6 +2051,48 @@ namespace ES.Tests
                     return descriptor;
             }
             return null;
+        }
+
+        private sealed class AuthorizationProbeEndpoint : IESAutomationTaskEndpoint,
+            IESAutomationContractBoundEndpoint
+        {
+            private readonly ESAutomationWorkerRegistration worker;
+
+            public AuthorizationProbeEndpoint(ESAutomationTaskDescriptor descriptor,
+                ESAutomationWorkerRegistration worker)
+            {
+                Descriptor = descriptor;
+                this.worker = worker;
+            }
+
+            public ESAutomationTaskDescriptor Descriptor { get; }
+            public ESAutomationCapability RequiredCapabilities { get; set; }
+            public int DescribeCount { get; private set; }
+            public int RunCount { get; private set; }
+
+            public ESAutomationInvocationRequirements DescribeInvocation(
+                ESAutomationTaskInvocation invocation)
+            {
+                DescribeCount++;
+                return new ESAutomationInvocationRequirements
+                {
+                    worker = worker,
+                    requiredCapabilities = RequiredCapabilities,
+                };
+            }
+
+            public ESAutomationTaskInvocationResult Run(ESAutomationTaskInvocation invocation)
+            {
+                RunCount++;
+                return ESAutomationTaskInvocationResult.Completed("test", invocation.invocationId);
+            }
+
+            public ESAutomationTaskInvocationResult GetRun(string runId)
+                => ESAutomationTaskInvocationResult.NotFound("test");
+
+            public ESAutomationTaskInvocationResult SubmitInput(
+                ESAutomationTaskInputSubmission submission)
+                => ESAutomationTaskInvocationResult.NotFound("test");
         }
 
         private sealed class UnboundEndpoint : IESAutomationTaskEndpoint

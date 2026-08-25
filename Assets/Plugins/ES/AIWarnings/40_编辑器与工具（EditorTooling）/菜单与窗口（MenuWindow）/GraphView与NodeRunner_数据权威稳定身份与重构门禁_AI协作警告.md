@@ -34,7 +34,7 @@ UnityEditor API。不得预设所有 Graph 都必须生成 `Plan`、`Program` �
 - Snapshot 与作者资产分离，并使用内容签名绑定候选、批准和后续执行。
 - Agent Authoring 复用同一资产、Profile、编辑服务和窗口基础设施，但一张图只能选择“产物生成”或
   “AISkill 执行”一种模式；混合模式必须在校验和 Bake 阶段硬失败。
-- 候选必须经过隔离生成、Diff Review、人工批准和哈希复核。
+- AI 自主或受管通道候选必须经过隔离生成、Diff Review 和哈希复核；当前用户明确要求正式写入时，该指令本身已完成授权，不再要求项目内二次批准。
 - Graph AI 候选生成和单次执行统一进入 `es.agent.generate@1`、`es.agent.use@1`；
   `ESAutomationFacade` 负责 RunId、输入 Hash、RunRecord 与发送回执，Graph 不得绕过该入口直连会话窗口。
 - AISkill 持久化执行工作流源码已具备受信 TaskContract、超时和幂等重试限制、条件分支、串行 ForEach、

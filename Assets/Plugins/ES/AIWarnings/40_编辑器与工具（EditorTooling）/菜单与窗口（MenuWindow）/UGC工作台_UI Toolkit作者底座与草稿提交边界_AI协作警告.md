@@ -85,6 +85,7 @@ Assets/Scripts/ESLogic/Editor/World/ESWorldAuthoringViewport.cs
 ### 拖放与视口
 
 - 拖放分为“可接受性预检”和“正式作者操作”。预检不得改数据；执行必须解析精确视口坐标、目标层级、权限、锁定、预算和 Undo 目标。
+- **P0 事件路由硬合同**：外部拖放事件必须由 Workbench Host 在子视口/`IMGUIContainer` 之前接收；`DragUpdatedEvent`、`DragPerformEvent`、`DragLeaveEvent` 在稳定宿主节点注册 `TrickleDown.TrickleDown`，注销时必须使用完全相同的节点、回调和阶段。`DragExitedEvent`、窗口失焦、根宿主 `PointerCaptureOutEvent`、根宿主 `DetachFromPanelEvent` 和拖放离开都必须幂等调用 `CancelWorkbenchDrag(true)`；任何路径不得只清反馈而保留 owner、session token 或外部拖放状态。该合同证明的是源代码路由意图，实际 UI 行为仍需 Unity 交互证据。
 - 2D/3D/游戏预览是同一作者数据的不同投影，不得各自维护第二份业务状态。
 - 工具轨尺寸、按钮、吸附值和视口覆盖层必须有稳定约束，不能因标签、Hover 或动态状态改变视口布局。
 - 视口临时对象、Terrain、Camera、RT 和 PreviewScene 必须受预览生命周期管理；预览成功不代表正式 Scene 已修改。

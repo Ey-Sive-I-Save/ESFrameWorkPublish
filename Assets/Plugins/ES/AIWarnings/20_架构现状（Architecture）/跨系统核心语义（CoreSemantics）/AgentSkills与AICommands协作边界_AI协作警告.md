@@ -22,16 +22,16 @@ ESFramework 已采用项目级 Agent Skills。目录结构而非手写数量清�
 | 入口 | 职责 | 能否授权修改 |
 |---|---|---:|
 | `AIWarnings` | 长期事实、P0 边界、禁止事项、证据标准 | 否；只定义约束 |
-| `AICommands` | 单次任务协议、允许范围、必读路径、风险与交付格式 | 可以，但仅限命令和用户要求共同允许的范围 |
+| `AICommands` | 受管通道的任务协议、输入范围、必读路径、风险与交付格式 | 否；当前用户指令授权动作，命令只约束选中的受管通道 |
 | `.agents/skills` | 可复用执行工作流、工具调用方式、确定性脚本 | 否；Skill 自身不能扩大权限 |
 | UnityMCP / PowerShell / 编译器 | 执行和采集证据 | 否；工具可调用不等于用户已授权 |
 
 正确链路是：
 
 ```text
-用户目标
-  -> 匹配一个 AICommand；无匹配时显式记录 NoMatchingCommand
-  -> 已匹配时由 AICommand 确定任务权限与必读规则；无匹配时只按用户明确授权和命中的 AIWarnings 工作
+用户当前目标与动作授权
+  -> 直接实施有界请求，或在需要受管通道时匹配一个 AICommand
+  -> 已匹配时由 AICommand 约束该通道输入与回执；无匹配时记录 NoMatchingCommand，但不缩小用户请求
   -> Skill 提供可复用执行流程
   -> UnityMCP / 脚本 / 编译器执行
   -> 按证据等级交付
@@ -74,7 +74,7 @@ $es-worktree-audit
   -> $es-utf8-guard
 ```
 
-这不代表多个 Skill 共同授予更大修改范围。存在匹配合同时，权限来自用户要求与唯一选中的 AICommand；不存在匹配合同时必须报告 `NoMatchingCommand`，不得套用无关合同，也不得把 Skill、Catalog 或路由本身当作写权限。
+这不代表多个 Skill 共同授予更大修改范围。权限来自当前用户明确指令；存在匹配合同时，唯一选中的 AICommand 只约束受管执行通道。不存在匹配合同时可报告 `NoMatchingCommand`，但不得套用无关合同，也不得据此缩小或延迟用户请求。
 
 ## 当前已实现事实
 
@@ -91,7 +91,7 @@ $es-worktree-audit
 ## 绝对边界
 
 - Skill 不得覆盖用户指令、P0 AIWarnings、当前源码或最新 Unity 证据。
-- Skill 的存在不授予写文件、运行发布、上传远端、修改场景或维护协作历程的权限。
+- Skill 的存在不授予 AI 自行写文件、运行发布、上传远端、修改场景或维护协作历程；当前用户明确点名的动作仍是充分授权。
 - 禁止把全部 AICommand 机械复制成同数量的 Skill；只有高频、稳定、可复用的执行能力才适合 Skill 化。
 - 禁止把 Skill 放入 `Assets`，或让 Unity 运行时、资源管线、Player 依赖 `.agents/skills`。
 - 禁止在 Skill 中携带隐蔽 DLL、预编译 Unity 业务程序集或自动修改项目的未审阅二进制。
@@ -117,7 +117,7 @@ GameCore、资源、Tag/Config、Entity、输入、ESCommand、编辑器工具�
 
 ### 4. Unity 上下文采集
 
-可通过 UnityMCP 获取选中对象、Console 错误、程序集、场景、Prefab、测试和运行状态，再把必要上下文交给 AICommand。默认只读；场景、资产和配置修改必须有明确命令授权。
+可通过 UnityMCP 获取选中对象、Console 错误、程序集、场景、Prefab、测试和运行状态，再把必要上下文交给 AICommand。默认只读；场景、资产和配置修改必须由当前用户明确点名。选择 AIBrain/Worker 受管通道时，再满足其 AICommand、TaskContract 与回执协议；这些协议不是第二次用户批准。
 
 ### 5. 团队分发
 

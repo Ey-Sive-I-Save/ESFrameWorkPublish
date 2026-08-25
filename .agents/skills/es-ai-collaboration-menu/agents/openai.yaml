@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES AI Collaboration Menu"
+  short_description: "Show a bounded context-aware ES collaboration menu"
+  default_prompt: "Use $es-ai-collaboration-menu when the user asks for 菜单 or a guided ES collaboration menu."

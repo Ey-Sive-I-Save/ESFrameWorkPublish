@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES AI Interaction Governance"
+  short_description: "Score prompts and suggest bounded next steps"
+  default_prompt: "Use $es-ai-interaction-governance to assess the task and propose bounded next steps."

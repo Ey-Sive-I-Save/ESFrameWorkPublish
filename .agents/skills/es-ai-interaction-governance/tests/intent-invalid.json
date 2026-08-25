@@ -1,0 +1,17 @@
+{
+  "contractVersion": "1",
+  "objective": "无效合同",
+  "scope": [],
+  "mustPreserve": [],
+  "allowedTransitions": [],
+  "forbiddenTransitions": [],
+  "acceptanceSignals": [],
+  "counterexamples": [],
+  "nonGoals": [],
+  "assumptions": [],
+  "unresolvedQuestions": [],
+  "intentAlignmentStatus": "aligned",
+  "executionDecision": "deny",
+  "revision": 0,
+  "sourceRefs": []
+}

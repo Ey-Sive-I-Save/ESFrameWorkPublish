@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-ai-collaboration-menu",
+  "sourceRoots": [".agents/skills/es-ai-collaboration-menu"],
+  "cases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "hash-change-cache-invalidation", "interruption-recovery", "deterministic-output"],
+  "staticClaims": ["bounded-menu", "deterministic-routing", "deterministic-replay", "natural-language-intent", "negation-safety", "compound-intent", "bracket-numbering", "decision-receipt", "permission-boundary", "invalid-input-rejection", "no-execute"],
+  "runtimeClaimsNotProven": ["user choice quality", "domain Skill execution", "Unity/editor/process behavior", "timing and visual behavior", "release behavior"],
+  "runtimeEscalation": {"required": false, "reason": "This Skill only renders a navigation menu."},
+  "caseAssertions": {
+    "normal-input": "create and context signals render all bounded options",
+    "invalid-input": "malformed JSON or unknown enum is rejected",
+    "denied-expansion": "menu output cannot authorize writes or Runtime",
+    "repeat-idempotency": "same input returns the same JSON",
+    "hash-change-cache-invalidation": "changed bundled menu data requires a fresh replay",
+    "interruption-recovery": "a rerun after interruption has no persistent cleanup requirement",
+    "deterministic-output": "recommendation and ordering are stable"
+  },
+  "responsibilityProfile": "governance",
+  "responsibilityChecks": ["authority-routing", "deterministic-replay", "evidence-contract"],
+  "responsibilityScope": "Bounded context-aware ES collaboration menu; no implementation or runtime authority.",
+  "specializedAcceptance": {"id":"collaboration-menu-static","title":"collaboration menu static gate","requiredStaticCases":["menu-positive","menu-invalid","menu-denied-expansion","menu-idempotency"],"evidenceArtifacts":["SKILL.md","governance.json","references/menu-contract.md","references/menu-options.json","scripts/Invoke-ESCollaborationMenu.ps1","scripts/Test-ESCollaborationMenu.ps1"],"sourceAssertions":["menu-options","recommendation","no-execute","determinism"],"runtimeBoundary":"Static acceptance proves menu structure and deterministic routing only."},
+  "specializedGuidanceRef": "references/static-replay-adapter.md"
+}

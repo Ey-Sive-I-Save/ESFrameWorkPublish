@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-ai-interaction-governance",
+  "sourceRoots": [".agents/skills/es-ai-interaction-governance"],
+  "cases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "hash-change-cache-invalidation", "interruption-recovery", "deterministic-output"],
+  "staticClaims": ["intent-contract-schema", "alignment-gate", "counterexample-replay", "deterministic-replay", "boundary-contract"],
+  "runtimeClaimsNotProven": ["user-intent quality beyond declared evidence", "Unity/editor/process behavior", "timing and visual behavior", "Profiler/Player/IL2CPP/release behavior"],
+  "runtimeEscalation": {"required": false, "reason": "This Skill validates interaction evidence and contracts; external behavior remains outside its claim."},
+  "caseAssertions": {
+    "normal-input": "aligned intent contract is accepted",
+    "invalid-input": "malformed or incomplete contract is rejected",
+    "denied-expansion": "misaligned contract cannot allow execution",
+    "repeat-idempotency": "repeated contract validation produces the same normalized hash",
+    "hash-change-cache-invalidation": "contract revision/hash is available for stale-plan detection",
+    "interruption-recovery": "partial contract declares a bounded recovery action",
+    "deterministic-output": "validator output is stable for the same contract"
+  },
+  "responsibilityProfile": "governance",
+  "responsibilityChecks": ["authority-routing", "deterministic-replay", "evidence-contract"],
+  "responsibilityScope": "Task-scoped user-intent contracts and evidence-first interaction assessment; no implementation or runtime authority.",
+  "specializedAcceptance": {
+    "id": "interaction-governance-static",
+    "title": "interaction intent contract static gate",
+    "requiredStaticCases": ["intent-contract-positive", "intent-contract-invalid", "intent-contract-denied", "intent-contract-idempotency", "intent-contract-recovery"],
+    "evidenceArtifacts": ["SKILL.md", "governance.json", "references/intent-contract.schema.json", "scripts/Test-ESIntentContract.ps1", "scripts/Test-ESInteractionGovernance.ps1"],
+    "sourceAssertions": ["intent-contract", "alignment-gate", "counterexample", "revision", "runtime-boundary"],
+    "runtimeBoundary": "Static acceptance proves contract structure and deterministic replay only; it does not prove that an AI understood unobserved user intent or that Unity/editor behavior is correct."
+  },
+  "specializedGuidanceRef": "references/static-specialized-acceptance.md"
+}

@@ -1,0 +1,15 @@
+{
+  "requestedScope": { "allowWrites": false, "allowRuntime": false },
+  "userMessages": [
+    { "text": "请调整评价体系", "timestamp": "2026-08-24T15:00:00Z", "line": 1 },
+    { "text": "确认，这个修正符合预期", "timestamp": "2026-08-24T15:03:00Z", "line": 5 }
+  ],
+  "assistantMessages": [
+    { "text": "收到初始反馈", "type": "final", "line": 2 },
+    { "text": "已按纠偏更新评价逻辑", "type": "final", "line": 4 }
+  ],
+  "toolEvents": [{ "name": "Test-ESInteractionGovernance", "success": true, "mutating": false, "runtime": false, "line": 3 }],
+  "fileChanges": [],
+  "verificationEvents": [{ "name": "static-validator", "status": "passed", "scope": "skill", "line": 6 }],
+  "userCorrections": [{ "text": "之前的评价不符合要求", "timestamp": "2026-08-24T15:02:00Z", "line": 3 }]
+}

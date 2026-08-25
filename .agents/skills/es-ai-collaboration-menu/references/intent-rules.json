@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {"id":"window-handoff","optionId":"coordinate-session","operation":"Handoff","weight":100,"terms":["交接","接手","交给新","handoff"]},
+    {"id":"session-fork","optionId":"coordinate-session","operation":"Fork","weight":95,"terms":["分叉","复制会话","fork"]},
+    {"id":"session-resume","optionId":"coordinate-session","operation":"Resume","weight":95,"terms":["恢复","旧会话","resume"]},
+    {"id":"create-content","optionId":"create-content","operation":"Create","weight":60,"terms":["创建","制作","新增","建立","生成"]},
+    {"id":"iterate-feature","optionId":"iterate-feature","operation":"Iterate","weight":60,"terms":["修复","迭代","改进","优化","修改","调整","为什么","问题","损坏","保持"]},
+    {"id":"validate-evidence","optionId":"validate-evidence","operation":"Validate","weight":65,"terms":["编译","验证","测试","验收","检查","证据"]},
+    {"id":"govern-framework","optionId":"govern-framework","operation":"Govern","weight":55,"terms":["规则","边界","权限","架构","治理","Skill"]},
+    {"id":"discover-context","optionId":"discover-context","operation":"Discover","weight":70,"terms":["不知道下一步","怎么开始","带我做","上下文","从哪里"]}
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "requestedScope": { "allowWrites": false, "allowRuntime": false },
+  "userMessages": [{ "text": "只读检查，不要修改", "timestamp": "2026-08-24T15:00:00Z" }],
+  "assistantMessages": [{ "text": "已完成并通过。", "type": "final" }],
+  "toolEvents": [{ "name": "Write-File", "success": true, "mutating": true, "runtime": false }],
+  "fileChanges": [{ "path": "example.txt", "kind": "modified" }],
+  "verificationEvents": [],
+  "userCorrections": [{ "text": "我说了不要修改" }]
+}

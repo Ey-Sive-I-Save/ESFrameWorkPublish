@@ -1,0 +1,18 @@
+{
+  "contractVersion": "1",
+  "objective": "让用户只用自然语言即可获得可发现、可解释、可选择的 ES 制作/迭代/治理/验收/协作菜单。",
+  "scope": ["自然语言意图解释", "菜单主项与二级项投影", "有限 Skill/Knowledge/AIWarnings 路由提示", "决策回执"],
+  "mustPreserve": ["菜单只展示和路由，不直接执行", "Fork 与 Handoff 永远分离", "用户选择仍是必要门", "最多 3 个 Skill、3 个 Knowledge、3 条 AIWarnings 建议收集"],
+  "allowedTransitions": ["unknown-intent -> discover-context", "high-confidence-intent -> recommended-menu-option", "compound-intent -> ordered-menu-stages", "user-selection -> route-only"],
+  "forbiddenTransitions": ["inferred-intent -> execution", "recommendation -> authorization", "fork -> handoff", "natural-language-risk -> silent-write", "unknown-intent -> guessed-domain"],
+  "acceptanceSignals": ["自然语言交接识别", "否定意图拒绝错误推荐", "复合意图形成有序阶段", "主菜单和二级菜单使用【】编号", "输出 capabilityPolicy.canDispatch=false", "重复输入回执稳定"],
+  "counterexamples": ["不要交接，先在当前窗口继续", "交接是什么意思", "只查看交接状态，不要打开窗口", "修复后再交给新 AI", "我不知道下一步该怎么做"],
+  "nonGoals": ["自动执行 Skill", "自动创建或切换会话", "自动运行 Unity/Runtime", "自动读取全量 Skill/Knowledge/AIWarnings", "真实用户接受率统计"],
+  "assumptions": ["用户可通过自然语言表达目标", "菜单数据和意图规则是项目内只读快照", "具体动作由后续 Skill 或会话合同承担"],
+  "unresolvedQuestions": ["真实用户语言覆盖率尚未统计", "真实宿主 UI 尚未接入"],
+  "intentAlignmentStatus": "aligned",
+  "executionDecision": "allow",
+  "revision": 1,
+  "sourceRefs": ["AGENTS.md", "Documentation/AIKnowledge/AIBRAIN_ENTRY.md", ".agents/skills/es-ai-interaction-governance/references/interaction-governance-contract.md", ".agents/skills/es-ai-collaboration-menu/SKILL.md"],
+  "recovery": {"resumeAction": "重新渲染同一 Prompt 与当前规则快照", "partialStatePolicy": "不保留执行状态；中断只丢弃本次展示回执"}
+}

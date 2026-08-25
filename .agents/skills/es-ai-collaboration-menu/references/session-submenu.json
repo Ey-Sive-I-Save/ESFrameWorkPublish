@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "submenuId": "es-session-coordination.v1",
+  "parentOptionId": "coordinate-session",
+  "options": [
+    {"id":"session-new","number":1,"label":"新建协作窗口","operation":"New","routeKey":"session","capability":"present-new-session-route","requiresExactIdentity":false,"requiresLaunchAcceptance":true,"usesHandoffOrchestrator":false,"requiresUserChoice":true},
+    {"id":"session-resume","number":2,"label":"恢复已有会话","operation":"Resume","routeKey":"session","capability":"present-resume-route","requiresExactIdentity":true,"requiresLaunchAcceptance":true,"usesHandoffOrchestrator":false,"requiresUserChoice":true},
+    {"id":"session-fork","number":3,"label":"分叉当前会话","operation":"Fork","routeKey":"session","capability":"present-fork-route","requiresExactIdentity":true,"requiresLaunchAcceptance":true,"usesHandoffOrchestrator":false,"requiresUserChoice":true},
+    {"id":"window-handoff","number":4,"label":"窗口交接：让新 AI 接手当前任务","operation":"Handoff","routeKey":"handover","capability":"present-handoff-route","requiresExactIdentity":true,"requiresLaunchAcceptance":true,"usesHandoffOrchestrator":true,"requiresUserChoice":true},
+    {"id":"session-focus","number":5,"label":"聚焦或切换职责窗口","operation":"Focus","routeKey":"session","capability":"present-focus-route","requiresExactIdentity":true,"requiresLaunchAcceptance":false,"usesHandoffOrchestrator":false,"requiresUserChoice":true},
+    {"id":"session-status","number":6,"label":"查看协作收尾与下一步","operation":"Status","routeKey":"session","capability":"present-status-route","requiresExactIdentity":false,"requiresLaunchAcceptance":false,"usesHandoffOrchestrator":false,"requiresUserChoice":true}
+  ],
+  "nonClaims": ["No submenu option executes a session operation", "Fork is not handoff", "Handoff must use Complete-ESCodexHandoff.ps1 and a new launch envelope"]
+}

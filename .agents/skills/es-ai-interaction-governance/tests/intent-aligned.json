@@ -1,0 +1,17 @@
+{
+  "contractVersion": "1",
+  "objective": "保留窗口当前休眠状态，不因系统生命周期自动放大",
+  "scope": ["EditorWindow生命周期"],
+  "mustPreserve": ["当前休眠矩形", "当前休眠状态", "Overlay可见连续性"],
+  "allowedTransitions": ["UserWake", "ExplicitClose", "ExplicitWindowRebuild"],
+  "forbiddenTransitions": ["PlayMode->AwakeBounds", "OnDisable->UserWake", "DomainReload->ImplicitWake"],
+  "acceptanceSignals": ["PlayMode前后矩形相等", "退出PlayMode后仍处于休眠", "显式唤醒才恢复awakeBounds"],
+  "counterexamples": ["退出PlayMode后窗口变大", "生命周期停用移除Overlay导致状态丢失"],
+  "nonGoals": ["不改变用户主动唤醒语义"],
+  "assumptions": [],
+  "unresolvedQuestions": [],
+  "intentAlignmentStatus": "aligned",
+  "executionDecision": "allow",
+  "revision": 1,
+  "sourceRefs": ["user-request", "Assets/Plugins/ES/Editor/ESPresentation/Core/ESEditorPresentationCore.cs"]
+}

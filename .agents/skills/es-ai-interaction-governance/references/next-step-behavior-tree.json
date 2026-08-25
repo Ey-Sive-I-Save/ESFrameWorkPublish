@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "treeId": "es-ai-interaction-next-steps",
+  "maxSuggestions": 3,
+  "contextCollection": {
+    "mode": "bounded-opt-in",
+    "neverAutoExecute": true,
+    "maxReads": { "skills": 3, "knowledgeEntries": 3, "aiwarningsP0": 3 },
+    "options": ["skill-only", "knowledge-only", "aiwarnings-only", "skill-knowledge", "skill-knowledge-aiwarnings"],
+    "notRecommendedFor": ["simple-read-only", "formatting-only", "already-routed-and-fresh"],
+    "record": ["taskKey", "planHash", "selection", "readSet", "sourceHashes", "stale", "nonClaims"]
+  },
+  "rules": [
+    { "id": "clarify-objective", "priority": 100, "when": { "objectiveClarity": "unclear" }, "label": "澄清目标与范围", "reason": "目标或边界不足，先确认再行动", "risk": "low", "requiresUserChoice": true },
+    { "id": "offer-context-collection", "priority": 95, "when": { "taskStarted": true, "contextCollectionRecommended": true }, "label": "收集本任务所需的 Skill、Knowledge 与 AIWarnings", "reason": "当前任务存在路由不确定、知识缺口或高风险边界；只做定向收集并等待选择", "risk": "low", "requiresUserChoice": true, "optionsRef": "#/contextCollection/options" },
+    { "id": "inspect-before-change", "priority": 90, "when": { "objectiveClarity": "partial", "writesRequested": true }, "label": "先做静态检查", "reason": "写入前确认目标文件和现状", "risk": "low", "requiresUserChoice": true },
+    { "id": "refresh-understanding", "priority": 80, "when": { "goalDrift": "possible" }, "label": "刷新当前理解", "reason": "任务上下文可能已变化", "risk": "low", "requiresUserChoice": true },
+    { "id": "run-static-validation", "priority": 70, "when": { "verificationScoreBelow": 7 }, "label": "补充静态验证", "reason": "现有证据不足以支撑当前结论", "risk": "low", "requiresUserChoice": true },
+    { "id": "prepare-handoff", "priority": 60, "when": { "handoffIntent": true }, "label": "准备交接摘要", "reason": "交接需要职责、证据和未证实项", "risk": "medium", "requiresUserChoice": true },
+    { "id": "request-runtime", "priority": 40, "when": { "runtimeRequired": true, "runtimeStatus": "not-run" }, "label": "申请运行时验收", "reason": "仅静态证据无法证明运行行为", "risk": "high", "requiresUserChoice": true }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {"area":"session","terms":["窗口交接","交接窗口","新窗口","当前窗口","新 AI","新AI","会话","分叉","恢复","交接"]},
+    {"area":"shader","terms":["Shader","shader","材质","渲染"]},
+    {"area":"input","terms":["输入","按键","键位","绑定","Action","InputAction","控制权","手柄","鼠标","键盘"]},
+    {"area":"ui","terms":["UI","界面","面板","HUD","按钮","背包","血条","对话框","菜单栏"]},
+    {"area":"editor","terms":["编辑器","EditorWindow","Inspector","编辑器窗口"]},
+    {"area":"gamecore","terms":["GameCore","配置","ConfigKey"]},
+    {"area":"resource","terms":["资源","Asset","ResourcePlan","Manifest"]},
+    {"area":"entity","terms":["角色","Entity","Prefab","实体","敌人","玩家","NPC","怪物","Boss","战斗单位"]}
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "profiles": {
+    "default": { "promptWeights": { "objective": 3, "target": 2, "scope": 2, "acceptance": 2, "constraints": 1 }, "dimensionWeights": { "prompt": 3, "intent": 4, "evidence": 3 }, "verificationRequired": false },
+    "engineering": { "promptWeights": { "objective": 3, "target": 2, "scope": 2, "acceptance": 2, "constraints": 1 }, "dimensionWeights": { "prompt": 2, "intent": 4, "evidence": 4 }, "verificationRequired": true },
+    "handover": { "promptWeights": { "objective": 3, "target": 2, "scope": 1, "acceptance": 2, "constraints": 2 }, "dimensionWeights": { "prompt": 3, "intent": 4, "evidence": 3 }, "verificationRequired": true },
+    "release": { "promptWeights": { "objective": 2, "target": 2, "scope": 2, "acceptance": 3, "constraints": 1 }, "dimensionWeights": { "prompt": 2, "intent": 3, "evidence": 5 }, "verificationRequired": true },
+    "minimal": { "promptWeights": { "objective": 5, "target": 3, "scope": 2 }, "dimensionWeights": { "prompt": 4, "intent": 4, "evidence": 2 }, "verificationRequired": false }
+  }
+}

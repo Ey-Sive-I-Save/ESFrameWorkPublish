@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "submenus": {
+    "create-content": {
+      "submenuId":"es-menu-create.v1",
+      "options":[
+        {"id":"create-gamecore","label":"GameCore / 配置","routeKey":"gamecore","relatedSkills":["es-gamecore-integration","es-gamecore-config-authoring"]},
+        {"id":"create-entity","label":"Entity / Prefab","routeKey":"entity","relatedSkills":["es-entity-authoring","es-entity-prefab-validation"]},
+        {"id":"create-editor","label":"Editor / Window","routeKey":"editor","relatedSkills":["es-editor-tooling","es-editor-availability-validator"]},
+        {"id":"create-ui","label":"UI / Screen","routeKey":"ui-automation","relatedSkills":["es-ui-intent-authoring","es-ui-prefab-authoring"]},
+        {"id":"create-shader","label":"Shader / Material","routeKey":"shader","relatedSkills":["es-editor-tooling","es-unity-compile"]},
+        {"id":"create-resource","label":"Resource / Asset","routeKey":"resource","relatedSkills":["es-resource-pipeline","es-resource-publish-audit"]}
+      ]
+    },
+    "iterate-feature": {
+      "submenuId":"es-menu-iterate.v1",
+      "options":[
+        {"id":"iterate-root-cause","label":"根因分析","routeKey":"analysis","relatedSkills":["es-first-principles-analysis"]},
+        {"id":"iterate-minimal-fix","label":"最小修复","routeKey":"iteration","relatedSkills":["es-adversarial-review"]},
+        {"id":"iterate-lifecycle","label":"生命周期修复","routeKey":"lifecycle","relatedSkills":["es-editor-tooling","es-codex-session-bootstrap"]},
+        {"id":"iterate-compatibility","label":"兼容性检查","routeKey":"compatibility","relatedSkills":["es-api-contract-review","es-dependency-boundary-audit"]},
+        {"id":"iterate-performance","label":"性能与资源检查","routeKey":"performance","relatedSkills":["es-performance-budgeting","es-observability-evidence"]},
+        {"id":"iterate-regression","label":"回归验证","routeKey":"verification","relatedSkills":["es-unity-compile","es-release-acceptance"]}
+      ]
+    },
+    "govern-framework": {
+      "submenuId":"es-menu-govern.v1",
+      "options":[
+        {"id":"govern-authority","label":"权威与路由","routeKey":"authority","relatedSkills":["es-aibrain-route-authoring","es-knowledge-validator"]},
+        {"id":"govern-skill","label":"Skill 能力与治理","routeKey":"skill","relatedSkills":["es-skill-governance","es-skill-validator"]},
+        {"id":"govern-api","label":"API 与兼容性","routeKey":"api","relatedSkills":["es-api-contract-review"]},
+        {"id":"govern-boundary","label":"依赖与生命周期边界","routeKey":"architecture","relatedSkills":["es-dependency-boundary-audit","es-module-lifecycle"]},
+        {"id":"govern-risk","label":"风险、恢复与变更预算","routeKey":"risk","relatedSkills":["es-change-risk-register","es-migration-planning"]}
+      ]
+    },
+    "validate-evidence": {
+      "submenuId":"es-menu-validate.v1",
+      "options":[
+        {"id":"validate-static","label":"静态与合同验证","routeKey":"static-replay","relatedSkills":["es-static-deep-replay","es-skill-validator"]},
+        {"id":"validate-compile","label":"Unity 编译与重载","routeKey":"compile","relatedSkills":["es-unity-compile"]},
+        {"id":"validate-runtime","label":"Runtime / PlayMode","routeKey":"runtime","relatedSkills":["es-release-acceptance","es-start-estest"]},
+        {"id":"validate-observe","label":"回执与可观察性","routeKey":"evidence-receipt","relatedSkills":["es-observability-evidence"]},
+        {"id":"validate-release","label":"发布与商业验收","routeKey":"release","relatedSkills":["es-release-acceptance","es-resource-publish-audit"]}
+      ]
+    },
+    "discover-context": {
+      "submenuId":"es-menu-discover.v1",
+      "options":[
+        {"id":"discover-skill","label":"发现必要 Skill","routeKey":"skill","relatedSkills":["es-skill-governance","es-skill-validator"]},
+        {"id":"discover-knowledge","label":"发现必要 Knowledge","routeKey":"knowledge","relatedSkills":["es-knowledge-validator","es-ai-knowledge-curation"]},
+        {"id":"discover-aiwarnings","label":"发现 AIWarnings 规则","routeKey":"aiwarnings","relatedSkills":["es-aiwarning-authoring"]},
+        {"id":"discover-combined","label":"Skill + Knowledge + AIWarnings","routeKey":"context-collection","relatedSkills":["es-ai-interaction-governance","es-aibrain-route-authoring"]}
+      ]
+    }
+  }
+}

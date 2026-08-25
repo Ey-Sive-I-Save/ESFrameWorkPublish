@@ -6,7 +6,7 @@
 
 ## Agent Skills 执行层
 
-AICommands 是任务协议，`.agents/skills` 是可复用执行层。选择命令后，可以按任务组合 Skill，但只能选择一个 AICommand 作为本次权限合同。
+AICommands 是受管通道任务协议，`.agents/skills` 是可复用执行层。选择命令后，可以按任务组合 Skill，但一个受管执行计划只能绑定一个 AICommand。当前用户明确指令独立授权直接项目动作，命令不得扩大或缩小该范围。
 
 | Skill | 适合配合的命令或任务 |
 |---|---|
@@ -16,7 +16,7 @@ AICommands 是任务协议，`.agents/skills` 是可复用执行层。选择命�
 | `$es-utf8-guard` | `检查_中文编码风险_AI命令.md`，以及所有会改文本的命令 |
 | `$es-worktree-audit` | `检查_脏工作树影响面_AI命令.md`，以及所有修改类命令的前后检查 |
 | `$es-codex-session-bootstrap` | 从固定项目根启动新 Codex、打开官方恢复/分叉选择器或按已确认 session ID 接手 |
-| `$es-generate-agent-artifacts` | `生成_AgentArtifact候选_AI命令.md`；只写隔离候选目录，等待 Diff Review 与人工批准 |
+| `$es-generate-agent-artifacts` | `生成_AgentArtifact候选_AI命令.md`；该受管命令只写隔离候选目录并等待 Diff Review；当前用户明确要求正式写入时可改走直接/Creator 通道 |
 | `$es-start-estest` | `ESAITest_直接启动ESTEST_AI命令.md`；通过既有 Unity 菜单、Player 参数或 API 启动和安全取消 ESTEST |
 | `$es-gamecore-integration` | GameCore 根 SO、RuntimeData 重注入、全局索引、GameManager 模块命令 |
 | `$es-resource-pipeline` | 资源治理、依赖分析、预览、导出、ResourcePlan、Manifest 与发布链路 |

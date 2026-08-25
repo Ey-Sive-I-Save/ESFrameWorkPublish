@@ -31,6 +31,7 @@ Documentation/AIKnowledge/entries/feishu-adapter-boundary.md
 ## 执行合同
 
 ```text
+commandId: feishu.read
 taskId: es.feishu.read
 taskVersion: 1
 入口：AIBrain planTask -> runTask -> ESAutomationFacade

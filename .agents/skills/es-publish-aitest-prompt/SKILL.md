@@ -16,13 +16,13 @@ description: Quickly publish a one-time prioritized message to the running ESFra
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 - External side-effect contract: the prompt inbox is outside the project root and is an explicitly authorized external-run target. The authorization must bind the current TaskContract, AIBrain PlanHash, target `PersistentDataPath`, TTL, wait budget and stop condition. A queued envelope is not proof of consumption.
 
 ## Workflow controls
 
 - Scope and authority are checked before execution; stale or missing evidence blocks the task.
-- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- Publishing to ESTEST/Player is an external Runtime action and requires the current user to name it. Once named, no secondary project approval is required; satisfy AIBrain/AICommand inputs only when the selected endpoint technically requires them.
 - Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
 Extract the message after the trigger phrase and send it through `scripts/Send-ESAITestPrompt.ps1`.

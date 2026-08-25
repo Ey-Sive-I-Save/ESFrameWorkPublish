@@ -1,6 +1,6 @@
 ---
 name: es-unity-compile
-description: Verify ESFramework Unity compilation and separate evidence from generated .csproj builds, Unity CLI batchmode, Console state, domain reload, Unity Test Runner, PlayMode, Profiler, IL2CPP, and release validation. Use for Unity compile errors, asmdef changes, ReloadDomain checks, Console inspection, Unity command-line compile/test requests, or claims that code is ready in Unity.
+description: Verify ESFramework Unity compilation and build provenance while separating generated .csproj, Unity CLI, Console, domain reload, Test Runner, PlayMode, Profiler, Player, IL2CPP, and release evidence. Use for compile errors, asmdef changes, ReloadDomain checks, Unity command-line compile/test requests, build input fingerprints, build receipts, artifact freshness, or claims that code or a Player is ready in Unity.
 ---
 
 ## Verification boundary
@@ -16,13 +16,14 @@ description: Verify ESFramework Unity compilation and separate evidence from gen
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
+- External process boundary: build identity Capture invokes only the exact `git` executable with an internal allowlist of read-only `status`, `rev-parse HEAD`, and `branch --show-current` arguments; it accepts no caller-supplied Git command.
 - Unity CLI is an external-run side effect. Before `Compile`, `EditModeTests` or `PlayModeTests`, require the external execution contract in `references/external-unity-execution-contract.md`; `Status` remains read-only.
 
 ## Workflow controls
 
 - Scope and authority are checked before execution; stale or missing evidence blocks the task.
-- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- A current user request directly authorizes bounded source and Assets changes. Unity compilation/reload/runtime, external-process and Git actions must be explicitly named; when a managed Unity channel is selected, its plan and command are protocol inputs rather than secondary approval.
 - Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
 Produce evidence at the layer actually tested. Never promote a lower-level result into a Unity or release claim.
@@ -38,6 +39,17 @@ Produce evidence at the layer actually tested. Never promote a lower-level resul
    使用 [Unity 证据包验证器](scripts/Test-ESUnityEvidencePacket.ps1) 检查 dotnet-build、Unity CLI、Editor Compile、Test Runner 与运行证据的分层，禁止低层结果升级。
 7. Run EditMode or PlayMode tests when the task requires them and the test assembly is available. Report job status and failures exactly.
 8. Run Profiler, IL2CPP Player, provider, or release checks only when explicitly required and actually available.
+
+## Build identity and artifact provenance
+
+Use the three scripts as one bounded protocol. They do not start Unity, execute a build, delete output, publish, or prove Runtime behavior.
+
+1. Before a build, run `scripts/New-ESUnityBuildIdentitySnapshot.ps1`. It captures HEAD, the complete dirty-worktree manifest except the declared output roots, Unity/project/package/scene/configuration identity, HybridCLR package identity, and the exact build intent. Write receipts only under `ES/Output/BuildIdentity`; build output must remain under `ES/Output/Builds`.
+2. Run the separately authorized Unity build without changing the captured inputs. Keep its BuildReport/log and outputs under the declared build output path.
+3. Run `scripts/Complete-ESUnityBuildIdentityReceipt.ps1`. It re-captures the inputs, refuses a caller-supplied `passed` result without a hashed `Unity.exe` and `build-log` or `build-report`, hashes every declared artifact, and exits `2` with `input-drifted` when the before/after fingerprints differ.
+4. Before consuming, comparing, or releasing an artifact, run `scripts/Test-ESUnityBuildIdentityReceipt.ps1`. It validates the current contract hash, receipt shape and internal hashes, re-hashes artifacts, and re-captures current inputs by default. Exit `0` means the static identity receipt is current, `1` means invalid/tampered/missing evidence, and `2` means stale or input-drifted.
+
+Receipts are immutable: choose distinct input and finalized receipt paths. A failed write may leave its uniquely named temporary file for diagnosis; no script silently deletes recovery evidence. `-SkipCurrentInputCheck` is only a forensic structural check and cannot establish freshness.
 
 ## Unity CLI
 
@@ -87,6 +99,8 @@ Never merge these labels.
 
 `scripts/Invoke-ESUnityCli.ps1` reports Unity CLI status or starts guarded batchmode compile/EditMode/PlayMode tests. Status is read-only; execution writes only caller-selected logs/results, defaulting to `Temp/ESUnityCLI`.
 
+`scripts/New-ESUnityBuildIdentitySnapshot.ps1`, `scripts/Complete-ESUnityBuildIdentityReceipt.ps1`, and `scripts/Test-ESUnityBuildIdentityReceipt.ps1` implement the build identity protocol defined by `ES/Automation/Contracts/es-unity-build-identity-receipt-v1.schema.json`. Their S1 identity evidence never upgrades a build status into Unity, Player, IL2CPP, or release acceptance.
+
 ## 受管 AI Bridge 编译控制
 
 当用户要求 AI 打开/关闭自动 Unity 编译或触发编译时，使用项目 `ESAutomationAiBridge` 的固定 Editor 主线程动作，不执行任意命令：
@@ -110,8 +124,11 @@ Responsibility-specific static assertions (these are source-level requirements, 
 - zero errors
 - stale receipt
 - project identity
+- build input fingerprint
+- artifact re-hash
+- input drift
 
-Required specialized cases: `project-identity, asmdef-closure, compile-log-classification, error-zero-contract, stale-receipt`
+Required specialized cases: `project-identity, asmdef-closure, compile-log-classification, error-zero-contract, stale-receipt, build-input-fingerprint, artifact-rehash, input-drift`
 Guidance: `references/static-specialized-acceptance.md`
 
 External execution contract: `references/external-unity-execution-contract.md`

@@ -13,7 +13,7 @@ Evidence: current source plus fresh Static and Runtime receipts; source presence
 | `feishu.task.mutate` | `es.feishu.task.dispatch@1` | `tasklist-create`, `task-create`, `virtual-team-fixture-create` | Yes |
 | `feishu.task.mutate` | `es.feishu.task.transition@1` | `task-update`, `task-complete`, `task-reopen`, `members-add`, `members-remove`, `reminder-add`, `reminder-remove` | Yes |
 
-All contracts use a 60-second host timeout, a 15-second per-request target, at most two bounded transient retries inside the host budget, a 4 MiB output ceiling, a 20-member limit and a 20-task batch ceiling. Live behavior remains unverified until Unity-managed receipts exist.
+All contracts use a 60-second host timeout, a 15-second per-request target, a 20-attempt network ceiling, a 4 MiB output ceiling, a 20-member limit and a 20-task batch ceiling. Reads and `client_token` task creation may use at most two transient retries. Writes without a server idempotency token do not retry; a lost response becomes `UNCERTAIN_REMOTE_RESULT`. Live behavior remains unverified until Unity-managed receipts exist.
 
 ## Lifecycle semantics
 
@@ -21,13 +21,17 @@ ES planning uses `Draft -> PendingApproval -> Ready -> InProgress -> Review -> V
 
 A transition must include the task GUID and a fresh `expectedUpdatedAt`. The Worker reads the current task before mutation and rejects mismatches as `REMOTE_VERSION_CONFLICT`. This reduces lost updates but does not create an atomic server ETag where Feishu does not expose one.
 
+Every live dispatch or transition uses a new InvocationId and includes `dryRunEvidenceRunId`. The referenced run must be an accepted DryRun from the same TaskContract, Worker and Schema, no older than 30 minutes, with the same normalized operation input and intact request/output hashes. A DryRun cannot authorize a changed target, payload or source hash.
+
+Task creation, task-list membership and member transitions may use `claimedRoles` instead of raw `members`. Each entry contains only a stable local `roleId` and the requested Feishu task role. C# resolves it from the same-AppId local identity store only when the owner enabled `allowTaskAssignment`; callers may not mix the two identity sources. Resolution is part of the normalized DryRun input, so a changed/released role invalidates prior evidence.
+
 Task creation uses the official `client_token` derived from stable RunId/work-item identity. Task-list creation lacks that token, so the managed Worker adds an `[ES:<hash>]` suffix and searches the exact name before creating, allowing conservative recovery after an uncertain response.
 
 ## Virtual-team fixture
 
-`virtual-team-fixture-create` creates one isolated list named with `[ES-TEST:<hash>]` and, by default, five role tasks: Product Owner, Technical Lead, Developer, QA and Release Owner. It creates no tenant users, departments or chats. Optional members must be current-tenant IDs supplied through an approved bounded request.
+`virtual-team-fixture-create` creates one isolated list named with `[ES-TEST:<hash>]` and, by default, five role tasks: Product Owner, Technical Lead, Developer, QA and Release Owner. These are role-labelled work items, not identities. It creates no tenant users, departments, chats or member assignments.
 
-The fixture never auto-deletes. Return the list/task IDs and URLs for inspection; archive or deletion needs a future separate command and is deliberately outside this contract.
+The fixture never auto-deletes. Return the list/task IDs and URLs for inspection; archive or deletion needs a future separate command and is deliberately outside this contract. Creating role-labelled tasks remains distinct from assigning locally claimed people to those tasks.
 
 ## Progress and evidence
 
@@ -36,6 +40,7 @@ The fixture never auto-deletes. Return the list/task IDs and URLs for inspection
 - AI may propose a transition; only the authorized transition contract writes it.
 - Completion requires the task's declared acceptance evidence and a fresh remote version.
 - Monitoring reports deltas, stale tasks, overdue tasks, blockers and missing evidence without rewriting source facts.
+- `task-list` supports `includeDetails=true` with `pageSize<=10` to retrieve per-task status/progress within the request budget; otherwise it returns the paged summary projection and continuation token.
 
 ## Runtime authorization
 

@@ -16,7 +16,7 @@ description: Author and validate ESFramework GameCore root SO, RuntimeData, Conf
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 维护 GameCore 内容层唯一入口和稳定配置身份，不让运行时反向依赖内容对象。
 
@@ -35,7 +35,7 @@ description: Author and validate ESFramework GameCore root SO, RuntimeData, Conf
 
 ## Engineering controls
 
-- 正式资产写入必须有 AICommand；Skill 只计划/验证，不扩大权限。
+- Skill 自主运行只计划/验证且不得扩大范围；当前用户明确要求的正式资产写入不以 AICommand 为前置条件。
 - 记录条目数、索引重建成本、并发/重入、兼容迁移和恢复。
 - 覆盖缺 root、重复 Key、反向引用、坏序列化、重复事务和中断恢复。
 - 使用 [稳定身份 Manifest 验证器](scripts/Test-ESStableIdentityManifest.ps1) 检查 Scope、稳定序列化值、SchemaHash、确定性顺序和冲突拒绝；任何持久化 `RuntimeKey`/`RuntimeId` 都必须阻断。

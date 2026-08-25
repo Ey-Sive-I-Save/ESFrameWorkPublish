@@ -9,7 +9,7 @@ This is a responsibility-specific static acceptance plan for **es-unity-compile*
 - Profile: `engineering`
 - Acceptance id: `unity-compile-static`
 - Runtime boundary: Static compilation artifacts do not prove Unity Editor reload or PlayMode behavior.
-- Static assertions: asmdef; compile log; zero errors; stale receipt; project identity
+- Static assertions: asmdef; compile log; zero errors; stale receipt; project identity; build input fingerprint; artifact re-hash; input drift
 
 ## Required specialized cases
 
@@ -18,6 +18,9 @@ This is a responsibility-specific static acceptance plan for **es-unity-compile*
 - `compile-log-classification`: replay the compile-log-classification contract from source/configuration and record pass or blocked evidence.
 - `error-zero-contract`: replay the error-zero-contract contract from source/configuration and record pass or blocked evidence.
 - `stale-receipt`: replay the stale-receipt contract from source/configuration and record pass or blocked evidence.
+- `build-input-fingerprint`: capture the same bounded inputs twice and require an identical fingerprint; changing outputPath or any included input must change it.
+- `artifact-rehash`: validate every artifact path under the declared output root and require current byte length, file manifest, and SHA-256 to match the receipt.
+- `input-drift`: re-capture current inputs and return the distinct stale/input-drifted result instead of accepting an old receipt.
 
 ## Evidence artifacts
 
@@ -25,6 +28,10 @@ This is a responsibility-specific static acceptance plan for **es-unity-compile*
 - `references/control-contract.md`
 - `scripts/Invoke-ESDotnetBuild.ps1`
 - `scripts/Test-ESUnityEvidencePacket.ps1`
+- `scripts/New-ESUnityBuildIdentitySnapshot.ps1`
+- `scripts/Complete-ESUnityBuildIdentityReceipt.ps1`
+- `scripts/Test-ESUnityBuildIdentityReceipt.ps1`
+- `ES/Automation/Contracts/es-unity-build-identity-receipt-v1.schema.json`
 - `references/evidence-receipt-contract.md`
 
 ## Acceptance rule

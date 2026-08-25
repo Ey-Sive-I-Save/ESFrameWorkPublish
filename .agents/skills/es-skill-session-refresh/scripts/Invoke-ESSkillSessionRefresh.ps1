@@ -8,7 +8,8 @@ param(
     [string]$ReportPath,
     [string[]]$SkillNames=@(),
     [string[]]$RouteKeys=@(),
-    [ValidateSet('Operational','CapabilityIndex','Audit')][string]$DiscoveryMode='Operational'
+    [ValidateSet('Operational','CapabilityIndex','Audit')][string]$DiscoveryMode='Operational',
+    [ValidateSet('explicit-user-drift','queue-update','session-resume','catalog-change','governance-change','knowledge-route-change','plan-bound-resource-change')][string]$Trigger='explicit-user-drift'
 )
 $ErrorActionPreference='Stop'
 $root=[IO.Path]::GetFullPath($ProjectRoot).TrimEnd('\','/')
@@ -148,7 +149,7 @@ foreach($change in $changes){
 $status=if(-not $baseline){'refreshed'}elseif($missingRouteScope){'blocked'}elseif($changes.Count -eq 0){'unchanged'}elseif($selectedChanges.Count -gt 0){'stale'}else{'refreshed'}
 $baselineHash='';if($baseline){$baselineHash=[string]$baseline.snapshotHash}
 $nextAction=if($missingRouteScope){'replan'}elseif($invalidated.Count -gt 0){'replan'}elseif($selectedChanges.Count -gt 0){'read-selected'}else{'none'}
-$result=[ordered]@{schemaVersion=3;validator='es-skill-session-refresh';mode=$Mode;sessionId=$SessionId;routeKeys=@($routeFilter);routeSelection=$current.routeSelection;discoveryMode=$DiscoveryMode;baselineSnapshotHash=$baselineHash;currentSnapshotHash=$snapshotHash;status=$status;changes=@($changes.ToArray());selectedSkills=@($selectedNames|Sort-Object);ignoredChanges=@($ignoredChanges.ToArray());invalidatedBindings=@($invalidated.ToArray());nextAction=$nextAction;snapshot=$current}
+$result=[ordered]@{schemaVersion=3;validator='es-skill-session-refresh';mode=$Mode;trigger=$Trigger;refreshStrategy='metadata-first-incremental';sessionId=$SessionId;routeKeys=@($routeFilter);routeSelection=$current.routeSelection;discoveryMode=$DiscoveryMode;baselineSnapshotHash=$baselineHash;currentSnapshotHash=$snapshotHash;status=$status;changes=@($changes.ToArray());selectedSkills=@($selectedNames|Sort-Object);ignoredChanges=@($ignoredChanges.ToArray());invalidatedBindings=@($invalidated.ToArray());nextAction=$nextAction;snapshot=$current}
 $snapshotFull=[IO.Path]::GetFullPath([IO.Path]::Combine($root,$SnapshotPath));if(-not $snapshotFull.StartsWith($root+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'SnapshotPath escapes ProjectRoot.'};$parent=Split-Path -Parent $snapshotFull;if(-not(Test-Path $parent)){New-Item -ItemType Directory -Path $parent -Force|Out-Null};[IO.File]::WriteAllText($snapshotFull,($current|ConvertTo-Json -Depth 12),(New-Object Text.UTF8Encoding($false)))
 if($ReportPath){$reportFull=[IO.Path]::GetFullPath([IO.Path]::Combine($root,$ReportPath));if(-not $reportFull.StartsWith($root+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'ReportPath escapes ProjectRoot.'};$reportParent=Split-Path -Parent $reportFull;if(-not(Test-Path $reportParent)){New-Item -ItemType Directory -Path $reportParent -Force|Out-Null};[IO.File]::WriteAllText($reportFull,($result|ConvertTo-Json -Depth 14),(New-Object Text.UTF8Encoding($false)))}
 $result|ConvertTo-Json -Depth 14

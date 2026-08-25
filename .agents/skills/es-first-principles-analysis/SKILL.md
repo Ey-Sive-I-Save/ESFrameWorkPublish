@@ -16,7 +16,7 @@ description: Perform first-principles analysis for ESFramework conceptual decomp
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request directly authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected.
 
 ## Responsibility-specific static acceptance
 
@@ -27,7 +27,7 @@ description: Perform first-principles analysis for ESFramework conceptual decomp
 ## Engineering controls
 
 - Scope and authority are checked before execution; stale or missing evidence blocks the task.
-- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- Do not use this Skill for permission expansion. Implement only the user's bounded goal; file count, byte size, path class, UTF-8 and diff checks affect review and evidence, not authorization. Missing `planTask` blocks only an AIBrain transport that technically requires it.
 - Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
 Use this skill to expose the mechanisms behind an ESFramework decision before recommending a direction. It is an analysis workflow, not a writing style and not authorization to edit.

@@ -81,6 +81,12 @@ The responder verifies both the selected CMD PID and its process start time befo
 
 ## Immutable launch envelope
 
+## Independent semantic archive
+
+Life-history and launch handoff artifacts are not the semantic archive. `New-ESProjectSemanticArchive.ps1` creates a separate, create-only JSON packet keyed by a logical `projectKey` and `archiveId`. It carries the current objective, important data, state, archive reason, expected outcome and explicit gap, plus at most 64 project-relative paths observed from the current worktree. It does not copy the old transcript, restore a conversation, restore a terminal window, or persist absolute filesystem paths. The default storage locator is an OS-local application-data directory outside the repository and is only a retrieval locator, not archive payload content.
+
+`Get-ESProjectSemanticArchives.ps1` lists bounded logical locators; `Get-ESProjectSemanticArchive.ps1` reads one exact packet. `Restore-ESProjectSemanticArchive.ps1` emits a new `partial-semantic` context containing the packet's objective, state, important data, reason, recent scope and expectation gap. It reports `sourceVerification=not-run` and `staleStatus=unknown-unchecked` unless an explicit current project root is supplied for read-only hash comparison. Restoration never claims completion and never substitutes life-history or handoff files.
+
 Before a real launch, the launcher writes one create-only JSON envelope under `%LOCALAPPDATA%\ESFramework\CodexSessions\envelopes`. It records:
 
 - the unique launch token, task key/fingerprint, responsibility key, and short tab title;
@@ -189,6 +195,8 @@ The mailbox enforces bounded input and local quotas: 8,000 characters per messag
 - `commercialBaselineReady`: the supported Windows environment, schema-v2 authority, zero applicable safe repairs, and cooperative mailbox are ready.
 - `fleetOperationalReady`: every eligible registered session has recent identity-and-hash-bound Hook activation evidence.
 - `managedDirectDeliveryReady`: a managed App Server path has proven identity and delivery receipts.
+
+Hook activation is currently an optional, degraded capability. The fleet profile is derived from coverage: `degraded-optional` for 0/N, `degraded-partial` for 0<M<N, and `verified-full` for M=N>0. `hookBlocksCooperativeBaseline=false` means that missing trust, reload, or activation evidence must not block the supported cooperative-mailbox baseline. A target route may report `verified-target` when that exact session has a valid receipt; this does not prove fleet coverage. `fleetOperationalReady=false` remains an honest report that full Hook coverage is not proven. A task that explicitly requires automatic turn-boundary delivery may still treat its missing Hook activation as a task-local block; ordinary session and mailbox work must continue.
 
 The commercial baseline is deliberately the bounded cooperative mailbox. Unsupported direct injection into an existing standalone Windows TUI and spontaneous idle wake are host limitations, not hidden requirements for that profile. They remain explicit informational boundaries and must never be advertised as available. `SelfTest` adds the complete Pester suite and App Server probe before allowing a commercial-baseline claim.
 

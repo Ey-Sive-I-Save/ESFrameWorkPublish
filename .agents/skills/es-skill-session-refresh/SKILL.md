@@ -22,11 +22,14 @@ Maintain a task-scoped capability snapshot for a long-running AI window. This Sk
 
 1. Treat user phrases such as “你的理解已经过时”, “刷新一下技能理解”, “重新理解当前项目提供的 Skill” or their English equivalents as an explicit refresh intent. Establish a project-relative session identity and objective; record the current AIBrain `planHash` when one exists, and never use a session snapshot as permission.
 2. Run `scripts/Invoke-ESSkillSessionRefresh.ps1 -Mode Build` to create a compact snapshot. The snapshot hashes the Resource Index, Catalog, Knowledge Index, and Skill metadata/resources without loading all documents into the model context.
-3. On a queue update, resume, or explicit refresh, run `-Mode Compare -BaselinePath <snapshot>`. Classify results as `unchanged`, `added`, `removed`, `metadata-changed`, `resource-changed`, `route-changed`, or `index-changed`.
+3. On a queue update, session resume, Catalog/governance/Knowledge route change, Plan-bound resource change, or explicit refresh, run `-Mode Compare -BaselinePath <snapshot> -Trigger <event>`. The event is a lightweight invalidation signal, not permission to execute. Classify results as `unchanged`, `added`, `removed`, `metadata-changed`, `resource-changed`, `route-changed`, or `index-changed`.
 4. Pass objective route keys with `-RouteKeys skill,session,...` when available. The script intersects changed Skills with each Skill governance `routeKeys` and the discovery policy. Use `-DiscoveryMode Operational` for an active task, `CapabilityIndex` for candidate capability discovery, and `Audit` only for governance inspection. Without route keys, the compare result is `blocked` with `nextAction=replan`; it never selects the whole portfolio.
 5. Re-check Knowledge `requiredReads` and source hashes for any newly selected or changed Skill. Use `es-task-read-snapshot` when multiple files must be consumed consistently.
-6. Mark the prior plan or conclusion `stale` when a bound Skill, governance hash, command contract, Knowledge source, or task read snapshot changed. Request a fresh plan; do not silently merge new rules into an old authorization.
-7. Produce a refresh receipt containing the baseline hash, current snapshot hash, changed items, selected items, ignored items, and stale decisions. A receipt is evidence of discovery, not evidence that the new Skill was understood or executed.
+6. Include `es-codex-session-bootstrap/references/task-closeout-contract.md` in the session capability snapshot; reread it only on session start, explicit refresh, or contract-hash change.
+7. Mark the prior plan or conclusion `stale` when a bound Skill, governance hash, command contract, Knowledge source, or task read snapshot changed. Request a fresh plan; do not silently merge new rules into an old authorization.
+8. Produce a refresh receipt containing the baseline hash, current snapshot hash, changed items, selected items, ignored items, and stale decisions. A receipt is evidence of discovery, not evidence that the new Skill was understood or executed.
+9. When presenting candidate follow-up actions, use the shared numeric menu contract from `es-ai-interaction-governance`: every action must be `1.`/`2.`/`3.` with a stable action ID. A numeric reply is only a selection; resolve it through `es-ai-interaction-governance/scripts/Resolve-ESNextStepSelection.ps1` and never treat `nextAction=replan` as automatic execution.
+10. In the user-facing closeout, render the numbered follow-up menu last. Do not append the Skill disclosure, Runtime status, verification score, or claims after `📌 下一步`.
 
 ## Change policy
 
@@ -56,6 +59,7 @@ nextAction: none | read-selected | replan | blocked
 ```
 
 Do not claim that a Skill was consumed merely because its hash was observed. Do not claim a task remains valid after a bound Skill or contract changed.
+If follow-up choices are emitted, include `nextSteps[]` with contiguous `number`, stable `id`, `label`, `requiresUserChoice=true`, and keep `nextAction` separate from the numbered menu.
 
 ## Engineering controls
 
@@ -75,4 +79,9 @@ The static replay cases are explicitly bounded: `normal-input`, `invalid-input`,
 
 - `scripts/Invoke-ESSkillSessionRefresh.ps1`: deterministic Build/Compare snapshot and delta report.
 - `scripts/Test-es-skill-session-refresh-StaticReplay.ps1`: project StaticDeepReplay adapter.
+- `../../tests/Test-ESSkillSessionRefreshBehavior.ps1`: deterministic route-scope and lifecycle-selection fixture; writes only project-relative StaticReplay evidence.
 - `references/session-refresh-contract.md`: snapshot fields, invalidation rules, and receipt semantics.
+
+### Host event contract
+
+An ES host should dispatch `queue-update`, `session-resume`, `catalog-change`, `governance-change`, `knowledge-route-change`, and `plan-bound-resource-change` to this Skill when those events are observed. The dispatcher passes the current task route keys and baseline snapshot. The Skill hashes metadata first, selects only matching operational Skills, and returns `replan` when a route scope is missing; it never turns an event into a full-portfolio read.

@@ -171,7 +171,7 @@ def validate(spec: Any, registry: dict[str, Any]) -> list[dict[str, str]]:
     for asset_id, asset in assets.items():
         if not ID_RE.fullmatch(str(asset_id)) or not isinstance(asset, dict):
             fail(issues, f"assets.{asset_id}", "asset id and entry must be valid", "asset")
-        elif asset.get("source") not in {"project-sprite", "ai-generated", "generated-placeholder"}:
+        elif asset.get("source") not in {"project-sprite", "ai-generated", "generated-procedural", "generated-placeholder"}:
             fail(issues, f"assets.{asset_id}.source", "must classify asset source", "asset")
     components = spec.get("components")
     if not isinstance(components, list) or not components:

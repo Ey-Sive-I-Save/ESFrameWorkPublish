@@ -16,7 +16,14 @@ description: Validate ESFramework text changes for strict UTF-8 decoding, Unicod
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
+
+## Execution classification
+
+- Strict UTF-8 decoding, replacement-character scans, mojibake review, and `git diff --check` are read-only checks and may run directly.
+- A current user request may modify any project text needed for its bounded goal, including source and governance. `Test-ESUserDirectedLowRiskPolicy.ps1` is a scope-closure aid, not a prerequisite or path allowlist; use `apply_patch` and preserve unrelated bytes.
+- Delete, rename, Git, Unity/Runtime, external-process, network, release and credential actions require action-specific user wording; managed-channel plans and contracts are transport requirements only.
+- Keep the low-risk path distinct from missing capabilities; neither permits silently widening the requested scope.
 
 Use this skill for every task that modifies project text, especially files containing Chinese.
 

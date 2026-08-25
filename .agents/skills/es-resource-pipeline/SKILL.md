@@ -16,7 +16,7 @@ description: Implement, diagnose, or audit the ESFramework resource pipeline acr
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 ## Specialized static acceptance
 
@@ -35,7 +35,7 @@ description: Implement, diagnose, or audit the ESFramework resource pipeline acr
 ## Engineering controls
 
 - Scope and authority are checked before execution; stale or missing evidence blocks the task.
-- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- A current user request directly authorizes bounded resource source and Assets changes. Pipeline execution, external, destructive, release and Git actions must be explicitly named; managed-channel plans and commands are protocol inputs only.
 - Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
 Treat editor authoring, generated plans, release artifacts, runtime providers, and scope ownership as separate layers.
@@ -43,7 +43,7 @@ Treat editor authoring, generated plans, release artifacts, runtime providers, a
 ## Workflow
 
 1. Read the AIWarnings start files and `references/project-map.md`.
-2. Select one matching AICommand. A read-only analysis command does not authorize a pipeline write.
+2. For direct work, treat the current explicit user request as edit authority. Select a matching AICommand only for `ManagedAIBrain/Worker`; a managed read-only contract still cannot be used as that channel's write protocol.
 3. Identify the affected stage: library/book authoring, catalog, reference graph, build plan, bundle manifest, release manifest, provider, downloader, or scope.
 4. Trace identifiers and hashes end to end. Verify which file or object is authoritative at each stage.
 5. Make the smallest coherent change without creating a second export, preview, manifest, or loading path.

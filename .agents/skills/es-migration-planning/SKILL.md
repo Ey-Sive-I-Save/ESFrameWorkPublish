@@ -16,7 +16,7 @@ description: Plan reversible ESFramework migrations across code, assets, AIWarni
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 先保护旧事实，再设计可回滚、可分批、可验证的迁移。
 
@@ -36,7 +36,7 @@ description: Plan reversible ESFramework migrations across code, assets, AIWarni
 
 ## Engineering controls
 
-- 不自动删除、覆盖、发布或改变基础设施；正式写入必须匹配 AICommand。
+- 未经用户明确要求，不自动删除、覆盖、发布或改变基础设施；当前用户已要求的正式写入不以 AICommand 为前置条件。
 - 风险登记覆盖数据丢失、链接漂移、权限扩大、部分失败、并发和版本兼容。
 - 覆盖 dry-run、非法输入、拒绝越界、重复批次和中断恢复。
 

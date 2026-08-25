@@ -20,12 +20,20 @@
   "commandRequirement": "none",
   "requiredAuthorityRefs": [
     "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
+    ".agents/skills/es-skill-governance/references/ui-knowledge-preflight-contract.md",
     "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
     "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
     "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
     "Documentation/ES_UI_AUTHORING_WORKFLOW.md"
   ],
   "taskContractRequired": false,
+  "knowledgePreflight": {
+    "required": true,
+    "contractRef": ".agents/skills/es-skill-governance/references/ui-knowledge-preflight-contract.md",
+    "receiptFields": ["selectedKnowledgeIds", "requiredReads", "sourceRefs", "staleCheck", "authority", "evidenceLevel", "nonClaims", "decision"],
+    "highRiskTriggers": ["reference-image", "screen-spec", "canvas-anchor", "responsive", "asset-manifest", "font-fallback", "fixture", "prefab-scene", "visual-evidence", "runtime-handoff"],
+    "exemptionPolicy": "explicit-user-statement-with-scope-and-reason"
+  },
   "productionEntrypoint": "ES.Editor.ESUIGameScreenMaterializer.RegenerateFromSpecBatchMode",
   "inputProtocol": "ScreenSpec v3",
   "outputArtifacts": ["Prefab", "Fixture Scene", "semantic snapshots", "GPU PNG evidence"],

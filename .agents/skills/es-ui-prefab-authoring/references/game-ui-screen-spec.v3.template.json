@@ -23,7 +23,7 @@
     {"id": "error", "fixture": "screen-id/error"}
   ],
   "assets": [
-    {"id": "frame", "role": "panel-frame", "source": "generated-placeholder", "path": "ES/UIAssets/screen-id/frame.png", "fallback": "frame-missing"}
+    {"id": "frame", "role": "panel-frame", "source": "generated-procedural", "path": "Assets/UI/Generated/AIUI/frame.asset", "fallback": "frame-missing"}
   ],
   "components": [
     {

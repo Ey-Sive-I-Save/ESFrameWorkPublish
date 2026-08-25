@@ -16,7 +16,7 @@ description: Build or review ESFramework Unity Editor windows, inspectors, drawe
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 ## Specialized static acceptance
 
@@ -35,16 +35,18 @@ description: Build or review ESFramework Unity Editor windows, inspectors, drawe
 ## Engineering controls
 
 - Scope and authority are checked before execution; stale or missing evidence blocks the task.
-- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- A current user request directly authorizes bounded editor source and Assets changes. Unity/Runtime, external, destructive and Git actions must be explicitly named; managed-channel plans and commands are protocol inputs only.
 - Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
 Keep editor tools explicit, user-driven, serialized-property safe, and resilient across domain reload without adding startup-wide scanning.
+
+For lifecycle, layout, sleep, restore, rebuild, default-state, or other user-visible behavior changes, consume the `es-ai-interaction-governance` intent contract before implementation. Bind each change and negative test to `mustPreserve`/`forbiddenTransitions`; do not interpret `OnDisable`, PlayMode, reload, or panel replacement as a user action unless the contract explicitly allows it.
 
 ## Workflow
 
 1. Read the AIWarnings start files and `references/project-map.md`.
 2. For any window, workbench, inspector, drawer, dialog, popup, layout, DPI, scroll, owner-lifecycle, or ReloadDomain work, read `Documentation/ES_EDITOR_WINDOW_PRODUCTION_STANDARD.md` and the availability matrix before implementation.
-2. Select the closest AICommand for the target window, preview, ReloadDomain, or SO tool. Confirm whether it authorizes edits.
+2. For direct work, treat the current explicit user request as edit authority. Select the closest AICommand only when the execution path is `ManagedAIBrain/Worker`, where it is a protocol input rather than a second approval.
 3. Classify the tool as window, drawer, attribute processor, menu action, asset preview, SO table, or background service.
 4. Inspect current ES examples and identify state ownership across serialized assets, `SessionState`, `EditorPrefs`, static caches, and live editor objects.
 5. Use `SerializedObject` and `SerializedProperty` for multi-object and undo-sensitive editing. Preserve mixed values and prefab override behavior.

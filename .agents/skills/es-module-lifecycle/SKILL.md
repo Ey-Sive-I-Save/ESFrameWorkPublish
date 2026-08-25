@@ -16,7 +16,7 @@ description: Classify and govern ESFramework modules that are proposed, scaffold
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 ## Responsibility-specific static acceptance
 
@@ -27,7 +27,7 @@ description: Classify and govern ESFramework modules that are proposed, scaffold
 ## Engineering controls
 
 - Scope and authority are checked before execution; stale or missing evidence blocks the task.
-- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- Advisory mode keeps an unrequested audit read-only. A current user request such as `审计并记录` directly authorizes its bounded audit-state and source changes; Runtime, external, destructive and Git actions must be explicitly named.
 - Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
 Classify the module from current implementation and evidence. Never infer completion from directories, type names, TODO counts, documentation claims, or an external report.
@@ -35,14 +35,14 @@ Classify the module from current implementation and evidence. Never infer comple
 ## Workflow
 
 1. Read the AIWarnings start files, the module-lifecycle warning, and the target domain rules selected by `RuleIndex`.
-2. Select `检查_模块成熟度与半成品影响_AI命令.md` when the user has not granted a narrower execution command. Treat it as read-only.
+2. Use `检查_模块成熟度与半成品影响_AI命令.md` as the audit workflow contract when that managed channel is selected. Direct work follows the current explicit user request and does not require an AICommand.
 3. Define the module boundary from its authority, entry points, registrations, consumers, and release path. Do not equate a folder with a module.
 4. Inspect source, configuration, serialized assets, initialization, tests, documentation, generated artifacts, and release integration relevant to that boundary.
 5. Assign exactly one maturity state: `Proposed`, `Scaffolded`, `Experimental`, `Implementing`, `Integrating`, `Verifying`, `Stable`, `Deprecated`, or `Archived`.
 6. Record `Blocked` separately with the exact missing authority, dependency, decision, tool, platform, or evidence.
 7. Detect unfinished-code leakage: default registration, automatic initialization, stable-module dependencies, serialized references, public compatibility claims, empty success paths, swallowed errors, and unrecoverable migrations.
 8. Build an evidence matrix without upgrading `.csproj`, Console, Test Runner, PlayMode, Profiler, Player, IL2CPP, provider, or release evidence into another layer.
-9. Recommend the smallest reversible action that satisfies the next transition gate. Do not implement, delete, migrate, stage, or publish without matching user and AICommand authority.
+9. Recommend the smallest reversible action that satisfies the next transition gate. Do not implement, delete, migrate, stage, or publish unless the current user explicitly requested that action; only a selected `ManagedAIBrain/Worker` channel additionally requires its matching protocol inputs.
 10. If authorized changes are made, preserve unrelated work, run `$es-utf8-guard`, and invoke `$es-unity-compile` or `$es-release-acceptance` only for evidence actually required by the target state.
 11. Establish `currentUserExplicitlyRequestedFormalAudit` from the current user message before loading this Skill. It is true only for explicit requests such as “审计”, “审计并记录”, “继续审计”, “输出模块成熟度矩阵”, or “写入/恢复审计检查点”. A review, explanation, feasibility judgment, or critique is never formal audit intent by itself.
 12. Treat ordinary review-only requests (“合理吗”, “商业级吗”, “需要修改吗”, “评价这份结论”, “还缺什么”) as technical review. In review-only mode do not write audit state, do not emit C0–C3 governance grades, do not create or refresh checkpoints, do not ask about handoff, and do not trigger any session-operation Skill.
@@ -70,7 +70,7 @@ Classify the module from current implementation and evidence. Never infer comple
 - `review-only`: answer the technical question only; no audit state, maturity matrix, checkpoint, handoff offer, or session operation.
 - `audit-only` / explicit “审计”: return the full findings and evidence matrix; write nothing and do not ask about recording unless separately authorized.
 - `audit+checkpoint` / “审计并记录”: write the fixed state file's target module block without asking for a path.
-- `resume` / “继续审计”: read the fixed state file, report stale fields, refresh facts from source, then continue only within the current user and AICommand authority.
+- `resume` / “继续审计”: read the fixed state file, report stale fields, refresh facts from source, then continue within the current explicit user request; validate AICommand and TaskContract inputs only when `ManagedAIBrain/Worker` is selected.
 
 ## Required output
 

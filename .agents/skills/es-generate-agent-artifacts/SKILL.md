@@ -1,6 +1,6 @@
 ---
 name: es-generate-agent-artifacts
-description: Generate review-only ESFramework AICommand and Agent Skill candidate packages from Agent Authoring Graph generation-request.json files. Use when a Graph/Cmd Agent request asks Codex to create or revise AICommands under Assets/Plugins/ES/AICommands or project Agent Skills under .agents/skills, while keeping all writes isolated under ES/Automation/Candidates/AgentAuthoring until Unity Diff Review and explicit human approval.
+description: Generate review-only ESFramework AICommand and Agent Skill candidate packages from Agent Authoring Graph generation-request.json files. Use when a Graph/Cmd Agent request asks Codex to create or revise AICommands or project Agent Skills. Candidate isolation constrains autonomous Graph generation; a current user request may explicitly authorize formal target paths without a second approval.
 ---
 
 ## Verification boundary
@@ -16,7 +16,7 @@ description: Generate review-only ESFramework AICommand and Agent Skill candidat
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 ## Responsibility-specific static acceptance
 
@@ -27,24 +27,21 @@ description: Generate review-only ESFramework AICommand and Agent Skill candidat
 ## Engineering controls
 
 - Scope and authority are checked before execution; stale or missing evidence blocks the task.
-- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- Candidate mode limits what this Skill initiates autonomously. A current user request may directly authorize bounded candidate, source, Assets or governance changes; Runtime, external, destructive and Git actions must be explicitly named.
 - Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
-Generate candidates only. Never approve or write directly to the formal AICommand or Agent Skill directories.
+When this Skill runs autonomously from a Graph/Cmd Agent generation request, generate candidates only and never approve or write directly to the formal AICommand or Agent Skill directories. A current explicit user request may instead name bounded formal targets; validate those outputs and present their diff for review without inventing a second approval step.
 
 ## Workflow
 
-1. Read `Assets/Plugins/ES/AICommands/生成_AgentArtifact候选_AI命令.md` completely.
-2. Read the request's `generation-request.json` and every required Reference.
-3. Read [generation-contract.md](references/generation-contract.md).
-4. Reconstruct the requirement mind map from `relations`; preserve which References and Constraints feed each OutputArtifact.
-5. Reject missing, disconnected, contradictory, or cross-stage relationships instead of flattening or guessing them.
-6. Reject paths outside the request's `candidate/` directory.
-7. Generate every declared OutputArtifact using its connected context, detailed fields, and validation gates.
-8. Create `candidate-manifest.json` and `validation-report.md`.
-9. Run safe read-only validation available in the current environment.
-10. Report that formal import still requires Unity Diff Review and explicit human approval.
-    使用 [候选产物验证器](scripts/Test-ESGenerationCandidatePacket.ps1) 检查 candidate 路径隔离、目标白名单和人工批准门禁。
+1. Select `AutonomousCandidate` only for a Graph/Cmd Agent launch; select `UserDirectedFormal` only when the current user explicitly names bounded formal targets.
+2. For `AutonomousCandidate`, read `Assets/Plugins/ES/AICommands/生成_AgentArtifact候选_AI命令.md`, the request's `generation-request.json`, every required Reference, and [generation-contract.md](references/generation-contract.md).
+3. For `AutonomousCandidate`, reconstruct the requirement mind map from `relations`; reject missing, disconnected, contradictory, or cross-stage relationships and reject paths outside the request's `candidate/` directory.
+4. For `UserDirectedFormal`, read the current target artifacts and applicable AIWarnings/validation contracts; do not require a candidate request or infer additional formal targets.
+5. Generate only the artifacts declared by the selected mode, preserving connected context, detailed fields, and validation gates.
+6. In `AutonomousCandidate`, create `candidate-manifest.json` and `validation-report.md`, then run [the candidate packet validator](scripts/Test-ESGenerationCandidatePacket.ps1) for path isolation, target allowlists, and declared user scope.
+7. In `UserDirectedFormal`, restrict writes to the named formal targets, run their formal validators, and provide a Diff Review. The current explicit request is sufficient and does not require a second project approval.
+8. Run all safe read-only validation available in the current environment and report the selected mode, exact outputs, failures, and non-claims.
 
 ## AICommand candidates
 
@@ -73,7 +70,7 @@ Use the declared trigger scenarios, workflow, non-goals, validation steps, and c
 
 ## Hard boundaries
 
-- Do not modify `Assets/Plugins/ES/AICommands` or `.agents/skills` directly.
+- In autonomous/Graph-triggered candidate mode, do not modify `Assets/Plugins/ES/AICommands` or `.agents/skills` directly. A current explicit user request may authorize named formal paths; keep the write bounded to those paths and validate the resulting diff.
 - Do not invoke Git staging, commit, reset, clean, push, or release operations.
 - Do not edit generated `.csproj` files.
 - Do not generate gameplay `ESCommand`, `ESSkillConfigKey`, Graph Runtime, Runner, Story Runtime, or BehaviorTree Runtime code.

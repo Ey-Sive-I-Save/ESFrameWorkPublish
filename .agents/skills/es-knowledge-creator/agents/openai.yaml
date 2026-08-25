@@ -1,4 +1,4 @@
 interface:
   display_name: "Knowledge Creator"
-  short_description: "Governed AIKnowledge output and curation"
-  default_prompt: "Use $es-knowledge-creator to produce bounded, source-grounded AIKnowledge output with route and evidence controls."
+  short_description: "Create evidence-bound Knowledge with failure prevention"
+  default_prompt: "Use $es-knowledge-creator to produce bounded AIKnowledge grounded in project sources, consent-gated official research, and an executable AI failure-surface matrix."

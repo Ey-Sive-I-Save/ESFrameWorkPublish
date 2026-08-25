@@ -16,7 +16,7 @@ description: Design and validate ESFramework AutomationCenter workers, TaskContr
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 建立受管 Worker 的输入、权限、生命周期、证据和恢复合同；AIBrain 不是 ProcessRunner。
 
@@ -36,7 +36,7 @@ description: Design and validate ESFramework AutomationCenter workers, TaskContr
 
 ## Engineering controls
 
-- Worker 不直接写 Assets；所有执行必须由 AIBrain PlanHash、AICommand、TaskContract 和 Facade 收口。
+- Worker 自主执行仍由 AIBrain PlanHash、AICommand、TaskContract 和 Facade 收口；这只约束 Worker 通道，不阻止当前用户授权下的直接 Assets 修改。
 - 记录进程/网络/文件权限、数据脱敏、资源预算、并发和 release artifact ownership。
 - 缺 capability、hash、TaskContract 或证据时 fail closed，不自动换 Worker。
 

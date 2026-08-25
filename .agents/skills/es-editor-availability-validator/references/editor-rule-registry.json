@@ -21,6 +21,7 @@
     {"ruleId":"EW-17","title":"hot-path-budget","applicableTo":["EditorWindow","Workbench","InspectorDrawer","PreviewImport","BackgroundService"],"severity":"high","staticChecks":["cache-budget-no-scan"],"runtimeChecks":["profiler-threshold"]},
     {"ruleId":"EW-18","title":"preview-ownership","applicableTo":["PreviewImport","EditorWindow","Workbench"],"severity":"high","staticChecks":["preview-session-release"],"runtimeChecks":["rendertexture-cleanup"]},
     {"ruleId":"EW-19","title":"es-token","applicableTo":["EditorWindow","Workbench","InspectorDrawer"],"severity":"medium","staticChecks":["es-token-theme"],"runtimeChecks":["light-dark-contrast"]},
-    {"ruleId":"EW-20","title":"long-value-accessibility","applicableTo":["EditorWindow","Workbench","InspectorDrawer","PreviewImport"],"severity":"medium","staticChecks":["long-text-path-guid-keyboard"],"runtimeChecks":["long-value-dpi"]}
+    {"ruleId":"EW-20","title":"long-value-accessibility","applicableTo":["EditorWindow","Workbench","InspectorDrawer","PreviewImport"],"severity":"medium","staticChecks":["long-text-path-guid-keyboard"],"runtimeChecks":["long-value-dpi"]},
+    {"ruleId":"EW-21","title":"event-routing-phase-contract","applicableTo":["Workbench"],"severity":"critical","staticChecks":["host-drag-route","trickle-down-phase","matching-unregister-phase","owner-release-paths"],"runtimeChecks":["drag-route-behavior"]}
   ]
 }

@@ -22,6 +22,8 @@ Describe 'ES Codex commercial readiness doctor' {
         $result.commercialBaselineReady | Should Be $true
         $result.fleetOperationalReady | Should Be $false
         $result.managedDirectDeliveryReady | Should Be $false
+        $result.hookDeliveryProfile | Should Be 'degraded-optional'
+        $result.hookBlocksCooperativeBaseline | Should Be $false
         $result.code.parserFailureCount | Should Be 0
         $result.registry.applicableRepairCount | Should Be 0
         [Convert]::ToBase64String([IO.File]::ReadAllBytes($registryPath)) | Should Be $before
@@ -59,5 +61,40 @@ Describe 'ES Codex commercial readiness doctor' {
         $repairIssue.requiresAuthorization | Should Be $true
         @($result.issues | Where-Object code -eq 'ESCS-HOST-001')[0].blocksCommercialBaseline | Should Be $false
         @($result.issues | Where-Object code -eq 'ESCS-HOST-002')[0].blocksCommercialBaseline | Should Be $false
+    }
+
+    It 'derives Hook profile from 0, partial, and full activation coverage' {
+        $brokerScript = Join-Path $scriptsRoot 'Get-ESCodexSessionBrokerStatus.ps1'
+        $messageStateScript = Join-Path $scriptsRoot 'ESCodexSessionMessageState.ps1'
+        . $messageStateScript
+        $projectRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $skillRoot))
+        $hookConfigPath = Join-Path $projectRoot '.codex\hooks.json'
+        $hookScriptPath = Join-Path $scriptsRoot 'Receive-ESCodexSessionMessageHook.ps1'
+
+        $cases = @(
+            [pscustomobject]@{ name = 'zero'; eligible = 3; active = 0; profile = 'degraded-optional'; reasonMatches = 'not observed' },
+            [pscustomobject]@{ name = 'partial'; eligible = 3; active = 1; profile = 'degraded-partial'; reasonMatches = '1 of 3' },
+            [pscustomobject]@{ name = 'full'; eligible = 3; active = 3; profile = 'verified-full'; reasonMatches = '' }
+        )
+
+        foreach ($case in $cases) {
+            $stateRoot = Join-Path $TestDrive ("hook-profile-" + $case.name)
+            [void][IO.Directory]::CreateDirectory($stateRoot)
+            $records = @(
+                1..$case.eligible | ForEach-Object {
+                    [ordered]@{ recordId = ('{0:x32}' -f $_); sessionId = ('session-' + $_); responsibilityKey = 'test'; lifecycleStatus = 'Registered' }
+                }
+            )
+            $registry = [ordered]@{ schemaVersion = 2; revision = 0; updatedUtc = ''; sessions = $records }
+            [IO.File]::WriteAllText((Join-Path $stateRoot 'sessions.json'), ($registry | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+            foreach ($record in @($records | Select-Object -First $case.active)) {
+                Write-ESCodexHookActivation $stateRoot ([pscustomobject]$record) 'Stop' $hookConfigPath $hookScriptPath | Out-Null
+            }
+
+            $result = & $brokerScript -StateRoot $stateRoot
+            $result.hookDeliveryProfile | Should Be $case.profile
+            $result.hookBlocksCooperativeBaseline | Should Be $false
+            $result.hookDegradationReason | Should Match $case.reasonMatches
+        }
     }
 }

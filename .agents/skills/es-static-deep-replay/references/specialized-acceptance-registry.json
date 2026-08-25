@@ -10,6 +10,12 @@
                        "responsibilityProfile":  "session"
                    },
                    {
+                       "skillName":  "es-ui-intent-authoring",
+                       "acceptanceId":  "ui-intent-static",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "authoring"
+                   },
+                   {
                        "skillName":  "es-ui-prefab-authoring",
                        "acceptanceId":  "ui-prefab-static",
                        "guidanceRef":  "references/static-specialized-acceptance.md",
@@ -48,6 +54,12 @@
                    {
                        "skillName":  "es-knowledge-creator",
                        "acceptanceId":  "knowledge-output-governance",
+                       "guidanceRef":  "references/static-specialized-acceptance.md",
+                       "responsibilityProfile":  "knowledge"
+                   },
+                   {
+                       "skillName":  "es-knowledge-validator",
+                       "acceptanceId":  "knowledge-validation-integrity",
                        "guidanceRef":  "references/static-specialized-acceptance.md",
                        "responsibilityProfile":  "knowledge"
                    },

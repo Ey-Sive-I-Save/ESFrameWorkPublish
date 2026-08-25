@@ -24,6 +24,20 @@ $hookActivations = @($registry.sessions | ForEach-Object { Test-ESCodexHookActiv
 $validHookActivations = @($hookActivations | Where-Object valid)
 $eligibleHookSessionCount = @($registry.sessions | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_.sessionId) -and [string]$_.lifecycleStatus -ne 'Closed' }).Count
 $allEligibleHooksObserved = $eligibleHookSessionCount -gt 0 -and $validHookActivations.Count -eq $eligibleHookSessionCount
+$hookDeliveryProfile = if ($eligibleHookSessionCount -gt 0 -and $validHookActivations.Count -eq $eligibleHookSessionCount) {
+    'verified-full'
+}
+elseif ($validHookActivations.Count -gt 0) {
+    'degraded-partial'
+}
+else {
+    'degraded-optional'
+}
+$hookDegradationReason = switch ($hookDeliveryProfile) {
+    'verified-full' { '' }
+    'degraded-partial' { "Hook activation is observed for $($validHookActivations.Count) of $eligibleHookSessionCount eligible session(s); automatic delivery is limited to observed sessions." }
+    default { 'Hook is configured but not observed; cooperative mailbox remains available and automatic turn-boundary delivery is unavailable.' }
+}
 $probe = $null
 $probeError = ''
 if ($ProbeAppServer) {
@@ -50,6 +64,9 @@ if ($ProbeAppServer) {
     anyTurnBoundaryHookObserved = $validHookActivations.Count -gt 0
     eligibleHookSessionCount = $eligibleHookSessionCount
     loadedAndObservedSessionCount = $validHookActivations.Count
+    hookDeliveryProfile = $hookDeliveryProfile
+    hookBlocksCooperativeBaseline = $false
+    hookDegradationReason = $hookDegradationReason
     hookActivations = $hookActivations
     automaticBusyCompletionDeliveryConfigured = $hookConfigPresent
     automaticBusyCompletionDeliveryActive = $validHookActivations.Count -gt 0

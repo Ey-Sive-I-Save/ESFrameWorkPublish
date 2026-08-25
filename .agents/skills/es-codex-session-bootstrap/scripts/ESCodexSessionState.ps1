@@ -179,12 +179,24 @@ function Read-ESCodexSessionRegistry([string]$Path) {
     }
 }
 
+function Test-ESCodexApprovedStatePath([string]$ResolvedPath) {
+    $separator = [IO.Path]::DirectorySeparatorChar
+    $approvedRoot = [IO.Path]::GetFullPath((Get-ESCodexLocalStateRoot)).TrimEnd('\', '/')
+    if ($ResolvedPath.StartsWith($approvedRoot + $separator, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+
+    # Isolated operational SmokeTest state is allowed only below the OS temp
+    # root and only when its first directory is the unique, validated marker
+    # created by Test-ESCodexSessionOperationalFlow.ps1.
+    $temporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/')
+    if (-not $ResolvedPath.StartsWith($temporaryRoot + $separator, [StringComparison]::OrdinalIgnoreCase)) { return $false }
+    $relative = $ResolvedPath.Substring(($temporaryRoot + $separator).Length)
+    return $relative -match '^ESCS-Smoke-[0-9a-f]{32}(?:[\\/]|$)'
+}
+
 function Save-ESCodexSessionRegistry([string]$Path, [object]$Registry) {
     $resolvedPath = [IO.Path]::GetFullPath($Path)
-    $root = Get-ESCodexLocalStateRoot
-    $root = [IO.Path]::GetFullPath($root)
-    if (-not $resolvedPath.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
-        throw 'Session registry path must remain inside the approved ESFramework CodexSessions state root.'
+    if (-not (Test-ESCodexApprovedStatePath $resolvedPath)) {
+        throw 'Session registry path must remain inside the approved ESFramework CodexSessions state root or a uniquely marked ESCS-Smoke temporary root.'
     }
     $parent = Split-Path -Parent $Path
     if (-not [string]::IsNullOrWhiteSpace($parent)) { [void][IO.Directory]::CreateDirectory($parent) }

@@ -16,7 +16,13 @@ description: Audit the ESFramework Git worktree before edits, reviews, builds, o
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The audit itself is read-only. The current explicit user request directly authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; managed-channel contracts are not secondary approval.
+
+## Execution classification
+
+- This audit is a read-only repository inspection and may run directly without `planTask` or an AICommand.
+- After the audit, the current explicit user request may proceed across the project paths strictly necessary for its goal. The compatibility scope validator records containment and expansion; its path classes and size thresholds do not veto user-directed source, Assets, governance or audit-state changes.
+- Delete, rename, Git, Unity/Runtime, external-process, network, release and credential actions require action-specific user wording. If an AIBrain/Worker channel is selected, satisfy its plan and contract protocol without requesting a second user approval.
 
 Establish ownership and overlap before changing files. Git remains the source-state authority.
 

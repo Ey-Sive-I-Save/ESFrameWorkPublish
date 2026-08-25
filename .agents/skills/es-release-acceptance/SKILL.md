@@ -17,7 +17,7 @@ description: Plan, execute, and report ESFramework acceptance across source chec
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
 - Runtime authorization manifests must conform to `ES/Automation/Contracts/es-runtime-authorization.schema.json` and be semantically checked by `.agents/skills/es-skill-governance/scripts/Test-ESRuntimeAuthorization.ps1`; a receipt or approval note alone never grants execution authority.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 Build an evidence matrix from the actual risk surface. Never upgrade a lower evidence layer into a higher release claim.
 
@@ -63,7 +63,7 @@ Approve only the explicitly requested scope whose required evidence rows passed.
 ## Engineering controls
 
 - **Owners**: ESFramework release maintainers own the workflow; a designated release owner alone accepts or releases the requested scope.
-- **Permission matrix**: evidence planning and log inspection are read-only; Unity state changes, Player builds, uploads, publishing, deletion and rollback each require explicit authorization and a matching TaskContract.
+- **Permission matrix**: evidence planning and log inspection are read-only; Unity state changes, Player builds, uploads, publishing, deletion and rollback each require explicit current-user authorization. A matching TaskContract is additionally required only when the selected execution path is ManagedAIBrain/Worker; it is not a second approval for direct user work.
 - **Change budget**: declare platforms, scenes, test assemblies, build targets, providers, artifact paths, maximum retries, timeout and stop conditions before execution.
 - **Risk register**: prevent evidence-layer substitution and accidental release; detect stale inputs, unrelated failures and partial artifacts; isolate failed rows; recover through preserved logs/artifacts and the target release rollback procedure.
 - **Scale/performance**: state asset/test counts, batching, first-run versus steady-state cost, expected disk/memory pressure, concurrency and bottlenecks. Never infer Profiler or platform performance from static checks.

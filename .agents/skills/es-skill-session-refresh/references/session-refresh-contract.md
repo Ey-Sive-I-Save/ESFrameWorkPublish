@@ -27,6 +27,10 @@ Invalidate the session binding when:
 
 An unrelated Skill change is reported but does not invalidate the current task unless route discovery selects it.
 
+## Host event triggers
+
+The host may invoke Compare with one of these bounded triggers: `queue-update`, `session-resume`, `catalog-change`, `governance-change`, `knowledge-route-change`, `plan-bound-resource-change`, or `explicit-user-drift`. A trigger only requests metadata comparison. It must carry the current route scope when one exists; a changed snapshot without route scope is `blocked` with `nextAction=replan`, never an implicit full-portfolio load.
+
 ## Receipt semantics
 
 `unchanged` means the observed metadata set is byte-identical to the baseline. `refreshed` means changes were found and selected metadata was re-read. `stale` means a previous plan or conclusion is no longer safe to reuse. `blocked` means the selected route has a missing, unreadable, or contradictory binding.

@@ -16,7 +16,7 @@ description: Review public C#, editor, runtime, JSON, YAML, MCP, and automation 
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 把 API 变更转成稳定身份、输入输出、生命周期、权限和兼容性证据。
 
@@ -35,7 +35,7 @@ description: Review public C#, editor, runtime, JSON, YAML, MCP, and automation 
 
 ## Engineering controls
 
-- 只读审查；任何修改必须由匹配 AICommand 单独授权。
+- Skill 审查阶段只读；当前用户已要求实施或接受本轮修复时可直接修改，不要求匹配 AICommand。受管通道仍遵守自身合同。
 - 必须有 owner、acceptance owner、risk register、boundary matrix、compatibility evidence 和 replay。
 - 覆盖正向、非法输入、拒绝扩权、重复调用和中断/版本漂移案例。
 

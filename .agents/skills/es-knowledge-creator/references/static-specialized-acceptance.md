@@ -19,11 +19,19 @@ This is a responsibility-specific static acceptance plan for **es-knowledge-crea
 - `stale-entry-detection`: replay the stale-entry-detection contract from source/configuration and record pass or blocked evidence.
 - `unsupported-claim-rejection`: replay the unsupported-claim-rejection contract from source/configuration and record pass or blocked evidence.
 
+The existing cases also cover the external-research and failure-surface policy:
+
+- `source-ref-hash` requires project-local provenance before external facts become durable SourceRefs.
+- `bounded-output` keeps official-source lookup domain/version/page bounded and prevents recursive web or repository collection.
+- `unsupported-claim-rejection` blocks live-URL-only provenance, network retrieval promoted to Runtime proof, quality scores that conceal hard blockers, and generic caution text used instead of executable failure prevention.
+- `denied-expansion` requires current explicit authorization before network access, external models/contexts, or persisted source snapshots.
+
 ## Evidence artifacts
 
 - `SKILL.md`
 - `references/knowledge-entry-contract.md`
 - `references/output-policy.md`
+- `references/research-and-failure-surface-policy.md`
 - `scripts/Test-ESKnowledgeEntry.ps1`
 - `scripts/Test-ESSkillEvidence.ps1`
 

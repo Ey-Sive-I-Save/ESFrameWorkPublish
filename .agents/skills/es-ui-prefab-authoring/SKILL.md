@@ -23,6 +23,23 @@ Static acceptance treats the component registry as authoritative metadata and is
 
 ## Capability model
 
+### Knowledge preflight (mandatory for high-risk UI work)
+
+Before interpreting a brief, selecting a layout or producing a ScreenSpec, read the shared
+contract at `.agents/skills/es-skill-governance/references/ui-knowledge-preflight-contract.md`.
+This Skill's work is high risk whenever it touches reference images, ScreenSpec, AssetManifest,
+Canvas/anchors/safe area/responsive profiles, fonts/fallbacks, BehaviorSpec/focus, Fixture,
+Prefab/Scene, Materializer, screenshots or visual QA. Resolve `AIBRAIN_ENTRY.md ->
+KnowledgeIndex.yaml -> canonical Knowledge owner`, read every selected `requiredReads` and
+SourceRef, and verify current SHA-256/stale state before planning or writing. Record
+`selectedKnowledgeIds`, `requiredReads`, `sourceRefs`, `staleCheck`, `authority`,
+`evidenceLevel`, `nonClaims` and `decision` in the plan/receipt. Missing route, unread
+Knowledge, index mismatch or stale SourceRef must fail closed as `NoKnowledgeRoute`,
+`KnowledgeReadRequired`, `KnowledgeIndexMismatch` or `KnowledgeStale`. Only an explicit
+user statement that Knowledge is not applicable can produce `exempted`, with exact scope
+and reason recorded; the AI must not infer an exemption. Purely read-only low-risk questions
+may bypass the full preflight but do not bypass project authority or evidence boundaries.
+
 Every generated screen is composed of six explicit layers:
 
 1. **ScreenSpec**: semantic component tree, screen family, profiles, states and visual intent.
@@ -80,8 +97,8 @@ Start from `references/game-ui-screen-spec.v3.template.json`. The spec must cont
 
 - `schemaVersion: 3`, stable lowercase `screenId` and a registered `template`;
 - one or more positive viewport `profiles` and deterministic `states`;
-- an `assets` manifest with source classification (`project-sprite`, `ai-generated` or
-  `generated-placeholder`), fallback and hash/provenance fields;
+- an `assets` manifest with source classification (`project-sprite`, `ai-generated`,
+  `generated-procedural` or `generated-placeholder`), fallback and hash/provenance fields;
 - a recursive `components` tree where every node has `type`, `zone`, `layout`, content/asset
   intent and `stateVariants`;
 - `behaviors` that describe visual input intent without calling runtime systems;
@@ -136,9 +153,10 @@ separate project-owned tests.
 - `references/game-ui-materializer-contract.md`: materializer behavior, fallback and evidence rules.
 - `scripts/validate_game_ui_screen_spec.py`: ScreenSpec v3 and registry validator.
 - `scripts/screen_spec_adapter.py`: in-memory v3-to-Unity semantic adapter; it writes no files.
+- `scripts/generate_ui_iteration_packet.py`: deterministic `rebuild` and `iterate` authoring packet generator; it writes only declared ScreenSpec and receipt outputs.
 - `scripts/self_test_game_ui_platform.py`: deterministic registry self-test across four screen families.
 
-The three scripts above are the only Skill production scripts. Any removed or unlisted script is not
+The four scripts above are the Skill production scripts. Any removed or unlisted script is not
 part of this protocol and must not be recreated as a parallel authority.
 
 ## Safety and recovery

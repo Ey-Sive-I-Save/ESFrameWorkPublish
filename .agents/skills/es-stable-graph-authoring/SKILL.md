@@ -16,13 +16,13 @@ description: Author and validate Stable Graph V2 assets, identities, edges, snap
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 维护 Stable Graph V2 的稳定身份、Undo、迁移、烘焙和消费者专属产物。
 
 ## Workflow
 
-1. 读取 Graph P0、ESAutomation/TaskContract、目标 consumer 和现有 asset；确认 Legacy 路径禁止恢复。
+1. 读取 Graph P0、目标 consumer 和现有 asset；确认 Legacy 路径禁止恢复。只有选择 Managed Automation/AIBrain 通道时才额外读取 ESAutomation/TaskContract。
 2. 定义 graphId/version/nodeId/edge.order、输入输出、Branch/FanOut/Join、snapshot 和 migration。
 3. 通过 Editor 白名单与 Undo/dry-run 修改；候选 Agent 产物只能进入隔离 Candidates。
 4. 运行结构、迁移、失败恢复和性能门禁；未执行真实闭环时保持 Verifying。
@@ -44,7 +44,8 @@ description: Author and validate Stable Graph V2 assets, identities, edges, snap
 
 ## Engineering controls
 
-- 不直接写 Assets、不绕过 AICommand/Facade、不把图存在宣称为执行成功。
+- `ManagedProtocolRequiredWhen`: `ManagedAutomation/AIBrain`; `DirectUserAssetWrite`: `ExplicitBoundedOnly`。
+- 自主或 Graph-triggered 运行不得直接写 `Assets`；当前用户明确要求的有界 Asset 修改可以直接执行。只有选择 Managed Automation/AIBrain 通道时才不得绕过 AICommand/Facade；任何通道都不得把图存在宣称为执行成功。
 - 记录节点/边规模、烘焙时间、内存、并发、取消、回滚和 consumer 兼容性。
 - 覆盖 malformed graph、重复 identity、非法 edge、拒绝 Legacy、部分失败和恢复。
 

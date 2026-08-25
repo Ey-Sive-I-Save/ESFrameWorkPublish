@@ -24,6 +24,8 @@
     "SKILL.md#enforce-the-fixed-route",
     "references/feishu-read-contract.md",
     "references/identity-data-governance.md",
+    "references/task-lifecycle-contract.md",
+    "references/identity-messaging-contract.md",
     "references/evidence-acceptance.md"
   ],
   "requiredControls": [
@@ -37,6 +39,8 @@
     "recovery",
     "freshness",
     "supply-chain"
+    ,"local-identity-ownership"
+    ,"recipient-consent"
   ],
   "routeKeys": [
     "feishu",
@@ -49,11 +53,79 @@
     "task-dispatch",
     "task-transition",
     "virtual-team",
+    "identity-claim",
+    "bot-ownership",
+    "onboarding",
+    "message-send",
+    "notification",
     "credential",
     "evidence"
   ],
-  "commandRequirement": "none",
-  "commandBindings": [],
+  "commandRequirement": "required",
+  "commandBindings": [
+    {
+      "commandId": "feishu.read",
+      "commandHash": "da2bd989e00cdfca55e84f906ce2a69b10930e6e53dde2ef750d8f304c16b750",
+      "role": "controlled-execution",
+      "riskLevel": "L2",
+      "writeMode": "external-run",
+      "bodyContains": ["commandId: feishu.read", "taskId: es.feishu.read"],
+      "taskContractRequired": true,
+      "taskContractRef": "Assets/Plugins/ES/Editor/ESAutomation/ESFeishuReadAutomation.cs"
+    },
+    {
+      "commandId": "feishu.task.monitor",
+      "commandHash": "ada1a52a0f04c32c50600feee412ea25638cf081d2a7408097be7191678a3924",
+      "role": "controlled-execution",
+      "riskLevel": "L2",
+      "writeMode": "external-run",
+      "bodyContains": ["commandId: feishu.task.monitor", "taskId: es.feishu.task.monitor"],
+      "taskContractRequired": true,
+      "taskContractRef": "ES/Automation/Contracts/feishu-task-monitor-v1.schema.json"
+    },
+    {
+      "commandId": "feishu.task.mutate",
+      "commandHash": "b711aed9c7c5eaa884d6e406b6bb5f6ec7ab1ace65a92fb218c0a4475b9ce796",
+      "role": "controlled-execution",
+      "riskLevel": "L3",
+      "writeMode": "external-run",
+      "bodyContains": ["commandId: feishu.task.mutate", "taskId: es.feishu.task.dispatch", "taskId: es.feishu.task.transition", "dryRunEvidenceRunId"],
+      "taskContractRequired": true,
+      "taskContractRef": "ES/Automation/Contracts/feishu-task-dispatch-v1.schema.json",
+      "taskContractRefs": [
+        "ES/Automation/Contracts/feishu-task-dispatch-v1.schema.json",
+        "ES/Automation/Contracts/feishu-task-transition-v1.schema.json"
+      ]
+    },
+    {
+      "commandId": "feishu.identity.manage",
+      "commandHash": "f3b85d270e46c2c2fd36afe32e37a260aa2e080a29061fad36855fd11f9ed54f",
+      "role": "controlled-execution",
+      "riskLevel": "L2",
+      "writeMode": "scoped-write",
+      "bodyContains": ["commandId: feishu.identity.manage", "taskId: es.feishu.identity.claim", "dryRunEvidenceRunId"],
+      "taskContractRequired": true,
+      "taskContractRef": "ES/Automation/Contracts/feishu-identity-claim-v1.schema.json"
+    },
+    {
+      "commandId": "feishu.message.send",
+      "commandHash": "3d33177c2da8d2b04b32d098f91c58b8d5ea213c7addec65072aee1b9978cc40",
+      "role": "controlled-execution",
+      "riskLevel": "L3",
+      "writeMode": "external-run",
+      "bodyContains": ["commandId: feishu.message.send", "taskId: es.feishu.message.send", "dryRunEvidenceRunId"],
+      "taskContractRequired": true,
+      "taskContractRef": "ES/Automation/Contracts/feishu-message-send-v1.schema.json"
+    }
+  ],
+  "requiredAuthorityRefs": [
+    "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+    "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
+    "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
+    "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md",
+    "Assets/Plugins/ES/AICommands/AICommandCatalog.json"
+  ],
+  "taskContractRequired": true,
   "verificationProfiles": {
     "StaticReview": {
       "required": ["structural", "governance", "semantic", "boundary", "contract", "evidence"],

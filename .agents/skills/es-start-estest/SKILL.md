@@ -16,19 +16,19 @@ description: Start, monitor, or safely cancel the ESFramework ESAITest/ESTEST ru
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 ## Workflow controls
 
 - Scope and authority are checked before execution; stale or missing evidence blocks the task.
-- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- Starting ESTEST is a Runtime/external action and therefore requires the current user to name that action and stop condition. Once named, no secondary project approval is required; satisfy AIBrain/AICommand inputs only when the selected ESTEST endpoint technically requires them.
 - Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
 Use the existing ESAITest Runner. Do not create another runner, input source, report writer, or editor initializer.
 
 ## Workflow
 
-1. Read `Assets/Plugins/ES/AICommands/ESAITest_直接启动ESTEST_AI命令.md` as the authorization contract.
+1. When using the managed ESTEST endpoint, read `Assets/Plugins/ES/AICommands/ESAITest_直接启动ESTEST_AI命令.md` as its execution contract.
 2. Confirm the repository root, branch, HEAD, worktree, Unity version, and intended Unity project instance.
 3. Choose one execution surface:
    - Unity Editor: invoke `【ES】/自动化与开发/自动化中心/ESAITest/直接启动 ESTEST` through UnityMCP.

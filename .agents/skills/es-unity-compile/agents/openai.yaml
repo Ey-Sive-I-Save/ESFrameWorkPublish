@@ -1,7 +1,7 @@
 interface:
   display_name: "ES Unity 编译验收"
-  short_description: "检查 Unity CLI、编译、Console、程序集与证据等级"
-  default_prompt: "Use $es-unity-compile to verify Unity compilation or run guarded Unity CLI compile/test workflows."
+  short_description: "检查 Unity 编译证据分层、构建身份回执与产物新鲜度"
+  default_prompt: "Use $es-unity-compile to verify Unity evidence or capture, finalize, and validate a build identity receipt without promoting static provenance into runtime acceptance."
 
 policy:
   allow_implicit_invocation: true

@@ -16,7 +16,7 @@ description: Design deterministic ESFramework test fixtures, scenes, assets, and
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 创建可重复、可清理、不会污染正式资产的测试夹具。
 
@@ -36,7 +36,7 @@ description: Design deterministic ESFramework test fixtures, scenes, assets, and
 
 ## Engineering controls
 
-- 夹具不是产品内容，不得进入发布链；正式资产变更必须另有 AICommand。
+- 夹具不是产品内容，不得自行进入发布链；当前用户明确要求的正式资产变更可直接执行，不要求另有 AICommand。发布动作仍须被用户单独点名。
 - 记录平台、Unity 版本、测试程序集、fixture hash、创建者和清理结果。
 - 明确首次/稳态成本、数量上限、并发隔离、超时和失败恢复。
 

@@ -16,7 +16,7 @@ description: Perform adversarial validation for ESFramework feasibility after so
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request directly authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected.
 
 ## Responsibility-specific static acceptance
 
@@ -27,7 +27,7 @@ description: Perform adversarial validation for ESFramework feasibility after so
 ## Engineering controls
 
 - Scope and authority are checked before execution; stale or missing evidence blocks the task.
-- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- The review pass is read-only by responsibility. Fixes requested by the user, or accepted within the original implementation request, may change any necessary project path without a second approval. Delete, rename, Git, Runtime, external-process, network, release and credential actions still require action-specific user wording; a managed channel may additionally require its protocol inputs.
 - Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
 Challenge whether the work achieves its stated intent. The review pass is read-only: it produces findings and evidence gaps and never silently changes the target. When it runs after an authorized implementation in the same task, accepted findings may be fixed under that original authorization, then revalidated before delivery.

@@ -18,7 +18,9 @@
                          "governance",
                          "source-hashes",
                          "deterministic-replay",
-                         "boundary-contract"
+                         "boundary-contract",
+                         "external-primary-source-consent",
+                         "failure-surface-weighting"
                      ],
     "runtimeClaimsNotProven":  [
                                    "Unity/editor/process behavior",
@@ -30,9 +32,9 @@
                               "reason":  "Only external execution can prove the declared runtime claims."
                           },
     "caseAssertions":  {
-                           "normal-input":  "source roots and required Skill files are present",
+                           "normal-input":  "source roots, required Skill files, and the research/failure-surface policy are present",
                            "invalid-input":  "invalid input is rejected by the declared contract",
-                           "denied-expansion":  "permission or path expansion is denied",
+                           "denied-expansion":  "permission, path, network, external-model, and source-snapshot expansion is denied without current explicit authorization",
                            "repeat-idempotency":  "repeat execution is idempotent",
                            "hash-change-cache-invalidation":  "hash or cache changes invalidate stale state",
                            "interruption-recovery":  "interruption and recovery are declared",
@@ -60,6 +62,7 @@
                                                             "SKILL.md",
                                                             "references/knowledge-entry-contract.md",
                                                             "references/output-policy.md",
+                                                            "references/research-and-failure-surface-policy.md",
                                                             "scripts/Test-ESKnowledgeEntry.ps1",
                                                             "scripts/Test-ESSkillEvidence.ps1"
                                                         ],
@@ -68,7 +71,9 @@
                                                            "ContentHash",
                                                            "bounded output",
                                                            "stale",
-                                                           "unsupported runtime claims"
+                                                           "unsupported runtime claims",
+                                                           "external primary-source provenance",
+                                                           "AI failure-surface weighting"
                                                        ],
                                   "runtimeBoundary":  "Runtime is not required for source/hash/output governance; runtime claims remain non-claims."
                               },

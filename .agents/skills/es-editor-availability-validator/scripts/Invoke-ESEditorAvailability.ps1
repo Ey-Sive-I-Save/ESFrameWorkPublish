@@ -35,21 +35,54 @@ $rows=New-Object 'System.Collections.Generic.List[object]'
 $findings=New-Object 'System.Collections.Generic.List[object]'
 $windowRecords=New-Object 'System.Collections.Generic.List[object]'
 $editorFiles=@($files|Where-Object {$_.Extension -in @('.cs','.uxml','.uss','.asmdef','.json')})
+$relatedEditorFiles = New-Object 'System.Collections.Generic.List[object]'
+foreach($file in $editorFiles){ [void]$relatedEditorFiles.Add($file) }
+if($TargetKind -eq 'Workbench'){
+    # Workbench contracts are intentionally split: the domain window owns identity and
+    # layout, while the shared base/host owns Undo delegation and event routing. Scan
+    # that bounded contract closure together instead of judging each file in isolation.
+    $workbenchContractPaths = @(
+        'Assets/Scripts/ESLogic/Editor/Workbench/ESWorkbenchWindowBase.cs',
+        'Assets/Scripts/ESLogic/Editor/Workbench/ESWorkbenchUIToolkitHost.cs',
+        'Assets/Scripts/ESLogic/Editor/Workbench/ESWorkbenchViewportFoundation.cs',
+        'Assets/Scripts/ESLogic/Editor/Workbench/ESWorkbenchAuthoringContracts.cs'
+    )
+    foreach($relativePath in $workbenchContractPaths){
+        $contractPath = Join-Path $root $relativePath
+        if(Test-Path -LiteralPath $contractPath -PathType Leaf){
+            [void]$relatedEditorFiles.Add((Get-Item -LiteralPath $contractPath))
+        }
+    }
+}
+$editorFiles=@($relatedEditorFiles | Sort-Object -Property FullName -Unique)
 if($editorFiles.Count -eq 0){[void]$findings.Add([pscustomobject]@{code='TargetNotEditorAsset';path=(Rel $targetFull);detail='No editor assets or configuration files found.'})}
 foreach($file in $editorFiles){
     try{$contents=ReadStrict $file.FullName}catch{[void]$findings.Add([pscustomobject]@{code='InvalidUtf8';path=(Rel $file.FullName);detail=$_.Exception.Message});continue}
     if($file.Extension -ne '.cs'){continue}
     $relative=Rel $file.FullName
-    $isWindowDeclaration=$contents -match '(?im)^\s*(?:(?:public|internal|private|protected|abstract|sealed|partial|static)\s+)*class\s+\w+\s*:\s*[^\{\r\n]*(?:\bEditorWindow\b|\bESSinglePageWindow\b|\bESSinglePageIMGUIWindow\b|\bESWorkbenchWindowBase\b)'
-    if($isWindowDeclaration){[void]$windowRecords.Add([pscustomobject]@{path=$relative;contents=$contents})}
+    $isWindowDeclaration=$contents -match '(?im)^\s*(?:(?:public|internal|private|protected|abstract|sealed|partial|static)\s+)*class\s+\w+(?:<[^>{}\r\n]+>)?\s*:\s*[^\{\r\n]*(?:\bEditorWindow\b|\bESSinglePageWindow\b|\bESSinglePageIMGUIWindow\b|\bESWorkbenchWindowBase\b)'
+    $isTestFile = $relative -match '(?i)(^|/)Tests?(/|$)'
+    if($isWindowDeclaration){
+        $isAbstractWindow = $contents -match '(?im)\babstract\s+class\s+\w+(?:<[^>{}\r\n]+>)?\s*:'
+        if(-not $isTestFile){
+            [void]$windowRecords.Add([pscustomobject]@{path=$relative;contents=$contents;isAbstract=$isAbstractWindow})
+        }
+    }
     if($relative -notmatch '(?i)(^|/)Editor(/|$)'){[void]$findings.Add([pscustomobject]@{code='EditorScope';path=$relative;detail='Editor extension implementation is outside an Editor-scoped path.'})}
     if($contents -match '(?i)InitializeOnLoad' -and $contents -match '(?i)(FindAssets|AssetDatabase\.(FindAssets|LoadAssetAtPath)|GetFiles\(|Directory\.GetFiles)'){
         [void]$findings.Add([pscustomobject]@{code='StartupScanRisk';path=$relative;detail='InitializeOnLoad is combined with broad asset or filesystem scanning; require explicit trigger or bounded incremental invalidation.'})
     }
-    if($isWindowDeclaration -and $contents -notmatch '(?i)(CreateGUI|OnGUI|ESWindow_DrawIMGUI)'){
+    if($isWindowDeclaration -and -not $isTestFile -and -not $isAbstractWindow -and $contents -notmatch '(?i)(CreateGUI|OnGUI|ESWindow_DrawIMGUI)'){
         [void]$findings.Add([pscustomobject]@{code='WindowLifecycle';path=$relative;detail='EditorWindow implementation has no visible GUI entry (OnGUI/CreateGUI).'})
     }
-    if($contents -match '(?i)SerializedObject|SerializedProperty' -and $contents -notmatch '(?i)Undo\.(RecordObject|RegisterCompleteObjectUndo)'){
+    $delegatedUndoEvidence = $false
+    if($TargetKind -eq 'Workbench' -and $contents -match '(?i)SerializedObject|SerializedProperty'){
+        $delegatedUndoEvidence = $contents -match '(?i)ESWorkbench_Record\s*\(' -or
+            (@($relatedEditorFiles | ForEach-Object { try { ReadStrict $_.FullName } catch { '' } }) -join "`n") -match '(?i)ESWorkbench_Record\s*\('
+    }
+    if($contents -match '(?i)SerializedObject|SerializedProperty' -and
+        $contents -notmatch '(?i)Undo\.(RecordObject|RegisterCompleteObjectUndo)' -and
+        -not $delegatedUndoEvidence){
         [void]$findings.Add([pscustomobject]@{code='UndoMissing';path=$relative;detail='Serialized editing detected without an Undo operation in the same file; verify delegated Undo ownership.'})
     }
     if($contents -match '(?i)EditorApplication\.(update|delayCall)|AssemblyReloadEvents' -and $contents -notmatch '(?i)(-=|Dispose|Unsubscribe|RemoveListener)'){
@@ -83,7 +116,7 @@ if($TargetContractPath){
     if(-not(Test-Path -LiteralPath $contractFull -PathType Leaf)){throw "TargetContractPath not found: $TargetContractPath"}
     try{$targetContract=ReadStrict $contractFull|ConvertFrom-Json}catch{[void]$findings.Add([pscustomobject]@{code='TargetContractInvalid';path=$TargetContractPath;detail=$_.Exception.Message})}
 }
-$hasFixedMaxBound=$windowContents -match '(?i)(ESWindow_MaxSize\s*=>|ESWindow_MaxSize\s*\{|(?:window\.)?maxSize\s*=|MaximumWindow(?:Width|Height)\s*[:=])'
+$hasFixedMaxBound=$windowContents -match '(?i)(ESWindow_MaxSize\s*=>|ESWindow_MaxSize\s*\{|(?:window\.)?maxSize\s*=|MaximumSize\s*[:=]|MaximumWindow(?:Width|Height)\s*[:=])'
 $hasAdaptiveResolveMaxBound=$windowContents -match '(?i)(ResolveAdaptiveMaximum\s*\(|AdaptiveMaximumWindow)'
 $hasContentAdaptiveMaxBound=$windowContents -match '(?i)(ContentAdaptiveWindow|AdjustMaximumWindow|content.?adaptive.?window)'
 $hasAdaptiveMaxBound=$hasAdaptiveResolveMaxBound -or $hasContentAdaptiveMaxBound
@@ -95,17 +128,27 @@ $frameworkFindings=New-Object 'System.Collections.Generic.List[object]'
 $layoutFindings=New-Object 'System.Collections.Generic.List[object]'
 if($isEditorWindow){
     foreach($window in $windowRecords){
+        if($window.isAbstract){ continue }
         $contents=[string]$window.contents
         $hasWindowBase=$contents -match '(?i)(?:ESSinglePageWindow|ESSinglePageIMGUIWindow|ESWorkbenchWindowBase)'
         $hasWindowBind=$contents -match '(?i)ES(?:\.)?WindowFoundation\s*\.\s*Bind(?:WithStandardSystemHost|FullSleep|Transient)?\s*\('
-        $hasWindowUnbind=$contents -match '(?i)ES(?:\.)?WindowFoundation\s*\.\s*Unbind\s*\('
-        $hasWindowMin=$contents -match '(?i)(ESWindow_MinSize\s*=>|ESWindow_MinSize\s*\{|(?:window\.)?minimumSize\s*=|ResolveAdaptiveMinimum\s*\()'
-        $hasWindowMax=$contents -match '(?i)(ESWindow_MaxSize\s*=>|ESWindow_MaxSize\s*\{|(?:window\.)?maxSize\s*=|MaximumWindow(?:Width|Height)\s*[:=]|ResolveAdaptiveMaximum\s*\(|AdaptiveMaximumWindow|ContentAdaptiveWindow|AdjustMaximumWindow|content.?adaptive.?window|HostWindowBounds|HostBoundedWindow|ApplyHostWindowBounds|UnboundedFlexibleLayout|AllowUnboundedWindow|flexible.?unbounded)'
+        $hasWindowSuspend=$contents -match '(?i)ES(?:\.)?WindowFoundation\s*\.\s*Suspend\s*\('
+        $hasWindowClose=$contents -match '(?i)ES(?:\.)?WindowFoundation\s*\.\s*Close\s*\('
+        $hasLegacyBooleanUnbind=$contents -match '(?i)ES(?:\.)?WindowFoundation\s*\.\s*Unbind\s*\([^\)]*,\s*(?:true|false)\s*\)'
+        $hasWindowMin=$contents -match '(?i)(ESWindow_MinSize\s*=>|ESWindow_MinSize\s*\{|(?:window\.)?minSize\s*=|MinimumSize\s*[:=]|ResolveAdaptiveMinimum\s*\()'
+        $hasWindowMax=$contents -match '(?i)(ESWindow_MaxSize\s*=>|ESWindow_MaxSize\s*\{|(?:window\.)?maxSize\s*=|MaximumSize\s*[:=]|MaximumWindow(?:Width|Height)\s*[:=]|ResolveAdaptiveMaximum\s*\(|AdaptiveMaximumWindow|ContentAdaptiveWindow|AdjustMaximumWindow|content.?adaptive.?window|HostWindowBounds|HostBoundedWindow|ApplyHostWindowBounds|UnboundedFlexibleLayout|AllowUnboundedWindow|flexible.?unbounded|ESWorkbench_LayoutMaxStrategy)' -or
+            ($resolvedTargetKind -eq 'Workbench' -and $windowContents -match '(?i)ESWorkbench_LayoutMaxStrategy\s*=>')
         if(-not ($hasWindowBase -or $hasWindowBind)){
             [void]$frameworkFindings.Add([pscustomobject]@{code='ESFrameworkIntegrationMissing';path=$window.path;detail='EditorWindow is not connected to an approved ES window base or ESWindowFoundation.Bind.'})
         }
-        if($hasWindowBind -and -not $hasWindowUnbind -and -not $hasWindowBase){
-            [void]$frameworkFindings.Add([pscustomobject]@{code='ESFrameworkUnbindMissing';path=$window.path;detail='Direct ESWindowFoundation binding has no visible Unbind lifecycle closure.'})
+        if($hasWindowBind -and -not $hasWindowBase -and -not $hasWindowSuspend){
+            [void]$frameworkFindings.Add([pscustomobject]@{code='ESFrameworkSuspendMissing';path=$window.path;detail='Direct ESWindowFoundation binding has no visible Suspend closure for OnDisable.'})
+        }
+        if($hasWindowBind -and -not $hasWindowBase -and -not $hasWindowClose){
+            [void]$frameworkFindings.Add([pscustomobject]@{code='ESFrameworkCloseMissing';path=$window.path;detail='Direct ESWindowFoundation binding has no visible Close closure for OnDestroy.'})
+        }
+        if($hasLegacyBooleanUnbind){
+            [void]$frameworkFindings.Add([pscustomobject]@{code='ESFrameworkLegacyUnbind';path=$window.path;detail='Boolean Unbind lifecycle routing is obsolete; use Unbind, Suspend, or Close by semantic phase.'})
         }
         if(-not $hasWindowMin){
             [void]$layoutFindings.Add([pscustomobject]@{code='LayoutMinSizeMissing';path=$window.path;detail='No minimum or adaptive minimum window bound was found.'})
@@ -185,15 +228,49 @@ $staticRules=New-Object 'System.Collections.Generic.List[object]'
 $ruleFailures=New-Object 'System.Collections.Generic.List[object]'
 $allTargetText=(@($editorFiles|ForEach-Object {try{ReadStrict $_.FullName}catch{''}}) -join "`n")
 $rulePatterns=@{
- 'EW-01'=@('EditorWindow|CustomEditor|PropertyDrawer|MenuItem|ScriptedImporter'); 'EW-02'=@('GetWindow\s*<|GetWindow\s*\(|singleton|single.?instance'); 'EW-03'=@('position\s*=|ShowAsDropDown|ShowUtility|ShowModalUtility|opening.?position'); 'EW-04'=@('minimumSize|maxSize|ESWindow_MinSize|ESWindow_MaxSize|AdaptiveMaximum|HostBound'); 'EW-05'=@('title|status|primary|summary|empty'); 'EW-06'=@('phase|stage|section|step'); 'EW-07'=@('SectionId|NavigatorId|section.?id|navigator.?id'); 'EW-08'=@('scroll|ScrollView|single.?axis|scroll.?owner'); 'EW-09'=@('action.?host|toolbar|menu|inspector|page'); 'EW-10'=@('primary.?action|Apply|Build|Create|Run'); 'EW-11'=@('error|failed|empty|recovery|status|state'); 'EW-12'=@('Undo\.|SetDirty|Dirty|AssetDatabase\.|SerializedObject|write'); 'EW-13'=@('StopPropagation|Focus|GUIUtility|event|pointer|drag'); 'EW-14'=@('owner(Key)?|parent|child|Bind|Unbind|Dispose'); 'EW-15'=@('sleep|wake|ESWindowFoundation|ESWindowSleepContract'); 'EW-16'=@('ReloadDomain|AssemblyReloadEvents|PlayMode|Unbind|rebind'); 'EW-17'=@('cache|budget|performance|Profiler|incremental|memo'); 'EW-18'=@('PreviewSession|RenderTexture|DestroyImmediate|cleanup|release'); 'EW-19'=@('ES.?Token|theme|USS|style|color'); 'EW-20'=@('tooltip|keyboard|shortcut|GUID|Hash|long|path|DPI|ellipsis')
+ 'EW-01'=@('EditorWindow|CustomEditor|PropertyDrawer|MenuItem|ScriptedImporter'); 'EW-02'=@('GetWindow\s*<|GetWindow\s*\(|singleton|single.?instance'); 'EW-03'=@('position\s*=|ShowAsDropDown|ShowUtility|ShowModalUtility|opening.?position'); 'EW-04'=@('minSize|maxSize|MinimumSize|MaximumSize|ESWindow_MinSize|ESWindow_MaxSize|AdaptiveMaximum|HostBound'); 'EW-05'=@('title|status|primary|summary|empty'); 'EW-06'=@('phase|stage|section|step'); 'EW-07'=@('SectionId|NavigatorId|section.?id|navigator.?id'); 'EW-08'=@('scroll|ScrollView|single.?axis|scroll.?owner'); 'EW-09'=@('action.?host|toolbar|menu|inspector|page'); 'EW-10'=@('primary.?action|Apply|Build|Create|Run'); 'EW-11'=@('error|failed|empty|recovery|status|state'); 'EW-12'=@('Undo\.|SetDirty|Dirty|AssetDatabase\.|SerializedObject|write'); 'EW-13'=@('StopPropagation|Focus|GUIUtility|event|pointer|drag'); 'EW-14'=@('owner(Key)?|parent|child|Bind|Unbind|Suspend|Close|Dispose'); 'EW-15'=@('sleep|wake|ESWindowFoundation|ESWindowSleepContract'); 'EW-16'=@('ReloadDomain|AssemblyReloadEvents|PlayMode|Unbind|Suspend|Close|rebind'); 'EW-17'=@('cache|budget|performance|Profiler|incremental|memo'); 'EW-18'=@('PreviewSession|RenderTexture|DestroyImmediate|cleanup|release'); 'EW-19'=@('ES.?Token|theme|USS|style|color'); 'EW-20'=@('tooltip|keyboard|shortcut|GUID|Hash|long|path|DPI|ellipsis'); 'EW-21'=@('RegisterCallback<DragUpdatedEvent>|RegisterCallback<DragPerformEvent>|RegisterCallback<DragLeaveEvent>|TrickleDown\.TrickleDown')
+}
+$eventRouteFailures=New-Object 'System.Collections.Generic.List[string]'
+$eventRouteEvidence=$true
+$hasConcreteWindow = @($windowRecords | Where-Object { -not $_.isAbstract }).Count -gt 0
+$targetIsSharedWorkbenchHost = (Rel $targetFull) -match '(?i)(^|/)ESWorkbenchUIToolkitHost\.cs$'
+if($resolvedTargetKind -eq 'Workbench'){
+    $eventRoutePatterns=@(
+        'RegisterCallback<DragUpdatedEvent>\s*\(\s*OnDragUpdated\s*,\s*TrickleDown\.TrickleDown\s*\)',
+        'RegisterCallback<DragPerformEvent>\s*\(\s*OnDragPerform\s*,\s*TrickleDown\.TrickleDown\s*\)',
+        'RegisterCallback<DragLeaveEvent>\s*\(\s*OnDragLeave\s*,\s*TrickleDown\.TrickleDown\s*\)',
+        'UnregisterCallback<DragUpdatedEvent>\s*\(\s*OnDragUpdated\s*,\s*TrickleDown\.TrickleDown\s*\)',
+        'UnregisterCallback<DragPerformEvent>\s*\(\s*OnDragPerform\s*,\s*TrickleDown\.TrickleDown\s*\)',
+        'UnregisterCallback<DragLeaveEvent>\s*\(\s*OnDragLeave\s*,\s*TrickleDown\.TrickleDown\s*\)',
+        'RegisterCallback<DragExitedEvent>\s*\(\s*OnDragExited\s*,\s*TrickleDown\.TrickleDown\s*\)',
+        'UnregisterCallback<DragExitedEvent>\s*\(\s*OnDragExited\s*,\s*TrickleDown\.TrickleDown\s*\)',
+        'RegisterCallback<PointerCaptureOutEvent>\s*\(\s*OnRootPointerCaptureOut\s*,\s*TrickleDown\.TrickleDown\s*\)',
+        'RegisterCallback<FocusOutEvent>\s*\(\s*OnRootFocusOut\s*,\s*TrickleDown\.TrickleDown\s*\)'
+    )
+    foreach($pattern in $eventRoutePatterns){if($allTargetText -notmatch $pattern){[void]$eventRouteFailures.Add($pattern)}}
+    if(@([regex]::Matches($allTargetText,'(?s)(?:OnDragLeave|OnDragExited|OnRootPointerCaptureOut|OnRootFocusOut|OnRootDetachedFromPanel)\s*\([^)]*\).*?CancelWorkbenchDrag\(true\)')).Count -lt 5){
+        [void]$eventRouteFailures.Add('all-owner-release-paths-call-CancelWorkbenchDrag(true)')
+    }
+    $eventRouteEvidence=($eventRouteFailures.Count -eq 0)
 }
 if($null -ne $ruleRegistry){
     foreach($rule in @($ruleRegistry.rules)){
         $applicable=@($rule.applicableTo) -contains $resolvedTargetKind
+        # Shared workbench hosts participate in the Workbench contract but do not
+        # own the singleton/menu entry. Apply EW-02 only when the bounded closure
+        # actually contains a concrete EditorWindow declaration.
+        if([string]$rule.ruleId -eq 'EW-02' -and ($targetIsSharedWorkbenchHost -or -not $hasConcreteWindow)){
+            [void]$staticRules.Add([pscustomobject]@{ruleId=[string]$rule.ruleId;title=[string]$rule.title;status='not-applicable';severity=[string]$rule.severity;details='Shared workbench host has no concrete EditorWindow declaration; singleton entry is owned by the domain window.';evidenceLevel='S2'});continue
+        }
         if(-not $applicable){[void]$staticRules.Add([pscustomobject]@{ruleId=[string]$rule.ruleId;title=[string]$rule.title;status='not-applicable';severity=[string]$rule.severity;details="TargetKind $resolvedTargetKind is outside this rule's scope.";evidenceLevel='S1'});continue}
-        $matched=HasAny $allTargetText $rulePatterns[[string]$rule.ruleId]
-        $ruleStatus=if($matched){'passed'}else{'blocked'}
-        $detail=if($matched){'Static source evidence matched the responsibility-specific rule pattern.'}else{'No responsibility-specific static evidence matched; declare an approved exception or add implementation evidence.'}
+        if([string]$rule.ruleId -eq 'EW-21'){
+            $ruleStatus=if($eventRouteEvidence){'passed'}else{'blocked'}
+            $detail=if($eventRouteEvidence){'Workbench drag events use host trickle-down routing with matching unregistration and all owner-release paths call CancelWorkbenchDrag(true).'}else{"Event-routing contract failed: $($eventRouteFailures -join '; ')"}
+        }else{
+            $matched=HasAny $allTargetText $rulePatterns[[string]$rule.ruleId]
+            $ruleStatus=if($matched){'passed'}else{'blocked'}
+            $detail=if($matched){'Static source evidence matched the responsibility-specific rule pattern.'}else{'No responsibility-specific static evidence matched; declare an approved exception or add implementation evidence.'}
+        }
         $item=[pscustomobject]@{ruleId=[string]$rule.ruleId;title=[string]$rule.title;status=$ruleStatus;severity=[string]$rule.severity;details=$detail;evidenceLevel='S2';runtimeChecks=@($rule.runtimeChecks)}
         [void]$staticRules.Add($item)
         if($ruleStatus -eq 'blocked'){[void]$ruleFailures.Add($item)}

@@ -18,6 +18,8 @@ Use the global Static/Runtime semantics in `.agents/skills/es-skill-governance/r
 
 Layout and ES framework integration are critical dimensions, each with weight `3`. Missing layout bounds or missing ES foundation integration blocks availability even when other source checks pass.
 
+When validating lifecycle or user-visible state behavior, require the `es-ai-interaction-governance` intent contract and report any observed or unproven violation of its `mustPreserve` or `forbiddenTransitions` fields separately from compile/layout evidence. Static availability must not be upgraded by a self-authored contract; the contract only bounds the claim and required evidence.
+
 The validator is target-kind aware: `-TargetKind Auto|EditorWindow|Workbench|InspectorDrawer|MenuAction|PreviewImport|BackgroundService` selects the responsibility matrix in `references/availability-matrix.md`. Editor targets additionally receive one result for each stable rule in `references/editor-rule-registry.json` (`EW-01` through `EW-20`); `not-applicable` is a scoped result, not a failure.
 
 The script supports `StaticReview`, `Development`, `Acceptance`, and `Release` validation modes. `StaticReview` is the default and performs source-level deep replay without starting Unity. Development mode may return `Degraded` for non-critical missing evidence; Acceptance/Release require explicitly authorized runtime evidence. Critical source defects produce `StaticBlocked`; missing external evidence produces `RuntimeRequiredForSelectedProfile`/`runtime-blocked`, not a claim that the source is defective.

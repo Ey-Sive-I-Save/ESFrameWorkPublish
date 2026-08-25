@@ -16,7 +16,7 @@ description: Validate ESFramework Entity, player/weapon Prefab, DataInfo, parts,
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 验证实体从定义、Prefab 装配到运行时消费和池化生命周期的闭环。
 
@@ -36,7 +36,7 @@ description: Validate ESFramework Entity, player/weapon Prefab, DataInfo, parts,
 
 ## Engineering controls
 
-- 任何 Prefab/Scene 写入需独立 AICommand；Skill 默认只读。
+- Skill 自主验证默认只读；当前用户明确要求的 Prefab/Scene 修改可直接执行，不要求独立 AICommand。
 - 记录实体数、层级深度、池容量、首次/稳态成本、并发、回滚和残留清理。
 - 覆盖缺组件、坏 DataInfo、错误挂点、非法所有权、重复 builder 和中断恢复。
 

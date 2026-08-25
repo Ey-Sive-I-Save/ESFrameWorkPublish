@@ -4,12 +4,23 @@
   "sourceRoots": [
     ".agents/skills/es-feishu-cli",
     "Assets/Plugins/ES/AICommands/Feishu只读知识接入_AI命令.md",
+    "Assets/Plugins/ES/AICommands/Feishu任务监控_AI命令.md",
+    "Assets/Plugins/ES/AICommands/Feishu任务派发与推进_AI命令.md",
+    "Assets/Plugins/ES/AICommands/Feishu本地角色与机器人认领_AI命令.md",
+    "Assets/Plugins/ES/AICommands/Feishu单人文本消息发送_AI命令.md",
     "Documentation/AIKnowledge/entries/feishu-adapter-boundary.md",
+    "Documentation/AIKnowledge/entries/feishu-task-lifecycle.md",
+    "Documentation/AIKnowledge/entries/feishu-identity-messaging.md",
+    "Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs",
     "Assets/Plugins/ES/Editor/ESAutomation/ESFeishuReadAutomation.cs",
     "Assets/Plugins/ES/Editor/ESAutomation/ESFeishuTaskAutomation.cs",
+    "Assets/Plugins/ES/Editor/ESAutomation/ESFeishuIdentityAutomation.cs",
     "ES/Automation/Contracts/feishu-task-monitor-v1.schema.json",
     "ES/Automation/Contracts/feishu-task-dispatch-v1.schema.json",
     "ES/Automation/Contracts/feishu-task-transition-v1.schema.json",
+    "ES/Automation/Contracts/feishu-identity-claim-v1.schema.json",
+    "ES/Automation/Contracts/feishu-message-send-v1.schema.json",
+    "ES/Automation/Workers/DotNet/FeishuIdentity/worker-manifest.json",
     "ES/Automation/Workers/Node/Feishu"
   ],
   "cases": [
@@ -27,6 +38,9 @@
     "source-hashes",
     "operation-allowlist",
     "external-write-approval-boundary",
+    "local-identity-ownership",
+    "recipient-consent",
+    "single-recipient-message-boundary",
     "credential-boundary",
     "authority-routing",
     "evidence-contract"
@@ -34,18 +48,20 @@
   "runtimeClaimsNotProven": [
     "Unity-managed Worker execution and Domain Reload recovery",
     "Feishu authentication, tenant permissions and network responses",
-    "timeout, cancellation, retry, rate-limit and circuit-breaker behavior",
+    "timeout, cancellation, retry, rate-limit and uncertain-write recovery behavior",
     "redaction, cache freshness and incremental synchronization behavior"
+    ,"local identity and private request-envelope ACL, encryption, retention, crash recovery and multi-process contention behavior"
+    ,"Feishu bot enablement, message delivery and server UUID behavior"
   ],
   "runtimeEscalation": {
     "required": true,
     "reason": "Only a fresh authorized managed run can prove Feishu authentication, network reads and process lifecycle behavior."
   },
   "caseAssertions": {
-    "normal-input": "the three allowed operations route to es.feishu.read@1 through AIBrain and the facade",
+    "normal-input": "knowledge, task, local identity and single-recipient message operations route through exact AICommand-to-TaskContract bindings, AIBrain and the facade",
     "invalid-input": "unknown operations, malformed fields and out-of-range bounds are rejected",
-    "denied-expansion": "direct CLI, credential input, remote mutation, path expansion and Assets writes are denied",
-    "repeat-idempotency": "InvocationId reuse is accepted only for the same normalized invocation hash",
+    "denied-expansion": "direct CLI, credential input, arbitrary recipient/webhook, bulk/rich message, path expansion and Assets writes are denied",
+    "repeat-idempotency": "InvocationId reuse is accepted only for the same normalized invocation hash; live writes bind a separate accepted DryRun receipt",
     "hash-change-cache-invalidation": "command, task, worker, Skill or governance drift invalidates stale plans and evidence",
     "interruption-recovery": "timeout, cancellation and Domain Reload have explicit terminal-evidence requirements",
     "deterministic-output": "normalized results, SourceRefs and receipts use bounded fields and stable identities"
@@ -54,17 +70,24 @@
   "responsibilityChecks": [
     "authority-routing",
     "operation-allowlist",
+    "identity-ownership",
+    "recipient-consent",
     "credential-isolation",
     "external-data-boundary",
     "evidence-contract"
   ],
-  "responsibilityScope": "Static acceptance of the managed Feishu read workflow; it does not prove external connectivity or Unity process behavior.",
+  "responsibilityScope": "Static acceptance of managed Feishu knowledge, task, local identity and one-recipient message workflows; it does not prove external connectivity or Unity process behavior.",
   "specializedAcceptance": {
     "id": "feishu-read-workflow-static",
-    "title": "managed Feishu read workflow static gate",
+    "title": "managed Feishu knowledge and task lifecycle static gate",
     "requiredStaticCases": [
       "fixed-route-identity",
       "read-operation-allowlist",
+      "task-operation-allowlist",
+      "identity-ownership-and-consent",
+      "single-recipient-message-boundary",
+      "dryrun-before-external-write",
+      "command-task-exact-binding",
       "credential-non-disclosure",
       "external-authority-non-escalation",
       "stale-hash-and-recovery-block"
@@ -74,10 +97,11 @@
       "governance.json",
       "references/feishu-read-contract.md",
       "references/identity-data-governance.md",
+      "references/identity-messaging-contract.md",
       "references/evidence-acceptance.md",
       "references/evidence-receipt-contract.md"
     ],
-    "sourceAssertions": ["boundary", "identity", "read-only", "credential-isolation", "freshness", "evidence"],
+    "sourceAssertions": ["boundary", "identity", "ownership", "recipient-consent", "single-recipient-message", "credential-isolation", "freshness", "evidence"],
     "runtimeBoundary": "Static acceptance cannot prove Feishu credentials, tenant permissions, network I/O, managed process termination, Domain Reload or cache behavior."
   },
   "specializedGuidanceRef": "references/static-specialized-acceptance.md"

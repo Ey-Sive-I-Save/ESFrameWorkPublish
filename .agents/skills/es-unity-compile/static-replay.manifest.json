@@ -54,13 +54,20 @@
                                                               "asmdef-closure",
                                                               "compile-log-classification",
                                                               "error-zero-contract",
-                                                              "stale-receipt"
+                                                              "stale-receipt",
+                                                              "build-input-fingerprint",
+                                                              "artifact-rehash",
+                                                              "input-drift"
                                                           ],
                                   "evidenceArtifacts":  [
                                                             "SKILL.md",
                                                             "references/control-contract.md",
                                                             "scripts/Invoke-ESDotnetBuild.ps1",
                                                             "scripts/Test-ESUnityEvidencePacket.ps1",
+                                                            "scripts/New-ESUnityBuildIdentitySnapshot.ps1",
+                                                            "scripts/Complete-ESUnityBuildIdentityReceipt.ps1",
+                                                            "scripts/Test-ESUnityBuildIdentityReceipt.ps1",
+                                                            "../../../ES/Automation/Contracts/es-unity-build-identity-receipt-v1.schema.json",
                                                             "references/evidence-receipt-contract.md"
                                                         ],
                                   "sourceAssertions":  [
@@ -68,7 +75,10 @@
                                                            "compile log",
                                                            "zero errors",
                                                            "stale receipt",
-                                                           "project identity"
+                                                           "project identity",
+                                                           "build input fingerprint",
+                                                           "artifact re-hash",
+                                                           "input drift"
                                                        ],
                                   "runtimeBoundary":  "Static compilation artifacts do not prove Unity Editor reload or PlayMode behavior."
                               },

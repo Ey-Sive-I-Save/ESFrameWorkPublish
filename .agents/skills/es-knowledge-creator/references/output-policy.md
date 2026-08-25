@@ -11,6 +11,8 @@
 
 The budget limits context and output, not the truth standard. If a task needs more than the budget, split it into named batches and preserve a handoff list.
 
+For `detailed-entry`, apply `research-and-failure-surface-policy.md`: 40% failure prevention, 25% applicable external primary-source calibration, 25% current project grounding, and 10% routing/execution value. Report hard blockers separately; a numeric score never overrides them.
+
 ## Authority decisions
 
 Knowledge is a derived navigation layer. It may summarize a source but never override it. If a Knowledge entry conflicts with current source, current source wins and the entry becomes stale. If AIWarnings conflict with an aspirational design document, the current P0/source fact wins unless a newer authority is explicitly identified.
@@ -18,6 +20,8 @@ Knowledge is a derived navigation layer. It may summarize a source but never ove
 ## Required non-claims
 
 Every detailed output must state what it does not prove. Typical gaps include Unity compilation, PlayMode lifecycle, Profiler allocation, Player/IL2CPP, platform backend, migration replay, and release acceptance.
+
+Every detailed output must also contain a failure-surface matrix or an explicit evidence-backed reason that fewer than three material failure modes exist. Generic "be careful" prose does not satisfy this requirement.
 
 ## Anti-expansion cases
 

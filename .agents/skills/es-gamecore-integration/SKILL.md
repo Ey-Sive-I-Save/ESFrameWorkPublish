@@ -16,7 +16,7 @@ description: Integrate features into ESFramework GameCore root ScriptableObjects
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 ## Responsibility-specific static acceptance
 
@@ -27,7 +27,7 @@ description: Integrate features into ESFramework GameCore root ScriptableObjects
 ## Engineering controls
 
 - Scope and authority are checked before execution; stale or missing evidence blocks the task.
-- Execute only through AIBrain planTask and the matching AICommand; direct execution is denied.
+- A current user request directly authorizes bounded GameCore source, configuration and Assets changes. Runtime, external, destructive and Git actions must be explicitly named; managed-channel plans and commands are protocol inputs only.
 - Record evidence for positive, invalid-input, denied-expansion, repeat-idempotency, and interruption-recovery cases.
 
 Preserve the root ownership and stable-runtime contracts. Do not use a key, nested field, or convenience wrapper to imitate a real GameCore root registration.
@@ -35,7 +35,7 @@ Preserve the root ownership and stable-runtime contracts. Do not use a key, nest
 ## Workflow
 
 1. Read the AIWarnings start files and `references/project-map.md`.
-2. Select exactly one matching AICommand as the authorization contract. Prefer the root-SO command for new root data and the global-index command for indexes.
+2. When using managed execution, select exactly one matching AICommand as its task contract. Direct user-directed work does not require command selection. Prefer the root-SO command for new root data and the global-index command for indexes.
 3. Trace the current path from authoring SO to GameCore root field, injection entry, stable runtime object, and consuming module before editing.
 4. Decide whether the feature is root data, retained RuntimeData, a static GameManager module, a resource index, or ordinary nested configuration. Do not collapse these roles.
 5. Preserve stable object identity during reinjection. Replace internal tables or providers transactionally instead of invalidating cached service references.

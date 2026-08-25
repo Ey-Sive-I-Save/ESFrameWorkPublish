@@ -16,7 +16,7 @@ description: Audit ESFramework assembly, package, editor/runtime, resource, and 
 
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 证明依赖方向、宿主边界和迁移影响，不把生成的 csproj 当作唯一事实。
 
@@ -25,7 +25,7 @@ description: Audit ESFramework assembly, package, editor/runtime, resource, and 
 1. 收集 asmdef、`.csproj`、Packages、Editor/Runtime 路径和实际源码引用；记录生成物与源码的区别。
 2. 建立 dependency graph，标出 allowed/forbidden/reverse/optional edges、所有者和证据。
 3. 检查序列化、反射、资源寻址、MCP/Worker 和构建平台的隐式边界。
-4. 输出最小修复或迁移建议；变更必须另行走 AICommand，并在目标平台重验。
+4. 输出最小修复或迁移建议；当前用户要求实施时可在同一范围直接变更，并在目标平台重验。选用受管通道时才走其 AICommand。
 
 ## Responsibility-specific static acceptance
 

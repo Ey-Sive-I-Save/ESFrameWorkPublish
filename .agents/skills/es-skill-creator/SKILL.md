@@ -1,6 +1,6 @@
 ---
 name: es-skill-creator
-description: Create, validate, and forward-test ESFramework project Skills with clear triggers, references, deterministic scripts, permission boundaries, UTF-8 safety, and scalable maintenance. Use when creating, upgrading, reviewing, classifying, or retiring a Skill under F:/aaProject/ESFrameWorkPublish/.agents/skills.
+description: Create, validate, and forward-test ESFramework project Skills with clear triggers, references, deterministic scripts, permission boundaries, UTF-8 safety, and scalable maintenance. Use when creating, upgrading, reviewing, classifying, or retiring a Skill under the current project's .agents/skills directory.
 ---
 
 ## Verification boundary
@@ -14,7 +14,9 @@ description: Create, validate, and forward-test ESFramework project Skills with 
 
 ## StaticDeepReplay-first creation standard
 
-Creation and upgrade must first be reproducible without Runtime: replay source/configuration contracts, deterministic scripts, boundary rules, negative inputs, idempotency, interruption recovery, and cache/manifest behavior. Runtime execution is opt-in only after explicit developer approval, an AIBrain plan, the matching AICommand/TaskContract, and a bounded evidence budget. A Skill must declare `staticWeight >= 0.5`, `staticDeepReplayRequired: true`, and `runtimeAuthorizationRequired: true` in `governance.json`.
+When upgrading an existing ES capability, also follow `../es-skill-governance/references/es-preservation-refactor-contract.md`: preserve existing ES entry points and defaults, and add governance at boundaries instead of replacing the subsystem.
+
+Creation and upgrade must first be reproducible without Runtime: replay source/configuration contracts, deterministic scripts, boundary rules, negative inputs, idempotency, interruption recovery, and cache/manifest behavior. Runtime execution is opt-in only when the current user explicitly requests the Runtime action and defines a bounded evidence budget with a timeout or stop condition. When the selected execution path is ManagedAIBrain/Worker, it additionally requires an AIBrain plan and the matching AICommand/TaskContract; those protocol inputs are not required for direct user work. A Skill must declare `staticWeight >= 0.5`, `staticDeepReplayRequired: true`, and `runtimeAuthorizationRequired: true` in `governance.json`.
 
 Every formal Skill must also ship three discoverable StaticDeepReplay artifacts: `static-replay.manifest.json`, `references/static-replay-adapter.md`, and a `scripts/*-StaticReplay.ps1` runner delegating to `es-static-deep-replay`. The manifest fixes the seven replay cases and separates `staticClaims` from `runtimeClaimsNotProven`; absence of any artifact is a creation failure, not a reason to invent an ad-hoc validator.
 
@@ -23,18 +25,18 @@ Every formal Skill must also ship three discoverable StaticDeepReplay artifacts:
 - Load the [Skill Resource Index](../../SKILL_RESOURCE_INDEX.yaml) before selecting references, scripts, MCP capabilities, or evidence.
 - Load the [Skill Catalog](../../SKILL_CATALOG.yaml) to select the family, route keys, lifecycle state, owner and current hash baseline. A new or changed Skill is not accepted until its single catalog record is refreshed.
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- MCP is optional and capability visibility never grants AI-initiated authority. The current explicit user request authorizes its bounded action under `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`; AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
 This skill provides guidance for creating effective skills.
 
 ## ESFramework Project Authority
 
-This project copy is the authority for Skills under `F:/aaProject/ESFrameWorkPublish/.agents/skills`.
+This project copy is the authority for Skills under `<current-project-root>/.agents/skills`; resolve the root from the current working directory instead of a machine-specific absolute path.
 
 - New project Skills must be direct children of `.agents/skills`, use lowercase `es-` names, and contain only the official Skill structure plus necessary resources.
 - Before creating or changing a Skill, read `.agents/README.md`, the relevant AIWarnings routes, and the current target Skill; do not copy AIWarnings, AICommands, session history, Unity assemblies, or generated output into a Skill.
 - Use the bundled `scripts/init_skill.py`, `scripts/generate_openai_yaml.py`, and `scripts/quick_validate.py` from this project copy. Pass an explicit project output path; do not silently write to global Skill directories.
-- After creating or changing a Skill, register it with `python scripts/Build-ESSkillCatalog.py --project-root F:/aaProject/ESFrameWorkPublish --write`, then run `scripts/Test-ESSkillCatalog.ps1`. Registration is an explicit project write and must be included in the change budget.
+- After creating or changing a Skill, run `python .agents/skills/es-skill-creator/scripts/Build-ESSkillCatalog.py --project-root . --catalog .agents/SKILL_CATALOG.yaml --write` from the current project root, then run `.agents/skills/es-skill-creator/scripts/Test-ESSkillCatalog.ps1`. Registration is an explicit project write and must be included in the change budget.
 - Before acceptance, invoke `$es-skill-validator` (read-only) for Structural, Governance, Catalog and Security profiles; behavioral cases require authoritative receipts and cannot be inferred from a green frontmatter check.
 - Before acceptance, invoke `$es-skill-validator -Profile StaticDeepReplay` and run the Skill-local `*-StaticReplay.ps1`; this is the default static fast path and must pass before any Runtime request is considered.
 - All bundled Python tools must read and write UTF-8 explicitly. Run the project UTF-8 guard and the Skill's own tests after changes.
@@ -63,7 +65,7 @@ Use `$es-skill-governance` as the governing contract for classification and acce
 .agents/skills/es-skill-governance/scripts/Test-ESSkillContract.ps1
 ```
 
-Every formal Project Skill must include a `governance.json` beside `SKILL.md` using schema version 1. The file records `tier`, `maturity`, `delivery`, `evidenceLevel`, `riskClass`, `executionMode`, `requiresBrainPlan`, `allowDirectExecution`, and `writePolicy`; Creator must create or update it together with the Skill and run `Test-ESSkillContract.ps1 -RequireGovernanceMetadata`. AIBrain reads this metadata through `KnowledgeIndex` before planning, so missing, stale, malformed, or permission-expanding metadata is a hard validation failure.
+Every formal Project Skill must include a `governance.json` beside `SKILL.md` using schema version 1. The file records `tier`, `maturity`, `delivery`, `evidenceLevel`, `riskClass`, `executionMode`, `requiresBrainPlan`, `allowDirectExecution`, and `writePolicy`; Creator must create or update it together with the Skill and run `Test-ESSkillContract.ps1 -RequireGovernanceMetadata`. `requiresBrainPlan` and `allowDirectExecution` describe Skill-autonomous/managed AIBrain execution only. Missing, stale or malformed metadata blocks that capability and its acceptance claim, not current-user-direct work.
 
 Keep these axes independent:
 
@@ -71,7 +73,7 @@ Keep these axes independent:
 - Maturity: `Proposed` through `Archived`.
 - Delivery: `Designed`, `Implemented-Unverified`, `Blocked`, `Failed`, `Accepted`, or `Released`.
 
-Tier never grants permission. AIWarnings remain the long-lived constraint authority, AICommand remains the per-task authorization contract, and this Creator only scaffolds or validates Skill artifacts within the explicitly authorized project path. A Skill must fail closed for missing prerequisites, denied expansion, malformed input, interrupted execution and unsafe reruns. Frontmatter or `quick_validate.py` alone is at most structural evidence; use the relevant S0-S6 evidence level and do not claim `Stable` without representative positive, invalid-input, denial, repeat/idempotency and recovery evidence.
+Tier never grants AI permission to expand scope. AIWarnings remain the long-lived constraint authority, the current user instruction authorizes actions, and AICommand remains a managed-channel task contract. This Creator initiates only work within the user goal; its candidate mode does not force a user-requested formal Skill change into a proposal. Fail closed for inferred expansion, malformed input, interrupted execution and unsafe reruns. Frontmatter or `quick_validate.py` alone is at most structural evidence; do not claim `Stable` without representative positive, invalid-input, denial, repeat/idempotency and recovery evidence.
 
 ## Specialized static acceptance
 
@@ -343,7 +345,7 @@ For example, when building an image-editor skill, relevant questions include:
 - "Can you give some examples of how this skill would be used?"
 - "I can imagine users asking for things like 'Remove the red-eye from this image' or 'Rotate this image'. Are there other ways you imagine this skill being used?"
 - "What would a user say that should trigger this skill?"
-- "Where should I create this project skill? Unless you explicitly choose another authorized project, place it under `F:/aaProject/ESFrameWorkPublish/.agents/skills` and use an `es-` name so Codex can discover it from the project root."
+- "Where should I create this project skill? Unless you explicitly choose another authorized project, place it under the current repository's `.agents/skills` directory and use an `es-` name so Codex can discover it from the project root."
 
 To avoid overwhelming users, avoid asking too many questions in a single message. Start with the most important questions and follow up as needed for better effectiveness.
 
@@ -379,7 +381,7 @@ At this point, it is time to actually create the skill.
 
 Skip this step only if the skill being developed already exists. In this case, continue to the next step.
 
-Before running `init_skill.py`, ask where the user wants the skill created. For this project, default to `F:/aaProject/ESFrameWorkPublish/.agents/skills`; only use a global Skill directory when the user explicitly requests a separate global Skill.
+Before running `init_skill.py`, ask where the user wants the skill created. For this project, default to `.agents/skills` resolved from the current repository root; only use a global Skill directory when the user explicitly requests a separate global Skill.
 
 When creating a new skill from scratch, always run the `init_skill.py` script. The script conveniently generates a new template skill directory that automatically includes everything a skill requires, making the skill creation process much more efficient and reliable.
 
@@ -392,9 +394,9 @@ scripts/init_skill.py <skill-name> --path <output-directory> [--resources script
 Examples:
 
 ```bash
-python scripts/init_skill.py es-example-skill --path "F:/aaProject/ESFrameWorkPublish/.agents/skills" --resources scripts,references
-python scripts/init_skill.py es-example-skill --path "F:/aaProject/ESFrameWorkPublish/.agents/skills" --resources scripts,references,assets
-python scripts/init_skill.py es-example-skill --path "F:/aaProject/ESFrameWorkPublish/.agents/skills" --resources scripts --examples
+python .agents/skills/es-skill-creator/scripts/init_skill.py es-example-skill --path ".agents/skills" --resources scripts,references
+python .agents/skills/es-skill-creator/scripts/init_skill.py es-example-skill --path ".agents/skills" --resources scripts,references,assets
+python .agents/skills/es-skill-creator/scripts/init_skill.py es-example-skill --path ".agents/skills" --resources scripts --examples
 ```
 
 The script:
@@ -450,6 +452,11 @@ Do not include any other fields in YAML frontmatter.
 Write instructions for using the skill and its bundled resources.
 
 ### Step 5: Validate the Skill
+
+For an existing Skill upgrade, run the governance change-impact preflight
+`../es-skill-governance/scripts/Get-ESSkillChangeImpact.ps1` before final
+validation. `medium` and `major` changes must not be reported as complete until
+their derived revalidation stages have fresh evidence.
 
 Once development of the skill is complete, validate the skill folder to catch basic issues early:
 

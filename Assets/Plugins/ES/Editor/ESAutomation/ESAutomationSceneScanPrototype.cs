@@ -843,7 +843,7 @@ namespace ES
                 return string.Empty;
             };
             request.completed = result => SubmitOptions(session.runId, 0, OptionsSchemaHash, result);
-            ESAdvancedDialogWindow.Show(request);
+            ESDialogService.Show(request);
         }
 
         private static void SubmitOptions(string runId, int requestGeneration, string schemaHash, ESAdvancedDialogResult result)

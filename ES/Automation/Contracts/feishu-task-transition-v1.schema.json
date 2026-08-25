@@ -6,6 +6,7 @@
   "required": ["operation", "taskGuid", "expectedUpdatedAt"],
   "properties": {
     "operation": { "enum": ["task-update", "task-complete", "task-reopen", "members-add", "members-remove", "reminder-add", "reminder-remove"] },
+    "dryRunEvidenceRunId": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
     "taskGuid": { "type": "string", "minLength": 1, "maxLength": 128 },
     "expectedUpdatedAt": { "type": "string", "minLength": 1, "maxLength": 64 },
     "summary": { "type": "string", "minLength": 1, "maxLength": 200 },
@@ -15,8 +16,72 @@
     "isAllDay": { "type": "boolean" },
     "agentTaskStatus": { "type": "integer", "minimum": 0, "maximum": 100 },
     "agentTaskProgress": { "type": "string", "maxLength": 2000 },
-    "members": { "type": "array", "minItems": 1, "maxItems": 20 },
+    "members": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/member" }
+    },
+    "claimedRoles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/claimedRole" }
+    },
     "relativeFireMinute": { "type": "integer", "minimum": -525600, "maximum": 0 },
     "reminderId": { "type": "string", "minLength": 1, "maxLength": 128 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "operation": { "const": "task-update" } }, "required": ["operation"] },
+      "then": {
+        "anyOf": [
+          { "required": ["summary"] },
+          { "required": ["description"] },
+          { "required": ["startTimestamp"] },
+          { "required": ["dueTimestamp"] },
+          { "required": ["agentTaskStatus"] },
+          { "required": ["agentTaskProgress"] }
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "operation": { "enum": ["members-add", "members-remove"] } }, "required": ["operation"] },
+      "then": {
+        "anyOf": [
+          { "required": ["members"] },
+          { "required": ["claimedRoles"] }
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "reminder-add" } }, "required": ["operation"] },
+      "then": { "required": ["relativeFireMinute"] }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "reminder-remove" } }, "required": ["operation"] },
+      "then": { "required": ["reminderId"] }
+    }
+  ],
+  "$defs": {
+    "member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "role"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "type": { "enum": ["user", "app", "chat"] },
+        "role": { "enum": ["assignee", "follower"] }
+      }
+    },
+    "claimedRole": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["roleId", "role"],
+      "properties": {
+        "roleId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,47}$" },
+        "role": { "enum": ["assignee", "follower"] }
+      }
+    }
   }
 }

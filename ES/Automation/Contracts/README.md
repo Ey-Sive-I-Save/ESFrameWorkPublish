@@ -11,6 +11,7 @@
 - `es-scene-scan-report-options.schema.json`：首个 `es.scene.scan` 原型的已注册输入表单。它是固定协议，不允许 Worker 动态扩展字段或控件。
 - `es-automation-ai-request.schema.json` / `es-automation-ai-response.schema.json`：本机受信 AI Bridge 的固定请求/响应信封；动作 payload 仍由 C# 按动作精确校验。
 - `es-automation-python-runtime.schema.json`：项目受管 Python 解释器及可选依赖锁文件的身份与 SHA-256 锁定协议。
+- `es-unity-build-identity-receipt-v1.schema.json`：Unity 构建意图、输入指纹、执行身份和逐项产物哈希的绑定协议；由 `es-unity-compile` 的 Capture/Finalize/Validate 脚本消费，不负责启动构建或证明 Runtime/发布通过。
 
 ## 规则
 

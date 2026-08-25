@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es.feishu.identity.claim@1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation"],
+      "properties": { "operation": { "const": "setup-status" } }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation"],
+      "properties": { "operation": { "const": "list-claims" } }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "roleId", "displayName", "allowTaskAssignment", "allowDirectMessage", "claimBotOwnership"],
+      "properties": {
+        "operation": { "const": "claim-role" },
+        "dryRunEvidenceRunId": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "roleId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,47}$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "taskMemberId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "taskMemberType": { "enum": ["user", "app"] },
+        "messageRecipientId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "messageRecipientType": { "enum": ["open_id", "user_id", "union_id", "email", "chat_id"] },
+        "allowTaskAssignment": { "type": "boolean", "default": false },
+        "allowDirectMessage": { "type": "boolean", "default": false },
+        "claimBotOwnership": { "type": "boolean", "default": false },
+        "botAlias": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,47}$" }
+      },
+      "dependentRequired": {
+        "taskMemberId": ["taskMemberType"],
+        "taskMemberType": ["taskMemberId"],
+        "messageRecipientId": ["messageRecipientType"],
+        "messageRecipientType": ["messageRecipientId"]
+      },
+      "anyOf": [
+        { "required": ["taskMemberId", "taskMemberType"] },
+        { "required": ["messageRecipientId", "messageRecipientType"] },
+        { "properties": { "claimBotOwnership": { "const": true } }, "required": ["claimBotOwnership"] }
+      ],
+      "allOf": [
+        {
+          "if": { "properties": { "allowTaskAssignment": { "const": true } }, "required": ["allowTaskAssignment"] },
+          "then": { "required": ["taskMemberId", "taskMemberType"] }
+        },
+        {
+          "if": { "properties": { "allowDirectMessage": { "const": true } }, "required": ["allowDirectMessage"] },
+          "then": { "required": ["messageRecipientId", "messageRecipientType"] }
+        },
+        {
+          "if": { "properties": { "claimBotOwnership": { "const": true } }, "required": ["claimBotOwnership"] },
+          "then": { "required": ["botAlias"] },
+          "else": { "not": { "required": ["botAlias"] } }
+        }
+      ]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "roleId"],
+      "properties": {
+        "operation": { "const": "release-role" },
+        "dryRunEvidenceRunId": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "roleId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,47}$" }
+      }
+    }
+  ]
+}

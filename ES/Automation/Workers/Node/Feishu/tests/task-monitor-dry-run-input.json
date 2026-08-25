@@ -6,8 +6,8 @@
   "workerType": "Other",
   "workerId": "es.feishu.task.node",
   "workerVersion": "0.1.0",
-  "entrypointHash": "6eeeb41b0feecd36f38bc1d24453aafcc00a0aa5325dba25af741e12a17fc88b",
-  "inputSchemaHash": "e9752b11191b19f155e36629e5fefcfb3ad8900a854f94057d3d980d57c28345",
+  "entrypointHash": "60a93f743fc7f83aaca6e99e91c340156c792006b81758228cd14773be68d7f8",
+  "inputSchemaHash": "e76103d13e908f0e9466c77cfb74c10f76fe9eaed0211e8443a62a37ef293eef",
   "dryRun": true,
   "operation": "tasklist-list",
   "input": { "operation": "tasklist-list", "pageSize": 20 }

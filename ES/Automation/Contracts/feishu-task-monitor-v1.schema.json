@@ -10,6 +10,7 @@
     "taskGuid": { "type": "string", "minLength": 1, "maxLength": 128 },
     "pageSize": { "type": "integer", "minimum": 1, "maximum": 50, "default": 20 },
     "pageToken": { "type": "string", "maxLength": 512 },
-    "completed": { "type": ["boolean", "null"] }
+    "completed": { "type": ["boolean", "null"] },
+    "includeDetails": { "type": "boolean", "default": false }
   }
 }

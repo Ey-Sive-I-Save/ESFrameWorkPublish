@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
@@ -13,21 +14,23 @@ namespace ES
 {
     /// <summary>
     /// 飞书 Task v2 受管接入。读取、派发和状态推进使用独立 TaskContract，
-    /// 外部写仅允许在 AIBrain 一次性计划、DryRun 和固定输入合同下执行。
+    /// 外部写仅允许在 AIBrain 有界计划、DryRun 和固定输入合同下执行。
     /// </summary>
     internal static class ESFeishuTaskAutomation
     {
         internal const string MonitorTaskId = "es.feishu.task.monitor";
         internal const string DispatchTaskId = "es.feishu.task.dispatch";
         internal const string TransitionTaskId = "es.feishu.task.transition";
+        internal const string MessageTaskId = "es.feishu.message.send";
         internal const int TaskVersion = 1;
         internal const string WorkerType = "Other";
         internal const string WorkerId = "es.feishu.task.node";
-        internal const string WorkerVersion = "0.1.0";
-        internal const string WorkerEntrypointHash = "6eeeb41b0feecd36f38bc1d24453aafcc00a0aa5325dba25af741e12a17fc88b";
+        internal const string WorkerVersion = "0.2.0";
+        internal const string WorkerEntrypointHash = "4dfd148e10fdc7e0bcd7167ec9f650f9e750d504bd0cf0764fc069401b6b066b";
         internal const string PackageLockHash = "f12bad503b40ce56b7dedf47bb7e98846d10dbcf4f00bcd95ed6881f98ed9f40";
         private const int TimeoutSeconds = 60;
         private const int MaximumRecoveredRuns = 256;
+        private static readonly TimeSpan DryRunEvidenceLifetime = TimeSpan.FromMinutes(30);
 
         private static readonly Dictionary<string, TaskSpec> Specs = CreateSpecs();
         private static readonly Dictionary<string, ActiveRun> ActiveRuns =
@@ -59,21 +62,27 @@ namespace ES
                 [MonitorTaskId] = new TaskSpec(
                     MonitorTaskId, "飞书任务监控", "读取任务清单、任务和分页进度。",
                     "ES/Automation/Contracts/feishu-task-monitor-v1.schema.json",
-                    "e9752b11191b19f155e36629e5fefcfb3ad8900a854f94057d3d980d57c28345",
+                    "e76103d13e908f0e9466c77cfb74c10f76fe9eaed0211e8443a62a37ef293eef",
                     monitor,
                     new[] { "tasklist-list", "tasklist-get", "task-list", "task-get" }),
                 [DispatchTaskId] = new TaskSpec(
                     DispatchTaskId, "飞书任务派发", "DryRun 后创建清单、任务或虚拟团队测试夹具。",
                     "ES/Automation/Contracts/feishu-task-dispatch-v1.schema.json",
-                    "90aafeb355a263fbcd10e91897d1f26a702767e9b0a97a5278d8114c7fc7dc8b",
+                    "f8f33f8419f634b84ab6b0fd82e68fadc1bff0ba7c765502c4e907683b07480f",
                     mutate,
                     new[] { "tasklist-create", "task-create", "virtual-team-fixture-create" }),
                 [TransitionTaskId] = new TaskSpec(
                     TransitionTaskId, "飞书任务推进", "按远端版本前置条件更新进度、完成状态、成员和提醒。",
                     "ES/Automation/Contracts/feishu-task-transition-v1.schema.json",
-                    "95008f8bc2bbe84c34b4340c990fb19d0e010432bdd1625f1911e285cc2475d9",
+                    "da3ec68c42da076cd9c11cbce01a2d5eca6eda00b9275587822867c1cf88705f",
                     mutate,
                     new[] { "task-update", "task-complete", "task-reopen", "members-add", "members-remove", "reminder-add", "reminder-remove" }),
+                [MessageTaskId] = new TaskSpec(
+                    MessageTaskId, "飞书单人文本消息", "向已认领且明确允许消息的单个角色发送纯文本。",
+                    "ES/Automation/Contracts/feishu-message-send-v1.schema.json",
+                    "8e0d477c0f26236482bce5e6e2ec3ca5ac6b1f422e16dd58e6b28f58ac1089ee",
+                    mutate,
+                    new[] { "send-text" }),
             };
         }
 
@@ -191,6 +200,16 @@ namespace ES
         {
             if (!TryNormalizeInput(spec, invocation, out JObject normalized, out string error))
                 return ESAutomationTaskInvocationResult.Rejected(error);
+            if (!string.IsNullOrWhiteSpace(invocation.invocationId)
+                && !Guid.TryParseExact(invocation.invocationId, "N", out _))
+                return ESAutomationTaskInvocationResult.Rejected(
+                    "InvocationId 必须为空或为 N 格式 GUID。");
+            if (!invocation.fromAi)
+                return ESAutomationTaskInvocationResult.Blocked(
+                    "飞书任务必须来自当前 AIBrain 有界计划。");
+            if (!invocation.dryRun && spec.TaskId != MonitorTaskId
+                && !TryValidateDryRunEvidence(spec, normalized, out error))
+                return ESAutomationTaskInvocationResult.Blocked(error);
             if (!TryResolveNode(out _, out string nodeError))
                 return ESAutomationTaskInvocationResult.Blocked(nodeError);
             if (!invocation.dryRun && !HasCredentials())
@@ -325,8 +344,33 @@ namespace ES
             candidate["operation"] = operation;
             if (!ValidateCommonInput(candidate, out error)) return false;
             if (spec.TaskId == MonitorTaskId && !ValidateMonitor(candidate, operation, out error)) return false;
-            if (spec.TaskId == DispatchTaskId && !ValidateDispatch(candidate, operation, out error)) return false;
+            if (spec.TaskId == DispatchTaskId
+                && !ValidateDispatch(candidate, operation, invocation.dryRun, out error)) return false;
             if (spec.TaskId == TransitionTaskId && !ValidateTransition(candidate, operation, invocation.dryRun, out error)) return false;
+            if (spec.TaskId == MessageTaskId
+                && !ValidateMessage(candidate, operation, invocation.dryRun, out error)) return false;
+            if ((spec.TaskId == DispatchTaskId || spec.TaskId == TransitionTaskId)
+                && candidate["claimedRoles"] is JArray claimedRoles)
+            {
+                IEnumerable<string> allowedRoles = operation == "tasklist-create"
+                    ? new[] { "editor", "viewer" }
+                    : new[] { "assignee", "follower" };
+                if (!ESFeishuIdentityAutomation.TryResolveTaskRoles(claimedRoles,
+                        allowedRoles, out JArray members, out string resolutionHash,
+                        out error)) return false;
+                candidate["members"] = members;
+                candidate["claimedRoleResolutionHash"] = resolutionHash;
+            }
+            if (spec.TaskId == MessageTaskId)
+            {
+                if (!ESFeishuIdentityAutomation.TryResolveMessageRole(
+                        candidate.Value<string>("roleId"), out string recipientId,
+                        out string recipientType, out string recipientRefHash, out error))
+                    return false;
+                candidate["recipientId"] = recipientId;
+                candidate["recipientType"] = recipientType;
+                candidate["recipientRefHash"] = recipientRefHash;
+            }
             normalized = Canonicalize(candidate);
             return true;
         }
@@ -334,7 +378,7 @@ namespace ES
         private static bool ValidateCommonInput(JObject input, out string error)
         {
             error = string.Empty;
-            foreach (JProperty property in input.Properties())
+            foreach (JProperty property in input.DescendantsAndSelf().OfType<JProperty>())
             {
                 if (property.Name.IndexOf("secret", StringComparison.OrdinalIgnoreCase) >= 0
                     || property.Name.IndexOf("token", StringComparison.OrdinalIgnoreCase) >= 0
@@ -344,17 +388,42 @@ namespace ES
                     return false;
                 }
             }
+            string serialized = input.ToString(Formatting.None);
+            if (Regex.IsMatch(serialized,
+                    "(?i)(authorization|app[_-]?secret|client[_-]?secret|access[_-]?token|refresh[_-]?token|bearer)\\s*[:=]"))
+            {
+                error = "输入包含疑似凭据标记，已在写入 request.json 前拒绝。";
+                return false;
+            }
+            foreach (string variable in new[] { "ES_FEISHU_APP_ID", "ES_FEISHU_APP_SECRET" })
+            {
+                string secret = Environment.GetEnvironmentVariable(variable);
+                if (!string.IsNullOrEmpty(secret)
+                    && serialized.IndexOf(secret, StringComparison.Ordinal) >= 0)
+                {
+                    error = "输入包含受管凭据值，已在写入 request.json 前拒绝。";
+                    return false;
+                }
+            }
             return true;
         }
 
         private static bool ValidateMonitor(JObject input, string operation, out string error)
         {
             error = string.Empty;
-            if (!ValidateAllowedFields(input,
-                    new[] { "operation", "tasklistGuid", "taskGuid", "pageSize", "pageToken", "completed" }, out error))
-                return false;
+            IEnumerable<string> allowed = operation == "tasklist-list"
+                ? new[] { "operation", "pageSize", "pageToken" }
+                : operation == "tasklist-get"
+                    ? new[] { "operation", "tasklistGuid" }
+                    : operation == "task-list"
+                        ? new[] { "operation", "tasklistGuid", "pageSize", "pageToken", "completed", "includeDetails" }
+                        : new[] { "operation", "taskGuid" };
+            if (!ValidateAllowedFields(input, allowed, out error)) return false;
             int pageSize = input.Value<int?>("pageSize") ?? 20;
             if (pageSize < 1 || pageSize > 50) { error = "pageSize 必须位于 1 到 50。"; return false; }
+            if (input.Value<bool?>("includeDetails") == true
+                && (operation != "task-list" || pageSize > 10))
+            { error = "includeDetails 仅用于 task-list，且 pageSize 不得超过 10。"; return false; }
             input["pageSize"] = pageSize;
             if ((operation == "tasklist-get" || operation == "task-list")
                 && !RequireBoundedString(input, "tasklistGuid", 128, out error)) return false;
@@ -362,28 +431,51 @@ namespace ES
             return OptionalBoundedString(input, "pageToken", 512, out error);
         }
 
-        private static bool ValidateDispatch(JObject input, string operation, out string error)
+        private static bool ValidateDispatch(JObject input, string operation, bool dryRun,
+            out string error)
         {
             error = string.Empty;
-            if (!ValidateAllowedFields(input, new[]
-                {
-                    "operation", "tasklistName", "tasklistGuid", "summary", "description",
-                    "startTimestamp", "dueTimestamp", "isAllDay", "members", "tasks", "fixturePrefix",
-                }, out error)) return false;
-            if (operation == "tasklist-create"
-                && !RequireBoundedString(input, "tasklistName", 80, out error)) return false;
-            if (operation == "task-create")
+            if (input["members"] != null && input["claimedRoles"] != null)
+            { error = "members 与 claimedRoles 不得混用；角色解析必须保持唯一来源。"; return false; }
+            if (dryRun && input["dryRunEvidenceRunId"] != null)
+            { error = "DryRun 请求不得引用另一次 DryRun 回执。"; return false; }
+            if (operation == "tasklist-create")
             {
-                if (!RequireBoundedString(input, "summary", 200, out error)) return false;
-                if (!RequireBoundedString(input, "tasklistGuid", 128, out error)) return false;
+                if (!ValidateAllowedFields(input,
+                        new[] { "operation", "dryRunEvidenceRunId", "tasklistName", "members", "claimedRoles" }, out error)
+                    || !RequireBoundedString(input, "tasklistName", 80, out error)
+                    || !ValidateMembers(input["members"], out error, false,
+                        new[] { "editor", "viewer" })
+                    || !ValidateClaimedRoles(input["claimedRoles"], out error, false,
+                        new[] { "editor", "viewer" })) return false;
             }
-            if (operation == "virtual-team-fixture-create"
-                && !OptionalBoundedString(input, "fixturePrefix", 40, out error)) return false;
-            if (!OptionalBoundedString(input, "description", 4000, out error)
-                || !ValidateTimestamp(input, "startTimestamp", out error)
-                || !ValidateTimestamp(input, "dueTimestamp", out error)
-                || !ValidateMembers(input["members"], out error)
-                || !ValidateTaskBatch(input["tasks"], out error)) return false;
+            else if (operation == "task-create")
+            {
+                if (!ValidateAllowedFields(input, new[]
+                    {
+                        "operation", "dryRunEvidenceRunId", "tasklistGuid", "summary",
+                        "description", "startTimestamp", "dueTimestamp", "isAllDay", "members", "claimedRoles",
+                    }, out error)
+                    || !RequireBoundedString(input, "summary", 200, out error)
+                    || !RequireBoundedString(input, "tasklistGuid", 128, out error)
+                    || !OptionalBoundedString(input, "description", 4000, out error)
+                    || !ValidateTimestamp(input, "startTimestamp", out error)
+                    || !ValidateTimestamp(input, "dueTimestamp", out error)
+                    || !ValidateMembers(input["members"], out error, false,
+                        new[] { "assignee", "follower" })
+                    || !ValidateClaimedRoles(input["claimedRoles"], out error, false,
+                        new[] { "assignee", "follower" })) return false;
+                if (input["isAllDay"] != null && input["startTimestamp"] == null
+                    && input["dueTimestamp"] == null)
+                { error = "isAllDay 必须与 startTimestamp 或 dueTimestamp 同时使用。"; return false; }
+            }
+            else
+            {
+                if (!ValidateAllowedFields(input,
+                        new[] { "operation", "dryRunEvidenceRunId", "tasks", "fixturePrefix" }, out error)
+                    || !OptionalBoundedString(input, "fixturePrefix", 40, out error)
+                    || !ValidateTaskBatch(input["tasks"], out error)) return false;
+            }
             return true;
         }
 
@@ -391,22 +483,42 @@ namespace ES
             out string error)
         {
             error = string.Empty;
-            if (!ValidateAllowedFields(input, new[]
-                {
-                    "operation", "taskGuid", "expectedUpdatedAt", "summary", "description",
-                    "startTimestamp", "dueTimestamp", "isAllDay", "agentTaskStatus",
-                    "agentTaskProgress", "members", "relativeFireMinute", "reminderId",
-                }, out error)) return false;
+            if (input["members"] != null && input["claimedRoles"] != null)
+            { error = "members 与 claimedRoles 不得混用；角色解析必须保持唯一来源。"; return false; }
+            var allowed = new List<string>
+            {
+                "operation", "taskGuid", "expectedUpdatedAt", "dryRunEvidenceRunId",
+            };
+            if (operation == "task-update")
+                allowed.AddRange(new[] { "summary", "description", "startTimestamp", "dueTimestamp",
+                    "isAllDay", "agentTaskStatus", "agentTaskProgress" });
+            else if (operation == "members-add" || operation == "members-remove")
+                allowed.AddRange(new[] { "members", "claimedRoles" });
+            else if (operation == "reminder-add") allowed.Add("relativeFireMinute");
+            else if (operation == "reminder-remove") allowed.Add("reminderId");
+            if (!ValidateAllowedFields(input, allowed, out error)) return false;
             if (!RequireBoundedString(input, "taskGuid", 128, out error)) return false;
-            if (!dryRun && !RequireBoundedString(input, "expectedUpdatedAt", 64, out error)) return false;
-            if (!OptionalBoundedString(input, "expectedUpdatedAt", 64, out error)
+            if (!RequireBoundedString(input, "expectedUpdatedAt", 64, out error)
                 || !OptionalBoundedString(input, "summary", 200, out error)
                 || !OptionalBoundedString(input, "description", 4000, out error)
                 || !OptionalBoundedString(input, "agentTaskProgress", 2000, out error)
                 || !ValidateTimestamp(input, "startTimestamp", out error)
                 || !ValidateTimestamp(input, "dueTimestamp", out error)) return false;
+            if (dryRun && input["dryRunEvidenceRunId"] != null)
+            { error = "DryRun 请求不得引用另一次 DryRun 回执。"; return false; }
+            if (operation == "task-update"
+                && !new[] { "summary", "description", "startTimestamp", "dueTimestamp",
+                    "agentTaskStatus", "agentTaskProgress" }.Any(name => input[name] != null))
+            { error = "task-update 至少需要一个允许的更新字段。"; return false; }
+            if (input["isAllDay"] != null && input["startTimestamp"] == null
+                && input["dueTimestamp"] == null)
+            { error = "isAllDay 必须与 startTimestamp 或 dueTimestamp 同时使用。"; return false; }
             if ((operation == "members-add" || operation == "members-remove")
-                && !ValidateMembers(input["members"], out error, true)) return false;
+                && !ValidateMembers(input["members"], out error,
+                    input["claimedRoles"] == null, new[] { "assignee", "follower" })) return false;
+            if ((operation == "members-add" || operation == "members-remove")
+                && !ValidateClaimedRoles(input["claimedRoles"], out error,
+                    input["members"] == null, new[] { "assignee", "follower" })) return false;
             if (operation == "reminder-add")
             {
                 int? minute = input.Value<int?>("relativeFireMinute");
@@ -418,6 +530,21 @@ namespace ES
             int? status = input.Value<int?>("agentTaskStatus");
             if (status.HasValue && (status.Value < 0 || status.Value > 100))
             { error = "agentTaskStatus 必须位于 0 到 100。"; return false; }
+            return true;
+        }
+
+        private static bool ValidateMessage(JObject input, string operation, bool dryRun,
+            out string error)
+        {
+            error = string.Empty;
+            if (operation != "send-text")
+            { error = "消息合同仅允许 send-text。"; return false; }
+            if (!ValidateAllowedFields(input,
+                    new[] { "operation", "dryRunEvidenceRunId", "roleId", "text" }, out error)
+                || !RequireRoleId(input, "roleId", out error)
+                || !RequireBoundedString(input, "text", 1000, out error)) return false;
+            if (dryRun && input["dryRunEvidenceRunId"] != null)
+            { error = "消息 DryRun 不得引用另一次 DryRun 回执。"; return false; }
             return true;
         }
 
@@ -464,7 +591,8 @@ namespace ES
             return true;
         }
 
-        private static bool ValidateMembers(JToken token, out string error, bool required = false)
+        private static bool ValidateMembers(JToken token, out string error, bool required = false,
+            IEnumerable<string> allowedRoles = null)
         {
             if (token == null || token.Type == JTokenType.Null)
             { error = required ? "members 为必填数组。" : string.Empty; return !required; }
@@ -472,14 +600,56 @@ namespace ES
             { error = "members 必须是 1 到 20 项的数组。"; return false; }
             foreach (JToken item in array)
             {
-                if (!(item is JObject member)
-                    || !RequireBoundedString(member, "id", 128, out error)
+                if (!(item is JObject member))
+                { error = "member 必须是对象。"; return false; }
+                if (!RequireBoundedString(member, "id", 128, out error)
                     || !OptionalBoundedString(member, "type", 16, out error)
                     || !OptionalBoundedString(member, "role", 16, out error)) return false;
                 if (member.Properties().Any(property => property.Name != "id"
                         && property.Name != "type" && property.Name != "role"))
                 { error = "member 包含未注册字段。"; return false; }
+                string type = member.Value<string>("type") ?? "user";
+                string role = member.Value<string>("role") ?? string.Empty;
+                if (type != "user" && type != "app" && type != "chat")
+                { error = "member.type 不在 user/app/chat 白名单。"; return false; }
+                if (allowedRoles != null && !allowedRoles.Contains(role, StringComparer.Ordinal))
+                { error = "member.role 不属于当前 operation 的允许角色。"; return false; }
             }
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool ValidateClaimedRoles(JToken token, out string error,
+            bool required, IEnumerable<string> allowedRoles)
+        {
+            if (token == null || token.Type == JTokenType.Null)
+            { error = required ? "claimedRoles 为必填数组。" : string.Empty; return !required; }
+            if (!(token is JArray array) || array.Count < 1 || array.Count > 20)
+            { error = "claimedRoles 必须是 1 到 20 项的数组。"; return false; }
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (JToken tokenItem in array)
+            {
+                if (!(tokenItem is JObject item)
+                    || item.Properties().Any(property => property.Name != "roleId"
+                        && property.Name != "role"))
+                { error = "claimedRole 必须只包含 roleId 和 role。"; return false; }
+                if (!RequireRoleId(item, "roleId", out error)) return false;
+                string roleId = item.Value<string>("roleId");
+                string role = item.Value<string>("role") ?? string.Empty;
+                if (!ids.Add(roleId)
+                    || !allowedRoles.Contains(role, StringComparer.Ordinal))
+                { error = "claimedRole 重复或 role 不属于当前操作。"; return false; }
+            }
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool RequireRoleId(JObject input, string name, out string error)
+        {
+            string value = input.Value<string>(name)?.Trim() ?? string.Empty;
+            if (!Regex.IsMatch(value, "^[a-z0-9][a-z0-9._-]{1,47}$"))
+            { error = name + " 必须是 2 到 48 位小写稳定标识。"; return false; }
+            input[name] = value;
             error = string.Empty;
             return true;
         }
@@ -491,8 +661,9 @@ namespace ES
             { error = "tasks 必须是 1 到 20 项的数组。"; return false; }
             foreach (JToken item in array)
             {
-                if (!(item is JObject task)
-                    || !RequireBoundedString(task, "summary", 200, out error)
+                if (!(item is JObject task))
+                { error = "fixture task 必须是对象。"; return false; }
+                if (!RequireBoundedString(task, "summary", 200, out error)
                     || !OptionalBoundedString(task, "description", 4000, out error)) return false;
                 if (task.Properties().Any(property => property.Name != "summary"
                         && property.Name != "description"))
@@ -509,6 +680,80 @@ namespace ES
                          StringComparer.Ordinal))
                 result[property.Name] = property.Value.DeepClone();
             return result;
+        }
+
+        private static bool TryValidateDryRunEvidence(TaskSpec spec, JObject liveInput,
+            out string error)
+        {
+            error = string.Empty;
+            string evidenceRunId = liveInput.Value<string>("dryRunEvidenceRunId") ?? string.Empty;
+            if (!Guid.TryParseExact(evidenceRunId, "N", out _))
+            { error = "Live 外部写必须提供 N 格式 dryRunEvidenceRunId。"; return false; }
+            string evidenceDirectory = GetRunDirectory(evidenceRunId);
+            string recordPath = Path.Combine(evidenceDirectory, "run-record.json");
+            string requestPath = Path.Combine(evidenceDirectory, "request.json");
+            try
+            {
+                if (!File.Exists(recordPath) || !File.Exists(requestPath))
+                { error = "未找到绑定的 DryRun RunRecord/request。"; return false; }
+                ESAutomationRunRecord record = ReadRecord(recordPath, spec.TaskId);
+                if (record.status != ESAutomationRunStatus.Completed
+                    || record.completionDecision?.accepted != true)
+                { error = "绑定的 DryRun 未形成已接受的终态证据。"; return false; }
+                if (!string.Equals(record.entrypointHash, WorkerEntrypointHash,
+                        StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(record.inputManifestHash, ComputeFileHash(requestPath),
+                        StringComparison.OrdinalIgnoreCase))
+                { error = "绑定的 DryRun RunRecord 或输入文件 Hash 已漂移。"; return false; }
+                if (record.outputs == null || record.outputHashes == null
+                    || record.outputs.Count != record.outputHashes.Count)
+                { error = "绑定的 DryRun 输出清单无效。"; return false; }
+                for (int i = 0; i < record.outputs.Count; i++)
+                {
+                    string outputPath = Path.GetFullPath(record.outputs[i]);
+                    if (!ESAutomationPathPolicy.IsWithin(outputPath, new[] { evidenceDirectory })
+                        || !File.Exists(outputPath)
+                        || ESManagedFileIO.ContainsExistingReparsePoint(outputPath)
+                        || !string.Equals(ComputeFileHash(outputPath), record.outputHashes[i],
+                            StringComparison.OrdinalIgnoreCase))
+                    { error = "绑定的 DryRun 输出路径或 Hash 已漂移。"; return false; }
+                }
+                if (!DateTimeOffset.TryParse(record.lastUpdatedAtUtc, out DateTimeOffset completedAt)
+                    || DateTimeOffset.UtcNow - completedAt > DryRunEvidenceLifetime
+                    || completedAt > DateTimeOffset.UtcNow.AddMinutes(1))
+                { error = "绑定的 DryRun 回执已过期或时间无效。"; return false; }
+                JObject request = JObject.Parse(File.ReadAllText(requestPath,
+                    new UTF8Encoding(false, true)));
+                if (request.Value<bool?>("dryRun") != true
+                    || request.Value<string>("taskId") != spec.TaskId
+                    || request.Value<int?>("taskVersion") != TaskVersion
+                    || !string.Equals(request.Value<string>("entrypointHash"), WorkerEntrypointHash,
+                        StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(request.Value<string>("inputSchemaHash"), spec.SchemaHash,
+                        StringComparison.OrdinalIgnoreCase))
+                { error = "绑定的 DryRun 身份或源码 Hash 与当前合同不一致。"; return false; }
+                string dataPath = Path.Combine(evidenceDirectory, "feishu-task-data.json");
+                JObject data = JObject.Parse(File.ReadAllText(dataPath,
+                    new UTF8Encoding(false, true)));
+                if (data.Value<bool?>("networkCalled") != false
+                    || data.Value<bool?>("mutationApplied") != false
+                    || !string.Equals(record.completionDecision.criterionResults?[0]?.evidenceHash,
+                        ComputeFileHash(dataPath), StringComparison.OrdinalIgnoreCase))
+                { error = "绑定的 DryRun 语义证据无效或已漂移。"; return false; }
+                var expected = request["input"] as JObject;
+                if (expected == null)
+                { error = "绑定的 DryRun 缺少规范化输入。"; return false; }
+                var actual = (JObject)liveInput.DeepClone();
+                actual.Remove("dryRunEvidenceRunId");
+                if (!JToken.DeepEquals(Canonicalize(expected), Canonicalize(actual)))
+                { error = "Live 输入与绑定的 DryRun 规范化输入不一致。"; return false; }
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = "DryRun 证据校验失败：" + SanitizeError(exception.GetBaseException().Message);
+                return false;
+            }
         }
 
         private static void PollActiveRuns()
@@ -880,7 +1125,8 @@ namespace ES
                 {
                     taskId = spec.TaskId,
                     taskVersion = TaskVersion,
-                    category = "External/FeishuTasks",
+                    category = spec.TaskId == MessageTaskId
+                        ? "External/FeishuMessaging" : "External/FeishuTasks",
                     displayName = spec.DisplayName,
                     summary = spec.Summary,
                     inputSchemaHash = spec.SchemaHash,

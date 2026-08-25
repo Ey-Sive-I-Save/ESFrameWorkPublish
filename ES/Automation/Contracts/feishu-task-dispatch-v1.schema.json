@@ -6,15 +6,72 @@
   "required": ["operation"],
   "properties": {
     "operation": { "enum": ["tasklist-create", "task-create", "virtual-team-fixture-create"] },
-    "tasklistName": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "dryRunEvidenceRunId": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "tasklistName": { "type": "string", "minLength": 1, "maxLength": 80 },
     "tasklistGuid": { "type": "string", "minLength": 1, "maxLength": 128 },
     "summary": { "type": "string", "minLength": 1, "maxLength": 200 },
     "description": { "type": "string", "maxLength": 4000 },
     "startTimestamp": { "type": "string", "pattern": "^[0-9]{1,16}$" },
     "dueTimestamp": { "type": "string", "pattern": "^[0-9]{1,16}$" },
     "isAllDay": { "type": "boolean", "default": false },
-    "members": { "type": "array", "maxItems": 20 },
-    "tasks": { "type": "array", "minItems": 1, "maxItems": 20 },
+    "members": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/member" }
+    },
+    "claimedRoles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/claimedRole" }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/fixtureTask" }
+    },
     "fixturePrefix": { "type": "string", "minLength": 1, "maxLength": 40 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "operation": { "const": "tasklist-create" } }, "required": ["operation"] },
+      "then": { "required": ["tasklistName"] }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "task-create" } }, "required": ["operation"] },
+      "then": { "required": ["tasklistGuid", "summary"] }
+    }
+  ],
+  "$defs": {
+    "member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "role"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "type": { "enum": ["user", "app", "chat"] },
+        "role": { "enum": ["assignee", "follower", "editor", "viewer"] }
+      }
+    },
+    "claimedRole": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["roleId", "role"],
+      "properties": {
+        "roleId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,47}$" },
+        "role": { "enum": ["assignee", "follower", "editor", "viewer"] }
+      }
+    },
+    "fixtureTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 4000 }
+      }
+    }
   }
 }

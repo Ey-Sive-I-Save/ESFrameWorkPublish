@@ -6,8 +6,8 @@
   "workerType": "Other",
   "workerId": "es.feishu.task.node",
   "workerVersion": "0.1.0",
-  "entrypointHash": "6eeeb41b0feecd36f38bc1d24453aafcc00a0aa5325dba25af741e12a17fc88b",
-  "inputSchemaHash": "90aafeb355a263fbcd10e91897d1f26a702767e9b0a97a5278d8114c7fc7dc8b",
+  "entrypointHash": "60a93f743fc7f83aaca6e99e91c340156c792006b81758228cd14773be68d7f8",
+  "inputSchemaHash": "1ecc8519b6d6a1dee451ff4841cbfb0f8e9e6f865f480f60285f985a1833054c",
   "dryRun": true,
   "operation": "virtual-team-fixture-create",
   "input": { "operation": "virtual-team-fixture-create", "fixturePrefix": "ES Commercial Test" }

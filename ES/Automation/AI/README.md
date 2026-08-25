@@ -30,7 +30,7 @@ ESAutomationAiBridge.TrySetTrustedPlayModeListening(true, out string reason);
 
 ## 受 AIBrain 门禁的任务调用
 
-`runTask` 不接受旧的“只给 taskId/taskVersion”直达格式。`requestId` 必须替换为新的 32 位十六进制 GUID；调用者还必须明确声明本次目标、定向 `routeKeys`、已选择的 AICommand、正式项目 Skill（或已烘焙的 Graph Workflow）以及已注册的 TaskContract：
+`runTask` 不接受旧的“只给 taskId/taskVersion”直达格式。先用新的 `requestId` 调用 `planTask`，保存返回的 `planHash` 和 `invocationId`；执行时使用另一个新的 `requestId`，但携带相同的 `invocationId` 与 `approvedPlanHash=planHash`。只有受信进程内宿主绑定了当前用户指令的 L1 本地计划，授权才可在 15 分钟内有限复用（默认最多 20 次）；外部 Bridge JSON 不能自报 `userDirected`。L1/L2 `candidate-only` 计划默认最多 5 次，L3 或其他计划默认单次；每次可复用调用仍须使用新的非空 `idempotencyKey`。
 
 ```json
 {
@@ -47,6 +47,30 @@ ESAutomationAiBridge.TrySetTrustedPlayModeListening(true, out string reason);
     "taskVersion": 1,
     "preset": "default",
     "input": {}
+  }
+}
+```
+
+`planTask` 返回的 `data.brainPlan` 中包含 `planHash`、`invocationId` 和 `planId`。随后执行：
+
+```json
+{
+  "protocolVersion": 1,
+  "requestId": "fedcba9876543210fedcba9876543210",
+  "actorId": "codex.local",
+  "action": "runTask",
+  "payload": {
+    "objective": "读取当前项目的场景扫描结果",
+    "routeKeys": ["editor", "scene-validation"],
+    "commandId": "scene.scan.review",
+    "skillNames": ["es-editor-tooling"],
+    "taskId": "es.scene.scan",
+    "taskVersion": 1,
+    "preset": "default",
+    "input": {},
+    "invocationId": "0123456789abcdef0123456789abcdef",
+    "approvedPlanHash": "<planTask 返回的 planHash>",
+    "idempotencyKey": "scene-scan-20260823-001"
   }
 }
 ```

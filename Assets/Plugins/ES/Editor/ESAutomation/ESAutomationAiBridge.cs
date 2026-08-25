@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -58,6 +59,8 @@ namespace ES
         private static bool updateSubscribed;
         private static volatile bool enabled;
         private static volatile bool rescanRequested;
+        private static volatile bool capabilityDriftRequested;
+        private static bool sessionRefreshSignaled;
         // 这是本次 Editor 会话的运行态门禁，绝不写回“用户已授权”的持久化设置。
         // PlayMode 默认暂停收件箱；受信的 Unity 主线程控制通道可以仅在本次 Play 中显式恢复。
         private static volatile bool playModeAutoSuspended;
@@ -349,12 +352,33 @@ namespace ES
                     EditorApplication.update += ProcessQueuedRequests;
                 }
                 foreach (string requestPath in Directory.GetFiles(InboxDirectory, "*.request.json", SearchOption.TopDirectoryOnly)) QueuePath(requestPath);
+                if (!sessionRefreshSignaled)
+                {
+                    sessionRefreshSignaled = true;
+                    ESAIBrainCoordinator.NotifyCapabilityDrift("session-resume");
+                }
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
                 Stop();
             }
+        }
+
+        // Temporary diagnostic menu used to verify the editor-session listener after a domain reload.
+        [MenuItem(MenuItemPathDefine.AUTOMATION_AI_CONTROL_PATH + "诊断 AI 收件箱监听")]
+        private static void LogListenerDiagnostics()
+        {
+            EnsureInitializedOnEditorMainThread();
+            Debug.Log("[ESAutomation] AI Bridge diagnostics: enabled=" + enabled
+                + ", listening=" + (watcher != null && watcher.EnableRaisingEvents && updateSubscribed)
+                + ", watcher=" + (watcher != null)
+                + ", updateSubscribed=" + updateSubscribed
+                + ", playMode=" + EditorApplication.isPlaying
+                + ", playModeAutoSuspended=" + playModeAutoSuspended
+                + ", trustedPlayModeOverride=" + trustedPlayModeListeningOverride
+                + ", inbox=" + InboxDirectory);
+            EnsureStartedIfEnabled();
         }
 
         private static void Stop()
@@ -379,6 +403,8 @@ namespace ES
             lock (queuedPathLock) queuedPathSet.Clear();
             while (queuedPaths.TryDequeue(out _)) { }
             rescanRequested = false;
+            capabilityDriftRequested = false;
+            sessionRefreshSignaled = false;
             ClearPendingSceneModificationApprovals("Bridge 停止、PlayMode 切换或 Domain Reload 使待批准场景计划失效。");
         }
 
@@ -395,6 +421,7 @@ namespace ES
             {
                 if (!queuedPathSet.Add(path)) return;
                 queuedPaths.Enqueue(path);
+                capabilityDriftRequested = true;
             }
         }
 
@@ -405,6 +432,12 @@ namespace ES
                 Stop();
                 return;
             }
+            if (capabilityDriftRequested)
+            {
+                capabilityDriftRequested = false;
+                ESAIBrainCoordinator.NotifyCapabilityDrift("queue-update");
+            }
+            ESAIBrainCoordinator.PollCapabilityDrift("catalog-change");
             if (rescanRequested)
             {
                 rescanRequested = false;
@@ -632,6 +665,7 @@ namespace ES
                                 ["knowledgeIndex"] = ESAIBrainCoordinator.KnowledgeIndexPath,
                                 ["skillsRoot"] = ESAIBrainCoordinator.ProjectSkillsRoot,
                                 ["discoveryAction"] = "listCapabilities",
+                                ["routeProbeAction"] = "runKnowledgeRouteProbes",
                                 ["planningAction"] = "planTask",
                                 ["execution"] = "runTask 必须先经 AIBrain 计划与权威门禁",
                             },
@@ -640,6 +674,28 @@ namespace ES
                         });
                     case "listCapabilities":
                         return HandleListCapabilities(requestId, action, payload);
+                    case "runKnowledgeRouteProbes":
+                    {
+                        RequireExactProperties(payload, Array.Empty<string>(), "runKnowledgeRouteProbes payload");
+                        ESAIBrainRouteProbeReport report = ESAIBrainRouteProbeRunner.Run();
+                        JObject data = JObject.FromObject(report);
+                        if (string.Equals(report.status, "Passed", StringComparison.Ordinal))
+                            return ESAutomationAiResponse.Completed(requestId, action,
+                                "AIKnowledge 静态路由回归探针已通过。", string.Empty, data);
+                        return new ESAutomationAiResponse
+                        {
+                            requestId = requestId,
+                            action = action,
+                            status = "Failed",
+                            message = "AIKnowledge 静态路由回归探针未通过。",
+                            data = data,
+                        };
+                    }
+                    case "getFailureTelemetry":
+                        RequireExactProperties(payload, Array.Empty<string>(), "getFailureTelemetry payload");
+                        return ESAutomationAiResponse.Completed(requestId, action,
+                            "已返回有界、脱敏的 AI 失败遥测。", string.Empty,
+                            JObject.FromObject(ESAIBrainFailureTelemetry.Snapshot()));
                     case "planTask":
                         return HandlePlanTask(requestId, action, actorId, payload);
                     case "runTask":
@@ -724,6 +780,13 @@ namespace ES
             ESAIBrainRequest brainRequest = CreateBrainRequest(requestId, actorId, payload, "runTask");
             ESAutomationTaskInvocationResult result = ESAIBrainCoordinator.Run(
                 brainRequest, out ESAIBrainPlan plan);
+            ESAIBrainFailureTelemetry.RecordPlan(plan, "runTask");
+            if (plan != null && plan.IsRunnable && result != null
+                && (string.Equals(result.status, "Blocked", StringComparison.Ordinal)
+                    || string.Equals(result.status, "Rejected", StringComparison.Ordinal)
+                    || string.Equals(result.status, "Failed", StringComparison.Ordinal)))
+                ESAIBrainFailureTelemetry.Record("TaskExecutionFailure", "runTask",
+                    result.status + "|" + result.message, result.runId);
             return FromTaskResultWithPlan(requestId, action, result, plan);
         }
 
@@ -734,7 +797,7 @@ namespace ES
                 ? new List<string>() : ReadStringArray(payload, "routeKeys");
             ESAIBrainProductionSurface surface = ESAIBrainCoordinator.DescribeProductionSurface(routeKeys);
             return ESAutomationAiResponse.Completed(requestId, action,
-                "已返回 Skills、AIWarnings、Knowledge、AICommand、CLI 和 MCP 生产力面。",
+                "已返回 Skills、AIWarnings、Knowledge、AICommand、CLI、Diagnostics 和 MCP 生产力面。",
                 string.Empty, JObject.FromObject(surface));
         }
 
@@ -743,20 +806,56 @@ namespace ES
         {
             ESAIBrainRequest brainRequest = CreateBrainRequest(requestId, actorId, payload, "planTask");
             ESAIBrainPlan plan = ESAIBrainCoordinator.Plan(brainRequest);
+            if (plan != null && plan.IsRunnable)
+            {
+                // The public compatibility overload remains available as
+                // TryApprovePlan(brainRequest, plan, out string approvalError).
+                if (ESAIBrainCoordinator.TryApprovePlan(brainRequest, plan,
+                        out ESAIBrainPlan canonicalPlan, out string approvalError))
+                {
+                    plan = canonicalPlan;
+                }
+                else
+                {
+                    plan = canonicalPlan ?? plan;
+                    ApplyPlanApprovalFailure(plan, approvalError);
+                }
+            }
+            ESAIBrainFailureTelemetry.RecordPlan(plan, "planTask");
             return FromBrainPlan(requestId, action, plan);
         }
+
+        private static void ApplyPlanApprovalFailure(ESAIBrainPlan plan, string approvalError)
+        {
+            if (plan == null) return;
+            plan.blockers.Add("计划授权签发失败：" + approvalError);
+            plan.status = "Blocked";
+            // The previous hash described the canonical Ready content, not this failure result.
+            plan.planHash = string.Empty;
+        }
+
+#if UNITY_INCLUDE_TESTS
+        internal static void Internal_ApplyPlanApprovalFailureForTests(
+            ESAIBrainPlan plan, string approvalError)
+        {
+            ApplyPlanApprovalFailure(plan, approvalError);
+        }
+#endif
 
         private static ESAIBrainRequest CreateBrainRequest(string requestId, string actorId,
             JObject payload, string context)
         {
             RequireExactProperties(payload, new[]
                 { "objective", "routeKeys", "commandId", "taskId", "taskVersion", "preset", "input" },
-                new[] { "skillNames", "dryRun" }, context + " payload");
+                new[] { "skillNames", "dryRun", "approvedPlanHash", "invocationId", "idempotencyKey" }, context + " payload");
             if (payload["routeKeys"].Type != JTokenType.Array)
                 throw new InvalidOperationException(context + ".routeKeys 必须是数组。");
             if (payload["skillNames"] != null && payload["skillNames"].Type != JTokenType.Array)
                 throw new InvalidOperationException(context + ".skillNames 必须是数组。");
             if (payload["input"].Type != JTokenType.Object) throw new InvalidOperationException(context + ".input 必须是对象。");
+            if (string.Equals(context, "runTask", StringComparison.Ordinal)
+                && payload["approvedPlanHash"] == null)
+                throw new InvalidOperationException("runTask requires approvedPlanHash from planTask.");
             bool dryRun = false;
             if (payload["dryRun"] != null)
             {
@@ -778,8 +877,18 @@ namespace ES
                 fromAi = true,
                 dryRun = dryRun,
                 actorId = actorId,
-                invocationId = requestId,
+                invocationId = payload["invocationId"] == null
+                    ? requestId : ReadRequestId(payload, "invocationId"),
+                approvedPlanHash = payload["approvedPlanHash"] == null
+                    ? string.Empty : ReadSha256(payload, "approvedPlanHash"),
+                idempotencyKey = payload["idempotencyKey"] == null
+                    ? string.Empty : ReadString(payload, "idempotencyKey"),
+                userDirectedRuntime = false,
+                userInstructionHash = string.Empty,
             };
+            if (!ESAIBrainCoordinator.TryBindTrustedHostProof(brainRequest,
+                    "es.automation.ai-bridge", string.Empty, false, out string proofError))
+                throw new InvalidOperationException("AIBrain trusted-host proof failed: " + proofError);
             return brainRequest;
         }
 
@@ -976,6 +1085,7 @@ namespace ES
             {
                 planId = plan.planId,
                 planHash = plan.planHash,
+                invocationId = plan.invocationId,
                 status = plan.status,
                 blockers = plan.blockers,
                 knowledge = plan.knowledge.Select(item => item.knowledgeId).ToArray(),
@@ -1758,6 +1868,16 @@ namespace ES
         public override void InitInvoke()
         {
             ESAutomationAiBridge.InitializeForEditorMainThread();
+            // ES_Logic.Editor is a separate assembly and is not part of the
+            // AssemblyStream type scan. Bind its UI endpoint at the same
+            // editor-main-thread boundary without introducing an assembly cycle.
+            Type endpointType = Type.GetType("ES.ESUIAutomationMaterializer, ES_Logic.Editor", false);
+            MethodInfo initialize = endpointType?.GetMethod(
+                "InitializeForEditor",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            if (initialize == null)
+                throw new InvalidOperationException("UI Materializer Endpoint 未加载，无法注册 es.ui.materialize-screen。");
+            initialize.Invoke(null, null);
         }
     }
 

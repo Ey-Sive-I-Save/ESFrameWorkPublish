@@ -62,9 +62,6 @@ namespace ES
             if (!string.IsNullOrWhiteSpace(invocation.invocationId)
                 && !Guid.TryParseExact(invocation.invocationId, "N", out _))
                 return ESAutomationTaskInvocationResult.Rejected("InvocationId 必须为空或为 N 格式 GUID。");
-            if (invocation.fromAi
-                && !ESAIBrainCoordinator.TryConsumeAuthorization(invocation, out string brainReason))
-                return ESAutomationTaskInvocationResult.Rejected(brainReason);
             if (!endpoints.TryGetValue(Key(invocation.taskId, invocation.taskVersion), out IESAutomationTaskEndpoint endpoint))
                 return ESAutomationTaskInvocationResult.Rejected("未注册或不支持的任务：" + invocation.taskId + "@" + invocation.taskVersion);
             if (!ESAutomationTaskRegistry.TryGet(invocation.taskId, invocation.taskVersion,
@@ -75,6 +72,17 @@ namespace ES
                 contract.Validate();
                 if (contract.worker == null || !contract.worker.enabled)
                     return ESAutomationTaskInvocationResult.Blocked("TaskContract 的 Worker 未被 C# Editor 启用。");
+                if (invocation.fromAi && !endpoint.Descriptor.allowAiInvoke)
+                    return ESAutomationTaskInvocationResult.Rejected(
+                        "该任务未授权 AI 直接调用：" + endpoint.Descriptor.taskId);
+                if (EditorApplication.isPlayingOrWillChangePlaymode
+                    && !endpoint.Descriptor.allowInPlayMode)
+                    return ESAutomationTaskInvocationResult.Blocked(
+                        "该任务未声明允许在 PlayMode 运行：" + endpoint.Descriptor.taskId);
+                if (invocation.fromAi
+                    && !ESAIBrainCoordinator.TryValidateAuthorization(invocation,
+                        out string preflightBrainReason))
+                    return ESAutomationTaskInvocationResult.Rejected(preflightBrainReason);
                 if (!(endpoint is IESAutomationContractBoundEndpoint bound))
                     return ESAutomationTaskInvocationResult.Rejected("Endpoint 未绑定 TaskContract 执行门禁。");
                 ESAutomationInvocationRequirements requirements = bound.DescribeInvocation(invocation);
@@ -139,16 +147,22 @@ namespace ES
                 foreach (string path in requirements.readPaths ?? new List<string>())
                     ESAutomationPathPolicy.EnsureWorkerReadAllowed(path, contract.readRoots);
                 foreach (string path in requirements.writePaths ?? new List<string>())
-                    ESAutomationPathPolicy.EnsureWorkerWriteAllowed(path, contract.writeRoots);
+                {
+                    if ((requirements.requiredCapabilities & ESAutomationCapability.MaterializeUI) != ESAutomationCapability.None)
+                        ESAutomationPathPolicy.EnsureUIWorkerWriteAllowed(path, contract.writeRoots);
+                    else
+                        ESAutomationPathPolicy.EnsureWorkerWriteAllowed(path, contract.writeRoots);
+                }
             }
             catch (Exception exception)
             {
                 return ESAutomationTaskInvocationResult.Rejected("Automation Contract 门禁拒绝调用：" + exception.Message);
             }
-            if (invocation.fromAi && !endpoint.Descriptor.allowAiInvoke)
-                return ESAutomationTaskInvocationResult.Rejected("该任务未授权 AI 直接调用：" + endpoint.Descriptor.taskId);
-            if (EditorApplication.isPlayingOrWillChangePlaymode && !endpoint.Descriptor.allowInPlayMode)
-                return ESAutomationTaskInvocationResult.Blocked("该任务未声明允许在 PlayMode 运行：" + endpoint.Descriptor.taskId);
+            // Re-check and consume immediately before execution. Another process may have
+            // consumed the bounded grant after the non-consuming preflight above.
+            if (invocation.fromAi
+                && !ESAIBrainCoordinator.TryConsumeAuthorization(invocation, out string brainReason))
+                return ESAutomationTaskInvocationResult.Rejected(brainReason);
             return endpoint.Run(invocation);
         }
 
@@ -401,7 +415,7 @@ namespace ES
         /// </summary>
         public string invocationId = string.Empty;
         /// <summary>
-        /// AI 调用的 AIBrain 计划指纹。Facade 会原子消费与完整 Invocation 绑定的一次性许可。
+        /// AI 调用的 AIBrain 计划指纹。Facade 会原子消费与完整 Invocation 绑定的有界复用许可。
         /// </summary>
         public string brainPlanHash = string.Empty;
         /// <summary>副作用重试和恢复使用的稳定幂等键；旧调用可为空以保持兼容。</summary>
@@ -414,6 +428,11 @@ namespace ES
         public bool fromAi;
         public bool dryRun;
         public string actorId = string.Empty;
+        // Internal authorization bindings are never accepted from Bridge JSON or persisted with task input.
+        internal string authorizationClass = string.Empty;
+        internal string authorizationBudgetClass = string.Empty;
+        internal string authorizationHostId = string.Empty;
+        internal string userInstructionHash = string.Empty;
     }
 
     public sealed class ESAutomationTaskInputSubmission

@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es.knowledge.route-probe-registry@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "registryId", "lifecycleState", "ownerKnowledgeId", "rankingVersion", "knowledgeIndexPath", "consumers", "probes"],
+  "properties": {
+    "$schema": { "const": "../../ES/Automation/Contracts/es-knowledge-route-probe-registry.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "registryId": { "const": "esframework-knowledge-route-probes" },
+    "lifecycleState": { "const": "operational-static" },
+    "ownerKnowledgeId": { "const": "es.knowledge.routing-quality.v1" },
+    "rankingVersion": { "const": "per-route-best-top3-v1" },
+    "knowledgeIndexPath": { "const": "Documentation/AIKnowledge/KnowledgeIndex.yaml" },
+    "consumers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cliValidator", "unityTestSource", "unityTestMethod", "bridgeOperation", "productionSurfaceId"],
+      "properties": {
+        "cliValidator": { "const": "Documentation/AIKnowledge/tools/Test-ESKnowledgeRouteProbeRegistry.ps1" },
+        "unityTestSource": { "const": "Assets/Plugins/ES/1_Design/Tests/ESAIBrainKnowledgeRoutingTests.cs" },
+        "unityTestMethod": { "const": "Plan_RouteProbeRegistry_MatchesFixedCrossDomainExpectations" },
+        "bridgeOperation": { "const": "runKnowledgeRouteProbes" },
+        "productionSurfaceId": { "const": "diagnostic.knowledge-route-probes" }
+      }
+    },
+    "probes": {
+      "type": "array",
+      "minItems": 10,
+      "items": { "$ref": "#/$defs/probe" }
+    }
+  },
+  "$defs": {
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![A-Za-z]:|[/\\\\]|.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$"
+    },
+    "stringSet": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "knowledgeExpectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["knowledgeId", "requiredReads"],
+      "properties": {
+        "knowledgeId": { "type": "string", "pattern": "^es\\.[a-z0-9.-]+\\.v[0-9]+$" },
+        "requiredReads": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/path" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probeId", "domain", "objective", "explicitRouteKeys", "expectedRouteKeys",
+        "expectedKnowledgeTop3", "forbiddenKnowledgeIds", "zeroHitAllowed", "repeatCount",
+        "evidenceBoundary"
+      ],
+      "properties": {
+        "probeId": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "domain": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "objective": { "type": "string", "minLength": 3, "maxLength": 300 },
+        "explicitRouteKeys": { "$ref": "#/$defs/stringSet" },
+        "expectedRouteKeys": { "$ref": "#/$defs/stringSet" },
+        "expectedKnowledgeTop3": {
+          "type": "array",
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/knowledgeExpectation" }
+        },
+        "forbiddenKnowledgeIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^es\\.[a-z0-9.-]+\\.v[0-9]+$" },
+          "uniqueItems": true
+        },
+        "zeroHitAllowed": { "type": "boolean" },
+        "repeatCount": { "type": "integer", "minimum": 2, "maximum": 5 },
+        "evidenceBoundary": { "const": "static-routing-only" },
+        "notes": { "type": "string", "maxLength": 500 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "zeroHitAllowed": { "const": true } } },
+          "then": { "properties": { "expectedKnowledgeTop3": { "maxItems": 0 } } },
+          "else": { "properties": { "expectedKnowledgeTop3": { "minItems": 1 } } }
+        }
+      ]
+    }
+  }
+}

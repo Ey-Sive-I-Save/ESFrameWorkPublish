@@ -29,6 +29,9 @@ namespace ES
         WriteTemp = 1 << 6,
         ExternalRead = 1 << 7,
         ExternalWrite = 1 << 8,
+        // Fixed, domain-scoped UI materialization. This is intentionally distinct from
+        // the forbidden generic WriteAssets capability.
+        MaterializeUI = 1 << 9,
     }
 
     /// <summary>
@@ -231,6 +234,7 @@ namespace ES
                     case "WriteTemp": result |= ESAutomationCapability.WriteTemp; break;
                     case "ExternalRead": result |= ESAutomationCapability.ExternalRead; break;
                     case "ExternalWrite": result |= ESAutomationCapability.ExternalWrite; break;
+                    case "MaterializeUI": result |= ESAutomationCapability.MaterializeUI; break;
                     default: throw new InvalidOperationException("TaskContract 包含未知能力：" + capability);
                 }
             }
@@ -1140,6 +1144,22 @@ namespace ES
             if (!IsWithin(normalized, new[] { ProjectRoot })) throw new UnauthorizedAccessException("Worker 写入路径必须位于项目根目录内。");
             if (IsWithin(normalized, ProtectedWriteRoots)) throw new InvalidOperationException("Worker 禁止写入受保护目录：" + normalized);
             if (!IsWithin(normalized, writeRoots)) throw new UnauthorizedAccessException("路径不在任务 WriteRoots 内：" + normalized);
+        }
+
+        /// <summary>
+        /// Dedicated in-process UI materializer boundary. Generic Workers still cannot
+        /// write Assets; only the fixed generated UI roots and evidence root are allowed.
+        /// </summary>
+        public static void EnsureUIWorkerWriteAllowed(string path, IEnumerable<string> writeRoots)
+        {
+            string normalized = Normalize(path);
+            string generatedPrefabRoot = Path.Combine(ProjectRoot, "Assets", "UI", "Prefabs", "Generated");
+            string generatedSceneRoot = Path.Combine(ProjectRoot, "Assets", "UI", "Scenes", "Generated");
+            string evidenceRoot = Path.Combine(ProjectRoot, "ES", "UIEvidence");
+            if (!IsWithin(normalized, new[] { generatedPrefabRoot, generatedSceneRoot, evidenceRoot }))
+                throw new UnauthorizedAccessException("MaterializeUI 只能写入 Generated UI 或 ES/UIEvidence：" + normalized);
+            if (!IsWithin(normalized, writeRoots))
+                throw new UnauthorizedAccessException("MaterializeUI 路径不在任务 WriteRoots 内：" + normalized);
         }
 
         public static void EnsureWorkerReadAllowed(string path, IEnumerable<string> readRoots)
@@ -2141,7 +2161,8 @@ namespace ES
             | ESAutomationCapability.Publish
             | ESAutomationCapability.WriteTemp
             | ESAutomationCapability.ExternalRead
-            | ESAutomationCapability.ExternalWrite;
+            | ESAutomationCapability.ExternalWrite
+            | ESAutomationCapability.MaterializeUI;
 
         public ESAutomationCapability userAuthorization;
         public ESAutomationCapability taskContract;
@@ -2451,6 +2472,7 @@ namespace ES
         /// </summary>
         public void RefreshDecisionSemantics()
         {
+            bool acceptanceWasClaimed = accepted;
             if (claimsNotProven == null) claimsNotProven = new List<string>();
             if (string.IsNullOrWhiteSpace(runtimeStatus)) runtimeStatus = "runtime-not-run";
             if (string.IsNullOrWhiteSpace(evidenceStatus)) evidenceStatus = "not-evaluated";
@@ -2470,6 +2492,9 @@ namespace ES
                 accepted = false;
                 decisionStatus = "Blocked";
                 blockingLayer = boundaryBlocked ? "static-boundary" : contractBlocked ? "static-contract" : codeBlocked ? "static-code" : "evidence";
+                if (acceptanceWasClaimed)
+                    ESAIBrainFailureTelemetry.Record("ClaimDowngraded", "completion-decision",
+                        decisionStatus + "|" + blockingLayer, runId);
                 return;
             }
             // A persisted boolean is not an external acceptance proof. If the
@@ -2482,6 +2507,9 @@ namespace ES
                 || unauthorizedToolCalls || staleEvidence || contradictoryEvidence
                 || sourceDrift || budgetViolation))
                 accepted = false;
+            if (acceptanceWasClaimed && !accepted)
+                ESAIBrainFailureTelemetry.Record("ClaimDowngraded", "completion-decision",
+                    evidenceStatus + "|" + runtimeStatus, runId);
             if (accepted)
             {
                 decisionStatus = "Accepted";
@@ -2678,7 +2706,8 @@ namespace ES
                     reason = "Strict snapshot binding requires CompletionDecision.";
                     return false;
                 }
-                if (!EvidenceBindsToSnapshot(result.completionDecision, result.executionSnapshot, true))
+                if (!ESAutomationReleaseGate.EvidenceBindsToSnapshot(
+                    result.completionDecision, result.executionSnapshot, true))
                 {
                     reason = "Strict snapshot binding requires complete criterion evidence bindings.";
                     return false;

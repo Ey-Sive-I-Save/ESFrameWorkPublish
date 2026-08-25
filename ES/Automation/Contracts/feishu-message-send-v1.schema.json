@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es.feishu.message.send@1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operation", "roleId", "text"],
+  "properties": {
+    "operation": { "const": "send-text" },
+    "dryRunEvidenceRunId": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "roleId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,47}$" },
+    "text": { "type": "string", "minLength": 1, "maxLength": 1000 }
+  }
+}

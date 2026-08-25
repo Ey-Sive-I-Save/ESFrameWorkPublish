@@ -20,11 +20,24 @@ namespace ES
     /// </summary>
     public static class ESAIBrainCoordinator
     {
+        private const int MaxKnowledgeEntriesPerPlan = 3;
         public const int ContractVersion = 1;
+        public const string KnowledgeRankingVersion = "per-route-best-top3-v1";
         public const string KnowledgeIndexPath = "Documentation/AIKnowledge/KnowledgeIndex.yaml";
         public const string ProjectSkillsRoot = ".agents/skills";
         public const string ProjectSkillCatalogPath = ".agents/SKILL_CATALOG.yaml";
         public const string ProjectSkillDiscoveryPolicyPath = ".agents/SKILL_DISCOVERY_POLICY.json";
+        private const string AuthorizationStorePath = "ES/Output/Automation/AIBrain/authorizations.json";
+        private const int AuthorizationStoreSchemaVersion = 3;
+        private const int MaximumAuthorizationRecords = 4096;
+        private const string AuthorizationStatusActive = "Active";
+        private const string AuthorizationStatusExhausted = "Exhausted";
+        private const string AuthorizationStatusExpired = "Expired";
+        private const string AuthorizationClassManaged = "ManagedAIBrain";
+        private const string AuthorizationClassCurrentUser = "CurrentUserDirect";
+        private const string AuthorizationBudgetLowRisk = "LowRiskDirected";
+        private const string AuthorizationBudgetCandidate = "CandidateOnly";
+        private const string AuthorizationBudgetHighRisk = "HighRisk";
         private const string SkillGovernanceMetadataFileName = "governance.json";
 
         private const string AiwarningsRoot = "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/";
@@ -34,20 +47,52 @@ namespace ES
         private const string AiwarningsRouteCatalog = AiwarningsRoot + "AIWarningsRouteCatalog.json";
         private static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(false, true);
         private static readonly object AuthorizationLock = new object();
-        private static readonly Dictionary<string, AIBrainExecutionAuthorization> Authorizations =
-            new Dictionary<string, AIBrainExecutionAuthorization>(StringComparer.OrdinalIgnoreCase);
-        private static readonly TimeSpan AuthorizationLifetime = TimeSpan.FromMinutes(1);
+        private static readonly TimeSpan AuthorizationLifetime = TimeSpan.FromMinutes(15);
+        private static readonly TimeSpan TrustedHostProofLifetime = TimeSpan.FromMinutes(5);
+        private const int AuthorizationPolicyVersion = 5;
+        private const int DefaultLowRiskAuthorizationUses = 20;
+        private const int DefaultCandidateAuthorizationUses = 5;
+        private const int DefaultHighRiskAuthorizationUses = 1;
+        private static Func<DateTimeOffset> authorizationUtcNow = () => DateTimeOffset.UtcNow;
+        private static string authorizationStorePathOverride = string.Empty;
+        private static int authorizationRecordLimit = MaximumAuthorizationRecords;
+        private static readonly object CapabilityDriftLock = new object();
+        private static readonly string[] CapabilityMetadataPaths =
+        {
+            ".agents/SKILL_RESOURCE_INDEX.yaml",
+            ".agents/SKILL_CATALOG.yaml",
+            ".agents/SKILL_DISCOVERY_POLICY.json",
+            "Documentation/AIKnowledge/KnowledgeIndex.yaml",
+            "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
+            "Assets/Plugins/ES/AICommands/AICommandCatalog.json",
+        };
+        private static string capabilityMetadataFingerprint = string.Empty;
+        private static string capabilityDriftTrigger = string.Empty;
+        private static DateTimeOffset nextCapabilityPollUtc = DateTimeOffset.MinValue;
+        private static int capabilityDriftGeneration;
+
+        public static event System.Action<ESAIBrainCapabilityDriftSignal> CapabilityDriftDetected;
+
+        public static int CapabilityDriftGeneration
+        {
+            get
+            {
+                lock (CapabilityDriftLock) return capabilityDriftGeneration;
+            }
+        }
 
         public static bool TryPlan(ESAIBrainRequest request, out ESAIBrainPlan plan, out string error)
         {
-            plan = BuildPlan(request);
+            plan = Plan(request);
             error = plan == null ? "AIBrain 未能建立计划。" : plan.FirstBlocker;
             return plan != null && plan.IsRunnable;
         }
 
         public static ESAIBrainPlan Plan(ESAIBrainRequest request)
         {
-            return BuildPlan(request);
+            if (!TrySnapshotRequest(request, out ESAIBrainRequest snapshot, out string snapshotError))
+                return CreateInvalidRequestPlan(request, snapshotError);
+            return BuildPlan(snapshot);
         }
 
         /// <summary>
@@ -71,45 +116,141 @@ namespace ES
                 plan = null;
                 return ESAutomationTaskInvocationResult.Rejected("AIBrain 执行缺少请求。");
             }
+            if (!TrySnapshotRequest(request, out ESAIBrainRequest snapshot, out string snapshotError))
+                return RejectPlan(out plan, "AIBrain 请求快照失败：" + snapshotError);
             try
             {
-                if (request.executionSnapshot != null) request.executionSnapshot.Validate();
-                if (!string.IsNullOrWhiteSpace(request.idempotencyKey)
-                    && (request.idempotencyKey.Length > 160
-                        || !Regex.IsMatch(request.idempotencyKey, "^[A-Za-z0-9._:-]+$")))
+                if (snapshot.executionSnapshot != null) snapshot.executionSnapshot.Validate();
+                if (!string.IsNullOrWhiteSpace(snapshot.idempotencyKey)
+                    && (snapshot.idempotencyKey.Length > 160
+                        || !Regex.IsMatch(snapshot.idempotencyKey, "^[A-Za-z0-9._:-]+$")))
                     return RejectPlan(out plan, "AIBrain 幂等键格式无效。");
             }
             catch (Exception exception)
             {
                 return RejectPlan(out plan, "AIBrain 执行快照无效：" + exception.Message);
             }
-            plan = BuildPlan(request);
+            plan = BuildPlan(snapshot);
             if (plan == null)
                 return ESAutomationTaskInvocationResult.Rejected("AIBrain 未能建立计划。");
             if (!plan.IsRunnable)
                 return ESAutomationTaskInvocationResult.Blocked(
                     "AIBrain 门禁未通过：" + plan.FirstBlocker, plan.planId);
-            if (request.executionSnapshot != null)
+            AuthorizationProfile authorizationProfile = AuthorizationProfile.Untrusted();
+            if (snapshot.fromAi)
             {
-                if (!string.Equals(request.executionSnapshot.brainPlanHash, plan.planHash,
+                if (!TryResolveAuthorizationProfile(plan, snapshot, true,
+                        out authorizationProfile, out string proofError))
+                    return ESAutomationTaskInvocationResult.Blocked(
+                        "AIBrain trusted-host proof is invalid: " + proofError, plan.planId);
+                if (!ESAutomationWorkerRegistration.IsSha256(snapshot.approvedPlanHash))
+                    return ESAutomationTaskInvocationResult.Blocked(
+                        "AI runTask requires the approvedPlanHash returned by planTask.", plan.planId);
+                if (!string.Equals(snapshot.approvedPlanHash, plan.planHash,
+                        StringComparison.OrdinalIgnoreCase))
+                    return ESAutomationTaskInvocationResult.Blocked(
+                        "approvedPlanHash does not match the current plan; re-plan is required.", plan.planId);
+                if (!ValidateExecutionEligibility(plan, authorizationProfile,
+                        out string executionEligibilityError))
+                    return ESAutomationTaskInvocationResult.Blocked(
+                        executionEligibilityError, plan.planId);
+            }
+            if (snapshot.executionSnapshot != null)
+            {
+                if (!string.Equals(snapshot.executionSnapshot.brainPlanHash, plan.planHash,
                     StringComparison.OrdinalIgnoreCase))
                     return ESAutomationTaskInvocationResult.Blocked(
                         "ExecutionSnapshot.brainPlanHash 与当前 AIBrain PlanHash 不一致。", plan.planId);
                 if (plan.command != null
-                    && !string.Equals(request.executionSnapshot.commandHash, plan.command.contractHash,
+                    && !string.Equals(snapshot.executionSnapshot.commandHash, plan.command.contractHash,
                         StringComparison.OrdinalIgnoreCase))
                     return ESAutomationTaskInvocationResult.Blocked(
                         "ExecutionSnapshot.commandHash 与当前 AICommand 合同不一致。", plan.planId);
+                if (plan.task != null
+                    && !string.Equals(snapshot.executionSnapshot.taskContractHash,
+                        plan.task.taskContractHash, StringComparison.OrdinalIgnoreCase))
+                    return ESAutomationTaskInvocationResult.Blocked(
+                        "ExecutionSnapshot.taskContractHash 与当前 TaskContract 不一致。", plan.planId);
             }
 
-            if (string.IsNullOrWhiteSpace(request.invocationId)
-                || !Guid.TryParseExact(request.invocationId, "N", out _))
+            if (string.IsNullOrWhiteSpace(snapshot.invocationId)
+                || !Guid.TryParseExact(snapshot.invocationId, "N", out _))
             {
                 return ESAutomationTaskInvocationResult.Rejected(
                     "AIBrain 执行必须携带稳定的 N 格式 InvocationId，以防止重复副作用。");
             }
 
-            var invocation = new ESAutomationTaskInvocation
+            var invocation = CreateInvocation(snapshot, plan, authorizationProfile);
+            return ESAutomationFacade.RunTask(invocation);
+        }
+
+        public static bool TryApprovePlan(ESAIBrainRequest request, ESAIBrainPlan plan,
+            out string error)
+        {
+            bool approved = TryApprovePlan(request, plan,
+                out ESAIBrainPlan canonicalPlan, out error);
+            if (approved && canonicalPlan != null)
+            {
+                // Preserve the original API while returning the identity actually written to Store.
+                plan.planId = canonicalPlan.planId;
+                plan.planHash = canonicalPlan.planHash;
+            }
+            return approved;
+        }
+
+        public static bool TryApprovePlan(ESAIBrainRequest request, ESAIBrainPlan plan,
+            out ESAIBrainPlan approvedCanonicalPlan, out string error)
+        {
+            approvedCanonicalPlan = null;
+            error = string.Empty;
+            if (request == null || plan == null)
+            {
+                error = "AIBrain 授权缺少请求或计划。";
+                return false;
+            }
+            string expectedPlanHash = plan.planHash ?? string.Empty;
+            if (!ESAutomationWorkerRegistration.IsSha256(expectedPlanHash))
+            {
+                error = "待批准计划缺少有效 PlanHash。";
+                return false;
+            }
+            if (!TrySnapshotRequest(request, out ESAIBrainRequest snapshot, out error)) return false;
+            if (string.IsNullOrWhiteSpace(snapshot.invocationId)
+                || !Guid.TryParseExact(snapshot.invocationId, "N", out _))
+            {
+                error = "计划必须携带稳定的 N 格式 InvocationId。";
+                return false;
+            }
+            if (!snapshot.fromAi)
+            {
+                error = "AIBrain 持久授权只签发给受管 AI 调用。";
+                return false;
+            }
+            ESAIBrainPlan canonicalPlan = BuildPlan(snapshot);
+            approvedCanonicalPlan = canonicalPlan;
+            if (canonicalPlan == null || !canonicalPlan.IsRunnable)
+            {
+                error = "只有重新构建后仍可运行的 canonical 计划才能签发授权："
+                    + (canonicalPlan?.FirstBlocker ?? "计划为空");
+                return false;
+            }
+            if (!string.Equals(expectedPlanHash, canonicalPlan.planHash,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                error = "待批准 PlanHash 与当前 canonical 计划不一致；必须重新规划。";
+                return false;
+            }
+            if (!TryResolveAuthorizationProfile(canonicalPlan, snapshot, true,
+                    out AuthorizationProfile profile, out error)) return false;
+            if (!ValidateExecutionEligibility(canonicalPlan, profile, out error)) return false;
+            return TryRegisterAuthorization(CreateInvocation(snapshot, canonicalPlan, profile),
+                canonicalPlan, profile, out error);
+        }
+
+        private static ESAutomationTaskInvocation CreateInvocation(ESAIBrainRequest request,
+            ESAIBrainPlan plan, AuthorizationProfile profile)
+        {
+            return new ESAutomationTaskInvocation
             {
                 invocationId = request.invocationId,
                 brainPlanHash = plan.planHash,
@@ -122,9 +263,321 @@ namespace ES
                 actorId = string.IsNullOrWhiteSpace(request.actorId) ? "aibrain" : request.actorId,
                 idempotencyKey = request.idempotencyKey ?? string.Empty,
                 executionSnapshot = request.executionSnapshot,
+                authorizationClass = profile.authorizationClass,
+                authorizationBudgetClass = profile.budgetClass,
+                authorizationHostId = profile.hostId,
+                userInstructionHash = profile.instructionHash,
             };
-            RegisterAuthorization(invocation);
-            return ESAutomationFacade.RunTask(invocation);
+        }
+
+        private static bool ValidateExecutionEligibility(ESAIBrainPlan plan,
+            AuthorizationProfile profile, out string error)
+        {
+            error = string.Empty;
+            bool lowRiskDirected = profile != null
+                && string.Equals(profile.authorizationClass, AuthorizationClassCurrentUser,
+                    StringComparison.Ordinal)
+                && IsLowRiskDirectedPlan(plan);
+            bool explicitUserRuntime = profile != null
+                && string.Equals(profile.authorizationClass, AuthorizationClassCurrentUser,
+                    StringComparison.Ordinal)
+                && ESAutomationWorkerRegistration.IsSha256(profile.instructionHash)
+                && IsExplicitUserRuntimePlan(plan);
+            bool bridgeUiMaterializer = profile != null
+                && string.Equals(profile.authorizationClass, AuthorizationClassManaged,
+                    StringComparison.Ordinal)
+                && ESAutomationWorkerRegistration.IsSha256(profile.instructionHash)
+                && IsExplicitUserRuntimePlan(plan);
+            foreach (ESAIBrainSkillBinding skill in plan.skills)
+            {
+                if (skill.reviewRequired && !lowRiskDirected && !explicitUserRuntime
+                    && !bridgeUiMaterializer)
+                {
+                    error = "Skill is still NeedsReview and cannot enter an AI execution plan: " + skill.name;
+                    return false;
+                }
+                if (!lowRiskDirected && !explicitUserRuntime && !bridgeUiMaterializer
+                    && !string.Equals(skill.runtimeEligibility, "authorized-only",
+                        StringComparison.Ordinal))
+                {
+                    error = "Skill has no runtime acceptance eligibility: " + skill.name
+                        + " (" + skill.runtimeEligibility + ")";
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool IsExplicitUserRuntimePlan(ESAIBrainPlan plan)
+        {
+            if (plan == null || plan.command == null || plan.task == null)
+                return false;
+            if (!string.Equals(plan.command.id, "ui.materialize-screen", StringComparison.Ordinal)
+                || !string.Equals(plan.command.riskLevel, "L2", StringComparison.Ordinal)
+                || !string.Equals(plan.command.writeMode, "scoped-write", StringComparison.Ordinal))
+                return false;
+            if (!string.Equals(plan.task.taskId, "es.ui.materialize-screen", StringComparison.Ordinal)
+                || plan.task.taskVersion != 1
+                || !string.Equals(plan.task.workerType, "Other", StringComparison.Ordinal)
+                || !plan.task.workerEnabled
+                || !plan.task.allowAiInvoke)
+                return false;
+            return plan.task.capabilities != null
+                && plan.task.capabilities.Contains("MaterializeUI");
+        }
+
+        private static bool IsExplicitUiMaterializerRequest(ESAIBrainRequest request)
+        {
+            return request != null
+                && string.Equals(request.commandId, "ui.materialize-screen", StringComparison.Ordinal)
+                && string.Equals(request.taskId, "es.ui.materialize-screen", StringComparison.Ordinal)
+                && request.taskVersion == 1;
+        }
+
+        internal static bool TryBindTrustedHostProof(ESAIBrainRequest request,
+            string hostId, string userInstructionHash, bool userDirected, out string error)
+        {
+            error = string.Empty;
+            if (request == null)
+            {
+                error = "Trusted-host proof requires a managed AI request.";
+                return false;
+            }
+            // A failed rebind must never leave a previously valid proof attached.
+            request.trustedHostProof = null;
+            if (!request.fromAi)
+            {
+                error = "Trusted-host proof requires a managed AI request.";
+                return false;
+            }
+            string normalizedHost = hostId?.Trim() ?? string.Empty;
+            if (!Regex.IsMatch(normalizedHost, "^[A-Za-z0-9._:-]{1,128}$"))
+            {
+                error = "Trusted host id is invalid.";
+                return false;
+            }
+            string normalizedInstructionHash = userInstructionHash?.Trim().ToLowerInvariant()
+                ?? string.Empty;
+            if (userDirected && !ESAutomationWorkerRegistration.IsSha256(normalizedInstructionHash))
+            {
+                error = "Current-user proof requires a bound instruction SHA-256.";
+                return false;
+            }
+            if (!userDirected
+                && string.Equals(normalizedHost, "es.automation.ai-bridge", StringComparison.Ordinal)
+                && IsExplicitUiMaterializerRequest(request))
+            {
+                // The local Bridge is gated by IsUserAuthorized before this proof is
+                // created. Bind the exact request internally; external JSON cannot
+                // assert a current-user flag or supply its own instruction hash.
+                normalizedInstructionHash = ComputeTrustedHostRequestHash(request);
+            }
+            if (!string.IsNullOrWhiteSpace(normalizedInstructionHash)
+                && !ESAutomationWorkerRegistration.IsSha256(normalizedInstructionHash))
+            {
+                error = "Trusted-host instruction hash is invalid.";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(request.invocationId)
+                || !Guid.TryParseExact(request.invocationId, "N", out _))
+            {
+                error = "Trusted-host proof requires a stable N format InvocationId.";
+                return false;
+            }
+
+            DateTimeOffset issuedAtUtc = AuthorizationUtcNow;
+            request.trustedHostProof = new AIBrainTrustedHostProof(
+                normalizedHost,
+                userDirected ? AuthorizationClassCurrentUser : AuthorizationClassManaged,
+                normalizedInstructionHash,
+                request.invocationId,
+                request.actorId ?? string.Empty,
+                ComputeTrustedHostRequestHash(request),
+                issuedAtUtc,
+                issuedAtUtc + TrustedHostProofLifetime);
+            return true;
+        }
+
+        private static bool TryResolveAuthorizationProfile(ESAIBrainPlan plan,
+            ESAIBrainRequest request, bool requireTrustedProof,
+            out AuthorizationProfile profile, out string error)
+        {
+            profile = AuthorizationProfile.Untrusted();
+            if (!TryValidateTrustedHostProof(request, out AIBrainTrustedHostProof proof,
+                    out error))
+                return !requireTrustedProof;
+
+            profile = CreateAuthorizationProfile(plan, proof.authorizationClass,
+                proof.hostId, proof.instructionHash);
+            return true;
+        }
+
+        private static AuthorizationProfile CreateAuthorizationProfile(ESAIBrainPlan plan,
+            string authorizationClass, string hostId, string instructionHash)
+        {
+            string budgetClass;
+            int maxUses;
+            if (plan != null && plan.command != null
+                && string.Equals(plan.command.writeMode, "candidate-only", StringComparison.Ordinal)
+                && (string.Equals(plan.command.riskLevel, "L1", StringComparison.Ordinal)
+                    || string.Equals(plan.command.riskLevel, "L2", StringComparison.Ordinal)))
+            {
+                budgetClass = AuthorizationBudgetCandidate;
+                maxUses = DefaultCandidateAuthorizationUses;
+            }
+            else if (string.Equals(authorizationClass, AuthorizationClassCurrentUser,
+                         StringComparison.Ordinal) && IsLowRiskDirectedPlan(plan))
+            {
+                budgetClass = AuthorizationBudgetLowRisk;
+                maxUses = DefaultLowRiskAuthorizationUses;
+            }
+            else
+            {
+                budgetClass = AuthorizationBudgetHighRisk;
+                maxUses = DefaultHighRiskAuthorizationUses;
+            }
+            return new AuthorizationProfile(authorizationClass, budgetClass,
+                hostId, instructionHash, maxUses);
+        }
+
+        private static bool TryValidateTrustedHostProof(ESAIBrainRequest request,
+            out AIBrainTrustedHostProof proof, out string error)
+        {
+            proof = request?.trustedHostProof;
+            error = string.Empty;
+            if (request == null || proof == null)
+            {
+                error = "Trusted-host proof is missing.";
+                return false;
+            }
+            DateTimeOffset now = AuthorizationUtcNow;
+            if (proof.issuedAtUtc > now || proof.expiresAtUtc <= now
+                || proof.expiresAtUtc - proof.issuedAtUtc > TrustedHostProofLifetime)
+            {
+                error = "Trusted-host proof is expired or outside its lifetime.";
+                return false;
+            }
+            if (!string.Equals(proof.invocationId, request.invocationId, StringComparison.Ordinal)
+                || !string.Equals(proof.actorId, request.actorId ?? string.Empty,
+                    StringComparison.Ordinal))
+            {
+                error = "Trusted-host proof identity does not match the request.";
+                return false;
+            }
+            if (!Regex.IsMatch(proof.hostId ?? string.Empty, "^[A-Za-z0-9._:-]{1,128}$")
+                || (!string.IsNullOrWhiteSpace(proof.instructionHash)
+                    && !ESAutomationWorkerRegistration.IsSha256(proof.instructionHash)))
+            {
+                error = "Trusted-host proof host or instruction hash is invalid.";
+                return false;
+            }
+            if (!ESAutomationWorkerRegistration.IsSha256(proof.requestHash)
+                || !string.Equals(proof.requestHash, ComputeTrustedHostRequestHash(request),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                error = "Trusted-host proof request binding has drifted.";
+                return false;
+            }
+            if (!string.Equals(proof.authorizationClass, AuthorizationClassManaged,
+                    StringComparison.Ordinal)
+                && !string.Equals(proof.authorizationClass, AuthorizationClassCurrentUser,
+                    StringComparison.Ordinal))
+            {
+                error = "Trusted-host proof authorization class is invalid.";
+                return false;
+            }
+            if (string.Equals(proof.authorizationClass, AuthorizationClassCurrentUser,
+                    StringComparison.Ordinal)
+                && !ESAutomationWorkerRegistration.IsSha256(proof.instructionHash))
+            {
+                error = "Current-user proof is not bound to an instruction hash.";
+                return false;
+            }
+            return true;
+        }
+
+        private static bool TrySnapshotRequest(ESAIBrainRequest source,
+            out ESAIBrainRequest snapshot, out string error)
+        {
+            snapshot = null;
+            error = string.Empty;
+            if (source == null) return true;
+            try
+            {
+                snapshot = new ESAIBrainRequest
+                {
+                    objective = source.objective ?? string.Empty,
+                    routeKeys = new List<string>(source.routeKeys ?? new List<string>()),
+                    commandId = source.commandId ?? string.Empty,
+                    skillNames = new List<string>(source.skillNames ?? new List<string>()),
+                    workflow = source.workflow == null ? null : new ESAIBrainWorkflowAuthority
+                    {
+                        workflowId = source.workflow.workflowId ?? string.Empty,
+                        contentHash = source.workflow.contentHash ?? string.Empty,
+                        sourceAssetGuid = source.workflow.sourceAssetGuid ?? string.Empty,
+                    },
+                    taskId = source.taskId ?? string.Empty,
+                    taskVersion = source.taskVersion,
+                    preset = source.preset ?? string.Empty,
+                    input = source.input == null ? new JObject() : (JObject)source.input.DeepClone(),
+                    fromAi = source.fromAi,
+                    dryRun = source.dryRun,
+                    actorId = source.actorId ?? string.Empty,
+                    invocationId = source.invocationId ?? string.Empty,
+                    approvedPlanHash = source.approvedPlanHash ?? string.Empty,
+                    idempotencyKey = source.idempotencyKey ?? string.Empty,
+                    userDirectedRuntime = source.userDirectedRuntime,
+                    userInstructionHash = source.userInstructionHash ?? string.Empty,
+                    executionSnapshot = SnapshotExecutionSnapshot(source.executionSnapshot),
+                    trustedHostProof = source.trustedHostProof,
+                };
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                return false;
+            }
+        }
+
+        private static ESAutomationExecutionSnapshot SnapshotExecutionSnapshot(
+            ESAutomationExecutionSnapshot source)
+        {
+            return source == null ? null : new ESAutomationExecutionSnapshot
+            {
+                snapshotId = source.snapshotId ?? string.Empty,
+                inputManifestHash = source.inputManifestHash ?? string.Empty,
+                sourceHash = source.sourceHash ?? string.Empty,
+                taskContractHash = source.taskContractHash ?? string.Empty,
+                commandHash = source.commandHash ?? string.Empty,
+                brainPlanHash = source.brainPlanHash ?? string.Empty,
+            };
+        }
+
+        private static ESAIBrainPlan CreateInvalidRequestPlan(ESAIBrainRequest request, string error)
+        {
+            var plan = new ESAIBrainPlan
+            {
+                contractVersion = ContractVersion,
+                planId = Guid.NewGuid().ToString("N"),
+                status = "InvalidRequest",
+                objective = request?.objective ?? string.Empty,
+                invocationId = request?.invocationId ?? string.Empty,
+            };
+            plan.blockers.Add("AIBrain 请求快照失败：" + error);
+            return plan;
+        }
+
+        private static bool IsLowRiskDirectedPlan(ESAIBrainPlan plan)
+        {
+            if (plan == null || plan.command == null
+                || !string.Equals(plan.command.riskLevel, "L1", StringComparison.Ordinal)) return false;
+            if (!string.Equals(plan.command.writeMode, "read-only", StringComparison.Ordinal)
+                && !string.Equals(plan.command.writeMode, "documentation-write", StringComparison.Ordinal)
+                && !string.Equals(plan.command.writeMode, "candidate-only", StringComparison.Ordinal)) return false;
+            if (plan.task != null && !string.Equals(plan.task.workerType, "DotNet", StringComparison.Ordinal)
+                && !string.Equals(plan.task.workerType, "Other", StringComparison.Ordinal)) return false;
+            return true;
         }
 
         private static ESAutomationTaskInvocationResult RejectPlan(out ESAIBrainPlan plan, string message)
@@ -133,63 +586,559 @@ namespace ES
             return ESAutomationTaskInvocationResult.Rejected(message);
         }
 
+        internal static bool TryValidateAuthorization(ESAutomationTaskInvocation invocation,
+            out string reason)
+        {
+            return TryAccessAuthorization(invocation, false, out reason);
+        }
+
         internal static bool TryConsumeAuthorization(ESAutomationTaskInvocation invocation,
             out string reason)
         {
+            return TryAccessAuthorization(invocation, true, out reason);
+        }
+
+        private static bool TryAccessAuthorization(ESAutomationTaskInvocation invocation,
+            bool consume, out string reason)
+        {
             reason = string.Empty;
             if (invocation == null || !invocation.fromAi
-                || !ESAutomationWorkerRegistration.IsSha256(invocation.brainPlanHash))
+                || !ESAutomationWorkerRegistration.IsSha256(invocation.brainPlanHash)
+                || string.IsNullOrWhiteSpace(invocation.invocationId)
+                || !Guid.TryParseExact(invocation.invocationId, "N", out _))
             {
-                reason = "AI Automation 调用缺少有效的 AIBrain PlanHash。";
+                reason = "AI Automation 调用缺少有效的 AIBrain PlanHash 或 InvocationId。";
                 return false;
             }
 
             lock (AuthorizationLock)
             {
-                PurgeExpiredAuthorizations();
-                if (!Authorizations.TryGetValue(invocation.brainPlanHash,
-                        out AIBrainExecutionAuthorization authorization))
+                if (!TryOpenAuthorizationLock(out string storePath,
+                        out FileStream storeLock, out string lockError))
                 {
-                    reason = "AIBrain PlanHash 未签发、已过期或已被消费。";
+                    reason = "AIBrain 执行许可事务锁不可用：" + lockError;
                     return false;
                 }
-                Authorizations.Remove(invocation.brainPlanHash);
-                string invocationHash = ComputeInvocationHash(invocation);
-                if (!string.Equals(authorization.invocationHash, invocationHash,
-                        StringComparison.OrdinalIgnoreCase))
+                using (storeLock)
                 {
-                    reason = "AIBrain 执行许可与当前 Invocation 不一致，已拒绝并消费该许可。";
-                    return false;
+                    var transaction = new AuthorizationStoreTransaction(AuthorizationUtcNow);
+                    DateTimeOffset transactionUtc = transaction.UtcNow;
+                    if (!TryLoadAuthorizationStore(storePath, false, transactionUtc,
+                            out AIBrainAuthorizationStore store, out string loadError))
+                    {
+                        reason = "AIBrain 执行许可存储不可用：" + loadError;
+                        return false;
+                    }
+                    if (TransitionExpiredAuthorizations(store, transactionUtc)
+                        && !transaction.TryPersistAuthorizationStore(storePath, store,
+                            out string expiryError))
+                    {
+                        reason = "AIBrain 过期许可无法持久化为 tombstone：" + expiryError;
+                        return false;
+                    }
+
+                    AIBrainAuthorizationRecord record = store.entries.FirstOrDefault(item =>
+                        string.Equals(item.planHash, invocation.brainPlanHash,
+                            StringComparison.OrdinalIgnoreCase));
+                    if (record == null)
+                    {
+                        reason = "AIBrain PlanHash 未签发或不属于当前策略代际。";
+                        return false;
+                    }
+                    if (!string.Equals(record.invocationId, invocation.invocationId,
+                            StringComparison.Ordinal))
+                    {
+                        reason = "AIBrain PlanHash 与 InvocationId 不一致。";
+                        return false;
+                    }
+                    if (!string.Equals(record.status, AuthorizationStatusActive,
+                            StringComparison.Ordinal))
+                    {
+                        reason = "AIBrain 执行许可已进入终态：" + record.status + "。";
+                        return false;
+                    }
+                    string bindingHash = ComputeAuthorizationBindingHash(invocation,
+                        record.authorizationClass, record.budgetClass, record.hostId,
+                        record.instructionHash, record.maxUses, record.issuedAtUtc,
+                        record.expiresAtUtc);
+                    if (!string.Equals(record.bindingHash, bindingHash,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        reason = "AIBrain 执行许可与当前 Invocation 不一致，已拒绝。"
+                            + " [stored=" + record.bindingHash + "; computed=" + bindingHash + "]";
+                        return false;
+                    }
+                    string key = invocation.idempotencyKey ?? string.Empty;
+                    if (record.maxUses > 1 && string.IsNullOrWhiteSpace(key))
+                    {
+                        reason = "可复用的 AIBrain 执行许可要求每次调用提供非空 idempotencyKey。";
+                        return false;
+                    }
+                    if (!string.IsNullOrWhiteSpace(key)
+                        && (key.Length > 160 || !Regex.IsMatch(key, "^[A-Za-z0-9._:-]+$")))
+                    {
+                        reason = "AIBrain idempotencyKey 格式无效。";
+                        return false;
+                    }
+                    if (!string.IsNullOrWhiteSpace(key)
+                        && record.usedIdempotencyKeys.Contains(key,
+                            StringComparer.OrdinalIgnoreCase))
+                    {
+                        reason = "重复的 idempotencyKey 已拒绝，避免重复副作用。";
+                        return false;
+                    }
+                    if (record.usedCount >= record.maxUses)
+                    {
+                        reason = "AIBrain 执行许可已达到最大复用次数。";
+                        return false;
+                    }
+                    if (!consume) return true;
+
+                    record.usedCount++;
+                    if (!string.IsNullOrWhiteSpace(key)) record.usedIdempotencyKeys.Add(key);
+                    if (record.usedCount == record.maxUses)
+                    {
+                        record.status = AuthorizationStatusExhausted;
+                        record.terminalAtUtc = transactionUtc;
+                    }
+                    store.revision++;
+                    if (!transaction.TryPersistAuthorizationStore(storePath, store, out string consumeError))
+                    {
+                        reason = "AIBrain 执行许可消费记录无法持久化：" + consumeError;
+                        return false;
+                    }
+                    return true;
                 }
-                return true;
             }
         }
 
-        private static void RegisterAuthorization(ESAutomationTaskInvocation invocation)
+        private static bool TryRegisterAuthorization(ESAutomationTaskInvocation invocation,
+            ESAIBrainPlan plan, AuthorizationProfile profile, out string error)
         {
+            error = string.Empty;
+            if (invocation == null || plan == null || profile == null
+                || !ESAutomationWorkerRegistration.IsSha256(plan.planHash)
+                || !string.Equals(invocation.brainPlanHash, plan.planHash,
+                    StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(invocation.invocationId)
+                || !Guid.TryParseExact(invocation.invocationId, "N", out _)
+                || string.IsNullOrWhiteSpace(plan.planId)
+                || !Guid.TryParseExact(plan.planId, "N", out _)
+                || !Regex.IsMatch(invocation.actorId ?? string.Empty,
+                    "^[A-Za-z0-9._:-]{1,128}$")
+                || !IsValidAuthorizationProfile(profile))
+            {
+                error = "AIBrain 授权注册输入无效。";
+                return false;
+            }
             lock (AuthorizationLock)
             {
-                PurgeExpiredAuthorizations();
-                Authorizations[invocation.brainPlanHash] = new AIBrainExecutionAuthorization
+                if (!TryOpenAuthorizationLock(out string storePath,
+                        out FileStream storeLock, out error)) return false;
+                using (storeLock)
                 {
-                    invocationHash = ComputeInvocationHash(invocation),
-                    expiresAtUtc = DateTimeOffset.UtcNow + AuthorizationLifetime,
-                };
+                    var transaction = new AuthorizationStoreTransaction(AuthorizationUtcNow);
+                    DateTimeOffset transactionUtc = transaction.UtcNow;
+                    if (!TryLoadAuthorizationStore(storePath, true, transactionUtc,
+                            out AIBrainAuthorizationStore store, out error)) return false;
+                    if (store.retiredInvocationIds.Contains(invocation.invocationId,
+                            StringComparer.Ordinal))
+                    {
+                        error = "旧策略 Invocation 不得在 Policy v5 中重签；必须使用新的 Invocation。";
+                        return false;
+                    }
+                    if (TransitionExpiredAuthorizations(store, transactionUtc)
+                        && !transaction.TryPersistAuthorizationStore(storePath, store,
+                            out string expiryError))
+                    {
+                        error = "AIBrain 过期许可无法持久化为 tombstone：" + expiryError;
+                        return false;
+                    }
+
+                    AIBrainAuthorizationRecord existingInvocation = store.entries.FirstOrDefault(item =>
+                        string.Equals(item.invocationId, invocation.invocationId,
+                            StringComparison.Ordinal));
+                    if (existingInvocation != null)
+                    {
+                        if (!string.Equals(existingInvocation.planHash, invocation.brainPlanHash,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            error = "InvocationId 已绑定另一 PlanHash，禁止换绑重签。";
+                            return false;
+                        }
+                        if (!string.Equals(existingInvocation.status, AuthorizationStatusActive,
+                                StringComparison.Ordinal))
+                        {
+                            error = "InvocationId 已进入 " + existingInvocation.status
+                                + " 终态，禁止重签。";
+                            return false;
+                        }
+                        string existingBinding = ComputeAuthorizationBindingHash(invocation,
+                            existingInvocation.authorizationClass, existingInvocation.budgetClass,
+                            existingInvocation.hostId, existingInvocation.instructionHash,
+                            existingInvocation.maxUses, existingInvocation.issuedAtUtc,
+                            existingInvocation.expiresAtUtc);
+                        if (!string.Equals(existingInvocation.bindingHash, existingBinding,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            error = "现有 Invocation 授权与当前 canonical 请求不一致。";
+                            return false;
+                        }
+                        return true;
+                    }
+                    if (store.entries.Any(item => string.Equals(item.planHash,
+                            invocation.brainPlanHash, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        error = "PlanHash 已绑定另一 InvocationId。";
+                        return false;
+                    }
+                    if (store.entries.Count >= authorizationRecordLimit)
+                    {
+                        error = "AIBrain 授权存储已达到容量上限；现有 Active 许可仍可消费，"
+                            + "新 Invocation 必须等待显式维护。";
+                        return false;
+                    }
+
+                    DateTimeOffset issuedAtUtc = transactionUtc;
+                    DateTimeOffset expiresAtUtc = issuedAtUtc + AuthorizationLifetime;
+                    store.entries.Add(new AIBrainAuthorizationRecord
+                    {
+                        planHash = invocation.brainPlanHash,
+                        bindingHash = ComputeAuthorizationBindingHash(invocation,
+                            profile.authorizationClass, profile.budgetClass, profile.hostId,
+                            profile.instructionHash, profile.maxUses, issuedAtUtc, expiresAtUtc),
+                        planId = plan.planId ?? string.Empty,
+                        invocationId = invocation.invocationId,
+                        actorId = invocation.actorId ?? string.Empty,
+                        authorizationClass = profile.authorizationClass,
+                        budgetClass = profile.budgetClass,
+                        hostId = profile.hostId,
+                        instructionHash = profile.instructionHash,
+                        status = AuthorizationStatusActive,
+                        issuedAtUtc = issuedAtUtc,
+                        expiresAtUtc = expiresAtUtc,
+                        terminalAtUtc = null,
+                        maxUses = profile.maxUses,
+                        usedCount = 0,
+                        usedIdempotencyKeys = new List<string>(),
+                    });
+                    store.revision++;
+                    return transaction.TryPersistAuthorizationStore(storePath, store, out error);
+                }
             }
         }
 
-        private static void PurgeExpiredAuthorizations()
+        private static DateTimeOffset AuthorizationUtcNow => authorizationUtcNow();
+
+        private static string CurrentAuthorizationStorePath =>
+            string.IsNullOrWhiteSpace(authorizationStorePathOverride)
+                ? AuthorizationStorePath : authorizationStorePathOverride;
+
+        private static bool TryOpenAuthorizationLock(out string storePath,
+            out FileStream storeLock, out string error)
         {
-            DateTimeOffset now = DateTimeOffset.UtcNow;
-            foreach (string key in Authorizations.Where(pair => pair.Value.expiresAtUtc <= now)
-                         .Select(pair => pair.Key).ToArray())
-                Authorizations.Remove(key);
+            storePath = string.Empty;
+            storeLock = null;
+            error = string.Empty;
+            string relativeStorePath = CurrentAuthorizationStorePath.Replace('\\', '/');
+            if (!TryResolveProjectPath(relativeStorePath, out storePath, out error)) return false;
+            if (!TryResolveProjectPath(relativeStorePath + ".lock", out string lockPath, out error))
+                return false;
+            try
+            {
+                string parent = Path.GetDirectoryName(storePath);
+                if (string.IsNullOrWhiteSpace(parent))
+                    throw new InvalidDataException("授权存储目录无效。");
+                ESManagedFileIO.EnsurePath(storePath, false, ESAutomationPathPolicy.ProjectRoot);
+                ESManagedFileIO.EnsurePath(lockPath, false, ESAutomationPathPolicy.ProjectRoot);
+                Directory.CreateDirectory(parent);
+                // Re-check after creation so a concurrent reparse-point swap fails closed.
+                ESManagedFileIO.EnsurePath(storePath, false, ESAutomationPathPolicy.ProjectRoot);
+                ESManagedFileIO.EnsurePath(lockPath, false, ESAutomationPathPolicy.ProjectRoot);
+                // The lock file is permanent. Deleting it after release would allow two writers
+                // to hold different file identities and would defeat cross-process exclusion.
+                storeLock = new FileStream(lockPath, FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite, FileShare.None);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                storeLock?.Dispose();
+                storeLock = null;
+                error = exception.Message;
+                return false;
+            }
         }
 
-        private static string ComputeInvocationHash(ESAutomationTaskInvocation invocation)
+        private static bool TryLoadAuthorizationStore(string path,
+            bool allowLegacyReinitialization, DateTimeOffset validationUtc,
+            out AIBrainAuthorizationStore store, out string error)
         {
-            string canonical = JsonConvert.SerializeObject(new
+            store = null;
+            error = string.Empty;
+            if (!File.Exists(path))
             {
+                store = CreateEmptyAuthorizationStore();
+                return true;
+            }
+            if (!TryReadTextAndHash(path, out string text, out _, out error)) return false;
+            try
+            {
+                JObject document = JObject.Parse(text);
+                int? schemaVersion = document.Value<int?>("schemaVersion");
+                int? policyVersion = document.Value<int?>("authorizationPolicyVersion");
+                if (schemaVersion == 2 && policyVersion == 4)
+                {
+                    if (!allowLegacyReinitialization)
+                    {
+                        error = "Policy v4/schema 2 授权已 stale，必须使用新 Invocation 重新规划。";
+                        return false;
+                    }
+                    JArray legacyEntries = document["entries"] as JArray
+                        ?? throw new InvalidDataException("旧授权存储缺少 entries。");
+                    if (legacyEntries.Count > authorizationRecordLimit)
+                        throw new InvalidDataException("旧授权存储超过迁移容量上限。");
+                    var retiredLegacyInvocations = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (JToken legacyToken in legacyEntries)
+                    {
+                        if (!(legacyToken is JObject legacyRecord))
+                            throw new InvalidDataException("旧授权存储 entries 包含非对象记录。");
+                        string invocationId = legacyRecord.Value<string>("invocationId")
+                            ?? string.Empty;
+                        string planHash = legacyRecord.Value<string>("planHash") ?? string.Empty;
+                        if (!Guid.TryParseExact(invocationId, "N", out _)
+                            || !ESAutomationWorkerRegistration.IsSha256(planHash))
+                            throw new InvalidDataException("旧授权存储包含无效 Invocation 或 PlanHash。");
+                        if (!retiredLegacyInvocations.Add(invocationId))
+                            throw new InvalidDataException("旧授权存储包含重复 InvocationId。");
+                    }
+                    store = CreateEmptyAuthorizationStore();
+                    store.retiredInvocationIds = retiredLegacyInvocations
+                        .OrderBy(item => item, StringComparer.Ordinal).ToList();
+                    return true;
+                }
+                if (schemaVersion != AuthorizationStoreSchemaVersion
+                    || policyVersion != AuthorizationPolicyVersion)
+                {
+                    error = "授权存储 schema/policy 代际无效且不能自动覆盖。";
+                    return false;
+                }
+                store = document.ToObject<AIBrainAuthorizationStore>();
+                return ValidateAuthorizationStore(store, validationUtc, out error);
+            }
+            catch (Exception exception)
+            {
+                error = "授权存储 JSON 无法安全加载：" + exception.Message;
+                return false;
+            }
+        }
+
+        private static AIBrainAuthorizationStore CreateEmptyAuthorizationStore()
+        {
+            return new AIBrainAuthorizationStore
+            {
+                schemaVersion = AuthorizationStoreSchemaVersion,
+                authorizationPolicyVersion = AuthorizationPolicyVersion,
+                revision = 0,
+                retiredInvocationIds = new List<string>(),
+                entries = new List<AIBrainAuthorizationRecord>(),
+            };
+        }
+
+        private static bool ValidateAuthorizationStore(AIBrainAuthorizationStore store,
+            DateTimeOffset validationUtc, out string error)
+        {
+            error = string.Empty;
+            if (store == null || store.schemaVersion != AuthorizationStoreSchemaVersion
+                || store.authorizationPolicyVersion != AuthorizationPolicyVersion
+                || store.revision < 0 || store.entries == null
+                || store.retiredInvocationIds == null
+                || store.entries.Count > authorizationRecordLimit
+                || store.retiredInvocationIds.Count > authorizationRecordLimit)
+            {
+                error = "授权存储头、revision 或容量无效。";
+                return false;
+            }
+            var planHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var invocationIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (AIBrainAuthorizationRecord record in store.entries)
+            {
+                if (!ValidateAuthorizationRecord(record, validationUtc, planHashes, invocationIds,
+                        out error)) return false;
+            }
+            if (store.retiredInvocationIds.Any(item => string.IsNullOrWhiteSpace(item)
+                    || !Guid.TryParseExact(item, "N", out _))
+                || store.retiredInvocationIds.Distinct(StringComparer.Ordinal).Count()
+                    != store.retiredInvocationIds.Count
+                || store.retiredInvocationIds.Any(invocationIds.Contains))
+            {
+                error = "授权存储包含无效、重复或仍处于活动记录的退役 InvocationId。";
+                return false;
+            }
+            store.retiredInvocationIds = store.retiredInvocationIds
+                .OrderBy(item => item, StringComparer.Ordinal).ToList();
+            return true;
+        }
+
+        private static bool ValidateAuthorizationRecord(AIBrainAuthorizationRecord record,
+            DateTimeOffset now, HashSet<string> planHashes, HashSet<string> invocationIds,
+            out string error)
+        {
+            error = string.Empty;
+            if (record == null
+                || !ESAutomationWorkerRegistration.IsSha256(record.planHash)
+                || !ESAutomationWorkerRegistration.IsSha256(record.bindingHash)
+                || !planHashes.Add(record.planHash)
+                || string.IsNullOrWhiteSpace(record.invocationId)
+                || !Guid.TryParseExact(record.invocationId, "N", out _)
+                || !invocationIds.Add(record.invocationId)
+                || string.IsNullOrWhiteSpace(record.planId)
+                || !Guid.TryParseExact(record.planId, "N", out _)
+                || !Regex.IsMatch(record.actorId ?? string.Empty, "^[A-Za-z0-9._:-]{1,128}$")
+                || !Regex.IsMatch(record.hostId ?? string.Empty, "^[A-Za-z0-9._:-]{1,128}$"))
+            {
+                error = "授权存储包含无效或重复身份。";
+                return false;
+            }
+            var profile = new AuthorizationProfile(record.authorizationClass,
+                record.budgetClass, record.hostId, record.instructionHash, record.maxUses);
+            if (!IsValidAuthorizationProfile(profile)
+                || record.issuedAtUtc == default
+                || record.expiresAtUtc <= record.issuedAtUtc
+                || record.expiresAtUtc - record.issuedAtUtc > AuthorizationLifetime
+                || record.issuedAtUtc > now + TimeSpan.FromMinutes(1))
+            {
+                error = "授权存储包含无效策略分类或 TTL。";
+                return false;
+            }
+            List<string> usedKeys = record.usedIdempotencyKeys ?? new List<string>();
+            bool validKeys = usedKeys.All(key => !string.IsNullOrWhiteSpace(key)
+                    && key.Length <= 160 && Regex.IsMatch(key, "^[A-Za-z0-9._:-]+$"))
+                && usedKeys.Distinct(StringComparer.OrdinalIgnoreCase).Count() == usedKeys.Count;
+            bool validUsage = record.usedCount >= 0 && record.usedCount <= record.maxUses
+                && (record.maxUses == 1 ? usedKeys.Count <= record.usedCount
+                    : usedKeys.Count == record.usedCount);
+            if (!validKeys || !validUsage)
+            {
+                error = "授权存储包含无效使用计数或幂等键。";
+                return false;
+            }
+            record.usedIdempotencyKeys = usedKeys;
+            bool validTerminalTime = !record.terminalAtUtc.HasValue
+                || (record.terminalAtUtc.Value <= now
+                    && record.terminalAtUtc.Value <= record.expiresAtUtc);
+            bool validState =
+                validTerminalTime &&
+                ((string.Equals(record.status, AuthorizationStatusActive,
+                     StringComparison.Ordinal)
+                  && record.usedCount < record.maxUses
+                  && !record.terminalAtUtc.HasValue)
+                || (string.Equals(record.status, AuthorizationStatusExhausted,
+                        StringComparison.Ordinal)
+                    && record.usedCount == record.maxUses
+                    && record.terminalAtUtc.HasValue
+                    && record.terminalAtUtc.Value >= record.issuedAtUtc
+                    && record.terminalAtUtc.Value <= record.expiresAtUtc)
+                || (string.Equals(record.status, AuthorizationStatusExpired,
+                        StringComparison.Ordinal)
+                    && record.usedCount < record.maxUses
+                    && record.terminalAtUtc.HasValue
+                    && record.terminalAtUtc.Value == record.expiresAtUtc));
+            if (!validState)
+            {
+                error = "授权存储包含无效 Active/Exhausted/Expired 状态。";
+                return false;
+            }
+            return true;
+        }
+
+        private static bool IsValidAuthorizationProfile(AuthorizationProfile profile)
+        {
+            if (profile == null
+                || (!string.Equals(profile.authorizationClass, AuthorizationClassManaged,
+                        StringComparison.Ordinal)
+                    && !string.Equals(profile.authorizationClass, AuthorizationClassCurrentUser,
+                        StringComparison.Ordinal))
+                || !Regex.IsMatch(profile.hostId ?? string.Empty,
+                    "^[A-Za-z0-9._:-]{1,128}$")) return false;
+            if (string.Equals(profile.authorizationClass, AuthorizationClassCurrentUser,
+                    StringComparison.Ordinal)
+                && !ESAutomationWorkerRegistration.IsSha256(profile.instructionHash)) return false;
+            if (!string.IsNullOrWhiteSpace(profile.instructionHash)
+                && !ESAutomationWorkerRegistration.IsSha256(profile.instructionHash)) return false;
+            return string.Equals(profile.budgetClass, AuthorizationBudgetLowRisk,
+                       StringComparison.Ordinal) && profile.maxUses == DefaultLowRiskAuthorizationUses
+                || string.Equals(profile.budgetClass, AuthorizationBudgetCandidate,
+                       StringComparison.Ordinal) && profile.maxUses == DefaultCandidateAuthorizationUses
+                || string.Equals(profile.budgetClass, AuthorizationBudgetHighRisk,
+                       StringComparison.Ordinal) && profile.maxUses == DefaultHighRiskAuthorizationUses;
+        }
+
+        private static bool TransitionExpiredAuthorizations(AIBrainAuthorizationStore store,
+            DateTimeOffset now)
+        {
+            bool changed = false;
+            foreach (AIBrainAuthorizationRecord record in store.entries)
+            {
+                if (!string.Equals(record.status, AuthorizationStatusActive,
+                        StringComparison.Ordinal) || record.expiresAtUtc > now) continue;
+                record.status = AuthorizationStatusExpired;
+                record.terminalAtUtc = record.expiresAtUtc;
+                changed = true;
+            }
+            if (changed) store.revision++;
+            return changed;
+        }
+
+        private static bool TryPersistAuthorizationStore(string path,
+            AIBrainAuthorizationStore store, DateTimeOffset validationUtc, out string error)
+        {
+            error = string.Empty;
+            try
+            {
+                store.entries = store.entries
+                    .OrderBy(item => item.planHash, StringComparer.OrdinalIgnoreCase).ToList();
+                if (!ValidateAuthorizationStore(store, validationUtc,
+                        out string validationError))
+                {
+                    error = "授权存储写前校验失败：" + validationError;
+                    return false;
+                }
+                ESManagedFileIO.WriteTextAtomic(path,
+                    JsonConvert.SerializeObject(store, Formatting.None), StrictUtf8,
+                    ESAutomationPathPolicy.ProjectRoot);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                return false;
+            }
+        }
+
+        private static string ComputeAuthorizationBindingHash(ESAutomationTaskInvocation invocation,
+            string authorizationClass, string budgetClass, string hostId,
+            string instructionHash, int maxUses, DateTimeOffset issuedAtUtc,
+            DateTimeOffset expiresAtUtc)
+        {
+            return ComputeCanonicalSha256(JToken.FromObject(new
+            {
+                authorizationPolicyVersion = AuthorizationPolicyVersion,
+                authorizationClass,
+                budgetClass,
+                hostId,
+                instructionHash,
+                invocationAuthorizationClass = invocation.authorizationClass,
+                invocationBudgetClass = invocation.authorizationBudgetClass,
+                invocationHostId = invocation.authorizationHostId,
+                invocationInstructionHash = invocation.userInstructionHash,
+                maxUses,
+                // Bind the instant, not its serialized offset representation. Unity's
+                // Json.NET settings may normalize DateTimeOffset offsets on reload;
+                // UTC ticks keep registration and consumption canonical across a
+                // process/domain reload while preserving the exact expiry window.
+                issuedAtUtcTicks = issuedAtUtc.UtcTicks,
+                expiresAtUtcTicks = expiresAtUtc.UtcTicks,
                 invocation.invocationId,
                 invocation.brainPlanHash,
                 invocation.taskId,
@@ -199,12 +1148,228 @@ namespace ES
                 invocation.fromAi,
                 invocation.dryRun,
                 invocation.actorId,
-                invocation.idempotencyKey,
                 invocation.executionSnapshot,
-            }, Formatting.None);
+            }));
+        }
+
+#if UNITY_INCLUDE_TESTS
+        internal static IDisposable Internal_BeginAuthorizationTestScope(
+            string projectRelativeStorePath, DateTimeOffset utcNow, int recordLimit = 64)
+        {
+            if (string.IsNullOrWhiteSpace(projectRelativeStorePath)
+                || Path.IsPathRooted(projectRelativeStorePath)
+                || recordLimit < 1 || recordLimit > MaximumAuthorizationRecords)
+                throw new ArgumentException("Authorization test scope is outside its bounded test root.");
+            if (!TryResolveProjectPath(projectRelativeStorePath,
+                    out string normalizedStorePath, out string pathError))
+                throw new ArgumentException(pathError);
+            if (!TryResolveProjectPath("ES/Output/Automation/AIBrain/Tests",
+                    out string normalizedTestsRoot, out string rootError))
+                throw new ArgumentException(rootError);
+            if (string.Equals(normalizedStorePath, normalizedTestsRoot,
+                    StringComparison.OrdinalIgnoreCase)
+                || !IsSameOrChildPath(normalizedTestsRoot, normalizedStorePath))
+                throw new ArgumentException("Authorization test scope is outside its bounded test root.");
+
+            lock (AuthorizationLock)
+            {
+                string previousPath = authorizationStorePathOverride;
+                Func<DateTimeOffset> previousClock = authorizationUtcNow;
+                int previousLimit = authorizationRecordLimit;
+                authorizationStorePathOverride = ToProjectRelative(normalizedStorePath);
+                authorizationUtcNow = () => utcNow;
+                authorizationRecordLimit = recordLimit;
+                return new AuthorizationTestScope(previousPath, previousClock, previousLimit);
+            }
+        }
+
+        internal static void Internal_SetAuthorizationUtcNowForTests(DateTimeOffset utcNow)
+        {
+            lock (AuthorizationLock) authorizationUtcNow = () => utcNow;
+        }
+
+        internal static void Internal_SetAuthorizationUtcNowProviderForTests(
+            Func<DateTimeOffset> utcNowProvider)
+        {
+            if (utcNowProvider == null) throw new ArgumentNullException(nameof(utcNowProvider));
+            lock (AuthorizationLock) authorizationUtcNow = utcNowProvider;
+        }
+
+        internal static string Internal_AuthorizationStorePathForTests()
+        {
+            if (!TryResolveProjectPath(CurrentAuthorizationStorePath,
+                    out string path, out string error)) throw new InvalidOperationException(error);
+            return path;
+        }
+
+        internal static string Internal_AuthorizationLockPathForTests()
+        {
+            if (!TryResolveProjectPath(CurrentAuthorizationStorePath + ".lock",
+                    out string path, out string error)) throw new InvalidOperationException(error);
+            return path;
+        }
+
+        internal static bool Internal_TryRegisterAuthorizationForTests(
+            ESAutomationTaskInvocation invocation, ESAIBrainPlan plan,
+            bool userDirected, out string error)
+        {
+            string instructionHash = userDirected ? new string('a', 64) : string.Empty;
+            AuthorizationProfile profile = CreateAuthorizationProfile(plan,
+                userDirected ? AuthorizationClassCurrentUser : AuthorizationClassManaged,
+                userDirected ? "es.tests.current-user" : "es.tests.managed",
+                instructionHash);
+            invocation.authorizationClass = profile.authorizationClass;
+            invocation.authorizationBudgetClass = profile.budgetClass;
+            invocation.authorizationHostId = profile.hostId;
+            invocation.userInstructionHash = profile.instructionHash;
+            return TryRegisterAuthorization(invocation, plan, profile, out error);
+        }
+
+        internal static bool Internal_ValidateTrustedHostProofForTests(
+            ESAIBrainRequest request, out string error)
+        {
+            return TryValidateTrustedHostProof(request, out _, out error);
+        }
+
+        internal static void Internal_ResetAuthorizationCacheForTests()
+        {
+            // Policy v5 intentionally has no authoritative process-local grant cache.
+        }
+
+        private sealed class AuthorizationTestScope : IDisposable
+        {
+            private readonly string previousPath;
+            private readonly Func<DateTimeOffset> previousClock;
+            private readonly int previousLimit;
+            private bool disposed;
+
+            public AuthorizationTestScope(string previousPath,
+                Func<DateTimeOffset> previousClock, int previousLimit)
+            {
+                this.previousPath = previousPath;
+                this.previousClock = previousClock;
+                this.previousLimit = previousLimit;
+            }
+
+            public void Dispose()
+            {
+                lock (AuthorizationLock)
+                {
+                    if (disposed) return;
+                    authorizationStorePathOverride = previousPath;
+                    authorizationUtcNow = previousClock;
+                    authorizationRecordLimit = previousLimit;
+                    disposed = true;
+                }
+            }
+        }
+#endif
+
+        /// <summary>
+        /// Emit a bounded, read-only capability drift signal. The signal contains
+        /// metadata hashes only; it never grants authority or loads Skill documents.
+        /// Callers must perform route-scoped refresh and re-plan after a bound change.
+        /// </summary>
+        public static void NotifyCapabilityDrift(string trigger)
+        {
+            string normalizedTrigger = string.IsNullOrWhiteSpace(trigger)
+                ? "unknown" : trigger.Trim();
+            string fingerprint = ComputeCapabilityMetadataFingerprint();
+            ESAIBrainCapabilityDriftSignal signal;
+            lock (CapabilityDriftLock)
+            {
+                capabilityDriftGeneration++;
+                capabilityMetadataFingerprint = fingerprint;
+                capabilityDriftTrigger = normalizedTrigger;
+                signal = new ESAIBrainCapabilityDriftSignal
+                {
+                    generation = capabilityDriftGeneration,
+                    trigger = normalizedTrigger,
+                    metadataFingerprint = fingerprint,
+                    nextAction = "route-scoped-compare-and-replan",
+                };
+            }
+            System.Action<ESAIBrainCapabilityDriftSignal> handler = CapabilityDriftDetected;
+            if (handler == null) return;
+            try
+            {
+                handler(signal);
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+        }
+
+        /// <summary>
+        /// Poll metadata at most once per second. This is intentionally cheaper than
+        /// reading Skill content and only emits when the metadata fingerprint changes.
+        /// </summary>
+        public static bool PollCapabilityDrift(string trigger = "catalog-change")
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            lock (CapabilityDriftLock)
+            {
+                if (now < nextCapabilityPollUtc) return false;
+                nextCapabilityPollUtc = now.AddSeconds(1);
+            }
+
+            string fingerprint = ComputeCapabilityMetadataFingerprint();
+            lock (CapabilityDriftLock)
+            {
+                if (string.IsNullOrWhiteSpace(capabilityMetadataFingerprint))
+                {
+                    capabilityMetadataFingerprint = fingerprint;
+                    capabilityDriftTrigger = trigger ?? string.Empty;
+                    return false;
+                }
+                if (string.Equals(capabilityMetadataFingerprint, fingerprint,
+                        StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+            NotifyCapabilityDrift(string.IsNullOrWhiteSpace(trigger) ? "metadata-change" : trigger);
+            return true;
+        }
+
+        private static string ComputeCapabilityMetadataFingerprint()
+        {
+            var canonical = new StringBuilder();
+            foreach (string relativePath in CapabilityMetadataPaths)
+                AppendCapabilityMetadataHash(canonical, relativePath);
+
+            if (TryResolveProjectPath(ProjectSkillsRoot, out string skillsRoot, out _)
+                && Directory.Exists(skillsRoot))
+            {
+                foreach (string governancePath in Directory.GetFiles(
+                    skillsRoot, SkillGovernanceMetadataFileName, SearchOption.AllDirectories)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+                {
+                    string relativePath = ToProjectRelative(governancePath);
+                    AppendCapabilityMetadataHash(canonical, relativePath);
+                }
+            }
+
             using (SHA256 sha = SHA256.Create())
-                return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(canonical)))
+                return BitConverter.ToString(sha.ComputeHash(
+                        StrictUtf8.GetBytes(canonical.ToString())))
                     .Replace("-", string.Empty).ToLowerInvariant();
+        }
+
+        private static void AppendCapabilityMetadataHash(StringBuilder canonical, string relativePath)
+        {
+            string normalized = (relativePath ?? string.Empty).Replace('\\', '/');
+            if (!TryResolveProjectPath(normalized, out string fullPath, out string pathError)
+                || !File.Exists(fullPath))
+            {
+                canonical.Append(normalized).Append("|missing|").Append(pathError ?? string.Empty).Append('\n');
+                return;
+            }
+            if (!TryReadTextAndHash(fullPath, out _, out string hash, out string error))
+            {
+                canonical.Append(normalized).Append("|unreadable|").Append(error ?? string.Empty).Append('\n');
+                return;
+            }
+            canonical.Append(normalized).Append('|').Append(hash).Append('\n');
         }
 
         /// <summary>
@@ -241,9 +1406,11 @@ namespace ES
             CollectCommands(surface);
             CollectSkills(surface);
             CollectAutomationAndCli(surface);
+            CollectDiagnostics(surface);
             surface.mcp.AddRange(ESAutomationAiBridge.CopyMcpCapabilitiesForBrain());
 
             surface.status = surface.blockers.Count == 0 ? "Ready" : "Partial";
+            surface.failureTelemetry = ESAIBrainFailureTelemetry.Snapshot();
             surface.inventoryHash = ComputeProductionSurfaceHash(surface);
             return surface;
         }
@@ -445,6 +1612,41 @@ namespace ES
             }
         }
 
+        private static void CollectDiagnostics(ESAIBrainProductionSurface surface)
+        {
+            string registryPath = Path.Combine(ESCommandPalettePathPolicy.ProjectRoot,
+                ESAIBrainRouteProbeRunner.RegistryPath.Replace('/', Path.DirectorySeparatorChar));
+            bool registered = File.Exists(registryPath);
+            surface.diagnostics.Add(new ESAIBrainCapabilityBinding
+            {
+                id = "diagnostic.knowledge-route-probes",
+                kind = "ReadOnlyDiagnostic",
+                status = registered ? "Registered" : "Unavailable",
+                displayName = "AIKnowledge route probes",
+                summary = "Runs the registered static route-probe dataset through the current AIBrain planner.",
+                authority = "AIBrain / AIKnowledge route-probe registry",
+                requiresUserAuthorization = true,
+                capabilities = new List<string>
+                {
+                    "runKnowledgeRouteProbes", "route-probe", "knowledge-quality", "static-routing-only"
+                },
+            });
+            if (!registered)
+                surface.blockers.Add("AIKnowledge route-probe registry is unavailable: "
+                    + ESAIBrainRouteProbeRunner.RegistryPath);
+            surface.diagnostics.Add(new ESAIBrainCapabilityBinding
+            {
+                id = "diagnostic.ai-failure-telemetry",
+                kind = "ReadOnlyDiagnostic",
+                status = "Registered",
+                displayName = "AI failure telemetry",
+                summary = "Returns bounded, detail-hashed AIBrain and completion-gate failures for this Editor process.",
+                authority = "AIBrain reliability runtime",
+                requiresUserAuthorization = true,
+                capabilities = new List<string> { "getFailureTelemetry", "failure-classification", "claim-downgrade" },
+            });
+        }
+
         private static string ComputeProductionSurfaceHash(ESAIBrainProductionSurface surface)
         {
             string canonical = JsonConvert.SerializeObject(new
@@ -462,6 +1664,7 @@ namespace ES
                     + "@" + item.runtimeEligibility + "@" + item.reviewRequired),
                 tasks = surface.tasks.Select(item => item.taskId + "@" + item.taskVersion + "@" + item.workerId),
                 cli = surface.cli.Select(item => item.id + "@" + item.status),
+                diagnostics = surface.diagnostics.Select(item => item.id + "@" + item.status),
                 mcp = surface.mcp.Select(item => item.id + "@" + item.status),
             }, Formatting.None);
             using (SHA256 sha = SHA256.Create())
@@ -477,6 +1680,7 @@ namespace ES
                 planId = Guid.NewGuid().ToString("N"),
                 status = "Blocked",
                 objective = request?.objective ?? string.Empty,
+                invocationId = request?.invocationId ?? string.Empty,
                 authority = new ESAIBrainAuthoritySnapshot(),
             };
 
@@ -534,9 +1738,16 @@ namespace ES
         private static string ResolveBlockedStatus(List<string> blockers)
         {
             string text = string.Join("\n", blockers);
-            if (text.Contains("AICommand", StringComparison.Ordinal)) return "NoMatchingCommand";
-            if (text.Contains("Skill", StringComparison.Ordinal)) return "NoMatchingSkill";
-            if (text.Contains("Knowledge", StringComparison.Ordinal)) return "NoKnowledgeRoute";
+            if (text.IndexOf("Automation Facade", StringComparison.Ordinal) >= 0
+                || text.IndexOf("TaskContract", StringComparison.Ordinal) >= 0
+                || text.IndexOf("已注册的 Automation", StringComparison.Ordinal) >= 0)
+                return "PlanTaskUnavailable";
+            if (text.IndexOf("SourceRef", StringComparison.Ordinal) >= 0
+                && text.IndexOf("漂移", StringComparison.Ordinal) >= 0)
+                return "SourceHashDrift";
+            if (text.IndexOf("AICommand", StringComparison.Ordinal) >= 0) return "NoMatchingCommand";
+            if (text.IndexOf("Skill", StringComparison.Ordinal) >= 0) return "NoMatchingSkill";
+            if (text.IndexOf("Knowledge", StringComparison.Ordinal) >= 0) return "NoKnowledgeRoute";
             return "Blocked";
         }
 
@@ -808,9 +2019,14 @@ namespace ES
                 return;
             }
 
+            string taskContractHash;
+            string descriptorHash;
             try
             {
+                descriptor.Validate();
                 contract.Validate();
+                taskContractHash = contract.ComputeStableHash();
+                descriptorHash = ComputeCanonicalSha256(JToken.FromObject(descriptor));
             }
             catch (Exception exception)
             {
@@ -831,12 +2047,70 @@ namespace ES
                 category = descriptor.category,
                 summary = descriptor.summary,
                 inputSchemaHash = descriptor.inputSchemaHash,
+                descriptorHash = descriptorHash,
+                taskContractHash = taskContractHash,
                 allowAiInvoke = descriptor.allowAiInvoke,
+                allowInPlayMode = descriptor.allowInPlayMode,
                 workerId = contract.worker?.workerId ?? string.Empty,
                 workerType = contract.worker?.type ?? string.Empty,
+                workerVersion = contract.worker?.version ?? string.Empty,
+                workerEntrypointHash = contract.worker?.entrypointHash ?? string.Empty,
+                workerEnabled = contract.worker?.enabled ?? false,
             };
             plan.task.capabilities.AddRange(contract.capabilities ?? new List<string>());
             plan.authority.automation = "ESAutomationFacade";
+            ValidateFeishuCommandTaskBinding(plan);
+        }
+
+        private static void ValidateFeishuCommandTaskBinding(ESAIBrainPlan plan)
+        {
+            string taskId = plan.task?.taskId ?? string.Empty;
+            string expectedCommandId;
+            switch (taskId)
+            {
+                case "es.feishu.read":
+                    expectedCommandId = "feishu.read";
+                    break;
+                case "es.feishu.task.monitor":
+                    expectedCommandId = "feishu.task.monitor";
+                    break;
+                case "es.feishu.task.dispatch":
+                case "es.feishu.task.transition":
+                    expectedCommandId = "feishu.task.mutate";
+                    break;
+                case "es.feishu.identity.claim":
+                    expectedCommandId = "feishu.identity.manage";
+                    break;
+                case "es.feishu.message.send":
+                    expectedCommandId = "feishu.message.send";
+                    break;
+                default:
+                    return;
+            }
+
+            if (plan.command == null
+                || !string.Equals(plan.command.id, expectedCommandId, StringComparison.Ordinal))
+            {
+                plan.blockers.Add("飞书 TaskContract 必须绑定精确 AICommand："
+                    + taskId + " -> " + expectedCommandId + "。");
+                return;
+            }
+            if ((taskId == "es.feishu.task.dispatch" || taskId == "es.feishu.task.transition")
+                && (!string.Equals(plan.command.writeMode, "external-run", StringComparison.Ordinal)
+                    || !string.Equals(plan.command.riskLevel, "L3", StringComparison.Ordinal)))
+                plan.blockers.Add("飞书外部写 AICommand 必须声明 L3/external-run，"
+                    + "并由 TaskContract 的 ExternalWrite 能力单独收紧。"
+                    + " 当前为 " + plan.command.riskLevel + "/" + plan.command.writeMode + "。");
+            if (taskId == "es.feishu.identity.claim"
+                && (!string.Equals(plan.command.writeMode, "scoped-write", StringComparison.Ordinal)
+                    || !string.Equals(plan.command.riskLevel, "L2", StringComparison.Ordinal)))
+                plan.blockers.Add("飞书本地身份 AICommand 必须声明 L2/scoped-write。"
+                    + " 当前为 " + plan.command.riskLevel + "/" + plan.command.writeMode + "。");
+            if (taskId == "es.feishu.message.send"
+                && (!string.Equals(plan.command.writeMode, "external-run", StringComparison.Ordinal)
+                    || !string.Equals(plan.command.riskLevel, "L3", StringComparison.Ordinal)))
+                plan.blockers.Add("飞书消息发送 AICommand 必须声明 L3/external-run。"
+                    + " 当前为 " + plan.command.riskLevel + "/" + plan.command.writeMode + "。");
         }
 
         private static bool TryReadAiwarnings(ESAIBrainPlan plan, string objective,
@@ -933,8 +2207,34 @@ namespace ES
                 return false;
             }
 
-            List<KnowledgeIndexEntry> matched = entries.Where(entry =>
-                entry.routeKeys.Any(routeKeys.Contains)).ToList();
+            var normalizedRouteKeys = new HashSet<string>(routeKeys, StringComparer.Ordinal);
+            var candidates = entries
+                .Select(entry => new
+                {
+                    Entry = entry,
+                    MatchedKeyCount = entry.routeKeys.Count(normalizedRouteKeys.Contains),
+                })
+                .Where(candidate => candidate.MatchedKeyCount > 0)
+                .ToList();
+            var bestMatchedKeyCountByRoute = normalizedRouteKeys.ToDictionary(
+                routeKey => routeKey,
+                routeKey => candidates
+                    .Where(candidate => candidate.Entry.routeKeys.Contains(routeKey))
+                    .Select(candidate => candidate.MatchedKeyCount)
+                    .DefaultIfEmpty(0)
+                    .Max(),
+                StringComparer.Ordinal);
+            List<KnowledgeIndexEntry> matched = candidates
+                .Where(candidate => candidate.Entry.routeKeys.Any(routeKey =>
+                    normalizedRouteKeys.Contains(routeKey)
+                    && candidate.MatchedKeyCount == bestMatchedKeyCountByRoute[routeKey]))
+                .OrderByDescending(candidate => candidate.MatchedKeyCount)
+                .ThenByDescending(candidate =>
+                    (double)candidate.MatchedKeyCount / candidate.Entry.routeKeys.Count)
+                .ThenBy(candidate => candidate.Entry.knowledgeId, StringComparer.Ordinal)
+                .Take(MaxKnowledgeEntriesPerPlan)
+                .Select(candidate => candidate.Entry)
+                .ToList();
             if (matched.Count == 0)
             {
                 plan.blockers.Add("没有 Knowledge 条目匹配当前 routeKeys。");
@@ -979,6 +2279,7 @@ namespace ES
                     plan.blockers.Add("Knowledge 条目缺少 SourceRefs：" + entry.knowledgeId);
                 }
                 var actualSourceHashes = new List<string>(sourceRefs.Count);
+                var normalizedSourceHashes = new List<string>(sourceRefs.Count);
                 foreach (KnowledgeSourceReference sourceRef in sourceRefs)
                 {
                     if (!TryResolveProjectPath(sourceRef.path, out string sourceFullPath, out string sourcePathError))
@@ -993,14 +2294,21 @@ namespace ES
                     else
                     {
                         actualSourceHashes.Add(actualHash);
-                        if (!string.Equals(actualHash, sourceRef.sha256, StringComparison.OrdinalIgnoreCase))
+                        bool normalizedHashAvailable = TryReadNormalizedTextHash(sourceFullPath,
+                            out string normalizedHash, out _);
+                        if (normalizedHashAvailable) normalizedSourceHashes.Add(normalizedHash);
+                        if (!string.Equals(actualHash, sourceRef.sha256, StringComparison.OrdinalIgnoreCase)
+                            && (!normalizedHashAvailable
+                                || !string.Equals(normalizedHash, sourceRef.sha256,
+                                    StringComparison.OrdinalIgnoreCase)))
                             plan.blockers.Add("Knowledge SourceRef 哈希漂移：" + sourceRef.path);
                     }
                     binding.sourceRefs.Add(sourceRef.path + " (" + actualHash + ")");
                 }
                 if (actualSourceHashes.Count == sourceRefs.Count
-                    && !string.Equals(ComputeStableHashSetHash(actualSourceHashes), entry.contentHash,
-                        StringComparison.OrdinalIgnoreCase))
+                    && normalizedSourceHashes.Count == sourceRefs.Count
+                    && !MatchesKnowledgeSourceSetHash(entry.contentHash, sourceRefs,
+                        actualSourceHashes, normalizedSourceHashes))
                     plan.blockers.Add("Knowledge SourceRef 集合 ContentHash 不匹配：" + entry.knowledgeId);
 
                 foreach (string requiredRead in entry.requiredReads)
@@ -1109,7 +2417,10 @@ namespace ES
                 }
                 else if (trimmed.StartsWith("requiredReads:", StringComparison.Ordinal))
                 {
-                    readingRequiredReads = true;
+                    string inlineReads = trimmed.Substring("requiredReads:".Length).Trim();
+                    if (inlineReads.Length > 0)
+                        current.requiredReads.AddRange(ParseInlineList(inlineReads));
+                    readingRequiredReads = inlineReads.Length == 0;
                 }
                 else if (readingRequiredReads && trimmed.StartsWith("- ", StringComparison.Ordinal))
                 {
@@ -1183,16 +2494,314 @@ namespace ES
                 "技能增量理解", "技能理解刷新", "技能能力刷新",
                 "understanding drift", "skill understanding refresh", "refresh skill understanding",
                 "capability refresh", "incremental skill discovery");
-            bool hasSnapshotSignal = ContainsAnyIgnoreCase(text,
-                "snapshot", "快照", "task read", "read manifest", "读取清单",
-                "源文件哈希", "文件哈希", "parser registry", "解析器注册",
-                "projectionpacket", "projection cache", "多文件读取", "重复读取",
-                "二进制解析", "文件格式");
+            bool hasSnapshotWord = ContainsAnyIgnoreCase(text, "snapshot", "快照");
+            bool hasExplicitReadConsistencySignal = ContainsAnyIgnoreCase(text,
+                "task read", "read manifest", "读取清单", "源文件哈希", "文件哈希",
+                "parser registry", "解析器注册", "projectionpacket", "projection cache",
+                "多文件读取", "重复读取", "二进制解析", "文件格式");
             bool hasFileContext = ContainsAnyIgnoreCase(text,
-                "文件", "读取", "解析", "parser", "projection", "binary", "snapshot",
-                "快照", "hash", "哈希");
+                "文件", "读取", "解析", "parser", "projection", "binary", "hash", "哈希",
+                "manifest", "清单");
             bool hasCacheContext = ContainsAnyIgnoreCase(text, "缓存命中", "缓存失效", "缓存漂移")
                 && hasFileContext;
+            bool hasReadConsistencyContext = hasExplicitReadConsistencySignal
+                || (hasSnapshotWord && hasFileContext) || hasCacheContext;
+            bool hasStorySnapshotContext = ContainsAnyIgnoreCase(text,
+                "story definition snapshot", "esstorydefinitionsnapshot", "剧情定义快照");
+            bool hasStableGraphContext = ContainsAnyIgnoreCase(text,
+                "stable graph", "stablegraph", "stable-graph", "esgraph", "graphview",
+                "noderunner", "edge.order", "edgeid", "graph bake", "graph snapshot",
+                "图资产", "图节点", "图边", "跨 domain 粘贴", "跨域粘贴", "未知端口")
+                || hasStorySnapshotContext;
+            bool hasGraphIdentity = hasStableGraphContext && ContainsAnyIgnoreCase(text,
+                "稳定身份", "身份", "graphid", "nodeid", "portid", "edgeid", "新增节点");
+            bool hasGraphUndo = hasStableGraphContext && ContainsAnyIgnoreCase(text,
+                "undo", "redo", "回滚", "原子编辑", "多步编辑");
+            bool hasGraphMigration = hasStableGraphContext && ContainsAnyIgnoreCase(text,
+                "迁移", "migration", "schema", "跨 domain", "跨域", "未知端口");
+            bool hasEdgeOrder = hasStableGraphContext && ContainsAnyIgnoreCase(text,
+                "edge.order", "边顺序", "调序", "重连");
+            bool hasGraphSnapshot = hasStableGraphContext && (hasSnapshotWord
+                || ContainsAnyIgnoreCase(text, "内容签名", "contentsignature"));
+            bool hasGraphBake = hasStableGraphContext && ContainsAnyIgnoreCase(text,
+                "bake", "烘焙", "内容签名", "缓存失效");
+            bool hasLegacyGraph = hasStableGraphContext && ContainsAnyIgnoreCase(text,
+                "legacy", "旧 graph", "旧graph", "noderunner", "恢复使用", "恢复旧");
+            bool hasExecutionGraphContext = ContainsAnyIgnoreCase(text, "graph", "执行图", "工作流图")
+                && ContainsAnyIgnoreCase(text, "taskcontract", "skillcall", "runrecord",
+                    "fanout", "join", "aiskill", "执行", "恢复执行", "执行恢复");
+            bool hasTaskContractContext = hasExecutionGraphContext
+                && ContainsAnyIgnoreCase(text, "taskcontract", "任务合同");
+            bool hasRunRecordContext = hasExecutionGraphContext
+                && ContainsAnyIgnoreCase(text, "runrecord", "运行记录");
+            bool hasFeishuContext = ContainsAnyIgnoreCase(text, "飞书", "feishu", "lark");
+            bool hasTaskMonitor = hasFeishuContext && ContainsAnyIgnoreCase(text,
+                "监控", "追踪", "查看任务", "读取任务", "任务清单", "task monitor", "task list");
+            bool hasTaskDispatch = hasFeishuContext && ContainsAnyIgnoreCase(text,
+                "派发", "分发", "创建任务", "创建清单", "虚拟团队", "dispatch", "virtual team");
+            bool hasTaskTransition = hasFeishuContext && ContainsAnyIgnoreCase(text,
+                "推进", "进度", "完成任务", "重新打开", "成员", "提醒", "transition", "progress");
+            bool hasIdentityClaim = hasFeishuContext && ContainsAnyIgnoreCase(text,
+                "角色", "认领", "机器人", "个人身份", "配置引导", "接入引导",
+                "identity claim", "role claim", "bot ownership", "onboarding");
+            bool hasMessageSend = hasFeishuContext && ContainsAnyIgnoreCase(text,
+                "发送消息", "消息通知", "通知角色", "单人消息", "message send", "notify role");
+            bool hasEditorWindowContext = ContainsAnyIgnoreCase(text,
+                "editorwindow", "editor window", "编辑器窗口");
+            bool hasExecuteAlwaysSignal = ContainsAnyIgnoreCase(text,
+                "executealways", "execute always");
+            bool hasExecuteInEditMode = ContainsAnyIgnoreCase(text,
+                "executeineditmode", "execute in edit mode");
+            bool hasPrefabStageContext = ContainsAnyIgnoreCase(text,
+                "prefab stage", "prefabstage", "prefab mode", "prefabmode",
+                "prefab auto save", "预制体模式", "预制体阶段", "预制体自动保存");
+            bool hasApplicationIsPlayingObject = ContainsAnyIgnoreCase(text,
+                "application.isplaying", "application isplaying", "playing world", "播放世界");
+            bool hasEditModeExecution = hasExecuteAlwaysSignal || hasExecuteInEditMode
+                || ContainsAnyIgnoreCase(text,
+                    "编辑态执行", "编辑模式执行", "edit mode 回调", "edit mode lifecycle");
+            bool hasPrefabAutoSave = hasPrefabStageContext
+                && ContainsAnyIgnoreCase(text, "auto save", "autosave", "自动保存");
+            bool hasUnityLifecycleContext = hasEditorWindowContext || hasEditModeExecution
+                || hasPrefabStageContext || hasApplicationIsPlayingObject
+                || ContainsAnyIgnoreCase(text,
+                "unity", "monobehaviour", "gameobject", "awake", "onenable", "ondisable",
+                "ondestroy", "runtimeinitializeonloadmethod",
+                "script execution order", "defaultexecutionorder", "domain reload",
+                "reloaddomain", "scene reload", "enter play mode", "play mode options",
+                "进入 play", "第二次进入 play", "域重载", "场景重载", "执行顺序");
+            bool hasStartCallback = Regex.IsMatch(text,
+                "(?<![A-Za-z0-9_])Start(?![A-Za-z0-9_])",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            bool hasMonoBehaviourLifecycle = hasUnityLifecycleContext && !hasEditModeExecution
+                && (ContainsAnyIgnoreCase(text,
+                    "monobehaviour", "awake", "onenable", "ondisable", "ondestroy",
+                    "生命周期") || hasStartCallback);
+            bool hasStaticState = hasUnityLifecycleContext && ContainsAnyIgnoreCase(text,
+                "static", "静态事件", "静态单例", "重复订阅", "第二次进入 play");
+            bool hasDomainReload = hasUnityLifecycleContext && ContainsAnyIgnoreCase(text,
+                "domain reload", "reloaddomain", "域重载", "第二次进入 play");
+            bool hasSceneReload = hasUnityLifecycleContext && ContainsAnyIgnoreCase(text,
+                "scene reload", "场景重载");
+            bool hasEnterPlayMode = hasUnityLifecycleContext && ContainsAnyIgnoreCase(text,
+                "enter play mode", "play mode options", "进入 play", "第二次进入 play",
+                "关闭 domain reload", "关闭 scene reload");
+            bool hasScriptExecutionOrder = hasUnityLifecycleContext && ContainsAnyIgnoreCase(text,
+                "script execution order", "defaultexecutionorder",
+                "runtimeinitializeonloadmethod", "执行顺序");
+            bool hasUnityCompile = hasUnityLifecycleContext && ContainsAnyIgnoreCase(text,
+                "编译", "compile", "compilation");
+            bool hasPlayerEvidence = hasUnityLifecycleContext
+                && ContainsAnyIgnoreCase(text, "player", "播放器")
+                && ContainsAnyIgnoreCase(text, "证明", "证据", "验证", "evidence", "verify");
+            bool hasExplicitKccContext = ContainsAnyIgnoreCase(text,
+                "kcc", "kinematic character controller", "kinematiccharactercontroller", "角色 kcc");
+            bool hasEntityCharacterControllerContext = ContainsAnyIgnoreCase(text,
+                    "character controller", "charactercontroller")
+                && ContainsAnyIgnoreCase(text, "entity", "角色", "玩家");
+            bool hasKccMotionContext = hasExplicitKccContext || hasEntityCharacterControllerContext
+                || ContainsAnyIgnoreCase(text, "角色移动", "玩家移动");
+            bool hasVehicleMotionContext = ContainsAnyIgnoreCase(text,
+                    "vehicle", "载具", "车辆", "骑乘", "mount", "driver", "驾驶")
+                && ContainsAnyIgnoreCase(text,
+                    "运动", "移动", "motion", "rigidbody", "kcc", "fixedupdate", "fixed update", "物理");
+            bool hasRigidbodyContext = ContainsAnyIgnoreCase(text, "rigidbody", "刚体");
+            bool hasFixedUpdateContext = ContainsAnyIgnoreCase(text,
+                "fixedupdate", "fixed update", "固定更新", "固定步", "物理步");
+            bool hasUiRaycastContext = ContainsAnyIgnoreCase(text,
+                "graphicraycaster", "graphic raycaster", "ui raycast", "eventsystem", "pointereventdata");
+            bool hasPhysicsQueryContext = !hasUiRaycastContext && ContainsAnyIgnoreCase(text,
+                "physics query", "physics.query", "物理查询", "碰撞查询",
+                "raycast", "ray cast", "射线检测", "射线查询",
+                "spherecast", "sphere cast", "capsulecast", "capsule cast", "boxcast", "box cast",
+                "球形投射", "胶囊投射", "盒体投射",
+                "overlapsphere", "overlapbox", "overlapcapsule", "physics.overlap",
+                "物理重叠", "重叠检测", "重叠查询");
+            bool hasColliderContext = ContainsAnyIgnoreCase(text, "collider", "碰撞体");
+            bool hasExplicitPhysicsTriggerContext = ContainsAnyIgnoreCase(text,
+                "querytriggerinteraction", "querieshittriggers", "ontrigger", "istrigger", "is trigger",
+                "physics trigger", "物理触发器", "碰撞触发器");
+            bool hasTriggerWord = ContainsAnyIgnoreCase(text, "trigger", "触发器");
+            bool hasTriggerContext = hasExplicitPhysicsTriggerContext
+                || (hasTriggerWord && (hasColliderContext || hasPhysicsQueryContext));
+            bool hasPhysicsContext = ContainsAnyIgnoreCase(text,
+                    "physics", "物理", "collision", "oncollision", "碰撞检测", "碰撞回调", "碰撞矩阵", "发生碰撞")
+                || hasRigidbodyContext || hasFixedUpdateContext || hasPhysicsQueryContext
+                || hasColliderContext || hasExplicitPhysicsTriggerContext;
+            bool hasLayerMaskContext = hasPhysicsContext && ContainsAnyIgnoreCase(text,
+                "layermask", "layer mask", "层掩码", "物理层", "~0", "全层");
+            bool hasQueryTriggerContext = hasPhysicsQueryContext && hasTriggerContext;
+            bool hasTransformSyncContext = hasPhysicsContext && ContainsAnyIgnoreCase(text,
+                "synctransforms", "sync transforms", "autosynctransforms", "transform 同步", "transform同步",
+                "立即查询", "立刻查询", "旧位置");
+            bool hasInterpolationContext = hasRigidbodyContext && ContainsAnyIgnoreCase(text,
+                "interpolation", "interpolate", "extrapolate", "插值", "抖动", "jitter");
+            bool hasSingleWriterContext = hasPhysicsContext && (ContainsAnyIgnoreCase(text,
+                    "单写入者", "single writer", "第二写入者", "争写")
+                || (hasRigidbodyContext && ContainsAnyIgnoreCase(text,
+                    "transform", "moveposition", "moverotation", "写位置", "写旋转", "直接改")));
+            bool hasKccGrounding = hasKccMotionContext && ContainsAnyIgnoreCase(text,
+                "grounding", "grounded", "接地", "地面", "斜坡");
+            bool hasKccMovingPlatform = hasKccMotionContext && ContainsAnyIgnoreCase(text,
+                "moving platform", "移动平台");
+            bool hasKccTeleport = hasKccMotionContext && ContainsAnyIgnoreCase(text,
+                "teleport", "传送", "瞬移");
+            bool hasKccMotionInfluence = hasKccMotionContext && ContainsAnyIgnoreCase(text,
+                "motion influence", "运动影响", "击退", "冲量", "外力");
+            bool hasKccVelocity = hasKccMotionContext && ContainsAnyIgnoreCase(text,
+                "velocity", "速度");
+            bool hasMountContext = hasVehicleMotionContext && ContainsAnyIgnoreCase(text,
+                "mount", "骑乘", "上车", "下车", "座位");
+            bool hasDriverContext = hasVehicleMotionContext && ContainsAnyIgnoreCase(text,
+                "driver", "驾驶", "驾驶输入");
+            bool hasUiToken = Regex.IsMatch(text,
+                "(?i)(^|[^a-z0-9])ui([^a-z0-9]|$)", RegexOptions.CultureInvariant);
+            bool hasScreenSpecContext = ContainsAnyIgnoreCase(text,
+                "screen spec", "screenspec", "screen-spec", "屏幕规格");
+            bool hasHudUi = ContainsAnyIgnoreCase(text,
+                "hud ui", "hud 界面", "hud界面", "战斗 hud", "战斗hud");
+            bool hasInventoryUi = ContainsAnyIgnoreCase(text,
+                "inventory ui", "inventory screen", "collection ui", "背包界面", "背包 ui", "背包ui",
+                "仓库界面", "图鉴界面", "配装界面", "装备界面");
+            bool hasShopUi = ContainsAnyIgnoreCase(text,
+                "shop ui", "shop screen", "store ui", "商店界面", "商店 ui", "商店ui", "商城界面");
+            bool hasDialogueUi = ContainsAnyIgnoreCase(text,
+                "dialogue ui", "dialogue screen", "conversation ui", "对话界面", "对话 ui", "对话ui", "剧情对话");
+            bool hasMapUi = ContainsAnyIgnoreCase(text,
+                "map ui", "map screen", "world map", "地图界面", "地图 ui", "地图ui", "世界地图");
+            bool hasProgressionUi = ContainsAnyIgnoreCase(text,
+                "progression ui", "skill tree ui", "quest ui", "技能树", "任务界面", "任务页", "成长界面");
+            bool hasResultUi = ContainsAnyIgnoreCase(text,
+                "result ui", "result screen", "results screen", "结算界面", "结果页", "奖励页");
+            bool hasSettingsUi = ContainsAnyIgnoreCase(text,
+                "settings ui", "settings screen", "设置界面", "设置页");
+            bool hasGameUiScreenFamilyContext = hasHudUi || hasInventoryUi || hasShopUi || hasDialogueUi
+                || hasMapUi || hasProgressionUi || hasResultUi || hasSettingsUi
+                || ContainsAnyIgnoreCase(text, "game ui screen family", "screen family", "屏幕族", "主菜单界面");
+            bool hasUiVisualDesignSubject = hasUiToken || hasScreenSpecContext || hasGameUiScreenFamilyContext
+                || ContainsAnyIgnoreCase(text, "用户界面", "游戏界面", "界面预制体");
+            bool hasUiIntentContract = ContainsAnyIgnoreCase(text,
+                "intent spec", "intentspec", "intent-spec", "player intent", "player goal",
+                "玩家目标", "界面目标", "交互目标", "主动作", "primary action");
+            bool hasRegisteredUiAction = ContainsAnyIgnoreCase(text,
+                "browse", "inspect", "select", "compare", "equip", "confirm", "cancel", "navigate",
+                "filter", "sort", "claim", "configure", "track", "respond", "resume", "retry", "dismiss",
+                "浏览", "查看", "检查", "选择", "比较", "装备", "确认", "取消", "导航", "筛选", "排序",
+                "领取", "配置", "追踪", "回应", "继续", "重试", "关闭");
+            bool hasUiActionDomain = hasUiVisualDesignSubject || ContainsAnyIgnoreCase(text,
+                "背包", "仓库", "图鉴", "商店", "商城", "地图", "技能树", "任务", "对话", "设置",
+                "菜单", "inventory", "collection", "shop", "store", "map", "quest", "dialogue", "settings");
+            bool hasUiGoalFraming = ContainsAnyIgnoreCase(text,
+                "玩家", "玩家目标", "用户想", "用户要", "界面目标", "ui 计划", "ui计划", "界面计划",
+                "交互计划", "player wants", "player needs", "player goal", "ui plan", "screen plan");
+            bool hasUiPlayerGoal = hasUiIntentContract
+                || (hasRegisteredUiAction && hasUiActionDomain && hasUiGoalFraming);
+            bool hasUiIntentClarification = hasUiPlayerGoal && ContainsAnyIgnoreCase(text,
+                "澄清", "不明确", "缺少信息", "需要补充", "ambiguous", "clarify", "needs-clarification", "blocked");
+            bool hasUiBusinessBridge = hasUiPlayerGoal && ContainsAnyIgnoreCase(text,
+                "business bridge", "businessbridge", "业务桥接", "业务接入");
+            bool hasUiColorDesign = hasUiVisualDesignSubject && ContainsAnyIgnoreCase(text,
+                "ui color", "ui colour", "color palette", "配色", "颜色", "色彩", "品牌色");
+            bool hasUiTypographyDesign = hasUiVisualDesignSubject && ContainsAnyIgnoreCase(text,
+                "ui font", "typography", "字体", "字号", "字重", "fallback font");
+            bool hasUiSpacingDesign = hasUiVisualDesignSubject && ContainsAnyIgnoreCase(text,
+                "spacing token", "ui spacing", "间距", "留白");
+            bool hasUiHierarchyDesign = hasUiVisualDesignSubject && ContainsAnyIgnoreCase(text,
+                "visual hierarchy", "视觉层级", "信息层级");
+            bool hasUiDensityDesign = hasUiVisualDesignSubject && ContainsAnyIgnoreCase(text,
+                "information density", "信息密度", "compact ui", "紧凑布局");
+            bool hasUiRarityDesign = hasUiVisualDesignSubject && ContainsAnyIgnoreCase(text,
+                "rarity", "稀有度");
+            bool hasUiMaterialDesign = hasUiVisualDesignSubject && ContainsAnyIgnoreCase(text,
+                "ui material", "界面材质", "ui 材质", "ui材质");
+            bool hasUiDesignToken = hasUiVisualDesignSubject && ContainsAnyIgnoreCase(text,
+                "design token", "design-token", "ui token", "设计令牌", "视觉 token", "视觉token");
+            bool hasUiVisualDesignContext = hasUiColorDesign || hasUiTypographyDesign || hasUiSpacingDesign
+                || hasUiHierarchyDesign || hasUiDensityDesign || hasUiRarityDesign || hasUiMaterialDesign
+                || hasUiDesignToken;
+            bool hasUiContext = hasUiToken || hasScreenSpecContext || ContainsAnyIgnoreCase(text,
+                "用户界面", "游戏界面", "界面预制体", "界面按钮", "界面参考图", "界面素材", "界面焦点",
+                "界面导航", "界面文本", "界面长文本", "界面本地化", "本地化界面", "canvas", "hud")
+                || hasGameUiScreenFamilyContext || hasUiVisualDesignContext || hasUiPlayerGoal;
+            bool hasUiReferenceEvidence = hasUiContext && ContainsAnyIgnoreCase(text,
+                "design evidence", "designevidence", "参考图", "reference image", "reference screenshot",
+                "设计稿来源", "来源区域", "source region", "视觉观察", "观察与假设", "vision review",
+                "reference provenance");
+            bool hasUiAssetManifest = hasUiContext && ContainsAnyIgnoreCase(text,
+                "assetmanifest", "asset manifest", "ui asset manifest", "素材清单", "素材 provenance",
+                "素材来源", "素材许可证", "asset license", "spriteatlas", "sprite atlas", "图集归属",
+                "crop policy", "裁剪策略", "9-slice", "九宫格", "asset resolver", "素材解析器");
+            bool hasUiBehaviorSpec = hasUiContext && ContainsAnyIgnoreCase(text,
+                "behaviorspec", "behavior spec", "behavior binding", "ui binding", "interaction.intent",
+                "交互 intent", "交互绑定", "焦点导航", "focus navigation", "selectable navigation",
+                "input modality", "输入模态", "键鼠焦点", "手柄焦点", "ui input module");
+            bool hasUiTextResilience = hasUiContext && ContainsAnyIgnoreCase(text,
+                "ui localization", "ui 本地化", "界面本地化", "long-content", "long content", "长文本",
+                "text wrapping", "文字换行", "文本换行", "glyph coverage", "字形覆盖", "font fallback",
+                "fallback font", "字体 fallback", "fallback 字体", "字体与 fallback", "字体和 fallback",
+                "字体及 fallback", "字体回退", "字体降级",
+                "bidi", "rtl", "双向文本", "从右到左", "line breaking", "行分断");
+            bool hasUiMaterializer = hasUiContext && ContainsAnyIgnoreCase(text,
+                "materializer", "物化器", "物化 ui", "物化 prefab", "物化预制体");
+            bool hasSceneContext = !hasUiContext && ContainsAnyIgnoreCase(text,
+                "scene", "场景", "测试关卡");
+            bool hasSceneBuilder = hasSceneContext && ContainsAnyIgnoreCase(text,
+                "builder", "构建器", "重建", "构建", "生成场景", "build scene");
+            bool hasPrefabOverride = hasSceneContext
+                && ContainsAnyIgnoreCase(text, "prefab", "预制体")
+                && ContainsAnyIgnoreCase(text, "override", "覆盖");
+            bool hasSceneFixture = hasSceneContext
+                && ContainsAnyIgnoreCase(text, "fixture", "夹具");
+            bool hasSceneLayout = hasSceneContext
+                && ContainsAnyIgnoreCase(text, "layout", "布局", "位置", "锚点");
+            bool hasSceneBackup = hasSceneContext
+                && ContainsAnyIgnoreCase(text, "backup", "备份", "回滚副本");
+            bool hasBackupManifest = hasSceneBackup
+                && ContainsAnyIgnoreCase(text, "manifest", "清单", "哈希", "hash");
+            bool hasSceneGuide = hasSceneContext
+                && ContainsAnyIgnoreCase(text, "scene guide", "guide", "导视", "诊断");
+            bool hasSceneAcceptance = hasSceneContext && ContainsAnyIgnoreCase(text,
+                "验收", "acceptance", "验证", "validation", "检查");
+            bool hasSceneRelease = hasSceneContext
+                && ContainsAnyIgnoreCase(text, "发布", "release");
+            bool hasSceneReceipt = hasSceneContext
+                && ContainsAnyIgnoreCase(text, "receipt", "回执", "运行记录");
+            bool hasSceneProfiler = hasSceneContext
+                && ContainsAnyIgnoreCase(text, "profiler", "性能采样");
+            bool hasSceneEvidence = hasSceneContext && ContainsAnyIgnoreCase(text,
+                "证据", "evidence", "receipt", "回执", "profiler", "验收", "acceptance");
+            bool hasUiPrefab = hasUiContext
+                && ContainsAnyIgnoreCase(text, "prefab", "预制体");
+            bool hasUiFixture = hasUiContext
+                && ContainsAnyIgnoreCase(text, "fixture", "夹具", "fixture scene");
+            bool hasUiLayout = hasUiContext
+                && ContainsAnyIgnoreCase(text, "layout", "布局", "anchor", "锚点");
+            bool hasResponsiveUi = hasUiContext && ContainsAnyIgnoreCase(text,
+                "responsive", "响应式", "safe area", "安全区", "分辨率", "adaptive");
+            bool hasUiVisualQa = hasUiContext && ContainsAnyIgnoreCase(text,
+                "visual", "视觉", "截图", "screenshot", "gpu", "像素");
+            bool hasUiVisualEvidence = hasUiVisualQa && ContainsAnyIgnoreCase(text,
+                "evidence", "证据", "png", "snapshot", "快照", "capture", "捕获", "验收", "acceptance");
+            bool hasUiAssetFallback = hasUiContext && ContainsAnyIgnoreCase(text,
+                "asset fallback", "素材 fallback", "素材降级", "素材缺失", "占位素材");
+            bool hasManagedAllocationQuestion = ContainsAnyIgnoreCase(text,
+                "托管分配", "managed allocation", "gc alloc", "gc allocation",
+                "会不会 gc", "是否 gc", "产生 gc", "分配误报", "allocation false positive");
+            bool hasManagedAllocationSyntax = ContainsAnyIgnoreCase(text,
+                "boxing", "装箱", "closure", "闭包", "lambda", "delegate", "委托",
+                "foreach", "iterator", "迭代器", "yield", "async", "await", "linq");
+            bool hasAllocationConcern = ContainsAnyIgnoreCase(text,
+                "分配", "alloc", "gc", "垃圾回收", "0 gc", "零 gc", "零gc", "热路径");
+            bool hasManagedAllocationContext = hasManagedAllocationQuestion
+                || (hasManagedAllocationSyntax && hasAllocationConcern);
+            bool hasMemoryCapacityContext = ContainsAnyIgnoreCase(text,
+                "内存预算", "memory budget", "驻留内存", "resident memory", "retained memory",
+                "容量预算", "capacity budget", "高水位", "high-water", "high water",
+                "池大小", "pool size", "缓存大小", "cache size", "池化成本", "gc tradeoff",
+                "memory profiler")
+                || (ContainsAnyIgnoreCase(text, "对象池", "pool", "缓存", "cache")
+                    && ContainsAnyIgnoreCase(text,
+                        "容量", "大小", "内存", "驻留", "保留", "峰值", "trim", "缩容"));
 
             var inferred = new List<string>();
             if (hasSkillUnderstandingRefreshSignal)
@@ -1205,8 +2814,192 @@ namespace ES
                     "incremental-discovery"
                 });
             }
-            if (hasSnapshotSignal || hasCacheContext)
+            if (hasReadConsistencyContext)
                 inferred.Add("consistency");
+            if (hasStableGraphContext)
+                inferred.AddRange(new[] { "graph", "stable-graph-v2" });
+            if (hasGraphIdentity) inferred.Add("graph-identity");
+            if (hasGraphUndo)
+                inferred.AddRange(new[] { "graph-undo", "rollback" });
+            if (hasGraphMigration) inferred.Add("graph-migration");
+            if (hasEdgeOrder) inferred.Add("edge-order");
+            if (hasGraphSnapshot) inferred.Add("graph-snapshot");
+            if (hasGraphBake) inferred.Add("graph-bake");
+            if (hasLegacyGraph) inferred.Add("legacy-graph");
+            if (hasStorySnapshotContext) inferred.Add("story");
+            if (hasExecutionGraphContext) inferred.Add("agent-execution-graph");
+            if (hasTaskContractContext) inferred.Add("task-contract");
+            if (hasRunRecordContext) inferred.Add("automation-run-record");
+            if (hasFeishuContext)
+                inferred.AddRange(new[] { "feishu", "lark", "external-adapter" });
+            if (hasTaskMonitor) inferred.Add("task-monitor");
+            if (hasTaskDispatch)
+                inferred.AddRange(new[] { "task-dispatch", "virtual-team" });
+            if (hasTaskTransition) inferred.Add("task-transition");
+            if (hasIdentityClaim)
+                inferred.AddRange(new[] { "identity-claim", "bot-ownership", "onboarding" });
+            if (hasMessageSend)
+                inferred.AddRange(new[] { "message-send", "notification" });
+            if (hasUnityLifecycleContext) inferred.Add("unity");
+            if (hasMonoBehaviourLifecycle)
+                inferred.AddRange(new[] { "monobehaviour", "lifecycle" });
+            if (hasStaticState) inferred.Add("static-state");
+            if (hasDomainReload) inferred.Add("domain-reload");
+            if (hasSceneReload) inferred.Add("scene-reload");
+            if (hasEnterPlayMode) inferred.Add("enter-play-mode");
+            if (hasScriptExecutionOrder) inferred.Add("script-execution-order");
+            if (hasExecuteAlwaysSignal) inferred.Add("execute-always");
+            if (hasExecuteInEditMode) inferred.Add("execute-in-edit-mode");
+            if (hasEditModeExecution) inferred.Add("edit-mode");
+            if (hasPrefabStageContext)
+                inferred.AddRange(new[] { "prefab-stage", "prefab-mode" });
+            if (hasPrefabAutoSave) inferred.Add("prefab-auto-save");
+            if (hasApplicationIsPlayingObject)
+                inferred.AddRange(new[] { "application-is-playing", "playing-world" });
+            if (hasEditorWindowContext)
+                inferred.AddRange(new[] { "editor", "editor-window", "owner-lifecycle" });
+            if (hasUnityCompile) inferred.Add("compile");
+            if (hasPlayerEvidence)
+                inferred.AddRange(new[] { "player", "evidence" });
+            if (hasKccMotionContext)
+                inferred.AddRange(new[] { "entity", "motion", "kcc", "character-controller" });
+            if (hasKccGrounding) inferred.Add("grounding");
+            if (hasKccMovingPlatform) inferred.Add("moving-platform");
+            if (hasKccTeleport) inferred.Add("teleport");
+            if (hasKccMotionInfluence) inferred.Add("motion-influence");
+            if (hasKccVelocity) inferred.Add("velocity");
+            if (hasVehicleMotionContext)
+                inferred.AddRange(new[] { "vehicle", "motion" });
+            if (hasMountContext)
+                inferred.AddRange(new[] { "mount", "rider" });
+            if (hasDriverContext)
+                inferred.AddRange(new[] { "driver", "input" });
+            if (hasPhysicsContext)
+                inferred.AddRange(new[] { "unity", "physics-3d" });
+            if (hasFixedUpdateContext)
+                inferred.AddRange(new[] { "fixed-update", "fixed-step" });
+            if (hasRigidbodyContext) inferred.Add("rigidbody");
+            if (hasRigidbodyContext && ContainsAnyIgnoreCase(text, "kinematic", "运动学刚体"))
+                inferred.Add("kinematic-rigidbody");
+            if (hasColliderContext) inferred.Add("collider");
+            if (hasTriggerContext) inferred.Add("trigger");
+            if (hasPhysicsQueryContext) inferred.Add("physics-query");
+            if (hasPhysicsQueryContext && ContainsAnyIgnoreCase(text,
+                    "raycast", "ray cast", "射线检测", "射线查询"))
+                inferred.Add("raycast");
+            if (hasPhysicsQueryContext && ContainsAnyIgnoreCase(text,
+                    "spherecast", "sphere cast", "capsulecast", "capsule cast", "boxcast", "box cast",
+                    "球形投射", "胶囊投射", "盒体投射"))
+                inferred.Add("cast");
+            if (hasPhysicsQueryContext && ContainsAnyIgnoreCase(text,
+                    "overlapsphere", "overlapbox", "overlapcapsule", "physics.overlap",
+                    "物理重叠", "重叠检测", "重叠查询"))
+                inferred.Add("overlap");
+            if (hasLayerMaskContext) inferred.Add("layer-mask");
+            if (hasQueryTriggerContext) inferred.Add("query-trigger");
+            if (hasTransformSyncContext) inferred.Add("transform-sync");
+            if (hasInterpolationContext) inferred.Add("interpolation");
+            if (hasSingleWriterContext) inferred.Add("single-writer");
+            if (hasSceneBuilder) inferred.Add("scene-builder");
+            if (hasPrefabOverride) inferred.Add("prefab-override");
+            if (hasSceneFixture) inferred.Add("scene-fixture");
+            if (hasSceneLayout) inferred.Add("scene-layout");
+            if (hasSceneBackup) inferred.Add("scene-backup");
+            if (hasBackupManifest) inferred.Add("backup-manifest");
+            if (hasSceneGuide) inferred.Add("scene-guide");
+            if (hasSceneGuide || hasSceneAcceptance || hasSceneRelease
+                || hasSceneReceipt || hasSceneProfiler)
+                inferred.Add("scene-validation");
+            if (hasSceneAcceptance) inferred.Add("acceptance");
+            if (hasSceneRelease) inferred.Add("release");
+            if (hasSceneEvidence) inferred.Add("evidence");
+            if (hasSceneReceipt) inferred.Add("receipt");
+            if (hasSceneProfiler) inferred.Add("profiler");
+            if (hasUiContext) inferred.Add("ui-automation");
+            if (hasUiPlayerGoal)
+                inferred.AddRange(new[] { "player-intent", "player-goal", "intent-spec", "primary-action" });
+            if (hasUiIntentClarification) inferred.Add("ui-intent-clarification");
+            if (hasUiBusinessBridge) inferred.Add("business-bridge");
+            if (hasScreenSpecContext) inferred.Add("screen-spec-v3");
+            if (hasUiPrefab) inferred.Add("ui-prefab");
+            if (hasUiFixture) inferred.Add("ui-fixture-scene");
+            if (hasUiPrefab || hasUiFixture || hasUiMaterializer) inferred.Add("materializer");
+            if (hasUiLayout) inferred.Add("ui-layout");
+            if (hasResponsiveUi) inferred.AddRange(new[] { "responsive", "ui-responsive" });
+            if (hasUiVisualQa) inferred.Add("visual-qa");
+            if (hasUiVisualEvidence) inferred.Add("visual-evidence");
+            if (hasUiAssetFallback) inferred.Add("asset-fallback");
+            if (hasUiReferenceEvidence)
+                inferred.AddRange(new[] { "ui-reference-evidence", "design-evidence", "reference-image",
+                    "reference-provenance", "source-region", "vision-review", "observation-assumption" });
+            if (hasUiAssetManifest)
+                inferred.AddRange(new[] { "ui-asset-manifest", "asset-manifest", "asset-provenance",
+                    "asset-license", "asset-fallback", "sprite-atlas", "crop-policy", "asset-resolver" });
+            if (hasUiBehaviorSpec)
+                inferred.AddRange(new[] { "ui-behavior-spec", "behavior-spec", "ui-binding",
+                    "ui-interaction-intent", "ui-focus", "ui-navigation", "input-modality", "input-system-ui" });
+            if (hasUiTextResilience)
+                inferred.AddRange(new[] { "ui-text-resilience", "ui-localization", "long-content",
+                    "text-wrapping", "bidi", "rtl", "glyph-coverage", "font-fallback", "line-breaking" });
+            if (hasGameUiScreenFamilyContext)
+                inferred.AddRange(new[] { "game-ui-screen-family", "commercial-ui", "ui-information-architecture" });
+            if (hasHudUi) inferred.Add("hud-ui");
+            if (hasInventoryUi) inferred.Add("inventory-ui");
+            if (hasShopUi) inferred.Add("shop-ui");
+            if (hasDialogueUi) inferred.Add("dialogue-ui");
+            if (hasMapUi) inferred.Add("map-ui");
+            if (hasProgressionUi) inferred.Add("progression-ui");
+            if (hasResultUi) inferred.Add("result-ui");
+            if (hasSettingsUi) inferred.Add("settings-ui");
+            if (hasUiVisualDesignContext)
+                inferred.AddRange(new[] { "ui-visual-design", "visual-design" });
+            if (hasUiDesignToken) inferred.Add("design-token");
+            if (hasUiColorDesign) inferred.Add("color-role");
+            if (hasUiTypographyDesign) inferred.Add("typography-role");
+            if (hasUiSpacingDesign) inferred.Add("spacing-token");
+            if (hasUiHierarchyDesign) inferred.Add("visual-hierarchy");
+            if (hasUiDensityDesign) inferred.Add("information-density");
+            if (hasUiRarityDesign) inferred.Add("rarity-visual");
+            if (hasUiMaterialDesign) inferred.Add("ui-material");
+            if (hasManagedAllocationContext)
+                inferred.AddRange(new[] { "performance", "managed-allocation", "allocation-static-audit" });
+            if (hasManagedAllocationContext && ContainsAnyIgnoreCase(text, "boxing", "装箱"))
+                inferred.Add("boxing");
+            if (hasManagedAllocationContext && ContainsAnyIgnoreCase(text, "closure", "闭包", "lambda"))
+                inferred.Add("closure");
+            if (hasManagedAllocationContext && ContainsAnyIgnoreCase(text, "delegate", "委托"))
+                inferred.Add("delegate");
+            if (hasManagedAllocationContext && ContainsAnyIgnoreCase(text, "foreach"))
+                inferred.Add("foreach");
+            if (hasManagedAllocationContext && ContainsAnyIgnoreCase(text, "iterator", "迭代器"))
+                inferred.Add("iterator");
+            if (hasManagedAllocationContext && ContainsAnyIgnoreCase(text, "yield"))
+                inferred.Add("yield");
+            if (hasManagedAllocationContext && ContainsAnyIgnoreCase(text, "async", "await"))
+                inferred.Add("async");
+            if (hasManagedAllocationContext && ContainsAnyIgnoreCase(text, "linq"))
+                inferred.Add("linq");
+            if (hasManagedAllocationContext && ContainsAnyIgnoreCase(text, "误报", "false positive"))
+                inferred.Add("false-positive");
+            if (hasMemoryCapacityContext)
+                inferred.AddRange(new[] { "performance", "memory-budget", "capacity-budget" });
+            if (hasMemoryCapacityContext && ContainsAnyIgnoreCase(text,
+                    "驻留", "resident memory", "retained memory", "保留"))
+                inferred.Add("resident-memory");
+            if (hasMemoryCapacityContext && ContainsAnyIgnoreCase(text,
+                    "高水位", "high-water", "high water", "峰值"))
+                inferred.Add("high-water-mark");
+            if (hasMemoryCapacityContext && ContainsAnyIgnoreCase(text, "对象池", "pool", "池大小"))
+                inferred.AddRange(new[] { "pool", "pool-size" });
+            if (hasMemoryCapacityContext && ContainsAnyIgnoreCase(text, "缓存", "cache", "缓存大小"))
+                inferred.Add("cache-size");
+            if (hasMemoryCapacityContext && ContainsAnyIgnoreCase(text, "trim", "缩容"))
+                inferred.Add("trim");
+            if (hasMemoryCapacityContext && ContainsAnyIgnoreCase(text, "memory profiler"))
+                inferred.Add("memory-profiler");
+            if (hasMemoryCapacityContext && ContainsAnyIgnoreCase(text,
+                    "池化成本", "gc tradeoff", "内存换 gc", "内存换gc"))
+                inferred.Add("gc-tradeoff");
             return inferred.Distinct(StringComparer.Ordinal).ToList();
         }
 
@@ -1602,19 +3395,137 @@ namespace ES
                     .Replace("-", string.Empty).ToLowerInvariant();
         }
 
+        private static string ComputeConcatenatedHashSetHash(IEnumerable<string> hashes)
+        {
+            string canonical = string.Concat((hashes ?? Enumerable.Empty<string>())
+                .Where(hash => !string.IsNullOrWhiteSpace(hash))
+                .Select(hash => hash.Trim().ToLowerInvariant())
+                .OrderBy(hash => hash, StringComparer.Ordinal));
+            using (SHA256 sha = SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(StrictUtf8.GetBytes(canonical)))
+                    .Replace("-", string.Empty).ToLowerInvariant();
+        }
+
+        private static bool MatchesKnowledgeSourceSetHash(string expected,
+            IEnumerable<KnowledgeSourceReference> sourceRefs,
+            IEnumerable<string> rawHashes, IEnumerable<string> normalizedHashes)
+        {
+            if (string.IsNullOrWhiteSpace(expected)) return false;
+            string normalizedExpected = expected.Trim().ToLowerInvariant();
+            string[] candidates =
+            {
+                ComputeKnowledgeSourceSetHash(sourceRefs),
+                // ContentHash is the compatibility hash over the declared,
+                // validated SourceRef hashes. This is also the effective hash
+                // when a text source is represented by its normalized form.
+                ComputeConcatenatedHashSetHash((sourceRefs ?? Enumerable.Empty<KnowledgeSourceReference>())
+                    .Select(sourceRef => sourceRef?.sha256 ?? string.Empty)),
+                ComputeStableHashSetHash(rawHashes),
+                ComputeConcatenatedHashSetHash(rawHashes),
+                ComputeStableHashSetHash(normalizedHashes),
+                ComputeConcatenatedHashSetHash(normalizedHashes),
+            };
+            return candidates.Any(candidate => string.Equals(candidate, normalizedExpected,
+                StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Knowledge refresh plans use a path-bound canonical record so that two
+        // different SourceRef sets cannot accidentally share the same content hash.
+        private static string ComputeKnowledgeSourceSetHash(
+            IEnumerable<KnowledgeSourceReference> sourceRefs)
+        {
+            string[] records = (sourceRefs ?? Enumerable.Empty<KnowledgeSourceReference>())
+                .Select(sourceRef => CanonicalSourceSetRecord(
+                    sourceRef?.path ?? string.Empty, sourceRef?.sha256 ?? string.Empty))
+                .OrderBy(record => record, StringComparer.Ordinal)
+                .ToArray();
+            using (SHA256 sha = SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(
+                    StrictUtf8.GetBytes(string.Join("\n", records))))
+                    .Replace("-", string.Empty).ToLowerInvariant();
+        }
+
+        private static string CanonicalSourceSetRecord(string path, string hash)
+        {
+            return CanonicalSourceSetField("source-set") + "|"
+                + CanonicalSourceSetField(path) + "|"
+                + CanonicalSourceSetField(hash);
+        }
+
+        private static string CanonicalSourceSetField(string value)
+        {
+            string text = value ?? string.Empty;
+            return text.Length + ":" + text;
+        }
+
+        private static bool TryReadNormalizedTextHash(string path, out string hash, out string error)
+        {
+            hash = string.Empty;
+            error = string.Empty;
+            try
+            {
+                byte[] bytes = File.ReadAllBytes(path);
+                string text = StrictUtf8.GetString(bytes)
+                    .Replace("\r\n", "\n")
+                    .Replace("\r", "\n");
+                using (SHA256 sha = SHA256.Create())
+                    hash = BitConverter.ToString(sha.ComputeHash(StrictUtf8.GetBytes(text)))
+                        .Replace("-", string.Empty).ToLowerInvariant();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                return false;
+            }
+        }
+
         private static string ComputePlanHash(ESAIBrainPlan plan, ESAIBrainRequest request)
         {
-            string canonical = JsonConvert.SerializeObject(new
+            TryResolveAuthorizationProfile(plan, request, false,
+                out AuthorizationProfile authorizationProfile, out _);
+            return ComputeCanonicalSha256(JToken.FromObject(new
             {
+                authorizationPolicyVersion = AuthorizationPolicyVersion,
                 plan.contractVersion,
+                plan.status,
                 plan.objective,
+                plan.knowledgeIndexHash,
                 plan.routeKeys,
-                knowledge = plan.knowledge.Select(item => new { item.knowledgeId, item.contentHash }),
-                warnings = plan.warnings.Select(item => new { item.projectPath, item.sha256 }),
-                command = plan.command == null ? string.Empty : plan.command.contractHash,
-                skills = plan.skills.Select(item => new
+                blockers = plan.blockers.OrderBy(item => item, StringComparer.Ordinal),
+                knowledge = plan.knowledge.OrderBy(item => item.knowledgeId, StringComparer.Ordinal)
+                    .Select(item => new
+                    {
+                        item.knowledgeId,
+                        item.file,
+                        item.topic,
+                        item.contentHash,
+                        routeKeys = item.routeKeys.OrderBy(value => value, StringComparer.Ordinal),
+                        relatedSkills = item.relatedSkills.OrderBy(value => value, StringComparer.Ordinal),
+                        requiredReads = item.requiredReads.OrderBy(value => value, StringComparer.Ordinal),
+                        sourceRefs = item.sourceRefs.OrderBy(value => value, StringComparer.Ordinal),
+                    }),
+                warnings = plan.warnings.OrderBy(item => item.projectPath, StringComparer.Ordinal)
+                    .ThenBy(item => item.sha256, StringComparer.Ordinal)
+                    .Select(item => new { item.projectPath, item.sha256 }),
+                evidence = plan.evidence.OrderBy(item => item.projectPath, StringComparer.Ordinal)
+                    .ThenBy(item => item.sha256, StringComparer.Ordinal)
+                    .Select(item => new { item.projectPath, item.sha256 }),
+                command = plan.command == null ? null : new
+                {
+                    plan.command.id,
+                    plan.command.path,
+                    plan.command.role,
+                    plan.command.riskLevel,
+                    plan.command.writeMode,
+                    plan.command.catalogHash,
+                    plan.command.contractHash,
+                    plan.command.reference,
+                },
+                skills = plan.skills.OrderBy(item => item.name, StringComparer.Ordinal).Select(item => new
                 {
                     item.name,
+                    item.skillPath,
                     item.skillHash,
                     item.metadataHash,
                     item.governanceHash,
@@ -1636,16 +3547,46 @@ namespace ES
                     item.runtimeEligibility,
                     item.reviewRequired,
                 }),
-                workflow = plan.workflow == null
-                    ? string.Empty : plan.workflow.workflowId + "@" + plan.workflow.contentHash,
-                task = plan.task == null ? string.Empty : plan.task.taskId + "@" + plan.task.taskVersion,
+                workflow = plan.workflow == null ? null : new
+                {
+                    plan.workflow.workflowId,
+                    plan.workflow.contentHash,
+                    plan.workflow.sourceAssetGuid,
+                },
+                task = plan.task == null ? null : new
+                {
+                    plan.task.taskId,
+                    plan.task.taskVersion,
+                    plan.task.displayName,
+                    plan.task.category,
+                    plan.task.summary,
+                    plan.task.inputSchemaHash,
+                    plan.task.descriptorHash,
+                    plan.task.taskContractHash,
+                    plan.task.allowAiInvoke,
+                    plan.task.allowInPlayMode,
+                    plan.task.workerId,
+                    plan.task.workerType,
+                    plan.task.workerVersion,
+                    plan.task.workerEntrypointHash,
+                    plan.task.workerEnabled,
+                    capabilities = plan.task.capabilities.OrderBy(value => value, StringComparer.Ordinal),
+                },
+                plan.authority,
+                authorization = new
+                {
+                    authorizationProfile.authorizationClass,
+                    authorizationProfile.budgetClass,
+                    authorizationProfile.hostId,
+                    authorizationProfile.instructionHash,
+                    authorizationProfile.maxUses,
+                },
                 request.invocationId,
                 request.preset,
                 input = request.input ?? new JObject(),
                 request.fromAi,
                 request.dryRun,
                 request.actorId,
-                request.idempotencyKey,
                 executionSnapshot = request.executionSnapshot == null ? null : new
                 {
                     request.executionSnapshot.snapshotId,
@@ -1657,10 +3598,72 @@ namespace ES
                     // including it here would create a self-referential hash.
                     brainPlanHash = string.Empty,
                 },
-            }, Formatting.None);
+            }));
+        }
+
+        private static string ComputeTrustedHostRequestHash(ESAIBrainRequest request)
+        {
+            return ComputeCanonicalSha256(JToken.FromObject(new
+            {
+                authorizationPolicyVersion = AuthorizationPolicyVersion,
+                request.objective,
+                routeKeys = request.routeKeys ?? new List<string>(),
+                request.commandId,
+                skillNames = request.skillNames ?? new List<string>(),
+                workflow = request.workflow == null ? null : new
+                {
+                    request.workflow.workflowId,
+                    request.workflow.contentHash,
+                    request.workflow.sourceAssetGuid,
+                },
+                request.taskId,
+                request.taskVersion,
+                request.preset,
+                input = request.input ?? new JObject(),
+                request.fromAi,
+                request.dryRun,
+                request.actorId,
+                request.invocationId,
+                request.userDirectedRuntime,
+                request.userInstructionHash,
+                executionSnapshot = request.executionSnapshot == null ? null : new
+                {
+                    request.executionSnapshot.snapshotId,
+                    request.executionSnapshot.inputManifestHash,
+                    request.executionSnapshot.sourceHash,
+                    request.executionSnapshot.taskContractHash,
+                    request.executionSnapshot.commandHash,
+                    brainPlanHash = string.Empty,
+                },
+            }));
+        }
+
+        private static string ComputeCanonicalSha256(JToken value)
+        {
+            string canonical = CanonicalizeToken(value ?? JValue.CreateNull())
+                .ToString(Formatting.None);
             using (SHA256 sha = SHA256.Create())
-                return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(canonical)))
+                return BitConverter.ToString(sha.ComputeHash(StrictUtf8.GetBytes(canonical)))
                     .Replace("-", string.Empty).ToLowerInvariant();
+        }
+
+        private static JToken CanonicalizeToken(JToken token)
+        {
+            if (token is JObject obj)
+            {
+                var result = new JObject();
+                foreach (JProperty property in obj.Properties()
+                             .OrderBy(item => item.Name, StringComparer.Ordinal))
+                    result.Add(property.Name, CanonicalizeToken(property.Value));
+                return result;
+            }
+            if (token is JArray array)
+            {
+                var result = new JArray();
+                foreach (JToken item in array) result.Add(CanonicalizeToken(item));
+                return result;
+            }
+            return token.DeepClone();
         }
 
         private sealed class KnowledgeIndexEntry
@@ -1680,10 +3683,75 @@ namespace ES
             public string sha256 = string.Empty;
         }
 
-        private sealed class AIBrainExecutionAuthorization
+        private sealed class AuthorizationProfile
         {
-            public string invocationHash = string.Empty;
+            public readonly string authorizationClass;
+            public readonly string budgetClass;
+            public readonly string hostId;
+            public readonly string instructionHash;
+            public readonly int maxUses;
+
+            public AuthorizationProfile(string authorizationClass, string budgetClass,
+                string hostId, string instructionHash, int maxUses)
+            {
+                this.authorizationClass = authorizationClass ?? string.Empty;
+                this.budgetClass = budgetClass ?? string.Empty;
+                this.hostId = hostId ?? string.Empty;
+                this.instructionHash = instructionHash ?? string.Empty;
+                this.maxUses = maxUses;
+            }
+
+            public static AuthorizationProfile Untrusted()
+            {
+                return new AuthorizationProfile("Untrusted", AuthorizationBudgetHighRisk,
+                    string.Empty, string.Empty, DefaultHighRiskAuthorizationUses);
+            }
+        }
+
+        private sealed class AIBrainAuthorizationStore
+        {
+            public int schemaVersion = AuthorizationStoreSchemaVersion;
+            public int authorizationPolicyVersion;
+            public long revision;
+            public List<string> retiredInvocationIds = new List<string>();
+            public List<AIBrainAuthorizationRecord> entries = new List<AIBrainAuthorizationRecord>();
+        }
+
+        private sealed class AuthorizationStoreTransaction
+        {
+            public AuthorizationStoreTransaction(DateTimeOffset utcNow)
+            {
+                UtcNow = utcNow;
+            }
+
+            public DateTimeOffset UtcNow { get; }
+
+            public bool TryPersistAuthorizationStore(string path,
+                AIBrainAuthorizationStore store, out string error)
+            {
+                return ESAIBrainCoordinator.TryPersistAuthorizationStore(
+                    path, store, UtcNow, out error);
+            }
+        }
+
+        private sealed class AIBrainAuthorizationRecord
+        {
+            public string planHash = string.Empty;
+            public string bindingHash = string.Empty;
+            public string planId = string.Empty;
+            public string invocationId = string.Empty;
+            public string actorId = string.Empty;
+            public string authorizationClass = string.Empty;
+            public string budgetClass = string.Empty;
+            public string hostId = string.Empty;
+            public string instructionHash = string.Empty;
+            public string status = AuthorizationStatusActive;
+            public DateTimeOffset issuedAtUtc;
             public DateTimeOffset expiresAtUtc;
+            public DateTimeOffset? terminalAtUtc;
+            public int maxUses = 1;
+            public int usedCount;
+            public List<string> usedIdempotencyKeys = new List<string>();
         }
     }
 
@@ -1703,9 +3771,49 @@ namespace ES
         public bool dryRun;
         public string actorId = string.Empty;
         public string invocationId = string.Empty;
-        /// <summary>可选的幂等键和执行快照会参与 AIBrain 计划/授权指纹，防止授权被换绑到另一组输入。</summary>
+        /// <summary>
+        /// Immutable plan hash returned by planTask. External AI execution must submit
+        /// it again; a changed plan is stale and cannot be authorized.
+        /// </summary>
+        public string approvedPlanHash = string.Empty;
+        /// <summary>幂等键用于本次执行去重；执行快照参与授权绑定，防止授权被换绑到另一组输入。</summary>
         public string idempotencyKey = string.Empty;
+        /// <summary>
+        /// Explicit current-user runtime authorization. This is not a blanket bypass:
+        /// the coordinator accepts it only for the fixed UI materializer plan and
+        /// requires the caller to bind a SHA-256 of the current user instruction.
+        /// </summary>
+        public bool userDirectedRuntime;
+        public string userInstructionHash = string.Empty;
         public ESAutomationExecutionSnapshot executionSnapshot;
+        [JsonIgnore]
+        internal AIBrainTrustedHostProof trustedHostProof;
+    }
+
+    internal sealed class AIBrainTrustedHostProof
+    {
+        internal readonly string hostId;
+        internal readonly string authorizationClass;
+        internal readonly string instructionHash;
+        internal readonly string invocationId;
+        internal readonly string actorId;
+        internal readonly string requestHash;
+        internal readonly DateTimeOffset issuedAtUtc;
+        internal readonly DateTimeOffset expiresAtUtc;
+
+        internal AIBrainTrustedHostProof(string hostId, string authorizationClass,
+            string instructionHash, string invocationId, string actorId,
+            string requestHash, DateTimeOffset issuedAtUtc, DateTimeOffset expiresAtUtc)
+        {
+            this.hostId = hostId ?? string.Empty;
+            this.authorizationClass = authorizationClass ?? string.Empty;
+            this.instructionHash = instructionHash ?? string.Empty;
+            this.invocationId = invocationId ?? string.Empty;
+            this.actorId = actorId ?? string.Empty;
+            this.requestHash = requestHash ?? string.Empty;
+            this.issuedAtUtc = issuedAtUtc;
+            this.expiresAtUtc = expiresAtUtc;
+        }
     }
 
     [Serializable]
@@ -1714,6 +3822,7 @@ namespace ES
         public int contractVersion;
         public string planId = string.Empty;
         public string planHash = string.Empty;
+        public string invocationId = string.Empty;
         public string status = string.Empty;
         public string objective = string.Empty;
         public string knowledgeIndexHash = string.Empty;
@@ -1867,9 +3976,15 @@ namespace ES
         public string category = string.Empty;
         public string summary = string.Empty;
         public string inputSchemaHash = string.Empty;
+        public string descriptorHash = string.Empty;
+        public string taskContractHash = string.Empty;
         public bool allowAiInvoke;
+        public bool allowInPlayMode;
         public string workerId = string.Empty;
         public string workerType = string.Empty;
+        public string workerVersion = string.Empty;
+        public string workerEntrypointHash = string.Empty;
+        public bool workerEnabled;
         public List<string> capabilities = new List<string>();
     }
 
@@ -1890,6 +4005,15 @@ namespace ES
     }
 
     [Serializable]
+    public sealed class ESAIBrainCapabilityDriftSignal
+    {
+        public int generation;
+        public string trigger = string.Empty;
+        public string metadataFingerprint = string.Empty;
+        public string nextAction = string.Empty;
+    }
+
+    [Serializable]
     public sealed class ESAIBrainProductionSurface
     {
         public int contractVersion;
@@ -1904,7 +4028,9 @@ namespace ES
         public readonly List<ESAIBrainSkillBinding> skills = new List<ESAIBrainSkillBinding>();
         public readonly List<ESAIBrainTaskBinding> tasks = new List<ESAIBrainTaskBinding>();
         public readonly List<ESAIBrainCapabilityBinding> cli = new List<ESAIBrainCapabilityBinding>();
+        public readonly List<ESAIBrainCapabilityBinding> diagnostics = new List<ESAIBrainCapabilityBinding>();
         public readonly List<ESAIBrainCapabilityBinding> mcp = new List<ESAIBrainCapabilityBinding>();
+        public ESAIBrainFailureTelemetrySnapshot failureTelemetry = new ESAIBrainFailureTelemetrySnapshot();
     }
 
     /// <summary>
@@ -1922,6 +4048,8 @@ namespace ES
         private ESAIBrainPlan latestPlan;
         private ESAIBrainProductionSurface productionSurface;
         private Vector2 scrollPosition;
+        private bool capabilityRefreshPending;
+        private ESAIBrainCapabilityDriftSignal lastCapabilityDrift;
 
         [MenuItem(MenuItemPathDefine.AUTOMATION_CENTER_PATH + "打开 AIBrain")]
         private static void Open() => OpenWindow();
@@ -1937,8 +4065,33 @@ namespace ES
         protected override string ESWindow_PageTitle => "AIBrain";
         protected override string ESWindow_PageKeywords => "AIBrain Knowledge AIWarnings AICommand Skill Automation";
 
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            ESAIBrainCoordinator.CapabilityDriftDetected += OnCapabilityDriftDetected;
+        }
+
+        protected override void OnDisable()
+        {
+            ESAIBrainCoordinator.CapabilityDriftDetected -= OnCapabilityDriftDetected;
+            base.OnDisable();
+        }
+
+        private void OnCapabilityDriftDetected(ESAIBrainCapabilityDriftSignal signal)
+        {
+            lastCapabilityDrift = signal;
+            capabilityRefreshPending = true;
+            Repaint();
+        }
+
         protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
         {
+            if (capabilityRefreshPending)
+            {
+                capabilityRefreshPending = false;
+                context.SetStatus("Capability metadata changed; route-scoped refresh required",
+                    ESMenuTreePageStatus.Warning);
+            }
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
             try
             {
@@ -1951,6 +4104,14 @@ namespace ES
                 skillName = EditorGUILayout.TextField("Project Skill", skillName);
                 taskId = EditorGUILayout.TextField("Automation Task（可空）", taskId);
                 taskVersion = EditorGUILayout.IntField("Task Version", taskVersion);
+                if (lastCapabilityDrift != null)
+                {
+                    EditorGUILayout.HelpBox(
+                        "Capability drift: " + lastCapabilityDrift.trigger
+                        + " / generation " + lastCapabilityDrift.generation
+                        + ". Existing plans are stale until route-scoped comparison and re-plan.",
+                        MessageType.Warning);
+                }
                 if (GUILayout.Button("刷新生产力面（Skills / CLI / MCP / Warnings / Knowledge）", GUILayout.Height(26f)))
                 {
                     productionSurface = ESAIBrainCoordinator.DescribeProductionSurface(Split(routeKeys));
@@ -2033,4 +4194,229 @@ namespace ES
                 .Select(item => item.Trim()).Where(item => item.Length > 0).ToList();
         }
     }
+
+    public static class ESAIBrainFailureTelemetry
+    {
+        private const int Capacity = 256;
+        private static readonly object Sync = new object();
+        private static readonly Queue<ESAIBrainFailureEvent> Events = new Queue<ESAIBrainFailureEvent>();
+
+        public static void Record(string category, string stage, string detail, string correlationId = "")
+        {
+            if (string.IsNullOrWhiteSpace(category)) return;
+            var item = new ESAIBrainFailureEvent
+            {
+                category = category.Trim(),
+                stage = string.IsNullOrWhiteSpace(stage) ? "unknown" : stage.Trim(),
+                occurredAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                correlationId = NormalizeIdentifier(correlationId),
+                detailHash = Hash(detail ?? string.Empty),
+            };
+            lock (Sync)
+            {
+                while (Events.Count >= Capacity) Events.Dequeue();
+                Events.Enqueue(item);
+            }
+        }
+
+        public static void RecordPlan(ESAIBrainPlan plan, string stage)
+        {
+            if (plan == null)
+            {
+                Record("PlanTaskUnavailable", stage, "plan:null");
+                return;
+            }
+            if (plan.IsRunnable) return;
+            Record(Classify(plan), stage, string.Join("\n", plan.blockers), plan.planId);
+        }
+
+        public static ESAIBrainFailureTelemetrySnapshot Snapshot()
+        {
+            ESAIBrainFailureEvent[] copy;
+            lock (Sync) copy = Events.ToArray();
+            var snapshot = new ESAIBrainFailureTelemetrySnapshot
+            {
+                generatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                capacity = Capacity,
+                retainedEventCount = copy.Length,
+            };
+            snapshot.counts.AddRange(copy.GroupBy(item => item.category, StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => new ESAIBrainFailureCount
+                {
+                    category = group.Key,
+                    count = group.Count(),
+                    lastOccurredAtUtc = group.Last().occurredAtUtc,
+                }));
+            snapshot.recent.AddRange(copy.Skip(Math.Max(0, copy.Length - 32)));
+            return snapshot;
+        }
+
+        internal static void ClearForTests()
+        {
+            lock (Sync) Events.Clear();
+        }
+
+        private static string Classify(ESAIBrainPlan plan)
+        {
+            string blockers = string.Join("\n", plan.blockers ?? new List<string>());
+            if (blockers.IndexOf("SourceRef", StringComparison.OrdinalIgnoreCase) >= 0
+                && blockers.IndexOf("漂移", StringComparison.OrdinalIgnoreCase) >= 0)
+                return "SourceHashDrift";
+            if (string.Equals(plan.status, "PlanTaskUnavailable", StringComparison.Ordinal))
+                return "PlanTaskUnavailable";
+            if (string.Equals(plan.status, "NoKnowledgeRoute", StringComparison.Ordinal))
+                return "NoKnowledgeRoute";
+            if (string.Equals(plan.status, "NoMatchingCommand", StringComparison.Ordinal))
+                return "NoMatchingCommand";
+            return "PlanBlocked";
+        }
+
+        private static string NormalizeIdentifier(string value)
+        {
+            value = value ?? string.Empty;
+            return value.Length <= 128 ? value : value.Substring(0, 128);
+        }
+
+        private static string Hash(string value)
+        {
+            using (SHA256 sha = SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value)))
+                    .Replace("-", string.Empty).ToLowerInvariant();
+        }
+    }
+
+    public static class ESAIBrainRouteProbeRunner
+    {
+        public const string RegistryPath = "Documentation/AIKnowledge/RouteProbeRegistry.json";
+
+        public static ESAIBrainRouteProbeReport Run()
+        {
+            var report = new ESAIBrainRouteProbeReport
+            {
+                generatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                registryPath = RegistryPath,
+                evidenceBoundary = "static-routing-only",
+            };
+            try
+            {
+                string fullPath = Path.Combine(ESCommandPalettePathPolicy.ProjectRoot,
+                    RegistryPath.Replace('/', Path.DirectorySeparatorChar));
+                string text = File.ReadAllText(fullPath, new UTF8Encoding(false, true));
+                report.registryHash = Hash(text);
+                JObject registry = JObject.Parse(text);
+                ValidateRegistry(registry);
+                report.rankingVersion = registry.Value<string>("rankingVersion") ?? string.Empty;
+                foreach (JObject probe in registry["probes"].OfType<JObject>())
+                    report.results.Add(RunProbe(probe));
+                report.status = report.results.All(item => item.passed) ? "Passed" : "Failed";
+            }
+            catch (Exception exception)
+            {
+                report.status = "Blocked";
+                report.error = exception.Message;
+            }
+            if (!string.Equals(report.status, "Passed", StringComparison.Ordinal))
+                ESAIBrainFailureTelemetry.Record("WrongKnowledgeRoute", "route-probe",
+                    JsonConvert.SerializeObject(report, Formatting.None), report.registryHash);
+            return report;
+        }
+
+        private static ESAIBrainRouteProbeResult RunProbe(JObject probe)
+        {
+            string probeId = probe.Value<string>("probeId") ?? string.Empty;
+            string[] expectedRoutes = ReadStrings(probe["expectedRouteKeys"]);
+            JObject[] expectedKnowledge = (probe["expectedKnowledgeTop3"] as JArray ?? new JArray())
+                .OfType<JObject>().ToArray();
+            string[] forbidden = ReadStrings(probe["forbiddenKnowledgeIds"]);
+            int repeatCount = probe.Value<int>("repeatCount");
+            var result = new ESAIBrainRouteProbeResult { probeId = probeId, passed = true };
+            for (int attempt = 0; attempt < repeatCount; attempt++)
+            {
+                ESAIBrainPlan plan = ESAIBrainCoordinator.Plan(new ESAIBrainRequest
+                {
+                    objective = probe.Value<string>("objective") ?? string.Empty,
+                    routeKeys = ReadStrings(probe["explicitRouteKeys"]).ToList(),
+                    invocationId = Guid.NewGuid().ToString("N"),
+                    fromAi = false,
+                });
+                string[] actualKnowledge = plan.knowledge.Select(item => item.knowledgeId).ToArray();
+                if (attempt == 0)
+                {
+                    result.actualRouteKeys.AddRange(plan.routeKeys);
+                    result.actualKnowledgeTop3.AddRange(actualKnowledge);
+                }
+                if (!expectedRoutes.SequenceEqual(plan.routeKeys, StringComparer.Ordinal)
+                    || !expectedKnowledge.Select(item => item.Value<string>("knowledgeId"))
+                        .SequenceEqual(actualKnowledge, StringComparer.Ordinal)
+                    || forbidden.Intersect(actualKnowledge, StringComparer.Ordinal).Any())
+                    result.passed = false;
+                foreach (JObject expectation in expectedKnowledge)
+                {
+                    ESAIBrainKnowledgeBinding binding = plan.knowledge.FirstOrDefault(item =>
+                        string.Equals(item.knowledgeId, expectation.Value<string>("knowledgeId"), StringComparison.Ordinal));
+                    string[] expectedReads = ReadStrings(expectation["requiredReads"]);
+                    if (binding == null || !expectedReads.SequenceEqual(binding.requiredReads, StringComparer.Ordinal))
+                    {
+                        result.passed = false;
+                        result.requiredReadsMismatch = true;
+                        if (binding != null && binding.requiredReads.Except(expectedReads, StringComparer.Ordinal).Any())
+                            result.requiredReadsOverflow = true;
+                    }
+                }
+            }
+            if (!result.passed)
+                ESAIBrainFailureTelemetry.Record(result.requiredReadsOverflow
+                    ? "RequiredReadOverflow" : "WrongKnowledgeRoute", "route-probe", probeId, probeId);
+            return result;
+        }
+
+        private static void ValidateRegistry(JObject registry)
+        {
+            if (registry == null || registry.Value<int?>("schemaVersion") != 1)
+                throw new InvalidDataException("Unsupported route probe schemaVersion.");
+            if (!string.Equals(registry.Value<string>("rankingVersion"),
+                    ESAIBrainCoordinator.KnowledgeRankingVersion, StringComparison.Ordinal))
+                throw new InvalidDataException("Unsupported route probe rankingVersion.");
+            if (!string.Equals(registry.Value<string>("lifecycleState"), "operational-static",
+                    StringComparison.Ordinal)
+                || !string.Equals(registry.Value<string>("ownerKnowledgeId"),
+                    "es.knowledge.routing-quality.v1", StringComparison.Ordinal))
+                throw new InvalidDataException("Route probe registration metadata is invalid.");
+            JObject consumers = registry["consumers"] as JObject
+                ?? throw new InvalidDataException("Route probe consumers are missing.");
+            if (!string.Equals(consumers.Value<string>("bridgeOperation"),
+                    "runKnowledgeRouteProbes", StringComparison.Ordinal)
+                || !string.Equals(consumers.Value<string>("productionSurfaceId"),
+                    "diagnostic.knowledge-route-probes", StringComparison.Ordinal))
+                throw new InvalidDataException("Route probe production consumer registration is invalid.");
+            JObject[] probes = (registry["probes"] as JArray ?? new JArray()).OfType<JObject>().ToArray();
+            if (probes.Length < 10) throw new InvalidDataException("At least 10 route probes are required.");
+            string[] ids = probes.Select(item => item.Value<string>("probeId") ?? string.Empty).ToArray();
+            if (ids.Any(string.IsNullOrWhiteSpace) || ids.Distinct(StringComparer.Ordinal).Count() != ids.Length)
+                throw new InvalidDataException("Route probe ids must be non-empty and unique.");
+        }
+
+        private static string[] ReadStrings(JToken token)
+        {
+            string[] values = (token as JArray ?? new JArray()).Values<string>().ToArray();
+            if (values.Any(string.IsNullOrWhiteSpace)
+                || values.Distinct(StringComparer.Ordinal).Count() != values.Length)
+                throw new InvalidDataException("Route probe arrays must contain unique non-empty strings.");
+            return values;
+        }
+
+        private static string Hash(string text)
+        {
+            using (SHA256 sha = SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(text)))
+                    .Replace("-", string.Empty).ToLowerInvariant();
+        }
+    }
+
+    [Serializable] public sealed class ESAIBrainFailureEvent { public string category = ""; public string stage = ""; public string occurredAtUtc = ""; public string correlationId = ""; public string detailHash = ""; }
+    [Serializable] public sealed class ESAIBrainFailureCount { public string category = ""; public int count; public string lastOccurredAtUtc = ""; }
+    [Serializable] public sealed class ESAIBrainFailureTelemetrySnapshot { public string generatedAtUtc = ""; public int capacity; public int retainedEventCount; public readonly List<ESAIBrainFailureCount> counts = new List<ESAIBrainFailureCount>(); public readonly List<ESAIBrainFailureEvent> recent = new List<ESAIBrainFailureEvent>(); }
+    [Serializable] public sealed class ESAIBrainRouteProbeResult { public string probeId = ""; public bool passed; public bool requiredReadsMismatch; public bool requiredReadsOverflow; public readonly List<string> actualRouteKeys = new List<string>(); public readonly List<string> actualKnowledgeTop3 = new List<string>(); }
+    [Serializable] public sealed class ESAIBrainRouteProbeReport { public string generatedAtUtc = ""; public string registryPath = ""; public string registryHash = ""; public string rankingVersion = ""; public string evidenceBoundary = ""; public string status = "Blocked"; public string error = ""; public readonly List<ESAIBrainRouteProbeResult> results = new List<ESAIBrainRouteProbeResult>(); }
 }

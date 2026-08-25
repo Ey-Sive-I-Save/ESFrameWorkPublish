@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/unity-build-identity-receipt/v1",
+  "title": "ES Unity Build Identity Receipt V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "fingerprintSchemaVersion", "contractRef", "contractHash",
+    "receiptId", "phase", "capturedAtUtc", "project", "intent", "inputIdentity",
+    "buildInputFingerprint", "execution", "artifacts", "artifactManifestHash",
+    "provenanceVerdict", "claimsNotProven", "staleWhen"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "fingerprintSchemaVersion": { "type": "integer", "const": 1 },
+    "contractRef": { "const": "ES/Automation/Contracts/es-unity-build-identity-receipt-v1.schema.json" },
+    "contractHash": { "$ref": "#/$defs/sha256" },
+    "receiptId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{7,127}$" },
+    "phase": { "enum": ["input-snapshot", "finalized"] },
+    "capturedAtUtc": { "type": "string", "format": "date-time" },
+    "project": { "$ref": "#/$defs/project" },
+    "intent": { "$ref": "#/$defs/intent" },
+    "inputIdentity": { "$ref": "#/$defs/inputIdentity" },
+    "buildInputFingerprint": { "$ref": "#/$defs/sha256" },
+    "execution": { "type": ["object", "null"] },
+    "artifacts": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/artifact" } },
+    "artifactManifestHash": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "const": "not-applicable" }] },
+    "provenanceVerdict": { "enum": ["input-captured", "provenance-bound", "input-drifted", "identity-incomplete"] },
+    "claimsNotProven": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "staleWhen": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "phase": { "const": "input-snapshot" } } },
+      "then": {
+        "properties": {
+          "execution": { "type": "null" },
+          "artifacts": { "maxItems": 0 },
+          "artifactManifestHash": { "const": "not-applicable" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "phase": { "const": "finalized" } } },
+      "then": {
+        "properties": { "execution": { "$ref": "#/$defs/execution" } }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "gitCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![A-Za-z]:)(?!/)(?!\\\\)(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$))[^:*?\\u0000-\\u001f]+$"
+    },
+    "hashOrState": {
+      "oneOf": [{ "$ref": "#/$defs/sha256" }, { "enum": ["deleted", "not-applicable", "unknown"] }]
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId", "projectRoot", "branch", "gitHead", "unityVersion", "unityRevision"],
+      "properties": {
+        "projectId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$" },
+        "projectRoot": { "type": "string", "minLength": 3 },
+        "branch": { "type": "string", "minLength": 1 },
+        "gitHead": { "$ref": "#/$defs/gitCommit" },
+        "unityVersion": { "type": "string", "minLength": 1 },
+        "unityRevision": { "type": "string", "minLength": 1 }
+      }
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["buildTarget", "buildTargetGroup", "architecture", "scriptingBackend", "development", "buildOptions", "outputPath"],
+      "properties": {
+        "buildTarget": { "type": "string", "minLength": 1 },
+        "buildTargetGroup": { "type": "string", "minLength": 1 },
+        "architecture": { "type": "string", "minLength": 1 },
+        "scriptingBackend": { "enum": ["Mono", "IL2CPP"] },
+        "development": { "type": "boolean" },
+        "buildOptions": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "outputPath": { "$ref": "#/$defs/relativePath" }
+      }
+    },
+    "fileEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "byteLength", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "byteLength": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/hashOrState" }
+      }
+    },
+    "worktreeEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "path", "originalPath", "byteLength", "sha256"],
+      "properties": {
+        "status": { "type": "string", "pattern": "^[ MADRCU?!]{2}$" },
+        "path": { "$ref": "#/$defs/relativePath" },
+        "originalPath": { "oneOf": [{ "$ref": "#/$defs/relativePath" }, { "const": "not-applicable" }] },
+        "byteLength": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/hashOrState" }
+      }
+    },
+    "sceneEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["order", "path", "sha256"],
+      "properties": {
+        "order": { "type": "integer", "minimum": 0 },
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "hybridClr": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode", "settingsHash", "packageVersion", "packageManifestHash",
+        "hotUpdateDllManifest", "hotUpdateDllManifestHash", "strippedAotDllManifest",
+        "strippedAotDllManifestHash", "linkXmlHash", "aotGenericReferencesHash"
+      ],
+      "properties": {
+        "mode": { "enum": ["enabled", "disabled"] },
+        "settingsHash": { "$ref": "#/$defs/hashOrState" },
+        "packageVersion": { "type": "string", "minLength": 1 },
+        "packageManifestHash": { "$ref": "#/$defs/hashOrState" },
+        "hotUpdateDllManifest": { "type": "array", "maxItems": 20000, "items": { "$ref": "#/$defs/fileEntry" } },
+        "hotUpdateDllManifestHash": { "$ref": "#/$defs/hashOrState" },
+        "strippedAotDllManifest": { "type": "array", "maxItems": 20000, "items": { "$ref": "#/$defs/fileEntry" } },
+        "strippedAotDllManifestHash": { "$ref": "#/$defs/hashOrState" },
+        "linkXmlHash": { "$ref": "#/$defs/hashOrState" },
+        "aotGenericReferencesHash": { "$ref": "#/$defs/hashOrState" }
+      }
+    },
+    "inputIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "worktreeState", "worktreeExclusions", "worktreeManifest", "scopedChangeManifestHash",
+        "projectSettingsHash", "projectConfigurationManifest", "projectConfigurationManifestHash",
+        "packageManifestHash", "packageLockHash", "scenes", "sceneListHash", "defineSymbols",
+        "managedStrippingLevel", "stripEngineCode", "hybridClr"
+      ],
+      "properties": {
+        "worktreeState": { "enum": ["clean", "dirty"] },
+        "worktreeExclusions": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/relativePath" } },
+        "worktreeManifest": { "type": "array", "maxItems": 20000, "items": { "$ref": "#/$defs/worktreeEntry" } },
+        "scopedChangeManifestHash": { "$ref": "#/$defs/sha256" },
+        "projectSettingsHash": { "$ref": "#/$defs/sha256" },
+        "projectConfigurationManifest": { "type": "array", "minItems": 1, "maxItems": 10000, "items": { "$ref": "#/$defs/fileEntry" } },
+        "projectConfigurationManifestHash": { "$ref": "#/$defs/sha256" },
+        "packageManifestHash": { "$ref": "#/$defs/sha256" },
+        "packageLockHash": { "$ref": "#/$defs/sha256" },
+        "scenes": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/sceneEntry" } },
+        "sceneListHash": { "$ref": "#/$defs/sha256" },
+        "defineSymbols": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "managedStrippingLevel": { "type": "string", "minLength": 1 },
+        "stripEngineCode": { "type": "boolean" },
+        "hybridClr": { "$ref": "#/$defs/hybridClr" }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actorId", "taskId", "planHash", "commandHash", "skillHashes", "startedAtUtc", "finishedAtUtc",
+        "unityExecutableHash", "toolchainIdentity", "effectiveArguments", "status", "failure", "recovery",
+        "inputIdentityHashBefore", "inputIdentityHashAfter"
+      ],
+      "properties": {
+        "actorId": { "type": "string", "minLength": 1 },
+        "taskId": { "type": "string", "minLength": 1 },
+        "planHash": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "const": "not-applicable" }] },
+        "commandHash": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "const": "not-applicable" }] },
+        "skillHashes": { "type": "array", "items": { "$ref": "#/$defs/sha256" } },
+        "startedAtUtc": { "type": "string", "format": "date-time" },
+        "finishedAtUtc": { "type": "string", "format": "date-time" },
+        "unityExecutableHash": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "const": "not-applicable" }] },
+        "toolchainIdentity": { "type": "string", "minLength": 1 },
+        "effectiveArguments": { "type": "array", "items": { "type": "string" } },
+        "status": { "enum": ["passed", "failed", "blocked", "cancelled", "interrupted", "input-drifted"] },
+        "failure": { "type": "string" },
+        "recovery": { "type": "string", "minLength": 1 },
+        "inputIdentityHashBefore": { "$ref": "#/$defs/sha256" },
+        "inputIdentityHashAfter": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "path", "kind", "byteLength", "sha256", "files"],
+      "properties": {
+        "role": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$" },
+        "path": { "$ref": "#/$defs/relativePath" },
+        "kind": { "enum": ["file", "directory"] },
+        "byteLength": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "files": { "type": "array", "maxItems": 20000, "items": { "$ref": "#/$defs/fileEntry" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "registryId": "esframework-skill-route-disposition",
+  "authority": "derived-navigation",
+  "purpose": "Classify routeKeys that are not yet closed across Skill, KnowledgeIndex and AIBrain.",
+  "highValueCrossDomain": {
+    "action": "promote",
+    "agent": "internal",
+    "artifacts": "internal",
+    "cache-invalidation": "internal",
+    "communication": "promote",
+    "credential": "internal",
+    "document-pull": "internal",
+    "error-prevention": "internal",
+    "external-authority": "internal",
+    "failure-surface": "internal",
+    "integration": "promote",
+    "knowledge-search": "promote",
+    "notes": "internal",
+    "observability": "internal",
+    "official-documentation": "internal",
+    "pipeline": "promote",
+    "plan": "promote",
+    "preservation": "promote",
+    "reload": "promote",
+    "route": "promote",
+    "rule": "internal",
+    "runrecord": "promote",
+    "screen-family": "promote",
+    "stable-graph": "promote"
+  },
+  "aibrainOnly": {
+    "static-replay": "promote-to-knowledge",
+    "deep-replay": "promote-to-knowledge"
+  },
+  "skillKnowledgeWithoutAIBrain": {
+    "aitest": "promote-to-aibrain",
+    "assembly": "promote-to-aibrain",
+    "authorization": "promote-to-aibrain",
+    "budget": "promote-to-aibrain",
+    "contract": "promote-to-aibrain",
+    "creator": "promote-to-aibrain",
+    "delivery": "promote-to-aibrain",
+    "dependency": "promote-to-aibrain",
+    "diagnosis": "promote-to-aibrain",
+    "discovery": "promote-to-aibrain",
+    "estest": "promote-to-aibrain",
+    "fixture-scene": "promote-to-aibrain",
+    "interaction": "promote-to-aibrain",
+    "maturity": "promote-to-aibrain",
+    "package": "promote-to-aibrain",
+    "prompt": "promote-to-aibrain",
+    "schema": "promote-to-aibrain",
+    "tier": "promote-to-aibrain",
+    "ui": "promote-to-aibrain",
+    "verification": "promote-to-aibrain",
+    "weapon": "skill-domain-only"
+  },
+  "aibrainOnlyReview": {
+    "knowledgeCandidate": [
+      "aot", "application-is-playing", "asset-authoring", "asset-database", "asset-guid", "bidi", "dialog", "drawer", "editor-performance", "edit-mode", "execute-always", "execute-in-edit-mode", "font-fallback", "glyph-coverage", "high-dpi", "il2cpp", "input-action", "inspector", "line-breaking", "long-content", "playing-world", "popup", "prefab-auto-save", "prefab-mode", "prefab-stage", "preview-lifecycle", "primary-action", "provider-transition", "rtl", "scene-backup", "scene-builder", "scene-fixture", "scene-layout", "serialization", "serialize-reference", "single-axis-scroll", "temporary-scope", "text-wrapping", "ui-ai-failure-prevention", "ui-clipping", "ui-intent-clarification", "ui-localization", "ui-system-selection", "ui-text-resilience", "undo-dirty", "window-production-standard"
+    ],
+    "removeOrKeepInternal": [
+      "arbitration", "backup", "backup-manifest", "business-bridge", "canonical-entry", "control", "dedup", "executor", "generic-life", "knowledge-quality", "misroute", "owner-scope", "permission-boundary", "portfolio", "request", "route-probe", "runner", "runner-tick", "runtime-mode"
+    ],
+    "decisionRule": "knowledgeCandidate requires a canonical KnowledgeIndex entry and requiredReads before remaining a user-facing AIBrain route; removeOrKeepInternal must not be used as a user route and should be removed from AIBrain unless a control-plane contract explicitly consumes it. Duplicate names in both lists are an audit error and must be resolved before release."
+  },
+  "dispositionMeaning": {
+    "promote": "Add to a canonical KnowledgeIndex/AIBrain function-area route because it changes cross-domain discovery.",
+    "internal": "Keep as Skill-internal implementation or evidence vocabulary; do not expose as a standalone user route.",
+    "promote-to-knowledge": "Retain AIBrain route and add KnowledgeIndex support so the route is not orphaned.",
+    "promote-to-aibrain": "Expose an existing Skill+Knowledge route in the AIBrain function-area table after requiredReads and authority are confirmed.",
+    "skill-domain-only": "Keep discoverable through the Skill registry only; do not expose as a cross-domain AIBrain route.",
+    "remove-or-keep-internal": "Do not route user work directly; either remove the AIBrain row or bind it to a control-plane Knowledge contract."
+  }
+}

@@ -7,7 +7,7 @@
 
 | 项目 | 结论 | 依据 |
 |---|---|---|
-| Target | `F:\aaProject\ESFrameWorkPublish` | 用户指定路径 |
+| Target | 当前项目根 | 用户指定项目；运行时从当前工作目录或 `ProjectRoot` 解析，不固化本机盘符 |
 | Stack | Unity/C#，含 Editor、Runtime、Test Runner、资源与发布链 | `.sln/.csproj`、`Assets`、`Packages`、`ES/Tools` |
 | Existing state | `partial + mature-but-needs-reconciliation` | AIWarnings/AICommands/.agents 均存在；治理入口此前缺少一份跨层基线 |
 | Source | `absent` | 未提供外部源项目或源治理根 |
@@ -35,6 +35,15 @@
 | AIWarnings Start 入口与索引 | 原路径不变 | 不复制、不重写 |
 | AICommands 与 Skill 全文 | 原路径不变 | 不复制、不改写 |
 | 既有交接/复盘/状态文件 | 原路径不变 | 不删除、不截断、不迁移 |
+
+## 2026-08-24 用户直接授权模型协调
+
+| 治理面 | 处置 | 机械证据 |
+|---|---|---|
+| 当前用户明确请求 | `normalize-in-place`：作为项目动作授权来源；只拒绝 AI 自主扩张、项目越界、实质歧义和未点名专项动作 | `user-directed-action-authority.md`、策略 JSON、策略验证器与 `.agents/tests/Test-ESUserDirectedActionAuthority.ps1` |
+| AIBrain / AICommand / TaskContract | `keep + lane-separation`：保留 `ManagedAIBrain` 技术协议，不再作为 `CurrentUserDirect` 的二次批准 | Architecture 与组合报告中的 `authorizationLane` / `laneCoverage` |
+| 商业组合门禁 | `normalize-in-place`：快照绑定入口、授权策略、验证器、回归和商业验证器自身；新增用户直接授权子检查 | `Test-ESCommercialCoherence.ps1` 与 `commercial-coherence-contract.md` |
+| 版本化交付 | `keep + expand-tracking`：授权权威文件全部进入 delivery tracking；未跟踪状态保持 `review`，不伪装成代码阻断 | `commercial-coherence.json.checks.deliveryTracking` |
 
 ## 未导入与延期
 

@@ -17,7 +17,7 @@ rules:
   - id: skill.verification.static-runtime-separation
     statement: Static source/configuration proof and Runtime external-execution proof are independent axes. runtime-not-run is evidence absence, not static failure; the selected verification profile determines whether it blocks.
   - id: skill.verification.static-deep-replay-first
-    statement: StaticDeepReplay is the default fast path and carries at least half of verification weight. Runtime is opt-in only with explicit developer authorization, AIBrain plan, matching AICommand/TaskContract, budget, timeout, and stop condition.
+    statement: StaticDeepReplay is the default fast path and carries at least half of verification weight. Runtime requires a current user instruction that explicitly names the action, budget, timeout and stop condition; AIBrain plan and matching AICommand/TaskContract are additional protocol inputs only when the AIBrain channel is selected.
   - id: skill.verification.static-replay-adapter
     statement: Every direct Skill must expose a project-local static-replay.manifest.json, an adapter reference, and a named *-StaticReplay.ps1 runner that delegates to es-static-deep-replay.
   - id: skill.verification.responsibility-specialization
@@ -25,7 +25,7 @@ rules:
   - id: skill.resource.no-copy
     statement: Rules remain in AIWarnings; contracts remain in AICommands; Skills link to live authority instead of copying it.
   - id: skill.resource.mcp-gated
-    statement: MCP is an evidence/host capability, never an implicit permission; capability status must be discovered through AIBrain.
+    statement: MCP is an evidence/host capability, never implicit permission for AI-inferred work. Current explicit user instructions remain the action authority; AIBrain discovery is required only when that managed channel is selected.
   - id: skill.resource.reference-depth
     statement: SKILL.md may link one level deep to stable references; references must declare authority, scope, staleWhen and evidence.
   - id: skill.resource.script-contract
@@ -70,8 +70,9 @@ currentSkills:
   - {name: es-skill-session-refresh, family: engineering, routeKeys: [skill, session, refresh, capability, delta, stale, routing, aibrain, understanding-drift, skill-understanding-refresh, capability-refresh, incremental-discovery], mcp: [none-required]}
   - {name: es-start-estest, family: project-test, routeKeys: [estest, test, runtime], mcp: [unity-editor]}
   - {name: es-tag-config, family: project-identity, routeKeys: [tag, config, identity], mcp: [unity-editor]}
+  - {name: es-ui-intent-authoring, family: project-ui, routeKeys: [ui-automation, player-intent, player-goal, intent-spec, screen-family, layout, responsive], mcp: [none-required]}
   - {name: es-ui-prefab-authoring, family: project-ui, routeKeys: [ui-automation, screen-spec-v3, ui, prefab, fixture-scene, layout, responsive, visual-qa], mcp: [unity-editor]}
-  - {name: es-unity-compile, family: engineering, routeKeys: [compile, unity, reload, test], mcp: [unity-editor]}
+  - {name: es-unity-compile, family: engineering, routeKeys: [compile, unity, reload, test, unity-build-identity, artifact-provenance, build-fingerprint, build-input-snapshot, build-output-hash, build-receipt, artifact-freshness, player-provenance, hybridclr-input-hash, build-reproducibility], mcp: [unity-editor]}
   - {name: es-use-ai-command, family: governance, routeKeys: [command, authorization, routing], mcp: [none-required]}
   - {name: es-utf8-guard, family: engineering, routeKeys: [utf8, text, validation], mcp: [none-required]}
   - {name: es-worktree-audit, family: engineering, routeKeys: [worktree, git, change-boundary], mcp: [none-required]}

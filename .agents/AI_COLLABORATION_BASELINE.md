@@ -11,7 +11,8 @@
 | 层 | 唯一职责 | 权威入口 |
 |---|---|---|
 | 长期规则 | 架构事实、P0 禁止事项、验收标准 | `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）` |
-| 任务合同 | 本次任务的输入、权限、必读路径和交付格式 | `Assets/Plugins/ES/AICommands` |
+| 用户授权 | 当前用户明确目标、修改意图和单独点名的副作用动作 | 当前用户指令 |
+| 任务合同 | 受管执行的输入、边界、必读路径和交付格式；不是二次用户审批 | `Assets/Plugins/ES/AICommands` |
 | 可复用流程 | 触发条件、步骤、失败恢复和确定性脚本 | `.agents/skills/es-*/SKILL.md` |
 | 编排控制面 | 按 routeKeys 发现知识、校验 Skill/Command、生成计划并签发一次性执行许可 | `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` |
 | 证据与状态 | 当前导航、模块成熟度、证据等级、交付结论 | `AIWarnings/当前状态（CurrentStatus）.md`、`ES/Documentation/Status` |
@@ -22,9 +23,9 @@
 
 1. 读取根 `AGENTS.md`，再读取 AIWarnings `README -> CurrentStatus -> RuleIndex -> 命中规则`。
 2. 审计工作树、目标路径和现有变更；不把脏工作树当作本次任务产物。
-3. 选择唯一匹配的 AICommand；没有匹配项时明确记录 `NoMatchingCommand`，不借用无关合同。
-4. 若经 AIBrain 编排，先执行 `planTask`，由它按 Knowledge/routeKeys 校验规则、Skill、AICommand 和 TaskContract；再由 `runTask` 消费一次性计划授权。
-5. 选择最小职责的 `es-*` Skill。Skill 不授予写权限；写入权限来自用户授权和任务合同。
+3. 用户当前明确目标或动作直接授权其有界范围。只有选用受管执行时才选择唯一匹配的 AICommand；没有匹配项记录 `NoMatchingCommand`，它不缩小用户请求。
+4. 若经 AIBrain 编排，先执行 `planTask`，再由 `runTask` 消费与 Invocation 绑定的计划；这是该通道的技术协议与证据，不是额外用户批准。直接项目修改不以该通道可用为前提。
+5. 选择最小职责的 `es-*` Skill。Skill 不授予 AI 自行扩张，也不得限制当前用户已经授权的目标；候选/只读模式只约束 Skill 自主执行。
 6. 先做最小实现，再按风险补静态检查、编译、Unity/Test Runner、运行时或发布证据。
 7. 交付时分开报告：`ModuleMaturity`、`EvidenceLevel`、`DeliveryVerdict`；源码存在或静态通过不能代替运行/发布证据。
 

@@ -19,7 +19,7 @@ ESFrameWorkPublish/
 │   └── skills/                           # Codex 项目级 Skill 固定发现路径
 ├── Assets/Plugins/ES/
 │   ├── AIWarnings/                       # 长期事实、P0 边界和验收规则
-│   └── AICommands/                       # 单次任务权限合同与执行模板
+│   └── AICommands/                       # 受管任务协议与执行模板
 ├── Documentation/                       # 稳定的开发者、架构和使用文档
 └── ES/
     ├── AI协作历程（Codex）/               # 用户明确授权后维护的逐轮会话档案
@@ -63,7 +63,7 @@ ESFrameWorkPublish/
 约束：
 
 1. Skill 文件夹名只使用小写字母、数字和连字符，并统一使用 `es-` 前缀。
-2. 不在 `skills` 下增加 `base/`、`domain/` 等分类嵌套；分类、路由、状态和哈希由 `SKILL_RESOURCE_INDEX.yaml`、`SKILL_CATALOG.yaml` 与 `.agents/SKILL_REGISTRY.manifest.json` 表达；发现资格由 `.agents/SKILL_DISCOVERY_POLICY.json` 统一裁决。
+2. 不在 `skills` 下增加 `base/`、`domain/` 等分类嵌套；分类、路由、状态和哈希由 `SKILL_RESOURCE_INDEX.yaml`、`SKILL_CATALOG.yaml` 与 `.agents/SKILL_REGISTRY.manifest.json` 表达；发现资格由 `.agents/SKILL_DISCOVERY_POLICY.json` 统一裁决。所有直接 Skill 的中文自然语言别名由 `.agents/SKILL_ROUTE_ALIASES.zh-CN.json` 注册，并用 `skills/es-skill-governance/scripts/Test-ESChineseSkillRouteCoverage.ps1` 校验；别名只负责发现，不授予权限。
 3. 每个 Skill 只保留一个明确职责，不把多个领域揉成万能 Skill。
 4. `SKILL.md` 保留核心步骤；详细项目路径进入一层 `references`，避免深层引用链。
 5. 重复且需要可靠执行的流程才进入 `scripts`；脚本必须说明写入范围和证据等级。
@@ -75,15 +75,15 @@ ESFrameWorkPublish/
 
 当本轮实际使用项目或系统 Skill 时，AI 必须在首次用户可见的进度更新中声明所用 Skill 及其任务关联，并在最终答复中以“本轮使用的 Skill”列出实际影响工作的 Skill 与作用。不得把可用但未使用的 Skill 充入清单。
 
-这项披露只说明工作流来源；它不替代 AICommand、TaskContract、用户授权、验证回执或 Runtime 证据。未使用任何 Skill 的纯文本答复不需要增加该段。
+这项披露只说明工作流来源；它不替代用户当前指令或验证证据。AICommand、TaskContract 与 AIBrain 计划仅在选用相应受管通道时提供编排和回执，不是用户授权的前置条件。未使用任何 Skill 的纯文本答复不需要增加该段。
 
-## 用户明确指令与默认项目修改
+## 用户明确指令与项目修改
 
-项目采用“默认项目可修改、风险路径单独升级”的双轨授权。用户已经明确指定目标和修改意图时，普通项目文件（包括源码、文档和测试资产）可以走 Fast Path，但必须通过 `.agents/skills/es-skill-governance/scripts/Test-ESUserDirectedLowRiskPolicy.ps1`，满足项目相对路径、风险 denylist、文件数量/字节预算、严格 UTF-8 和差异复核。
+项目采用“当前用户指令直接授权、AI 推断扩张默认拒绝”的单一模型。用户已经明确目标、修改意图或动作时，实现该目标严格必要的项目内创建和修改可直接进行；源码、`Assets/`、`.agents/`、AIKnowledge、AIWarnings、AICommands、设置、生成物和报告不再按路径类型要求二次批准。AICommand、TaskContract、AIBrain 计划和 Skill 状态可服务受管编排与证据，但不能否决、缩小或延迟该请求。
 
-风险 denylist 覆盖 `.agents` 控制面、AIWarnings/AICommands/KnowledgeIndex、ProjectSettings/Packages、凭据与密钥、生成物/发布目录、Unity 运行时、网络、外部进程、删除、重命名和 Git。命中风险路径时，验证器返回具体风险类别，只有该风险对应的 AIBrain `planTask`、AICommand、TaskContract 或人工批准可以升级；能力缺失不得阻断普通本地文件编辑。
+`references/user-directed-low-risk-policy.json` 与 `Test-ESUserDirectedLowRiskPolicy.ps1` 保留旧名用于兼容，实际只检查声明的用户范围、计划目标、项目根包含关系和动作类型。文件数/字节阈值及路径类别只产生复核信号，不是授权黑名单。详细语义见 `.agents/skills/es-skill-governance/references/user-directed-action-authority.md`。
 
-默认项目修改不授予运行、发布、网络、凭据、删除或治理路由权限，也不把模型陈述当作验收证据。用户未明确指定目标时仍保持只读，避免“默认可修改”变成无目标写入。
+用户未提出修改时保持只读。删除、重命名、Git 写、Unity/Runtime、交互式或常驻进程、对外产生副作用的进程、网络、发布和凭据访问必须被用户单独点名，不能由普通文件修改推导；一旦点名，不再要求项目内部二次批准。为完成已授权目标严格必要的项目既有本地静态验证器、解析器、编译器和格式化器属于常规质量验证，可在有界、超时、无网络、无安装和无常驻副作用的条件下直接运行。UTF-8、工作树保护、Diff 和证据门禁继续约束实现质量与完成声明。
 
 ## 全局 Static / Runtime 语义
 
@@ -95,7 +95,7 @@ ESFrameWorkPublish/
 
 | Skill | 简介 |
 |---|---|
-| `$es-use-ai-command` | 选择、校验并执行一个 AICommand，把它作为本次任务权限合同。 |
+| `$es-use-ai-command` | 在用户选择受管执行时发现、校验并使用一个 AICommand，作为编排与回执合同。 |
 | `$es-skill-creator` | 以官方 Skill Creator 为底座创建、升级、验证和 forward-test 项目级 Skill；默认输出到 `.agents/skills/es-*`。 |
 | `$es-unity-compile` | 区分 `.csproj`、Unity Console、ReloadDomain、Test Runner、PlayMode、Profiler、IL2CPP 与发布证据。 |
 | `$es-fix-compile-error` | 定位、最小修复并验证一个明确的 C# 或 Unity 编译错误。 |
@@ -103,6 +103,7 @@ ESFrameWorkPublish/
 | `$es-worktree-audit` | 审计 staged、unstaged、untracked、删除、重命名和目标路径重叠。 |
 | `$es-codex-session-bootstrap` | 从项目根启动、恢复或分叉 Codex 会话，并加载最小权威初始化上下文。 |
 | `$es-generate-agent-artifacts` | 按 Agent Authoring Graph 请求生成隔离的 AICommand 与 Agent Skill 候选包。 |
+| `$es-ai-collaboration-menu` | 用户提出“菜单”时显示可发现、可选择、不会自动执行的 ES 制作/迭代/治理/验收协作菜单。 |
 | `$es-start-estest` | 通过 Unity 菜单、Player 参数或公开 API 直接启动、监控和安全中断 ESTEST。 |
 | `$es-publish-aitest-prompt` | 响应“你快告诉测试AI……”等自然语言，把一次性 P0–P4 提示快速投递到运行中的 ESTEST。 |
 
@@ -126,7 +127,7 @@ ESFrameWorkPublish/
 |---|---|
 | `$es-module-lifecycle` | 响应“审计”“审计并记录”“继续审计”，分类模块成熟度并管理固定续接检查点。 |
 | `$es-skill-governance` | 治理 Skill 的等级、权限、证据、规模与执行成本；处理慢启动、重复扫描/Hash、缓存及 Fast/Deep Path 边界。 |
-| `$es-feishu-cli` | 规划并验收经 AIBrain 与精确 TaskContract 受管执行的飞书知识读取、任务监控、派发、虚拟团队夹具和进度推进；外部写必须先 DryRun 并单次授权，Skill 不授予直启 CLI 或实网权限。 |
+| `$es-feishu-cli` | 规划并验收经 AIBrain 与精确 TaskContract 受管执行的飞书知识读取、任务监控、派发、虚拟团队夹具和进度推进；外部写必须由当前用户明确点名，受管执行仍先 DryRun 并把该指令绑定到单次动作，Skill 不授予直启 CLI 或实网权限。 |
 | `$es-ai-knowledge-curation` | 从源码、AIWarnings、AICommands、Skills、测试和证据维护可追溯 Knowledge 条目与索引。 |
 | `$es-knowledge-creator` | 限制 AIKnowledge 输出范围，按 route-pack/detailed-entry/full-audit 分级生成并校验来源、哈希和证据。 |
 | `$es-knowledge-validator` | 独立、只读验证 Knowledge 条目与索引的来源哈希、身份、路由、RequiredRead 和相关 Skill 闭包。 |
@@ -158,7 +159,7 @@ ESFrameWorkPublish/
 是长期架构事实、P0 禁止事项或验收规则？
   -> Assets/Plugins/ES/AIWarnings/
 
-是一次任务的权限、输入、必读路径和交付模板？
+是受管通道的一次任务输入、必读路径和交付模板？
   -> Assets/Plugins/ES/AICommands/
 
 是稳定开发者文档或架构契约？

@@ -319,7 +319,7 @@ namespace ES.EditorInternal
                 "复制包含组件获取、生命周期和回写的完整参考。",
                 ESAdvancedDialogActionRole.Primary,
                 false);
-            ESAdvancedDialogWindow.Show(request);
+            ESDialogService.Show(request);
         }
 
         internal static Vector2 CalculateCodeDialogTopLeft(

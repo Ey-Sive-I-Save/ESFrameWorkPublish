@@ -1,5 +1,5 @@
-#ifndef ES_COMPOSITE_SSU_EFFECTS_INCLUDED
-#define ES_COMPOSITE_SSU_EFFECTS_INCLUDED
+#ifndef ES_COMPOSITE_ESNative_EFFECTS_INCLUDED
+#define ES_COMPOSITE_ESNative_EFFECTS_INCLUDED
 
 #ifndef ES_ROTATE_2D_INCLUDED
 #define ES_ROTATE_2D_INCLUDED
@@ -56,7 +56,7 @@ half3 ESCompositeApplyCamouflage(
     half3 layered = lerp(baseColor, colorA * (half)patternA, patternA);
     float patternB = saturate((densityB - noiseB) / max(smoothnessB, 0.005));
     layered = lerp(layered, colorB * (half)patternB, patternB);
-    float luminance = ESCompositeSSULuminance(source);
+    float luminance = ESCompositeESNativeLuminance(source);
     half3 result = layered * (half)pow(luminance, clamp(contrast, 0.001, 8.0));
     return lerp(source, result, saturate((half)fade));
 }
@@ -71,7 +71,7 @@ half3 ESCompositeApplyMetal(
     float noise,
     float fadeMask)
 {
-    float luminance = ESCompositeSSULuminance(source);
+    float luminance = ESCompositeESNativeLuminance(source);
     float highlight = max(
         (highlightDensity - noise) / max(highlightDensity, 0.01),
         0.0);
@@ -106,7 +106,7 @@ half3 ESCompositeApplyEnchanted(
             blend * rainbowDensity + rainbowSpeed * timeValue,
             saturate(rainbowSaturation),
             1.0));
-    float luminance = ESCompositeSSULuminance(source);
+    float luminance = ESCompositeESNativeLuminance(source);
     half3 effectColor = palette * (half)(pow(luminance, clamp(contrast, 0.001, 8.0))
         * clamp(brightness, 0.0, 16.0));
     float weight = max(noiseSum - reduce, 0.0) * saturate(fade);
@@ -128,7 +128,7 @@ half3 ESCompositeApplyShifting(
     float rainbowEnabled,
     float fade)
 {
-    float luminance = ESCompositeSSULuminance(source);
+    float luminance = ESCompositeESNativeLuminance(source);
     float phase = frac((luminance + timeValue * clamp(speed, -32.0, 32.0))
         * clamp(density, -32.0, 32.0));
     float safeBrightness = clamp(brightness, 0.0, 16.0);

@@ -464,7 +464,7 @@ namespace ES.Tests
             bool glitch,
             float hologramSpace)
         {
-            block.SetFloat(Shader.PropertyToID("_SSUStatusContract"), 1f);
+            block.SetFloat(Shader.PropertyToID("_ESNativeStatusContract"), 1f);
             block.SetFloat(Shader.PropertyToID("_EnableHologram"), hologram ? 1f : 0f);
             block.SetFloat(Shader.PropertyToID("_HologramFade"), hologram ? 1f : 0f);
             block.SetColor(Shader.PropertyToID("_HologramColor"), new Color(0.08f, 0.9f, 1.8f, 1f));
@@ -523,13 +523,13 @@ namespace ES.Tests
             switch (shaderName)
             {
                 case "ES/2D/Composite URP":
-                    return ES2DCompositeURPProperties.TrySetSSUExactContract(material, block, true);
+                    return ES2DCompositeURPProperties.TrySetESNativeExactContract(material, block, true);
                 case "ES/UI/Composite URP":
-                    return ESUICompositeURPProperties.TrySetSSUExactContract(material, block, true);
+                    return ESUICompositeURPProperties.TrySetESNativeExactContract(material, block, true);
                 case "ES/3D/Lit Composite URP":
-                    return ES3DLitCompositeURPProperties.TrySetSSUExactContract(material, block, true);
+                    return ES3DLitCompositeURPProperties.TrySetESNativeExactContract(material, block, true);
                 case "ES/3D/VFX Composite URP":
-                    return ES3DVFXCompositeURPProperties.TrySetSSUExactContract(material, block, true);
+                    return ES3DVFXCompositeURPProperties.TrySetESNativeExactContract(material, block, true);
                 default:
                     Assert.Fail("Unsupported MPB visual validation shader: " + shaderName);
                     return false;
@@ -677,7 +677,7 @@ namespace ES.Tests
                 Assert.That(runtimeMaterial, Is.Not.Null);
                 Assert.That(runtimeMaterial.shader.name, Is.EqualTo("ES/UI/Composite URP"));
                 Assert.That(runtimeMaterial.GetFloat("_EnableTMPCompatibility"), Is.EqualTo(1f));
-                Assert.That(ESUICompositeURPProperties.PrepareMaterialForDynamicSSU(runtimeMaterial), Is.True);
+                Assert.That(ESUICompositeURPProperties.PrepareMaterialForDynamicESNative(runtimeMaterial), Is.True);
                 ConfigureExactEffects(runtimeMaterial, enableCompositeEffects, false, 0f);
 
                 text.ForceMeshUpdate(true, true);

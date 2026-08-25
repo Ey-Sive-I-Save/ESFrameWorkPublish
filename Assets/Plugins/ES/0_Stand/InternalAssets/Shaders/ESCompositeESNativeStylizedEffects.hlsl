@@ -1,7 +1,7 @@
-#ifndef ES_COMPOSITE_SSU_STYLIZED_EFFECTS_INCLUDED
-#define ES_COMPOSITE_SSU_STYLIZED_EFFECTS_INCLUDED
+#ifndef ES_COMPOSITE_ESNative_STYLIZED_EFFECTS_INCLUDED
+#define ES_COMPOSITE_ESNative_STYLIZED_EFFECTS_INCLUDED
 
-float ESCompositeSampleSSUStylizedNoise(float2 uv)
+float ESCompositeSampleESNativeStylizedNoise(float2 uv)
 {
     return ESCompositePerceptualNoise(SAMPLE_TEXTURE2D(
         _UberNoiseTexture,
@@ -9,12 +9,12 @@ float ESCompositeSampleSSUStylizedNoise(float2 uv)
         uv).r);
 }
 
-float ESCompositeSSUStylizedLuminance(float3 color)
+float ESCompositeESNativeStylizedLuminance(float3 color)
 {
     return (color.r * 2.0 + color.g * 3.0 + color.b) / 6.0;
 }
 
-float ESCompositeResolveSSUHologramCoordinate(
+float ESCompositeResolveESNativeHologramCoordinate(
     float2 localCoordinate,
     float3 positionWS)
 {
@@ -41,7 +41,7 @@ float ESCompositeResolveSSUHologramCoordinate(
         step(0.5, _HologramSpace));
 }
 
-float2 ESCompositeApplySSUHologramUV(
+float2 ESCompositeApplyESNativeHologramUV(
     float2 uv,
     float hologramCoordinate,
     float textureWidth,
@@ -52,10 +52,10 @@ float2 ESCompositeApplySSUHologramUV(
     float scanHeight = hologramCoordinate
         + timeValue * _HologramDistortionSpeed;
     float densityNoise = clamp(
-        ESCompositeSampleSSUStylizedNoise(scanHeight.xx * _HologramDistortionDensity),
+        ESCompositeSampleESNativeStylizedNoise(scanHeight.xx * _HologramDistortionDensity),
         0.075,
         0.6);
-    float offsetNoise = ESCompositeSampleSSUStylizedNoise(
+    float offsetNoise = ESCompositeSampleESNativeStylizedNoise(
         scanHeight.xx * _HologramDistortionScale) - 0.5;
     float2 distortionDirection = _HologramDistortionDirection.xy;
     float distortionDirectionLength = length(distortionDirection);
@@ -67,28 +67,28 @@ float2 ESCompositeApplySSUHologramUV(
     return uv;
 }
 
-float ESCompositeSSUGlitchFade(float2 coordinate, float timeValue)
+float ESCompositeESNativeGlitchFade(float2 coordinate, float timeValue)
 {
-    float maskNoise = ESCompositeSampleSSUStylizedNoise(
+    float maskNoise = ESCompositeSampleESNativeStylizedNoise(
         (coordinate + _GlitchMaskSpeed.xy * timeValue) * _GlitchMaskScale.xy);
     return saturate(max(maskNoise, saturate(_GlitchMaskMin)) * saturate(_GlitchFade));
 }
 
-float2 ESCompositeApplySSUGlitchUV(float2 uv, float2 coordinate, float timeValue)
+float2 ESCompositeApplyESNativeGlitchUV(float2 uv, float2 coordinate, float timeValue)
 {
-    float distortionNoise = ESCompositeSampleSSUStylizedNoise(
+    float distortionNoise = ESCompositeSampleESNativeStylizedNoise(
         (coordinate + _GlitchDistortionSpeed.xy * timeValue)
             * _GlitchDistortionScale.xy) - 0.5;
     return uv + distortionNoise * _GlitchDistortion.xy
-        * ESCompositeSSUGlitchFade(coordinate, timeValue);
+        * ESCompositeESNativeGlitchFade(coordinate, timeValue);
 }
 
-half4 ESCompositeApplySSUHologramColor(
+half4 ESCompositeApplyESNativeHologramColor(
     half4 source,
     float hologramCoordinate,
     float timeValue)
 {
-    float luminance = ESCompositeSSUStylizedLuminance(source.rgb);
+    float luminance = ESCompositeESNativeStylizedLuminance(source.rgb);
     float scanHeight = hologramCoordinate + timeValue * _HologramSpeed;
     float lineFrequency = max(abs(_HologramLineFrequency), 0.001);
     float lineGap = clamp(_HologramLineGap, 0.001, 8.0);
@@ -103,26 +103,26 @@ half4 ESCompositeApplySSUHologramColor(
     return lerp(source, hologram, (half)safeFade);
 }
 
-half3 ESCompositeApplySSUGlitchColor(
+half3 ESCompositeApplyESNativeGlitchColor(
     half3 source,
     float2 coordinate,
     float timeValue)
 {
-    float colorNoise = ESCompositeSampleSSUStylizedNoise(
+    float colorNoise = ESCompositeSampleESNativeStylizedNoise(
         (coordinate + _GlitchNoiseSpeed.xy * timeValue) * _GlitchNoiseScale.xy);
     half3 hueColor = (half3)ESCompositeHsvToRgb(float3(
         colorNoise + timeValue * _GlitchHueSpeed,
         1.0,
         1.0));
-    half3 glitchColor = (half)ESCompositeSSUStylizedLuminance(source)
+    half3 glitchColor = (half)ESCompositeESNativeStylizedLuminance(source)
         * (half)clamp(_GlitchBrightness, 0.0, 16.0) * hueColor;
     return lerp(
         source,
         glitchColor,
-        (half)ESCompositeSSUGlitchFade(coordinate, timeValue));
+        (half)ESCompositeESNativeGlitchFade(coordinate, timeValue));
 }
 
-float2 ESCompositeSSUOutlineDistortedUV(
+float2 ESCompositeESNativeOutlineDistortedUV(
     float2 uv,
     float enabled,
     float2 intensity,
@@ -132,12 +132,12 @@ float2 ESCompositeSSUOutlineDistortedUV(
 {
     if (enabled <= 0.5)
         return uv;
-    float noise = ESCompositeSampleSSUStylizedNoise(
+    float noise = ESCompositeSampleESNativeStylizedNoise(
         (uv + timeValue * noiseSpeed) * noiseScale) - 0.5;
     return uv + noise * intensity;
 }
 
-half4 ESCompositeApplySSUInnerOutline(
+half4 ESCompositeApplyESNativeInnerOutline(
     half4 source,
     half minimumNeighbourAlpha,
     half3 tint,
@@ -152,7 +152,7 @@ half4 ESCompositeApplySSUInnerOutline(
     return result;
 }
 
-half4 ESCompositeApplySSUOuterOutline(
+half4 ESCompositeApplyESNativeOuterOutline(
     half4 source,
     half maximumNeighbourAlpha,
     half3 tint,

@@ -1,7 +1,7 @@
-#ifndef ES_COMPOSITE_SSU_STATUS_EFFECTS_INCLUDED
-#define ES_COMPOSITE_SSU_STATUS_EFFECTS_INCLUDED
+#ifndef ES_COMPOSITE_ESNative_STATUS_EFFECTS_INCLUDED
+#define ES_COMPOSITE_ESNative_STATUS_EFFECTS_INCLUDED
 
-float ESCompositeSampleSSUStatusNoise(float2 uv)
+float ESCompositeSampleESNativeStatusNoise(float2 uv)
 {
     return ESCompositePerceptualNoise(SAMPLE_TEXTURE2D(
         _UberNoiseTexture,
@@ -9,12 +9,12 @@ float ESCompositeSampleSSUStatusNoise(float2 uv)
         uv).r);
 }
 
-half3 ESCompositeApplySSUFrozen(half3 source, float2 coordinate, float timeValue)
+half3 ESCompositeApplyESNativeFrozen(half3 source, float2 coordinate, float timeValue)
 {
-    float luminance = ESCompositeSSULuminance(source);
-    float snowNoise = ESCompositeSampleSSUStatusNoise(
+    float luminance = ESCompositeESNativeLuminance(source);
+    float snowNoise = ESCompositeSampleESNativeStatusNoise(
         coordinate * _FrozenSnowScale.xy);
-    float highlightDistortionNoise = ESCompositeSampleSSUStatusNoise(
+    float highlightDistortionNoise = ESCompositeSampleESNativeStatusNoise(
         (coordinate + timeValue * _FrozenHighlightDistortionSpeed.xy)
             * _FrozenHighlightDistortionScale.xy);
     float2 highlightUV = (
@@ -22,7 +22,7 @@ half3 ESCompositeApplySSUFrozen(half3 source, float2 coordinate, float timeValue
         + timeValue * _FrozenHighlightSpeed.xy
         + (highlightDistortionNoise - 0.25) * _FrozenHighlightDistortion.xy)
         * _FrozenHighlightScale.xy;
-    float highlightNoise = ESCompositeSampleSSUStatusNoise(highlightUV);
+    float highlightNoise = ESCompositeSampleESNativeStatusNoise(highlightUV);
 
     half3 frozen = _FrozenTint.rgb
         * (half)pow(luminance, max(_FrozenContrast, 0.001));
@@ -38,15 +38,15 @@ half3 ESCompositeApplySSUFrozen(half3 source, float2 coordinate, float timeValue
     return lerp(source, frozen, saturate((half)_FrozenFade));
 }
 
-half3 ESCompositeApplySSUBurn(half3 source, float2 coordinate)
+half3 ESCompositeApplyESNativeBurn(half3 source, float2 coordinate)
 {
-    float swirlNoise = ESCompositeSampleSSUStatusNoise(
+    float swirlNoise = ESCompositeSampleESNativeStatusNoise(
         coordinate * _BurnSwirlNoiseScale.xy);
-    float insideNoise = ESCompositeSampleSSUStatusNoise(
+    float insideNoise = ESCompositeSampleESNativeStatusNoise(
         (coordinate + (swirlNoise - 0.5) * _BurnSwirlFactor)
             * _BurnInsideNoiseScale.xy);
     float insideNoiseMask = saturate(_BurnInsideNoiseFactor - insideNoise);
-    float edgeNoise = ESCompositeSampleSSUStatusNoise(
+    float edgeNoise = ESCompositeSampleESNativeStatusNoise(
         coordinate * _BurnEdgeNoiseScale.xy);
     float burnRatio = (
         _BurnRadius
@@ -55,7 +55,7 @@ half3 ESCompositeApplySSUBurn(half3 source, float2 coordinate)
         / max(_BurnWidth, 0.01);
     float insideMask = saturate(burnRatio);
     float edgeMask = step(burnRatio, 1.0) * step(0.0, burnRatio);
-    float luminance = ESCompositeSSULuminance(source);
+    float luminance = ESCompositeESNativeLuminance(source);
     half3 inside = (half)pow(luminance, max(_BurnInsideContrast, 0.001))
         * (_BurnInsideColor.rgb
             + _BurnInsideNoiseColor.rgb * (half)insideNoiseMask);
@@ -64,9 +64,9 @@ half3 ESCompositeApplySSUBurn(half3 source, float2 coordinate)
     return lerp(source, burned, saturate((half)_BurnFade));
 }
 
-half3 ESCompositeApplySSURainbow(half3 source, float2 coordinate, float timeValue)
+half3 ESCompositeApplyESNativeRainbow(half3 source, float2 coordinate, float timeValue)
 {
-    float noise = ESCompositeSampleSSUStatusNoise(
+    float noise = ESCompositeSampleESNativeStatusNoise(
         coordinate * _RainbowNoiseScale.xy);
     float hue = (
         distance(coordinate, _RainbowCenter.xy)
@@ -79,13 +79,13 @@ half3 ESCompositeApplySSURainbow(half3 source, float2 coordinate, float timeValu
         rainbowHsv.x,
         saturate(_RainbowSaturation),
         rainbowHsv.z * _RainbowBrightness));
-    float luminance = abs(ESCompositeSSULuminance(source));
+    float luminance = abs(ESCompositeESNativeLuminance(source));
     return source + (half3)rainbow
         * (half)pow(luminance, max(_RainbowContrast, 0.001))
         * (half)saturate(_RainbowFade);
 }
 
-half3 ESCompositeApplySSUShine(
+half3 ESCompositeApplyESNativeShine(
     half3 source,
     float shineCoordinate,
     float2 maskUV,
@@ -106,7 +106,7 @@ half3 ESCompositeApplySSUShine(
             maskUV * _ShineMask_ST.xy + _ShineMask_ST.zw);
         mask = maskSample.r * maskSample.a;
     }
-    float luminance = ESCompositeSSULuminance(source);
+    float luminance = ESCompositeESNativeLuminance(source);
     half3 luminanceColor = half3(luminance, luminance, luminance);
     half3 saturatedSource = lerp(luminanceColor, source, saturate((half)_ShineSaturation));
     half3 shine = pow(max(saturatedSource, 0.0h), max((half)_ShineContrast, 0.001h))
@@ -114,12 +114,12 @@ half3 ESCompositeApplySSUShine(
     return source + shine * (half)(band * saturate(_ShineFade) * mask);
 }
 
-half3 ESCompositeApplySSUPoison(half3 source, float2 coordinate, float timeValue)
+half3 ESCompositeApplyESNativePoison(half3 source, float2 coordinate, float timeValue)
 {
-    float noise = ESCompositeSampleSSUStatusNoise(
+    float noise = ESCompositeSampleESNativeStatusNoise(
         (coordinate + timeValue * _PoisonNoiseSpeed.xy)
             * _PoisonNoiseScale.xy);
-    float luminance = ESCompositeSSULuminance(source);
+    float luminance = ESCompositeESNativeLuminance(source);
     half3 recolored = lerp(
         source,
         _PoisonColor.rgb * (half)luminance,
@@ -131,7 +131,7 @@ half3 ESCompositeApplySSUPoison(half3 source, float2 coordinate, float timeValue
         * (half)(stripe * _PoisonFade * _PoisonNoiseBrightness);
 }
 
-half3 ESCompositeApplySSUStatusEffects(
+half3 ESCompositeApplyESNativeStatusEffects(
     half3 source,
     float2 coordinate,
     float2 maskUV,
@@ -140,15 +140,15 @@ half3 ESCompositeApplySSUStatusEffects(
 {
     half3 color = source;
     if (_EnableFrozen > 0.5)
-        color = ESCompositeApplySSUFrozen(color, coordinate, timeValue);
+        color = ESCompositeApplyESNativeFrozen(color, coordinate, timeValue);
     if (_EnableBurn > 0.5)
-        color = ESCompositeApplySSUBurn(color, coordinate);
+        color = ESCompositeApplyESNativeBurn(color, coordinate);
     if (_EnableRainbow > 0.5)
-        color = ESCompositeApplySSURainbow(color, coordinate, timeValue);
+        color = ESCompositeApplyESNativeRainbow(color, coordinate, timeValue);
     if (_EnableShine > 0.5)
-        color = ESCompositeApplySSUShine(color, shineCoordinate, maskUV, timeValue);
+        color = ESCompositeApplyESNativeShine(color, shineCoordinate, maskUV, timeValue);
     if (_EnablePoison > 0.5)
-        color = ESCompositeApplySSUPoison(color, coordinate, timeValue);
+        color = ESCompositeApplyESNativePoison(color, coordinate, timeValue);
     return color;
 }
 

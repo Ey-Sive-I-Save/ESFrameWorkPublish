@@ -122,8 +122,8 @@ namespace ES.EditorInternal
             { "_EnablePalette", "启用调色板映射" }, { "_PaletteTex", "调色板纹理" }, { "_PaletteRow", "调色板采样行" }, { "_PaletteStrength", "调色板强度" },
             { "_EnableHalftone", "启用半色调" }, { "_HalftoneScale", "半色调密度" }, { "_HalftoneAngle", "半色调角度" }, { "_HalftoneStrength", "半色调强度" },
             { "_HalftonePosition", "半色调中心" }, { "_HalftoneFade", "半色调扩散" }, { "_HalftoneFadeWidth", "半色调扩散宽度" },
-            { "_HalftoneInvert", "反转半色调" }, { "_HalftoneAlphaPattern", "使用 SSU 透明点阵" },
-            { "_EnableFullDistortion", "启用 SSU 全局扰动" }, { "_FullDistortionFade", "全局扰动淡出" },
+            { "_HalftoneInvert", "反转半色调" }, { "_HalftoneAlphaPattern", "使用 ESNative 透明点阵" },
+            { "_EnableFullDistortion", "启用 ESNative 全局扰动" }, { "_FullDistortionFade", "全局扰动淡出" },
             { "_FullDistortionDistortion", "全局扰动方向强度" }, { "_FullDistortionNoiseScale", "全局扰动噪声缩放" },
             { "_EnableTextureLayer1", "启用纹理层 1" }, { "_TextureLayer1Texture", "纹理层 1 贴图" }, { "_TextureLayer1Color", "纹理层 1 颜色" },
             { "_EnableTextureLayer2", "启用纹理层 2" }, { "_TextureLayer2Texture", "纹理层 2 贴图" }, { "_TextureLayer2Color", "纹理层 2 颜色" },
@@ -170,7 +170,7 @@ namespace ES.EditorInternal
             { "_FrozenDensity", "冰冻雪花密度" }, { "_FrozenSpeed", "冰冻流动速度" }, { "_EnableBurn", "启用燃烧" },
             { "_BurnEdgeColor", "燃烧边缘颜色" }, { "_BurnInsideColor", "燃烧内部颜色" }, { "_BurnProgress", "燃烧进度" }, { "_BurnWidth", "燃烧边缘宽度" },
             { "_EnablePoison", "启用中毒" }, { "_PoisonColor", "中毒颜色" }, { "_PoisonDensity", "中毒密度" }, { "_PoisonSpeed", "中毒速度" },
-            { "_SSUStatusContract", "使用 SSU 精确效果合同" },
+            { "_ESNativeStatusContract", "使用 ESNative 精确效果合同" },
             { "_FrozenFade", "冰冻强度" }, { "_FrozenTint", "冰冻色调" }, { "_FrozenContrast", "冰冻对比度" },
             { "_FrozenSnowColor", "冰冻雪花颜色" }, { "_FrozenSnowContrast", "冰冻雪花对比度" },
             { "_FrozenSnowDensity", "冰冻雪花密度" }, { "_FrozenSnowScale", "冰冻雪花缩放" },
@@ -410,14 +410,14 @@ namespace ES.EditorInternal
             { "_EnableFullGlowDissolve", "按共享噪声执行硬溶解并在阈值边界叠加完整 HDR 辉光。" },
             { "_EnableCustomFade", "以顶点 Alpha、遮罩和共享噪声计算非线性透明度，接管普通顶点 Alpha 乘法。" },
             { "_EnableSqueeze", "在 UV 空间按到中心的幂次距离执行径向挤压。" },
-            { "_EnableSineRotate", "围绕指定 UV 中心按 SSU 兼容角度公式周期旋转。" },
+            { "_EnableSineRotate", "围绕指定 UV 中心按 ESNative 兼容角度公式周期旋转。" },
             { "_EnableSineMove", "在顶点阶段按 X/Y 独立频率执行周期位移。" },
             { "_EnableSineScale", "在顶点阶段从原始顶点位置执行单向正弦缩放。" },
             { "_EnableSquish", "沿可配置局部方向执行保面积挤压；交互挤压复用同一方向。" },
             { "_EnableVibrate", "沿可配置主方向及其垂直方向组合周期位移，形成二维震动。" },
             { "_EnableHologram", "在局部 UV 或世界高度空间生成扫描线，并支持对比度、透明度和分段扰动。" },
             { "_EnableGlitch", "以独立遮罩、颜色噪声和位移噪声产生方向可控的故障效果。" },
-            { "_SSUStatusContract", "启用后按 SSU 精确参数与共享公式执行状态、全息、故障和描边效果；关闭时保持 ES 原生轻量公式。" },
+            { "_ESNativeStatusContract", "启用后按 ESNative 精确参数与共享公式执行状态、全息、故障和描边效果；关闭时保持 ES 原生轻量公式。" },
             { "_EnableRim", "按视线与表面法线夹角增加轮廓光。" },
             { "_EnableFrozen", "叠加冰冻颜色与冰晶高光；需要噪声纹理参与。" },
             { "_EnableBurn", "按噪声推进燃烧边缘；通常与溶解或裁剪一起使用。" },
@@ -437,7 +437,7 @@ namespace ES.EditorInternal
             { "_ReceiveShadows", "控制 Lit 材质是否接收主光源阴影；修改会同步 Shader Keyword。" }
         };
         private static readonly GUIContent SearchLabel = new GUIContent("查找效果");
-        private static readonly HashSet<string> SSUStatusContractProperties = new HashSet<string>(StringComparer.Ordinal)
+        private static readonly HashSet<string> ESNativeStatusContractProperties = new HashSet<string>(StringComparer.Ordinal)
         {
             "_FrozenFade", "_FrozenTint", "_FrozenContrast", "_FrozenSnowColor",
             "_FrozenSnowContrast", "_FrozenSnowDensity", "_FrozenSnowScale",
@@ -459,7 +459,7 @@ namespace ES.EditorInternal
             "_FrozenColor", "_FrozenHighlight", "_FrozenDensity", "_FrozenSpeed",
             "_BurnProgress", "_ShineAngle", "_ShineIntensity", "_ShineDirection", "_PoisonSpeed"
         };
-        private static readonly HashSet<string> SSUStylizedContractProperties = new HashSet<string>(StringComparer.Ordinal)
+        private static readonly HashSet<string> ESNativeStylizedContractProperties = new HashSet<string>(StringComparer.Ordinal)
         {
             "_InnerOutlineFade", "_InnerOutlineDistortionToggle", "_InnerOutlineDistortionIntensity",
             "_InnerOutlineNoiseScale", "_InnerOutlineNoiseSpeed", "_InnerOutlineTextureToggle",
@@ -487,20 +487,20 @@ namespace ES.EditorInternal
 
         private static bool IsVisible(MaterialProperty property, MaterialProperty[] all, string shaderName)
         {
-            MaterialProperty statusContract = Find(all, "_SSUStatusContract");
+            MaterialProperty statusContract = Find(all, "_ESNativeStatusContract");
             if (statusContract != null && !statusContract.hasMixedValue)
             {
-                bool useSSUStatusContract = statusContract.floatValue > 0.5f;
+                bool useESNativeStatusContract = statusContract.floatValue > 0.5f;
                 bool spriteOrUI = shaderName == "ES/2D/Composite URP"
                     || shaderName == "ES/UI/Composite URP";
                 bool vfx = shaderName == "ES/3D/VFX Composite URP";
                 bool keepActiveShineProperty = property.name == "_ShineDirection"
                     || (vfx && property.name == "_ShineIntensity");
-                bool isContractOnly = SSUStatusContractProperties.Contains(property.name)
+                bool isContractOnly = ESNativeStatusContractProperties.Contains(property.name)
                     && (property.name != "_BurnInsideColor" || shaderName == "ES/3D/Lit Composite URP");
-                if (isContractOnly && !useSSUStatusContract) return false;
+                if (isContractOnly && !useESNativeStatusContract) return false;
                 if (LegacyStatusProperties.Contains(property.name)
-                    && useSSUStatusContract
+                    && useESNativeStatusContract
                     && !keepActiveShineProperty) return false;
                 bool stylizedContractShader = spriteOrUI || vfx;
                 bool sharedHologramProperty = property.name == "_HologramFade"
@@ -511,13 +511,13 @@ namespace ES.EditorInternal
                     || (vfx && property.name == "_HologramMinAlpha");
                 bool sharedGlitchProperty = property.name == "_GlitchDistortion";
                 if (stylizedContractShader
-                    && SSUStylizedContractProperties.Contains(property.name)
+                    && ESNativeStylizedContractProperties.Contains(property.name)
                     && !sharedHologramProperty
                     && !sharedGlitchProperty
-                    && !useSSUStatusContract) return false;
+                    && !useESNativeStatusContract) return false;
                 if (stylizedContractShader
                     && LegacyStylizedProperties.Contains(property.name)
-                    && useSSUStatusContract) return false;
+                    && useESNativeStatusContract) return false;
             }
             string controller = ResolveController(property.name, shaderName);
             if (!string.IsNullOrEmpty(controller))
@@ -580,7 +580,7 @@ namespace ES.EditorInternal
             {
                 MaterialProperty flame = Find(all, "_EnableFlame");
                 MaterialProperty smoke = Find(all, "_EnableSmoke");
-                MaterialProperty contract = Find(all, "_SSUStatusContract");
+                MaterialProperty contract = Find(all, "_ESNativeStatusContract");
                 bool flameInactive = flame == null || (!flame.hasMixedValue && flame.floatValue < 0.5f);
                 bool smokeInactive = smoke == null || (!smoke.hasMixedValue && smoke.floatValue < 0.5f);
                 bool contractInactive = contract == null || (!contract.hasMixedValue && contract.floatValue < 0.5f);
@@ -702,7 +702,7 @@ namespace ES.EditorInternal
             if (property == null) return true;
             string name = property.name;
             return ((property.flags & MaterialProperty.PropFlags.HideInInspector) != 0
-                    && !SSUStatusContractProperties.Contains(name))
+                    && !ESNativeStatusContractProperties.Contains(name))
                 || name == "_texcoord"
                 || name == "_AlphaTex"
                 || name.StartsWith("unity_", StringComparison.Ordinal);
@@ -817,7 +817,7 @@ namespace ES.EditorInternal
                     || name.StartsWith("_Hologram", StringComparison.Ordinal) || name == "_EnableHologram"
                     || name.StartsWith("_Rim", StringComparison.Ordinal) || name == "_EnableRim"
                     || name.StartsWith("_Glitch", StringComparison.Ordinal) || name == "_EnableGlitch"
-                    || name == "_SSUStatusContract"
+                    || name == "_ESNativeStatusContract"
                     || name == "_EmissionColor") return "动态表现";
                 if (name == "_EnableRadialMask" || name.StartsWith("_RadialMask", StringComparison.Ordinal)
                     || name == "_EnableFresnelMask" || name.StartsWith("_Fresnel", StringComparison.Ordinal)
@@ -963,11 +963,11 @@ namespace ES.EditorInternal
             if (name == "_PaletteTex") return "横向表示输入明度到目标颜色的映射；建议 Clamp、无 Mipmap，按需要选择 Point 或 Bilinear。";
             if (name == "_EnablePalette") return "按当前颜色明度采样调色板纹理；Standard 及以上质量生效。";
             if (name == "_EnableHalftone") return "在局部 UV 中生成抗锯齿网点；Standard 及以上质量生效。";
-            if (name == "_AddColorContrastToggle") return "按当前颜色的加权亮度调制叠加色，接近 SSU 的 Contrast Toggle。";
+            if (name == "_AddColorContrastToggle") return "按当前颜色的加权亮度调制叠加色，接近 ESNative 的 Contrast Toggle。";
             if (name == "_AddColorMaskToggle") return "按 _AddColorMask 的 RGB×Alpha 调制叠加色；遮罩使用当前 UV 与 ST，并复用主纹理采样状态。";
-            if (name == "_StrongTintContrastToggle") return "按当前颜色的加权亮度调制强制染色，接近 SSU 的 Contrast Toggle。";
+            if (name == "_StrongTintContrastToggle") return "按当前颜色的加权亮度调制强制染色，接近 ESNative 的 Contrast Toggle。";
             if (name == "_StrongTintMaskToggle") return "按 _StrongTintMask 的 RGB×Alpha 调制强制染色；遮罩使用当前 UV 与 ST，并复用主纹理采样状态。";
-            if (name == "_HalftoneAlphaPattern") return "启用 SSU 兼容的透明点阵；关闭时保持既有 ES RGB 半色调视觉。";
+            if (name == "_HalftoneAlphaPattern") return "启用 ESNative 兼容的透明点阵；关闭时保持既有 ES RGB 半色调视觉。";
             if (name == "_HalftoneFade") return "透明点阵从中心向外扩散的半径，可超过 1 覆盖完整局部 UV。";
             if (name == "_HalftoneFadeWidth") return "透明点阵的径向过渡宽度；运行时最小按 0.01 处理。";
             if (name == "_EnablePixelate") return "在 Sprite 局部 UV 中量化采样，旋转或 Tight Atlas 下仍保持单 Sprite 边界。";
@@ -980,17 +980,17 @@ namespace ES.EditorInternal
             if (name == "_ScreenTilingPixelsPerUnit") return "表示主纹理每次重复覆盖的屏幕像素尺寸；分辨率变化时保持像素尺度语义。";
             if (name == "_EnableSmoothPixelArt") return "使用屏幕导数重建像素边缘，不增加纹理采样；与模糊同时启用时视觉目标冲突。";
             if (name == "_EnableCheckerboard") return "按连续世界坐标生成交错暗格，只修改 RGB，不改变原始 Alpha。";
-            if (name == "_UberNoiseTexture") return "Flame、Smoke、Ink Spread、Camouflage、Metal、Enchanted、SSU Fade、Custom Fade 与 Full Glow Dissolve 共用的灰度噪声；建议 Repeat、Bilinear。";
-            if (name == "_EnableFullDistortion") return "使用共享噪声的两次独立采样分别驱动 XY，兼容 SSU Full Distortion。";
+            if (name == "_UberNoiseTexture") return "Flame、Smoke、Ink Spread、Camouflage、Metal、Enchanted、ESNative Fade、Custom Fade 与 Full Glow Dissolve 共用的灰度噪声；建议 Repeat、Bilinear。";
+            if (name == "_EnableFullDistortion") return "使用共享噪声的两次独立采样分别驱动 XY，兼容 ESNative Full Distortion。";
             if (name == "_DistortionDirection") return "XY 分别缩放噪声造成的 UV 位移；(1,0) 仅水平，(0,1) 仅垂直，(1,1) 保持旧材质的对角线结果。";
-            if (name == "_EnableDirectionalDistortion") return "按 SSU 合同先位移 UV，再将同一方向可见度乘入 Alpha；可与其他 SSU Fade 叠加。";
+            if (name == "_EnableDirectionalDistortion") return "按 ESNative 合同先位移 UV，再将同一方向可见度乘入 Alpha；可与其他 ESNative Fade 叠加。";
             if (name == "_EnableFullAlphaDissolve"
                 || name == "_EnableSourceAlphaDissolve"
                 || name == "_EnableSourceGlowDissolve"
                 || name == "_EnableDirectionalAlphaFade"
                 || name == "_EnableDirectionalGlowFade")
-                return "保留 SSU 同名参数，可与其他 SSU Fade 同时启用并按固定顺序执行。";
-            if (name == "_EnableFlame") return "按 SSU 合同使用局部 UV 中心 (0.5, 0.4) 生成火焰；通常搭配空白白色主纹理。";
+                return "保留 ESNative 同名参数，可与其他 ESNative Fade 同时启用并按固定顺序执行。";
+            if (name == "_EnableFlame") return "按 ESNative 合同使用局部 UV 中心 (0.5, 0.4) 生成火焰；通常搭配空白白色主纹理。";
             if (name == "_EnableSmoke") return "按局部 UV 生成径向烟雾；启用顶点色种子后使用顶点 R 通道错开粒子图样。";
             if (name == "_SmokeVertexSeed") return "粒子系统需提供可变化的顶点红色；普通 Sprite 顶点色一致时不会产生逐粒子差异。";
             if (name == "_EnableWind" || name == "_EnableSquish" || name == "_EnableWiggle" || name == "_EnableVibrate"
@@ -1003,10 +1003,10 @@ namespace ES.EditorInternal
             if (name == "_WindGlobalInfluence") return "场景存在 ESCompositeGlobalWind 时混合全局方向、强度和速度。";
             if (name == "_WiggleDirection") return "定义摇摆波相位沿局部 UV 的传播方向；(0,1) 保持旧版纵向传播。";
             if (name == "_GlitchScanDirection") return shaderName == "ES/3D/VFX Composite URP"
-                ? "定义轻量故障条带在世界空间中的扫描方向；SSU 精确合同仍由故障噪声缩放与速度控制。"
+                ? "定义轻量故障条带在世界空间中的扫描方向；ESNative 精确合同仍由故障噪声缩放与速度控制。"
                 : "定义轻量故障条带在局部坐标中的扫描方向；(0,1) 保持旧版横向条带。";
-            if (name == "_RainbowDirection") return "定义兼容线性彩虹色带在局部坐标中的增长方向；SSU 精确合同的径向彩虹仍由彩虹中心控制。";
-            if (name == "_SquishFade") return "周期挤压的强度乘数；迁移 SSU 时保留同名参数，运行时交互挤压使用独立 MPB 通道。";
+            if (name == "_RainbowDirection") return "定义兼容线性彩虹色带在局部坐标中的增长方向；ESNative 精确合同的径向彩虹仍由彩虹中心控制。";
+            if (name == "_SquishFade") return "周期挤压的强度乘数；迁移 ESNative 时保留同名参数，运行时交互挤压使用独立 MPB 通道。";
             if (name == "_QualityTier") return "基础/标准/高质量会同步控制 ES 关键词。";
             if (name == "_ResourceProfile") return "动态完整允许 MaterialPropertyBlock 随时切换效果；材质优化仅编译当前材质已启用效果需要的资源组，适合静态组合和移动端预算。";
             if (name == "_EnableVertexAnimation") return shaderName == "ES/3D/Lit Composite URP" ? "Lit 会同步主画面、阴影和深度顶点位置。" : null;
@@ -1024,7 +1024,7 @@ namespace ES.EditorInternal
                 && shaderName == "ES/3D/Lit Composite URP")
                 return "依据 BaseMap Alpha 在当前网格覆盖范围内生成；网格边界没有透明留白时，外侧部分会被几何范围裁掉。";
             if (name == "_EnableHologram" && shaderName == "ES/3D/Lit Composite URP")
-                return "使用局部 UV 扫描线并同步 Alpha Pass；与 SSU 的世界高度/正交相机合同不是无损等价。";
+                return "使用局部 UV 扫描线并同步 Alpha Pass；与 ESNative 的世界高度/正交相机合同不是无损等价。";
             if (name == "_EnableGlitch" && shaderName == "ES/3D/Lit Composite URP")
                 return "随机横向偏移共享表面 UV，主画面、阴影、深度和场景选择使用同一坐标。";
             if (name == "_EnableVertexStreams") return "ParticleSystem Renderer 顶点流需提供 Custom1.xyzw 和 Custom2.x；各通道仅作为增量。";
@@ -1048,7 +1048,7 @@ namespace ES.EditorInternal
             if (name == "_EnableShiftHue") return "持续旋转原色相；速度使用当前统一时间源并允许负值反向。";
             if (name == "_EnableAddHue") return "依据原图明度叠加动态色相，不替换原颜色；HDR 亮度可超过 1。";
             if (name == "_AddHueMask") return "红通道与 Alpha 相乘作为叠加强度；纹理缩放/偏移可独立调整。";
-            if (name == "_EnableSineGlow") return "按 SSU 波形在最小值和扩展峰值间周期叠加辉光；频率使用当前统一时间源。";
+            if (name == "_EnableSineGlow") return "按 ESNative 波形在最小值和扩展峰值间周期叠加辉光；频率使用当前统一时间源。";
             if (name == "_SineGlowMask") return "RGB 与 Alpha 共同调制辉光颜色；白色遮罩保持完整效果。";
             if (name == "_EnableShadow") return shaderName == "ES/3D/Lit Composite URP"
                 ? "增加一次偏移 BaseMap Alpha 采样并在主体后方合成；仅能出现在当前网格覆盖范围内。"
@@ -1070,9 +1070,9 @@ namespace ES.EditorInternal
             if (name == "_UseNormalMap") return "关闭时跳过法线纹理采样；开启后才显示纹理和强度。";
             if (name == "_UseMetallicMap") return "开启后使用纹理 R 通道乘金属度，并按所选通道调制光滑度。";
             if (name == "_MetallicMap") return "R 通道固定为金属度；光滑度可选择 R 或 A，纹理缩放/偏移可独立调整。";
-            if (name == "_SmoothnessMapChannel") return "常规打包纹理选择 Alpha；迁移 SSU 金属贴图时选择 Red。";
+            if (name == "_SmoothnessMapChannel") return "常规打包纹理选择 Alpha；迁移 ESNative 金属贴图时选择 Red。";
             if (name == "_UseEmission") return "关闭时跳过自发光纹理采样；开启后才显示颜色和纹理。";
-            if (name == "_EmissionUseAlpha") return "开启后自发光 RGB 额外乘贴图 Alpha，用于兼容 SSU 自发光贴图合同。";
+            if (name == "_EmissionUseAlpha") return "开启后自发光 RGB 额外乘贴图 Alpha，用于兼容 ESNative 自发光贴图合同。";
             if (name == "_NormalMap") return "纹理导入类型应为 Normal map。";
             if (name == "_MaskTex") return "RGBA 通道对应 Renderer2D Blend Style 的遮罩过滤。";
             if (name == "_NoiseTex") return "建议使用 Repeat 包裹和线性过滤。";

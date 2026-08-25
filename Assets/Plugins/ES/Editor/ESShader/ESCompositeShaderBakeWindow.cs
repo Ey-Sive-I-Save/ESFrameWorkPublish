@@ -6,6 +6,7 @@ using UnityEngine.UI;
 
 namespace ES.EditorInternal
 {
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Workspace)]
     public sealed class ESCompositeShaderBakeWindow : EditorWindow, IESWindowPresentationShortTitle
     {
         public string ESWindow_PresentationShortTitle => "材质";
@@ -82,8 +83,13 @@ namespace ES.EditorInternal
 
         private void OnDisable()
         {
-            ES.ESWindowFoundation.Unbind(this, true);
+            ES.ESWindowFoundation.Suspend(this);
             ReleaseBakedTexture();
+        }
+
+        private void OnDestroy()
+        {
+            ES.ESWindowFoundation.Close(this);
         }
 
         private void OnSelectionChange()

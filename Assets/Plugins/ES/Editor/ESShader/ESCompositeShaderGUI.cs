@@ -7,7 +7,7 @@ namespace ES.EditorInternal
 {
     /// <summary>
     /// ES Composite 材质 Inspector。
-    /// 设计基线参考 SSU：按 Shader 属性声明顺序处理，使用状态机驱动分类、开关和隐藏，
+    /// 设计基线参考 ESNative：按 Shader 属性声明顺序处理，使用状态机驱动分类、开关和隐藏，
     /// 同时保留 ES 的中文帮助、PropertyBlock 示例和 ESEditorPresentation 视觉体系。
     /// </summary>
     public sealed partial class ESCompositeShaderGUI : ShaderGUI

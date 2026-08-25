@@ -107,17 +107,17 @@ Shader "ES/3D/VFX Composite URP"
         _HologramGap ("全息线间隔", Range(0,1)) = 0.35
         _HologramSpeed ("全息速度", Float) = 1
         _HologramMinAlpha ("全息最低透明度", Range(0,1)) = 0.2
-        _HologramFade ("SSU 全息淡入", Range(0,1)) = 1
-        _HologramContrast ("SSU 全息对比度", Float) = 1
+        _HologramFade ("ESNative 全息淡入", Range(0,1)) = 1
+        _HologramContrast ("ESNative 全息对比度", Float) = 1
         [Enum(LocalUV,0,WorldProjection,1)] _HologramSpace ("全息扫描空间", Float) = 1
         _HologramDirection ("全息扫描方向", Vector) = (0,1,0,0)
-        _HologramLineFrequency ("SSU 全息线频率", Float) = 60
-        _HologramLineGap ("SSU 全息线间隔", Float) = 0.35
-        _HologramDistortionOffset ("SSU 全息扰动偏移", Float) = 0.5
+        _HologramLineFrequency ("ESNative 全息线频率", Float) = 60
+        _HologramLineGap ("ESNative 全息线间隔", Float) = 0.35
+        _HologramDistortionOffset ("ESNative 全息扰动偏移", Float) = 0.5
         _HologramDistortionDirection ("全息扰动方向", Vector) = (1,0,0,0)
-        _HologramDistortionSpeed ("SSU 全息扰动速度", Float) = 2
-        _HologramDistortionDensity ("SSU 全息扰动密度", Float) = 0.5
-        _HologramDistortionScale ("SSU 全息扰动缩放", Float) = 10
+        _HologramDistortionSpeed ("ESNative 全息扰动速度", Float) = 2
+        _HologramDistortionDensity ("ESNative 全息扰动密度", Float) = 0.5
+        _HologramDistortionScale ("ESNative 全息扰动缩放", Float) = 10
 
         // Dynamic Effects - Rim
         [Toggle] _EnableRim ("启用边缘光", Float) = 0
@@ -138,18 +138,18 @@ Shader "ES/3D/VFX Composite URP"
         _GlitchAmount ("故障偏移", Range(0,0.2)) = 0.02
         _GlitchSpeed ("故障速度", Float) = 3
         _GlitchScanDirection ("故障条带方向", Vector) = (0,1,0,0)
-        _GlitchFade ("SSU 故障淡入", Range(0,1)) = 1
-        _GlitchMaskMin ("SSU 故障遮罩下限", Range(0,1)) = 0.4
-        _GlitchMaskScale ("SSU 故障遮罩缩放", Vector) = (0,0.2,0,0)
-        _GlitchMaskSpeed ("SSU 故障遮罩速度", Vector) = (0,4,0,0)
-        _GlitchHueSpeed ("SSU 故障色相速度", Float) = 0.5
-        _GlitchBrightness ("SSU 故障亮度", Float) = 2
-        _GlitchNoiseScale ("SSU 故障噪声缩放", Vector) = (0,3,0,0)
-        _GlitchNoiseSpeed ("SSU 故障噪声速度", Vector) = (0,1,0,0)
-        _GlitchDistortion ("SSU 故障位移", Vector) = (0.1,0,0,0)
-        _GlitchDistortionScale ("SSU 故障位移缩放", Vector) = (0,3,0,0)
-        _GlitchDistortionSpeed ("SSU 故障位移速度", Vector) = (0,1,0,0)
-        [Toggle] _SSUStatusContract ("使用 SSU 精确全息/故障合同", Float) = 0
+        _GlitchFade ("ESNative 故障淡入", Range(0,1)) = 1
+        _GlitchMaskMin ("ESNative 故障遮罩下限", Range(0,1)) = 0.4
+        _GlitchMaskScale ("ESNative 故障遮罩缩放", Vector) = (0,0.2,0,0)
+        _GlitchMaskSpeed ("ESNative 故障遮罩速度", Vector) = (0,4,0,0)
+        _GlitchHueSpeed ("ESNative 故障色相速度", Float) = 0.5
+        _GlitchBrightness ("ESNative 故障亮度", Float) = 2
+        _GlitchNoiseScale ("ESNative 故障噪声缩放", Vector) = (0,3,0,0)
+        _GlitchNoiseSpeed ("ESNative 故障噪声速度", Vector) = (0,1,0,0)
+        _GlitchDistortion ("ESNative 故障位移", Vector) = (0.1,0,0,0)
+        _GlitchDistortionScale ("ESNative 故障位移缩放", Vector) = (0,3,0,0)
+        _GlitchDistortionSpeed ("ESNative 故障位移速度", Vector) = (0,1,0,0)
+        [Toggle] _ESNativeStatusContract ("使用 ESNative 精确全息/故障合同", Float) = 0
         [HDR] _EmissionColor ("自发光颜色", Color) = (0,0,0,1)
 
         // Depth Interaction

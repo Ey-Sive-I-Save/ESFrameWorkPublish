@@ -1,7 +1,7 @@
-#ifndef ES_COMPOSITE_SSU_FADE_STACK_INCLUDED
-#define ES_COMPOSITE_SSU_FADE_STACK_INCLUDED
+#ifndef ES_COMPOSITE_ESNative_FADE_STACK_INCLUDED
+#define ES_COMPOSITE_ESNative_FADE_STACK_INCLUDED
 
-float2 ESCompositeSSURotate(float2 value, float rotationDegrees)
+float2 ESCompositeESNativeRotate(float2 value, float rotationDegrees)
 {
     float angle = ((rotationDegrees / 180.0) - 0.25) * 3.14159265;
     float sine;
@@ -12,7 +12,7 @@ float2 ESCompositeSSURotate(float2 value, float rotationDegrees)
         value.x * sine + value.y * cosine);
 }
 
-float ESCompositeSSUDirectionalRatio(
+float ESCompositeESNativeDirectionalRatio(
     float2 coordinate,
     float rotation,
     float fade,
@@ -20,16 +20,16 @@ float ESCompositeSSUDirectionalRatio(
     float noise,
     float noiseFactor)
 {
-    float2 rotated = ESCompositeSSURotate(coordinate, rotation);
+    float2 rotated = ESCompositeESNativeRotate(coordinate, rotation);
     return (rotated.x + rotated.y + fade + noise * noiseFactor) / max(width, 0.001);
 }
 
-float ESCompositeSSUResolveInvert(float value, float invert)
+float ESCompositeESNativeResolveInvert(float value, float invert)
 {
     return lerp(value, 1.0 - value, step(0.5, invert));
 }
 
-float2 ESCompositeApplySSUDirectionalDistortionUV(float2 uv, float2 coordinate)
+float2 ESCompositeApplyESNativeDirectionalDistortionUV(float2 uv, float2 coordinate)
 {
     if (_EnableDirectionalDistortion < 0.5)
         return uv;
@@ -52,20 +52,20 @@ float2 ESCompositeApplySSUDirectionalDistortionUV(float2 uv, float2 coordinate)
         _UberNoiseTexture,
         sampler_UberNoiseTexture,
         coordinate * _DirectionalDistortionNoiseScale.xy).r);
-    float rawVisibility = saturate(ESCompositeSSUDirectionalRatio(
+    float rawVisibility = saturate(ESCompositeESNativeDirectionalRatio(
         coordinate,
         _DirectionalDistortionRotation,
         _DirectionalDistortionFade,
         _DirectionalDistortionWidth,
         fadeNoise,
         _DirectionalDistortionNoiseFactor));
-    float visibility = ESCompositeSSUResolveInvert(
+    float visibility = ESCompositeESNativeResolveInvert(
         rawVisibility,
         _DirectionalDistortionInvert);
     return uv + distortion * (1.0 - visibility);
 }
 
-half3 ESCompositeApplySSUFadeStackColor(
+half3 ESCompositeApplyESNativeFadeStackColor(
     half3 color,
     float2 coordinate,
     out float visibility)
@@ -78,19 +78,19 @@ half3 ESCompositeApplySSUFadeStackColor(
             _UberNoiseTexture,
             sampler_UberNoiseTexture,
             coordinate * _DirectionalDistortionNoiseScale.xy).r);
-        float rawVisibility = saturate(ESCompositeSSUDirectionalRatio(
+        float rawVisibility = saturate(ESCompositeESNativeDirectionalRatio(
             coordinate,
             _DirectionalDistortionRotation,
             _DirectionalDistortionFade,
             _DirectionalDistortionWidth,
             noise,
             _DirectionalDistortionNoiseFactor));
-        visibility *= ESCompositeSSUResolveInvert(
+        visibility *= ESCompositeESNativeResolveInvert(
             rawVisibility,
             _DirectionalDistortionInvert);
     }
 
-    // SSU applies these effects in this fixed order after sampling the sprite.
+    // ESNative applies these effects in this fixed order after sampling the sprite.
     if (_EnableFullAlphaDissolve > 0.5)
     {
         float width = max(_FullAlphaDissolveWidth, 0.001);
@@ -113,7 +113,7 @@ half3 ESCompositeApplySSUFadeStackColor(
         float sourceVisibility = saturate(
             (_SourceAlphaDissolveFade - distanceWithNoise)
             / max(_SourceAlphaDissolveWidth, 0.001));
-        visibility *= ESCompositeSSUResolveInvert(
+        visibility *= ESCompositeESNativeResolveInvert(
             sourceVisibility,
             _SourceAlphaDissolveInvert);
     }
@@ -143,14 +143,14 @@ half3 ESCompositeApplySSUFadeStackColor(
             _UberNoiseTexture,
             sampler_UberNoiseTexture,
             coordinate * _DirectionalAlphaFadeNoiseScale.xy).r);
-        float directionalVisibility = saturate(ESCompositeSSUDirectionalRatio(
+        float directionalVisibility = saturate(ESCompositeESNativeDirectionalRatio(
             coordinate,
             _DirectionalAlphaFadeRotation,
             _DirectionalAlphaFadeFade,
             _DirectionalAlphaFadeWidth,
             noise,
             _DirectionalAlphaFadeNoiseFactor));
-        visibility *= ESCompositeSSUResolveInvert(
+        visibility *= ESCompositeESNativeResolveInvert(
             directionalVisibility,
             _DirectionalAlphaFadeInvert);
     }
@@ -161,14 +161,14 @@ half3 ESCompositeApplySSUFadeStackColor(
             _UberNoiseTexture,
             sampler_UberNoiseTexture,
             coordinate * _DirectionalGlowFadeNoiseScale.xy).r);
-        float ratio = max(ESCompositeSSUDirectionalRatio(
+        float ratio = max(ESCompositeESNativeDirectionalRatio(
             coordinate,
             _DirectionalGlowFadeRotation,
             _DirectionalGlowFadeFade,
             _DirectionalGlowFadeWidth,
             noise,
             _DirectionalGlowFadeNoiseFactor), 0.0);
-        float resolvedRatio = ESCompositeSSUResolveInvert(
+        float resolvedRatio = ESCompositeESNativeResolveInvert(
             ratio,
             _DirectionalGlowFadeInvert);
         float directionalVisibility = step(0.1, resolvedRatio);

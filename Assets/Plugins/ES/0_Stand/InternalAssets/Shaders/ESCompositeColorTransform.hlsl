@@ -111,7 +111,7 @@ float ESCompositeShineCoordinate3D(
         ESCompositeResolveShineDirection3D(explicitDirection, fallbackDirection));
 }
 
-float ESCompositeSSULuminance(float3 color)
+float ESCompositeESNativeLuminance(float3 color)
 {
     return max((color.r * 2.0 + color.g * 3.0 + color.b) / 6.0, 0.0);
 }
@@ -146,7 +146,7 @@ half3 ESCompositeApplyInkSpread(
     float fade,
     float spreadMask)
 {
-    float luminance = ESCompositeSSULuminance(source);
+    float luminance = ESCompositeESNativeLuminance(source);
     half3 target = inkColor * (half)pow(luminance, max(contrast, 0.001));
     return lerp(source, target, saturate((half)(fade * spreadMask)));
 }
@@ -168,7 +168,7 @@ half3 ESCompositeApplyAddHue(
     float fadeMask)
 {
     float3 hueColor = ESCompositeHsvToRgb(float3(frac(timeValue * speed), saturate(saturation), max(brightness, 0.0)));
-    float luminance = ESCompositeSSULuminance(source);
+    float luminance = ESCompositeESNativeLuminance(source);
     return source + (half3)(hueColor * pow(luminance, max(contrast, 0.001)) * saturate(fadeMask));
 }
 
@@ -182,7 +182,7 @@ half3 ESCompositeApplySineGlow(
     float maximum,
     float fade)
 {
-    float luminance = ESCompositeSSULuminance(source);
+    float luminance = ESCompositeESNativeLuminance(source);
     float wave = (sin(timeValue * frequency) + 1.0) * (maximum - minimum) + minimum;
     return source + glowColor * (half)(pow(luminance, max(contrast, 0.001)) * fade * wave);
 }

@@ -359,18 +359,18 @@ namespace ES.Tests
             switch (shader.name)
             {
                 case "ES/2D/Composite URP":
-                    Assert.That(ES2DCompositeURPProperties.PrepareMaterialForDynamicSSU(material), Is.True);
+                    Assert.That(ES2DCompositeURPProperties.PrepareMaterialForDynamicESNative(material), Is.True);
                     break;
                 case "ES/UI/Composite URP":
-                    Assert.That(ESUICompositeURPProperties.PrepareMaterialForDynamicSSU(material), Is.True);
+                    Assert.That(ESUICompositeURPProperties.PrepareMaterialForDynamicESNative(material), Is.True);
                     break;
                 case "ES/3D/Lit Composite URP":
-                    Assert.That(ES3DLitCompositeURPProperties.PrepareMaterialForDynamicSSU(material), Is.True);
+                    Assert.That(ES3DLitCompositeURPProperties.PrepareMaterialForDynamicESNative(material), Is.True);
                     SetFloatIfPresent(material, "_Metallic", 0f);
                     SetFloatIfPresent(material, "_Smoothness", 0.25f);
                     break;
                 case "ES/3D/VFX Composite URP":
-                    Assert.That(ES3DVFXCompositeURPProperties.PrepareMaterialForDynamicSSU(material), Is.True);
+                    Assert.That(ES3DVFXCompositeURPProperties.PrepareMaterialForDynamicESNative(material), Is.True);
                     break;
                 default:
                     Assert.Fail("Unsupported visual validation shader: " + shader.name);
@@ -387,7 +387,7 @@ namespace ES.Tests
             bool glitch,
             float hologramSpace)
         {
-            SetFloatIfPresent(material, "_SSUStatusContract", 1f);
+            SetFloatIfPresent(material, "_ESNativeStatusContract", 1f);
             SetFloatIfPresent(material, "_EnableHologram", hologram ? 1f : 0f);
             SetFloatIfPresent(material, "_HologramFade", hologram ? 1f : 0f);
             SetColorIfPresent(material, "_HologramColor", new Color(0.08f, 0.9f, 1.8f, 1f));

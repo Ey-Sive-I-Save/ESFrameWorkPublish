@@ -8,7 +8,7 @@
 #include "ESCompositeRecolor.hlsl"
 #include "ESCompositeGenerated.hlsl"
 #include "ESCompositeSampling.hlsl"
-#include "ESCompositeSSUEffects.hlsl"
+#include "ESCompositeESNativeEffects.hlsl"
 #include "ESCompositeFade.hlsl"
 
 // No resource-mask keyword means the dynamic MPB-safe variant. Optimized materials
@@ -536,7 +536,7 @@ float4 _MetalNoiseDistortionSpeed;
 float4 _MetalNoiseDistortion;
 float _MetalMaskToggle;
 float _EnableFrozen;
-float _SSUStatusContract;
+float _ESNativeStatusContract;
 float _FrozenFade;
 half4 _FrozenTint;
 float _FrozenContrast;
@@ -653,9 +653,9 @@ float4 _NoiseScale;
 float4 _NoiseSpeed;
 CBUFFER_END
 
-#include "ESCompositeSSUFadeStack.hlsl"
-#include "ESCompositeSSUStatusEffects.hlsl"
-#include "ESCompositeSSUStylizedEffects.hlsl"
+#include "ESCompositeESNativeFadeStack.hlsl"
+#include "ESCompositeESNativeStatusEffects.hlsl"
+#include "ESCompositeESNativeStylizedEffects.hlsl"
 
 // Time, UV And Vertex Deformation
 float ESCompositeTime()
@@ -708,7 +708,7 @@ float ESResolveLitShineCoordinate(
 #include "ESCompositeSpriteVertexMotion.hlsl"
 
 #if defined(ES_LIT_COMPILE_SURFACE_RESOURCES)
-#include "ES3DLitCompositeSSUSurface.hlsl"
+#include "ES3DLitCompositeESNativeSurface.hlsl"
 #endif
 
 float ESVertexAnimationMask(float4 vertexColor)
@@ -747,7 +747,7 @@ float ESLitRandom(float2 value)
 
 float ESLitHologramCoordinate(float2 uv, float3 positionWS)
 {
-    return ESCompositeResolveSSUHologramCoordinate(uv, positionWS);
+    return ESCompositeResolveESNativeHologramCoordinate(uv, positionWS);
 }
 
 float2 ESLitApplyHologramUV(float2 uv, float3 positionWS)
@@ -925,7 +925,7 @@ float2 ESResolveLitUV(
     }
 #endif
 #if defined(ES_LIT_COMPILE_FADE_RESOURCES)
-    uv = ESCompositeApplySSUDirectionalDistortionUV(uv, frac(uv));
+    uv = ESCompositeApplyESNativeDirectionalDistortionUV(uv, frac(uv));
 #endif
     return uv;
 }
@@ -978,21 +978,21 @@ float2 ESApplyLitStylizedAndPixelUV(
     stylizedCoordinate = uv;
     hologramCoordinate = 0.0;
 #if defined(_ES_QUALITY_HIGH)
-    if (_SSUStatusContract > 0.5)
+    if (_ESNativeStatusContract > 0.5)
     {
         if (_EnableHologram > 0.5)
         {
-            hologramCoordinate = ESCompositeResolveSSUHologramCoordinate(
+            hologramCoordinate = ESCompositeResolveESNativeHologramCoordinate(
                 stylizedCoordinate,
                 positionWS);
-            uv = ESCompositeApplySSUHologramUV(
+            uv = ESCompositeApplyESNativeHologramUV(
                 uv,
                 hologramCoordinate,
                 _BaseMap_TexelSize.z,
                 ESCompositeTime());
         }
         if (_EnableGlitch > 0.5)
-            uv = ESCompositeApplySSUGlitchUV(
+            uv = ESCompositeApplyESNativeGlitchUV(
                 uv,
                 stylizedCoordinate,
                 ESCompositeTime());
@@ -1417,7 +1417,7 @@ half3 ESLitOutlineTint(float2 uv, bool pixel)
     return tint;
 }
 
-half ESLitSSUMinNeighbourAlpha8(float2 uv, float2 width)
+half ESLitESNativeMinNeighbourAlpha8(float2 uv, float2 width)
 {
     const float diagonal = 0.705;
     half value = 1.0h;
@@ -1432,7 +1432,7 @@ half ESLitSSUMinNeighbourAlpha8(float2 uv, float2 width)
     return value;
 }
 
-half ESLitSSUMaxNeighbourAlpha8(float2 uv, float2 width)
+half ESLitESNativeMaxNeighbourAlpha8(float2 uv, float2 width)
 {
     const float diagonal = 0.705;
     half value = 0.0h;
@@ -1447,7 +1447,7 @@ half ESLitSSUMaxNeighbourAlpha8(float2 uv, float2 width)
     return value;
 }
 
-half ESLitSSUMaxNeighbourAlpha4(float2 uv, float2 width)
+half ESLitESNativeMaxNeighbourAlpha4(float2 uv, float2 width)
 {
     half value = 0.0h;
     value = max(value, ESLitBaseAlpha(uv + float2(0.0, -width.y)));
@@ -1457,12 +1457,12 @@ half ESLitSSUMaxNeighbourAlpha4(float2 uv, float2 width)
     return value;
 }
 
-void ESLitApplySSUOutlines(float2 uv, inout half4 color)
+void ESLitApplyESNativeOutlines(float2 uv, inout half4 color)
 {
     float timeValue = ESCompositeTime();
     if (_EnableInnerOutline > 0.5)
     {
-        float2 distortedUV = ESCompositeSSUOutlineDistortedUV(
+        float2 distortedUV = ESCompositeESNativeOutlineDistortedUV(
             uv,
             _InnerOutlineDistortionToggle,
             _InnerOutlineDistortionIntensity.xy,
@@ -1477,9 +1477,9 @@ void ESLitApplySSUOutlines(float2 uv, inout half4 color)
                 sampler_BaseMap,
                 uv + timeValue * _InnerOutlineTextureSpeed.xy).rgb;
 #endif
-        color = ESCompositeApplySSUInnerOutline(
+        color = ESCompositeApplyESNativeInnerOutline(
             color,
-            ESLitSSUMinNeighbourAlpha8(
+            ESLitESNativeMinNeighbourAlpha8(
                 distortedUV,
                 max(_InnerOutlineWidth, 0.0) * 100.0 * _BaseMap_TexelSize.xy),
             tint,
@@ -1488,7 +1488,7 @@ void ESLitApplySSUOutlines(float2 uv, inout half4 color)
     }
     if (_EnableOuterOutline > 0.5)
     {
-        float2 distortedUV = ESCompositeSSUOutlineDistortedUV(
+        float2 distortedUV = ESCompositeESNativeOutlineDistortedUV(
             uv,
             _OuterOutlineDistortionToggle,
             _OuterOutlineDistortionIntensity.xy,
@@ -1503,9 +1503,9 @@ void ESLitApplySSUOutlines(float2 uv, inout half4 color)
                 sampler_BaseMap,
                 uv + timeValue * _OuterOutlineTextureSpeed.xy).rgb;
 #endif
-        color = ESCompositeApplySSUOuterOutline(
+        color = ESCompositeApplyESNativeOuterOutline(
             color,
-            ESLitSSUMaxNeighbourAlpha8(
+            ESLitESNativeMaxNeighbourAlpha8(
                 distortedUV,
                 max(_OuterOutlineWidth, 0.0) * 100.0 * _BaseMap_TexelSize.xy),
             tint,
@@ -1522,9 +1522,9 @@ void ESLitApplySSUOutlines(float2 uv, inout half4 color)
                 sampler_BaseMap,
                 uv + timeValue * _PixelOutlineTextureSpeed.xy).rgb;
 #endif
-        color = ESCompositeApplySSUOuterOutline(
+        color = ESCompositeApplyESNativeOuterOutline(
             color,
-            ESLitSSUMaxNeighbourAlpha4(
+            ESLitESNativeMaxNeighbourAlpha4(
                 uv,
                 max(_PixelOutlineWidth, 0.0) * _BaseMap_TexelSize.xy),
             tint,
@@ -1533,22 +1533,22 @@ void ESLitApplySSUOutlines(float2 uv, inout half4 color)
     }
 }
 
-half ESLitApplySSUOutlineAlpha(float2 uv, half alpha)
+half ESLitApplyESNativeOutlineAlpha(float2 uv, half alpha)
 {
     float timeValue = ESCompositeTime();
     half4 probe = half4(0.0h, 0.0h, 0.0h, alpha);
     if (_EnableInnerOutline > 0.5)
     {
-        float2 distortedUV = ESCompositeSSUOutlineDistortedUV(
+        float2 distortedUV = ESCompositeESNativeOutlineDistortedUV(
             uv,
             _InnerOutlineDistortionToggle,
             _InnerOutlineDistortionIntensity.xy,
             _InnerOutlineNoiseScale.xy,
             _InnerOutlineNoiseSpeed.xy,
             timeValue);
-        probe = ESCompositeApplySSUInnerOutline(
+        probe = ESCompositeApplyESNativeInnerOutline(
             probe,
-            ESLitSSUMinNeighbourAlpha8(
+            ESLitESNativeMinNeighbourAlpha8(
                 distortedUV,
                 max(_InnerOutlineWidth, 0.0) * 100.0 * _BaseMap_TexelSize.xy),
             0.0h,
@@ -1557,16 +1557,16 @@ half ESLitApplySSUOutlineAlpha(float2 uv, half alpha)
     }
     if (_EnableOuterOutline > 0.5)
     {
-        float2 distortedUV = ESCompositeSSUOutlineDistortedUV(
+        float2 distortedUV = ESCompositeESNativeOutlineDistortedUV(
             uv,
             _OuterOutlineDistortionToggle,
             _OuterOutlineDistortionIntensity.xy,
             _OuterOutlineNoiseScale.xy,
             _OuterOutlineNoiseSpeed.xy,
             timeValue);
-        probe = ESCompositeApplySSUOuterOutline(
+        probe = ESCompositeApplyESNativeOuterOutline(
             probe,
-            ESLitSSUMaxNeighbourAlpha8(
+            ESLitESNativeMaxNeighbourAlpha8(
                 distortedUV,
                 max(_OuterOutlineWidth, 0.0) * 100.0 * _BaseMap_TexelSize.xy),
             0.0h,
@@ -1575,9 +1575,9 @@ half ESLitApplySSUOutlineAlpha(float2 uv, half alpha)
     }
     if (_EnablePixelOutline > 0.5)
     {
-        probe = ESCompositeApplySSUOuterOutline(
+        probe = ESCompositeApplyESNativeOuterOutline(
             probe,
-            ESLitSSUMaxNeighbourAlpha4(
+            ESLitESNativeMaxNeighbourAlpha4(
                 uv,
                 max(_PixelOutlineWidth, 0.0) * _BaseMap_TexelSize.xy),
             0.0h,
@@ -1589,9 +1589,9 @@ half ESLitApplySSUOutlineAlpha(float2 uv, half alpha)
 
 void ESLitApplyOutlines(float2 uv, half sourceAlpha, inout half4 color)
 {
-    if (_SSUStatusContract > 0.5)
+    if (_ESNativeStatusContract > 0.5)
     {
-        ESLitApplySSUOutlines(uv, color);
+        ESLitApplyESNativeOutlines(uv, color);
         return;
     }
     if (_EnableInnerOutline > 0.5)
@@ -1699,10 +1699,10 @@ float ESComputeLitAlpha(
     half alpha = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, uv).a * _BaseColor.a;
 #if defined(_ES_QUALITY_HIGH)
     half sourceAlpha = alpha;
-    if (_SSUStatusContract > 0.5)
+    if (_ESNativeStatusContract > 0.5)
     {
         if (_EnableInnerOutline > 0.5 || _EnableOuterOutline > 0.5 || _EnablePixelOutline > 0.5)
-            alpha = ESLitApplySSUOutlineAlpha(uv, alpha);
+            alpha = ESLitApplyESNativeOutlineAlpha(uv, alpha);
     }
     else
     {
@@ -1733,8 +1733,8 @@ float ESComputeLitAlpha(
 #if defined(_ES_QUALITY_HIGH)
     if (_EnableHologram > 0.5)
     {
-        if (_SSUStatusContract > 0.5)
-            alpha = ESCompositeApplySSUHologramColor(
+        if (_ESNativeStatusContract > 0.5)
+            alpha = ESCompositeApplyESNativeHologramColor(
                 half4(0.0h, 0.0h, 0.0h, alpha),
                 hologramCoordinate,
                 ESCompositeTime()).a;
@@ -1770,7 +1770,7 @@ float ESComputeLitAlpha(
 #if defined(ES_LIT_COMPILE_FADE_RESOURCES)
     half3 unusedFadeColor = 0.0h;
     float ssuFadeVisibility;
-    unusedFadeColor = ESCompositeApplySSUFadeStackColor(
+    unusedFadeColor = ESCompositeApplyESNativeFadeStackColor(
         unusedFadeColor,
         frac(uv),
         ssuFadeVisibility);
@@ -1823,7 +1823,7 @@ void ESInitializeSurface(
         baseSample.rgb = lerp(baseSample.rgb, chroma, saturate(_ChromaticIntensity));
     }
 #if defined(_ES_QUALITY_HIGH)
-    if (_SSUStatusContract <= 0.5 && _EnableGlitch > 0.5)
+    if (_ESNativeStatusContract <= 0.5 && _EnableGlitch > 0.5)
         baseSample.rgb = ESLitApplyGlitchColor(baseSample.rgb, uv);
 #endif
 #if defined(_ES_QUALITY_HIGH)
@@ -1860,7 +1860,7 @@ void ESInitializeSurface(
 #if defined(ES_LIT_COMPILE_FADE_RESOURCES)
     half3 beforeFadeStack = baseSample.rgb;
     float ssuFadeVisibility;
-    baseSample.rgb = ESCompositeApplySSUFadeStackColor(
+    baseSample.rgb = ESCompositeApplyESNativeFadeStackColor(
         baseSample.rgb,
         frac(uv),
         ssuFadeVisibility);
@@ -1868,22 +1868,22 @@ void ESInitializeSurface(
     ssuEmission += max(baseSample.rgb - beforeFadeStack, 0.0h);
 #endif
 #if defined(_ES_QUALITY_HIGH)
-    if (_SSUStatusContract > 0.5)
+    if (_ESNativeStatusContract > 0.5)
     {
         if (_EnableHologram > 0.5)
-            baseSample = ESCompositeApplySSUHologramColor(
+            baseSample = ESCompositeApplyESNativeHologramColor(
                 baseSample,
                 hologramCoordinate,
                 ESCompositeTime());
         if (_EnableGlitch > 0.5)
-            baseSample.rgb = ESCompositeApplySSUGlitchColor(
+            baseSample.rgb = ESCompositeApplyESNativeGlitchColor(
                 baseSample.rgb,
                 stylizedCoordinate,
                 ESCompositeTime());
     }
 #endif
 #if defined(ES_LIT_COMPILE_SURFACE_RESOURCES)
-    ESApplyLitSSUSurfaceEffects(
+    ESApplyLitESNativeSurfaceEffects(
         uv,
         positionWS,
         baseSample.a * dissolveAlpha,
@@ -1902,7 +1902,7 @@ void ESInitializeSurface(
     }
 #endif
 #if defined(_ES_QUALITY_HIGH)
-    if (_SSUStatusContract <= 0.5 && _EnableHologram > 0.5)
+    if (_ESNativeStatusContract <= 0.5 && _EnableHologram > 0.5)
     {
         half hologramVisibility = ESLitHologramVisibility(uv, positionWS);
         baseSample.rgb = lerp(baseSample.rgb, _HologramColor.rgb, saturate((half)_HologramFade) * 0.55h);
@@ -1963,7 +1963,7 @@ void ESInitializeSurface(
     surfaceData.clearCoatSmoothness = 0.0;
 #if defined(_ES_QUALITY_HIGH)
 #if defined(ES_LIT_COMPILE_SURFACE_RESOURCES)
-    if (_SSUStatusContract <= 0.5 && _EnableBurn > 0.5)
+    if (_ESNativeStatusContract <= 0.5 && _EnableBurn > 0.5)
         surfaceData.emission += _BurnEdgeColor.rgb * (1.0 - smoothstep(_BurnProgress, _BurnProgress + _BurnWidth, ESNoise(positionWS)));
 #endif
 #endif
@@ -2057,7 +2057,7 @@ half4 ES3DLitFragment(ES3DLitVaryings input) : SV_Target
     if (_EnableRim > 0.5) result.rgb += _RimColor.rgb * pow(1.0 - saturate(dot(inputData.normalWS, inputData.viewDirectionWS)), _RimPower) * _RimIntensity;
 #endif
 #if defined(_ES_QUALITY_HIGH)
-    if (_SSUStatusContract <= 0.5 && _EnableShine > 0.5)
+    if (_ESNativeStatusContract <= 0.5 && _EnableShine > 0.5)
     {
         float shineCoordinate = ESResolveLitShineCoordinate(
             surfaceUV,

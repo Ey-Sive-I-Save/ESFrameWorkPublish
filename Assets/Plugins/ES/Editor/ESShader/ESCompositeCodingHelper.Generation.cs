@@ -466,7 +466,7 @@ namespace ES.EditorInternal
                 if (litAdvancedSurfaceProperty)
                     return "ES3DLitCompositeURPProperties." + ToPascal(propertyName);
 
-                bool sharedSSUGuiProperty = propertyName == "_EnableAddColor"
+                bool sharedESNativeGuiProperty = propertyName == "_EnableAddColor"
                     || propertyName.StartsWith("_AddColor", StringComparison.Ordinal)
                     || propertyName == "_EnableStrongTint" || propertyName.StartsWith("_StrongTint", StringComparison.Ordinal)
                     || propertyName == "_EnableAlphaTint" || propertyName.StartsWith("_AlphaTint", StringComparison.Ordinal)
@@ -499,7 +499,7 @@ namespace ES.EditorInternal
                     || propertyName == "_EnableEnchanted" || propertyName.StartsWith("_Enchanted", StringComparison.Ordinal)
                     || propertyName == "_EnableShifting" || propertyName.StartsWith("_Shifting", StringComparison.Ordinal)
                     || propertyName == "_UberNoiseTexture";
-                if (sharedSSUGuiProperty)
+                if (sharedESNativeGuiProperty)
                     return "ESCompositeURPProperties." + ToPascal(propertyName);
 
                 bool sharedTimeProperty = propertyName == "_EnableTimeFPS"

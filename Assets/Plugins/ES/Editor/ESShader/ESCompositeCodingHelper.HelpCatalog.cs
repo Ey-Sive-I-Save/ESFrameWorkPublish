@@ -166,7 +166,7 @@ namespace ES.EditorInternal
             { "_ShineColor", "设置扫光带叠加的 HDR 颜色。" },
             { "_ShineDirection", "设置扫光投影方向；2D/UI 使用 XY，Lit/VFX 使用 XYZ，零向量回退到各 Shader 的兼容默认方向。" },
             { "_ShineIntensity", "控制扫光带叠加到输出颜色的亮度。" },
-            { "_ShineRotation", "设置 SSU 精确扫光的兼容旋转角；仅在扫光方向为零向量时使用。" },
+            { "_ShineRotation", "设置 ESNative 精确扫光的兼容旋转角；仅在扫光方向为零向量时使用。" },
             { "_ShineSpace", "选择扫光坐标空间：兼容默认保持旧材质行为，局部 UV 跟随纹理，世界投影跨表面连续。" },
             { "_ShineSpeed", "控制扫光带沿指定方向移动的速度。" },
             { "_ShineWidth", "控制单条扫光带的可见宽度。" },
@@ -181,8 +181,8 @@ namespace ES.EditorInternal
             { "_SineGlowColor", "设置周期性叠加的 HDR 辉光颜色。" },
             { "_SineGlowContrast", "控制原图亮度对辉光强度的影响曲线。" },
             { "_SineGlowFrequency", "控制正弦辉光使用当前时间源振荡的速度。" },
-            { "_SineGlowMin", "设置 SSU 正弦波形在最低相位使用的值。" },
-            { "_SineGlowMax", "设置 SSU 正弦波形的范围参数；实际峰值遵循兼容公式。" },
+            { "_SineGlowMin", "设置 ESNative 正弦波形在最低相位使用的值。" },
+            { "_SineGlowMax", "设置 ESNative 正弦波形的范围参数；实际峰值遵循兼容公式。" },
             { "_SineGlowMaskToggle", "决定是否读取正弦辉光遮罩；关闭时跳过遮罩采样。" },
             { "_SineGlowMask", "使用 RGB 与 Alpha 共同调制正弦辉光颜色。" },
             { "_SparkleColor", "设置程序化闪点叠加的 HDR 颜色。" },
@@ -293,7 +293,7 @@ namespace ES.EditorInternal
             AddHelp(map, "ES/2D/Composite URP", "_EnableInkSpread", "启用墨水扩散", "从局部坐标中心按距离和共享噪声推进墨水颜色。", "开关");
             AddHelp(map, "ES/2D/Composite URP", "_EnableShiftHue", "启用动态色相偏移", "使用统一时间源持续旋转原图色相。", "开关");
             AddHelp(map, "ES/2D/Composite URP", "_EnableAddHue", "启用动态色相叠加", "按原图亮度叠加随时间变化的 HDR 色相，可选遮罩。", "开关");
-            AddHelp(map, "ES/2D/Composite URP", "_EnableSineGlow", "启用正弦辉光", "按 SSU 兼容波形周期叠加 HDR 辉光，可选彩色遮罩。", "开关");
+            AddHelp(map, "ES/2D/Composite URP", "_EnableSineGlow", "启用正弦辉光", "按 ESNative 兼容波形周期叠加 HDR 辉光，可选彩色遮罩。", "开关");
             AddHelp(map, "ES/2D/Composite URP", "_EnableSqueeze", "启用径向挤压", "在主纹理采样前围绕中心重映射 UV；会与序列帧、平铺和其他 UV 效果叠加。", "开关");
             AddHelp(map, "ES/2D/Composite URP", "_EnableSineRotate", "启用正弦旋转", "按统一时间源围绕指定中心往复旋转 UV，不改变几何边界。", "开关");
             AddHelp(map, "ES/2D/Composite URP", "_EnableSineMove", "启用正弦移动", "在顶点阶段沿 XY 偏移网格；Renderer Bounds 过小时可能被错误剔除。", "开关");
@@ -309,10 +309,10 @@ namespace ES.EditorInternal
             AddHelp(map, "ES/2D/Composite URP", "_EnableRainbow", "启用彩虹渐变", "开启沿坐标和时间变化的彩虹染色。", "开关");
             AddHelp(map, "ES/2D/Composite URP", "_EnableInnerOutline", "启用内描边", "在精灵内部边缘绘制描边。", "开关");
             AddHelp(map, "ES/2D/Composite URP", "_EnableOuterOutline", "启用外描边", "在精灵外部扩展透明区域绘制描边。", "开关");
-            AddHelp(map, "ES/2D/Composite URP", "_EnablePixelOutline", "启用像素描边", "按 SSU 四方向像素邻域绘制硬边描边。", "开关");
+            AddHelp(map, "ES/2D/Composite URP", "_EnablePixelOutline", "启用像素描边", "按 ESNative 四方向像素邻域绘制硬边描边。", "开关");
             AddHelp(map, "ES/2D/Composite URP", "_EnableShine", "启用扫光", "开启沿指定角度移动的扫光带。", "开关");
-            AddHelp(map, "ES/2D/Composite URP", "_ShineMaskToggle", "使用扫光遮罩", "SSU 合同模式下以遮罩纹理的 R 与 A 通道限制扫光。", "开关");
-            AddHelp(map, "ES/2D/Composite URP", "_ShineMask", "扫光遮罩", "SSU 合同模式使用的独立扫光遮罩纹理。", "纹理");
+            AddHelp(map, "ES/2D/Composite URP", "_ShineMaskToggle", "使用扫光遮罩", "ESNative 合同模式下以遮罩纹理的 R 与 A 通道限制扫光。", "开关");
+            AddHelp(map, "ES/2D/Composite URP", "_ShineMask", "扫光遮罩", "ESNative 合同模式使用的独立扫光遮罩纹理。", "纹理");
             AddHelp(map, "ES/2D/Composite URP", "_ShineIntensity", "扫光强度", "控制扫光叠加到最终颜色的强度。", "浮点/范围");
             AddHelp(map, "ES/2D/Composite URP", "_EnableSparkle", "启用亮晶晶", "开启程序化闪点和闪烁高光。", "开关");
             AddHelp(map, "ES/2D/Composite URP", "_SparkleIntensity", "亮晶晶强度", "控制闪点叠加亮度。", "浮点/范围");
@@ -342,9 +342,9 @@ namespace ES.EditorInternal
             AddHelp(map, "ES/2D/Composite URP", "_EnableDistortion", "启用噪声扰动", "开启噪声驱动的 UV 扰动。", "开关");
             AddHelp(map, "ES/2D/Composite URP", "_DistortionStrength", "扰动强度", "控制噪声扰动造成的 UV 偏移量。", "浮点/范围");
             AddHelp(map, "ES/2D/Composite URP", "_DistortionDirection", "扰动方向与轴强度", "分别缩放噪声造成的 XY 位移；(1,1) 保持旧材质结果。", "向量");
-            AddHelp(map, "ES/2D/Composite URP", "_EnableHologram", "启用全息", "普通材质使用兼容扫描线；SSU 精确合同使用世界高度、对比度、最低透明度和双噪声横向扰动。", "开关");
+            AddHelp(map, "ES/2D/Composite URP", "_EnableHologram", "启用全息", "普通材质使用兼容扫描线；ESNative 精确合同使用世界高度、对比度、最低透明度和双噪声横向扰动。", "开关");
             AddHelp(map, "ES/2D/Composite URP", "_HologramColor", "全息颜色", "设置全息覆盖层的颜色。", "颜色");
-            AddHelp(map, "ES/2D/Composite URP", "_EnableGlitch", "启用故障", "普通材质使用兼容抖动；SSU 精确合同使用独立遮罩、颜色噪声和位移噪声。", "开关");
+            AddHelp(map, "ES/2D/Composite URP", "_EnableGlitch", "启用故障", "普通材质使用兼容抖动；ESNative 精确合同使用独立遮罩、颜色噪声和位移噪声。", "开关");
             AddHelp(map, "ES/2D/Composite URP", "_GlitchIntensity", "故障强度", "控制故障效果的最大 UV 偏移。", "浮点/范围");
             AddHelp(map, "ES/2D/Composite URP", "_EnableFrozen", "启用冰冻", "开启冰冻颜色和冰晶高光效果。", "开关");
             AddHelp(map, "ES/2D/Composite URP", "_EnableBurn", "启用燃烧", "开启按噪声推进的燃烧边缘和裁剪。", "开关");
@@ -364,8 +364,8 @@ namespace ES.EditorInternal
             AddHelp(map, "ES/3D/Lit Composite URP", "_EnableRim", "启用边缘光", "按视角边缘为模型增加轮廓光；需要标准或高质量档。", "开关");
             AddHelp(map, "ES/3D/Lit Composite URP", "_RimIntensity", "边缘光强度", "控制轮廓光的叠加强度。", "浮点/范围");
             AddHelp(map, "ES/3D/Lit Composite URP", "_EnableShine", "启用扫光", "开启沿模型表面移动的扫光高光；仅高质量档执行。", "开关");
-            AddHelp(map, "ES/3D/Lit Composite URP", "_ShineMaskToggle", "使用扫光遮罩", "SSU 合同模式下以基础 UV 采样遮罩的 R 与 A 通道限制扫光。", "开关");
-            AddHelp(map, "ES/3D/Lit Composite URP", "_ShineMask", "扫光遮罩", "SSU 合同模式使用的独立扫光遮罩纹理。", "纹理");
+            AddHelp(map, "ES/3D/Lit Composite URP", "_ShineMaskToggle", "使用扫光遮罩", "ESNative 合同模式下以基础 UV 采样遮罩的 R 与 A 通道限制扫光。", "开关");
+            AddHelp(map, "ES/3D/Lit Composite URP", "_ShineMask", "扫光遮罩", "ESNative 合同模式使用的独立扫光遮罩纹理。", "纹理");
             AddHelp(map, "ES/3D/Lit Composite URP", "_ShineIntensity", "扫光强度", "控制扫光高光的叠加强度。", "浮点/范围");
             AddHelp(map, "ES/3D/Lit Composite URP", "_EnableSparkle", "启用亮晶晶", "在高质量档位下开启程序化闪点。", "开关");
             AddHelp(map, "ES/3D/Lit Composite URP", "_EnableFlow", "启用纹理流动", "沿顶点 UV 推进主纹理采样。", "开关");
@@ -439,7 +439,7 @@ namespace ES.EditorInternal
             AddHelp(map, "ES/3D/Lit Composite URP", "_EnableNegative", "启用负片", "按强度把 Lit 基础颜色混合到负片结果。", "开关");
             AddHelp(map, "ES/3D/Lit Composite URP", "_EnableRainbow", "启用彩虹渐变", "按 UV 纵坐标和统一时间源混合彩虹色。", "开关");
             AddHelp(map, "ES/3D/Lit Composite URP", "_EnablePingPongGlow", "启用往返发光", "在两个 HDR 颜色之间周期往返并写入 Emission。", "开关");
-            AddHelp(map, "ES/3D/Lit Composite URP", "_UberNoiseTexture", "SSU 效果共享噪声", "供墨水、迷彩、金属、冰冻、中毒与附魔共享；建议关闭 sRGB 并使用 Repeat。", "纹理");
+            AddHelp(map, "ES/3D/Lit Composite URP", "_UberNoiseTexture", "ESNative 效果共享噪声", "供墨水、迷彩、金属、冰冻、中毒与附魔共享；建议关闭 sRGB 并使用 Repeat。", "纹理");
             AddHelp(map, "ES/3D/VFX Composite URP", "_MainTex", "VFX 主纹理", "粒子或特效卡片的主采样纹理。", "纹理");
             AddHelp(map, "ES/3D/VFX Composite URP", "_EnableSequence", "启用序列帧", "把主纹理按行列切分并选择当前帧；关闭时保持原始 UV。", "开关");
             AddHelp(map, "ES/3D/VFX Composite URP", "_SequencePlayback", "序列帧播放方式", "选择手动帧、按当前时间源播放，或读取 ParticleSystem Custom1.z 作为帧号偏移。", "强枚举");
@@ -539,7 +539,7 @@ namespace ES.EditorInternal
             AddHelp(map, "ES/UI/Composite URP", "_EnableInkSpread", "UI 墨水扩散", "从 UI 局部坐标中心按距离和共享噪声推进墨水颜色。", "开关");
             AddHelp(map, "ES/UI/Composite URP", "_EnableShiftHue", "UI 动态色相偏移", "使用统一时间源持续旋转 UI 原色相。", "开关");
             AddHelp(map, "ES/UI/Composite URP", "_EnableAddHue", "UI 动态色相叠加", "按原图亮度叠加随时间变化的 HDR 色相，可选遮罩。", "开关");
-            AddHelp(map, "ES/UI/Composite URP", "_EnableSineGlow", "UI 正弦辉光", "按 SSU 兼容波形周期叠加 HDR 辉光，可选彩色遮罩。", "开关");
+            AddHelp(map, "ES/UI/Composite URP", "_EnableSineGlow", "UI 正弦辉光", "按 ESNative 兼容波形周期叠加 HDR 辉光，可选彩色遮罩。", "开关");
             AddHelp(map, "ES/UI/Composite URP", "_EnableSqueeze", "UI 径向挤压", "在 UI 主纹理采样前围绕中心重映射 UV。", "开关");
             AddHelp(map, "ES/UI/Composite URP", "_EnableSineRotate", "UI 正弦旋转", "按统一时间源旋转 UI 采样 UV，不扩大 RectTransform 几何边界。", "开关");
             AddHelp(map, "ES/UI/Composite URP", "_EnableSineMove", "UI 正弦移动", "在顶点阶段移动 UI 网格；可能越出 Mask 或 RectMask2D 的裁切区域。", "开关");
@@ -551,12 +551,12 @@ namespace ES.EditorInternal
             AddHelp(map, "ES/UI/Composite URP", "_EnableEnchanted", "UI 附魔流光", "叠加双色或彩虹滚动流光，适合卡牌和稀有度强调。", "开关");
             AddHelp(map, "ES/UI/Composite URP", "_EnableShifting", "UI 明度流变", "按图像明度生成双色或彩虹动态流变。", "开关");
             AddHelp(map, "ES/UI/Composite URP", "_EnableShadow", "UI 精灵阴影", "额外采样一次偏移后的主纹理 Alpha；会继续受 UI Clip Rect 裁切。", "开关");
-            AddHelp(map, "ES/UI/Composite URP", "_EnableHologram", "UI 全息开关", "普通材质使用兼容扫描线；SSU 精确合同使用世界高度扫描、颜色对比和双噪声扰动。", "开关");
-            AddHelp(map, "ES/UI/Composite URP", "_EnableGlitch", "UI 故障开关", "普通材质使用兼容抖动；SSU 精确合同使用独立遮罩、颜色噪声和位移噪声。", "开关");
+            AddHelp(map, "ES/UI/Composite URP", "_EnableHologram", "UI 全息开关", "普通材质使用兼容扫描线；ESNative 精确合同使用世界高度扫描、颜色对比和双噪声扰动。", "开关");
+            AddHelp(map, "ES/UI/Composite URP", "_EnableGlitch", "UI 故障开关", "普通材质使用兼容抖动；ESNative 精确合同使用独立遮罩、颜色噪声和位移噪声。", "开关");
             AddHelp(map, "ES/UI/Composite URP", "_EnableFlow", "UI 纹理流动", "按时间推进 UI 主纹理 UV。", "开关");
             AddHelp(map, "ES/UI/Composite URP", "_EnableShine", "UI 扫光", "在 UI 表面叠加可控方向的扫光。", "开关");
-            AddHelp(map, "ES/UI/Composite URP", "_ShineMaskToggle", "UI 扫光遮罩", "SSU 合同模式下以遮罩纹理的 R 与 A 通道限制扫光。", "开关");
-            AddHelp(map, "ES/UI/Composite URP", "_ShineMask", "UI 扫光遮罩纹理", "SSU 合同模式使用的独立扫光遮罩。", "纹理");
+            AddHelp(map, "ES/UI/Composite URP", "_ShineMaskToggle", "UI 扫光遮罩", "ESNative 合同模式下以遮罩纹理的 R 与 A 通道限制扫光。", "开关");
+            AddHelp(map, "ES/UI/Composite URP", "_ShineMask", "UI 扫光遮罩纹理", "ESNative 合同模式使用的独立扫光遮罩。", "纹理");
             AddHelp(map, "ES/UI/Composite URP", "_EnableSparkle", "UI 亮晶晶", "在 UI 上叠加程序化闪点。", "开关");
             AddHelp(map, "ES/UI/Composite URP", "_EnableChromatic", "UI 色差", "对 UI 主纹理执行轻量 RGB 分离。", "开关");
             AddHelp(map, "ES/UI/Composite URP", "_EnableBlur", "UI 纹理模糊", "对 UI 主纹理执行轻量五点模糊，不等于背景毛玻璃。", "开关");

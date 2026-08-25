@@ -77,7 +77,7 @@ Shader "ES/3D/Lit Composite URP"
         _HalftoneFade ("半色调扩散", Float) = 1
         _HalftoneFadeWidth ("半色调扩散宽度", Float) = 1.5
         [Toggle] _HalftoneInvert ("反转半色调", Float) = 0
-        [Toggle] _HalftoneAlphaPattern ("使用 SSU 透明点阵", Float) = 0
+        [Toggle] _HalftoneAlphaPattern ("使用 ESNative 透明点阵", Float) = 0
         [Toggle] _EnableSharpen ("启用纹理锐化", Float) = 0
         _SharpenAmount ("锐化强度", Range(0,4)) = 1
         _SharpenRadius ("锐化半径", Range(0,0.02)) = 0.001
@@ -190,7 +190,7 @@ Shader "ES/3D/Lit Composite URP"
         _GlitchDistortion ("故障位移", Vector) = (0.1,0,0,0)
         _GlitchDistortionScale ("故障位移缩放", Vector) = (0,3,0,0)
         _GlitchDistortionSpeed ("故障位移速度", Vector) = (0,1,0,0)
-        [Toggle] _EnableFullDistortion ("启用 SSU 全局扰动", Float) = 0
+        [Toggle] _EnableFullDistortion ("启用 ESNative 全局扰动", Float) = 0
         _FullDistortionFade ("全局扰动淡出", Range(0,1)) = 1
         _FullDistortionDistortion ("全局扰动方向强度", Vector) = (0.2,0.2,0,0)
         _FullDistortionNoiseScale ("全局扰动噪声缩放", Vector) = (0.5,0.5,0,0)
@@ -262,19 +262,19 @@ Shader "ES/3D/Lit Composite URP"
         [NoScaleOffset] _FadeMask ("渐隐遮罩", 2D) = "white" {}
         _FadeDistortionStrength ("渐隐扰动强度", Range(0,0.2)) = 0.03
         _DissolveEdgeIntensity ("溶解边缘强度", Range(0,8)) = 1
-        // SSU Composable Fade Stack
-        [Toggle] _EnableFullAlphaDissolve ("启用 SSU 全局透明溶解", Float) = 0
+        // ESNative Composable Fade Stack
+        [Toggle] _EnableFullAlphaDissolve ("启用 ESNative 全局透明溶解", Float) = 0
         _FullAlphaDissolveFade ("全局透明溶解进度", Float) = 0.5
         _FullAlphaDissolveWidth ("全局透明溶解宽度", Float) = 0.5
         _FullAlphaDissolveNoiseScale ("全局透明溶解噪声缩放", Vector) = (0.1,0.1,0,0)
-        [Toggle] _EnableSourceAlphaDissolve ("启用 SSU 源点透明溶解", Float) = 0
+        [Toggle] _EnableSourceAlphaDissolve ("启用 ESNative 源点透明溶解", Float) = 0
         _SourceAlphaDissolveFade ("源点透明溶解进度", Float) = 1
         _SourceAlphaDissolvePosition ("源点透明溶解位置", Vector) = (0,0,0,0)
         _SourceAlphaDissolveWidth ("源点透明溶解宽度", Float) = 0.2
         _SourceAlphaDissolveNoiseScale ("源点透明溶解噪声缩放", Vector) = (0.3,0.3,0,0)
         _SourceAlphaDissolveNoiseFactor ("源点透明溶解噪声影响", Float) = 0.2
         [Toggle] _SourceAlphaDissolveInvert ("反转源点透明溶解", Float) = 0
-        [Toggle] _EnableSourceGlowDissolve ("启用 SSU 源点辉光溶解", Float) = 0
+        [Toggle] _EnableSourceGlowDissolve ("启用 ESNative 源点辉光溶解", Float) = 0
         _SourceGlowDissolveFade ("源点辉光溶解进度", Float) = 1
         _SourceGlowDissolvePosition ("源点辉光溶解位置", Vector) = (0,0,0,0)
         _SourceGlowDissolveWidth ("源点辉光溶解宽度", Float) = 0.1
@@ -282,14 +282,14 @@ Shader "ES/3D/Lit Composite URP"
         _SourceGlowDissolveNoiseScale ("源点辉光溶解噪声缩放", Vector) = (0.3,0.3,0,0)
         _SourceGlowDissolveNoiseFactor ("源点辉光溶解噪声影响", Float) = 0.2
         [Toggle] _SourceGlowDissolveInvert ("反转源点辉光溶解", Float) = 0
-        [Toggle] _EnableDirectionalAlphaFade ("启用 SSU 方向透明渐隐", Float) = 0
+        [Toggle] _EnableDirectionalAlphaFade ("启用 ESNative 方向透明渐隐", Float) = 0
         _DirectionalAlphaFadeFade ("方向透明渐隐进度", Float) = 0
         _DirectionalAlphaFadeRotation ("方向透明渐隐角度", Range(0,360)) = 0
         _DirectionalAlphaFadeWidth ("方向透明渐隐宽度", Float) = 0.2
         _DirectionalAlphaFadeNoiseScale ("方向透明渐隐噪声缩放", Vector) = (0.3,0.3,0,0)
         _DirectionalAlphaFadeNoiseFactor ("方向透明渐隐噪声影响", Float) = 0.2
         [Toggle] _DirectionalAlphaFadeInvert ("反转方向透明渐隐", Float) = 0
-        [Toggle] _EnableDirectionalGlowFade ("启用 SSU 方向辉光渐隐", Float) = 0
+        [Toggle] _EnableDirectionalGlowFade ("启用 ESNative 方向辉光渐隐", Float) = 0
         _DirectionalGlowFadeFade ("方向辉光渐隐进度", Float) = 0
         _DirectionalGlowFadeRotation ("方向辉光渐隐角度", Range(0,360)) = 0
         [HDR] _DirectionalGlowFadeEdgeColor ("方向辉光渐隐边缘颜色", Color) = (11.98431,0.6901961,0.6901961,0)
@@ -297,7 +297,7 @@ Shader "ES/3D/Lit Composite URP"
         _DirectionalGlowFadeNoiseScale ("方向辉光渐隐噪声缩放", Vector) = (0.4,0.4,0,0)
         _DirectionalGlowFadeNoiseFactor ("方向辉光渐隐噪声影响", Float) = 0.2
         [Toggle] _DirectionalGlowFadeInvert ("反转方向辉光渐隐", Float) = 0
-        [Toggle] _EnableDirectionalDistortion ("启用 SSU 方向扰动渐隐", Float) = 0
+        [Toggle] _EnableDirectionalDistortion ("启用 ESNative 方向扰动渐隐", Float) = 0
         _DirectionalDistortionFade ("方向扰动渐隐进度", Float) = 0
         _DirectionalDistortionRotation ("方向扰动渐隐角度", Range(0,360)) = 0
         _DirectionalDistortionWidth ("方向扰动渐隐宽度", Float) = 0.5
@@ -340,7 +340,7 @@ Shader "ES/3D/Lit Composite URP"
         [HDR] _DissolveEdgeColor ("溶解边缘颜色", Color) = (1,0.1,0.01,1)
         _DissolveEdgeWidth ("溶解边缘宽度", Range(0.001,1)) = 0.08
 
-        // SSU Surface Color And Material Effects
+        // ESNative Surface Color And Material Effects
         [Toggle] _EnableAddColor ("启用叠加颜色", Float) = 0
         [HDR] _AddColor ("叠加颜色", Color) = (1,0,0,1)
         _AddColorFade ("叠加颜色强度", Range(0,1)) = 1
@@ -439,12 +439,12 @@ Shader "ES/3D/Lit Composite URP"
         _RainbowDensity ("彩虹密度", Float) = 1
         _RainbowDirection ("彩虹色带方向", Vector) = (0,1,0,0)
         _RainbowBrightness ("彩虹亮度", Float) = 1
-        [HideInInspector] _RainbowFade ("SSU 彩虹强度", Range(0,1)) = 1
-        [HideInInspector] _RainbowSaturation ("SSU 彩虹饱和度", Range(0,1)) = 1
-        [HideInInspector] _RainbowContrast ("SSU 彩虹对比度", Float) = 1
-        [HideInInspector] _RainbowCenter ("SSU 彩虹中心", Vector) = (0,0,0,0)
-        [HideInInspector] _RainbowNoiseScale ("SSU 彩虹噪声缩放", Vector) = (0.2,0.2,0,0)
-        [HideInInspector] _RainbowNoiseFactor ("SSU 彩虹噪声因子", Float) = 0.2
+        [HideInInspector] _RainbowFade ("ESNative 彩虹强度", Range(0,1)) = 1
+        [HideInInspector] _RainbowSaturation ("ESNative 彩虹饱和度", Range(0,1)) = 1
+        [HideInInspector] _RainbowContrast ("ESNative 彩虹对比度", Float) = 1
+        [HideInInspector] _RainbowCenter ("ESNative 彩虹中心", Vector) = (0,0,0,0)
+        [HideInInspector] _RainbowNoiseScale ("ESNative 彩虹噪声缩放", Vector) = (0.2,0.2,0,0)
+        [HideInInspector] _RainbowNoiseFactor ("ESNative 彩虹噪声因子", Float) = 0.2
         [Toggle] _EnablePingPongGlow ("启用往返发光", Float) = 0
         [HDR] _GlowFrom ("往返发光起点", Color) = (1,0,0,1)
         [HDR] _GlowTo ("往返发光终点", Color) = (0,0.3,1,1)
@@ -453,25 +453,25 @@ Shader "ES/3D/Lit Composite URP"
         _GlowContrast ("往返发光亮度对比", Range(0.001,8)) = 1
         _GlowFade ("往返发光淡入", Range(0,1)) = 1
 
-        // SSU Pattern And Status Effects
-        [HideInInspector] _SSUStatusContract ("SSU 精确效果合同", Float) = 0
-        [NoScaleOffset] _UberNoiseTexture ("SSU 效果共享噪声", 2D) = "white" {}
+        // ESNative Pattern And Status Effects
+        [HideInInspector] _ESNativeStatusContract ("ESNative 精确效果合同", Float) = 0
+        [NoScaleOffset] _UberNoiseTexture ("ESNative 效果共享噪声", 2D) = "white" {}
         [Toggle] _EnableFrozen ("启用冰冻", Float) = 0
-        [HideInInspector] _FrozenFade ("SSU 冰冻强度", Range(0,1)) = 1
-        [HideInInspector] _FrozenTint ("SSU 冰冻色调", Color) = (1.819608,4.611765,5.992157,0)
-        [HideInInspector] _FrozenContrast ("SSU 冰冻对比度", Float) = 2
-        [HideInInspector] _FrozenSnowColor ("SSU 冰冻雪花颜色", Color) = (1.123529,1.373203,1.498039,0)
-        [HideInInspector] _FrozenSnowContrast ("SSU 冰冻雪花对比度", Float) = 1
-        [HideInInspector] _FrozenSnowDensity ("SSU 冰冻雪花密度", Range(0,1)) = 0.25
-        [HideInInspector] _FrozenSnowScale ("SSU 冰冻雪花缩放", Vector) = (0.1,0.1,0,0)
-        [HideInInspector] _FrozenHighlightColor ("SSU 冰冻高光颜色", Color) = (1.797647,4.604501,5.992157,1)
-        [HideInInspector] _FrozenHighlightContrast ("SSU 冰冻高光对比度", Float) = 2
-        [HideInInspector] _FrozenHighlightDensity ("SSU 冰冻高光密度", Range(0,1)) = 1
-        [HideInInspector] _FrozenHighlightSpeed ("SSU 冰冻高光速度", Vector) = (0.1,0.1,0,0)
-        [HideInInspector] _FrozenHighlightScale ("SSU 冰冻高光缩放", Vector) = (0.2,0.2,0,0)
-        [HideInInspector] _FrozenHighlightDistortion ("SSU 冰冻高光扰动", Vector) = (0.5,0.5,0,0)
-        [HideInInspector] _FrozenHighlightDistortionSpeed ("SSU 冰冻高光扰动速度", Vector) = (-0.05,-0.05,0,0)
-        [HideInInspector] _FrozenHighlightDistortionScale ("SSU 冰冻高光扰动缩放", Vector) = (0.2,0.2,0,0)
+        [HideInInspector] _FrozenFade ("ESNative 冰冻强度", Range(0,1)) = 1
+        [HideInInspector] _FrozenTint ("ESNative 冰冻色调", Color) = (1.819608,4.611765,5.992157,0)
+        [HideInInspector] _FrozenContrast ("ESNative 冰冻对比度", Float) = 2
+        [HideInInspector] _FrozenSnowColor ("ESNative 冰冻雪花颜色", Color) = (1.123529,1.373203,1.498039,0)
+        [HideInInspector] _FrozenSnowContrast ("ESNative 冰冻雪花对比度", Float) = 1
+        [HideInInspector] _FrozenSnowDensity ("ESNative 冰冻雪花密度", Range(0,1)) = 0.25
+        [HideInInspector] _FrozenSnowScale ("ESNative 冰冻雪花缩放", Vector) = (0.1,0.1,0,0)
+        [HideInInspector] _FrozenHighlightColor ("ESNative 冰冻高光颜色", Color) = (1.797647,4.604501,5.992157,1)
+        [HideInInspector] _FrozenHighlightContrast ("ESNative 冰冻高光对比度", Float) = 2
+        [HideInInspector] _FrozenHighlightDensity ("ESNative 冰冻高光密度", Range(0,1)) = 1
+        [HideInInspector] _FrozenHighlightSpeed ("ESNative 冰冻高光速度", Vector) = (0.1,0.1,0,0)
+        [HideInInspector] _FrozenHighlightScale ("ESNative 冰冻高光缩放", Vector) = (0.2,0.2,0,0)
+        [HideInInspector] _FrozenHighlightDistortion ("ESNative 冰冻高光扰动", Vector) = (0.5,0.5,0,0)
+        [HideInInspector] _FrozenHighlightDistortionSpeed ("ESNative 冰冻高光扰动速度", Vector) = (-0.05,-0.05,0,0)
+        [HideInInspector] _FrozenHighlightDistortionScale ("ESNative 冰冻高光扰动缩放", Vector) = (0.2,0.2,0,0)
         [Toggle] _EnableCamouflage ("启用迷彩", Float) = 0
         _CamouflageFade ("迷彩强度", Range(0,1)) = 1
         _CamouflageBaseColor ("迷彩基础颜色", Color) = (0.7450981,0.7254902,0.5686275,0)
@@ -507,12 +507,12 @@ Shader "ES/3D/Lit Composite URP"
         _FrozenDensity ("冰冻雪花密度", Range(0,1)) = 0.35
         _FrozenSpeed ("冰冻流动速度", Float) = 0.2
         [Toggle] _EnablePoison ("启用中毒", Float) = 0
-        [HideInInspector] _PoisonFade ("SSU 中毒强度", Range(0,1)) = 1
-        [HideInInspector] _PoisonRecolorFactor ("SSU 中毒重着色因子", Range(0,1)) = 0.5
-        [HideInInspector] _PoisonShiftSpeed ("SSU 中毒条纹速度", Float) = 0.2
-        [HideInInspector] _PoisonNoiseBrightness ("SSU 中毒噪声亮度", Float) = 2
-        [HideInInspector] _PoisonNoiseScale ("SSU 中毒噪声缩放", Vector) = (0.2,0.2,0,0)
-        [HideInInspector] _PoisonNoiseSpeed ("SSU 中毒噪声速度", Vector) = (0,-0.2,0,0)
+        [HideInInspector] _PoisonFade ("ESNative 中毒强度", Range(0,1)) = 1
+        [HideInInspector] _PoisonRecolorFactor ("ESNative 中毒重着色因子", Range(0,1)) = 0.5
+        [HideInInspector] _PoisonShiftSpeed ("ESNative 中毒条纹速度", Float) = 0.2
+        [HideInInspector] _PoisonNoiseBrightness ("ESNative 中毒噪声亮度", Float) = 2
+        [HideInInspector] _PoisonNoiseScale ("ESNative 中毒噪声缩放", Vector) = (0.2,0.2,0,0)
+        [HideInInspector] _PoisonNoiseSpeed ("ESNative 中毒噪声速度", Vector) = (0,-0.2,0,0)
         [HDR] _PoisonColor ("中毒颜色", Color) = (0.2,1,0.1,1)
         _PoisonDensity ("中毒密度", Float) = 3
         _PoisonSpeed ("中毒速度", Float) = 1
@@ -546,14 +546,14 @@ Shader "ES/3D/Lit Composite URP"
         _RimPower ("边缘光幂次", Range(0.1,8)) = 3
         _RimIntensity ("边缘光强度", Range(0,8)) = 1
         [Toggle] _EnableShine ("启用扫光", Float) = 0
-        [HideInInspector] _ShineFade ("SSU 扫光强度", Range(0,1)) = 1
-        [HideInInspector] _ShineSaturation ("SSU 扫光饱和度", Range(0,1)) = 0.5
-        [HideInInspector] _ShineContrast ("SSU 扫光对比度", Float) = 2
-        [HideInInspector] _ShineRotation ("SSU 扫光旋转", Range(0,360)) = 30
-        [HideInInspector] _ShineSmooth ("SSU 扫光平滑度", Float) = 1
-        [HideInInspector] _ShineFrequency ("SSU 扫光频率", Float) = 0.3
-        [Toggle] _ShineMaskToggle ("SSU 扫光遮罩", Float) = 0
-        [NoScaleOffset] _ShineMask ("SSU 扫光遮罩纹理", 2D) = "white" {}
+        [HideInInspector] _ShineFade ("ESNative 扫光强度", Range(0,1)) = 1
+        [HideInInspector] _ShineSaturation ("ESNative 扫光饱和度", Range(0,1)) = 0.5
+        [HideInInspector] _ShineContrast ("ESNative 扫光对比度", Float) = 2
+        [HideInInspector] _ShineRotation ("ESNative 扫光旋转", Range(0,360)) = 30
+        [HideInInspector] _ShineSmooth ("ESNative 扫光平滑度", Float) = 1
+        [HideInInspector] _ShineFrequency ("ESNative 扫光频率", Float) = 0.3
+        [Toggle] _ShineMaskToggle ("ESNative 扫光遮罩", Float) = 0
+        [NoScaleOffset] _ShineMask ("ESNative 扫光遮罩纹理", 2D) = "white" {}
         [HDR] _ShineColor ("扫光颜色", Color) = (1,1,1,1)
         _ShineSpeed ("扫光速度", Float) = 1
         _ShineWidth ("扫光宽度", Float) = 0.15
@@ -584,18 +584,18 @@ Shader "ES/3D/Lit Composite URP"
         _BlurRadius ("模糊半径", Range(0,0.02)) = 0.001
         _BlurIntensity ("模糊强度", Range(0,1)) = 0.35
         [Toggle] _EnableBurn ("启用燃烧边缘", Float) = 0
-        [HideInInspector] _BurnFade ("SSU 燃烧强度", Range(0,1)) = 1
-        [HideInInspector] _BurnPosition ("SSU 燃烧位置", Vector) = (0,5,0,0)
-        [HideInInspector] _BurnRadius ("SSU 燃烧半径", Float) = 5
-        [HideInInspector] _BurnEdgeNoiseScale ("SSU 燃烧边缘噪声缩放", Vector) = (0.3,0.3,0,0)
-        [HideInInspector] _BurnEdgeNoiseFactor ("SSU 燃烧边缘噪声因子", Float) = 0.5
-        [HideInInspector] _BurnInsideContrast ("SSU 燃烧内部对比度", Float) = 2
-        [HideInInspector] _BurnInsideColor ("SSU 燃烧内部颜色", Color) = (0.75,0.5625,0.525,0)
-        [HideInInspector] _BurnInsideNoiseColor ("SSU 燃烧内部噪声颜色", Color) = (3084.047,257.0039,0,0)
-        [HideInInspector] _BurnInsideNoiseFactor ("SSU 燃烧内部噪声因子", Float) = 0.2
-        [HideInInspector] _BurnInsideNoiseScale ("SSU 燃烧内部噪声缩放", Vector) = (0.5,0.5,0,0)
-        [HideInInspector] _BurnSwirlFactor ("SSU 燃烧旋涡因子", Float) = 1
-        [HideInInspector] _BurnSwirlNoiseScale ("SSU 燃烧旋涡噪声缩放", Vector) = (0.1,0.1,0,0)
+        [HideInInspector] _BurnFade ("ESNative 燃烧强度", Range(0,1)) = 1
+        [HideInInspector] _BurnPosition ("ESNative 燃烧位置", Vector) = (0,5,0,0)
+        [HideInInspector] _BurnRadius ("ESNative 燃烧半径", Float) = 5
+        [HideInInspector] _BurnEdgeNoiseScale ("ESNative 燃烧边缘噪声缩放", Vector) = (0.3,0.3,0,0)
+        [HideInInspector] _BurnEdgeNoiseFactor ("ESNative 燃烧边缘噪声因子", Float) = 0.5
+        [HideInInspector] _BurnInsideContrast ("ESNative 燃烧内部对比度", Float) = 2
+        [HideInInspector] _BurnInsideColor ("ESNative 燃烧内部颜色", Color) = (0.75,0.5625,0.525,0)
+        [HideInInspector] _BurnInsideNoiseColor ("ESNative 燃烧内部噪声颜色", Color) = (3084.047,257.0039,0,0)
+        [HideInInspector] _BurnInsideNoiseFactor ("ESNative 燃烧内部噪声因子", Float) = 0.2
+        [HideInInspector] _BurnInsideNoiseScale ("ESNative 燃烧内部噪声缩放", Vector) = (0.5,0.5,0,0)
+        [HideInInspector] _BurnSwirlFactor ("ESNative 燃烧旋涡因子", Float) = 1
+        [HideInInspector] _BurnSwirlNoiseScale ("ESNative 燃烧旋涡噪声缩放", Vector) = (0.1,0.1,0,0)
         [HDR] _BurnEdgeColor ("燃烧边缘颜色", Color) = (1,0.05,0,1)
         _BurnProgress ("燃烧进度", Range(0,1)) = 0
         _BurnWidth ("燃烧边缘宽度", Float) = 0.1
@@ -826,7 +826,7 @@ Shader "ES/3D/Lit Composite URP"
                         * _RimIntensity;
 #endif
 #if defined(_ES_QUALITY_HIGH)
-                if (_SSUStatusContract <= 0.5 && _EnableShine > 0.5)
+                if (_ESNativeStatusContract <= 0.5 && _EnableShine > 0.5)
                 {
                     float shineCoordinate = ESResolveLitShineCoordinate(
                         surfaceUV,

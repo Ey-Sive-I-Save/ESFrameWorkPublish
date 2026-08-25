@@ -338,7 +338,7 @@ namespace ES.EditorInternal
                 : 2;
             bool high = quality >= 2;
             bool standard = quality >= 1;
-            bool exactContract = IsEnabledValue(material, "_SSUStatusContract");
+            bool exactContract = IsEnabledValue(material, "_ESNativeStatusContract");
             int mainTextureTapSamples = UsesEtc1ExternalAlpha(material) ? 2 : 1;
             int samples = 0;
 
@@ -493,7 +493,7 @@ namespace ES.EditorInternal
                 && (IsEnabledValue(material, "_EnableTMPCompatibility") || IsEnabledValue(material, "_EnableSDF")))
                 return 0;
 
-            bool exactContract = IsEnabledValue(material, "_SSUStatusContract");
+            bool exactContract = IsEnabledValue(material, "_ESNativeStatusContract");
             if (!exactContract)
             {
                 if (shaderName == "ES/3D/Lit Composite URP")

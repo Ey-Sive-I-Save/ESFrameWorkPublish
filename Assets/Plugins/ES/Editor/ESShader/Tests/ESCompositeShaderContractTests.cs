@@ -181,7 +181,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void LitShader_ExposesSSUSurfaceColorAndStatusContract()
+        public void LitShader_ExposesESNativeSurfaceColorAndStatusContract()
         {
             Shader shader = RequireShader("ES/3D/Lit Composite URP");
 
@@ -318,6 +318,31 @@ namespace ES.Tests
             Assert.That(source, Does.Contain("abs(_ChromaticOffset) > 0.000001"));
         }
 
+        [Test]
+        public void MaterialMigration_StampsBaselineVersionAndRejectsFutureVersion()
+        {
+            Shader shader = RequireShader("ES/2D/Composite URP");
+            var material = new Material(shader);
+
+            try
+            {
+                Assert.That(ES.EditorInternal.ESCompositeMaterialMigration.GetStoredVersion(material), Is.EqualTo(0));
+                Assert.That(ES.EditorInternal.ESCompositeMaterialMigration.Migrate(material, false), Is.True);
+                Assert.That(
+                    ES.EditorInternal.ESCompositeMaterialMigration.GetStoredVersion(material),
+                    Is.EqualTo(ES.EditorInternal.ESCompositeMaterialMigration.CurrentVersion));
+
+                material.SetOverrideTag(
+                    ES.EditorInternal.ESCompositeMaterialMigration.VersionTagName,
+                    (ES.EditorInternal.ESCompositeMaterialMigration.CurrentVersion + 1).ToString());
+                Assert.That(ES.EditorInternal.ESCompositeMaterialMigration.Migrate(material, false), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(material);
+            }
+        }
+
         [TestCase("ES2DCompositeURP.shader")]
         [TestCase("ESUICompositeURP.shader")]
         public void SpriteShaders_GuardSharpenBeforeNeighbourSampling(string fileName)
@@ -339,7 +364,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void LitShader_ExposesRemainingSSUEffectsAndKeepsSharedPassContracts()
+        public void LitShader_ExposesRemainingESNativeEffectsAndKeepsSharedPassContracts()
         {
             Shader shader = RequireShader("ES/3D/Lit Composite URP");
             AssertProperties(
@@ -398,11 +423,11 @@ namespace ES.Tests
         }
 
         [Test]
-        public void LitSSUSurfaceEffects_ShareRuntimePassesWhileMetaRemainsStable()
+        public void LitESNativeSurfaceEffects_ShareRuntimePassesWhileMetaRemainsStable()
         {
             string shaderSource = File.ReadAllText(ShaderRoot + "ES3DLitCompositeURP.shader");
             string commonSource = File.ReadAllText(ShaderRoot + "ES3DLitCompositeURPCommon.hlsl");
-            string effectSource = File.ReadAllText(ShaderRoot + "ES3DLitCompositeSSUSurface.hlsl");
+            string effectSource = File.ReadAllText(ShaderRoot + "ES3DLitCompositeESNativeSurface.hlsl");
             string[] parentSwitches =
             {
                 "_EnableAddColor", "_EnableStrongTint", "_EnableAlphaTint", "_EnableColorReplace",
@@ -414,29 +439,29 @@ namespace ES.Tests
                 "_EnablePingPongGlow"
             };
 
-            Assert.That(commonSource, Does.Contain("#include \"ES3DLitCompositeSSUSurface.hlsl\""));
-            Assert.That(commonSource, Does.Contain("ESApplyLitSSUSurfaceEffects(uv, baseSample.a * dissolveAlpha"));
-            Assert.That(shaderSource, Does.Not.Contain("ESApplyLitSSUSurfaceEffects(surfaceUV, albedo.a"));
+            Assert.That(commonSource, Does.Contain("#include \"ES3DLitCompositeESNativeSurface.hlsl\""));
+            Assert.That(commonSource, Does.Contain("ESApplyLitESNativeSurfaceEffects(uv, baseSample.a * dissolveAlpha"));
+            Assert.That(shaderSource, Does.Not.Contain("ESApplyLitESNativeSurfaceEffects(surfaceUV, albedo.a"));
             Assert.That(shaderSource, Does.Contain("float2 surfaceUV = ESBaseUV(input.uv);"));
             Assert.That(shaderSource, Does.Contain("time-driven composite effects remain runtime-only"));
             for (int i = 0; i < parentSwitches.Length; i++)
                 Assert.That(effectSource, Does.Contain("if (" + parentSwitches[i] + " > 0.5)"),
                     parentSwitches[i] + " does not gate its Lit surface path.");
 
-            Assert.That(commonSource, Does.Contain("#include \"ESCompositeSSUStatusEffects.hlsl\""));
-            Assert.That(commonSource, Does.Contain("#include \"ESCompositeSSUStylizedEffects.hlsl\""));
-            Assert.That(commonSource, Does.Contain("ESLitSSUMinNeighbourAlpha8"));
-            Assert.That(commonSource, Does.Contain("ESLitSSUMaxNeighbourAlpha8"));
-            Assert.That(commonSource, Does.Contain("ESLitSSUMaxNeighbourAlpha4"));
-            Assert.That(commonSource, Does.Contain("ESLitApplySSUOutlines"));
-            Assert.That(commonSource, Does.Contain("ESLitApplySSUOutlineAlpha"));
-            Assert.That(commonSource, Does.Contain("ESCompositeApplySSUHologramUV"));
-            Assert.That(commonSource, Does.Contain("ESCompositeApplySSUGlitchUV"));
-            Assert.That(commonSource, Does.Contain("ESCompositeApplySSUHologramColor"));
-            Assert.That(commonSource, Does.Contain("ESCompositeApplySSUGlitchColor"));
-            Assert.That(effectSource, Does.Contain("if (_SSUStatusContract > 0.5)"));
-            Assert.That(effectSource, Does.Contain("ESCompositeApplySSUStatusEffects(color, uv, uv, timeValue)"));
-            Assert.That(effectSource, Does.Contain("_SSUStatusContract <= 0.5 && (_EnableFrozen > 0.5 || _EnablePoison > 0.5)"));
+            Assert.That(commonSource, Does.Contain("#include \"ESCompositeESNativeStatusEffects.hlsl\""));
+            Assert.That(commonSource, Does.Contain("#include \"ESCompositeESNativeStylizedEffects.hlsl\""));
+            Assert.That(commonSource, Does.Contain("ESLitESNativeMinNeighbourAlpha8"));
+            Assert.That(commonSource, Does.Contain("ESLitESNativeMaxNeighbourAlpha8"));
+            Assert.That(commonSource, Does.Contain("ESLitESNativeMaxNeighbourAlpha4"));
+            Assert.That(commonSource, Does.Contain("ESLitApplyESNativeOutlines"));
+            Assert.That(commonSource, Does.Contain("ESLitApplyESNativeOutlineAlpha"));
+            Assert.That(commonSource, Does.Contain("ESCompositeApplyESNativeHologramUV"));
+            Assert.That(commonSource, Does.Contain("ESCompositeApplyESNativeGlitchUV"));
+            Assert.That(commonSource, Does.Contain("ESCompositeApplyESNativeHologramColor"));
+            Assert.That(commonSource, Does.Contain("ESCompositeApplyESNativeGlitchColor"));
+            Assert.That(effectSource, Does.Contain("if (_ESNativeStatusContract > 0.5)"));
+            Assert.That(effectSource, Does.Contain("ESCompositeApplyESNativeStatusEffects(color, uv, uv, timeValue)"));
+            Assert.That(effectSource, Does.Contain("_ESNativeStatusContract <= 0.5 && (_EnableFrozen > 0.5 || _EnablePoison > 0.5)"));
             Assert.That(effectSource, Does.Contain("emission += max(withAddHue - color"));
             Assert.That(effectSource, Does.Contain("emission += max(withSineGlow - color"));
             Assert.That(effectSource, Does.Contain("emission += lerp(_GlowFrom.rgb, _GlowTo.rgb"));
@@ -470,7 +495,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void LitParameters_PreserveSSUFloatInputsAndShareIds()
+        public void LitParameters_PreserveESNativeFloatInputsAndShareIds()
         {
             var block = new MaterialPropertyBlock();
             var texture = new Texture2D(1, 1);
@@ -523,8 +548,8 @@ namespace ES.Tests
                 Assert.That(block.GetFloat(ES3DLitCompositeURPProperties.GlitchBrightness), Is.EqualTo(16f));
                 Assert.That(block.GetVector(ES3DLitCompositeURPProperties.GlitchDistortion),
                     Is.EqualTo(new Vector4(2f, -2f, 0f, 0f)));
-                Assert.That(ES3DLitCompositeURPProperties.SSUExactContract,
-                    Is.EqualTo(ESCompositeURPProperties.SSUStatusContract));
+                Assert.That(ES3DLitCompositeURPProperties.ESNativeExactContract,
+                    Is.EqualTo(ESCompositeURPProperties.ESNativeStatusContract));
                 Assert.That(ES3DLitCompositeURPProperties.TextureLayer1Enabled,
                     Is.EqualTo(ESCompositeURPProperties.TextureLayer1Enabled));
                 Assert.That(ES3DLitCompositeURPProperties.SpriteShadowEnabled,
@@ -659,10 +684,10 @@ namespace ES.Tests
                 ES3DLitCompositeURPProperties.SetResourceProfile(material, ES3DLitResourceProfile.材质优化);
                 AssertResourceMask(material, 0);
 
-                material.SetFloat("_SSUStatusContract", 1f);
+                material.SetFloat("_ESNativeStatusContract", 1f);
                 ES3DLitCompositeURPProperties.RefreshResourceProfile(material);
                 AssertResourceMask(material, 4);
-                material.SetFloat("_SSUStatusContract", 0f);
+                material.SetFloat("_ESNativeStatusContract", 0f);
 
                 material.SetFloat("_EnableUVDistort", 1f);
                 ES3DLitCompositeURPProperties.RefreshResourceProfile(material);
@@ -721,10 +746,10 @@ namespace ES.Tests
                 SetSpriteResourceProfile(material, shaderName, ESSpriteCompositeResourceProfile.材质优化);
                 AssertSpriteResourceMask(material, 0);
 
-                material.SetFloat("_SSUStatusContract", 1f);
+                material.SetFloat("_ESNativeStatusContract", 1f);
                 RefreshSpriteResourceProfile(material, shaderName);
                 AssertSpriteResourceMask(material, 4);
-                material.SetFloat("_SSUStatusContract", 0f);
+                material.SetFloat("_ESNativeStatusContract", 0f);
 
                 material.SetFloat("_EnableUVDistort", 1f);
                 RefreshSpriteResourceProfile(material, shaderName);
@@ -749,7 +774,7 @@ namespace ES.Tests
         [TestCase("ES/UI/Composite URP")]
         [TestCase("ES/3D/Lit Composite URP")]
         [TestCase("ES/3D/VFX Composite URP")]
-        public void DynamicSSUPreparation_SelectsHighQualityBeforeWritingPropertyBlock(string shaderName)
+        public void DynamicESNativePreparation_SelectsHighQualityBeforeWritingPropertyBlock(string shaderName)
         {
             Material material = CreateTestMaterial(RequireShader(shaderName));
             var block = new MaterialPropertyBlock();
@@ -759,7 +784,7 @@ namespace ES.Tests
                 if (shaderName == ES2DCompositeURPProperties.ShaderName)
                 {
                     ES2DCompositeURPProperties.SetResourceProfile(material, ESSpriteCompositeResourceProfile.材质优化);
-                    prepared = ES2DCompositeURPProperties.TrySetSSUExactContract(material, block, true);
+                    prepared = ES2DCompositeURPProperties.TrySetESNativeExactContract(material, block, true);
                     AssertSpriteResourceMask(material, -1);
                     Assert.That(material.IsKeywordEnabled("_ES_QUALITY_BASIC"), Is.False);
                     Assert.That(material.IsKeywordEnabled("_ES_QUALITY_STANDARD"), Is.False);
@@ -767,26 +792,26 @@ namespace ES.Tests
                 else if (shaderName == ESUICompositeURPProperties.ShaderName)
                 {
                     ESUICompositeURPProperties.SetResourceProfile(material, ESSpriteCompositeResourceProfile.材质优化);
-                    prepared = ESUICompositeURPProperties.TrySetSSUExactContract(material, block, true);
+                    prepared = ESUICompositeURPProperties.TrySetESNativeExactContract(material, block, true);
                     AssertSpriteResourceMask(material, -1);
                     Assert.That(material.IsKeywordEnabled("_ES_QUALITY_HIGH"), Is.True);
                 }
                 else if (shaderName == ES3DLitCompositeURPProperties.ShaderName)
                 {
                     ES3DLitCompositeURPProperties.SetResourceProfile(material, ES3DLitResourceProfile.材质优化);
-                    prepared = ES3DLitCompositeURPProperties.TrySetSSUExactContract(material, block, true);
+                    prepared = ES3DLitCompositeURPProperties.TrySetESNativeExactContract(material, block, true);
                     AssertResourceMask(material, -1);
                     Assert.That(material.IsKeywordEnabled("_ES_QUALITY_HIGH"), Is.True);
                 }
                 else
                 {
-                    prepared = ES3DVFXCompositeURPProperties.TrySetSSUExactContract(material, block, true);
+                    prepared = ES3DVFXCompositeURPProperties.TrySetESNativeExactContract(material, block, true);
                     Assert.That(material.IsKeywordEnabled("_ES_QUALITY_HIGH"), Is.True);
                 }
 
                 Assert.That(prepared, Is.True);
                 Assert.That(material.GetFloat("_QualityTier"), Is.EqualTo(2f));
-                Assert.That(block.GetFloat(ESCompositeURPProperties.SSUExactContract), Is.EqualTo(1f));
+                Assert.That(block.GetFloat(ESCompositeURPProperties.ESNativeExactContract), Is.EqualTo(1f));
             }
             finally
             {
@@ -933,14 +958,14 @@ namespace ES.Tests
             Material material = CreateTestMaterial(RequireShader("ES/2D/Composite URP"));
             try
             {
-                material.SetFloat("_SSUStatusContract", 1f);
+                material.SetFloat("_ESNativeStatusContract", 1f);
                 material.SetFloat("_EnableFrozen", 1f);
                 material.SetFloat("_EnableBurn", 1f);
                 material.SetFloat("_EnableRainbow", 1f);
                 material.SetFloat("_EnablePoison", 1f);
                 Assert.That((int)estimate.Invoke(null, new object[] { material, material.shader.name }), Is.EqualTo(8));
 
-                material.SetFloat("_SSUStatusContract", 0f);
+                material.SetFloat("_ESNativeStatusContract", 0f);
                 Assert.That((int)estimate.Invoke(null, new object[] { material, material.shader.name }), Is.EqualTo(1));
                 material.SetFloat("_EnableDistortion", 1f);
                 Assert.That((int)estimate.Invoke(null, new object[] { material, material.shader.name }), Is.EqualTo(1));
@@ -961,7 +986,7 @@ namespace ES.Tests
             try
             {
                 material.SetFloat("_QualityTier", 2f);
-                material.SetFloat("_SSUStatusContract", 1f);
+                material.SetFloat("_ESNativeStatusContract", 1f);
                 material.SetFloat("_EnableInnerOutline", 1f);
                 material.SetFloat("_InnerOutlineFade", 1f);
                 material.SetFloat("_InnerOutlineDistortionToggle", 1f);
@@ -969,7 +994,7 @@ namespace ES.Tests
                 Assert.That((int)estimate.Invoke(null, new object[] { material, material.shader.name }), Is.EqualTo(10));
 
                 material.SetFloat("_QualityTier", 0f);
-                material.SetFloat("_SSUStatusContract", 0f);
+                material.SetFloat("_ESNativeStatusContract", 0f);
                 material.SetFloat("_EnableOuterOutline", 1f);
                 material.SetFloat("_OuterOutlineFade", 1f);
                 material.SetFloat("_EnablePixelOutline", 1f);
@@ -992,7 +1017,7 @@ namespace ES.Tests
             try
             {
                 material.SetFloat("_QualityTier", 1f);
-                material.SetFloat("_SSUStatusContract", 1f);
+                material.SetFloat("_ESNativeStatusContract", 1f);
                 material.SetFloat("_EnableHologram", 1f);
                 material.SetFloat("_EnableGlitch", 1f);
                 Assert.That((int)estimate.Invoke(null, new object[] { material, material.shader.name }), Is.EqualTo(6));
@@ -1015,10 +1040,10 @@ namespace ES.Tests
                 material.SetFloat("_QualityTier", 2f);
                 material.SetFloat("_EnablePixelOutline", 1f);
                 material.SetFloat("_PixelOutlineFade", 1f);
-                material.SetFloat("_SSUStatusContract", 0f);
+                material.SetFloat("_ESNativeStatusContract", 0f);
                 Assert.That((int)estimate.Invoke(null, new object[] { material, material.shader.name }), Is.EqualTo(8));
 
-                material.SetFloat("_SSUStatusContract", 1f);
+                material.SetFloat("_ESNativeStatusContract", 1f);
                 Assert.That((int)estimate.Invoke(null, new object[] { material, material.shader.name }), Is.EqualTo(4));
             }
             finally
@@ -1050,12 +1075,12 @@ namespace ES.Tests
         public void ShaderSamplingHotPaths_AvoidLegacyStatusAndFadeStackDuplicateReads()
         {
             string spriteSource = File.ReadAllText(ShaderRoot + "ES2DCompositeURP.shader");
-            Assert.That(spriteSource, Does.Contain("|| (_SSUStatusContract <= 0.5"));
+            Assert.That(spriteSource, Does.Contain("|| (_ESNativeStatusContract <= 0.5"));
             Assert.That(spriteSource, Does.Contain(
                 "&& (_EnableFrozen > 0.5 || _EnableBurn > 0.5 || _EnablePoison > 0.5))"));
 
             string litSource = File.ReadAllText(ShaderRoot + "ES3DLitCompositeURPCommon.hlsl");
-            Assert.That(CountOccurrences(litSource, "ESCompositeApplySSUFadeStackColor("), Is.EqualTo(2));
+            Assert.That(CountOccurrences(litSource, "ESCompositeApplyESNativeFadeStackColor("), Is.EqualTo(2));
             Assert.That(litSource, Does.Contain("dissolveAlpha *= ssuFadeVisibility;"));
         }
 
@@ -1139,7 +1164,7 @@ namespace ES.Tests
         [TestCase("ES/2D/Composite URP")]
         [TestCase("ES/3D/Lit Composite URP")]
         [TestCase("ES/UI/Composite URP")]
-        public void CompositeShaders_ExposeCompleteSsuTintContract(string shaderName)
+        public void CompositeShaders_ExposeCompleteEsNativeTintContract(string shaderName)
         {
             AssertProperties(
                 RequireShader(shaderName),
@@ -1149,7 +1174,7 @@ namespace ES.Tests
                 "_StrongTintContrastToggle", "_StrongTintContrast", "_StrongTintMaskToggle", "_StrongTintMask");
 
             string source = shaderName == "ES/3D/Lit Composite URP"
-                ? File.ReadAllText(ShaderRoot + "ES3DLitCompositeSSUSurface.hlsl")
+                ? File.ReadAllText(ShaderRoot + "ES3DLitCompositeESNativeSurface.hlsl")
                 : ReadShaderSource(RequireShader(shaderName));
             Assert.That(source, Does.Contain("_AddColorContrastToggle"));
             Assert.That(source, Does.Contain("_AddColorMaskToggle"));
@@ -1264,7 +1289,7 @@ namespace ES.Tests
 
         [TestCase("ES/2D/Composite URP")]
         [TestCase("ES/UI/Composite URP")]
-        public void SpriteShaders_ExposeSSUColorAndShadowContract(string shaderName)
+        public void SpriteShaders_ExposeESNativeColorAndShadowContract(string shaderName)
         {
             Shader shader = RequireShader(shaderName);
             AssertProperties(
@@ -1310,7 +1335,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void SSUColorAndShadowParameters_ClampValuesAndShareIds()
+        public void ESNativeColorAndShadowParameters_ClampValuesAndShareIds()
         {
             var block = new MaterialPropertyBlock();
             ESCompositeURPProperties.SetSpriteShadow(block, true, new Vector2(99f, -99f), Color.black, 2f);
@@ -1359,7 +1384,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void SSUColorTransform_UsesCompatibleLuminanceAndSineWave()
+        public void ESNativeColorTransform_UsesCompatibleLuminanceAndSineWave()
         {
             string source = File.ReadAllText(ShaderRoot + "ESCompositeColorTransform.hlsl");
             Assert.That(source, Does.Contain("(color.r * 2.0 + color.g * 3.0 + color.b) / 6.0"));
@@ -1370,12 +1395,12 @@ namespace ES.Tests
         [TestCase("ES/2D/Composite URP")]
         [TestCase("ES/UI/Composite URP")]
         [TestCase("ES/3D/Lit Composite URP")]
-        public void CompositeShaders_ExposeCompleteSSUStatusEffectContract(string shaderName)
+        public void CompositeShaders_ExposeCompleteESNativeStatusEffectContract(string shaderName)
         {
             Shader shader = RequireShader(shaderName);
             AssertProperties(
                 shader,
-                "_SSUStatusContract",
+                "_ESNativeStatusContract",
                 "_FrozenFade", "_FrozenTint", "_FrozenContrast", "_FrozenSnowColor",
                 "_FrozenSnowContrast", "_FrozenSnowDensity", "_FrozenSnowScale",
                 "_FrozenHighlightColor", "_FrozenHighlightContrast", "_FrozenHighlightDensity",
@@ -1396,12 +1421,12 @@ namespace ES.Tests
         [TestCase("ES/2D/Composite URP")]
         [TestCase("ES/UI/Composite URP")]
         [TestCase("ES/3D/Lit Composite URP")]
-        public void CompositeShaders_ExposeSSUExactStylizedContract(string shaderName)
+        public void CompositeShaders_ExposeESNativeExactStylizedContract(string shaderName)
         {
             Shader shader = RequireShader(shaderName);
             AssertProperties(
                 shader,
-                "_SSUStatusContract",
+                "_ESNativeStatusContract",
                 "_EnableInnerOutline", "_InnerOutlineFade", "_InnerOutlineColor", "_InnerOutlineWidth",
                 "_InnerOutlineDistortionToggle", "_InnerOutlineDistortionIntensity",
                 "_InnerOutlineNoiseScale", "_InnerOutlineNoiseSpeed", "_InnerOutlineTextureToggle",
@@ -1427,25 +1452,25 @@ namespace ES.Tests
             string stylizedSource = shaderName == "ES/3D/Lit Composite URP"
                 ? File.ReadAllText(ShaderRoot + "ES3DLitCompositeURPCommon.hlsl")
                 : source;
-            Assert.That(stylizedSource, Does.Contain("#include \"ESCompositeSSUStylizedEffects.hlsl\""));
-            Assert.That(stylizedSource, Does.Contain("ESCompositeApplySSUHologramUV"));
-            Assert.That(stylizedSource, Does.Contain("ESCompositeApplySSUGlitchUV"));
-            Assert.That(stylizedSource, Does.Contain("ESCompositeApplySSUHologramColor"));
-            Assert.That(stylizedSource, Does.Contain("ESCompositeApplySSUGlitchColor"));
+            Assert.That(stylizedSource, Does.Contain("#include \"ESCompositeESNativeStylizedEffects.hlsl\""));
+            Assert.That(stylizedSource, Does.Contain("ESCompositeApplyESNativeHologramUV"));
+            Assert.That(stylizedSource, Does.Contain("ESCompositeApplyESNativeGlitchUV"));
+            Assert.That(stylizedSource, Does.Contain("ESCompositeApplyESNativeHologramColor"));
+            Assert.That(stylizedSource, Does.Contain("ESCompositeApplyESNativeGlitchColor"));
             if (shaderName == "ES/3D/Lit Composite URP")
             {
-                Assert.That(stylizedSource, Does.Contain("ESLitSSUMinNeighbourAlpha8"));
-                Assert.That(stylizedSource, Does.Contain("ESLitSSUMaxNeighbourAlpha8"));
-                Assert.That(stylizedSource, Does.Contain("ESLitSSUMaxNeighbourAlpha4"));
+                Assert.That(stylizedSource, Does.Contain("ESLitESNativeMinNeighbourAlpha8"));
+                Assert.That(stylizedSource, Does.Contain("ESLitESNativeMaxNeighbourAlpha8"));
+                Assert.That(stylizedSource, Does.Contain("ESLitESNativeMaxNeighbourAlpha4"));
             }
             else
             {
                 Assert.That(source, Does.Contain("ESMinOutlineAlpha8"));
                 Assert.That(source, Does.Contain("ESMaxOutlineAlpha8"));
                 Assert.That(source, Does.Contain("ESMaxOutlineAlpha4"));
-                Assert.That(source, Does.Contain("ESApplySSUExactOutlines"));
+                Assert.That(source, Does.Contain("ESApplyESNativeExactOutlines"));
                 Assert.That(source, Does.Match(
-                    @"ESCompositeApplySSUHologramUV\([\s\S]{0,200}_MainTex_TexelSize\.z,"));
+                    @"ESCompositeApplyESNativeHologramUV\([\s\S]{0,200}_MainTex_TexelSize\.z,"));
             }
         }
 
@@ -1455,7 +1480,7 @@ namespace ES.Tests
             Shader shader = RequireShader("ES/3D/VFX Composite URP");
             AssertProperties(
                 shader,
-                "_SSUStatusContract",
+                "_ESNativeStatusContract",
                 "_EnableHologram", "_HologramFade", "_HologramColor", "_HologramContrast",
                 "_HologramSpace", "_HologramLineFrequency", "_HologramLineGap", "_HologramSpeed",
                 "_HologramMinAlpha", "_HologramDistortionOffset", "_HologramDistortionSpeed",
@@ -1471,13 +1496,13 @@ namespace ES.Tests
             int sequence = source.IndexOf("uv = ESApplySequenceUV", customData, System.StringComparison.Ordinal);
             int flow = source.IndexOf("uv = ESApplyFlowMap(uv, timeValue);", sequence, System.StringComparison.Ordinal);
             int coordinate = source.IndexOf("float2 stylizedCoordinate = ESSequenceLocalCoordinate", flow, System.StringComparison.Ordinal);
-            int hologramUV = source.IndexOf("ESCompositeApplySSUHologramUV", coordinate, System.StringComparison.Ordinal);
-            int glitchUV = source.IndexOf("ESCompositeApplySSUGlitchUV", hologramUV, System.StringComparison.Ordinal);
+            int hologramUV = source.IndexOf("ESCompositeApplyESNativeHologramUV", coordinate, System.StringComparison.Ordinal);
+            int glitchUV = source.IndexOf("ESCompositeApplyESNativeGlitchUV", hologramUV, System.StringComparison.Ordinal);
             int atlasWrap = source.IndexOf("uv = ESWrapSequenceUV(uv, atlasBounds);", glitchUV, System.StringComparison.Ordinal);
             int sample = source.IndexOf("half4 source = SAMPLE_TEXTURE2D", atlasWrap, System.StringComparison.Ordinal);
             int chromatic = source.IndexOf("if (_EnableChromatic > 0.5", sample, System.StringComparison.Ordinal);
-            int hologramColor = source.IndexOf("ESCompositeApplySSUHologramColor", chromatic, System.StringComparison.Ordinal);
-            int glitchColor = source.IndexOf("ESCompositeApplySSUGlitchColor", hologramColor, System.StringComparison.Ordinal);
+            int hologramColor = source.IndexOf("ESCompositeApplyESNativeHologramColor", chromatic, System.StringComparison.Ordinal);
+            int glitchColor = source.IndexOf("ESCompositeApplyESNativeGlitchColor", hologramColor, System.StringComparison.Ordinal);
             int radialMask = source.IndexOf("if (_EnableRadialMask > 0.5)", glitchColor, System.StringComparison.Ordinal);
             int dissolve = source.IndexOf("float dissolveProgress =", radialMask, System.StringComparison.Ordinal);
             int rim = source.IndexOf("if (_EnableRim > 0.5 || _EnableFresnelMask > 0.5)", dissolve, System.StringComparison.Ordinal);
@@ -1487,7 +1512,7 @@ namespace ES.Tests
             int emission = source.IndexOf("float emissionMultiplier =", sparkle, System.StringComparison.Ordinal);
             int alphaClip = source.IndexOf("if (_AlphaClip > 0.5)", emission, System.StringComparison.Ordinal);
 
-            Assert.That(source, Does.Contain("#include \"ESCompositeSSUStylizedEffects.hlsl\""));
+            Assert.That(source, Does.Contain("#include \"ESCompositeESNativeStylizedEffects.hlsl\""));
             Assert.That(source, Does.Contain("#define _UberNoiseTexture _NoiseTex"));
             Assert.That(customData, Is.GreaterThan(fragment));
             Assert.That(sequence, Is.GreaterThan(customData));
@@ -1508,7 +1533,7 @@ namespace ES.Tests
             Assert.That(sparkle, Is.GreaterThan(depth));
             Assert.That(emission, Is.GreaterThan(sparkle));
             Assert.That(alphaClip, Is.GreaterThan(emission));
-            Assert.That(source, Does.Contain("_SSUStatusContract <= 0.5 && _EnableHologram > 0.5"));
+            Assert.That(source, Does.Contain("_ESNativeStatusContract <= 0.5 && _EnableHologram > 0.5"));
         }
 
         [Test]
@@ -1524,20 +1549,20 @@ namespace ES.Tests
             ES3DVFXCompositeURPProperties.SetHologram(
                 block, true, Color.cyan, -10f, 2f, 256f, 2f);
             ES3DVFXCompositeURPProperties.SetGlitch(block, true, 2f, -256f);
-            ES3DVFXCompositeURPProperties.SetSSUExactHologram(
+            ES3DVFXCompositeURPProperties.SetESNativeExactHologram(
                 exactBlock, true, Color.magenta, 72f, 0.4f, 3f, 0.6f,
                 0.8f, 2f, ES3DLitHologramSpace.局部UV,
                 0.25f, 4f, 0.75f, 12f);
-            ES3DVFXCompositeURPProperties.SetSSUExactGlitch(
+            ES3DVFXCompositeURPProperties.SetESNativeExactGlitch(
                 exactBlock, true, 2f, -1f,
                 new Vector2(2f, 3f), new Vector2(4f, 5f),
                 6f, 7f,
                 new Vector2(8f, 9f), new Vector2(10f, 11f),
                 new Vector2(12f, 13f), new Vector2(14f, 15f), new Vector2(16f, 17f));
 
-            Assert.That(shaderSource, Does.Contain("[Toggle] _SSUStatusContract"));
+            Assert.That(shaderSource, Does.Contain("[Toggle] _ESNativeStatusContract"));
             Assert.That(shaderSource, Does.Not.Contain("[HideInInspector] _HologramFade"));
-            Assert.That(shaderSource, Does.Not.Contain("_GlitchIntensity (\"SSU 故障强度\""));
+            Assert.That(shaderSource, Does.Not.Contain("_GlitchIntensity (\"ESNative 故障强度\""));
             Assert.That(commonSource, Does.Not.Contain("float _GlitchIntensity;"));
             Assert.That(metadataSource, Does.Contain("bool vfx = shaderName == \"ES/3D/VFX Composite URP\";"));
             Assert.That(metadataSource, Does.Contain("bool stylizedContractShader = spriteOrUI || vfx;"));
@@ -1551,7 +1576,7 @@ namespace ES.Tests
                 presetStart,
                 System.StringComparison.Ordinal);
             string vfxPreset = productivitySource.Substring(presetStart, presetEnd - presetStart);
-            Assert.That(vfxPreset, Does.Contain("new PresetAssignment(\"_SSUStatusContract\", 1f)"));
+            Assert.That(vfxPreset, Does.Contain("new PresetAssignment(\"_ESNativeStatusContract\", 1f)"));
             Assert.That(vfxPreset, Does.Contain("new PresetAssignment(\"_HologramLineFrequency\", 72f)"));
             Assert.That(vfxPreset, Does.Contain("new PresetAssignment(\"_GlitchDistortion\""));
             Assert.That(vfxPreset, Does.Not.Contain("new PresetAssignment(\"_HologramFrequency\""));
@@ -1586,8 +1611,8 @@ namespace ES.Tests
             int flow = source.IndexOf("if (_EnableFlow > 0.5) uv +=", fragment, System.StringComparison.Ordinal);
             int fadeDistortion = source.IndexOf("uv += perpendicular *", flow, System.StringComparison.Ordinal);
             int coordinate = source.IndexOf(coordinateToken, fadeDistortion, System.StringComparison.Ordinal);
-            int hologram = source.IndexOf("ESCompositeApplySSUHologramUV", coordinate, System.StringComparison.Ordinal);
-            int glitch = source.IndexOf("ESCompositeApplySSUGlitchUV", hologram, System.StringComparison.Ordinal);
+            int hologram = source.IndexOf("ESCompositeApplyESNativeHologramUV", coordinate, System.StringComparison.Ordinal);
+            int glitch = source.IndexOf("ESCompositeApplyESNativeGlitchUV", hologram, System.StringComparison.Ordinal);
             int pixelate = source.IndexOf("if (_EnablePixelate > 0.5)", glitch, System.StringComparison.Ordinal);
             int sample = source.IndexOf(sampleToken, pixelate, System.StringComparison.Ordinal);
             int chromatic = source.IndexOf("if (_EnableChromatic > 0.5", sample, System.StringComparison.Ordinal);
@@ -1699,7 +1724,7 @@ namespace ES.Tests
         {
             string source = File.ReadAllText(ShaderRoot + "ES3DVFXCompositeURPCommon.hlsl");
             int legacyBranch = source.IndexOf(
-                "if (_SSUStatusContract <= 0.5 && _EnableHologram > 0.5)",
+                "if (_ESNativeStatusContract <= 0.5 && _EnableHologram > 0.5)",
                 System.StringComparison.Ordinal);
             int spaceSelection = source.IndexOf(
                 "float legacyHologramCoordinate = _HologramSpace < 0.5",
@@ -1781,7 +1806,7 @@ namespace ES.Tests
                 "_EnableHologram", "_HologramDirection", "_HologramDistortionDirection",
                 "_EnableGlitch", "_GlitchScanDirection", "_GlitchDistortion");
 
-            string sharedSource = File.ReadAllText(ShaderRoot + "ESCompositeSSUStylizedEffects.hlsl");
+            string sharedSource = File.ReadAllText(ShaderRoot + "ESCompositeESNativeStylizedEffects.hlsl");
             Assert.That(sharedSource, Does.Contain("_HologramDirection.xy"));
             Assert.That(sharedSource, Does.Contain("_HologramDirection.xyz"));
             Assert.That(sharedSource, Does.Contain("_HologramDistortionDirection.xy"));
@@ -1793,9 +1818,9 @@ namespace ES.Tests
         }
 
         [Test]
-        public void SSUStylizedEffects_ClampRuntimeInputsBeforeNonlinearMath()
+        public void ESNativeStylizedEffects_ClampRuntimeInputsBeforeNonlinearMath()
         {
-            string source = File.ReadAllText(ShaderRoot + "ESCompositeSSUStylizedEffects.hlsl");
+            string source = File.ReadAllText(ShaderRoot + "ESCompositeESNativeStylizedEffects.hlsl");
 
             Assert.That(source, Does.Contain("float safeTextureWidth = max(abs(textureWidth), 1.0);"));
             Assert.That(source, Does.Contain("float lineGap = clamp(_HologramLineGap, 0.001, 8.0);"));
@@ -1823,7 +1848,7 @@ namespace ES.Tests
 
         [TestCase("ES/2D/Composite URP", "ES2DCompositeURP.shader")]
         [TestCase("ES/UI/Composite URP", "ESUICompositeURP.shader")]
-        [TestCase("ES/3D/Lit Composite URP", "ES3DLitCompositeSSUSurface.hlsl")]
+        [TestCase("ES/3D/Lit Composite URP", "ES3DLitCompositeESNativeSurface.hlsl")]
         public void LegacyLinearRainbow_UsesExplicitBandDirection(
             string shaderName,
             string executionFile)
@@ -1851,8 +1876,8 @@ namespace ES.Tests
             Assert.That(materialConstants, Does.Contain("float _SplitToneShift;"));
         }
 
-        [TestCase("ES2DCompositeURP.shader", "half4 ESComputeCompositeColor", "alpha *= fadeVisibility;", "if (_SSUStatusContract <= 0.5 && _EnableShine > 0.5)")]
-        [TestCase("ESUICompositeURP.shader", "half4 ESUIFragment", "color.a *= fadeVisibility;", "if (_SSUStatusContract <= 0.5 && _EnableShine > 0.5)")]
+        [TestCase("ES2DCompositeURP.shader", "half4 ESComputeCompositeColor", "alpha *= fadeVisibility;", "if (_ESNativeStatusContract <= 0.5 && _EnableShine > 0.5)")]
+        [TestCase("ESUICompositeURP.shader", "half4 ESUIFragment", "color.a *= fadeVisibility;", "if (_ESNativeStatusContract <= 0.5 && _EnableShine > 0.5)")]
         public void SpriteAndUIShine_RunsAfterCoverageAndBeforeSparkle(
             string fileName,
             string fragmentToken,
@@ -1896,7 +1921,7 @@ namespace ES.Tests
             int fragment = source.IndexOf("half4 ESForwardFragment", System.StringComparison.Ordinal);
             int lighting = source.IndexOf("UniversalFragmentPBR", fragment, System.StringComparison.Ordinal);
             int rim = source.IndexOf("if (_EnableRim > 0.5)", lighting, System.StringComparison.Ordinal);
-            int shine = source.IndexOf("if (_SSUStatusContract <= 0.5 && _EnableShine > 0.5)", rim, System.StringComparison.Ordinal);
+            int shine = source.IndexOf("if (_ESNativeStatusContract <= 0.5 && _EnableShine > 0.5)", rim, System.StringComparison.Ordinal);
             int sparkle = source.IndexOf("if (_EnableSparkle > 0.5)", shine, System.StringComparison.Ordinal);
 
             Assert.That(lighting, Is.GreaterThan(fragment));
@@ -1910,7 +1935,7 @@ namespace ES.Tests
         {
             string common = File.ReadAllText(ShaderRoot + "ES3DLitCompositeURPCommon.hlsl");
             string shader = File.ReadAllText(ShaderRoot + "ES3DLitCompositeURP.shader");
-            string exact = File.ReadAllText(ShaderRoot + "ES3DLitCompositeSSUSurface.hlsl");
+            string exact = File.ReadAllText(ShaderRoot + "ES3DLitCompositeESNativeSurface.hlsl");
 
             Assert.That(common, Does.Contain("float ESResolveLitShineCoordinate("));
             Assert.That(common, Does.Contain("float shineCoordinate = ESResolveLitShineCoordinate("));
@@ -2032,7 +2057,7 @@ namespace ES.Tests
                 litBlock, true, Color.cyan, 60f, 0.5f, 4f, 0.4f,
                 1f, 2f, ES3DLitHologramSpace.世界投影, 0.3f, 4f, 0.7f, 12f,
                 new Vector3(1f, 2f, 3f), new Vector2(2f, -1f));
-            ES3DVFXCompositeURPProperties.SetSSUExactHologram(
+            ES3DVFXCompositeURPProperties.SetESNativeExactHologram(
                 vfxBlock, true, Color.cyan, 50f, 0.6f, 5f, 0.5f,
                 1f, 2f, ES3DLitHologramSpace.世界投影, 0.4f, 5f, 0.8f, 13f,
                 new Vector3(-1f, 4f, 2f), new Vector2(-3f, 2f));
@@ -2314,8 +2339,8 @@ namespace ES.Tests
             int flowAndFade = source.IndexOf("uv = ESApplyFlowMap(uv);", baseUv, System.StringComparison.Ordinal);
             int stylized = source.IndexOf("return ESApplyLitStylizedAndPixelUV(", flowAndFade, System.StringComparison.Ordinal);
             int stylizedFunction = source.IndexOf("float2 ESApplyLitStylizedAndPixelUV(", System.StringComparison.Ordinal);
-            int hologram = source.IndexOf("ESCompositeApplySSUHologramUV", stylizedFunction, System.StringComparison.Ordinal);
-            int glitch = source.IndexOf("ESCompositeApplySSUGlitchUV", hologram, System.StringComparison.Ordinal);
+            int hologram = source.IndexOf("ESCompositeApplyESNativeHologramUV", stylizedFunction, System.StringComparison.Ordinal);
+            int glitch = source.IndexOf("ESCompositeApplyESNativeGlitchUV", hologram, System.StringComparison.Ordinal);
             int smoothPixel = source.IndexOf("ESCompositeSmoothPixelUV", glitch, System.StringComparison.Ordinal);
             int pixelate = source.IndexOf("if (_EnablePixelate > 0.5)", smoothPixel, System.StringComparison.Ordinal);
 
@@ -2329,10 +2354,10 @@ namespace ES.Tests
         }
 
         [Test]
-        public void SSUExactStylizedParameters_PreserveFloatValuesAcrossSpriteApis()
+        public void ESNativeExactStylizedParameters_PreserveFloatValuesAcrossSpriteApis()
         {
             var block = new MaterialPropertyBlock();
-            ES2DCompositeURPProperties.SetSSUExactContract(block, true);
+            ES2DCompositeURPProperties.SetESNativeExactContract(block, true);
             ES2DCompositeURPProperties.SetHologram(
                 block, true, Color.cyan, 4096f, 3f, 256f, 0.25f,
                 0.75f, 12f, ES3DLitHologramSpace.世界高度,
@@ -2345,7 +2370,7 @@ namespace ES.Tests
             ESUICompositeURPProperties.SetPixelOutline(
                 block, true, Color.white, 9f, 0.5f, false, null, new Vector2(256f, -256f), false);
 
-            Assert.That(block.GetFloat(ESCompositeURPProperties.SSUExactContract), Is.EqualTo(1f));
+            Assert.That(block.GetFloat(ESCompositeURPProperties.ESNativeExactContract), Is.EqualTo(1f));
             Assert.That(block.GetFloat(ESCompositeURPProperties.HologramLineGap), Is.EqualTo(3f));
             Assert.That(block.GetFloat(ESCompositeURPProperties.HologramContrast), Is.EqualTo(12f));
             Assert.That(block.GetFloat(ESCompositeURPProperties.HologramDistortionScale), Is.EqualTo(-4096f));
@@ -2381,9 +2406,9 @@ namespace ES.Tests
         }
 
         [Test]
-        public void SSUExactStylizedSharedFunctions_MatchCommercialFormulaShape()
+        public void ESNativeExactStylizedSharedFunctions_MatchCommercialFormulaShape()
         {
-            string source = File.ReadAllText(ShaderRoot + "ESCompositeSSUStylizedEffects.hlsl");
+            string source = File.ReadAllText(ShaderRoot + "ESCompositeESNativeStylizedEffects.hlsl");
             Assert.That(source, Does.Contain("worldHeight / orthographicHeight"));
             Assert.That(source, Does.Contain("frac(localCoordinate).y"));
             Assert.That(source, Does.Contain(
@@ -2393,18 +2418,18 @@ namespace ES.Tests
             Assert.That(source, Does.Contain("return max(maskNoise, _GlitchMaskMin) * _GlitchFade;"));
             Assert.That(source, Does.Contain("half3 firstTint = lerp(source.rgb, tint, colorWeight);"));
             Assert.That(source, Does.Contain("result.rgb = lerp(firstTint, tint, colorWeight);"));
-            Assert.That(source, Does.Not.Contain("saturate((half)ESCompositeSSUGlitchFade"));
+            Assert.That(source, Does.Not.Contain("saturate((half)ESCompositeESNativeGlitchFade"));
         }
 
         [Test]
-        public void SSUStatusEffects_PreserveSourceExecutionOrder()
+        public void ESNativeStatusEffects_PreserveSourceExecutionOrder()
         {
-            string source = File.ReadAllText(ShaderRoot + "ESCompositeSSUStatusEffects.hlsl");
-            int frozen = source.IndexOf("ESCompositeApplySSUFrozen(color", System.StringComparison.Ordinal);
-            int burn = source.IndexOf("ESCompositeApplySSUBurn(color", System.StringComparison.Ordinal);
-            int rainbow = source.IndexOf("ESCompositeApplySSURainbow(color", System.StringComparison.Ordinal);
-            int shine = source.IndexOf("ESCompositeApplySSUShine(color", System.StringComparison.Ordinal);
-            int poison = source.IndexOf("ESCompositeApplySSUPoison(color", System.StringComparison.Ordinal);
+            string source = File.ReadAllText(ShaderRoot + "ESCompositeESNativeStatusEffects.hlsl");
+            int frozen = source.IndexOf("ESCompositeApplyESNativeFrozen(color", System.StringComparison.Ordinal);
+            int burn = source.IndexOf("ESCompositeApplyESNativeBurn(color", System.StringComparison.Ordinal);
+            int rainbow = source.IndexOf("ESCompositeApplyESNativeRainbow(color", System.StringComparison.Ordinal);
+            int shine = source.IndexOf("ESCompositeApplyESNativeShine(color", System.StringComparison.Ordinal);
+            int poison = source.IndexOf("ESCompositeApplyESNativePoison(color", System.StringComparison.Ordinal);
 
             Assert.That(frozen, Is.GreaterThanOrEqualTo(0));
             Assert.That(burn, Is.GreaterThan(frozen));
@@ -2424,7 +2449,7 @@ namespace ES.Tests
         [TestCase("ES2DCompositeURP.shader")]
         [TestCase("ESUICompositeURP.shader")]
         [TestCase("ES3DLitCompositeURP.shader")]
-        public void RestoredSSUControls_AreDeclaredAndApplied(string fileName)
+        public void RestoredESNativeControls_AreDeclaredAndApplied(string fileName)
         {
             Shader shader = RequireShader(
                 fileName == "ES2DCompositeURP.shader" ? "ES/2D/Composite URP"
@@ -2449,7 +2474,7 @@ namespace ES.Tests
 
         [TestCase("ES/2D/Composite URP")]
         [TestCase("ES/UI/Composite URP")]
-        public void SpriteShaders_ExposeExtendedSSUEffectContract(string shaderName)
+        public void SpriteShaders_ExposeExtendedESNativeEffectContract(string shaderName)
         {
             Shader shader = RequireShader(shaderName);
             AssertProperties(
@@ -2480,7 +2505,7 @@ namespace ES.Tests
                 "_ShiftingColorA", "_ShiftingColorB");
 
             string source = ReadShaderSource(shader);
-            Assert.That(source, Does.Contain("#include \"ESCompositeSSUEffects.hlsl\""));
+            Assert.That(source, Does.Contain("#include \"ESCompositeESNativeEffects.hlsl\""));
             AssertSourceTokenWithinEffect(source, "_EnableCustomFade", "_CustomFadeFadeMask", "_EnableSmoke");
             AssertSourceTokenWithinEffect(source, "_EnableCustomFade", "_UberNoiseTexture", "_EnableSmoke");
             AssertSourceTokenWithinEffect(source, "_EnableCamouflage", "_UberNoiseTexture", "_EnableMetal");
@@ -2502,7 +2527,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void ExtendedSSUVertexMotion_UsesOriginalPositionAndParentSwitches()
+        public void ExtendedESNativeVertexMotion_UsesOriginalPositionAndParentSwitches()
         {
             string source = File.ReadAllText(ShaderRoot + "ESCompositeSpriteVertexMotion.hlsl");
             Assert.That(source, Does.Contain("float2 basePosition = positionOS.xy;"));
@@ -2535,9 +2560,9 @@ namespace ES.Tests
         }
 
         [Test]
-        public void ExtendedSSUEffects_ClampUnsafeMathAndNormalizeLoopPhase()
+        public void ExtendedESNativeEffects_ClampUnsafeMathAndNormalizeLoopPhase()
         {
-            string source = File.ReadAllText(ShaderRoot + "ESCompositeSSUEffects.hlsl");
+            string source = File.ReadAllText(ShaderRoot + "ESCompositeESNativeEffects.hlsl");
             Assert.That(source, Does.Contain("clamp(power, 0.001, 8.0)"));
             Assert.That(source, Does.Contain("clamp(contrast, 0.001, 8.0)"));
             Assert.That(source, Does.Contain("lerp(source, effectColor, saturate(weight))"));
@@ -2546,7 +2571,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void ExtendedSSUParameters_ClampValuesAndShareSpriteIds()
+        public void ExtendedESNativeParameters_ClampValuesAndShareSpriteIds()
         {
             var block = new MaterialPropertyBlock();
             ESCompositeURPProperties.SetSqueeze(block, true, Vector2.one, new Vector2(99f, -99f), 0f, 2f);
@@ -3341,7 +3366,7 @@ namespace ES.Tests
         }
 
         [Test]
-        public void UIShader_ExposesCompleteSSUGuiColorOutlineGlowAndStatusContract()
+        public void UIShader_ExposesCompleteESNativeGuiColorOutlineGlowAndStatusContract()
         {
             Shader shader = RequireShader("ES/UI/Composite URP");
             AssertProperties(
@@ -3363,7 +3388,7 @@ namespace ES.Tests
                 "_EnableFrozen", "_FrozenColor", "_FrozenHighlight", "_FrozenDensity", "_FrozenSpeed",
                 "_EnableBurn", "_BurnEdgeColor", "_BurnInsideColor", "_BurnProgress", "_BurnWidth",
                 "_EnablePoison", "_PoisonColor", "_PoisonDensity", "_PoisonSpeed",
-                "_SSUStatusContract",
+                "_ESNativeStatusContract",
                 "_FrozenFade", "_FrozenTint", "_FrozenContrast", "_FrozenSnowColor",
                 "_FrozenSnowContrast", "_FrozenSnowDensity", "_FrozenSnowScale",
                 "_FrozenHighlightColor", "_FrozenHighlightContrast", "_FrozenHighlightDensity",
@@ -3385,7 +3410,7 @@ namespace ES.Tests
             Assert.That(source, Does.Contain("rcp(ESSpritePixelSize()) * _PixelOutlineWidth"));
             Assert.That(source, Does.Not.Contain("ESSampleMainTexture"));
 
-            const string statusGate = "if (_SSUStatusContract <= 0.5";
+            const string statusGate = "if (_ESNativeStatusContract <= 0.5";
             int statusGateIndex = source.IndexOf(statusGate);
             Assert.That(statusGateIndex, Is.GreaterThanOrEqualTo(0));
             int statusNoiseIndex = source.IndexOf("float statusNoise", statusGateIndex);
@@ -3782,345 +3807,10 @@ namespace ES.Tests
             }
         }
 
-        [Test]
-        public void MaterialMigration_StampsBaselineVersionAndRejectsFutureVersion()
-        {
-            Shader shader = RequireShader("ES/2D/Composite URP");
-            var material = new Material(shader);
-
-            try
-            {
-                Assert.That(ES.EditorInternal.ESCompositeMaterialMigration.GetStoredVersion(material), Is.EqualTo(0));
-                Assert.That(ES.EditorInternal.ESCompositeMaterialMigration.Migrate(material, false), Is.True);
-                Assert.That(
-                    ES.EditorInternal.ESCompositeMaterialMigration.GetStoredVersion(material),
-                    Is.EqualTo(ES.EditorInternal.ESCompositeMaterialMigration.CurrentVersion));
-
-                material.SetOverrideTag(
-                    ES.EditorInternal.ESCompositeMaterialMigration.VersionTagName,
-                    (ES.EditorInternal.ESCompositeMaterialMigration.CurrentVersion + 1).ToString());
-                Assert.That(ES.EditorInternal.ESCompositeMaterialMigration.Migrate(material, false), Is.False);
-            }
-            finally
-            {
-                Object.DestroyImmediate(material);
-            }
-        }
-
-        [TestCase("Sprite Shaders Ultimate/Standard SSU", "ES/2D/Composite URP", ES.EditorInternal.ESCompositeSSUBlendMode.Alpha)]
-        [TestCase("Sprite Shaders Ultimate/Additive SSU", "ES/2D/Composite URP", ES.EditorInternal.ESCompositeSSUBlendMode.Additive)]
-        [TestCase("Sprite Shaders Ultimate/Multiplicative SSU", "ES/2D/Composite URP", ES.EditorInternal.ESCompositeSSUBlendMode.Multiply)]
-        [TestCase("Sprite Shaders Ultimate/2D Lit URP SSU", "ES/2D/Composite URP", ES.EditorInternal.ESCompositeSSUBlendMode.Alpha)]
-        [TestCase("Sprite Shaders Ultimate/GUI SSU", "ES/UI/Composite URP", ES.EditorInternal.ESCompositeSSUBlendMode.Alpha)]
-        [TestCase("Sprite Shaders Ultimate/Additive GUI SSU", "ES/UI/Composite URP", ES.EditorInternal.ESCompositeSSUBlendMode.Additive)]
-        [TestCase("Sprite Shaders Ultimate/3D Lit URP SSU", "ES/3D/Lit Composite URP", ES.EditorInternal.ESCompositeSSUBlendMode.Alpha)]
-        [TestCase("Sprite Shaders Ultimate/3D Lit Cutout URP SSU", "ES/3D/Lit Composite URP", ES.EditorInternal.ESCompositeSSUBlendMode.Alpha)]
-        [TestCase("Sprite Shaders Ultimate/3D Lit BuiltIn SSU", "ES/3D/Lit Composite URP", ES.EditorInternal.ESCompositeSSUBlendMode.Alpha)]
-        [TestCase("Sprite Shaders Ultimate/3D Lit Cutout BuiltIn SSU", "ES/3D/Lit Composite URP", ES.EditorInternal.ESCompositeSSUBlendMode.Alpha)]
-        public void SSUMigration_ResolvesSupportedShaderFamilies(
-            string sourceShader,
-            string expectedTarget,
-            ES.EditorInternal.ESCompositeSSUBlendMode expectedBlend)
-        {
-            bool resolved = ES.EditorInternal.ESCompositeSSUMaterialMigration.TryResolveSourceShader(
-                sourceShader,
-                out string target,
-                out ES.EditorInternal.ESCompositeSSUBlendMode blend);
-
-            Assert.That(resolved, Is.True);
-            Assert.That(target, Is.EqualTo(expectedTarget));
-            Assert.That(blend, Is.EqualTo(expectedBlend));
-        }
-
-        [TestCase("Sprite Shaders Ultimate/Unknown SSU")]
-        [TestCase("UI/Default")]
-        public void SSUMigration_DoesNotRouteUnsupportedShaderFamilies(string sourceShader)
-        {
-            Assert.That(
-                ES.EditorInternal.ESCompositeSSUMaterialMigration.TryResolveSourceShader(
-                    sourceShader,
-                    out _,
-                    out _),
-                Is.False);
-        }
-
-        [TestCase("Sprite Shaders Ultimate/Standard SSU", "ES/2D/Composite URP")]
-        [TestCase("Sprite Shaders Ultimate/GUI SSU", "ES/UI/Composite URP")]
-        public void SSUMigration_MapsCompleteTimeContractForSpriteAndUi(string sourceShaderName, string targetShaderName)
-        {
-            Material source = CreateTestMaterial(RequireShader(sourceShaderName));
-            Material migrated = null;
-            try
-            {
-                source.SetFloat("_ToggleCustomTime", 1f);
-                source.SetFloat("_ToggleUnscaledTime", 1f);
-                source.SetFloat("_TimeValue", 7.5f);
-                source.SetFloat("_ToggleTimeSpeed", 1f);
-                source.SetFloat("_TimeSpeed", -2.25f);
-                source.SetFloat("_ToggleTimeFPS", 1f);
-                source.SetFloat("_TimeFPS", -500f);
-                source.SetFloat("_ToggleTimeFrequency", 1f);
-                source.SetFloat("_TimeFrequency", -3.5f);
-                source.SetFloat("_TimeRange", -0.6f);
-
-                migrated = ES.EditorInternal.ESCompositeSSUMaterialMigration.CreateMigratedMaterial(
-                    source,
-                    ES.EditorInternal.ESCompositeSSUTargetMode.Auto,
-                    ES.EditorInternal.ESCompositeSSUBlendMode.Auto,
-                    true,
-                    out ES.EditorInternal.ESCompositeSSUMigrationReport report);
-
-                Assert.That(migrated, Is.Not.Null);
-                Assert.That(report.TargetShaderName, Is.EqualTo(targetShaderName));
-                Assert.That(migrated.GetFloat("_TimeMode"), Is.EqualTo(1f), "SSU applies Unscaled Time after Custom Time.");
-                Assert.That(migrated.GetFloat("_CustomTime"), Is.EqualTo(7.5f));
-                Assert.That(migrated.GetFloat("_TimeScale"), Is.EqualTo(-2.25f));
-                Assert.That(migrated.GetFloat("_EnableTimeFPS"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_TimeFPS"), Is.EqualTo(240f));
-                Assert.That(migrated.GetFloat("_EnableTimeFrequency"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_TimeFrequency"), Is.EqualTo(-3.5f));
-                Assert.That(migrated.GetFloat("_TimeRange"), Is.EqualTo(-0.6f));
-            }
-            finally
-            {
-                if (migrated != null) Object.DestroyImmediate(migrated);
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [TestCase("Sprite Shaders Ultimate/Standard SSU", "ES/2D/Composite URP")]
-        [TestCase("Sprite Shaders Ultimate/GUI SSU", "ES/UI/Composite URP")]
-        public void SSUMigration_SpriteAndUiPreserveExactStylizedParameters(
-            string sourceShaderName,
-            string targetShaderName)
-        {
-            Material source = CreateTestMaterial(RequireShader(sourceShaderName));
-            Material migrated = null;
-            var tintTexture = new Texture2D(2, 2);
-            try
-            {
-                Color hologramTint = new Color(0.25f, 1.5f, 2f, 1f);
-                source.SetFloat("_EnableHologram", 1f);
-                source.SetColor("_HologramTint", hologramTint);
-                source.SetFloat("_HologramLineGap", 3f);
-                source.SetFloat("_HologramLineSpeed", 0.75f);
-                source.SetFloat("_HologramContrast", 2.5f);
-                source.SetFloat("_EnableGlitch", 1f);
-                source.SetFloat("_GlitchFade", 0.6f);
-                source.SetFloat("_GlitchBrightness", 4.5f);
-                source.SetVector("_GlitchDistortion", new Vector4(0.1f, -0.2f, 0f, 0f));
-                source.SetFloat("_EnableOuterOutline", 1f);
-                source.SetFloat("_OuterOutlineWidth", 0.125f);
-                source.SetFloat("_OuterOutlineFade", 0.7f);
-                source.SetFloat("_OuterOutlineTextureToggle", 1f);
-                source.SetTexture("_OuterOutlineTintTexture", tintTexture);
-                source.SetFloat("_OuterOutlineOutlineOnlyToggle", 1f);
-
-                migrated = ES.EditorInternal.ESCompositeSSUMaterialMigration.CreateMigratedMaterial(
-                    source,
-                    ES.EditorInternal.ESCompositeSSUTargetMode.Auto,
-                    ES.EditorInternal.ESCompositeSSUBlendMode.Auto,
-                    true,
-                    out ES.EditorInternal.ESCompositeSSUMigrationReport report);
-
-                Assert.That(migrated, Is.Not.Null);
-                Assert.That(report.TargetShaderName, Is.EqualTo(targetShaderName));
-                Assert.That(migrated.GetFloat("_SSUStatusContract"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_QualityTier"), Is.EqualTo(2f));
-                Assert.That(migrated.GetColor("_HologramColor"), Is.EqualTo(hologramTint));
-                Assert.That(migrated.GetFloat("_HologramLineGap"), Is.EqualTo(3f));
-                Assert.That(migrated.GetFloat("_HologramSpeed"), Is.EqualTo(0.75f));
-                Assert.That(migrated.GetFloat("_HologramContrast"), Is.EqualTo(2.5f));
-                Assert.That(migrated.GetFloat("_HologramSpace"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_GlitchFade"), Is.EqualTo(0.6f));
-                Assert.That(migrated.GetFloat("_GlitchBrightness"), Is.EqualTo(4.5f));
-                Assert.That(migrated.GetVector("_GlitchDistortion"),
-                    Is.EqualTo(new Vector4(0.1f, -0.2f, 0f, 0f)));
-                Assert.That(migrated.GetFloat("_OuterOutlineWidth"), Is.EqualTo(0.125f));
-                Assert.That(migrated.GetFloat("_OuterOutlineFade"), Is.EqualTo(0.7f));
-                Assert.That(migrated.GetTexture("_OuterOutlineTintTexture"), Is.SameAs(tintTexture));
-                Assert.That(migrated.GetFloat("_OuterOutlineOutlineOnlyToggle"), Is.EqualTo(1f));
-            }
-            finally
-            {
-                if (migrated != null) Object.DestroyImmediate(migrated);
-                Object.DestroyImmediate(tintTexture);
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [TestCase("Sprite Shaders Ultimate/Standard SSU", "ES/2D/Composite URP")]
-        [TestCase("Sprite Shaders Ultimate/GUI SSU", "ES/UI/Composite URP")]
-        [TestCase("Sprite Shaders Ultimate/3D Lit URP SSU", "ES/3D/Lit Composite URP")]
-        public void SSUMigration_ShineUsesExplicitLocalSpaceWithoutDirectionOverride(
-            string sourceShaderName,
-            string targetShaderName)
-        {
-            Material source = CreateTestMaterial(RequireShader(sourceShaderName));
-            Material migrated = null;
-            try
-            {
-                source.SetFloat("_EnableShine", 1f);
-                source.SetFloat("_ShineRotation", 47f);
-
-                migrated = ES.EditorInternal.ESCompositeSSUMaterialMigration.CreateMigratedMaterial(
-                    source,
-                    ES.EditorInternal.ESCompositeSSUTargetMode.Auto,
-                    ES.EditorInternal.ESCompositeSSUBlendMode.Auto,
-                    true,
-                    out ES.EditorInternal.ESCompositeSSUMigrationReport report);
-
-                Assert.That(migrated, Is.Not.Null);
-                Assert.That(report.TargetShaderName, Is.EqualTo(targetShaderName));
-                Assert.That(migrated.GetFloat("_ShineSpace"), Is.EqualTo((float)ESCompositeProjectionSpace.局部UV));
-                Assert.That(migrated.GetVector("_ShineDirection"), Is.EqualTo(Vector4.zero));
-                Assert.That(migrated.GetFloat("_ShineRotation"), Is.EqualTo(47f));
-            }
-            finally
-            {
-                if (migrated != null) Object.DestroyImmediate(migrated);
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [Test]
-        public void SSUMigration_LitMapsPbrTimeAndAliasedEffects()
-        {
-            Material source = CreateTestMaterial(RequireShader("Sprite Shaders Ultimate/3D Lit URP SSU"));
-            Material migrated = null;
-            var baseTexture = new Texture2D(8, 4);
-            try
-            {
-                var emission = new Color(3f, 0.4f, 0.2f, 1f);
-                var strongTint = new Color(0.2f, 0.7f, 1.5f, 1f);
-                var replaceTo = new Color(1.8f, 0.1f, 0.3f, 1f);
-                source.SetTexture("_MainTex", baseTexture);
-                source.SetTextureScale("_MainTex", new Vector2(2f, 3f));
-                source.SetTextureOffset("_MainTex", new Vector2(0.25f, 0.5f));
-                source.SetFloat("_NormalIntensity", 1.4f);
-                source.SetFloat("_MetallicMapToggle", 1f);
-                source.SetTextureScale("_MetallicMap", new Vector2(4f, 5f));
-                source.SetTextureOffset("_MetallicMap", new Vector2(0.1f, 0.2f));
-                source.SetFloat("_EmissionToggle", 1f);
-                source.SetColor("_EmissionTint", emission);
-                source.SetFloat("_ToggleCustomTime", 1f);
-                source.SetFloat("_TimeValue", 12.5f);
-                source.SetFloat("_ToggleTimeSpeed", 1f);
-                source.SetFloat("_TimeSpeed", 2.25f);
-                source.SetFloat("_EnableStrongTint", 1f);
-                source.SetColor("_StrongTintTint", strongTint);
-                source.SetFloat("_EnableColorReplace", 1f);
-                source.SetColor("_ColorReplaceToColor", replaceTo);
-                source.SetFloat("_ColorReplaceRange", 0.35f);
-                source.SetFloat("_EnableDirectionalAlphaFade", 1f);
-                source.SetFloat("_DirectionalAlphaFadeFade", 0.25f);
-                source.SetFloat("_DirectionalAlphaFadeWidth", 0.12f);
-                source.SetFloat("_EnableUVScale", 1f);
-                source.SetVector("_UVScaleScale", new Vector4(2f, 0.75f, 0f, 0f));
-
-                migrated = ES.EditorInternal.ESCompositeSSUMaterialMigration.CreateMigratedMaterial(
-                    source,
-                    ES.EditorInternal.ESCompositeSSUTargetMode.Auto,
-                    ES.EditorInternal.ESCompositeSSUBlendMode.Auto,
-                    true,
-                    out ES.EditorInternal.ESCompositeSSUMigrationReport report);
-
-                Assert.That(migrated, Is.Not.Null);
-                Assert.That(report.TargetShaderName, Is.EqualTo("ES/3D/Lit Composite URP"));
-                Assert.That(migrated.GetTexture("_BaseMap"), Is.SameAs(baseTexture));
-                Assert.That(migrated.GetTextureScale("_BaseMap"), Is.EqualTo(new Vector2(2f, 3f)));
-                Assert.That(migrated.GetTextureOffset("_BaseMap"), Is.EqualTo(new Vector2(0.25f, 0.5f)));
-                Assert.That(migrated.GetFloat("_NormalScale"), Is.EqualTo(1.4f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_UseMetallicMap"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_SmoothnessMapChannel"), Is.Zero);
-                Assert.That(migrated.GetTextureScale("_MetallicMap"), Is.EqualTo(Vector2.one));
-                Assert.That(migrated.GetTextureOffset("_MetallicMap"), Is.EqualTo(Vector2.zero));
-                Assert.That(migrated.GetFloat("_UseEmission"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_EmissionUseAlpha"), Is.EqualTo(1f));
-                Assert.That(migrated.GetColor("_EmissionColor"), Is.EqualTo(emission));
-                Assert.That(migrated.GetFloat("_TimeMode"), Is.EqualTo(2f));
-                Assert.That(migrated.GetFloat("_CustomTime"), Is.EqualTo(12.5f));
-                Assert.That(migrated.GetFloat("_TimeScale"), Is.EqualTo(2.25f));
-                Assert.That(migrated.GetFloat("_QualityTier"), Is.EqualTo(2f));
-                Assert.That(migrated.GetColor("_StrongTint"), Is.EqualTo(strongTint));
-                Assert.That(migrated.GetColor("_ReplaceTo"), Is.EqualTo(replaceTo));
-                Assert.That(migrated.GetFloat("_ReplaceRange"), Is.EqualTo(0.35f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_FadeMode"), Is.Zero);
-                Assert.That(migrated.GetFloat("_EnableDirectionalAlphaFade"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_DirectionalAlphaFadeFade"), Is.EqualTo(0.25f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_DirectionalAlphaFadeWidth"), Is.EqualTo(0.12f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_EnableUVTransform"), Is.EqualTo(1f));
-                Assert.That(migrated.GetVector("_UVScale"), Is.EqualTo(new Vector4(2f, 0.75f, 0f, 0f)));
-                Assert.That(migrated.GetFloat("_Surface"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_AlphaClip"), Is.Zero);
-            }
-            finally
-            {
-                if (migrated != null) Object.DestroyImmediate(migrated);
-                Object.DestroyImmediate(baseTexture);
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [Test]
-        public void SSUMigration_PreservesComposableFadeStackWithoutLegacyCollapse()
-        {
-            Material source = CreateTestMaterial(RequireShader("Sprite Shaders Ultimate/Standard SSU"));
-            Material migrated = null;
-            try
-            {
-                string[] enables =
-                {
-                    "_EnableFullAlphaDissolve",
-                    "_EnableSourceAlphaDissolve",
-                    "_EnableSourceGlowDissolve",
-                    "_EnableDirectionalAlphaFade",
-                    "_EnableDirectionalGlowFade",
-                    "_EnableDirectionalDistortion"
-                };
-                for (int i = 0; i < enables.Length; i++)
-                    source.SetFloat(enables[i], 1f);
-
-                source.SetFloat("_FullAlphaDissolveFade", 0.31f);
-                source.SetVector("_SourceAlphaDissolvePosition", new Vector4(0.2f, 0.7f, 0f, 0f));
-                source.SetColor("_SourceGlowDissolveEdgeColor", new Color(4f, 2f, 1f, 0f));
-                source.SetFloat("_DirectionalAlphaFadeRotation", 123f);
-                source.SetFloat("_DirectionalGlowFadeNoiseFactor", 0.37f);
-                source.SetVector("_DirectionalDistortionDistortion", new Vector4(0.08f, -0.12f, 0f, 0f));
-
-                migrated = ES.EditorInternal.ESCompositeSSUMaterialMigration.CreateMigratedMaterial(
-                    source,
-                    ES.EditorInternal.ESCompositeSSUTargetMode.Auto,
-                    ES.EditorInternal.ESCompositeSSUBlendMode.Auto,
-                    true,
-                    out ES.EditorInternal.ESCompositeSSUMigrationReport report);
-
-                Assert.That(migrated, Is.Not.Null);
-                Assert.That(report.Issues, Has.None.Matches<ES.EditorInternal.ESCompositeSSUMigrationIssue>(
-                    issue => issue.Severity == ES.EditorInternal.ESCompositeSSUMigrationSeverity.Error));
-                Assert.That(report.Issues, Has.Some.Matches<ES.EditorInternal.ESCompositeSSUMigrationIssue>(
-                    issue => issue.Message.Contains("6 个可叠加 SSU Fade")));
-                Assert.That(migrated.GetFloat("_FadeMode"), Is.Zero);
-                for (int i = 0; i < enables.Length; i++)
-                    Assert.That(migrated.GetFloat(enables[i]), Is.EqualTo(1f), enables[i]);
-                Assert.That(migrated.GetFloat("_FullAlphaDissolveFade"), Is.EqualTo(0.31f).Within(0.0001f));
-                Assert.That(migrated.GetVector("_SourceAlphaDissolvePosition"), Is.EqualTo(new Vector4(0.2f, 0.7f, 0f, 0f)));
-                Assert.That(migrated.GetColor("_SourceGlowDissolveEdgeColor"), Is.EqualTo(new Color(4f, 2f, 1f, 0f)));
-                Assert.That(migrated.GetFloat("_DirectionalAlphaFadeRotation"), Is.EqualTo(123f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_DirectionalGlowFadeNoiseFactor"), Is.EqualTo(0.37f).Within(0.0001f));
-                Assert.That(migrated.GetVector("_DirectionalDistortionDistortion"), Is.EqualTo(new Vector4(0.08f, -0.12f, 0f, 0f)));
-            }
-            finally
-            {
-                if (migrated != null) Object.DestroyImmediate(migrated);
-                Object.DestroyImmediate(source);
-            }
-        }
-
         [TestCase("ES2DCompositeURP.shader")]
         [TestCase("ESUICompositeURP.shader")]
         [TestCase("ES3DLitCompositeURP.shader")]
-        public void CompositeShaders_ExposeComposableSSUFadeStack(string shaderName)
+        public void CompositeShaders_ExposeComposableESNativeFadeStack(string shaderName)
         {
             string source = File.ReadAllText(ShaderRoot + shaderName);
             string executionSource = shaderName == "ES3DLitCompositeURP.shader"
@@ -4140,13 +3830,13 @@ namespace ES.Tests
 
             for (int i = 0; i < properties.Length; i++)
                 Assert.That(source, Does.Contain(properties[i]), properties[i]);
-            Assert.That(executionSource, Does.Contain("#include \"ESCompositeSSUFadeStack.hlsl\""));
+            Assert.That(executionSource, Does.Contain("#include \"ESCompositeESNativeFadeStack.hlsl\""));
         }
 
         [Test]
-        public void SSUFadeStack_PreservesSourceOrderAndDirectionalDistortionPhases()
+        public void ESNativeFadeStack_PreservesSourceOrderAndDirectionalDistortionPhases()
         {
-            string source = File.ReadAllText(ShaderRoot + "ESCompositeSSUFadeStack.hlsl");
+            string source = File.ReadAllText(ShaderRoot + "ESCompositeESNativeFadeStack.hlsl");
             int fullAlpha = source.IndexOf("if (_EnableFullAlphaDissolve", System.StringComparison.Ordinal);
             int sourceAlpha = source.IndexOf("if (_EnableSourceAlphaDissolve", System.StringComparison.Ordinal);
             int sourceGlow = source.IndexOf("if (_EnableSourceGlowDissolve", System.StringComparison.Ordinal);
@@ -4158,19 +3848,19 @@ namespace ES.Tests
             Assert.That(sourceGlow, Is.GreaterThan(sourceAlpha));
             Assert.That(directionalAlpha, Is.GreaterThan(sourceGlow));
             Assert.That(directionalGlow, Is.GreaterThan(directionalAlpha));
-            Assert.That(source, Does.Contain("ESCompositeApplySSUDirectionalDistortionUV"));
-            Assert.That(source, Does.Contain("visibility *= ESCompositeSSUResolveInvert"));
+            Assert.That(source, Does.Contain("ESCompositeApplyESNativeDirectionalDistortionUV"));
+            Assert.That(source, Does.Contain("visibility *= ESCompositeESNativeResolveInvert"));
 
             string litCommon = File.ReadAllText(ShaderRoot + "ES3DLitCompositeURPCommon.hlsl");
-            Assert.That(litCommon, Does.Contain("uv = ESCompositeApplySSUDirectionalDistortionUV(uv, frac(uv));"));
+            Assert.That(litCommon, Does.Contain("uv = ESCompositeApplyESNativeDirectionalDistortionUV(uv, frac(uv));"));
             Assert.That(litCommon, Does.Contain("visibility *= ssuFadeVisibility;"));
-            Assert.That(litCommon, Does.Contain("baseSample.rgb = ESCompositeApplySSUFadeStackColor("));
+            Assert.That(litCommon, Does.Contain("baseSample.rgb = ESCompositeApplyESNativeFadeStackColor("));
         }
 
         [TestCase("ES/2D/Composite URP", "_ES_SPRITE_RESOURCE_MASK_2")]
         [TestCase("ES/UI/Composite URP", "_ES_SPRITE_RESOURCE_MASK_2")]
         [TestCase("ES/3D/Lit Composite URP", "_ES_LIT_RESOURCE_MASK_2")]
-        public void ComposableSSUFadeStack_RequestsFadeResourceBit(
+        public void ComposableESNativeFadeStack_RequestsFadeResourceBit(
             string shaderName,
             string expectedKeyword)
         {
@@ -4192,490 +3882,6 @@ namespace ES.Tests
             {
                 Object.DestroyImmediate(material);
             }
-        }
-
-        [Test]
-        public void SSUMigration_LitMapsCompleteHalftoneAlphaContract()
-        {
-            Material source = CreateTestMaterial(RequireShader("Sprite Shaders Ultimate/3D Lit URP SSU"));
-            Material migrated = null;
-            var texture = new Texture2D(200, 100);
-            try
-            {
-                source.SetTexture("_MainTex", texture);
-                source.SetFloat("_EnableSharpen", 1f);
-                source.SetFloat("_SharpenFactor", 8f);
-                source.SetFloat("_SharpenOffset", 2f);
-                source.SetFloat("_SharpenFade", 0.75f);
-                source.SetFloat("_EnablePixelate", 1f);
-                source.SetFloat("_PixelatePixelDensity", 16f);
-                source.SetFloat("_PixelatePixelsPerUnit", 100f);
-                source.SetFloat("_PixelateFade", 0.5f);
-                source.SetFloat("_EnableHalftone", 1f);
-                source.SetFloat("_HalftoneTiling", 3f);
-                source.SetFloat("_HalftoneFade", 0.25f);
-                source.SetVector("_HalftonePosition", new Vector4(0.2f, 0.7f, 0f, 0f));
-                source.SetFloat("_HalftoneFadeWidth", -0.5f);
-                source.SetFloat("_HalftoneInvert", 1f);
-
-                migrated = ES.EditorInternal.ESCompositeSSUMaterialMigration.CreateMigratedMaterial(
-                    source,
-                    ES.EditorInternal.ESCompositeSSUTargetMode.Auto,
-                    ES.EditorInternal.ESCompositeSSUBlendMode.Auto,
-                    true,
-                    out ES.EditorInternal.ESCompositeSSUMigrationReport report);
-
-                Assert.That(migrated.GetFloat("_SharpenAmount"), Is.EqualTo(4f));
-                Assert.That(migrated.GetFloat("_SharpenRadius"), Is.EqualTo(2f / 512f).Within(0.000001f));
-                Assert.That(migrated.GetFloat("_SharpenFade"), Is.EqualTo(0.75f));
-                Assert.That(migrated.GetFloat("_PixelateCells"), Is.EqualTo(64f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_PixelateStrength"), Is.EqualTo(0.5f));
-                Assert.That(migrated.GetFloat("_HalftoneScale"), Is.EqualTo(4f));
-                Assert.That(migrated.GetFloat("_HalftoneStrength"), Is.Zero);
-                Assert.That(migrated.GetVector("_HalftonePosition"), Is.EqualTo(new Vector4(0.2f, 0.7f, 0f, 0f)));
-                Assert.That(migrated.GetFloat("_HalftoneFade"), Is.EqualTo(0.25f));
-                Assert.That(migrated.GetFloat("_HalftoneFadeWidth"), Is.EqualTo(0.5f));
-                Assert.That(migrated.GetFloat("_HalftoneInvert"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_HalftoneAlphaPattern"), Is.EqualTo(1f));
-                Assert.That(report.Issues, Has.Some.Matches<ES.EditorInternal.ESCompositeSSUMigrationIssue>(
-                    issue => issue.Message.Contains("透明点阵") && issue.Severity == ES.EditorInternal.ESCompositeSSUMigrationSeverity.Info));
-            }
-            finally
-            {
-                if (migrated != null) Object.DestroyImmediate(migrated);
-                Object.DestroyImmediate(texture);
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [Test]
-        public void SSUMigration_LitMapsRemainingEffectsAndReportsAdvancedLosses()
-        {
-            Material source = CreateTestMaterial(RequireShader("Sprite Shaders Ultimate/3D Lit URP SSU"));
-            Material migrated = null;
-            var layerTexture = new Texture2D(4, 4);
-            try
-            {
-                var hologramTint = new Color(0.2f, 1.5f, 2.5f, 1f);
-                source.SetFloat("_EnableTextureLayer1", 1f);
-                source.SetTexture("_TextureLayer1Texture", layerTexture);
-                source.SetFloat("_TextureLayer1Fade", 0.65f);
-                source.SetFloat("_EnableHologram", 1f);
-                source.SetColor("_HologramTint", hologramTint);
-                source.SetFloat("_HologramFade", 0.4f);
-                source.SetFloat("_HologramContrast", 2.5f);
-                source.SetFloat("_HologramLineSpeed", 0.75f);
-                source.SetFloat("_HologramLineGap", 3f);
-                source.SetFloat("_HologramDistortionOffset", 0.2f);
-                source.SetFloat("_HologramDistortionDensity", 0.7f);
-                source.SetFloat("_EnableGlitch", 1f);
-                source.SetFloat("_GlitchFade", 0.5f);
-                source.SetFloat("_GlitchMaskMin", 0.3f);
-                source.SetVector("_GlitchDistortion", new Vector4(0.1f, 0.05f, 0f, 0f));
-                source.SetVector("_GlitchMaskSpeed", new Vector4(0f, 4f, 0f, 0f));
-                source.SetVector("_GlitchNoiseSpeed", new Vector4(0f, 2f, 0f, 0f));
-                source.SetVector("_GlitchDistortionSpeed", new Vector4(0f, 3f, 0f, 0f));
-                source.SetFloat("_EnableFullDistortion", 1f);
-                source.SetFloat("_FullDistortionFade", 0.25f);
-                source.SetVector("_FullDistortionDistortion", new Vector4(0.2f, 0.1f, 0f, 0f));
-                source.SetVector("_FullDistortionNoiseScale", new Vector4(3f, 2f, 0f, 0f));
-                source.SetFloat("_EnableOuterOutline", 1f);
-                source.SetFloat("_OuterOutlineFade", 0.6f);
-                source.SetFloat("_OuterOutlineTextureToggle", 1f);
-                source.SetTexture("_OuterOutlineTintTexture", layerTexture);
-                source.SetFloat("_OuterOutlineOutlineOnlyToggle", 1f);
-
-                migrated = ES.EditorInternal.ESCompositeSSUMaterialMigration.CreateMigratedMaterial(
-                    source,
-                    ES.EditorInternal.ESCompositeSSUTargetMode.Auto,
-                    ES.EditorInternal.ESCompositeSSUBlendMode.Auto,
-                    true,
-                    out ES.EditorInternal.ESCompositeSSUMigrationReport report);
-
-                Assert.That(migrated, Is.Not.Null);
-                Assert.That(migrated.GetFloat("_EnableTextureLayer1"), Is.EqualTo(1f));
-                Assert.That(migrated.GetTexture("_TextureLayer1Texture"), Is.SameAs(layerTexture));
-                Assert.That(migrated.GetFloat("_TextureLayer1Fade"), Is.EqualTo(0.65f).Within(0.0001f));
-                Assert.That(migrated.GetColor("_HologramColor"), Is.EqualTo(hologramTint));
-                Assert.That(migrated.GetFloat("_HologramFade"), Is.EqualTo(0.4f));
-                Assert.That(migrated.GetFloat("_HologramContrast"), Is.EqualTo(2.5f));
-                Assert.That(migrated.GetFloat("_HologramSpace"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_HologramSpeed"), Is.EqualTo(0.75f));
-                Assert.That(migrated.GetFloat("_HologramLineGap"), Is.EqualTo(3f));
-                Assert.That(migrated.GetFloat("_HologramDistortionOffset"), Is.EqualTo(0.2f));
-                Assert.That(migrated.GetFloat("_HologramDistortionDensity"), Is.EqualTo(0.7f));
-                Assert.That(migrated.GetFloat("_GlitchFade"), Is.EqualTo(0.5f));
-                Assert.That(migrated.GetFloat("_GlitchMaskMin"), Is.EqualTo(0.3f));
-                Assert.That(migrated.GetVector("_GlitchDistortion"), Is.EqualTo(new Vector4(0.1f, 0.05f, 0f, 0f)));
-                Assert.That(migrated.GetFloat("_GlitchIntensity"), Is.EqualTo(new Vector2(0.1f, 0.05f).magnitude).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_GlitchSpeed"), Is.EqualTo(4f));
-                Assert.That(migrated.GetFloat("_OuterOutlineFade"), Is.EqualTo(0.6f));
-                Assert.That(migrated.GetTexture("_OuterOutlineTintTexture"), Is.SameAs(layerTexture));
-                Assert.That(migrated.GetFloat("_OuterOutlineOutlineOnlyToggle"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_EnableFullDistortion"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_FullDistortionFade"), Is.EqualTo(0.25f));
-                Assert.That(migrated.GetVector("_FullDistortionDistortion"), Is.EqualTo(new Vector4(0.2f, 0.1f, 0f, 0f)));
-                Assert.That(migrated.GetVector("_FullDistortionNoiseScale"), Is.EqualTo(new Vector4(3f, 2f, 0f, 0f)));
-                Assert.That(migrated.GetFloat("_EnableUVDistort"), Is.Zero);
-                Assert.That(migrated.GetFloat("_SSUStatusContract"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_QualityTier"), Is.EqualTo(2f));
-                Assert.That(report.Issues, Has.Some.Matches<ES.EditorInternal.ESCompositeSSUMigrationIssue>(
-                    issue => issue.Message.Contains("Hologram") && issue.Message.Contains("透视相机")));
-                Assert.That(report.Issues, Has.Some.Matches<ES.EditorInternal.ESCompositeSSUMigrationIssue>(
-                    issue => issue.Message.Contains("Glitch") && issue.Message.Contains("精确合同")));
-                Assert.That(report.Issues, Has.Some.Matches<ES.EditorInternal.ESCompositeSSUMigrationIssue>(
-                    issue => issue.Message.Contains("Full Distortion") && issue.Message.Contains("两次独立噪声")));
-                Assert.That(report.Issues, Has.Some.Matches<ES.EditorInternal.ESCompositeSSUMigrationIssue>(
-                    issue => issue.Message.Contains("Outline")
-                        && issue.Message.Contains("网格覆盖范围")));
-            }
-            finally
-            {
-                if (migrated != null) Object.DestroyImmediate(migrated);
-                Object.DestroyImmediate(layerTexture);
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [Test]
-        public void SSUMigration_LitCutoutMapsSurfaceAndCutoff()
-        {
-            Material source = CreateTestMaterial(RequireShader("Sprite Shaders Ultimate/3D Lit Cutout URP SSU"));
-            Material migrated = null;
-            try
-            {
-                source.SetFloat("_AlphaClip", 0.37f);
-                migrated = ES.EditorInternal.ESCompositeSSUMaterialMigration.CreateMigratedMaterial(
-                    source,
-                    ES.EditorInternal.ESCompositeSSUTargetMode.Auto,
-                    ES.EditorInternal.ESCompositeSSUBlendMode.Auto,
-                    true,
-                    out _);
-
-                Assert.That(migrated, Is.Not.Null);
-                Assert.That(migrated.GetFloat("_Surface"), Is.Zero);
-                Assert.That(migrated.GetFloat("_AlphaClip"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_Cutoff"), Is.EqualTo(0.37f).Within(0.0001f));
-                Assert.That(migrated.GetTag("RenderType", false), Is.EqualTo("TransparentCutout"));
-                Assert.That(migrated.renderQueue, Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.AlphaTest));
-            }
-            finally
-            {
-                if (migrated != null) Object.DestroyImmediate(migrated);
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [Test]
-        public void SSUMigration_BuiltInLitRequiresExplicitLossyOptIn()
-        {
-            Material source = CreateTestMaterial(RequireShader("Sprite Shaders Ultimate/3D Lit BuiltIn SSU"));
-            try
-            {
-                ES.EditorInternal.ESCompositeSSUMigrationReport report =
-                    ES.EditorInternal.ESCompositeSSUMaterialMigration.Analyze(source);
-
-                Assert.That(report.TargetShaderName, Is.EqualTo("ES/3D/Lit Composite URP"));
-                Assert.That(report.HasErrors, Is.False);
-                Assert.That(report.HasWarnings, Is.True);
-                Assert.That(report.CanMigrate(false), Is.False);
-                Assert.That(report.CanMigrate(true), Is.True);
-            }
-            finally
-            {
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [Test]
-        public void SSUMigration_FullDistortionDoesNotRequireLossyOptIn()
-        {
-            Material source = CreateTestMaterial(RequireShader("Sprite Shaders Ultimate/Standard SSU"));
-            try
-            {
-                source.SetFloat("_EnableFullDistortion", 1f);
-                ES.EditorInternal.ESCompositeSSUMigrationReport report =
-                    ES.EditorInternal.ESCompositeSSUMaterialMigration.Analyze(source);
-
-                Assert.That(report.HasErrors, Is.False);
-                Assert.That(report.Issues, Has.None.Matches<ES.EditorInternal.ESCompositeSSUMigrationIssue>(
-                    issue => issue.Message.Contains("Full Distortion")
-                        && issue.Severity == ES.EditorInternal.ESCompositeSSUMigrationSeverity.Warning));
-                Assert.That(report.CanMigrate(false), Is.True);
-                Assert.That(report.CanMigrate(true), Is.True);
-            }
-            finally
-            {
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [Test]
-        public void SSUMigration_BurnPreservesCompleteStatusContractWithoutLossyOptIn()
-        {
-            Material source = CreateTestMaterial(RequireShader("Sprite Shaders Ultimate/Standard SSU"));
-            Material migrated = null;
-            try
-            {
-                source.SetFloat("_EnableBurn", 1f);
-                source.SetFloat("_BurnFade", 0.63f);
-                source.SetFloat("_BurnRadius", 2.75f);
-                source.SetVector("_BurnPosition", new Vector4(0.25f, 0.75f, 0f, 0f));
-                ES.EditorInternal.ESCompositeSSUMigrationReport report =
-                    ES.EditorInternal.ESCompositeSSUMaterialMigration.Analyze(source);
-
-                Assert.That(report.HasErrors, Is.False);
-                Assert.That(report.HasWarnings, Is.False);
-                Assert.That(report.PartiallyCompatibleEffectCount, Is.Zero);
-                Assert.That(report.CanMigrate(false), Is.True);
-
-                migrated = ES.EditorInternal.ESCompositeSSUMaterialMigration.CreateMigratedMaterial(
-                    source,
-                    ES.EditorInternal.ESCompositeSSUTargetMode.Auto,
-                    ES.EditorInternal.ESCompositeSSUBlendMode.Auto,
-                    false,
-                    out _);
-                Assert.That(migrated, Is.Not.Null);
-                Assert.That(migrated.GetFloat("_SSUStatusContract"), Is.EqualTo(1f));
-                Assert.That(migrated.GetFloat("_BurnFade"), Is.EqualTo(0.63f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_BurnRadius"), Is.EqualTo(2.75f).Within(0.0001f));
-                Assert.That(migrated.GetVector("_BurnPosition"), Is.EqualTo(new Vector4(0.25f, 0.75f, 0f, 0f)));
-            }
-            finally
-            {
-                if (migrated != null) Object.DestroyImmediate(migrated);
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [TestCase("_EnableFrozen")]
-        [TestCase("_EnableRainbow")]
-        [TestCase("_EnableShine")]
-        [TestCase("_EnablePoison")]
-        public void SSUMigration_OtherStatusEffectsHaveCompleteParameterSchemas(string enabledProperty)
-        {
-            Material source = CreateTestMaterial(RequireShader("Sprite Shaders Ultimate/Standard SSU"));
-            try
-            {
-                source.SetFloat(enabledProperty, 1f);
-                ES.EditorInternal.ESCompositeSSUMigrationReport report =
-                    ES.EditorInternal.ESCompositeSSUMaterialMigration.Analyze(source);
-
-                Assert.That(report.HasErrors, Is.False);
-                Assert.That(report.HasWarnings, Is.False);
-                Assert.That(report.PartiallyCompatibleEffectCount, Is.Zero);
-                Assert.That(report.CanMigrate(false), Is.True);
-            }
-            finally
-            {
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [TestCase("Sprite Shaders Ultimate/Standard SSU", ES.EditorInternal.ESCompositeSSUTargetMode.TwoD)]
-        [TestCase("Sprite Shaders Ultimate/GUI SSU", ES.EditorInternal.ESCompositeSSUTargetMode.UI)]
-        [TestCase("Sprite Shaders Ultimate/3D Lit URP SSU", ES.EditorInternal.ESCompositeSSUTargetMode.Lit)]
-        public void SSUMigration_RestoresRenamedColorAndFilterControls(
-            string sourceShaderName,
-            ES.EditorInternal.ESCompositeSSUTargetMode targetMode)
-        {
-            Material source = CreateTestMaterial(RequireShader(sourceShaderName));
-            Material migrated = null;
-            try
-            {
-                source.SetFloat("_EnableAlphaTint", 1f);
-                source.SetColor("_AlphaTintColor", Color.cyan);
-                source.SetFloat("_AlphaTintMinAlpha", 0.21f);
-                source.SetFloat("_AlphaTintFade", 0.73f);
-                source.SetFloat("_EnableColorReplace", 1f);
-                source.SetColor("_ColorReplaceFromColor", Color.red);
-                source.SetColor("_ColorReplaceToColor", Color.blue);
-                source.SetFloat("_ColorReplaceContrast", 2.4f);
-                source.SetFloat("_ColorReplaceFade", 0.62f);
-                source.SetFloat("_EnableSplitToning", 1f);
-                source.SetFloat("_SplitToningContrast", 3.1f);
-                source.SetFloat("_SplitToningShift", -0.35f);
-                source.SetFloat("_EnablePingPongGlow", 1f);
-                source.SetFloat("_PingPongGlowContrast", 1.8f);
-                source.SetFloat("_PingPongGlowFade", 0.54f);
-                source.SetFloat("_EnableSharpen", 1f);
-                source.SetFloat("_SharpenFactor", 2.2f);
-                source.SetFloat("_SharpenOffset", 3f);
-
-                migrated = ES.EditorInternal.ESCompositeSSUMaterialMigration.CreateMigratedMaterial(
-                    source,
-                    targetMode,
-                    ES.EditorInternal.ESCompositeSSUBlendMode.Auto,
-                    true,
-                    out ES.EditorInternal.ESCompositeSSUMigrationReport report);
-
-                Assert.That(migrated, Is.Not.Null);
-                Assert.That(migrated.GetColor("_AlphaTint"), Is.EqualTo(Color.cyan));
-                Assert.That(migrated.GetFloat("_AlphaTintMin"), Is.EqualTo(0.21f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_AlphaTintFade"), Is.EqualTo(0.73f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_ReplaceContrast"), Is.EqualTo(2.4f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_ReplaceFade"), Is.EqualTo(0.62f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_SplitToneContrast"), Is.EqualTo(3.1f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_SplitToneShift"), Is.EqualTo(-0.35f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_GlowContrast"), Is.EqualTo(1.8f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_GlowFade"), Is.EqualTo(0.54f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_SharpenAmount"), Is.EqualTo(2.2f).Within(0.0001f));
-                Assert.That(migrated.GetFloat("_SharpenRadius"), Is.EqualTo(3f / 512f).Within(0.0001f));
-                Assert.That(report.Issues, Has.Some.Matches<ES.EditorInternal.ESCompositeSSUMigrationIssue>(
-                    issue => issue.Severity == ES.EditorInternal.ESCompositeSSUMigrationSeverity.Info
-                        && issue.Message.Contains("执行顺序遵循 ES Composite 管线")));
-            }
-            finally
-            {
-                if (migrated != null) Object.DestroyImmediate(migrated);
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [Test]
-        public void SSUMigration_ClampsEnabledDirectRangeProperties()
-        {
-            Material source = CreateTestMaterial(RequireShader("Sprite Shaders Ultimate/Standard SSU"));
-            Material migrated = null;
-            try
-            {
-                source.SetFloat("_EnableNegative", 1f);
-                source.SetFloat("_NegativeFade", 4f);
-                ES.EditorInternal.ESCompositeSSUMigrationReport preview =
-                    ES.EditorInternal.ESCompositeSSUMaterialMigration.Analyze(source);
-
-                Assert.That(preview.ClampedPropertyCount, Is.GreaterThan(0));
-                Assert.That(preview.CanMigrate(false), Is.False);
-                migrated = ES.EditorInternal.ESCompositeSSUMaterialMigration.CreateMigratedMaterial(
-                    source,
-                    ES.EditorInternal.ESCompositeSSUTargetMode.Auto,
-                    ES.EditorInternal.ESCompositeSSUBlendMode.Auto,
-                    true,
-                    out _);
-                Assert.That(migrated.GetFloat("_NegativeFade"), Is.EqualTo(1f));
-            }
-            finally
-            {
-                if (migrated != null) Object.DestroyImmediate(migrated);
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [Test]
-        public void SSUMigration_ConvertsWorldTilingForNonSquareTextures()
-        {
-            Material source = CreateTestMaterial(RequireShader("Sprite Shaders Ultimate/Standard SSU"));
-            Material migrated = null;
-            var texture = new Texture2D(200, 100);
-            try
-            {
-                source.SetTexture("_MainTex", texture);
-                source.SetFloat("_EnableWorldTiling", 1f);
-                source.SetFloat("_WorldTilingPixelsPerUnit", 100f);
-                source.SetVector("_WorldTilingScale", new Vector4(1f, 1f, 0f, 0f));
-                source.SetVector("_WorldTilingOffset", new Vector4(0.5f, 0.25f, 0f, 0f));
-                migrated = ES.EditorInternal.ESCompositeSSUMaterialMigration.CreateMigratedMaterial(
-                    source,
-                    ES.EditorInternal.ESCompositeSSUTargetMode.Auto,
-                    ES.EditorInternal.ESCompositeSSUBlendMode.Auto,
-                    true,
-                    out _);
-
-                Assert.That(migrated.GetFloat("_WorldTilingPixelsPerUnit"), Is.EqualTo(0.5f).Within(0.0001f));
-                Assert.That(migrated.GetVector("_WorldTilingScale").y, Is.EqualTo(2f).Within(0.0001f));
-                Assert.That(migrated.GetVector("_WorldTilingOffset").x, Is.EqualTo(0.25f).Within(0.0001f));
-                Assert.That(migrated.GetVector("_WorldTilingOffset").y, Is.EqualTo(0.25f).Within(0.0001f));
-            }
-            finally
-            {
-                if (migrated != null) Object.DestroyImmediate(migrated);
-                Object.DestroyImmediate(texture);
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [Test]
-        public void SSUMigration_RejectsCompositeAndOrdinaryMaterials()
-        {
-            Material composite = CreateTestMaterial(RequireShader("ES/2D/Composite URP"));
-            Material ordinary = CreateTestMaterial(RequireShader("UI/Default"));
-            try
-            {
-                ES.EditorInternal.ESCompositeSSUMigrationReport compositeReport =
-                    ES.EditorInternal.ESCompositeSSUMaterialMigration.Analyze(composite);
-                ES.EditorInternal.ESCompositeSSUMigrationReport ordinaryReport =
-                    ES.EditorInternal.ESCompositeSSUMaterialMigration.Analyze(
-                        ordinary,
-                        ES.EditorInternal.ESCompositeSSUTargetMode.TwoD,
-                        ES.EditorInternal.ESCompositeSSUBlendMode.Alpha);
-
-                Assert.That(compositeReport.HasErrors, Is.True);
-                Assert.That(ordinaryReport.HasErrors, Is.True);
-                Assert.That(ordinaryReport.CanMigrate(true), Is.False);
-            }
-            finally
-            {
-                Object.DestroyImmediate(ordinary);
-                Object.DestroyImmediate(composite);
-            }
-        }
-
-        [Test]
-        public void SSUMigration_CreatesIndependentMaterialWithoutMutatingSource()
-        {
-            Material source = CreateTestMaterial(RequireShader("Sprite Shaders Ultimate/Standard SSU"));
-            Material migrated = null;
-            try
-            {
-                source.name = "SSU Migration Source";
-                source.SetFloat("_EnableFullDistortion", 1f);
-                source.SetFloat("_FullDistortionFade", 0.25f);
-                Shader sourceShader = source.shader;
-                int sourceQueue = source.renderQueue;
-
-                migrated = ES.EditorInternal.ESCompositeSSUMaterialMigration.CreateMigratedMaterial(
-                    source,
-                    ES.EditorInternal.ESCompositeSSUTargetMode.Auto,
-                    ES.EditorInternal.ESCompositeSSUBlendMode.Auto,
-                    true,
-                    out ES.EditorInternal.ESCompositeSSUMigrationReport report);
-
-                Assert.That(migrated, Is.Not.Null);
-                Assert.That(report.CanMigrate(true), Is.True);
-                Assert.That(migrated, Is.Not.SameAs(source));
-                Assert.That(migrated.shader.name, Is.EqualTo("ES/2D/Composite URP"));
-                Assert.That(source.shader, Is.SameAs(sourceShader));
-                Assert.That(source.renderQueue, Is.EqualTo(sourceQueue));
-                Assert.That(source.GetFloat("_EnableFullDistortion"), Is.EqualTo(1f));
-                Assert.That(source.GetFloat("_FullDistortionFade"), Is.EqualTo(0.25f));
-            }
-            finally
-            {
-                if (migrated != null) Object.DestroyImmediate(migrated);
-                Object.DestroyImmediate(source);
-            }
-        }
-
-        [Test]
-        public void SSUMigration_SourceKeepsSnapshotAndOutputSafetyContracts()
-        {
-            const string editorRoot = "Assets/Plugins/ES/Editor/ESShader/";
-            string migrationSource = File.ReadAllText(editorRoot + "ESCompositeSSUMaterialMigration.cs");
-            string windowSource = File.ReadAllText(editorRoot + "ESCompositeSSUMigrationWindow.cs");
-
-            Assert.That(migrationSource, Does.Contain("m_SavedProperties.m_Floats"));
-            Assert.That(migrationSource, Does.Contain("m_SavedProperties.m_Ints"));
-            Assert.That(migrationSource, Does.Contain("m_SavedProperties.m_Colors"));
-            Assert.That(migrationSource, Does.Contain("m_SavedProperties.m_TexEnvs"));
-            Assert.That(migrationSource, Does.Not.Contain("source.SetFloat"));
-            Assert.That(migrationSource, Does.Not.Contain("source.shader ="));
-            Assert.That(windowSource, Does.Contain("AssetDatabase.GenerateUniqueAssetPath"));
-            Assert.That(windowSource, Does.Contain("TryNormalizeAssetFolder"));
-            Assert.That(windowSource, Does.Contain("AssetDatabase.FindAssets(\"t:Material\""));
-            Assert.That(windowSource, Does.Contain("AssetDatabase.SaveAssetIfDirty"));
-            Assert.That(windowSource, Does.Not.Contain("AssetDatabase.SaveAssets()"));
-            Assert.That(migrationSource, Does.Contain("ESCompositeInteractiveWind2D"));
-            Assert.That(migrationSource, Does.Contain("ESCompositeWindParallax"));
         }
 
         [Test]

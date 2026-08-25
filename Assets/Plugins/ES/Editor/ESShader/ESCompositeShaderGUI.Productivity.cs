@@ -174,7 +174,7 @@ namespace ES.EditorInternal
             "_EnableGlitch", "_GlitchAmount", "_GlitchIntensity", "_GlitchSpeed", "_GlitchFade",
             "_GlitchMaskMin", "_GlitchMaskScale", "_GlitchMaskSpeed", "_GlitchHueSpeed",
             "_GlitchBrightness", "_GlitchNoiseScale", "_GlitchNoiseSpeed", "_GlitchDistortion",
-            "_GlitchDistortionScale", "_GlitchDistortionSpeed", "_SSUStatusContract",
+            "_GlitchDistortionScale", "_GlitchDistortionSpeed", "_ESNativeStatusContract",
             "_BlendMode", "_ZWriteMode", "_ZTest", "_Cull", "_QueueOffset"
         };
 
@@ -349,7 +349,7 @@ namespace ES.EditorInternal
                 new PresetAssignment("_QualityTier", 1f)),
             new CompositePreset(
                 "vfx.hologram", "全息故障", "高质量扫描线、轻微故障与色差组合，适合投影和数字替身。", "ES/3D/VFX Composite URP",
-                new PresetAssignment("_SSUStatusContract", 1f),
+                new PresetAssignment("_ESNativeStatusContract", 1f),
                 new PresetAssignment("_EnableHologram", 1f),
                 new PresetAssignment("_HologramColor", new Color(0.05f, 1.1f, 2.2f, 1f)),
                 new PresetAssignment("_HologramFade", 0.9f),

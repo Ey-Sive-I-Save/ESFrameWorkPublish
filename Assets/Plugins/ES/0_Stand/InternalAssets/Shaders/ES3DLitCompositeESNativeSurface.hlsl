@@ -1,7 +1,7 @@
-#ifndef ES_3D_LIT_COMPOSITE_SSU_SURFACE_INCLUDED
-#define ES_3D_LIT_COMPOSITE_SSU_SURFACE_INCLUDED
+#ifndef ES_3D_LIT_COMPOSITE_ESNative_SURFACE_INCLUDED
+#define ES_3D_LIT_COMPOSITE_ESNative_SURFACE_INCLUDED
 
-void ESApplyLitSSUSurfaceEffects(
+void ESApplyLitESNativeSurfaceEffects(
     float2 uv,
     float3 positionWS,
     half alpha,
@@ -54,7 +54,7 @@ void ESApplyLitSSUSurfaceEffects(
             _ReplaceRange,
             _ReplaceRange + max(_ReplaceSoftness, 0.001),
             colorDistance);
-        float replaceLuminance = ESCompositeSSULuminance(color);
+        float replaceLuminance = ESCompositeESNativeLuminance(color);
         half3 replaceTarget = _ReplaceTo.rgb
             * (half)pow(replaceLuminance, max(_ReplaceContrast, 0.001));
         color = lerp(color, replaceTarget, saturate(replace * _ReplaceFade));
@@ -247,14 +247,14 @@ void ESApplyLitSSUSurfaceEffects(
             metalNoise,
             _MetalFade * metalMask);
     }
-    if (_SSUStatusContract > 0.5)
+    if (_ESNativeStatusContract > 0.5)
     {
         float exactShineCoordinate = ESResolveLitShineCoordinate(
             uv,
             positionWS,
             _ShineRotation,
             1.0);
-        color = ESCompositeApplySSUStatusEffects(
+        color = ESCompositeApplyESNativeStatusEffects(
             color,
             uv,
             uv,
@@ -268,7 +268,7 @@ void ESApplyLitSSUSurfaceEffects(
     }
     if (_EnableNegative > 0.5)
         color = lerp(color, 1.0h - color, saturate(_NegativeFade));
-    if (_SSUStatusContract <= 0.5 && _EnableRainbow > 0.5)
+    if (_ESNativeStatusContract <= 0.5 && _EnableRainbow > 0.5)
     {
         float rainbowCoordinate = ESCompositeDirectionalCoordinate2D(
             uv,
@@ -281,7 +281,7 @@ void ESApplyLitSSUSurfaceEffects(
     if (_EnablePingPongGlow > 0.5)
     {
         float wave = 0.5 + 0.5 * sin(timeValue * _GlowFrequency);
-        float glowLuminance = ESCompositeSSULuminance(color);
+        float glowLuminance = ESCompositeESNativeLuminance(color);
         emission += lerp(_GlowFrom.rgb, _GlowTo.rgb, wave)
             * (half)pow(glowLuminance, max(_GlowContrast, 0.001))
             * _GlowIntensity
@@ -289,19 +289,19 @@ void ESApplyLitSSUSurfaceEffects(
     }
 
     float statusNoise = 0.0;
-    if (_SSUStatusContract <= 0.5 && (_EnableFrozen > 0.5 || _EnablePoison > 0.5))
+    if (_ESNativeStatusContract <= 0.5 && (_EnableFrozen > 0.5 || _EnablePoison > 0.5))
         statusNoise = ESCompositePerceptualNoise(SAMPLE_TEXTURE2D(
             _UberNoiseTexture,
             sampler_UberNoiseTexture,
             uv).r);
-    if (_SSUStatusContract <= 0.5 && _EnableFrozen > 0.5)
+    if (_ESNativeStatusContract <= 0.5 && _EnableFrozen > 0.5)
     {
         float snow = smoothstep(1.0 - _FrozenDensity, 1.0, statusNoise);
         color = lerp(color, _FrozenColor.rgb, 0.65h);
         emission += _FrozenHighlight.rgb * snow
             * (0.5 + 0.5 * sin(timeValue * _FrozenSpeed + statusNoise * 6.0));
     }
-    if (_SSUStatusContract <= 0.5 && _EnablePoison > 0.5)
+    if (_ESNativeStatusContract <= 0.5 && _EnablePoison > 0.5)
     {
         float poison = 0.5 + 0.5 * sin(
             timeValue * _PoisonSpeed + statusNoise * _PoisonDensity * 6.0);

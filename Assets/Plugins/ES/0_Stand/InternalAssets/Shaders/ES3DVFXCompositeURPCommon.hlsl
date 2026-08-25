@@ -143,7 +143,7 @@ CBUFFER_START(UnityPerMaterial)
     float4 _GlitchDistortion;
     float4 _GlitchDistortionScale;
     float4 _GlitchDistortionSpeed;
-    float _SSUStatusContract;
+    float _ESNativeStatusContract;
     half4 _EmissionColor;
     float _EnableSoftParticles;
     float _SoftParticleNear;
@@ -157,11 +157,11 @@ CBUFFER_START(UnityPerMaterial)
     float _BlendMode;
 CBUFFER_END
 
-// VFX reuses its authored noise resource for the shared SSU contract so the
+// VFX reuses its authored noise resource for the shared ESNative contract so the
 // exact path adds no sampler and remains compatible with particle materials.
 #define _UberNoiseTexture _NoiseTex
 #define sampler_UberNoiseTexture sampler_NoiseTex
-#include "ESCompositeSSUStylizedEffects.hlsl"
+#include "ESCompositeESNativeStylizedEffects.hlsl"
 
 float _ESUnscaledTime;
 float _ESUnscaledTimeValid;
@@ -382,21 +382,21 @@ half4 ES3DVFXFragment(ESVaryings input) : SV_Target
     float2 stylizedCoordinate = ESSequenceLocalCoordinate(uv, atlasBounds);
     float hologramCoordinate = 0.0;
 #if defined(_ES_QUALITY_HIGH)
-    if (_SSUStatusContract > 0.5)
+    if (_ESNativeStatusContract > 0.5)
     {
         if (_EnableHologram > 0.5)
         {
-            hologramCoordinate = ESCompositeResolveSSUHologramCoordinate(
+            hologramCoordinate = ESCompositeResolveESNativeHologramCoordinate(
                 stylizedCoordinate,
                 input.positionWS);
-            uv = ESCompositeApplySSUHologramUV(
+            uv = ESCompositeApplyESNativeHologramUV(
                 uv,
                 hologramCoordinate,
                 _MainTex_TexelSize.z,
                 timeValue);
         }
         if (_EnableGlitch > 0.5)
-            uv = ESCompositeApplySSUGlitchUV(uv, stylizedCoordinate, timeValue);
+            uv = ESCompositeApplyESNativeGlitchUV(uv, stylizedCoordinate, timeValue);
     }
     else if (_EnableGlitch > 0.5)
     {
@@ -455,11 +455,11 @@ half4 ES3DVFXFragment(ESVaryings input) : SV_Target
 #endif
 
 #if defined(_ES_QUALITY_HIGH)
-    if (_SSUStatusContract > 0.5)
+    if (_ESNativeStatusContract > 0.5)
     {
         if (_EnableHologram > 0.5)
         {
-            half4 hologramSource = ESCompositeApplySSUHologramColor(
+            half4 hologramSource = ESCompositeApplyESNativeHologramColor(
                 half4(color, alpha),
                 hologramCoordinate,
                 timeValue);
@@ -467,7 +467,7 @@ half4 ES3DVFXFragment(ESVaryings input) : SV_Target
             alpha = hologramSource.a;
         }
         if (_EnableGlitch > 0.5)
-            color = ESCompositeApplySSUGlitchColor(color, stylizedCoordinate, timeValue);
+            color = ESCompositeApplyESNativeGlitchColor(color, stylizedCoordinate, timeValue);
     }
 #endif
 
@@ -554,7 +554,7 @@ half4 ES3DVFXFragment(ESVaryings input) : SV_Target
         float sparkle = step(1.0 - _SparkleDensity, sparkleSeed) * pow(saturate(sparkleWave * sparkleShape), max(1.0, _SparkleSharpness));
         color += _SparkleColor.rgb * sparkle * _SparkleIntensity;
     }
-    if (_SSUStatusContract <= 0.5 && _EnableHologram > 0.5)
+    if (_ESNativeStatusContract <= 0.5 && _EnableHologram > 0.5)
     {
         float2 legacyLocalDirection = _HologramDirection.xy;
         float legacyLocalDirectionLength = length(legacyLocalDirection);

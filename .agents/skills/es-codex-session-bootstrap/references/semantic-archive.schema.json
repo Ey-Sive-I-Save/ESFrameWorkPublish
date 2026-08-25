@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "esframework://codex/semantic-archive.schema.json",
+  "title": "ESFramework Semantic Archive",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "archiveKind", "archiveId", "projectKey", "objective", "state", "importantData", "archiveReason", "recentScope", "expectation", "createdUtc"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "archiveKind": {"const": "es-semantic-archive"},
+    "archiveId": {"type": "string", "pattern": "^[A-Za-z0-9._-]{8,96}$"},
+    "projectKey": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,80}$"},
+    "responsibilityKey": {"type": "string", "maxLength": 160},
+    "objective": {"type": "string", "minLength": 1, "maxLength": 8000},
+    "state": {"type": "object"},
+    "importantData": {"type": "object"},
+    "archiveReason": {"type": "string", "minLength": 1, "maxLength": 1000},
+    "recentScope": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["relativePath", "changeKind"],
+        "properties": {
+          "relativePath": {"type": "string", "pattern": "^(?!/)(?!.*(^|/)\.\.(?:/|$)).+"},
+          "changeKind": {"type": "string", "enum": ["modified", "added", "deleted", "renamed", "observed", "unknown"]},
+          "contentSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+        }
+      }
+    },
+    "expectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expected", "gapSummary"],
+      "properties": {
+        "expected": {"type": "array", "maxItems": 32, "items": {"type": "string", "maxLength": 1000}},
+        "gapSummary": {"type": "string", "maxLength": 4000},
+        "gapStatus": {"type": "string", "enum": ["unknown", "open", "partial", "aligned", "blocked"]}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "branch": {"type": "string", "maxLength": 240},
+        "headSha": {"type": "string", "pattern": "^[a-f0-9]{7,64}$"},
+        "source": {"type": "string", "enum": ["user-supplied", "worktree-observed", "mixed", "unobserved"]}
+      }
+    },
+    "createdUtc": {"type": "string", "format": "date-time"},
+    "updatedUtc": {"type": "string", "format": "date-time"}
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "ruleSetId": "es-skill-change-impact-v1",
+  "classes": {
+    "small": {
+      "description": "Non-semantic documentation or formatting changes.",
+      "revalidationRequired": false,
+      "requiredStages": ["local-contract"]
+    },
+    "medium": {
+      "description": "Behavioral references, tests, or bounded workflow changes without authority expansion.",
+      "revalidationRequired": true,
+      "requiredStages": ["creator-review", "governance-review", "contract", "evidence", "static-deep-replay"]
+    },
+    "major": {
+      "description": "New Skill or changes to triggers, permissions, scripts, schemas, governance, routing, or evidence contracts.",
+      "revalidationRequired": true,
+      "requiredStages": ["creator-review", "governance-review", "contract", "evidence", "catalog-registry", "static-deep-replay"]
+    }
+  },
+  "majorPathPatterns": [
+    "^SKILL\\.md$",
+    "^governance\\.json$",
+    "^agents/",
+    "^scripts/",
+    "^mcp/",
+    "^static-replay\\.manifest\\.json$",
+    "^references/.*(contract|schema|permission|authority|boundary|governance|verification).*\\.(md|json|yaml)$",
+    "^tests?/"
+  ],
+  "mediumPathPatterns": [
+    "^references/",
+    "^assets/"
+  ],
+  "smallPathPatterns": [
+    "^README\\.md$",
+    "^CHANGELOG\\.md$",
+    "\\.(txt|log)$"
+  ],
+  "majorSemanticPatterns": [
+    "(?i)(writePolicy|allowDirectExecution|runtimeAuthorization|network|credential|secret|permission|routeKey|commandBinding|canWrite|canDispatch|publish|changeGit|governance|schemaVersion|staticDeepReplay)"
+  ]
+}

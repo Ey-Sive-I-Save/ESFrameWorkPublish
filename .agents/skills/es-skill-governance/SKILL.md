@@ -18,14 +18,14 @@ description: "Classify, design, upgrade, review, validate, and retire ESFramewor
 - Read [the evidence receipt contract](references/evidence-receipt-contract.md) and run [the evidence validator](scripts/Test-ESSkillEvidence.ps1) against every execution receipt.
 - Read [the Runtime authorization contract](references/runtime-authorization-contract.md) before any runtime proposal; validate a supplied manifest with `scripts/Test-ESRuntimeAuthorization.ps1`. The machine-readable contract is `ES/Automation/Contracts/es-runtime-authorization.schema.json`; the validator remains the semantic authority for path containment, source hashes, expiry, and budget relationships.
 - Run [the static/runtime semantics audit](scripts/Test-ESSkillVerificationSemantics.ps1) after a batch upgrade; it reports Skills whose claims are runtime-heavy but lack explicit verification profiles.
-- MCP is optional and deny-by-default; capability visibility never grants permission. Use AIBrain `planTask`, the matching AICommand, and the current TaskContract before any write or external operation.
+- Capability visibility never grants AI-initiated authority. Apply [the user-directed action authority](references/user-directed-action-authority.md): the current user's explicit request directly authorizes its bounded action, while AIBrain, AICommand and TaskContract are protocol inputs only when their managed channel is selected. Reject inferred expansion, not user-directed paths.
 
-Use this Skill to turn a proposed project Skill into a bounded, testable and maintainable capability. It governs scope, workflow, resources, evidence, risk, ownership and maturity; it never grants permission to edit source, Git, Unity state, release outputs or external systems.
+Use this Skill to turn a proposed project Skill into a bounded, testable and maintainable capability. It governs scope, workflow, resources, evidence, risk, ownership and maturity. It never grants AI permission to invent work beyond the current user request, and it never narrows work the user has already authorized.
 
 ## Authority and boundaries
 
 1. Read `.agents/README.md`, the AIWarnings entry, `CurrentStatus`, `RuleIndex`, and the P0/domain rules matched by the Skill's work.
-2. Treat `.agents/skills/<name>/SKILL.md` as the Skill workflow authority, AIWarnings as long-lived constraints, and AICommands as the per-task authorization contract.
+2. Treat `.agents/skills/<name>/SKILL.md` as the Skill workflow authority, AIWarnings as long-lived constraints, the current user instruction as action authority, and AICommands as managed-channel task contracts.
 3. Keep three axes separate: **Tier** (`SmallTool`, `Workflow`, `Engineering`), **Maturity** (`Proposed` through `Archived`), and **Delivery** (`Designed`, `Implemented-Unverified`, `Blocked`, `Failed`, `Accepted`, `Released`).
 4. Use the project's S0-S6 evidence levels. Never describe a Skill as production-ready from frontmatter validation alone.
 5. Preserve the direct-child `es-*` layout under `.agents/skills`. Do not copy AIWarnings, AICommands, session history, Unity assemblies, generated artifacts, or hidden binaries into a Skill.
@@ -45,7 +45,11 @@ Read [references/tier-matrix.md](references/tier-matrix.md) before choosing a ti
 
 Read [references/verification-semantics.md](references/verification-semantics.md) for the project-wide distinction between source-level (`Static`) and external-execution (`Runtime`) evidence. Never convert `runtime-not-run` into a static failure; select the verification profile that matches the claim.
 
-The default is `StaticDeepReplay` first: complete static simulation and boundary analysis before any Runtime proposal. Runtime is opt-in only and requires explicit developer approval, AIBrain plan, matching AICommand/TaskContract, and a bounded evidence budget.
+Read [references/es-preservation-refactor-contract.md](references/es-preservation-refactor-contract.md) before refactoring an existing ES subsystem. Preserve ES entry points and default behavior; add commercial controls at boundaries and require migration evidence for breaking changes.
+
+The default is `StaticDeepReplay` first. Runtime is opt-in only: the current user must explicitly request the Runtime action and a bounded stop condition. When Runtime is executed through AIBrain, its plan, AICommand and TaskContract remain mandatory transport inputs, but they are not a second user approval.
+
+For project work, the current explicit user instruction authorizes the named goal and strictly necessary project-local changes, including source, Assets, governance/control-plane, settings, documentation, tests and generated evidence. `UserDirectedLowRisk` is now a compatibility name for a scope-closure validator, not a low-risk allowlist. Path classes and size thresholds are review signals only. Delete, rename, Git, Runtime, external-process, network, release and credential actions must be explicitly named; once named, they require no additional project approval.
 
 Every Skill-local `Test-ESSkillEvidence.ps1` is required to delegate to `scripts/Test-ESStrictEvidenceReceipt.ps1` (or implement an equivalent strict contract). Local receipt validation must not stop at field presence; it must verify project-relative paths, source hashes, PlanHash, tool identity, capture time, and freshness.
 
@@ -67,6 +71,8 @@ Read [references/commercial-controls.md](references/commercial-controls.md) for 
 8. Report target, changes, tier/maturity/delivery, evidence, verified and unverified behavior, blockers, impact and next action.
 9. If `governance.json` is present, include its hash in the acceptance evidence. AIBrain must bind that hash into the plan; changing governance metadata requires a new plan.
 
+Before declaring an existing Skill upgrade complete, run `scripts/Get-ESSkillChangeImpact.ps1` for the target Skill. A `medium` or `major` result is a derived revalidation gate: report the impact to the user and complete its `requiredStages` before claiming `Accepted`; it does not request a second authorization. The rule contract is `references/skill-change-impact-contract.md` and the machine rules are `references/skill-change-impact-rules.json`.
+
 ## Tier operating rules
 
 - **SmallTool**: one obvious entry point and narrow blast radius; prefer read-only or dry-run; one deterministic script is enough when it removes repeated errors. No child Skills or unrelated scans.
@@ -84,14 +90,6 @@ Read [references/commercial-controls.md](references/commercial-controls.md) for 
 
 A Skill may be called `Stable` only when its trigger is precise, write scope is explicit, scripts pass representative runs, denial fails closed, and evidence matches the claim. Workflow and Engineering tiers also require recovery and scale/performance notes. Missing Unity, Player, Profiler, IL2CPP or release evidence remains explicitly unverified.
 
-## Specialized static acceptance
-
-- Guidance: `references/static-specialized-acceptance.md`
-- Acceptance ID: `governance-contract`
-- Required cases: `metadata-completeness, authority-ref-closure, permission-denial, profile-weight, stale-governance-hash`
-- Static assertions: authority refs are closed; runtime hard gate; StaticDeepReplay-first; permission expansion denied; governance hash
-- This contract is responsibility-specific and remains distinct from Runtime proof.
-
 ## Responsibility-specific static acceptance
 
 - Profile: `governance`
@@ -101,8 +99,8 @@ A Skill may be called `Stable` only when its trigger is precise, write scope is 
 ## Engineering controls
 
 - **Owners**: ESFramework AI governance maintainers own maintenance; the task requester or designated maintainer owns acceptance.
-- **Permission matrix**: inspection and planning are read-only; Skill/validator writes require explicit task authorization; Git, Unity state, release, deletion, network and external AI remain separately unauthorized.
-- **Capability modes**: `references/capability-mode-registry.json` is the explicit exception registry. The default is `mutating`, which requires an AICommand binding. `advisory` produces analysis/review only; `candidate` produces proposals only. Neither mode grants project writes or external execution.
+- **Permission matrix**: inspection is read-only unless the current user requests a change. That current instruction authorizes its bounded goal; Git, Unity/Runtime, release, deletion/rename, network, external process and credentials require action-specific wording, not a second approval.
+- **Capability modes**: `references/capability-mode-registry.json` classifies unattended or AIBrain-orchestrated Skill behavior. `advisory` and `candidate` limit what the Skill may initiate by itself; they do not force an explicitly user-directed implementation into proposal-only mode. `mutating` uses an AICommand binding only when the managed channel is selected.
 - **Command binding registry**: `references/command-binding-registry.json` is an auditable bridge for existing Skills while their minified `governance.json` is migrated. It must contain the exact command ID, body hash, role, risk level and write mode; the validator resolves and rehashes it before allowing the binding.
 - **Change budget**: name exact Skill paths, maximum Skill count, allowed files, retry count, timeout and stop condition before any batch upgrade.
 - **Risk register**: prevent tier inflation with the tier matrix; detect permission expansion through metadata validation; isolate malformed Skills by failing closed; recover by preserving the previous files and invalidating the old PlanHash.
@@ -111,12 +109,12 @@ A Skill may be called `Stable` only when its trigger is precise, write scope is 
 - **Compatibility and retirement**: schema or authority semantic changes require validator/AIBrain updates and Knowledge hash refresh. Retirement requires removing active routes only after a replacement or explicit deprecation decision.
 - **Acceptance replay**: rerun the contract validator plus positive, invalid-input, denied-expansion, repeat/idempotency and interruption/recovery cases; record command, inputs, output and governance hash.
 - **Evidence separation**: record static proof and runtime proof on separate axes. A Skill may be source-supported and runtime-unverified; it may not claim runtime or release acceptance from static evidence.
-- **Runtime consent**: never open Unity, run a game, switch scenes, launch a Player or start an external process merely because a runtime check exists. Ask for or consume explicit developer authorization tied to the current plan and stop condition.
+- **Runtime consent**: never open Unity, run a game, switch scenes, launch a Player or start an external process merely because a runtime check exists. A current user request that explicitly names the Runtime/external action and a bounded stop condition is sufficient; do not ask for a second project approval.
 - **Static weight**: every profile gives StaticDeepReplay at least half of its evidence weight; Runtime is supplementary unless an explicitly authorized RuntimeAcceptance/ReleaseAcceptance profile is selected.
 
 ## AIBrain operating boundary
 
-When the task is routed through AIBrain, use `planTask` before `runTask`. The plan must name the routed Knowledge entries, AICommand, Skill hashes, governance metadata, TaskContract and required evidence. `runTask` may consume only the one-time plan authorization and matching invocation; it must not call ProcessRunner or write `Assets/` directly. If a Skill or its `governance.json` changes after planning, discard the old plan and re-plan. See [references/aibrain-contract.md](references/aibrain-contract.md).
+When the task is routed through AIBrain, use `planTask` before `runTask`. The plan must name the routed Knowledge entries, AICommand, Skill hashes, governance metadata, TaskContract and required evidence. `runTask` may consume only the bounded plan token and matching invocation; it must not call ProcessRunner or write paths outside that plan. These are managed-channel invariants, not prerequisites for direct user-directed work. If a Skill or its `governance.json` changes after planning, discard the old plan and re-plan. See [references/aibrain-contract.md](references/aibrain-contract.md).
 
 ## Bundled resources
 
@@ -125,12 +123,18 @@ When the task is routed through AIBrain, use `planTask` before `runTask`. The pl
 - [references/scale-patterns.md](references/scale-patterns.md): child tools, references, scripts, dependencies and maintenance.
 - [references/commercial-controls.md](references/commercial-controls.md): commercial-grade controls and operating obligations.
 - [references/performance-controls.md](references/performance-controls.md): universal fast-path/deep-path execution and scale limits.
-- [references/aibrain-contract.md](references/aibrain-contract.md): AIBrain routing, plan hash and one-time execution contract.
+- [references/aibrain-contract.md](references/aibrain-contract.md): AIBrain routing, plan hash and invocation-bound, time-and-use-limited execution contract.
 - [references/verification-semantics.md](references/verification-semantics.md): Static/Runtime axes and verification profiles.
 - [references/runtime-authorization-contract.md](references/runtime-authorization-contract.md): one-time runtime authorization binding.
 - `scripts/Test-ESSkillContract.ps1`: read-only structural and contract checks.
 - `scripts/Test-ESSkillArchitecture.ps1`: lifecycle, route-scope and registry-manifest closure checks.
+- `scripts/Test-ESCommercialCoherence.ps1`: read-only aggregate gate for Skill, AICommand, ES Automation compatibility, and AIKnowledge static surfaces; it never starts Runtime.
+  The aggregate gate also records before/after governance-surface hashes and blocks when the audit spans multiple source generations.
+- Read `references/commercial-coherence-contract.md` before changing the aggregate gate or interpreting `static-coherent`.
+- Run `scripts/Test-ESStaticAcceptanceCoverage.ps1` when changing the Skill portfolio; it verifies every Skill has a responsibility-specific static acceptance plan and discoverable evidence artifacts.
+- [references/user-directed-action-authority.md](references/user-directed-action-authority.md), `references/user-directed-low-risk-policy.json` and `scripts/Test-ESUserDirectedLowRiskPolicy.ps1`: current-user direct authority plus deterministic declared-scope checks; the old `UserDirectedLowRisk` name is compatibility-only and contains no path denylist.
 - `scripts/Build-ESSkillRegistryManifest.ps1`: deterministic, project-relative registry snapshot builder.
+- `.agents/SKILL_ROUTE_ALIASES.zh-CN.json` and `scripts/Test-ESChineseSkillRouteCoverage.ps1`: authoritative Chinese discovery aliases for every direct Skill; missing or ambiguous aliases block route coverage only, never grant permission.
 
 Run:
 
@@ -143,12 +147,17 @@ Run:
 
 Acceptance ID: `governance-contract`
 
+Guidance: `references/static-specialized-acceptance.md`
+
 Responsibility-specific static assertions (these are source-level requirements, not Runtime claims):
 - authority refs are closed
 - runtime hard gate
 - StaticDeepReplay-first
 - permission expansion denied
 - governance hash
+- ES entry compatibility
+- commercial coherence snapshot stability
+- knowledge source freshness classification
 
-Required specialized cases: `metadata-completeness, authority-ref-closure, permission-denial, profile-weight, stale-governance-hash`
+Required specialized cases: `metadata-completeness, authority-ref-closure, permission-denial, profile-weight, stale-governance-hash, es-entry-compatibility, commercial-coherence-snapshot`
 Guidance: `references/static-specialized-acceptance.md`

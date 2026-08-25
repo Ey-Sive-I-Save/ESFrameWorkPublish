@@ -7,6 +7,14 @@ param(
 $ErrorActionPreference='Stop'
 $root=(Resolve-Path -LiteralPath $ProjectRoot).Path.TrimEnd('\','/')
 $utf8=New-Object Text.UTF8Encoding($false,$true)
+. (Join-Path $PSScriptRoot 'ESPathBoundary.Common.ps1')
+
+try {
+    $reportTarget=Resolve-ESContainedRelativePath -Candidate $ReportPath -ContainerRoot $root -Label 'ReportPath'
+} catch {
+    Write-Error $_.Exception.Message -ErrorAction Continue
+    exit 2
+}
 
 function ReadStrict([string]$relativePath) {
     $full=Join-Path $root ($relativePath.Replace('/','\'))
@@ -32,6 +40,15 @@ if($text.ContainsKey('center')){
     AddCheck $checks 'center-contract' 'Existing TaskContract and Worker registration remain authoritative' `
         (Has $text.center 'class\s+ESAutomationTaskContract' -and Has $text.center 'class\s+ESAutomationTaskRegistry' -and Has $text.center 'class\s+ESAutomationProcessRunner') `
         'TaskContract, TaskRegistry and ProcessRunner must remain available.'
+    AddCheck $checks 'center-capability-envelope' 'Commercial capability envelope remains at the ES execution boundary' `
+        (Has $text.center 'class\s+ESAutomationCapabilityEnvelope' -and Has $text.center 'ValidateCapabilityEnvelope') `
+        'CapabilityEnvelope must constrain TaskContract, Worker and project boundaries before execution.'
+    AddCheck $checks 'center-completion-decision' 'CompletionDecision remains externally verifiable' `
+        (Has $text.center 'class\s+ESAutomationCompletionDecision' -and Has $text.center 'EvidenceBindsToSnapshot') `
+        'Completion cannot be inferred from model output or worker completion alone.'
+    AddCheck $checks 'center-freshness-policy' 'Evidence freshness and snapshot binding remain explicit' `
+        (Has $text.center 'class\s+ESAutomationFreshnessPolicy' -and Has $text.center 'brainPlanHash') `
+        'Freshness policy must bind evidence to the AIBrain plan snapshot.'
 }
 if($text.ContainsKey('facade')){
     AddCheck $checks 'facade-entry' 'ES Facade remains the single task execution entry' `
@@ -48,6 +65,18 @@ if($text.ContainsKey('brain')){
     AddCheck $checks 'brain-no-direct-process' 'AIBrain does not directly launch arbitrary processes' `
         (-not (Has $text.brain '(?<!ESAutomationProcessRunner\.)\bProcess\.Start\s*\(')) `
         'Process launch belongs to a registered ES ProcessRunner adapter.'
+    AddCheck $checks 'brain-policy-v5-authorization' 'AIBrain authorization uses the persisted Policy v5 bounded-use store' `
+        (Has $text.brain 'AuthorizationStoreSchemaVersion\s*=\s*3' `
+            -and Has $text.brain 'AuthorizationPolicyVersion\s*=\s*5' `
+            -and Has $text.brain 'DefaultLowRiskAuthorizationUses\s*=\s*20' `
+            -and Has $text.brain 'DefaultCandidateAuthorizationUses\s*=\s*5' `
+            -and Has $text.brain 'DefaultHighRiskAuthorizationUses\s*=\s*1' `
+            -and Has $text.brain 'TryOpenAuthorizationLock' `
+            -and Has $text.brain 'TryConsumeAuthorization' `
+            -and Has $text.brain 'usedIdempotencyKeys' `
+            -and Has $text.brain 'AuthorizationStatusExhausted' `
+            -and -not (Has $text.brain 'static\s+readonly\s+Dictionary<string,\s*AIBrainExecutionAuthorization>\s+Authorizations')) `
+        'Policy v5 must persist bounded 20/5/1 use, idempotency, and terminal state without an authoritative process-local grant cache.'
 }
 if($text.ContainsKey('bridge')){
     AddCheck $checks 'bridge-actions' 'Existing AI Bridge actions remain discoverable' `
@@ -56,11 +85,14 @@ if($text.ContainsKey('bridge')){
     AddCheck $checks 'bridge-brain-routing' 'AI Bridge routes through AIBrain' `
         (Has $text.bridge 'ESAIBrainCoordinator\.') `
         'AI Bridge must not become a parallel execution authority.'
+    AddCheck $checks 'bridge-planhash-gate' 'AI Bridge requires the approved AIBrain PlanHash for execution' `
+        (Has $text.bridge 'approvedPlanHash' -and Has $text.bridge 'runTask requires approvedPlanHash') `
+        'External runTask must not execute without a current approvedPlanHash.'
 }
 
 $blocked=@($checks|Where-Object status -eq 'blocked')
-$relative=$ReportPath.Replace('\','/')
-$fullReport=Join-Path $root ($ReportPath.Replace('/','\'))
+$relative=$reportTarget.RelativePath
+$fullReport=$reportTarget.FullPath
 $parent=Split-Path -Parent $fullReport
 if(-not(Test-Path -LiteralPath $parent)){New-Item -ItemType Directory -Path $parent -Force|Out-Null}
 $result=[ordered]@{
@@ -73,6 +105,14 @@ $result=[ordered]@{
     claimsNotProven=@('Unity runtime behavior','actual process execution','performance and visual behavior')
     reportPath=$relative
 }
-[IO.File]::WriteAllText($fullReport,($result|ConvertTo-Json -Depth 8),$utf8)
+$reportTarget=Resolve-ESContainedRelativePath -Candidate $relative -ContainerRoot $root -Label 'ReportPath'
+$fullReport=$reportTarget.FullPath
+$temporary="$fullReport.tmp-$([Guid]::NewGuid().ToString('N'))"
+try {
+    [IO.File]::WriteAllText($temporary,($result|ConvertTo-Json -Depth 8),$utf8)
+    Move-Item -LiteralPath $temporary -Destination $fullReport -Force
+} finally {
+    if(Test-Path -LiteralPath $temporary){Remove-Item -LiteralPath $temporary -Force}
+}
 $result|ConvertTo-Json -Depth 8
 if($blocked.Count -gt 0){exit 1};exit 0

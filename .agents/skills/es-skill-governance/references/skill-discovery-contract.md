@@ -32,7 +32,7 @@ Skill 的存在、可发现、可规划和可运行是四个不同事实。Catal
 
 ## 运行权限
 
-`discoveryState` 永远不授予权限。运行仍必须经过 AIBrain `planTask`、匹配的 AICommand、TaskContract、当前授权和运行证据。`not-proven` 只能表示静态可规划，不得声称运行可用。
+`discoveryState` 永远不授予 AI 自行执行权限，也不得缩小当前用户明确请求。用户点名 Runtime 动作后即具备项目授权；若选用 AIBrain 通道，运行还必须满足其 `planTask`、AICommand 和 TaskContract 协议。`not-proven` 只限制运行可用性声明，不是二次批准状态。
 
 ## 变更与恢复
 

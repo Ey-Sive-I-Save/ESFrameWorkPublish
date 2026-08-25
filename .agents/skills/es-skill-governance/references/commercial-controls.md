@@ -1,6 +1,6 @@
 # Commercial-grade controls
 
-商业级 Skill 不是“功能更多”，而是每个可产生影响的面都有可审计的控制。以下控制与 Skill 等级、AICommand 授权和 AIBrain 计划共同生效。
+商业级 Skill 不是“功能更多”，而是每个可产生影响的面都有可审计的控制。以下控制与当前用户指令共同生效；AICommand 与 AIBrain 计划只在选用受管通道时提供协议和证据。
 
 ## 1. Identity and version
 
@@ -10,12 +10,12 @@
 
 ## 2. Authority and permission
 
-权威顺序固定为：当前源码/真实证据 > AIWarnings P0 > AICommand > AIBrain 路由 > Skill > AIKnowledge 摘要。Skill 只能提供工作流；AICommand 提供单次授权；AIBrain 只做定向计划、门禁和一次性授权。
+事实与证据顺序固定为：当前源码/真实证据 > AIWarnings P0 > AICommand/AIBrain 回执 > Skill > AIKnowledge 摘要。项目动作授权来自当前用户明确指令；Skill 只提供工作流，AICommand 与 AIBrain 为受管通道提供合同、计划令牌和回执。
 
-- 不得把 `governance.json`、Knowledge、聊天确认或按钮可见当作写权限。
+- 不得把 `governance.json`、Knowledge、模型自述或按钮可见当作写权限；宿主传入的当前用户明确指令是授权来源。
 - `authorityClass` 只表示 Skill 在路由和门禁链中的优先级；不得用 Engineering 或 project-gate 冒充修改、发布、删除或网络权限。
 - 读、计划、写、发布、删除、外部网络和 AI 调用分别声明，不用一个 `allow` 布尔值包办。
-- 缺少明确授权、命令、TaskContract、路径或目标身份时必须 fail closed。
+- 缺少当前用户明确授权、目标范围或动作身份时必须 fail closed。只有选用受管通道时，缺少其命令或 TaskContract 才阻断该通道；不得据此阻断同一用户范围内的直接项目修改。
 
 ## 3. Risk and change budget
 

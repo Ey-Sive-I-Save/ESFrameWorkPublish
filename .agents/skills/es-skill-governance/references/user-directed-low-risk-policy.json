@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 2,
+  "policyId": "es-user-directed-action-authority",
+  "compatibilityName": "UserDirectedLowRisk",
+  "authority": "current-explicit-user-instruction",
+  "enabled": true,
+  "writeMode": "user-directed-actions-without-secondary-project-approval",
+  "requiresExplicitUserInstruction": true,
+  "secondaryApprovalRequired": false,
+  "projectBoundary": {
+    "requireContainedTarget": true,
+    "acceptContainedAbsoluteInput": true,
+    "normalizeToProjectRelativePath": true,
+    "resolveExistingReparsePoints": true
+  },
+  "ordinaryOperations": ["create", "modify"],
+  "localStaticValidation": {
+    "classification": "ordinary-quality-validation",
+    "separateActionRequired": false,
+    "requirements": [
+      "strictly-necessary-for-authorized-target",
+      "project-existing-tool",
+      "bounded-input-and-timeout",
+      "no-network",
+      "no-dependency-install",
+      "no-unity-or-runtime",
+      "no-resident-service"
+    ]
+  },
+  "actionSpecificOperations": [
+    "delete",
+    "rename",
+    "git-stage",
+    "git-commit",
+    "git-push",
+    "git-reset",
+    "git-rebase",
+    "git-checkout",
+    "git-clean",
+    "unity-runtime",
+    "external-process",
+    "network",
+    "release",
+    "credential-access"
+  ],
+  "actionSpecificPathGlobs": {
+    "credentials": [
+      ".env",
+      ".env.*",
+      "*/.env",
+      "*/.env.*",
+      "secret.*",
+      "*/secret.*",
+      "secrets.*",
+      "*/secrets.*",
+      "*.secret.*",
+      "*.secrets.*",
+      "*_secret.*",
+      "*/*_secret.*",
+      "*-secret.*",
+      "*/*-secret.*",
+      "secrets/*",
+      "*/secrets/*",
+      "credential.*",
+      "*/credential.*",
+      "credentials.*",
+      "*/credentials.*",
+      "credentials-*",
+      "*/credentials-*",
+      "*_credential.*",
+      "*/*_credential.*",
+      "credentials/*",
+      "*/credentials/*",
+      "token.*",
+      "*/token.*",
+      "tokens.*",
+      "*/tokens.*",
+      "*_token.*",
+      "*/*_token.*",
+      "*-token.*",
+      "*/*-token.*",
+      "tokens/*",
+      "*/tokens/*",
+      "*.pem",
+      "*.key",
+      "*.pfx",
+      "*.p12",
+      "*.jks"
+    ]
+  },
+  "nonDenyingPathClasses": {
+    "control-plane": ["AGENTS.md", ".agents", "AIWarnings", "AICommands", "KnowledgeIndex.yaml", "AIBRAIN_ENTRY.md"],
+    "environment": ["ProjectSettings", "Packages", "Library", "Temp", "Logs", "UserSettings"],
+    "generated-or-release": ["ES/Output", "Build", "ES/Releases", "*.dll", "*.exe", "*.so", "*.dylib"]
+  },
+  "denyConditions": [
+    "missing-current-explicit-user-instruction",
+    "planned-target-outside-declared-user-scope",
+    "ai-inferred-scope-expansion",
+    "project-root-escape",
+    "action-specific-operation-not-explicitly-requested"
+  ],
+  "reviewThresholds": {
+    "fileCount": 32,
+    "existingInputBytes": 2097152,
+    "blocking": false
+  },
+  "reviewConditions": [
+    "create-target-already-exists",
+    "modify-target-does-not-yet-exist"
+  ],
+  "qualityChecks": [
+    "preserve-existing-worktree-changes",
+    "strict-utf8-for-text",
+    "targeted-diff-review",
+    "git-diff-check",
+    "source-ref-and-hash-when-applicable",
+    "truthful-evidence-claims"
+  ],
+  "orchestration": {
+    "aibrainPlanRequiredForDirectUserAction": false,
+    "aiCommandRequiredForDirectUserAction": false,
+    "taskContractRequiredForDirectUserAction": false,
+    "managedChannelMayRequireProtocolInputs": true,
+    "protocolInputsAreSecondaryApproval": false
+  },
+  "authorityNote": "用户当前明确目标或动作是项目修改授权。路径类别不否决明确请求；只拒绝无用户指令、AI 自行扩大范围、项目越界，或未被单独点名的删除、Git 写、Runtime、网络、交互式/常驻/对外副作用进程、发布和凭据动作。对已授权目标严格必要的项目既有本地静态验证器在有界、无网络、无安装、无 Runtime 和无常驻副作用时属于普通质量验证。凭据路径使用明确文件名、扩展名、目录或分隔符模式，不得把 CancellationToken、业务 Token 类型或包含 secret/credential 字样的普通源码误判为凭据。"
+}

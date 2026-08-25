@@ -6,14 +6,16 @@ Every governed Skill has two independent evidence axes. They answer different qu
 
 The project is **StaticDeepReplay-first**. A Skill must exhaust source/configuration replay, contract simulation, boundary checks, deterministic fixtures, cache-backed analysis, and negative/recovery cases before proposing Runtime execution. Static evidence has a default portfolio weight of `0.7`; Runtime evidence has a default weight of `0.3`.
 
-Runtime is never an implicit next step. Starting Unity, opening a project, entering PlayMode, changing scenes, launching a Player, or invoking an external process requires all of the following:
+Runtime is never an implicit next step. Starting Unity, opening a project, entering PlayMode, changing scenes, launching a Player, or invoking an interactive, long-running, networked, or externally consequential process requires all of the following:
 
-1. explicit developer authorization for the current task phase;
-2. an AIBrain plan and matching AICommand/TaskContract;
-3. a declared Runtime evidence budget, target, timeout, and stop condition;
-4. a reason StaticDeepReplay cannot answer the remaining claim.
+1. a current user instruction explicitly naming the Runtime/external action;
+2. a declared Runtime evidence budget, target, timeout, and stop condition;
+3. a reason StaticDeepReplay cannot answer the remaining claim;
+4. when the selected execution channel is AIBrain/Worker, its plan and matching AICommand/TaskContract protocol.
 
-Without those conditions the correct result is `runtime-not-authorized` or `runtime-not-run`; do not start the runtime “for completeness”.
+Without the first three conditions the correct result is `runtime-not-authorized` or `runtime-not-run`; do not start Runtime “for completeness”. Missing managed-channel inputs block that channel only and do not require the user to approve the same action again.
+
+Project-bundled deterministic static validators, parsers, compilers, and formatters that are strictly necessary to verify an already authorized target remain on the Static axis. They do not require a separately named process action when their inputs and timeout are bounded and they do not access the network, install dependencies, start Unity/Runtime, publish, or leave a resident service. This exception authorizes verification only; it cannot expand the project goal or evidence claim.
 
 ## Static axis
 
@@ -58,7 +60,7 @@ For a Skill whose `RuntimeAcceptance.runtimeRequired` or `ReleaseAcceptance.runt
 
 ### Evidence receipt integrity
 
-Every Runtime or behavioral receipt must be a project-relative JSON artifact with `skillName`, `case`, `status`, `evidenceLevel`, `receiptPath`, `toolId`, `unityVersion` (use `not-applicable` for non-Unity work), `capturedUtc`, `planHash`, `sourceRefs`, and `sourceRefHashes`. The validator must resolve the receipt path, verify every referenced file exists, recompute each SHA-256 hash, parse `capturedUtc`, and reject receipts older than the declared freshness window (default 168 hours). A syntactically valid receipt with stale or missing bindings is `runtime-not-authorized`/`blocked`, never `passed`.
+Every Runtime or behavioral receipt must be a project-relative JSON artifact with `skillName`, `case`, `status`, `evidenceLevel`, `receiptPath`, `toolId`, `unityVersion` (use `not-applicable` for non-Unity work), `capturedUtc`, `authorizationSource`, `sourceRefs`, and `sourceRefHashes`. A managed AIBrain receipt also requires `planHash`; a direct user-directed receipt records `planHash: not-applicable`. The validator must resolve paths, verify source hashes and freshness, and reject stale evidence. Receipt failure blocks the evidence claim, not the user's underlying project authorization.
 
 ## StaticDeepReplay completion contract
 
@@ -76,7 +78,7 @@ An inapplicable case must be explicitly marked `not-applicable` with a reason; i
 
 ## Runtime authorization contract
 
-Runtime authorization is not a boolean permission. A valid one-time authorization must bind the current task identity, AIBrain `PlanHash`, exact AICommand and TaskContract, project-relative target paths, start/expiry timestamps, time budget, timeout, stop condition, and one-time scope. Missing or stale bindings yield `runtime-not-authorized` and no runtime operation may start.
+Runtime authorization is not inferred from a file-edit request. A direct Runtime action must bind the current user instruction, exact target, start/expiry, budget, timeout and stop condition. When AIBrain performs it, the same envelope additionally binds PlanHash, AICommand and TaskContract. Missing bindings yield `runtime-not-authorized`; they never trigger a request for duplicate user approval.
 
 ## Declaration rule
 

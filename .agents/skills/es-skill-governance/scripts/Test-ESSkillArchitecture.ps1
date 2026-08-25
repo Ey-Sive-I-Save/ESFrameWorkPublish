@@ -1,11 +1,13 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$ProjectRoot,
-    [string]$ReportPath='ES/Output/SkillArchitecture/architecture.json',
-    [switch]$BuildManifest
+    [string]$ReportPath,
+    [switch]$BuildManifest,
+    [ValidateSet('CurrentUserDirect','ManagedAIBrain')][string]$AuthorizationLane='CurrentUserDirect'
 )
 $ErrorActionPreference='Stop'
 $root=(Resolve-Path -LiteralPath $ProjectRoot).Path.TrimEnd('\','/')
+. (Join-Path $PSScriptRoot 'ESPathBoundary.Common.ps1')
 function Rel([string]$path){$full=[IO.Path]::GetFullPath($path);if(-not $full.StartsWith($root+'\',[StringComparison]::OrdinalIgnoreCase)){return $null};$full.Substring($root.Length+1).Replace('\','/')}
 function Hash([string]$path){(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()}
 function ReadStrict([string]$path){[IO.File]::ReadAllText($path,(New-Object Text.UTF8Encoding($false,$true)))}
@@ -14,6 +16,10 @@ function Scalar([string]$block,[string]$key){$m=[regex]::Match($block,'(?m)^\s+'
 function InlineList([string]$block,[string]$key){$m=[regex]::Match($block,'(?m)^\s+'+[regex]::Escape($key)+':\s*\[([^\]]*)\]');if(-not $m.Success){return @()};@($m.Groups[1].Value.Split(',')|ForEach-Object {$_.Trim().Trim([char]34,[char]39)}|Where-Object {$_})}
 function KnowledgeBlocks([string]$text){@([regex]::Matches($text,'(?ms)^\s*-\s+knowledgeId:.*?(?=^\s*-\s+knowledgeId:|\z)')|ForEach-Object {$_.Value})}
 function JsonHash([string]$path){(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()}
+function Add-ManagedFinding([string]$code,[string]$skill,[string]$detail){
+    $severity=if($AuthorizationLane -eq 'ManagedAIBrain'){'blocked'}else{'review'}
+    [void]$findings.Add([pscustomobject]@{severity=$severity;code=$code;skill=$skill;detail=$detail})
+}
 function ResolveExpected([object]$policy,[object]$gov){
     $state=$policy.states.PSObject.Properties[[string]$gov.maturity]
     if($null -eq $state){throw "maturity not registered: $($gov.maturity)"}
@@ -44,7 +50,11 @@ foreach($dir in $skillDirectories){
     if($catalogRuntime -and $catalogRuntime -ne $expected.runtimeEligibility){[void]$findings.Add([pscustomobject]@{severity='blocked';code='catalog-runtime-mismatch';skill=$name;detail="$catalogRuntime != $($expected.runtimeEligibility)"})}
     $routes=@($gov.routeKeys|ForEach-Object {[string]$_}|Where-Object {$_})
     if(@($routes|Where-Object {$generic -notcontains $_}).Count -eq 0){[void]$findings.Add([pscustomobject]@{severity='blocked';code='generic-route-only';skill=$name;detail='At least one domain routeKey is required.'})}
-    if(@($routes|Where-Object {$generic -contains $_}).Count -gt 0){[void]$findings.Add([pscustomobject]@{severity='review';code='generic-route-overlap';skill=$name;detail='Generic routeKey is auxiliary and must not be used as the only intent signal.'})}
+    # Generic keys are valid auxiliary signals when a domain key is present. The
+    # preceding generic-route-only check already hard-blocks a Skill that has no
+    # domain route; retaining this as an info finding avoids turning an expected
+    # composite route into a false Architecture review.
+    if(@($routes|Where-Object {$generic -contains $_}).Count -gt 0){[void]$findings.Add([pscustomobject]@{severity='info';code='generic-route-overlap';skill=$name;detail='Generic routeKey is auxiliary; a domain routeKey is present and remains authoritative.'})}
 }
 $knowledgePath=Join-Path $root 'Documentation/AIKnowledge/KnowledgeIndex.yaml'
 $knowledgeText=ReadStrict $knowledgePath
@@ -60,28 +70,44 @@ foreach($dir in $skillDirectories){
 }
 $bindingPath=Join-Path $root '.agents/skills/es-skill-governance/references/command-binding-registry.json'
 $commandCatalogPath=Join-Path $root 'Assets/Plugins/ES/AICommands/AICommandCatalog.json'
-$bindingJson=Get-Content $bindingPath -Raw -Encoding UTF8|ConvertFrom-Json
-$commandJson=Get-Content $commandCatalogPath -Raw -Encoding UTF8|ConvertFrom-Json
-$boundNames=@($bindingJson.entries|ForEach-Object {[string]$_.skillName}|Sort-Object -Unique)
-foreach($binding in @($bindingJson.entries)){
+$bindingJson=$null
+$commandJson=$null
+try{$bindingJson=Get-Content $bindingPath -Raw -Encoding UTF8|ConvertFrom-Json}catch{Add-ManagedFinding 'command-binding-registry-missing-or-invalid' '*' $_.Exception.Message}
+try{$commandJson=Get-Content $commandCatalogPath -Raw -Encoding UTF8|ConvertFrom-Json}catch{Add-ManagedFinding 'command-catalog-missing-or-invalid' '*' $_.Exception.Message}
+$bindingEntries=if($bindingJson){@($bindingJson.entries)}else{@()}
+$commandEntries=if($commandJson){@($commandJson.commands)}else{@()}
+$exemptions=if($bindingJson){@($bindingJson.nonExecutionExemptions)}else{@()}
+$exemptNames=@($exemptions|ForEach-Object {[string]$_.skillName}|Where-Object {$_})
+foreach($exemption in $exemptions){
+    $exemptSkill=[string]$exemption.skillName
+    if(@($skillDirectories|Where-Object Name -eq $exemptSkill).Count -ne 1){Add-ManagedFinding 'command-exemption-skill-missing' $exemptSkill 'Non-execution exemption must reference exactly one Skill.'}
+    if([string]$exemption.reason -notmatch '\S'){Add-ManagedFinding 'command-exemption-reason-missing' $exemptSkill 'Non-execution exemption requires a reason.'}
+    if(@($exemption.allowedOutputs|Where-Object {[string]$_ -match '\S'}).Count -eq 0){Add-ManagedFinding 'command-exemption-output-missing' $exemptSkill 'Non-execution exemption requires bounded output types.'}
+}
+$boundNames=@($bindingEntries|ForEach-Object {[string]$_.skillName}|Sort-Object -Unique)
+foreach($binding in $bindingEntries){
     $name=[string]$binding.skillName;$commandId=[string]$binding.commandId
-    if(@($skillDirectories|Where-Object Name -eq $name).Count -ne 1){[void]$findings.Add([pscustomobject]@{severity='blocked';code='command-binding-skill-missing';skill=$name;detail='Command binding references a missing or duplicate Skill.'});continue}
-    $command=@($commandJson.commands|Where-Object {[string]$_.id -ceq $commandId})
-    if($command.Count -ne 1){[void]$findings.Add([pscustomobject]@{severity='blocked';code='command-binding-command-missing';skill=$name;detail="Command binding does not resolve uniquely: $commandId"});continue}
+    if(@($skillDirectories|Where-Object Name -eq $name).Count -ne 1){Add-ManagedFinding 'command-binding-skill-missing' $name 'Command binding references a missing or duplicate Skill.';continue}
+    $command=@($commandEntries|Where-Object {[string]$_.id -ceq $commandId})
+    if($command.Count -ne 1){Add-ManagedFinding 'command-binding-command-missing' $name "Command binding does not resolve uniquely: $commandId";continue}
     $commandPath=Join-Path $root ([string]$command[0].path)
-    if(-not(Test-Path $commandPath -PathType Leaf)){[void]$findings.Add([pscustomobject]@{severity='blocked';code='command-body-missing';skill=$name;detail=$commandPath});continue}
-    if([string]$binding.commandHash -ne (Hash $commandPath)){[void]$findings.Add([pscustomobject]@{severity='blocked';code='command-binding-hash-stale';skill=$name;detail=$commandId})}
+    if(-not(Test-Path $commandPath -PathType Leaf)){Add-ManagedFinding 'command-body-missing' $name $commandPath;continue}
+    if([string]$binding.commandHash -ne (Hash $commandPath)){Add-ManagedFinding 'command-binding-hash-stale' $name $commandId}
     if($binding.PSObject.Properties.Name -contains 'taskContractRequired' -and [bool]$binding.taskContractRequired -and [string]$binding.taskContractRef -notmatch '\S'){
-        [void]$findings.Add([pscustomobject]@{severity='blocked';code='task-contract-ref-missing';skill=$name;detail=$commandId})
+        Add-ManagedFinding 'task-contract-ref-missing' $name $commandId
     }
-    if([string]$binding.taskContractRef -match '\S' -and -not(Test-Path (Join-Path $root ([string]$binding.taskContractRef)) -PathType Leaf)){
-        [void]$findings.Add([pscustomobject]@{severity='blocked';code='task-contract-missing';skill=$name;detail=[string]$binding.taskContractRef})
+    $taskContractRef = if($binding.PSObject.Properties.Name -contains 'taskContractRef'){[string]$binding.taskContractRef}else{''}
+    if($taskContractRef -match '\S' -and -not(Test-Path (Join-Path $root $taskContractRef) -PathType Leaf)){
+        Add-ManagedFinding 'task-contract-missing' $name $taskContractRef
     }
 }
 foreach($dir in $skillDirectories){
     $gov=Get-Content (Join-Path $dir.FullName 'governance.json') -Raw -Encoding UTF8|ConvertFrom-Json
-    if([string]$gov.writePolicy -notin @('read-only','report-only-explicit-path') -and $boundNames -notcontains $dir.Name){
-        [void]$findings.Add([pscustomobject]@{severity='review';code='command-binding-unresolved';skill=$dir.Name;detail='Skill declares an authorized write policy but has no entry in command-binding-registry.json.'})
+    if([string]$gov.writePolicy -notin @('read-only','report-only-explicit-path') -and $boundNames -notcontains $dir.Name -and $exemptNames -notcontains $dir.Name){
+        Add-ManagedFinding 'command-binding-unresolved' $dir.Name 'Skill declares a managed-channel write policy but has no entry in command-binding-registry.json.'
+    }
+    if($exemptNames -contains $dir.Name){
+        [void]$findings.Add([pscustomobject]@{severity='info';code='command-binding-not-applicable';skill=$dir.Name;detail='Registered non-execution exemption; a managed AIBrain side effect still requires its channel binding.'})
     }
 }
 $manifestPath=Join-Path $root '.agents/SKILL_REGISTRY.manifest.json'
@@ -93,10 +119,17 @@ if(-not (Test-Path $manifestPath)){
         if([int]$manifest.schemaVersion -ne 1 -or [string]$manifest.manifestId -ne 'esframework-skill-registry'){
             [void]$findings.Add([pscustomobject]@{severity='blocked';code='registry-manifest-schema';skill='*';detail='Registry manifest schema or identity is invalid.'})
         }
-        foreach($metadataPath in @('.agents/SKILL_DISCOVERY_POLICY.json','.agents/SKILL_RESOURCE_INDEX.yaml','.agents/SKILL_CATALOG.yaml','Documentation/AIKnowledge/KnowledgeIndex.yaml','Assets/Plugins/ES/AICommands/AICommandCatalog.json')){
+        # Resource Index points to the manifest by path but does not embed its hash,
+        # so the manifest can bind the Resource Index without a circular hash.
+        foreach($metadataPath in @('.agents/SKILL_DISCOVERY_POLICY.json','.agents/SKILL_RESOURCE_INDEX.yaml','.agents/SKILL_CATALOG.yaml','Documentation/AIKnowledge/AIBRAIN_ENTRY.md','Assets/Plugins/ES/AICommands/AICommandCatalog.json')){
             $full=Join-Path $root $metadataPath;$declared=$manifest.metadata.PSObject.Properties[$metadataPath]
-            if($null -eq $declared -or [string]$declared.Value -ne (Hash $full)){
-                [void]$findings.Add([pscustomobject]@{severity='blocked';code='registry-metadata-stale';skill='*';detail="Registry metadata hash stale: $metadataPath"})
+            $actualHash=if(Test-Path -LiteralPath $full -PathType Leaf){Hash $full}else{'missing'}
+            if($null -eq $declared -or [string]$declared.Value -ne $actualHash){
+                if($metadataPath -eq 'Assets/Plugins/ES/AICommands/AICommandCatalog.json'){
+                    Add-ManagedFinding 'registry-managed-metadata-stale' '*' "Registry managed-channel metadata hash stale: $metadataPath"
+                }else{
+                    [void]$findings.Add([pscustomobject]@{severity='blocked';code='registry-metadata-stale';skill='*';detail="Registry metadata hash stale: $metadataPath"})
+                }
             }
         }
         $manifestNames=@($manifest.skills|ForEach-Object {[string]$_.skillName});$actualNames=@($skillDirectories|ForEach-Object {[string]$_.Name})
@@ -108,11 +141,25 @@ if(-not (Test-Path $manifestPath)){
         }
     } catch { [void]$findings.Add([pscustomobject]@{severity='blocked';code='registry-manifest-invalid';skill='*';detail=$_.Exception.Message}) }
 }
-$blocked=@($findings|Where-Object severity -eq 'blocked');$reviews=@($findings|Where-Object severity -eq 'review')
+$blocked=@($findings|Where-Object severity -eq 'blocked');$reviews=@($findings|Where-Object severity -eq 'review');$infos=@($findings|Where-Object severity -eq 'info')
 $status=if($blocked.Count -gt 0){'blocked'}elseif($reviews.Count -gt 0){'review'}else{'passed'}
 $skillCount=($stateCounts.Values|Measure-Object -Sum|Select-Object -ExpandProperty Sum)
 $manifestRelative=if(Test-Path $manifestPath){Rel $manifestPath}else{$null}
-$result=[ordered]@{schemaVersion=1;validator='es-skill-architecture';generatedUtc=[DateTime]::UtcNow.ToString('o');status=$status;skillCount=$skillCount;stateCounts=$stateCounts;findings=@($findings.ToArray());manifestPath=$manifestRelative}
-$reportFull=Join-Path $root $ReportPath.Replace('/','\');$parent=Split-Path -Parent $reportFull;if(-not(Test-Path $parent)){New-Item -ItemType Directory -Path $parent -Force|Out-Null};[IO.File]::WriteAllText($reportFull,($result|ConvertTo-Json -Depth 12),(New-Object Text.UTF8Encoding($false)))
+$result=[ordered]@{schemaVersion=1;validator='es-skill-architecture';generatedUtc=[DateTime]::UtcNow.ToString('o');authorizationLane=$AuthorizationLane;status=$status;skillCount=$skillCount;stateCounts=$stateCounts;findings=@($findings.ToArray());blockedCount=$blocked.Count;reviewCount=$reviews.Count;infoCount=$infos.Count;manifestPath=$manifestRelative}
+if($ReportPath){
+    try{$reportTarget=Resolve-ESContainedRelativePath -Candidate $ReportPath -ContainerRoot $root -Label 'ReportPath'}
+    catch{Write-Error $_.Exception.Message -ErrorAction Continue;exit 2}
+    $reportFull=$reportTarget.FullPath
+    $parent=Split-Path -Parent $reportFull
+    if(-not(Test-Path $parent)){New-Item -ItemType Directory -Path $parent -Force|Out-Null}
+    $reportFull=(Resolve-ESContainedRelativePath -Candidate $reportTarget.RelativePath -ContainerRoot $root -Label 'ReportPath').FullPath
+    $temporary="$reportFull.tmp-$([Guid]::NewGuid().ToString('N'))"
+    try{
+        [IO.File]::WriteAllText($temporary,($result|ConvertTo-Json -Depth 12),(New-Object Text.UTF8Encoding($false)))
+        Move-Item -LiteralPath $temporary -Destination $reportFull -Force
+    }finally{
+        if(Test-Path -LiteralPath $temporary){Remove-Item -LiteralPath $temporary -Force}
+    }
+}
 $result|ConvertTo-Json -Depth 12
 if($status -eq 'blocked'){exit 1};exit 0

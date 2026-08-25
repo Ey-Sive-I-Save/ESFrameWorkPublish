@@ -9,7 +9,7 @@ This is a responsibility-specific static acceptance plan for **es-skill-governan
 - Profile: `governance`
 - Acceptance id: `governance-contract`
 - Runtime boundary: Runtime cannot prove authority closure; only execution authorization receipts can prove actual enforcement.
-- Static assertions: authority refs are closed; runtime hard gate; StaticDeepReplay-first; permission expansion denied; governance hash
+- Static assertions: authority refs are closed; runtime hard gate; StaticDeepReplay-first; permission expansion denied; governance hash; ES entry compatibility; commercial coherence snapshot stability
 
 ## Required specialized cases
 
@@ -19,6 +19,7 @@ This is a responsibility-specific static acceptance plan for **es-skill-governan
 - `profile-weight`: replay the profile-weight contract from source/configuration and record pass or blocked evidence.
 - `stale-governance-hash`: replay the stale-governance-hash contract from source/configuration and record pass or blocked evidence.
 - `es-entry-compatibility`: replay the ES AIBrain -> Facade -> TaskContract/Worker boundary and reject direct parallel execution entry points.
+- `commercial-coherence-snapshot`: replay the aggregate static gate over Skill Architecture, AICommand governance, ES Automation compatibility and Knowledge validation; require a stable governance-surface snapshot and report source drift as review evidence.
 
 ## Evidence artifacts
 
@@ -29,6 +30,8 @@ This is a responsibility-specific static acceptance plan for **es-skill-governan
 - `scripts/Test-ESSkillContract.ps1`
 - `scripts/Test-ESRuntimeAuthorizationContract.ps1`
 - `scripts/Test-ESAutomationCompatibility.ps1`
+- `scripts/Test-ESCommercialCoherence.ps1`
+- `references/commercial-coherence-contract.md`
 
 ## Acceptance rule
 

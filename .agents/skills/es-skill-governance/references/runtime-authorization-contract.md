@@ -1,6 +1,6 @@
 # Runtime Authorization Contract
 
-Runtime execution is opt-in and must be bound to one current task. A boolean such as `developerAuthorizationRequired=true` is only a declaration; it does not authorize execution.
+Runtime execution is opt-in and must be bound to one current user request. The user's explicit Runtime instruction is the authorization source; a boolean such as `developerAuthorizationRequired=true` is only a declaration. The manifest below is required for the managed AIBrain/Worker lane, not as a second approval for a direct user-directed Runtime action.
 
 ## Required fields
 
@@ -24,6 +24,6 @@ Runtime execution is opt-in and must be bound to one current task. A boolean suc
 }
 ```
 
-`targetPaths` must stay inside the project root. `expiresAtUtc` must be later than `issuedAtUtc`; an expired or reused one-time authorization is invalid. The authorization grants only the declared runtime operation; it does not grant source, Git, publishing, deletion, network, or unrelated Unity permissions.
+`targetPaths` must stay inside the project root. `expiresAtUtc` must be later than `issuedAtUtc`; an expired or reused managed execution token is invalid. The current user instruction grants only the declared Runtime operation; it does not imply source, Git, publishing, deletion, network, or unrelated Unity actions.
 
-The validator also loads `ES/Automation/Contracts/es-runtime-authorization.schema.json` and checks that the schema itself declares the complete required field set. It requires `taskContractRef` to exist inside the project and its SHA-256 to equal `taskContractHash`; `timeoutSeconds` cannot exceed `timeBudgetSeconds`; task, command, stop-condition, approval, and target-path values cannot be empty. `Test-ESRuntimeAuthorization.ps1` is a read-only structural validator: `-Consume` is deliberately rejected until a governed one-time ledger is available, so validation cannot be mistaken for authorization consumption.
+For the managed lane, the validator also loads `ES/Automation/Contracts/es-runtime-authorization.schema.json` and checks the complete field set, task contract hash, time relationships and target containment. `Test-ESRuntimeAuthorization.ps1` is a read-only structural validator: `-Consume` is deliberately rejected until a governed one-time ledger is available. A direct user-directed Runtime tool may use a host-native receipt instead; it must still bind the current request, exact action, target, budget, timeout and stop condition.

@@ -26,9 +26,20 @@ foreach($dir in Get-ChildItem -LiteralPath $skillsRoot -Directory | Sort-Object 
     $staticSignals=[regex]::Matches($text,$staticPattern).Count
     $declared=($null -ne $gov -and @($gov.PSObject.Properties.Name) -contains 'verificationProfiles')
     $classification=if($runtimeSignals -gt 0 -and $staticSignals -eq 0){'runtime-only'}elseif($runtimeSignals -gt 0 -and $staticSignals -gt 0){'dual-signal'}elseif($staticSignals -gt 0){'static-only'}else{'unclassified'}
-    $rows += [pscustomobject]@{skill=$dir.Name;classification=$classification;runtimeSignals=$runtimeSignals;staticSignals=$staticSignals;explicitVerificationProfiles=$declared;runtimeRequiresReview=($runtimeSignals -gt 0 -and -not $declared)}
+    $runtimeProfileOptional=$false
+    $runtimeProfileOptionalReason=''
+    if($declared){
+        foreach($profileName in @('RuntimeAcceptance','ReleaseAcceptance')){
+            $profile=$gov.verificationProfiles.$profileName
+            if($null -ne $profile -and @($profile.required).Count -gt 0 -and $profile.runtimeRequired -ne $true){
+                $runtimeProfileOptional=$true
+                $runtimeProfileOptionalReason += "$profileName declares evidence dimensions but runtimeRequired=false; "
+            }
+        }
+    }
+    $rows += [pscustomobject]@{skill=$dir.Name;classification=$classification;runtimeSignals=$runtimeSignals;staticSignals=$staticSignals;explicitVerificationProfiles=$declared;runtimeRequiresReview=($runtimeSignals -gt 0 -and -not $declared);runtimeProfileOptional=$runtimeProfileOptional;runtimeProfileOptionalReason=$runtimeProfileOptionalReason.Trim()}
 }
-$result=[ordered]@{schemaVersion=1;validator='Test-ESSkillVerificationSemantics';generatedUtc=[DateTime]::UtcNow.ToString('o');staticRuntimePolicy='governance/references/verification-semantics.md';skillCount=$rows.Count;runtimeOnlyCount=@($rows|Where-Object classification -eq 'runtime-only').Count;missingExplicitProfileCount=@($rows|Where-Object {-not $_.explicitVerificationProfiles}).Count;rows=$rows}
+$result=[ordered]@{schemaVersion=1;validator='Test-ESSkillVerificationSemantics';generatedUtc=[DateTime]::UtcNow.ToString('o');staticRuntimePolicy='governance/references/verification-semantics.md';skillCount=$rows.Count;runtimeOnlyCount=@($rows|Where-Object classification -eq 'runtime-only').Count;missingExplicitProfileCount=@($rows|Where-Object {-not $_.explicitVerificationProfiles}).Count;runtimeProfileOptionalCount=@($rows|Where-Object runtimeProfileOptional).Count;runtimeProfileOptionalPolicy='reported-for-review; not a static failure unless the Skill claims RuntimeAcceptance/ReleaseAcceptance as required';rows=$rows}
 if($ReportPath){
     if([IO.Path]::IsPathRooted($ReportPath)){throw 'ReportPath must be project-relative'}
     $full=[IO.Path]::GetFullPath([IO.Path]::Combine($root,$ReportPath))

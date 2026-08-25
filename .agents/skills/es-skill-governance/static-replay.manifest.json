@@ -55,7 +55,8 @@
                                                               "permission-denial",
                                                               "profile-weight",
                                                               "stale-governance-hash",
-                                                              "es-entry-compatibility"
+                                                              "es-entry-compatibility",
+                                                              "commercial-coherence-snapshot"
                                                           ],
                                   "evidenceArtifacts":  [
                                                             "SKILL.md",
@@ -67,7 +68,10 @@
                                                             "../../SKILL_DISCOVERY_POLICY.json",
                                                             "../../SKILL_REGISTRY.manifest.json",
                                                             "scripts/Test-ESSkillArchitecture.ps1",
-                                                            "scripts/Test-ESAutomationCompatibility.ps1"
+                                                            "scripts/Test-ESAutomationCompatibility.ps1",
+                                                            "scripts/Test-ESCommercialCoherence.ps1",
+                                                            "scripts/Test-ESStaticAcceptanceCoverage.ps1",
+                                                            "references/commercial-coherence-contract.md"
                                                         ],
                                   "sourceAssertions":  [
                                                            "authority refs are closed",
@@ -75,7 +79,9 @@
                                                            "StaticDeepReplay-first",
                                                            "permission expansion denied",
                                                            "governance hash",
-                                                           "ES entry compatibility"
+                                                           "ES entry compatibility",
+                                                           "commercial coherence snapshot stability",
+                                                           "knowledge source freshness classification"
                                                        ],
                                   "runtimeBoundary":  "Runtime cannot prove authority closure; only execution authorization receipts can prove actual enforcement."
                               },

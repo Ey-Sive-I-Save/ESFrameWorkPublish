@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string] $SkillPath,
-    [switch] $RequireGovernanceMetadata
+    [switch] $RequireGovernanceMetadata,
+    [ValidateSet('CurrentUserDirect','ManagedAIBrain')][string] $AuthorizationLane = 'CurrentUserDirect'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -76,7 +77,11 @@ if (Test-Path -LiteralPath $governanceFile -PathType Leaf) {
     if ($governanceText) {
         try { $governance = $governanceText | ConvertFrom-Json } catch { Add-Issue "governance.json is not valid JSON: $($_.Exception.Message)"; $governance = $null }
         if ($governance) {
-            foreach ($property in @('schemaVersion','skillName','tier','maturity','delivery','evidenceLevel','riskClass','executionMode','requiresBrainPlan','allowDirectExecution','writePolicy','authorityClass','owner','acceptanceOwner','routeKeys','requiredCases','controlRefs')) {
+            $requiredProperties = @('schemaVersion','skillName','tier','maturity','delivery','evidenceLevel','riskClass','executionMode','writePolicy','authorityClass','owner','acceptanceOwner','routeKeys','requiredCases','controlRefs')
+            if ($AuthorizationLane -eq 'ManagedAIBrain') {
+                $requiredProperties += @('requiresBrainPlan','allowDirectExecution')
+            }
+            foreach ($property in $requiredProperties) {
                 if ($null -eq $governance.PSObject.Properties[$property]) { Add-Issue "governance.json missing property: $property" }
             }
             if ($governance.schemaVersion -ne 1) { Add-Issue 'governance.json schemaVersion must be 1' }
@@ -87,13 +92,13 @@ if (Test-Path -LiteralPath $governanceFile -PathType Leaf) {
             if ([string]$governance.evidenceLevel -notmatch '^S[0-6]$') { Add-Issue 'governance.json evidenceLevel must be S0-S6' }
             if ([string]$governance.riskClass -notmatch '^[a-z0-9][a-z0-9-]*$') { Add-Issue 'governance.json riskClass is invalid' }
             if ([string]$governance.executionMode -notmatch '^[a-z0-9][a-z0-9-]*$') { Add-Issue 'governance.json executionMode is invalid' }
-            if ($governance.allowDirectExecution -eq $true) { Add-Issue 'governance.json allowDirectExecution must be false for project Skills' }
+            if ($AuthorizationLane -eq 'ManagedAIBrain' -and $governance.allowDirectExecution -eq $true) { Add-Issue 'governance.json allowDirectExecution must be false for ManagedAIBrain execution' }
             if ([string]$governance.authorityClass -notmatch '^(standard|core-governed|project-gate)$') { Add-Issue 'governance.json authorityClass is invalid' }
             if ([string]::IsNullOrWhiteSpace([string]$governance.owner)) { Add-Issue 'governance.json owner is required' }
             if ([string]::IsNullOrWhiteSpace([string]$governance.acceptanceOwner)) { Add-Issue 'governance.json acceptanceOwner is required' }
             if (@($governance.routeKeys).Count -eq 0) { Add-Issue 'governance.json routeKeys must not be empty' }
             if (@($governance.controlRefs).Count -eq 0) { Add-Issue 'governance.json controlRefs must not be empty' }
-            if ([string]$governance.authorityClass -ne 'standard' -and $governance.requiresBrainPlan -ne $true) { Add-Issue 'governed authority classes require requiresBrainPlan=true' }
+            if ($AuthorizationLane -eq 'ManagedAIBrain' -and [string]$governance.authorityClass -ne 'standard' -and $governance.requiresBrainPlan -ne $true) { Add-Issue 'governed authority classes require requiresBrainPlan=true for ManagedAIBrain execution' }
             if ([string]$governance.authorityClass -eq 'project-gate' -and [string]$governance.evidenceLevel -notmatch '^S[2-6]$') { Add-Issue 'project-gate requires evidenceLevel S2-S6' }
 
             $requiredCases = @('positive','invalid-input','denied-expansion','repeat-idempotency')
@@ -146,5 +151,5 @@ if ($issues.Count -gt 0) {
     $issues | ForEach-Object { Write-Error $_ }
     exit 1
 }
-Write-Output "PASS: $name contract, UTF-8, frontmatter, metadata, references and layout"
+Write-Output "PASS: $name contract, UTF-8, frontmatter, metadata, references and layout (authorizationLane=$AuthorizationLane)"
 exit 0

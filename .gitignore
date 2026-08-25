@@ -98,8 +98,13 @@ crashlytics-build.properties
 /ES/Automation/Output/
 /ES/Automation/AI/Inbox/
 /ES/Automation/AI/Responses/
+/ES/Automation/AI/Archive/
 /ES/Automation/Runs/AISkillGraph/active-runs.json
 /ES/Automation/Runs/*-latest.json
+# Machine-local Feishu identity state and private task request envelopes may contain
+# external identity projections or message text and must never enter Git or project knowledge.
+/ES/Automation/Runs/FeishuIdentity/
+/ES/Automation/Runs/FeishuTasks/
 
 # Misplaced local validation output.
 /Boundary
@@ -126,3 +131,8 @@ crashlytics-build.properties
 
 # Machine-local rollback copies. Reviewed baselines under ES/Bak/Reviewed remain tracked.
 /ES/Bak/Local/
+
+# AI/UI validation outputs are reproducible local evidence, not project source.
+# Existing tracked evidence remains tracked; new UIEvidence output requires an
+# explicit force-add decision if it is intentionally promoted to a baseline.
+/ES/UIEvidence/

@@ -887,6 +887,7 @@ namespace ES.EditorInternal
         }
     }
 
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Inspector)]
     internal sealed class ESGameCoreDefinitionEditorWindow : ESSinglePageIMGUIWindow<ESGameCoreDefinitionEditorWindow>
     {
         public override string ESWindow_PresentationShortTitle => "核心";

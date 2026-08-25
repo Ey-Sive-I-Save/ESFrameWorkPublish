@@ -493,7 +493,7 @@ namespace ES
 
                 SimpleToolsWindow.UsingWindow?.Repaint();
             };
-            ESAdvancedDialogWindow.Show(request);
+            ESDialogService.Show(request);
         }
 
         private void ScanCurrentSceneEffects()
@@ -1923,7 +1923,7 @@ namespace ES
                     result.values.GetString("template", defaultTemplateId),
                     result.values.GetToggle("saveScene"));
             };
-            ESAdvancedDialogWindow.Show(request);
+            ESDialogService.Show(request);
         }
 
         private static ESAdvancedDialogValidation ValidateSceneExampleRequest(ESAdvancedDialogValues values)

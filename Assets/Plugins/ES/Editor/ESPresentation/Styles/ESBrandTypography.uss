@@ -231,3 +231,71 @@
     border-bottom-left-radius: 6px;
     border-bottom-right-radius: 6px;
 }
+
+/* Workbench surfaces use one visual hierarchy: the viewport is the stage,
+   side panes are quiet utilities, and resources are rows with previews rather
+   than a stack of equally loud framed cards. */
+.es-workbench-shell {
+    background-color: rgb(14, 18, 22);
+    color: rgb(229, 236, 240);
+}
+
+.es-workbench-shell .es-workbench-command-bar {
+    min-height: 44px;
+    padding-left: 10px;
+    padding-right: 10px;
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(45, 61, 72);
+}
+
+.es-workbench-shell .es-workbench-side-panel,
+.es-workbench-shell .es-workbench-inspector-panel,
+.es-workbench-shell .es-workbench-bottom-drawer {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.es-workbench-shell .es-workbench-center-stage {
+    background-color: rgb(11, 15, 19);
+}
+
+.es-workbench-shell .es-workbench-viewport-surface {
+    background-color: rgb(12, 17, 21);
+}
+
+.es-workbench-shell .es-workbench-tool-rail {
+    background-color: rgb(18, 24, 29);
+    border-right-color: rgb(38, 53, 63);
+}
+
+.es-workbench-shell .es-workbench-subbar,
+.es-workbench-shell .es-workbench-panel-header,
+.es-workbench-shell .es-workbench-viewport-footer {
+    background-color: rgb(19, 25, 30);
+    border-bottom-width: 1px;
+    border-bottom-color: rgb(38, 53, 63);
+}
+
+.es-workbench-shell .es-workbench-resource-card {
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    border-bottom-left-radius: 3px;
+    border-bottom-right-radius: 3px;
+    padding-left: 6px;
+    padding-right: 6px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.es-workbench-shell .es-workbench-resource-preview {
+    border-top-left-radius: 2px;
+    border-top-right-radius: 2px;
+    border-bottom-left-radius: 2px;
+    border-bottom-right-radius: 2px;
+}
+
+.es-workbench-shell .es-workbench-resource-card:hover {
+    border-bottom-color: rgb(86, 157, 192);
+}

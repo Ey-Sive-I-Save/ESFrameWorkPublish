@@ -1335,6 +1335,7 @@ namespace ES
         }
     }
 
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Workspace)]
     internal sealed class ESWindowSleepBenchmarkProbeWindow : EditorWindow,
         IESWindowMultiInstanceContract
     {
@@ -1351,6 +1352,7 @@ namespace ES
 
         private void CreateGUI()
         {
+            ESWindowFoundation.Unbind(this);
             rootVisualElement.Clear();
             rootVisualElement.style.flexDirection = FlexDirection.Column;
             rootVisualElement.style.paddingLeft = 8f;
@@ -1383,20 +1385,19 @@ namespace ES
                 pickingMode = PickingMode.Ignore
             });
 
-            ESWindowFoundation.Bind(
+            ESWindowFoundation.BindFullSleep(
                 this,
-                new ESWindowActionHosts(system: systemActions),
-                allowSemiSleep: true);
+                new ESWindowActionHosts(system: systemActions));
         }
 
         private void OnDisable()
         {
-            ESWindowFoundation.Unbind(this);
+            ESWindowFoundation.Suspend(this);
         }
 
         private void OnDestroy()
         {
-            ESWindowFoundation.Unbind(this, true);
+            ESWindowFoundation.Close(this);
         }
     }
 

@@ -3728,6 +3728,7 @@ namespace ES.EditorInternal
         private static string Normalize(string path) { return (path ?? string.Empty).Replace('\\', '/').TrimStart('/'); }
     }
 
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Workspace)]
     public sealed class ESAgentArtifactCandidateReviewWindow : EditorWindow, IESWindowPresentationShortTitle
     {
         public string ESWindow_PresentationShortTitle => "候选";
@@ -3797,7 +3798,12 @@ namespace ES.EditorInternal
 
         private void OnDisable()
         {
-            ESWindowFoundation.Unbind(this, true);
+            ESWindowFoundation.Suspend(this);
+        }
+
+        private void OnDestroy()
+        {
+            ESWindowFoundation.Close(this);
         }
 
         private void OnGUI()

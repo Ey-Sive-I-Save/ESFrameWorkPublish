@@ -2369,6 +2369,7 @@ namespace ES {
     /// ES 的 UI Toolkit 菜单树窗口宿主。菜单、搜索、内容区和状态栏均由 UI Toolkit
     /// 管理；新页面可直接返回 VisualElement，历史页面可通过独立 PropertyTree 渐进迁移。
     /// </summary>
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Workspace)]
     public abstract class ESMenuTreeWindow<This> : EditorWindow, IESWindowPageContextHost,
         IESWindowPresentationMetadata, IESWindowPresentationShortTitle,
         IESWindowPresentationTabLabel,
@@ -2637,6 +2638,15 @@ namespace ES {
         {
         }
 
+        /// <summary>
+        /// Runs after the final ES Presentation bind for the current VisualTree.
+        /// Owner windows resolve pending children here, when both the host and
+        /// its action surfaces are ready.
+        /// </summary>
+        protected virtual void ESWindow_OnFoundationBound()
+        {
+        }
+
         public static This OpenWindow()
         {
             bool alreadyOpen = HasOpenInstances<This>();
@@ -2683,7 +2693,7 @@ namespace ES {
             UsingWindow?.ScheduleMenuRebuild();
         }
 
-        private void OnEnable()
+        protected virtual void OnEnable()
         {
             try
             {
@@ -2757,7 +2767,7 @@ namespace ES {
             HideActivePage();
             ReleasePageViewList(previousViewPages);
 
-            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this);
+            ESWindowFoundation.Unbind(this);
             rootVisualElement.Clear();
             rootVisualElement.style.backgroundColor =
                 ES.EditorInternal.ESEditorPresentation.WindowInsetSurfaceColor;
@@ -2936,10 +2946,11 @@ namespace ES {
                 SetStatus("菜单构建失败：" + exception.Message, ESMenuTreePageStatus.Error);
             }
 
-            ESWindowFoundation.Bind(
-                this,
-                actionHosts,
-                allowSemiSleep: ESWindow_SupportsSemiSleep);
+            if (ESWindow_SupportsSemiSleep)
+                ESWindowFoundation.BindFullSleep(this, actionHosts);
+            else
+                ESWindowFoundation.BindTransient(this, actionHosts);
+            ESWindow_OnFoundationBound();
             UpdateCompactToolbarScopeVisibility();
             if (!serializedSleepOwnerDetachedByClose
                 && ESWindow_SleepLinkMode != ESWindowSleepLinkMode.Independent)
@@ -3013,7 +3024,7 @@ namespace ES {
 
             try
             {
-                ES.EditorInternal.ESEditorPresentation.UnbindWindow(this);
+                ESWindowFoundation.Unbind(this);
             }
             catch (Exception unbindFailure)
             {
@@ -3048,6 +3059,11 @@ namespace ES {
             retry.style.height = 30f;
             failureRoot.Add(retry);
             rootVisualElement.Add(failureRoot);
+
+            if (ESWindow_SupportsSemiSleep)
+                ESWindowFoundation.BindFullSleep(this);
+            else
+                ESWindowFoundation.BindTransient(this);
         }
 
         private void RebuildNavigation()
@@ -5863,7 +5879,7 @@ namespace ES {
             runtimePageOrder.Clear();
         }
 
-        private void OnDisable()
+        protected virtual void OnDisable()
         {
             try
             {
@@ -5879,10 +5895,15 @@ namespace ES {
             navigationRebuildSchedule?.Pause();
             navigationRebuildSchedule = null;
             ESWindow_SelectionChanged = null;
-            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+            ESWindowFoundation.Suspend(this);
             DisposeAllPages();
             if (ReferenceEquals(UsingWindow, this))
                 UsingWindow = null;
+        }
+
+        protected virtual void OnDestroy()
+        {
+            ESWindowFoundation.Close(this);
         }
 
         private void PlaceInitialWindow()
@@ -6096,6 +6117,7 @@ namespace ES {
         }
     }
 
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Workspace)]
     public abstract class ESOdinMenuTreeWindow<This> : OdinMenuEditorWindow,
         IESWindowPresentationMetadata, IESWindowPresentationShortTitle,
         IESWindowPresentationTabLabel,
@@ -6183,8 +6205,8 @@ namespace ES {
                 : string.Empty;
         }
 
-        /// <summary>兼容窗口刷新入口；Odin 菜单由其宿主维护，刷新请求只需重绘当前树。</summary>
-        public void ForceMenuTreeRebuild()
+        /// <summary>Odin 菜单由其宿主维护；ES 刷新链只请求重绘当前树。</summary>
+        public void Internal_RepaintMenuTree()
         {
             Repaint();
         }
@@ -6303,7 +6325,7 @@ namespace ES {
             window.ESWindow_SetSleepOwnerOverride(sleepOwner);
             if (sleepOwner != null && window.ESWindow_SleepLinkMode != ESWindowSleepLinkMode.Independent)
                 ESWindowFoundation.SetSleepOwner(window, sleepOwner, window.ESWindow_SleepLinkMode);
-            window.ForceMenuTreeRebuild();
+            window.Internal_RepaintMenuTree();
         }
 
         public static void OpenWindow(string stableId)
@@ -6580,9 +6602,10 @@ namespace ES {
             {
                 odinSystemActionBar?.RemoveFromHierarchy();
                 odinSystemActionBar = null;
-                ES.EditorInternal.ESEditorPresentation.BindWindow(
-                    this,
-                    allowSemiSleep: ESWindow_SupportsSemiSleep);
+                if (ESWindow_SupportsSemiSleep)
+                    ESWindowFoundation.BindFullSleep(this);
+                else
+                    ESWindowFoundation.BindTransient(this);
             }
             if (!serializedSleepOwnerDetachedByClose
                 && ESWindow_SleepLinkMode != ESWindowSleepLinkMode.Independent)
@@ -6687,7 +6710,7 @@ namespace ES {
         {
             openingActivationSchedule?.Pause();
             openingActivationSchedule = null;
-            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+            ESWindowFoundation.Suspend(this);
             base.OnDisable();
         }
         public static void ES_RefreshWindow()
@@ -6698,7 +6721,7 @@ namespace ES {
         public virtual void ESWindow_RefreshWindow()
         {
             ES_SaveData();
-            this.ForceMenuTreeRebuild();
+            Internal_RepaintMenuTree();
             ES_LoadData();
         }
         public virtual void ES_LoadData()
@@ -6715,7 +6738,7 @@ namespace ES {
         /// </summary>
         protected override void OnDestroy()
         {
-            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+            ESWindowFoundation.Close(this);
             // Debug.Log($"[ESOdinMenuTreeWindow] 窗口销毁，开始调用 {registeredPages.Count} 个页面的OnPageDisable");
             
             int callCount = 0;

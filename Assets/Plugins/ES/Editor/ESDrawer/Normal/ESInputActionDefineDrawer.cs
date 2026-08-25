@@ -274,6 +274,7 @@ namespace ES.EditorInternal
 
         [ESWindowSleepContract(
             ESWindowSleepMode.Transient,
+            ESWindowSurfaceKind.Utility,
             "Unity 原生 InputAction 导入器由调用方控制生命周期")]
         private sealed class ESInputActionImportWindow : ESSinglePageIMGUIWindow<ESInputActionImportWindow>
         {

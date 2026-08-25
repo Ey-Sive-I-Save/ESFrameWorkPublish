@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using ES;
 using Sirenix.OdinInspector.Editor;
 using UnityEditor;
@@ -124,6 +127,16 @@ namespace ES.EditorInternal
 
         private sealed class NavigationContext
         {
+            private sealed class ManagedIdentityToken
+            {
+                internal ManagedIdentityToken(long value)
+                {
+                    Value = value;
+                }
+
+                internal long Value { get; }
+            }
+
             private const string SessionKeyPrefix = "ES.EditorSectionNavigator.";
             private const float DirectoryToolbarHeight = 22f;
             private const float DirectoryRowHeight = 24f;
@@ -137,6 +150,10 @@ namespace ES.EditorInternal
             private const float CompactMarkerSize = 4f;
             private const float CompactSelectedMarkerSize = 7f;
             private const double CompactLongPressSeconds = 0.12d;
+            private static readonly ConditionalWeakTable<object, ManagedIdentityToken>
+                ManagedTargetIdentities =
+                    new ConditionalWeakTable<object, ManagedIdentityToken>();
+            private static long nextManagedTargetIdentity;
             private readonly List<SectionDescriptor> sections = new List<SectionDescriptor>(8);
             private bool initialized;
             private string selectedId;
@@ -179,8 +196,11 @@ namespace ES.EditorInternal
 
                 initialized = true;
                 selectionKey = BuildSelectionKey(tree);
-                visibilityKey = selectionKey + ".directoryVisible";
-                directoryVisible = SessionState.GetBool(visibilityKey, true);
+                visibilityKey = string.IsNullOrEmpty(selectionKey)
+                    ? null
+                    : selectionKey + ".directoryVisible";
+                directoryVisible = string.IsNullOrEmpty(visibilityKey)
+                    || SessionState.GetBool(visibilityKey, true);
 
                 RegisterDeclaredSections(tree.TargetType);
 
@@ -188,7 +208,7 @@ namespace ES.EditorInternal
                 if (sections.Count == 0)
                     return;
 
-                selectedId = SessionState.GetString(selectionKey, sections[0].Id);
+                selectedId = ReadPersistedSelection(selectionKey, sections[0].Id);
                 if (FindIndex(selectedId) < 0)
                     Select(sections[0].Id);
             }
@@ -824,7 +844,39 @@ namespace ES.EditorInternal
             private string BuildSelectionKey(PropertyTree tree)
             {
                 string typeName = tree.TargetType == null ? "Unknown" : tree.TargetType.FullName;
-                return SessionKeyPrefix + typeName + "." + BuildTargetIdentity(tree) + "." + navigatorId;
+                return BuildDurableSelectionKey(
+                    typeName,
+                    BuildTargetIdentity(tree),
+                    navigatorId);
+            }
+
+            private static string BuildDurableSelectionKey(
+                string typeName,
+                string targetIdentity,
+                string navigatorIdentity)
+            {
+                bool isDurable = targetIdentity != null
+                    && (targetIdentity.StartsWith("Global", StringComparison.Ordinal)
+                        || targetIdentity.StartsWith("MultiGlobal:", StringComparison.Ordinal));
+                if (!isDurable)
+                    return null;
+                return SessionKeyPrefix
+                    + (string.IsNullOrEmpty(typeName) ? "Unknown" : typeName)
+                    + "."
+                    + targetIdentity
+                    + "."
+                    + (string.IsNullOrEmpty(navigatorIdentity)
+                        ? ESEditorSectionAttribute.DefaultNavigatorId
+                        : navigatorIdentity);
+            }
+
+            private static string ReadPersistedSelection(
+                string selectionKey,
+                string fallbackSectionId)
+            {
+                return string.IsNullOrEmpty(selectionKey)
+                    ? fallbackSectionId
+                    : SessionState.GetString(selectionKey, fallbackSectionId);
             }
 
             private static string BuildTargetIdentity(PropertyTree tree)
@@ -835,34 +887,83 @@ namespace ES.EditorInternal
                 if (tree.WeakTargets.Count == 1)
                 {
                     if (tree.WeakTargets[0] is UnityEngine.Object target)
-                        return "Object" + target.GetInstanceID();
+                        return BuildUnityTargetIdentity(target);
 
-                    return "SingleNonUnity";
+                    return BuildManagedTargetIdentity(tree.WeakTargets[0]);
                 }
 
                 // A multi-object inspector previously used a shared "0" key. That made one
                 // selection's active section leak into every other multi-selection of the same
                 // type. Sort IDs so Unity selection order does not change the persisted state.
-                var ids = new List<int>(tree.WeakTargets.Count);
+                var identities = new List<string>(tree.WeakTargets.Count);
                 for (int i = 0; i < tree.WeakTargets.Count; i++)
                 {
                     if (tree.WeakTargets[i] is UnityEngine.Object target)
-                        ids.Add(target.GetInstanceID());
+                        identities.Add(BuildUnityTargetIdentity(target));
+                    else
+                        identities.Add(BuildManagedTargetIdentity(tree.WeakTargets[i]));
                 }
 
-                if (ids.Count == 0)
-                    return "MultiNonUnity" + tree.WeakTargets.Count;
-
-                ids.Sort();
-                var builder = new StringBuilder(ids.Count * 12 + 8);
+                // GlobalObjectId is stable across domain reload and editor restarts for
+                // persistent assets/scenes. Sorting the identities keeps multi-selection
+                // state independent from Unity's selection order.
+                identities.Sort(StringComparer.Ordinal);
+                bool isDurable = identities.TrueForAll(identity =>
+                    identity.StartsWith("Global", StringComparison.Ordinal));
+                var builder = new StringBuilder(identities.Count * 48 + 16);
                 builder.Append("Multi");
-                for (int i = 0; i < ids.Count; i++)
+                builder.Append(identities.Count.ToString(CultureInfo.InvariantCulture));
+                builder.Append(':');
+                for (int i = 0; i < identities.Count; i++)
                 {
-                    builder.Append('_');
-                    builder.Append(ids[i]);
+                    builder.Append(identities[i].Length.ToString(CultureInfo.InvariantCulture));
+                    builder.Append(':');
+                    builder.Append(identities[i]);
                 }
 
+                return (isDurable ? "MultiGlobal:" : "MultiTransient:")
+                    + ComputeIdentityDigest(builder.ToString());
+            }
+
+            private static string ComputeIdentityDigest(string value)
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(value ?? string.Empty);
+                byte[] digest;
+                using (SHA256 algorithm = SHA256.Create())
+                    digest = algorithm.ComputeHash(bytes);
+                var builder = new StringBuilder(digest.Length * 2);
+                for (int i = 0; i < digest.Length; i++)
+                    builder.Append(digest[i].ToString("x2", CultureInfo.InvariantCulture));
                 return builder.ToString();
+            }
+
+            private static string BuildUnityTargetIdentity(UnityEngine.Object target)
+            {
+                if (target == null)
+                    return "Null";
+
+                GlobalObjectId globalId = GlobalObjectId.GetGlobalObjectIdSlow(target);
+                if (GlobalObjectId.GlobalObjectIdentifierToObjectSlow(globalId) == target)
+                    return "Global" + globalId;
+
+                // Unsaved transient objects have no durable Unity identity. Keep the
+                // fallback explicitly transient rather than implying restart stability.
+                return "Transient" + target.GetInstanceID();
+            }
+
+            private static string BuildManagedTargetIdentity(object target)
+            {
+                if (target == null)
+                    return "TransientManagedNull";
+
+                ManagedIdentityToken token = ManagedTargetIdentities.GetValue(
+                    target,
+                    _ => new ManagedIdentityToken(
+                        Interlocked.Increment(ref nextManagedTargetIdentity)));
+                return "TransientManaged"
+                    + (target.GetType().FullName ?? target.GetType().Name)
+                    + ":"
+                    + token.Value.ToString(CultureInfo.InvariantCulture);
             }
 
             private static GUIStyle SectionStyle

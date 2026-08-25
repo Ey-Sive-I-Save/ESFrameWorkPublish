@@ -44,6 +44,7 @@ namespace ES.EditorInternal
         AgentMindMap
     }
 
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Workspace)]
     public sealed class ESStableGraphViewWindow : EditorWindow, IESWindowPresentationShortTitle
     {
         public string ESWindow_PresentationShortTitle => "图";
@@ -183,6 +184,7 @@ namespace ES.EditorInternal
         private void CreateGUI()
         {
             DisposeGraphProjection();
+            ESWindowFoundation.Unbind(this);
             rootVisualElement.Clear();
             toolbarContainer = new VisualElement();
             toolbarContainer.style.flexShrink = 0f;
@@ -250,7 +252,7 @@ namespace ES.EditorInternal
             rootVisualElement.Add(toolbarContainer);
             toolbarLayoutMode = (ToolbarLayoutMode)byte.MaxValue;
             ApplyToolbarLayout(position.width > 0f ? position.width : 1200f);
-            ESWindowFoundation.Bind(
+            ESWindowFoundation.BindFullSleep(
                 this,
                 new ESWindowActionHosts(system: systemActionHost));
             rootVisualElement.UnregisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
@@ -459,13 +461,18 @@ namespace ES.EditorInternal
 
         private void OnDisable()
         {
-            ESEditorPresentation.UnbindWindow(this, true);
+            ESWindowFoundation.Suspend(this);
             Undo.undoRedoPerformed -= OnUndoRedo;
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.projectChanged -= OnProjectChanged;
             Selection.selectionChanged -= OnGlobalSelectionChanged;
             FlushAutoSave();
             DisposeGraphProjection();
+        }
+
+        private void OnDestroy()
+        {
+            ESWindowFoundation.Close(this);
         }
 
         private void DisposeGraphProjection()

@@ -32,7 +32,10 @@ public class ESTreeMenuBuilder : EditorInvoker_Level1
     }
 }
 
- [ES.ESWindowSleepContract(ES.ESWindowSleepMode.Transient, "短生命周期树菜单")]
+ [ES.ESWindowSleepContract(
+     ES.ESWindowSleepMode.Transient,
+     ES.ESWindowSurfaceKind.Popup,
+     "短生命周期树菜单")]
  [ES.ESWindowPresentationShortTitle("树")]
 public class ESTreeMenuShower : OdinEditorWindow
 {
@@ -47,15 +50,21 @@ public class ESTreeMenuShower : OdinEditorWindow
         base.OnEnable();
         // This is a transient popup, so it participates in ES lifecycle cleanup
         // but must never expose independent semi-sleep controls.
-        ES.EditorInternal.ESEditorPresentation.BindWindow(this, allowSemiSleep: false);
+        ES.ESWindowFoundation.BindTransient(this);
     }
 
     protected override void OnDisable()
     {
         base.OnDisable();
-        ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+        ES.ESWindowFoundation.Suspend(this);
         if (ReferenceEquals(UsingWindow, this))
             UsingWindow = null;
+    }
+
+    protected override void OnDestroy()
+    {
+        ES.ESWindowFoundation.Close(this);
+        base.OnDestroy();
     }
 
     public static ESTreeMenuShower OpenWith(ESTreeCollectorName tree)

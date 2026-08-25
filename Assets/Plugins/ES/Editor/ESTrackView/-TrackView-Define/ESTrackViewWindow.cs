@@ -13,7 +13,8 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using Cursor = UnityEngine.UIElements.Cursor;
 
-    public class ESTrackViewWindow : OdinEditorWindow, ES.IESWindowPresentationShortTitle
+[ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Workspace)]
+public class ESTrackViewWindow : OdinEditorWindow, ES.IESWindowPresentationShortTitle
 {
     public string ESWindow_PresentationShortTitle => "轨道";
     internal const string SleepOwnerKey = "ES.TrackView.Window";
@@ -143,8 +144,7 @@ using Cursor = UnityEngine.UIElements.Cursor;
 
     protected override void OnDestroy()
     {
-        ESWindowFoundation.ClearPendingSleepOwners(SleepOwnerKey);
-        ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+        ESWindowFoundation.Close(this);
         EditorApplication.update -= FlushScheduledViewRefresh;
         EditorApplication.update -= FlushAutoSave;
         EditorApplication.update -= PollTrackContainerRevision;
@@ -221,7 +221,7 @@ using Cursor = UnityEngine.UIElements.Cursor;
 
     protected override void OnDisable()
     {
-        ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+        ESWindowFoundation.Suspend(this);
         EditorApplication.update -= FlushScheduledViewRefresh;
         EditorApplication.update -= FlushAutoSave;
         EditorApplication.update -= PollTrackContainerRevision;
@@ -611,7 +611,7 @@ using Cursor = UnityEngine.UIElements.Cursor;
         //隐藏特殊资源
 
         BindElements();
-        ESWindowFoundation.Bind(
+        ESWindowFoundation.BindFullSleep(
             this,
             new ESWindowActionHosts(system: toolbar.SystemActionHost));
         ESWindowFoundation.ResolvePendingSleepOwners(SleepOwnerKey, this);

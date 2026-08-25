@@ -5,11 +5,13 @@ using System.IO;
 using System.Text;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.TestTools.TestRunner.Api;
 using UnityEngine;
+using UnityEngine.TestTools;
 using UnityEngine.UIElements;
 using ES.EditorInternal;
 
@@ -369,6 +371,108 @@ namespace ES.Tests
             public int capacity;
         }
 
+        private sealed class QueuedSynchronizationContext : SynchronizationContext
+        {
+            private SendOrPostCallback callback;
+            private object callbackState;
+
+            public override void Post(SendOrPostCallback value, object state)
+            {
+                Assert.IsNull(callback, "测试同步上下文一次只允许一个待处理回调。");
+                callback = value;
+                callbackState = state;
+            }
+
+            public void RunPostedCallback()
+            {
+                SendOrPostCallback pending = callback;
+                object state = callbackState;
+                callback = null;
+                callbackState = null;
+                Assert.IsNotNull(pending, "预期 cancellation 已投递回 Editor 上下文。");
+                pending.Invoke(state);
+            }
+        }
+
+        private static string ExtractBalancedSourceBlock(
+            string source,
+            string declaration)
+        {
+            int declarationIndex = source.IndexOf(declaration, StringComparison.Ordinal);
+            Assert.GreaterOrEqual(
+                declarationIndex,
+                0,
+                "未找到源码声明：" + declaration);
+            int openingBrace = source.IndexOf('{', declarationIndex);
+            Assert.GreaterOrEqual(openingBrace, 0, "声明缺少方法体：" + declaration);
+
+            int depth = 0;
+            bool inString = false;
+            bool inCharacter = false;
+            bool escaped = false;
+            for (int i = openingBrace; i < source.Length; i++)
+            {
+                char current = source[i];
+                if (escaped)
+                {
+                    escaped = false;
+                    continue;
+                }
+                if ((inString || inCharacter) && current == '\\')
+                {
+                    escaped = true;
+                    continue;
+                }
+                if (!inCharacter && current == '"')
+                {
+                    inString = !inString;
+                    continue;
+                }
+                if (!inString && current == '\'')
+                {
+                    inCharacter = !inCharacter;
+                    continue;
+                }
+                if (inString || inCharacter)
+                    continue;
+                if (current == '{')
+                    depth++;
+                else if (current == '}' && --depth == 0)
+                    return source.Substring(openingBrace, i - openingBrace + 1);
+            }
+
+            Assert.Fail("源码声明缺少闭合花括号：" + declaration);
+            return string.Empty;
+        }
+
+        private static MethodInfo GetDialogServiceMethod(string name)
+        {
+            MethodInfo method = typeof(ESDialogService).GetMethod(
+                name,
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(method, "ESDialogService 缺少内部治理入口：" + name);
+            return method;
+        }
+
+        private static List<ESDialogService.DialogOperation> GetDialogOperationList(
+            string fieldName)
+        {
+            FieldInfo field = typeof(ESDialogService).GetField(
+                fieldName,
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(field, "ESDialogService 缺少治理集合：" + fieldName);
+            return (List<ESDialogService.DialogOperation>)field.GetValue(null);
+        }
+
+        private static List<ESAdvancedDialogWindow> GetDialogWindowList(string fieldName)
+        {
+            FieldInfo field = typeof(ESDialogService).GetField(
+                fieldName,
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(field, "ESDialogService 缺少窗口治理集合：" + fieldName);
+            return (List<ESAdvancedDialogWindow>)field.GetValue(null);
+        }
+
         public sealed class RuntimeContractWindow : ESMenuTreeWindow<RuntimeContractWindow>,
             IESWindowMultiInstanceContract
         {
@@ -409,6 +513,10 @@ namespace ES.Tests
             }
         }
 
+        [ESWindowSleepContract(
+            ESWindowSleepMode.Transient,
+            ESWindowSurfaceKind.Utility,
+            "test compact sparse window")]
         public sealed class CompactSparseContractWindow
             : ESMenuTreeWindow<CompactSparseContractWindow>
         {
@@ -421,6 +529,10 @@ namespace ES.Tests
             }
         }
 
+        [ESWindowSleepContract(
+            ESWindowSleepMode.Transient,
+            ESWindowSurfaceKind.Utility,
+            "test no-sleep window")]
         public sealed class NoSemiSleepContractWindow
             : ESMenuTreeWindow<NoSemiSleepContractWindow>
         {
@@ -460,6 +572,33 @@ namespace ES.Tests
             protected override void ESWindow_BuildMenuTree(ESMenuTreeBuilder builder)
             {
                 builder.Add("follow.page", "跟随 / 页面", new EmptyPage());
+            }
+        }
+
+        [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Workspace)]
+        public sealed class RelationshipCallbackContractWindow : EditorWindow,
+            IESWindowMultiInstanceContract,
+            IESWindowSleepRelationshipState
+        {
+            public bool DetachedByOwnerClose;
+            public bool ThrowOnDetach;
+            public EditorWindow CloseOnDetach;
+
+            string IESWindowMultiInstanceContract.ESWindow_MultiInstanceCoordinatorId
+                => "ES.Tests.RelationshipCallback";
+
+            bool IESWindowSleepRelationshipState.SleepOwnerDetachedByClose
+                => DetachedByOwnerClose;
+
+            void IESWindowSleepRelationshipState.DetachSleepOwnerAfterOwnerClose()
+            {
+                DetachedByOwnerClose = true;
+                EditorWindow target = CloseOnDetach;
+                CloseOnDetach = null;
+                if (target != null)
+                    ESWindowFoundation.Close(target);
+                if (ThrowOnDetach)
+                    throw new InvalidOperationException("ES relationship callback failure");
             }
         }
 
@@ -792,6 +931,72 @@ namespace ES.Tests
             Assert.AreEqual(
                 "Assets/GameCore/Skills/FireBall.asset",
                 tooltip.GetValue(item));
+        }
+
+        [TestCase("FireBall", "技能/火系", false)]
+        [TestCase("中文 🔥", "路径/子", false)]
+        [TestCase("", "", true)]
+        public void SearchDropdownStableEntryIdsMatchLegacyFNVSequence(
+            string label,
+            string groupPath,
+            bool separator)
+        {
+            ESSearchDropdown.Entry entry = separator
+                ? ESSearchDropdown.Entry.Separator(groupPath)
+                : ESSearchDropdown.Entry.Item(label, () => { }, groupPath);
+
+            Assert.AreEqual(
+                ComputeLegacySearchEntryId(label, groupPath, separator),
+                entry.Id,
+                "稳定 Entry Id 必须保持旧字符串输入序列，不得因无分配优化发生漂移。");
+        }
+
+        [Test]
+        public void SearchDropdownBuilderAddRangePreservesOrderCallbacksAndKnownCapacity()
+        {
+            var values = new List<int> { 3, 1, 2 };
+            var selected = new List<int>();
+            ESSearchDropdown.Builder builder = ESSearchDropdown.Create("测试")
+                .AddRange(values, value => "Entry-" + value, value => selected.Add(value));
+
+            Assert.AreEqual(values.Count, builder.Entries.Count);
+            for (int i = 0; i < values.Count; i++)
+            {
+                Assert.AreEqual("Entry-" + values[i], builder.Entries[i].Label);
+                builder.Entries[i].OnSelected?.Invoke();
+            }
+
+            CollectionAssert.AreEqual(values, selected,
+                "AddRange 必须保留输入顺序和回调捕获语义。");
+
+            FieldInfo entriesField = typeof(ESSearchDropdown.Builder).GetField(
+                "entries",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(entriesField);
+            var storedEntries = entriesField.GetValue(builder) as List<ESSearchDropdown.Entry>;
+            Assert.IsNotNull(storedEntries);
+            Assert.GreaterOrEqual(
+                storedEntries.Capacity,
+                values.Count,
+                "已知 ICollection<T> 输入应至少预留当前候选集容量。");
+        }
+
+        private static int ComputeLegacySearchEntryId(string label, string groupPath, bool separator)
+        {
+            unchecked
+            {
+                uint hash = 2166136261u;
+                string value = (groupPath ?? string.Empty) + "\n"
+                    + (label ?? string.Empty) + "\n" + separator;
+                for (int i = 0; i < value.Length; i++)
+                {
+                    hash ^= value[i];
+                    hash *= 16777619u;
+                }
+
+                int id = (int)(hash & 0x7fffffff);
+                return id == 0 ? 1 : id;
+            }
         }
 
         [Test]
@@ -2578,7 +2783,7 @@ namespace ES.Tests
             }
             finally
             {
-                ESWindowFoundation.Unbind(window, true);
+                ESWindowFoundation.Close(window);
                 UnityEngine.Object.DestroyImmediate(window);
             }
 
@@ -3012,6 +3217,214 @@ namespace ES.Tests
         }
 
         [Test]
+        public void ProgressAndDialogVisualTreeRebuildUnbindBeforeClear()
+        {
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "Plugins",
+                    "ES",
+                    "Editor",
+                    "EditorTools",
+                    "ESAdvancedDialog",
+                    "ESAdvancedDialog.cs"),
+                Encoding.UTF8);
+            foreach (string declaration in new[]
+                     {
+                         "public sealed class ESProgressCenterWindow",
+                         "public sealed class ESAdvancedDialogWindow"
+                     })
+            {
+                string typeBody = ExtractBalancedSourceBlock(source, declaration);
+                string createGui = ExtractBalancedSourceBlock(typeBody, "public void CreateGUI()");
+                int unbind = createGui.IndexOf(
+                    "ESWindowFoundation.Unbind(this);",
+                    StringComparison.Ordinal);
+                int clear = createGui.IndexOf(
+                    "rootVisualElement.Clear();",
+                    StringComparison.Ordinal);
+                Assert.GreaterOrEqual(unbind, 0, declaration + " 重建前必须调用 Unbind。");
+                Assert.Greater(clear, unbind, declaration + " 必须先 Unbind 再 Clear VisualTree。");
+            }
+        }
+
+        [TestCase(false, false)]
+        [TestCase(true, true)]
+        public void AdvancedDialogEscapeRespectsBusyCancellationPolicy(
+            bool allowOperationCancellation,
+            bool expectedCancellation)
+        {
+            var request = new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.escape-policy." + Guid.NewGuid().ToString("N"),
+                title = "取消策略测试",
+                allowMainWorkspaceFallback = true,
+                allowOperationCancellation = allowOperationCancellation,
+                animateOpening = false,
+            };
+            ESAdvancedDialogWindow window = ESAdvancedDialogWindow.Create(request, null);
+            try
+            {
+                window.CreateGUI();
+                Type windowType = typeof(ESAdvancedDialogWindow);
+                MethodInfo beginBusy = windowType.GetMethod(
+                    "BeginBusy",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                MethodInfo onKeyDown = windowType.GetMethod(
+                    "OnKeyDown",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                FieldInfo cancellationField = windowType.GetField(
+                    "operationCancellation",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                FieldInfo busyField = windowType.GetField(
+                    "busy",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                FieldInfo busyLabelField = windowType.GetField(
+                    "busyLabel",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(beginBusy);
+                Assert.IsNotNull(onKeyDown);
+                Assert.IsNotNull(cancellationField);
+                Assert.IsNotNull(busyField);
+                Assert.IsNotNull(busyLabelField);
+
+                beginBusy.Invoke(window, new object[] { "正在执行测试操作", "escape-policy" });
+                var cancellation = cancellationField.GetValue(window) as CancellationTokenSource;
+                Assert.IsNotNull(cancellation);
+
+                KeyDownEvent escape = KeyDownEvent.GetPooled(
+                    '\0',
+                    KeyCode.Escape,
+                    EventModifiers.None);
+                try
+                {
+                    onKeyDown.Invoke(window, new object[] { escape });
+                }
+                finally
+                {
+                    escape.Dispose();
+                }
+
+                Assert.AreEqual(expectedCancellation, cancellation.IsCancellationRequested);
+                Assert.IsTrue((bool)busyField.GetValue(window),
+                    "Escape 只请求取消，异步操作结束前 Busy 状态必须保持。");
+                if (!allowOperationCancellation)
+                {
+                    Label busyLabel = busyLabelField.GetValue(window) as Label;
+                    Assert.IsNotNull(busyLabel);
+                    StringAssert.Contains("不可取消", busyLabel.text);
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+                ESProgressCenter.DismissCompleted();
+            }
+        }
+
+        [Test]
+        public void AdvancedDialogBusyVisualStateSurvivesCreateGUIRebuild()
+        {
+            var request = new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.busy-rebuild." + Guid.NewGuid().ToString("N"),
+                title = "Busy 重建测试",
+                allowMainWorkspaceFallback = true,
+                allowOperationCancellation = true,
+                animateOpening = false,
+            };
+            ESAdvancedDialogWindow window = ESAdvancedDialogWindow.Create(request, null);
+            Type windowType = typeof(ESAdvancedDialogWindow);
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            MethodInfo beginBusy = windowType.GetMethod("BeginBusy", flags);
+            MethodInfo cancelBusy = windowType.GetMethod("CancelBusyOperation", flags);
+            FieldInfo busyField = windowType.GetField("busy", flags);
+            FieldInfo busyOverlayField = windowType.GetField("busyOverlay", flags);
+            FieldInfo busyLabelField = windowType.GetField("busyLabel", flags);
+            FieldInfo cancelButtonField = windowType.GetField("cancelBusyButton", flags);
+            FieldInfo decisionActionsField = windowType.GetField("decisionActions", flags);
+            FieldInfo auxiliaryActionsField = windowType.GetField("auxiliaryActions", flags);
+            FieldInfo refreshScheduleField = windowType.GetField("busyRefreshSchedule", flags);
+            FieldInfo cancellationField = windowType.GetField("operationCancellation", flags);
+            FieldInfo activeProgressField = windowType.GetField("activeProgress", flags);
+            Assert.IsNotNull(beginBusy);
+            Assert.IsNotNull(cancelBusy);
+            Assert.IsNotNull(busyField);
+            Assert.IsNotNull(busyOverlayField);
+            Assert.IsNotNull(busyLabelField);
+            Assert.IsNotNull(cancelButtonField);
+            Assert.IsNotNull(decisionActionsField);
+            Assert.IsNotNull(auxiliaryActionsField);
+            Assert.IsNotNull(refreshScheduleField);
+            Assert.IsNotNull(cancellationField);
+            Assert.IsNotNull(activeProgressField);
+
+            try
+            {
+                window.CreateGUI();
+                beginBusy.Invoke(window, new object[] { "正在执行重建测试", "busy-rebuild" });
+                object cancellationBeforeRebuild = cancellationField.GetValue(window);
+                object progressBeforeRebuild = activeProgressField.GetValue(window);
+                object scheduleBeforeRebuild = refreshScheduleField.GetValue(window);
+                Assert.IsNotNull(cancellationBeforeRebuild);
+                Assert.IsNotNull(progressBeforeRebuild);
+                Assert.IsNotNull(scheduleBeforeRebuild);
+                window.CreateGUI();
+
+                Assert.IsTrue((bool)busyField.GetValue(window));
+                Assert.AreEqual(
+                    DisplayStyle.Flex,
+                    ((VisualElement)busyOverlayField.GetValue(window)).style.display.value);
+                Assert.AreEqual(
+                    "正在执行重建测试",
+                    ((Label)busyLabelField.GetValue(window)).text);
+                Assert.IsFalse(
+                    ((VisualElement)decisionActionsField.GetValue(window)).enabledSelf);
+                Assert.IsFalse(
+                    ((VisualElement)auxiliaryActionsField.GetValue(window)).enabledSelf);
+                Assert.IsTrue(((Button)cancelButtonField.GetValue(window)).enabledSelf);
+                Assert.IsNotNull(refreshScheduleField.GetValue(window),
+                    "VisualTree 重建后必须重新安装 Busy 刷新调度。");
+                Assert.AreSame(
+                    cancellationBeforeRebuild,
+                    cancellationField.GetValue(window),
+                    "VisualTree 重建不得替换当前异步操作的 CancellationTokenSource。");
+                Assert.AreSame(
+                    progressBeforeRebuild,
+                    activeProgressField.GetValue(window),
+                    "VisualTree 重建不得替换当前操作对应的 Progress 状态。");
+                Assert.AreNotSame(
+                    scheduleBeforeRebuild,
+                    refreshScheduleField.GetValue(window),
+                    "VisualTree 重建必须废弃旧 panel 的 schedule 并创建新调度。");
+
+                cancelBusy.Invoke(window, null);
+                Assert.IsTrue(
+                    ((CancellationTokenSource)cancellationField.GetValue(window))
+                    .IsCancellationRequested);
+                object cancelledScheduleBeforeRebuild = refreshScheduleField.GetValue(window);
+                window.CreateGUI();
+
+                Assert.AreEqual(
+                    "正在取消",
+                    ((Label)busyLabelField.GetValue(window)).text);
+                Assert.IsFalse(((Button)cancelButtonField.GetValue(window)).enabledSelf,
+                    "取消请求跨 VisualTree 重建后不得重新启用取消按钮。");
+                Assert.IsNotNull(refreshScheduleField.GetValue(window));
+                Assert.AreSame(cancellationBeforeRebuild, cancellationField.GetValue(window));
+                Assert.AreSame(progressBeforeRebuild, activeProgressField.GetValue(window));
+                Assert.AreNotSame(
+                    cancelledScheduleBeforeRebuild,
+                    refreshScheduleField.GetValue(window));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+                ESProgressCenter.DismissCompleted();
+            }
+        }
+
+        [Test]
         public void AdvancedDialogOwnerOffsetPreservesNegativeDisplayCoordinates()
         {
             Rect owner = new Rect(-1500f, 80f, 1200f, 800f);
@@ -3313,6 +3726,566 @@ namespace ES.Tests
         }
 
         [Test]
+        public void DialogOperationCompletesCallbackAndEveryTaskExactlyOnce()
+        {
+            var operation = new ESDialogService.DialogOperation(new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.operation.complete-once",
+                title = "Operation complete once",
+                allowMainWorkspaceFallback = true,
+            });
+            var primary = new TaskCompletionSource<ESAdvancedDialogResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var observer = new TaskCompletionSource<ESAdvancedDialogResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            int callbackCount = 0;
+            bool callbackSawDetachedSubscribers = false;
+            operation.AddSubscriber(
+                result =>
+                {
+                    callbackCount++;
+                    callbackSawDetachedSubscribers = operation.subscribers.Count == 0;
+                },
+                primary);
+            operation.AddSubscriber(null, observer);
+            var firstResult = new ESAdvancedDialogResult { accepted = true };
+
+            Assert.IsTrue(operation.CompleteOnce(firstResult));
+            Assert.IsFalse(operation.CompleteOnce(
+                new ESAdvancedDialogResult { cancelled = true }));
+
+            Assert.AreEqual(1, callbackCount);
+            Assert.IsTrue(callbackSawDetachedSubscribers,
+                "发布用户回调前必须先移出订阅集合，避免回调重入漏发后续 Task。");
+            Assert.AreSame(firstResult, primary.Task.Result);
+            Assert.AreSame(firstResult, observer.Task.Result);
+            Assert.AreEqual(ESDialogService.DialogOperationState.Completed, operation.state);
+        }
+
+        [Test]
+        public void DialogOperationFirstTerminalResultWinsAcrossClosingAndCompletion()
+        {
+            var operation = new ESDialogService.DialogOperation(new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.operation.first-terminal",
+                title = "First terminal result",
+                allowMainWorkspaceFallback = true,
+            });
+            var completion = new TaskCompletionSource<ESAdvancedDialogResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            operation.AddSubscriber(null, completion);
+            var accepted = new ESAdvancedDialogResult { accepted = true };
+            var cancelled = new ESAdvancedDialogResult { cancelled = true };
+            var failed = new ESAdvancedDialogResult
+            {
+                exception = new InvalidOperationException("late failure")
+            };
+
+            Assert.AreSame(accepted, operation.CaptureTerminalResult(accepted));
+            Assert.IsTrue(operation.BeginClosing(cancelled));
+            Assert.AreSame(accepted, operation.terminalResult);
+            Assert.IsTrue(operation.CompleteOnce(failed));
+
+            Assert.AreSame(accepted, completion.Task.Result,
+                "确认、取消、关闭异常竞争时，只有首个终态可以发布。");
+            Assert.IsFalse(operation.CompleteOnce(cancelled));
+            Assert.AreSame(accepted, operation.terminalResult);
+        }
+
+        [Test]
+        public void DialogDeadWindowCompletesOperationWhenPendingQueueIsEmpty()
+        {
+            ESDialogService.Shutdown();
+            ESDialogService.RestartAfterPresenterRegistration();
+            List<ESDialogService.DialogOperation> activeOperations =
+                GetDialogOperationList("activeOperations");
+            List<ESDialogService.DialogOperation> pendingDialogs =
+                GetDialogOperationList("pendingDialogs");
+            Assert.IsEmpty(pendingDialogs,
+                "该测试要求空队列，以锁定无 pending 时 dead operation 仍被 monitor 收敛。");
+            var operation = new ESDialogService.DialogOperation(new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.dead-window." + Guid.NewGuid().ToString("N"),
+                title = "Dead window",
+                allowMainWorkspaceFallback = true,
+            });
+            var completion = new TaskCompletionSource<ESAdvancedDialogResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            operation.AddSubscriber(null, completion);
+            ESAdvancedDialogWindow deadWindow = ESAdvancedDialogWindow.Create(
+                operation.request,
+                null);
+            UnityEngine.Object.DestroyImmediate(deadWindow);
+            operation.window = deadWindow;
+            operation.state = ESDialogService.DialogOperationState.Active;
+            activeOperations.Add(operation);
+            try
+            {
+                GetDialogServiceMethod("MonitorOwnerLifetime").Invoke(null, null);
+                Assert.IsTrue(completion.Task.IsCompleted);
+                Assert.IsTrue(completion.Task.Result.cancelled);
+                Assert.AreEqual(
+                    ESDialogService.DialogOperationState.Completed,
+                    operation.state);
+                CollectionAssert.DoesNotContain(activeOperations, operation);
+            }
+            finally
+            {
+                activeOperations.Remove(operation);
+                GetDialogServiceMethod("UpdateOwnerLifetimeMonitor").Invoke(null, null);
+            }
+        }
+
+        [Test]
+        public void DialogOpenNowStopsWhenCreateReentrantlyCompletesOperation()
+        {
+            ESDialogService.Shutdown();
+            ESDialogService.RestartAfterPresenterRegistration();
+            ESDialogService.DialogOperation operation = null;
+            var accepted = new ESAdvancedDialogResult { accepted = true };
+            var request = new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.open-reentrant." + Guid.NewGuid().ToString("N"),
+                title = "Open reentrant completion",
+                allowMainWorkspaceFallback = true,
+                validate = _ =>
+                {
+                    operation.CompleteOnce(accepted);
+                    return string.Empty;
+                },
+            };
+            operation = new ESDialogService.DialogOperation(request);
+            var completion = new TaskCompletionSource<ESAdvancedDialogResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            operation.AddSubscriber(null, completion);
+            int activeBefore = ESDialogService.ActiveCount;
+
+            object opened = GetDialogServiceMethod("OpenNow").Invoke(
+                null,
+                new object[] { operation, false });
+
+            Assert.IsNull(opened);
+            Assert.AreSame(accepted, completion.Task.Result);
+            Assert.AreEqual(activeBefore, ESDialogService.ActiveCount,
+                "Create 回调重入完成后不得继续注册或打开窗口。");
+        }
+
+        [Test]
+        public void DialogBuildFailureRemainsTerminalWhenShutdownCancelsActiveOperations()
+        {
+            ESDialogService.Shutdown();
+            ESDialogService.RestartAfterPresenterRegistration();
+            List<ESDialogService.DialogOperation> activeOperations =
+                GetDialogOperationList("activeOperations");
+            List<ESAdvancedDialogWindow> activeWindows = GetDialogWindowList("activeWindows");
+            var buildFailure = new InvalidOperationException("dialog build failure probe");
+            var request = new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.build-failure-shutdown."
+                    + Guid.NewGuid().ToString("N"),
+                title = "Build failure shutdown",
+                allowMainWorkspaceFallback = true,
+                createCustomContent = _ => throw buildFailure,
+            };
+            var operation = new ESDialogService.DialogOperation(request);
+            var completion = new TaskCompletionSource<ESAdvancedDialogResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            operation.AddSubscriber(null, completion);
+            ESAdvancedDialogWindow window = ESAdvancedDialogWindow.Create(request, null);
+            operation.window = window;
+            operation.state = ESDialogService.DialogOperationState.Active;
+            activeOperations.Add(operation);
+            activeWindows.Add(window);
+            try
+            {
+                LogAssert.Expect(
+                    LogType.Exception,
+                    new System.Text.RegularExpressions.Regex(
+                        "dialog build failure probe"));
+                window.CreateGUI();
+
+                ESDialogService.Shutdown();
+
+                Assert.IsTrue(completion.Task.IsCompleted);
+                Assert.AreSame(buildFailure, completion.Task.Result.exception,
+                    "构建 failure 已经成为首个终态，Shutdown 取消不得覆盖它。");
+                Assert.IsFalse(completion.Task.Result.cancelled);
+                Assert.AreEqual(
+                    ESDialogService.DialogOperationState.Completed,
+                    operation.state);
+                CollectionAssert.DoesNotContain(activeOperations, operation);
+                CollectionAssert.DoesNotContain(activeWindows, window);
+            }
+            finally
+            {
+                activeOperations.Remove(operation);
+                activeWindows.Remove(window);
+                if (window != null)
+                    UnityEngine.Object.DestroyImmediate(window);
+                ESDialogService.RestartAfterPresenterRegistration();
+            }
+        }
+
+        [Test]
+        public void DialogParentCloseCancelsActiveAndQueuedChildrenBeforeCallbacksCanReopen()
+        {
+            ESDialogService.Shutdown();
+            ESDialogService.RestartAfterPresenterRegistration();
+            List<ESDialogService.DialogOperation> activeOperations =
+                GetDialogOperationList("activeOperations");
+            List<ESDialogService.DialogOperation> pendingDialogs =
+                GetDialogOperationList("pendingDialogs");
+            List<ESAdvancedDialogWindow> activeWindows = GetDialogWindowList("activeWindows");
+            Assert.IsEmpty(activeOperations);
+            Assert.IsEmpty(pendingDialogs);
+            Assert.IsEmpty(activeWindows);
+
+            var parentRequest = new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.parent-close." + Guid.NewGuid().ToString("N"),
+                title = "Parent close",
+                allowMainWorkspaceFallback = true,
+            };
+            ESAdvancedDialogWindow parentWindow = ESAdvancedDialogWindow.Create(
+                parentRequest,
+                null);
+            var parent = new ESDialogService.DialogOperation(parentRequest)
+            {
+                window = parentWindow,
+                state = ESDialogService.DialogOperationState.Active,
+            };
+            parent.AddSubscriber(null, null);
+
+            var activeChildRequest = new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.active-child." + Guid.NewGuid().ToString("N"),
+                title = "Active child",
+                owner = parentWindow,
+                allowMainWorkspaceFallback = false,
+            };
+            ESAdvancedDialogWindow activeChildWindow = ESAdvancedDialogWindow.Create(
+                activeChildRequest,
+                null);
+            var activeChild = new ESDialogService.DialogOperation(activeChildRequest)
+            {
+                window = activeChildWindow,
+                state = ESDialogService.DialogOperationState.Active,
+            };
+            ESAdvancedDialogResult callbackReopenResult = null;
+            ESAdvancedDialogWindow callbackReopenedWindow = null;
+            activeChild.AddSubscriber(
+                _ =>
+                {
+                    callbackReopenedWindow = ESDialogService.Show(new ESAdvancedDialogRequest
+                    {
+                        dialogId = "tests.dialog.callback-child."
+                            + Guid.NewGuid().ToString("N"),
+                        title = "Callback child",
+                        owner = parentWindow,
+                        allowMainWorkspaceFallback = false,
+                        completed = result => callbackReopenResult = result,
+                    });
+                },
+                null);
+
+            var queuedChild = new ESDialogService.DialogOperation(new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.queued-child." + Guid.NewGuid().ToString("N"),
+                title = "Queued child",
+                owner = parentWindow,
+                allowMainWorkspaceFallback = false,
+            });
+            var queuedCompletion = new TaskCompletionSource<ESAdvancedDialogResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            queuedChild.AddSubscriber(null, queuedCompletion);
+            queuedChild.state = ESDialogService.DialogOperationState.Queued;
+
+            activeOperations.Add(parent);
+            activeOperations.Add(activeChild);
+            activeWindows.Add(parentWindow);
+            activeWindows.Add(activeChildWindow);
+            pendingDialogs.Add(queuedChild);
+            try
+            {
+                var parentResult = new ESAdvancedDialogResult { cancelled = true };
+                ESDialogService.NotifyClosed(parentWindow, parentResult);
+
+                Assert.AreEqual(ESDialogService.DialogOperationState.Completed, activeChild.state);
+                Assert.AreEqual(ESDialogService.DialogOperationState.Completed, queuedChild.state);
+                Assert.IsTrue(queuedCompletion.Task.Result.cancelled);
+                Assert.IsNull(callbackReopenedWindow,
+                    "父关闭期间的子回调不得重新打开受该父窗口拥有的对话框。");
+                Assert.IsNotNull(callbackReopenResult);
+                Assert.IsTrue(callbackReopenResult.cancelled);
+                Assert.AreEqual(
+                    ESDialogService.DialogOperationState.Completed,
+                    parent.state);
+            }
+            finally
+            {
+                GetDialogServiceMethod("DetachOperation").Invoke(null, new object[] { parent });
+                GetDialogServiceMethod("DetachOperation").Invoke(null, new object[] { activeChild });
+                GetDialogServiceMethod("DetachOperation").Invoke(null, new object[] { queuedChild });
+                activeWindows.Remove(parentWindow);
+                activeWindows.Remove(activeChildWindow);
+                if (activeChildWindow != null)
+                    UnityEngine.Object.DestroyImmediate(activeChildWindow);
+                if (parentWindow != null)
+                    UnityEngine.Object.DestroyImmediate(parentWindow);
+                ESDialogService.RestartAfterPresenterRegistration();
+            }
+        }
+
+        [Test]
+        public void DialogFocusExistingQueuesBehindClosingDuplicate()
+        {
+            ESDialogService.Shutdown();
+            ESDialogService.RestartAfterPresenterRegistration();
+            List<ESDialogService.DialogOperation> activeOperations =
+                GetDialogOperationList("activeOperations");
+            List<ESDialogService.DialogOperation> pendingDialogs =
+                GetDialogOperationList("pendingDialogs");
+            List<ESAdvancedDialogWindow> activeWindows = GetDialogWindowList("activeWindows");
+            string id = "tests.dialog.closing-focus." + Guid.NewGuid().ToString("N");
+            var closing = new ESDialogService.DialogOperation(new ESAdvancedDialogRequest
+            {
+                dialogId = id,
+                title = "Closing duplicate",
+                allowMainWorkspaceFallback = true,
+            });
+            ESAdvancedDialogWindow closingWindow = ESAdvancedDialogWindow.Create(
+                closing.request,
+                null);
+            closing.window = closingWindow;
+            closing.state = ESDialogService.DialogOperationState.Closing;
+            activeOperations.Add(closing);
+            activeWindows.Add(closingWindow);
+            var incoming = new ESDialogService.DialogOperation(new ESAdvancedDialogRequest
+            {
+                dialogId = id,
+                title = "Incoming focus",
+                allowMainWorkspaceFallback = true,
+                duplicatePolicy = ESDialogDuplicatePolicy.FocusExisting,
+            });
+            incoming.AddSubscriber(null, null);
+            try
+            {
+                object[] arguments = { incoming, null };
+                object opened = GetDialogServiceMethod("SubmitOperation").Invoke(null, arguments);
+
+                Assert.IsNull(opened);
+                Assert.AreSame(incoming, arguments[1]);
+                CollectionAssert.Contains(pendingDialogs, incoming);
+                Assert.AreEqual(ESDialogService.DialogOperationState.Queued, incoming.state);
+                Assert.AreEqual(ESDialogService.DialogOperationState.Closing, closing.state,
+                    "FocusExisting 不能把 subscriber 转交给即将结束的 operation。");
+            }
+            finally
+            {
+                GetDialogServiceMethod("DetachOperation").Invoke(null, new object[] { incoming });
+                activeOperations.Remove(closing);
+                activeWindows.Remove(closingWindow);
+                UnityEngine.Object.DestroyImmediate(closingWindow);
+                GetDialogServiceMethod("UpdateOwnerLifetimeMonitor").Invoke(null, null);
+            }
+        }
+
+        [Test]
+        public void DialogReplaceExistingRemovesEveryQueuedDuplicate()
+        {
+            ESDialogService.Shutdown();
+            ESDialogService.RestartAfterPresenterRegistration();
+            List<ESDialogService.DialogOperation> pendingDialogs =
+                GetDialogOperationList("pendingDialogs");
+            string id = "tests.dialog.replace-queued." + Guid.NewGuid().ToString("N");
+            ESDialogService.DialogOperation first = CreateQueuedDialogOperation(id);
+            ESDialogService.DialogOperation second = CreateQueuedDialogOperation(id);
+            var replacement = new ESDialogService.DialogOperation(new ESAdvancedDialogRequest
+            {
+                dialogId = id,
+                title = "Replacement",
+                allowMainWorkspaceFallback = true,
+                duplicatePolicy = ESDialogDuplicatePolicy.ReplaceExisting,
+            });
+            pendingDialogs.Add(first);
+            pendingDialogs.Add(second);
+            try
+            {
+                object[] arguments = { replacement, null };
+                GetDialogServiceMethod("SubmitOperation").Invoke(null, arguments);
+
+                Assert.AreEqual(ESDialogService.DialogOperationState.Completed, first.state);
+                Assert.AreEqual(ESDialogService.DialogOperationState.Completed, second.state);
+                Assert.IsTrue(first.terminalResult.cancelled);
+                Assert.IsTrue(second.terminalResult.cancelled);
+                Assert.AreEqual(
+                    1,
+                    pendingDialogs.Count(item => string.Equals(
+                        item?.request?.dialogId,
+                        id,
+                        StringComparison.Ordinal)),
+                    "ReplaceExisting 必须一次清理所有已排队重复项。");
+                CollectionAssert.Contains(pendingDialogs, replacement);
+            }
+            finally
+            {
+                GetDialogServiceMethod("DetachOperation").Invoke(
+                    null,
+                    new object[] { replacement });
+                pendingDialogs.Remove(first);
+                pendingDialogs.Remove(second);
+                GetDialogServiceMethod("UpdateOwnerLifetimeMonitor").Invoke(null, null);
+            }
+        }
+
+        private static ESDialogService.DialogOperation CreateQueuedDialogOperation(string id)
+        {
+            var operation = new ESDialogService.DialogOperation(new ESAdvancedDialogRequest
+            {
+                dialogId = id,
+                title = "Queued duplicate",
+                allowMainWorkspaceFallback = true,
+            });
+            operation.AddSubscriber(null, null);
+            operation.state = ESDialogService.DialogOperationState.Queued;
+            return operation;
+        }
+
+        [Test]
+        public void DialogOperationTransfersFocusedSubscribersToOneCompletionChannel()
+        {
+            var source = new ESDialogService.DialogOperation(new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.operation.focus-source",
+                title = "Focus source",
+                allowMainWorkspaceFallback = true,
+            });
+            var target = new ESDialogService.DialogOperation(new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.operation.focus-target",
+                title = "Focus target",
+                allowMainWorkspaceFallback = true,
+            });
+            var sourceTask = new TaskCompletionSource<ESAdvancedDialogResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var targetTask = new TaskCompletionSource<ESAdvancedDialogResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            source.AddSubscriber(null, sourceTask);
+            target.AddSubscriber(null, targetTask);
+
+            source.TransferSubscribersTo(target);
+            var sharedResult = new ESAdvancedDialogResult { accepted = true };
+
+            Assert.AreEqual(ESDialogService.DialogOperationState.Completed, source.state);
+            Assert.AreEqual(0, source.subscribers.Count);
+            Assert.AreEqual(2, target.subscribers.Count);
+            Assert.IsFalse(source.CompleteOnce(
+                new ESAdvancedDialogResult { cancelled = true }));
+            Assert.IsTrue(target.CompleteOnce(sharedResult));
+            Assert.AreSame(sharedResult, sourceTask.Task.Result);
+            Assert.AreSame(sharedResult, targetTask.Task.Result);
+        }
+
+        [Test]
+        public void AdvancedDialogCompatibilityOpenersAreObsoleteAndHidden()
+        {
+            string[] methodNames = { "Show", "ShowAsync", "ShowModal" };
+            for (int i = 0; i < methodNames.Length; i++)
+            {
+                MethodInfo method = typeof(ESAdvancedDialogWindow).GetMethod(
+                    methodNames[i],
+                    BindingFlags.Public | BindingFlags.Static);
+                Assert.IsNotNull(method, methodNames[i]);
+                Assert.IsNotNull(
+                    method.GetCustomAttribute<ObsoleteAttribute>(),
+                    methodNames[i] + " 只允许作为旧源码兼容转发，生产入口必须使用 ESDialogService。");
+                var editorBrowsable = method.GetCustomAttribute<
+                    System.ComponentModel.EditorBrowsableAttribute>();
+                Assert.IsNotNull(editorBrowsable, methodNames[i]);
+                Assert.AreEqual(
+                    System.ComponentModel.EditorBrowsableState.Never,
+                    editorBrowsable.State,
+                    methodNames[i]);
+            }
+        }
+
+        [Test]
+        public void DialogSubscriberCancellationPublishesOnceAndCancelsOnlyItsTask()
+        {
+            var operation = new ESDialogService.DialogOperation(new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.operation.cancellation",
+                title = "Operation cancellation",
+                allowMainWorkspaceFallback = true,
+            });
+            var completion = new TaskCompletionSource<ESAdvancedDialogResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            int callbackCount = 0;
+            ESAdvancedDialogResult callbackResult = null;
+            ESDialogService.DialogSubscriber subscriber = operation.AddSubscriber(
+                result =>
+                {
+                    callbackCount++;
+                    callbackResult = result;
+                },
+                completion);
+            var context = new QueuedSynchronizationContext();
+            using (var cancellation = new CancellationTokenSource())
+            {
+                subscriber.RegisterCancellation(operation, cancellation.Token, context);
+                cancellation.Cancel();
+                Assert.IsFalse(completion.Task.IsCompleted,
+                    "token 回调只能投递到 Editor 上下文，不能跨线程直接修改窗口治理状态。");
+                context.RunPostedCallback();
+            }
+
+            Assert.AreEqual(1, callbackCount);
+            Assert.IsNotNull(callbackResult);
+            Assert.IsTrue(callbackResult.cancelled);
+            Assert.IsTrue(completion.Task.IsCanceled);
+            Assert.IsTrue(subscriber.IsCompleted);
+            Assert.AreEqual(ESDialogService.DialogOperationState.Completed, operation.state);
+            Assert.IsFalse(operation.CompleteOnce(new ESAdvancedDialogResult { accepted = true }));
+            Assert.AreEqual(1, callbackCount);
+        }
+
+        [Test]
+        public void AdvancedDialogRebuildReleasesEachCustomContentGenerationOnce()
+        {
+            int created = 0;
+            int released = 0;
+            var request = new ESAdvancedDialogRequest
+            {
+                dialogId = "tests.dialog.custom-content.rebuild",
+                title = "Custom content rebuild",
+                allowMainWorkspaceFallback = true,
+                createCustomContent = _ => new Label("generation-" + ++created),
+                releaseCustomContent = _ => released++,
+            };
+            ESAdvancedDialogWindow window = ESAdvancedDialogWindow.Create(request, null);
+            try
+            {
+                window.CreateGUI();
+                VisualElement first = window.rootVisualElement.Q("ESDialogCustomContent");
+                window.CreateGUI();
+                VisualElement second = window.rootVisualElement.Q("ESDialogCustomContent");
+
+                Assert.AreEqual(2, created);
+                Assert.AreEqual(1, released,
+                    "重建前必须释放上一代 custom content，且不能提前释放当前代。");
+                Assert.IsNotNull(first);
+                Assert.IsNotNull(second);
+                Assert.AreNotSame(first, second);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+            Assert.AreEqual(2, released,
+                "窗口销毁必须且只能释放最后一代 custom content。");
+        }
+
+        [Test]
         public void ModalDialogRejectsQueuePolicyBeforeOpeningWindow()
         {
             var request = new ESAdvancedDialogRequest
@@ -3467,7 +4440,7 @@ namespace ES.Tests
             }
             finally
             {
-                ESWindowFoundation.Unbind(window, true);
+                ESWindowFoundation.Close(window);
                 UnityEngine.Object.DestroyImmediate(window);
             }
         }
@@ -3501,7 +4474,7 @@ namespace ES.Tests
             }
             finally
             {
-                ESWindowFoundation.Unbind(window, true);
+                ESWindowFoundation.Close(window);
                 UnityEngine.Object.DestroyImmediate(window);
             }
         }
@@ -3534,9 +4507,52 @@ namespace ES.Tests
             }
             finally
             {
-                ESWindowFoundation.Unbind(window, true);
+                ESWindowFoundation.Close(window);
                 UnityEngine.Object.DestroyImmediate(window);
             }
+        }
+
+        [Test]
+        public void MenuTreeBuildFailureRebindsAccordingToDeclaredSleepContractAfterClear()
+        {
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "Plugins",
+                    "ES",
+                    "Editor",
+                    "ESMenuTreeWindow",
+                    "-Templates",
+                    "-ESMenuTreeWindow.cs"),
+                Encoding.UTF8);
+            string recovery = ExtractBalancedSourceBlock(
+                source,
+                "private void RecoverFromWindowBuildFailure(");
+            int unbind = recovery.IndexOf(
+                "ESWindowFoundation.Unbind(this);",
+                StringComparison.Ordinal);
+            int clear = recovery.IndexOf(
+                "rootVisualElement.Clear();",
+                StringComparison.Ordinal);
+            int contractBranch = recovery.IndexOf(
+                "if (ESWindow_SupportsSemiSleep)",
+                StringComparison.Ordinal);
+            int bindFull = recovery.IndexOf(
+                "ESWindowFoundation.BindFullSleep(this);",
+                StringComparison.Ordinal);
+            int bindTransient = recovery.IndexOf(
+                "ESWindowFoundation.BindTransient(this);",
+                StringComparison.Ordinal);
+
+            Assert.GreaterOrEqual(unbind, 0);
+            Assert.Greater(clear, unbind,
+                "构建失败视图替换 VisualTree 前必须先解除旧绑定。");
+            Assert.Greater(contractBranch, clear,
+                "失败视图挂载完成后必须按声明合同重新进入 Foundation。");
+            Assert.Greater(bindFull, contractBranch,
+                "Full 窗口构建失败后仍必须恢复完整休眠绑定。");
+            Assert.Greater(bindTransient, bindFull,
+                "Transient 窗口构建失败后必须恢复瞬态生命周期绑定。");
         }
 
         [Test]
@@ -3571,7 +4587,7 @@ namespace ES.Tests
             }
             finally
             {
-                ESWindowFoundation.Unbind(window, true);
+                ESWindowFoundation.Close(window);
                 UnityEngine.Object.DestroyImmediate(window);
             }
         }
@@ -3641,7 +4657,7 @@ namespace ES.Tests
                     child,
                     owner,
                     ESWindowSleepLinkMode.FollowOwner));
-                ESWindowFoundation.Unbind(owner, true);
+                ESWindowFoundation.Close(owner);
                 Assert.AreEqual(
                     ESWindowSleepLinkMode.Independent,
                     ESWindowFoundation.GetSleepLinkMode(child),
@@ -3650,9 +4666,152 @@ namespace ES.Tests
             }
             finally
             {
-                ESWindowFoundation.Unbind(child, true);
-                ESWindowFoundation.Unbind(owner, true);
+                ESWindowFoundation.Close(child);
+                ESWindowFoundation.Close(owner);
                 UnityEngine.Object.DestroyImmediate(child);
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        [Test]
+        public void SleepOwnerContractRejectsAmbiguousModeOwnerCombinationsWithoutMutation()
+        {
+            DefaultSemiSleepContractWindow owner =
+                ScriptableObject.CreateInstance<DefaultSemiSleepContractWindow>();
+            DefaultSemiSleepContractWindow child =
+                ScriptableObject.CreateInstance<DefaultSemiSleepContractWindow>();
+            try
+            {
+                ESWindowFoundation.Bind(owner);
+                ESWindowFoundation.Bind(child);
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner));
+
+                Assert.IsFalse(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    ESWindowSleepLinkMode.Independent));
+                Assert.IsFalse(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    null,
+                    ESWindowSleepLinkMode.FollowOwner));
+                Assert.IsFalse(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    null,
+                    ESWindowSleepLinkMode.OwnedSurface));
+                Assert.IsFalse(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    (ESWindowSleepLinkMode)byte.MaxValue));
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.FollowOwner,
+                    ESWindowFoundation.GetSleepLinkMode(child),
+                    "被拒绝的模式/owner 组合不得改写已有关系。");
+
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    null,
+                    ESWindowSleepLinkMode.Independent));
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.Independent,
+                    ESWindowFoundation.GetSleepLinkMode(child));
+            }
+            finally
+            {
+                ESWindowFoundation.Close(child);
+                ESWindowFoundation.Close(owner);
+                UnityEngine.Object.DestroyImmediate(child);
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        [Test]
+        public void OwnerCloseRestoresOwnedSurfaceBeforeIsolatedRelationshipCallback()
+        {
+            RuntimeContractWindow owner =
+                ScriptableObject.CreateInstance<RuntimeContractWindow>();
+            RelationshipCallbackContractWindow child =
+                ScriptableObject.CreateInstance<RelationshipCallbackContractWindow>();
+            try
+            {
+                ESWindowFoundation.Bind(owner);
+                ESWindowFoundation.Bind(child);
+                Assert.IsTrue(ESWindowFoundation.TrySetWindowSleepAllowed(child, false));
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    ESWindowSleepLinkMode.OwnedSurface));
+                Assert.IsFalse(ESWindowFoundation.IsWindowSleepSupported(child));
+
+                child.ThrowOnDetach = true;
+                LogAssert.Expect(
+                    LogType.Exception,
+                    new System.Text.RegularExpressions.Regex(
+                        "ES relationship callback failure"));
+                Assert.DoesNotThrow(() => ESWindowFoundation.Close(owner));
+
+                Assert.IsFalse(ESWindowFoundation.IsBound(owner));
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.Independent,
+                    ESWindowFoundation.GetSleepLinkMode(child));
+                Assert.IsTrue(ESWindowFoundation.IsWindowSleepSupported(child),
+                    "OwnedSurface 的 owner 关闭后必须恢复子窗口原本的 Full 能力。");
+                Assert.IsFalse(ESWindowFoundation.IsWindowSemiSleepAllowed(child),
+                    "恢复类型能力时不得覆盖用户关闭休眠的选择。");
+                Assert.IsTrue(child.DetachedByOwnerClose,
+                    "Core 状态恢复后仍必须发送持久脱离通知。");
+            }
+            finally
+            {
+                ESWindowFoundation.Close(child);
+                ESWindowFoundation.Close(owner);
+                UnityEngine.Object.DestroyImmediate(child);
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        [Test]
+        public void OwnerCloseUsesSnapshotWhenRelationshipCallbackClosesSibling()
+        {
+            RuntimeContractWindow owner =
+                ScriptableObject.CreateInstance<RuntimeContractWindow>();
+            RelationshipCallbackContractWindow mutatingChild =
+                ScriptableObject.CreateInstance<RelationshipCallbackContractWindow>();
+            RelationshipCallbackContractWindow sibling =
+                ScriptableObject.CreateInstance<RelationshipCallbackContractWindow>();
+            try
+            {
+                ESWindowFoundation.Bind(owner);
+                ESWindowFoundation.Bind(mutatingChild);
+                ESWindowFoundation.Bind(sibling);
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    mutatingChild,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner));
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    sibling,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner));
+                mutatingChild.CloseOnDetach = sibling;
+
+                Assert.DoesNotThrow(() => ESWindowFoundation.Close(owner));
+
+                Assert.IsFalse(ESWindowFoundation.IsBound(owner));
+                Assert.IsFalse(ESWindowFoundation.IsBound(sibling));
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.Independent,
+                    ESWindowFoundation.GetSleepLinkMode(mutatingChild));
+                Assert.IsTrue(mutatingChild.DetachedByOwnerClose);
+            }
+            finally
+            {
+                ESWindowFoundation.Close(sibling);
+                ESWindowFoundation.Close(mutatingChild);
+                ESWindowFoundation.Close(owner);
+                UnityEngine.Object.DestroyImmediate(sibling);
+                UnityEngine.Object.DestroyImmediate(mutatingChild);
                 UnityEngine.Object.DestroyImmediate(owner);
             }
         }
@@ -3689,10 +4848,112 @@ namespace ES.Tests
             }
             finally
             {
-                ESWindowFoundation.Unbind(child, true);
-                ESWindowFoundation.Unbind(owner, true);
+                ESWindowFoundation.Close(child);
+                ESWindowFoundation.Close(owner);
                 UnityEngine.Object.DestroyImmediate(child);
                 UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        [Test]
+        public void SuspendAndContentRebuildPreserveFollowOwnerUntilRealClose()
+        {
+            DefaultSemiSleepContractWindow owner =
+                ScriptableObject.CreateInstance<DefaultSemiSleepContractWindow>();
+            FollowOwnerContractWindow child =
+                ScriptableObject.CreateInstance<FollowOwnerContractWindow>();
+            try
+            {
+                ESWindowFoundation.Bind(owner);
+                ESWindowFoundation.Bind(child);
+                child.ReactivateOwner(owner);
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    child,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner));
+
+                ESWindowFoundation.Suspend(owner);
+                Assert.IsTrue(
+                    ESWindowFoundation.IsBound(owner),
+                    "OnDisable 暂停必须保留可恢复 binding slot。");
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.FollowOwner,
+                    ESWindowFoundation.GetSleepLinkMode(child),
+                    "暂时停用不得永久切断 FollowOwner。");
+
+                ESWindowFoundation.Bind(owner);
+                ESWindowFoundation.Unbind(owner);
+                Assert.IsTrue(
+                    ESWindowFoundation.IsBound(owner),
+                    "VisualTree 内容重建必须保留可恢复 binding slot。");
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.FollowOwner,
+                    ESWindowFoundation.GetSleepLinkMode(child),
+                    "VisualTree 内容重建解绑不得把存活子窗口降级为 Independent。");
+                ESWindowFoundation.Unbind(child);
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.FollowOwner,
+                    ESWindowFoundation.GetSleepLinkMode(child),
+                    "子窗口内容重建也不得丢失 FollowOwner 关系。");
+
+                ESWindowFoundation.Close(owner);
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.Independent,
+                    ESWindowFoundation.GetSleepLinkMode(child));
+                Assert.IsTrue(
+                    ((IESWindowSleepRelationshipState)child).SleepOwnerDetachedByClose,
+                    "只有 OnDestroy 的真实 Close 才能持久化 owner 已关闭语义。");
+            }
+            finally
+            {
+                ESWindowFoundation.Close(child);
+                ESWindowFoundation.Close(owner);
+                UnityEngine.Object.DestroyImmediate(child);
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        [Test]
+        public void RejectedPendingOwnerCycleKeepsRecoveryIntent()
+        {
+            DefaultSemiSleepContractWindow first =
+                ScriptableObject.CreateInstance<DefaultSemiSleepContractWindow>();
+            DefaultSemiSleepContractWindow second =
+                ScriptableObject.CreateInstance<DefaultSemiSleepContractWindow>();
+            const string ownerKey = "ES.Tests.PendingCycle";
+            try
+            {
+                ESWindowFoundation.Bind(first);
+                ESWindowFoundation.Bind(second);
+                Assert.IsTrue(ESWindowFoundation.SetSleepOwner(
+                    first,
+                    second,
+                    ESWindowSleepLinkMode.FollowOwner));
+                Assert.IsTrue(ESWindowFoundation.RegisterPendingSleepOwner(
+                    second,
+                    ownerKey,
+                    ESWindowSleepLinkMode.FollowOwner));
+
+                Assert.AreEqual(
+                    0,
+                    ESWindowFoundation.ResolvePendingSleepOwners(ownerKey, first),
+                    "会形成 owner 环的恢复必须被拒绝。");
+                ESWindowFoundation.ClearSleepOwner(first);
+                Assert.AreEqual(
+                    1,
+                    ESWindowFoundation.ResolvePendingSleepOwners(ownerKey, first),
+                    "被拒绝的 Pending 恢复意图必须保留到 owner 图合法为止。");
+                Assert.AreEqual(
+                    ESWindowSleepLinkMode.FollowOwner,
+                    ESWindowFoundation.GetSleepLinkMode(second));
+            }
+            finally
+            {
+                ESWindowFoundation.ClearPendingSleepOwners(ownerKey);
+                ESWindowFoundation.Close(second);
+                ESWindowFoundation.Close(first);
+                UnityEngine.Object.DestroyImmediate(second);
+                UnityEngine.Object.DestroyImmediate(first);
             }
         }
 
@@ -3716,7 +4977,7 @@ namespace ES.Tests
             }
             finally
             {
-                ESWindowFoundation.Unbind(window, true);
+                ESWindowFoundation.Close(window);
                 UnityEngine.Object.DestroyImmediate(window);
             }
         }
@@ -3742,7 +5003,7 @@ namespace ES.Tests
                     owner,
                     ESWindowSleepLinkMode.FollowOwner));
 
-                ESWindowFoundation.Unbind(owner, true);
+                ESWindowFoundation.Close(owner);
                 var relationship = (IESWindowSleepRelationshipState)child;
                 Assert.IsTrue(
                     relationship.SleepOwnerDetachedByClose,
@@ -3762,7 +5023,7 @@ namespace ES.Tests
                     ESWindowSleepLinkMode.FollowOwner));
 
                 reloadFlag.SetValue(null, true);
-                ESWindowFoundation.Unbind(owner, true);
+                ESWindowFoundation.Close(owner);
                 Assert.IsFalse(
                     relationship.SleepOwnerDetachedByClose,
                     "Domain Reload 期间只释放活动引用，不得把声明关系误记为用户关闭后的永久脱离。");
@@ -3770,8 +5031,8 @@ namespace ES.Tests
             finally
             {
                 reloadFlag.SetValue(null, false);
-                ESWindowFoundation.Unbind(child, true);
-                ESWindowFoundation.Unbind(owner, true);
+                ESWindowFoundation.Close(child);
+                ESWindowFoundation.Close(owner);
                 UnityEngine.Object.DestroyImmediate(child);
                 UnityEngine.Object.DestroyImmediate(owner);
             }
@@ -3792,7 +5053,6 @@ namespace ES.Tests
             AssertFollowOwnerContract(
                 typeof(ESAssetPackageRecordPreviewWindow),
                 "ES.AssetPackageBake.Window");
-
             MethodInfo assetPreviewOpen = typeof(ESAssetPackageRecordPreviewWindow).GetMethod(
                 "Open",
                 BindingFlags.Public | BindingFlags.Static,
@@ -3801,17 +5061,17 @@ namespace ES.Tests
                 {
                     typeof(ESAssetPackageBakeData),
                     typeof(ESAssetPackageBakeRecord),
-                    typeof(UnityEditor.EditorWindow)
+                    typeof(ESAssetPackageBakeWindow)
                 },
                 null);
             Assert.IsNotNull(
                 assetPreviewOpen,
-                "资产记录预览必须由打开方显式传入 EditorWindow owner。");
+                "资产记录预览必须由打开方显式传入具体 ESAssetPackageBakeWindow owner。");
             Assert.IsNotNull(
                 typeof(ESAssetPackageBakeWindow).GetMethod(
-                    "ESWindow_OnHostEnable",
+                    "ESWindow_OnFoundationBound",
                     BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly),
-                "资产包主窗口必须在恢复时按稳定 ownerKey 解析 PendingFollowOwner。");
+                "资产包主窗口必须在 Foundation 绑定完成后按稳定 ownerKey 解析 PendingFollowOwner。");
         }
 
         private static void AssertFollowOwnerContract(Type windowType, string expectedOwnerKey)
@@ -3840,7 +5100,7 @@ namespace ES.Tests
             }
             finally
             {
-                ESWindowFoundation.Unbind(window, true);
+                ESWindowFoundation.Close(window);
                 UnityEngine.Object.DestroyImmediate(window);
             }
         }
@@ -4043,7 +5303,7 @@ namespace ES.Tests
             }
             finally
             {
-                ESWindowFoundation.Unbind(window, true);
+                ESWindowFoundation.Close(window);
                 UnityEngine.Object.DestroyImmediate(window);
             }
         }

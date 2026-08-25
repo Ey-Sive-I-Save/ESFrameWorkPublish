@@ -109,9 +109,9 @@ namespace ES
             base.ESWindow_OnHostDisable();
         }
 
-        protected override void ESWindow_OnHostEnable()
+        protected override void ESWindow_OnFoundationBound()
         {
-            base.ESWindow_OnHostEnable();
+            base.ESWindow_OnFoundationBound();
             ESWindowFoundation.ResolvePendingSleepOwners(SleepOwnerKey, this);
         }
 
@@ -1759,10 +1759,15 @@ namespace ES
             {
                 SetSelectedRecord(record);
                 SelectLoadedAsset(asset);
-                ESAssetPackageRecordPreviewWindow.Open(
-                    bake,
-                    record,
-                    ESAssetPackageBakeWindow.UsingWindow);
+                ESAssetPackageBakeWindow owner = ESAssetPackageBakeWindow.UsingWindow;
+                if (owner != null)
+                {
+                    ESAssetPackageRecordPreviewWindow.Open(bake, record, owner);
+                }
+                else
+                {
+                    Debug.LogWarning("[资产包预览] 无法打开：资产包烘焙窗口已关闭。");
+                }
                 Event.current.Use();
             }
             if (GUI.Button(pingButtonRect, "Ping"))
@@ -1782,10 +1787,17 @@ namespace ES
                 SetSelectedRecord(record);
                 SelectLoadedAsset(asset);
                 if (evt.clickCount >= 2 && asset != null)
-                    ESAssetPackageRecordPreviewWindow.Open(
-                        bake,
-                        record,
-                        ESAssetPackageBakeWindow.UsingWindow);
+                {
+                    ESAssetPackageBakeWindow owner = ESAssetPackageBakeWindow.UsingWindow;
+                    if (owner != null)
+                    {
+                        ESAssetPackageRecordPreviewWindow.Open(bake, record, owner);
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[资产包预览] 无法打开：资产包烘焙窗口已关闭。");
+                    }
+                }
                 ESAssetPackageBakeWindow.UsingWindow?.Repaint();
                 evt.Use();
             }
@@ -2323,6 +2335,7 @@ namespace ES
         }
     }
 
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Preview)]
     public class ESAssetPackageRecordPreviewWindow : ESSinglePageIMGUIWindow<ESAssetPackageRecordPreviewWindow>
     {
         private const string PrefKeyBakeGuid = "ES.AssetPackageRecordPreviewWindow.BakeGuid";
@@ -2356,27 +2369,20 @@ namespace ES
         public static void Open(
             ESAssetPackageBakeData bake,
             ESAssetPackageBakeRecord record,
-            EditorWindow owner)
+            ESAssetPackageBakeWindow owner)
         {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner));
+
             if (record == null)
                 return;
 
             ESAssetPackageRecordPreviewWindow window = GetWindow<ESAssetPackageRecordPreviewWindow>("资产完整预览");
             window.ESWindow_SetSleepOwnerOverride(owner);
-            if (owner != null)
-            {
-                ESWindowFoundation.SetSleepOwner(
-                    window,
-                    owner,
-                    ESWindowSleepLinkMode.FollowOwner);
-            }
-            else
-            {
-                ESWindowFoundation.RegisterPendingSleepOwner(
-                    window,
-                    ESAssetPackageBakeWindow.SleepOwnerKey,
-                    ESWindowSleepLinkMode.FollowOwner);
-            }
+            ESWindowFoundation.SetSleepOwner(
+                window,
+                owner,
+                ESWindowSleepLinkMode.FollowOwner);
             window.ReleasePreviewResources();
             window.bake = bake;
             window.record = record;

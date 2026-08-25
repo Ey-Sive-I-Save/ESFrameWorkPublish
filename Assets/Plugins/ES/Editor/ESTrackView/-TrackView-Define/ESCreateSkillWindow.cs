@@ -3,7 +3,10 @@ using ES;
 using UnityEditor;
 using UnityEngine;
 
- [ES.ESWindowSleepContract(ES.ESWindowSleepMode.Transient, "短生命周期创建窗口")]
+ [ES.ESWindowSleepContract(
+     ES.ESWindowSleepMode.Transient,
+     ES.ESWindowSurfaceKind.Utility,
+     "短生命周期创建窗口")]
  [ES.ESWindowPresentationShortTitle("技能")]
 public sealed class ESCreateSkillWindow : EditorWindow
 {
@@ -14,12 +17,17 @@ public sealed class ESCreateSkillWindow : EditorWindow
 
     private void OnEnable()
     {
-        ES.EditorInternal.ESEditorPresentation.BindWindow(this, allowSemiSleep: false);
+        ES.ESWindowFoundation.BindTransient(this);
     }
 
     private void OnDisable()
     {
-        ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+        ES.ESWindowFoundation.Suspend(this);
+    }
+
+    private void OnDestroy()
+    {
+        ES.ESWindowFoundation.Close(this);
     }
 
     public static void Open()

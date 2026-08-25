@@ -580,7 +580,15 @@ namespace ES
             if (currentConfigIndex >= 0 && currentConfigIndex < globalConfigs.Count)
             {
                 var config = globalConfigs[currentConfigIndex];
-                EditorInputDialog.Show("重命名配置", "输入新的配置名称:", config.ConfigName, (newName) =>
+                if (ESDialogService.TryShowTextInputModal(
+                    "simple-tools.package.rename-config",
+                    "重命名配置",
+                    "输入新的配置名称：",
+                    config.ConfigName,
+                    out string newName,
+                    owner: SimpleToolsWindow.UsingWindow,
+                    allowMainWorkspaceFallback: false,
+                    fieldLabel: "配置名称"))
                 {
                     if (!string.IsNullOrEmpty(newName) && newName != config.ConfigName)
                     {
@@ -593,7 +601,7 @@ namespace ES
                         AssetDatabase.SaveAssets();
 #endif
                     }
-                });
+                }
             }
         }
 
@@ -2054,105 +2062,4 @@ namespace ES
     #endregion
     }
 
-    /// <summary>
-    /// 简单的编辑器输入对话框
-    /// </summary>
-    [ES.ESWindowSleepContract(ES.ESWindowSleepMode.Transient, "短生命周期输入对话框")]
-    public class EditorInputDialog : EditorWindow
-    {
-        private string message;
-        private string inputValue = "";
-        private string defaultValue = "";
-        private System.Action<string> onConfirm;
-        private bool isInitialized = false;
-
-        private void OnEnable()
-        {
-            // This legacy input modal is intentionally short-lived and must
-            // never acquire independent ES semi-sleep controls.
-            ES.EditorInternal.ESEditorPresentation.BindWindow(this, allowSemiSleep: false);
-        }
-
-        private void OnDisable()
-        {
-            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
-            isInitialized = false;
-            onConfirm = null;
-        }
-
-        public static void Show(string title, string message, string defaultValue, System.Action<string> onConfirm)
-        {
-            var window = GetWindow<EditorInputDialog>(true, title, true);
-            window.message = message;
-            window.defaultValue = defaultValue;
-            window.inputValue = defaultValue;
-            window.onConfirm = onConfirm;
-            window.isInitialized = true;
-            window.minSize = new Vector2(300, 120);
-            window.maxSize = new Vector2(300, 120);
-            window.ShowModal();
-        }
-
-        public static string Show(string title, string message, string defaultValue = "")
-        {
-            string result = null;
-            Show(title, message, defaultValue, (value) => result = value);
-            return result;
-        }
-
-        private void OnGUI()
-        {
-            if (!isInitialized) return;
-
-            // ES-owned legacy input dialog: keep the same mint-green surface
-            // family as ESAdvancedDialogWindow while retaining IMGUI behavior.
-            bool dark = ES.EditorInternal.ESEditorPresentation.IsProSkin;
-            Color previousBackground = GUI.backgroundColor;
-            Color previousContent = GUI.contentColor;
-            Color surface = dark
-                ? new Color(0.070f, 0.125f, 0.095f, 1f)
-                : new Color(0.875f, 0.955f, 0.895f, 1f);
-            Color raised = dark
-                ? new Color(0.095f, 0.165f, 0.120f, 1f)
-                : new Color(0.925f, 0.975f, 0.940f, 1f);
-            Color text = dark
-                ? new Color(0.835f, 0.925f, 0.865f, 1f)
-                : new Color(0.105f, 0.205f, 0.135f, 1f);
-            EditorGUI.DrawRect(new Rect(0f, 0f, position.width, position.height), surface);
-            GUI.contentColor = text;
-
-            GUILayout.Label(message, EditorStyles.wordWrappedLabel);
-            GUILayout.Space(10);
-
-            GUI.SetNextControlName("InputField");
-            GUI.backgroundColor = raised;
-            inputValue = EditorGUILayout.TextField("输入:", inputValue);
-
-            // 自动聚焦到输入框
-            if (Event.current.type == EventType.Repaint)
-            {
-                EditorGUI.FocusTextInControl("InputField");
-            }
-
-            GUILayout.Space(10);
-
-            EditorGUILayout.BeginHorizontal();
-            GUI.backgroundColor = raised;
-            if (GUILayout.Button("确定", GUILayout.Width(80), GUILayout.Height(24)))
-            {
-                try { onConfirm?.Invoke(inputValue); }
-                catch (Exception exception) { Debug.LogException(exception); }
-                finally { Close(); }
-            }
-            if (GUILayout.Button("取消", GUILayout.Width(80), GUILayout.Height(24)))
-            {
-                try { onConfirm?.Invoke(null); }
-                catch (Exception exception) { Debug.LogException(exception); }
-                finally { Close(); }
-            }
-            EditorGUILayout.EndHorizontal();
-            GUI.backgroundColor = previousBackground;
-            GUI.contentColor = previousContent;
-        }
-    }
 }

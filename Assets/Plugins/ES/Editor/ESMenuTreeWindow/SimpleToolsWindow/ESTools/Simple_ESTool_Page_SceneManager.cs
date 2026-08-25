@@ -748,8 +748,17 @@ namespace ES
 
             if (result == 0) // 重命名
             {
-                string newDisplayName = EditorInputDialog.Show("重命名场景", "输入新名称:", scene.DisplayName);
-                if (!string.IsNullOrEmpty(newDisplayName) && newDisplayName != scene.DisplayName)
+                if (ESDialogService.TryShowTextInputModal(
+                        "simple-tools.scene-manager.rename-scene",
+                        "重命名场景",
+                        "输入新名称：",
+                        scene.DisplayName,
+                        out string newDisplayName,
+                        owner: SimpleToolsWindow.UsingWindow,
+                        allowMainWorkspaceFallback: false,
+                        fieldLabel: "场景名称")
+                    && !string.IsNullOrEmpty(newDisplayName)
+                    && newDisplayName != scene.DisplayName)
                 {
                     // 记录撤销操作
                     Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "重命名场景");
@@ -804,8 +813,17 @@ namespace ES
 
             if (result == 0) // 重命名
             {
-                string newDisplayName = EditorInputDialog.Show("重命名资产", "输入新名称:", asset.DisplayName);
-                if (!string.IsNullOrEmpty(newDisplayName) && newDisplayName != asset.DisplayName)
+                if (ESDialogService.TryShowTextInputModal(
+                        "simple-tools.scene-manager.rename-asset",
+                        "重命名资产",
+                        "输入新名称：",
+                        asset.DisplayName,
+                        out string newDisplayName,
+                        owner: SimpleToolsWindow.UsingWindow,
+                        allowMainWorkspaceFallback: false,
+                        fieldLabel: "资产名称")
+                    && !string.IsNullOrEmpty(newDisplayName)
+                    && newDisplayName != asset.DisplayName)
                 {
                     // 记录撤销操作
                     Undo.RegisterCompleteObjectUndo(ESSceneGlobalData.Instance, "重命名资产");

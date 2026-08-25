@@ -81,6 +81,18 @@ namespace ES
             {
                 if (values == null || getLabel == null || onSelected == null)
                     return this;
+
+                // 已知集合容量时只预留一次，避免 AddRange 构建较大候选集时
+                // 反复扩容和复制；不改变枚举顺序、回调捕获或 Provider 时机。
+                ICollection<T> collection = values as ICollection<T>;
+                if (collection != null)
+                {
+                    int additionalCount = collection.Count;
+                    if (additionalCount > entries.Capacity - entries.Count
+                        && additionalCount <= int.MaxValue - entries.Count)
+                        entries.Capacity = entries.Count + additionalCount;
+                }
+
                 foreach (T value in values)
                 {
                     T captured = value;
@@ -228,15 +240,37 @@ namespace ES
                 unchecked
                 {
                     uint hash = 2166136261u;
-                    string value = (groupPath ?? string.Empty) + "\n" + (label ?? string.Empty) + "\n" + separator;
-                    for (int i = 0; i < value.Length; i++)
-                    {
-                        hash ^= value[i];
-                        hash *= 16777619u;
-                    }
+                    // 保持旧字符串拼接算法的字节序列完全一致，但避免每个 Entry
+                    // 为稳定 Id 创建一次临时组合字符串。separator 的 ToString() 结果
+                    // 是首字母大写的 "True"/"False"，这里显式展开以保留既有身份。
+                    hash = AppendHash(hash, groupPath);
+                    hash = AppendHashChar(hash, '\n');
+                    hash = AppendHash(hash, label);
+                    hash = AppendHashChar(hash, '\n');
+                    hash = separator
+                        ? AppendHashLiteral(hash, "True")
+                        : AppendHashLiteral(hash, "False");
                     int id = (int)(hash & 0x7fffffff);
                     return id == 0 ? 1 : id;
                 }
+            }
+
+            private static uint AppendHash(uint hash, string value)
+            {
+                return AppendHashLiteral(hash, value ?? string.Empty);
+            }
+
+            private static uint AppendHashLiteral(uint hash, string value)
+            {
+                for (int i = 0; i < value.Length; i++)
+                    hash = AppendHashChar(hash, value[i]);
+                return hash;
+            }
+
+            private static uint AppendHashChar(uint hash, char value)
+            {
+                hash ^= value;
+                return hash * 16777619u;
             }
         }
 

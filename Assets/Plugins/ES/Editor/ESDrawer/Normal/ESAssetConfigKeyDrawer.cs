@@ -1203,6 +1203,7 @@ namespace ES.EditorInternal
     {
         public override void InitInvoke()
         {
+            ESAssetReferEditorBridge.OpenAssetKeyPicker = ESAssetReferKeyPickerWindow.Open;
             ESAssetReferEditorBridge.NotifyAssetLibraryChanged = library =>
             {
                 string path = library != null ? AssetDatabase.GetAssetPath(library) : string.Empty;
@@ -1282,4 +1283,210 @@ namespace ES.EditorInternal
 
     [CustomPropertyDrawer(typeof(ESAssetReferScriptableObjectConfigKey))]
     public sealed class ESAssetReferScriptableObjectConfigKeyDrawer : ESAssetConfigKeyDrawerBase { protected override Type ResolveEnumType() => typeof(ESAssetReferScriptableObjectEnumKey); protected override ESAssetReferKind ResolveKind() => ESAssetReferKind.ScriptableObject; }
+}
+
+namespace ES
+{
+    [ESWindowSleepContract(
+        ESWindowSleepMode.Transient,
+        ESWindowSurfaceKind.Popup,
+        "短生命周期资源 Key 选择器")]
+    internal sealed class ESAssetReferKeyPickerWindow : EditorWindow, IESWindowPresentationShortTitle
+    {
+        private const float RowHeight = 38f;
+        private static readonly Vector2 MinimumSize = new Vector2(480f, 340f);
+        private static readonly Vector2 MaximumSize = new Vector2(960f, 760f);
+
+        private readonly List<int> filteredIndices = new List<int>(128);
+        private ESAssetReferKind kind;
+        private ESAssetPage[] pages = Array.Empty<ESAssetPage>();
+        private string[] searchTexts = Array.Empty<string>();
+        private string[] detailLabels = Array.Empty<string>();
+        private Action<ESAssetPage> onSelected;
+        private ESAssetPage current;
+        private Vector2 scroll;
+        private string search = string.Empty;
+        private string appliedSearch;
+        private int cacheVersion = -1;
+        private bool configured;
+
+        public string ESWindow_PresentationShortTitle => "资源 Key";
+
+        internal static void Open(
+            ESAssetReferKind kind,
+            ESAssetPage current,
+            Action<ESAssetPage> onSelected)
+        {
+            ESAssetReferKeyPickerWindow window = GetWindow<ESAssetReferKeyPickerWindow>(
+                true,
+                "选择 " + kind + " Key",
+                false);
+            window.hideFlags = HideFlags.DontSave;
+            window.titleContent = new GUIContent("选择 " + kind + " Key");
+            window.minSize = MinimumSize;
+            window.maxSize = MaximumSize;
+            window.kind = kind;
+            window.current = current;
+            window.onSelected = onSelected;
+            window.search = string.Empty;
+            window.appliedSearch = null;
+            window.scroll = Vector2.zero;
+            window.cacheVersion = -1;
+            window.configured = true;
+            window.RefreshCacheIfNeeded();
+            window.RebuildFilter();
+            window.ShowAuxWindow();
+            window.Focus();
+            window.Repaint();
+        }
+
+        private void OnEnable()
+        {
+            ESWindowFoundation.BindTransient(this);
+            EditorApplication.delayCall -= CloseIfContextWasLost;
+            EditorApplication.delayCall += CloseIfContextWasLost;
+        }
+
+        private void OnDisable()
+        {
+            EditorApplication.delayCall -= CloseIfContextWasLost;
+            ESWindowFoundation.Suspend(this);
+            configured = false;
+            onSelected = null;
+            current = null;
+            pages = Array.Empty<ESAssetPage>();
+            searchTexts = Array.Empty<string>();
+            detailLabels = Array.Empty<string>();
+            filteredIndices.Clear();
+        }
+
+        private void OnDestroy()
+        {
+            ESWindowFoundation.Close(this);
+        }
+
+        private void CloseIfContextWasLost()
+        {
+            EditorApplication.delayCall -= CloseIfContextWasLost;
+            if (this != null && !configured)
+                Close();
+        }
+
+        private void OnGUI()
+        {
+            if (!configured)
+            {
+                Close();
+                return;
+            }
+
+            EditorGUILayout.Space(4f);
+            GUI.SetNextControlName("ESAssetReferKeySearch");
+            string nextSearch = EditorGUILayout.TextField(search, EditorStyles.toolbarSearchField);
+            if (!string.Equals(nextSearch, search, StringComparison.Ordinal))
+                search = nextSearch;
+            if (!string.Equals(appliedSearch, search, StringComparison.Ordinal)
+                || cacheVersion != ESAssetRegistry.Version)
+            {
+                RefreshCacheIfNeeded();
+                RebuildFilter();
+            }
+
+            EditorGUILayout.BeginVertical();
+            scroll = EditorGUILayout.BeginScrollView(scroll);
+            float totalHeight = filteredIndices.Count * RowHeight;
+            Rect contentRect = GUILayoutUtility.GetRect(1f, totalHeight, GUILayout.ExpandWidth(true));
+            int first = Mathf.Max(0, Mathf.FloorToInt(scroll.y / RowHeight));
+            int visible = Mathf.CeilToInt(position.height / RowHeight) + 2;
+            int last = Mathf.Min(filteredIndices.Count, first + visible);
+            for (int row = first; row < last; row++)
+            {
+                int pageIndex = filteredIndices[row];
+                ESAssetPage page = pages[pageIndex];
+                if (page == null)
+                    continue;
+
+                Rect rowRect = new Rect(
+                    contentRect.x,
+                    contentRect.y + row * RowHeight,
+                    contentRect.width,
+                    RowHeight - 2f);
+                if (ReferenceEquals(page, current))
+                    EditorGUI.DrawRect(rowRect, new Color(0.20f, 0.48f, 0.72f, 0.25f));
+                if (GUI.Button(rowRect, GUIContent.none, GUIStyle.none))
+                {
+                    try
+                    {
+                        onSelected?.Invoke(page);
+                    }
+                    finally
+                    {
+                        Close();
+                    }
+                    GUIUtility.ExitGUI();
+                }
+
+                Rect nameRect = new Rect(
+                    rowRect.x + 6f,
+                    rowRect.y + 2f,
+                    rowRect.width - 12f,
+                    18f);
+                Rect keyRect = new Rect(nameRect.x, nameRect.y + 17f, nameRect.width, 16f);
+                EditorGUI.LabelField(nameRect, page.Name, EditorStyles.boldLabel);
+                EditorGUI.LabelField(keyRect, detailLabels[pageIndex], EditorStyles.miniLabel);
+            }
+            EditorGUILayout.EndScrollView();
+            EditorGUILayout.EndVertical();
+
+            if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
+                Close();
+            if (Event.current.type == EventType.Repaint
+                && string.IsNullOrEmpty(GUI.GetNameOfFocusedControl()))
+                EditorGUI.FocusTextInControl("ESAssetReferKeySearch");
+        }
+
+        private void RefreshCacheIfNeeded()
+        {
+            if (cacheVersion == ESAssetRegistry.Version)
+                return;
+
+            IReadOnlyList<ESAssetPage> source = ESAssetRegistry.GetPagesByKind(kind);
+            int count = source?.Count ?? 0;
+            pages = new ESAssetPage[count];
+            searchTexts = new string[count];
+            detailLabels = new string[count];
+            for (int i = 0; i < count; i++)
+            {
+                ESAssetPage page = source[i];
+                pages[i] = page;
+                searchTexts[i] = page == null
+                    ? string.Empty
+                    : ((page.Name ?? string.Empty) + "\n"
+                       + (page.EffectiveStringKey ?? string.Empty) + "\n"
+                       + page.EnumKey + "\n"
+                       + (page.SourceBook ?? string.Empty) + "\n"
+                       + (page.SourceLibrary ?? string.Empty)).ToLowerInvariant();
+                detailLabels[i] = page == null
+                    ? string.Empty
+                    : "String: " + page.EffectiveStringKey
+                      + "    Enum: " + page.EnumKey
+                      + "    Page: " + page.SourceBook;
+            }
+            cacheVersion = ESAssetRegistry.Version;
+        }
+
+        private void RebuildFilter()
+        {
+            filteredIndices.Clear();
+            string term = string.IsNullOrWhiteSpace(search)
+                ? string.Empty
+                : search.Trim().ToLowerInvariant();
+            for (int i = 0; i < pages.Length; i++)
+            {
+                if (term.Length == 0 || searchTexts[i].Contains(term))
+                    filteredIndices.Add(i);
+            }
+            appliedSearch = search;
+        }
+    }
 }

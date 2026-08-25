@@ -644,9 +644,14 @@ namespace ES
             if (trackWindow == null)
                 trackWindow = ESTrackViewWindow.window;
 
+            if (trackWindow == null)
+            {
+                Debug.LogWarning("[轨道编辑器] 无法打开技能配置检查器：当前没有可用的轨道窗口。");
+                return;
+            }
+
             ESTrackSkillDataTemporaryInspectorWindow.CloseCurrentWindow();
-            if (trackWindow != null)
-                trackWindow.Last_EditorWindowForSkillDataInfo = null;
+            trackWindow.Last_EditorWindowForSkillDataInfo = null;
 
             var editorWindow = ESTrackSkillDataTemporaryInspectorWindow.OpenFor(
                 skillData,
@@ -654,8 +659,7 @@ namespace ES
                 "技能配置",
                 trackWindow);
 
-            if (trackWindow != null)
-                trackWindow.Last_EditorWindowForSkillDataInfo = editorWindow;
+            trackWindow.Last_EditorWindowForSkillDataInfo = editorWindow;
         }
 
         public static bool BindCurrentSkillDataToEntityAndPlay(ESTrackViewWindow trackWindow)

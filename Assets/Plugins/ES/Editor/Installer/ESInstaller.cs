@@ -10,6 +10,7 @@ using UnityEditor;
 using UnityEditor.PackageManager;
 using UnityEditor.PackageManager.Requests;
 using UnityEngine;
+using UpmPackageInfo = UnityEditor.PackageManager.PackageInfo;
 
 
 namespace ES.EditorInternal.Installer
@@ -46,32 +47,6 @@ namespace ES.EditorInternal.Installer
         }
 
         private static ESInstaller installer;
-
-        private sealed class DependencyCheckWindowLease : IDisposable
-        {
-            private readonly int generation;
-            private bool disposed;
-
-            internal DependencyCheckWindowLease(ESInstaller instance, int generation)
-            {
-                Instance = instance;
-                this.generation = generation;
-            }
-
-            internal ESInstaller Instance { get; }
-
-            public void Dispose()
-            {
-                if (disposed)
-                    return;
-                disposed = true;
-                ReleaseCheckInstance(Instance, generation);
-            }
-        }
-
-        private static ESInstaller temporaryCheckInstance;
-        private static int dependencyCheckLeaseCount;
-        private static int dependencyCheckGeneration;
         private static bool dependencyCheckInProgress;
 
         private static bool TryBeginDependencyCheck()
@@ -87,53 +62,53 @@ namespace ES.EditorInternal.Installer
             dependencyCheckInProgress = false;
         }
 
-        private static DependencyCheckWindowLease AcquireCheckInstance()
+        private sealed class DependencyCheckResult
         {
-            if (installer == null)
+            internal int TotalRequired { get; private set; }
+            internal int InstalledRequired { get; private set; }
+            internal bool HasUninstalledRequiredDependencies => InstalledRequired < TotalRequired;
+
+            internal void RecordRequiredDependency(bool isInstalled)
             {
-                installer = EditorWindow.CreateInstance<ESInstaller>();
-                installer.hideFlags = HideFlags.HideAndDontSave;
-                temporaryCheckInstance = installer;
-                dependencyCheckLeaseCount = 0;
-                dependencyCheckGeneration++;
+                TotalRequired++;
+                if (isInstalled)
+                    InstalledRequired++;
+            }
+        }
+
+        private sealed class InstalledPackageSnapshot
+        {
+            internal InstalledPackageSnapshot(
+                UpmPackageInfo[] packages,
+                string failureMessage)
+            {
+                Packages = packages ?? Array.Empty<UpmPackageInfo>();
+                FailureMessage = failureMessage;
             }
 
-            dependencyCheckLeaseCount++;
-            return new DependencyCheckWindowLease(installer, dependencyCheckGeneration);
+            internal UpmPackageInfo[] Packages { get; }
+            internal string FailureMessage { get; }
+            internal bool IsAvailable => string.IsNullOrEmpty(FailureMessage);
         }
 
-        private static void ReleaseCheckInstance(ESInstaller checkInstance, int generation)
+        private static InstallationProfile LoadCanonicalInstallationProfile()
         {
-            if (generation != dependencyCheckGeneration)
-                return;
-
-            dependencyCheckLeaseCount = Math.Max(0, dependencyCheckLeaseCount - 1);
-            if (dependencyCheckLeaseCount > 0
-                || !ReferenceEquals(temporaryCheckInstance, checkInstance))
-                return;
-
-            temporaryCheckInstance = null;
-            if (ReferenceEquals(installer, checkInstance))
-                installer = null;
-            if (checkInstance != null)
-                DestroyImmediate(checkInstance);
+            InstallationProfile profile = InstallationProfile.LoadFromFile()
+                ?? new InstallationProfile();
+            profile.enableAutoCheck = EditorPrefs.GetBool(GetAutoCheckPreferenceKey(), false);
+            profile.skipNextAutoCheck = SessionState.GetBool(
+                GetSkipNextAutoCheckSessionKey(),
+                false);
+            return profile;
         }
 
-        private static ESInstaller GetOrPromoteInstallerWindow()
+        private static ESInstaller GetOrCreateInstallerWindow()
         {
             ESInstaller window = installer;
             if (window == null)
             {
                 window = GetWindow<ESInstaller>("ES 安装管理器");
                 installer = window;
-                temporaryCheckInstance = null;
-                dependencyCheckLeaseCount = 0;
-                dependencyCheckGeneration++;
-            }
-            else if (ReferenceEquals(temporaryCheckInstance, window))
-            {
-                temporaryCheckInstance = null;
-                window.hideFlags = HideFlags.None;
             }
 
             return window;
@@ -145,30 +120,25 @@ namespace ES.EditorInternal.Installer
                 return;
             try
             {
-                using DependencyCheckWindowLease lease = AcquireCheckInstance();
-                ESInstaller checkInstance = lease.Instance;
-                if (checkInstance.currentProfile == null)
-                {
-                    checkInstance.InitializePaths();
-                    checkInstance.LoadConfiguration();
-                }
+                InstallationProfile profile = LoadCanonicalInstallationProfile();
 
                 // 检查是否启用自动检查
-                if (!checkInstance.currentProfile.enableAutoCheck)
+                if (!profile.enableAutoCheck)
                     return;
 
                 // 检查是否跳过此次检查
-                if (checkInstance.currentProfile.skipNextAutoCheck)
+                if (profile.skipNextAutoCheck)
                 {
-                    checkInstance.currentProfile.skipNextAutoCheck = false;
+                    profile.skipNextAutoCheck = false;
                     SessionState.SetBool(GetSkipNextAutoCheckSessionKey(), false);
                     return;
                 }
                 // 检查是否有未安装的必需依赖
-                bool hasUninstalledRequiredDependencies = await CheckForUninstalledRequiredDependenciesAsync(checkInstance.currentProfile.mainPackage);
+                DependencyCheckResult result =
+                    await CheckRequiredDependenciesAsync(profile.mainPackage);
 
                 // 如果有未安装的必需依赖，显示安装器
-                if (hasUninstalledRequiredDependencies)
+                if (result.HasUninstalledRequiredDependencies)
                     ShowInstallerWithWarning();
             }
             catch (Exception e)
@@ -181,8 +151,12 @@ namespace ES.EditorInternal.Installer
             }
         }
 
-        private static async Task<bool> CheckUnityPackageInstalledAsync(UnityPackageDependency dependency)
+        private static bool CheckUnityPackageInstalled(
+            UnityPackageDependency dependency,
+            IReadOnlyList<UpmPackageInfo> installedPackages)
         {
+            if (dependency == null)
+                return false;
 
             // 首先检查类是否存在（同步操作）
             if (!string.IsNullOrEmpty(dependency.checkClass))
@@ -197,24 +171,14 @@ namespace ES.EditorInternal.Installer
             if (string.IsNullOrEmpty(dependency.packageId))
                 return false;
 
-            try
-            {
-                var request = Client.List(false, false);
-                await WaitForListRequestCompletion(request);
-
-                if (request.Status == StatusCode.Success)
-                {
-                    return request.Result.Any(p => p.name == dependency.packageId);
-                }
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
+            return installedPackages != null
+                && installedPackages.Any(package => package != null
+                    && string.Equals(package.name, dependency.packageId, StringComparison.Ordinal));
         }
 
-        private static async Task<bool> CheckGitPackageInstalledAsync(GitPackageDependency dependency)
+        private static bool CheckGitPackageInstalled(
+            GitPackageDependency dependency,
+            IReadOnlyList<UpmPackageInfo> installedPackages)
         {
             if (dependency == null)
                 return false;
@@ -234,71 +198,96 @@ namespace ES.EditorInternal.Installer
             if (string.IsNullOrEmpty(dependency.gitUrl))
                 return false;
 
-            try
-            {
-                var request = Client.List(false, false);
-                await WaitForListRequestCompletion(request);
-
-                if (request.Status == StatusCode.Success)
-                {
-                    return request.Result.Any(p => p.packageId == pinnedGitUrl || p.name == pinnedGitUrl);
-                }
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
+            return installedPackages != null
+                && installedPackages.Any(package => package != null
+                    && (string.Equals(package.packageId, pinnedGitUrl, StringComparison.Ordinal)
+                        || string.Equals(package.name, pinnedGitUrl, StringComparison.Ordinal)));
         }
 
-        private static Task<bool> CheckUserPackageInstalledAsync(UserPackageDependency dependency)
+        private static bool IsUserPackageInstalled(UserPackageDependency dependency)
         {
             // 用户包只通过类检查（同步操作）
-            if (string.IsNullOrEmpty(dependency.checkClass))
-                return Task.FromResult(false);
+            if (dependency == null || string.IsNullOrEmpty(dependency.checkClass))
+                return false;
 
-            return Task.FromResult(IsClassExists(dependency.checkClass));
+            return IsClassExists(dependency.checkClass);
         }
 
         /// <summary>
-        /// 检查包是否有未安装的必需依赖
+        /// 使用一次 UPM 快照统一检查四类必需依赖。
         /// </summary>
-        private static async Task<bool> CheckForUninstalledRequiredDependenciesAsync(ESPackageBase package)
+        private static async Task<DependencyCheckResult> CheckRequiredDependenciesAsync(
+            ESPackageBase package)
         {
-            if (package == null) return false;
+            var result = new DependencyCheckResult();
+            if (package == null)
+                return result;
 
-            // 收集所有必需依赖的检查任务
-            var checkTasks = new List<Task<bool>>();
-
-            // 添加Unity包检查任务
-            foreach (var dep in package.unityDependencies.Where(d => d.isRequired))
+            InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync();
+            if (!snapshot.IsAvailable)
+                throw new InvalidOperationException(snapshot.FailureMessage);
+            UpmPackageInfo[] installedPackages = snapshot.Packages;
+            foreach (UnityPackageDependency dependency in
+                     (IEnumerable<UnityPackageDependency>)package.unityDependencies
+                     ?? Enumerable.Empty<UnityPackageDependency>())
             {
-                checkTasks.Add(CheckUnityPackageInstalledAsync(dep));
+                if (dependency == null || !dependency.isRequired)
+                    continue;
+                result.RecordRequiredDependency(
+                    CheckUnityPackageInstalled(dependency, installedPackages));
             }
 
-            // 添加Git包检查任务
-            foreach (var dep in package.gitDependencies.Where(d => d.isRequired))
+            foreach (GitPackageDependency dependency in
+                     (IEnumerable<GitPackageDependency>)package.gitDependencies
+                     ?? Enumerable.Empty<GitPackageDependency>())
             {
-                checkTasks.Add(CheckGitPackageInstalledAsync(dep));
+                if (dependency == null || !dependency.isRequired)
+                    continue;
+                result.RecordRequiredDependency(
+                    CheckGitPackageInstalled(dependency, installedPackages));
             }
 
-            // 添加用户包检查任务
-            foreach (var dep in package.userDependencies.Where(d => d.isRequired))
+            foreach (UserPackageDependency dependency in
+                     (IEnumerable<UserPackageDependency>)package.userDependencies
+                     ?? Enumerable.Empty<UserPackageDependency>())
             {
-                checkTasks.Add(CheckUserPackageInstalledAsync(dep));
+                if (dependency == null || !dependency.isRequired)
+                    continue;
+                result.RecordRequiredDependency(IsUserPackageInstalled(dependency));
             }
 
-            // 添加资产文件检查任务
-            foreach (var dep in package.assetFileDependencies.Where(d => d.isRequired))
+            foreach (AssetFileDependency dependency in
+                     (IEnumerable<AssetFileDependency>)package.assetFileDependencies
+                     ?? Enumerable.Empty<AssetFileDependency>())
             {
-                checkTasks.Add(Task.Run(() => CheckAssetFileInstalled(dep)));
+                if (dependency == null || !dependency.isRequired)
+                    continue;
+                result.RecordRequiredDependency(CheckAssetFileInstalled(dependency));
             }
 
-            // 并行执行所有检查任务
-            var results = await Task.WhenAll(checkTasks);
+            return result;
+        }
 
-            // 如果任何一个必需依赖未安装，返回true
-            return results.Any(installed => !installed);
+        private static async Task<InstalledPackageSnapshot> CaptureInstalledPackageSnapshotAsync()
+        {
+            try
+            {
+                ListRequest request = Client.List(false, false);
+                await WaitForListRequestCompletion(request);
+                if (request.Status == StatusCode.Success && request.Result != null)
+                    return new InstalledPackageSnapshot(request.Result.ToArray(), null);
+
+                return new InstalledPackageSnapshot(
+                    null,
+                    "ES Installer 无法读取 UPM 包快照: "
+                    + (request.Error?.message ?? request.Status.ToString()));
+            }
+            catch (Exception exception)
+            {
+                return new InstalledPackageSnapshot(
+                    null,
+                    $"ES Installer 无法读取 UPM 包快照: {exception.Message}");
+            }
         }
 
         private static Task WaitForListRequestCompletion(ListRequest request)
@@ -343,67 +332,16 @@ namespace ES.EditorInternal.Installer
             }
             try
             {
-                using DependencyCheckWindowLease lease = AcquireCheckInstance();
-                ESInstaller checkInstance = lease.Instance;
-                if (checkInstance.currentProfile == null)
-                {
-                    checkInstance.InitializePaths();
-                    checkInstance.LoadConfiguration();
-                }
-
-                // 检查是否有未安装的必需依赖
-                bool hasUninstalledRequiredDependencies = false;
-                int totalRequired = 0;
-                int installedRequired = 0;
-
-                // 检查Unity官方包
-                foreach (var dependency in checkInstance.currentProfile.mainPackage.unityDependencies.Where(d => d.isRequired))
-                {
-                    totalRequired++;
-                    if (await CheckUnityPackageInstalledAsync(dependency))
-                    {
-                        installedRequired++;
-                    }
-                    else
-                    {
-                        hasUninstalledRequiredDependencies = true;
-                    }
-                }
-
-                // 检查Git包
-                foreach (var dependency in checkInstance.currentProfile.mainPackage.gitDependencies.Where(d => d.isRequired))
-                {
-                    totalRequired++;
-                    if (await CheckGitPackageInstalledAsync(dependency))
-                    {
-                        installedRequired++;
-                    }
-                    else
-                    {
-                        hasUninstalledRequiredDependencies = true;
-                    }
-                }
-
-                // 检查用户包
-                foreach (var dependency in checkInstance.currentProfile.mainPackage.userDependencies.Where(d => d.isRequired))
-                {
-                    totalRequired++;
-                    if (await CheckUserPackageInstalledAsync(dependency))
-                    {
-                        installedRequired++;
-                    }
-                    else
-                    {
-                        hasUninstalledRequiredDependencies = true;
-                    }
-                }
+                InstallationProfile profile = LoadCanonicalInstallationProfile();
+                DependencyCheckResult result =
+                    await CheckRequiredDependenciesAsync(profile.mainPackage);
 
                 // 显示检查结果
-                if (hasUninstalledRequiredDependencies)
+                if (result.HasUninstalledRequiredDependencies)
                 {
                     bool openInstaller = EditorUtility.DisplayDialog(
                         "ES框架依赖检查结果",
-                        $"发现未安装的必需依赖！\n\n已安装: {installedRequired}/{totalRequired}\n\n是否打开安装管理器来解决依赖问题？",
+                        $"发现未安装的必需依赖！\n\n已安装: {result.InstalledRequired}/{result.TotalRequired}\n\n是否打开安装管理器来解决依赖问题？",
                         "打开安装器",
                         "稍后处理"
                     );
@@ -417,7 +355,7 @@ namespace ES.EditorInternal.Installer
                 {
                     EditorUtility.DisplayDialog(
                         "ES框架依赖检查结果",
-                        $"所有必需依赖都已正确安装！\n\n已安装: {installedRequired}/{totalRequired}",
+                        $"所有必需依赖都已正确安装！\n\n已安装: {result.InstalledRequired}/{result.TotalRequired}",
                         "确定"
                     );
                 }
@@ -488,7 +426,7 @@ namespace ES.EditorInternal.Installer
 
         private static void ShowInstallerWithWarning()
         {
-            if (installer != null && !ReferenceEquals(installer, temporaryCheckInstance))
+            if (installer != null)
             {
                 installer.Focus();
                 return;
@@ -615,12 +553,23 @@ namespace ES.EditorInternal.Installer
                 {
                     try
                     {
-                        string json = File.ReadAllText(packageJsonPath);
+                        string json = File.ReadAllText(
+                            packageJsonPath,
+                            new UTF8Encoding(false, true));
                         T package = JsonUtility.FromJson<T>(json);
                         if (package != null)
                         {
+                            ExtensionPackageJsonData serializedData =
+                                JsonUtility.FromJson<ExtensionPackageJsonData>(json);
+                            if (serializedData?.installationNotes != null)
+                                package.installNotes = serializedData.installationNotes;
                             package.packageFolderPath = folderPath;
                             package.installState = PackageInstallState.Loading;
+                            package.unityDependencies ??= new List<UnityPackageDependency>();
+                            package.gitDependencies ??= new List<GitPackageDependency>();
+                            package.userDependencies ??= new List<UserPackageDependency>();
+                            package.assetFileDependencies ??= new List<AssetFileDependency>();
+                            package.tags ??= new List<string>();
                             // 从文件夹名推断folderName
                             if (string.IsNullOrEmpty(package.folderName))
                             {
@@ -707,7 +656,9 @@ namespace ES.EditorInternal.Installer
                     var profile = new InstallationProfile();
 
                     // 扫描Downloads文件夹下的所有子文件夹
-                    string[] subFolders = Directory.GetDirectories(downloadsFolder);
+                    string[] subFolders = Directory.GetDirectories(downloadsFolder)
+                        .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
 
                     foreach (string folderPath in subFolders)
                     {
@@ -725,6 +676,8 @@ namespace ES.EditorInternal.Installer
                         {
                             // 加载主包
                             var mainPackage = ESPackageBase.LoadFromJson<ESMainPackage>(folderPath);
+                            mainPackage.packageId = "es_main";
+                            mainPackage.folderName = "Main";
                             profile.mainPackage = mainPackage;
                             profile.profileName = $"{mainPackage.displayName} {mainPackage.version}";
                         }
@@ -732,6 +685,9 @@ namespace ES.EditorInternal.Installer
                         {
                             // 加载扩展包
                             var extensionPackage = ESPackageBase.LoadFromJson<ESExtensionPackage>(folderPath);
+                            extensionPackage.packageId = $"ext_{folderName}";
+                            extensionPackage.folderName = folderName;
+                            extensionPackage.requiredMainPackages ??= new List<string>();
                             profile.extensionPackages.Add(extensionPackage);
                         }
                     }
@@ -825,7 +781,7 @@ namespace ES.EditorInternal.Installer
         [MenuItem(MenuItemPathDefine.INSTALL_DEPENDENCY_PATH + "打开安装管理器", false, 0)]
         static void ShowInstaller()
         {
-            installer = GetOrPromoteInstallerWindow();
+            installer = GetOrCreateInstallerWindow();
             installer.minSize = new Vector2(600, 500);
             installer.Show();
             installer.Focus();
@@ -1728,11 +1684,47 @@ namespace ES.EditorInternal.Installer
 
         private void LoadConfiguration()
         {
-            // InitializePaths 已给出受控 Downloads 根，不需要为定位本脚本执行全项目 FindAssets。
-            currentProfile = new InstallationProfile();
-            ScanAndLoadAllPackages();
-            currentProfile.enableAutoCheck = EditorPrefs.GetBool(GetAutoCheckPreferenceKey(), false);
-            currentProfile.skipNextAutoCheck = SessionState.GetBool(GetSkipNextAutoCheckSessionKey(), false);
+            currentProfile = LoadCanonicalInstallationProfile();
+            RebuildPackageUiIndex(currentProfile);
+        }
+
+        private void RebuildPackageUiIndex(InstallationProfile profile)
+        {
+            availablePackageIds.Clear();
+            packageDisplayNames.Clear();
+
+            ESMainPackage mainPackage = profile?.mainPackage;
+            if (mainPackage == null)
+                return;
+
+            mainPackage.packageId = "es_main";
+            availablePackageIds.Add(mainPackage.packageId);
+            packageDisplayNames[mainPackage.packageId] =
+                string.IsNullOrWhiteSpace(mainPackage.displayName)
+                    ? "ES Framework 主包 (必需)"
+                    : $"{mainPackage.displayName} (必需)";
+
+            foreach (ESExtensionPackage package in
+                     (IEnumerable<ESExtensionPackage>)profile.extensionPackages
+                     ?? Enumerable.Empty<ESExtensionPackage>())
+            {
+                if (package == null || string.IsNullOrWhiteSpace(package.packageId))
+                    continue;
+                if (packageDisplayNames.ContainsKey(package.packageId))
+                {
+                    Debug.LogWarning($"ES Installer 忽略重复包 ID: {package.packageId}");
+                    continue;
+                }
+
+                availablePackageIds.Add(package.packageId);
+                packageDisplayNames[package.packageId] =
+                    string.IsNullOrWhiteSpace(package.displayName)
+                        ? package.folderName
+                        : $"{package.displayName} v{package.version}";
+            }
+
+            if (!packageDisplayNames.ContainsKey(currentSelectedPackageId))
+                currentSelectedPackageId = mainPackage.packageId;
         }
 
         private static string GetAutoCheckPreferenceKey()
@@ -1867,13 +1859,21 @@ namespace ES.EditorInternal.Installer
         private async Task CheckPackageDependenciesAsync(ESPackageBase package)
         {
             if (package == null) return;
+            InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync();
+            if (!snapshot.IsAvailable)
+            {
+                ShowStatus(snapshot.FailureMessage, MessageType.Error);
+                return;
+            }
+            UpmPackageInfo[] installedPackages = snapshot.Packages;
 
             // 检查Unity包
             if (package.unityDependencies != null)
             {
                 foreach (var dep in package.unityDependencies)
                 {
-                    dep.isInstalled = await CheckUnityPackageInstalledAsync(dep);
+                    if (dep != null)
+                        dep.isInstalled = CheckUnityPackageInstalled(dep, installedPackages);
                 }
             }
 
@@ -1882,7 +1882,8 @@ namespace ES.EditorInternal.Installer
             {
                 foreach (var dep in package.gitDependencies)
                 {
-                    dep.isInstalled = await CheckGitPackageInstalledAsync(dep);
+                    if (dep != null)
+                        dep.isInstalled = CheckGitPackageInstalled(dep, installedPackages);
                 }
             }
 
@@ -1891,7 +1892,8 @@ namespace ES.EditorInternal.Installer
             {
                 foreach (var dep in package.userDependencies)
                 {
-                    dep.isInstalled = CheckUserPackageInstalled(dep);
+                    if (dep != null)
+                        dep.isInstalled = IsUserPackageInstalled(dep);
                 }
             }
 
@@ -1900,21 +1902,10 @@ namespace ES.EditorInternal.Installer
             {
                 foreach (var dep in package.assetFileDependencies)
                 {
-                    dep.isInstalled = CheckAssetFileInstalled(dep);
+                    if (dep != null)
+                        dep.isInstalled = CheckAssetFileInstalled(dep);
                 }
             }
-        }
-
-        /// <summary>
-        /// 同步检查用户包是否已安装
-        /// </summary>
-        private bool CheckUserPackageInstalled(UserPackageDependency dependency)
-        {
-            // 用户包只通过类检查（同步操作）
-            if (string.IsNullOrEmpty(dependency.checkClass))
-                return false;
-
-            return IsClassExists(dependency.checkClass);
         }
 
         /// <summary>
@@ -1938,365 +1929,6 @@ namespace ES.EditorInternal.Installer
             // 检查文件是否存在
             return TryResolveProjectAssetPath(dependency.assetPath, out string fullPath)
                 && (File.Exists(fullPath) || Directory.Exists(fullPath));
-        }
-
-        /// <summary>
-        /// 扫描并加载所有包（主包+扩展包）
-        /// </summary>
-        private void ScanAndLoadAllPackages()
-        {
-            if (!Directory.Exists(downloadsFolderPath))
-            {
-                Directory.CreateDirectory(downloadsFolderPath);
-                return;
-            }
-
-            // 清空包列表
-            availablePackageIds.Clear();
-            packageDisplayNames.Clear();
-
-            // 添加主包
-            availablePackageIds.Add("es_main");
-            packageDisplayNames["es_main"] = "ES Framework 主包 (必需)";
-
-            // 首先处理主包
-            string mainFolderPath = Path.Combine(downloadsFolderPath, "Main");
-            string mainJsonPath = Path.Combine(mainFolderPath, "package.json");
-            //    Debug.Log("Scanning main package folder: " + mainFolderPath);
-
-            if (File.Exists(mainJsonPath))
-            {
-                // Debug.Log("Loading main package configuration: " + mainJsonPath);
-                try
-                {
-                    string jsonContent = File.ReadAllText(mainJsonPath);
-                    var packageData = JsonUtility.FromJson<ExtensionPackageJsonData>(jsonContent);
-
-                    // 更新主包配置
-                    currentProfile.mainPackage.displayName = packageData.displayName;
-                    currentProfile.mainPackage.version = packageData.version;
-                    currentProfile.mainPackage.description = packageData.description;
-                    currentProfile.mainPackage.folderName = string.IsNullOrWhiteSpace(packageData.folderName) ? "Main" : packageData.folderName;
-                    currentProfile.mainPackage.checkClass = packageData.checkClass;
-                    currentProfile.mainPackage.assetPath = packageData.assetPath;
-                    currentProfile.mainPackage.installNotes = packageData.installationNotes;
-                    currentProfile.mainPackage.tags = packageData.tags != null ? new List<string>(packageData.tags) : new List<string>();
-                    currentProfile.mainPackage.author = packageData.author;
-                    currentProfile.mainPackage.website = packageData.website;
-                    currentProfile.mainPackage.license = packageData.license;
-
-                    // 更新依赖项
-                    currentProfile.mainPackage.unityDependencies?.Clear();
-                    currentProfile.mainPackage.gitDependencies?.Clear();
-                    currentProfile.mainPackage.userDependencies?.Clear();
-                    currentProfile.mainPackage.assetFileDependencies?.Clear();
-
-
-                    if (packageData.unityDependencies != null)
-                    {
-
-                        foreach (var dep in packageData.unityDependencies)
-                        {
-                            currentProfile.mainPackage.unityDependencies.Add(new UnityPackageDependency
-                            {
-                                name = dep.name,
-                                version = dep.version,
-                                description = dep.description,
-                                packageId = dep.packageId,
-                                isRequired = dep.isRequired,
-                                checkClass = dep.checkClass,
-                                installUrl = dep.installUrl
-                            });
-                        }
-                    }
-                    // Debug.Log("1Updating main package dependencies...");
-
-                    if (packageData.gitDependencies != null)
-                    {
-                        foreach (var dep in packageData.gitDependencies)
-                        {
-                            currentProfile.mainPackage.gitDependencies.Add(new GitPackageDependency
-                            {
-                                name = dep.name,
-                                version = dep.version,
-                                description = dep.description,
-                                gitUrl = dep.gitUrl,
-                                checkClass = dep.checkClass,
-                                isRequired = dep.isRequired
-                            });
-                        }
-                    }
-                    // Debug.Log("2Updating main package dependencies...");
-                    if (packageData.userDependencies != null)
-                    {
-                        foreach (var dep in packageData.userDependencies)
-                        {
-                            currentProfile.mainPackage.userDependencies.Add(new UserPackageDependency
-                            {
-                                name = dep.name,
-                                version = dep.version,
-                                description = dep.description,
-                                checkClass = dep.checkClass,
-                                installInstructions = dep.installInstructions,
-                                isRequired = dep.isRequired
-                            });
-                        }
-                    }
-                    // Debug.Log("3Updating main package dependencies...");
-                    if (packageData.assetFileDependencies != null)
-                    {
-                        foreach (var dep in packageData.assetFileDependencies)
-                        {
-                            currentProfile.mainPackage.assetFileDependencies.Add(new AssetFileDependency
-                            {
-                                name = dep.name,
-                                version = dep.version,
-                                description = dep.description,
-                                assetPath = dep.assetPath,
-                                checkClass = dep.checkClass,
-                                isRequired = dep.isRequired
-                            });
-                        }
-                    }
-                    // Debug.Log("4Updating main package dependencies...");
-                }
-                catch (System.Exception e)
-                {
-                    Debug.LogError($"加载主包配置失败: {mainJsonPath}, 错误: {e.Message}");
-                }
-            }
-            else
-            {
-            }
-
-            // 扫描Downloads文件夹下的所有子文件夹
-            string[] subDirectories = Directory.GetDirectories(downloadsFolderPath);
-
-            foreach (string subDir in subDirectories)
-            {
-                string folderName = Path.GetFileName(subDir);
-                string jsonPath = Path.Combine(subDir, "package.json");
-
-                // 跳过Main文件夹（主包已处理）
-                if (folderName.Equals("Main", StringComparison.OrdinalIgnoreCase))
-                    continue;
-                //Debug.Log("Scanning extension package folder: " + folderName);
-                // 尝试加载扩展包配置
-                if (File.Exists(jsonPath))
-                {
-                    try
-                    {
-                        string jsonContent = File.ReadAllText(jsonPath);
-                        var packageData = JsonUtility.FromJson<ExtensionPackageJsonData>(jsonContent);
-
-                        string packageId = $"ext_{folderName}";
-
-                        // 添加到可用包列表
-                        availablePackageIds.Add(packageId);
-                        packageDisplayNames[packageId] = $"{packageData.displayName} v{packageData.version}";
-
-                        // 检查是否已经存在相同的扩展包
-                        var existingPackage = currentProfile.extensionPackages.FirstOrDefault(p => p.packageId == packageId);
-
-                        if (existingPackage == null)
-                        {
-                            // 创建新的扩展包
-                            var newPackage = CreateExtensionPackageFromJson(packageData, folderName, packageId);
-                            currentProfile.extensionPackages.Add(newPackage);
-                        }
-                        else
-                        {
-                            // 更新现有包的信息（保留安装状态）
-                            UpdateExtensionPackageFromJson(existingPackage, packageData);
-                            // 检查安装状态
-                            CheckExtensionPackageInstallation(existingPackage);
-                        }
-                    }
-                    catch (System.Exception e)
-                    {
-                        Debug.LogError($"加载扩展包配置失败: {jsonPath}, 错误: {e.Message}");
-                    }
-                }
-                else
-                {
-                    // 没有JSON配置文件，创建基本配置
-                    string packageId = $"ext_{folderName}";
-                    availablePackageIds.Add(packageId);
-                    packageDisplayNames[packageId] = $"{folderName} (无配置)";
-                }
-            }
-
-        }
-
-        /// <summary>
-        /// 从JSON数据创建扩展包
-        /// </summary>
-        private ESExtensionPackage CreateExtensionPackageFromJson(ExtensionPackageJsonData data, string folderName, string packageId)
-        {
-            var package = new ESExtensionPackage
-            {
-                packageId = packageId,
-                displayName = data.displayName,
-                version = data.version,
-                description = data.description,
-                folderName = folderName,
-                installNotes = data.installationNotes,
-                checkClass = data.checkClass,
-                assetPath = data.assetPath,
-                tags = data.tags != null ? new List<string>(data.tags) : new List<string>(),
-                author = data.author,
-                website = data.website,
-                license = data.license,
-                requiredMainPackages = data.requiredMainPackages != null ? new List<string>(data.requiredMainPackages) : new List<string>(),
-                unityDependencies = new List<UnityPackageDependency>(),
-                gitDependencies = new List<GitPackageDependency>(),
-                userDependencies = new List<UserPackageDependency>(),
-                assetFileDependencies = new List<AssetFileDependency>()
-            };
-
-            // 添加Unity包依赖项
-            if (data.unityDependencies != null)
-            {
-                foreach (var dep in data.unityDependencies)
-                {
-                    package.unityDependencies.Add(new UnityPackageDependency
-                    {
-                        name = dep.name,
-                        version = dep.version,
-                        description = dep.description,
-                        packageId = dep.packageId,
-                        isRequired = dep.isRequired,
-                        checkClass = dep.checkClass,
-                        installUrl = dep.installUrl
-                    });
-                }
-            }
-
-            // 添加Git包依赖项
-            if (data.gitDependencies != null)
-            {
-                foreach (var dep in data.gitDependencies)
-                {
-                    package.gitDependencies.Add(new GitPackageDependency
-                    {
-                        name = dep.name,
-                        version = dep.version,
-                        description = dep.description,
-                        gitUrl = dep.gitUrl,
-                        checkClass = dep.checkClass,
-                        isRequired = dep.isRequired
-                    });
-                }
-            }
-
-            // 添加用户包依赖项
-            if (data.userDependencies != null)
-            {
-                foreach (var dep in data.userDependencies)
-                {
-                    package.userDependencies.Add(new UserPackageDependency
-                    {
-                        name = dep.name,
-                        version = dep.version,
-                        description = dep.description,
-                        checkClass = dep.checkClass,
-                        installInstructions = dep.installInstructions,
-                        isRequired = dep.isRequired
-                    });
-                }
-            }
-
-            return package;
-        }
-
-        /// <summary>
-        /// 从JSON数据更新现有扩展包
-        /// </summary>
-        private void UpdateExtensionPackageFromJson(ESExtensionPackage package, ExtensionPackageJsonData data)
-        {
-            // 更新基本信息（保留安装状态）
-            package.displayName = data.displayName;
-            package.version = data.version;
-            package.description = data.description;
-            package.installNotes = data.installationNotes;
-            package.checkClass = data.checkClass;
-            package.assetPath = data.assetPath;
-            package.tags = data.tags != null ? new List<string>(data.tags) : new List<string>();
-            package.author = data.author;
-            package.website = data.website;
-            package.license = data.license;
-            package.requiredMainPackages = data.requiredMainPackages != null ? new List<string>(data.requiredMainPackages) : new List<string>();
-
-            // 更新依赖项（清空并重新添加）
-            package.unityDependencies.Clear();
-            package.gitDependencies.Clear();
-            package.userDependencies.Clear();
-            package.assetFileDependencies.Clear();
-
-            if (data.unityDependencies != null)
-            {
-                foreach (var dep in data.unityDependencies)
-                {
-                    package.unityDependencies.Add(new UnityPackageDependency
-                    {
-                        name = dep.name,
-                        version = dep.version,
-                        description = dep.description,
-                        packageId = dep.packageId,
-                        isRequired = dep.isRequired,
-                        checkClass = dep.checkClass,
-                        installUrl = dep.installUrl
-                    });
-                }
-            }
-
-            if (data.gitDependencies != null)
-            {
-                foreach (var dep in data.gitDependencies)
-                {
-                    package.gitDependencies.Add(new GitPackageDependency
-                    {
-                        name = dep.name,
-                        version = dep.version,
-                        description = dep.description,
-                        gitUrl = dep.gitUrl,
-                        checkClass = dep.checkClass,
-                        isRequired = dep.isRequired
-                    });
-                }
-            }
-
-            if (data.userDependencies != null)
-            {
-                foreach (var dep in data.userDependencies)
-                {
-                    package.userDependencies.Add(new UserPackageDependency
-                    {
-                        name = dep.name,
-                        version = dep.version,
-                        description = dep.description,
-                        checkClass = dep.checkClass,
-                        installInstructions = dep.installInstructions,
-                        isRequired = dep.isRequired
-                    });
-                }
-            }
-
-            if (data.assetFileDependencies != null)
-            {
-                foreach (var dep in data.assetFileDependencies)
-                {
-                    package.assetFileDependencies.Add(new AssetFileDependency
-                    {
-                        name = dep.name,
-                        version = dep.version,
-                        description = dep.description,
-                        assetPath = dep.assetPath,
-                        checkClass = dep.checkClass,
-                        isRequired = dep.isRequired
-                    });
-                }
-            }
         }
 
         /// <summary>
@@ -2440,12 +2072,6 @@ namespace ES.EditorInternal.Installer
             AssetDatabase.importPackageFailed -= OnTrustedImportFailed;
             if (installer == this)
                 installer = null;
-            if (ReferenceEquals(temporaryCheckInstance, this))
-            {
-                temporaryCheckInstance = null;
-                dependencyCheckLeaseCount = 0;
-                dependencyCheckGeneration++;
-            }
 
             // 只有在有未保存的更改时才询问用户是否保存
             if (isConfigModified)
@@ -2527,7 +2153,6 @@ namespace ES.EditorInternal.Installer
                     {
                         string json = JsonUtility.ToJson(installer.currentProfile, true);
                         Debug.Log("InstallationProfile: " + json);
-                        //EditorUtility.DisplayDialog("Debug", "currentProfile is null", "OK");
                     }
                 }
 
@@ -4473,11 +4098,16 @@ namespace ES.EditorInternal.Installer
             }
 
             ShowStatus("正在检查所有Unity官方包...", MessageType.Info);
-
-            foreach (var dependency in currentProfile.mainPackage.unityDependencies)
+            InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync();
+            if (!snapshot.IsAvailable)
             {
-                await CheckUnityPackageDependency(dependency);
+                ShowStatus(snapshot.FailureMessage, MessageType.Error);
+                return;
             }
+            UpmPackageInfo[] installedPackages = snapshot.Packages;
+            foreach (UnityPackageDependency dependency in currentProfile.mainPackage.unityDependencies)
+                if (dependency != null)
+                    dependency.isInstalled = CheckUnityPackageInstalled(dependency, installedPackages);
 
             ShowStatus("Unity官方包检查完成", MessageType.Info);
             Repaint();
@@ -4504,53 +4134,20 @@ namespace ES.EditorInternal.Installer
                 Debug.LogWarning("UnityPackageDependency 为空");
                 return;
             }
-            if (string.IsNullOrEmpty(dependency.packageId))
-            {
-                dependency.isInstalled = false;
-                ShowStatus($"Unity包 {dependency.name} 缺少Package ID", MessageType.Warning);
-                return;
-            }
-
             try
             {
-                // 首先尝试通过类检查（如果提供了检查类名）
-                if (!string.IsNullOrEmpty(dependency.checkClass))
-                {
-                    if (IsClassExists(dependency.checkClass))
-                    {
-                        dependency.isInstalled = true;
-                        ShowStatus($"Unity包 {dependency.name} 已安装 (通过类验证)", MessageType.Info);
-                        Repaint();
-                        return;
-                    }
-                }
-
-                // 如果没有检查类或类检查失败，使用UPM检查
-                // 在主线程同步发起请求（这不会阻塞）
-                var request = Client.List(false, false);
-                await WaitForListRequestCompletion(request);
-
-                if (request.Status == StatusCode.Success)
-                {
-                    dependency.isInstalled = request.Result.Any(p => p.name == dependency.packageId);
-                    if (dependency.isInstalled)
-                    {
-                        ShowStatus($"Unity包 {dependency.name} 已安装 (通过UPM验证)", MessageType.Info);
-                    }
-                    else
-                    {
-                        ShowStatus($"Unity包 {dependency.name} 未安装", MessageType.Warning);
-                    }
-                }
-                else
-                {
-                    dependency.isInstalled = false;
-                    ShowStatus($"检查Unity包 {dependency.name} 失败: {request.Error?.message}", MessageType.Error);
-                }
+                InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync();
+                if (!snapshot.IsAvailable)
+                    throw new InvalidOperationException(snapshot.FailureMessage);
+                dependency.isInstalled = CheckUnityPackageInstalled(dependency, snapshot.Packages);
+                ShowStatus(
+                    dependency.isInstalled
+                        ? $"Unity包 {dependency.name} 已安装"
+                        : $"Unity包 {dependency.name} 未安装",
+                    dependency.isInstalled ? MessageType.Info : MessageType.Warning);
             }
             catch (Exception e)
             {
-                dependency.isInstalled = false;
                 ShowStatus($"检查Unity包 {dependency.name} 异常: {e.Message}", MessageType.Error);
             }
 
@@ -4607,7 +4204,7 @@ namespace ES.EditorInternal.Installer
                 ShowStatus("Git包依赖为空，无法进行供应链校验。", MessageType.Error);
                 return;
             }
-            if (!TryValidatePinnedGitUrl(dependency.gitUrl, out string pinnedGitUrl, out _, out string pinError))
+            if (!TryValidatePinnedGitUrl(dependency.gitUrl, out _, out _, out string pinError))
             {
                 dependency.isInstalled = false;
                 ShowStatus($"Git包 {dependency.name} 被供应链门禁拒绝：{pinError}", MessageType.Error);
@@ -4616,44 +4213,18 @@ namespace ES.EditorInternal.Installer
 
             try
             {
-                // 首先尝试通过类检查（如果提供了检查类名）
-                if (!string.IsNullOrEmpty(dependency.checkClass))
-                {
-                    if (IsClassExists(dependency.checkClass))
-                    {
-                        dependency.isInstalled = true;
-                        ShowStatus($"Git包 {dependency.name} 已安装 (通过类验证)", MessageType.Info);
-                        Repaint();
-                        return;
-                    }
-                }
-
-                // 如果没有检查类或类检查失败，使用UPM检查
-                // 在主线程同步发起请求（这不会阻塞）
-                var request = Client.List(false, false);
-                await WaitForListRequestCompletion(request);
-
-                if (request.Status == StatusCode.Success)
-                {
-                    dependency.isInstalled = request.Result.Any(p => p.packageId == pinnedGitUrl || p.name == pinnedGitUrl);
-                    if (dependency.isInstalled)
-                    {
-                        ShowStatus($"Git包 {dependency.name} 已安装 (通过UPM验证)", MessageType.Info);
-                    }
-                    else
-                    {
-                        ShowStatus($"Git包 {dependency.name} 未安装", MessageType.Warning);
-                    }
-                }
-                else
-                {
-                    dependency.isInstalled = false;
-                    ShowStatus($"检查Git包 {dependency.name} 失败: {request.Error.message}", MessageType.Error);
-                }
+                InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync();
+                if (!snapshot.IsAvailable)
+                    throw new InvalidOperationException(snapshot.FailureMessage);
+                dependency.isInstalled = CheckGitPackageInstalled(dependency, snapshot.Packages);
+                ShowStatus(
+                    dependency.isInstalled
+                        ? $"Git包 {dependency.name} 已安装"
+                        : $"Git包 {dependency.name} 未安装",
+                    dependency.isInstalled ? MessageType.Info : MessageType.Warning);
             }
             catch (Exception e)
             {
-                dependency.isInstalled = false;
                 ShowStatus($"检查Git包 {dependency.name} 异常: {e.Message}", MessageType.Error);
             }
 
@@ -4751,11 +4322,16 @@ namespace ES.EditorInternal.Installer
             }
 
             ShowStatus("正在检查所有Git包...", MessageType.Info);
-
-            foreach (var dependency in currentProfile.mainPackage.gitDependencies)
+            InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync();
+            if (!snapshot.IsAvailable)
             {
-                await CheckGitPackageDependency(dependency);
+                ShowStatus(snapshot.FailureMessage, MessageType.Error);
+                return;
             }
+            UpmPackageInfo[] installedPackages = snapshot.Packages;
+            foreach (GitPackageDependency dependency in currentProfile.mainPackage.gitDependencies)
+                if (dependency != null)
+                    dependency.isInstalled = CheckGitPackageInstalled(dependency, installedPackages);
 
             ShowStatus("Git包检查完成", MessageType.Info);
             Repaint();
@@ -4915,16 +4491,8 @@ namespace ES.EditorInternal.Installer
                 // 1. 重新加载配置文件
                 LoadSavedConfiguration();
 
-                // 2. 重新扫描并加载所有包
-                ScanAndLoadAllPackages();
-
-                // 3. 异步检查所有包的安装状态
+                // 2. 基于同一 canonical profile 检查包和四类依赖状态。
                 await CheckAllPackagesInstallStateAsync();
-
-                // 4. 检查所有依赖状态
-                await CheckAllUnityPackages();
-                await CheckAllGitPackages();
-                await CheckAllUserPackages();
 
                 ShowStatus("所有状态刷新完成", MessageType.Info);
             }

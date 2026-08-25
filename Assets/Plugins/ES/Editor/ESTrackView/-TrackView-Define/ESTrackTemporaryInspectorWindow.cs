@@ -142,6 +142,7 @@ namespace ES
         }
     }
 
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Inspector)]
     public sealed class ESTrackItemTemporaryInspectorWindow : ESTrackTemporaryInspectorWindow<ESTrackItemTemporaryInspectorWindow>
     {
         public static ESTrackItemTemporaryInspectorWindow OpenFor(
@@ -149,8 +150,11 @@ namespace ES
             UnityEngine.Object sourceAsset,
             string title,
             string page,
-            EditorWindow owner = null)
+            ESTrackViewWindow owner)
         {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner));
+
             string stableId = EnsureStableTrackId(track, sourceAsset);
             return OpenIndependent(track, sourceAsset, stableId, title, page, owner);
         }
@@ -185,6 +189,7 @@ namespace ES
         }
     }
 
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Inspector)]
     public sealed class ESTrackClipTemporaryInspectorWindow : ESTrackTemporaryInspectorWindow<ESTrackClipTemporaryInspectorWindow>
     {
         public static ESTrackClipTemporaryInspectorWindow OpenFor(
@@ -192,8 +197,11 @@ namespace ES
             UnityEngine.Object sourceAsset,
             string title,
             string page,
-            EditorWindow owner = null)
+            ESTrackViewWindow owner)
         {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner));
+
             string stableId = EnsureStableClipId(clip, sourceAsset);
             return OpenIndependent(clip, sourceAsset, stableId, title, page, owner);
         }
@@ -228,14 +236,18 @@ namespace ES
         }
     }
 
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Inspector)]
     public sealed class ESTrackSkillDataTemporaryInspectorWindow : ESTrackTemporaryInspectorWindow<ESTrackSkillDataTemporaryInspectorWindow>
     {
         public static ESTrackSkillDataTemporaryInspectorWindow OpenFor(
             UnityEngine.Object skillData,
             string title,
             string page,
-            EditorWindow owner = null)
+            ESTrackViewWindow owner)
         {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner));
+
             return OpenIndependent(skillData, skillData, string.Empty, title, page, owner);
         }
 

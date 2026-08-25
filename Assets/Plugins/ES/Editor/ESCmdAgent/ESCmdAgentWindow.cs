@@ -1790,6 +1790,7 @@ namespace ES
         }
     }
 
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Workspace)]
     public sealed class ESCmdAgentWindow : EditorWindow, IESWindowPresentationShortTitle
     {
         public string ESWindow_PresentationShortTitle => "Agent";
@@ -2242,7 +2243,6 @@ namespace ES
         {
             EnsureReady();
             BuildInterface();
-            ESWindowFoundation.Bind(this, headerActionHosts);
             SelectInitialSession();
             RefreshAmbientContextIfChanged();
         }
@@ -2256,7 +2256,7 @@ namespace ES
             }
             externalCmdDiscoveryGeneration++;
             externalCmdDiscoveryTask = null;
-            EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+            ESWindowFoundation.Suspend(this);
             EditorApplication.update -= OnEditorUpdate;
             Selection.selectionChanged -= MarkAmbientContextDirty;
             bool reloading = !editorQuitting && (preserveProcessesForReload || EditorApplication.isCompiling);
@@ -2299,6 +2299,11 @@ namespace ES
                 usingTransientAgentConfig = false;
             }
             UnsubscribeForegroundCmdObservation();
+        }
+
+        private void OnDestroy()
+        {
+            ESWindowFoundation.Close(this);
         }
 
         private static void MarkReloadingDomain()
@@ -2967,6 +2972,7 @@ namespace ES
 
         private void BuildInterface()
         {
+            ESWindowFoundation.Unbind(this);
             rootVisualElement.Clear();
             sessionRowsByLocalId.Clear();
             rootVisualElement.AddToClassList("es-agent-root");
@@ -2990,6 +2996,7 @@ namespace ES
             ApplyResponsiveLayout(float.IsNaN(initialWidth) || initialWidth <= 0f
                 ? position.width
                 : initialWidth);
+            ESWindowFoundation.BindFullSleep(this, headerActionHosts);
         }
 
         private VisualElement BuildHeader()

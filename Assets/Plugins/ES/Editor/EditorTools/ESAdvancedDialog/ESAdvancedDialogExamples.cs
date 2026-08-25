@@ -81,7 +81,7 @@ namespace ES
                     owner: null,
                     allowMainWorkspaceFallback: true);
             };
-            ESAdvancedDialogWindow.Show(request);
+            ESDialogService.Show(request);
         }
 
         [MenuItem("【ES】/自动化与开发/编辑器扩展/编辑器/ES 危险确认对话框演示", false, 9166)]
@@ -167,7 +167,7 @@ namespace ES
                         message = "父窗口关闭时，本窗口会随父窗口安全取消。",
                         showCancel = false,
                     };
-                    ESAdvancedDialogWindow.Show(child);
+                    ESDialogService.Show(child);
                 });
             request.confirmAsync = async (values, progress, token) =>
             {
@@ -181,7 +181,7 @@ namespace ES
                     await Task.Delay(140, token);
                 }
             };
-            ESAdvancedDialogWindow.Show(request);
+            ESDialogService.Show(request);
         }
 
         [MenuItem("【ES】/自动化与开发/编辑器扩展/编辑器/ES 分步同步进度演示", false, 9168)]

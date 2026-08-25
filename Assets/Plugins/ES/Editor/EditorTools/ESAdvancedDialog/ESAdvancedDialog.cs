@@ -768,6 +768,30 @@ namespace ES
             }
         }
 
+        internal static bool TryGetProgress(
+            string id,
+            out float progress,
+            out string summary)
+        {
+            progress = 0f;
+            summary = string.Empty;
+            if (string.IsNullOrWhiteSpace(id))
+                return false;
+            lock (gate)
+            {
+                for (int i = records.Count - 1; i >= 0; i--)
+                {
+                    ProgressRecord record = records[i];
+                    if (!string.Equals(record.id, id, StringComparison.Ordinal))
+                        continue;
+                    progress = record.progress;
+                    summary = record.summary ?? string.Empty;
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public static bool RequestCancel(string id)
         {
             CancellationTokenSource cancellation = null;
@@ -854,12 +878,25 @@ namespace ES
             {
                 DateTime cutoff = DateTime.UtcNow.AddSeconds(-CompletedVisibilitySeconds);
                 DateTime failedCutoff = DateTime.UtcNow.AddSeconds(-FailedVisibilitySeconds);
-                RemoveRecordsLocked(item =>
-                    item.state != ESProgressState.Running
-                    && item.finishedAtUtc < (item.state == ESProgressState.Failed
-                        ? failedCutoff
-                        : cutoff));
-                hasRunning = records.Any(item => item.state == ESProgressState.Running);
+                for (int i = records.Count - 1; i >= 0; i--)
+                {
+                    ProgressRecord record = records[i];
+                    if (record.state == ESProgressState.Running
+                        || record.finishedAtUtc >= (record.state == ESProgressState.Failed
+                            ? failedCutoff
+                            : cutoff))
+                        continue;
+                    record.cancellation.Dispose();
+                    records.RemoveAt(i);
+                }
+                hasRunning = false;
+                for (int i = 0; i < records.Count; i++)
+                {
+                    if (records[i].state != ESProgressState.Running)
+                        continue;
+                    hasRunning = true;
+                    break;
+                }
                 hasVisible = records.Count > 0;
             }
 
@@ -962,7 +999,10 @@ namespace ES
         }
     }
 
-    [ESWindowSleepContract(ESWindowSleepMode.Transient, "跨任务全局进度聚合面不参与自动半休眠")]
+    [ESWindowSleepContract(
+        ESWindowSleepMode.Transient,
+        ESWindowSurfaceKind.Utility,
+        "跨任务全局进度聚合面不参与自动半休眠")]
     [ESWindowPresentationShortTitle("进度")]
     public sealed class ESProgressCenterWindow : EditorWindow
     {
@@ -979,6 +1019,9 @@ namespace ES
             result.titleContent = new GUIContent("ES 任务进度");
             result.minSize = new Vector2(320f, 120f);
             Rect main = EditorGUIUtility.GetMainWindowPosition();
+            result.maxSize = new Vector2(
+                Mathf.Max(result.minSize.x, main.width - 24f),
+                Mathf.Max(result.minSize.y, main.height - 24f));
             float width = Mathf.Min(410f, Mathf.Max(320f, main.width - 24f));
             int visibleTasks = Mathf.Clamp(ESProgressCenter.GetSnapshot().Count, 1, 3);
             float desiredHeight = 72f + visibleTasks * 68f;
@@ -997,6 +1040,7 @@ namespace ES
 
         public void CreateGUI()
         {
+            ESWindowFoundation.Unbind(this);
             rootVisualElement.Clear();
             rootVisualElement.style.backgroundColor =
                 ES.EditorInternal.ESEditorPresentation.WindowSurfaceColor;
@@ -1027,7 +1071,7 @@ namespace ES
             content.style.minWidth = 0f;
             rootVisualElement.Add(content);
             RefreshNow();
-            ES.EditorInternal.ESEditorPresentation.BindWindow(this, allowSemiSleep: false);
+            ESWindowFoundation.BindTransient(this);
         }
 
         internal void RefreshNow()
@@ -1101,7 +1145,12 @@ namespace ES
 
         private void OnDisable()
         {
-            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+            ESWindowFoundation.Suspend(this);
+        }
+
+        private void OnDestroy()
+        {
+            ESWindowFoundation.Close(this);
         }
     }
 
@@ -1109,26 +1158,192 @@ namespace ES
     {
         private const int MaximumActiveDialogs = 8;
         private const int MaximumPendingDialogs = 64;
-        private sealed class PendingDialog
+        private const double CloseRetryIntervalSeconds = 0.25d;
+        internal enum DialogOperationState : byte
         {
-            internal ESAdvancedDialogRequest request;
-            internal TaskCompletionSource<ESAdvancedDialogResult> completion;
-            internal readonly List<TaskCompletionSource<ESAdvancedDialogResult>> observers =
-                new List<TaskCompletionSource<ESAdvancedDialogResult>>();
+            Queued,
+            Scheduled,
+            Opening,
+            Active,
+            Closing,
+            Completed,
+        }
+
+        internal sealed class DialogSubscriber
+        {
+            private readonly Action<ESAdvancedDialogResult> callback;
+            private readonly TaskCompletionSource<ESAdvancedDialogResult> completion;
+            private CancellationTokenRegistration cancellationRegistration;
+            private bool cancellationRegistered;
+            private bool completed;
+
+            internal DialogSubscriber(
+                Action<ESAdvancedDialogResult> callback,
+                TaskCompletionSource<ESAdvancedDialogResult> completion)
+            {
+                this.callback = callback;
+                this.completion = completion;
+            }
+
+            internal Task<ESAdvancedDialogResult> Task => completion?.Task;
+            internal bool IsCompleted => completed;
+
+            internal void RegisterCancellation(
+                DialogOperation operation,
+                CancellationToken cancellationToken,
+                SynchronizationContext editorContext)
+            {
+                if (completed || !cancellationToken.CanBeCanceled)
+                    return;
+
+                CancellationTokenRegistration registration = cancellationToken.Register(() =>
+                    editorContext.Post(
+                        _ => CancelSubscriber(operation, this, cancellationToken),
+                        null));
+                cancellationRegistration = registration;
+                cancellationRegistered = true;
+                if (completed)
+                    DisposeCancellation();
+            }
 
             internal void Complete(ESAdvancedDialogResult result)
             {
+                if (completed)
+                    return;
+                completed = true;
+                DisposeCancellation();
+                InvokeCallback(result);
                 completion?.TrySetResult(result);
-                for (int i = 0; i < observers.Count; i++)
-                    observers[i]?.TrySetResult(result);
-                observers.Clear();
+            }
+
+            internal void Cancel(
+                ESAdvancedDialogResult result,
+                CancellationToken cancellationToken)
+            {
+                if (completed)
+                    return;
+                completed = true;
+                DisposeCancellation();
+                InvokeCallback(result);
+                completion?.TrySetCanceled(cancellationToken);
+            }
+
+            private void InvokeCallback(ESAdvancedDialogResult result)
+            {
+                if (callback == null)
+                    return;
+                try
+                {
+                    callback.Invoke(result);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
+
+            private void DisposeCancellation()
+            {
+                if (!cancellationRegistered)
+                    return;
+                cancellationRegistration.Dispose();
+                cancellationRegistration = default;
+                cancellationRegistered = false;
+            }
+        }
+
+        internal sealed class DialogOperation
+        {
+            internal readonly ESAdvancedDialogRequest request;
+            internal readonly List<DialogSubscriber> subscribers =
+                new List<DialogSubscriber>(2);
+            internal DialogOperationState state;
+            internal ESAdvancedDialogWindow window;
+            internal EditorApplication.CallbackFunction scheduledCallback;
+            internal ESAdvancedDialogResult terminalResult;
+            internal double nextCloseRetryAt;
+
+            internal DialogOperation(ESAdvancedDialogRequest request)
+            {
+                this.request = request ?? throw new ArgumentNullException(nameof(request));
+                state = DialogOperationState.Queued;
+            }
+
+            internal DialogSubscriber AddSubscriber(
+                Action<ESAdvancedDialogResult> callback,
+                TaskCompletionSource<ESAdvancedDialogResult> completion)
+            {
+                var subscriber = new DialogSubscriber(callback, completion);
+                subscribers.Add(subscriber);
+                return subscriber;
+            }
+
+            internal void TransferSubscribersTo(DialogOperation target)
+            {
+                if (target == null)
+                    throw new ArgumentNullException(nameof(target));
+                target.subscribers.AddRange(subscribers);
+                subscribers.Clear();
+                state = DialogOperationState.Completed;
+            }
+
+            internal ESAdvancedDialogResult CaptureTerminalResult(
+                ESAdvancedDialogResult result)
+            {
+                if (terminalResult == null && result != null)
+                    terminalResult = result;
+                return terminalResult;
+            }
+
+            internal bool BeginClosing(ESAdvancedDialogResult result)
+            {
+                if (state == DialogOperationState.Completed)
+                    return false;
+                CaptureTerminalResult(result);
+                if (state != DialogOperationState.Closing)
+                    nextCloseRetryAt = 0d;
+                state = DialogOperationState.Closing;
+                return true;
+            }
+
+            internal bool CancelSubscriber(
+                DialogSubscriber subscriber,
+                CancellationToken cancellationToken,
+                ESAdvancedDialogResult result)
+            {
+                if (subscriber == null || !subscribers.Remove(subscriber))
+                    return false;
+                subscriber.Cancel(result, cancellationToken);
+                return subscribers.Count == 0;
+            }
+
+            internal bool CompleteOnce(ESAdvancedDialogResult result)
+            {
+                if (state == DialogOperationState.Completed)
+                    return false;
+                ESAdvancedDialogResult resolvedResult = CaptureTerminalResult(result) ?? result;
+                state = DialogOperationState.Completed;
+                DialogSubscriber[] completionSnapshot = subscribers.ToArray();
+                subscribers.Clear();
+                for (int i = 0; i < completionSnapshot.Length; i++)
+                    completionSnapshot[i]?.Complete(resolvedResult);
+                return true;
             }
         }
 
         private static readonly List<ESAdvancedDialogWindow> activeWindows =
             new List<ESAdvancedDialogWindow>();
-        private static readonly List<PendingDialog> pendingDialogs =
-            new List<PendingDialog>();
+        private static readonly List<DialogOperation> activeOperations =
+            new List<DialogOperation>();
+        private static readonly List<DialogOperation> pendingDialogs =
+            new List<DialogOperation>();
+        private static readonly List<DialogOperation> invalidPendingScratch =
+            new List<DialogOperation>(4);
+        private static readonly List<ESAdvancedDialogWindow> invalidOwnerScratch =
+            new List<ESAdvancedDialogWindow>(4);
+        private static readonly List<DialogOperation> closingOperationScratch =
+            new List<DialogOperation>(4);
+        private static DialogOperation scheduledOperation;
         private static bool openingReplacement;
         private static bool shuttingDown;
         private static bool ownerLifetimeMonitorInstalled;
@@ -1143,33 +1358,117 @@ namespace ES
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
             UnityEditor.Compilation.CompilationPipeline.compilationFinished -= OnCompilationFinished;
             UnityEditor.Compilation.CompilationPipeline.compilationFinished += OnCompilationFinished;
-            if (!ownerLifetimeMonitorInstalled)
-            {
-                EditorApplication.update -= MonitorOwnerLifetime;
-                EditorApplication.update += MonitorOwnerLifetime;
-                ownerLifetimeMonitorInstalled = true;
-            }
+            EditorApplication.update -= MonitorOwnerLifetime;
+            ownerLifetimeMonitorInstalled = false;
+            UpdateOwnerLifetimeMonitor();
         }
 
         private static void MonitorOwnerLifetime()
         {
-            if (shuttingDown)
-                return;
-
-            for (int i = pendingDialogs.Count - 1; i >= 0; i--)
+            if (shuttingDown
+                || pendingDialogs.Count == 0
+                && activeWindows.Count == 0
+                && activeOperations.Count == 0)
             {
-                PendingDialog pending = pendingDialogs[i];
-                if (pending?.request == null || !IsOwnerInvalid(pending.request))
-                    continue;
-                pendingDialogs.RemoveAt(i);
-                pending.Complete(CancelledResult());
+                UpdateOwnerLifetimeMonitor();
+                return;
             }
 
-            ESAdvancedDialogWindow[] invalidWindows = activeWindows
-                .Where(window => IsLive(window) && window.HasInvalidOwner)
-                .ToArray();
-            for (int i = 0; i < invalidWindows.Length; i++)
-                invalidWindows[i].CancelAndClose();
+            invalidPendingScratch.Clear();
+            for (int i = 0; i < pendingDialogs.Count; i++)
+            {
+                DialogOperation pending = pendingDialogs[i];
+                if (pending?.request == null || !IsOwnerInvalid(pending.request))
+                    continue;
+                invalidPendingScratch.Add(pending);
+            }
+            for (int i = 0; i < invalidPendingScratch.Count; i++)
+                CompleteOperation(invalidPendingScratch[i], CancelledResult());
+            invalidPendingScratch.Clear();
+
+            PruneDeadActiveOperations();
+            if (shuttingDown)
+            {
+                UpdateOwnerLifetimeMonitor();
+                return;
+            }
+
+            closingOperationScratch.Clear();
+            double closeRetryNow = EditorApplication.timeSinceStartup;
+            for (int i = 0; i < activeOperations.Count; i++)
+            {
+                DialogOperation operation = activeOperations[i];
+                if (operation?.state == DialogOperationState.Closing)
+                    closingOperationScratch.Add(operation);
+            }
+            for (int i = 0; i < closingOperationScratch.Count; i++)
+            {
+                DialogOperation operation = closingOperationScratch[i];
+                if (operation == null
+                    || operation.state != DialogOperationState.Closing
+                    || !activeOperations.Contains(operation))
+                    continue;
+                if (closeRetryNow < operation.nextCloseRetryAt)
+                    continue;
+                operation.nextCloseRetryAt = closeRetryNow + CloseRetryIntervalSeconds;
+                ESAdvancedDialogWindow window = operation.window;
+                bool windowClosed = CloseWindowBestEffort(window);
+                if (operation.state != DialogOperationState.Completed && windowClosed)
+                {
+                    ESAdvancedDialogResult result = ResolveOperationResult(operation, null)
+                        ?? CancelledResult();
+                    CompleteOperation(operation, result);
+                }
+            }
+            closingOperationScratch.Clear();
+
+            invalidOwnerScratch.Clear();
+            for (int i = activeWindows.Count - 1; i >= 0; i--)
+            {
+                ESAdvancedDialogWindow window = activeWindows[i];
+                if (!IsLive(window))
+                {
+                    activeWindows.RemoveAt(i);
+                    continue;
+                }
+                DialogOperation operation = FindActiveOperation(window);
+                if (operation == null || window.HasInvalidOwner)
+                    invalidOwnerScratch.Add(window);
+            }
+            for (int i = 0; i < invalidOwnerScratch.Count; i++)
+            {
+                ESAdvancedDialogWindow window = invalidOwnerScratch[i];
+                DialogOperation operation = FindActiveOperation(window);
+                if (operation?.state == DialogOperationState.Closing)
+                    continue;
+                if (operation != null)
+                    CancelOperation(operation, CancelledResult());
+                else
+                {
+                    if (closeRetryNow < window.NextServiceCloseRetryAt)
+                        continue;
+                    window.NextServiceCloseRetryAt =
+                        closeRetryNow + CloseRetryIntervalSeconds;
+                    CloseWindowBestEffort(window);
+                }
+            }
+            invalidOwnerScratch.Clear();
+            TryDrainQueue();
+            UpdateOwnerLifetimeMonitor();
+        }
+
+        private static void UpdateOwnerLifetimeMonitor()
+        {
+            bool shouldInstall = !shuttingDown
+                && (pendingDialogs.Count > 0
+                    || activeWindows.Count > 0
+                    || activeOperations.Count > 0);
+            if (shouldInstall == ownerLifetimeMonitorInstalled)
+                return;
+            EditorApplication.update -= MonitorOwnerLifetime;
+            if (shouldInstall)
+                EditorApplication.update += MonitorOwnerLifetime;
+            ownerLifetimeMonitorInstalled = shouldInstall;
         }
 
         private static void OnPlayModeStateChanged(PlayModeStateChange state)
@@ -1187,6 +1486,7 @@ namespace ES
                 // Shutdown is a boundary cancellation, not a permanent
                 // service disable. New requests are valid again in EditMode.
                 shuttingDown = false;
+                UpdateOwnerLifetimeMonitor();
             }
         }
 
@@ -1197,52 +1497,23 @@ namespace ES
             // must be usable again instead of remaining permanently shut down.
             if (!EditorApplication.isPlayingOrWillChangePlaymode
                 && !EditorApplication.isCompiling)
+            {
                 shuttingDown = false;
+                UpdateOwnerLifetimeMonitor();
+            }
         }
 
         public static ESAdvancedDialogWindow Show(ESAdvancedDialogRequest request)
         {
             ValidateServiceRequest(request);
-            if (shuttingDown)
-                return null;
             request = PrepareRequest(request);
-            PendingDialog pendingDuplicate = FindPendingDuplicate(request.dialogId);
-            if (pendingDuplicate != null)
+            DialogOperation operation = CreateOperation(request, null, out _);
+            if (shuttingDown)
             {
-                if (request.duplicatePolicy == ESDialogDuplicatePolicy.ReplaceExisting)
-                {
-                    pendingDialogs.Remove(pendingDuplicate);
-                    pendingDuplicate.Complete(
-                        new ESAdvancedDialogResult { accepted = false, cancelled = true });
-                }
-                else if (request.duplicatePolicy != ESDialogDuplicatePolicy.AllowParallel)
-                {
-                    return null;
-                }
-            }
-            ESAdvancedDialogWindow duplicate = FindDuplicate(request.dialogId);
-            if (duplicate != null)
-            {
-                switch (request.duplicatePolicy)
-                {
-                    case ESDialogDuplicatePolicy.FocusExisting:
-                        duplicate.Focus();
-                        return duplicate;
-                    case ESDialogDuplicatePolicy.ReplaceExisting:
-                        openingReplacement = true;
-                        duplicate.CancelAndClose();
-                        break;
-                    case ESDialogDuplicatePolicy.Queue:
-                        Enqueue(new PendingDialog { request = request });
-                        return null;
-                }
-            }
-            if (request.queueBehindActiveDialog && activeWindows.Any(IsLive))
-            {
-                Enqueue(new PendingDialog { request = request });
+                operation.CompleteOnce(CancelledResult());
                 return null;
             }
-            return OpenNow(request, null, false);
+            return SubmitOperation(operation, out _);
         }
 
         public static Task<ESAdvancedDialogResult> ShowAsync(
@@ -1250,107 +1521,35 @@ namespace ES
             CancellationToken cancellationToken = default)
         {
             ValidateServiceRequest(request);
-            if (shuttingDown)
-                return Task.FromResult(new ESAdvancedDialogResult
-                {
-                    accepted = false,
-                    cancelled = true,
-                });
             request = PrepareRequest(request);
             var completion = new TaskCompletionSource<ESAdvancedDialogResult>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             SynchronizationContext editorContext = SynchronizationContext.Current
                 ?? throw new InvalidOperationException(
                     "ESDialogService.ShowAsync 必须从 Unity Editor 主线程调用。");
-            ESAdvancedDialogWindow observedWindow = null;
-            bool ownsWindow = false;
-            CancellationTokenRegistration cancellationRegistration = default;
+            DialogOperation operation = CreateOperation(
+                request,
+                completion,
+                out DialogSubscriber subscriber);
             if (cancellationToken.IsCancellationRequested)
             {
-                completion.TrySetCanceled(cancellationToken);
+                operation.CancelSubscriber(
+                    subscriber,
+                    cancellationToken,
+                    CancelledResult());
+                operation.CompleteOnce(CancelledResult());
                 return completion.Task;
             }
-            if (cancellationToken.CanBeCanceled)
+            if (shuttingDown)
             {
-                cancellationRegistration = cancellationToken.Register(() =>
-                {
-                    editorContext.Post(_ =>
-                    {
-                        if (ownsWindow && observedWindow != null)
-                            observedWindow.CancelAndClose();
-                        else if (observedWindow != null)
-                            observedWindow.RemoveCompletionObserver(completion);
-                        PendingDialog queued = pendingDialogs.FirstOrDefault(item =>
-                            item?.completion == completion || item?.observers.Contains(completion) == true);
-                        if (queued?.completion == completion)
-                        {
-                            if (queued.observers.Count > 0)
-                            {
-                                queued.completion = queued.observers[0];
-                                queued.observers.RemoveAt(0);
-                            }
-                            else
-                            {
-                                pendingDialogs.Remove(queued);
-                            }
-                        }
-                        else
-                            queued?.observers.Remove(completion);
-                        completion.TrySetCanceled(cancellationToken);
-                    }, null);
-                });
-                completion.Task.ContinueWith(_ => cancellationRegistration.Dispose());
-            }
-            PendingDialog pendingDuplicate = FindPendingDuplicate(request.dialogId);
-            if (pendingDuplicate != null
-                && request.duplicatePolicy == ESDialogDuplicatePolicy.FocusExisting)
-            {
-                pendingDuplicate.observers.Add(completion);
+                operation.CompleteOnce(CancelledResult());
                 return completion.Task;
             }
-            if (pendingDuplicate != null
-                && request.duplicatePolicy == ESDialogDuplicatePolicy.Queue)
-            {
-                Enqueue(new PendingDialog
-                {
-                    request = request,
-                    completion = completion,
-                });
-                return completion.Task;
-            }
-            if (pendingDuplicate != null
-                && request.duplicatePolicy == ESDialogDuplicatePolicy.ReplaceExisting)
-            {
-                pendingDialogs.Remove(pendingDuplicate);
-                pendingDuplicate.Complete(
-                    new ESAdvancedDialogResult { accepted = false, cancelled = true });
-            }
-            ESAdvancedDialogWindow duplicate = FindDuplicate(request.dialogId);
-            if (duplicate != null && request.duplicatePolicy == ESDialogDuplicatePolicy.FocusExisting)
-            {
-                observedWindow = duplicate;
-                duplicate.Focus();
-                duplicate.AddCompletionObserver(completion);
-                return completion.Task;
-            }
-            if (duplicate != null && request.duplicatePolicy == ESDialogDuplicatePolicy.ReplaceExisting)
-            {
-                openingReplacement = true;
-                duplicate.CancelAndClose();
-            }
-            if ((duplicate != null && request.duplicatePolicy == ESDialogDuplicatePolicy.Queue)
-                || request.queueBehindActiveDialog && activeWindows.Any(IsLive))
-            {
-                Enqueue(new PendingDialog
-                {
-                    request = request,
-                    completion = completion,
-                });
-                return completion.Task;
-            }
-
-            observedWindow = OpenNow(request, completion, false);
-            ownsWindow = true;
+            SubmitOperation(operation, out DialogOperation acceptedOperation);
+            subscriber.RegisterCancellation(
+                acceptedOperation,
+                cancellationToken,
+                editorContext);
             return completion.Task;
         }
 
@@ -1378,8 +1577,55 @@ namespace ES
                 throw new InvalidOperationException("ShowModal 不接受异步校验或异步动作；请使用 ShowAsync。");
             var completion = new TaskCompletionSource<ESAdvancedDialogResult>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
-            OpenNow(request, completion, true);
+            DialogOperation operation = CreateOperation(request, completion, out _);
+            OpenNow(operation, true);
             return completion.Task.GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// 显示受 ES 对话框生命周期治理的同步单行文本输入框。
+        /// 调用方必须提供稳定 dialogId，并显式选择 owner 或主工作区 fallback。
+        /// </summary>
+        public static bool TryShowTextInputModal(
+            string dialogId,
+            string title,
+            string message,
+            string initialValue,
+            out string value,
+            EditorWindow owner,
+            bool allowMainWorkspaceFallback,
+            string fieldLabel = "输入",
+            string confirmText = "确定",
+            string cancelText = "取消",
+            bool required = false)
+        {
+            const string valueFieldId = "value";
+            value = string.Empty;
+            var request = new ESAdvancedDialogRequest
+            {
+                dialogId = dialogId,
+                title = title,
+                message = message ?? string.Empty,
+                confirmText = confirmText,
+                cancelText = cancelText,
+                initialFocusFieldId = valueFieldId,
+                owner = owner,
+                allowMainWorkspaceFallback = allowMainWorkspaceFallback,
+                minSize = new Vector2(420f, 240f),
+                preferredSize = new Vector2(520f, 300f),
+            };
+            request.AddText(
+                valueFieldId,
+                string.IsNullOrWhiteSpace(fieldLabel) ? "输入" : fieldLabel.Trim(),
+                initialValue ?? string.Empty,
+                required);
+
+            ESAdvancedDialogResult result = ShowModal(request);
+            if (result == null || !result.accepted || result.values == null)
+                return false;
+
+            value = result.values.GetString(valueFieldId);
+            return true;
         }
 
         private static ESAdvancedDialogRequest PrepareRequest(ESAdvancedDialogRequest request)
@@ -1388,42 +1634,137 @@ namespace ES
             return snapshot;
         }
 
+        private static DialogOperation CreateOperation(
+            ESAdvancedDialogRequest request,
+            TaskCompletionSource<ESAdvancedDialogResult> completion,
+            out DialogSubscriber subscriber)
+        {
+            Action<ESAdvancedDialogResult> callback = request.completed;
+            request.completed = null;
+            var operation = new DialogOperation(request);
+            subscriber = operation.AddSubscriber(callback, completion);
+            return operation;
+        }
+
+        private static ESAdvancedDialogWindow SubmitOperation(
+            DialogOperation operation,
+            out DialogOperation acceptedOperation)
+        {
+            if (operation == null)
+                throw new ArgumentNullException(nameof(operation));
+            acceptedOperation = operation;
+            ESAdvancedDialogRequest request = operation.request;
+            if (IsOwnerInvalid(request))
+            {
+                CompleteOperation(operation, CancelledResult());
+                return null;
+            }
+
+            DialogOperation[] pendingDuplicates = FindPendingDuplicates(request.dialogId);
+            DialogOperation pendingDuplicate = pendingDuplicates.FirstOrDefault();
+            DialogOperation[] liveDuplicates = FindLiveDuplicateOperations(request.dialogId);
+            DialogOperation activeDuplicate = liveDuplicates.FirstOrDefault(item =>
+                !item.window.IsClosingOrCompleted
+                && (item.state == DialogOperationState.Opening
+                    || item.state == DialogOperationState.Active));
+            DialogOperation closingDuplicate = liveDuplicates.FirstOrDefault(item =>
+                item.state == DialogOperationState.Closing
+                || item.window.IsClosingOrCompleted);
+            if (request.duplicatePolicy == ESDialogDuplicatePolicy.ReplaceExisting
+                && (pendingDuplicates.Length > 0 || liveDuplicates.Length > 0))
+            {
+                openingReplacement = true;
+                try
+                {
+                    for (int i = 0; i < pendingDuplicates.Length; i++)
+                        DetachOperation(pendingDuplicates[i]);
+                    Enqueue(operation, true);
+                    for (int i = 0; i < pendingDuplicates.Length; i++)
+                        pendingDuplicates[i]?.CompleteOnce(CancelledResult());
+                    for (int i = 0; i < liveDuplicates.Length; i++)
+                        CancelOperation(liveDuplicates[i], CancelledResult());
+                }
+                finally
+                {
+                    openingReplacement = false;
+                }
+                TryDrainQueue();
+                return operation.window;
+            }
+
+            if (pendingDuplicate != null)
+            {
+                if (request.duplicatePolicy == ESDialogDuplicatePolicy.FocusExisting)
+                {
+                    operation.TransferSubscribersTo(pendingDuplicate);
+                    acceptedOperation = pendingDuplicate;
+                    return pendingDuplicate.window;
+                }
+                if (request.duplicatePolicy == ESDialogDuplicatePolicy.Queue)
+                {
+                    Enqueue(operation, false);
+                    TryDrainQueue();
+                    return null;
+                }
+            }
+
+            if (activeDuplicate == null
+                && closingDuplicate != null
+                && request.duplicatePolicy != ESDialogDuplicatePolicy.AllowParallel)
+            {
+                Enqueue(operation, false);
+                TryDrainQueue();
+                return null;
+            }
+
+            if (activeDuplicate != null)
+            {
+                if (request.duplicatePolicy == ESDialogDuplicatePolicy.FocusExisting)
+                {
+                    operation.TransferSubscribersTo(activeDuplicate);
+                    acceptedOperation = activeDuplicate;
+                    activeDuplicate.window?.Focus();
+                    return activeDuplicate.window;
+                }
+                if (request.duplicatePolicy == ESDialogDuplicatePolicy.Queue)
+                {
+                    Enqueue(operation, false);
+                    TryDrainQueue();
+                    return null;
+                }
+            }
+
+            if (request.queueBehindActiveDialog && HasLiveActiveWindow())
+            {
+                Enqueue(operation, false);
+                TryDrainQueue();
+                return null;
+            }
+
+            return OpenNow(operation, false);
+        }
+
         internal static void NotifyClosed(
             ESAdvancedDialogWindow window,
             ESAdvancedDialogResult result)
         {
-            ESAdvancedDialogWindow[] children = activeWindows
-                .Where(item => IsLive(item) && item != window && item.Owner == window)
-                .ToArray();
-            for (int i = 0; i < children.Length; i++)
-                children[i].CancelAndClose();
-            activeWindows.RemoveAll(item => !IsLive(item) || item == window);
+            DialogOperation operation = FindActiveOperation(window);
+            operation?.BeginClosing(result ?? CancelledResult());
+            CancelOwnedDialogs(window, operation);
+
+            if (operation != null)
+                CompleteOperation(
+                    operation,
+                    ResolveOperationResult(operation, result ?? CancelledResult()));
+            else
+                activeWindows.RemoveAll(item =>
+                    !IsLive(item) || ReferenceEquals(item, window));
+            UpdateOwnerLifetimeMonitor();
             if (shuttingDown)
                 return;
             if (openingReplacement)
                 return;
-            if (activeWindows.Any(IsLive) || pendingDialogs.Count == 0)
-                return;
-            PendingDialog next = TakeNextPending();
-            if (next == null)
-                return;
-            EditorApplication.delayCall += () =>
-            {
-                // ReloadDomain/PlayMode can run this callback after Shutdown has
-                // already cancelled the request. Never resurrect a stale dialog.
-                if (shuttingDown)
-                {
-                    next?.completion?.TrySetResult(CancelledResult());
-                    return;
-                }
-                if (next?.completion?.Task.IsCanceled == true)
-                {
-                    OpenNextQueued();
-                    return;
-                }
-                OpenNow(next.request, next.completion, false);
-                AddPendingObserversToWindow(next);
-            };
+            TryDrainQueue();
         }
 
         internal static Rect ResolveOwnerBounds(ESAdvancedDialogRequest request)
@@ -1504,106 +1845,535 @@ namespace ES
         internal static int PendingCount => pendingDialogs.Count;
 
         private static ESAdvancedDialogWindow OpenNow(
-            ESAdvancedDialogRequest request,
-            TaskCompletionSource<ESAdvancedDialogResult> completion,
+            DialogOperation operation,
             bool modal)
         {
-            if (IsOwnerInvalid(request))
+            if (operation == null || operation.state == DialogOperationState.Completed)
+                return null;
+            if (IsOwnerInvalid(operation.request))
             {
-                completion?.TrySetResult(CancelledResult());
+                CompleteOperation(operation, CancelledResult());
                 return null;
             }
+            PruneDeadActiveOperations();
             activeWindows.RemoveAll(item => !IsLive(item));
             if (activeWindows.Count >= MaximumActiveDialogs)
-                throw new InvalidOperationException(
+            {
+                var exception = new InvalidOperationException(
                     "ES 对话框活动窗口已达到上限 " + MaximumActiveDialogs
                     + "；请复用稳定 dialogId 或启用队列，而不是继续并行打开。");
+                CompleteOperation(operation, FailedResult(exception));
+                throw exception;
+            }
+            ESAdvancedDialogWindow window = null;
             try
             {
-                ESAdvancedDialogWindow window = ESAdvancedDialogWindow.Create(request, completion);
+                operation.state = DialogOperationState.Opening;
+                RemoveScheduledCallback(operation);
+                if (!pendingDialogs.Contains(operation))
+                    pendingDialogs.Insert(0, operation);
+                UpdateOwnerLifetimeMonitor();
+                window = ESAdvancedDialogWindow.Create(operation.request, null);
+                if (operation.state == DialogOperationState.Completed)
+                {
+                    RemovePendingRegistration(operation);
+                    if (!CloseWindowBestEffort(window))
+                        TrackUnclosedWindow(
+                            window,
+                            "ES 对话框创建期间 operation 已被重入完成，但新建窗口尚未退出。");
+                    return null;
+                }
+                operation.window = window;
+                pendingDialogs.Remove(operation);
                 activeWindows.Add(window);
-                window.Open(modal);
+                activeOperations.Add(operation);
+                UpdateOwnerLifetimeMonitor();
+                window.Internal_OpenFromDialogService(modal);
+                if (operation.state == DialogOperationState.Opening)
+                    operation.state = DialogOperationState.Active;
                 return window;
             }
-            finally
+            catch (Exception exception)
             {
-                openingReplacement = false;
+                if (operation.state != DialogOperationState.Completed)
+                {
+                    ESAdvancedDialogResult failure = FailedResult(exception);
+                    operation.BeginClosing(
+                        ResolveOperationResult(operation, WindowResult(window) ?? failure));
+                }
+                bool windowClosed = CloseWindowBestEffort(window);
+                if (operation.state != DialogOperationState.Completed && windowClosed)
+                    CompleteOperation(operation, ResolveOperationResult(operation, FailedResult(exception)));
+                else if (operation.state != DialogOperationState.Completed)
+                {
+                    ScheduleCloseRetry(operation);
+                    Debug.LogError(
+                        "ES 对话框打开失败且窗口无法关闭；operation 保留在治理表中，禁止留下未跟踪窗口。",
+                        window);
+                }
+                else if (!windowClosed)
+                    TrackUnclosedWindow(
+                        window,
+                        "ES 对话框重入完成后打开流程抛出异常，窗口仍未退出。");
+                UpdateOwnerLifetimeMonitor();
+                throw;
             }
         }
 
-        private static void OpenNextQueued()
+        private static void TryDrainQueue()
         {
-            if (activeWindows.Any(IsLive) || pendingDialogs.Count == 0)
+            if (shuttingDown
+                || openingReplacement
+                || scheduledOperation != null)
                 return;
-            PendingDialog next = TakeNextPending();
-            if (next == null)
+            PruneDeadActiveOperations();
+            if (pendingDialogs.Count == 0)
+            {
+                UpdateOwnerLifetimeMonitor();
                 return;
-            OpenNow(next.request, next.completion, false);
-            AddPendingObserversToWindow(next);
+            }
+            if (HasLiveActiveWindow())
+                return;
+
+            while (pendingDialogs.Count > 0)
+            {
+                DialogOperation next = pendingDialogs[0];
+                if (next == null || next.state == DialogOperationState.Completed)
+                {
+                    pendingDialogs.RemoveAt(0);
+                    continue;
+                }
+                if (IsOwnerInvalid(next.request))
+                {
+                    CompleteOperation(next, CancelledResult());
+                    continue;
+                }
+
+                next.state = DialogOperationState.Scheduled;
+                scheduledOperation = next;
+                next.scheduledCallback = () => OpenScheduled(next);
+                EditorApplication.delayCall += next.scheduledCallback;
+                UpdateOwnerLifetimeMonitor();
+                return;
+            }
+            UpdateOwnerLifetimeMonitor();
+        }
+
+        private static void OpenScheduled(DialogOperation operation)
+        {
+            if (operation == null)
+                return;
+            RemoveScheduledCallback(operation);
+            if (operation.state == DialogOperationState.Completed
+                || !pendingDialogs.Contains(operation))
+            {
+                TryDrainQueue();
+                return;
+            }
+
+            operation.state = DialogOperationState.Queued;
+            if (shuttingDown)
+            {
+                CompleteOperation(operation, CancelledResult());
+                return;
+            }
+            PruneDeadActiveOperations();
+            if (HasLiveActiveWindow())
+            {
+                TryDrainQueue();
+                return;
+            }
+            if (IsOwnerInvalid(operation.request))
+            {
+                CompleteOperation(operation, CancelledResult());
+                TryDrainQueue();
+                return;
+            }
+
+            try
+            {
+                OpenNow(operation, false);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            finally
+            {
+                TryDrainQueue();
+            }
         }
 
         private static ESAdvancedDialogWindow FindDuplicate(string dialogId)
         {
-            if (string.IsNullOrWhiteSpace(dialogId))
-                return null;
-            activeWindows.RemoveAll(item => !IsLive(item));
-            return activeWindows.FirstOrDefault(window =>
-                string.Equals(window.DialogId, dialogId.Trim(), StringComparison.Ordinal));
+            return FindLiveDuplicateOperations(dialogId).FirstOrDefault()?.window;
         }
 
-        private static PendingDialog FindPendingDuplicate(string dialogId)
+        private static DialogOperation FindActiveDuplicateOperation(string dialogId)
+        {
+            return FindLiveDuplicateOperations(dialogId).FirstOrDefault(item =>
+                !item.window.IsClosingOrCompleted
+                && (item.state == DialogOperationState.Opening
+                    || item.state == DialogOperationState.Active));
+        }
+
+        private static DialogOperation[] FindLiveDuplicateOperations(string dialogId)
         {
             if (string.IsNullOrWhiteSpace(dialogId))
-                return null;
+                return Array.Empty<DialogOperation>();
             string normalized = dialogId.Trim();
-            return pendingDialogs.FirstOrDefault(item =>
-                item?.request != null
-                && string.Equals(item.request.dialogId?.Trim(), normalized, StringComparison.Ordinal));
+            PruneDeadActiveOperations();
+            return activeOperations
+                .Where(item => item != null
+                    && item.state != DialogOperationState.Completed
+                    && IsLive(item.window)
+                    && string.Equals(
+                        item.request.dialogId?.Trim(),
+                        normalized,
+                        StringComparison.Ordinal))
+                .ToArray();
         }
 
-        private static PendingDialog TakeNextPending()
+        private static DialogOperation FindActiveOperation(ESAdvancedDialogWindow window)
         {
-            while (pendingDialogs.Count > 0)
+            if (ReferenceEquals(window, null))
+                return null;
+            for (int i = 0; i < activeOperations.Count; i++)
             {
-                PendingDialog next = pendingDialogs[0];
-                pendingDialogs.RemoveAt(0);
-                if (next?.completion?.Task.IsCanceled == true)
-                    continue;
-                if (next?.request == null || IsOwnerInvalid(next.request))
-                {
-                    next?.Complete(CancelledResult());
-                    continue;
-                }
-                return next;
+                DialogOperation operation = activeOperations[i];
+                if (ReferenceEquals(operation?.window, window))
+                    return operation;
             }
             return null;
         }
 
-        private static void AddPendingObserversToWindow(PendingDialog pending)
+        private static DialogOperation FindPendingDuplicate(string dialogId)
         {
-            if (pending == null || pending.observers.Count == 0)
+            return FindPendingDuplicates(dialogId).FirstOrDefault();
+        }
+
+        private static DialogOperation[] FindPendingDuplicates(string dialogId)
+        {
+            if (string.IsNullOrWhiteSpace(dialogId))
+                return Array.Empty<DialogOperation>();
+            string normalized = dialogId.Trim();
+            return pendingDialogs
+                .Where(item => item?.state != DialogOperationState.Completed
+                    && item?.request != null
+                    && string.Equals(
+                        item.request.dialogId?.Trim(),
+                        normalized,
+                        StringComparison.Ordinal))
+                .ToArray();
+        }
+
+        private static bool HasLiveActiveWindow()
+        {
+            for (int i = 0; i < activeWindows.Count; i++)
+                if (IsLive(activeWindows[i]))
+                    return true;
+            return false;
+        }
+
+        private static void PruneDeadActiveOperations()
+        {
+            while (true)
+            {
+                int deadIndex = -1;
+                for (int i = 0; i < activeOperations.Count; i++)
+                {
+                    DialogOperation candidate = activeOperations[i];
+                    if (candidate == null
+                        || candidate.state == DialogOperationState.Completed
+                        || !IsLive(candidate.window))
+                    {
+                        deadIndex = i;
+                        break;
+                    }
+                }
+                if (deadIndex < 0)
+                    break;
+                DialogOperation operation = activeOperations[deadIndex];
+                if (operation == null)
+                    activeOperations.RemoveAt(deadIndex);
+                else if (operation.state == DialogOperationState.Completed)
+                    DetachOperation(operation);
+                else
+                {
+                    ESAdvancedDialogResult result = ResolveOperationResult(operation, null)
+                        ?? CancelledResult();
+                    operation.BeginClosing(result);
+                    CancelOwnedDialogs(operation.window, operation);
+                    CompleteOperation(
+                        operation,
+                        ResolveOperationResult(operation, result));
+                }
+            }
+            activeWindows.RemoveAll(item => !IsLive(item));
+        }
+
+        private static void CancelOwnedDialogs(
+            ESAdvancedDialogWindow owner,
+            DialogOperation ownerOperation)
+        {
+            if (ReferenceEquals(owner, null))
                 return;
-            ESAdvancedDialogWindow window = FindDuplicate(pending.request.dialogId);
-            if (window == null)
+
+            DialogOperation[] pendingChildren = pendingDialogs
+                .Where(item => item?.request != null
+                    && ReferenceEquals(item.request.owner, owner))
+                .ToArray();
+            for (int i = 0; i < pendingChildren.Length; i++)
+                CancelOperation(pendingChildren[i], CancelledResult());
+
+            DialogOperation[] activeChildren = activeOperations
+                .Where(item => item != null
+                    && !ReferenceEquals(item, ownerOperation)
+                    && item.request != null
+                    && ReferenceEquals(item.request.owner, owner))
+                .ToArray();
+            for (int i = 0; i < activeChildren.Length; i++)
+                CancelOperation(activeChildren[i], CancelledResult());
+
+            ESAdvancedDialogWindow[] untrackedChildren = activeWindows
+                .Where(item => IsLive(item)
+                    && !ReferenceEquals(item, owner)
+                    && ReferenceEquals(item.Owner, owner)
+                    && FindActiveOperation(item) == null)
+                .ToArray();
+            for (int i = 0; i < untrackedChildren.Length; i++)
+                CloseWindowBestEffort(untrackedChildren[i]);
+        }
+
+        private static void CancelSubscriber(
+            DialogOperation operation,
+            DialogSubscriber subscriber,
+            CancellationToken cancellationToken)
+        {
+            if (operation == null || subscriber == null)
                 return;
-            for (int i = 0; i < pending.observers.Count; i++)
-                window.AddCompletionObserver(pending.observers[i]);
-            pending.observers.Clear();
+            bool noSubscribersRemain = operation.CancelSubscriber(
+                subscriber,
+                cancellationToken,
+                CancelledResult());
+            if (!noSubscribersRemain)
+                return;
+            CancelOperation(operation, CancelledResult());
+            if (!shuttingDown && !openingReplacement)
+                TryDrainQueue();
+        }
+
+        private static void CancelOperation(
+            DialogOperation operation,
+            ESAdvancedDialogResult result)
+        {
+            if (operation == null || operation.state == DialogOperationState.Completed)
+                return;
+            operation.BeginClosing(
+                ResolveOperationResult(operation, result ?? CancelledResult()));
+            ESAdvancedDialogWindow window = operation.window;
+            if (IsLive(window))
+            {
+                try
+                {
+                    window.CancelAndClose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+                // CancelAndClose can return without closing when the window has
+                // already published a build failure. Shutdown and owner loss must
+                // still remove that native surface before detaching the operation.
+                bool windowClosed = CloseWindowBestEffort(window);
+                if (operation.state != DialogOperationState.Completed && !windowClosed)
+                {
+                    ScheduleCloseRetry(operation);
+                    Debug.LogError(
+                        "ES 对话框取消后窗口仍然存活；operation 保留在治理表中，等待真实关闭。",
+                        window);
+                    UpdateOwnerLifetimeMonitor();
+                    return;
+                }
+            }
+            if (operation.state != DialogOperationState.Completed)
+                CompleteOperation(
+                    operation,
+                    ResolveOperationResult(operation, result ?? CancelledResult()));
+        }
+
+        private static bool CloseWindowBestEffort(ESAdvancedDialogWindow window)
+        {
+            if (!IsLive(window))
+                return true;
+            try
+            {
+                window.Close();
+            }
+            catch (Exception closeException)
+            {
+                Debug.LogException(closeException);
+            }
+            if (!IsLive(window))
+                return true;
+            try
+            {
+                UnityEngine.Object.DestroyImmediate(window);
+            }
+            catch (Exception destroyException)
+            {
+                Debug.LogException(destroyException);
+            }
+            return !IsLive(window);
+        }
+
+        private static void CompleteOperation(
+            DialogOperation operation,
+            ESAdvancedDialogResult result)
+        {
+            if (operation == null || operation.state == DialogOperationState.Completed)
+                return;
+            ESAdvancedDialogResult resolvedResult = operation.CaptureTerminalResult(
+                result ?? CancelledResult());
+            DetachOperation(operation);
+            operation.CompleteOnce(resolvedResult ?? CancelledResult());
+            UpdateOwnerLifetimeMonitor();
+        }
+
+        internal static void CloseCompletedWindow(ESAdvancedDialogWindow window)
+        {
+            if (ReferenceEquals(window, null))
+                return;
+            DialogOperation operation = FindActiveOperation(window);
+            ESAdvancedDialogResult result = WindowResult(window) ?? CancelledResult();
+            operation?.BeginClosing(ResolveOperationResult(operation, result));
+            bool windowClosed = CloseWindowBestEffort(window);
+            if (operation != null
+                && operation.state != DialogOperationState.Completed
+                && windowClosed)
+            {
+                CompleteOperation(operation, ResolveOperationResult(operation, result));
+            }
+            else if (!windowClosed)
+            {
+                TrackUnclosedWindow(
+                    window,
+                    "ES 对话框提交结果后仍然存活；窗口已保留在治理表中继续收敛。");
+            }
+            UpdateOwnerLifetimeMonitor();
+        }
+
+        private static void DetachOperation(DialogOperation operation)
+        {
+            if (operation == null)
+                return;
+            RemovePendingRegistration(operation);
+            activeOperations.Remove(operation);
+            ESAdvancedDialogWindow window = operation.window;
+            for (int i = activeWindows.Count - 1; i >= 0; i--)
+            {
+                if (!IsLive(activeWindows[i])
+                    || ReferenceEquals(activeWindows[i], window))
+                    activeWindows.RemoveAt(i);
+            }
+            operation.window = null;
+        }
+
+        private static void RemovePendingRegistration(DialogOperation operation)
+        {
+            if (operation == null)
+                return;
+            RemoveScheduledCallback(operation);
+            pendingDialogs.Remove(operation);
+        }
+
+        private static void RemoveScheduledCallback(DialogOperation operation)
+        {
+            if (operation == null)
+                return;
+            EditorApplication.CallbackFunction callback = operation.scheduledCallback;
+            if (callback != null)
+                EditorApplication.delayCall -= callback;
+            operation.scheduledCallback = null;
+            if (ReferenceEquals(scheduledOperation, operation))
+                scheduledOperation = null;
         }
 
         private static bool IsLive(EditorWindow window) => window != null;
 
         private static bool IsOwnerInvalid(ESAdvancedDialogRequest request)
         {
-            return request != null
-                && !request.allowMainWorkspaceFallback
-                && !ReferenceEquals(request.owner, null)
-                && request.owner == null;
+            if (request == null || ReferenceEquals(request.owner, null))
+                return false;
+            if (IsClosingOwner(request.owner))
+                return true;
+            return !request.allowMainWorkspaceFallback && request.owner == null;
+        }
+
+        private static bool IsClosingOwner(EditorWindow owner)
+        {
+            if (!(owner is ESAdvancedDialogWindow dialog))
+                return false;
+            if (dialog.IsClosingOrCompleted)
+                return true;
+            DialogOperation operation = FindActiveOperation(dialog);
+            return operation?.state == DialogOperationState.Closing
+                || operation?.state == DialogOperationState.Completed;
+        }
+
+        private static ESAdvancedDialogResult ResolveOperationResult(
+            DialogOperation operation,
+            ESAdvancedDialogResult fallback)
+        {
+            if (operation?.terminalResult != null)
+                return operation.terminalResult;
+            ESAdvancedDialogResult windowResult = WindowResult(operation?.window);
+            return windowResult ?? fallback;
+        }
+
+        private static ESAdvancedDialogResult WindowResult(
+            ESAdvancedDialogWindow window)
+        {
+            return ReferenceEquals(window, null) ? null : window.LastResult;
+        }
+
+        private static void TrackUnclosedWindow(
+            ESAdvancedDialogWindow window,
+            string message)
+        {
+            if (!IsLive(window))
+                return;
+            if (!activeWindows.Contains(window))
+                activeWindows.Add(window);
+            ScheduleCloseRetry(FindActiveOperation(window));
+            window.NextServiceCloseRetryAt =
+                EditorApplication.timeSinceStartup + CloseRetryIntervalSeconds;
+            Debug.LogError(message, window);
+            UpdateOwnerLifetimeMonitor();
+        }
+
+        private static void ScheduleCloseRetry(DialogOperation operation)
+        {
+            if (operation == null || operation.state != DialogOperationState.Closing)
+                return;
+            operation.nextCloseRetryAt =
+                EditorApplication.timeSinceStartup + CloseRetryIntervalSeconds;
         }
 
         private static ESAdvancedDialogResult CancelledResult()
         {
             return new ESAdvancedDialogResult { accepted = false, cancelled = true };
+        }
+
+        private static ESAdvancedDialogResult FailedResult(Exception exception)
+        {
+            return new ESAdvancedDialogResult
+            {
+                accepted = false,
+                cancelled = false,
+                actionId = string.Empty,
+                exception = exception,
+            };
         }
 
         private static void ValidateServiceRequest(ESAdvancedDialogRequest request)
@@ -1613,13 +2383,22 @@ namespace ES
             ESAdvancedDialogWindow.ValidateRequest(request);
         }
 
-        private static void Enqueue(PendingDialog pending)
+        private static void Enqueue(DialogOperation operation, bool insertFirst)
         {
             if (pendingDialogs.Count >= MaximumPendingDialogs)
-                throw new InvalidOperationException(
+            {
+                var exception = new InvalidOperationException(
                     "ES 对话框等待队列已达到上限 " + MaximumPendingDialogs
                     + "；请检查是否在循环或高频回调中重复提交对话框。");
-            pendingDialogs.Add(pending);
+                operation?.CompleteOnce(FailedResult(exception));
+                throw exception;
+            }
+            operation.state = DialogOperationState.Queued;
+            if (insertFirst)
+                pendingDialogs.Insert(0, operation);
+            else
+                pendingDialogs.Add(operation);
+            UpdateOwnerLifetimeMonitor();
         }
 
         internal static ESAdvancedDialogRequest SnapshotRequest(ESAdvancedDialogRequest source)
@@ -1709,28 +2488,50 @@ namespace ES
             if (shuttingDown)
                 return;
             shuttingDown = true;
+            EditorApplication.update -= MonitorOwnerLifetime;
+            ownerLifetimeMonitorInstalled = false;
             var cancelled = new ESAdvancedDialogResult
             {
                 accepted = false,
                 cancelled = true,
                 actionId = string.Empty,
             };
-            for (int i = 0; i < pendingDialogs.Count; i++)
-                pendingDialogs[i]?.Complete(cancelled);
-            pendingDialogs.Clear();
-            ESAdvancedDialogWindow[] windows = activeWindows.Where(IsLive).ToArray();
-            for (int i = 0; i < windows.Length; i++)
-                windows[i].CancelAndClose();
-            activeWindows.Clear();
+            while (pendingDialogs.Count > 0)
+            {
+                DialogOperation operation = pendingDialogs[0];
+                if (operation == null)
+                    pendingDialogs.RemoveAt(0);
+                else
+                    CompleteOperation(operation, cancelled);
+            }
+            DialogOperation[] activeSnapshot = activeOperations.ToArray();
+            for (int i = 0; i < activeSnapshot.Length; i++)
+            {
+                DialogOperation operation = activeSnapshot[i];
+                if (operation != null)
+                    CancelOperation(operation, cancelled);
+            }
+            scheduledOperation = null;
+            activeWindows.RemoveAll(item => !IsLive(item));
+            invalidPendingScratch.Clear();
+            invalidOwnerScratch.Clear();
+            closingOperationScratch.Clear();
+            if (activeOperations.Count > 0 || HasLiveActiveWindow())
+                Debug.LogError(
+                    "ES 对话框关闭阶段仍有窗口无法退出；治理记录已保留，未将存活窗口静默遗弃。");
         }
 
         internal static void RestartAfterPresenterRegistration()
         {
             shuttingDown = false;
+            UpdateOwnerLifetimeMonitor();
         }
     }
 
-    [ESWindowSleepContract(ESWindowSleepMode.Transient, "对话框由集中服务治理")]
+    [ESWindowSleepContract(
+        ESWindowSleepMode.Transient,
+        ESWindowSurfaceKind.Dialog,
+        "对话框由集中服务治理")]
     [ESWindowPresentationShortTitle("对话框")]
     public sealed class ESAdvancedDialogWindow : EditorWindow, IESWindowMultiInstanceContract
     {
@@ -1766,9 +2567,11 @@ namespace ES
         private IVisualElementScheduledItem busyRefreshSchedule;
         private int validationGeneration;
         private bool busy;
+        private string busyMessage = string.Empty;
         private bool asyncValidationPending;
         private bool customContentReleased;
         private bool resultPublished;
+        private bool buildFailureCloseScheduled;
         private bool initialPositionReapplyUpdateSubscribed;
         private bool initialPositionReapplyDelayScheduled;
         private IVisualElementScheduledItem initialPositionReapplySchedule;
@@ -1793,6 +2596,8 @@ namespace ES
                 && !ReferenceEquals(request.owner, null)
                 && request.owner == null;
         internal ESAdvancedDialogResult LastResult => lastResult;
+        internal bool IsClosingOrCompleted => completed;
+        internal double NextServiceCloseRetryAt { get; set; }
 
         // Dialogs deliberately use a dedicated mint-green surface family so they remain
         // visually distinct from ordinary ES tool windows. Semantic warning/error colors
@@ -1844,11 +2649,15 @@ namespace ES
         /// <summary>
         /// 打开一个独立的 Utility 窗口。调用方只能读取确认结果；任何业务动作必须由 completed 回调之后的调用方自行执行。
         /// </summary>
+        [Obsolete("Use ESDialogService.Show instead.", false)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static ESAdvancedDialogWindow Show(ESAdvancedDialogRequest request)
         {
             return ESDialogService.Show(request);
         }
 
+        [Obsolete("Use ESDialogService.ShowAsync instead.", false)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static Task<ESAdvancedDialogResult> ShowAsync(
             ESAdvancedDialogRequest request,
             CancellationToken cancellationToken = default)
@@ -1856,6 +2665,8 @@ namespace ES
             return ESDialogService.ShowAsync(request, cancellationToken);
         }
 
+        [Obsolete("Use ESDialogService.ShowModal instead.", false)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static ESAdvancedDialogResult ShowModal(ESAdvancedDialogRequest request)
         {
             return ESDialogService.ShowModal(request);
@@ -1867,15 +2678,42 @@ namespace ES
         {
             ValidateRequest(request);
             var window = CreateInstance<ESAdvancedDialogWindow>();
-            if (completion != null)
-                window.completionObservers.Add(completion);
-            window.Initialize(request);
-            window.titleContent = new GUIContent(BuildNativeTitle(request.title));
-            window.ApplyInitialPosition();
-            return window;
+            try
+            {
+                if (completion != null)
+                    window.completionObservers.Add(completion);
+                window.Initialize(request);
+                window.titleContent = new GUIContent(BuildNativeTitle(request.title));
+                window.ApplyInitialPosition();
+                return window;
+            }
+            catch
+            {
+                try
+                {
+                    if (window != null)
+                        ESDialogService.CloseCompletedWindow(window);
+                }
+                catch (Exception cleanupException)
+                {
+                    Debug.LogException(cleanupException);
+                }
+                if (window != null)
+                {
+                    try
+                    {
+                        window.ReleaseWindowResources();
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        Debug.LogException(cleanupException);
+                    }
+                }
+                throw;
+            }
         }
 
-        internal void Open(bool modal)
+        internal void Internal_OpenFromDialogService(bool modal)
         {
             modalMode = modal;
             titleContent = new GUIContent(
@@ -2063,6 +2901,8 @@ namespace ES
 
         public void CreateGUI()
         {
+            ESWindowFoundation.Unbind(this);
+            PrepareForVisualTreeRebuild();
             rootVisualElement.Clear();
             fieldBlocks.Clear();
             fieldControls.Clear();
@@ -2073,7 +2913,7 @@ namespace ES
             if (!initialized || request == null)
             {
                 BuildExpiredView();
-                ES.EditorInternal.ESEditorPresentation.BindWindow(this, allowSemiSleep: false);
+                ESWindowFoundation.BindTransient(this);
                 return;
             }
 
@@ -2138,16 +2978,45 @@ namespace ES
             BuildSummary(bodyScroll);
             for (int i = 0; i < request.fields.Count; i++)
                 BuildField(bodyScroll, request.fields[i]);
-            BuildCustomContent(bodyScroll);
+            if (!BuildCustomContent(bodyScroll))
+            {
+                ESWindowFoundation.BindTransient(this);
+                return;
+            }
             BuildValidation(bodyScroll);
             BuildFooter(dialogContent);
             BuildBusyOverlay(shell.Content);
+            RestoreBusyPresentation();
 
             rootVisualElement.RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
             rootVisualElement.RegisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
-            ES.EditorInternal.ESEditorPresentation.BindWindow(this, allowSemiSleep: false);
+            ESWindowFoundation.BindTransient(this);
             RefreshValidation();
             ScheduleInitialFocus();
+        }
+
+        private void PrepareForVisualTreeRebuild()
+        {
+            rootVisualElement.UnregisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
+            rootVisualElement.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
+            busyRefreshSchedule?.Pause();
+            busyRefreshSchedule = null;
+            CancelAsyncValidation();
+            ReleaseCustomContent();
+            customContentReleased = false;
+            customContent = null;
+            shell = null;
+            dialogContent = null;
+            bodyScroll = null;
+            confirmButton = null;
+            validationLabel = null;
+            validationPanel = null;
+            busyOverlay = null;
+            busyLabel = null;
+            busyProgress = null;
+            cancelBusyButton = null;
+            decisionActions = null;
+            auxiliaryActions = null;
         }
 
         private void ApplyDialogPalette()
@@ -2276,19 +3145,60 @@ namespace ES
             position = initialScreenPosition;
         }
 
-        private void BuildCustomContent(VisualElement parent)
+        private bool BuildCustomContent(VisualElement parent)
         {
             if (request.createCustomContent == null)
+                return true;
+            try
+            {
+                customContent = request.createCustomContent(BuildValues());
+                if (customContent == null)
+                    return true;
+                customContent.name = string.IsNullOrWhiteSpace(customContent.name)
+                    ? "ESDialogCustomContent"
+                    : customContent.name;
+                customContent.style.minWidth = 0f;
+                customContent.style.marginBottom = 11f;
+                parent.Add(customContent);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                CompleteWithFailureAndScheduleClose(exception);
+                return false;
+            }
+        }
+
+        private void CompleteWithFailureAndScheduleClose(Exception exception)
+        {
+            if (!completed && request != null)
+            {
+                completed = true;
+                CancelAsyncValidation();
+                operationCancellation?.Cancel();
+                lastResult = new ESAdvancedDialogResult
+                {
+                    accepted = false,
+                    cancelled = false,
+                    actionId = string.Empty,
+                    values = BuildValues(),
+                    exception = exception,
+                };
+            }
+            if (buildFailureCloseScheduled || this == null)
                 return;
-            customContent = request.createCustomContent(BuildValues());
-            if (customContent == null)
-                return;
-            customContent.name = string.IsNullOrWhiteSpace(customContent.name)
-                ? "ESDialogCustomContent"
-                : customContent.name;
-            customContent.style.minWidth = 0f;
-            customContent.style.marginBottom = 11f;
-            parent.Add(customContent);
+            buildFailureCloseScheduled = true;
+            EditorApplication.delayCall -= CloseAfterBuildFailure;
+            EditorApplication.delayCall += CloseAfterBuildFailure;
+        }
+
+        private void CloseAfterBuildFailure()
+        {
+            EditorApplication.delayCall -= CloseAfterBuildFailure;
+            buildFailureCloseScheduled = false;
+            if (this != null)
+                ESDialogService.CloseCompletedWindow(this);
         }
 
         private void BuildBusyOverlay(VisualElement parent)
@@ -2338,11 +3248,43 @@ namespace ES
             parent.Add(busyOverlay);
         }
 
+        private void RestoreBusyPresentation()
+        {
+            if (!busy || busyOverlay == null)
+                return;
+
+            bool cancellationRequested = operationCancellation?.IsCancellationRequested == true
+                || activeProgress?.IsCancellationRequested == true;
+            busyOverlay.style.display = DisplayStyle.Flex;
+            if (busyLabel != null)
+            {
+                busyLabel.text = cancellationRequested
+                    ? "正在取消"
+                    : string.IsNullOrWhiteSpace(busyMessage) ? "正在处理" : busyMessage;
+            }
+            if (cancelBusyButton != null)
+            {
+                cancelBusyButton.style.display = request?.allowOperationCancellation == true
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
+                ES.EditorInternal.ESWindowPresentation.SetButtonEnabled(
+                    cancelBusyButton,
+                    request?.allowOperationCancellation == true && !cancellationRequested);
+            }
+            ES.EditorInternal.ESWindowPresentation.SetElementEnabled(decisionActions, false);
+            ES.EditorInternal.ESWindowPresentation.SetElementEnabled(auxiliaryActions, false);
+            RefreshBusyOverlay();
+            busyRefreshSchedule?.Pause();
+            busyRefreshSchedule = rootVisualElement.schedule
+                .Execute(RefreshBusyOverlay)
+                .Every(100);
+        }
+
         private void ScheduleInitialFocus()
         {
             rootVisualElement.schedule.Execute(() =>
             {
-                if (this == null || completed)
+                if (this == null || completed || busy)
                     return;
                 VisualElement target = null;
                 if (!string.IsNullOrWhiteSpace(request.initialFocusFieldId))
@@ -3043,6 +3985,7 @@ namespace ES
             if (busy)
                 throw new InvalidOperationException("当前对话框已有操作正在执行。");
             busy = true;
+            busyMessage = message ?? string.Empty;
             operationCancellation?.Dispose();
             string progressId = string.IsNullOrWhiteSpace(DialogId)
                 ? "dialog." + GetInstanceID() + "." + operationId
@@ -3054,11 +3997,14 @@ namespace ES
                 request.allowOperationCancellation);
             operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 activeProgress.CancellationToken);
-            busyOverlay.style.display = DisplayStyle.Flex;
-            busyLabel.text = message;
-            cancelBusyButton.style.display = request.allowOperationCancellation
-                ? DisplayStyle.Flex
-                : DisplayStyle.None;
+            if (busyOverlay != null)
+                busyOverlay.style.display = DisplayStyle.Flex;
+            if (busyLabel != null)
+                busyLabel.text = busyMessage;
+            if (cancelBusyButton != null)
+                cancelBusyButton.style.display = request.allowOperationCancellation
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
             ES.EditorInternal.ESWindowPresentation.SetElementEnabled(decisionActions, false);
             ES.EditorInternal.ESWindowPresentation.SetElementEnabled(auxiliaryActions, false);
             busyRefreshSchedule?.Pause();
@@ -3069,18 +4015,33 @@ namespace ES
         {
             if (!busy || activeProgress == null)
                 return;
-            ESProgressSnapshot snapshot = ESProgressCenter.GetSnapshot()
-                .LastOrDefault(item => string.Equals(item.id, activeProgress.Id, StringComparison.Ordinal));
-            if (snapshot == null)
+            if (!ESProgressCenter.TryGetProgress(
+                    activeProgress.Id,
+                    out float progress,
+                    out string summary)
+                || busyProgress == null)
                 return;
-            busyProgress.value = Mathf.Clamp01(snapshot.progress) * 100f;
-            busyProgress.title = snapshot.summary ?? string.Empty;
+            busyProgress.value = Mathf.Clamp01(progress) * 100f;
+            busyProgress.title = summary;
         }
 
         private void CancelBusyOperation()
         {
+            if (!busy)
+                return;
+            if (request == null || !request.allowOperationCancellation)
+            {
+                if (busyLabel != null)
+                    busyLabel.text = "正在执行，当前操作不可取消";
+                shell?.SetStatus(
+                    "当前操作不允许取消，请等待执行完成。",
+                    ES.EditorInternal.ESStatusKind.Warning);
+                return;
+            }
+
             operationCancellation?.Cancel();
             activeProgress?.RequestCancel();
+            busyMessage = "正在取消";
             ES.EditorInternal.ESWindowPresentation.SetButtonEnabled(cancelBusyButton, false);
             if (busyLabel != null)
                 busyLabel.text = "正在取消";
@@ -3089,9 +4050,11 @@ namespace ES
         private void EndBusy()
         {
             busy = false;
+            busyMessage = string.Empty;
             busyRefreshSchedule?.Pause();
             busyRefreshSchedule = null;
-            busyOverlay.style.display = DisplayStyle.None;
+            if (busyOverlay != null)
+                busyOverlay.style.display = DisplayStyle.None;
             ES.EditorInternal.ESWindowPresentation.SetButtonEnabled(cancelBusyButton, true);
             ES.EditorInternal.ESWindowPresentation.SetElementEnabled(decisionActions, true);
             ES.EditorInternal.ESWindowPresentation.SetElementEnabled(auxiliaryActions, true);
@@ -3242,6 +4205,9 @@ namespace ES
             minSize = new Vector2(
                 Mathf.Min(Mathf.Max(360f, requestedMin.x), centered.width),
                 Mathf.Min(Mathf.Max(240f, requestedMin.y), centered.height));
+            maxSize = new Vector2(
+                Mathf.Max(minSize.x, workArea.width),
+                Mathf.Max(minSize.y, workArea.height));
             int ownerDepth = request.positionMode == ESAdvancedDialogPositionMode.CustomScreenPosition
                 ? 0
                 : ESDialogService.ResolveOwnerDepth(request);
@@ -3610,7 +4576,7 @@ namespace ES
             if (!TryComplete(accepted, !accepted, null))
                 return;
             if (this != null)
-                Close();
+                ESDialogService.CloseCompletedWindow(this);
         }
 
         private void CompleteFromAction(string actionId)
@@ -3618,7 +4584,7 @@ namespace ES
             if (!TryComplete(false, false, actionId))
                 return;
             if (this != null)
-                Close();
+                ESDialogService.CloseCompletedWindow(this);
         }
 
         private bool TryComplete(bool accepted, bool cancelled, string actionId)
@@ -3658,30 +4624,126 @@ namespace ES
 
         private void OnDisable()
         {
+            ReleaseWindowResources();
+            try
+            {
+                ESWindowFoundation.Suspend(this);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            CompleteCloseLifecycle();
+        }
+
+        private void OnDestroy()
+        {
+            ReleaseWindowResources();
+            CompleteCloseLifecycle();
+            try
+            {
+                ESWindowFoundation.Close(this);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+        }
+
+        private void ReleaseWindowResources()
+        {
             StopInitialPositionReapplyLoop();
+            EditorApplication.delayCall -= CloseAfterBuildFailure;
+            buildFailureCloseScheduled = false;
             rootVisualElement.UnregisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
             rootVisualElement.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
             busyRefreshSchedule?.Pause();
             busyRefreshSchedule = null;
-            validationCancellation?.Cancel();
-            validationCancellation?.Dispose();
-            validationCancellation = null;
-            operationCancellation?.Cancel();
-            operationCancellation?.Dispose();
-            operationCancellation = null;
-            if (activeProgress != null)
+            CancelAndDispose(ref validationCancellation);
+            CancelAndDispose(ref operationCancellation);
+            ESProgressHandle progress = activeProgress;
+            activeProgress = null;
+            if (progress != null)
             {
-                activeProgress.Cancel("对话框已关闭");
-                activeProgress = null;
+                try
+                {
+                    progress.Cancel("对话框已关闭");
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
             }
             ReleaseCustomContent();
-            ownerInteractionHold?.Dispose();
+            IDisposable interactionHold = ownerInteractionHold;
             ownerInteractionHold = null;
-            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+            if (interactionHold != null)
+            {
+                try
+                {
+                    interactionHold.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
+        }
+
+        private void CompleteCloseLifecycle()
+        {
             if (initialized && !completed)
-                TryComplete(false, true, null);
-            ESDialogService.NotifyClosed(this, lastResult);
+            {
+                try
+                {
+                    TryComplete(false, true, null);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                    completed = true;
+                    lastResult = new ESAdvancedDialogResult
+                    {
+                        accepted = false,
+                        cancelled = false,
+                        actionId = string.Empty,
+                        exception = exception,
+                    };
+                }
+            }
+            try
+            {
+                ESDialogService.NotifyClosed(this, lastResult);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
             PublishResult();
+        }
+
+        private static void CancelAndDispose(ref CancellationTokenSource source)
+        {
+            CancellationTokenSource current = source;
+            source = null;
+            if (current == null)
+                return;
+            try
+            {
+                current.Cancel();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            try
+            {
+                current.Dispose();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
         }
 
         private void ReleaseCustomContent()

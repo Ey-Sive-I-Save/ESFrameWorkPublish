@@ -10,7 +10,10 @@ namespace ES
     /// ES 编辑器少量固定选项选择器。适合 2～12 个枚举、模式或职责模板；
     /// 大型、动态或需要搜索的数据源应继续使用 ESSearchDropdown。
     /// </summary>
-    [ESWindowSleepContract(ESWindowSleepMode.Transient, "短生命周期选择弹窗")]
+    [ESWindowSleepContract(
+        ESWindowSleepMode.Transient,
+        ESWindowSurfaceKind.Popup,
+        "短生命周期选择弹窗")]
     [ESWindowPresentationShortTitle("选择")]
     public sealed class ESCompactChoicePopup : EditorWindow
     {
@@ -113,7 +116,7 @@ namespace ES
 
         public void CreateGUI()
         {
-            EditorInternal.ESEditorPresentation.BindWindow(this, allowSemiSleep: false);
+            ESWindowFoundation.BindTransient(this);
             StyleSheet style = AssetDatabase.LoadAssetAtPath<StyleSheet>(StylePath);
             if (style != null && !rootVisualElement.styleSheets.Contains(style))
                 rootVisualElement.styleSheets.Add(style);
@@ -179,12 +182,17 @@ namespace ES
             EditorApplication.delayCall -= CloseIfContextWasLost;
             rootVisualElement.UnregisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
             ReleaseHostInteractionHold();
-            EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+            ESWindowFoundation.Suspend(this);
             configured = false;
             options = Array.Empty<Option>();
             optionButtons.Clear();
             if (ReferenceEquals(activePopup, this))
                 activePopup = null;
+        }
+
+        private void OnDestroy()
+        {
+            ESWindowFoundation.Close(this);
         }
 
         private void CloseIfContextWasLost()

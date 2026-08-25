@@ -331,7 +331,10 @@ namespace ES
         }
     }
 
-    [ES.ESWindowSleepContract(ES.ESWindowSleepMode.Transient, "短生命周期命令面板")]
+    [ES.ESWindowSleepContract(
+        ES.ESWindowSleepMode.Transient,
+        ES.ESWindowSurfaceKind.Popup,
+        "短生命周期命令面板")]
     public sealed class ESCommandPaletteWindow : EditorWindow, IESWindowPresentationShortTitle
     {
         public string ESWindow_PresentationShortTitle => "命令";
@@ -567,7 +570,7 @@ namespace ES
 
         private void OnEnable()
         {
-            ES.EditorInternal.ESEditorPresentation.BindWindow(this, allowSemiSleep: false);
+            ESWindowFoundation.BindTransient(this);
             if (!stylesAcquired)
             {
                 AcquireStyles();
@@ -581,7 +584,7 @@ namespace ES
         private void OnDisable()
         {
             SessionState.SetString(LastTabKey, activeTab);
-            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+            ESWindowFoundation.Suspend(this);
             UnregisterSearchTick();
             UnregisterShortcutCheckTick();
             if (stylesAcquired)
@@ -596,7 +599,7 @@ namespace ES
 
         private void OnDestroy()
         {
-            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
+            ESWindowFoundation.Close(this);
             UnregisterSearchTick();
             UnregisterShortcutCheckTick();
             if (stylesAcquired)

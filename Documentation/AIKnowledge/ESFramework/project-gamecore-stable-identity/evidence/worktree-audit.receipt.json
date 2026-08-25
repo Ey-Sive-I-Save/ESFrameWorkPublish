@@ -1,0 +1,19 @@
+{
+  "skillName": "es-worktree-audit",
+  "case": "bounded-target-overlap-audit",
+  "status": "passed",
+  "evidenceLevel": "S1",
+  "receiptPath": "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/evidence/worktree-audit.receipt.json",
+  "sourceRefs": [
+    ".agents/skills/es-worktree-audit/SKILL.md",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/README.md"
+  ],
+  "sourceRefHashes": {
+    ".agents/skills/es-worktree-audit/SKILL.md": "51f7749d47e21de9abc52a232c114596bb33847fc85bdae9190ab4a3b3188f22",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/README.md": "06df7d13aea22fe3afc7fe9ba4a4216aedb78b25fe0f426708a6213a4c08b730"
+  },
+  "toolId": "Get-ESWorktreeImpact.ps1",
+  "unityVersion": "2022.3.45f1",
+  "capturedUtc": "2026-08-23T12:06:36.6081048Z",
+  "planHash": "d68e811e1dbd92714a47bebcfabea087d959f112735e6cd4230de09cb7f2c95c"
+}

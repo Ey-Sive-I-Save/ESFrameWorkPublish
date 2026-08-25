@@ -2,33 +2,56 @@
 
 `KnowledgeId`: `es.project.scene-release-evidence.v1`  
 `Authority`: `Source + AIWarnings + Skill contract`  
-`RouteKeys`: `scene-validation`, `guide`, `builder`, `acceptance`, `release`, `evidence`, `receipt`, `profiler`, `unity`  
-`ContentHash`: `2a4766a6a66a445b7c7739f0226ce6fd8ce711cb79dbe1465d1a171c1f2a180b`
+`RouteKeys`: `scene-validation`, `scene-guide`, `acceptance`, `release`, `evidence`, `receipt`, `profiler`, `unity`
+`ContentHash`: `2f727bdfc9eca9625e0810da520bd4e32f3e6077710db3c63e6bfe3110d05f8d`
 
-## Guide 的职责边界
+## Scope
 
-`ESSceneValidationGuide` 是每个测试场景自己的导视和诊断组件：展示步骤、路线、预期和实时检查。它没有全局单例，不读取/改写玩家输入，不向 Entity/Vehicle/Camera Prefab 注入组件；自定义检查必须拿到该 Guide 实例并调用 `ReportCheck`。
+本条目只负责 Scene Guide、验收层级、证据回执，以及 PlayMode、Profiler、Player 和发布结论的升级边界。它不负责 Builder 源码权威、Prefab Override、Fixture 布局或备份分层；这些事实由 `es.unity.editor.project-scene-builder-authority.v1` 持有。UI Fixture 与 ScreenSpec 由 `es.project.ui-automation-authoring.v1` 持有。
 
-内建检查读取 ESGameManager、Input、LocalControl、Camera 输出和显式目标。外部结果写入后立即可读；常规 Evaluate 负责重放状态，`latchPass` 可保持已通过结果。HUD 只在状态/展示失效时重建文本，路线标记在 LateUpdate 读取显式相机和观察者。源码上的这些节流不能直接证明目标平台“零 GC”。
+## Trigger and routing
 
-## Builder 权威与生成资产
+- 自然语言触发：场景验收、Guide 检查、PlayMode 验证、Profiler 证据、Player 验收、发布回执。
+- 精确路由：`scene-validation`、`scene-guide`、`acceptance`、`release`、`evidence`、`receipt`、`profiler`、`unity`。
+- 预期最小命中：本条目；涉及 Builder/Override 时追加 Scene Builder，涉及 UI Fixture 时追加 UI Automation，总量不得超过 3。
+- 邻近误路由：只有 `builder`、`fixture` 或 `backup` 时回退到 Scene Builder。只有通用 `unity` 或 `evidence` 时必须先补充场景上下文，不能直接宣称发布验收。
 
-场景 Builder 是可重建测试 Fixture 的权威来源；生成 `.unity` 只是输出。修改生成场景而不同步 Builder，下一次生成会覆盖修补。覆盖审计要区分：Builder 源码、项目内生成场景、外部临时副本/备份。项目外备份不能作为仓库可复现证据，也不能冒充正式资产。
+## Decision rules
 
-Guide 的 `ConfigureForAuthoring` 是显式编辑器配置入口，工具不应反射私有字段。标准化 Guide 允许不同场景复用诊断语义，但每个场景仍需配置自己的路线、目标和机器可读检查。
+1. 校验本条目、SourceRefs、requiredReads 和证据输入的新鲜度；任一漂移即标记 `stale` 并重新规划。
+2. 先声明目标 acceptance level，再读取 evidence matrix 中该层的 required checks；没有明确层级时停止并请求验收范围。
+3. 只有当前回执包含入口、环境、退出状态、产物、失败项和对应哈希，且 required checks 全部通过、无 blocker，才能输出该层“通过”。
+4. 写 Scene、运行 Unity、Profiler、Player 或发布前，当前用户必须明确点名对应目标或动作；一旦点名即可在该范围直接实施。仅选用受管通道时才要求匹配 AICommand、AIBrain 计划和 TaskContract，缺失只阻断该通道。
+5. 证据入口不可用但静态来源仍有效时标记 `Deferred/runtime-not-run`，不得降级为“基本通过”。
 
-## 证据阶梯
+## Verified facts
 
-静态阅读和哈希只证明“当前文件是什么”；编译证明程序集边界和语法；EditMode 证明纯合同；PlayMode 证明 Unity 生命周期与场景交互；Profiler/目标平台证明性能预算；发布回执证明指定入口、环境、产物和结果被实际执行。低等级证据不能冒充高等级结论。
+- 当前源码定义 `ESSceneValidationGuide` 的显式配置与检查入口；这是源码事实，不是场景已运行事实。
+- AIWarnings 规定 Guide 与场景验收的职责边界；这是 P0 规则，不是 PlayMode 回执。
+- `es-release-acceptance` 及其 evidence matrix/receipt contract 定义验收层级与回执字段；Skill 合同不证明任何一次执行已经发生。
+- 静态文件和哈希只能证明被读取版本；编译、EditMode、PlayMode、Profiler、Player 与发布必须分别由对应当前运行证据证明。
 
-`es-release-acceptance` 要求先确定 acceptance level，再按 evidence matrix 运行对应入口，并把命令/入口、环境、退出状态、关键产物与失败项写入 receipt。验收规则是 required checks 全部有可验证证据且无 blocker；“源码看起来正确”“测试文件存在”“有人曾经截图”都不是有效回执。
+## Common AI failure modes
 
-## 发布非宣称与恢复
+| 错误行为 | 症状与根因 | 预防与替代动作 | 恢复和缺失证据 |
+|---|---|---|---|
+| 把 Guide 全绿写成项目可发布 | 将局部运行状态扩大为全局结论 | 将结论限定到本次场景和已配置检查，再按 evidence matrix 升级 | 撤回发布结论；补 Player/发布回执 |
+| 把测试源码或按钮存在写成已执行 | 把静态存在性当运行事件 | 要求当前 RunRecord、退出状态和产物哈希 | 标记 `runtime-not-run`；执行受权入口 |
+| 用 Editor 结果替代 Player/Profiler | 混淆验收层级 | 每层只接受该层规定的证据 | 降回最后可证明层；补目标平台证据 |
+| receipt 缺字段仍判通过 | 证据无法复现或绑定错误输入 | 验证 receipt contract、PlanHash 和输入哈希 | 判 `Blocked`；生成新计划和新回执 |
+| 场景生成覆盖脏工作区 | 未审计写入范围与恢复路径 | 写前审计 dirty worktree、Owner、取消和回滚 | 停止执行；按记录恢复，不猜测文件归属 |
 
-- Guide 全绿只说明配置的检查在本次场景运行中成立，不代表整个项目可发布。
-- Editor 测试通过不能替代 Player/目标平台；Profiler 预算不能由代码审阅推断。
-- 场景生成或测试会写项目状态时，必须先审计 dirty worktree、精确记录影响范围并保留可恢复路径。
-- receipt 缺字段、SourceRef 漂移或某层证据不可运行时，结论保持“未验收/受阻”，不能降级措辞为“基本通过”。
+## Execution checklist
+
+- 开始前：读取 AIWarnings Start、CurrentStatus、RuleIndex、本条目 requiredReads；校验 SourceRefs/ContentHash；确定验收层级和 Owner。
+- 实施中：绑定稳定场景身份、入口、PlanHash、TaskContract、环境和超时；保留取消、失败、重复执行和恢复路径。
+- 完成后：验证退出状态、必需产物、哈希、失败项和回执新鲜度；逐项对照 required checks。
+- 不可跳过：PlayMode、Profiler、Player 或发布声明必须有对应当前运行证据。
+- 禁止：用文件存在、按钮存在、测试源码存在、旧截图或旧回执冒充执行成功。
+
+## Evidence boundary
+
+Static 可证明当前源码、规则、合同与哈希内容；不能证明 Unity 已编译、Guide 已运行、PlayMode 已通过、Profiler 达标、Player 可用或发布完成。当前未附运行回执时统一报告 `runtime-not-run`。
 
 ## SourceRefs
 
@@ -36,8 +59,8 @@ Guide 的 `ConfigureForAuthoring` 是显式编辑器配置入口，工具不应�
 - `Assets/Plugins/ES/AIWarnings/50_验证与发布（ValidationRelease）/测试场景验收（SceneValidation）/场景构建器权威_覆盖审计与项目内备份分层_AI协作警告.md` (`3bb8490dfdf42399110309ada24f51926fdd6b6894a7373f0ef583ec90c52cbc`)
 - `Documentation/ES_SCENE_VALIDATION_GUIDE_STANDARD.md` (`2debe25a8da6d854270a17304291a600efe587251d9a7f4773b56eaa367d737b`)
 - `Assets/Scripts/ESLogic/Runtime/Developer/Diagnostics/ESSceneValidationGuide.cs` (`f6858785179a66d09857f051ee9fa5c66d8fb9b3123ca4c3c01f6898de02d6d5`)
-- `.agents/skills/es-release-acceptance/SKILL.md` (`3ef346c8be19390311e3c5f6b6feb079b528ee7b191d10d834724435cac8d901`)
+- `.agents/skills/es-release-acceptance/SKILL.md` (`8cc50a64bf90c8c8302836255b7a022f2aa33040fb02065e1d4448755f8b27c6`)
 - `.agents/skills/es-release-acceptance/references/evidence-matrix.md` (`b4e9b8e1c4614adbef1f52c0758e47728253374b4d43bb9c38d7a2b1a23e3d85`)
-- `.agents/skills/es-release-acceptance/references/evidence-receipt-contract.md` (`316be0b6ca77daca05dc4e823043ef5f203f3a821e34c9123e34ed533c2df173`)
+- `.agents/skills/es-release-acceptance/references/evidence-receipt-contract.md` (`6200d8178982010bbdbae30a19b9de92f53ea0ca2fea47aa0ccefa3777fc0d94`)
 
 `EvidenceLevel`: `S1`; `StaleWhen`: Scene Guide、Builder 权威、证据矩阵、receipt 合同或发布入口变化。

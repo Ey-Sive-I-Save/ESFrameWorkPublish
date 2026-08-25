@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.audio-vfx-runtime.v1`  
 `Authority`: `Source + AIWarnings`  
 `RouteKeys`: `audio`, `audio-cue`, `voice`, `vfx`, `variant`, `budget`, `pool`, `resource`, `owner`  
-`ContentHash`: `38850d2f84409a29501f690b2459d5249ec21142fcb36d8b7a9f4eb243110ece`
+`ContentHash`: `6ee1132fdfd415eb33ee7da2401bc14ccbe3d880362653bd1f03ed7b2b7977c3`
 
 ## 定义与运行实例分离
 
@@ -28,6 +28,12 @@ VFXModule 同样使用 Handle、状态、结束原因和失败码；Variant 解�
 - AudioSource/VFX Root 可以池化；定义 ScriptableObject 和稳定 RuntimeData 不进 GameObject Pool。
 - Provider 切换、资源 Scope 释放和 Owner 生命周期都能结束实例，必须保留可观察原因。
 
+`StaleWhen`: Audio/VFX 模块、资源 Provider/Pool、预算合同、AIWarnings 或任一 SourceRef 哈希变化。
+
+## 静态测试证据
+
+`ESAudioCueRuntimeTests.cs` 覆盖 Provider 切换、资源 Owner 结束、Owner 销毁、预算抢占/拒绝、待处理 admission 取消、Handle generation、终态历史和机器可读失败码。当前未发现与 `ESVfxModule` 对等的专门测试文件；因此 VFX 的 Spawn/Despawn、粒子结束判定和 Pool 回收仍是源码静态证据，不能声明 Runtime 已通过。
+
 ## SourceRefs
 
 - `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/音频（Audio）/音频播放与资源边界_AI协作警告.md` (`4c4708f45e7e6c147c5bbd306c4f66604898f82c47edbad04c9d04e3984b80b0`)
@@ -37,5 +43,6 @@ VFXModule 同样使用 Handle、状态、结束原因和失败码；Variant 解�
 - `Assets/Scripts/ESLogic/Runtime/Data/For_Info/InfoType/ESVfxInfo.cs` (`ad2a5bf071d8baf7e6c145e753626b18b2ada52f8dcc200b124314c68ac6c792`)
 - `Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESVfxModule.cs` (`738dd55a48c2b7ce3e01916d11145ba7a2409ca49e577b7ba4d74da1d3b4babf`)
 - `Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/ESVfxAudioEmitter.cs` (`7b949ce87342c8378dc0c64ec3369d40350e94284c3a6d73d7429ce1f41b75b6`)
+- `Assets/Plugins/ES/1_Design/Tests/ESAudioCueRuntimeTests.cs` (`57a234d4b6338f8e5582db52a1fdb547cd222806bbd9798c2e54176df2adcf41`)
 
 `EvidenceLevel`: `S1`; `StaleWhen`: Cue/VFX 定义、资源解析、预算、Handle 或 Owner 结束语义变化。

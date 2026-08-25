@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.state-buff-tag-value-arbitration.v1`  
 `Authority`: `Source + AIWarnings`  
 `RouteKeys`: `state`, `buff`, `tag`, `value-change`, `permit`, `lease`, `camera`, `arbitration`, `lifecycle`  
-`ContentHash`: `bf9ddc59e9326e73e4b551440eca54bf2dbf982c17ad682fd0bda57da8b01a6a`
+`ContentHash`: `588a4149c66d8fceaa100d2e31413bfeadd750fb56c18de69d7a97c4eeec4279`
 
 ## 三种“状态”不能混为一层
 
@@ -35,6 +35,17 @@ BuffFrame 是状态效果的命令缓冲事务：`BeginBuffFrame(owner)` 后声�
 
 Camera、控制、UI Focus、音频 Voice 等“多来源争用单一出口”的系统应使用：稳定 owner/source、priority、generation-safe token、显式结束原因和可观察当前赢家。`ESCameraDirector` 是该模式的领域实例；它不授权其他领域复用 Camera 内部键。Permit 只回答“能否执行”，Arbiter 还要回答“谁是赢家”，两者不能合并。
 
+`StaleWhen`: State/Buff/Tag/ValueChange/Permit 仲裁合同或任一 SourceRef 哈希变化。
+
+## 静态测试证据
+
+当前仓库已有部分失败面测试：
+
+- `ESTagCatalogRuntimeTests.cs` 覆盖稳定 Tag Catalog 解析、未注册 key 拒绝和运行时 key 边界。
+- `ESValueChangeSetTests.cs` 覆盖 stale/foreign token、generation、owner/source 批量释放、优先级仲裁、批处理通知和 HardDisable。
+
+BuffFrame 的提交/回滚/取消仍缺专门测试；本条目不把该部分声明为已运行或已闭合。
+
 ## SourceRefs
 
 - `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/Buff标签与数值（BuffTagValue）/Buff职责边界_被动持续机制_AI协作警告.md` (`6f8518f81bb15330013bf7829237954c2f84f373523c3f149071f11052523f76`)
@@ -46,7 +57,9 @@ Camera、控制、UI Focus、音频 Voice 等“多来源争用单一出口”�
 - `Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/ValueChange/SERVICE_ESFloatValueChangeSet.cs` (`6a00c1c7423aabc16a5f0539262f77f7a5e8dd5dd5c462a6203e4a59afbc7c9b`)
 - `Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/ValueChange/SERVICE_ESPermitSet.cs` (`2f2c243ab4cb12a886fe5ff4324be28aa82b722e8c249955c9b204cb70127bac`)
 - `Assets/Scripts/ESLogic/Runtime/Entity/Entity/Domains/Buff/_EntityBuffDomain.cs` (`95e0ae56541c0410867a8de6f18f67f70eb04ae2b0026d8a0f6a559a40305af4`)
-- `Assets/Scripts/ESLogic/Runtime/State/Core/StateMachine/StateMachine.cs` (`3a12c983d7294fa232702f4d60440605bba89c2af6024b473cf06d4108d2cde7`)
+- `Assets/Scripts/ESLogic/Runtime/State/Core/StateMachine/StateMachine.cs` (`53197774f0c98613af3bec8819dada81a2908e32715a23e032b6fff00507c9a8`)
 - `Assets/Scripts/ESLogic/Runtime/Camera/Core/ESCameraDirector.cs` (`a0b7dffee4d1518c2a1c89e50f9f68dcf2f136f02a63c2642e9039199fd441c9`)
+- `Assets/Plugins/ES/1_Design/Tests/ESTagCatalogRuntimeTests.cs` (`7a7e7ecba2fef233b2d487cd32d52cc4c3530b606fb0732e881e4416810f4c90`)
+- `Assets/Plugins/ES/0_Stand/Tests/ValueChange/ESValueChangeSetTests.cs` (`320f307a37c81dabfccce10310839db035b70717dc21858e0d5952cb6c0238a6`)
 
 `EvidenceLevel`: `S1`; `StaleWhen`: Token/Lease、BuffFrame、State 生命周期或请求仲裁协议变化。

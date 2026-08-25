@@ -1,0 +1,25 @@
+{
+  "skillName": "es-worktree-audit",
+  "case": "candidate-directory-overlap-boundary",
+  "status": "passed",
+  "evidenceLevel": "S1",
+  "receiptPath": "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/evidence/worktree-robustness.receipt.json",
+  "sourceRefs": [
+    ".agents/skills/es-worktree-audit/SKILL.md",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/README.md",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/gamecore-root-runtime-data.md",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/configkey-runtimekey-catalog.md",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/content-registration-transaction.md"
+  ],
+  "sourceRefHashes": {
+    ".agents/skills/es-worktree-audit/SKILL.md": "51f7749d47e21de9abc52a232c114596bb33847fc85bdae9190ab4a3b3188f22",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/README.md": "77ae93e47d7c9b776b60cdfb4e5b7c1b59d76a8fc6c5531b1e1e25c18a6f9e3d",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/gamecore-root-runtime-data.md": "b6ae9df8293551e3e24e716e7ab851eb22cfabb89ee18a7c10ae860b6b1fe1c1",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/configkey-runtimekey-catalog.md": "b717931d2933a73038793a4706e63c1e8519fac8cd56a687b268f525fb87cac3",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/content-registration-transaction.md": "1f881f8b64735c08e6096fc3cc3876708b122e0f7721778b707c7c624fd16ef5"
+  },
+  "toolId": "Get-ESWorktreeImpact.ps1",
+  "unityVersion": "2022.3.45f1",
+  "capturedUtc": "2026-08-23T12:19:31.5956043Z",
+  "planHash": "ef6cbab639f4c8d5c0ae2d5441d1f04f9704d0a5c2d1416fb40bb36669a4c53b"
+}

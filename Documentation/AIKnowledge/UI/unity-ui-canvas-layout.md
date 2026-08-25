@@ -2,7 +2,7 @@
 
 `KnowledgeId`: `es.unity.ui-canvas-layout.v1`  
 `Authority`: `Unity 2022.3 package documentation + package source + project version`  
-`RouteKeys`: `ui`, `ui-unity`, `ui-canvas`, `ui-layout`, `ui-responsive`, `rect-transform`, `canvas-scaler`  
+`RouteKeys`: `ui-automation`, `ui`, `ui-unity`, `ui-canvas`, `ui-layout`, `responsive`, `ui-responsive`, `rect-transform`, `canvas-scaler`
 `ContentHash`: `d9fb346e62ba470b2de600c78a2127d8a16d65d5641b68c73831bb003cf41e89`
 
 ## Scope

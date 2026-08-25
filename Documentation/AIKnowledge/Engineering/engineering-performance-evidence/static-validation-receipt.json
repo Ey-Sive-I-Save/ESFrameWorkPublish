@@ -1,0 +1,110 @@
+{
+  "receiptId": "engineering-performance-evidence-static-curation-20260823",
+  "skillName": "es-ai-knowledge-curation",
+  "case": "engineering-performance-evidence-source-closure",
+  "status": "passed",
+  "evidenceLevel": "S1",
+  "receiptPath": "Documentation/AIKnowledge/Engineering/engineering-performance-evidence/static-validation-receipt.json",
+  "toolId": "codex-static-curation",
+  "unityVersion": "2022.3.45f1",
+  "capturedUtc": "2026-08-23T15:09:25.5554167Z",
+  "timestampUtc": "2026-08-23T15:09:25.5554167Z",
+  "startedAt": "2026-08-23T12:24:04.3897214Z",
+  "finishedAt": "2026-08-23T15:09:25.5554167Z",
+  "actorId": "codex",
+  "planHash": "f1d48da833de1ab3678d3323cf3b7214f1ea40ce9979c7140395e5e4173b76e7",
+  "planHashKind": "deterministic-local-static-plan",
+  "planHashInputs": "knowledge-quality-remediation-v1|entry-sha256|index-sha256|command-sha256",
+  "aibrainPlanHash": null,
+  "commandId": "knowledge.entry.update",
+  "commandPath": "Assets/Plugins/ES/AICommands/受管AIKnowledge更新_AI命令.md",
+  "commandHash": "bb3e567392463be03caa4408ead2251287e8af560967e766a21fd0afc23bc486",
+  "commandDiscoveryStatus": "exact-path-record-verified",
+  "inputsHash": "e9b0d4ed77d583e6d06c8147a3b2f923bc852fffa0fad02833c3e54b0b74a40a",
+  "skillHashes": {
+    "es-ai-knowledge-curation": "11f1a15e704484e47eab55b4e5a38e5cc8ea620c6506e27be58f66a11bf7a742",
+    "es-performance-budgeting": "6739e835db8d04e87d170b6128eacefd5d80d157da4669c2cd50ad2d438bbaa2",
+    "es-observability-evidence": "03125723a7c2e7350394a87626909b2bc71e310cfd18a2e7cc9a5ff4e6d192e5",
+    "es-first-principles-analysis": "ca4a6edcb8b895577fbe45a78c663457bf328811b1b9ab832b58d6deba952e87",
+    "es-use-ai-command": "95992c5695a56c60b3020d0956668616afc8a798a623a216fade8549a7574592"
+  },
+  "sourceRefs": [
+    "Documentation/AIKnowledge/Engineering/engineering-performance-evidence/hot-path-container-performance-evidence-contract.md",
+    "ProjectSettings/ProjectVersion.txt",
+    "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_P0_热路径容器预热与稳态GC边界_AI协作警告.md",
+    "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_核心热路径缺失依赖不判空_AI协作警告.md",
+    "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/对象池（Pool）/对象池预热_Space与0GC_AI协作警告.md",
+    "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/对象池（Pool）/GameObject对象池_GameManager模块_AI协作警告.md",
+    "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md",
+    "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs",
+    "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESGameObjectPoolModule.cs",
+    ".agents/skills/es-performance-budgeting/references/performance-budget-contract.md",
+    ".agents/skills/es-observability-evidence/references/evidence-receipt-contract.md",
+    ".agents/skills/es-ai-knowledge-curation/references/knowledge-entry-contract.md",
+    "Assets/Plugins/ES/AICommands/方案_性能预算与0GC_AI命令.md"
+  ],
+  "sourceRefHashes": {
+    "Documentation/AIKnowledge/Engineering/engineering-performance-evidence/hot-path-container-performance-evidence-contract.md": "c6f8a29ad33c71a0eb4693678680b7ccdd1a98c26d747fd9a36b2e3bf823f9d5",
+    "ProjectSettings/ProjectVersion.txt": "a1141b79efc22ad583133c02da76d77a863533680c77dcd2178d1b8413645a08",
+    "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_P0_热路径容器预热与稳态GC边界_AI协作警告.md": "2f5cbca2bf00645da654a88262a228e60999e0a7af44cc35d7a8a7b8267f7665",
+    "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/运行时性能（RuntimePerformance）/项目最高警告_核心热路径缺失依赖不判空_AI协作警告.md": "02ba0a6d00e9a15ac0d6d4aec2c4689d5652ad284f169742b8c904e1c552440b",
+    "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/对象池（Pool）/对象池预热_Space与0GC_AI协作警告.md": "f88f17a86b2703c968ba19aefafacfc36b79c26c0b20d567dd0e69d10b7c25a3",
+    "Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/对象池（Pool）/GameObject对象池_GameManager模块_AI协作警告.md": "6beb3f9d18ebf505170695a06e52c0065a49c0fd7628a800853bc529f355a633",
+    "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md": "a33c17c739c6394096b8892bd3eb2497ff4f02b2ecd17fd86e14b4d7ce8c3306",
+    "Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs": "e1e0e8f29fcb14600344ae46262d328a53af72c06c2764c5c9c19176b25ce9f3",
+    "Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESGameObjectPoolModule.cs": "e5904b9119fed0902e25bb048a0c24682b4e372c0873e2637785a4355a53fe27",
+    ".agents/skills/es-performance-budgeting/references/performance-budget-contract.md": "d285bec3cfd0d86000bb828353c70b5b8bd26e498437f77dba9dd2568618ed6e",
+    ".agents/skills/es-observability-evidence/references/evidence-receipt-contract.md": "bc4aa4619224223ad566d13473a28ce2a3073aad7f5262c7890bc37b260a5c7f",
+    ".agents/skills/es-ai-knowledge-curation/references/knowledge-entry-contract.md": "9b13200cd6380a87c0f64aa5cc5cc4503628e34093d6a9a3d319b11b8cd5e20e",
+    "Assets/Plugins/ES/AICommands/方案_性能预算与0GC_AI命令.md": "63daa1b9d857252c93f2f84193fd05c29ae3cdd5d09a21f46020d1541b346705"
+  },
+  "externalSourceRefs": {
+    "https://docs.unity3d.com/2022.3/Documentation/Manual/performance-garbage-collection-best-practices.html": "152d29e7dfe38044f672b6cb34167dc96dc36fb3c64590cd721d446f7af3d655",
+    "https://docs.unity3d.com/2022.3/Documentation/ScriptReference/Pool.ObjectPool_1.html": "1e56a3a1498c69ffbad7aaf0c8a3d3f3245bb3610d56984170e63cd14e31d0a8",
+    "https://docs.unity3d.com/2022.3/Documentation/ScriptReference/Unity.Profiling.ProfilerMarker.html": "fe4a70232585e937693f1aa69a3b725ebede33c989c2cae69aa58835fb1823d4",
+    "https://docs.unity3d.com/2022.3/Documentation/ScriptReference/Unity.Profiling.ProfilerRecorder.html": "77f2294a4712d4c866f64c7bec7c3f217068ccb771115b69152d51fe1facab2d"
+  },
+  "outputs": [
+    {
+      "path": "Documentation/AIKnowledge/Engineering/engineering-performance-evidence/hot-path-container-performance-evidence-contract.md",
+      "sha256": "c6f8a29ad33c71a0eb4693678680b7ccdd1a98c26d747fd9a36b2e3bf823f9d5"
+    }
+  ],
+  "evidenceRefs": [
+    "strict-utf8-decode",
+    "required-field-check",
+    "local-source-ref-sha256",
+    "external-official-doc-http-200-and-sha256",
+    "derived-content-hash-replay",
+    "target-directory-boundary"
+  ],
+  "checks": {
+    "routeMinimality": "passed: hot-container keys select the canonical performance entry; the shared release projection no longer owns generic container-performance keys",
+    "sourceClosure": "passed: all declared local SourceRefs exist and hashes match",
+    "staleIndex": "passed for this entry: KnowledgeId, path, route overlap, EvidenceLevel, and ContentHash match the current index binding",
+    "duplicateReadPrevention": "passed: previously captured hashes were reused until a source-drift check",
+    "boundedBatch": "passed: one Knowledge entry and one receipt under the authorized category directory",
+    "utf8": "passed: strict UTF-8 decode, no replacement character or known mojibake marker",
+    "contentHash": "passed: local project SourceRefs replay to e9b0d4ed77d583e6d06c8147a3b2f923bc852fffa0fad02833c3e54b0b74a40a; external official documentation is freshness-bound separately",
+    "deniedExpansion": "passed for bounded targets: modified only the performance entry, its receipt, the shared route projection, and KnowledgeIndex; did not modify source, Git, history, audit, release, Prefab, Scene, or AIBRAIN_ENTRY",
+    "repositoryValidation": "blocked: final Mode All runs reported 14 out-of-batch findings; target entry and shared route projection each passed Mode Entry",
+    "deterministicReplay": "blocked by concurrent input drift: final parallel Mode All runs returned e57f027cd49668365a541223326b9bb2aff1b7cb5d7b60481c7aac3a08759ecf and f18ae2c4a9b47565975097155780fab0a7ded042bae320181b1cbfec144c024a",
+    "runtime": "not-run"
+  },
+  "profile": "StaticReview",
+  "staticStatus": "static-passed",
+  "staticCodeStatus": "not-applicable-documentation-only",
+  "staticContractStatus": "static-partial: exact AICommand verified; target entry passes; full repository validation remains blocked by unrelated SourceRef drift; no AIBrain PlanHash was issued",
+  "staticBoundaryStatus": "static-passed-for-bounded-targets-with-explicit-user-direction",
+  "runtimeStatus": "runtime-not-run",
+  "overallVerdict": "TargetStaticPassedRepositoryStaticBlocked",
+  "claimsNotProven": [
+    "runtime GC allocation",
+    "CPU or memory budget compliance",
+    "Editor, Player, IL2CPP, device, or release acceptance",
+    "formal AIBrain Runtime authorization"
+  ],
+  "failure": null,
+  "recovery": "Recompute all SourceRef hashes and the derived ContentHash after any StaleWhen condition. Obtain a fresh AIBrain plan and Runtime TaskContract before running Unity or Profiler.",
+  "staleWhen": "Any SourceRef/output hash changes, Unity or official documentation version changes, command metadata changes, or the entry is registered in KnowledgeIndex with inconsistent identity/routing/hash."
+}

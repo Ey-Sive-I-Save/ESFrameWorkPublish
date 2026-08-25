@@ -1,0 +1,25 @@
+{
+  "skillName": "es-adversarial-review",
+  "case": "single-model-multi-lens-knowledge-review",
+  "status": "passed",
+  "evidenceLevel": "S1",
+  "receiptPath": "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/evidence/adversarial-review.receipt.json",
+  "sourceRefs": [
+    ".agents/skills/es-adversarial-review/SKILL.md",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/README.md",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/gamecore-root-runtime-data.md",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/configkey-runtimekey-catalog.md",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/content-registration-transaction.md"
+  ],
+  "sourceRefHashes": {
+    ".agents/skills/es-adversarial-review/SKILL.md": "f07a4c2fe5a8f838cb66c3aa4b6a6c1eb6eede52b59556f0c40b0f5eae7cdaca",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/README.md": "06df7d13aea22fe3afc7fe9ba4a4216aedb78b25fe0f426708a6213a4c08b730",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/gamecore-root-runtime-data.md": "89ac01fa239e648b8ce30b263c37bca140f65d1ced96b5187cb1e1a7f93730cf",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/configkey-runtimekey-catalog.md": "bf29779584d8ad4aac6d6beb5581bcd077dfcc7a2e54243fa2c882abd3ded539",
+    "Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/content-registration-transaction.md": "29662e3a665a9f0bb86d933d6e29119e335fd61b0985fdb152c19479347ecbde"
+  },
+  "toolId": "codex-single-model-multi-lens",
+  "unityVersion": "2022.3.45f1",
+  "capturedUtc": "2026-08-23T12:06:36.6081048Z",
+  "planHash": "d68e811e1dbd92714a47bebcfabea087d959f112735e6cd4230de09cb7f2c95c"
+}

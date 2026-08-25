@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.story-world-runtime-authoring.v1`  
 `Authority`: `Source`  
 `RouteKeys`: `story`, `quest`, `dialogue`, `world`, `world-map`, `save`, `catalog`, `authoring`, `content-drift`  
-`ContentHash`: `091b3b21867895ebfd7420ce78df6fe3cf05c3ad9a95ba6ede9eb25586c9f490`
+`ContentHash`: `835a51d816eca9e17d7a9044e83a223d0a89568394c5ada852ed7ad75721ba5e`
 
 ## Story 当前能力是受限切片
 
@@ -33,13 +33,26 @@ ExecutionTicket 记录 expected revision、node visit sequence、action id 和 P
 - World 定义包含 Navigation/Vegetation/Streaming 配置，不等于每个后端都已实现并接入发布。
 - 当前 Story Validator 主动限制长期 Story；知识库不得用规划描述覆盖这个源码事实。
 
+`StaleWhen`: Story/World Catalog、Save、编辑事务、运行时版本或任一 SourceRef 哈希变化。
+
+## 静态测试证据
+
+- `ESStorySliceATests.cs` 覆盖 RuntimeMode lease、Story 图验证、Catalog 候选发布/失败保留、迟到提交和 Save hook 边界。
+- `ESWorldDialogueDataTests.cs` 覆盖重复节点、缺失目标边和 Dialogue placement 边界。
+- `ESWorldEditSessionTests.cs` 覆盖外部基线漂移拒绝、Commit/Rollback、Domain Reload 恢复、多窗口冲突和 Undo/Redo 哈希一致性。
+
+这些是源码与 EditMode 测试绑定；没有运行 Test Runner，因此不声明 Story 全流程或 World 运行时已通过。
+
 ## SourceRefs
 
 - `Assets/Scripts/ESLogic/Runtime/Story/Definitions/ESStoryDefinitionCatalog.cs` (`df7be43d2e524d1c50a2bc3f6ab1c62831e64d6624b1c2d3ab0cf4f84db83231`)
 - `Assets/Scripts/ESLogic/Runtime/Story/Instances/ESStoryRuntimeTypes.cs` (`0a991e9beac9aa4abdd6bdefccc967f9d6af395a529463cc51033b2b7cbfb01e`)
 - `Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESStoryModule.cs` (`900f1edc2c816b2e47e8a28fca08eb47e48c9f28ccbd645df548d190f788c78c`)
-- `Assets/Scripts/ESLogic/Runtime/World/Map/ESWorldMapData.cs` (`106e283f6cc0bc91c8c72fcc30063afa20c3f9329179341b0ed6e0fbdf8c7edd`)
+- `Assets/Scripts/ESLogic/Runtime/World/Map/ESWorldMapData.cs` (`a9ecd0961c53ca9a42105f33b5e160c4a0e8edab62dcf4176e0133083f3655c3`)
 - `Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/ESWorldMapModule.cs` (`da8038b0053e4306ecb1c2167452164be3d9fa7d25278661adad533e42ea8b76`)
 - `Assets/Scripts/ESLogic/Editor/World/ESWorldEditSession.cs` (`8300cd18fd60715d75b5f1f74c7e6d2b023b5e4c59dd36df177cd665a0913f0b`)
+- `Assets/Scripts/ESLogic/Tests/Story/EditMode/ESStorySliceATests.cs` (`94eda09935ba3bb094a606326447c69e986fea88a4e0f31f1221cee72d579202`)
+- `Assets/Scripts/ESLogic/Tests/World/EditMode/ESWorldDialogueDataTests.cs` (`5f2967858401dc695d208a700b74971831a8876fa1aa0ecc7aee270e55913099`)
+- `Assets/Scripts/ESLogic/Editor/World/Tests/ESWorldEditSessionTests.cs` (`87c39f5c2bb6008ccc362cc3b54fb3d61115a4aa43fcc616affaa3f8eb27cf88`)
 
 `EvidenceLevel`: `S1`; `StaleWhen`: Story 切片范围、Catalog/提交防护、Save schema、World 定义/状态或编辑事务变化。

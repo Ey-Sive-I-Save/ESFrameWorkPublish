@@ -6,16 +6,20 @@
 `Authority`: `Derived`
 `RouteKeys`: `feishu`, `lark`, `external-adapter`, `dry-run`
 `EvidenceLevel`: `S1`
-`ContentHash`: `9d807c344b24436c35835ed69f5cad65159b4c40c956ac12288de4fac5d071a1`
+`ContentHash`: `213843683a35870c55805831ca987af5525b29d21deef115d9acdb5892e554ef`
 
 `SourceRefs`:
 
 - `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md` (`a33c17c739c6394096b8892bd3eb2497ff4f02b2ecd17fd86e14b4d7ce8c3306`)
-- `Documentation/ES_AUTOMATION_CENTER_STANDARD.md` (`fc2da7d1f70575744515c6ecbabb878c407ccdeebacd9b4bd39f5da84aea89cf`)
+- `Documentation/ES_AUTOMATION_CENTER_STANDARD.md` (`fda3f8e4408e507fd257bb4093b8e19f83c1374834578639b443b52690280121`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESFeishuReadAutomation.cs` (`98b7c0e8770931785caba92979a59b43c41eb052a528e1ccd55652622e72df12`)
+- `ES/Automation/Workers/Node/Feishu/worker.js` (`16b419b0452b9761e9d8f08acbf1e65ff815d8ac3043773df3e146786a4c887e`)
+- `ES/Automation/Workers/Node/Feishu/package-lock.json` (`f12bad503b40ce56b7dedf47bb7e98846d10dbcf4f00bcd95ed6881f98ed9f40`)
+- `ES/Automation/Workers/Node/Feishu/tests/dry-run-input.json` (`8fd40a68fbc03f0bba0536620f2496069c771f39004801d1c18cdf82a947667f`)
 
 `EvidenceRefs`:
 
-- `Assets/Plugins/ES/Editor/ESAutomation/ESFeishuReadAutomation.cs`（本地 SHA-256：`37aa6c084a1047a00c30975487265cdc24c0141ea64eaed1f323a42559f94a43`）
+- `Assets/Plugins/ES/Editor/ESAutomation/ESFeishuReadAutomation.cs`（本地 SHA-256：`98b7c0e8770931785caba92979a59b43c41eb052a528e1ccd55652622e72df12`）
 - `ES/Automation/Workers/Node/Feishu/worker.js`（本地 SHA-256：`16b419b0452b9761e9d8f08acbf1e65ff815d8ac3043773df3e146786a4c887e`）
 - `ES/Automation/Workers/Node/Feishu/package-lock.json`（本地 SHA-256：`f12bad503b40ce56b7dedf47bb7e98846d10dbcf4f00bcd95ed6881f98ed9f40`）
 - `ES/Automation/Workers/Node/Feishu/tests/dry-run-input.json`（本地 SHA-256：`8fd40a68fbc03f0bba0536620f2496069c771f39004801d1c18cdf82a947667f`）
@@ -31,7 +35,7 @@ knowledge search
 knowledge pull
 ```
 
-第一阶段已实现并仅允许 `auth-status`、`knowledge-search`、`document-pull` 三个只读操作；`knowledge publish` 与 `message send` 仍未开放。计划默认只读；发布、发消息和修改远端知识库必须显式确认。
+第一阶段只读合同仍仅允许 `auth-status`、`knowledge-search`、`document-pull`；它不能发送消息或修改知识。单人纯文本消息已由独立 `es.feishu.message.send@1` L3 合同形成静态实现候选，必须走独立 AICommand、角色许可、DryRun 和一次性授权；真实认证与消息送达仍未验收。`knowledge publish` 继续未开放。
 
 ## ES 接入链
 

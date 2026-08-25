@@ -28,51 +28,31 @@
 
 ## Two-phase execution and capability drift
 
-`planTask` returns an immutable `planHash`. External `runTask` must submit it as `approvedPlanHash`; the coordinator compares the current bindings and rejects stale plans, `NeedsReview` Skills, or Skills without `authorized-only` runtime eligibility before issuing one-time authorization.
+`planTask` returns an immutable `planHash`. External `runTask` must submit it as `approvedPlanHash`; the coordinator compares the current bindings and rejects stale plans, `NeedsReview` Skills, or Skills without `authorized-only` runtime eligibility before issuing an invocation-bound authorization. Policy v5 stores grants in schema 3 under a permanent cross-process lock and atomically persists `Active / Exhausted / Expired` state. The authorization expires after 15 minutes; a trusted in-process host that binds the full request and current user-instruction SHA-256 may receive at most 20 uses for an L1 local plan, L1/L2 `candidate-only` plans receive at most 5, and L3 or other plans 1. Every reusable use requires a fresh non-empty `idempotencyKey`. External Bridge JSON cannot self-assert `userDirected`. The user-enabled local Bridge remains `ManagedAIBrain`, and only the exact `ui.materialize-screen` + `es.ui.materialize-screen@1` + `L2` + `scoped-write` + `MaterializeUI` combination receives an internally request-bound UI runtime exception; all other `not-proven` Skills remain blocked.
 
 The ES host emits bounded capability-drift signals for queue updates and session resume, and polls Catalog, governance, Knowledge-route, and command metadata hashes. A signal contains only a trigger, generation, and metadata fingerprint. It never loads the full Skill portfolio, grants permission, or substitutes for route-scoped comparison and re-planning.
 
-## AIKnowledge 权威质量门禁
+## Knowledge 使用最小规则
 
-本文件是 AIKnowledge 的**发现与使用权威**，不是源码、AIWarnings、AICommand、Skill 或 Unity 运行证据的替代品。任何把 Knowledge 用于项目事实、设计或实现的任务，都必须先通过以下一次性门禁；门禁未通过时只能报告缺口，不能继续基于猜测输出。
+本页只负责发现，不复制各合同的完整规则。使用 Knowledge 时：
 
-### 1. 来源和权威裁决
+1. 从 `KnowledgeIndex.yaml` 按对象、动作、风险和版本选择 1～3 个条目，再读取其 `requiredReads`、正文和 `SourceRefs`；禁止递归加载全库。
+2. SourceRef 缺失、Hash 漂移、索引不一致或 `StaleWhen` 命中时，标记相关条目/计划 `stale` 并回读权威来源。
+3. Knowledge 只能支持其 `Authority`/`EvidenceLevel` 覆盖的结论；静态证据不能声称 Unity、Runtime、Profiler、Player、IL2CPP、视觉、性能或发布已通过。
+4. 一次性读取回执只记录 `selectedKnowledgeIds`、`requiredReads`、来源哈希、`authorityDecision`、`evidenceLevel`、`staleCheck` 和 `nonClaims`；权限和完整证据分别遵循 AGENTS、AICommand/TaskContract 与验证器合同。
+5. 理解过时或 Skill 刷新意图统一路由到 `es-skill-session-refresh`；只做增量哈希与路由筛选，不自动读取全量 Skill。
 
-按以下顺序回读事实，较低层只能导航或补充，不能覆盖较高层：
-
-```text
-当前源码、配置、测试与真实验证回执
-  > Unity 官方文档 / UnityCsReference / 已安装包源码（必须注明当前版本）
-  > AIWarnings P0 与领域规则
-  > AICommand、TaskContract 与 Skill 合同
-  > AIBrain 路由记录
-  > AIKnowledge 条目与索引
-  > 缓存、搜索摘要或模型记忆
-```
-
-Unity、运行时、Profiler、Player、IL2CPP、视觉、性能或发布结论，必须绑定对应的真实证据；静态条目只能说明“源码/文档如此”，不能把 `S1`/`S2` 推断成运行通过。
-
-### 2. 路由、读取和输出门禁
-
-1. 用任务的对象、动作、风险和版本匹配 `KnowledgeIndex.yaml`，最多选择 1～3 个最小条目；禁止为建立上下文递归读取全部 `entries/`。
-2. 先读取命中条目的 `requiredReads`、正文和 `SourceRefs`，再读取对应 AIWarnings、AICommand、Skill、源码和测试。路径越界、缺失或无法读取即 `blocked`。
-3. 每条输出必须能转化为 AI 可执行检查：触发条件、前置读取、允许动作、禁止动作、失败处理/恢复、完成验证和明确 `non-claims`；只有背景摘要而没有决策或检查规则的内容不得作为正式 Knowledge。
-4. 发现多个条目描述同一事实时，只保留一个 canonical 条目；其他条目只能通过共享路由投影引用它，不得复制另一份会漂移的摘要。新增条目前先做 route 探针和重复事实检查。
-5. 没有匹配路由时，回到 AIWarnings Start、CurrentStatus、RuleIndex 与当前权威来源，记录 Knowledge 覆盖缺口；不得用相似条目或缓存替代。
-
-### 3. 新鲜度和证据门禁
-
-正式条目必须同时具备 `KnowledgeId`、`Authority`、`RouteKeys`、`RequiredReads`、`SourceRefs`、`ContentHash`、`EvidenceLevel` 和 `StaleWhen`；有验证或发布事实时还必须具备 `EvidenceRefs`。任一 SourceRef 缺失、SHA-256 漂移、索引绑定不一致、`StaleWhen` 触发或验证器返回 `blocked`，条目及依赖它的旧计划立即标记 `stale`，先回读并重新计算哈希。
-
-静态验证的通过范围只覆盖文本、路径、路由、哈希和合同闭包；`runtime-not-run` 是未取得运行证据的明确状态，不能写成“已验证”“可发布”或“性能达标”。
-
-### 4. 一次性接受回执
-
-使用 Knowledge 前应保留本次门禁的最小回执：`selectedKnowledgeIds`、实际 `requiredReads`、来源哈希快照、`authorityDecision`、`evidenceLevel`、`staleCheck`、`nonClaims` 和验证器结果。回执只证明本次读取和静态判断，不授予源码、Unity、Git、发布或删除权限；来源变化后必须重新接受。
-
-当用户说“你的理解已经过时”“刷新一下技能理解”“重新理解当前项目提供的 Skill”，或表达等价含义时，AIBrain 必须将其识别为 `understanding-drift` / `skill-understanding-refresh` 意图，自动路由到增量刷新能力；用户不需要知道或点名具体 Skill。该意图只触发哈希比较和当前任务路由筛选，不授权全量读取 Skill 正文。
+权威分工：`AGENTS.md` 定义稳定治理边界；`KnowledgeIndex.yaml` 负责知识选择；对应 `SKILL.md`、AIWarnings、AICommand、TaskContract 和 Receipt 负责具体规则与证明。
 
 ## 组件如何找到 AIBrain
+
+### 会话交接意图别名
+
+以下表达都归入 `session + handover` 路由，不要求用户知道 Skill 名称：`交接窗口`、`窗口交接`、`让新 AI 接手`、`交给新窗口`、`准备交接`、`写入 AI 历程`、`保存会话历程`、`handoff`、`handover`、`resume`、`fork`。命中后首选 `es-codex-session-bootstrap`；“理解过时/刷新 Skill”才路由到 `es-skill-session-refresh`。涉及真实新窗口交接时必须使用该 Skill 的 `Complete-ESCodexHandoff.ps1` 编排器，不得直接调用普通 New 入口替代。
+
+所有直接项目 Skill 的中文自然语言别名统一登记在 `.agents/SKILL_ROUTE_ALIASES.zh-CN.json`；使用 `.agents/skills/es-skill-governance/scripts/Test-ESChineseSkillRouteCoverage.ps1` 检查覆盖、孤儿别名和歧义。别名只负责发现，不授予权限。
+
+AI 自发现入口：对用户目标先调用 `.agents/skills/es-skill-governance/scripts/Resolve-ESChineseSkillRoute.ps1` 做中文别名匹配；唯一命中后读取项目内对应 `SKILL.md` 与 `governance.json`。多命中时按对象、动作和风险消歧；无命中时报告 `NoSkillRoute`，回到本页和 `KnowledgeIndex.yaml`，不得猜测或全量扫描。
 
 | 组件 | 固定指针 |
 |---|---|
@@ -91,46 +71,67 @@ Unity、运行时、Profiler、Player、IL2CPP、视觉、性能或发布结论�
 | 治理、规划与 Skill 执行成本 | `aibrain, governance, planning, authority, skill-performance, execution-cost, fast-path, deep-path, cache` | `es-skill-governance`, `es-use-ai-command` |
 | 分析、审查、迁移与变更风险 | `analysis, design, root-cause, review, risk, change-budget, rollback, migration, compatibility` | `es-first-principles-analysis`, `es-adversarial-review`, `es-change-risk-register`, `es-migration-planning` |
 | AIBrain 编排与 Automation 任务路由 | `orchestration, task-routing, automation, task-contract, worker, automation-run-record, agent-execution-graph, aicommand, mcp` | `es-aibrain-route-authoring`, `es-use-ai-command`, `es-automation-worker-authoring`, `es-aicommand-contract-authoring` |
+| AI 用户交互与任务收尾治理 | `interaction, conversation, prompt, objective, verification, uncertainty, next-step, behavior-tree, context-collection, numeric-selection, next-step-dispatch, goal-drift, handover, closeout, evaluation, dialogue-quality` | `es-ai-interaction-governance`, `es-codex-session-bootstrap`, `es-skill-session-refresh` |
+| ES AI 协作菜单与制作/迭代引导 | `menu, collaboration-menu, guidance, creation, iteration, framework-governance, evidence, context-discovery, session-coordination` | `es-ai-collaboration-menu` |
 | Skill 验证与质量门禁 | `skill, validation, security, catalog, evidence, evidence-pending, portfolio, static-replay, deep-replay, deterministic, static-boundary, external-side-effect, blocking-layer` | `es-skill-validator`, `es-skill-creator`, `es-static-deep-replay` |
 | 商业一致性与交付证据 | `commercial-coherence, delivery-tracking, evidence-receipt, report-hash, source-freshness, plan-hash, static-review, runtime-not-run` | `es-skill-governance`, `es-knowledge-validator`, `es-release-acceptance` |
 | 工作树与编码 | `worktree, utf8, validation` | `es-worktree-audit`, `es-utf8-guard` |
-| Unity 编译、MonoBehaviour 生命周期与验收 | `unity, compile, monobehaviour, lifecycle, static-state, domain-reload, scene-reload, enter-play-mode, script-execution-order, execute-always, player, il2cpp, aot, test, release, evidence` | `es-unity-compile`, `es-release-acceptance`, `es-editor-availability-validator` |
+| Unity 编译、MonoBehaviour 生命周期与验收 | `unity, compile, monobehaviour, lifecycle, static-state, domain-reload, scene-reload, enter-play-mode, script-execution-order, player, il2cpp, aot, test, release, evidence, unity-build-identity, artifact-provenance, build-fingerprint, build-input-snapshot, build-output-hash, build-receipt, artifact-freshness, player-provenance, hybridclr-input-hash, build-reproducibility` | `es-unity-compile`, `es-release-acceptance`, `es-editor-availability-validator`, `es-observability-evidence`, `es-worktree-audit` |
+| Unity 编辑态执行与 Prefab Stage | `unity, execute-always, execute-in-edit-mode, edit-mode, prefab-stage, prefab-mode, prefab-auto-save, application-is-playing, playing-world` | `es-editor-tooling`, `es-unity-compile` |
+| 游戏 UI 玩家目标与 IntentSpec | `ui-automation, player-intent, player-goal, intent-spec, primary-action, ui-intent-clarification, business-bridge` | `es-ui-intent-authoring`, `es-ui-prefab-authoring` |
 | 游戏 UI 自动化装配 | `ui-automation, screen-spec-v3, ui-prefab, ui-fixture-scene, ui-layout, responsive, visual-qa, asset-fallback` | `es-ui-prefab-authoring`, `es-unity-compile` |
+| Unity UI AI 防错适配 | `ui-automation, ui-ai-failure-prevention, ui-system-selection, ui-layout, responsive, ui-clipping, ui-interaction, ui-rendering, ui-input, ui-toolkit, visual-evidence, evidence-boundary` | `es-knowledge-creator`, `es-ai-knowledge-curation`, `es-ui-prefab-authoring` |
+| 游戏 UI 外部方案与规范化适配 | `ui-automation, normalized-adapter, canonical-owner, knowledge-deduplication, schema-adapter, ai-error-prevention, open-source-ui, design-to-unity, intermediate-representation, source-map, readiness-report, visual-diff, conformance, ui-flow, known-loss, ui-mcp` | `es-knowledge-creator`, `es-ai-knowledge-curation`, `es-ui-prefab-authoring` |
+| 游戏 UI 屏幕族与信息架构 | `game-ui-screen-family, commercial-ui, hud-ui, inventory-ui, shop-ui, dialogue-ui, map-ui, progression-ui, result-ui, settings-ui, ui-information-architecture` | `es-ui-intent-authoring`, `es-ui-prefab-authoring` |
+| 游戏 UI 视觉设计与 Token | `ui-visual-design, visual-design, design-token, color-role, typography-role, spacing-token, visual-hierarchy, information-density, rarity-visual, ui-material` | `es-ui-prefab-authoring`, `es-editor-tooling` |
+| 游戏 UI 参考图与输入证据 | `ui-reference-evidence, design-evidence, reference-image, reference-provenance, source-region, vision-review, observation-assumption` | `es-ui-prefab-authoring`, `es-knowledge-creator` |
+| 游戏 UI AssetManifest 与素材解析 | `ui-asset-manifest, asset-manifest, asset-provenance, asset-license, asset-fallback, sprite-atlas, crop-policy, asset-resolver` | `es-ui-prefab-authoring`, `es-resource-pipeline`, `es-resource-publish-audit` |
+| 游戏 UI 行为、焦点与导航 | `ui-behavior-spec, behavior-spec, ui-binding, ui-interaction-intent, ui-focus, ui-navigation, input-modality, input-system-ui` | `es-ui-prefab-authoring`, `es-input-action` |
+| 游戏 UI 文本与本地化韧性 | `ui-text-resilience, ui-localization, long-content, text-wrapping, bidi, rtl, glyph-coverage, font-fallback, line-breaking` | `es-ui-prefab-authoring`, `es-editor-tooling` |
 | 测试场景构建与备份权威 | `scene-builder, prefab-override, scene-fixture, scene-layout, scene-backup, backup-manifest` | `es-test-fixture-authoring`, `es-editor-tooling` |
 | 测试场景验收与发布证据 | `scene-validation, scene-guide, acceptance, release, evidence, receipt, profiler, unity` | `es-release-acceptance`, `es-observability-evidence`, `es-worktree-audit` |
 | GameCore 与稳定身份 | `gamecore, config, identity, config-key, runtime-key, catalog, root-so, runtime-data, content-registration` | `es-gamecore-integration`, `es-gamecore-config-authoring`, `es-tag-config` |
 | 资源与发布链 | `resource, asset, manifest, provider, resource-plan, owner-scope, temporary-scope, lease, provider-transition` | `es-resource-pipeline`, `es-resource-publish-audit` |
 | Entity、输入与命令 | `entity, input, input-action, runtime-mode, control, command, runner, runner-tick, lifecycle` | `es-entity-authoring`, `es-entity-prefab-validation`, `es-input-action`, `es-command-authoring` |
 | 运行时生命周期、Pool 与仲裁 | `runtime, lifecycle, generic-life, pool, operation, lease, request, arbitration, commit, executor` | `es-entity-authoring`, `es-performance-budgeting`, `es-test-fixture-authoring` |
-| 热路径容器与性能证据 | `performance, runtime-hot-container, container-warmup, steady-state-gc, capacity-growth, pool, prewarm, profiler, run-record, zero-gc` | `es-performance-budgeting`, `es-observability-evidence`, `es-ai-knowledge-curation` |
+| 热路径、托管分配与内存容量证据 | `performance, runtime-hot-container, container-warmup, steady-state-gc, capacity-growth, pool, prewarm, profiler, run-record, zero-gc, managed-allocation, allocation-static-audit, boxing, closure, delegate, foreach, iterator, yield, async, linq, gc, false-positive, hot-path, memory-budget, resident-memory, capacity-budget, high-water-mark, pool-size, cache-size, trim, retention, memory-profiler, gc-tradeoff` | `es-performance-budgeting`, `es-observability-evidence`, `es-ai-knowledge-curation`, `es-knowledge-validator` |
 | 编辑器、Graph 与 Agent 产物 | `editor, graph, agent-authoring, editor-window, editor-extension, inspector, drawer, dialog, popup, workbench, layout, responsive, high-dpi, single-axis-scroll, owner-lifecycle, reload-domain, undo-dirty, preview-lifecycle, editor-performance, window-production-standard` | `es-editor-tooling`, `es-editor-availability-validator`, `es-generate-agent-artifacts` |
 | Stable Graph V2 作者与烘焙边界 | `graph, stable-graph-v2, graph-identity, graph-undo, graph-migration, edge-order, graph-snapshot, graph-bake, legacy-graph` | `es-stable-graph-authoring`, `es-editor-tooling` |
 | 编辑器正式资产与序列化事务 | `editor, asset-authoring, asset-database, prefab, prefab-override, serialized-object, serialized-property, undo, dirty, save, transaction, scene-builder, backup` | `es-editor-tooling`, `es-api-contract-review`, `es-entity-prefab-validation`, `es-test-fixture-authoring` |
 | Unity 序列化、渲染与图集 | `unity, serialization, asset-guid, local-file-id, serialize-reference, rendering, shader, material, shader-keyword, shader-variant, material-variant, sprite-atlas, ui-canvas, canvas-sorting, ui-batching, draw-call, frame-debugger, srp-batcher, material-property-block, mask, stencil, batch-break` | `es-editor-tooling`, `es-api-contract-review`, `es-performance-budgeting`, `es-observability-evidence`, `es-unity-compile`, `es-release-acceptance` |
 | Fixture 与视觉证据 | `fixture, test-fixture, deterministic, editmode, playmode, screenshot, resolution, visual-qa, visual-evidence, gpu-capture` | `es-test-fixture-authoring`, `es-observability-evidence`, `es-release-acceptance` |
 | 模块审计与会话 | `audit, lifecycle, session, handover` | `es-module-lifecycle`, `es-codex-session-bootstrap` |
+| 跨域协作路由与证据基础设施 | `action, communication, integration, knowledge-search, pipeline, plan, preservation, reload, route, runrecord, screen-family, stable-graph, static-replay, deep-replay` | `es-aibrain-route-authoring`, `es-task-read-snapshot`, `es-observability-evidence`, `es-static-deep-replay`, `es-editor-tooling`, `es-stable-graph-authoring` |
 | 飞书外部协作适配器 | `feishu, lark, external-adapter, dry-run, task-monitor, task-dispatch, task-transition, virtual-team, identity-claim, bot-ownership, onboarding, message-send, notification` | `es-feishu-cli`, `es-use-ai-command`, `es-automation-worker-authoring` |
-| Knowledge 输出、验证与条目治理 | `knowledge, knowledge-quality, knowledge-output, validation, source-ref, content-hash, hash, routing, route-probe, misroute, canonical-entry, dedup, evidence, evidence-boundary, permission-boundary, bounded-output, stale` | `es-knowledge-creator`, `es-knowledge-validator`, `es-ai-knowledge-curation`, `es-aibrain-route-authoring` |
+| Knowledge 输出、验证、维护事务与条目治理 | `knowledge, knowledge-quality, knowledge-output, validation, source-ref, content-hash, hash, routing, route-probe, misroute, canonical-entry, dedup, maintenance-transaction, refresh-plan, stable-refresh, cas, concurrent-update, atomic-projection, recovery, evidence, evidence-boundary, permission-boundary, bounded-output, stale` | `es-knowledge-creator`, `es-knowledge-validator`, `es-ai-knowledge-curation`, `es-aibrain-route-authoring`, `es-worktree-audit`, `es-task-read-snapshot`, `es-utf8-guard` |
 | 任务读取一致性与解析投影基础设施 | `task, read, snapshot, consistency, hash, stale` | `es-task-read-snapshot` |
 | 长运行 AI 会话的 Skill 增量发现与能力刷新 | `skill, session, refresh, capability, delta, stale, routing` | `es-skill-session-refresh`, `es-task-read-snapshot` |
 | Skill 理解刷新与增量能力发现 | `understanding-drift, skill-understanding-refresh, capability-refresh, incremental-discovery` | `es-skill-session-refresh`, `es-task-read-snapshot` |
 | AIWarnings 领域治理 | `aiwarnings, p0, architecture, runtime, editor, validation, handover, archive` | `es-aiwarning-authoring`, `es-aibrain-route-authoring`, `es-ai-knowledge-curation` |
 
-路由歧义收口：`skill-performance`、`execution-cost`、`fast-path`、`deep-path` 和 `cache` 只在任务明确讨论 **Skill 调用、启动或执行流程** 时归入治理功能区。运行时缓存、GC、帧预算或 Unity 性能问题仍按运行时性能和 `$es-performance-budgeting` 路由；AIBrain 不得只因出现 `cache` 一词就改变领域。`consistency` 只表示文件读取基础设施，必须同时出现文件、读取、解析、哈希、清单或投影语义；Graph Bake Snapshot、Story Definition Snapshot 等领域快照不得仅因 `Snapshot` 一词误命中任务读取基础设施。
+### 机器可读 Knowledge 路由探针
 
-目录是导航投影，不授予权限；最终权限仍由 AICommand、TaskContract 和用户授权决定。
+`es.knowledge.routing-quality.v1` 是路由探针的 canonical owner。`Documentation/AIKnowledge/RouteProbeRegistry.json` 是唯一数据集，`ES/Automation/Contracts/es-knowledge-route-probe-registry.schema.json` 是结构合同；其他 Knowledge 只引用，不复制探针事实。
 
-Skill 发现资格还必须读取 `.agents/SKILL_DISCOVERY_POLICY.json`：`candidate` 只能作为能力候选展示，`operational-candidate` 只能进入计划并保持运行证据未证明，只有 `operational` 才能进入正式能力面；任何状态都不能替代 AICommand、TaskContract 或开发者授权。`.agents/SKILL_REGISTRY.manifest.json` 的元数据代际不一致时，AIBrain 必须把相关计划标为 stale 并重新规划。
+- 命令行静态验证：`powershell -NoProfile -File Documentation/AIKnowledge/tools/Test-ESKnowledgeRouteProbeRegistry.ps1 -ProjectRoot <absolute-project-root>`
+- Unity 自然语言推导验证：`ESAIBrainKnowledgeRoutingTests.Plan_RouteProbeRegistry_MatchesFixedCrossDomainExpectations`
+- AI Bridge 只读操作：`runKnowledgeRouteProbes`；`listCapabilities` 通过 `diagnostic.knowledge-route-probes` 发现该能力。
+- `operational-static` 只表示注册、结构、当前索引排名、Top-3、禁止命中、requiredReads 和确定性重放静态闭合；Unity Test Runner 未执行时仍为 `runtime-not-run`。
+- 新领域先向注册表增加唯一 `probeId`，再运行 CLI；涉及自然语言推导变化时还必须运行 Unity 测试消费者。不得在领域 Knowledge 中另建平行探针表。
+
+路由歧义：`cache` 只有在任务明确涉及 Skill 执行/读取基础设施时才进入治理路由；运行时缓存、GC、帧预算仍走性能路由。`Snapshot` 只有同时出现文件读取、解析、哈希、清单或投影语义时才进入一致性路由。
+
+目录和 routeKey 只负责发现，不授予权限。用户指令是动作授权；受管通道另行遵循 `AICommand`、`TaskContract`、`PlanHash` 与 `.agents/SKILL_DISCOVERY_POLICY.json`。Registry 代际漂移只使相关计划 `stale`，不扩大或缩小用户授权。
 
 ## 受治理核心 Skills
 
-以下 Skill 使用 AIBrain 可执行校验的独立权威轴。`project-gate` 是跨项目门禁，`core-governed` 是核心治理流程；二者都必须经过 `planTask`、禁止直接执行，并且不扩大写权限。基础工程 Skill 可以由 AIBrain 按任务形态自动附加，但仍必须经过同样的 Skill、AICommand、TaskContract 和证据门禁。
+以下 Skill 使用 AIBrain 可执行校验的独立权威轴。`project-gate` 是跨项目门禁，`core-governed` 是核心治理流程；二者在 AIBrain 自主/受管通道中必须经过 `planTask` 且禁止无当前用户指令的直启。该元数据不阻止 current-user-direct 工作。基础工程 Skill 可由 AIBrain 自动附加，但只能在当前用户范围和受管通道合同内运行。
 
 - `project-gate`: `es-skill-governance`, `es-use-ai-command`, `es-feishu-cli`, `es-utf8-guard`, `es-release-acceptance`
 - `core-governed`: `es-skill-creator`, `es-worktree-audit`, `es-task-read-snapshot`
 
-它们是高权威门禁/编排能力，不等于拥有源码、Unity、Git 或发布权限。
+这些 Skill 只是高权威门禁/编排入口，不自动获得源码、Unity、Git 或发布权限。
 
 ## 扩展 Skill 族
 
-资源组合索引位于 `.agents/SKILL_RESOURCE_INDEX.yaml`，分类与生命周期快照位于 `.agents/SKILL_CATALOG.yaml`。每个直接 Skill 目录必须有且仅有一条 Catalog 记录；记录包含 family、routeKeys、状态、首次注册、最近修改/复核时间与治理哈希。Catalog 只负责发现和陈列，不授予权限；AIBrain 仍以 AIWarnings、AICommand 和 `governance.json` 为执行门禁。需要脚本或 MCP 时，先读取资源索引、Catalog 和对应合同，再检查连接状态与证据，不把 MCP 可见性当作授权。
+资源组合索引：`.agents/SKILL_RESOURCE_INDEX.yaml`；分类与生命周期：`.agents/SKILL_CATALOG.yaml`。需要脚本或 MCP 时先读索引和对应合同，再检查连接与证据；MCP 可见性不等于授权。

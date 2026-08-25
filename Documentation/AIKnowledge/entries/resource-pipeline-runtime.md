@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.resource-pipeline-runtime.v1`  
 `Authority`: `Source + AIWarnings`  
 `RouteKeys`: `resource`, `asset`, `library`, `manifest`, `provider`, `scope`, `resource-plan`, `bake`, `release`  
-`ContentHash`: `eb0d858cbc35c8a7d166253eb7239a2205745fd3a7b2f9b73dda9184bc31eb46`
+`ContentHash`: `d03d1b310247e4ab951cd6d78a375626406e0de9c6cd3a823d44af0320f27e5f`
 
 ## 权威链
 
@@ -63,6 +63,22 @@ Ready -> ReleaseAwaiting -> Released
 
 Bake 扩展负责依赖收集、ConfigKey 同步、GameCore 展开和 Extension companion。Preview 与 Bake 输出不能被当成 Player 发布证据；发布至少要验证 Manifest/Bundle Index 完整性、目标平台 Player 读取、Scope 生命周期和释放后引用状态。
 
+## Unity 2022.3 版本校准（外部资料未绑定为项目 SourceRef）
+
+以下内容只校准 Unity/AssetBundle API 的外部行为；ESFramework 的 Manifest、RuntimeMap、Provider、Lease
+和回滚合同仍以本条目 SourceRefs 对应的源码、P0 和测试为准：
+
+- Unity 的 AssetBundle Manifest/下载接口可按 bundle Hash、CRC 和依赖关系参与缓存命中与完整性校验；Hash/CRC
+  不匹配时不得把结果标记为 `Ready`，也不能把“文件存在”当作已验证资产。
+- `AssetBundle.LoadAssetAsync` 只表示异步加载 API 语义，不证明 ES Loader、Scope、Lease 或 Provider transition
+  已经正确完成；异步请求完成也不等于资源已正式发布或可安全卸载。
+- Hash/CRC/依赖校验只能作为 ES 下载器的输入门禁，不能替代 Manifest/Bundle Index/RuntimeMap 的版本、平台、
+  owner、generation 和发布来源校验。
+- 外部资料不能证明下载失败、取消、损坏缓存、旧代迟到结果或 Provider 切换已经回滚；这些必须由项目源码、
+  负例/故障注入和真实回执分别证明。
+- 本版本校准来源未保存为项目本地快照，因此长期声明标记为 `external-source-not-bound`；版本或官方 API
+  语义变化时必须重新校准，不能把本节当作项目权威事实。
+
 ## 常见失败
 
 - LocalBuild 没有本地发布入口：阻断，不降级 EditorDirect。
@@ -70,10 +86,12 @@ Bake 扩展负责依赖收集、ConfigKey 同步、GameCore 展开和 Extension 
 - Scope 提前释放：检查 retain 所有者，而不是增加全局常驻引用。
 - ReleaseAwaiting 中重入失败 Plan：必须创建新事务。
 - 运行时依赖 AssetDatabase/Library：分层违规，应补 Bake 产物。
+- `ResourcePlan` Context Dispose 请求取消，不等于底层 Bundle 请求已即时取消；当前 Loader 的合并加载/场景与 Bundle 入口可使用 `CancellationToken.None`，必须等待 pending/收尾回执后才能声明资源已停止加载。
+- 依赖获取侧有循环检测不等于释放侧天然安全；当前 `ReleaseAssetBundleTree` 递归释放未形成与获取侧等价的 cycle guard。RuntimeMap 的依赖环必须在构建/验证阶段阻断，或补释放侧防环，不能凭静态状态机宣称异常依赖已闭合。
 
 ## SourceRefs
 
-- `Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源加载底层_Library只属Editor_Runtime只认ManifestTable_AI协作警告.md` (`dec94e56d35c545c6c0c0676af5e3919b58a2ee84a249db69966f7f8935fc1ce`)
+- `Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源加载底层_Library只属Editor_Runtime只认ManifestTable_AI协作警告.md` (`3690baec342ba8262d9d64bbafdca85e9c43cf63670f3d12470e4307ffc5df43`)
 - `Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/资源运行时与发布（RuntimeAssets）/项目最高警告_资源工具链_四阶段严格隔离_AI协作警告.md` (`98e2336f8e9197051c93eaa3fe774f087463089cc931ffc85f459516e6d48563`)
 - `Assets/Plugins/ES/0_Stand/_Res/Runtime/ESAssetScope.cs` (`d1551ea4cbc8bccefd7f24038548fa2d650b70ffe6815600f7614b9a543d5ade`)
 - `Assets/Plugins/ES/0_Stand/_Res/Runtime/ESRuntimeAssetProviderFactory.cs` (`c63353575fa5f1824cdd4399965efbe47b3b47d0d298f89bf1f9f659f8212ee4`)

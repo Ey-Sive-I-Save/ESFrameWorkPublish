@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-ai-knowledge-curation",
+  "case": "authoritative-source-closure",
+  "status": "passed",
+  "evidenceLevel": "S1",
+  "receiptPath": "Documentation/AIKnowledge/Unity/unity-lifecycle-domain-reload/authoritative-source-verification.receipt.json",
+  "timestampUtc": "2026-08-23T12:32:38.5709347Z",
+  "capturedUtc": "2026-08-23T12:32:38.5709347Z",
+  "toolId": "codex-authoritative-source-verification",
+  "unityVersion": "2022.3.45f1",
+  "planHash": "f836de7414a5de3bf37e9979e2d9de3c398a6fed59efb8d9067f6b08336e18d8",
+  "planHashKind": "launch-task-fingerprint",
+  "runtimeStatus": "not-run",
+  "sourceRefs": [
+    ".agents/skills/es-ai-knowledge-curation/SKILL.md",
+    "ProjectSettings/ProjectVersion.txt",
+    "ProjectSettings/EditorSettings.asset",
+    "Documentation/AIKnowledge/Unity/unity-lifecycle-domain-reload/official-source-lock.md"
+  ],
+  "sourceRefHashes": {
+    ".agents/skills/es-ai-knowledge-curation/SKILL.md": "451e696318c63cdeebc1a76dc00455cab9d3d140b6f169ef50b50ac99ca5907a",
+    "ProjectSettings/ProjectVersion.txt": "a1141b79efc22ad583133c02da76d77a863533680c77dcd2178d1b8413645a08",
+    "ProjectSettings/EditorSettings.asset": "901bf7853e3e65491b8292b0f1e03737e25f578c9dd95e4a8ff6655c19a2d3f4",
+    "Documentation/AIKnowledge/Unity/unity-lifecycle-domain-reload/official-source-lock.md": "428560f7dd4251050f6bb6b77914a6886657648e09952c4823dcdf0d9f0ed25e"
+  },
+  "authoritativeSources": [
+    {
+      "id": "unity-manual-execution-order",
+      "authority": "Unity official manual 2022.3",
+      "uri": "https://docs.unity3d.com/2022.3/Documentation/Manual/ExecutionOrder.html",
+      "httpStatus": 200,
+      "utf8ContentSha256": "1522acc3a2425b9434eb84db26f5a6a1829fa8825cda00002f401cf5f4257e13",
+      "hashMatchedSourceLock": true
+    },
+    {
+      "id": "unity-manual-domain-reloading",
+      "authority": "Unity official manual 2022.3",
+      "uri": "https://docs.unity3d.com/2022.3/Documentation/Manual/DomainReloading.html",
+      "httpStatus": 200,
+      "utf8ContentSha256": "7313d20cee0b2ccbe78484a93fbaffa9daec1ce2acf925409cc2fd3c6262c1df",
+      "hashMatchedSourceLock": true
+    },
+    {
+      "id": "unity-manual-configurable-enter-play-mode",
+      "authority": "Unity official manual 2022.3",
+      "uri": "https://docs.unity3d.com/2022.3/Documentation/Manual/ConfigurableEnterPlayMode.html",
+      "httpStatus": 200,
+      "utf8ContentSha256": "c3b82130e000bc0ee89d79e935c9d595232bc221f6f44a1db2be2fb0c2795245",
+      "hashMatchedSourceLock": true
+    },
+    {
+      "id": "unity-manual-scene-reloading",
+      "authority": "Unity official manual 2022.3",
+      "uri": "https://docs.unity3d.com/2022.3/Documentation/Manual/SceneReloading.html",
+      "httpStatus": 200,
+      "utf8ContentSha256": "bf199b6437d7266f68dc5d229b15186071af8bb16d988b34db58c1b1bbcbdfda",
+      "hashMatchedSourceLock": true
+    },
+    {
+      "id": "unity-manual-script-execution-order",
+      "authority": "Unity official manual 2022.3",
+      "uri": "https://docs.unity3d.com/2022.3/Documentation/Manual/class-MonoManager.html",
+      "httpStatus": 200,
+      "utf8ContentSha256": "e25ce76b5787e7b378ce0400c6f4b84f08540ce485221efca2f5dbb2fb203dac",
+      "hashMatchedSourceLock": true
+    },
+    {
+      "id": "unity-core-api-xml",
+      "authority": "Installed Unity 2022.3.45f1 API documentation",
+      "path": "D:\\UnityEdi\\2022.3.45f1\\Editor\\Data\\Managed\\UnityEngine\\UnityEngine.CoreModule.xml",
+      "sha256": "ce120ca131e9d371794fa1d453bdd97d8ed3d39dee97c40f8467f7cac2b1bbce",
+      "hashMatchedSourceLock": true
+    },
+    {
+      "id": "unity-editor-api-xml",
+      "authority": "Installed Unity 2022.3.45f1 API documentation",
+      "path": "D:\\UnityEdi\\2022.3.45f1\\Editor\\Data\\Managed\\UnityEditor.xml",
+      "sha256": "85c417af947171f08ec139c80231e896102d3ea09f086b1b91bf2d0b20e60020",
+      "hashMatchedSourceLock": true
+    },
+    {
+      "id": "project-version",
+      "authority": "Current project setting",
+      "path": "ProjectSettings/ProjectVersion.txt",
+      "sha256": "a1141b79efc22ad583133c02da76d77a863533680c77dcd2178d1b8413645a08"
+    },
+    {
+      "id": "project-editor-settings",
+      "authority": "Current project setting",
+      "path": "ProjectSettings/EditorSettings.asset",
+      "sha256": "901bf7853e3e65491b8292b0f1e03737e25f578c9dd95e4a8ff6655c19a2d3f4"
+    }
+  ],
+  "verifiedClaims": [
+    {
+      "claimId": "lifecycle-awake-onenable-start",
+      "sourceId": "unity-manual-execution-order",
+      "verbatimExcerpt": "Awake: First lifecycle function called when a new instance of an object is created. Always called before any Start functions. If a GameObject is inactive during start up, Awake is not called until it is made active."
+    },
+    {
+      "claimId": "lifecycle-cross-object-order",
+      "sourceId": "unity-manual-execution-order",
+      "verbatimExcerpt": "Awake is only guaranteed to be called before OnEnable in the scope of each individual object. Across multiple objects the order is not deterministic and you can’t rely on one object’s Awake being called before another object’s OnEnable."
+    },
+    {
+      "claimId": "lifecycle-use-start-after-scene-awake",
+      "sourceId": "unity-manual-execution-order",
+      "verbatimExcerpt": "Any work that depends on Awake having been called for all objects in the scene should be done in Start."
+    },
+    {
+      "claimId": "domain-reload-default-reset",
+      "sourceId": "unity-manual-domain-reloading",
+      "verbatimExcerpt": "Domain Reloading resets your scripting state, and is enabled by default. It provides you with a completely fresh scripting state, and resets all static fields and registered handlers each time you enter Play Mode."
+    },
+    {
+      "claimId": "domain-reload-disabled-static-state",
+      "sourceId": "unity-manual-domain-reloading",
+      "verbatimExcerpt": "When Domain Reloading is disabled, the values of static fields in your code do not automatically reset to their original values. You need to add code that explicitly does this."
+    },
+    {
+      "claimId": "domain-reload-subsystem-registration",
+      "sourceId": "unity-manual-domain-reloading",
+      "verbatimExcerpt": "For runtime scripts, you must use the [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)] attribute to reset static fields and event handlers."
+    },
+    {
+      "claimId": "enter-play-mode-two-actions",
+      "sourceId": "unity-manual-configurable-enter-play-mode",
+      "verbatimExcerpt": "It resets the scripting state (this is also called a “Domain Reload”) It reloads the Scene"
+    },
+    {
+      "claimId": "scene-reload-callbacks",
+      "sourceId": "unity-manual-scene-reloading",
+      "verbatimExcerpt": "Unity still calls the same initialization functions (such as OnEnable, OnDisable and OnDestroy) as if it were freshly loaded."
+    },
+    {
+      "claimId": "script-order-per-event-category",
+      "sourceId": "unity-manual-script-execution-order",
+      "verbatimExcerpt": "The order applies to each category of event function separately"
+    },
+    {
+      "claimId": "runtime-initialization-not-orderable",
+      "sourceId": "unity-manual-script-execution-order",
+      "verbatimExcerpt": "The execution order specified in this settings window does not affect the order of functions marked with the RuntimeInitializeOnLoadMethod attribute. (You cannot specify an order for runtime initialization.)"
+    },
+    {
+      "claimId": "default-execution-order-api",
+      "sourceId": "unity-core-api-xml",
+      "verbatimExcerpt": "Specifies the script execution order for a MonoBehaviour-derived class relative to other MonoBehaviour-derived types."
+    },
+    {
+      "claimId": "subsystem-registration-api",
+      "sourceId": "unity-core-api-xml",
+      "verbatimExcerpt": "Callback invoked when starting up the runtime. Called before the first scene is loaded."
+    },
+    {
+      "claimId": "disable-domain-reload-api",
+      "sourceId": "unity-editor-api-xml",
+      "verbatimExcerpt": "When Domain Reload is disabled, scripts are not reloaded when entering Play Mode."
+    },
+    {
+      "claimId": "project-enter-play-mode-disabled",
+      "sourceId": "project-editor-settings",
+      "verbatimExcerpt": "m_EnterPlayModeOptionsEnabled: 0"
+    }
+  ],
+  "derivedGuidanceBoundary": "Recommendations about explicit coordinators, idempotent ownership cleanup, stable-key ordering, and the four-case test matrix are engineering guidance derived from the verified Unity mechanisms; they are not represented as verbatim Unity requirements.",
+  "nonClaims": [
+    "No Unity Editor or PlayMode execution was performed.",
+    "No ESFramework runtime type was proven Domain Reload safe.",
+    "No Player, IL2CPP, Profiler, or release acceptance was performed."
+  ]
+}

@@ -2,7 +2,7 @@
 
 `KnowledgeId`: `es.unity.ui-layout-clipping.v1`  
 `Authority`: `Unity 2022.3 UGUI package documentation + package source`  
-`RouteKeys`: `ui`, `ui-unity`, `ui-layout`, `ui-clipping`, `ui-responsive`, `scroll-rect`  
+`RouteKeys`: `ui-automation`, `ui`, `ui-unity`, `ui-layout`, `responsive`, `ui-responsive`, `ui-clipping`, `scroll-rect`
 `ContentHash`: `6755927e1fc9f018a08d690ca1fbd35aee13b2d0308ba955cd10323c140e6d47`
 
 ## Scope

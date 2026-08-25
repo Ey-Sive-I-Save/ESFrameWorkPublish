@@ -6,16 +6,28 @@
 `Authority`: `Source + Skill contract`
 `EvidenceLevel`: `S2`
 `RouteKeys`: `task`, `read`, `snapshot`, `cache`, `hash`, `stale`, `consistency`, `parser`, `projection`, `binary`
-`ContentHash`: `7c793cc10b7b88aa4938d56777ab01ae725bb00812d5fad7c5091a8030dcba95`
+`ContentHash`: `ea5d8854f9316d8c5249680456c7f9d51f567b4a65c3bf909bae03cd6c2580cf`
 `StaleWhen`: AIBrain 目标分类、Task Read Snapshot 合同、Parser Registry、ProjectionPacket 或缓存键/失效规则变化。
 
 `SourceRefs`:
 
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`9735b55bf6b2df8758050f2b84b053aabc0438ddf633c3c61ba43e4d684349d9`)
-- `.agents/skills/es-task-read-snapshot/SKILL.md` (`2aba9af6d3adf5d3437ab6afd893dbe2dd5fc909c5b8b3bd23864c1f43b60cea`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`edc33e609c4fefd2dbaf832043dade36e7ca07beedab1db09703947fa7cb9a19`)
+- `.agents/skills/es-task-read-snapshot/SKILL.md` (`16702d156f3ee81bb11925c5f0ef4a8bb8f532eb500e8fdf0908f6241b0e79f5`)
 - `.agents/skills/es-task-read-snapshot/governance.json` (`024fe8412bcf7f570d8de08c214c6fc7ea32e4cb7ec58a410ba20ac01f94f29a`)
 - `.agents/skills/es-task-read-snapshot/references/task-read-snapshot-contract.md` (`b19ddfcf4ecb2eeb9af82a5b2ae6a844ca636ee26ccf83995d1f33f216cf348f`)
 - `ES/Output/FileProjectionParsers.json` (`e70211e6c84af94ada6f844009da3c7bd45fb95575a8726b34c3345382a3d817`)
+- `.agents/skills/es-task-read-snapshot/agents/openai.yaml` (`7e296be26b8a4eecc9c77845ffa7ce5a59e70c4a23ef4335f3ee499c64e00f22`)
+- `.agents/skills/es-task-read-snapshot/static-replay.manifest.json` (`727d5e0569f479beb7ac9232067a7daf0cea82f2e972da1a680d17d25734f897`)
+- `.agents/skills/es-task-read-snapshot/references/evidence-receipt-contract.md` (`573ae3290ef250f3f3aebda0f39547f4fa3b200cca05ed0e1c562c530d50ee6f`)
+- `.agents/skills/es-task-read-snapshot/references/static-replay-adapter.md` (`87357b36d77934aeded6d121043a841dea3ba72d41c7968d313dfee822643ad2`)
+- `.agents/skills/es-task-read-snapshot/references/static-specialized-acceptance.md` (`07c826ccb94bfe19e5fe26c2fc90a0cc78ed5628499f9700381a44f379d41bb7`)
+- `.agents/skills/es-task-read-snapshot/scripts/Invoke-ESProjectionCache.ps1` (`fec6f8816a6b91ada7b36a8b2e1357d86c977d29a627bacadf33b602c55311f7`)
+- `.agents/skills/es-task-read-snapshot/scripts/Invoke-ESProjectionPipeline.ps1` (`2bec9e597b5febcbf6661157ecd80fd7736fc57b6d1c2e637ae96f7c65bc485d`)
+- `.agents/skills/es-task-read-snapshot/scripts/Invoke-ESTaskReadSnapshot.ps1` (`45a1b72d9976e0a72badf33c44cbe74eda2f98552dce89ee6d082dc630c2dff7`)
+- `.agents/skills/es-task-read-snapshot/scripts/Test-es-task-read-snapshot-StaticReplay.ps1` (`f8c34f26b5842ba5e03ad064d27f8c39e08006f5a3cff86de55fa9330ecef06f`)
+- `.agents/skills/es-task-read-snapshot/scripts/Test-ESProjectionPacket.ps1` (`2fa0b8fa1dcb81b72756e62a301728883765ef9ab4d8677b4fda752975cbc863`)
+- `.agents/skills/es-task-read-snapshot/scripts/Test-ESProjectionRegistry.ps1` (`716901938f6469705e52ca64922af17062160916ea2932a8f1e71962266aeb7f`)
+- `.agents/skills/es-task-read-snapshot/scripts/Test-ESSkillEvidence.ps1` (`517812931891e035004f5807932a277cb50538ea60f2ccf81ff7d929fb377909`)
 
 `EvidenceRefs`: Skill S2 receipts、Parser Registry/ProjectionPacket 静态验证和 Portfolio 结果；尚无 Unity Editor 中 `planTask` 自动分类回放证据。
 

@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.runtime-ui-window-current-state.v1`  
 `Authority`: `Source + AIWarnings reconciliation`  
 `RouteKeys`: `runtime-ui-window`, `ui-root`, `window`, `lease`, `layer`, `focus`, `pool-on-close`, `resource-scope`  
-`ContentHash`: `aea241636d1583fd89fd8223636a45692f37aa1a63936c177c55b8ba737f1609`
+`ContentHash`: `229c18ba7edae4ed146f7ecfe0b137a5b3168aa0d5b4c147ca3489849139e7a2`
 
 ## 重要差异
 
@@ -34,9 +34,11 @@ Open 先验证 Root 注册和 Catalog，再在对应 Layer lane 的 Semaphore �
 
 下一步治理动作应是运行目标测试/场景验收，明确 owner 与 release evidence，再决定把 route 从 reserved 升为 current 或维持 implementing。
 
+`StaleWhen`: UI Window Catalog、Lease、Layer、Pool 生命周期、RuleIndex 或任一 SourceRef 哈希变化。
+
 ## SourceRefs
 
-- `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md` (`c5359cb022ebc2902c4400ad44429da36d1a2dcfa44803586f8f91aaca0d704f`)
+- `Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md` (`89c647f286f3ff648cc7c3fd7dd0646e1f36c5ded4963b9a5a598d7611ba0a59`)
 - `Assets/Scripts/ESLogic/Runtime/UI/Window/ESUIWindowDefinition.cs` (`384906164f510db5a2bf7d0d7db2dfd965914409f2daba6075fd346806eb8703`)
 - `Assets/Scripts/ESLogic/Runtime/UI/Window/ESUIWindowCatalog.cs` (`b279d9f901e0329acd873aad5ed86d5d962f0015574d856840e97aacfe0ee86e`)
 - `Assets/Scripts/ESLogic/Runtime/UI/Window/ESUIRootCoordinator.cs` (`ef6541e2d52bbc402b30792775c8af6d77678050e3e6f219540fbafa79d581c9`)

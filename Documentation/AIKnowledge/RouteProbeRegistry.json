@@ -1,0 +1,1216 @@
+{
+  "$schema": "../../ES/Automation/Contracts/es-knowledge-route-probe-registry.schema.json",
+  "schemaVersion": 1,
+  "registryId": "esframework-knowledge-route-probes",
+  "lifecycleState": "operational-static",
+  "ownerKnowledgeId": "es.knowledge.routing-quality.v1",
+  "rankingVersion": "per-route-best-top3-v1",
+  "knowledgeIndexPath": "Documentation/AIKnowledge/KnowledgeIndex.yaml",
+  "consumers": {
+    "cliValidator": "Documentation/AIKnowledge/tools/Test-ESKnowledgeRouteProbeRegistry.ps1",
+    "unityTestSource": "Assets/Plugins/ES/1_Design/Tests/ESAIBrainKnowledgeRoutingTests.cs",
+    "unityTestMethod": "Plan_RouteProbeRegistry_MatchesFixedCrossDomainExpectations",
+    "bridgeOperation": "runKnowledgeRouteProbes",
+    "productionSurfaceId": "diagnostic.knowledge-route-probes"
+  },
+  "probes": [
+    {
+      "probeId": "stable-graph-identity",
+      "domain": "stable-graph",
+      "objective": "给 Stable Graph V2 新增节点时如何保持稳定身份",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["graph", "stable-graph-v2", "graph-identity"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.stable-graph-v2.v1",
+          "requiredReads": [
+            "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/GraphView与NodeRunner_数据权威稳定身份与重构门禁_AI协作警告.md",
+            "Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.engineering.task-read-snapshot.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "graph-task-contract-collision",
+      "domain": "automation-graph",
+      "objective": "TaskContract 未命中时 Graph SkillCall 能否执行",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["agent-execution-graph", "task-contract"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.automation-aibrain-graph.v1",
+          "requiredReads": [
+            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md",
+            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.stable-graph-v2.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "unity-monobehaviour-lifecycle",
+      "domain": "unity-lifecycle",
+      "objective": "MonoBehaviour 的 Awake、OnEnable、Start 到底怎么排？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "monobehaviour", "lifecycle"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.lifecycle-domain-reload.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-lifecycle-domain-reload/unity-lifecycle-domain-reload.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": [
+        "es.function-area.lifecycle.v1",
+        "es.unity.serialization-prefab-identity.v1",
+        "es.project.runtime-lifecycle-pool-arbitration.v1"
+      ],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "execute-always-edit-initialization",
+      "domain": "unity-edit-mode",
+      "objective": "ExecuteAlways 的 OnEnable 在编辑态能直接跑游戏初始化吗？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "execute-always", "edit-mode"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.execute-always-prefab-stage.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-execute-always-prefab-stage/unity-execute-always-prefab-stage.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.lifecycle-domain-reload.v1", "es.function-area.lifecycle.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "execute-always-prefab-mutation",
+      "domain": "unity-edit-mode",
+      "objective": "ExecuteAlways 脚本为什么在 Prefab Stage 中改坏了预制体？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "execute-always", "edit-mode", "prefab-stage", "prefab-mode"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.execute-always-prefab-stage.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-execute-always-prefab-stage/unity-execute-always-prefab-stage.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.lifecycle-domain-reload.v1", "es.unity.serialization-prefab-identity.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "prefab-mode-global-play-state",
+      "domain": "unity-edit-mode",
+      "objective": "Prefab Mode 中只检查 Application.isPlaying 安全吗？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "prefab-stage", "prefab-mode", "application-is-playing", "playing-world"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.execute-always-prefab-stage.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-execute-always-prefab-stage/unity-execute-always-prefab-stage.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.function-area.release.v1", "es.unity.serialization-prefab-identity.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "object-playing-world-boundary",
+      "domain": "unity-edit-mode",
+      "objective": "Application.IsPlaying(gameObject) 和 Application.isPlaying 有什么边界？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "application-is-playing", "playing-world"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.execute-always-prefab-stage.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-execute-always-prefab-stage/unity-execute-always-prefab-stage.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.lifecycle-domain-reload.v1", "es.function-area.release.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "execute-in-edit-mode-prefab-mode",
+      "domain": "unity-edit-mode",
+      "objective": "ExecuteInEditMode 组件进入 Prefab Mode 时应该怎么办？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "execute-in-edit-mode", "edit-mode", "prefab-stage", "prefab-mode"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.execute-always-prefab-stage.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-execute-always-prefab-stage/unity-execute-always-prefab-stage.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.lifecycle-domain-reload.v1", "es.function-area.lifecycle.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "prefab-stage-mode-boundary",
+      "domain": "unity-edit-mode",
+      "objective": "Prefab Stage 的 isolation 和 in context 能当普通场景吗？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "prefab-stage", "prefab-mode"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.execute-always-prefab-stage.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-execute-always-prefab-stage/unity-execute-always-prefab-stage.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.serialization-prefab-identity.v1", "es.unity.editor-prefab-asset-transaction.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "execute-always-update-cadence",
+      "domain": "unity-edit-mode",
+      "objective": "ExecuteAlways 的 Update 为什么没有每个编辑器帧都调用？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "execute-always", "edit-mode"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.execute-always-prefab-stage.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-execute-always-prefab-stage/unity-execute-always-prefab-stage.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.lifecycle-domain-reload.v1", "es.engineering.hot-path-container-performance-evidence.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "execute-always-shared-material",
+      "domain": "unity-edit-mode",
+      "objective": "ExecuteAlways 能否在编辑态直接修改共享 Material？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "execute-always", "edit-mode"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.execute-always-prefab-stage.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-execute-always-prefab-stage/unity-execute-always-prefab-stage.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.rendering-material-atlas.v1", "es.unity.lifecycle-domain-reload.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "prefab-auto-save-recovery",
+      "domain": "unity-edit-mode",
+      "objective": "Prefab Auto Save 开启时脚本自动改值怎么恢复？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "prefab-stage", "prefab-mode", "prefab-auto-save"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.execute-always-prefab-stage.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-execute-always-prefab-stage/unity-execute-always-prefab-stage.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.serialization-prefab-identity.v1", "es.unity.editor-prefab-asset-transaction.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "prefab-object-playing-world",
+      "domain": "unity-edit-mode",
+      "objective": "预制体模式下的对象是否属于 playing world？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "prefab-stage", "prefab-mode", "application-is-playing", "playing-world"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.execute-always-prefab-stage.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-execute-always-prefab-stage/unity-execute-always-prefab-stage.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.lifecycle-domain-reload.v1", "es.function-area.release.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "editor-window-domain-reload",
+      "domain": "editor-window",
+      "objective": "EditorWindow 在 ReloadDomain 后怎样恢复 owner 和 SessionState？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "domain-reload", "editor", "editor-window", "owner-lifecycle"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.editor-window-lifecycle-menu.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Editor/project-editor-asset-authoring/editor-window-lifecycle-menu.md"]
+        },
+        {
+          "knowledgeId": "es.engineering.editor-availability-validation.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/editor-availability-validation.md",
+            ".agents/skills/es-editor-availability-validator/SKILL.md",
+            ".agents/skills/es-editor-availability-validator/governance.json",
+            ".agents/skills/es-editor-availability-validator/references/availability-matrix.md",
+            ".agents/skills/es-editor-availability-validator/references/editor-rule-registry.json",
+            ".agents/skills/es-editor-tooling/SKILL.md",
+            "Documentation/ES_EDITOR_WINDOW_PRODUCTION_STANDARD.md",
+            "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md"
+          ]
+        },
+        {
+          "knowledgeId": "es.unity.lifecycle-domain-reload.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-lifecycle-domain-reload/unity-lifecycle-domain-reload.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.scene-release-evidence.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "scene-builder-authority",
+      "domain": "scene-builder",
+      "objective": "请重建测试场景并保持 Builder 为权威",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["scene-builder"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.editor.project-scene-builder-authority.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Editor/project-scene-builder-authority/scene-builder-prefab-fixture-backup-authority.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.ui-automation-authoring.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "scene-release-receipt",
+      "domain": "scene-release",
+      "objective": "为测试场景生成包含失败项的发布回执",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["scene-validation", "release", "evidence", "receipt"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.scene-release-evidence.v1",
+          "requiredReads": ["Documentation/AIKnowledge/entries/scene-release-evidence.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.function-area.release.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-screenspec-visual",
+      "domain": "ui-automation",
+      "objective": "根据截图生成 ScreenSpec v3 游戏 UI",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-automation", "screen-spec-v3", "visual-qa"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.ui-automation-authoring.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/ui-automation-authoring.md",
+            ".agents/skills/es-ui-prefab-authoring/SKILL.md",
+            ".agents/skills/es-ui-intent-authoring/SKILL.md",
+            ".agents/skills/es-ui-intent-authoring/references/intent-spec.contract.md",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.editor.project-scene-builder-authority.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-inventory-screen-family",
+      "domain": "ui-screen-family",
+      "objective": "背包界面应该使用哪个屏幕族？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-automation", "game-ui-screen-family", "commercial-ui", "ui-information-architecture", "inventory-ui"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.game-ui-screen-family-decisions.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/game-ui-screen-family-decisions.md",
+            "Documentation/AIKnowledge/entries/ui-automation-authoring.md",
+            "Documentation/AIKnowledge/Editor/project-screen-spec-materializer/screen-spec-component-registration.md",
+            "Documentation/AIKnowledge/UI/unity-ui-canvas-layout.md",
+            "Documentation/AIKnowledge/UI/unity-ui-interaction-rendering.md",
+            "Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md",
+            ".agents/skills/es-ui-intent-authoring/SKILL.md",
+            ".agents/skills/es-ui-intent-authoring/references/intent-spec.contract.md",
+            ".agents/skills/es-ui-intent-authoring/references/player-intent-registry.json",
+            ".agents/skills/es-ui-prefab-authoring/SKILL.md",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md",
+            ".agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py",
+            ".agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py",
+            "Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.editor.project-scene-builder-authority.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-player-intent-equip",
+      "domain": "ui-player-intent",
+      "objective": "把玩家在背包中装备物品的目标转换成 IntentSpec UI 计划",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-automation", "player-intent", "player-goal", "intent-spec", "primary-action"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.game-ui-player-intent-spec.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/game-ui-player-intent-spec.md",
+            ".agents/skills/es-ui-intent-authoring/SKILL.md",
+            ".agents/skills/es-ui-intent-authoring/references/intent-spec.contract.md",
+            ".agents/skills/es-ui-intent-authoring/references/player-intent-registry.json",
+            ".agents/skills/es-ui-intent-authoring/scripts/validate_intent_spec.py",
+            ".agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.runtime-ui-window-current-state.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-typography-fallback",
+      "domain": "ui-visual-design",
+      "objective": "游戏界面字体与 Fallback 应该怎样绑定？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-automation", "ui-text-resilience", "ui-localization", "long-content", "text-wrapping", "bidi", "rtl", "glyph-coverage", "font-fallback", "line-breaking", "ui-visual-design", "visual-design", "typography-role"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.game-ui-text-localization-resilience.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/game-ui-text-localization-resilience.md",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json",
+            ".agents/skills/es-ui-prefab-authoring/references/ai-visual-brief.md",
+            ".agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py",
+            ".agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py",
+            "Assets/Scripts/ESLogic/Editor/UI/ESUIScreenSpecAdapter.cs",
+            "Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs",
+            "Documentation/ES_UI_AUTHORING_WORKFLOW.md",
+            "Packages/manifest.json",
+            "Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md"
+          ]
+        },
+        {
+          "knowledgeId": "es.project.game-ui-visual-design-system.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/game-ui-visual-design-system.md",
+            "Documentation/AIKnowledge/entries/ui-automation-authoring.md",
+            "Documentation/AIKnowledge/Editor/project-screen-spec-materializer/screen-spec-component-registration.md",
+            "Documentation/AIKnowledge/Editor/project-screen-spec-materializer/visual-evidence-boundary.md",
+            "Documentation/AIKnowledge/UI/unity-ui-canvas-layout.md",
+            "Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md",
+            ".agents/skills/es-ui-prefab-authoring/SKILL.md",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json",
+            ".agents/skills/es-ui-prefab-authoring/references/ai-visual-brief.md",
+            ".agents/skills/es-ui-prefab-authoring/references/commercial-ui-patterns.md",
+            ".agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py",
+            ".agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py",
+            "Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs",
+            "Documentation/ES_UI_AUTHORING_WORKFLOW.md",
+            "Packages/manifest.json"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.rendering-material-atlas.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-source-inspection-not-player-intent",
+      "domain": "ui-player-intent-negative",
+      "objective": "检查背包代码",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": [],
+      "expectedKnowledgeTop3": [],
+      "forbiddenKnowledgeIds": [
+        "es.project.game-ui-player-intent-spec.v1",
+        "es.project.game-ui-reference-design-evidence.v1",
+        "es.project.game-ui-asset-manifest.v1",
+        "es.project.game-ui-behavior-focus-navigation.v1",
+        "es.project.game-ui-text-localization-resilience.v1",
+        "es.unity.ui-ai-failure-prevention.v1"
+      ],
+      "zeroHitAllowed": true,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-color-design-token",
+      "domain": "ui-visual-design",
+      "objective": "UI 颜色和 Design Token 应该怎样设计？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-automation", "ui-visual-design", "visual-design", "design-token", "color-role"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.game-ui-visual-design-system.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/game-ui-visual-design-system.md",
+            "Documentation/AIKnowledge/entries/ui-automation-authoring.md",
+            "Documentation/AIKnowledge/Editor/project-screen-spec-materializer/screen-spec-component-registration.md",
+            "Documentation/AIKnowledge/Editor/project-screen-spec-materializer/visual-evidence-boundary.md",
+            "Documentation/AIKnowledge/UI/unity-ui-canvas-layout.md",
+            "Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md",
+            ".agents/skills/es-ui-prefab-authoring/SKILL.md",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json",
+            ".agents/skills/es-ui-prefab-authoring/references/ai-visual-brief.md",
+            ".agents/skills/es-ui-prefab-authoring/references/commercial-ui-patterns.md",
+            ".agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py",
+            ".agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py",
+            "Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs",
+            "Documentation/ES_UI_AUTHORING_WORKFLOW.md",
+            "Packages/manifest.json"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.rendering-material-atlas.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "mixed-refresh-scene-builder",
+      "domain": "mixed-intent",
+      "objective": "刷新技能理解后继续构建测试场景",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": [
+        "understanding-drift",
+        "skill-understanding-refresh",
+        "capability-refresh",
+        "incremental-discovery",
+        "scene-builder"
+      ],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.engineering.skill-session-refresh.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/skill-session-refresh.md",
+            ".agents/skills/es-skill-session-refresh/SKILL.md",
+            ".agents/skills/es-skill-session-refresh/governance.json",
+            ".agents/skills/es-skill-session-refresh/references/session-refresh-contract.md",
+            "Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs"
+          ]
+        },
+        {
+          "knowledgeId": "es.unity.editor.project-scene-builder-authority.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Editor/project-scene-builder-authority/scene-builder-prefab-fixture-backup-authority.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.ui-automation-authoring.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "feishu-virtual-team-dispatch",
+      "domain": "feishu-task",
+      "objective": "给飞书虚拟团队派发任务",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["feishu", "lark", "external-adapter", "task-dispatch", "virtual-team"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.feishu.task-lifecycle.v1",
+          "requiredReads": [
+            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md",
+            "Assets/Plugins/ES/AICommands/Feishu任务监控_AI命令.md",
+            "Assets/Plugins/ES/AICommands/Feishu任务派发与推进_AI命令.md"
+          ]
+        },
+        {
+          "knowledgeId": "es.feishu.adapter-boundary.v1",
+          "requiredReads": [
+            "Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md",
+            "Documentation/ES_AUTOMATION_CENTER_STANDARD.md"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.feishu.identity-messaging.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "task-read-snapshot-drift",
+      "domain": "read-consistency",
+      "objective": "文件快照哈希漂移后如何保证重复读取一致",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["consistency"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.engineering.task-read-snapshot.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/task-read-snapshot-infrastructure.md",
+            ".agents/skills/es-task-read-snapshot/SKILL.md",
+            ".agents/skills/es-task-read-snapshot/governance.json",
+            "ES/Output/FileProjectionParsers.json"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.engineering.hot-path-container-performance-evidence.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "knowledge-quality-explicit-route",
+      "domain": "knowledge-quality",
+      "objective": "审计知识路由探针的误命中并执行 canonical 去重",
+      "explicitRouteKeys": ["knowledge", "knowledge-quality", "route-probe", "misroute"],
+      "expectedRouteKeys": ["knowledge", "knowledge-quality", "route-probe", "misroute"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.knowledge.routing-quality.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/knowledge-routing-quality.md",
+            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md",
+            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md",
+            "Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md",
+            "Documentation/AIKnowledge/RouteProbeRegistry.json",
+            "ES/Automation/Contracts/es-knowledge-route-probe-registry.schema.json",
+            "Documentation/AIKnowledge/tools/Test-ESKnowledgeRouteProbeRegistry.ps1"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.function-area.routing.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only",
+      "notes": "显式 routeKeys 用于锁定 Knowledge 质量路由；自然语言推导尚不覆盖通用 Knowledge 词汇。"
+    },
+    {
+      "probeId": "managed-allocation-foreach",
+      "domain": "managed-allocation",
+      "objective": "这段 C# foreach 是否会产生托管分配？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["performance", "managed-allocation", "allocation-static-audit", "foreach"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.engineering.managed-allocation-static-audit.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Engineering/engineering-performance-evidence/managed-allocation-static-audit.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.engineering.runtime-memory-capacity-budget.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "managed-allocation-closure-delegate",
+      "domain": "managed-allocation",
+      "objective": "捕获闭包和 delegate 的 GC Alloc 是静态误报吗？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["performance", "managed-allocation", "allocation-static-audit", "closure", "delegate", "false-positive"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.engineering.managed-allocation-static-audit.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Engineering/engineering-performance-evidence/managed-allocation-static-audit.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.engineering.runtime-memory-capacity-budget.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "managed-allocation-async",
+      "domain": "managed-allocation",
+      "objective": "async/await 在热路径中是否每次都会分配？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["performance", "managed-allocation", "allocation-static-audit", "async"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.engineering.managed-allocation-static-audit.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Engineering/engineering-performance-evidence/managed-allocation-static-audit.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.engineering.runtime-memory-capacity-budget.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "memory-capacity-pool-resident",
+      "domain": "memory-capacity",
+      "objective": "对象池峰值后驻留内存不下降，容量和 Trim 应怎么定？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["performance", "memory-budget", "capacity-budget", "resident-memory", "high-water-mark", "pool", "pool-size", "trim"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.engineering.runtime-memory-capacity-budget.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Engineering/engineering-performance-evidence/runtime-memory-capacity-budget.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.engineering.managed-allocation-static-audit.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "memory-capacity-cache-high-water",
+      "domain": "memory-capacity",
+      "objective": "缓存大小和 high-water 如何进入 memory budget？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["performance", "memory-budget", "capacity-budget", "high-water-mark", "cache-size"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.engineering.runtime-memory-capacity-budget.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Engineering/engineering-performance-evidence/runtime-memory-capacity-budget.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.engineering.managed-allocation-static-audit.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "memory-capacity-profiler-tradeoff",
+      "domain": "memory-capacity",
+      "objective": "用 Memory Profiler 判断池化成本是否值得",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["performance", "memory-budget", "capacity-budget", "memory-profiler", "gc-tradeoff"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.engineering.runtime-memory-capacity-budget.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Engineering/engineering-performance-evidence/runtime-memory-capacity-budget.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.engineering.managed-allocation-static-audit.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "async-without-allocation-concern",
+      "domain": "negative-control",
+      "objective": "async 任务完成后继续业务流程",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": [],
+      "expectedKnowledgeTop3": [],
+      "forbiddenKnowledgeIds": ["es.engineering.managed-allocation-static-audit.v1"],
+      "zeroHitAllowed": true,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "file-cache-not-memory-budget",
+      "domain": "negative-control",
+      "objective": "读取缓存命中的配置文件",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["consistency"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.engineering.task-read-snapshot.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/task-read-snapshot-infrastructure.md",
+            ".agents/skills/es-task-read-snapshot/SKILL.md",
+            ".agents/skills/es-task-read-snapshot/governance.json",
+            "ES/Output/FileProjectionParsers.json"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.engineering.runtime-memory-capacity-budget.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "unknown-objective-zero-hit",
+      "domain": "negative-control",
+      "objective": "quux-liminal-archive",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": [],
+      "expectedKnowledgeTop3": [],
+      "forbiddenKnowledgeIds": ["es.knowledge.routing-quality.v1"],
+      "zeroHitAllowed": true,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "explicit-route-recovery",
+      "domain": "negative-control",
+      "objective": "quux-liminal-archive",
+      "explicitRouteKeys": ["scene-builder"],
+      "expectedRouteKeys": ["scene-builder"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.editor.project-scene-builder-authority.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Editor/project-scene-builder-authority/scene-builder-prefab-fixture-backup-authority.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.ui-automation-authoring.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "physics-rigidbody-interpolation",
+      "domain": "unity-physics",
+      "objective": "Rigidbody 插值为什么仍然会抖动？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "physics-3d", "rigidbody", "interpolation"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.physics-motion-authority.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-physics-motion-authority/unity-physics-motion-authority.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.entity-kcc-motion.v1", "es.project.vehicle-mount-motion.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "physics-rigidbody-transform-writer",
+      "domain": "unity-physics",
+      "objective": "可以在 Update 直接改 Rigidbody 的 Transform 位置吗？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "physics-3d", "rigidbody", "single-writer"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.physics-motion-authority.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-physics-motion-authority/unity-physics-motion-authority.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.entity-kcc-motion.v1", "es.project.vehicle-mount-motion.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "physics-transform-query-sync",
+      "domain": "unity-physics",
+      "objective": "修改 Collider Transform 后立刻 Raycast 为什么还是旧位置？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "physics-3d", "collider", "physics-query", "raycast", "transform-sync"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.physics-motion-authority.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-physics-motion-authority/unity-physics-motion-authority.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.entity-kcc-motion.v1", "es.project.vehicle-mount-motion.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "physics-raycast-filtering",
+      "domain": "unity-physics",
+      "objective": "Raycast 应该怎样设置 LayerMask 并忽略 Trigger？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "physics-3d", "trigger", "physics-query", "raycast", "layer-mask", "query-trigger"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.physics-motion-authority.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-physics-motion-authority/unity-physics-motion-authority.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.entity-kcc-motion.v1", "es.project.vehicle-mount-motion.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "physics-cast-buffer-saturation",
+      "domain": "unity-physics",
+      "objective": "SphereCastNonAlloc 缓冲区满了以后怎么恢复？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "physics-3d", "physics-query", "cast"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.physics-motion-authority.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-physics-motion-authority/unity-physics-motion-authority.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.entity-kcc-motion.v1", "es.project.vehicle-mount-motion.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "physics-overlap-trigger-policy",
+      "domain": "unity-physics",
+      "objective": "OverlapSphere 查询是否应该命中触发器？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "physics-3d", "trigger", "physics-query", "overlap", "query-trigger"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.physics-motion-authority.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-physics-motion-authority/unity-physics-motion-authority.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.entity-kcc-motion.v1", "es.project.vehicle-mount-motion.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "physics-trigger-lifecycle-cleanup",
+      "domain": "unity-physics",
+      "objective": "Collider Trigger 的 Enter/Exit 能不能作为唯一生命周期清理？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["unity", "physics-3d", "collider", "trigger"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.physics-motion-authority.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-physics-motion-authority/unity-physics-motion-authority.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.entity-kcc-motion.v1", "es.project.vehicle-mount-motion.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "entity-kcc-grounding-owner",
+      "domain": "entity-kcc-motion",
+      "objective": "KCC 角色接地和斜坡处理应该由谁写根位置？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["entity", "motion", "kcc", "character-controller", "grounding"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.entity-kcc-motion.v1",
+          "requiredReads": ["Documentation/AIKnowledge/ESFramework/project-entity-physics-motion/entity-kcc-motion.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.physics-motion-authority.v1", "es.project.vehicle-mount-motion.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "entity-kcc-platform-teleport",
+      "domain": "entity-kcc-motion",
+      "objective": "KCC 在移动平台上传送后怎样避免第二写入者？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["entity", "motion", "kcc", "character-controller", "moving-platform", "teleport"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.entity-kcc-motion.v1",
+          "requiredReads": ["Documentation/AIKnowledge/ESFramework/project-entity-physics-motion/entity-kcc-motion.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.physics-motion-authority.v1", "es.project.vehicle-mount-motion.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-reference-design-evidence-owner",
+      "domain": "ui-reference-evidence",
+      "objective": "为游戏界面参考图记录来源区域、观察与假设并完成 vision review",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-automation", "ui-reference-evidence", "design-evidence", "reference-image", "reference-provenance", "source-region", "vision-review", "observation-assumption"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.game-ui-reference-design-evidence.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/game-ui-reference-design-evidence.md",
+            ".agents/skills/es-ui-prefab-authoring/references/ai-visual-brief.md",
+            ".agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py",
+            "Assets/Scripts/ESLogic/Editor/UI/ESUIScreenSpecAdapter.cs",
+            "Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs",
+            "Documentation/ES_UI_AUTHORING_WORKFLOW.md",
+            "Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.game-ui-asset-manifest.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-asset-manifest-owner",
+      "domain": "ui-asset-manifest",
+      "objective": "为界面素材清单建立带哈希、许可证、fallback 和 SpriteAtlas owner 的 AssetManifest",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-automation", "ui-asset-manifest", "asset-manifest", "asset-provenance", "asset-license", "asset-fallback", "sprite-atlas", "crop-policy", "asset-resolver"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.game-ui-asset-manifest.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/game-ui-asset-manifest.md",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md",
+            ".agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py",
+            ".agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py",
+            "Assets/Scripts/ESLogic/Editor/UI/ESUIScreenSpecAdapter.cs",
+            "Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs",
+            "Documentation/ES_UI_AUTHORING_WORKFLOW.md",
+            "Packages/manifest.json",
+            "Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.game-ui-reference-design-evidence.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-behavior-focus-navigation-owner",
+      "domain": "ui-behavior-focus-navigation",
+      "objective": "为界面按钮定义 BehaviorSpec、键鼠和手柄焦点导航与 input modality binding",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-automation", "ui-behavior-spec", "behavior-spec", "ui-binding", "ui-interaction-intent", "ui-focus", "ui-navigation", "input-modality", "input-system-ui"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.game-ui-behavior-focus-navigation.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/game-ui-behavior-focus-navigation.md",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json",
+            ".agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py",
+            ".agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py",
+            "Assets/Scripts/ESLogic/Editor/UI/ESUIScreenSpecAdapter.cs",
+            "Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs",
+            "Documentation/ES_UI_AUTHORING_WORKFLOW.md",
+            "Packages/manifest.json",
+            "Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.game-ui-player-intent-spec.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-text-localization-resilience-owner",
+      "domain": "ui-text-localization-resilience",
+      "objective": "验证界面本地化长文本、RTL/Bidi、字形覆盖和文本换行",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-automation", "ui-text-resilience", "ui-localization", "long-content", "text-wrapping", "bidi", "rtl", "glyph-coverage", "font-fallback", "line-breaking"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.game-ui-text-localization-resilience.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/game-ui-text-localization-resilience.md",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json",
+            ".agents/skills/es-ui-prefab-authoring/references/ai-visual-brief.md",
+            ".agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py",
+            ".agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py",
+            "Assets/Scripts/ESLogic/Editor/UI/ESUIScreenSpecAdapter.cs",
+            "Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs",
+            "Documentation/ES_UI_AUTHORING_WORKFLOW.md",
+            "Packages/manifest.json",
+            "Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.game-ui-asset-manifest.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-prefab-fixture-materializer-owner",
+      "domain": "ui-materializer",
+      "objective": "生成界面预制体和 Fixture Scene",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-automation", "ui-prefab", "ui-fixture-scene", "materializer"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.editor.project-screen-spec-materializer.prefab-fixture-structure.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Editor/project-screen-spec-materializer/materializer-prefab-fixture-structure.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.editor.project-scene-builder-authority.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-output-visual-evidence-owner",
+      "domain": "ui-visual-evidence",
+      "objective": "检查界面预制体的 GPU PNG 视觉证据和 profile/state 快照",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-automation", "ui-prefab", "materializer", "visual-qa", "visual-evidence"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.editor.project-screen-spec-materializer.visual-evidence.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Editor/project-screen-spec-materializer/visual-evidence-boundary.md"]
+        },
+        {
+          "knowledgeId": "es.project.ui-automation-authoring.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/ui-automation-authoring.md",
+            ".agents/skills/es-ui-prefab-authoring/SKILL.md",
+            ".agents/skills/es-ui-intent-authoring/SKILL.md",
+            ".agents/skills/es-ui-intent-authoring/references/intent-spec.contract.md",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md"
+          ]
+        },
+        {
+          "knowledgeId": "es.editor.project-screen-spec-materializer.prefab-fixture-structure.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Editor/project-screen-spec-materializer/materializer-prefab-fixture-structure.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.game-ui-reference-design-evidence.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-responsive-layout-owners",
+      "domain": "ui-layout",
+      "objective": "检查游戏界面安全区、响应式布局和内容裁剪",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-automation", "ui-layout", "responsive", "ui-responsive"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.ui-layout-clipping.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/UI/unity-ui-layout-clipping.md",
+            "Library/PackageCache/com.unity.ugui@1.0.0/Documentation~/comp-UIAutoLayout.md",
+            "Library/PackageCache/com.unity.ugui@1.0.0/Documentation~/script-ScrollRect.md",
+            "Library/PackageCache/com.unity.ugui@1.0.0/Documentation~/script-ContentSizeFitter.md",
+            "Library/PackageCache/com.unity.ugui@1.0.0/Documentation~/script-Mask.md",
+            "Library/PackageCache/com.unity.ugui@1.0.0/Documentation~/script-RectMask2D.md",
+            "Library/PackageCache/com.unity.ugui@1.0.0/Runtime/UI/Core/Layout/LayoutRebuilder.cs",
+            "Library/PackageCache/com.unity.ugui@1.0.0/Runtime/UI/Core/Layout/ContentSizeFitter.cs"
+          ]
+        },
+        {
+          "knowledgeId": "es.unity.ui-canvas-layout.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/UI/unity-ui-canvas-layout.md",
+            "ProjectSettings/ProjectVersion.txt",
+            "Packages/manifest.json",
+            "Packages/packages-lock.json",
+            "Library/PackageCache/com.unity.ugui@1.0.0/Documentation~/UICanvas.md",
+            "Library/PackageCache/com.unity.ugui@1.0.0/Documentation~/class-RectTransform.md",
+            "Library/PackageCache/com.unity.ugui@1.0.0/Documentation~/script-CanvasScaler.md"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.unity.editor.project-scene-builder-authority.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-ai-system-routing",
+      "domain": "ui-ai-routing",
+      "objective": "Unity 游戏 UI 应该选择 UGUI、UI Toolkit 还是 IMGUI？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-ai-failure-prevention", "ui-system-selection", "ui-toolkit"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.unity.ui-ai-failure-prevention.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/UI/unity-ui-ai-failure-prevention.md",
+            "Documentation/AIKnowledge/UI/unity-ui-canvas-layout.md",
+            "Documentation/AIKnowledge/UI/unity-ui-layout-clipping.md",
+            "Documentation/AIKnowledge/UI/unity-ui-interaction-rendering.md",
+            "Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md",
+            "Documentation/AIKnowledge/UI/unity-official-agent-skills-source-snapshot.md",
+            "Documentation/AIKnowledge/entries/ui-automation-authoring.md",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md",
+            ".agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.ui-automation-authoring.v1", "es.unity.editor.project-scene-builder-authority.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-open-source-normalized-adapter",
+      "domain": "ui-automation-adapter",
+      "objective": "把开源 UI 自动化方案归一到 ES 唯一 canonical owner，去重 ScreenSpec、AssetManifest、LayoutPlan、BehaviorSpec 和视觉证据路由",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["ui-automation", "normalized-adapter", "canonical-owner", "knowledge-deduplication", "schema-adapter", "ai-error-prevention"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.game-ui-normalized-adapter-layer.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/game-ui-normalized-adapter-layer.md",
+            "Documentation/AIKnowledge/entries/game-ui-open-source-automation-patterns.md",
+            "Documentation/AIKnowledge/entries/ui-automation-authoring.md",
+            "Documentation/AIKnowledge/entries/game-ui-reference-design-evidence.md",
+            "Documentation/AIKnowledge/entries/game-ui-asset-manifest.md",
+            "Documentation/AIKnowledge/entries/game-ui-behavior-focus-navigation.md",
+            "Documentation/AIKnowledge/UI/unity-ui-canvas-layout.md",
+            ".agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md"
+          ]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.editor-workbench-authoring.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "ui-static-artifact-not-runtime-acceptance",
+      "domain": "ui-runtime-evidence-negative",
+      "objective": "看到开源 README、静态 JSON 或已保存 Prefab，能否直接证明 Unity Runtime、输入和 Player 已通过",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": [],
+      "expectedKnowledgeTop3": [],
+      "forbiddenKnowledgeIds": [
+        "es.project.game-ui-normalized-adapter-layer.v1",
+        "es.project.game-ui-open-source-automation-patterns.v1",
+        "es.project.ui-automation-authoring.v1",
+        "es.project.scene-release-evidence.v1"
+      ],
+      "zeroHitAllowed": true,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    },
+    {
+      "probeId": "vehicle-rigidbody-fixed-submit",
+      "domain": "vehicle-motion",
+      "objective": "载具 Rigidbody 的驾驶输入为什么只能在 FixedUpdate 提交？",
+      "explicitRouteKeys": [],
+      "expectedRouteKeys": ["vehicle", "motion", "driver", "input", "unity", "physics-3d", "fixed-update", "fixed-step", "rigidbody"],
+      "expectedKnowledgeTop3": [
+        {
+          "knowledgeId": "es.project.vehicle-mount-motion.v1",
+          "requiredReads": [
+            "Documentation/AIKnowledge/entries/vehicle-mount-motion.md",
+            "Assets/Plugins/ES/1_Design/Tests/VehicleControllerSafetyTests.cs"
+          ]
+        },
+        {
+          "knowledgeId": "es.unity.physics-motion-authority.v1",
+          "requiredReads": ["Documentation/AIKnowledge/Unity/unity-physics-motion-authority/unity-physics-motion-authority.md"]
+        }
+      ],
+      "forbiddenKnowledgeIds": ["es.project.entity-kcc-motion.v1"],
+      "zeroHitAllowed": false,
+      "repeatCount": 3,
+      "evidenceBoundary": "static-routing-only"
+    }
+  ]
+}

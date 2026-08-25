@@ -7,8 +7,8 @@
 | 现有入口 | 当前职责 | 处理 | AIBrain 关系 |
 |---|---|---|---|
 | `Assets/Plugins/ES/AIWarnings` | P0、长期事实、禁止事项、证据标准 | `keep` | 执行前按 routeKeys 读取，不作为用户主要启动界面 |
-| `Assets/Plugins/ES/AICommands` | 单次任务权限合同 | `keep` | AIBrain 选择，不得扩大权限 |
-| `.agents/skills` | 可复用执行工作流 | `keep` | AIBrain 定向路由，正式导入仍需候选审批 |
+| `Assets/Plugins/ES/AICommands` | 受管通道单次任务协议 | `keep` | AIBrain 选择，只约束该通道，不得扩大或缩小用户范围 |
+| `.agents/skills` | 可复用执行工作流 | `keep` | AIBrain 定向路由；自主候选不能正式导入，当前用户明确要求正式写入时可直接实施 |
 | `Assets/Plugins/ES/Editor/ESAutomation` | 注册任务、受管 Worker、RunRecord | `keep` | AIBrain 唯一执行协调边界 |
 | `Documentation/AIKnowledge` | 定向检索索引和派生摘要 | `adopt` | AIBrain 的查询层，不拥有源事实 |
 | `.zread/wiki` | 自动生成代码导航缓存 | `defer` | 只作为低优先级导航，不进入 P0 |

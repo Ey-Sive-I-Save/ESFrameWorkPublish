@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.project.gamecore-identity-registration.v1`  
 `Authority`: `Source + AIWarnings`  
 `RouteKeys`: `gamecore`, `config-key`, `stable-key`, `runtime-key`, `sodata`, `content-registration`, `transaction`  
-`ContentHash`: `34ed50917d6a9d221642260efdd2158e025448e870125c510296308fd34ab335`
+`ContentHash`: `b84bb2e02fbe0df05bcf320b8a4159057795983fe44238ebb6046258e1518817`
 
 ## AIWarnings 提示所对应的真实问题
 
@@ -26,6 +26,7 @@ AIWarnings 对“稳定 Key”“GameCore RuntimeData 驻留”“Info/Group/Pac
 - `SoDataGroup<T>` 是同类型 Info 的作者字典。重复 Key 被拒绝；其 `InjectGameCoreTables` 只转发实现 `IGameCoreSO` 的条目，不反射猜测。
 - `SoDataPack<T>` 是多个 Group 的显式聚合快照。它检查 Group 的 Info 类型，并按 Key 合并；重复键不会静默覆盖有效对象。
 - Group 和 Pack 都不是“根 GameCore 的替代品”。根资产、依赖资产与 Consumer 快照由内容注册与烘焙链显式建立。
+- `SoDataPack.Check()` 当前对键名变化是“移除旧键后直接加入新键”；若多个旧键改成同一个新键，后续 `Add` 会抛出重复键异常且没有本地回滚。因此它是静态一致性检查，不是键迁移事务；迁移前应先做冲突预检或使用外层候选快照/回滚。
 
 ## RuntimeData 稳定驻留机制
 
@@ -74,11 +75,11 @@ commit=true
 ## SourceRefs
 
 - `Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_稳定Key_Catalog烘焙与RuntimeKey进程边界_AI协作警告.md` (`c6960fac99de98e02d304bca863a312314f065268f54f961f35cf61f68a847c7`)
-- `Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCoreRuntimeData稳定驻留与事务注入_AI协作警告.md` (`974957efac661db1bbbb7c578f5b4aa49c9a389a1e5a483ffd83ea766a436381`)
-- `Assets/Plugins/ES/1_Design/ConfigKey/ESConfigKey.cs` (`ffe397fec6d57cbec8c8a7d388f45fbd8bf6705cd4b9ced389843830ebe4ad82`)
-- `Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/PackGroupInfo/0-SoDataInfo.cs` (`4ceec7012317ad6ca0deeb410f111e8446eaf09f84410217f3bebb4313cc4d20`)
-- `Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/PackGroupInfo/1-SoDataGroup.cs` (`d805db516c2fbc9f3471978c42dc32d77f9a015358e39bf92061b4647acaae07`)
-- `Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/PackGroupInfo/2-SoDataPack.cs` (`e0ebdc30c11c6496107adfeba4d2d0a4af2bde02234ba6bbc555eb819ea2feda`)
+- `Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/GameCore边界（GameCore）/项目最高警告_GameCoreRuntimeData稳定驻留与事务注入_AI协作警告.md` (`3d237b03c1b8acf59368e6293a374010e624ede948299351b0b6b268e432a34b`)
+- `Assets/Plugins/ES/1_Design/ConfigKey/ESConfigKey.cs` (`08c4fda0e5ec09db552834ff2137314aec6244709ea7d40c9c0e276a9987c33e`)
+- `Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/PackGroupInfo/0-SoDataInfo.cs` (`85bd3b3512aae56da1ebd0ef0bacbc98df8dbc2a742377c531fdb197ab7fe3ae`)
+- `Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/PackGroupInfo/1-SoDataGroup.cs` (`899fbcd7cd7b989a1baa6ee5f829d1772cb56a8a6f80a066d6086bd6b27e2f6e`)
+- `Assets/Plugins/ES/0_Stand/BaseDefine_ValueType/SO/PackGroupInfo/2-SoDataPack.cs` (`b07d4dfb9f53dfd0ea3b36e6c9d0e9a00acca34954d30e1315d2f189d846205c`)
 - `Assets/Plugins/ES/Editor/ESContentRegistration/ESContentRegistrationAuthoring.cs` (`2184f8b6e14f4cb557e59cf813e34750105838c7155b9efbf973bb2abb9539ac`)
 - `Assets/Plugins/ES/Editor/ESContentRegistration/Tests/ESContentRegistrationTests.cs` (`c773e81fa71707fd13fa49acbeff9ceec1f9ffb0a996308b1d53c4505fbd0eb0`)
 

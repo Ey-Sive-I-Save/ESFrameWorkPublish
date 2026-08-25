@@ -6,12 +6,12 @@
 `EvidenceLevel`: `S1`
 `Authority`: `Derived`
 `RouteKeys`: `skill`, `routing`, `validation`, `iteration`
-`ContentHash`: `9dd2daf5748fc393af9a8d01d0f79eabca202071fc0607f0df9f88c3e703433b`
+`ContentHash`: `0d76a288c1a87585f1006c6522957375807af48a66ae1cda8e8e04345b5ecf0d`
 
 `SourceRefs`:
 
-- `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md` (`8213b590650bbca456ce77f2545419e695ae736d979cfc03de08d17728c01cdf`)
-- `.agents/skills/es-generate-agent-artifacts/SKILL.md` (`2962ac46089ada1a54a139b74cf9fa57f895aac955bf475b8a9f6d2cfd067e5d`)
+- `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md` (`025244bd6a0ec254e8cde057bf7c782dd6e6cbc96b29fb2514de3bed172bc6fb`)
+- `.agents/skills/es-generate-agent-artifacts/SKILL.md` (`b2c08931566c9cdd9b6ad5f8cea2dda0be00cb2358468ee8dac841fb5469c60e`)
 
 `EvidenceRefs`: 三个候选 Skill 的 `quick_validate.py` 结构验证输出；未执行代表任务、非触发任务和失败注入。
 
@@ -25,7 +25,7 @@ AIBrain 不加载全部 Skill，而是使用 KnowledgeIndex 的 `routeKeys`、`r
 任务意图
   -> Knowledge routeKeys
   -> RequiredReads + RelatedSkills
-  -> AICommand 权限合同
+  -> 可选 AICommand / TaskContract 受管通道协议
   -> Skill 工作流
 ```
 
@@ -42,11 +42,11 @@ Skill 的等级、证据和恢复义务以 `es-skill-governance` 为治理权威
 ## 质量闭环
 
 ```text
-候选生成 -> UTF-8/结构验证 -> 代表任务前测 -> 失败样本记录 -> 修订 -> 再测 -> Unity Diff Review -> 人工批准
+候选生成 -> UTF-8/结构验证 -> 代表任务前测 -> 失败样本记录 -> 修订 -> 再测 -> Diff Review -> 按当前用户目标决定候选保留或正式写入
 ```
 
 每轮至少记录：触发是否准确、是否读取了正确 Knowledge、是否越权、输出是否可验证、失败是否可恢复。
 
 ## 正式导入边界
 
-新 Skill 只能先写入 `ES/Automation/Candidates/AgentAuthoring/<request-id>/candidate/`，经候选验证、Diff Review 和明确批准后才导入 `.agents/skills`。
+AI 自主或 `ManagedAIBrain` 候选生成先写入 `ES/Automation/Candidates/AgentAuthoring/<request-id>/candidate/`。当前用户明确要求正式创建、导入或更新 Skill 时，可在验证和 Diff Review 后直接写入 `.agents/skills`，不再索取项目内二次批准。

@@ -10,6 +10,24 @@
 
 AIKnowledge 解决“针对一个任务挑选最小相关知识集合”的问题，而不是把整个项目压缩成一份总结。
 
+三态落地可用性评分规范见：[`tools/ESKnowledgeEffectivenessRubric.md`](tools/ESKnowledgeEffectivenessRubric.md)。
+
+## 使用理念：以落地决策为中心
+
+Knowledge 的价值不是替 AI 读完全部源码，也不是让 AI 背诵摘要；它应当用最小的、可追溯的路由集合，
+把 AI 引向足以做出当前决策的源码、Schema、测试和风险边界。使用 Knowledge 后允许减少源码读取深度，
+但必须显式报告尚未覆盖的调用方、生命周期、并发、迁移、回滚或运行行为。
+
+- 评价优先看 `DecisionUtility`：能否选对动作、阻止危险动作、在失败或漂移时停下并恢复。
+- 同时记录 `EvidenceCoverage` 和 `ReadCost`：少读源码是 Knowledge 的效率收益，不自动等于证据错误；
+  覆盖不足要作为 `CoverageGap` 报告。
+- Knowledge 是导航和边界层，不替代当前源码、AIWarnings P0、Schema、测试或真实回执；摘要不能冒充
+  项目权威，`runtime-not-run` 不能冒充运行通过。
+- Knowledge 新增的内容只有在改变实际决策、减少误操作或补足版本边界时才算增益；引用数量、哈希数量、
+  文本长度和通用网络背景本身不加分。
+- 三态比较应区分“项目源码基线”“项目源码 + Knowledge”“再加外部权威资料”，并把 Knowledge 带来的
+  路由、治理、停止条件和读取成本变化单列，不能把更浅的源码覆盖误判为事实冲突。
+
 典型查询：
 
 - 做 Weapon/Shot 热路径：只返回 ProjectileWeapon P0、热路径容器 P0、ItemShotPhysics、Pool 和对应验证 Skill。
@@ -21,7 +39,8 @@ AIKnowledge 解决“针对一个任务挑选最小相关知识集合”的问�
 ```text
 源码与真实验证证据
   > AIWarnings P0
-  > AICommand 权限合同
+  > 当前用户明确动作授权
+  > AICommand / TaskContract 受管通道协议
   > AIBrain 编排记录
   > AIKnowledge 摘要与索引
   > zread / Feishu 缓存

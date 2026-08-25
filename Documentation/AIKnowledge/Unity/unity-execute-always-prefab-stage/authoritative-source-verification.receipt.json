@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-ai-knowledge-curation",
+  "case": "authoritative-source-closure",
+  "status": "passed",
+  "evidenceLevel": "S1",
+  "receiptPath": "Documentation/AIKnowledge/Unity/unity-execute-always-prefab-stage/authoritative-source-verification.receipt.json",
+  "timestampUtc": "2026-08-23T16:20:49.0028283Z",
+  "capturedUtc": "2026-08-23T16:16:48.2794115Z",
+  "toolId": "codex-authoritative-source-verification",
+  "unityVersion": "2022.3.45f1",
+  "planHash": "2311869603af9250725bcd608122bf3662caefe8d6b54495bea393f415bf0c71",
+  "planHashKind": "bounded-task-fingerprint",
+  "runtimeStatus": "not-run",
+  "sourceRefs": [
+    ".agents/skills/es-ai-knowledge-curation/SKILL.md",
+    "ProjectSettings/ProjectVersion.txt",
+    "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md",
+    "Documentation/AIKnowledge/Unity/unity-execute-always-prefab-stage/official-source-lock.md"
+  ],
+  "sourceRefHashes": {
+    ".agents/skills/es-ai-knowledge-curation/SKILL.md": "11f1a15e704484e47eab55b4e5a38e5cc8ea620c6506e27be58f66a11bf7a742",
+    "ProjectSettings/ProjectVersion.txt": "a1141b79efc22ad583133c02da76d77a863533680c77dcd2178d1b8413645a08",
+    "Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md": "d08d443a6b8bc4712142904375adb627b420981d674643b0ec3166753c152c37",
+    "Documentation/AIKnowledge/Unity/unity-execute-always-prefab-stage/official-source-lock.md": "3f15f91f871b0c37b891e4abe0efda386e4fdce7a0e1ba3ca7b3352b06ec2018"
+  },
+  "authoritativeSources": [
+    {
+      "id": "unity-execute-always",
+      "authority": "Unity official ScriptReference 2022.3",
+      "uri": "https://docs.unity3d.com/2022.3/Documentation/ScriptReference/ExecuteAlways.html",
+      "httpStatus": 200,
+      "utf8ContentSha256": "5a343cf69e3afe15e89eac7ac8589a740f1ae1481bd0f9c247be05b63d73eede",
+      "hashMatchedSourceLock": true
+    },
+    {
+      "id": "unity-application-is-playing-object",
+      "authority": "Unity official ScriptReference 2022.3",
+      "uri": "https://docs.unity3d.com/2022.3/Documentation/ScriptReference/Application.IsPlaying.html",
+      "httpStatus": 200,
+      "utf8ContentSha256": "238f1a5927dd2cb125bdd166a475e4bda7d892363f5944025511bacf4b5e3b31",
+      "hashMatchedSourceLock": true
+    },
+    {
+      "id": "unity-prefab-mode-manual",
+      "authority": "Unity official manual 2022.3",
+      "uri": "https://docs.unity3d.com/2022.3/Documentation/Manual/EditingInPrefabMode.html",
+      "httpStatus": 200,
+      "utf8ContentSha256": "83611457ff7f00fd79c505ce63a0df3501f141896d1c266ef9a5bb0dbc07ca0d",
+      "hashMatchedSourceLock": true
+    },
+    {
+      "id": "unity-prefab-stage",
+      "authority": "Unity official ScriptReference 2022.3",
+      "uri": "https://docs.unity3d.com/2022.3/Documentation/ScriptReference/SceneManagement.PrefabStage.html",
+      "httpStatus": 200,
+      "utf8ContentSha256": "48869540f2d99a74ae196ee89d962fe2e867c9b2d4b71df2d65e2f93109ea369",
+      "hashMatchedSourceLock": true
+    },
+    {
+      "id": "unity-prefab-stage-get",
+      "authority": "Unity official ScriptReference 2022.3",
+      "uri": "https://docs.unity3d.com/2022.3/Documentation/ScriptReference/SceneManagement.PrefabStageUtility.GetPrefabStage.html",
+      "httpStatus": 200,
+      "utf8ContentSha256": "a0d71013aeac6610264a66a9413e86d3af284c66a0fb3870f9d52068dcd85358",
+      "hashMatchedSourceLock": true
+    },
+    {
+      "id": "unity-core-api-xml",
+      "authority": "Installed Unity 2022.3.45f1 API documentation",
+      "path": "D:/UnityEdi/2022.3.45f1/Editor/Data/Managed/UnityEngine/UnityEngine.CoreModule.xml",
+      "sha256": "ce120ca131e9d371794fa1d453bdd97d8ed3d39dee97c40f8467f7cac2b1bbce",
+      "hashMatchedSourceLock": true
+    },
+    {
+      "id": "unity-editor-api-xml",
+      "authority": "Installed Unity 2022.3.45f1 API documentation",
+      "path": "D:/UnityEdi/2022.3.45f1/Editor/Data/Managed/UnityEditor.xml",
+      "sha256": "85c417af947171f08ec139c80231e896102d3ea09f086b1b91bf2d0b20e60020",
+      "hashMatchedSourceLock": true
+    }
+  ],
+  "verifiedClaims": [
+    {
+      "claimId": "execute-always-edit-and-play",
+      "sourceId": "unity-core-api-xml",
+      "verbatimExcerpt": "Makes instances of a script always execute, both as part of Play Mode and when editing."
+    },
+    {
+      "claimId": "object-playing-world",
+      "sourceId": "unity-core-api-xml",
+      "verbatimExcerpt": "Returns true if the given object is part of the playing world either in any kind of built Player or in Play Mode."
+    },
+    {
+      "claimId": "prefab-stage-editing-context",
+      "sourceId": "unity-editor-api-xml",
+      "verbatimExcerpt": "The PrefabStage class represents an editing context for Prefab Assets."
+    },
+    {
+      "claimId": "prefab-stage-object-resolution",
+      "sourceId": "unity-editor-api-xml",
+      "verbatimExcerpt": "Get the Prefab stage which contains the given GameObject."
+    },
+    {
+      "claimId": "prefab-mode-game-logic-risk",
+      "sourceId": "unity-execute-always",
+      "verbatimExcerpt": "a Prefab being edited in Prefab Mode may incorrectly get modified and saved by logic intended only to be run as part of the game"
+    },
+    {
+      "claimId": "edit-mode-update-change-driven",
+      "sourceId": "unity-execute-always",
+      "verbatimExcerpt": "Update is only called when something in the Scene changed."
+    },
+    {
+      "claimId": "prefab-mode-auto-save",
+      "sourceId": "unity-prefab-mode-manual",
+      "verbatimExcerpt": "Auto Save is on by default."
+    }
+  ],
+  "derivedGuidanceBoundary": "Context classification, side-effect separation, idempotent preview ownership, and the proposed validation matrix are engineering guidance derived from the verified Unity mechanisms and ES P0; they are not represented as verbatim Unity requirements.",
+  "nonClaims": [
+    "No Unity Editor, Prefab Mode, Domain Reload, Undo, Save, or Play Mode execution was performed.",
+    "No current ESFramework ExecuteAlways type or Prefab Asset was proven safe.",
+    "No Player, Profiler, IL2CPP, or release acceptance was performed."
+  ]
+}

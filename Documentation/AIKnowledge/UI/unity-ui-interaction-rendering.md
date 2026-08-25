@@ -3,7 +3,7 @@
 `KnowledgeId`: `es.unity.ui-interaction-rendering.v1`  
 `Authority`: `Unity 2022.3 UGUI/Input System package documentation + package source`  
 `RouteKeys`: `ui`, `ui-unity`, `ui-interaction`, `ui-rendering`, `ui-input`, `event-system`, `graphic-raycaster`, `selectable`  
-`ContentHash`: `a4ebf91f9304527acefa98658194f87b93b0885e3354daec5d71907af72ee15d`
+`ContentHash`: `d7fc16048ea5f2442cfc91ad6f6331b7205f6feb03fd2562b67aa3623b5645ff`
 
 ## Scope
 
@@ -75,7 +75,7 @@ Input System 的 UI 模块只作为事件输入适配层，不拥有业务命令
 - `Library/PackageCache/com.unity.ugui@1.0.0/Documentation~/script-Slider.md` (`0c9456d509cc8defc9961e73a425495bd09b9c86ded7b32e8bad731865fc6646`)
 - `Library/PackageCache/com.unity.ugui@1.0.0/Runtime/UI/Core/CanvasUpdateRegistry.cs` (`6d74c8cfa3500ffc2f35e1dd6ebc991178e2227194e8994dffe9db74575171cb`)
 - `Library/PackageCache/com.unity.ugui@1.0.0/Runtime/UI/Core/Graphic.cs` (`c23b303effecdb6693f791cbbe703f0c368fd92b1443934ae90d4d97c21dd9b0`)
-- `Library/PackageCache/com.unity.ugui@1.0.0/Runtime/UI/Core/GraphicRaycaster.cs` (`1625f39ea41156afec5995401d8aaab16eb931029cdf496963fddd4bbf0f66ca`)
+- `Library/PackageCache/com.unity.ugui@1.0.0/Runtime/UI/Core/GraphicRaycaster.cs` (`a7c7eadb563eece18edc99969a570b2421ac7fee0fd39b02ccafa4a8ddd2eee2`)
 - `Library/PackageCache/com.unity.ugui@1.0.0/Runtime/UI/Core/Selectable.cs` (`aa2703fa92ae0ec0386e309dcd06c3646c581ccc756f16a7735a19ab8fcb1a30`)
 - `Library/PackageCache/com.unity.inputsystem@1.11.2/InputSystem/Plugins/UI/InputSystemUIInputModule.cs` (`6f7abbed16e134a5f9e0cae4de505bf5b7d49232bca80fb51bc69b2287e175d7`)
 

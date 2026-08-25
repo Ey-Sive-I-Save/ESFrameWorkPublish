@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-adversarial-review",
+  "case": "single-model-authority-provenance-review",
+  "status": "passed",
+  "evidenceLevel": "S1",
+  "receiptPath": "Documentation/AIKnowledge/Unity/unity-lifecycle-domain-reload/adversarial-authority-review.receipt.json",
+  "sourceRefs": [
+    ".agents/skills/es-adversarial-review/SKILL.md",
+    "Documentation/AIKnowledge/Unity/unity-lifecycle-domain-reload/unity-lifecycle-domain-reload.md",
+    "Documentation/AIKnowledge/Unity/unity-lifecycle-domain-reload/authoritative-source-verification.receipt.json",
+    "Documentation/AIKnowledge/Unity/unity-lifecycle-domain-reload/official-source-lock.md"
+  ],
+  "sourceRefHashes": {
+    ".agents/skills/es-adversarial-review/SKILL.md": "7b6993311aa3458488d892ea595bba5f6f375c03290be48cd494c80d1e18eee5",
+    "Documentation/AIKnowledge/Unity/unity-lifecycle-domain-reload/unity-lifecycle-domain-reload.md": "cd8a4a80c7f04f39aa649c3e96b84b8221db99f6644adddb20bb02b49c16a74a",
+    "Documentation/AIKnowledge/Unity/unity-lifecycle-domain-reload/authoritative-source-verification.receipt.json": "a884c672431d97604c76a265bb09c9772588e0640c1e46a19cf97dcb8a35e5a5",
+    "Documentation/AIKnowledge/Unity/unity-lifecycle-domain-reload/official-source-lock.md": "428560f7dd4251050f6bb6b77914a6886657648e09952c4823dcdf0d9f0ed25e"
+  },
+  "toolId": "codex-single-model-multi-lens",
+  "unityVersion": "2022.3.45f1",
+  "capturedUtc": "2026-08-23T12:38:38.4501881Z",
+  "planHash": "f836de7414a5de3bf37e9979e2d9de3c398a6fed59efb8d9067f6b08336e18d8",
+  "planHashKind": "launch-task-fingerprint",
+  "reviewMode": "single-model-multi-lens",
+  "intent": "Verify that lifecycle knowledge claims are grounded in current authoritative Unity and project sources rather than model memory.",
+  "findings": [
+    {
+      "severity": "medium",
+      "status": "fixed",
+      "finding": "The entry lacked the current contract's EvidenceRefs field and the earlier source lock primarily stored translated summaries rather than directly matchable excerpts.",
+      "correction": "Added a strict authoritative-source receipt with current source hashes and 14 verbatim excerpts, then linked it from the entry and separated verified facts from derived guidance."
+    },
+    {
+      "severity": "low",
+      "status": "fixed",
+      "finding": "EvidenceRef initially used the SourceRef line shape and was accidentally included by the legacy ContentHash validator.",
+      "correction": "Changed EvidenceRef hash notation to an explicit sha256 field and independently verified it, preserving the existing SourceRef ContentHash and shared index binding."
+    }
+  ],
+  "conclusion": "The documented Unity mechanisms are supported by currently matching official/manual/API/project evidence. Engineering recommendations remain explicitly derived guidance.",
+  "runtimeStatus": "not-run",
+  "nonClaims": [
+    "This is not independent-model evidence.",
+    "No Unity Editor, Domain Reload, Scene Reload, or PlayMode behavior was executed.",
+    "No ESFramework runtime implementation was accepted."
+  ]
+}

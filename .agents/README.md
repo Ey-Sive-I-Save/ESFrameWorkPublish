@@ -77,6 +77,14 @@ ESFrameWorkPublish/
 
 这项披露只说明工作流来源；它不替代 AICommand、TaskContract、用户授权、验证回执或 Runtime 证据。未使用任何 Skill 的纯文本答复不需要增加该段。
 
+## 用户明确指令与默认项目修改
+
+项目采用“默认项目可修改、风险路径单独升级”的双轨授权。用户已经明确指定目标和修改意图时，普通项目文件（包括源码、文档和测试资产）可以走 Fast Path，但必须通过 `.agents/skills/es-skill-governance/scripts/Test-ESUserDirectedLowRiskPolicy.ps1`，满足项目相对路径、风险 denylist、文件数量/字节预算、严格 UTF-8 和差异复核。
+
+风险 denylist 覆盖 `.agents` 控制面、AIWarnings/AICommands/KnowledgeIndex、ProjectSettings/Packages、凭据与密钥、生成物/发布目录、Unity 运行时、网络、外部进程、删除、重命名和 Git。命中风险路径时，验证器返回具体风险类别，只有该风险对应的 AIBrain `planTask`、AICommand、TaskContract 或人工批准可以升级；能力缺失不得阻断普通本地文件编辑。
+
+默认项目修改不授予运行、发布、网络、凭据、删除或治理路由权限，也不把模型陈述当作验收证据。用户未明确指定目标时仍保持只读，避免“默认可修改”变成无目标写入。
+
 ## 全局 Static / Runtime 语义
 
 所有 Skill 的验证必须分成两个独立轴：`Static` 只证明源码、配置、合同、哈希和确定性脚本可以证明的事实；`Runtime` 只证明 Unity、进程、显示器、时序、布局引擎或其他外部环境中的实际行为。`runtime-not-run` 表示证据尚未运行，不表示静态设计失败。`StaticReview` 可在 Runtime 未运行时完成；`RuntimeAcceptance` 和 `ReleaseAcceptance` 才要求对应的运行证据。完整规则见 `.agents/skills/es-skill-governance/references/verification-semantics.md`。
@@ -118,11 +126,28 @@ ESFrameWorkPublish/
 |---|---|
 | `$es-module-lifecycle` | 响应“审计”“审计并记录”“继续审计”，分类模块成熟度并管理固定续接检查点。 |
 | `$es-skill-governance` | 治理 Skill 的等级、权限、证据、规模与执行成本；处理慢启动、重复扫描/Hash、缓存及 Fast/Deep Path 边界。 |
-| `$es-feishu-cli` | 规划并验收经 AIBrain、`feishu.read` 与 `es.feishu.read@1` 受管执行的飞书只读认证、知识搜索和文档拉取；不授予直启 CLI 或实网权限。 |
+| `$es-feishu-cli` | 规划并验收经 AIBrain 与精确 TaskContract 受管执行的飞书知识读取、任务监控、派发、虚拟团队夹具和进度推进；外部写必须先 DryRun 并单次授权，Skill 不授予直启 CLI 或实网权限。 |
 | `$es-ai-knowledge-curation` | 从源码、AIWarnings、AICommands、Skills、测试和证据维护可追溯 Knowledge 条目与索引。 |
 | `$es-knowledge-creator` | 限制 AIKnowledge 输出范围，按 route-pack/detailed-entry/full-audit 分级生成并校验来源、哈希和证据。 |
+| `$es-knowledge-validator` | 独立、只读验证 Knowledge 条目与索引的来源哈希、身份、路由、RequiredRead 和相关 Skill 闭包。 |
 | `$es-skill-validator` | 只读验证 Skill 的结构、治理、Catalog 哈希、安全信号与验收证据；不授予执行权限。 |
 | Skill Portfolio Gate | 交付/发布前对全部直接 Skill 执行组合门禁；任一 Skill 失败或安全阻断都会阻止组合通过。 |
+
+### 商业级协作闭环入口
+
+当任务涉及“创建/重构/验收 Skill、AICommand、AIBrain、ES Automation 或 Knowledge”时，按以下顺序执行：
+
+```text
+1. 读取 Documentation/AIKnowledge/AIBRAIN_ENTRY.md
+2. 读取对应 Skill 的 static-replay.manifest.json 与 static-specialized-acceptance.md
+3. 运行 Test-ESStaticAcceptanceCoverage.ps1，确认职责静态验收基础完整
+4. 运行 Test-ESCommercialCoherence.ps1，检查 Skill、AICommand、ES Automation、Knowledge 和交付跟踪
+5. SourceRef 变化时先运行 Export-ESKnowledgeRefreshPlan.ps1
+6. 仅对稳定来源显式运行 Invoke-ESKnowledgeStableRefresh.ps1 -Apply
+7. Runtime 另行取得授权，不把 runtime-not-run 改写为失败或通过
+```
+
+商业组合报告位于 `ES/Output/Governance/commercial-coherence.json`。其中 `blocked` 表示合同或结构失败，`review` 表示证据新鲜度或版本控制待处理；两者不可混淆。
 
 ## 新文件放置决策
 

@@ -2,11 +2,38 @@ schemaVersion: 1
 indexId: esframework-aiknowledge
 status: foundational
 authority: derived-index
+qualityGate:
+  schemaVersion: 1
+  authority: Documentation/AIKnowledge/AIBRAIN_ENTRY.md
+  authorityType: discovery-and-usage-contract
+  routeSelection:
+    maxResults: 3
+    requireRouteKeyOverlap: true
+    noRecursiveEntryLoad: true
+    noMatchAction: read-start-chain-and-report-coverage-gap
+  sourcePriority: [current-source-tests-receipts, unity-official-and-version-pinned-package-source, aiwarnings-p0-and-domain-rules, aicommand-taskcontract-and-skill-contracts, aibrain-route, aiknowledge, cache-or-model-memory]
+  requiredEntryFields: [KnowledgeId, Authority, RouteKeys, RequiredReads, SourceRefs, ContentHash, EvidenceLevel, StaleWhen]
+  verification:
+    indexProfile: Index
+    entryProfile: All
+    staleOnSourceRefDrift: true
+    staleOnIndexBindingMismatch: true
+    runtimeClaimsRequireEvidence: true
+    runtimeNotRunLabel: runtime-not-run
+  outputContract:
+    mustBeActionable: true
+    requiredGuidance: [trigger, requiredReads, allowed, forbidden, failure-recovery, completion-verification, non-claims]
+    rejectSummaryOnly: true
+  deduplication:
+    policy: canonical-entry
+    oneFactOneCanonicalOwner: true
+    sharedRouteProjectionAllowed: true
+    duplicateFactAction: route-to-canonical-and-block-copy
 entries:
   - knowledgeId: es.skill.governance-creator.v1
     file: entries/skill-governance-creator.md
     topic: Skill 治理与 Creator 聚合
-    routeKeys: [skill, governance, creator, validation, evidence, tier, maturity, delivery, aibrain, risk, authority, skill-performance, execution-cost, fast-path, deep-path, cache]
+    routeKeys: [skill, governance, creator, validation, evidence, tier, maturity, delivery, aibrain, risk, authority, skill-performance, execution-cost, fast-path, deep-path, cache, commercial-coherence, delivery-tracking, evidence-receipt, report-hash, source-freshness, plan-hash, static-review, runtime-not-run]
     relatedSkills: [es-skill-governance, es-skill-creator, es-generate-agent-artifacts]
     requiredReads:
       - .agents/README.md
@@ -29,7 +56,7 @@ entries:
       - .agents/skills/es-skill-creator/scripts/quick_validate.py
     authority: Derived
     evidenceLevel: S2
-    contentHash: f14357b4c2916563be1a8e4308fe9e6fb73fb36735c1f2146f6361d96ecede8a
+    contentHash: 4303bfa0eb8727c8dc6907511c60c35b1e04144efac9fda076e53d5bf03ac95a
     staleWhen: Governance/Creator/AIBrain 合同、验证器、候选导入边界或任一 SourceRef 哈希变化
   - knowledgeId: es.aibrain.orchestration.v1
     file: entries/aibrain-orchestration.md
@@ -43,8 +70,22 @@ entries:
       - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 66af4ab2f3c606b9a9e72a8777bb4ad3a8e945c5ed0172b8b9276bc1bb1fa21b
+    contentHash: 7fa27cbbf4c88248cb8fd50896878474859b7bff454885cd2a1b9c810e53a336
     staleWhen: AIBrain/ESAutomationCenter/TaskContract/Skill治理元数据结构或权威路由变化
+  - knowledgeId: es.knowledge.routing-quality.v1
+    file: entries/knowledge-routing-quality.md
+    topic: AIKnowledge 最小路由、canonical 去重、新鲜度与错误预防
+    routeKeys: [knowledge, knowledge-quality, knowledge-output, source-ref, content-hash, stale, canonical-entry, dedup, route-probe, misroute, bounded-output, evidence-boundary, permission-boundary]
+    relatedSkills: [es-knowledge-creator, es-knowledge-validator, es-ai-knowledge-curation, es-aibrain-route-authoring, es-task-read-snapshot]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/knowledge-routing-quality.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/README.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/当前状态（CurrentStatus）.md
+      - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
+    authority: Derived from current project contracts and routing source
+    evidenceLevel: S1
+    contentHash: 4a804037658264e14af723c5cd402bf8fd9c445a5f7fa6637081b2422c1cc492
+    staleWhen: 任一 SourceRef 哈希、Knowledge 条目合同、AIBrain 选择算法、用户定向低风险策略、AICommand 权限或验证器判定规则变化
   - knowledgeId: es.aibrain.authority-startup.v1
     file: entries/authority-and-startup.md
     topic: 启动入口与权威分层
@@ -55,7 +96,7 @@ entries:
       - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
     authority: AIWarnings
     evidenceLevel: S1
-    contentHash: 42960922fdb532e8b76146bc223faddb11c422c01e1f6e92132b4dfe3cd1d2bf
+    contentHash: 494030d538bdfde2a0e3f182c4b1a70e7468e044ca5baba7167502de6dbc4458
     staleWhen: 启动链、会话合同或 AIWarnings 入口语义变化
   - knowledgeId: es.skill.selection-quality.v1
     file: entries/skill-selection-and-quality-loop.md
@@ -67,7 +108,7 @@ entries:
       - .agents/skills/es-generate-agent-artifacts/SKILL.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 67e8e54ae644d61881461801e70ba2b7bb88023bdcecc3ec97e6e0560947dbb3
+    contentHash: 9ee0777a735621b57f401bf8622ada7454a2d5e86672be6d509d3a0cbe81d41e
     staleWhen: Skill 目录合同、候选生成合同或验证器变化
   - knowledgeId: es.feishu.adapter-boundary.v1
     file: entries/feishu-adapter-boundary.md
@@ -79,8 +120,35 @@ entries:
       - Documentation/ES_AUTOMATION_CENTER_STANDARD.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 02d804f8f560c874f54ea06b4245d317fd0729517f864e9552d34b9a6a9f56eb
+    contentHash: 9d807c344b24436c35835ed69f5cad65159b4c40c956ac12288de4fac5d071a1
     staleWhen: Feishu SDK/API、凭据策略、Node Worker/C# TaskContract、Unity 受管运行证据或任一 SourceRef 哈希变化
+  - knowledgeId: es.feishu.task-lifecycle.v1
+    file: entries/feishu-task-lifecycle.md
+    topic: Feishu 受管任务监控、派发、虚拟团队与进度推进
+    routeKeys: [feishu, lark, task-monitor, task-dispatch, task-transition, virtual-team, external-write, dry-run]
+    relatedSkills: [es-feishu-cli, es-use-ai-command, es-automation-worker-authoring, es-aicommand-contract-authoring]
+    requiredReads:
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md
+      - Assets/Plugins/ES/AICommands/Feishu任务监控_AI命令.md
+      - Assets/Plugins/ES/AICommands/Feishu任务派发与推进_AI命令.md
+    authority: Derived
+    evidenceLevel: S1
+    contentHash: 2653f08cae9c2154b6cbe2d8e28e61e236443bfeaa1e46b23cf66a9bcc9c0ed1
+    staleWhen: 飞书 Task v2 SDK/API、AICommand、TaskContract、Schema、Worker、AIBrain 绑定或 Runtime 证据变化
+  - knowledgeId: es.feishu.identity-messaging.v1
+    file: entries/feishu-identity-messaging.md
+    topic: Feishu 本地角色认领、机器人所有权与单人文本消息
+    routeKeys: [feishu, lark, identity-claim, bot-ownership, onboarding, message-send, notification, task-dispatch, external-write, dry-run]
+    relatedSkills: [es-feishu-cli, es-use-ai-command, es-automation-worker-authoring, es-aicommand-contract-authoring]
+    requiredReads:
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md
+      - Assets/Plugins/ES/AICommands/Feishu本地角色与机器人认领_AI命令.md
+      - Assets/Plugins/ES/AICommands/Feishu单人文本消息发送_AI命令.md
+      - .agents/skills/es-feishu-cli/references/identity-messaging-contract.md
+    authority: Derived
+    evidenceLevel: S1
+    contentHash: 547d4755d999739cc37284d0510368bc97b1a121983a7cdea63ab647969f659a
+    staleWhen: 本地身份 AICommand/TaskContract/Schema/Store、Feishu IM SDK/API、消息 Worker、AIBrain 绑定或 Runtime 证据变化
   - knowledgeId: es.automation.governance-contracts.v1
     file: entries/automation-governance-contracts.md
     topic: ES Automation 商业级治理合同与兼容式迁移
@@ -91,7 +159,7 @@ entries:
       - Documentation/ES_AUTOMATION_GOVERNANCE_CONTRACTS.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: a65e205637537775013e2418275197388af9af8510cdee03a064edd8c2c74ab3
+    contentHash: 526f66078c8f7a43c2acfebe21674370718b2e50563718b01da30291d5d136bc
     staleWhen: ESAutomation TaskContract、CompletionDecision、Verifier 或 Receipt 合同变更
   - knowledgeId: es.function-area.governance.v1
     file: entries/function-area-routing.md
@@ -102,7 +170,7 @@ entries:
       - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 5f01837b54da850107132684007fb467f472533cc54421ffdfdc093be5eb3f84
+    contentHash: a9a6488997198455a69addd1a75f47a6c299b8b98dcd30f1b4364f8f77b0afb3
     staleWhen: AIBrain 路由、AICommand 或核心治理 Skill 变化
   - knowledgeId: es.function-area.worktree.v1
     file: entries/function-area-routing.md
@@ -113,18 +181,18 @@ entries:
       - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 5f01837b54da850107132684007fb467f472533cc54421ffdfdc093be5eb3f84
+    contentHash: a9a6488997198455a69addd1a75f47a6c299b8b98dcd30f1b4364f8f77b0afb3
     staleWhen: 工作树审计、UTF-8 门禁或验证规则变化
   - knowledgeId: es.function-area.release.v1
     file: entries/function-area-routing.md
     topic: Unity 编译与验收功能区
-    routeKeys: [unity, compile, test, release, evidence, diagnosis, verification, estest, aitest, prompt, worker]
+    routeKeys: [unity, compile, test, release, evidence, diagnosis, verification, estest, aitest, prompt, worker, profiler, domain-reload, enter-play-mode, player, il2cpp, aot]
     relatedSkills: [es-unity-compile, es-release-acceptance, es-performance-budgeting, es-observability-evidence, es-release-notes-evidence, es-fix-compile-error, es-start-estest, es-publish-aitest-prompt]
     requiredReads:
       - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 5f01837b54da850107132684007fb467f472533cc54421ffdfdc093be5eb3f84
+    contentHash: a9a6488997198455a69addd1a75f47a6c299b8b98dcd30f1b4364f8f77b0afb3
     staleWhen: Unity、测试、Profiler、Player 或发布证据规则变化
   - knowledgeId: es.function-area.gamecore.v1
     file: entries/function-area-routing.md
@@ -135,7 +203,7 @@ entries:
       - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 5f01837b54da850107132684007fb467f472533cc54421ffdfdc093be5eb3f84
+    contentHash: a9a6488997198455a69addd1a75f47a6c299b8b98dcd30f1b4364f8f77b0afb3
     staleWhen: GameCore、ConfigKey 或稳定身份规则变化
   - knowledgeId: es.function-area.resource.v1
     file: entries/function-area-routing.md
@@ -146,7 +214,7 @@ entries:
       - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 5f01837b54da850107132684007fb467f472533cc54421ffdfdc093be5eb3f84
+    contentHash: a9a6488997198455a69addd1a75f47a6c299b8b98dcd30f1b4364f8f77b0afb3
     staleWhen: ResourcePlan、Manifest、Provider 或发布链变化
   - knowledgeId: es.function-area.entity.v1
     file: entries/function-area-routing.md
@@ -157,7 +225,7 @@ entries:
       - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 5f01837b54da850107132684007fb467f472533cc54421ffdfdc093be5eb3f84
+    contentHash: a9a6488997198455a69addd1a75f47a6c299b8b98dcd30f1b4364f8f77b0afb3
     staleWhen: Entity、输入、ESCommand 或运行时契约变化
   - knowledgeId: es.function-area.editor-agent.v1
     file: entries/function-area-routing.md
@@ -168,7 +236,7 @@ entries:
       - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 5f01837b54da850107132684007fb467f472533cc54421ffdfdc093be5eb3f84
+    contentHash: a9a6488997198455a69addd1a75f47a6c299b8b98dcd30f1b4364f8f77b0afb3
     staleWhen: Editor、Graph 或候选产物边界变化
   - knowledgeId: es.engineering.editor-availability-validation.v1
     file: entries/editor-availability-validation.md
@@ -186,7 +254,7 @@ entries:
       - Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/编辑器扩展AI常识_EditorExtensionCommonSense_AI协作警告.md
     authority: Source + AIWarnings + Skill contract
     evidenceLevel: S2
-    contentHash: 1e42eba11a306b86a63256d23994470ac2ab96eb640486dc605caaf692645e4d
+    contentHash: e50c949d04d6ad7fb75f2a905d2bd6f957351550329419b96312dd528447bf4e
     staleWhen: 编辑器扩展规则、ReloadDomain/Undo/序列化边界、可用性矩阵、验证脚本或证据合同变化
   - knowledgeId: es.function-area.lifecycle.v1
     file: entries/function-area-routing.md
@@ -197,20 +265,25 @@ entries:
       - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 5f01837b54da850107132684007fb467f472533cc54421ffdfdc093be5eb3f84
+    contentHash: a9a6488997198455a69addd1a75f47a6c299b8b98dcd30f1b4364f8f77b0afb3
     staleWhen: 模块状态、会话合同或交接规则变化
   - knowledgeId: es.skill.resource-index.v1
     file: entries/skill-resource-index.md
     topic: Skill 多资源组合与 MCP/证据导航
-    routeKeys: [skill, resource-index, catalog, validation, security, reference, script, mcp, evidence, evidence-pending, static-boundary, external-side-effect, blocking-layer, knowledge-output, bounded-output, skill-performance, execution-cost, fast-path, deep-path, cache]
-    relatedSkills: [es-skill-governance, es-skill-creator, es-skill-validator, es-static-deep-replay, es-knowledge-creator, es-ai-knowledge-curation, es-aibrain-route-authoring]
+    routeKeys: [skill, resource-index, catalog, validation, security, reference, script, mcp, evidence, evidence-pending, static-boundary, external-side-effect, blocking-layer, skill-performance, execution-cost, fast-path, deep-path, cache, lifecycle, discovery, route-scope, registry, incremental-discovery]
+    relatedSkills: [es-skill-governance, es-skill-creator, es-skill-validator, es-knowledge-validator, es-static-deep-replay, es-knowledge-creator, es-ai-knowledge-curation, es-aibrain-route-authoring]
     requiredReads:
       - .agents/SKILL_RESOURCE_INDEX.yaml
       - .agents/SKILL_CATALOG.yaml
+      - .agents/SKILL_DISCOVERY_POLICY.json
+      - .agents/SKILL_REGISTRY.manifest.json
       - .agents/skills/es-skill-validator/SKILL.md
       - .agents/skills/es-skill-validator/governance.json
       - .agents/skills/es-skill-validator/scripts/Invoke-ESSkillValidation.ps1
       - .agents/skills/es-skill-validator/scripts/Test-ESSkillEvidence.ps1
+      - .agents/skills/es-knowledge-validator/SKILL.md
+      - .agents/skills/es-knowledge-validator/governance.json
+      - .agents/skills/es-knowledge-validator/scripts/Invoke-ESKnowledgeValidation.ps1
       - .agents/skills/es-static-deep-replay/SKILL.md
       - .agents/skills/es-static-deep-replay/governance.json
       - .agents/skills/es-static-deep-replay/scripts/Invoke-ESStaticDeepReplay.ps1
@@ -218,10 +291,12 @@ entries:
       - .agents/skills/es-skill-validator/references/validation-rubric.md
       - .agents/skills/es-skill-validator/references/boundary-decision-contract.md
       - .agents/skills/es-skill-governance/references/verification-semantics.md
+      - .agents/skills/es-skill-governance/scripts/Test-ESSkillArchitecture.ps1
+      - .agents/skills/es-skill-governance/scripts/Build-ESSkillRegistryManifest.ps1
       - Documentation/AIKnowledge/AIBRAIN_ENTRY.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 2b6979d63daba1e2f8525f95b2b50b472aec41a655e8c8ac935275a8ca8a0c85
+    contentHash: dfe51d6e04f8521003dc382a9dc1872f1172fab6b9762e91909327c1f9d3940a
     staleWhen: Skill 资源索引、AIBrain 路由或 MCP 能力合同变化
   - knowledgeId: es.aiwarnings.domain-map.v1
     file: entries/aiwarnings-domain-map.md
@@ -234,10 +309,10 @@ entries:
       - Assets/Plugins/ES/AIWarnings/00_开始阅读（Start）/规则索引（RuleIndex）.md
     authority: AIWarnings
     evidenceLevel: S1
-    contentHash: ba3e37a86cbf92bacf94131a83914f5b116e9f91df46985aece5312f692cd338
+    contentHash: 32db49cc160b3638d381f9f002359373d72b134fa9e171c3502451eba90b3667
     staleWhen: 任一 AIWarnings Start SourceRef、RuleIndex 或领域目录边界变化
   - knowledgeId: es.aiwarnings.domain-inventory.v1
-    file: AIWarningsDomainInventory.yaml
+    file: entries/aiwarnings-domain-inventory.md
     topic: AIWarnings 文件级领域清单
     routeKeys: [aiwarnings, inventory, p0, architecture, runtime, editor, validation, handover, archive]
     relatedSkills: [es-ai-knowledge-curation, es-aiwarning-authoring, es-aibrain-route-authoring]
@@ -248,7 +323,7 @@ entries:
       - .agents/skills/es-ai-knowledge-curation/scripts/Build-ESAIWarningsInventory.ps1
     authority: Derived
     evidenceLevel: S1
-    contentHash: 7c1f3cfc06b9dceea2dd78d12f00c7015099d32d8f91a7855d8d0eb1f0bd317a
+    contentHash: d57601b017a5ea91d1fb81bdb68775d7c3b83dc5cf145ae42dbd72ba4e98c99c
     staleWhen: AIWarnings 文件数量、目录边界、SourceRef 哈希或 RuleIndex 变化
   - knowledgeId: es.project.gamecore-identity-registration.v1
     file: entries/gamecore-identity-registration.md
@@ -286,13 +361,14 @@ entries:
   - knowledgeId: es.project.automation-aibrain-graph.v1
     file: entries/automation-aibrain-graph.md
     topic: AutomationCenter、AIBrain、Graph 与受管 Worker 完整机制
-    routeKeys: [automation, aibrain, task-contract, worker, run-record, graph, skill, aicommand, mcp]
-    relatedSkills: [es-aibrain-route-authoring, es-automation-worker-authoring, es-aicommand-contract-authoring, es-stable-graph-authoring]
+    routeKeys: [automation, aibrain, task-contract, worker, automation-run-record, agent-execution-graph, skill, aicommand, mcp]
+    relatedSkills: [es-aibrain-route-authoring, es-automation-worker-authoring, es-aicommand-contract-authoring]
     requiredReads:
-      - Documentation/AIKnowledge/entries/automation-aibrain-graph.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md
+      - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md
     authority: Source + AIWarnings
     evidenceLevel: S1
-    contentHash: ca879f3946d30c0d2a75bdbf1d32bf0a3218bba22fcfe13a16731f6eedbb1faf
+    contentHash: 86147857ed96cb54db4da523b711816a050cb122950da734db0b9d3e2e1fac43
     staleWhen: PlanHash、TaskContract、Worker、Bridge、Graph 或 RunRecord 合同变化
   - knowledgeId: es.project.editor-workbench-authoring.v1
     file: entries/editor-workbench-authoring.md
@@ -303,12 +379,12 @@ entries:
       - Documentation/AIKnowledge/entries/editor-workbench-authoring.md
     authority: Source + AIWarnings
     evidenceLevel: S1
-    contentHash: 779f873a27efa9221c5e274c93c7ae8579f13e9fad1fab9e5155e0d2876878d7
+    contentHash: 47840604dce786ba7bf07b6c2ade04c422ba5f9ec0d9539a484107a948f477f1
     staleWhen: Workbench、Contribution、Draft/Source、Undo 或正式输出后端变化
   - knowledgeId: es.project.ui-automation-authoring.v1
     file: entries/ui-automation-authoring.md
     topic: ScreenSpec v3 游戏 UI 自动化装配、布局治理与视觉证据边界
-    routeKeys: [ui-automation, screen-spec-v3, ui, prefab, fixture-scene, layout, responsive, visual-qa, asset-fallback, fixture]
+    routeKeys: [ui-automation, screen-spec-v3, ui-prefab, ui-fixture-scene, ui-layout, responsive, visual-qa, asset-fallback]
     relatedSkills: [es-ui-prefab-authoring, es-unity-compile]
     requiredReads:
       - Documentation/AIKnowledge/entries/ui-automation-authoring.md
@@ -368,7 +444,7 @@ entries:
     requiredReads: [Documentation/AIKnowledge/entries/runtime-ui-window-current-state.md]
     authority: Source + AIWarnings reconciliation
     evidenceLevel: S1
-    contentHash: 97c07cf0bafbdd8191b54fb311bd2771374fbdbec7b19f15e7f1424d086f899d
+    contentHash: aea241636d1583fd89fd8223636a45692f37aa1a63936c177c55b8ba737f1609
     staleWhen: RuleIndex 状态、UI Window 源码、AICommand 或运行证据变化
   - knowledgeId: es.project.shader-atlas-rendering.v1
     file: entries/shader-atlas-rendering.md
@@ -403,12 +479,12 @@ entries:
   - knowledgeId: es.project.scene-release-evidence.v1
     file: entries/scene-release-evidence.md
     topic: 测试场景、发布验收与证据等级
-    routeKeys: [scene-validation, guide, builder, acceptance, release, evidence, receipt, profiler, unity]
+    routeKeys: [scene-validation, scene-guide, acceptance, release, evidence, receipt, profiler, unity]
     relatedSkills: [es-release-acceptance, es-test-fixture-authoring, es-observability-evidence, es-worktree-audit]
     requiredReads: [Documentation/AIKnowledge/entries/scene-release-evidence.md]
     authority: Source + AIWarnings + Skill contract
     evidenceLevel: S1
-    contentHash: af1b142b6f9a18b3ef334231ef5b3ab6f494ade68ac323b6af3e3472d6612dec
+    contentHash: 54aa1cb6045ded71d2ea7d39c5ca37a568085bc703cf944a9e927a0501cee1a4
     staleWhen: Scene Guide、Builder 权威、证据矩阵、receipt 合同或发布入口变化
   - knowledgeId: es.project.game-manager-save-transaction.v1
     file: entries/game-manager-save-transaction.md
@@ -442,7 +518,7 @@ entries:
       - ES/Output/FileProjectionParsers.json
     authority: Source + Skill contract
     evidenceLevel: S2
-    contentHash: e9f7fb04cc4f7282f356a5856741fd859cc10fd3d8a5fac12ccd535d7fc55280
+    contentHash: 4744c8b554b5c98e40f8468e2ac65750a6290d28cb4bbd0ad1945532a67b341d
     staleWhen: AIBrain 目标分类、Task Read Snapshot 合同、Parser Registry、ProjectionPacket 或缓存键/失效规则变化
   - knowledgeId: es.engineering.skill-session-refresh.v1
     file: entries/skill-session-refresh.md
@@ -457,12 +533,12 @@ entries:
       - Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs
     authority: Source + Skill contract
     evidenceLevel: S2
-    contentHash: 30c267bea295234dfacc59e87800701f23bd1d1760cb9fab0434752f4c69c911
+    contentHash: 8e5d03180f4b3f8a84620348fd9e3c05b561a467d3e60057b91851cabed30386
     staleWhen: Skill Catalog、Resource Index、Knowledge 路由、Skill 哈希、治理合同或当前会话 PlanHash 绑定变化
   - knowledgeId: es.unity.ui-canvas-layout.v1
     file: UI/unity-ui-canvas-layout.md
     topic: Unity UGUI Canvas、RectTransform 与响应式布局
-    routeKeys: [knowledge, ui, ui-unity, ui-canvas, ui-layout, ui-responsive, rect-transform, canvas-scaler]
+    routeKeys: [ui, ui-unity, ui-canvas, ui-layout, ui-responsive, rect-transform, canvas-scaler]
     relatedSkills: [es-ui-prefab-authoring, es-editor-tooling, es-unity-compile, es-knowledge-creator, es-ai-knowledge-curation]
     requiredReads:
       - Documentation/AIKnowledge/UI/unity-ui-canvas-layout.md
@@ -512,3 +588,245 @@ entries:
     evidenceLevel: S2
     contentHash: a4ebf91f9304527acefa98658194f87b93b0885e3354daec5d71907af72ee15d
     staleWhen: Unity/UGUI/Input System 版本、EventSystem/Raycaster/Selectable 合同、输入资产或任一 SourceRef 哈希变化
+  - knowledgeId: es.project.command-runner-lifecycle.v1
+    file: ESFramework/project-entity-input-command-runtime/command-runner-lifecycle.md
+    topic: ESCommand、Player、RunnerTick 与服务边界
+    routeKeys: [command, player, runner, runner-tick, playable, cancel, virtual-input, runtime-mode, lifecycle]
+    relatedSkills: [es-command-authoring, es-input-action]
+    requiredReads: [Documentation/AIKnowledge/ESFramework/project-entity-input-command-runtime/command-runner-lifecycle.md]
+    authority: Current source + AIWarnings
+    evidenceLevel: S1
+    contentHash: 2c52d7c286246ac460667430874df70331d875b490867d6c948a73cd7e2676d7
+    staleWhen: ESCommand 返回合同、Player、RunnerTick、服务注入、RuntimeMode 或任一 SourceRef 哈希变化
+  - knowledgeId: es.project.entity-control-ownership.v1
+    file: ESFramework/project-entity-input-command-runtime/entity-control-ownership.md
+    topic: Entity 控制所有权与生命周期边界
+    routeKeys: [entity, prefab, domain, control, writer, permit, lifecycle, pool]
+    relatedSkills: [es-entity-authoring, es-entity-prefab-validation]
+    requiredReads: [Documentation/AIKnowledge/ESFramework/project-entity-input-command-runtime/entity-control-ownership.md]
+    authority: Current source + AIWarnings P0
+    evidenceLevel: S1
+    contentHash: d5a761bf326ae22bb0ca9b18790f0d69119e8722d356f440e2ab899fcc336a27
+    staleWhen: Entity 生命周期、Prefab 入口、控制所有权、Permit、挂载路由或任一 SourceRef 哈希变化
+  - knowledgeId: es.project.input-runtime-mode-routing.v1
+    file: ESFramework/project-entity-input-command-runtime/input-runtime-mode-routing.md
+    topic: InputAction、RuntimeMode 与实体意图路由
+    routeKeys: [input, input-action, binding, profile, virtual-input, runtime-mode, policy, control]
+    relatedSkills: [es-input-action, es-entity-authoring]
+    requiredReads: [Documentation/AIKnowledge/ESFramework/project-entity-input-command-runtime/input-runtime-mode-routing.md]
+    authority: Current source + AIWarnings + Unity package documentation
+    evidenceLevel: S1
+    contentHash: e792a3fb1d23bc8ec7fe098fff2771f619f27d0bb349c75d8055746f2955a678
+    staleWhen: Unity/Input System 版本、Action/Binding/Profile、RuntimeMode Policy 或任一 SourceRef 哈希变化
+  - knowledgeId: esframework.project.configkey-runtimekey-catalog.v1
+    file: ESFramework/project-gamecore-stable-identity/configkey-runtimekey-catalog.md
+    topic: ConfigKey、Catalog 与 RuntimeKey 身份边界
+    routeKeys: [gamecore, config-key, stable-key, enum-key, string-key, catalog, runtime-key, schema-hash]
+    relatedSkills: [es-gamecore-config-authoring, es-tag-config, es-gamecore-integration, es-ai-knowledge-curation]
+    requiredReads: [Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/configkey-runtimekey-catalog.md]
+    authority: Source + AIWarnings
+    evidenceLevel: S1
+    contentHash: 5fa07a272f6b4d0c0f2bb7cae859cc7c76386d690fb22b30f07f8581d56f3ee9
+    staleWhen: SourceRef、Unity 版本、稳定 Key、Catalog、SchemaHash、RuntimeKey 生命周期或证据边界变化
+  - knowledgeId: esframework.project.gamecore-content-registration-transaction.v1
+    file: ESFramework/project-gamecore-stable-identity/content-registration-transaction.md
+    topic: GameCore 内容注册事务
+    routeKeys: [gamecore, content-registration, preview, commit, cas, guid, local-file-id, consumer, rollback, idempotency]
+    relatedSkills: [es-gamecore-config-authoring, es-gamecore-integration, es-ai-knowledge-curation, es-editor-tooling]
+    requiredReads: [Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/content-registration-transaction.md]
+    authority: Source + AIWarnings + Unity official documentation
+    evidenceLevel: S1
+    contentHash: c8836122a857f8e7cb72987669ec447a3ec462319f90aa58b63be94ea2c3facd
+    staleWhen: SourceRef、Unity Editor API、Preview/Commit/CAS、Dirty、Rollback、幂等或 Consumer 同步合同变化
+  - knowledgeId: esframework.project.gamecore-root-runtime-data.v1
+    file: ESFramework/project-gamecore-stable-identity/gamecore-root-runtime-data.md
+    topic: GameCore 根 SO 与 RuntimeData 稳定驻留
+    routeKeys: [gamecore, root-so, runtime-data, retained-shell, ready, sodata, group, pack, injection]
+    relatedSkills: [es-gamecore-integration, es-gamecore-config-authoring, es-ai-knowledge-curation]
+    requiredReads: [Documentation/AIKnowledge/ESFramework/project-gamecore-stable-identity/gamecore-root-runtime-data.md]
+    authority: Source + AIWarnings + Unity official documentation
+    evidenceLevel: S1
+    contentHash: 30821b6494f4940ef576b63e5fdaac0f848525ce8608a7eca5ad747e406efc6a
+    staleWhen: SourceRef、Unity 版本、GameCore 聚合、RuntimeData 驻留、Ready 顺序或依赖方向变化
+  - knowledgeId: es.project.resource-runtime-lease-boundaries.v1
+    file: ESFramework/project-resource-runtime-lease/resource-runtime-lease-boundaries.md
+    topic: ESFramework 资源运行时 Lease 与释放边界
+    routeKeys: [resource, asset, manifest, resource-plan, asset-refer, owner-scope, temporary-scope, lease, release, provider-transition]
+    relatedSkills: [es-resource-pipeline, es-resource-publish-audit]
+    requiredReads: [Documentation/AIKnowledge/ESFramework/project-resource-runtime-lease/resource-runtime-lease-boundaries.md]
+    authority: Current source + AIWarnings P0 + Unity package metadata
+    evidenceLevel: S1
+    contentHash: aeca934e76eb7618774304c9480236746e5f6fcd92c3f3f4e328ef8bb86b108f
+    staleWhen: Unity/AssetBundle、Manifest、RuntimeMap、Provider、Scope、ResourcePlan、释放安全点或任一 SourceRef 哈希变化
+  - knowledgeId: es.project.runtime-lifecycle-pool-arbitration.v1
+    file: ESFramework/project-runtime-lifecycle-pool-arbitration/runtime-lifecycle-pool-arbitration.md
+    topic: ESGenericLife、Pool、Operation、Lease 与请求仲裁边界
+    routeKeys: [runtime, lifecycle, generic-life, pool, operation, lease, request, arbitration, commit, executor, ownership]
+    relatedSkills: [es-entity-authoring, es-performance-budgeting, es-test-fixture-authoring]
+    requiredReads: [Documentation/AIKnowledge/ESFramework/project-runtime-lifecycle-pool-arbitration/runtime-lifecycle-pool-arbitration.md]
+    authority: Current source + AIWarnings P0 + Unity official documentation
+    evidenceLevel: S1
+    contentHash: 5e6783219da08239a4587fe86c22d3a55abe75b741db9d07e211b18beaf99374
+    staleWhen: Unity 生命周期、Pool、ESGenericLife、Operation、Lease、请求仲裁或任一 SourceRef 哈希变化
+  - knowledgeId: es.project.editor-asset-authoring.v1
+    file: Editor/project-editor-asset-authoring.md
+    topic: ES Editor 正式资产生产与事务边界
+    routeKeys: [editor, asset-authoring, asset-database, prefab, scene, serialized-object, undo, dirty, save, transaction, stable-identity]
+    relatedSkills: [es-editor-tooling, es-api-contract-review]
+    requiredReads: [Documentation/AIKnowledge/Editor/project-editor-asset-authoring.md]
+    authority: Unity official documentation + current source + AIWarnings
+    evidenceLevel: S1
+    contentHash: 3bd0637e1b4a313e266bf14beaa0dd17913112bfa139bbc5b2d82e9732365d61
+    staleWhen: Unity Editor、正式资产事务、SourceRef 或共享路由变化
+  - knowledgeId: es.unity.editor-window-lifecycle-menu.v1
+    file: Editor/project-editor-asset-authoring/editor-window-lifecycle-menu.md
+    topic: Unity EditorWindow 生命周期与 ES 菜单边界
+    routeKeys: [editor, editor-window, reload-domain, session-state, menu-item, menu-architecture, single-instance, owner-lifecycle]
+    relatedSkills: [es-editor-tooling, es-editor-availability-validator]
+    requiredReads: [Documentation/AIKnowledge/Editor/project-editor-asset-authoring/editor-window-lifecycle-menu.md]
+    authority: Unity official documentation + AIWarnings + current source
+    evidenceLevel: S1
+    contentHash: 4196cea8a7e905dd048e43443e6017dd3cab031a9395c91a23521e2fd122b6b0
+    staleWhen: Unity Editor、EditorWindow、Domain Reload、SessionState、菜单架构或任一 SourceRef 哈希变化
+  - knowledgeId: es.unity.editor-prefab-asset-transaction.v1
+    file: Editor/project-editor-asset-authoring/prefab-asset-transaction.md
+    topic: Prefab 正式资产编辑与提交事务
+    routeKeys: [editor, prefab, asset-authoring, prefab-override, save-as-prefab-asset, stable-identity, preflight, commit, rollback, idempotency]
+    relatedSkills: [es-editor-tooling, es-entity-prefab-validation]
+    requiredReads: [Documentation/AIKnowledge/Editor/project-editor-asset-authoring/prefab-asset-transaction.md]
+    authority: Unity official documentation + AIWarnings + current source
+    evidenceLevel: S1
+    contentHash: b34cb9b7e0ccc41ee15342b66812b1ace9886964c27ef9634b9a652d8b0e8c76
+    staleWhen: Unity Prefab、AssetDatabase、内容注册事务、稳定身份、测试定义或任一 SourceRef 哈希变化
+  - knowledgeId: es.unity.editor-serialized-undo-dirty.v1
+    file: Editor/project-editor-asset-authoring/serialized-property-undo-dirty.md
+    topic: SerializedProperty、Undo 与 Dirty 写入合同
+    routeKeys: [editor, serialized-object, serialized-property, multi-object, undo, dirty, prefab-override, rollback]
+    relatedSkills: [es-editor-tooling, es-api-contract-review]
+    requiredReads: [Documentation/AIKnowledge/Editor/project-editor-asset-authoring/serialized-property-undo-dirty.md]
+    authority: Unity official documentation + AIWarnings + current source
+    evidenceLevel: S1
+    contentHash: d9d617c7166a8e19071fcb72222b0c02ae72a6e6035b8a563c37dbab4ef960c3
+    staleWhen: Unity SerializedObject、Undo、Dirty、Prefab override、ES 多目标写入或任一 SourceRef 哈希变化
+  - knowledgeId: es.unity.editor.project-scene-builder-authority.v1
+    file: Editor/project-scene-builder-authority/scene-builder-prefab-fixture-backup-authority.md
+    topic: 场景构建器、Prefab Override、Fixture 布局与备份权威
+    routeKeys: [scene-validation, scene-builder, prefab-override, scene-fixture, scene-layout, scene-backup, backup-manifest]
+    relatedSkills: [es-test-fixture-authoring, es-editor-tooling, es-release-acceptance]
+    requiredReads: [Documentation/AIKnowledge/Editor/project-scene-builder-authority/scene-builder-prefab-fixture-backup-authority.md]
+    authority: Source + AIWarnings + Unity official documentation
+    evidenceLevel: S1
+    contentHash: 76b18c81584c954e10ea7578c8b7b15f119a186a4ec554fb49206f71cc8bea45
+    staleWhen: Unity、Scene Builder、Fixture Spec、Prefab 审计、Scene Guide、备份分层或任一 SourceRef 哈希变化
+  - knowledgeId: es.editor.project-screen-spec-materializer.prefab-fixture-structure.v1
+    file: Editor/project-screen-spec-materializer/materializer-prefab-fixture-structure.md
+    topic: Materializer、Prefab 与 Fixture Scene 结构
+    routeKeys: [materializer, prefab, fixture-scene, ui-hierarchy, canvas, canvas-scaler, profile-state]
+    relatedSkills: [es-ui-prefab-authoring, es-unity-compile]
+    requiredReads: [Documentation/AIKnowledge/Editor/project-screen-spec-materializer/materializer-prefab-fixture-structure.md]
+    authority: Current project source + Unity UGUI package source/documentation
+    evidenceLevel: S1
+    contentHash: e02d178fa6592ced6c3fe0def9703101056aa8ef2a42e5ac6325d1cede9e4ce1
+    staleWhen: Unity/UGUI、Materializer、Prefab/Fixture 结构、Canvas 配置或任一 SourceRef 哈希变化
+  - knowledgeId: es.editor.project-screen-spec-materializer.screen-spec-components.v1
+    file: Editor/project-screen-spec-materializer/screen-spec-component-registration.md
+    topic: ScreenSpec v3 与组件注册边界
+    routeKeys: [screen-spec-v3, ui-automation, component-registry, ui-component, semantic-preservation, materializer]
+    relatedSkills: [es-ui-prefab-authoring, es-unity-compile]
+    requiredReads: [Documentation/AIKnowledge/Editor/project-screen-spec-materializer/screen-spec-component-registration.md]
+    authority: Current project source + governed UI authoring contracts
+    evidenceLevel: S1
+    contentHash: 2df4fd0905f2e4d218f694f4e699ade386008ff2bea56f5f349b0d1ea62dfe55
+    staleWhen: ScreenSpec v3、组件注册表、Validator、Adapter、Materializer 或任一 SourceRef 哈希变化
+  - knowledgeId: es.editor.project-screen-spec-materializer.visual-evidence.v1
+    file: Editor/project-screen-spec-materializer/visual-evidence-boundary.md
+    topic: ScreenSpec Materializer 视觉证据边界
+    routeKeys: [visual-qa, visual-evidence, fixture, gpu-capture, snapshot, runtime-evidence, evidence-boundary]
+    relatedSkills: [es-ui-prefab-authoring, es-unity-compile, es-release-acceptance]
+    requiredReads: [Documentation/AIKnowledge/Editor/project-screen-spec-materializer/visual-evidence-boundary.md]
+    authority: AIWarnings P0 + current Materializer source + governed evidence contract
+    evidenceLevel: S1
+    contentHash: 9e5d82d40e823eeb9f0b1875e24b3977116f657424e4981688602cb5a8eee3ba
+    staleWhen: Unity、Materializer 捕获、证据等级、UI 作者工作流或任一 SourceRef 哈希变化
+  - knowledgeId: es.project.stable-graph-v2.v1
+    file: Editor/project-stable-graph-v2/stable-graph-v2-authoring.md
+    topic: Stable Graph V2 稳定身份、Undo、迁移与烘焙边界
+    routeKeys: [editor, graph, stable-graph-v2, graph-identity, graph-undo, graph-migration, edge-order, graph-snapshot, graph-bake, legacy-graph]
+    relatedSkills: [es-stable-graph-authoring, es-editor-tooling]
+    requiredReads:
+      - Assets/Plugins/ES/AIWarnings/40_编辑器与工具（EditorTooling）/菜单与窗口（MenuWindow）/GraphView与NodeRunner_数据权威稳定身份与重构门禁_AI协作警告.md
+      - Assets/Plugins/ES/AIWarnings/10_P0最高约束（P0Guardrails）/配置与稳定身份（IdentityConfig）/项目最高警告_P0_高频命名清晰与P1_无意义包装禁止_AI协作警告.md
+    authority: Current source + AIWarnings domain rule + Unity official documentation
+    evidenceLevel: S1
+    contentHash: f7e95e3735c2ee19c9271fe646c8862024a04f1a87536060550c60119b4343c8
+    staleWhen: Unity、Graph schema/身份/order、编辑事务、迁移、Snapshot、Bake 或任一 SourceRef 哈希变化
+  - knowledgeId: es.engineering.fixture-visual-qa.v1
+    file: Engineering/engineering-fixture-visual-qa/deterministic-fixture-visual-qa.md
+    topic: 确定性 Fixture、EditMode/PlayMode 与视觉 QA 证据
+    routeKeys: [fixture, test-fixture, deterministic, editmode, playmode, screenshot, resolution, visual-qa, evidence, failure-recovery]
+    relatedSkills: [es-test-fixture-authoring, es-release-acceptance, es-observability-evidence]
+    requiredReads: [Documentation/AIKnowledge/Engineering/engineering-fixture-visual-qa/deterministic-fixture-visual-qa.md]
+    authority: Source + AIWarnings + Unity package documentation + Skill contracts
+    evidenceLevel: S2
+    contentHash: 475b605571540ed7a509d508fed64f228469e8e2cdef33a2710f1fa65af607d9
+    staleWhen: Unity/Test Framework/UGUI、Fixture、视觉证据、场景 Builder/Guide 或任一 SourceRef 哈希变化
+  - knowledgeId: es.unity.compile-player-il2cpp-evidence.v1
+    file: Engineering/engineering-unity-compile-il2cpp-acceptance/unity-compile-player-il2cpp-evidence.md
+    topic: Unity 编译、Player、IL2CPP/AOT 与裁剪证据边界
+    routeKeys: [unity, compile, csproj, domain-reload, player, il2cpp, aot, hybridclr, managed-stripping, link-xml, evidence, unity-build-stability, build-risk, build-recovery, build-regression]
+    relatedSkills: [es-unity-compile, es-release-acceptance, es-change-risk-register, es-worktree-audit]
+    requiredReads: [Documentation/AIKnowledge/Engineering/engineering-unity-compile-il2cpp-acceptance/unity-compile-player-il2cpp-evidence.md]
+    authority: Project settings + AIWarnings P0 + Skill contracts + HybridCLR package source
+    evidenceLevel: S1
+    contentHash: eeab972fae3680737728d2b73d602347444b054327e8a66c0ff82cfc3a052566
+    staleWhen: Unity、PlayerSettings、HybridCLR、编译/发布/风险/工作树 Skill、AIWarnings P0 或任一 SourceRef 哈希变化
+  - knowledgeId: es.unity.lifecycle-domain-reload.v1
+    file: Unity/unity-lifecycle-domain-reload/unity-lifecycle-domain-reload.md
+    topic: Unity MonoBehaviour 生命周期、静态状态与 Domain Reload
+    routeKeys: [unity, monobehaviour, lifecycle, static-state, domain-reload, scene-reload, enter-play-mode, script-execution-order, execute-always]
+    relatedSkills: [es-unity-compile]
+    requiredReads: [Documentation/AIKnowledge/Unity/unity-lifecycle-domain-reload/unity-lifecycle-domain-reload.md]
+    authority: Unity official manuals + installed API documentation + project settings
+    evidenceLevel: S1
+    contentHash: 3716bb8d5063c78d4f5b84cd21de05989a27add1c522d8a92cf2e9c2e4c7991e
+    staleWhen: Unity、Enter Play Mode 设置、官方资料、本机 API XML 或任一 SourceRef 哈希变化
+  - knowledgeId: es.unity.rendering-material-atlas.v1
+    file: Unity/unity-rendering-material-atlas/unity-rendering-material-atlas.md
+    topic: Unity Shader、Material、SpriteAtlas 与 Canvas 合批边界
+    routeKeys: [unity, rendering, shader, material, shader-keyword, shader-variant, material-variant, sprite-atlas, ui-canvas, canvas-sorting, ui-batching, draw-call, frame-debugger, srp-batcher, material-property-block, mask, stencil, batch-break]
+    relatedSkills: [es-editor-tooling, es-performance-budgeting, es-observability-evidence, es-unity-compile, es-release-acceptance]
+    requiredReads: [Documentation/AIKnowledge/Unity/unity-rendering-material-atlas/unity-rendering-material-atlas.md]
+    authority: Unity package documentation + package source + project version
+    evidenceLevel: S2
+    contentHash: fd809872c9d3dcc3507446d98ff248f573fa6bd53b70d17b832842496912f5bc
+    staleWhen: Unity/URP/UGUI、Shader Keyword/Variant、Material、SpriteAtlas、Canvas 或任一 SourceRef 哈希变化
+  - knowledgeId: es.unity.serialization-prefab-identity.v1
+    file: UnitySerializationPrefab/unity-serialization-prefab-identity.md
+    topic: Unity 序列化、Prefab 与持久身份
+    routeKeys: [unity, serialization, prefab, asset-guid, local-file-id, instance-id, serialize-reference, field-migration, prefab-override]
+    relatedSkills: [es-editor-tooling, es-api-contract-review, es-entity-prefab-validation]
+    requiredReads: [Documentation/AIKnowledge/UnitySerializationPrefab/unity-serialization-prefab-identity.md]
+    authority: Unity official documentation + UnityCsReference + project version
+    evidenceLevel: S1
+    contentHash: 697d242d955d9b0d6f61e32b4c9fc3340cc36b538ab99a8555ee33ca13e946a3
+    staleWhen: Unity、序列化、AssetDatabase、PrefabUtility、官方资料快照或任一 SourceRef 哈希变化
+  - knowledgeId: es.engineering.hot-path-container-performance-evidence.v1
+    file: Engineering/engineering-performance-evidence/hot-path-container-performance-evidence-contract.md
+    topic: 热路径容器预热、扩容、池化与性能证据合同
+    routeKeys: [performance, runtime-hot-container, container-warmup, steady-state-gc, capacity-growth, pool, prewarm, profiler, run-record, evidence, zero-gc]
+    relatedSkills: [es-ai-knowledge-curation, es-performance-budgeting, es-observability-evidence, es-first-principles-analysis, es-adversarial-review, es-use-ai-command]
+    requiredReads: [Documentation/AIKnowledge/Engineering/engineering-performance-evidence/hot-path-container-performance-evidence-contract.md]
+    authority: Unity official documentation + Source + AIWarnings + AICommand + Skill contracts
+    evidenceLevel: S1
+    contentHash: e9b0d4ed77d583e6d06c8147a3b2f923bc852fffa0fad02833c3e54b0b74a40a
+    staleWhen: Unity、热路径容器 P0、Pool、性能预算、证据回执、Automation RunRecord、AICommand、目标平台或任一 SourceRef 哈希变化
+  - knowledgeId: es.project.entity-kcc-motion.v1
+    file: ESFramework/project-entity-physics-motion/entity-kcc-motion.md
+    topic: Entity KCC 运动所有权、固定步与运动影响边界
+    routeKeys: [entity, motion, kcc, fixed-step, grounding, moving-platform, teleport, motion-influence, velocity, character-controller]
+    relatedSkills: [es-entity-authoring, es-entity-prefab-validation, es-performance-budgeting, es-test-fixture-authoring, es-release-acceptance]
+    requiredReads: [Documentation/AIKnowledge/ESFramework/project-entity-physics-motion/entity-kcc-motion.md]
+    authority: Current project source + AIWarnings + bundled KCC source + project settings
+    evidenceLevel: S1
+    contentHash: 4faa17d34c972a0aed5579c3a9cf6b85579aa3dc7b74a24e142eaa7b982aa247
+    staleWhen: Unity 版本、Time/Physics 设置、Entity/EntityKCCData、KCC 接口或系统、运动影响测试定义、AIWarnings 运动规则或任一 SourceRef 哈希变化

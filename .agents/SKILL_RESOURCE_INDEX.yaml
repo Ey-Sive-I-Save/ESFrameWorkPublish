@@ -37,7 +37,7 @@ rules:
   - id: skill.discovery.route-scope
     statement: Operational discovery requires a task route scope; an empty route scope must request re-planning and may not trigger whole-portfolio Skill正文读取.
   - id: skill.discovery.registry-manifest
-    statement: Skill Catalog, Resource Index, Knowledge Index, AICommand Catalog and discovery policy are bound by the generated Skill Registry Manifest; a generation or metadata hash mismatch is stale and requires rebuild before acceptance.
+    statement: Skill Catalog, Resource Index, AIBRAIN route entry, AICommand Catalog and discovery policy are bound by the generated Skill Registry Manifest; KnowledgeIndex is validated by its own SourceRef/ContentHash contract and by the dependency-closure check. Any generation or metadata hash mismatch is stale and requires rebuild before acceptance.
   - id: skill.portfolio.gate
     statement: Before project-level acceptance or release, Test-ESSkillPortfolio.ps1 must run across every direct Skill; any contract, required-resource, hash or security block keeps the portfolio blocked.
   - id: skill.execution.performance-path
@@ -53,7 +53,7 @@ currentSkills:
   - {name: es-editor-tooling, family: project-editor, routeKeys: [editor, ui, graph], mcp: [unity-editor]}
   - {name: es-editor-availability-validator, family: engineering, routeKeys: [editor, editor-window, editor-extension, reload-domain, interaction, visual, availability, validation, evidence], mcp: [none-required]}
   - {name: es-entity-authoring, family: project-entity, routeKeys: [entity, prefab, runtime], mcp: [unity-editor]}
-  - {name: es-feishu-cli, family: project, routeKeys: [feishu, lark, external-adapter, dry-run], mcp: [none-required]}
+  - {name: es-feishu-cli, family: project, routeKeys: [feishu, lark, external-adapter, dry-run, task-monitor, task-dispatch, task-transition, virtual-team, identity-claim, bot-ownership, onboarding, message-send, notification], mcp: [none-required]}
   - {name: es-first-principles-analysis, family: governance, routeKeys: [analysis, design, architecture], mcp: [none-required]}
   - {name: es-fix-compile-error, family: engineering, routeKeys: [compile, diagnosis, csharp], mcp: [unity-editor]}
   - {name: es-gamecore-integration, family: project-gamecore, routeKeys: [gamecore, config, identity], mcp: [unity-editor]}
@@ -77,4 +77,4 @@ currentSkills:
   - {name: es-worktree-audit, family: engineering, routeKeys: [worktree, git, change-boundary], mcp: [none-required]}
 newSkills:
   engineering: [es-repository-discovery, es-change-risk-register, es-test-fixture-authoring, es-api-contract-review, es-dependency-boundary-audit, es-performance-budgeting, es-observability-evidence, es-migration-planning, es-security-input-audit, es-release-notes-evidence]
-  project: [es-ai-knowledge-curation, es-knowledge-creator, es-skill-validator, es-aibrain-route-authoring, es-aiwarning-authoring, es-aicommand-contract-authoring, es-stable-graph-authoring, es-resource-publish-audit, es-gamecore-config-authoring, es-entity-prefab-validation, es-automation-worker-authoring]
+  project: [es-ai-knowledge-curation, es-knowledge-creator, es-knowledge-validator, es-skill-validator, es-aibrain-route-authoring, es-aiwarning-authoring, es-aicommand-contract-authoring, es-stable-graph-authoring, es-resource-publish-audit, es-gamecore-config-authoring, es-entity-prefab-validation, es-automation-worker-authoring]

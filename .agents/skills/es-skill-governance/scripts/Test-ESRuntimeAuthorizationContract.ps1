@@ -24,7 +24,7 @@ try {
         timeBudgetSeconds = 60; timeoutSeconds = 30; stopCondition = 'stop-on-first-boundary-failure'; oneTime = $true
         developerApproval = 'fixture-approved'
     }
-    function Write-Authorization([hashtable]$value) {
+    function Write-Authorization([System.Collections.IDictionary]$value) {
         [IO.File]::WriteAllText($authorizationPath, ($value | ConvertTo-Json -Depth 8), $utf8)
     }
     function Copy-Authorization([System.Collections.IDictionary]$value) {

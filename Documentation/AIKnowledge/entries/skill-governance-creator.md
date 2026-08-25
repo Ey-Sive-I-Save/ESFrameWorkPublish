@@ -5,15 +5,15 @@
 `KnowledgeId`: `es.skill.governance-creator.v1`
 `Authority`: `Derived`
 `EvidenceLevel`: `S2`
-`RouteKeys`: `skill`, `governance`, `creator`, `validation`, `evidence`, `tier`, `maturity`, `delivery`, `aibrain`, `risk`, `authority`, `skill-performance`, `execution-cost`, `fast-path`, `deep-path`, `cache`
-`ContentHash`: `a49ec5f338b4e53d20045edad7dbd9198393154a62c8107914bac539f8523b05`
+`RouteKeys`: `skill`, `governance`, `creator`, `validation`, `evidence`, `tier`, `maturity`, `delivery`, `aibrain`, `risk`, `authority`, `skill-performance`, `execution-cost`, `fast-path`, `deep-path`, `cache`, `commercial-coherence`, `delivery-tracking`, `evidence-receipt`, `report-hash`, `source-freshness`, `plan-hash`, `static-review`, `runtime-not-run`
+`ContentHash`: `4303bfa0eb8727c8dc6907511c60c35b1e04144efac9fda076e53d5bf03ac95a`
 
 `SourceRefs`:
 
-- `.agents/README.md` (`34013af49344d76eae53f0b72c485e657914f46a49aebad56f25a397bff36cfc`)
-- `.agents/SKILL_RESOURCE_INDEX.yaml` (`dac562240b2eb1148def4f783ba4d4fdff4a119c6f620b2fdb57667a7e444a28`)
-- `Documentation/AIKnowledge/AIBRAIN_ENTRY.md` (`a9d171a938841e2fab4409814b9dbcba98261269d30fef7a16304425c59ee316`)
-- `.agents/skills/es-skill-governance/SKILL.md` (`a255d84986b1f24127d00de90d61bb419b1f10d0b6edb308d08ad8b7ccf67399`)
+- `.agents/README.md` (`140d048ede62efb430f5c345991aa68630bb7fb35aeec1e17c00f2d718f68d7d`)
+- `.agents/SKILL_RESOURCE_INDEX.yaml` (`c228def28eb268015d89d0088bdf92a841d81ef4237035e8e103d0f36f085991`)
+- `Documentation/AIKnowledge/AIBRAIN_ENTRY.md` (`06e25a46e0c729f677954c44ebc5edafcba3967146f700418804707cc83119b9`)
+- `.agents/skills/es-skill-governance/SKILL.md` (`8386b37114d34a57f6a065857ad139504de5aa7ba0e2b77f6e346559b9319184`)
 - `.agents/skills/es-skill-governance/agents/openai.yaml` (`381fd906710223483c30c9c6ac1ee48f9581ac69c4cc67e7883a634beb22a101`)
 - `.agents/skills/es-skill-governance/governance.json` (`f13e9e0f74fd861970aecec77f3a44190785322734037b90c26065c83f699330`)
 - `ES/Automation/Contracts/es-runtime-authorization.schema.json` (`4f0634d2af203a1dabbc509fb2af381c11d5148431aed670ae2ab3ba4ef10853`)
@@ -22,15 +22,15 @@
 - `.agents/skills/es-skill-governance/references/scale-patterns.md` (`c9d8dab8b6c9c8cbc0fd55ef2c247e65c3e696d546f48239f528c7f048a3a4f4`)
 - `.agents/skills/es-skill-governance/references/commercial-controls.md` (`ddb24159116e49b20fd9517316b3b3416f1e12247747ee7f1f0ecb79a1ce94a4`)
 - `.agents/skills/es-skill-governance/references/performance-controls.md` (`a83420ccb429dea42826ff7dab7f3cbfbc4575624b2246da402f45bfe6ca6519`)
-- `.agents/skills/es-skill-governance/references/aibrain-contract.md` (`3dcb611b5297a6d5a3dca7cd564c91173cdd355c1ff54d7b490eb58c9c7ae826`)
+- `.agents/skills/es-skill-governance/references/aibrain-contract.md` (`80348cb1905e8badb7e1be59942086761332e01b1be5e9f2ac441a8dda28fc33`)
 - `.agents/skills/es-skill-governance/scripts/Test-ESSkillContract.ps1` (`600ac229aa87f4e7417551e07e3eeb689c5d5286be52b3fb05f24dd0ec934885`)
-- `.agents/skills/es-skill-creator/SKILL.md` (`0ebf058edef8179061ff9215b2c989357c7b89bccd43735a7af1c6d6c1ad259a`)
+- `.agents/skills/es-skill-creator/SKILL.md` (`d01813e9053236a9e900d25f246368482fd1fd23555c254a0ee1f40dff7884f7`)
 - `.agents/skills/es-skill-creator/governance.json` (`c21cd92044d256af1ad32b12c03d2a69235731a58749ea9215b1656c2f6a1cc1`)
 - `.agents/skills/es-skill-creator/scripts/quick_validate.py` (`effb02b4a13ea2caee7d2eceded3d95b214ad92433de821e402564fc2e8b9654`)
 - `.agents/skills/es-skill-creator/scripts/init_skill.py` (`b57f34722cacf52a0d9b1e31e4e4e4d077e26eae79054a4d67c9d2d90cb11193`)
 - `.agents/skills/es-skill-creator/scripts/generate_openai_yaml.py` (`837c5c8a82589cd9e2e66714b57114cd4299480c83fa0a69bca124f68ab61a6d`)
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`9735b55bf6b2df8758050f2b84b053aabc0438ddf633c3c61ba43e4d684349d9`)
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationAiBridge.cs` (`42ce9f445dee210e9ff788ae20680f1b8ba5b2dda94da5d6060630d2a72441c5`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`d3f8e0d6944395a14e8f680d2e7cc6afcb74f4485e578d3a6bfb3ebd798fd86e`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationAiBridge.cs` (`75fc4b138f360c75de3232bdec4dd18b8862a4d48eff6f588378bb47779fd0f8`)
 
 `EvidenceRefs`:
 

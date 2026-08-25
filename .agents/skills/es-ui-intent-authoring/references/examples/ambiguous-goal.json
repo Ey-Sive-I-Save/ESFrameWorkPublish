@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "status": "needs-clarification",
+  "intentId": "player-menu-ambiguous",
+  "primaryAction": "browse",
+  "secondaryActions": [],
+  "screenFamilies": ["navigation"],
+  "informationPriority": ["navigation"],
+  "requiredStates": ["default", "selected", "empty"],
+  "layoutPreferences": {
+    "wide": {"composition": "navigation-list", "detailVisibility": "collapsed"},
+    "narrow": {"composition": "navigation-list", "detailVisibility": "collapsed"}
+  },
+  "inputModalities": ["pointer", "keyboard", "gamepad", "touch"],
+  "businessBridge": "unresolved-player-goal",
+  "visualOnly": true,
+  "confidence": 0.42,
+  "missingInputs": ["primary-goal", "target-screen-family"],
+  "blockedWhen": ["request names a menu but does not state what the player wants to do"]
+}

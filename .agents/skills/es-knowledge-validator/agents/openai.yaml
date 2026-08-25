@@ -1,0 +1,4 @@
+interface:
+  display_name: "Knowledge Validator"
+  short_description: "Validate Knowledge closure and practical AI decision value"
+  default_prompt: "Use $es-knowledge-validator to validate an AIKnowledge entry and its KnowledgeIndex binding. When practical value is uncertain, propose the consent-gated three-condition effectiveness comparison."

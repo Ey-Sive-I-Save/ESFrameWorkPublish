@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "registryId": "es.game-ui.player-intents",
+  "actions": {
+    "browse": {"screenFamilies": ["collection", "navigation", "world"], "informationPriority": ["content", "navigation"]},
+    "inspect": {"screenFamilies": ["collection", "result", "world"], "informationPriority": ["selected-item", "details", "stats"]},
+    "select": {"screenFamilies": ["collection", "navigation", "conversation"], "informationPriority": ["options", "selection", "action-bar"]},
+    "compare": {"screenFamilies": ["collection", "result"], "informationPriority": ["candidates", "comparison", "stats"]},
+    "equip": {"screenFamilies": ["collection"], "informationPriority": ["item-list", "selected-item", "stats", "action-bar"]},
+    "confirm": {"screenFamilies": ["modal", "result", "system"], "informationPriority": ["message", "consequences", "action-bar"]},
+    "cancel": {"screenFamilies": ["modal", "system"], "informationPriority": ["message", "action-bar"]},
+    "navigate": {"screenFamilies": ["navigation", "world"], "informationPriority": ["destination", "navigation"]},
+    "filter": {"screenFamilies": ["collection", "navigation"], "informationPriority": ["filters", "content"]},
+    "sort": {"screenFamilies": ["collection"], "informationPriority": ["sort-options", "content"]},
+    "claim": {"screenFamilies": ["progression", "result"], "informationPriority": ["reward", "progress", "action-bar"]},
+    "configure": {"screenFamilies": ["system"], "informationPriority": ["setting", "value", "action-bar"]},
+    "track": {"screenFamilies": ["world", "hud", "progression"], "informationPriority": ["objective", "progress", "location"]},
+    "respond": {"screenFamilies": ["conversation"], "informationPriority": ["dialogue", "choices", "portrait"]},
+    "resume": {"screenFamilies": ["modal", "navigation"], "informationPriority": ["message", "action-bar"]},
+    "retry": {"screenFamilies": ["result", "modal"], "informationPriority": ["error", "action-bar"]},
+    "dismiss": {"screenFamilies": ["modal", "system", "result"], "informationPriority": ["message", "action-bar"]}
+  },
+  "screenFamilies": ["hud", "navigation", "modal", "conversation", "progression", "collection", "combat", "world", "system", "result"],
+  "states": ["default", "selected", "disabled", "loading", "empty", "error", "long-content"],
+  "inputModalities": ["pointer", "keyboard", "gamepad", "touch"],
+  "forbiddenBusinessFields": ["items", "inventory", "price", "quantity", "stats", "currency", "quest", "combat", "saveData"]
+}

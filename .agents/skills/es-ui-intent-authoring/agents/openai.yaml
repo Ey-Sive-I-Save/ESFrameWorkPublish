@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES UI Intent Authoring"
+  short_description: "Turn player goals into UI screen plans"
+  default_prompt: "Use $es-ui-intent-authoring to classify a player goal and produce a bounded IntentSpec for a game UI."

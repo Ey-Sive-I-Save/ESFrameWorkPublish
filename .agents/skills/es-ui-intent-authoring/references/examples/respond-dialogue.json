@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "status": "confirmed",
+  "intentId": "respond-dialogue",
+  "primaryAction": "respond",
+  "secondaryActions": ["select", "cancel"],
+  "screenFamilies": ["conversation"],
+  "informationPriority": ["dialogue", "choices", "portrait"],
+  "requiredStates": ["default", "selected", "disabled", "loading", "error", "long-content"],
+  "layoutPreferences": {
+    "wide": {"composition": "portrait-dialogue-choices", "detailVisibility": "expanded"},
+    "narrow": {"composition": "stacked-dialogue-choices", "detailVisibility": "expanded"}
+  },
+  "inputModalities": ["pointer", "keyboard", "gamepad", "touch"],
+  "businessBridge": "dialogue-domain",
+  "visualOnly": true,
+  "confidence": 0.91,
+  "missingInputs": [],
+  "blockedWhen": []
+}

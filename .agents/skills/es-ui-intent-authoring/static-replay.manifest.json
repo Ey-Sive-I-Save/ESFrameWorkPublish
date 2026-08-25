@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-ui-intent-authoring",
+  "sourceRoots": [".agents/skills/es-ui-intent-authoring"],
+  "cases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "hash-change-cache-invalidation", "interruption-recovery", "deterministic-output"],
+  "staticClaims": ["intent-spec-schema", "screen-family-routing", "clarification-gate", "business-boundary", "deterministic-replay"],
+  "runtimeClaimsNotProven": ["runtime intent menu", "input navigation", "Unity materialization", "Prefab/Scene output", "visual fidelity", "player usability"],
+  "runtimeEscalation": {"required": true, "reason": "Runtime UI and input evidence require a separate authorized capability."},
+  "caseAssertions": {
+    "normal-input": "A valid IntentSpec selects one registered primary action and compatible screen family.",
+    "invalid-input": "Unknown fields, actions, families, states and malformed values are rejected.",
+    "denied-expansion": "Business payloads and runtime behavior flags are rejected.",
+    "repeat-idempotency": "The same IntentSpec produces the same validation hash.",
+    "hash-change-cache-invalidation": "Changes to the contract or registry invalidate the source hash.",
+    "interruption-recovery": "An incomplete replay is not accepted without a fresh receipt.",
+    "deterministic-output": "Normalized result fields are stable and sorted."
+  },
+  "responsibilityProfile": "authoring",
+  "responsibilityChecks": ["authority-routing", "bounded-output", "deterministic-replay", "evidence-contract", "compatibility-boundary"],
+  "responsibilityScope": "Static semantic planning only; no Unity or runtime claim.",
+  "specializedAcceptance": {
+    "id": "ui-intent-static",
+    "title": "IntentSpec v1 static planning",
+    "requiredStaticCases": ["schema-validation", "registry-boundary", "clarification-gate", "business-boundary", "deterministic-plan"],
+    "evidenceArtifacts": ["SKILL.md", "references/intent-spec.contract.md", "references/player-intent-registry.json", "scripts/validate_intent_spec.py"],
+    "sourceAssertions": ["IntentSpec", "player intent registry", "clarification gate", "visualOnly", "deterministic replay"],
+    "runtimeBoundary": "Static checks do not prove runtime menus, input, Unity assets or visual fidelity."
+  },
+  "specializedGuidanceRef": "references/static-specialized-acceptance.md"
+}

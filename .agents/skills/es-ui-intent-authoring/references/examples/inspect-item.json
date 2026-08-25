@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "status": "confirmed",
+  "intentId": "inspect-item",
+  "primaryAction": "inspect",
+  "secondaryActions": ["compare", "select", "cancel"],
+  "screenFamilies": ["collection", "result"],
+  "informationPriority": ["selected-item", "details", "stats", "action-bar"],
+  "requiredStates": ["default", "selected", "loading", "empty", "error", "long-content"],
+  "layoutPreferences": {
+    "wide": {"composition": "grid-detail", "detailVisibility": "expanded"},
+    "narrow": {"composition": "list-detail", "detailVisibility": "collapsed"}
+  },
+  "inputModalities": ["pointer", "keyboard", "gamepad", "touch"],
+  "businessBridge": "item-inspection-domain",
+  "visualOnly": true,
+  "confidence": 0.94,
+  "missingInputs": [],
+  "blockedWhen": []
+}

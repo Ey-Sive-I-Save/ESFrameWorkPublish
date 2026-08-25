@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "skillName": "es-knowledge-validator",
+  "sourceRoots": [".agents/skills/es-knowledge-validator"],
+  "cases": ["normal-input", "invalid-input", "denied-expansion", "repeat-idempotency", "hash-change-cache-invalidation", "interruption-recovery", "deterministic-output"],
+  "staticClaims": ["strict-utf8", "path-containment", "source-hashes", "source-set-hash", "entry-body-hash", "exact-route-set", "explicit-shared-route-projection", "index-closure", "deterministic-replay", "consent-gated-three-condition-protocol"],
+  "runtimeClaimsNotProven": ["Unity/editor/process behavior", "timing and visual behavior", "Profiler/Player/IL2CPP/release behavior"],
+  "runtimeEscalation": {"required": false, "reason": "Knowledge source and index validation is static; Runtime claims require separate authoritative evidence."},
+  "caseAssertions": {
+    "normal-input": "required validator files, contracts, and the optional three-condition protocol are present",
+    "invalid-input": "malformed entries and index structures are blocked",
+    "denied-expansion": "rooted, traversing, and external report paths are denied; comparison side effects remain consent-gated",
+    "repeat-idempotency": "unchanged inputs produce deterministic findings",
+    "hash-change-cache-invalidation": "SourceRef or normalized entry-body changes invalidate prior results",
+    "interruption-recovery": "rerun from current files after an interrupted or concurrent read",
+    "deterministic-output": "findings use stable ordering and input hashing"
+  },
+  "responsibilityProfile": "knowledge",
+  "responsibilityChecks": ["knowledge-boundary", "permission-boundary", "deterministic-replay", "evidence-contract"],
+  "responsibilityScope": "Source-set hash, normalized entry-body hash, identity, exact route projection, required-read, and related-Skill closure.",
+  "specializedAcceptance": {
+    "id": "knowledge-validation-integrity",
+    "title": "Knowledge validation integrity",
+    "requiredStaticCases": ["source-hash-valid", "source-hash-drift", "content-hash-mismatch", "entry-body-hash-mismatch", "route-set-mismatch", "shared-route-projection", "duplicate-id", "denied-path-expansion", "deterministic-repeat", "stable-refresh-boundary"],
+    "evidenceArtifacts": ["SKILL.md", "references/knowledge-validation-contract.md", "references/static-specialized-acceptance.md", "references/three-condition-comparative-evaluation.md", "scripts/Invoke-ESKnowledgeValidation.ps1", "scripts/Export-ESKnowledgeRefreshPlan.ps1", "scripts/Invoke-ESKnowledgeStableRefresh.ps1", "scripts/Test-ESKnowledgeEntry.ps1", "scripts/Test-ESSkillEvidence.ps1"],
+    "sourceAssertions": ["strict UTF-8", "SourceRefs", "ContentHash", "KnowledgeId", "requiredReads"],
+    "runtimeBoundary": "Static knowledge validation does not prove Unity, Player, Profiler, IL2CPP, network, or release behavior."
+  },
+  "specializedGuidanceRef": "references/static-specialized-acceptance.md"
+}

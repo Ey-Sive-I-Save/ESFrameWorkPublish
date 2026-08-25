@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "status": "confirmed",
+  "intentId": "configure-display",
+  "primaryAction": "configure",
+  "secondaryActions": ["confirm", "cancel", "dismiss"],
+  "screenFamilies": ["system"],
+  "informationPriority": ["setting", "value", "action-bar"],
+  "requiredStates": ["default", "selected", "disabled", "loading", "error", "long-content"],
+  "layoutPreferences": {
+    "wide": {"composition": "two-column-settings", "detailVisibility": "expanded"},
+    "narrow": {"composition": "stacked-settings", "detailVisibility": "expanded"}
+  },
+  "inputModalities": ["pointer", "keyboard", "gamepad", "touch"],
+  "businessBridge": "settings-domain",
+  "visualOnly": true,
+  "confidence": 0.9,
+  "missingInputs": [],
+  "blockedWhen": []
+}

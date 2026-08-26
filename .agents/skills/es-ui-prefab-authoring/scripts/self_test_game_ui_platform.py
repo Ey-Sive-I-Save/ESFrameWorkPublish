@@ -537,8 +537,9 @@ def assert_snapshot_evidence_gate() -> None:
                 common = {"schemaVersion": 1, "panelId": "snapshot-proof", "profileId": profile_id, "stateId": state_id, "runId": "run-1", "specHash": spec_hash, "sceneGeneration": 1}
                 viewport = {"width": width, "height": height, "orientation": "landscape" if width >= height else "portrait"}
                 canvas = {"renderMode": "ScreenSpaceCamera", "scaler": {"uiScaleMode": "ScaleWithScreenSize", "referenceResolution": [1920, 1080], "screenMatchMode": "MatchWidthOrHeight", "match": 0.5}}
-                editor_element = {"path": "Canvas/snapshot-proof/hero-art", "active": True, "screenRect": {"x": 20, "y": 20, "width": width - 40, "height": height - 40}, "focalCrop": {"safeCropSatisfied": True}}
-                runtime_element = {"path": "Canvas/snapshot-proof/hero-art", "active": True, "screenX": 20, "screenY": 20, "screenWidth": width - 40, "screenHeight": height - 40, "focalCrop": {"safeCropSatisfied": True}}
+                structure = {"parentPath": "Canvas/snapshot-proof", "siblingIndex": 0, "anchorMin": [0.0, 0.0], "anchorMax": [1.0, 1.0], "pivot": [0.5, 0.5]}
+                editor_element = {"path": "Canvas/snapshot-proof/hero-art", "active": True, "screenRect": {"x": 20, "y": 20, "width": width - 40, "height": height - 40}, "focalCrop": {"safeCropSatisfied": True}, **structure}
+                runtime_element = {"path": "Canvas/snapshot-proof/hero-art", "active": True, "hasButton": False, "interactionTarget": None, "screenX": 20, "screenY": 20, "screenWidth": width - 40, "screenHeight": height - 40, "focalCrop": {"safeCropSatisfied": True}, **structure}
                 editor = {**common, "command": "editor.snapshot", "captureKey": f"snapshot-proof.{profile_id}.{state_id}", "rootPath": "Canvas/snapshot-proof", "viewport": viewport, "canvas": canvas, "elements": [editor_element]}
                 runtime = {**common, "command": "ui.snapshot", "rootPath": "Canvas/snapshot-proof", "viewport": viewport, "canvas": canvas, "screenWidth": width, "screenHeight": height, "uiElements": [runtime_element]}
                 (evidence_root / f"{profile_id}__{state_id}.editor.json").write_text(json.dumps(editor), encoding="utf-8")
@@ -601,6 +602,60 @@ def assert_snapshot_evidence_gate() -> None:
         if not any(issue.get("code") == "snapshot-active-invalid" for issue in receipt["issues"]):
             raise AssertionError("missing active state must be rejected")
         broken["uiElements"][0]["active"] = True
+        broken["uiElements"][0]["parentPath"] = "Canvas/snapshot-proof/incorrect-parent"
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-structure-mismatch" and issue.get("field") == "parentPath" for issue in receipt["issues"]):
+            raise AssertionError("editor and UI element parent paths must agree")
+        broken["uiElements"][0]["parentPath"] = "Canvas/snapshot-proof"
+        broken["uiElements"][0]["siblingIndex"] = 1
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-structure-mismatch" and issue.get("field") == "siblingIndex" for issue in receipt["issues"]):
+            raise AssertionError("editor and UI sibling order must agree")
+        broken["uiElements"][0]["siblingIndex"] = 0
+        broken["uiElements"][0]["anchorMin"] = [0.1, 0.0]
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-structure-mismatch" and issue.get("field") == "anchorMin" for issue in receipt["issues"]):
+            raise AssertionError("editor and UI anchors must agree")
+        broken["uiElements"][0]["anchorMin"] = [0.0, 0.0]
+        broken["uiElements"][0]["pivot"] = [0.25, 0.5]
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-structure-mismatch" and issue.get("field") == "pivot" for issue in receipt["issues"]):
+            raise AssertionError("editor and UI pivots must agree")
+        broken["uiElements"][0]["pivot"] = [0.5, 0.5]
+        snapshot_width = int(broken["viewport"]["width"])
+        snapshot_height = int(broken["viewport"]["height"])
+        broken["uiElements"][0]["screenX"] = snapshot_width - 10
+        broken["uiElements"][0]["screenWidth"] = 20
+        broken_editor["elements"][0]["screenRect"]["x"] = snapshot_width - 10
+        broken_editor["elements"][0]["screenRect"]["width"] = 20
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        editor_path.write_text(json.dumps(broken_editor), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-runtime-viewport-containment" for issue in receipt["issues"]):
+            raise AssertionError("runtime element rectangles must remain in the profile viewport")
+        broken["uiElements"][0]["screenX"] = 20
+        broken["uiElements"][0]["screenWidth"] = snapshot_width - 40
+        broken_editor["elements"][0]["screenRect"]["x"] = 20
+        broken_editor["elements"][0]["screenRect"]["width"] = snapshot_width - 40
+        broken["uiElements"][0]["hasButton"] = True
+        broken["uiElements"][0]["interactionTarget"] = [snapshot_width, snapshot_height]
+        broken_editor["elements"][0]["interactionTarget"] = [snapshot_width, snapshot_height]
+        broken["uiElements"][0]["screenWidth"] = snapshot_width - 41
+        broken_editor["elements"][0]["screenRect"]["width"] = snapshot_width - 41
+        broken_path.write_text(json.dumps(broken), encoding="utf-8")
+        editor_path.write_text(json.dumps(broken_editor), encoding="utf-8")
+        receipt = validate_snapshot_evidence(spec_path, evidence_root)
+        if not any(issue.get("code") == "snapshot-interaction-target-size" for issue in receipt["issues"]):
+            raise AssertionError("active buttons must meet their declared interaction target dimensions")
+        broken["uiElements"][0]["hasButton"] = False
+        broken["uiElements"][0]["interactionTarget"] = None
+        broken_editor["elements"][0]["interactionTarget"] = None
+        broken["uiElements"][0]["screenWidth"] = snapshot_width - 40
+        broken_editor["elements"][0]["screenRect"]["width"] = snapshot_width - 40
         broken["uiElements"][0]["focalCrop"]["safeCropSatisfied"] = False
         broken_path.write_text(json.dumps(broken), encoding="utf-8")
         receipt = validate_snapshot_evidence(spec_path, evidence_root)

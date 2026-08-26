@@ -67,3 +67,16 @@ reusable authoring constraints, not a visual acceptance claim.
   `visualTarget`, `fidelityMode`, `referencePolicy`, `referenceSources` and `productBoundary`.
 - Evidence: classifier decision, reference/source receipt when required, primary interaction trace,
   and a validator result proving the intent contract matches the ScreenSpec.
+
+## UI-FB-007: matching rectangles are not enough to prove one layout
+
+- Trigger: editor and UI snapshots share a screen rectangle but disagree on parent hierarchy,
+  sibling order, anchors, pivot, viewport containment, or an active button's declared target size.
+- Root cause: geometry is compared without proving the RectTransform structure that owns it, or a
+  visual target is treated as an input target.
+- Block: do not pass the snapshot pair or let it enter GPU evidence validation.
+- Required next input: serialize and compare `parentPath`, `siblingIndex`, `anchorMin`, `anchorMax`
+  and `pivot`; keep every runtime screen rect inside its profile viewport; for every active Button
+  with `interactionTarget`, compare the resolved runtime dimensions to the declared minimum.
+- Evidence: paired editor/UI snapshots through `validate_ui_snapshot_evidence.py`, including
+  negative fixtures for hierarchy, anchor/pivot, viewport and interaction-target drift.

@@ -3120,7 +3120,7 @@ namespace ES.Editor
             var result = new JArray();
             foreach (RectTransform rect in instance.GetComponentsInChildren<RectTransform>(true))
             {
-                if (!TryGetLogicalSnapshotPath(instance, rect, out string path, out _)) continue;
+                if (!TryGetLogicalSnapshotPath(instance, rect, out string path, out string parentPath)) continue;
                 Rect screen = ScreenRect(rect, width, height);
                 Button button = rect.GetComponent<Button>();
                 Graphic graphic = rect.GetComponent<Graphic>();
@@ -3166,7 +3166,12 @@ namespace ES.Editor
                 result.Add(new JObject
                 {
                     ["path"] = path,
+                    ["parentPath"] = parentPath,
                     ["active"] = rect.gameObject.activeInHierarchy,
+                    ["siblingIndex"] = rect.GetSiblingIndex(),
+                    ["anchorMin"] = new JArray(rect.anchorMin.x, rect.anchorMin.y),
+                    ["anchorMax"] = new JArray(rect.anchorMax.x, rect.anchorMax.y),
+                    ["pivot"] = new JArray(rect.pivot.x, rect.pivot.y),
                     ["hasButton"] = button != null,
                     ["interactable"] = button != null && button.interactable,
                     ["hasGraphic"] = graphic != null,

@@ -84,6 +84,17 @@ def finite_rect(value: Any, fields: tuple[str, str, str, str]) -> tuple[float, f
     return tuple(result)  # type: ignore[return-value]
 
 
+def finite_pair(value: Any) -> tuple[float, float] | None:
+    if not isinstance(value, list) or len(value) != 2:
+        return None
+    result: list[float] = []
+    for raw in value:
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)) or not math.isfinite(float(raw)):
+            return None
+        result.append(float(raw))
+    return tuple(result)  # type: ignore[return-value]
+
+
 def unique_paths(elements: list[dict[str, Any]]) -> tuple[dict[str, dict[str, Any]], list[str]]:
     result: dict[str, dict[str, Any]] = {}
     duplicates: list[str] = []
@@ -111,8 +122,62 @@ def valid_canvas_metadata(value: Any) -> bool:
     return not isinstance(match, bool) and isinstance(match, (int, float)) and math.isfinite(float(match)) and 0.0 <= float(match) <= 1.0
 
 
+def validate_snapshot_structure_pair(source: dict[str, Any], target: dict[str, Any], path: str, root_path: str, profile_id: str, state_id: str, issues: list[dict[str, Any]]) -> bool:
+    valid = True
+    for field in ("parentPath",):
+        source_value, target_value = source.get(field), target.get(field)
+        if not isinstance(source_value, str) or not source_value or not isinstance(target_value, str) or not target_value:
+            issues.append({"code": "snapshot-structure-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": field})
+            valid = False
+        elif source_value != target_value:
+            issues.append({"code": "snapshot-structure-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "field": field, "editor": source_value, "ui": target_value})
+            valid = False
+    for field in ("siblingIndex",):
+        source_value, target_value = source.get(field), target.get(field)
+        if isinstance(source_value, bool) or not isinstance(source_value, int) or source_value < 0 or isinstance(target_value, bool) or not isinstance(target_value, int) or target_value < 0:
+            issues.append({"code": "snapshot-structure-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": field})
+            valid = False
+        elif source_value != target_value:
+            issues.append({"code": "snapshot-structure-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "field": field, "editor": source_value, "ui": target_value})
+            valid = False
+    for field in ("anchorMin", "anchorMax", "pivot"):
+        source_value, target_value = finite_pair(source.get(field)), finite_pair(target.get(field))
+        if source_value is None or target_value is None:
+            issues.append({"code": "snapshot-structure-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "field": field})
+            valid = False
+        elif any(abs(left - right) > 0.0001 for left, right in zip(source_value, target_value)):
+            issues.append({"code": "snapshot-structure-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "field": field, "editor": source_value, "ui": target_value})
+            valid = False
+    parent_path = source.get("parentPath")
+    if isinstance(parent_path, str) and parent_path and path != root_path and parent_path != root_path and not parent_path.startswith(root_path + "/"):
+        issues.append({"code": "snapshot-parent-path-root", "profileId": profile_id, "stateId": state_id, "path": path, "parentPath": parent_path, "rootPath": root_path})
+        valid = False
+    return valid
+
+
+def validate_runtime_viewport_and_interaction(target: dict[str, Any], target_rect: tuple[float, float, float, float], path: str, profile_id: str, state_id: str, expected: tuple[int, int], issues: list[dict[str, Any]]) -> bool:
+    valid = True
+    x, y, width, height = target_rect
+    if x < -0.01 or y < -0.01 or x + width > expected[0] + 0.01 or y + height > expected[1] + 0.01:
+        issues.append({"code": "snapshot-runtime-viewport-containment", "profileId": profile_id, "stateId": state_id, "path": path, "rect": target_rect, "viewport": expected})
+        valid = False
+    has_button = target.get("hasButton")
+    if not isinstance(has_button, bool):
+        issues.append({"code": "snapshot-button-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "hasButton": has_button})
+        return False
+    if target.get("active") is True and has_button and target.get("interactionTarget") is not None:
+        minimum = finite_pair(target.get("interactionTarget"))
+        if minimum is None or minimum[0] <= 0 or minimum[1] <= 0:
+            issues.append({"code": "snapshot-interaction-target-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "interactionTarget": target.get("interactionTarget")})
+            valid = False
+        elif width + 0.01 < minimum[0] or height + 0.01 < minimum[1]:
+            issues.append({"code": "snapshot-interaction-target-size", "profileId": profile_id, "stateId": state_id, "path": path, "actual": [width, height], "minimum": minimum})
+            valid = False
+    return valid
+
+
 def validate_snapshot_geometry_pair(editor: dict[str, Any], runtime: dict[str, Any], profile_id: str, state_id: str, expected: tuple[int, int] | None, issues: list[dict[str, Any]]) -> dict[str, Any]:
-    evidence: dict[str, Any] = {"checkedElementCount": 0, "status": "passed"}
+    evidence: dict[str, Any] = {"checkedElementCount": 0, "checkedStructuralElementCount": 0, "checkedInteractionTargetCount": 0, "status": "passed"}
     issue_count_before_geometry = len(issues)
     if expected is None:
         issues.append({"code": "snapshot-profile-viewport", "profileId": profile_id, "stateId": state_id, "message": "profile must provide positive integer width and height"})
@@ -153,6 +218,13 @@ def validate_snapshot_geometry_pair(editor: dict[str, Any], runtime: dict[str, A
             issues.append({"code": "snapshot-active-invalid", "profileId": profile_id, "stateId": state_id, "path": path, "editor": source.get("active"), "ui": target.get("active")})
         elif source.get("active") != target.get("active"):
             issues.append({"code": "snapshot-active-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "editor": source.get("active"), "ui": target.get("active")})
+        if source.get("interactionTarget") != target.get("interactionTarget"):
+            issues.append({"code": "snapshot-interaction-target-mismatch", "profileId": profile_id, "stateId": state_id, "path": path, "editor": source.get("interactionTarget"), "ui": target.get("interactionTarget")})
+        if isinstance(editor_root_path, str) and editor_root_path and validate_snapshot_structure_pair(source, target, path, editor_root_path, profile_id, state_id, issues):
+            evidence["checkedStructuralElementCount"] += 1
+        if expected is not None and validate_runtime_viewport_and_interaction(target, target_rect, path, profile_id, state_id, expected, issues):
+            if target.get("active") is True and target.get("hasButton") is True and target.get("interactionTarget") is not None:
+                evidence["checkedInteractionTargetCount"] += 1
         evidence["checkedElementCount"] += 1
     if len(issues) > issue_count_before_geometry:
         evidence["status"] = "blocked"

@@ -4002,6 +4002,8 @@ namespace ES
 
         private void OnDragLeave(DragLeaveEvent evt)
         {
+            if (disposed)
+                return;
             externalDragTransferInFlight = false;
             StopDragEdgePan();
             HideDropFeedback();
@@ -4479,6 +4481,20 @@ namespace ES
 
         private void RebuildObjectList(bool refreshSource = true)
         {
+            IReadOnlyList<ESWorkbenchObjectDescriptor> resolvedSource = null;
+            if (refreshSource)
+            {
+                try
+                {
+                    resolvedSource = getObjects?.Invoke();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "ES 工作台对象 Provider 刷新失败，已保留上一次有效列表。", exception));
+                    return;
+                }
+            }
             contentPointerGate.Reset();
             pointerCoordinator.ResetIfOwnerKind(ESWorkbenchPointerOwnerKind.Content);
             visibleObjects.Clear();
@@ -4488,7 +4504,6 @@ namespace ES
                 contentSourceById.Clear();
                 contentSourceBySource.Clear();
                 duplicateContentIdCount = 0;
-                IReadOnlyList<ESWorkbenchObjectDescriptor> resolvedSource = getObjects?.Invoke();
                 if (resolvedSource != null)
                 {
                     for (int i = 0; i < resolvedSource.Count; i++)
@@ -9302,7 +9317,22 @@ namespace ES
             rootVisualElement.style.paddingTop = 8f;
             rootVisualElement.style.paddingBottom = 8f;
             rootVisualElement.style.backgroundColor = ESEditorPresentation.WindowRaisedSurfaceColor;
-            VisualElement content = request?.CreateContent(context);
+            VisualElement content = null;
+            try
+            {
+                content = request?.CreateContent(context);
+            }
+            catch (Exception exception)
+            {
+                configured = false;
+                Debug.LogException(new InvalidOperationException(
+                    "ES Workbench Popup 内容创建失败，已安排安全关闭。", exception));
+                rootVisualElement.Add(new HelpBox(
+                    "弹窗内容创建失败，窗口将自动关闭。",
+                    HelpBoxMessageType.Error));
+                EditorApplication.delayCall -= CloseIfContextWasLost;
+                EditorApplication.delayCall += CloseIfContextWasLost;
+            }
             if (content != null)
             {
                 content.style.flexGrow = 1f;

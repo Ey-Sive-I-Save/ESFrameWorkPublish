@@ -1,6 +1,6 @@
 # ES Composite Shader 独立测试资产
 
-本目录提供四类 ES Composite Shader 的纯测试 Scene、对象、Material 和程序化纹理。它不引用 `Assets/ESNormalAssets`、`Assets/Sprite Shaders Ultimate/Demo` 或旧 `InternalAssets/ShaderExamples`。
+本目录提供四类 ES Composite Shader 的纯测试 Scene、对象、Material 和程序化纹理。它不引用 `Assets/ESNormalAssets`、`Assets/ESNative/Demo` 或旧 `InternalAssets/ShaderExamples`。
 
 ## 快速入口
 
@@ -21,6 +21,14 @@ Assets/ESTestAssets/CompositeShaders/Generated/Scenes/00_CompositeShader_TestOve
 ```text
 【ES】/验证与诊断/验证环境/Shader/打开 Composite Shader 测试总览
 ```
+
+在需要无人值守地同时材质化 ES UI ScreenSpec、刷新六个场景并检查产物时，可在确认没有 Unity 实例占用项目后执行：
+
+```powershell
+.\Tools\Build-ESCompositeShaderShowcase.ps1 -UnityPath "<UnityEditor.exe>"
+```
+
+脚本会先拒绝已锁定项目，随后按固定顺序生成 ScreenSpec Prefab/Fixture，再调用唯一场景构建器刷新六个场景，并检查最终产物数量。
 
 构建器是所有生成 Scene、Material 和 Texture 的布局权威。不要直接修改生成场景来替代构建器修改。刷新已有场景前，构建器会将同名场景备份到 `ES/Bak/Local/CompositeShaderTestAssets/<UTC运行标识>`，并写入包含源路径、时间、大小和 SHA-256 的 `BACKUP_MANIFEST.md`。
 
@@ -53,7 +61,7 @@ CompositeShaders/
 | `04_CompositeShader_3D_VFX_Cases` | 无效果基准、10 个 VFX 配方及一个粒子顶点流案例：序列帧、Polar UV、Flow Map、径向遮罩、深度交界等 |
 | `05_CompositeShader_ProductionRecipes` | 无效果基准、Basic/Standard/High 对比、三种扫光方向、效果顺序和共享材质 MPB 差异 |
 
-共生成 57 个独立案例材质，另有 2 个独立环境材质。每个分类场景都有无效果基准；PlayMode 观察台支持单案例选择、当前效果相关参数滑条、开关/枚举分段控件、自动动画开关、当前/全部回正、单独观察、六场景切换与返回总览。观察台的商业化视觉层由 `UI/ESCompositeShaderObservationPanel.uxml` 与同名 `.uss` 独立承载，脚本只绑定案例、参数和状态；只有视图资产缺失时才回退到兼容用的程序化 UGUI。观察台采用固定的标题区、案例区、参数区、操作区和导航区，窄屏会按 UI Toolkit PanelSettings 比例缩放，长文本自动截断，案例与参数滚动区带独立边界和滚动提示，选中案例使用稳定的高亮态。总览默认以收起面板的展示模式进入，展开后可使用“无效果基准”快捷入口；每一行参数都提供独立回正按钮。回正会恢复 UI 运行时材质的完整源属性和旋转对象的初始姿态，并暂停自动动画，避免下一帧再次覆盖。Renderer 参数仅写入 `MaterialPropertyBlock`，UI 参数仅写入可销毁的运行时材质实例，不修改生成材质资产。VFX 粒子顶点流也作为独立案例登记，可单独观察。案例标签同时显示“观察效果”和实际材质名，避免标题与材质错位。
+共生成 57 个独立案例材质，另有 2 个独立环境材质。每个分类场景都有无效果基准；PlayMode 工作台支持单案例选择、当前效果相关参数滑条、开关/枚举分段控件、Subtle/Standard/Hero 预设、自动动画、当前/全部回正、单独观察、宿主识别、诊断提示、六场景漫游导航与返回总览。完整视觉结构由 `UI/ESCompositeShaderObservationPanel.uxml` 与同名 `.uss` 承载，脚本只绑定案例、参数、状态和动作，视图资产缺失时直接禁用并明确报错，不再用程序化 UGUI 静默替代。可复审的 ES UI 装配合同位于 `Assets/UI/Contracts/ESCompositeShaderShowcase.screen-spec.v3.json`，用于后续由 `ESUIGameScreenMaterializer` 生成 Prefab、Fixture Scene 与视觉证据。Renderer 参数仅写入 `MaterialPropertyBlock`，UI 参数仅写入可销毁的运行时材质实例，不修改生成材质资产。
 
 ## 生效顺序检查
 
@@ -69,7 +77,7 @@ CompositeShaders/
 
 1. 打开总览和五个分类场景，确认 Console 没有 Shader 导入、材质属性或 Missing Script 错误。
 2. 进入 PlayMode，检查时间驱动效果、动态溶解和 MPB A/B 是否产生不同结果。
-3. 使用右侧 Runtime Observation Console：选择案例、拖动参数、切换自动演示/单独观察、执行当前或全部回正，并在六个场景之间切换。
+3. 使用右侧 ES Composite Shader Lab：选择案例、应用预设、拖动参数、切换自动演示/单独观察/高级参数、执行当前或全部回正，并在六个场景之间切换。
 4. 在 2D/UI 场景检查外描边是否被 Sprite/Canvas 几何边界裁切；被裁切时属于宿主几何限制，不得误报为参数未接入。
 5. 在 UI 场景分别检查 `传奇流变 · Stencil` 与 `主题换肤 · RectMask2D`，确认自定义 Shader 经过 Unity UI 的模板和矩形裁剪链后仍正确显示。
 6. 在 VFX 场景确认 URP Asset 和目标 Camera 的 Depth Texture 条件，再判断软粒子/深度交界结果。

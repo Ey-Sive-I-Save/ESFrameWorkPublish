@@ -12,9 +12,7 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
-  m_InvalidKeywords:
-  - _ENABLEENCHANTED_ON
-  - _SHINEMASKTOGGLE_ON
+  m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -202,6 +200,7 @@ Material:
     - _ESInteractiveWindHeight: 1
     - _ESInteractiveWindRotation: 0
     - _ESMaterialVersion: 1
+    - _ESNativeStatusContract: 1
     - _ESWindPhaseOffset: 0
     - _EnableAddColor: 0
     - _EnableAddHue: 0
@@ -392,7 +391,6 @@ Material:
     - _ReplaceRange: 0.1
     - _ReplaceSoftness: 0.1
     - _ResourceProfile: 0
-    - _SSUStatusContract: 1
     - _Saturation: 1
     - _ScreenTilingPixelsPerUnit: 128
     - _SequenceColumns: 1

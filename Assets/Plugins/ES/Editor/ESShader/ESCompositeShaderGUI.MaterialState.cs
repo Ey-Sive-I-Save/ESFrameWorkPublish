@@ -15,6 +15,9 @@ namespace ES.EditorInternal
         {
             AssemblyReloadEvents.beforeAssemblyReload += ReleaseDefaults;
             EditorApplication.quitting += ReleaseDefaults;
+            // Keep this subscription across multiple asset changes; ReleaseDefaults
+            // only detaches terminal lifecycle hooks above.
+            EditorApplication.projectChanged += ReleaseDefaults;
         }
 
         #endregion
@@ -249,6 +252,8 @@ namespace ES.EditorInternal
 
         private static void ReleaseDefaults()
         {
+            AssemblyReloadEvents.beforeAssemblyReload -= ReleaseDefaults;
+            EditorApplication.quitting -= ReleaseDefaults;
             foreach (KeyValuePair<Shader, Material> pair in Defaults)
             {
                 if (pair.Value != null) UnityEngine.Object.DestroyImmediate(pair.Value);

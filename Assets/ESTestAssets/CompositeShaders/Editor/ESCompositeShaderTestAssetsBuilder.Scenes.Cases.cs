@@ -18,7 +18,7 @@ namespace ES.TestAssets.Editor
                 CreateSceneHeader(root, "Composite Shader 独立测试总览", "四类 Shader / 五个分类场景 / 一套验收路线", "先确认类别，再进入对应场景做动态观察", 5.85f, new Color(0.35f, 0.82f, 1f, 1f));
                 CreateWorldLabel(
                     root,
-                    "全部资产位于 Assets/ESTestAssets/CompositeShaders · 不引用 ESNormalAssets / SSU Demo",
+                    "全部资产位于 Assets/ESTestAssets/CompositeShaders · 不引用 ESNormalAssets / ESNative Demo",
                     new Vector3(0f, 4.28f, 0f),
                     0.045f,
                     new Color(0.48f, 0.82f, 1f, 1f));
@@ -113,9 +113,6 @@ namespace ES.TestAssets.Editor
                 scaler.referenceResolution = new Vector2(1920f, 1080f);
                 scaler.matchWidthOrHeight = 0.5f;
                 canvasObject.AddComponent<GraphicRaycaster>();
-
-                CreateUIText(canvasObject.transform, "UI Composite Shader · 10 个实用案例", new Vector2(0f, 475f), new Vector2(1000f, 70f), 38, Color.white);
-                CreateUIText(canvasObject.transform, "Canvas / Stencil / Mask 语义与普通 Renderer 分开验收", new Vector2(0f, 425f), new Vector2(1200f, 45f), 22, new Color(0.5f, 0.82f, 1f, 1f));
 
                 string[] ids =
                 {
@@ -348,7 +345,6 @@ namespace ES.TestAssets.Editor
             image.preserveAspect = true;
             image.raycastTarget = false;
 
-            CreateUIText(groupRect, FormatCaseLabel(title, material), new Vector2(0f, -160f), new Vector2(350f, 92f), 17, new Color(0.85f, 0.9f, 0.98f, 1f));
             return image;
         }
 
@@ -382,29 +378,6 @@ namespace ES.TestAssets.Editor
             CreateWorldLabel(caseRoot.transform, title, new Vector3(0f, 1.58f, 0f), 0.058f);
             CreateWorldLabel(caseRoot.transform, "材质 · " + (material == null ? "<材质缺失>" : material.name), new Vector3(0f, 1.24f, 0f), 0.042f, new Color(0.64f, 0.72f, 0.84f, 1f));
             return image;
-        }
-
-        private static Text CreateUIText(Transform parent, string value, Vector2 position, Vector2 size, int fontSize, Color color)
-        {
-            GameObject textObject = new GameObject(value + " Text", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
-            RectTransform rect = (RectTransform)textObject.transform;
-            rect.SetParent(parent, false);
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = position;
-            rect.sizeDelta = size;
-            Text text = textObject.GetComponent<Text>();
-            text.text = value;
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = fontSize;
-            text.alignment = TextAnchor.MiddleCenter;
-            text.color = color;
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
-            text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = Mathf.Max(10, fontSize - 7);
-            text.resizeTextMaxSize = fontSize;
-            text.raycastTarget = false;
-            return text;
         }
 
         private static void CreateParticleVertexStreamCase(Transform root, Vector3 position, Material material, ESCompositeShaderTestAnimator animator)

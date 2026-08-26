@@ -650,13 +650,32 @@ namespace ES.EditorInternal
             if (string.IsNullOrEmpty(path)) return null;
 
             var preset = ScriptableObject.CreateInstance<ESCompositeShaderPreset>();
-            preset.name = System.IO.Path.GetFileNameWithoutExtension(path);
-            preset.CaptureFrom(source);
-            AssetDatabase.CreateAsset(preset, path);
-            AssetDatabase.SaveAssetIfDirty(preset);
-            SessionState.SetString(sessionKey, AssetDatabase.AssetPathToGUID(path));
-            Selection.activeObject = preset;
-            return preset;
+            bool createdAsset = false;
+            try
+            {
+                if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path) != null
+                    || System.IO.File.Exists(System.IO.Path.GetFullPath(path)))
+                    throw new InvalidOperationException("目标预设资产已存在；请选择新的路径。");
+                preset.name = System.IO.Path.GetFileNameWithoutExtension(path);
+                preset.CaptureFrom(source);
+                AssetDatabase.CreateAsset(preset, path);
+                createdAsset = true;
+                AssetDatabase.SaveAssetIfDirty(preset);
+                if (string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(path)))
+                    throw new InvalidOperationException("预设资产已创建，但没有得到有效 GUID。");
+                SessionState.SetString(sessionKey, AssetDatabase.AssetPathToGUID(path));
+                Selection.activeObject = preset;
+                return preset;
+            }
+            catch (Exception exception)
+            {
+                if (createdAsset)
+                    AssetDatabase.DeleteAsset(path);
+                else if (preset != null)
+                    UnityEngine.Object.DestroyImmediate(preset);
+                Debug.LogError("创建 ES Composite Shader 预设失败：" + exception.Message);
+                return null;
+            }
         }
 
         private static CompositePreset[] GetPresets(string shaderName)

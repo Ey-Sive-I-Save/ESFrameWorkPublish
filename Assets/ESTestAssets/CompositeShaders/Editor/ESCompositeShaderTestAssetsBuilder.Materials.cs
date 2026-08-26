@@ -320,19 +320,19 @@ namespace ES.TestAssets.Editor
             {
                 case Shader2D:
                     ES2DCompositeURPProperties.SetQuality(material, quality);
-                    if (exactContract) ES2DCompositeURPProperties.SetSSUExactContract(material, true, textures.Noise);
+                    if (exactContract) ES2DCompositeURPProperties.SetESNativeExactContract(material, true, textures.Noise);
                     break;
                 case ShaderUI:
                     ESUICompositeURPProperties.SetQuality(material, quality);
-                    if (exactContract) ESUICompositeURPProperties.SetSSUExactContract(material, true, textures.Noise);
+                    if (exactContract) ESUICompositeURPProperties.SetESNativeExactContract(material, true, textures.Noise);
                     break;
                 case ShaderLit:
                     ES3DLitCompositeURPProperties.SetQuality(material, quality);
-                    if (exactContract) ES3DLitCompositeURPProperties.SetSSUExactContract(material, true, textures.Noise);
+                    if (exactContract) ES3DLitCompositeURPProperties.SetESNativeExactContract(material, true, textures.Noise);
                     break;
                 case ShaderVfx:
                     ES3DVFXCompositeURPProperties.SetQuality(material, quality);
-                    if (exactContract) ES3DVFXCompositeURPProperties.SetSSUExactContract(material, true);
+                    if (exactContract) ES3DVFXCompositeURPProperties.SetESNativeExactContract(material, true);
                     break;
                 default:
                     throw new InvalidOperationException("未注册的 Composite Shader：" + material.shader.name);

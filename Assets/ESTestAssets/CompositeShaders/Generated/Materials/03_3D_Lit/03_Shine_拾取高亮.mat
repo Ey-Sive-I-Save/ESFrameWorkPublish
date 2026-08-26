@@ -19,7 +19,8 @@ Material:
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap: {}
+  stringTagMap:
+    RenderType: Opaque
   disabledShaderPasses: []
   m_LockedProperties: 
   m_SavedProperties:
@@ -203,6 +204,7 @@ Material:
     - _ESInteractiveWindHeight: 1
     - _ESInteractiveWindRotation: 0
     - _ESMaterialVersion: 1
+    - _ESNativeStatusContract: 0
     - _ESWindPhaseOffset: 0
     - _EmissionUseAlpha: 0
     - _EnableAddColor: 0
@@ -399,7 +401,6 @@ Material:
     - _ResourceProfile: 0
     - _RimIntensity: 1
     - _RimPower: 3
-    - _SSUStatusContract: 0
     - _Saturation: 1
     - _ScreenTilingPixelsPerUnit: 128
     - _ShadowFade: 1

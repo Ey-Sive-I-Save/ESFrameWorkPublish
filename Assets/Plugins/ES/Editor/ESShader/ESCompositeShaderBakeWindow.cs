@@ -76,6 +76,7 @@ namespace ES.EditorInternal
         {
             titleContent = new GUIContent("Composite 烘焙");
             minSize = new Vector2(420f, 520f);
+            maxSize = new Vector2(1400f, 1000f);
             ES.ESWindowFoundation.BindWithStandardSystemHost(
                 this,
                 ES.ESWindowFoundation.EnsureStandardSystemActionBar(this));
@@ -94,6 +95,15 @@ namespace ES.EditorInternal
 
         private void OnSelectionChange()
         {
+            Repaint();
+        }
+
+        private void OnProjectChange()
+        {
+            // A source Shader/Texture can be replaced while this window remains
+            // open. Do not keep displaying a baked snapshot from the old import.
+            ReleaseBakedTexture();
+            lastError = "项目资源已变化，请重新生成烘焙预览。";
             Repaint();
         }
 
@@ -246,14 +256,22 @@ namespace ES.EditorInternal
                             frameCount == 0 ? 1f : (float)i / frameCount))
                         throw new OperationCanceledException();
                     float time = startTime + frameInterval * i;
-                    Texture2D frame = RenderFrame(material, texture, sourceSprite, frameSize, time, sRgb);
-                    if (frame == null)
-                        throw new InvalidOperationException("GPU 预览没有返回纹理。请确认当前图形设备可用。");
+                    Texture2D frame = null;
+                    try
+                    {
+                        frame = RenderFrame(material, texture, sourceSprite, frameSize, time, sRgb);
+                        if (frame == null)
+                            throw new InvalidOperationException("GPU 预览没有返回纹理。请确认当前图形设备可用。");
 
-                    int x = horizontalFrames ? i * frameSize.x : 0;
-                    int y = horizontalFrames ? 0 : i * frameSize.y;
-                    bakedTexture.SetPixels32(x, y, frameSize.x, frameSize.y, frame.GetPixels32());
-                    DestroyImmediate(frame);
+                        int x = horizontalFrames ? i * frameSize.x : 0;
+                        int y = horizontalFrames ? 0 : i * frameSize.y;
+                        bakedTexture.SetPixels32(x, y, frameSize.x, frameSize.y, frame.GetPixels32());
+                    }
+                    finally
+                    {
+                        if (frame != null)
+                            DestroyImmediate(frame);
+                    }
                 }
                 bakedTexture.Apply(false, false);
             }
@@ -275,6 +293,12 @@ namespace ES.EditorInternal
 
         private void ExportPng()
         {
+            if (bakedTexture == null)
+            {
+                lastError = "没有可导出的烘焙预览。";
+                return;
+            }
+
             string defaultName = SanitizeFileName(material != null ? material.name : "ESComposite") + "_Baked.png";
             string path = EditorUtility.SaveFilePanelInProject(
                 "导出 ES Composite PNG",
@@ -284,24 +308,53 @@ namespace ES.EditorInternal
             if (string.IsNullOrEmpty(path))
                 return;
 
-            File.WriteAllBytes(Path.GetFullPath(path), bakedTexture.EncodeToPNG());
-            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
-            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
-            if (importer != null)
+            bool createdFile = false;
+            bool completed = false;
+            try
             {
-                importer.textureType = importAsSprite ? TextureImporterType.Sprite : TextureImporterType.Default;
-                importer.spriteImportMode = SpriteImportMode.Single;
-                importer.alphaIsTransparency = true;
-                importer.mipmapEnabled = generateMipMaps;
-                importer.sRGBTexture = sRgb;
-                importer.wrapMode = TextureWrapMode.Clamp;
-                importer.filterMode = filterMode;
-                importer.SaveAndReimport();
-            }
+                string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."))
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+                string absolutePath = Path.GetFullPath(path);
+                if (!absolutePath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("导出路径必须位于当前 Unity 项目内。");
+                if (File.Exists(absolutePath))
+                    throw new IOException("目标文件已存在；为避免覆盖，请选择新的路径。");
 
-            Texture2D imported = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-            Selection.activeObject = imported;
-            EditorGUIUtility.PingObject(imported);
+                byte[] pngBytes = bakedTexture.EncodeToPNG();
+                if (pngBytes == null || pngBytes.Length == 0)
+                    throw new InvalidOperationException("PNG 编码没有返回有效数据。");
+
+                File.WriteAllBytes(absolutePath, pngBytes);
+                createdFile = true;
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
+                TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer != null)
+                {
+                    importer.textureType = importAsSprite ? TextureImporterType.Sprite : TextureImporterType.Default;
+                    importer.spriteImportMode = SpriteImportMode.Single;
+                    importer.alphaIsTransparency = true;
+                    importer.mipmapEnabled = generateMipMaps;
+                    importer.sRGBTexture = sRgb;
+                    importer.wrapMode = TextureWrapMode.Clamp;
+                    importer.filterMode = filterMode;
+                    importer.SaveAndReimport();
+                }
+
+                Texture2D imported = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                if (imported == null)
+                    throw new InvalidOperationException("PNG 已写入，但 Unity 没有成功导入目标资产。");
+                Selection.activeObject = imported;
+                EditorGUIUtility.PingObject(imported);
+                completed = true;
+                lastError = null;
+            }
+            catch (Exception exception)
+            {
+                if (createdFile && !completed)
+                    AssetDatabase.DeleteAsset(path);
+                lastError = "导出 PNG 失败：" + exception.Message;
+            }
         }
 
         private static Texture2D RenderFrame(
@@ -409,11 +462,14 @@ namespace ES.EditorInternal
                 RenderTextureFormat.ARGB32,
                 useSrgb ? RenderTextureReadWrite.sRGB : RenderTextureReadWrite.Linear);
             RenderTexture previous = RenderTexture.active;
+            Texture2D result = null;
             try
             {
+                if (temporary == null)
+                    return null;
                 Graphics.Blit(source, temporary);
                 RenderTexture.active = temporary;
-                var result = new Texture2D(width, height, UnityEngine.TextureFormat.RGBA32, false, !useSrgb)
+                result = new Texture2D(width, height, UnityEngine.TextureFormat.RGBA32, false, !useSrgb)
                 {
                     hideFlags = HideFlags.HideAndDontSave
                 };
@@ -421,10 +477,17 @@ namespace ES.EditorInternal
                 result.Apply(false, false);
                 return result;
             }
+            catch
+            {
+                if (result != null)
+                    UnityEngine.Object.DestroyImmediate(result);
+                throw;
+            }
             finally
             {
                 RenderTexture.active = previous;
-                RenderTexture.ReleaseTemporary(temporary);
+                if (temporary != null)
+                    RenderTexture.ReleaseTemporary(temporary);
             }
         }
 

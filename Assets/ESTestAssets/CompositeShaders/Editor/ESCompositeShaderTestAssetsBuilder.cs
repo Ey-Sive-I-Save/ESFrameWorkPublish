@@ -20,6 +20,8 @@ namespace ES.TestAssets.Editor
         internal const string MaterialRoot = GeneratedRoot + "/Materials";
         internal const string SceneRoot = GeneratedRoot + "/Scenes";
         internal const string OverviewScenePath = SceneRoot + "/00_CompositeShader_TestOverview.unity";
+        internal const string AuthoredUiUxmlPath = Root + "/UI/ESCompositeShaderObservationPanel.uxml";
+        internal const string AuthoredUiUssPath = Root + "/UI/ESCompositeShaderObservationPanel.uss";
 
         internal const string Shader2D = "ES/2D/Composite URP";
         internal const string ShaderUI = "ES/UI/Composite URP";

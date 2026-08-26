@@ -184,6 +184,12 @@ namespace ES.TestAssets.Editor
 
         private static void ValidateGeneratedScene(Scene scene, string path)
         {
+            if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(AuthoredUiUxmlPath) == null
+                || AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(AuthoredUiUssPath) == null)
+                throw new InvalidOperationException(
+                    "Composite Shader 场景必须依赖 authored ES UI 资产，禁止静默回退到程序化 UI："
+                    + AuthoredUiUxmlPath + " / " + AuthoredUiUssPath);
+
             if (!scene.IsValid() || !scene.isLoaded || scene.rootCount != 1)
                 throw new InvalidOperationException("测试场景根结构无效：" + path);
 
@@ -196,6 +202,8 @@ namespace ES.TestAssets.Editor
                 throw new InvalidOperationException("测试场景缺少 Camera：" + path);
             if (roots[0].GetComponentsInChildren<ESSceneValidationGuide>(true).Length != 1)
                 throw new InvalidOperationException("测试场景必须恰好包含一个 ESSceneValidationGuide：" + path);
+            if (roots[0].GetComponentsInChildren<ESCompositeShaderTestAnimator>(true).Length != 1)
+                throw new InvalidOperationException("测试场景必须恰好包含一个 ESCompositeShaderTestAnimator：" + path);
 
             Component[] components = roots[0].GetComponentsInChildren<Component>(true);
             for (int i = 0; i < components.Length; i++)
@@ -216,6 +224,7 @@ namespace ES.TestAssets.Editor
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = background;
             camera.depthTextureMode |= DepthTextureMode.Depth;
+            cameraObject.AddComponent<ESCompositeShaderShowcaseCameraRig>();
             return camera;
         }
 
@@ -234,6 +243,7 @@ namespace ES.TestAssets.Editor
                 cameraObject.GetComponent<UniversalAdditionalCameraData>()
                 ?? cameraObject.AddComponent<UniversalAdditionalCameraData>();
             additionalCameraData.requiresDepthTexture = true;
+            cameraObject.AddComponent<ESCompositeShaderShowcaseCameraRig>();
             return camera;
         }
 

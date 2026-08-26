@@ -134,80 +134,92 @@ namespace ES.EditorInternal
             if (fader == null || material == null || material.shader == null)
                 return 0;
 
-            var serializedFader = new SerializedObject(fader);
-            serializedFader.Update();
-            SerializedProperty tracks = serializedFader.FindProperty("tracks");
-            int copied = 0;
-            for (int i = 0; i < tracks.arraySize; i++)
+            using (var serializedFader = new SerializedObject(fader))
             {
-                SerializedProperty track = tracks.GetArrayElementAtIndex(i);
-                SerializedProperty propertyName = track.FindPropertyRelative("propertyName");
-                int shaderPropertyIndex = material.shader.FindPropertyIndex(propertyName.stringValue);
-                if (shaderPropertyIndex < 0)
-                    continue;
-
-                ShaderPropertyType propertyType = material.shader.GetPropertyType(shaderPropertyIndex);
-                SerializedProperty valueType = track.FindPropertyRelative("valueType");
-                string endpointPrefix = copyFrom ? "from" : "to";
-                switch (propertyType)
+                serializedFader.Update();
+                SerializedProperty tracks = serializedFader.FindProperty("tracks");
+                if (tracks == null)
+                    return 0;
+                int copied = 0;
+                for (int i = 0; i < tracks.arraySize; i++)
                 {
-                    case ShaderPropertyType.Color:
-                        valueType.enumValueIndex = (int)ESCompositeShaderFadeValueType.Color;
-                        track.FindPropertyRelative(endpointPrefix + "Color").colorValue =
-                            material.GetColor(propertyName.stringValue);
-                        copied++;
-                        break;
-                    case ShaderPropertyType.Vector:
-                        valueType.enumValueIndex = (int)ESCompositeShaderFadeValueType.Vector;
-                        track.FindPropertyRelative(endpointPrefix + "Vector").vector4Value =
-                            material.GetVector(propertyName.stringValue);
-                        copied++;
-                        break;
-                    case ShaderPropertyType.Float:
-                    case ShaderPropertyType.Range:
-                        valueType.enumValueIndex = (int)ESCompositeShaderFadeValueType.Float;
-                        track.FindPropertyRelative(endpointPrefix + "Float").floatValue =
-                            material.GetFloat(propertyName.stringValue);
-                        copied++;
-                        break;
+                    SerializedProperty track = tracks.GetArrayElementAtIndex(i);
+                    SerializedProperty propertyName = track.FindPropertyRelative("propertyName");
+                    int shaderPropertyIndex = material.shader.FindPropertyIndex(propertyName.stringValue);
+                    if (shaderPropertyIndex < 0)
+                        continue;
+
+                    ShaderPropertyType propertyType = material.shader.GetPropertyType(shaderPropertyIndex);
+                    SerializedProperty valueType = track.FindPropertyRelative("valueType");
+                    string endpointPrefix = copyFrom ? "from" : "to";
+                    switch (propertyType)
+                    {
+                        case ShaderPropertyType.Color:
+                            valueType.enumValueIndex = (int)ESCompositeShaderFadeValueType.Color;
+                            track.FindPropertyRelative(endpointPrefix + "Color").colorValue =
+                                material.GetColor(propertyName.stringValue);
+                            copied++;
+                            break;
+                        case ShaderPropertyType.Vector:
+                            valueType.enumValueIndex = (int)ESCompositeShaderFadeValueType.Vector;
+                            track.FindPropertyRelative(endpointPrefix + "Vector").vector4Value =
+                                material.GetVector(propertyName.stringValue);
+                            copied++;
+                            break;
+                        case ShaderPropertyType.Float:
+                        case ShaderPropertyType.Range:
+                            valueType.enumValueIndex = (int)ESCompositeShaderFadeValueType.Float;
+                            track.FindPropertyRelative(endpointPrefix + "Float").floatValue =
+                                material.GetFloat(propertyName.stringValue);
+                            copied++;
+                            break;
+                    }
                 }
+                serializedFader.ApplyModifiedProperties();
+                return copied;
             }
-            serializedFader.ApplyModifiedProperties();
-            return copied;
         }
 
         private static void PrepareGraphicInstancesWithUndo(ESCompositeShaderFader fader)
         {
-            var serializedFader = new SerializedObject(fader);
-            serializedFader.Update();
-            var graphics = new List<Graphic>();
-            if (serializedFader.FindProperty("collectChildren").boolValue)
+            using (var serializedFader = new SerializedObject(fader))
             {
-                bool includeInactive = serializedFader.FindProperty("includeInactive").boolValue;
-                graphics.AddRange(fader.GetComponentsInChildren<Graphic>(includeInactive));
-            }
-            else
-            {
-                SerializedProperty graphicProperties = serializedFader.FindProperty("graphics");
-                for (int i = 0; i < graphicProperties.arraySize; i++)
+                serializedFader.Update();
+                var graphics = new List<Graphic>();
+                SerializedProperty collectChildren = serializedFader.FindProperty("collectChildren");
+                if (collectChildren == null)
+                    return;
+                if (collectChildren.boolValue)
                 {
-                    var graphic = graphicProperties.GetArrayElementAtIndex(i).objectReferenceValue as Graphic;
-                    if (graphic != null) graphics.Add(graphic);
+                    SerializedProperty includeInactiveProperty = serializedFader.FindProperty("includeInactive");
+                    bool includeInactive = includeInactiveProperty != null && includeInactiveProperty.boolValue;
+                    graphics.AddRange(fader.GetComponentsInChildren<Graphic>(includeInactive));
                 }
-            }
-
-            for (int i = 0; i < graphics.Count; i++)
-            {
-                Graphic graphic = graphics[i];
-                if (!ESCompositeMaterialInstance.IsCompositeMaterial(graphic.material))
-                    continue;
-                ESCompositeMaterialInstance instance = graphic.GetComponent<ESCompositeMaterialInstance>();
-                if (instance == null)
-                    instance = Undo.AddComponent<ESCompositeMaterialInstance>(graphic.gameObject);
                 else
-                    Undo.RecordObject(instance, "配置 ES Composite Material Instance");
-                instance.Configure(graphic);
-                EditorUtility.SetDirty(instance);
+                {
+                    SerializedProperty graphicProperties = serializedFader.FindProperty("graphics");
+                    if (graphicProperties == null)
+                        return;
+                    for (int i = 0; i < graphicProperties.arraySize; i++)
+                    {
+                        var graphic = graphicProperties.GetArrayElementAtIndex(i).objectReferenceValue as Graphic;
+                        if (graphic != null) graphics.Add(graphic);
+                    }
+                }
+
+                for (int i = 0; i < graphics.Count; i++)
+                {
+                    Graphic graphic = graphics[i];
+                    if (!ESCompositeMaterialInstance.IsCompositeMaterial(graphic.material))
+                        continue;
+                    ESCompositeMaterialInstance instance = graphic.GetComponent<ESCompositeMaterialInstance>();
+                    if (instance == null)
+                        instance = Undo.AddComponent<ESCompositeMaterialInstance>(graphic.gameObject);
+                    else
+                        Undo.RecordObject(instance, "配置 ES Composite Material Instance");
+                    instance.Configure(graphic);
+                    EditorUtility.SetDirty(instance);
+                }
             }
         }
 
@@ -229,35 +241,39 @@ namespace ES.EditorInternal
             HashSet<string> unique,
             List<string> result)
         {
-            var serializedFader = new SerializedObject(fader);
-            serializedFader.Update();
-            SerializedProperty tracks = serializedFader.FindProperty("tracks");
-            List<Material> materials = CollectTargetMaterials(serializedFader);
-
-            for (int trackIndex = 0; trackIndex < tracks.arraySize; trackIndex++)
+            using (var serializedFader = new SerializedObject(fader))
             {
-                SerializedProperty track = tracks.GetArrayElementAtIndex(trackIndex);
-                string propertyName = track.FindPropertyRelative("propertyName").stringValue;
-                if (string.IsNullOrWhiteSpace(propertyName))
-                {
-                    AddDiagnostic("轨道 " + (trackIndex + 1) + " 没有属性名。", unique, result);
-                    continue;
-                }
+                serializedFader.Update();
+                SerializedProperty tracks = serializedFader.FindProperty("tracks");
+                if (tracks == null)
+                    return;
+                List<Material> materials = CollectTargetMaterials(serializedFader);
 
-                int valueType = track.FindPropertyRelative("valueType").enumValueIndex;
-                for (int materialIndex = 0; materialIndex < materials.Count; materialIndex++)
+                for (int trackIndex = 0; trackIndex < tracks.arraySize; trackIndex++)
                 {
-                    Material material = materials[materialIndex];
-                    int propertyIndex = material.shader.FindPropertyIndex(propertyName);
-                    if (propertyIndex < 0)
+                    SerializedProperty track = tracks.GetArrayElementAtIndex(trackIndex);
+                    string propertyName = track.FindPropertyRelative("propertyName").stringValue;
+                    if (string.IsNullOrWhiteSpace(propertyName))
                     {
-                        AddDiagnostic(material.name + " 缺少轨道属性 " + propertyName + "。", unique, result);
+                        AddDiagnostic("轨道 " + (trackIndex + 1) + " 没有属性名。", unique, result);
                         continue;
                     }
 
-                    ShaderPropertyType shaderType = material.shader.GetPropertyType(propertyIndex);
-                    if (!MatchesTrackType(shaderType, valueType))
-                        AddDiagnostic(material.name + " 的 " + propertyName + " 类型与轨道不一致。", unique, result);
+                    int valueType = track.FindPropertyRelative("valueType").enumValueIndex;
+                    for (int materialIndex = 0; materialIndex < materials.Count; materialIndex++)
+                    {
+                        Material material = materials[materialIndex];
+                        int propertyIndex = material.shader.FindPropertyIndex(propertyName);
+                        if (propertyIndex < 0)
+                        {
+                            AddDiagnostic(material.name + " 缺少轨道属性 " + propertyName + "。", unique, result);
+                            continue;
+                        }
+
+                        ShaderPropertyType shaderType = material.shader.GetPropertyType(propertyIndex);
+                        if (!MatchesTrackType(shaderType, valueType))
+                            AddDiagnostic(material.name + " 的 " + propertyName + " 类型与轨道不一致。", unique, result);
+                    }
                 }
             }
         }
@@ -267,20 +283,26 @@ namespace ES.EditorInternal
             var result = new List<Material>();
             var unique = new HashSet<Material>();
             SerializedProperty renderers = serializedFader.FindProperty("renderers");
-            for (int i = 0; i < renderers.arraySize; i++)
+            if (renderers != null)
             {
-                var renderer = renderers.GetArrayElementAtIndex(i).objectReferenceValue as Renderer;
-                if (renderer == null) continue;
-                Material[] materials = renderer.sharedMaterials;
-                for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
-                    AddCompositeMaterial(materials[materialIndex], unique, result);
+                for (int i = 0; i < renderers.arraySize; i++)
+                {
+                    var renderer = renderers.GetArrayElementAtIndex(i).objectReferenceValue as Renderer;
+                    if (renderer == null) continue;
+                    Material[] materials = renderer.sharedMaterials;
+                    for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
+                        AddCompositeMaterial(materials[materialIndex], unique, result);
+                }
             }
 
             SerializedProperty graphics = serializedFader.FindProperty("graphics");
-            for (int i = 0; i < graphics.arraySize; i++)
+            if (graphics != null)
             {
-                var graphic = graphics.GetArrayElementAtIndex(i).objectReferenceValue as Graphic;
-                if (graphic != null) AddCompositeMaterial(graphic.material, unique, result);
+                for (int i = 0; i < graphics.arraySize; i++)
+                {
+                    var graphic = graphics.GetArrayElementAtIndex(i).objectReferenceValue as Graphic;
+                    if (graphic != null) AddCompositeMaterial(graphic.material, unique, result);
+                }
             }
             return result;
         }

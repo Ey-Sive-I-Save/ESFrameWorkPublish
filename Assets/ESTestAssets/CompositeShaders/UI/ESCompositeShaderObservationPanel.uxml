@@ -4,10 +4,16 @@
             <ui:VisualElement name="header" class="panel-header">
                 <ui:Label name="eyebrow" text="ES COMPOSITE SHADER LAB" class="eyebrow" />
                 <ui:Label name="scene-title" class="scene-title" />
+                <ui:Label name="scene-subtitle" text="从效果目标出发，实时调整并验证 ES 材质" class="scene-subtitle" />
                 <ui:Button name="collapse-button" text="−" class="collapse-button" />
                 <ui:Label name="status" class="status" />
             </ui:VisualElement>
             <ui:VisualElement name="panel-body" class="panel-body">
+                <ui:VisualElement name="intent-strip" class="intent-strip">
+                    <ui:Label text="当前工作流" class="intent-kicker" />
+                    <ui:Label text="选择效果 · 调整参数 · 预览结果 · 回到基线" class="intent-copy" />
+                    <ui:Label name="host-badge" text="HOST · 自动识别" class="host-badge" />
+                </ui:VisualElement>
                 <ui:VisualElement class="divider" />
                 <ui:VisualElement class="section-heading case-heading">
                     <ui:Label text="案例" class="section-title" />
@@ -16,25 +22,49 @@
                 </ui:VisualElement>
                 <ui:ScrollView name="case-list" class="case-list" mode="Vertical" />
                 <ui:Label name="selected-case" class="selected-case" />
+                <ui:VisualElement name="selected-preview" class="selected-preview">
+                    <ui:VisualElement class="preview-copy">
+                        <ui:Label text="当前效果" class="preview-kicker" />
+                        <ui:Label name="preview-description" text="选择一个案例开始调整" class="preview-description" />
+                    </ui:VisualElement>
+                    <ui:Label name="preview-state" text="PREVIEW" class="preview-state" />
+                </ui:VisualElement>
+                <ui:VisualElement name="preset-row" class="preset-row">
+                    <ui:Label text="预设" class="preset-label" />
+                    <ui:Button name="preset-subtle" text="Subtle" class="preset-button" />
+                    <ui:Button name="preset-standard" text="Standard" class="preset-button preset-button-active" />
+                    <ui:Button name="preset-hero" text="Hero" class="preset-button" />
+                </ui:VisualElement>
                 <ui:VisualElement class="section-heading">
                     <ui:Label text="参数" class="section-title" />
-                    <ui:Label text="拖动后接管当前值，单项可回正" class="section-subtitle" />
+                    <ui:Label text="结果参数优先；高级属性按需展开" class="section-subtitle" />
                 </ui:VisualElement>
                 <ui:ScrollView name="control-list" class="control-list" mode="Vertical" />
                 <ui:VisualElement class="toggle-row">
                     <ui:Toggle name="auto-toggle" label="自动演示" />
                     <ui:Toggle name="solo-toggle" label="单独观察" />
+                    <ui:Toggle name="advanced-toggle" label="高级参数" class="row-last" />
                 </ui:VisualElement>
                 <ui:VisualElement class="action-row">
                     <ui:Button name="reset-selected" text="↺ 当前回正" class="action-button" />
                     <ui:Button name="reset-all" text="↺ 全部回正" class="action-button" />
-                    <ui:Button name="overview-button" text="⌂ 返回总览" class="action-button accent-button" />
+                    <ui:Button name="overview-button" text="⌂ 返回总览" class="action-button accent-button row-last" />
+                </ui:VisualElement>
+                <ui:VisualElement name="binding-row" class="binding-row">
+                    <ui:Button name="save-variant" text="保存当前效果" class="binding-button" />
+                    <ui:Button name="apply-selected" text="应用到选中对象" class="binding-button binding-button-primary" />
+                    <ui:Button name="undo-last" text="撤销" class="binding-button row-last" />
+                </ui:VisualElement>
+                <ui:VisualElement name="diagnostic-box" class="diagnostic-box">
+                    <ui:Label text="验证提示" class="diagnostic-title" />
+                    <ui:Label name="diagnostic-copy" text="预览不会修改源材质；Renderer 使用 MPB，UI 使用运行时实例。" class="diagnostic-copy" />
                 </ui:VisualElement>
                 <ui:VisualElement class="section-heading scene-heading">
-                    <ui:Label text="场景" class="section-title" />
-                    <ui:Label text="Shader / 材质组" class="section-subtitle" />
+                    <ui:Label text="漫游" class="section-title" />
+                    <ui:Label text="在效果展区之间快速移动" class="section-subtitle" />
                 </ui:VisualElement>
                 <ui:VisualElement name="scene-nav" class="scene-nav" />
+                <ui:Label name="roam-hint" text="点击导航按钮切换展区 · 场景导视会标记当前验证路线" class="roam-hint" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

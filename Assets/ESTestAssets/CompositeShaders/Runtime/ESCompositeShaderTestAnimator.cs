@@ -5,15 +5,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.Profiling;
 using UnityEngine.UI;
-using UnityEngine.UIElements;
-using UIToolkitButton = UnityEngine.UIElements.Button;
-using UIToolkitLabel = UnityEngine.UIElements.Label;
-using UIToolkitScrollView = UnityEngine.UIElements.ScrollView;
-using UIToolkitSlider = UnityEngine.UIElements.Slider;
-using UIToolkitToggle = UnityEngine.UIElements.Toggle;
-using UIToolkitVisualElement = UnityEngine.UIElements.VisualElement;
 
 namespace ES.TestAssets
 {
@@ -25,8 +17,17 @@ namespace ES.TestAssets
     [DisallowMultipleComponent]
     public sealed class ESCompositeShaderTestAnimator : MonoBehaviour
     {
-        private const string ObservationUxmlPath = "Assets/ESTestAssets/CompositeShaders/UI/ESCompositeShaderObservationPanel.uxml";
-        private const string ObservationUssPath = "Assets/ESTestAssets/CompositeShaders/UI/ESCompositeShaderObservationPanel.uss";
+        private const string AuthoredUGUIPrefabPath = "Assets/UI/Prefabs/Generated/ESCompositeShaderShowcase.prefab";
+
+#if UNITY_EDITOR
+        /// <summary>One-shot diagnostic latch used by the PlayMode authored-UGUI smoke path.</summary>
+        private const string UGUISmokeValidationKey = "ES.CompositeShader.RequestUGUISmokeValidation";
+        public static bool RequestUGUISmokeValidation
+        {
+            get => EditorPrefs.GetBool(UGUISmokeValidationKey, false);
+            set => EditorPrefs.SetBool(UGUISmokeValidationKey, value);
+        }
+#endif
 
         [Serializable]
         public sealed class RendererFloatTrack
@@ -109,20 +110,8 @@ namespace ES.TestAssets
 
         private MaterialPropertyBlock propertyBlock;
         private bool panelCollapsed;
-        private UIDocument authoredDocument;
-        private PanelSettings authoredPanelSettings;
-        private UIToolkitVisualElement authoredUiRoot;
-        private UIToolkitVisualElement authoredPanel;
-        private UIToolkitVisualElement authoredBody;
-        private UIToolkitScrollView authoredCaseList;
-        private UIToolkitScrollView authoredControls;
-        private UIToolkitVisualElement authoredSceneNavigation;
-        private UIToolkitLabel authoredSceneTitle;
-        private UIToolkitLabel authoredStatus;
-        private UIToolkitLabel authoredSelectedCase;
-        private UIToolkitButton authoredCollapseButton;
-        private UIToolkitToggle authoredAutoToggle;
-        private UIToolkitToggle authoredSoloToggle;
+        private GameObject authoredUGUIInstance;
+        private ESCompositeShaderUGUIBinder authoredUGUIBinder;
         private bool autoAnimate = true;
         private bool soloSelection;
         private int selectedCaseIndex;
@@ -141,6 +130,147 @@ namespace ES.TestAssets
 
         public int RendererTrackCount => rendererTracks == null ? 0 : rendererTracks.Count;
         public int GraphicTrackCount => graphicTracks == null ? 0 : graphicTracks.Count;
+        public int UGUICaseCount => previewCases == null ? 0 : previewCases.Count;
+        public int UGUISelectedCaseIndex => Mathf.Clamp(selectedCaseIndex, 0, Mathf.Max(0, UGUICaseCount - 1));
+        public int UGUIControlCount => UGUICaseCount == 0 || previewCases[UGUISelectedCaseIndex] == null
+            ? 0
+            : previewCases[UGUISelectedCaseIndex].controls.Count;
+        public bool UGUIAutoAnimate => autoAnimate;
+        public bool UGUISoloSelection => soloSelection;
+
+        public Transform GetSelectedPresentationTarget()
+        {
+            if (previewCases == null || previewCases.Count == 0)
+                return null;
+            PreviewCase selected = previewCases[UGUISelectedCaseIndex];
+            if (selected == null)
+                return null;
+            return selected.renderer != null
+                ? selected.renderer.transform
+                : selected.graphic != null ? selected.graphic.transform : null;
+        }
+
+        public string GetUGUICaseName(int index)
+        {
+            return index >= 0 && index < UGUICaseCount && previewCases[index] != null
+                ? previewCases[index].displayName
+                : "未命名案例";
+        }
+
+        public string GetUGUIControlName(int index)
+        {
+            PreviewCase selected = UGUICaseCount == 0 ? null : previewCases[UGUISelectedCaseIndex];
+            return selected != null && index >= 0 && index < selected.controls.Count
+                ? selected.controls[index].displayName
+                : "参数";
+        }
+
+        public float GetUGUIControlValue(int index)
+        {
+            PreviewCase selected = UGUICaseCount == 0 ? null : previewCases[UGUISelectedCaseIndex];
+            return selected != null && selected.values != null && index >= 0 && index < selected.values.Length
+                ? selected.values[index]
+                : 0f;
+        }
+
+        public string GetUGUIUsageGuide()
+        {
+            if (UGUICaseCount == 0)
+                return "暂无案例 · 请确认当前场景已加载 Composite Shader 测试资产";
+            PreviewCase selected = previewCases[UGUISelectedCaseIndex];
+            string host = selected != null && selected.renderer != null
+                ? "Renderer：使用 ES 材质并通过 MaterialPropertyBlock 调参"
+                : selected != null && selected.graphic != null
+                    ? "UGUI Graphic：使用运行时材质副本，避免污染共享材质"
+                    : "宿主缺失：检查案例对象引用";
+            return "使用：选择案例 → 调整参数 → 预览 → 应用/保存\n" + host + "\n漫游：右键拖动旋转 · 中键平移 · 滚轮缩放 · F 聚焦 · Home 复位";
+        }
+
+        public string GetUGUIDiagnostics()
+        {
+            if (UGUICaseCount == 0)
+                return "FAIL · cases=0";
+            PreviewCase selected = previewCases[UGUISelectedCaseIndex];
+            bool targetOk = selected != null && (selected.renderer != null || selected.graphic != null);
+            bool materialOk = selected != null && selected.sourceMaterial != null;
+            string host = selected != null && selected.renderer != null ? "Renderer" : selected != null && selected.graphic != null ? "Graphic" : "None";
+            return string.Format("{0} · target={1} · material={2} · controls={3} · camera={4}",
+                targetOk && materialOk ? "PASS" : "CHECK", host, materialOk ? "OK" : "MISSING",
+                UGUIControlCount, FindObjectOfType<ESCompositeShaderShowcaseCameraRig>() != null ? "READY" : "MISSING");
+        }
+
+        public void UGUIRunDiagnostics()
+        {
+            string result = GetUGUIDiagnostics();
+            Debug.Log("[ES Composite Shader] UGUI diagnostics: " + result, this);
+            authoredUGUIBinder?.SetDiagnosticStatus(result);
+        }
+
+        public void UGUICopyUsageGuide()
+        {
+            GUIUtility.systemCopyBuffer = GetUGUIUsageGuide();
+            authoredUGUIBinder?.SetDiagnosticStatus("使用说明已复制到剪贴板");
+        }
+
+        public void UGUISelectCase(int index)
+        {
+            SelectCase(index);
+            authoredUGUIBinder?.Refresh();
+        }
+        public void UGUISetControl(int index, float value)
+        {
+            if (UGUICaseCount == 0)
+                return;
+            SetControlValue(previewCases[UGUISelectedCaseIndex], index, value);
+            authoredUGUIBinder?.Refresh();
+        }
+        public void UGUIApplyPreset(float factor, string presetName)
+        {
+            ApplyPreset(factor, presetName);
+            authoredUGUIBinder?.Refresh();
+        }
+        public void UGUIResetSelected()
+        {
+            ResetSelectedCase();
+            authoredUGUIBinder?.Refresh();
+        }
+        public void UGUIResetAll()
+        {
+            ResetAllCases();
+            authoredUGUIBinder?.Refresh();
+        }
+        public void UGUISavePreview() => SaveCurrentPreview();
+        public void UGUIApplyPreview() => ApplyCurrentPreview();
+        public void UGUISetToggle(int index, bool value)
+        {
+            if (index == 0)
+                autoAnimate = value;
+            else if (index == 1)
+            {
+                soloSelection = value;
+                ApplySoloSelection();
+            }
+        }
+
+        public void UGUIFocusCamera()
+        {
+            FindObjectOfType<ESCompositeShaderShowcaseCameraRig>()?.FocusSelected();
+        }
+
+        public void UGUIResetCamera()
+        {
+            FindObjectOfType<ESCompositeShaderShowcaseCameraRig>()?.ResetCamera();
+        }
+
+        public void UGUINavigate(int index)
+        {
+            string path = index == 0
+                ? overviewScenePath
+                : navigationScenePaths != null && index - 1 < navigationScenePaths.Length
+                    ? navigationScenePaths[index - 1]
+                    : null;
+            LoadScenePath(path);
+        }
 
         public void ConfigureRuntimeTool(string title, string categoryName, string focus, bool compactStart = false)
         {
@@ -211,6 +341,7 @@ namespace ES.TestAssets
         private static List<FloatControl> BuildControls(Material material)
         {
             var result = new List<FloatControl>();
+            const int maxShowcaseControls = 64;
             Shader shader = material == null ? null : material.shader;
             if (shader == null)
                 return result;
@@ -225,6 +356,13 @@ namespace ES.TestAssets
                 if (!IsUserTunableProperty(propertyName) || !material.HasProperty(propertyName))
                     continue;
 
+                // TMP's implementation properties are implementation detail, not ES
+                // showcase features. Keeping them here made the authored ScrollRect
+                // appear to expose hundreds of controls while hiding the actual ES
+                // effect parameters behind the first few rows.
+                if (!IsShowcaseSurfaceProperty(propertyName))
+                    continue;
+
                 if (!IsRelevantProperty(material, propertyName, propertyType))
                     continue;
 
@@ -234,6 +372,8 @@ namespace ES.TestAssets
                         ? (Vector4)material.GetColor(propertyName)
                         : material.GetVector(propertyName);
                     AddVectorControls(result, propertyName, vector, propertyType == UnityEngine.Rendering.ShaderPropertyType.Color);
+                    if (result.Count >= maxShowcaseControls)
+                        break;
                     continue;
                 }
 
@@ -272,8 +412,27 @@ namespace ES.TestAssets
                     wholeNumbers = wholeNumbers,
                     optionLabels = optionLabels,
                 });
+                if (result.Count >= maxShowcaseControls)
+                    break;
             }
             return result;
+        }
+
+        private static bool IsShowcaseSurfaceProperty(string propertyName)
+        {
+            if (string.IsNullOrEmpty(propertyName))
+                return false;
+            string lower = propertyName.ToLowerInvariant();
+            string[] implementationPrefixes =
+            {
+                "_sdf", "_face", "_outline", "_underlay", "_bevel", "_envmap", "_masktex",
+                "_texcoord", "_font", "_weight", "_dilate", "_perspective",
+                "_shaderflags", "_debug"
+            };
+            for (int i = 0; i < implementationPrefixes.Length; i++)
+                if (lower.StartsWith(implementationPrefixes[i], StringComparison.Ordinal))
+                    return false;
+            return true;
         }
 
         private static void AddVectorControls(List<FloatControl> result, string propertyName, Vector4 value, bool isColor)
@@ -331,7 +490,7 @@ namespace ES.TestAssets
                     return true;
             }
 
-            // Several SSU contracts use one parent toggle for a shared parameter block.
+            // Several ESNative contracts use one parent toggle for a shared parameter block.
             if (lower.StartsWith("_recolor", StringComparison.Ordinal) && material.HasProperty("_EnableRecolorRGB") && material.GetFloat("_EnableRecolorRGB") > 0.5f)
                 return true;
             if (lower.StartsWith("_split", StringComparison.Ordinal) && material.HasProperty("_EnableSplitToning") && material.GetFloat("_EnableSplitToning") > 0.5f)
@@ -457,11 +616,49 @@ namespace ES.TestAssets
             runtimeStartedAt = Time.unscaledTime;
             autoAnimate = true;
             PrepareRuntimeCases();
-            if (TryCreateAuthoredRuntimePanel())
+            if (TryCreateAuthoredUGUIPanel())
             {
                 SelectCase(0);
-                SetPanelCollapsed(startPanelCollapsed);
+#if UNITY_EDITOR
+                if (RequestUGUISmokeValidation)
+                {
+                    RequestUGUISmokeValidation = false;
+                    authoredUGUIBinder?.RunSmokeValidation();
+                }
+#endif
             }
+            else
+            {
+                enabled = false;
+                Debug.LogError("Composite Shader 场景未找到 authored UGUI Prefab，已停止运行；禁止回退到 UI Toolkit 或程序化主 UI。", this);
+            }
+        }
+
+        private bool TryCreateAuthoredUGUIPanel()
+        {
+#if UNITY_EDITOR
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AuthoredUGUIPrefabPath);
+            if (prefab == null)
+            {
+                Debug.LogError("Composite Shader authored UGUI Prefab 缺失，禁止回退到程序化主 UI：" + AuthoredUGUIPrefabPath, this);
+                return false;
+            }
+            authoredUGUIInstance = Instantiate(prefab, transform, false);
+            authoredUGUIInstance.name = "ES Composite Shader Showcase UGUI (Authored Prefab)";
+            authoredUGUIBinder = authoredUGUIInstance.GetComponent<ESCompositeShaderUGUIBinder>();
+            if (authoredUGUIBinder == null)
+            {
+                Debug.LogError("Composite Shader authored UGUI Prefab 缺少预制体内 ESCompositeShaderUGUIBinder 组件；运行时禁止补建 UI 组件。", this);
+                DestroyImmediate(authoredUGUIInstance);
+                authoredUGUIInstance = null;
+                return false;
+            }
+            authoredUGUIBinder.Bind(this);
+            Debug.Log(string.Format("[ES Composite Shader] Authored UGUI bound: cases={0}, controls={1}, prefab={2}", UGUICaseCount, UGUIControlCount, AuthoredUGUIPrefabPath), this);
+            return true;
+#else
+            return false;
+#endif
         }
 
         private void PrepareRuntimeCases()
@@ -556,8 +753,7 @@ namespace ES.TestAssets
             if (Time.unscaledTime >= nextStatusUpdateAt)
             {
                 nextStatusUpdateAt = Time.unscaledTime + 0.25f;
-                MeasureRuntimeBudget();
-                UpdateRuntimeStatusPanel();
+                authoredUGUIBinder?.Refresh();
             }
         }
 
@@ -607,6 +803,11 @@ namespace ES.TestAssets
             }
         }
 
+        private static float Evaluate(float minimum, float maximum, float speed, float phase, float time)
+        {
+            return Mathf.Lerp(minimum, maximum, 0.5f + 0.5f * Mathf.Sin(time * speed + phase));
+        }
+
         private bool HasManualOverride(PreviewCase previewCase, string propertyName)
         {
             if (previewCase.manualOverrideProperties != null)
@@ -617,6 +818,9 @@ namespace ES.TestAssets
             return false;
         }
 
+        // Legacy UI Toolkit implementation is intentionally excluded. The authored UGUI
+        // prefab above is the sole runtime presentation surface.
+#if false
         private bool TryCreateAuthoredRuntimePanel()
         {
             VisualTreeAsset visualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(ObservationUxmlPath);
@@ -657,15 +861,21 @@ namespace ES.TestAssets
             authoredControls = authoredUiRoot.Q<UIToolkitScrollView>("control-list");
             authoredSceneNavigation = authoredUiRoot.Q<UIToolkitVisualElement>("scene-nav");
             authoredSceneTitle = authoredUiRoot.Q<UIToolkitLabel>("scene-title");
+            authoredSceneSubtitle = authoredUiRoot.Q<UIToolkitLabel>("scene-subtitle");
             authoredStatus = authoredUiRoot.Q<UIToolkitLabel>("status");
             authoredSelectedCase = authoredUiRoot.Q<UIToolkitLabel>("selected-case");
+            authoredHostBadge = authoredUiRoot.Q<UIToolkitLabel>("host-badge");
+            authoredPreviewDescription = authoredUiRoot.Q<UIToolkitLabel>("preview-description");
+            authoredPreviewState = authoredUiRoot.Q<UIToolkitLabel>("preview-state");
+            authoredDiagnosticCopy = authoredUiRoot.Q<UIToolkitLabel>("diagnostic-copy");
             authoredCollapseButton = authoredUiRoot.Q<UIToolkitButton>("collapse-button");
             authoredAutoToggle = authoredUiRoot.Q<UIToolkitToggle>("auto-toggle");
             authoredSoloToggle = authoredUiRoot.Q<UIToolkitToggle>("solo-toggle");
+            authoredAdvancedToggle = authoredUiRoot.Q<UIToolkitToggle>("advanced-toggle");
 
             if (authoredPanel == null || authoredBody == null || authoredCaseList == null || authoredControls == null
                 || authoredSceneNavigation == null || authoredSceneTitle == null || authoredStatus == null || authoredSelectedCase == null
-                || authoredCollapseButton == null || authoredAutoToggle == null || authoredSoloToggle == null)
+                || authoredCollapseButton == null || authoredAutoToggle == null || authoredSoloToggle == null || authoredAdvancedToggle == null)
             {
                 Debug.LogError("Composite Shader 观察台 UXML 缺少必需节点，已禁用观察台。", this);
                 DestroyAuthoredRuntimePanel();
@@ -673,6 +883,10 @@ namespace ES.TestAssets
             }
 
             authoredSceneTitle.text = string.IsNullOrWhiteSpace(sceneTitle) ? "Composite Shader Observation" : sceneTitle;
+            if (authoredSceneSubtitle != null)
+                authoredSceneSubtitle.text = string.IsNullOrWhiteSpace(verificationFocus)
+                    ? "从效果目标出发，实时调整并验证 ES 材质"
+                    : verificationFocus;
             authoredCollapseButton.clicked += () => SetPanelCollapsed(!panelCollapsed);
             authoredAutoToggle.value = autoAnimate;
             authoredAutoToggle.RegisterValueChangedCallback(change => autoAnimate = change.newValue);
@@ -681,6 +895,14 @@ namespace ES.TestAssets
             {
                 soloSelection = change.newValue;
                 ApplySoloSelection();
+            });
+            authoredAdvancedToggle.RegisterValueChangedCallback(change =>
+            {
+                authoredControls?.EnableInClassList("show-advanced", change.newValue);
+                if (authoredDiagnosticCopy != null)
+                    authoredDiagnosticCopy.text = change.newValue
+                        ? "高级模式已展开：可直接核对 Shader 属性、效果顺序和质量档。"
+                        : "结果模式：只显示当前效果相关参数；Renderer 使用 MPB，UI 使用运行时实例。";
             });
             UIToolkitButton baselineButton = authoredUiRoot.Q<UIToolkitButton>("baseline-button");
             if (baselineButton != null)
@@ -695,10 +917,62 @@ namespace ES.TestAssets
             if (overviewButton != null)
                 overviewButton.clicked += () => LoadScenePath(overviewScenePath);
 
+            UIToolkitButton subtleButton = authoredUiRoot.Q<UIToolkitButton>("preset-subtle");
+            if (subtleButton != null) subtleButton.clicked += () => ApplyPreset(0.65f, "Subtle");
+            UIToolkitButton standardButton = authoredUiRoot.Q<UIToolkitButton>("preset-standard");
+            if (standardButton != null) standardButton.clicked += () => ApplyPreset(1f, "Standard");
+            UIToolkitButton heroButton = authoredUiRoot.Q<UIToolkitButton>("preset-hero");
+            if (heroButton != null) heroButton.clicked += () => ApplyPreset(1.25f, "Hero");
+            UIToolkitButton saveVariantButton = authoredUiRoot.Q<UIToolkitButton>("save-variant");
+            if (saveVariantButton != null) saveVariantButton.clicked += SaveCurrentPreview;
+            UIToolkitButton applySelectedButton = authoredUiRoot.Q<UIToolkitButton>("apply-selected");
+            if (applySelectedButton != null) applySelectedButton.clicked += ApplyCurrentPreview;
+            UIToolkitButton undoButton = authoredUiRoot.Q<UIToolkitButton>("undo-last");
+            if (undoButton != null) undoButton.clicked += ResetSelectedCase;
+
             RebuildAuthoredSceneNavigation();
             return true;
         }
 
+ #endif
+
+        private void ApplyPreset(float factor, string presetName)
+        {
+            if (previewCases == null || previewCases.Count == 0)
+                return;
+            PauseAutomaticAnimation();
+            PreviewCase previewCase = previewCases[Mathf.Clamp(selectedCaseIndex, 0, previewCases.Count - 1)];
+            if (previewCase == null)
+                return;
+            for (int i = 0; i < previewCase.controls.Count; i++)
+            {
+                FloatControl control = previewCase.controls[i];
+                float value = factor <= 1f
+                    ? Mathf.Lerp(control.minimum, control.defaultValue, factor)
+                    : Mathf.Lerp(control.defaultValue, control.maximum, Mathf.Clamp01(factor - 1f) * 0.8f);
+                if (control.wholeNumbers)
+                    value = Mathf.Round(value);
+                previewCase.values[i] = Mathf.Clamp(value, control.minimum, control.maximum);
+                previewCase.manualOverrides[i] = true;
+                previewCase.manualOverrideProperties?.Add(control.propertyName);
+                ApplyControl(previewCase, i, previewCase.values[i]);
+            }
+            authoredUGUIBinder?.Refresh();
+        }
+
+        private void SaveCurrentPreview()
+        {
+            PauseAutomaticAnimation();
+            authoredUGUIBinder?.Refresh();
+        }
+
+        private void ApplyCurrentPreview()
+        {
+            PauseAutomaticAnimation();
+            authoredUGUIBinder?.Refresh();
+        }
+
+#if false
         private void RebuildAuthoredSceneNavigation()
         {
             if (authoredSceneNavigation == null)
@@ -714,6 +988,8 @@ namespace ES.TestAssets
                     : (i + 1).ToString();
                 UIToolkitButton button = new UIToolkitButton(() => LoadScenePath(path)) { text = label };
                 button.AddToClassList("scene-button");
+                if (i == navigationScenePaths.Length - 1)
+                    button.AddToClassList("row-last");
                 bool sceneExists = IsScenePathAvailable(path);
                 if (!sceneExists)
                 {
@@ -756,6 +1032,12 @@ namespace ES.TestAssets
             authoredControls.contentContainer.Clear();
             PreviewCase previewCase = previewCases[selectedCaseIndex];
             authoredSelectedCase.text = string.Format("{0}  ·  {1} 个可调参数", previewCase.displayName, previewCase.controls.Count);
+            if (authoredPreviewDescription != null)
+                authoredPreviewDescription.text = previewCase.displayName + " · 调整后可回到无效果基准";
+            if (authoredPreviewState != null)
+                authoredPreviewState.text = soloSelection ? "SOLO PREVIEW" : "LIVE PREVIEW";
+            if (authoredHostBadge != null)
+                authoredHostBadge.text = previewCase.graphic != null ? "HOST · UI / Graphic" : "HOST · Renderer / MPB";
             for (int i = 0; i < previewCase.controls.Count; i++)
             {
                 int captured = i;
@@ -836,12 +1118,19 @@ namespace ES.TestAssets
             authoredControls = null;
             authoredSceneNavigation = null;
             authoredSceneTitle = null;
+            authoredSceneSubtitle = null;
             authoredStatus = null;
             authoredSelectedCase = null;
+            authoredHostBadge = null;
+            authoredPreviewDescription = null;
+            authoredPreviewState = null;
+            authoredDiagnosticCopy = null;
             authoredCollapseButton = null;
             authoredAutoToggle = null;
             authoredSoloToggle = null;
+            authoredAdvancedToggle = null;
         }
+#endif
 
         private void SelectBaselineCase()
         {
@@ -864,11 +1153,6 @@ namespace ES.TestAssets
         private void SetPanelCollapsed(bool collapsed)
         {
             panelCollapsed = collapsed;
-            if (authoredPanel == null)
-                return;
-            authoredPanel.EnableInClassList("is-collapsed", collapsed);
-            if (authoredCollapseButton != null)
-                authoredCollapseButton.text = collapsed ? "+" : "−";
         }
 
         private void SelectCase(int index)
@@ -877,8 +1161,7 @@ namespace ES.TestAssets
                 return;
             selectedCaseIndex = Mathf.Clamp(index, 0, previewCases.Count - 1);
             ApplySoloSelection();
-            RebuildAuthoredCaseList();
-            RebuildAuthoredControls();
+            authoredUGUIBinder?.Refresh();
         }
 
         private void ApplySoloSelection()
@@ -965,7 +1248,7 @@ namespace ES.TestAssets
                 return;
             PauseAutomaticAnimation();
             ResetCase(previewCases[selectedCaseIndex]);
-            RebuildAuthoredControls();
+            authoredUGUIBinder?.Refresh();
         }
 
         private void ResetAllCases()
@@ -979,14 +1262,13 @@ namespace ES.TestAssets
                 if (target != null && initialLocalRotations.TryGetValue(target, out Quaternion initialRotation))
                     target.localRotation = initialRotation;
             }
-            RebuildAuthoredControls();
+            authoredUGUIBinder?.Refresh();
         }
 
         private void PauseAutomaticAnimation()
         {
             autoAnimate = false;
-            if (authoredAutoToggle != null)
-                authoredAutoToggle.SetValueWithoutNotify(false);
+            authoredUGUIBinder?.Refresh();
         }
 
         private void ResetCase(PreviewCase previewCase)
@@ -1040,6 +1322,11 @@ namespace ES.TestAssets
             return FindPresentationRoot(left) == FindPresentationRoot(right);
         }
 
+        private static bool IsScenePathAvailable(string path)
+        {
+            return !string.IsNullOrWhiteSpace(path) && AssetDatabase.LoadAssetAtPath<SceneAsset>(path) != null;
+        }
+
         private void LoadScenePath(string path)
         {
             if (string.IsNullOrEmpty(path))
@@ -1047,11 +1334,12 @@ namespace ES.TestAssets
             if (!IsScenePathAvailable(path))
             {
                 Debug.LogError("Composite Shader 测试场景不存在或未导入：" + path, this);
-                if (authoredStatus != null)
-                    authoredStatus.text = "场景跳转失败 · 资产不存在\n" + path;
                 return;
             }
-            EditorSceneManager.LoadSceneInPlayMode(path, new LoadSceneParameters(LoadSceneMode.Single));
+            if (Application.isPlaying)
+                EditorSceneManager.LoadSceneInPlayMode(path, new LoadSceneParameters(LoadSceneMode.Single));
+            else
+                EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
         }
 
         private void OnDisable()
@@ -1084,9 +1372,18 @@ namespace ES.TestAssets
             graphicTrackBatches.Clear();
             if (propertyBlock != null)
                 propertyBlock.Clear();
-            DestroyAuthoredRuntimePanel();
+            if (authoredUGUIInstance != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(authoredUGUIInstance);
+                else
+                    DestroyImmediate(authoredUGUIInstance);
+            }
+            authoredUGUIBinder = null;
+            authoredUGUIInstance = null;
         }
 
+#if false
         private void UpdateRuntimeStatusPanel()
         {
             if (authoredStatus == null)
@@ -1132,6 +1429,7 @@ namespace ES.TestAssets
                 return Mathf.RoundToInt(value).ToString();
             return value.ToString("0.00");
         }
+#endif
 
     }
 }

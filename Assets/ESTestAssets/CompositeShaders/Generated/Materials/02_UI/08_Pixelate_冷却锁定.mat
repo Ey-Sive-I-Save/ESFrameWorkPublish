@@ -182,6 +182,7 @@ Material:
     - _ESInteractiveWindHeight: 1
     - _ESInteractiveWindRotation: 0
     - _ESMaterialVersion: 1
+    - _ESNativeStatusContract: 0
     - _ESWindPhaseOffset: 0
     - _EnableAddColor: 0
     - _EnableAddHue: 0
@@ -385,7 +386,6 @@ Material:
     - _SDFOutlineWidth: 0
     - _SDFSoftness: 1
     - _SDFThreshold: 0.5
-    - _SSUStatusContract: 0
     - _Saturation: 0.15
     - _ScaleRatioA: 1
     - _ScaleRatioB: 1

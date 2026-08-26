@@ -16,8 +16,9 @@ Material:
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
+  m_CustomRenderQueue: 3000
+  stringTagMap:
+    RenderType: Transparent
   disabledShaderPasses: []
   m_LockedProperties: 
   m_SavedProperties:
@@ -57,6 +58,7 @@ Material:
     - _Distortion: 0
     - _DstBlend: 10
     - _ESMaterialVersion: 1
+    - _ESNativeStatusContract: 0
     - _EnableBlur: 0
     - _EnableChromatic: 0
     - _EnableDepthIntersection: 0
@@ -112,7 +114,6 @@ Material:
     - _RadialMaskSoftness: 0.1
     - _RimIntensity: 1
     - _RimPower: 3
-    - _SSUStatusContract: 0
     - _SequenceColumns: 1
     - _SequenceFrame: 0
     - _SequencePlayback: 1

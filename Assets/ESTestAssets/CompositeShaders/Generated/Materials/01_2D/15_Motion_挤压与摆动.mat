@@ -201,6 +201,7 @@ Material:
     - _ESInteractiveWindHeight: 1
     - _ESInteractiveWindRotation: 0
     - _ESMaterialVersion: 1
+    - _ESNativeStatusContract: 0
     - _ESWindPhaseOffset: 0
     - _EnableAddColor: 0
     - _EnableAddHue: 0
@@ -391,7 +392,6 @@ Material:
     - _ReplaceRange: 0.1
     - _ReplaceSoftness: 0.1
     - _ResourceProfile: 0
-    - _SSUStatusContract: 0
     - _Saturation: 1
     - _ScreenTilingPixelsPerUnit: 128
     - _SequenceColumns: 1

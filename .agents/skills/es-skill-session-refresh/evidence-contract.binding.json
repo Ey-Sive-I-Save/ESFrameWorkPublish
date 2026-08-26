@@ -1,0 +1,29 @@
+{
+    "schemaVersion":  1,
+    "bindingId":  "es.skill-evidence-binding.es-skill-session-refresh.v1",
+    "skillName":  "es-skill-session-refresh",
+    "contract":  {
+                     "id":  "es.skill-evidence-receipt",
+                     "version":  "1",
+                     "path":  "ES/Automation/Contracts/es-skill-evidence-receipt-v1.schema.json",
+                     "hash":  "9fbf168a71ff71c0b16d45ec8fdc18d7891a42b3c3f17638b28d3d3541b1f880"
+                 },
+    "localContract":  {
+                          "path":  "references/evidence-receipt-contract.md",
+                          "hash":  "7808c6efe148704007bc38ca8f79c1e644df6114aaa6c98f5c7123f4d865786f",
+                          "mode":  "additive-extension"
+                      },
+    "stableEntrypoint":  {
+                             "path":  "scripts/Test-ESSkillEvidence.ps1",
+                             "hash":  "517812931891e035004f5807932a277cb50538ea60f2ccf81ff7d929fb377909",
+                             "mode":  "central-delegate",
+                             "centralValidatorPath":  ".agents/skills/es-skill-governance/scripts/Test-ESStrictEvidenceReceipt.ps1"
+                         },
+    "compatibility":  {
+                          "legacyReadable":  true,
+                          "legacyReceiptBeforeUtc":  "2026-08-26T03:45:00Z",
+                          "legacyReceiptAcceptanceEndsUtc":  "2026-09-02T03:45:00Z",
+                          "newReceiptBinding":  "required",
+                          "retirementState":  "not-authorized"
+                      }
+}

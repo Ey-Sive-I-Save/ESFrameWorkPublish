@@ -29,6 +29,9 @@ namespace ES
         private const string EnablePreferenceKey = "ES.Automation.AiBridge.Enabled";
         private const int MaxRequestBytes = 128 * 1024;
         private const int MaxRequestsPerEditorUpdate = 4;
+        // FileSystemWatcher 事件可能在短时间内集中到达。队列满时不丢弃 Inbox 文件，
+        // 只要求下一轮重扫，避免外部输入把 Editor 内存中的待处理路径无限推高。
+        private const int MaxQueuedRequests = 256;
         private const int ControlActionAuditVersion = 1;
         private const int MaxPendingSceneModificationApprovals = 32;
         private static readonly TimeSpan SceneModificationApprovalLifetime = TimeSpan.FromMinutes(5);
@@ -386,6 +389,9 @@ namespace ES
             // Stop 是授权撤销、PlayMode 切换和监听故障的共同收口点；
             // 不保留本次 Play 的受信覆盖，避免重新启用 Bridge 后静默恢复监听。
             trustedPlayModeListeningOverride = false;
+            // 初始化阶段可能已经排队一次性启动回调；停止时主动撤销，
+            // 避免授权/PlayMode/Domain Reload 边界留下过期回调再触发一次启动尝试。
+            EditorApplication.delayCall -= EnsureStartedIfEnabled;
             if (updateSubscribed)
             {
                 updateSubscribed = false;
@@ -402,10 +408,43 @@ namespace ES
             }
             lock (queuedPathLock) queuedPathSet.Clear();
             while (queuedPaths.TryDequeue(out _)) { }
+            CancelActiveRunsForLifecycle("TaskContext /eval 因 Bridge 生命周期停止而取消。");
             rescanRequested = false;
             capabilityDriftRequested = false;
             sessionRefreshSignaled = false;
             ClearPendingSceneModificationApprovals("Bridge 停止、PlayMode 切换或 Domain Reload 使待批准场景计划失效。");
+        }
+
+        private static void CancelActiveRunsForLifecycle(string reason)
+        {
+            foreach (ActiveRun active in ActiveRuns.Values.ToList())
+            {
+                try
+                {
+                    if (!active.Execution.HasExited)
+                        active.Execution.Terminate();
+                    FinishWithoutResult(active, ESAutomationRunStatus.Cancelled, reason);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError("[ESAutomationAiBridge] 生命周期取消受管 Run 失败：" + exception);
+                    try
+                    {
+                        FinishWithoutResult(active, ESAutomationRunStatus.Failed,
+                            "生命周期取消未能确认进程终止：" + exception.GetBaseException().Message);
+                    }
+                    catch (Exception recordException)
+                    {
+                        Debug.LogError("[ESAutomationAiBridge] 生命周期失败状态回执写入失败：" + recordException);
+                    }
+                }
+                finally
+                {
+                    ActiveRuns.Remove(active.Record.runId);
+                    try { active.Execution.Dispose(); }
+                    catch (Exception exception) { Debug.LogError("[ESAutomationAiBridge] 释放受管 Run 失败：" + exception); }
+                }
+            }
         }
 
         private static void OnWatcherFileEvent(object sender, FileSystemEventArgs arguments) => QueuePath(arguments.FullPath);
@@ -419,6 +458,11 @@ namespace ES
             if (!RequestFileNamePattern.IsMatch(fileName)) return;
             lock (queuedPathLock)
             {
+                if (queuedPaths.Count >= MaxQueuedRequests)
+                {
+                    rescanRequested = true;
+                    return;
+                }
                 if (!queuedPathSet.Add(path)) return;
                 queuedPaths.Enqueue(path);
                 capabilityDriftRequested = true;
@@ -847,7 +891,8 @@ namespace ES
         {
             RequireExactProperties(payload, new[]
                 { "objective", "routeKeys", "commandId", "taskId", "taskVersion", "preset", "input" },
-                new[] { "skillNames", "dryRun", "approvedPlanHash", "invocationId", "idempotencyKey" }, context + " payload");
+                new[] { "skillNames", "dryRun", "approvedPlanHash", "invocationId", "idempotencyKey",
+                    "routeProfileId", "goalRevisionPath" }, context + " payload");
             if (payload["routeKeys"].Type != JTokenType.Array)
                 throw new InvalidOperationException(context + ".routeKeys 必须是数组。");
             if (payload["skillNames"] != null && payload["skillNames"].Type != JTokenType.Array)
@@ -877,6 +922,10 @@ namespace ES
                 fromAi = true,
                 dryRun = dryRun,
                 actorId = actorId,
+                routeProfileId = payload["routeProfileId"] == null
+                    ? "governance" : ReadString(payload, "routeProfileId"),
+                goalRevisionPath = payload["goalRevisionPath"] == null
+                    ? string.Empty : ReadString(payload, "goalRevisionPath"),
                 invocationId = payload["invocationId"] == null
                     ? requestId : ReadRequestId(payload, "invocationId"),
                 approvedPlanHash = payload["approvedPlanHash"] == null
@@ -1863,11 +1912,648 @@ namespace ES
         internal JObject CreatePlanData() => (JObject)planData.DeepClone();
     }
 
+    /// <summary>
+    /// Managed advisory /eval adapter. It creates an immutable TaskContext EvaluationRecord
+    /// through the platform PowerShell entry point without mutating task/context lifecycle.
+    /// Automation run status remains transport evidence and is never projected as the
+    /// TaskContext evaluation decision.
+    /// </summary>
+    internal static class ESTaskContextEvaluationAutomation
+    {
+        internal const string TaskId = "es.task-context.evaluate";
+        internal const int TaskVersion = 1;
+        internal const string WorkerType = "PowerShell";
+        internal const string WorkerId = "es.task-context.evaluate";
+        internal const string WorkerVersion = "1.0.0";
+        internal const string WorkerEntrypointHash = "bb2046146493e97c7d3d49b46bdab766f52ed1ca3c55889720cebdce86e19f10";
+        internal const string InputSchemaHash = "2487fd438cca301f84b3c723f5ce827463be68a1d4d902e0a9dd01af4021f12d";
+        private const string CommandId = "task.context-runtime.mutate";
+        private const string StoreRoot = "ES/Output/TaskContextRuntime";
+        private const int TimeoutSeconds = 60;
+        private const long MaxResultBytes = 512L * 1024L;
+        private const ESAutomationCapability RequiredCapabilities =
+            ESAutomationCapability.ReadArtifacts | ESAutomationCapability.WriteReports;
+        private static readonly Dictionary<string, ActiveRun> ActiveRuns =
+            new Dictionary<string, ActiveRun>(StringComparer.Ordinal);
+
+        private static string RunsRoot => Path.Combine(ESAutomationPathPolicy.ProjectRoot,
+            "ES", "Automation", "Runs", "TaskContextEvaluation");
+        private static string TaskStoreRoot => Path.Combine(ESAutomationPathPolicy.ProjectRoot,
+            "ES", "Output", "TaskContextRuntime");
+        private static string WorkerPath => Path.Combine(ESAutomationPathPolicy.ProjectRoot,
+            "ES", "Automation", "Workers", "PowerShell", "Invoke-ESTaskContextEvaluationWorker.ps1");
+        private static string InputSchemaPath => Path.Combine(ESAutomationPathPolicy.ProjectRoot,
+            "ES", "Automation", "Contracts", "es-task-context-evaluation-request-v1.schema.json");
+
+        internal static void Register()
+        {
+            VerifyStaticBindings();
+            if (!ESAutomationTaskRegistry.TryGet(TaskId, TaskVersion, out ESAutomationTaskContract existing))
+            {
+                ESAutomationTaskRegistry.Register(CreateTaskContract());
+            }
+            else
+            {
+                ValidateExistingContract(existing);
+            }
+
+            if (!ESAutomationProcessRunner.IsAdapterRegistered(WorkerType, WorkerId))
+                ESAutomationProcessRunner.RegisterAdapter(new EvaluationWorkerAdapter());
+            if (!ESAutomationFacade.TryGetDescriptor(TaskId, TaskVersion, out _))
+                ESAutomationFacade.Register(new EvaluationEndpoint());
+
+            EditorApplication.update -= PollActiveRuns;
+            EditorApplication.update += PollActiveRuns;
+        }
+
+        private static ESAutomationTaskContract CreateTaskContract()
+            => new ESAutomationTaskContract
+            {
+                taskId = TaskId,
+                version = TaskVersion,
+                worker = CreateWorkerRegistration(),
+                inputs = new List<string> { "request.json" },
+                readRoots = new List<string>
+                {
+                    "ES/Automation/Runs/TaskContextEvaluation",
+                    "ES/Automation/TaskContextRuntime",
+                    "ES/Automation/Contracts",
+                    StoreRoot,
+                },
+                writeRoots = new List<string>
+                {
+                    "ES/Automation/Runs/TaskContextEvaluation",
+                    StoreRoot,
+                },
+                capabilities = new List<string> { "ReadArtifacts", "WriteReports" },
+                inputSchemaHash = InputSchemaHash,
+                timeoutSeconds = TimeoutSeconds,
+                supportsDryRun = false,
+                supportsRetry = false,
+                outputs = new List<string> { "evaluation-record.json", "result.json", "run-record.json" },
+                performanceBudget = new ESAutomationPerformanceBudget
+                {
+                    maxDurationSeconds = TimeoutSeconds,
+                    maxOutputBytes = MaxResultBytes,
+                    maxRetryCount = 0,
+                    maxFindingCount = 32,
+                },
+            };
+
+        private static ESAutomationWorkerRegistration CreateWorkerRegistration()
+            => new ESAutomationWorkerRegistration
+            {
+                type = WorkerType,
+                workerId = WorkerId,
+                version = WorkerVersion,
+                entrypointHash = WorkerEntrypointHash,
+                enabled = true,
+            };
+
+        private static void ValidateExistingContract(ESAutomationTaskContract contract)
+        {
+            contract.Validate();
+            ESAutomationTaskContract expected = CreateTaskContract();
+            if (!string.Equals(contract.ComputeStableHash(), expected.ComputeStableHash(),
+                    StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("TaskContext /eval TaskContract 与平台注册定义不一致。");
+            contract.worker.enabled = true;
+        }
+
+        private static void VerifyStaticBindings()
+        {
+            if (!File.Exists(WorkerPath) || !File.Exists(InputSchemaPath)
+                || ESManagedFileIO.ContainsExistingReparsePoint(WorkerPath)
+                || ESManagedFileIO.ContainsExistingReparsePoint(InputSchemaPath))
+                throw new InvalidOperationException("TaskContext /eval Worker 或输入 Schema 缺失/路径不安全。");
+            if (!string.Equals(ComputeFileHash(WorkerPath), WorkerEntrypointHash,
+                    StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(ComputeFileHash(InputSchemaPath), InputSchemaHash,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("TaskContext /eval Worker 或输入 Schema Hash 漂移。");
+        }
+
+        private static ESAutomationTaskInvocationResult Run(ESAutomationTaskInvocation invocation)
+        {
+            if (!TryNormalizeInput(invocation?.input, out EvaluationInput input, out string inputError))
+                return ESAutomationTaskInvocationResult.Rejected(inputError);
+            if (invocation.dryRun)
+                return ESAutomationTaskInvocationResult.Blocked(
+                    "TaskContext advisory /eval creates one immutable EvaluationRecord and does not support DryRun.");
+
+            string runId = string.IsNullOrWhiteSpace(invocation.invocationId)
+                ? Guid.NewGuid().ToString("N") : invocation.invocationId;
+            string directory = GetRunDirectory(runId);
+            string requestPath = Path.Combine(directory, "request.json");
+            string resultPath = Path.Combine(directory, "result.json");
+            string recordPath = Path.Combine(directory, "run-record.json");
+            string invocationHash = ComputeCanonicalHash(new JObject
+            {
+                ["taskId"] = TaskId,
+                ["taskVersion"] = TaskVersion,
+                ["runId"] = runId,
+                ["brainPlanHash"] = invocation.brainPlanHash ?? string.Empty,
+                ["idempotencyKey"] = input.IdempotencyKey,
+                ["taskContextId"] = input.TaskContextId,
+                ["expectedTaskRevision"] = input.ExpectedTaskRevision,
+                ["expectedContextVersion"] = input.ExpectedContextVersion,
+            });
+
+            if (File.Exists(recordPath))
+            {
+                ESAutomationRunRecord existing = ReadRunRecord(recordPath);
+                if (!string.Equals(existing.invocationHash, invocationHash, StringComparison.OrdinalIgnoreCase))
+                    return ESAutomationTaskInvocationResult.Rejected(
+                        "相同 TaskContext /eval InvocationId 已绑定不同输入。");
+                return ToInvocationResult(existing, directory);
+            }
+
+            ESAutomationPathPolicy.EnsureWorkerDirectory(directory,
+                new[] { "ES/Automation/Runs/TaskContextEvaluation" });
+            JObject request = CreateWorkerRequest(runId, input);
+            WriteJsonCreateOnly(requestPath, request,
+                new[] { "ES/Automation/Runs/TaskContextEvaluation" });
+            var record = new ESAutomationRunRecord
+            {
+                runId = runId,
+                taskId = TaskId,
+                taskVersion = TaskVersion,
+                operatorId = invocation.actorId ?? string.Empty,
+                gitCommit = ESAutomationSourceState.GetCurrentGitCommit(),
+                workerType = WorkerType,
+                workerId = WorkerId,
+                workerVersion = WorkerVersion,
+                entrypointHash = WorkerEntrypointHash,
+                inputManifestHash = ComputeFileHash(requestPath),
+                invocationHash = invocationHash,
+                idempotencyKey = input.IdempotencyKey,
+                executionSnapshot = invocation.executionSnapshot,
+                status = ESAutomationRunStatus.Starting,
+                startedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                lastUpdatedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                operationDirectory = directory,
+            };
+            WriteRunRecord(recordPath, record);
+
+            try
+            {
+                ESAutomationProcessExecution execution = ESAutomationProcessRunner.Start(
+                    new ESAutomationProcessRequest
+                    {
+                        taskId = TaskId,
+                        taskVersion = TaskVersion,
+                        runId = runId,
+                        dryRun = false,
+                        inputContractPath = requestPath,
+                    });
+                record.processId = execution.ProcessId;
+                ESAutomationRunStatus.Transition(record, ESAutomationRunStatus.Running);
+                WriteRunRecord(recordPath, record);
+                ActiveRuns.Add(runId, new ActiveRun
+                {
+                    Execution = execution,
+                    Record = record,
+                    Directory = directory,
+                    RecordPath = recordPath,
+                    ResultPath = resultPath,
+                });
+                return ESAutomationTaskInvocationResult.Accepted(
+                    "TaskContext advisory /eval 已由受管 PowerShell Worker 接受；Automation Accepted 不代表评价 accepted。",
+                    runId, CreateBoundaryData());
+            }
+            catch (Exception exception)
+            {
+                ESAutomationRunStatus.Transition(record, ESAutomationRunStatus.Failed);
+                record.errors.Add(exception.GetBaseException().Message);
+                WriteRunRecord(recordPath, record);
+                return ESAutomationTaskInvocationResult.Failed("TaskContext /eval Worker 启动失败。", runId);
+            }
+        }
+
+        private static JObject CreateWorkerRequest(string runId, EvaluationInput input)
+        {
+            string evaluationSchema = ProjectPath("ES/Automation/Contracts/es-evaluation-record-v1.schema.json");
+            string cli = ProjectPath("ES/Automation/TaskContextRuntime/Invoke-ESTaskContextRuntime.ps1");
+            string module = ProjectPath("ES/Automation/TaskContextRuntime/ESTaskContextRuntime.psm1");
+            string evaluatorRegistry = ProjectPath("ES/Automation/Contracts/es-outcome-evaluator.registry.json");
+            return new JObject
+            {
+                ["protocolVersion"] = 1,
+                ["automationTaskId"] = TaskId,
+                ["automationTaskVersion"] = TaskVersion,
+                ["runId"] = runId,
+                ["workerType"] = WorkerType,
+                ["workerId"] = WorkerId,
+                ["workerVersion"] = WorkerVersion,
+                ["entrypointHash"] = WorkerEntrypointHash,
+                ["operation"] = "Evaluate",
+                ["storeRoot"] = StoreRoot,
+                ["taskContextId"] = input.TaskContextId,
+                ["expectedTaskRevision"] = input.ExpectedTaskRevision,
+                ["expectedContextVersion"] = input.ExpectedContextVersion,
+                ["idempotencyKey"] = input.IdempotencyKey,
+                ["evaluationContractId"] = "es://automation/contracts/evaluation-record/v1",
+                ["evaluationContractHash"] = ComputeFileHash(evaluationSchema),
+                ["platformCliPath"] = "ES/Automation/TaskContextRuntime/Invoke-ESTaskContextRuntime.ps1",
+                ["platformCliHash"] = ComputeFileHash(cli),
+                ["platformModulePath"] = "ES/Automation/TaskContextRuntime/ESTaskContextRuntime.psm1",
+                ["platformModuleHash"] = ComputeFileHash(module),
+                ["outcomeEvaluatorRegistryPath"] = "ES/Automation/Contracts/es-outcome-evaluator.registry.json",
+                ["outcomeEvaluatorRegistryHash"] = ComputeFileHash(evaluatorRegistry),
+            };
+        }
+
+        private static bool TryNormalizeInput(JObject value, out EvaluationInput input, out string error)
+        {
+            input = null;
+            error = string.Empty;
+            string[] expected = { "taskId", "expectedTaskRevision", "expectedContextVersion", "idempotencyKey" };
+            if (value == null || value.Properties().Any(property => !expected.Contains(property.Name)))
+            {
+                error = "TaskContext /eval 输入包含未注册字段；Automation 状态、scope、Profile 和 governanceHash 不得跨合同投影。";
+                return false;
+            }
+            if (expected.Any(field => value[field] == null))
+            {
+                error = "TaskContext /eval 输入缺少必需字段。";
+                return false;
+            }
+            if (value["taskId"].Type != JTokenType.String
+                || value["idempotencyKey"].Type != JTokenType.String
+                || value["expectedTaskRevision"].Type != JTokenType.Integer
+                || value["expectedContextVersion"].Type != JTokenType.Integer)
+            {
+                error = "TaskContext /eval 输入类型无效。";
+                return false;
+            }
+            string taskContextId = value.Value<string>("taskId")?.Trim() ?? string.Empty;
+            string idempotencyKey = value.Value<string>("idempotencyKey")?.Trim() ?? string.Empty;
+            int taskRevision = value.Value<int>("expectedTaskRevision");
+            int contextVersion = value.Value<int>("expectedContextVersion");
+            if (!Regex.IsMatch(taskContextId, "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$")
+                || !Regex.IsMatch(idempotencyKey, "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$")
+                || taskRevision < 1 || contextVersion < 1)
+            {
+                error = "TaskContext /eval 身份、CAS 或幂等键格式无效。";
+                return false;
+            }
+            string taskDirectory = Path.Combine(TaskStoreRoot, taskContextId);
+            if (!Directory.Exists(taskDirectory) || ESManagedFileIO.ContainsExistingReparsePoint(taskDirectory))
+            {
+                error = "TaskContext /eval 目标不存在或路径不安全。";
+                return false;
+            }
+            input = new EvaluationInput
+            {
+                TaskContextId = taskContextId,
+                ExpectedTaskRevision = taskRevision,
+                ExpectedContextVersion = contextVersion,
+                IdempotencyKey = idempotencyKey,
+            };
+            return true;
+        }
+
+        private static void PollActiveRuns()
+        {
+            if (ActiveRuns.Count == 0) return;
+            foreach (string runId in ActiveRuns.Keys.ToList())
+            {
+                ActiveRun active = ActiveRuns[runId];
+                try
+                {
+                    if (active.Execution.EnforceTimeout(DateTimeOffset.UtcNow))
+                    {
+                        FinishWithoutResult(active, ESAutomationRunStatus.TimedOut,
+                            "TaskContext /eval Worker 超时并已终止。");
+                        ActiveRuns.Remove(runId);
+                        continue;
+                    }
+                    if (!active.Execution.HasExited) continue;
+                    active.Execution.WaitForExit(1000);
+                    FinalizeResult(active);
+                    ActiveRuns.Remove(runId);
+                }
+                catch (Exception exception)
+                {
+                    FinishWithoutResult(active, ESAutomationRunStatus.Failed,
+                        exception.GetBaseException().Message);
+                    ActiveRuns.Remove(runId);
+                }
+                finally
+                {
+                    if (!ActiveRuns.ContainsKey(runId)) active.Execution.Dispose();
+                }
+            }
+        }
+
+        private static void FinalizeResult(ActiveRun active)
+        {
+            if (!File.Exists(active.ResultPath) || ESManagedFileIO.ContainsExistingReparsePoint(active.ResultPath)
+                || new FileInfo(active.ResultPath).Length > MaxResultBytes)
+                throw new InvalidDataException("TaskContext /eval result.json 缺失、不安全或过大。");
+            ESAutomationRunResult result = JsonConvert.DeserializeObject<ESAutomationRunResult>(
+                File.ReadAllText(active.ResultPath, new UTF8Encoding(false, true)));
+            if (result == null) throw new InvalidDataException("TaskContext /eval result.json 为空。");
+            result.Validate();
+            if (result.taskId != TaskId || result.taskVersion != TaskVersion
+                || result.runId != active.Record.runId || result.workerType != WorkerType
+                || result.workerId != WorkerId || result.workerVersion != WorkerVersion
+                || !string.Equals(result.entrypointHash, WorkerEntrypointHash, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(result.inputManifestHash, active.Record.inputManifestHash, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("TaskContext /eval Worker 结果身份或输入 Hash 不匹配。");
+            if (result.completionDecision != null)
+                throw new InvalidDataException("TaskContext /eval Worker 不得生成 Automation CompletionDecision。");
+
+            var resolvedOutputs = new List<string>();
+            for (int index = 0; index < result.outputs.Count; index++)
+            {
+                string output = Path.GetFullPath(Path.Combine(active.Directory, result.outputs[index]));
+                if (!ESAutomationPathPolicy.IsWithin(output, new[] { active.Directory })
+                    || !File.Exists(output) || ESManagedFileIO.ContainsExistingReparsePoint(output)
+                    || !string.Equals(ComputeFileHash(output), result.outputHashes[index], StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("TaskContext /eval Worker 输出缺失、越界或 Hash 不匹配。");
+                resolvedOutputs.Add(output);
+            }
+            if (result.status == "Passed" && result.exitCode != 0)
+                throw new InvalidDataException("TaskContext /eval Passed 结果必须使用 exitCode=0。");
+
+            active.Record.exitCode = result.exitCode;
+            active.Record.outputs = resolvedOutputs;
+            active.Record.outputHashes = new List<string>(result.outputHashes);
+            active.Record.findings = new List<string>(result.findings);
+            active.Record.errors = new List<string>(result.errors);
+            ESAutomationRunStatus.Transition(active.Record,
+                result.status == "Passed" ? ESAutomationRunStatus.Completed : ESAutomationRunStatus.Failed);
+            WriteRunRecord(active.RecordPath, active.Record);
+        }
+
+        private static void FinishWithoutResult(ActiveRun active, string status, string error)
+        {
+            active.Record.exitCode = -1;
+            active.Record.errors.Add(error ?? string.Empty);
+            ESAutomationRunStatus.Transition(active.Record, status);
+            WriteRunRecord(active.RecordPath, active.Record);
+        }
+
+        private static ESAutomationTaskInvocationResult GetRun(string runId)
+        {
+            if (!Guid.TryParseExact(runId, "N", out _))
+                return ESAutomationTaskInvocationResult.Rejected("RunId 必须是 N 格式 GUID。");
+            string directory = GetRunDirectory(runId);
+            string recordPath = Path.Combine(directory, "run-record.json");
+            if (!File.Exists(recordPath)) return ESAutomationTaskInvocationResult.NotFound("TaskContext /eval Run 不存在。");
+            return ToInvocationResult(ReadRunRecord(recordPath), directory);
+        }
+
+        private static ESAutomationTaskInvocationResult Cancel(string runId, string actorId)
+        {
+            if (!ActiveRuns.TryGetValue(runId, out ActiveRun active))
+                return GetRun(runId);
+            try
+            {
+                active.Execution.Terminate();
+                FinishWithoutResult(active, ESAutomationRunStatus.Cancelled,
+                    "TaskContext /eval 由 " + (actorId ?? string.Empty) + " 取消。");
+                ActiveRuns.Remove(runId);
+                active.Execution.Dispose();
+                return new ESAutomationTaskInvocationResult
+                {
+                    status = ESAutomationRunStatus.Cancelled,
+                    message = "TaskContext /eval 已取消。",
+                    runId = runId,
+                    data = CreateBoundaryData(),
+                };
+            }
+            catch (Exception exception)
+            {
+                return ESAutomationTaskInvocationResult.Failed(
+                    "TaskContext /eval 取消失败：" + exception.GetBaseException().Message, runId);
+            }
+        }
+
+        private static ESAutomationTaskInvocationResult ToInvocationResult(
+            ESAutomationRunRecord record, string directory)
+        {
+            JObject data = CreateBoundaryData();
+            data["automationStatus"] = record.status;
+            string evaluationPath = Path.Combine(directory, "evaluation-record.json");
+            if (record.status == ESAutomationRunStatus.Completed && File.Exists(evaluationPath))
+            {
+                JObject evaluation = JObject.Parse(File.ReadAllText(evaluationPath,
+                    new UTF8Encoding(false, true)));
+                data["evaluation"] = evaluation;
+                return ESAutomationTaskInvocationResult.Completed(
+                    "TaskContext advisory /eval 已完成；请读取 evaluation.decision，不能使用 Automation status 代替。",
+                    record.runId, data);
+            }
+            if (record.status == ESAutomationRunStatus.Failed
+                || record.status == ESAutomationRunStatus.TimedOut
+                || record.status == ESAutomationRunStatus.Cancelled)
+                return new ESAutomationTaskInvocationResult
+                {
+                    status = record.status,
+                    message = record.errors.Count == 0 ? "TaskContext /eval 未完成。" : record.errors[0],
+                    runId = record.runId,
+                    data = data,
+                };
+            return ESAutomationTaskInvocationResult.Accepted(
+                "TaskContext advisory /eval 仍在受管 Worker 中执行。", record.runId, data);
+        }
+
+        private static JObject CreateBoundaryData()
+            => new JObject
+            {
+                ["adapterContract"] = "es.task-context.evaluate@1",
+                ["decisionAuthority"] = "TaskContextRuntime EvaluationRecord",
+                ["decisionScope"] = "task-object",
+                ["sourceRegistrationIntegrated"] = true,
+                ["unityRuntimeRegistrationVerified"] = false,
+                ["productionExecutionObserved"] = false,
+                ["globalP0Integrated"] = false,
+                ["runtimeStatus"] = "runtime-not-run",
+                ["nonClaims"] = new JArray
+                {
+                    "Automation Accepted/Completed is not TaskContext evaluation accepted",
+                    "Static/Runtime and governanceHash are not projected into TaskContext Profile or decision",
+                    "This adapter does not mutate TaskRevision, ContextVersion, taskStatus, or contextStatus",
+                },
+            };
+
+        private static ESAutomationRunRecord ReadRunRecord(string path)
+            => JsonConvert.DeserializeObject<ESAutomationRunRecord>(
+                File.ReadAllText(path, new UTF8Encoding(false, true)))
+               ?? throw new InvalidDataException("TaskContext /eval RunRecord 为空。");
+
+        private static void WriteRunRecord(string path, ESAutomationRunRecord record)
+            => ESAutomationPathPolicy.WriteWorkerTextAtomic(path,
+                JsonConvert.SerializeObject(record, Formatting.Indented),
+                new[] { "ES/Automation/Runs/TaskContextEvaluation" });
+
+        private static void WriteJsonCreateOnly(string path, JToken value, IEnumerable<string> roots)
+        {
+            ESAutomationPathPolicy.EnsureWorkerWriteAllowed(path, roots);
+            using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
+            using (var writer = new StreamWriter(stream, new UTF8Encoding(false, true)))
+                writer.Write(value.ToString(Formatting.Indented));
+        }
+
+        private static string ComputeFileHash(string path)
+        {
+            using (var stream = File.OpenRead(path))
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", string.Empty)
+                    .ToLowerInvariant();
+        }
+
+        private static string ComputeCanonicalHash(JToken value)
+        {
+            string text = value.ToString(Formatting.None);
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(new UTF8Encoding(false, true).GetBytes(text)))
+                    .Replace("-", string.Empty).ToLowerInvariant();
+        }
+
+        private static string ProjectPath(string relativePath)
+        {
+            string full = Path.GetFullPath(Path.Combine(ESAutomationPathPolicy.ProjectRoot,
+                relativePath.Replace('/', Path.DirectorySeparatorChar)));
+            if (!ESAutomationPathPolicy.IsWithin(full, new[] { ESAutomationPathPolicy.ProjectRoot })
+                || !File.Exists(full) || ESManagedFileIO.ContainsExistingReparsePoint(full))
+                throw new InvalidOperationException("TaskContext /eval 平台绑定缺失或路径不安全：" + relativePath);
+            return full;
+        }
+
+        private static string GetRunDirectory(string runId)
+        {
+            if (!Guid.TryParseExact(runId, "N", out _)) throw new InvalidOperationException("RunId 必须是 N 格式 GUID。");
+            return Path.Combine(RunsRoot, runId);
+        }
+
+#if UNITY_INCLUDE_TESTS
+        internal static bool Internal_TryNormalizeInputForTests(JObject value, out string error)
+            => TryNormalizeInput(value, out _, out error);
+#endif
+
+        private sealed class EvaluationWorkerAdapter : IESAutomationWorkerAdapter
+        {
+            public string WorkerType => ESTaskContextEvaluationAutomation.WorkerType;
+            public string WorkerId => ESTaskContextEvaluationAutomation.WorkerId;
+
+            public System.Diagnostics.ProcessStartInfo CreateStartInfo(
+                ESAutomationTaskContract contract, ESAutomationProcessRequest request)
+            {
+                VerifyStaticBindings();
+                string systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System);
+                string powershell = Path.Combine(systemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+                if (!File.Exists(powershell) || ESManagedFileIO.ContainsExistingReparsePoint(powershell))
+                    throw new InvalidOperationException("受信 Windows PowerShell 入口不可用。");
+                string outputDirectory = GetRunDirectory(request.runId);
+                return new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = powershell,
+                    Arguments = "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "
+                        + Quote(WorkerPath) + " -InputPath " + Quote(request.inputContractPath)
+                        + " -OutputDirectory " + Quote(outputDirectory)
+                        + " -ProjectRoot " + Quote(ESAutomationPathPolicy.ProjectRoot),
+                    WorkingDirectory = Path.GetDirectoryName(WorkerPath),
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    StandardOutputEncoding = new UTF8Encoding(false, true),
+                    StandardErrorEncoding = new UTF8Encoding(false, true),
+                };
+            }
+
+            private static string Quote(string value) => "\"" + value.Replace("\"", "\\\"") + "\"";
+        }
+
+        private sealed class EvaluationEndpoint : IESAutomationTaskEndpoint,
+            IESAutomationContractBoundEndpoint, IESAutomationCancellableTaskEndpoint
+        {
+            public ESAutomationTaskDescriptor Descriptor { get; } = new ESAutomationTaskDescriptor
+            {
+                taskId = TaskId,
+                taskVersion = TaskVersion,
+                category = "AI/TaskContext",
+                displayName = "TaskContext advisory /eval",
+                summary = "通过平台 evaluator 生成 task-object 范围的不可变 EvaluationRecord；不改变任务生命周期。",
+                allowAiInvoke = true,
+                allowInPlayMode = false,
+                inputSchemaHash = InputSchemaHash,
+            };
+
+            public ESAutomationTaskInvocationResult Run(ESAutomationTaskInvocation invocation)
+                => ESTaskContextEvaluationAutomation.Run(invocation);
+            public ESAutomationTaskInvocationResult GetRun(string runId)
+                => ESTaskContextEvaluationAutomation.GetRun(runId);
+            public ESAutomationTaskInvocationResult SubmitInput(ESAutomationTaskInputSubmission submission)
+                => ESAutomationTaskInvocationResult.Rejected("TaskContext /eval 不接受分阶段输入。");
+            public ESAutomationTaskInvocationResult CancelRun(string runId, string actorId)
+                => ESTaskContextEvaluationAutomation.Cancel(runId, actorId);
+
+            public ESAutomationInvocationRequirements DescribeInvocation(ESAutomationTaskInvocation invocation)
+            {
+                if (!TryNormalizeInput(invocation?.input, out EvaluationInput input, out string error))
+                    throw new InvalidOperationException(error);
+                string runId = string.IsNullOrWhiteSpace(invocation?.invocationId)
+                    ? Guid.NewGuid().ToString("N") : invocation.invocationId;
+                return new ESAutomationInvocationRequirements
+                {
+                    worker = CreateWorkerRegistration(),
+                    requiredCapabilities = RequiredCapabilities,
+                    dryRun = invocation?.dryRun ?? true,
+                    readPaths = new List<string>
+                    {
+                        Path.Combine(TaskStoreRoot, input.TaskContextId),
+                        ProjectPath("ES/Automation/TaskContextRuntime/Invoke-ESTaskContextRuntime.ps1"),
+                        ProjectPath("ES/Automation/TaskContextRuntime/ESTaskContextRuntime.psm1"),
+                        ProjectPath("ES/Automation/Contracts/es-evaluation-record-v1.schema.json"),
+                        ProjectPath("ES/Automation/Contracts/es-outcome-evaluator.registry.json"),
+                        GetRunDirectory(runId),
+                    },
+                    writePaths = new List<string>
+                    {
+                        Path.Combine(TaskStoreRoot, input.TaskContextId),
+                        GetRunDirectory(runId),
+                    },
+                };
+            }
+        }
+
+        private sealed class EvaluationInput
+        {
+            public string TaskContextId;
+            public int ExpectedTaskRevision;
+            public int ExpectedContextVersion;
+            public string IdempotencyKey;
+        }
+
+        private sealed class ActiveRun
+        {
+            public ESAutomationProcessExecution Execution;
+            public ESAutomationRunRecord Record;
+            public string Directory;
+            public string RecordPath;
+            public string ResultPath;
+        }
+    }
+
     internal sealed class ESAutomationAiBridgeInitializer : EditorInvoker_Level0
     {
         public override void InitInvoke()
         {
             ESAutomationAiBridge.InitializeForEditorMainThread();
+            try
+            {
+                ESTaskContextEvaluationAutomation.Register();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("TASK_CONTEXT_EVAL_REGISTRATION_ISOLATED: TaskContext /eval 注册失败；该能力已隔离，其他 Automation Endpoint 将继续注册。\n"
+                    + exception.GetBaseException().Message);
+            }
             // ES_Logic.Editor is a separate assembly and is not part of the
             // AssemblyStream type scan. Bind its UI endpoint at the same
             // editor-main-thread boundary without introducing an assembly cycle.

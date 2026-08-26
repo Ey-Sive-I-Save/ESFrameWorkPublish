@@ -1953,6 +1953,8 @@ namespace ES
         private bool hostPresentationDirty;
         private bool ambientContextDirty = true;
         private bool mcpConnectInProgress;
+        private int mcpConnectionGeneration;
+        private Task mcpConnectionTask;
         private bool syncingResponsibility;
         private string sessionListSignature = string.Empty;
         private string progressPresentationSignature = string.Empty;
@@ -2220,6 +2222,7 @@ namespace ES
         private void OnEnable()
         {
             minSize = MinimumWindowSize;
+            maxSize = new Vector2(1600f, 1100f);
             SubscribeForegroundCmdObservation();
             AssemblyReloadEvents.beforeAssemblyReload -= MarkReloadingDomain;
             AssemblyReloadEvents.beforeAssemblyReload += MarkReloadingDomain;
@@ -2256,7 +2259,10 @@ namespace ES
             }
             externalCmdDiscoveryGeneration++;
             externalCmdDiscoveryTask = null;
+            mcpConnectionGeneration++;
             ESWindowFoundation.Suspend(this);
+            ReleaseSerializedAgent();
+            UnregisterComposerDragCallbacks();
             EditorApplication.update -= OnEditorUpdate;
             Selection.selectionChanged -= MarkAmbientContextDirty;
             bool reloading = !editorQuitting && (preserveProcessesForReload || EditorApplication.isCompiling);
@@ -2295,10 +2301,16 @@ namespace ES
             {
                 DestroyImmediate(agent);
                 agent = null;
-                serializedAgent = null;
                 usingTransientAgentConfig = false;
             }
             UnsubscribeForegroundCmdObservation();
+        }
+
+        private void ReleaseSerializedAgent()
+        {
+            try { serializedAgent?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            finally { serializedAgent = null; }
         }
 
         private void OnDestroy()
@@ -3334,9 +3346,12 @@ namespace ES
                 composerHistoryDraft = evt.newValue ?? string.Empty;
             });
             composer.RegisterCallback<KeyDownEvent>(OnComposerKeyDown);
-            composer.RegisterCallback<DragUpdatedEvent>(OnComposerDragUpdated);
-            composer.RegisterCallback<DragPerformEvent>(OnComposerDragPerform);
-            composer.RegisterCallback<DragLeaveEvent>(OnComposerDragLeave);
+            composer.RegisterCallback<DragUpdatedEvent>(OnComposerDragUpdated, TrickleDown.TrickleDown);
+            composer.RegisterCallback<DragPerformEvent>(OnComposerDragPerform, TrickleDown.TrickleDown);
+            composer.RegisterCallback<DragLeaveEvent>(OnComposerDragLeave, TrickleDown.TrickleDown);
+            composer.RegisterCallback<DragExitedEvent>(OnComposerDragExited, TrickleDown.TrickleDown);
+            composer.RegisterCallback<PointerCaptureOutEvent>(OnComposerPointerCaptureOut, TrickleDown.TrickleDown);
+            composer.RegisterCallback<FocusOutEvent>(OnComposerFocusOut, TrickleDown.TrickleDown);
             panel.Add(composer);
 
             VisualElement actions = new VisualElement();
@@ -3540,6 +3555,7 @@ namespace ES
         {
             if (panel == null)
                 return;
+            ReleaseSerializedAgent();
             panel.Clear();
             Label heading = new Label("控制台设置");
             heading.AddToClassList("es-agent-mini-heading");
@@ -7234,15 +7250,25 @@ namespace ES
             composer?.Focus();
         }
 
-        private async void ConnectMcpAsync()
+        private void ConnectMcpAsync()
+        {
+            if (mcpConnectInProgress || (mcpConnectionTask != null && !mcpConnectionTask.IsCompleted))
+                return;
+            mcpConnectionTask = ConnectMcpCoreAsync();
+        }
+
+        private async Task ConnectMcpCoreAsync()
         {
             if (mcpConnectInProgress)
                 return;
+            int generation = ++mcpConnectionGeneration;
             mcpConnectInProgress = true;
             UpdateMcpConnectButton(ESCmdAgentMcpContextCollector.GetSnapshot());
             try
             {
                 ESCmdAgentMcpContextSnapshot before = ESCmdAgentMcpContextCollector.GetSnapshot(true);
+                if (!IsMcpConnectionActive(generation))
+                    return;
                 if (!before.packageLoaded)
                 {
                     SetMcpConnectionStatus("UnityMCP 包尚未载入，无法连接。", false);
@@ -7256,7 +7282,7 @@ namespace ES
                         "配置并连接", "取消");
                     if (!confirmed)
                     {
-                        if (selectedSession != null)
+                        if (IsMcpConnectionActive(generation) && selectedSession != null)
                         {
                             selectedSession.status = "已取消 MCP 配置";
                             UpdateSessionPresentation(selectedSession, false);
@@ -7270,12 +7296,16 @@ namespace ES
                         SetMcpConnectionStatus(configured.message, false);
                         return;
                     }
+                    if (!IsMcpConnectionActive(generation))
+                        return;
                     SetMcpConnectionStatus(configured.message, true);
                 }
 
+                if (!IsMcpConnectionActive(generation))
+                    return;
                 SetMcpConnectionStatus("正在启动 UnityMCP Bridge…", true);
                 ESCmdAgentMcpActionResult connected = await ESCmdAgentMcpContextCollector.StartUnityBridgeAsync();
-                if (this == null)
+                if (!IsMcpConnectionActive(generation))
                     return;
                 ESCmdAgentMcpContextCollector.Invalidate();
                 ambientContextSignature = string.Empty;
@@ -7284,15 +7314,26 @@ namespace ES
                 if (connected.success)
                     PlayFeedback(ESEditorFeedbackSoundKind.Success);
             }
+            catch (Exception exception)
+            {
+                if (IsMcpConnectionActive(generation))
+                    SetMcpConnectionStatus("MCP 连接失败：" + exception.GetBaseException().Message, false);
+                Debug.LogException(exception);
+            }
             finally
             {
                 mcpConnectInProgress = false;
-                if (this != null)
+                if (IsMcpConnectionActive(generation))
                 {
                     UpdateMcpConnectButton(ESCmdAgentMcpContextCollector.GetSnapshot());
                     composer?.Focus();
                 }
             }
+        }
+
+        private bool IsMcpConnectionActive(int generation)
+        {
+            return this != null && generation == mcpConnectionGeneration;
         }
 
         private void SetMcpConnectionStatus(string message, bool positive)
@@ -8660,8 +8701,42 @@ namespace ES
 
         private void OnComposerDragLeave(DragLeaveEvent evt)
         {
+            ClearComposerDragState();
+        }
+
+        private void OnComposerDragExited(DragExitedEvent evt)
+        {
+            ClearComposerDragState();
+        }
+
+        private void OnComposerPointerCaptureOut(PointerCaptureOutEvent evt)
+        {
+            ClearComposerDragState();
+        }
+
+        private void OnComposerFocusOut(FocusOutEvent evt)
+        {
+            ClearComposerDragState();
+        }
+
+        private void ClearComposerDragState()
+        {
             DragAndDrop.visualMode = DragAndDropVisualMode.None;
             composer?.RemoveFromClassList("drag-over");
+        }
+
+        private void UnregisterComposerDragCallbacks()
+        {
+            if (composer == null)
+                return;
+            composer.UnregisterCallback<KeyDownEvent>(OnComposerKeyDown);
+            composer.UnregisterCallback<DragUpdatedEvent>(OnComposerDragUpdated, TrickleDown.TrickleDown);
+            composer.UnregisterCallback<DragPerformEvent>(OnComposerDragPerform, TrickleDown.TrickleDown);
+            composer.UnregisterCallback<DragLeaveEvent>(OnComposerDragLeave, TrickleDown.TrickleDown);
+            composer.UnregisterCallback<DragExitedEvent>(OnComposerDragExited, TrickleDown.TrickleDown);
+            composer.UnregisterCallback<PointerCaptureOutEvent>(OnComposerPointerCaptureOut, TrickleDown.TrickleDown);
+            composer.UnregisterCallback<FocusOutEvent>(OnComposerFocusOut, TrickleDown.TrickleDown);
+            ClearComposerDragState();
         }
 
         private static List<string> ResolveDroppedPaths()
@@ -8954,7 +9029,7 @@ namespace ES
             try
             {
                 AssetDatabase.CreateAsset(created, DefaultAgentAssetPath);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(created);
             }
             catch (Exception exception)
             {

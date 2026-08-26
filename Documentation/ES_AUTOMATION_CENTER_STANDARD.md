@@ -106,10 +106,12 @@ userAuthorization
 
 并且在每次 `RunTask` 前绑定调用身份：
 
-- AI 调用必须携带有效的 AIBrain `PlanHash`，并先通过一次性 Invocation 授权消费；
+- AI 调用必须携带有效的 AIBrain `PlanHash`，并先消费与 Invocation、15 分钟有效期、剩余次数和幂等键闭合的执行授权；由受信宿主绑定当前用户指令的 L1 本地计划最多 20 次，L1/L2 `candidate-only` 计划最多 5 次，L3 或其他计划 1 次，可复用授权每次都要求新的非空 `idempotencyKey`；外部 Bridge JSON 不得自报 `userDirected`；
 - 人工调用必须携带明确 `ActorId`；
 - 本次实际请求能力必须被 `userAuthorization` 覆盖；
 - 任何能力越界都在 `ESAutomationFacade` 工具边界返回 `Blocked`，不能由 Worker 或模型自行解释为允许。
+
+当前授权实现为 Policy v5 / Store schema 3：永久 `.lock` 文件串行化跨进程读改写，Store 使用受管原子替换；PlanHash 与 InvocationId 双唯一，状态为 `Active / Exhausted / Expired`。Policy v4/schema 2 只允许在新 Invocation 注册时迁移，旧 InvocationId 必须持久退役；未知代际或损坏 Store fail-closed 且不覆盖。Facade 只在 Endpoint、合同、能力、快照、路径、AI 与 PlayMode 预检全部通过后消费次数，再立即派发。当前文件 Bridge 固定绑定 `ManagedAIBrain`；20 次 `CurrentUserDirect` 分支需要另一个真实绑定用户指令 SHA-256 的受信进程内宿主，当前源码未登记该生产宿主。
 
 旧任务没有声明 `CapabilityEnvelope` 时保持原有兼容路径；一旦声明，必须走 `AllowsInvocation`，不能只调用无身份的 `Allows`。
 

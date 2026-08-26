@@ -279,6 +279,130 @@ namespace ES
     }
 
     [Serializable]
+    public sealed class ESAutomationExternalSourceRef
+    {
+        public string provider = string.Empty;
+        public string tenantHash = string.Empty;
+        public string spaceIdHash = string.Empty;
+        public string objectType = string.Empty;
+        public string objectTokenHash = string.Empty;
+        public string remoteVersion = string.Empty;
+        public string updatedAtUtc = string.Empty;
+        public string retrievedAtUtc = string.Empty;
+        public string contentHash = string.Empty;
+        public string classification = string.Empty;
+        public string sanitizerVersion = string.Empty;
+
+        public void Validate()
+        {
+            if (!string.Equals(provider, "feishu", StringComparison.Ordinal))
+                throw new InvalidOperationException("External SourceRef provider is invalid.");
+            ValidateHash(tenantHash, nameof(tenantHash));
+            ValidateHash(spaceIdHash, nameof(spaceIdHash));
+            ValidateHash(objectTokenHash, nameof(objectTokenHash));
+            if (string.IsNullOrWhiteSpace(objectType))
+                throw new InvalidOperationException("External SourceRef requires objectType.");
+            if (!string.IsNullOrWhiteSpace(contentHash)) ValidateHash(contentHash, nameof(contentHash));
+            if (!string.IsNullOrWhiteSpace(updatedAtUtc)
+                && !DateTimeOffset.TryParse(updatedAtUtc, out _))
+                throw new InvalidOperationException("External SourceRef updatedAtUtc is invalid.");
+            if (!DateTimeOffset.TryParse(retrievedAtUtc, out _))
+                throw new InvalidOperationException("External SourceRef retrievedAtUtc is invalid.");
+            if (!string.Equals(classification, "ExternalCollaboration", StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(sanitizerVersion))
+                throw new InvalidOperationException("External SourceRef classification or sanitizer is invalid.");
+        }
+
+        private static void ValidateHash(string value, string name)
+        {
+            if (!ESAutomationWorkerRegistration.IsSha256(value))
+                throw new InvalidOperationException("External SourceRef requires SHA-256 " + name + ".");
+        }
+    }
+
+    [Serializable]
+    public sealed class ESAutomationExternalEvidenceReceipt
+    {
+        public int protocolVersion = 1;
+        public string planHash = string.Empty;
+        public string commandId = string.Empty;
+        public string taskId = string.Empty;
+        public int taskVersion;
+        public string governanceHash = string.Empty;
+        public bool dryRun;
+        public string operation = string.Empty;
+        public string runId = string.Empty;
+        public string invocationHash = string.Empty;
+        public string inputManifestHash = string.Empty;
+        public List<string> outputHashes = new List<string>();
+        public string evidenceScope = string.Empty;
+        public string classification = string.Empty;
+        public string sanitizerVersion = string.Empty;
+        public bool networkCalled;
+        public int exitCode;
+        public string startedAtUtc = string.Empty;
+        public string completedAtUtc = string.Empty;
+        public string runtimeAuthorizationRef = string.Empty;
+        public string credentialSourceType = string.Empty;
+        public string tenantHash = string.Empty;
+        public string spacePolicyHash = string.Empty;
+        public int redactionCount;
+        public List<ESAutomationExternalSourceRef> sourceRefs = new List<ESAutomationExternalSourceRef>();
+        public List<string> unresolvedGaps = new List<string>();
+
+        public void Validate()
+        {
+            if (protocolVersion != 1) throw new InvalidOperationException("External receipt protocol is invalid.");
+            ValidateHash(planHash, nameof(planHash));
+            ValidateHash(governanceHash, nameof(governanceHash));
+            ValidateHash(invocationHash, nameof(invocationHash));
+            ValidateHash(inputManifestHash, nameof(inputManifestHash));
+            if (!Guid.TryParseExact(runId, "N", out _))
+                throw new InvalidOperationException("External receipt runId is invalid.");
+            if (string.IsNullOrWhiteSpace(commandId) || string.IsNullOrWhiteSpace(taskId)
+                || taskVersion < 1 || string.IsNullOrWhiteSpace(operation))
+                throw new InvalidOperationException("External receipt requires command and operation identity.");
+            if (outputHashes == null || sourceRefs == null || unresolvedGaps == null)
+                throw new InvalidOperationException("External receipt collections cannot be null.");
+            foreach (string outputHash in outputHashes) ValidateHash(outputHash, nameof(outputHashes));
+            foreach (ESAutomationExternalSourceRef sourceRef in sourceRefs)
+            {
+                if (sourceRef == null) throw new InvalidOperationException("External receipt contains a null SourceRef.");
+                sourceRef.Validate();
+            }
+            if (!string.Equals(classification, "ExternalCollaboration", StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(sanitizerVersion))
+                throw new InvalidOperationException("External receipt classification or sanitizer is invalid.");
+            if (!DateTimeOffset.TryParse(startedAtUtc, out DateTimeOffset started)
+                || !DateTimeOffset.TryParse(completedAtUtc, out DateTimeOffset completed)
+                || completed < started)
+                throw new InvalidOperationException("External receipt timestamps are invalid.");
+            if (redactionCount < 0) throw new InvalidOperationException("External receipt redactionCount is invalid.");
+            if (dryRun)
+            {
+                if (networkCalled || !string.Equals(evidenceScope, "Static", StringComparison.Ordinal))
+                    throw new InvalidOperationException("External DryRun receipt cannot claim Runtime network evidence.");
+            }
+            else
+            {
+                if (!networkCalled || !string.Equals(evidenceScope, "Runtime", StringComparison.Ordinal))
+                    throw new InvalidOperationException("External live receipt requires Runtime network evidence.");
+                ValidateHash(runtimeAuthorizationRef, nameof(runtimeAuthorizationRef));
+                ValidateHash(tenantHash, nameof(tenantHash));
+                ValidateHash(spacePolicyHash, nameof(spacePolicyHash));
+                if (string.IsNullOrWhiteSpace(credentialSourceType))
+                    throw new InvalidOperationException("External live receipt requires credentialSourceType.");
+            }
+        }
+
+        private static void ValidateHash(string value, string name)
+        {
+            if (!ESAutomationWorkerRegistration.IsSha256(value))
+                throw new InvalidOperationException("External receipt requires SHA-256 " + name + ".");
+        }
+    }
+
+    [Serializable]
     public sealed class ESAutomationRunRecord
     {
         public int protocolVersion = 1;
@@ -320,6 +444,8 @@ namespace ES
         public ESAutomationExecutionSnapshot executionSnapshot;
         public ESAutomationCompletionDecision completionDecision;
         public ESAutomationTraceReconciliation traceReconciliation;
+        // Optional, validated projection for untrusted external collaboration evidence.
+        public ESAutomationExternalEvidenceReceipt externalEvidence;
     }
 
     [Serializable]
@@ -1226,8 +1352,9 @@ namespace ES
             string normalized = Normalize(root);
             if (!IsWithin(normalized, new[] { ReportsRoot, TempRoot, RunsRoot,
                     Path.Combine(ProjectRoot, "Assets", "UI"),
-                    Path.Combine(ProjectRoot, "ES", "UIEvidence") }))
-                throw new UnauthorizedAccessException("WriteRoots 必须位于 ES/Automation/Reports、Temp、Runs、Assets/UI 或 ES/UIEvidence：" + normalized);
+                    Path.Combine(ProjectRoot, "ES", "UIEvidence"),
+                    Path.Combine(ProjectRoot, "ES", "Output", "TaskContextRuntime") }))
+                throw new UnauthorizedAccessException("WriteRoots 必须位于 ES/Automation/Reports、Temp、Runs、Assets/UI、ES/UIEvidence 或平台 TaskContextRuntime StoreRoot：" + normalized);
         }
 
         private static IEnumerable<string> ProtectedWriteRoots
@@ -1563,6 +1690,12 @@ namespace ES
         protected override string ESWindow_PageStableId => "automation.center";
         protected override string ESWindow_PageTitle => "自动化中心";
         protected override string ESWindow_PageKeywords => "Automation Worker Task Run AI Bridge 自动化 任务";
+
+        protected override void ESWindow_OnHostEnable()
+        {
+            base.ESWindow_OnHostEnable();
+            maxSize = new Vector2(1400f, 1000f);
+        }
 
         protected override void ESWindow_BuildPageActions(
             ICollection<ESMenuTreePageAction> actions)

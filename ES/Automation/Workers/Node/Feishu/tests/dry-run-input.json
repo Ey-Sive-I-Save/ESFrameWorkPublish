@@ -6,11 +6,19 @@
   "workerType": "Other",
   "workerId": "es.feishu.node",
   "workerVersion": "0.1.0",
-  "entrypointHash": "16b419b0452b9761e9d8f08acbf1e65ff815d8ac3043773df3e146786a4c887e",
+  "entrypointHash": "6648314a09548129bbb70a3399644b5b03375c8a9b1e635e3a69bbb89b086033",
+  "commandId": "feishu.read",
+  "planHash": "3333333333333333333333333333333333333333333333333333333333333333",
+  "governanceHash": "2222222222222222222222222222222222222222222222222222222222222222",
+  "invocationHash": "1111111111111111111111111111111111111111111111111111111111111111",
   "dryRun": true,
   "operation": "auth-status",
   "query": "",
   "spaceId": "",
   "documentId": "",
-  "pageSize": 20
+  "pageSize": 20,
+  "runtimeAuthorizationRef": "",
+  "credentialSourceType": "",
+  "tenantHash": "",
+  "spacePolicyHash": ""
 }

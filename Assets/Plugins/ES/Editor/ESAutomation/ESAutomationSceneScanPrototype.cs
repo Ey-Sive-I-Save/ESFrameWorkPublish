@@ -769,7 +769,13 @@ namespace ES
                 session.phase = "AwaitingInput";
                 session.updatedAtUtc = DateTimeOffset.UtcNow.ToString("O");
                 SaveSession(session);
-                EditorApplication.delayCall += () => OpenOptionsDialog(session);
+                EditorApplication.CallbackFunction openOptionsCallback = null;
+                openOptionsCallback = () =>
+                {
+                    EditorApplication.delayCall -= openOptionsCallback;
+                    OpenOptionsDialog(session);
+                };
+                EditorApplication.delayCall += openOptionsCallback;
                 return;
             }
             if (result.status == "Completed")

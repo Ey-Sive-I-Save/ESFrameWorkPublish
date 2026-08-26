@@ -27,6 +27,8 @@ namespace ES
         public const string ProjectSkillsRoot = ".agents/skills";
         public const string ProjectSkillCatalogPath = ".agents/SKILL_CATALOG.yaml";
         public const string ProjectSkillDiscoveryPolicyPath = ".agents/SKILL_DISCOVERY_POLICY.json";
+        public const string RoutePlanContractId = "es://automation/contracts/route-plan/v1";
+        public const string RouteStageRegistryPath = "ES/Automation/Contracts/es-route-stage.registry.json";
         private const string AuthorizationStorePath = "ES/Output/Automation/AIBrain/authorizations.json";
         private const int AuthorizationStoreSchemaVersion = 3;
         private const int MaximumAuthorizationRecords = 4096;
@@ -65,6 +67,7 @@ namespace ES
             "Documentation/AIKnowledge/KnowledgeIndex.yaml",
             "Documentation/AIKnowledge/AIBRAIN_ENTRY.md",
             "Assets/Plugins/ES/AICommands/AICommandCatalog.json",
+            RouteStageRegistryPath,
         };
         private static string capabilityMetadataFingerprint = string.Empty;
         private static string capabilityDriftTrigger = string.Empty;
@@ -1731,8 +1734,742 @@ namespace ES
                 plan.blockers.Add("执行必须携带稳定的 N 格式 InvocationId。");
 
             plan.status = plan.blockers.Count == 0 ? "Ready" : ResolveBlockedStatus(plan.blockers);
+            plan.routePlan = BuildReadOnlyRoutePlan(plan, request);
             plan.planHash = ComputePlanHash(plan, request);
             return plan;
+        }
+
+        private static ESAIBrainRoutePlan BuildReadOnlyRoutePlan(
+            ESAIBrainPlan legacyPlan, ESAIBrainRequest request)
+        {
+            var routePlan = new ESAIBrainRoutePlan
+            {
+                schemaVersion = 1,
+                contractId = RoutePlanContractId,
+                profile = string.IsNullOrWhiteSpace(request.routeProfileId)
+                    ? "governance" : request.routeProfileId.Trim().ToLowerInvariant(),
+                scope = "task-object",
+                status = "EvidencePending",
+                routeState = "core",
+                evidenceState = "pending",
+                effect = "claim-cap",
+                executionEnabled = false,
+                compatibility = new ESAIBrainRouteCompatibility
+                {
+                    legacyPlanStatus = legacyPlan.status,
+                    projectionOnly = true,
+                    productionRouteIntegrated = false,
+                    globalP0Integrated = false,
+                    executionAuthority = "none",
+                },
+            };
+            routePlan.routeKeys.AddRange((legacyPlan.routeKeys ?? new List<string>())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.Trim().ToLowerInvariant())
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(value => value, StringComparer.Ordinal));
+            AddRouteStopConditions(routePlan);
+
+            bool hardBlocked = false;
+            bool needsRegistration = false;
+            bool evidencePending = false;
+            if (!Regex.IsMatch(routePlan.profile, "^[a-z0-9][a-z0-9._:-]{0,127}$"))
+            {
+                AddRouteIssue(routePlan, "route-plan", "profile", "ROUTE.PROFILE_INVALID",
+                    "profile must be one registered exact token", "hard-block",
+                    "Use an exact registered RoutePlan profile.");
+                hardBlocked = true;
+            }
+
+            var sourceRefs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (TryBindGoalRevision(request.goalRevisionPath, routePlan,
+                    out ESAIBrainGoalRevisionBinding goalRevision, out string goalError))
+            {
+                routePlan.goalRevision = goalRevision;
+                AddRouteSourceRef(sourceRefs, goalRevision.projectPath, goalRevision.artifactHash,
+                    routePlan, ref hardBlocked);
+            }
+            else if (string.IsNullOrWhiteSpace(request.goalRevisionPath))
+            {
+                AddRouteIssue(routePlan, "goal-revision", "goalRevisionPath",
+                    "ROUTE.GOAL_REVISION_REQUIRED",
+                    "a composable RoutePlan must bind one frozen GoalRevision",
+                    "claim-cap", "Create or select a frozen GoalRevision and re-plan.");
+                evidencePending = true;
+            }
+            else
+            {
+                AddRouteIssue(routePlan, "goal-revision", "goalRevisionPath",
+                    "ROUTE.GOAL_REVISION_INVALID", goalError, "hard-block",
+                    "Repair the referenced GoalRevision or provide its current immutable path.");
+                hardBlocked = true;
+            }
+
+            RouteStageRegistry registry = null;
+            string registryHash = string.Empty;
+            if (!TryReadRouteStageRegistry(out registry, out registryHash, out string registryError))
+            {
+                AddRouteIssue(routePlan, "route-stage-registry", "registry",
+                    "ROUTE.REGISTRY_INVALID", registryError, "hard-block",
+                    "Repair the central Route Stage Registry and re-plan.");
+                hardBlocked = true;
+            }
+            else
+            {
+                AddRouteSourceRef(sourceRefs, RouteStageRegistryPath, registryHash,
+                    routePlan, ref hardBlocked);
+                BuildRegisteredRouteStages(legacyPlan, routePlan, registry,
+                    ref hardBlocked, ref needsRegistration, ref evidencePending);
+            }
+
+            AddCurrentRouteSourceRefs(legacyPlan, routePlan, sourceRefs, ref hardBlocked);
+            BuildRouteSnapshot(routePlan, sourceRefs, registryHash, ref hardBlocked);
+
+            routePlan.maxDepth = routePlan.stages.Count == 0
+                ? 0 : routePlan.stages.Max(stage => stage.depth);
+            if (hardBlocked)
+            {
+                routePlan.status = "Blocked";
+                routePlan.routeState = "blocked";
+                routePlan.evidenceState = "partial";
+                routePlan.effect = "hard-block";
+            }
+            else if (needsRegistration)
+            {
+                routePlan.status = "NeedsRegistration";
+                routePlan.routeState = "blocked";
+                routePlan.evidenceState = "pending";
+                routePlan.effect = "hard-block";
+            }
+            else if (routePlan.stages.Count == 0)
+            {
+                routePlan.status = legacyPlan.workflow == null ? "EvidencePending" : "NotApplicable";
+                routePlan.routeState = "core";
+                routePlan.evidenceState = "pending";
+                routePlan.effect = legacyPlan.workflow == null ? "claim-cap" : "review";
+            }
+            else if (evidencePending)
+            {
+                routePlan.status = "EvidencePending";
+                routePlan.routeState = routePlan.maxDepth == 0 ? "core" : "extension";
+                routePlan.evidenceState = "pending";
+                routePlan.effect = "claim-cap";
+            }
+            else
+            {
+                routePlan.status = "Ready";
+                routePlan.routeState = routePlan.maxDepth == 0 ? "core" : "extension";
+                routePlan.evidenceState = "closed";
+                routePlan.effect = "review";
+            }
+
+            BuildRouteShadowIntegration(routePlan, legacyPlan.status);
+            routePlan.routePlanHash = ComputeRoutePlanHash(routePlan);
+            routePlan.routePlanId = "route-" + routePlan.routePlanHash.Substring(0, 32);
+            return routePlan;
+        }
+
+        private static void BuildRouteShadowIntegration(
+            ESAIBrainRoutePlan routePlan, string legacyPlanStatus)
+        {
+            const string selectedProfile = "governance";
+            const string selectedScope = "task-object";
+            bool eligible = string.Equals(routePlan.profile, selectedProfile,
+                                StringComparison.Ordinal)
+                            && string.Equals(routePlan.scope, selectedScope,
+                                StringComparison.Ordinal);
+            string decisionHash = eligible
+                ? ComputeRouteShadowDecisionHash(routePlan, legacyPlanStatus)
+                : null;
+            string decisionId = decisionHash == null
+                ? null : "route-decision-" + decisionHash.Substring(0, 32);
+            routePlan.shadowIntegration = new ESAIBrainRouteShadowIntegration
+            {
+                contractId = "es://automation/contracts/route-plan-shadow-candidate/v1",
+                mode = "read-only-shadow",
+                algorithmId = "route-shadow-canonical-v1",
+                selectedProfile = selectedProfile,
+                selectedScope = selectedScope,
+                candidateStatus = eligible ? "candidate-emitted" : "not-selected",
+                decisionHash = decisionHash,
+                decisionId = decisionId,
+                legacyPlanStatusBefore = legacyPlanStatus,
+                legacyPlanStatusAfter = legacyPlanStatus,
+                stateChanged = false,
+                verificationRequired = true,
+                rollbackState = "available",
+                rollbackAction = "discard-shadow-candidate",
+                productionRouteIntegrated = false,
+                globalP0Integrated = false,
+            };
+            routePlan.shadowIntegration.observationCodes.AddRange(eligible
+                ? new[]
+                {
+                    "SHADOW.SCOPED_MATCH",
+                    "SHADOW.ROLLBACK_AVAILABLE",
+                    "SHADOW.NO_PRODUCTION_TAKEOVER",
+                }
+                : new[]
+                {
+                    "SHADOW.PROFILE_SCOPE_NOT_SELECTED",
+                    "SHADOW.ROLLBACK_AVAILABLE",
+                    "SHADOW.NO_PRODUCTION_TAKEOVER",
+                });
+        }
+
+        private static string ComputeRouteShadowDecisionHash(
+            ESAIBrainRoutePlan routePlan, string legacyPlanStatus)
+        {
+            return ComputeCanonicalSha256(JToken.FromObject(new
+            {
+                contractId = "es://automation/contracts/route-plan-shadow-candidate/v1",
+                mode = "read-only-shadow",
+                algorithmId = "route-shadow-canonical-v1",
+                profile = routePlan.profile,
+                scope = routePlan.scope,
+                legacyPlanStatus,
+                routePlan.status,
+                routePlan.routeState,
+                routePlan.evidenceState,
+                routePlan.effect,
+                routePlan.routeKeys,
+                routePlan.goalRevision,
+                routePlan.stages,
+                routePlan.maxDepth,
+                routePlan.issues,
+                routePlan.snapshot,
+            }));
+        }
+
+        private static void AddRouteStopConditions(ESAIBrainRoutePlan routePlan)
+        {
+            routePlan.stopConditions.Add(new ESAIBrainRouteStopCondition
+            {
+                code = "ROUTE.UNREGISTERED_STAGE",
+                predicate = "a selected Skill has no unique stage contract for the exact profile and route",
+                trigger = "before accepting the composed RoutePlan",
+                outcome = "hard-block",
+                recovery = "register one exact stage contract; do not infer an order",
+            });
+            routePlan.stopConditions.Add(new ESAIBrainRouteStopCondition
+            {
+                code = "ROUTE.DEPTH_LIMIT",
+                predicate = "the next dependency level exceeds the registered depth budget",
+                trigger = "before adding the next stage",
+                outcome = "stop-next-read",
+                recovery = "reduce the plan or register a depth-2 reason for the exact profile and route",
+            });
+            routePlan.stopConditions.Add(new ESAIBrainRouteStopCondition
+            {
+                code = "ROUTE.DEPENDENCY_INVALID",
+                predicate = "a required token is missing, duplicated, or cyclic",
+                trigger = "while topologically ordering registered stages",
+                outcome = "hard-block",
+                recovery = "repair stage requires/produces and re-plan from the same GoalRevision",
+            });
+        }
+
+        private static void AddRouteIssue(ESAIBrainRoutePlan routePlan, string targetObject,
+            string field, string reasonCode, string predicate, string effect, string recovery)
+        {
+            routePlan.issues.Add(new ESAIBrainRouteIssue
+            {
+                targetObject = targetObject,
+                field = field,
+                profile = routePlan.profile,
+                scope = routePlan.scope,
+                reasonCode = reasonCode,
+                predicate = string.IsNullOrWhiteSpace(predicate) ? reasonCode : predicate,
+                effect = effect,
+                recovery = recovery,
+            });
+        }
+
+        private static bool TryBindGoalRevision(string projectPath, ESAIBrainRoutePlan routePlan,
+            out ESAIBrainGoalRevisionBinding binding, out string error)
+        {
+            binding = null;
+            error = string.Empty;
+            if (string.IsNullOrWhiteSpace(projectPath))
+            {
+                error = "GoalRevision path is missing.";
+                return false;
+            }
+            if (!TryResolveProjectPath(projectPath, out string fullPath, out error)) return false;
+            if (!File.Exists(fullPath))
+            {
+                error = "GoalRevision file does not exist.";
+                return false;
+            }
+            if (!TryReadTextAndHash(fullPath, out string text, out string artifactHash, out error))
+                return false;
+            try
+            {
+                JObject goal = JObject.Parse(text);
+                string[] required =
+                {
+                    "schemaVersion", "goalId", "goalRevision", "scope", "acceptanceIntent",
+                    "status", "budget", "parentGoalRef", "revisionHash",
+                };
+                if (!HasExactProperties(goal, required))
+                    throw new InvalidDataException("GoalRevision fields are not the exact V1 contract.");
+                if (goal.Value<int?>("schemaVersion") != 1
+                    || !string.Equals(goal.Value<string>("status"), "frozen", StringComparison.Ordinal))
+                    throw new InvalidDataException("GoalRevision must be schemaVersion 1 and frozen.");
+                string goalId = goal.Value<string>("goalId") ?? string.Empty;
+                string revision = goal.Value<string>("goalRevision") ?? string.Empty;
+                string revisionHash = (goal.Value<string>("revisionHash") ?? string.Empty).ToLowerInvariant();
+                if (!Regex.IsMatch(goalId, "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$")
+                    || !Regex.IsMatch(revision, "^r[1-9][0-9]{0,8}$")
+                    || !ESAutomationWorkerRegistration.IsSha256(revisionHash)
+                    || !(goal["scope"] is JArray scope) || scope.Count == 0
+                    || !(goal["budget"] is JObject))
+                    throw new InvalidDataException("GoalRevision identity, scope, budget, or hash is invalid.");
+                if (scope.Any(item => item.Type != JTokenType.String
+                        || string.IsNullOrWhiteSpace(item.Value<string>()))
+                    || scope.Values<string>().Distinct(StringComparer.OrdinalIgnoreCase).Count() != scope.Count)
+                    throw new InvalidDataException("GoalRevision scope must be a non-empty unique string set.");
+                var core = new JObject
+                {
+                    ["schemaVersion"] = 1,
+                    ["goalId"] = goalId,
+                    ["goalRevision"] = revision,
+                    ["scope"] = scope.DeepClone(),
+                    ["acceptanceIntent"] = goal["acceptanceIntent"]?.DeepClone() ?? JValue.CreateNull(),
+                    ["status"] = "frozen",
+                    ["budget"] = goal["budget"].DeepClone(),
+                    ["parentGoalRef"] = goal["parentGoalRef"]?.DeepClone() ?? JValue.CreateNull(),
+                };
+                if (!string.Equals(ComputeCanonicalSha256(core), revisionHash,
+                        StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("GoalRevision hash mismatch.");
+                binding = new ESAIBrainGoalRevisionBinding
+                {
+                    goalId = goalId,
+                    goalRevision = revision,
+                    revisionHash = revisionHash,
+                    projectPath = ToProjectRelative(fullPath),
+                    artifactHash = artifactHash,
+                };
+                routePlan.budget = (JObject)goal["budget"].DeepClone();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                return false;
+            }
+        }
+
+        private static bool TryReadRouteStageRegistry(out RouteStageRegistry registry,
+            out string registryHash, out string error)
+        {
+            registry = null;
+            registryHash = string.Empty;
+            error = string.Empty;
+            if (!TryResolveProjectPath(RouteStageRegistryPath, out string fullPath, out error)
+                || !TryReadTextAndHash(fullPath, out string text, out registryHash, out error))
+                return false;
+            try
+            {
+                JObject root = JObject.Parse(text);
+                if (!HasExactProperties(root, "schemaVersion", "registryId", "normalizationVersion",
+                        "defaultMaxDepth", "maxDepth", "externalInputs", "depthAuthorizations", "stages")
+                    || root.Value<int?>("schemaVersion") != 1
+                    || !string.Equals(root.Value<string>("registryId"),
+                        "esframework-route-stage-registry", StringComparison.Ordinal)
+                    || !string.Equals(root.Value<string>("normalizationVersion"),
+                        "route-stage-canonical-v1", StringComparison.Ordinal)
+                    || root.Value<int?>("defaultMaxDepth") != 1
+                    || root.Value<int?>("maxDepth") != 2)
+                    throw new InvalidDataException("Route Stage Registry header is invalid.");
+
+                registry = new RouteStageRegistry
+                {
+                    defaultMaxDepth = 1,
+                    maxDepth = 2,
+                    externalInputs = ReadRouteStringSet(root["externalInputs"], "externalInputs"),
+                };
+                if (!registry.externalInputs.Contains("goal-revision", StringComparer.Ordinal))
+                    throw new InvalidDataException("Route Stage Registry must declare goal-revision as an external input.");
+
+                if (!(root["depthAuthorizations"] is JArray authorizations))
+                    throw new InvalidDataException("depthAuthorizations must be an array.");
+                foreach (JObject item in authorizations.OfType<JObject>())
+                {
+                    if (!HasExactProperties(item, "reasonCode", "authorizesDepth", "profiles", "routeKeys"))
+                        throw new InvalidDataException("A depth authorization has unsupported fields.");
+                    var authorization = new RouteDepthAuthorization
+                    {
+                        reasonCode = item.Value<string>("reasonCode") ?? string.Empty,
+                        authorizesDepth = item.Value<int?>("authorizesDepth") ?? 0,
+                        profiles = ReadRouteStringSet(item["profiles"], "depthAuthorization.profiles"),
+                        routeKeys = ReadRouteStringSet(item["routeKeys"], "depthAuthorization.routeKeys"),
+                    };
+                    if (!Regex.IsMatch(authorization.reasonCode,
+                            "^ROUTE\\.DEPTH_2\\.[A-Z0-9_]{1,80}$")
+                        || authorization.authorizesDepth != 2
+                        || authorization.profiles.Count == 0 || authorization.routeKeys.Count == 0)
+                        throw new InvalidDataException("A depth authorization is invalid.");
+                    registry.depthAuthorizations.Add(authorization);
+                }
+                if (registry.depthAuthorizations.Select(item => item.reasonCode)
+                    .Distinct(StringComparer.Ordinal).Count() != registry.depthAuthorizations.Count)
+                    throw new InvalidDataException("Depth reason codes must be unique.");
+
+                if (!(root["stages"] is JArray stages))
+                    throw new InvalidDataException("stages must be an array.");
+                foreach (JObject item in stages.OfType<JObject>())
+                {
+                    if (!HasExactProperties(item, "stageContractId", "skillName", "profiles",
+                            "routeKeys", "requires", "produces", "failureConditions", "depthReasonCode"))
+                        throw new InvalidDataException("A route stage has unsupported fields.");
+                    var stage = new RouteStageDefinition
+                    {
+                        stageContractId = item.Value<string>("stageContractId") ?? string.Empty,
+                        skillName = item.Value<string>("skillName") ?? string.Empty,
+                        profiles = ReadRouteStringSet(item["profiles"], "stage.profiles"),
+                        routeKeys = ReadRouteStringSet(item["routeKeys"], "stage.routeKeys"),
+                        requires = ReadRouteStringSet(item["requires"], "stage.requires"),
+                        produces = ReadRouteStringSet(item["produces"], "stage.produces"),
+                        failureConditions = ReadRouteStringSet(item["failureConditions"],
+                            "stage.failureConditions"),
+                        depthReasonCode = item.Value<string>("depthReasonCode") ?? string.Empty,
+                    };
+                    if (!Regex.IsMatch(stage.stageContractId, "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$")
+                        || !Regex.IsMatch(stage.skillName, "^[a-z0-9][a-z0-9-]{0,80}$")
+                        || stage.profiles.Count == 0 || stage.routeKeys.Count == 0
+                        || stage.produces.Count == 0 || stage.failureConditions.Count == 0
+                        || !string.IsNullOrEmpty(stage.depthReasonCode)
+                        && !Regex.IsMatch(stage.depthReasonCode,
+                            "^ROUTE\\.DEPTH_2\\.[A-Z0-9_]{1,80}$"))
+                        throw new InvalidDataException("A route stage contract is invalid.");
+                    registry.stages.Add(stage);
+                }
+                if (registry.stages.Count == 0
+                    || registry.stages.Select(item => item.stageContractId)
+                        .Distinct(StringComparer.Ordinal).Count() != registry.stages.Count)
+                    throw new InvalidDataException("Route stage contracts must be non-empty and uniquely identified.");
+                return true;
+            }
+            catch (Exception exception)
+            {
+                registry = null;
+                error = exception.Message;
+                return false;
+            }
+        }
+
+        private static List<string> ReadRouteStringSet(JToken value, string field)
+        {
+            if (!(value is JArray array)) throw new InvalidDataException(field + " must be an array.");
+            var result = new List<string>();
+            foreach (JToken token in array)
+            {
+                string item = token.Type == JTokenType.String ? token.Value<string>() : string.Empty;
+                if (!Regex.IsMatch(item ?? string.Empty, "^[a-z0-9][a-z0-9._:-]{0,127}$"))
+                    throw new InvalidDataException(field + " contains an invalid token.");
+                result.Add(item);
+            }
+            if (result.Distinct(StringComparer.Ordinal).Count() != result.Count)
+                throw new InvalidDataException(field + " must be unique.");
+            return result;
+        }
+
+        private static bool HasExactProperties(JObject value, params string[] expected)
+        {
+            if (value == null) return false;
+            var actual = new HashSet<string>(value.Properties().Select(item => item.Name),
+                StringComparer.Ordinal);
+            return actual.SetEquals(expected ?? Array.Empty<string>());
+        }
+
+        private static void BuildRegisteredRouteStages(ESAIBrainPlan legacyPlan,
+            ESAIBrainRoutePlan routePlan, RouteStageRegistry registry,
+            ref bool hardBlocked, ref bool needsRegistration, ref bool evidencePending)
+        {
+            var routeKeys = new HashSet<string>(routePlan.routeKeys, StringComparer.Ordinal);
+            var selected = new List<RouteStageDefinition>();
+            foreach (ESAIBrainSkillBinding skill in legacyPlan.skills.OrderBy(item => item.name,
+                         StringComparer.Ordinal))
+            {
+                List<RouteStageDefinition> matches = registry.stages.Where(item =>
+                        string.Equals(item.skillName, skill.name, StringComparison.Ordinal)
+                        && item.profiles.Contains(routePlan.profile, StringComparer.Ordinal)
+                        && item.routeKeys.Any(routeKeys.Contains))
+                    .ToList();
+                if (matches.Count != 1)
+                {
+                    AddRouteIssue(routePlan, skill.name, "stageContractId",
+                        matches.Count == 0 ? "ROUTE.UNREGISTERED_STAGE" : "ROUTE.AMBIGUOUS_STAGE",
+                        matches.Count == 0
+                            ? "no exact stage contract matches the selected Skill, profile, and route"
+                            : "multiple stage contracts match the selected Skill, profile, and route",
+                        "hard-block", "Register exactly one stage contract for this Skill/profile/route.");
+                    needsRegistration = true;
+                    continue;
+                }
+                selected.Add(matches[0]);
+            }
+            if (selected.Count == 0) return;
+
+            var producers = new Dictionary<string, RouteStageDefinition>(StringComparer.Ordinal);
+            foreach (RouteStageDefinition stage in selected)
+            {
+                foreach (string output in stage.produces)
+                {
+                    if (producers.TryGetValue(output, out RouteStageDefinition prior))
+                    {
+                        AddRouteIssue(routePlan, stage.skillName, "produces",
+                            "ROUTE.DUPLICATE_PRODUCT",
+                            output + " is produced by both " + prior.skillName + " and " + stage.skillName,
+                            "hard-block", "Assign one canonical producer for the route token.");
+                        hardBlocked = true;
+                    }
+                    else producers.Add(output, stage);
+                }
+            }
+
+            var dependencies = selected.ToDictionary(item => item,
+                _ => new HashSet<RouteStageDefinition>());
+            foreach (RouteStageDefinition stage in selected)
+            {
+                foreach (string input in stage.requires)
+                {
+                    if (registry.externalInputs.Contains(input, StringComparer.Ordinal))
+                    {
+                        if (string.Equals(input, "goal-revision", StringComparison.Ordinal)
+                            && routePlan.goalRevision == null)
+                            evidencePending = true;
+                        continue;
+                    }
+                    if (!producers.TryGetValue(input, out RouteStageDefinition producer))
+                    {
+                        AddRouteIssue(routePlan, stage.skillName, "requires",
+                            "ROUTE.MISSING_INPUT", "no selected stage produces " + input,
+                            "hard-block", "Select or register the stage that produces the required token.");
+                        hardBlocked = true;
+                        continue;
+                    }
+                    dependencies[stage].Add(producer);
+                }
+            }
+
+            var ordered = new List<RouteStageDefinition>();
+            var depths = new Dictionary<RouteStageDefinition, int>();
+            var remaining = new HashSet<RouteStageDefinition>(selected);
+            while (remaining.Count > 0)
+            {
+                List<RouteStageDefinition> ready = remaining
+                    .Where(item => dependencies[item].All(ordered.Contains))
+                    .OrderBy(item => item.stageContractId, StringComparer.Ordinal).ToList();
+                if (ready.Count == 0)
+                {
+                    AddRouteIssue(routePlan, "route-plan", "stages",
+                        "ROUTE.DEPENDENCY_CYCLE", "stage dependencies contain a cycle",
+                        "hard-block", "Break the cycle in the central stage contracts.");
+                    hardBlocked = true;
+                    break;
+                }
+                foreach (RouteStageDefinition stage in ready)
+                {
+                    int depth = dependencies[stage].Count == 0
+                        ? 0 : dependencies[stage].Max(item => depths[item]) + 1;
+                    depths[stage] = depth;
+                    ordered.Add(stage);
+                    remaining.Remove(stage);
+                }
+            }
+
+            int sequence = 0;
+            foreach (RouteStageDefinition stage in ordered)
+            {
+                int depth = depths[stage];
+                if (depth > registry.maxDepth)
+                {
+                    AddRouteIssue(routePlan, stage.skillName, "depth",
+                        "ROUTE.DEPTH_LIMIT", "stage depth " + depth + " exceeds registry maxDepth",
+                        "stop-next-read", "Reduce dependencies before adding this stage.");
+                    hardBlocked = true;
+                    continue;
+                }
+                if (depth > registry.defaultMaxDepth)
+                {
+                    RouteDepthAuthorization authorization = registry.depthAuthorizations.FirstOrDefault(item =>
+                        string.Equals(item.reasonCode, stage.depthReasonCode, StringComparison.Ordinal)
+                        && item.authorizesDepth == depth
+                        && item.profiles.Contains(routePlan.profile, StringComparer.Ordinal)
+                        && item.routeKeys.Any(routeKeys.Contains));
+                    if (authorization == null)
+                    {
+                        AddRouteIssue(routePlan, stage.skillName, "depthReasonCode",
+                            "ROUTE.DEPTH_REASON_UNAUTHORIZED",
+                            "depth 2 requires a registered reason for the exact profile and route",
+                            "hard-block", "Register or select the allowed depth-2 reason.");
+                        hardBlocked = true;
+                        continue;
+                    }
+                }
+                else if (!string.IsNullOrEmpty(stage.depthReasonCode))
+                {
+                    AddRouteIssue(routePlan, stage.skillName, "depthReasonCode",
+                        "ROUTE.DEPTH_REASON_MISAPPLIED",
+                        "a depth-2 reason cannot authorize a shallower stage",
+                        "hard-block", "Remove the reason or repair the dependency graph.");
+                    hardBlocked = true;
+                    continue;
+                }
+
+                sequence++;
+                var output = new ESAIBrainRouteStage
+                {
+                    stageId = "stage-" + sequence.ToString("00") + "-" + stage.skillName,
+                    stageContractId = stage.stageContractId,
+                    skillName = stage.skillName,
+                    depth = depth,
+                    depthReasonCode = stage.depthReasonCode,
+                    executionStatus = "not-executed",
+                };
+                output.requires.AddRange(stage.requires.OrderBy(item => item, StringComparer.Ordinal));
+                output.produces.AddRange(stage.produces.OrderBy(item => item, StringComparer.Ordinal));
+                output.failureConditions.AddRange(stage.failureConditions
+                    .OrderBy(item => item, StringComparer.Ordinal));
+                routePlan.stages.Add(output);
+            }
+        }
+
+        private static void AddCurrentRouteSourceRefs(ESAIBrainPlan legacyPlan,
+            ESAIBrainRoutePlan routePlan, Dictionary<string, string> sourceRefs, ref bool hardBlocked)
+        {
+            AddRouteSourceRef(sourceRefs, KnowledgeIndexPath, legacyPlan.knowledgeIndexHash,
+                routePlan, ref hardBlocked);
+            AddCurrentRouteSourceRef(ProjectSkillCatalogPath, sourceRefs, routePlan, ref hardBlocked);
+            AddCurrentRouteSourceRef(ProjectSkillDiscoveryPolicyPath, sourceRefs, routePlan,
+                ref hardBlocked);
+            AddCurrentRouteSourceRef(".agents/SKILL_RESOURCE_INDEX.yaml", sourceRefs, routePlan,
+                ref hardBlocked);
+            foreach (ESAIBrainEvidenceBinding item in legacyPlan.warnings.Concat(legacyPlan.evidence))
+                AddRouteSourceRef(sourceRefs, item.projectPath, item.sha256, routePlan, ref hardBlocked);
+            foreach (ESAIBrainSkillBinding skill in legacyPlan.skills)
+            {
+                AddRouteSourceRef(sourceRefs, skill.skillPath.TrimEnd('/') + "/SKILL.md",
+                    skill.skillHash, routePlan, ref hardBlocked);
+                AddRouteSourceRef(sourceRefs, skill.skillPath.TrimEnd('/') + "/agents/openai.yaml",
+                    skill.metadataHash, routePlan, ref hardBlocked);
+                AddRouteSourceRef(sourceRefs, skill.skillPath.TrimEnd('/') + "/governance.json",
+                    skill.governanceHash, routePlan, ref hardBlocked);
+            }
+            if (legacyPlan.command != null)
+                AddRouteSourceRef(sourceRefs, legacyPlan.command.path,
+                    legacyPlan.command.contractHash, routePlan, ref hardBlocked);
+        }
+
+        private static void AddCurrentRouteSourceRef(string projectPath,
+            Dictionary<string, string> sourceRefs, ESAIBrainRoutePlan routePlan, ref bool hardBlocked)
+        {
+            string readError = string.Empty;
+            string hash = string.Empty;
+            if (!TryResolveProjectPath(projectPath, out string fullPath, out string pathError)
+                || !TryReadTextAndHash(fullPath, out _, out hash, out readError))
+            {
+                AddRouteIssue(routePlan, "route-snapshot", "sourceRefs",
+                    "ROUTE.SOURCE_REF_UNAVAILABLE",
+                    string.IsNullOrWhiteSpace(pathError) ? readError : pathError,
+                    "hard-block", "Restore the current source and re-plan.");
+                hardBlocked = true;
+                return;
+            }
+            AddRouteSourceRef(sourceRefs, projectPath, hash, routePlan, ref hardBlocked);
+        }
+
+        private static void AddRouteSourceRef(Dictionary<string, string> sourceRefs,
+            string projectPath, string hash, ESAIBrainRoutePlan routePlan, ref bool hardBlocked)
+        {
+            string normalizedPath = (projectPath ?? string.Empty).Replace('\\', '/').Trim();
+            string normalizedHash = (hash ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(normalizedPath) || Path.IsPathRooted(normalizedPath)
+                || normalizedPath.Split('/').Contains("..")
+                || !ESAutomationWorkerRegistration.IsSha256(normalizedHash))
+            {
+                AddRouteIssue(routePlan, "route-snapshot", "sourceRefs",
+                    "ROUTE.SOURCE_REF_INVALID", "SourceRef path or SHA-256 is invalid",
+                    "hard-block", "Use a current project-relative SourceRef and SHA-256.");
+                hardBlocked = true;
+                return;
+            }
+            if (sourceRefs.TryGetValue(normalizedPath, out string existing)
+                && !string.Equals(existing, normalizedHash, StringComparison.OrdinalIgnoreCase))
+            {
+                AddRouteIssue(routePlan, "route-snapshot", "sourceRefs",
+                    "ROUTE.SOURCE_REF_CONFLICT", normalizedPath + " has conflicting hashes",
+                    "hard-block", "Re-read the source once and rebuild the plan snapshot.");
+                hardBlocked = true;
+                return;
+            }
+            sourceRefs[normalizedPath] = normalizedHash;
+        }
+
+        private static void BuildRouteSnapshot(ESAIBrainRoutePlan routePlan,
+            Dictionary<string, string> sourceRefs, string registryHash, ref bool hardBlocked)
+        {
+            string head = ESAutomationSourceState.GetCurrentGitCommit();
+            if (!Regex.IsMatch(head ?? string.Empty, "^[a-f0-9]{40}$"))
+            {
+                AddRouteIssue(routePlan, "route-snapshot", "head", "ROUTE.HEAD_UNAVAILABLE",
+                    "Git HEAD is not a current 40-character commit SHA",
+                    "hard-block", "Restore a readable Git HEAD and re-plan.");
+                hardBlocked = true;
+            }
+            routePlan.snapshot = new ESAIBrainRouteSnapshot
+            {
+                head = Regex.IsMatch(head ?? string.Empty, "^[a-f0-9]{40}$") ? head : null,
+                registryHash = ESAutomationWorkerRegistration.IsSha256(registryHash ?? string.Empty)
+                    ? registryHash.ToLowerInvariant() : null,
+                coverage = new ESAIBrainRouteSnapshotCoverage
+                {
+                    normalizationVersion = "route-plan-canonical-v1",
+                },
+            };
+            routePlan.snapshot.coverage.includes.AddRange(new[]
+            {
+                "goal-revision-artifact",
+                "knowledge-index",
+                "route-stage-registry",
+                "selected-skill-contracts",
+                "selected-warning-and-command-bindings",
+            });
+            foreach (KeyValuePair<string, string> item in sourceRefs
+                         .OrderBy(item => item.Key, StringComparer.Ordinal))
+                routePlan.snapshot.sourceRefs.Add(new ESAIBrainRouteSourceRef
+                    { projectPath = item.Key, sha256 = item.Value });
+            routePlan.snapshot.sourceRefsHash = ComputeCanonicalSha256(JToken.FromObject(
+                routePlan.snapshot.sourceRefs.Select(item => new { item.projectPath, item.sha256 })));
+        }
+
+        private static string ComputeRoutePlanHash(ESAIBrainRoutePlan routePlan)
+        {
+            return ComputeCanonicalSha256(JToken.FromObject(new
+            {
+                routePlan.schemaVersion,
+                routePlan.contractId,
+                routePlan.status,
+                routePlan.routeState,
+                routePlan.evidenceState,
+                routePlan.effect,
+                routePlan.profile,
+                routePlan.scope,
+                routePlan.routeKeys,
+                routePlan.goalRevision,
+                routePlan.stages,
+                routePlan.maxDepth,
+                routePlan.budget,
+                routePlan.stopConditions,
+                routePlan.issues,
+                routePlan.snapshot,
+                routePlan.shadowIntegration,
+                routePlan.compatibility,
+                routePlan.executionEnabled,
+            }));
         }
 
         private static string ResolveBlockedStatus(List<string> blockers)
@@ -2083,6 +2820,9 @@ namespace ES
                     break;
                 case "es.feishu.message.send":
                     expectedCommandId = "feishu.message.send";
+                    break;
+                case "es.task-context.evaluate":
+                    expectedCommandId = "task.context-runtime.mutate";
                     break;
                 default:
                     return;
@@ -3572,6 +4312,7 @@ namespace ES
                     plan.task.workerEnabled,
                     capabilities = plan.task.capabilities.OrderBy(value => value, StringComparer.Ordinal),
                 },
+                routePlan = plan.routePlan,
                 plan.authority,
                 authorization = new
                 {
@@ -3587,6 +4328,8 @@ namespace ES
                 request.fromAi,
                 request.dryRun,
                 request.actorId,
+                request.routeProfileId,
+                request.goalRevisionPath,
                 executionSnapshot = request.executionSnapshot == null ? null : new
                 {
                     request.executionSnapshot.snapshotId,
@@ -3624,6 +4367,8 @@ namespace ES
                 request.dryRun,
                 request.actorId,
                 request.invocationId,
+                request.routeProfileId,
+                request.goalRevisionPath,
                 request.userDirectedRuntime,
                 request.userInstructionHash,
                 executionSnapshot = request.executionSnapshot == null ? null : new
@@ -3753,6 +4498,36 @@ namespace ES
             public int usedCount;
             public List<string> usedIdempotencyKeys = new List<string>();
         }
+
+        private sealed class RouteStageRegistry
+        {
+            public int defaultMaxDepth;
+            public int maxDepth;
+            public List<string> externalInputs = new List<string>();
+            public List<RouteDepthAuthorization> depthAuthorizations =
+                new List<RouteDepthAuthorization>();
+            public List<RouteStageDefinition> stages = new List<RouteStageDefinition>();
+        }
+
+        private sealed class RouteDepthAuthorization
+        {
+            public string reasonCode = string.Empty;
+            public int authorizesDepth;
+            public List<string> profiles = new List<string>();
+            public List<string> routeKeys = new List<string>();
+        }
+
+        private sealed class RouteStageDefinition
+        {
+            public string stageContractId = string.Empty;
+            public string skillName = string.Empty;
+            public List<string> profiles = new List<string>();
+            public List<string> routeKeys = new List<string>();
+            public List<string> requires = new List<string>();
+            public List<string> produces = new List<string>();
+            public List<string> failureConditions = new List<string>();
+            public string depthReasonCode = string.Empty;
+        }
     }
 
     [Serializable]
@@ -3771,6 +4546,8 @@ namespace ES
         public bool dryRun;
         public string actorId = string.Empty;
         public string invocationId = string.Empty;
+        public string routeProfileId = "governance";
+        public string goalRevisionPath = string.Empty;
         /// <summary>
         /// Immutable plan hash returned by planTask. External AI execution must submit
         /// it again; a changed plan is stale and cannot be authorized.
@@ -3835,6 +4612,7 @@ namespace ES
         public ESAIBrainWorkflowAuthority workflow;
         public ESAIBrainCommandBinding command;
         public ESAIBrainTaskBinding task;
+        public ESAIBrainRoutePlan routePlan;
         public ESAIBrainAuthoritySnapshot authority = new ESAIBrainAuthoritySnapshot();
 
         [JsonIgnore]
@@ -3843,6 +4621,140 @@ namespace ES
 
         [JsonIgnore]
         public string FirstBlocker => blockers.Count == 0 ? string.Empty : blockers[0];
+    }
+
+    [Serializable]
+    public sealed class ESAIBrainRoutePlan
+    {
+        public int schemaVersion;
+        public string contractId = string.Empty;
+        public string routePlanId = string.Empty;
+        public string routePlanHash = string.Empty;
+        public string status = string.Empty;
+        public string routeState = string.Empty;
+        public string evidenceState = string.Empty;
+        public string effect = string.Empty;
+        public string profile = string.Empty;
+        public string scope = string.Empty;
+        public readonly List<string> routeKeys = new List<string>();
+        public ESAIBrainGoalRevisionBinding goalRevision;
+        public readonly List<ESAIBrainRouteStage> stages = new List<ESAIBrainRouteStage>();
+        public int maxDepth;
+        public JObject budget = new JObject();
+        public readonly List<ESAIBrainRouteStopCondition> stopConditions =
+            new List<ESAIBrainRouteStopCondition>();
+        public readonly List<ESAIBrainRouteIssue> issues = new List<ESAIBrainRouteIssue>();
+        public ESAIBrainRouteSnapshot snapshot = new ESAIBrainRouteSnapshot();
+        public ESAIBrainRouteShadowIntegration shadowIntegration =
+            new ESAIBrainRouteShadowIntegration();
+        public ESAIBrainRouteCompatibility compatibility = new ESAIBrainRouteCompatibility();
+        public bool executionEnabled;
+    }
+
+    [Serializable]
+    public sealed class ESAIBrainRouteShadowIntegration
+    {
+        public string contractId = string.Empty;
+        public string mode = string.Empty;
+        public string algorithmId = string.Empty;
+        public string selectedProfile = string.Empty;
+        public string selectedScope = string.Empty;
+        public string candidateStatus = string.Empty;
+        public string decisionHash;
+        public string decisionId;
+        public string legacyPlanStatusBefore = string.Empty;
+        public string legacyPlanStatusAfter = string.Empty;
+        public bool stateChanged;
+        public bool verificationRequired;
+        public string rollbackState = string.Empty;
+        public string rollbackAction = string.Empty;
+        public bool productionRouteIntegrated;
+        public bool globalP0Integrated;
+        public readonly List<string> observationCodes = new List<string>();
+    }
+
+    [Serializable]
+    public sealed class ESAIBrainGoalRevisionBinding
+    {
+        public string goalId = string.Empty;
+        public string goalRevision = string.Empty;
+        public string revisionHash = string.Empty;
+        public string projectPath = string.Empty;
+        public string artifactHash = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class ESAIBrainRouteStage
+    {
+        public string stageId = string.Empty;
+        public string stageContractId = string.Empty;
+        public string skillName = string.Empty;
+        public int depth;
+        public readonly List<string> requires = new List<string>();
+        public readonly List<string> produces = new List<string>();
+        public readonly List<string> failureConditions = new List<string>();
+        public string depthReasonCode = string.Empty;
+        public string executionStatus = "not-executed";
+    }
+
+    [Serializable]
+    public sealed class ESAIBrainRouteStopCondition
+    {
+        public string code = string.Empty;
+        public string predicate = string.Empty;
+        public string trigger = string.Empty;
+        public string outcome = string.Empty;
+        public readonly List<string> evidence = new List<string>();
+        public string recovery = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class ESAIBrainRouteIssue
+    {
+        [JsonProperty("object")]
+        public string targetObject = string.Empty;
+        public string field = string.Empty;
+        public string profile = string.Empty;
+        public string scope = string.Empty;
+        public string reasonCode = string.Empty;
+        public string predicate = string.Empty;
+        public string effect = string.Empty;
+        public string recovery = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class ESAIBrainRouteSourceRef
+    {
+        public string projectPath = string.Empty;
+        public string sha256 = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class ESAIBrainRouteSnapshot
+    {
+        public string head = string.Empty;
+        public readonly List<ESAIBrainRouteSourceRef> sourceRefs =
+            new List<ESAIBrainRouteSourceRef>();
+        public string sourceRefsHash = string.Empty;
+        public string registryHash = string.Empty;
+        public ESAIBrainRouteSnapshotCoverage coverage = new ESAIBrainRouteSnapshotCoverage();
+    }
+
+    [Serializable]
+    public sealed class ESAIBrainRouteSnapshotCoverage
+    {
+        public string normalizationVersion = string.Empty;
+        public readonly List<string> includes = new List<string>();
+    }
+
+    [Serializable]
+    public sealed class ESAIBrainRouteCompatibility
+    {
+        public string legacyPlanStatus = string.Empty;
+        public bool projectionOnly;
+        public bool productionRouteIntegrated;
+        public bool globalP0Integrated;
+        public string executionAuthority = string.Empty;
     }
 
     [Serializable]
@@ -4064,6 +4976,12 @@ namespace ES
         protected override string ESWindow_PageStableId => "automation.aibrain";
         protected override string ESWindow_PageTitle => "AIBrain";
         protected override string ESWindow_PageKeywords => "AIBrain Knowledge AIWarnings AICommand Skill Automation";
+
+        protected override void ESWindow_OnHostEnable()
+        {
+            base.ESWindow_OnHostEnable();
+            maxSize = new Vector2(1400f, 1000f);
+        }
 
         protected override void OnEnable()
         {

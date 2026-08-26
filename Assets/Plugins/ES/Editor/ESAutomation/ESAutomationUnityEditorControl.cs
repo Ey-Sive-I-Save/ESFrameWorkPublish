@@ -260,6 +260,9 @@ namespace ES
 
         private static void RestoreCompilationPolicy()
         {
+            // delayCall 是一次性恢复任务；先解除注册，避免 ReloadDomain/重复初始化
+            // 后残留旧委托或重复执行编译锁恢复。
+            EditorApplication.delayCall -= RestoreCompilationPolicy;
             if (!IsAutoCompilationSuppressed) return;
             AssetDatabase.DisallowAutoRefresh();
             if (!reloadLockHeld)

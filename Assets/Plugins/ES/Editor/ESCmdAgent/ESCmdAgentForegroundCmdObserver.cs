@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using UnityEditor;
 
 namespace ES
 {
@@ -145,6 +146,15 @@ namespace ES
         private static int unityProcessId;
         private static ESCmdAgentForegroundCmdObservation lastExternalForeground;
 
+        [InitializeOnLoadMethod]
+        private static void InitializeLifecycle()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload -= ReleaseAllForLifecycle;
+            AssemblyReloadEvents.beforeAssemblyReload += ReleaseAllForLifecycle;
+            EditorApplication.quitting -= ReleaseAllForLifecycle;
+            EditorApplication.quitting += ReleaseAllForLifecycle;
+        }
+
         internal static void Acquire()
         {
             if (!IsWindows())
@@ -171,6 +181,21 @@ namespace ES
                     return;
                 UnhookWinEvent(foregroundChangedHook);
                 foregroundChangedHook = IntPtr.Zero;
+                lastExternalForeground = null;
+            }
+        }
+
+        private static void ReleaseAllForLifecycle()
+        {
+            if (!IsWindows()) return;
+            lock (ObservationGate)
+            {
+                observerReferenceCount = 0;
+                if (foregroundChangedHook != IntPtr.Zero)
+                {
+                    try { UnhookWinEvent(foregroundChangedHook); }
+                    finally { foregroundChangedHook = IntPtr.Zero; }
+                }
                 lastExternalForeground = null;
             }
         }

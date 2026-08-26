@@ -50,6 +50,44 @@ namespace ES
             ReconcileInterruptedRuns();
             EditorApplication.update -= PollActiveRuns;
             EditorApplication.update += PollActiveRuns;
+            AssemblyReloadEvents.beforeAssemblyReload -= StopActiveRunsForLifecycle;
+            AssemblyReloadEvents.beforeAssemblyReload += StopActiveRunsForLifecycle;
+            EditorApplication.quitting -= StopActiveRunsForLifecycle;
+            EditorApplication.quitting += StopActiveRunsForLifecycle;
+        }
+
+        private static void StopActiveRunsForLifecycle()
+        {
+            EditorApplication.update -= PollActiveRuns;
+            foreach (string runId in ActiveRuns.Keys.ToList())
+            {
+                if (!ActiveRuns.TryGetValue(runId, out ActiveRun active)) continue;
+                try
+                {
+                    active.Execution.Terminate();
+                    FinishWithoutWorkerResult(active, ESAutomationRunStatus.Cancelled,
+                        "编辑器生命周期结束；飞书任务 Worker 已终止。");
+                }
+                catch (Exception exception)
+                {
+                    try
+                    {
+                        FinishWithoutWorkerResult(active, ESAutomationRunStatus.Failed,
+                            "编辑器生命周期结束，但飞书任务 Worker 终止未确认："
+                            + exception.GetBaseException().Message);
+                    }
+                    catch (Exception writeException)
+                    {
+                        UnityEngine.Debug.LogException(writeException);
+                    }
+                }
+                finally
+                {
+                    try { active.Execution.Dispose(); }
+                    catch (Exception disposeException) { UnityEngine.Debug.LogException(disposeException); }
+                    ActiveRuns.Remove(runId);
+                }
+            }
         }
 
         private static Dictionary<string, TaskSpec> CreateSpecs()

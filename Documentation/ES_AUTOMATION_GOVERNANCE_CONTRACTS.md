@@ -30,9 +30,11 @@ ES 原有 `TaskDescriptor.inputSchemaHash` 现在可以由 `TaskContract.inputSc
 
 内置 `es.scene.scan` 已启用这条绑定：TaskContract、Facade Descriptor、受管 Schema 文件和 Worker 的输入检查点共同使用同一 `OptionsSchemaHash`；Schema 文件发生漂移时，既有 Worker 指纹检查和注册门禁都会拒绝继续执行。
 
-AIBrain 的一次性授权指纹现在同时绑定任务、版本、输入、调用身份、幂等键和可选 ExecutionSnapshot。快照或幂等键发生替换时，即使仍使用同一个 PlanHash，也会被授权消费门禁拒绝。
+AIBrain Policy v5 的有界授权同时绑定策略代际、授权分类、任务、版本、输入、调用身份和可选 ExecutionSnapshot；幂等键作为每次可复用消费的唯一键单独持久化。快照或绑定字段发生替换时，即使仍使用同一个 PlanHash，也会被授权消费门禁拒绝。Store schema 3 使用永久跨进程锁、受管原子替换、PlanHash/InvocationId 双唯一和 `Active / Exhausted / Expired` 终态；确定性 Facade 预检失败不消费次数。
 
 `ESAutomationRunResult.Validate()` 是 Receipt 的第一道结构门禁：它会校验时间单调性、重试计数、幂等键格式、ExecutionSnapshot，以及 CompletionDecision 与 RunId 的绑定。它不能替代业务 Verifier，但可以阻止格式合法、语义却串 Run 的收据进入写入边界。
+
+外部协作任务可在 `RunRecord.externalEvidence` 投影经过 C# 边界验证的专项回执。当前 Feishu 只读回执绑定 PlanHash、CommandId、治理 Hash、Invocation/Input/Output Hash、DryRun/Live 网络语义、`ExternalCollaboration` 分类、净化版本、脱敏计数、哈希化 SourceRef 和未证实项；Live 还必须绑定非秘密的 Runtime 授权引用、凭据来源类型、租户 Hash 与空间策略 Hash。该投影是可选兼容字段，不能让外部内容升级为项目事实，也不能用字段存在替代外部服务或 Unity Runtime 证据。
 
 新任务可额外提供 `ESAutomationTraceReconciliation`。它记录预期调用数、实际调用数、越权调用数和重复调用数；一旦提供，就必须满足逐项对账，不能只把 `traceReconciled` 布尔值写成 `true`。历史任务仍可使用兼容的布尔字段。
 

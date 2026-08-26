@@ -70,8 +70,6 @@
   "responsibilityChecks": [
     "authority-routing",
     "operation-allowlist",
-    "identity-ownership",
-    "recipient-consent",
     "credential-isolation",
     "external-data-boundary",
     "evidence-contract"

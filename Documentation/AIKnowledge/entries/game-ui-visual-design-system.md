@@ -4,9 +4,9 @@
 `Authority`: `Current project source + governed UI authoring contracts + derived visual-system decisions + official source snapshot`
 `RouteKeys`: `ui-automation`, `visual-qa`, `ui-visual-design`, `visual-design`, `design-token`, `color-role`, `typography-role`, `spacing-token`, `visual-hierarchy`, `information-density`, `rarity-visual`, `ui-material`
 `HashSchema`: `v2`
-`ContentHash`: `1292ed146928c166eb8eb04184f6f5e72eba52c23de7fe2a0fac133a85e96965`  
-`SourceSetHash`: `1292ed146928c166eb8eb04184f6f5e72eba52c23de7fe2a0fac133a85e96965`  
-`EntryBodyHash`: `0791dccb8c80011d7ff23ab309d43d16751f02082174a9ac0517a30db1ca9130`
+`ContentHash`: `bbb23209e5b17cf215d3c242cbe42e4cd49491bcdadf4f3bdc9b80c5e532e089`
+`SourceSetHash`: `bbb23209e5b17cf215d3c242cbe42e4cd49491bcdadf4f3bdc9b80c5e532e089`
+`EntryBodyHash`: `5d9360db8472fb07b89adcfcaaefb24fe591fa40a2618e68240357ffe78839ac`
 `EvidenceLevel`: `S0`
 `StaleWhen`: ScreenSpec v3 Token schema、Validator、Adapter、Materializer、字体/素材治理、视觉证据合同、官方来源锁或任一 SourceRef 哈希变化。
 
@@ -75,9 +75,9 @@ Token 保存语义角色，具体值来自项目视觉资产或已批准规范�
 ## Asset and state contract
 
 - Empty/Loading/Error 保留页面骨架，只替换负责的内容区，避免状态切换导致整屏跳动。
-- 图片声明 aspect mode、focal alignment、窄屏保留区域和 fallback；占位图只证明布局输入存在。
+- 图片声明 aspect mode、focal alignment、窄屏保留区域和 fallback；高保真焦点主体额外用 `focalAssetPolicies` 把组件槽位、AssetManifest crop/focal-point/安全裁切区、正有限 `sourceAspectRatio` 与 `atlasRotationPolicy: disallow-rotation` 绑定为可检查合同。Resolver 在最终静态矩形上预测 cover UV 并阻断无法保留安全区的 profile；Materializer 再将该策略传给 `ESUIFocalCropRawImage`，拒绝旋转 SpriteAtlas、以实际 Sprite UV 宽高比交叉校验并写入 source/applied UV 和 `safeCropSatisfied`。这只证明静态与源码链，不证明实际 SpriteAtlas/GPU 构图。占位图只证明布局输入存在。
 - 正式素材至少记录 `source`、`hash`、`provenance`、`license`、`fallback`；图标/图片追加 `atlasOwner`，字体追加 Font Asset 与 Fallback 链。
-- 当前模板/Validator 没有完整强制这些字段。知识中的目标合同不能被描述为现有实现。
+- 当前 Validator 只在 `--require-advanced-composition` 的焦点主体路径强制 crop/focal-point/safe-crop 与 manifest 一致；它不证明 Sprite 导入、实际裁切、许可证或商业视觉，其他素材字段也仍需各自质量门。
 - 每次视觉修正只改变一个可归因原因；contract/source/baseline hash 变化后旧报告立即 stale。
 
 ## Failure-surface matrix
@@ -168,6 +168,29 @@ Token 保存语义角色，具体值来自项目视觉资产或已批准规范�
 - 验证时：结构检查先于像素；同一 profile/state 绑定 baseline、capture 和输入哈希。
 - 完成后：复算 SourceRefs、SourceSetHash、EntryBodyHash 与唯一 Index binding；分层报告 non-claims。
 
+## Failure feedback from lobby evidence
+
+The v18/v19 lobby batches are negative evidence and must remain routed into future visual work.
+Apply the reusable rules in `.agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md`:
+
+- `UI-FB-001`: authored hero art must preserve focal-subject identity and orientation; token tint
+  or stale generated art is a hard stop.
+- `UI-FB-002`: a commercial screen needs one visible primary action and an intentional hierarchy;
+  equal-emphasis component grids are not sufficient.
+- `UI-FB-003`: wide and narrow layouts require separate reflow decisions and a complete state matrix.
+- `UI-FB-004`: static completion and non-empty PNGs cannot become visual acceptance.
+- `UI-FB-005`: every review finding must change a spec/registry/validator/materializer field and
+  name the evidence that will falsify the fix.
+
+`advancedComposition` now provides a static decision contract for one primary action, focal or
+intentional no-focal treatment, focal crop/focal-point/safe-crop linkage to AssetManifest, key
+alignment/clearance, post-layout action-density constraints and responsive semantic equivalence.
+It prevents these decisions from being omitted; it does not evaluate visual taste or replace Unity
+pixel evidence.
+
+These rules are derived from project evidence, not proof that the current materializer satisfies
+them. A future batch must report the changed rule ID and the artifact field changed because of it.
+
 ## RequiredReads
 
 - `Documentation/AIKnowledge/entries/game-ui-visual-design-system.md`
@@ -183,21 +206,24 @@ Token 保存语义角色，具体值来自项目视觉资产或已批准规范�
 - `.agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py`
 - `.agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py`
 - `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs`
+- `Assets/Scripts/ESLogic/Runtime/UI/ESUIFocalCropRawImage.cs`
 - `Documentation/ES_UI_AUTHORING_WORKFLOW.md`
 - `Packages/manifest.json`
 
 ## SourceRefs
 
-- `.agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json` (`4aba3b950fef2b9c45dc6b4ba6abc3b6a59517ddeb566ab86ede106d5facf38d`)
+- `.agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json` (`c90228507834858d10720385a17e03996aed2392b2cad35d63b3449d0c8c93bb`)
 - `.agents/skills/es-ui-prefab-authoring/references/ai-visual-brief.md` (`744e99b7f133a90b8ee6ff11208717511f37a352a37c9f25d7ddb5c9fc220f6b`)
 - `.agents/skills/es-ui-prefab-authoring/references/commercial-ui-patterns.md` (`85579b0750d426fc9f615b60d488ff90626956a6f68784ff232175fba5e5c248`)
-- `.agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py` (`4d60216d8d3c870d243f01577074b7b16b5e2234cb8eff02f9f26231521def74`)
-- `.agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py` (`df9aee267b62ba91fbb2e00cda6e6ec6bb05255bd287a67ffbf96aecf358e420`)
-- `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs` (`26c7a8382b5f95830cf13f26819faecbf89f4f84484ac3c1282c84fb6ab14801`)
+- `.agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py` (`b191bf200879dab3a7edd0b173d1065d59d7c0e2fc0b5cd5160285219ae3d136`)
+- `.agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py` (`28e29084d48d737a09eb281c2b26ee599d38c9e92a7d6ef081cbb59beea34668`)
+- `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs` (`2e82399e64ed5833891b1d4237791f4552306354c6a2acfd5e496e0d856207cd`)
+- `Assets/Scripts/ESLogic/Runtime/UI/ESUIFocalCropRawImage.cs` (`5653c9b8c5fe381a8f65412236adb3616e7460ece82c99efb76e47fbec91a4cc`)
 - `Documentation/ES_UI_AUTHORING_WORKFLOW.md` (`8e1fe9d3736ad07de9ae953dd628d3f512dc94713ea07a9aee32208570746aa4`)
-- `Documentation/AIKnowledge/entries/ui-automation-authoring.md` (`6785f682878cfaba2fb0f525e947eadace8cd8f31e5ba3cc0df62d3a4da5098d`)
+- `Documentation/AIKnowledge/entries/ui-automation-authoring.md` (`34b980e70b2aa519f3adb0429e4584e06a8fefbdc770e201edbe2266d20b10f3`)
 - `Packages/manifest.json` (`d447378a6e35e070c3fa8df645a5829a703eb4b488f8ae8132cd894ab19d016d`)
 - `Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md` (`d29ff698cd8fc3b0a3e014efe1780ef4a141e620b05cd3bf22be9d72ab3548de`)
+- `.agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md` (`3e197021939577729a0c23a3f632046271385d02d7336fdcc0f2b0d50e4226d1`)
 
 ## Evidence boundary
 

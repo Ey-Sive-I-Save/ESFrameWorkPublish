@@ -10,6 +10,20 @@ $entry = (Resolve-Path -LiteralPath (Join-Path $root $EntryPath)).Path
 $utf8 = [Text.UTF8Encoding]::new($false, $true)
 $text = $utf8.GetString([IO.File]::ReadAllBytes($entry))
 
+function Get-CanonicalSourceHash([string]$Path) {
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $textExtensions = @('.cs','.csproj','.md','.json','.yaml','.yml','.ps1','.py','.txt','.asmdef','.asset','.meta')
+    if ([IO.Path]::GetExtension($Path).ToLowerInvariant() -in $textExtensions) {
+        $sourceText = [Text.UTF8Encoding]::new($false, $true).GetString($bytes)
+        $sourceText = $sourceText -replace "`r`n", "`n"
+        $sourceText = $sourceText -replace "`r", "`n"
+        $bytes = [Text.Encoding]::UTF8.GetBytes($sourceText)
+    }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-','').ToLowerInvariant() }
+    finally { $sha.Dispose() }
+}
+
 foreach ($field in @('KnowledgeId','Authority','RouteKeys','ContentHash','SourceRefs','EvidenceLevel','StaleWhen')) {
     $fieldPattern = [Regex]::Escape('`' + $field + '`')
     if ($field -eq 'SourceRefs') { $fieldPattern = '(?m)^##\s+SourceRefs\s*$|' + $fieldPattern }
@@ -29,7 +43,7 @@ foreach ($match in $refs) {
     $declared = $match.Groups[2].Value
     $source = Join-Path $root $relative
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "SourceRef missing: $relative" }
-    $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $source).Hash.ToLowerInvariant()
+    $actual = Get-CanonicalSourceHash $source
     if ($actual -ne $declared) { throw "SourceRef hash drift: $relative" }
     [void]$hashes.Add($declared)
 }

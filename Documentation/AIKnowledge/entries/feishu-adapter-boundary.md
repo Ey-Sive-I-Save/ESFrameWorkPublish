@@ -6,24 +6,24 @@
 `Authority`: `Derived`
 `RouteKeys`: `feishu`, `lark`, `external-adapter`, `dry-run`
 `EvidenceLevel`: `S1`
-`ContentHash`: `213843683a35870c55805831ca987af5525b29d21deef115d9acdb5892e554ef`
+`ContentHash`: `08d52951a7f03caf4983af215bc2f908e5d8e5696bec49186204d7092b71f8a9`
 
 `SourceRefs`:
 
 - `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md` (`a33c17c739c6394096b8892bd3eb2497ff4f02b2ecd17fd86e14b4d7ce8c3306`)
 - `Documentation/ES_AUTOMATION_CENTER_STANDARD.md` (`fda3f8e4408e507fd257bb4093b8e19f83c1374834578639b443b52690280121`)
-- `Assets/Plugins/ES/Editor/ESAutomation/ESFeishuReadAutomation.cs` (`98b7c0e8770931785caba92979a59b43c41eb052a528e1ccd55652622e72df12`)
-- `ES/Automation/Workers/Node/Feishu/worker.js` (`16b419b0452b9761e9d8f08acbf1e65ff815d8ac3043773df3e146786a4c887e`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESFeishuReadAutomation.cs` (`4abfcc41a21a17e289e617451c8d06e119de8ac5e0b4d1635d93dc8e049e11b0`)
+- `ES/Automation/Workers/Node/Feishu/worker.js` (`6648314a09548129bbb70a3399644b5b03375c8a9b1e635e3a69bbb89b086033`)
 - `ES/Automation/Workers/Node/Feishu/package-lock.json` (`f12bad503b40ce56b7dedf47bb7e98846d10dbcf4f00bcd95ed6881f98ed9f40`)
-- `ES/Automation/Workers/Node/Feishu/tests/dry-run-input.json` (`8fd40a68fbc03f0bba0536620f2496069c771f39004801d1c18cdf82a947667f`)
+- `ES/Automation/Workers/Node/Feishu/tests/dry-run-input.json` (`46e8b8fa3eb7c7b55a24f27cde81ff285decbdad09eb08e493649d910f7afde2`)
 
 `EvidenceRefs`:
 
-- `Assets/Plugins/ES/Editor/ESAutomation/ESFeishuReadAutomation.cs`（本地 SHA-256：`98b7c0e8770931785caba92979a59b43c41eb052a528e1ccd55652622e72df12`）
-- `ES/Automation/Workers/Node/Feishu/worker.js`（本地 SHA-256：`16b419b0452b9761e9d8f08acbf1e65ff815d8ac3043773df3e146786a4c887e`）
+- `Assets/Plugins/ES/Editor/ESAutomation/ESFeishuReadAutomation.cs`（规范化 SHA-256：`4abfcc41a21a17e289e617451c8d06e119de8ac5e0b4d1635d93dc8e049e11b0`）
+- `ES/Automation/Workers/Node/Feishu/worker.js`（规范化 SHA-256：`6648314a09548129bbb70a3399644b5b03375c8a9b1e635e3a69bbb89b086033`）
 - `ES/Automation/Workers/Node/Feishu/package-lock.json`（本地 SHA-256：`f12bad503b40ce56b7dedf47bb7e98846d10dbcf4f00bcd95ed6881f98ed9f40`）
-- `ES/Automation/Workers/Node/Feishu/tests/dry-run-input.json`（本地 SHA-256：`8fd40a68fbc03f0bba0536620f2496069c771f39004801d1c18cdf82a947667f`）
-- Node Worker DryRun：`auth-status` 返回 `exitCode=0`、`status=DryRun`、`networkCalled=false`；输出位于项目 `ES/Automation/Temp/Feishu/<runId>/`，尚无真实 Feishu 网络证据。
+- `ES/Automation/Workers/Node/Feishu/tests/dry-run-input.json`（规范化 SHA-256：`46e8b8fa3eb7c7b55a24f27cde81ff285decbdad09eb08e493649d910f7afde2`）
+- 当前 Worker 指纹变更后尚未执行 Node DryRun、Unity 受管运行或真实网络请求；旧 DryRun 不能证明当前实现。
 
 `StaleWhen`: Feishu 官方 SDK/API、凭据策略、目标接入类型、TaskContract 或任一 SourceRef 哈希变化。
 
@@ -54,9 +54,10 @@ AIBrain
 
 - 凭据只允许环境变量或 Windows 凭据管理器。
 - 不得进入命令行参数、输入 JSON、普通日志、Knowledge 或 Git。
-- 每次运行必须有 DryRun、超时、取消、退出码、输入/输出 Hash 和失败报告。
-- Feishu 内容必须标记为外部缓存或协作记录，不能提升为 ES 源事实。
+- Live 运行必须绑定租户 Hash、空间白名单策略 Hash、PlanHash 和稳定 InvocationId。
+- 每次成功运行必须有规范化输出、`feishu-receipt.json`、输入/输出 Hash、分类、净化版本、SourceRef 和未证实项。
+- Feishu 内容固定标记为 `ExternalCollaboration`；搜索/文档只落盘白名单字段和受限文本，不能提升为 ES 源事实。
 
 ## 当前状态
 
-官方 `@larksuiteoapi/node-sdk@1.73.0` 已下载到受管 Node Worker 工作区；C# TaskContract、WorkerAdapter、Facade Endpoint 和 RunRecord 接入源码已完成并通过生成工程编译。用户级 `ES_AUTOMATION_NODE_PATH` 已指向受审查的 Node 入口，但当前 Unity 进程需重启后才能继承；Feishu 凭据、Unity 受管运行和真实网络调用尚未验收，因此本条目不代表外部服务已连通。
+官方 `@larksuiteoapi/node-sdk@1.73.0` 锁定在受管 Node Worker 工作区。当前源码已补 `ExternalRead` 能力、输入字段/InvocationId 拒绝、租户与空间策略绑定、目录/reparse 边界、文档空间归属复核、凭据模式脱敏、256 KiB 文档上限、哈希化 SourceRef 和 RunRecord 外部回执投影。生成工程静态编译不等于 Node、Unity、凭据、租户权限、真实网络、取消或 Domain Reload 已验收，因此本条目不代表外部服务已连通。

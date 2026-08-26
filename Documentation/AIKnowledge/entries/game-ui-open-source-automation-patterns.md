@@ -6,7 +6,7 @@
 `HashSchema`: `v2`  
 `ContentHash`: `de8d60942db8904aa5a970720e73c13136604fc9109e85ef4bb99b7b8b95bfb0`  
 `SourceSetHash`: `de8d60942db8904aa5a970720e73c13136604fc9109e85ef4bb99b7b8b95bfb0`  
-`EntryBodyHash`: `3309e28abae39e1bc4223cdb34b60bfe9106429f59f22007592a88e462ff5577`  
+`EntryBodyHash`: `3309e28abae39e1bc4223cdb34b60bfe9106429f59f22007592a88e462ff5577`
 `EvidenceLevel`: `S0`  
 `StaleWhen`: 固定开源仓库 commit、raw 文件哈希、许可证、UI IR/flow 协议、当前 ES ScreenSpec/AssetManifest/BehaviorSpec/Materializer 合同或任一 SourceRef 哈希变化。
 
@@ -178,13 +178,13 @@
 
 ## SourceRefs
 
-- `Documentation/AIKnowledge/UI/game-ui-open-source-automation-source-snapshot.md` (`062317be13f5e6385307dc31ff5d0f1830798ffdc7c092dab3e8ede46ebbbac5`)
+- `Documentation/AIKnowledge/UI/game-ui-open-source-automation-source-snapshot.md` (`f276bff04711fab6e8d6713079c9854acfaad653e2f39ac5a5cae00cc1329344`)
 - `Documentation/AIKnowledge/entries/ui-automation-authoring.md` (`6785f682878cfaba2fb0f525e947eadace8cd8f31e5ba3cc0df62d3a4da5098d`)
 - `Documentation/AIKnowledge/UI/unity-ui-ai-failure-prevention.md` (`1f48ec5d7dc61214d6b1dd35bd90d0e656db0f543eb4e04d63d32d67e683ce81`)
 - `Documentation/AIKnowledge/entries/game-ui-reference-design-evidence.md` (`30812a40e9cf0ca57e658c73c0c76a08f8eb33a5d19e5386008c973a3e263531`)
-- `Documentation/AIKnowledge/entries/game-ui-asset-manifest.md` (`598789e8246d7074318d77ef11b191ba68599f89ccacbec63b4eea1fd26f3c7f`)
+- `Documentation/AIKnowledge/entries/game-ui-asset-manifest.md` (`f864dc8ebe68059f582b5ce070290c5bd5d7705a3614dbad78c42c2946aac8c3`)
 - `Documentation/AIKnowledge/entries/game-ui-behavior-focus-navigation.md` (`68a02db420f87d097bc632b5c2e3e479628eccc62f83c678741d51937f2682e6`)
-- `.agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md` (`69fd14142f1a859f1c25cffd0bd56d86633c17943396913f6558d3b673c433ff`)
+- `.agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md` (`dbd59e994b1a142befb956a2739848e3bf4e9f6ca8c89bd679b3ca950d863aa0`)
 
 ## Evidence boundary
 

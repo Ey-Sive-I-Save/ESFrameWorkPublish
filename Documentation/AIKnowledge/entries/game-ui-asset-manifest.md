@@ -6,7 +6,7 @@
 `HashSchema`: `v2`  
 `ContentHash`: `58e08515b70bb85d851cd9c3d8b6431ea9c8ad56b4a7a7734669c1a6e33c1004`  
 `SourceSetHash`: `58e08515b70bb85d851cd9c3d8b6431ea9c8ad56b4a7a7734669c1a6e33c1004`  
-`EntryBodyHash`: `682ce7a02d577f0b490f9989bf862eca2e002145763ccea5d50a886951ff8ee4`  
+`EntryBodyHash`: `682ce7a02d577f0b490f9989bf862eca2e002145763ccea5d50a886951ff8ee4`
 `EvidenceLevel`: `S0`  
 `RuntimeEvidence`: `runtime-not-run`
 
@@ -29,13 +29,13 @@ ResourcePlan/Provider 发布，不把 `assetSlots`、Registry `requiresAsset` �
 
 | 字段组 | 最小合同 | 当前消费者状态 |
 |---|---|---|
-| Identity | stable asset id、role、content SHA-256、source kind、source identity | Validator 只检查 id/entry 和 `source` 枚举，不检查 hash/provenance |
-| Rights | license id/text、author/owner、allowed use、review status | 当前模板、Validator、Adapter、Materializer 未闭合 |
-| Import | project path、asset GUID（存在时）、texture/sprite type、pixels per unit、filter/wrap、color space | 当前执行形未保留正式 manifest |
-| Geometry | original size、crop rect、pivot、border/9-slice、preserveAspect | 当前 Materializer 只给专用白图 recipe，不解析这些字段 |
+| Identity | stable asset id、role、content SHA-256、source kind、source identity | `resolve_ui_asset_manifest.py` 对声明路径、实际哈希、GUID 和尺寸做静态回执；商业来源仍需单独审核 |
+| Rights | license id/text、author/owner、allowed use、review status | ScreenSpec 可声明 provenance/license；`generated-procedural` 当前保持 deferred，不能升级为商业授权 |
+| Import | project path、asset GUID（存在时）、texture/sprite type、pixels per unit、filter/wrap、color space | ScreenSpec 的 importPolicy 被保留并进入回执；Unity AssetImporter 实际状态仍需 Runtime/Editor 证据 |
+| Geometry | original size、crop rect、pivot、border/9-slice、preserveAspect | resolver 读取 aspect/crop/focal/nineSlice/resolutionSet 字段并绑定身份；最终裁切仍需 GPU 复核 |
 | Atlas | atlas owner/id、variant、include/build policy、packing constraints | 项目未由本知识证明已创建或发布 SpriteAtlas |
 | Fallback | fallback id、触发条件、视觉/布局影响、placeholder 状态 | 白图可保持结构可见，但必须报告 placeholder |
-| Resolution | resolver id/version、resolved path/GUID/hash、resolution receipt | 当前没有 AssetManifest resolver |
+| Resolution | resolver id/version、resolved path/GUID/hash、resolution receipt | `resolve_ui_asset_manifest.py` 已是静态解析器；它不发布资源、不创建 Atlas，也不授予商业验收 |
 
 ## Decision rules
 
@@ -49,12 +49,10 @@ ResourcePlan/Provider 发布，不把 `assetSlots`、Registry `requiresAsset` �
 
 ## Verified facts
 
-- 模板只示例 `id/role/source/path/fallback`，没有 hash、provenance、license、crop、Atlas 或 resolver receipt。
-- Python Validator 仅接受 `project-sprite`、`ai-generated`、`generated-placeholder` 三种 `source`；
-  它只校验组件槽引用已声明，不读取文件、不算 hash、不检查许可证。
-- Python/C# Adapter 只把组件的 `assetSlots` 投影到执行树，没有把根 `assets` 作为正式 manifest 保留。
-- Materializer contract 明确 resolver 是 future 能力；当前源码生成并使用 `Assets/UI/Generated/` 白图，
-  快照中的 `assets` 数组为空。
+- ScreenSpec 当前样例的根 `assets` 已包含 path/hash/provenance/license/import/crop/Atlas/resolution/fallback 字段。
+- `resolve_ui_asset_manifest.py` 会在项目根下解析声明路径、重新计算 SHA-256、读取 `.meta` GUID 和尺寸；当前大厅回执为 10/10 verified，commercial acceptance 仍 deferred。
+- Python/C# Adapter 保留根 `assets` 与组件 `assetSlots`，Materializer 先消费声明路径；按 semantic ID 生成 procedural art 只作为声明资源不可用时的 fallback。
+- 当前生成资源是项目内 `generated-procedural` Sprite 候选，不是已批准的商业美术；Atlas 构建、Unity 导入和 GPU 辨识度仍未证明。
 - 项目 manifest 未声明 Addressables；这不阻止未来资源方案，但当前不能声称 Addressables 解析/发布可用。
 
 ## Required reads
@@ -67,7 +65,7 @@ ResourcePlan/Provider 发布，不把 `assetSlots`、Registry `requiresAsset` �
 
 | 错误行为 | 触发/症状 | 根因 | 预防检查 | 正确动作 | 恢复动作 | 当前证据 | 缺失证据 | Source owner |
 |---|---|---|---|---|---|---|---|---|
-| `assetSlots` 被当成正式资源 | Validator 通过但 Prefab 仍是白图 | 混淆语义引用和解析结果 | 检查 root manifest 与 resolver receipt | 标记 placeholder/Blocked | 补 resolver 后以新 spec hash 重物化 | Validator/Adapter/Materializer 源码 | 当前资源解析回执 | 本条目 + resolver owner |
+| `assetSlots` 被当成正式资源 | Validator 通过但 Prefab 仍是白图 | 混淆语义引用和解析结果 | 检查 root manifest 与 resolver receipt | 标记 placeholder/Blocked | 补 resolver 后以新 spec hash 重物化 | Validator/Adapter/Materializer + resolver 回执 | Unity 导入与 GPU 辨识度复核 | 本条目 + resolver owner |
 | 只校验 source 枚举 | 无 hash/license 仍签收 | 误读 Validator 覆盖 | 逐项核对 identity/rights/import/geometry | 补齐 manifest 或停止 | 使旧 Prefab/证据 stale | Validator 静态源码 | 内容哈希与权利证据 | 本条目 |
 | fallback 冒充商业美术 | 画面可见即写“素材完成” | 把可渲染性当资产真实性 | 快照/报告列出 placeholder | 只声明结构可见 | 替换素材后重采集所有状态 | 白图 fallback 源码 | 正式 Sprite 与视觉/发布证据 | Materializer + 资源 owner |
 | 裁剪/9-slice 被截图反推 | 不同 profile 边框变形 | 缺失几何合同 | 核对原图、crop、border、PPU | 显式记录并验证 import | 恢复原资源，重导入和重物化 | Unity Image 官方来源锁 | 当前 AssetImporter/Prefab 回执 | 本条目 + Unity asset owner |
@@ -82,8 +80,8 @@ ResourcePlan/Provider 发布，不把 `assetSlots`、Registry `requiresAsset` �
 
 ## Evidence boundary and non-claims
 
-Static 只能证明当前合同缺口、枚举校验、字段丢失和白图 fallback。没有导入 Sprite、创建 Atlas、
-运行 resolver、构建 Addressables/AssetBundle、渲染素材或执行 Player/发布验收。
+Static 可证明声明资源的路径、哈希、GUID、尺寸和 provenance 回执；不能证明 Unity 导入 Sprite、
+创建 Atlas、构建 Addressables/AssetBundle、GPU 主视觉辨识度或 Player/发布验收。商业素材审核仍为 deferred。
 
 ## SourceRefs
 
@@ -91,6 +89,7 @@ Static 只能证明当前合同缺口、枚举校验、字段丢失和白图 fal
 - `.agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json` (`e67d3ba3bb5af3f93a2071de611bcd98d7ea35e48d6fd2b6f343490271548f09`)
 - `.agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md` (`69fd14142f1a859f1c25cffd0bd56d86633c17943396913f6558d3b673c433ff`)
 - `.agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py` (`4d60216d8d3c870d243f01577074b7b16b5e2234cb8eff02f9f26231521def74`)
+- `.agents/skills/es-ui-prefab-authoring/scripts/resolve_ui_asset_manifest.py` (`e435d150cc8f5a6928aa255a958c626af54ef977e02ddad01ace002badf36eb9`)
 - `.agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py` (`df9aee267b62ba91fbb2e00cda6e6ec6bb05255bd287a67ffbf96aecf358e420`)
 - `Assets/Scripts/ESLogic/Editor/UI/ESUIScreenSpecAdapter.cs` (`4688b2f94c887ffda48468492f39aad66a8a47cffb1a25f1ddd3e48e97e84158`)
 - `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs` (`26c7a8382b5f95830cf13f26819faecbf89f4f84484ac3c1282c84fb6ab14801`)

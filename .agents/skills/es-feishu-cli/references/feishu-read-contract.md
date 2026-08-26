@@ -7,7 +7,7 @@ Evidence: current source plus fresh Static or Runtime receipts; this document al
 
 ## Contract status
 
-The registered source currently accepts `operation`, `query`, `spaceId`, `documentId` and `pageSize`; `dryRun` and `invocationId` are invocation-level fields. The stronger paging, filtering, SourceRef, retry and size rules below are the target contract for phased hardening. Reject any claim that a target rule is implemented until current source and evidence prove it.
+The registered source accepts only `operation`, `query`, `spaceId`, `documentId` and `pageSize`; `dryRun` and `invocationId` are invocation-level fields. Unknown fields are rejected. Search and pull now require a bounded `spaceId`; Live execution additionally checks it against `ES_FEISHU_ALLOWED_SPACE_IDS` and binds `ES_FEISHU_TENANT_ID` by hash. Multi-page retrieval, filters and retries remain target-only gaps.
 
 Common identity is fixed to `commandId=feishu.read`, `taskId=es.feishu.read`, `taskVersion=1`. Unknown fields, credential material, executable paths and command-line fragments are invalid input.
 
@@ -41,7 +41,7 @@ Input:
 |---|---|
 | `operation` | Literal `knowledge-search`. |
 | `query` | Required, trimmed, 1-512 UTF-8 characters after normalization. |
-| `spaceId` | Exactly one identifier from the authorization allowlist. The current adapter does not yet require it, so Runtime must block an empty/unapproved value. |
+| `spaceId` | Required bounded identifier; Live must match exactly one identifier from the managed authorization allowlist. |
 | `pageSize` | Integer 1-50; default 20. |
 | `pageToken` | Opaque server token; target contract only, never parse or synthesize. |
 | `filters` | Optional allowlisted document type/update-time filters; target contract only. |
@@ -51,7 +51,7 @@ Normalized item fields: `SourceRef`, `spaceIdHash`, `objectTokenHash`, `objectTy
 
 Return `items`, `nextPageToken`, `hasMore`, `pagesRead`, `truncated`, and `deduplicatedCount`. Deduplicate by `(spaceId, objectToken, objectType)` and keep the newest version/update time. Stable-sort by remote relevance when provided, then update time descending, then SourceRef.
 
-The current Worker fetches only its implemented page. Do not emulate unsupported paging outside the registered Worker or claim the 5-page target is available.
+The current Worker fetches one implemented page, hashes the query and opaque next-page token, persists only normalized item fields, and marks `truncated=true` when the server reports more data. Do not emulate unsupported paging outside the registered Worker or claim the 5-page target is available.
 
 ## document-pull
 
@@ -62,12 +62,12 @@ Input:
 | `operation` | Literal `document-pull`. |
 | `sourceRef` | Target requirement: validated search/authz SourceRef bound to tenant, space, object type and token. |
 | `documentId` | Current adapter field; must resolve to the same allowlisted identity as SourceRef before Runtime use. |
-| `spaceId` | Required by target authorization even where the current source treats it as optional. |
-| `maxContentBytes` | Default 256 KiB; hard maximum 1 MiB after normalization. Target contract only. |
+| `spaceId` | Required and checked against the managed Live allowlist. The Worker also resolves the wiki node and verifies the document belongs to the same space before pulling content. |
+| `maxContentBytes` | Current fixed limit is 256 KiB after sanitization; oversized normalized text is explicitly marked truncated. A caller-selectable limit remains target-only. |
 
 Normalized output fields: `SourceRef`, sanitized `title`, bounded `content` or summary, `objectType`, `version`, `updatedAtUtc`, `retrievedAtUtc`, `classification`, `sanitizerVersion`, `contentHash`, `truncated`, and attachment/link metadata without downloading unapproved objects.
 
-Redact and size-check streaming data before durable disk persistence. Current C# enforces only the aggregate 8 MiB TaskContract budget after Worker output exists; this does not prove the per-document target or pre-write protection.
+The Worker strips unnecessary controls, redacts credential patterns and bounds content before durable persistence. C# independently enforces a 512 KiB normalized-data limit, a 1 MiB aggregate output budget, output hashes and the external-evidence receipt. The SDK still returns the remote body in memory rather than through a streaming sanitizer, so bounded-memory streaming remains unimplemented.
 
 ## Time, retry, cancellation and idempotency
 

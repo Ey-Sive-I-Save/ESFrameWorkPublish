@@ -14,7 +14,7 @@ Credential values may come only from:
 1. an allowlisted managed process environment inherited by Unity/Automation; or
 2. a Windows Credential Manager broker that returns secrets directly to the managed Worker without serializing them into the request.
 
-Current source reads `ES_FEISHU_APP_ID` and `ES_FEISHU_APP_SECRET` from the process environment. Credential Manager, environment-variable allowlisting and broker audit are target gaps, not current facts. `ES_AUTOMATION_NODE_PATH` is executable configuration, not a Feishu credential, and must remain an administrator-managed path verified by Worker policy.
+Current source reads `ES_FEISHU_APP_ID` and `ES_FEISHU_APP_SECRET` from the process environment, binds `ES_FEISHU_TENANT_ID` by hash, and enforces the `ES_FEISHU_ALLOWED_SPACE_IDS` allowlist for Live knowledge reads. Credential Manager, environment-variable source allowlisting and broker audit remain target gaps. `ES_AUTOMATION_NODE_PATH` is executable configuration, not a Feishu credential, and must remain an administrator-managed path verified by Worker policy.
 
 Bind Runtime authorization to tenant identity, application identity hash, credential source type and credential version/reference, but never the secret. Also bind allowed space IDs, operation, PlanHash, AICommand/TaskContract/Worker hashes, Skill governance hash, output/network budget, timeout, expiry and stop condition.
 

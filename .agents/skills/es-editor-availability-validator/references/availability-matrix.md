@@ -6,7 +6,11 @@ The validator resolves `TargetKind` before loading evidence. Use `-TargetKind` w
 |---|---|
 | EditorWindow | framework-integration, visual |
 | Workbench | framework-integration, visual |
-| InspectorDrawer | visual |
+| AdvancedDropdown | advanced-dropdown-contract |
+| TransientPopup | transient-popup-contract |
+| PreviewWindow | preview-window-contract |
+| InspectorDrawer | inspector-drawer-contract, visual |
+| ShaderGUI | shader-gui-contract, visual |
 | MenuAction | none |
 | PreviewImport | none |
 | BackgroundService | none |
@@ -16,7 +20,11 @@ Every EditorWindow/Workbench result also includes the 20-rule registry (`EW-01` 
 | Target | Required rows before `Ready` |
 |---|---|
 | EditorWindow/workbench | framework-integration, compile, reloadDomain, interaction, visual, recovery, performance |
+| AdvancedDropdown | advanced-dropdown-contract, compile, reloadDomain, interaction, visual, recovery, performance |
+| TransientPopup | transient-popup-contract, compile, reloadDomain, interaction, visual, recovery, performance |
+| PreviewWindow | preview-window-contract, compile, reloadDomain, interaction, visual, recovery, performance |
 | Inspector/drawer/property UI | compile, serialization, multiSelection, undo, prefabOverride, visual |
+| ShaderGUI/material Inspector | shader-gui-contract, compile, serialization, multiSelection, undo, prefabOverride, visual |
 | Menu/action tool | compile, menuReachability, invalidInput, boundary, repeatIdempotency |
 | Asset preview/import tool | compile, previewLifecycle, missingAsset, cleanup, reloadDomain, performance |
 | Background editor service | compile, startupScope, cancellation, cleanup, reloadDomain, performance |

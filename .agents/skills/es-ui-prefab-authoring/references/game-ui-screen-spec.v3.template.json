@@ -6,9 +6,45 @@
   "prefabPath": "Assets/UI/Prefabs/Generated/screen-id.prefab",
   "fixtureScenePath": "Assets/UI/Scenes/Generated/screen-id.unity",
   "tokens": {
+    "background": "#07111D",
     "surface": "#182230",
+    "surfaceRaised": "#243447",
     "text": "#F4F7FB",
-    "accent": "#53B8FF"
+    "mutedText": "#A9BBC4",
+    "accent": "#53B8FF",
+    "danger": "#E86D73",
+    "onAccent": "#07111D",
+    "onDanger": "#07111D",
+    "titleSize": 30,
+    "bodySize": 18,
+    "labelSize": 20,
+    "captionSize": 16,
+    "numericSize": 18,
+    "spacing": 12,
+    "padding": 20
+  },
+  "designContract": {
+    "coordinateSpace": "screen-top-left-normalized",
+    "canvas": {"rootRole": "screen-root", "renderMode": "ScreenSpaceOverlay", "scalerMode": "ScaleWithScreenSize", "singleRoot": true, "nestedCanvasPolicy": "forbid-unless-declared"},
+    "anchorPolicy": {"defaultPivot": [0.5, 0.5], "allowedStrategies": ["stretch", "absolute", "edge-docked", "center", "flow", "list", "grid"], "safeAreaTarget": "profile-safe-area-inset"},
+    "colorRoles": {"primaryAction": "accent", "secondaryAction": "surface", "feedback": "danger", "foregroundOnAccent": "onAccent", "foregroundOnDanger": "onDanger"},
+    "typographyRoles": {
+      "title": {"token": "titleSize", "maxLines": 1, "overflow": "ellipsis"},
+      "body": {"token": "bodySize", "maxLines": 2, "overflow": "wrap"},
+      "label": {"token": "labelSize", "maxLines": 1, "overflow": "ellipsis"},
+      "caption": {"token": "captionSize", "maxLines": 2, "overflow": "ellipsis"},
+      "numeric": {"token": "numericSize", "maxLines": 1, "overflow": "ellipsis"}
+    },
+    "layerRoles": {"background": 0, "information": 100, "feedback": 200, "action": 300}
+  },
+  "intentContract": {
+    "requestedScreenFamily": "collection",
+    "requestedPrimaryIntent": "select-item",
+    "visualTarget": "original-collection-screen",
+    "fidelityMode": "original",
+    "referencePolicy": "not-required",
+    "referenceSources": [],
+    "productBoundary": "original-no-official-assets"
   },
   "profiles": [
     {"id": "wide", "width": 1920, "height": 1080, "orientation": "landscape"},
@@ -30,20 +66,38 @@
       "id": "frame",
       "type": "frame",
       "zone": "header",
-      "layout": {"mode": "stretch", "bounds": [0.02, 0.02, 0.98, 0.98], "minSize": [44, 44]},
+      "layout": {"mode": "stretch", "bounds": [0.02, 0.02, 0.98, 0.98], "minSize": [44, 44], "anchor": {"strategy": "stretch", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inside"}},
       "assetSlots": ["frame"],
       "content": {},
-      "stateVariants": {"default": {}, "disabled": {}}
+      "visualVariant": "surface",
+      "colorToken": "surface",
+      "typographyRole": "none",
+      "layerRole": "information",
+      "siblingOrder": 0,
+      "stateVariants": {"default": {}, "selected": {}, "disabled": {}}
     },
     {
       "id": "content",
       "type": "frame",
       "zone": "content",
-      "layout": {"mode": "stretch", "bounds": [0.02, 0.10, 0.98, 0.90], "minSize": [44, 44]},
+      "layout": {"mode": "stretch", "bounds": [0.02, 0.10, 0.98, 0.90], "minSize": [44, 44], "anchor": {"strategy": "stretch", "edge": "none", "pivot": [0.5, 0.5], "safeArea": "inside"}},
       "content": {},
+      "visualVariant": "surface",
+      "colorToken": "surface",
+      "typographyRole": "none",
+      "layerRole": "information",
+      "siblingOrder": 1,
       "stateVariants": {"default": {}, "empty": {}, "loading": {}, "error": {}}
     }
   ],
+  "stateSemantics": {
+    "default": {"fixtureData": {}, "fixtureTextBindings": [], "affectedComponentIds": ["frame", "content"], "visualChanges": ["baseline visual hierarchy is visible"], "interactionChanges": ["baseline input intent is available"], "geometryPolicy": {"preserveBounds": true}, "effects": [{"componentId": "frame", "changes": {"graphicAlpha": 1.0}}, {"componentId": "content", "changes": {"graphicAlpha": 1.0}}]},
+    "selected": {"fixtureData": {}, "fixtureTextBindings": [], "affectedComponentIds": ["frame"], "visualChanges": ["focus outline is visible"], "interactionChanges": ["selection is available"], "geometryPolicy": {"preserveBounds": true}, "effects": [{"componentId": "frame", "changes": {"outline": true}}]},
+    "empty": {"fixtureData": {}, "fixtureTextBindings": [], "affectedComponentIds": ["content"], "visualChanges": ["empty content region is hidden"], "interactionChanges": ["empty action is unavailable"], "geometryPolicy": {"preserveBounds": true}, "effects": [{"componentId": "content", "changes": {"visible": false}}]},
+    "loading": {"fixtureData": {}, "fixtureTextBindings": [], "affectedComponentIds": ["content"], "visualChanges": ["content is visibly loading"], "interactionChanges": ["content waits for data"], "geometryPolicy": {"preserveBounds": true}, "effects": [{"componentId": "content", "changes": {"graphicAlpha": 0.72}}]},
+    "disabled": {"fixtureData": {}, "fixtureTextBindings": [], "affectedComponentIds": ["frame"], "visualChanges": ["disabled frame has reduced emphasis"], "interactionChanges": ["frame action is disabled"], "geometryPolicy": {"preserveBounds": true}, "effects": [{"componentId": "frame", "changes": {"graphicAlpha": 0.45, "interactable": false}}]},
+    "error": {"fixtureData": {}, "fixtureTextBindings": [], "affectedComponentIds": ["content"], "visualChanges": ["content uses feedback color"], "interactionChanges": ["error acknowledgement remains available"], "geometryPolicy": {"preserveBounds": true}, "effects": [{"componentId": "content", "changes": {"graphicColor": "#E86C73"}}]}
+  },
   "behaviors": [],
   "bindings": []
 }

@@ -1,0 +1,29 @@
+{
+    "schemaVersion":  1,
+    "bindingId":  "es.skill-evidence-binding.es-knowledge-creator.v1",
+    "skillName":  "es-knowledge-creator",
+    "contract":  {
+                     "id":  "es.skill-evidence-receipt",
+                     "version":  "1",
+                     "path":  "ES/Automation/Contracts/es-skill-evidence-receipt-v1.schema.json",
+                     "hash":  "9fbf168a71ff71c0b16d45ec8fdc18d7891a42b3c3f17638b28d3d3541b1f880"
+                 },
+    "localContract":  {
+                          "path":  "references/evidence-receipt-contract.md",
+                          "hash":  "65833387c2059dc4ebc47e581c75ac0bfeb6572c53dfeac498e0a837724695ae",
+                          "mode":  "additive-extension"
+                      },
+    "stableEntrypoint":  {
+                             "path":  "scripts/Test-ESSkillEvidence.ps1",
+                             "hash":  "517812931891e035004f5807932a277cb50538ea60f2ccf81ff7d929fb377909",
+                             "mode":  "central-delegate",
+                             "centralValidatorPath":  ".agents/skills/es-skill-governance/scripts/Test-ESStrictEvidenceReceipt.ps1"
+                         },
+    "compatibility":  {
+                          "legacyReadable":  true,
+                          "legacyReceiptBeforeUtc":  "2026-08-26T03:45:00Z",
+                          "legacyReceiptAcceptanceEndsUtc":  "2026-09-02T03:45:00Z",
+                          "newReceiptBinding":  "required",
+                          "retirementState":  "not-authorized"
+                      }
+}

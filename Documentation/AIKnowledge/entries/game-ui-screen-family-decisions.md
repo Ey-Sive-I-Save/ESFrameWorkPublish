@@ -4,9 +4,9 @@
 `Authority`: `Current project source + governed UI authoring contracts + derived screen-family decisions`
 `RouteKeys`: `ui-automation`, `game-ui-screen-family`, `commercial-ui`, `hud-ui`, `inventory-ui`, `shop-ui`, `dialogue-ui`, `map-ui`, `progression-ui`, `result-ui`, `settings-ui`, `ui-information-architecture`
 `HashSchema`: `v2`
-`ContentHash`: `b2c4d82041129aa49cc56270499594c65b19bef688bc666bdf9c8a9360e94da1`
-`SourceSetHash`: `b2c4d82041129aa49cc56270499594c65b19bef688bc666bdf9c8a9360e94da1`
-`EntryBodyHash`: `e7b24c2cbc0d4e090358e5ea50f1af7f3c8ad06a9cc06f8d662a90a56bdff5cd`
+`ContentHash`: `31688f658b350df9cb0673b15aa5e67654e75df06f4532e2a544dd3c7ed68485`
+`SourceSetHash`: `31688f658b350df9cb0673b15aa5e67654e75df06f4532e2a544dd3c7ed68485`
+`EntryBodyHash`: `c77910234aab1d80355ae501d6323a9d8b5e75fc5898fbc52f3a3d7120f0d90f`
 `EvidenceLevel`: `S0`
 `StaleWhen`: ScreenSpec v3、组件注册表、Validator、Adapter、Materializer、现有 UI canonical 条目、官方来源锁或任一 SourceRef 哈希变化。
 
@@ -164,6 +164,16 @@ CanvasScaler 的 Reference Resolution 与宽高匹配必须随 profile 记录。
 - 完成后：分别报告 Static、Runtime、Visual；复算 SourceRefs、v2 哈希和唯一 Index binding。
 - 禁止：虚构模板或业务事实、用局部状态重排整屏、用静态检查冒充 Unity/视觉通过。
 
+## Failure feedback from lobby evidence
+
+The lobby evidence exposed a routing failure, not merely a styling defect. Before selecting a
+template, apply `UI-FB-002` and `UI-FB-003` from
+`.agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md`: choose the
+screen family from player intent, define one primary action and required zones, then author
+separate wide/narrow reflow constraints. A generic navigation template with a hero image is not
+evidence of a commercial lobby. If the next ScreenSpec does not change the diagnosed family,
+hierarchy, focal-art brief or profile constraints, stop with `feedback-not-incorporated`.
+
 ## RequiredReads
 
 - `Documentation/AIKnowledge/entries/game-ui-screen-family-decisions.md`
@@ -189,11 +199,12 @@ CanvasScaler 的 Reference Resolution 与宽高匹配必须随 profile 记录。
 - `.agents/skills/es-ui-intent-authoring/references/player-intent-registry.json` (`b51b4bdceb18b285aea9beb385a9101f0f733908370eb6847ad4c89dc7990578`)
 - `.agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json` (`e67d3ba3bb5af3f93a2071de611bcd98d7ea35e48d6fd2b6f343490271548f09`)
 - `.agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md` (`69fd14142f1a859f1c25cffd0bd56d86633c17943396913f6558d3b673c433ff`)
-- `.agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py` (`4d60216d8d3c870d243f01577074b7b16b5e2234cb8eff02f9f26231521def74`)
+- `.agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py` (`92a7bbc479e1c056bb3b8993a7e9c2d3fccaefbfe990b45775bfc66871364277`)
 - `.agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py` (`df9aee267b62ba91fbb2e00cda6e6ec6bb05255bd287a67ffbf96aecf358e420`)
-- `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs` (`26c7a8382b5f95830cf13f26819faecbf89f4f84484ac3c1282c84fb6ab14801`)
-- `Documentation/AIKnowledge/entries/ui-automation-authoring.md` (`6785f682878cfaba2fb0f525e947eadace8cd8f31e5ba3cc0df62d3a4da5098d`)
+- `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs` (`ca98805423cd18b3e55d861041e6e48a73c91eeb70a36c9699de8d0566252fb1`)
+- `Documentation/AIKnowledge/entries/ui-automation-authoring.md` (`7e64233bdcfd1e783a74085c456feab2409bb72511868e9b73e7176b566df3e3`)
 - `Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md` (`d29ff698cd8fc3b0a3e014efe1780ef4a141e620b05cd3bf22be9d72ab3548de`)
+- `.agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md` (`79e862b0b2da00b892270bbff342f64b9602bcb4c8e4c4be4092cfc8f993ca0a`)
 
 ## Evidence boundary
 

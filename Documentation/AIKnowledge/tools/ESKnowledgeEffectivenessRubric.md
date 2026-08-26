@@ -37,6 +37,21 @@
 `EvidenceBindings`、`CounterfactualResult` 和 `TelemetryCompleteness` 字段。任何一项为 false 或
 `unknown`，不得宣称三态实验已验证。
 
+### 初步实验的反馈边界
+
+单模型的新隔离上下文可以产出 `single-model-isolated-preliminary` 结果，但它不等同于盲评、
+多模型独立性或正式验收。初步结果只能反馈可复用的决策规则，不得直接修改 `Three-State-Experiment-Validated`
+状态，也不得把一次任务的分数写成 Knowledge 的长期质量事实。
+
+- A→B 只有在新增 Knowledge 改变了正确动作、停止条件、恢复路径、权限边界或可测读取成本时才计增益；
+  文字长度、引用数量和表达完整度不计增益。
+- B→C 只有在新增的版本匹配一手资料改变了 API、兼容性或行为决策时才计外部资料增益；外部资料不能覆盖
+  ESFramework 的所有权、授权、回滚、canonical 或证据规则。
+- 缺少 input/output token、读取文件/字节、查询次数或耗时遥测时，`ReadCost`、`ReadEfficiency` 和 `Total`
+  必须为 `uncalculated`，不得用估算值补齐。
+- `NoKnowledgeRoute`、误命中、SourceDrift、关键 Contradiction 或 UnsupportedClaim 仍是硬阻断，
+  不能被总体分数抵消。
+
 ## 三项核心指标
 
 三态是实验条件，不是评分轴：A 为项目源码基线，B 为源码加 Knowledge，C 为 B 加版本匹配的外部一手资料。

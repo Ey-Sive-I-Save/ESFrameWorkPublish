@@ -7,12 +7,12 @@
 ## SourceRefs
 
 - `Documentation/ES_AUTOMATION_CENTER_STANDARD.md` (`fda3f8e4408e507fd257bb4093b8e19f83c1374834578639b443b52690280121`)
-- `Documentation/ES_AUTOMATION_GOVERNANCE_CONTRACTS.md` (`7926d55447f671f3a8c707e541def2076f19fb1eff0fd90c80cf127691d80793`)
-- `ES/Automation/Contracts/es-automation-task-contract.schema.json` (`ee34f8f5e8e79ac22ccab1345bea9cabe6cbf90340009187ad23076d95f9da12`)
+- `Documentation/ES_AUTOMATION_GOVERNANCE_CONTRACTS.md` (`f980736e6e2e5f4569f0239494492407b12b88ea9e25e3b1460c357ad436b949`)
+- `ES/Automation/Contracts/es-automation-task-contract.schema.json` (`54e2cce394895b33d23f5c23c5af296a0ecdbcebbcbe5b567fe72497d0b15c9d`)
 - `ES/Automation/Contracts/es-automation-run-result.schema.json` (`65068ccad7fd2632703b53536971068c0b09dea79ea192b73ce19316c93b83ea`)
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs` (`a636a42521eb8f13462455b726c7e06fe3211cd733e5c280092af0a45673e485`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs` (`6fc627e16930d541b1275bb5d687e1fdad8d96b751616002dbf2fbdbfa38fbc3`)
 
-`ContentHash`: `c48888f858ce0df2c7a895b3294db72608dfd9f5b49a2792fbb58f084bc80ff0`
+`ContentHash`: `aa7e483c14ecbc5b389d466ce36e8d6cf6b26b7b01719ae0dc2f87b6c2a405d6`
 
 当任务涉及 AICommand、TaskContract、Worker、权限、验收、Receipt、幂等、源漂移或商业级交付时，必须先阅读上述两个源文件。
 

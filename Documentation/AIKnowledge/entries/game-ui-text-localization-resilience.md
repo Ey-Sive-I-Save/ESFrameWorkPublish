@@ -4,9 +4,9 @@
 `Authority`: `Current ScreenSpec/adapter/materializer source + TMP/package facts + official source snapshot`  
 `RouteKeys`: `ui-automation`, `ui-text-resilience`, `ui-localization`, `long-content`, `text-wrapping`, `bidi`, `rtl`, `glyph-coverage`, `font-fallback`, `line-breaking`  
 `HashSchema`: `v2`  
-`ContentHash`: `6cb6664e2d64a289c375d46603a6d9e421c366d62cc2823b93643ec038f3b81f`  
-`SourceSetHash`: `6cb6664e2d64a289c375d46603a6d9e421c366d62cc2823b93643ec038f3b81f`  
-`EntryBodyHash`: `a1ac054d4f341afe0ed7e45ec2de4dfd2fcb2429238b8670aac3ba710a9702a8`  
+`ContentHash`: `0632d7088c2e111810f6dcec9514fe2072a3e14d89c6bb2615f34cd284696c8d`
+`SourceSetHash`: `0632d7088c2e111810f6dcec9514fe2072a3e14d89c6bb2615f34cd284696c8d`
+`EntryBodyHash`: `1fdd595cb1c67811e67bba92053e9496f9eddda1772493e3895482632d02e861`
 `EvidenceLevel`: `S0`  
 `RuntimeEvidence`: `runtime-not-run`
 
@@ -39,7 +39,7 @@
 ## Decision rules
 
 1. 先列出目标 locale/script 与确定性文本 fixtures，再决定宽度、换行、截断或缩放；禁止只以英文调布局。
-2. 关键标题、正文、按钮、计数器和动态值分别声明 wrap/overflow/maxLines 与不可截断语义。
+2. 每个可见 fixture 字符串显式声明 `fixtureTextBindings.componentId/fixtureDataKey`，再为关键标题、正文、按钮、计数器和动态值分别声明 overflow/maxLines、像素 insets、动作净空与不可截断语义；不得由键名或节点名猜目标。
 3. 自动缩小字体必须有可读性下限和失败状态；超过预算时优先重排、滚动或请求产品裁决，不能无限缩小。
 4. TMP Font Asset、字形集、Fallback 顺序、来源和许可证必须绑定当前 hash；Fallback 命中不是主字体覆盖。
 5. RTL/Bidi 需要文本顺序、标点/数字/占位符、对齐、导航方向和方向性图标的组合 Fixture；
@@ -51,11 +51,9 @@
 
 - ScreenSpec 模板的 states 未默认列出 `long-content`，但 Materializer contract/Fixture Driver 支持该状态；
   AI visual brief 要求 `long-content/localized` Fixture。
-- Python Validator 只要求部分组件 `content.text` 是字符串，不校验 locale、字形、换行、maxLines、
-  RTL/Bidi 或文本 fixture 覆盖。
-- Python/C# Adapter 只保留 `content.text`，没有保留 locale、text key、direction 或字体绑定。
-- Materializer 的 `UiElement` 有 `wrapText/maxLines/overflow`，但当前 C# Adapter 没有从 ScreenSpec
-  投影这些字段；Materializer 对 `long-content` 只强制 `enableWordWrapping = true`。
+- Validator 现在校验 fixture 文本的目标、键、溢出策略、最大行数、像素 insets、动作净空、状态执行集和 effect 文本所有权；`scroll` 在尚无注册容器 recipe 时拒绝。
+- Python/C# Adapter 保留完整 `stateSemantics`，Materializer 按其中的显式 binding 替换 TMP 文本，不再由节点名启发式追加长文。
+- Resolver 为每个 profile/state binding 记录像素矩形、保守行数估计、可用行数、ellipsis 截断与动作净空；这是静态近似而不是 TMP/GPU 排版证明。
 - 项目固定 TMP 3.0.9，包源码提供 fallbackFontAssetTable 能力；项目 manifest 未声明 Unity Localization
   或 Accessibility 包，因此不能声称运行时语言切换、读屏或辅助技术已实现。
 
@@ -75,6 +73,9 @@
 | 无限缩小字体 | 按钮文字勉强塞入但不可读 | 用字号掩盖布局预算不足 | 固定最小字号和重排阈值 | 重排/换行/滚动或 Blocked | 恢复 Token 后调整布局 | Visual Brief | 可读性/视觉证据 | visual + layout owner |
 | 镜像父节点冒充 RTL | 数字、标点、图标和焦点方向错误 | 混淆几何镜像与 Bidi | 运行 mixed-script/数字/占位符 fixture | 分别处理文本、布局和方向性图标 | 回退 LTR 并标记未支持 | UAX #9 来源锁 | 当前 TMP/输入 RTL 回执 | 本条目 + runtime owner |
 | Validator 字符串检查冒充文本韧性 | schema 通过但换行/裁剪失败 | 静态类型检查覆盖过窄 | 对照 wrap/overflow/font/locale 合同 | 保持 `Implemented-Unverified` | 补 Validator/Adapter/Fixture 后重跑 | Validator/Adapter 源码 | 端到端布局证据 | 本条目 + Adapter owner |
+| fixture 字符串未绑定渲染目标 | FixtureData 有最长文案，画面仍使用短文案或 Materializer 以名字猜节点 | 数据与组件之间没有稳定所有权 | 每个可见 fixture 文本使用一个 `fixtureTextBindings`；禁止绑定 action/control 或和 `effects.text` 双写 | 用 binding 驱动 Materializer 和 Typography | 修正 binding 后重算 profile/state `textFit` | Validator/Resolver/Materializer 静态链路 | TMP/GPU 文字快照 | 本条目 + layout owner |
+| wrap 宣称安全却没有高度预算 | 文本框一行高，长文本换行后压住血条/操作 | `maxLines` 与实际 profile rect 脱节 | 以 resolved pixel rect、字体 token、content insets 和 reserveActionClearancePx 计算行容量/净空 | wrap 超容量阻断；ellipsis 记录 `truncated` | 改基准 LayoutPlan、文案或溢出策略，不改状态几何 | `textFit` 静态回执 | TMP 实际行分断/GPU capture | 本条目 + layout owner |
+| 文本规避了单个 action 却挤压整组操作 | LayoutGroup 重排后按钮尺寸或间距不足，文字仍侵入高密度交互区 | 只检查 authored child bounds 或单一净空 | 对关键操作组声明 `interactionDensity`，按最终静态矩形检查 targetSize 与最小组内间距 | 密度不足阻断 LayoutPlan，不用缩字掩盖 | 改组布局、profile 变体或文本策略，再重算全部 profile | `interactionDensity` 静态回执 | Unity LayoutGroup/TMP rebuild 与 GPU capture | layout owner |
 | 规范阈值直接映射 Unity 数值 | CSS px/WCAG 被当 ScreenSpec 单位 | 缺少单位和缩放映射 | 记录 CanvasScaler/profile/像素换算 | 只作校准并实测 | 废弃错误阈值结论 | 官方来源锁 | 当前设备/Canvas 测量 | layout owner |
 
 ## Execution checklist
@@ -91,12 +92,14 @@ Accessibility，没有导入字体资产、切换 locale、执行 Bidi/RTL、渲
 
 ## SourceRefs
 
-- `.agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json` (`4aba3b950fef2b9c45dc6b4ba6abc3b6a59517ddeb566ab86ede106d5facf38d`)
+- `.agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json` (`c90228507834858d10720385a17e03996aed2392b2cad35d63b3449d0c8c93bb`)
 - `.agents/skills/es-ui-prefab-authoring/references/ai-visual-brief.md` (`744e99b7f133a90b8ee6ff11208717511f37a352a37c9f25d7ddb5c9fc220f6b`)
-- `.agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py` (`4d60216d8d3c870d243f01577074b7b16b5e2234cb8eff02f9f26231521def74`)
-- `.agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py` (`df9aee267b62ba91fbb2e00cda6e6ec6bb05255bd287a67ffbf96aecf358e420`)
-- `Assets/Scripts/ESLogic/Editor/UI/ESUIScreenSpecAdapter.cs` (`4688b2f94c887ffda48468492f39aad66a8a47cffb1a25f1ddd3e48e97e84158`)
-- `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs` (`26c7a8382b5f95830cf13f26819faecbf89f4f84484ac3c1282c84fb6ab14801`)
+- `.agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py` (`b191bf200879dab3a7edd0b173d1065d59d7c0e2fc0b5cd5160285219ae3d136`)
+- `.agents/skills/es-ui-prefab-authoring/scripts/resolve_ui_layout_plan.py` (`49956b5d72e4e5068743a6eb5b8c38567a5c492de18597033ed852a357d254de`)
+- `.agents/skills/es-ui-prefab-authoring/scripts/evaluate_ui_typography.py` (`222f7171566f78cda15f90220455532c13410a240aa575962ad0d6471c7f91e9`)
+- `.agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py` (`28e29084d48d737a09eb281c2b26ee599d38c9e92a7d6ef081cbb59beea34668`)
+- `Assets/Scripts/ESLogic/Editor/UI/ESUIScreenSpecAdapter.cs` (`dad8470537b6236ad3cda2d9e78ac862eeaf513e63f4b799c2cc79fb23ca4a07`)
+- `Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs` (`2e82399e64ed5833891b1d4237791f4552306354c6a2acfd5e496e0d856207cd`)
 - `Documentation/ES_UI_AUTHORING_WORKFLOW.md` (`8e1fe9d3736ad07de9ae953dd628d3f512dc94713ea07a9aee32208570746aa4`)
 - `Packages/manifest.json` (`d447378a6e35e070c3fa8df645a5829a703eb4b488f8ae8132cd894ab19d016d`)
 - `Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md` (`d29ff698cd8fc3b0a3e014efe1780ef4a141e620b05cd3bf22be9d72ab3548de`)

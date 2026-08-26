@@ -91,6 +91,7 @@ function Test-ExecutableMatchesVersion {
         }
     }
     catch {
+        Write-Verbose ("Unable to read Unity executable product version; falling back to the bounded path version check: " + $_.Exception.Message)
     }
 
     $normalized = [IO.Path]::GetFullPath($Executable).Replace('/', '\')

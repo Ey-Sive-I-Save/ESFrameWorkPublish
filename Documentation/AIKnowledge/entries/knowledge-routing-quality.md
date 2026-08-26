@@ -6,7 +6,7 @@
 `Authority`: `Derived from current project contracts and routing source`
 `EvidenceLevel`: `S1`
 `RouteKeys`: `knowledge`, `knowledge-quality`, `knowledge-output`, `source-ref`, `content-hash`, `stale`, `canonical-entry`, `dedup`, `route-probe`, `misroute`, `bounded-output`, `evidence-boundary`, `permission-boundary`
-`ContentHash`: `f0f605a86d0bbf37374dad191b2ce3669d0988aae3f5f34e319461d1692a878a`
+`ContentHash`: `c0268b32a74aec9f441525b70d0b9b662e42190748ead90b7ce0b9b6b7c8e462`
 `StaleWhen`: 任一 SourceRef 哈希、Knowledge 条目合同、AIBrain 选择算法、用户直接授权策略、AICommand 受管协议或验证器判定规则变化。
 
 `RequiredReads`:
@@ -29,7 +29,7 @@
 - `.agents/skills/es-skill-governance/references/user-directed-low-risk-policy.json` (`bb242508ba5c0b08c046e1460d4e53ef2a216c428b146f954e1a5150ba8ba2b3`)
 - `Assets/Plugins/ES/AICommands/受管AIKnowledge更新_AI命令.md` (`9abb93f4bedd67ea1d2560655efddc4a2eb16ad6110398b24d98fe008320e1d7`)
 - `Assets/Plugins/ES/Editor/ESAutomation/ESAIBrainCoordinator.cs` (`edc33e609c4fefd2dbaf832043dade36e7ca07beedab1db09703947fa7cb9a19`)
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs` (`a636a42521eb8f13462455b726c7e06fe3211cd733e5c280092af0a45673e485`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs` (`6fc627e16930d541b1275bb5d687e1fdad8d96b751616002dbf2fbdbfa38fbc3`)
 - `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationAiBridge.cs` (`20b63b3db889b705ae740d366fa234b8ae49b50a60bf72056cd2a96b86db9b57`)
 - `Assets/Plugins/ES/1_Design/Tests/ESAIBrainKnowledgeRoutingTests.cs` (`a3440dc4f6c042cf0d54c1934a9119be7a6dfe90e72f376a73f8bccafe62f3af`)
 - `Documentation/AIKnowledge/RouteProbeRegistry.json` (`d5e828c736e236ca12552fefb750509b3db4de48a4a6c1a9835b461ee24d017d`)
@@ -128,6 +128,16 @@
 | 权限扩张 | AI 将用户目标外的索引/Assets 加入计划 | 比较声明用户范围与实际目标；受管通道再检查 AICommand/TaskContract | 移除推断扩张或向用户澄清；不要索取重复批准 | 用户范围记录；受管时再附 PlanHash/回执 |
 | 忘记失败恢复 | 只写 happy path | 检查非法输入、拒绝扩权、重复执行和中断恢复 | 补齐恢复动作后再接受条目 | 回放结果 |
 | 临时结果长期化 | 缓存、扫描或旧快照写成长期事实 | 检查 Authority、时间和 StaleWhen | 改为 Deferred/临时证据并绑定失效条件 | 新鲜权威来源 |
+
+## Effectiveness Feedback Rules
+
+三态效果实验只能把可复用的决策变化反馈为规则，不能把一次任务的分数直接升级为长期事实：
+
+- Knowledge 只有在改变继续/停止判断、路由选择、SourceDrift 处理、恢复路径、权限边界或可测读取成本时才算产生增益；文本更长、引用更多或停止条件更多本身不加分。
+- `NoKnowledgeRoute`、明显误命中、SourceRef 漂移和关键证据冲突都是硬停止条件；不得用“最像”的条目、旧 route-pack 或相邻摘要补齐缺口。
+- 验证器只报告漂移、绑定或 ContentHash 问题；修复必须重新读取当前权威来源、重新规划，并通过 planHash/CAS/整批回滚流程，不能在验证阶段顺手修复。
+- A/B/C 的增益必须按新增证据归因：Knowledge 负责项目路由、所有权、权限和证据边界；版本匹配的一手资料只负责其直接支持的 API/兼容性事实，不能替代 ESFramework 规则。
+- 未记录 input/output token、读取文件/字节、查询次数和耗时时，`ReadCost`、`ReadEfficiency` 与 `Total` 必须保持 `uncalculated`，不得用估算值补齐。
 
 ## Canonical Ownership And Deduplication
 

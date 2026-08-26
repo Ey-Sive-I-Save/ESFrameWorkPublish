@@ -5,7 +5,7 @@ param(
     [string]$EvidencePath,
     [string]$ReportPath,
     [string]$RuntimeAuthorizationPath,
-    [ValidateSet('Auto','EditorWindow','Workbench','InspectorDrawer','MenuAction','PreviewImport','BackgroundService')][string]$TargetKind='Auto',
+    [ValidateSet('Auto','EditorWindow','Workbench','AdvancedDropdown','TransientPopup','PreviewWindow','InspectorDrawer','ShaderGUI','MenuAction','PreviewImport','BackgroundService')][string]$TargetKind='Auto',
     [string]$TargetContractPath,
     [ValidateRange(1,8760)][int]$MaxEvidenceAgeHours=168,
     [ValidateSet('StaticReview','Development','Acceptance','Release')][string]$ValidationMode='StaticReview'
@@ -34,6 +34,11 @@ if(Test-Path -LiteralPath $targetFull -PathType Leaf){$files=@(Get-Item -Literal
 $rows=New-Object 'System.Collections.Generic.List[object]'
 $findings=New-Object 'System.Collections.Generic.List[object]'
 $windowRecords=New-Object 'System.Collections.Generic.List[object]'
+$advancedDropdownRecords=New-Object 'System.Collections.Generic.List[object]'
+$transientPopupRecords=New-Object 'System.Collections.Generic.List[object]'
+$previewWindowRecords=New-Object 'System.Collections.Generic.List[object]'
+$drawerRecords=New-Object 'System.Collections.Generic.List[object]'
+$shaderGuiRecords=New-Object 'System.Collections.Generic.List[object]'
 $editorFiles=@($files|Where-Object {$_.Extension -in @('.cs','.uxml','.uss','.asmdef','.json')})
 $relatedEditorFiles = New-Object 'System.Collections.Generic.List[object]'
 foreach($file in $editorFiles){ [void]$relatedEditorFiles.Add($file) }
@@ -54,6 +59,13 @@ if($TargetKind -eq 'Workbench'){
         }
     }
 }
+if($TargetKind -eq 'ShaderGUI'){
+    $targetDirectory = Split-Path -Parent $targetFull
+    $targetStem = (([IO.Path]::GetFileNameWithoutExtension($targetFull) -split '\.')[0])
+    foreach($partialFile in @(Get-ChildItem -LiteralPath $targetDirectory -File -Filter ($targetStem + '*.cs'))){
+        [void]$relatedEditorFiles.Add($partialFile)
+    }
+}
 $editorFiles=@($relatedEditorFiles | Sort-Object -Property FullName -Unique)
 if($editorFiles.Count -eq 0){[void]$findings.Add([pscustomobject]@{code='TargetNotEditorAsset';path=(Rel $targetFull);detail='No editor assets or configuration files found.'})}
 foreach($file in $editorFiles){
@@ -68,19 +80,65 @@ foreach($file in $editorFiles){
             [void]$windowRecords.Add([pscustomobject]@{path=$relative;contents=$contents;isAbstract=$isAbstractWindow})
         }
     }
-    if($relative -notmatch '(?i)(^|/)Editor(/|$)'){[void]$findings.Add([pscustomobject]@{code='EditorScope';path=$relative;detail='Editor extension implementation is outside an Editor-scoped path.'})}
-    if($contents -match '(?i)InitializeOnLoad' -and $contents -match '(?i)(FindAssets|AssetDatabase\.(FindAssets|LoadAssetAtPath)|GetFiles\(|Directory\.GetFiles)'){
+    $isAdvancedDropdownDeclaration=$contents -match '(?im)^\s*(?:(?:public|internal|private|protected|abstract|sealed|partial|static)\s+)*class\s+\w+(?:<[^>{}\r\n]+>)?\s*:\s*[^\{\r\n]*\bAdvancedDropdown\b'
+    if($isAdvancedDropdownDeclaration -and -not $isTestFile){
+        [void]$advancedDropdownRecords.Add([pscustomobject]@{path=$relative;contents=$contents})
+    }
+    $isTransientPopupDeclaration = $contents -match '(?i)ESWindowSleepContract\s*\(\s*(?:ES\.)?ESWindowSleepMode\.Transient\s*,\s*(?:ES\.)?ESWindowSurfaceKind\.(?:Popup|Utility)'
+    if($isTransientPopupDeclaration -and -not $isTestFile){
+        [void]$transientPopupRecords.Add([pscustomobject]@{path=$relative;contents=$contents})
+    }
+    $isPreviewWindowDeclaration = $contents -match '(?i)ESWindowSleepContract\s*\(\s*(?:ES\.)?ESWindowSleepMode\.(?:Full|Transient)\s*,\s*(?:ES\.)?ESWindowSurfaceKind\.Preview'
+    if($isPreviewWindowDeclaration -and -not $isTestFile){
+        [void]$previewWindowRecords.Add([pscustomobject]@{path=$relative;contents=$contents})
+    }
+    $isDrawerDeclaration = $contents -match '(?i)(CustomPropertyDrawer\s*\(|\bclass\s+\w+\s*:\s*(?:PropertyDrawer|OdinAttributeDrawer|OdinValueDrawer|OdinGroupDrawer)|\bCustomEditor\s*\()'
+    if($isDrawerDeclaration -and -not $isTestFile){
+        [void]$drawerRecords.Add([pscustomobject]@{path=$relative;contents=$contents})
+    }
+    $isShaderGuiDeclaration = $contents -match '(?im)\bclass\s+\w+(?:<[^>{}\r\n]+>)?\s*:\s*[^\{\r\n]*\bShaderGUI\b'
+    if($isShaderGuiDeclaration -and -not $isTestFile){
+        [void]$shaderGuiRecords.Add([pscustomobject]@{path=$relative;contents=$contents})
+    }
+    $editorScopedPath = $relative -match '(?i)(^|/)Editor(/|$)'
+    # ES keeps a small set of editor-only preview implementations beside their
+    # runtime partials. An explicit UNITY_EDITOR compilation guard is the scope
+    # boundary for PreviewImport targets; do not classify those files as runtime
+    # implementations merely because their directory is named Runtime.
+    $editorScopedByGuard = $TargetKind -eq 'PreviewImport' -and
+        $contents -match '(?im)^\s*#if\s+UNITY_EDITOR\b'
+    if(-not ($editorScopedPath -or $editorScopedByGuard)){
+        [void]$findings.Add([pscustomobject]@{code='EditorScope';path=$relative;detail='Editor extension implementation is outside an Editor-scoped path.'})
+    }
+    # Only a real Unity initialization attribute on production code is a startup
+    # scan risk. Test contracts and comments may mention InitializeOnLoad while
+    # deliberately exercising bounded discovery helpers; they must not turn a
+    # static detector into a false production finding.
+    $hasUnityInitializationAttribute = $contents -match '(?im)^\s*\[(?:InitializeOnLoad|InitializeOnLoadMethod)\b[^\]]*\]'
+    if(-not $isTestFile -and $hasUnityInitializationAttribute -and $contents -match '(?i)(FindAssets|GetFiles\(|Directory\.GetFiles|GetDirectories\(|Directory\.GetDirectories)'){
         [void]$findings.Add([pscustomobject]@{code='StartupScanRisk';path=$relative;detail='InitializeOnLoad is combined with broad asset or filesystem scanning; require explicit trigger or bounded incremental invalidation.'})
     }
     if($isWindowDeclaration -and -not $isTestFile -and -not $isAbstractWindow -and $contents -notmatch '(?i)(CreateGUI|OnGUI|ESWindow_DrawIMGUI)'){
         [void]$findings.Add([pscustomobject]@{code='WindowLifecycle';path=$relative;detail='EditorWindow implementation has no visible GUI entry (OnGUI/CreateGUI).'})
     }
     $delegatedUndoEvidence = $false
+    if($contents -match '(?i)(ESEditorSerializedMutation\.TryApply|TryMutateTargets\s*\()'){
+        $delegatedUndoEvidence = $true
+    }
     if($TargetKind -eq 'Workbench' -and $contents -match '(?i)SerializedObject|SerializedProperty'){
         $delegatedUndoEvidence = $contents -match '(?i)ESWorkbench_Record\s*\(' -or
             (@($relatedEditorFiles | ForEach-Object { try { ReadStrict $_.FullName } catch { '' } }) -join "`n") -match '(?i)ESWorkbench_Record\s*\('
     }
-    if($contents -match '(?i)SerializedObject|SerializedProperty' -and
+    # Merely reading a SerializedObject/SerializedProperty does not create a
+    # mutation boundary. Require an actual serialized write before demanding
+    # an Undo operation; this avoids blocking diagnostic windows that only
+    # project read-only state into their UI.
+    # ApplyModifiedProperties is a commit boundary, not proof that this file
+    # changed serialized state: read-only inspectors commonly call it after
+    # drawing nested controls. Require an actual property/array mutation.
+    $hasSerializedWrite = $contents -match '(?i)(\.\s*(?:intValue|stringValue|boolValue|longValue|floatValue|doubleValue|enumValueIndex|objectReferenceValue|managedReferenceValue|exposedReferenceValue)\s*=(?!=)|(?:InsertArrayElementAtIndex|DeleteArrayElementAtIndex|ClearArray)\s*\()'
+    $intentionalNoUndo = $contents -match '(?im)^\s*//\s*ES-EDITOR-VALIDATOR:\s*intentional-no-undo\b'
+    if(-not $isTestFile -and -not $intentionalNoUndo -and $contents -match '(?i)SerializedObject|SerializedProperty' -and $hasSerializedWrite -and
         $contents -notmatch '(?i)Undo\.(RecordObject|RegisterCompleteObjectUndo)' -and
         -not $delegatedUndoEvidence){
         [void]$findings.Add([pscustomobject]@{code='UndoMissing';path=$relative;detail='Serialized editing detected without an Undo operation in the same file; verify delegated Undo ownership.'})
@@ -90,20 +148,35 @@ foreach($file in $editorFiles){
     }
 }
 $windowContents=(@($windowRecords|ForEach-Object {[string]$_.contents}) -join "`n")
+$advancedDropdownContents=(@($advancedDropdownRecords|ForEach-Object {[string]$_.contents}) -join "`n")
+$transientPopupContents=(@($transientPopupRecords|ForEach-Object {[string]$_.contents}) -join "`n")
+$previewWindowContents=(@($previewWindowRecords|ForEach-Object {[string]$_.contents}) -join "`n")
+$drawerContents=(@($drawerRecords|ForEach-Object {[string]$_.contents}) -join "`n")
+$shaderGuiSourceFiles = @($editorFiles)
+if($shaderGuiRecords.Count -gt 0 -or $TargetKind -eq 'ShaderGUI'){
+    $shaderGuiDirectory = Split-Path -Parent $targetFull
+    $shaderGuiPrefix = (([IO.Path]::GetFileNameWithoutExtension($targetFull) -split '\.')[0])
+    $shaderGuiSourceFiles = @(Get-ChildItem -LiteralPath $shaderGuiDirectory -File -Filter ($shaderGuiPrefix + '*.cs'))
+}
+$shaderGuiContents=(@($shaderGuiSourceFiles|ForEach-Object { try { ReadStrict $_.FullName } catch { '' } }) -join "`n")
 $isEditorWindow=$windowRecords.Count -gt 0
-$inferredKind=if($isEditorWindow){if($windowContents -match '(?i)(Workbench|ESWorkbenchWindowBase)'){'Workbench'}else{'EditorWindow'}}elseif($editorFiles.Count -gt 0 -and $windowContents -match '(?i)(CustomEditor|PropertyDrawer|CreatePropertyGUI|OnGUI\s*\(.*Property)'){'InspectorDrawer'}elseif($windowContents -match '(?i)(MenuItem|ValidateCommand|commandId)'){'MenuAction'}elseif($windowContents -match '(?i)(AssetPreview|ScriptedImporter|OnImportAsset|AssetPostprocessor)'){'PreviewImport'}else{'BackgroundService'}
+$inferredKind=if($advancedDropdownRecords.Count -gt 0){'AdvancedDropdown'}elseif($transientPopupRecords.Count -gt 0){'TransientPopup'}elseif($previewWindowRecords.Count -gt 0){'PreviewWindow'}elseif($shaderGuiRecords.Count -gt 0){'ShaderGUI'}elseif($drawerRecords.Count -gt 0){'InspectorDrawer'}elseif($isEditorWindow){if($windowContents -match '(?i)(Workbench|ESWorkbenchWindowBase)'){'Workbench'}else{'EditorWindow'}}elseif($windowContents -match '(?i)(MenuItem|ValidateCommand|commandId)'){'MenuAction'}elseif($windowContents -match '(?i)(AssetPreview|ScriptedImporter|OnImportAsset|AssetPostprocessor)'){'PreviewImport'}else{'BackgroundService'}
 $resolvedTargetKind=if($TargetKind -eq 'Auto'){$inferredKind}else{$TargetKind}
 $targetKindSource=if($TargetKind -eq 'Auto'){'inferred'}else{'explicit'}
 $matrix=[ordered]@{
   EditorWindow=@('compile','reloadDomain','interaction','visual','recovery','performance')
   Workbench=@('compile','reloadDomain','interaction','visual','recovery','performance')
+  AdvancedDropdown=@('compile','reloadDomain','interaction','visual','recovery','performance')
+  TransientPopup=@('compile','reloadDomain','interaction','visual','recovery','performance')
+  PreviewWindow=@('compile','reloadDomain','interaction','visual','recovery','performance')
   InspectorDrawer=@('compile','serialization','multiSelection','undo','prefabOverride','visual')
+  ShaderGUI=@('compile','serialization','multiSelection','undo','prefabOverride','visual')
   MenuAction=@('compile','menuReachability','invalidInput','boundary','repeatIdempotency')
   PreviewImport=@('compile','previewLifecycle','missingAsset','cleanup','reloadDomain','performance')
   BackgroundService=@('compile','startupScope','cancellation','cleanup','reloadDomain','performance')
 }
 $required=@($matrix[$resolvedTargetKind])
-$criticalByKind=[ordered]@{EditorWindow=@('framework-integration','visual');Workbench=@('framework-integration','visual');InspectorDrawer=@('visual');MenuAction=@();PreviewImport=@();BackgroundService=@()}
+$criticalByKind=[ordered]@{EditorWindow=@('framework-integration','visual');Workbench=@('framework-integration','visual');AdvancedDropdown=@('visual');TransientPopup=@('visual');PreviewWindow=@('visual');InspectorDrawer=@('visual');ShaderGUI=@('visual');MenuAction=@();PreviewImport=@();BackgroundService=@()}
 $criticalDimensions=@($criticalByKind[$resolvedTargetKind])
 $registryPath=Join-Path $root '.agents/skills/es-editor-availability-validator/references/editor-rule-registry.json'
 $ruleRegistry=$null
@@ -126,6 +199,85 @@ $hasMaxBound=$hasFixedMaxBound -or $hasAdaptiveMaxBound -or $hasHostMaxBound -or
 $maxBoundStrategy=if($hasFixedMaxBound){'fixed'}elseif($hasAdaptiveResolveMaxBound){'adaptive-resolve'}elseif($hasContentAdaptiveMaxBound){'content-adaptive'}elseif($hasHostMaxBound){'host-bounded'}elseif($hasFlexibleMaxBound){'unbounded-flexible'}else{''}
 $frameworkFindings=New-Object 'System.Collections.Generic.List[object]'
 $layoutFindings=New-Object 'System.Collections.Generic.List[object]'
+$dropdownFindings=New-Object 'System.Collections.Generic.List[object]'
+if($resolvedTargetKind -eq 'AdvancedDropdown'){
+    if($advancedDropdownRecords.Count -eq 0){
+        [void]$dropdownFindings.Add([pscustomobject]@{code='AdvancedDropdownTargetMissing';path=(Rel $targetFull);detail='TargetKind AdvancedDropdown did not find an AdvancedDropdown implementation.'})
+    }else{
+        if($advancedDropdownContents -notmatch '(?i)(minimumSize\s*=|AbsoluteMinimumWidth|NormalizeMinimumWindowSize)'){
+            [void]$dropdownFindings.Add([pscustomobject]@{code='AdvancedDropdownSizeBoundaryMissing';path=(Rel $targetFull);detail='AdvancedDropdown has no visible minimum-size boundary.'})
+        }
+        if($advancedDropdownContents -notmatch '(?i)(DetachFromPanelEvent|Dispose\(\)|Close\()'){
+            [void]$dropdownFindings.Add([pscustomobject]@{code='AdvancedDropdownLifecycleMissing';path=(Rel $targetFull);detail='AdvancedDropdown has no visible detach/close cleanup path.'})
+        }
+    }
+}
+$popupFindings=New-Object 'System.Collections.Generic.List[object]'
+if($resolvedTargetKind -eq 'TransientPopup'){
+    if($transientPopupRecords.Count -eq 0){
+        [void]$popupFindings.Add([pscustomobject]@{code='TransientPopupTargetMissing';path=(Rel $targetFull);detail='TargetKind TransientPopup did not find a Transient Popup/Utility contract.'})
+    }else{
+        if($transientPopupContents -notmatch '(?i)(ESWindowFoundation\.BindTransient|BindTransient\s*\()'){
+            [void]$popupFindings.Add([pscustomobject]@{code='TransientPopupBindMissing';path=(Rel $targetFull);detail='Transient Popup has no visible BindTransient lifecycle binding.'})
+        }
+        if($transientPopupContents -notmatch '(?i)(ESWindowFoundation\.Suspend|ESWindowFoundation\.Close|OnDisable|OnDestroy)'){
+            [void]$popupFindings.Add([pscustomobject]@{code='TransientPopupLifecycleMissing';path=(Rel $targetFull);detail='Transient Popup has no visible suspend/close lifecycle path.'})
+        }
+        if($transientPopupContents -notmatch '(?i)(minSize\s*=|MinimumSize\s*[:=]|MinimumPopupWidth|NormalizePopupSize)'){
+            [void]$popupFindings.Add([pscustomobject]@{code='TransientPopupSizeBoundaryMissing';path=(Rel $targetFull);detail='Transient Popup has no visible minimum-size boundary.'})
+        }
+    }
+}
+$previewFindings=New-Object 'System.Collections.Generic.List[object]'
+if($resolvedTargetKind -eq 'PreviewWindow'){
+    if($previewWindowRecords.Count -eq 0){
+        [void]$previewFindings.Add([pscustomobject]@{code='PreviewWindowTargetMissing';path=(Rel $targetFull);detail='TargetKind PreviewWindow did not find a Preview surface contract.'})
+    }else{
+        if($previewWindowContents -notmatch '(?i)(RenderGUI\s*\(|PreviewScene|PreviewSession|PreviewView|AssetPreview)'){
+            [void]$previewFindings.Add([pscustomobject]@{code='PreviewWindowRenderBoundaryMissing';path=(Rel $targetFull);detail='Preview window has no visible render/session boundary.'})
+        }
+        if($previewWindowContents -notmatch '(?i)(ESWindowFoundation\.SetSleepOwner|ESWindow_SleepOwner|ESWindow_SleepLinkMode)'){
+            [void]$previewFindings.Add([pscustomobject]@{code='PreviewWindowOwnerBoundaryMissing';path=(Rel $targetFull);detail='Preview window has no visible owner/reload boundary.'})
+        }
+        if($previewWindowContents -notmatch '(?i)(Dispose\(\)|OnDisable|ESWindow_OnHostDisable)'){
+            [void]$previewFindings.Add([pscustomobject]@{code='PreviewWindowCleanupMissing';path=(Rel $targetFull);detail='Preview window has no visible preview cleanup boundary.'})
+        }
+    }
+}
+$drawerFindings=New-Object 'System.Collections.Generic.List[object]'
+if($resolvedTargetKind -eq 'InspectorDrawer'){
+    if($drawerRecords.Count -eq 0){
+        [void]$drawerFindings.Add([pscustomobject]@{code='InspectorDrawerTargetMissing';path=(Rel $targetFull);detail='TargetKind InspectorDrawer did not find a PropertyDrawer, CustomEditor, or Odin drawer declaration.'})
+    }else{
+        if($drawerContents -notmatch '(?i)(SerializedProperty|SerializedObject|PropertyTree|ValueEntry)'){
+            [void]$drawerFindings.Add([pscustomobject]@{code='InspectorDrawerSerializationBoundaryMissing';path=(Rel $targetFull);detail='Inspector/Drawer has no visible serialized-property or PropertyTree boundary.'})
+        }
+        $drawerWrites = $drawerContents -match '(?i)(\.\s*(?:intValue|stringValue|boolValue|floatValue|doubleValue|objectReferenceValue|managedReferenceValue)\s*=|ApplyModifiedProperties|SetValue\s*\(|Write\s*\()'
+        if($drawerWrites -and $drawerContents -notmatch '(?i)(Undo\.(?:RecordObject|RecordObjects|RegisterCompleteObjectUndo)|ESWorkbench_Record\s*\()'){
+            [void]$drawerFindings.Add([pscustomobject]@{code='InspectorDrawerUndoBoundaryMissing';path=(Rel $targetFull);detail='Inspector/Drawer write path has no visible Undo boundary.'})
+        }
+        if($drawerContents -match '(?i)hasMultipleDifferentValues' -and $drawerContents -notmatch '(?i)(showMixedValue|mixed)'){
+            [void]$drawerFindings.Add([pscustomobject]@{code='InspectorDrawerMixedStateMissing';path=(Rel $targetFull);detail='Multi-object state is queried without visible mixed-value presentation.'})
+        }
+    }
+}
+$shaderGuiFindings=New-Object 'System.Collections.Generic.List[object]'
+if($resolvedTargetKind -eq 'ShaderGUI'){
+    if($shaderGuiRecords.Count -eq 0){
+        [void]$shaderGuiFindings.Add([pscustomobject]@{code='ShaderGUITargetMissing';path=(Rel $targetFull);detail='TargetKind ShaderGUI did not find a ShaderGUI implementation.'})
+    }else{
+        if($shaderGuiContents -notmatch '(?i)(MaterialEditor|MaterialProperty)'){
+            [void]$shaderGuiFindings.Add([pscustomobject]@{code='ShaderGUIPropertyBoundaryMissing';path=(Rel $targetFull);detail='ShaderGUI has no visible MaterialEditor/MaterialProperty boundary.'})
+        }
+        if($shaderGuiContents -notmatch '(?i)editor\.targets|targets\.Length|targetObjects'){
+            [void]$shaderGuiFindings.Add([pscustomobject]@{code='ShaderGUIMultiSelectionMissing';path=(Rel $targetFull);detail='ShaderGUI has no visible multi-material target handling.'})
+        }
+        $shaderGuiWrites = $shaderGuiContents -match '(?i)(\.\s*(?:SetFloat|SetColor|SetVector|SetTexture|EnableKeyword|DisableKeyword|SetOverrideTag|SetShaderPassEnabled|renderQueue\s*=)|ApplyModifiedProperties|PropertiesChanged\s*\()'
+        if($shaderGuiWrites -and $shaderGuiContents -notmatch '(?i)Undo\.(?:RecordObject|RecordObjects|RegisterCompleteObjectUndo)'){
+            [void]$shaderGuiFindings.Add([pscustomobject]@{code='ShaderGUIUndoBoundaryMissing';path=(Rel $targetFull);detail='ShaderGUI mutation path has no visible Undo boundary.'})
+        }
+    }
+}
 if($isEditorWindow){
     foreach($window in $windowRecords){
         if($window.isAbstract){ continue }
@@ -161,9 +313,19 @@ if($isEditorWindow){
 $structStatus=if(@($findings|Where-Object {$_.code -in @('TargetNotEditorAsset','InvalidUtf8','EditorScope')}).Count -gt 0){'failed'}else{'passed'}
 [void]$rows.Add((Row 'structural' $structStatus 'Target, editor scope, and UTF-8 checks completed.'))
 [void]$rows.Add((Row 'framework-integration' $(if(-not $isEditorWindow){'not-applicable'}elseif($frameworkFindings.Count -gt 0){'blocked'}else{'passed'}) 'ES framework foundation, sleep lifecycle, and unbind integration check.' '' 3 ($criticalDimensions -contains 'framework-integration')))
+$dropdownStatus=if($resolvedTargetKind -ne 'AdvancedDropdown'){'not-applicable'}elseif($dropdownFindings.Count -gt 0){'blocked'}else{'passed'}
+[void]$rows.Add((Row 'advanced-dropdown-contract' $dropdownStatus 'AdvancedDropdown size, provider-build and detach cleanup boundary.' '' 3 ($resolvedTargetKind -eq 'AdvancedDropdown')))
+$popupStatus=if($resolvedTargetKind -ne 'TransientPopup'){'not-applicable'}elseif($popupFindings.Count -gt 0){'blocked'}else{'passed'}
+[void]$rows.Add((Row 'transient-popup-contract' $popupStatus 'Transient Popup/Utility binding, lifecycle, and size boundary.' '' 3 ($resolvedTargetKind -eq 'TransientPopup')))
+$previewStatus=if($resolvedTargetKind -ne 'PreviewWindow'){'not-applicable'}elseif($previewFindings.Count -gt 0){'blocked'}else{'passed'}
+[void]$rows.Add((Row 'preview-window-contract' $previewStatus 'Preview render/session, owner, and cleanup boundary.' '' 3 ($resolvedTargetKind -eq 'PreviewWindow')))
+$drawerStatus=if($resolvedTargetKind -ne 'InspectorDrawer'){'not-applicable'}elseif($drawerFindings.Count -gt 0){'blocked'}else{'passed'}
+[void]$rows.Add((Row 'inspector-drawer-contract' $drawerStatus 'Inspector/Drawer serialization, Undo, and mixed-value boundary.' '' 3 ($resolvedTargetKind -eq 'InspectorDrawer')))
+$shaderGuiStatus=if($resolvedTargetKind -ne 'ShaderGUI'){'not-applicable'}elseif($shaderGuiFindings.Count -gt 0){'blocked'}else{'passed'}
+[void]$rows.Add((Row 'shader-gui-contract' $shaderGuiStatus 'ShaderGUI MaterialProperty, multi-selection, and Undo boundary.' '' 3 ($resolvedTargetKind -eq 'ShaderGUI')))
 $boundaryStatus=if(@($findings|Where-Object {$_.code -in @('StartupScanRisk','UndoMissing','CallbackCleanup','WindowLifecycle')}).Count -gt 0){'blocked'}else{'passed'}
 [void]$rows.Add((Row 'static-boundary' $boundaryStatus 'Static lifecycle, scan, Undo, and callback checks completed.' '' 2 $false))
-[void]$findings.AddRange($frameworkFindings); [void]$findings.AddRange($layoutFindings)
+[void]$findings.AddRange($frameworkFindings); [void]$findings.AddRange($layoutFindings); [void]$findings.AddRange($dropdownFindings); [void]$findings.AddRange($popupFindings); [void]$findings.AddRange($previewFindings); [void]$findings.AddRange($drawerFindings); [void]$findings.AddRange($shaderGuiFindings)
 if($EvidencePath){
     if([IO.Path]::IsPathRooted($EvidencePath)){throw 'EvidencePath must be project-relative'}
     $evidenceFull=[IO.Path]::GetFullPath([IO.Path]::Combine($root,$EvidencePath))
@@ -268,6 +430,12 @@ if($null -ne $ruleRegistry){
             $detail=if($eventRouteEvidence){'Workbench drag events use host trickle-down routing with matching unregistration and all owner-release paths call CancelWorkbenchDrag(true).'}else{"Event-routing contract failed: $($eventRouteFailures -join '; ')"}
         }else{
             $matched=HasAny $allTargetText $rulePatterns[[string]$rule.ruleId]
+            if($resolvedTargetKind -eq 'InspectorDrawer' -and [string]$rule.ruleId -eq 'EW-01'){
+                $matched = $matched -or $allTargetText -match '(?i)Odin(?:Attribute)?Drawer|PropertyDrawer|CustomPropertyDrawer'
+            }
+            if($resolvedTargetKind -eq 'InspectorDrawer' -and [string]$rule.ruleId -eq 'EW-17'){
+                $matched = $matched -or $allTargetText -match '(?i)Dictionary|HashSet|cache|memo|incremental'
+            }
             $ruleStatus=if($matched){'passed'}else{'blocked'}
             $detail=if($matched){'Static source evidence matched the responsibility-specific rule pattern.'}else{'No responsibility-specific static evidence matched; declare an approved exception or add implementation evidence.'}
         }
@@ -302,7 +470,7 @@ if($runtimeRequired){
     }
 }
 $staticCriticalRuleFailures=@($ruleFailures|Where-Object {$_.severity -eq 'critical'})
-$staticHard=@($rows|Where-Object {$_.id -in @('structural','framework-integration','static-boundary') -and $_.status -in @('failed','blocked')})
+$staticHard=@($rows|Where-Object {$_.id -in @('structural','framework-integration','static-boundary','transient-popup-contract','preview-window-contract','inspector-drawer-contract','shader-gui-contract') -and $_.status -in @('failed','blocked')})
 $staticVisualBlocked=$layoutFindings.Count -gt 0
 $runtimeHard=@($rows|Where-Object {
     $isStaticVisual = $_.id -eq 'visual' -and $staticVisualBlocked

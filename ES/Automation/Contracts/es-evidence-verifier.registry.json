@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/evidence-verifier-registry/v1",
+  "schemaVersion": 1,
+  "registryId": "es.task-context.evidence-verifiers.v1",
+  "verifiers": [
+    {
+      "verifierId": "platform.file-hash-manifest-v1",
+      "authority": "TaskContextRuntime",
+      "artifactFormat": "json",
+      "claimIdPattern": "^source-integrity(?:[._-][A-Za-z0-9][A-Za-z0-9._-]{0,60})?$",
+      "requiredArtifactFields": ["schemaVersion", "claimId", "sourceScopeHash", "observations"],
+      "observationFields": ["path", "expectedSha256"],
+      "outcomePolicy": "failed-if-any-hash-mismatch;unverified-if-empty;passed-if-all-match"
+    },
+    {
+      "verifierId": "platform.static-replay-v1",
+      "authority": "TaskContextRuntime",
+      "artifactFormat": "json",
+      "claimIdPattern": "^regression(?:[._-][A-Za-z0-9][A-Za-z0-9._-]{0,60})?$",
+      "requiredArtifactFields": ["schemaVersion", "claimId", "sourceScopeHash", "skillName", "manifestPath"],
+      "observationFields": ["sourceRefs", "sourceRefHashes", "planHash", "cases"],
+      "outcomePolicy": "failed-if-static-replay-blocked;unverified-if-runner-unavailable;passed-if-static-replay-passed",
+      "implementationPath": ".agents/skills/es-static-deep-replay/scripts/Invoke-ESStaticDeepReplay.ps1",
+      "implementationHash": "c158b3e338a40848bbfb95183f4e1340c4a226cb7181a574a172c487ffc58a12",
+      "maxSourceFiles": 2048,
+      "maxSourceBytes": 134217728,
+      "maxExecutionSeconds": 300,
+      "maxOutputChars": 2097152
+    },
+    {
+      "verifierId": "platform.codex-transcript-slice-v1",
+      "authority": "TaskContextRuntime",
+      "artifactFormat": "json",
+      "claimIdPattern": "^interaction-correction(?:[._-][A-Za-z0-9][A-Za-z0-9._-]{0,52})?$",
+      "requiredArtifactFields": ["schemaVersion", "contractId", "claimId", "sourceScopeHash", "taskId", "goalRevisionHash", "taskRevision", "contextVersion", "sessionId", "sourceTranscriptPath", "sourceLineCount", "sourcePrefixSha256", "startLine", "endLine", "normalizedSliceSha256", "normalizationVersion"],
+      "observationFields": ["correctionObserved", "correctionCount", "eligibleTaskCount"],
+      "outcomePolicy": "passed-if-task-slice-verified;unverified-if-followup-missing",
+      "implementationPath": "ES/Automation/Evaluation/ESTranscriptCorrectionObservation.psm1",
+      "implementationHash": "999468f56e2d2835db061718d2d2a7162a9b823f50d04200b31dcb145b56e85e",
+      "contractPath": "ES/Automation/Contracts/es-task-transcript-slice-v1.schema.json",
+      "contractHash": "d54e64b6e20073a1cd092ce84cc64b6475538252ab8d27520e24a85bdfc7756e",
+      "maxTranscriptBytes": 33554432,
+      "maxSliceLines": 512,
+      "maxSliceChars": 1048576
+    }
+  ]
+}

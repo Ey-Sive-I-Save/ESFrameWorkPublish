@@ -71,6 +71,7 @@ AI 自发现入口：对用户目标先调用 `.agents/skills/es-skill-governanc
 | 治理、规划与 Skill 执行成本 | `aibrain, governance, planning, authority, skill-performance, execution-cost, fast-path, deep-path, cache` | `es-skill-governance`, `es-use-ai-command` |
 | 分析、审查、迁移与变更风险 | `analysis, design, root-cause, review, risk, change-budget, rollback, migration, compatibility` | `es-first-principles-analysis`, `es-adversarial-review`, `es-change-risk-register`, `es-migration-planning` |
 | AIBrain 编排与 Automation 任务路由 | `orchestration, task-routing, automation, task-contract, worker, automation-run-record, agent-execution-graph, aicommand, mcp` | `es-aibrain-route-authoring`, `es-use-ai-command`, `es-automation-worker-authoring`, `es-aicommand-contract-authoring` |
+| 任务与上下文平台生命周期 | `task-context-runtime, task-lifecycle, context-lifecycle, goal-revision, route-plan, completion-decision, delivery-acceptance, evidence-set, evidence-verifier, source-scope, receipt, cas, reopen` | `es-task-context-runtime`, `es-aibrain-route-authoring`, `es-task-read-snapshot`, `es-observability-evidence` |
 | AI 用户交互与任务收尾治理 | `interaction, conversation, prompt, objective, verification, uncertainty, next-step, behavior-tree, context-collection, numeric-selection, next-step-dispatch, goal-drift, handover, closeout, evaluation, dialogue-quality` | `es-ai-interaction-governance`, `es-codex-session-bootstrap`, `es-skill-session-refresh` |
 | ES AI 协作菜单与制作/迭代引导 | `menu, collaboration-menu, guidance, creation, iteration, framework-governance, evidence, context-discovery, session-coordination` | `es-ai-collaboration-menu` |
 | Skill 验证与质量门禁 | `skill, validation, security, catalog, evidence, evidence-pending, portfolio, static-replay, deep-replay, deterministic, static-boundary, external-side-effect, blocking-layer` | `es-skill-validator`, `es-skill-creator`, `es-static-deep-replay` |
@@ -81,7 +82,7 @@ AI 自发现入口：对用户目标先调用 `.agents/skills/es-skill-governanc
 | 游戏 UI 玩家目标与 IntentSpec | `ui-automation, player-intent, player-goal, intent-spec, primary-action, ui-intent-clarification, business-bridge` | `es-ui-intent-authoring`, `es-ui-prefab-authoring` |
 | 游戏 UI 自动化装配 | `ui-automation, screen-spec-v3, ui-prefab, ui-fixture-scene, ui-layout, responsive, visual-qa, asset-fallback` | `es-ui-prefab-authoring`, `es-unity-compile` |
 | Unity UI AI 防错适配 | `ui-automation, ui-ai-failure-prevention, ui-system-selection, ui-layout, responsive, ui-clipping, ui-interaction, ui-rendering, ui-input, ui-toolkit, visual-evidence, evidence-boundary` | `es-knowledge-creator`, `es-ai-knowledge-curation`, `es-ui-prefab-authoring` |
-| 游戏 UI 外部方案与规范化适配 | `ui-automation, normalized-adapter, canonical-owner, knowledge-deduplication, schema-adapter, ai-error-prevention, open-source-ui, design-to-unity, intermediate-representation, source-map, readiness-report, visual-diff, conformance, ui-flow, known-loss, ui-mcp` | `es-knowledge-creator`, `es-ai-knowledge-curation`, `es-ui-prefab-authoring` |
+| 游戏 UI 外部方案与规范化适配 | `ui-automation, ui-workflow, normalized-adapter, canonical-owner, knowledge-deduplication, schema-adapter, ai-error-prevention, open-source-ui, design-to-unity, intermediate-representation, source-map, readiness-report, visual-diff, conformance, ui-flow, known-loss, ui-mcp` | `es-knowledge-creator`, `es-ai-knowledge-curation`, `es-ui-prefab-authoring` |
 | 游戏 UI 屏幕族与信息架构 | `game-ui-screen-family, commercial-ui, hud-ui, inventory-ui, shop-ui, dialogue-ui, map-ui, progression-ui, result-ui, settings-ui, ui-information-architecture` | `es-ui-intent-authoring`, `es-ui-prefab-authoring` |
 | 游戏 UI 视觉设计与 Token | `ui-visual-design, visual-design, design-token, color-role, typography-role, spacing-token, visual-hierarchy, information-density, rarity-visual, ui-material` | `es-ui-prefab-authoring`, `es-editor-tooling` |
 | 游戏 UI 参考图与输入证据 | `ui-reference-evidence, design-evidence, reference-image, reference-provenance, source-region, vision-review, observation-assumption` | `es-ui-prefab-authoring`, `es-knowledge-creator` |
@@ -128,7 +129,7 @@ AI 自发现入口：对用户目标先调用 `.agents/skills/es-skill-governanc
 以下 Skill 使用 AIBrain 可执行校验的独立权威轴。`project-gate` 是跨项目门禁，`core-governed` 是核心治理流程；二者在 AIBrain 自主/受管通道中必须经过 `planTask` 且禁止无当前用户指令的直启。该元数据不阻止 current-user-direct 工作。基础工程 Skill 可由 AIBrain 自动附加，但只能在当前用户范围和受管通道合同内运行。
 
 - `project-gate`: `es-skill-governance`, `es-use-ai-command`, `es-feishu-cli`, `es-utf8-guard`, `es-release-acceptance`
-- `core-governed`: `es-skill-creator`, `es-worktree-audit`, `es-task-read-snapshot`
+- `core-governed`: `es-skill-creator`, `es-worktree-audit`, `es-task-context-runtime`, `es-task-read-snapshot`
 
 这些 Skill 只是高权威门禁/编排入口，不自动获得源码、Unity、Git 或发布权限。
 

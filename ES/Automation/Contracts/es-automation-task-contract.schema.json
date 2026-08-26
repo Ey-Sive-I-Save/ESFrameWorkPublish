@@ -26,7 +26,7 @@
     "capabilities": {
       "type": "array",
       "uniqueItems": true,
-      "items": { "type": "string", "enum": ["ReadArtifacts", "WriteReports", "WriteTemp", "WriteAssets", "WriteUiAssets", "Delete", "Upload", "Publish"] }
+      "items": { "type": "string", "enum": ["ReadArtifacts", "WriteReports", "WriteTemp", "WriteAssets", "Delete", "Upload", "Publish", "ExternalRead", "ExternalWrite", "MaterializeUI"] }
     },
     "timeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 7200 },
     "supportsDryRun": { "type": "boolean" },

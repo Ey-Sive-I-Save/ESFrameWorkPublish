@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/goal/v1",
+  "title": "ES Goal V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "goalId", "goalRevision", "scope", "acceptanceIntent", "status", "budget", "parentGoalRef", "revisionHash"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "goalId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+    "goalRevision": { "type": "string", "pattern": "^r[1-9][0-9]{0,8}$" },
+    "scope": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "acceptanceIntent": { "type": ["string", "object"] },
+    "status": { "const": "frozen" },
+    "budget": { "type": "object" },
+    "parentGoalRef": { "type": ["string", "null"] },
+    "revisionHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

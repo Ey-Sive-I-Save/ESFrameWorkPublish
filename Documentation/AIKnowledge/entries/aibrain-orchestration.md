@@ -6,11 +6,11 @@
 `Authority`: `Derived`
 `RouteKeys`: `aibrain`, `orchestration`, `task-routing`, `evidence`
 `EvidenceLevel`: `S1`
-`ContentHash`: `f4bed972d8eaa714ab956ecbe65ca5dd2b5eac7cc74bfd018400f252521398b2`
+`ContentHash`: `bbd42d2ed32462bcbaffe51efc9a16c75976f0bb7e67120d0903dc8a9c43a450`
 
 `SourceRefs`:
 
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs` (`a636a42521eb8f13462455b726c7e06fe3211cd733e5c280092af0a45673e485`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs` (`6fc627e16930d541b1275bb5d687e1fdad8d96b751616002dbf2fbdbfa38fbc3`)
 - `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationFacade.cs` (`e61a58d14237555a09207cf3e3c596b48e0ee2de6188d10584b950c62606d4d2`)
 - `Assets/Plugins/ES/Editor/ESAutomation/ESAgentGraphAutomationEndpoint.cs` (`0bc253ebba46f4deb28cc4820677ee02a7233a070d57b682bbe91242640fd13c`)
 - `Assets/Plugins/ES/Editor/ESGraphViewV2/ESAISkillExecutionWorkflow.cs` (`7b17d81c0dc4bbf04d2e91df2c8e47e46c9b811de622dfef03c7f408476a192e`)

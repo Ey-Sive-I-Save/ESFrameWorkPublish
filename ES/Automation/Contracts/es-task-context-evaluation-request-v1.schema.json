@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/task-context-evaluation-request/v1",
+  "title": "ES TaskContext advisory evaluation request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "taskId",
+    "expectedTaskRevision",
+    "expectedContextVersion",
+    "idempotencyKey"
+  ],
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$"
+    },
+    "expectedTaskRevision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "expectedContextVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"
+    }
+  }
+}

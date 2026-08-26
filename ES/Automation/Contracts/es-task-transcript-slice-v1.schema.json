@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/task-transcript-slice/v1",
+  "title": "ES Task-bound Codex transcript slice v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractId",
+    "claimId",
+    "sourceScopeHash",
+    "taskId",
+    "goalRevisionHash",
+    "taskRevision",
+    "contextVersion",
+    "sessionId",
+    "sourceTranscriptPath",
+    "sourceLineCount",
+    "sourcePrefixSha256",
+    "startLine",
+    "endLine",
+    "normalizedSliceSha256",
+    "normalizationVersion"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/task-transcript-slice/v1" },
+    "claimId": { "type": "string", "pattern": "^interaction-correction(?:[._-][A-Za-z0-9][A-Za-z0-9._-]{0,52})?$" },
+    "sourceScopeHash": { "$ref": "#/$defs/hash" },
+    "taskId": { "$ref": "#/$defs/id" },
+    "goalRevisionHash": { "$ref": "#/$defs/hash" },
+    "taskRevision": { "type": "integer", "minimum": 1 },
+    "contextVersion": { "type": "integer", "minimum": 1 },
+    "sessionId": { "type": "string", "pattern": "^[a-f0-9-]{16,64}$" },
+    "sourceTranscriptPath": { "type": "string", "minLength": 1 },
+    "sourceLineCount": { "type": "integer", "minimum": 1 },
+    "sourcePrefixSha256": { "$ref": "#/$defs/hash" },
+    "startLine": { "type": "integer", "minimum": 1 },
+    "endLine": { "type": "integer", "minimum": 1 },
+    "normalizedSliceSha256": { "$ref": "#/$defs/hash" },
+    "normalizationVersion": { "const": "codex-task-feedback-v1" }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" }
+  }
+}

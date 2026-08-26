@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/route-stage-registry/v1",
+  "title": "ES Route Stage Registry V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "registryId", "normalizationVersion", "defaultMaxDepth", "maxDepth", "externalInputs", "depthAuthorizations", "stages"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "registryId": { "const": "esframework-route-stage-registry" },
+    "normalizationVersion": { "const": "route-stage-canonical-v1" },
+    "defaultMaxDepth": { "const": 1 },
+    "maxDepth": { "const": 2 },
+    "externalInputs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "depthAuthorizations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/depthAuthorization" }
+    },
+    "stages": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/stageContract" }
+    }
+  },
+  "$defs": {
+    "token": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"
+    },
+    "stringSet": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "depthAuthorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reasonCode", "authorizesDepth", "profiles", "routeKeys"],
+      "properties": {
+        "reasonCode": { "type": "string", "pattern": "^ROUTE\\.DEPTH_2\\.[A-Z0-9_]{1,80}$" },
+        "authorizesDepth": { "const": 2 },
+        "profiles": { "$ref": "#/$defs/stringSet" },
+        "routeKeys": { "$ref": "#/$defs/stringSet" }
+      }
+    },
+    "stageContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stageContractId", "skillName", "profiles", "routeKeys", "requires", "produces", "failureConditions", "depthReasonCode"],
+      "properties": {
+        "stageContractId": { "$ref": "#/$defs/id" },
+        "skillName": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,80}$" },
+        "profiles": { "$ref": "#/$defs/stringSet" },
+        "routeKeys": { "$ref": "#/$defs/stringSet" },
+        "requires": { "$ref": "#/$defs/stringSet" },
+        "produces": { "$ref": "#/$defs/stringSet" },
+        "failureConditions": { "$ref": "#/$defs/stringSet" },
+        "depthReasonCode": {
+          "type": "string",
+          "pattern": "^(|ROUTE\\.DEPTH_2\\.[A-Z0-9_]{1,80})$"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "contractId": "es://automation/contracts/task-context-evaluation-adapter/v1",
+  "adapterId": "es.task-context.evaluate@1",
+  "taskId": "es.task-context.evaluate",
+  "taskVersion": 1,
+  "commandId": "task.context-runtime.mutate",
+  "skillName": "es-task-context-runtime",
+  "routeKeys": [
+    "task-context-runtime",
+    "evaluation",
+    "completion-decision",
+    "evidence-set"
+  ],
+  "inputContract": {
+    "path": "ES/Automation/Contracts/es-task-context-evaluation-request-v1.schema.json",
+    "sha256": "2487fd438cca301f84b3c723f5ce827463be68a1d4d902e0a9dd01af4021f12d",
+    "fields": [
+      "taskId",
+      "expectedTaskRevision",
+      "expectedContextVersion",
+      "idempotencyKey"
+    ]
+  },
+  "worker": {
+    "type": "PowerShell",
+    "workerId": "es.task-context.evaluate",
+    "version": "1.0.0",
+    "entrypoint": "ES/Automation/Workers/PowerShell/Invoke-ESTaskContextEvaluationWorker.ps1",
+    "entrypointHash": "bb2046146493e97c7d3d49b46bdab766f52ed1ca3c55889720cebdce86e19f10"
+  },
+  "platformBinding": {
+    "storeRoot": "ES/Output/TaskContextRuntime",
+    "action": "Evaluate",
+    "evaluationContractId": "es://automation/contracts/evaluation-record/v1",
+    "decisionAuthority": "TaskContextRuntime EvaluationRecord",
+    "decisionScope": "task-object"
+  },
+  "lifecycleEffects": {
+    "taskRevision": "unchanged",
+    "contextVersion": "unchanged",
+    "taskStatus": "unchanged",
+    "contextStatus": "unchanged",
+    "writes": [
+      "one create-only advisory EvaluationRecord under the selected TaskContext",
+      "one bounded Automation RunRecord and worker result under ES/Automation/Runs/TaskContextEvaluation"
+    ]
+  },
+  "forbiddenProjections": [
+    "Automation Accepted or Completed -> TaskContext evaluation accepted",
+    "Automation Blocked -> TaskContext hard-block",
+    "Automation Static or Runtime -> TaskContext Profile or scope",
+    "Automation governanceHash -> TaskContext decisionId, recordHash, or snapshot hash",
+    "TaskContext failure -> project-global P0"
+  ],
+  "observability": {
+    "discovery": "listCapabilities tasks and cli",
+    "planning": "planTask with exact taskId, commandId, Skill, and route",
+    "execution": "runTask with the approved plan hash",
+    "status": "getRun returns Automation status and the bound EvaluationRecord separately",
+    "mismatchSignals": [
+      "worker or input schema hash drift",
+      "TaskContext CAS mismatch",
+      "platform artifact hash drift",
+      "unexpected input field",
+      "Automation CompletionDecision injection",
+      "output path or hash mismatch"
+    ]
+  },
+  "rollback": {
+    "fastPath": "Disable the AI Bridge or omit es.task-context.evaluate from the selected RoutePlan.",
+    "registration": "Remove only the ESTaskContextEvaluationAutomation initializer registration and rebuild the Editor assembly.",
+    "data": "Keep immutable EvaluationRecords and RunRecords; rollback never deletes or rewrites prior evidence."
+  },
+  "integration": {
+    "sourceRegistrationIntegrated": true,
+    "unityRuntimeRegistrationVerified": false,
+    "productionExecutionObserved": false,
+    "globalP0Integrated": false,
+    "runtimeStatus": "runtime-not-run",
+    "releaseStatus": "not-verified"
+  }
+}

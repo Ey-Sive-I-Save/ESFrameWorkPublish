@@ -1,0 +1,86 @@
+{
+  "contractVersion": "1",
+  "objective": "Provide a platform-owned, read-only commercial evaluation control plane that derives bounded operational metrics from verified TaskContext event chains and immutable EvaluationRecords without converting missing telemetry into false success or project-global failure.",
+  "scope": [
+    "ES/Automation/Contracts/es-commercial-evaluation-v1.schema.json",
+    "ES/Automation/Contracts/es-commercial-metric-registry-v1.schema.json",
+    "ES/Automation/Contracts/es-commercial-metric.registry.json",
+    "ES/Automation/Evaluation/",
+    "ES/Automation/TaskContextRuntime/ESTaskContextRuntime.psm1",
+    ".agents/skills/es-task-context-runtime/"
+  ],
+  "mustPreserve": [
+    "TaskContextRuntime remains the authority for event-chain, EvaluationRecord, Receipt, GoalRevision, AcceptanceProfile, sourceScope, and completion identities",
+    "commercial aggregation is read-only and never mutates task or context lifecycle",
+    "metrics are cohort-scoped and never project a task failure into project-global P0",
+    "missing cost, correction, claim-audit, or regression telemetry produces evidence-pending with a null value rather than zero",
+    "humanCorrectionRate closes only from platform-reverified task-bound Codex transcript slices and never from candidate counts or whole-session projection",
+    "Static, Runtime, and Release evidence remain independent",
+    "Automation Accepted and Blocked remain transport statuses and are never used as TaskContext outcomes",
+    "all source EvaluationRecords and event chains are re-read and integrity-verified before aggregation",
+    "same verified source snapshot produces the same snapshotHash and metric values"
+  ],
+  "allowedTransitions": [
+    "verified TaskContext observations -> deterministic cohort snapshot -> CommercialEvaluationReport",
+    "evidence-pending metric -> closed metric only after its registered authoritative source becomes available",
+    "new immutable task evidence -> new snapshotHash and report identity"
+  ],
+  "forbiddenTransitions": [
+    "missing metric telemetry -> numeric zero",
+    "task-object failure -> project-global hard block",
+    "Automation run status -> commercial success or failure",
+    "unverified EvaluationRecord -> aggregation input",
+    "single successful run -> stableSuccessRate evidence",
+    "static report -> Runtime or Release acceptance",
+    "commercial report generation -> TaskRevision or ContextVersion mutation"
+  ],
+  "acceptanceSignals": [
+    "metric registry and report schemas pass structural and semantic validation",
+    "successRate, stableSuccessRate, hardViolationRate, meanLatency, and recoveryRate are deterministically derived from verified platform records",
+    "claimOverstatementRate and meanCost remain evidence-pending until an authoritative registered source is supplied",
+    "humanCorrectionRate closes only for tasks with a platform-reverified task-bound correction observation; tasks without one remain outside its denominator",
+    "regressionPassRate closes only from task-scoped OutcomeAssertions produced by the registered platform.static-replay-v1 verifier, otherwise it remains evidence-pending/null",
+    "tampered EvaluationRecord, broken event chain, duplicate TaskId, scope expansion, forged registry hash, and false-zero telemetry are rejected",
+    "direct PowerShell 5.1 test entrypoints run without requiring callers to supply paths solely to initialize PSScriptRoot",
+    "strict UTF-8 and target diff checks pass"
+  ],
+  "counterexamples": [
+    "an empty task cohort reports 100 percent success",
+    "one accepted task is reported as stable success",
+    "missing correction telemetry reports humanCorrectionRate equals zero",
+    "a tampered EvaluationRecord participates in a commercial report",
+    "an Automation Accepted run increments successRate",
+    "a task-scoped hard failure becomes a project-global P0",
+    "report generation changes TaskRevision or ContextVersion",
+    "the same source snapshot produces different metric values"
+  ],
+  "nonGoals": [
+    "Unity, Worker, network, or Release execution",
+    "automatic production-route takeover",
+    "global P0 integration",
+    "inventing cost, correction, claim-audit, or regression facts from chat text",
+    "combining unrelated domain scores into one ES quality score"
+  ],
+  "assumptions": [
+    "TaskContext event chains and EvaluationRecords are available under a project-relative StoreRoot",
+    "PowerShell 5.1 or later is available for the platform-neutral static implementation",
+    "stable success requires at least two task observations for the same frozen GoalRevision hash"
+  ],
+  "unresolvedQuestions": [],
+  "intentAlignmentStatus": "aligned",
+  "executionDecision": "allow",
+  "revision": 3,
+  "sourceRefs": [
+    "current user objective: commercial-grade controllable AI collaboration platform",
+    "ES/Automation/Contracts/es-task-context-runtime-intent-v1.json",
+    "ES/Automation/Contracts/es-evaluation-record-v1.schema.json",
+    "ES/Automation/Contracts/es-evidence-verifier.registry.json",
+    ".agents/skills/es-static-deep-replay/scripts/Invoke-ESStaticDeepReplay.ps1",
+    "ES/Automation/TaskContextRuntime/references/state-transition-contract.md",
+    "AGENTS.md"
+  ],
+  "recovery": {
+    "resumeAction": "Re-read the selected TaskContext event chains and EvaluationRecords, discard the uncommitted report, and regenerate from the current verified snapshot.",
+    "partialStatePolicy": "Fail the report on tamper or identity mismatch; keep individual unavailable metrics evidence-pending without mutating source tasks."
+  }
+}

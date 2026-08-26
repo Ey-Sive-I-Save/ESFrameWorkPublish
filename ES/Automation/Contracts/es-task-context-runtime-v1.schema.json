@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/task-context-runtime/v1",
+  "title": "ES TaskContextRuntime v1",
+  "oneOf": [
+    { "$ref": "#/$defs/event" },
+    { "$ref": "#/$defs/completionReceipt" }
+  ],
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+    "taskStatus": { "enum": ["Active", "Suspended", "Completed", "Cancelled", "Blocked", "Invalidated"] },
+    "contextStatus": { "enum": ["Live", "Compacting", "PartiallyInvalidated", "Frozen", "Archived", "Expired", "Quarantined"] },
+    "completionDecision": { "enum": ["accepted", "rejected", "undetermined"] },
+    "deliveryAcceptance": { "enum": ["accepted", "pending", "rejected"] },
+    "sourceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "length", "sha256", "verifiedUtc"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "length": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/hash" },
+        "verifiedUtc": { "type": "string", "format": "date-time" }
+      }
+    },
+    "acceptanceProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "outcomeEvaluatorId", "outcomeEvaluatorDefinitionHash", "outcomeEvaluatorRegistryHash", "evaluationContractId", "evaluationContractHash", "requiredClaims", "requiredVerifiers", "optionalClaims", "optionalVerifiers", "verifierRegistryHash", "evidenceContractId", "evidenceContractHash", "maxEvidenceAgeHours", "allowUnverifiedClaims", "frozen", "profileHash"],
+      "properties": {
+        "profileId": { "$ref": "#/$defs/id" },
+        "outcomeEvaluatorId": { "$ref": "#/$defs/id" },
+        "outcomeEvaluatorDefinitionHash": { "$ref": "#/$defs/hash" },
+        "outcomeEvaluatorRegistryHash": { "$ref": "#/$defs/hash" },
+        "evaluationContractId": { "const": "es://automation/contracts/evaluation-record/v1" },
+        "evaluationContractHash": { "$ref": "#/$defs/hash" },
+        "requiredClaims": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "requiredVerifiers": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["claimId", "verifierId", "verifierDefinitionHash"], "properties": { "claimId": { "$ref": "#/$defs/id" }, "verifierId": { "$ref": "#/$defs/id" }, "verifierDefinitionHash": { "$ref": "#/$defs/hash" } } } },
+        "optionalClaims": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "optionalVerifiers": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["claimId", "verifierId", "verifierDefinitionHash"], "properties": { "claimId": { "$ref": "#/$defs/id" }, "verifierId": { "$ref": "#/$defs/id" }, "verifierDefinitionHash": { "$ref": "#/$defs/hash" } } } },
+        "verifierRegistryHash": { "$ref": "#/$defs/hash" },
+        "evidenceContractId": { "const": "es://automation/contracts/platform-evidence/v1" },
+        "evidenceContractHash": { "$ref": "#/$defs/hash" },
+        "maxEvidenceAgeHours": { "type": "integer", "minimum": 1, "maximum": 8760 },
+        "allowUnverifiedClaims": { "type": "boolean" },
+        "frozen": { "const": true },
+        "profileHash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "routePlanBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["routePlanId", "routePlanPath", "routePlanHash", "artifactHash", "snapshotHash", "profile", "routeState", "routeKeys", "head", "sourceRefsHash", "registryHash"],
+      "properties": {
+        "routePlanId": { "type": "string", "pattern": "^route-[a-f0-9]{32}$" },
+        "routePlanPath": { "type": "string", "minLength": 1 },
+        "routePlanHash": { "$ref": "#/$defs/hash" },
+        "artifactHash": { "$ref": "#/$defs/hash" },
+        "snapshotHash": { "$ref": "#/$defs/hash" },
+        "profile": { "$ref": "#/$defs/id" },
+        "routeState": { "enum": ["core", "extension"] },
+        "routeKeys": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "head": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "sourceRefsHash": { "$ref": "#/$defs/hash" },
+        "registryHash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["taskId", "planHash", "routePlan", "goalId", "goalRevision", "goalRevisionHash", "goalRevisionPath", "createdUtc", "interactionSessionId", "taskRevision", "contextVersion", "taskStatus", "contextStatus", "completionDecision", "deliveryAcceptance", "acceptanceProfile", "requestedSourceScope", "resolvedSourceScope", "verifiedSourceScope", "verifiedSourceScopeHash", "evidenceSet", "completionReceipt", "idempotencyKeys"],
+      "properties": {
+        "taskId": { "$ref": "#/$defs/id" },
+        "planHash": { "$ref": "#/$defs/hash" },
+        "routePlan": { "$ref": "#/$defs/routePlanBinding" },
+        "goalId": { "$ref": "#/$defs/id" },
+        "goalRevision": { "type": "string", "pattern": "^r[1-9][0-9]{0,8}$" },
+        "goalRevisionHash": { "$ref": "#/$defs/hash" },
+        "goalRevisionPath": { "type": "string", "minLength": 1 },
+        "createdUtc": { "type": "string", "format": "date-time" },
+        "interactionSessionId": { "oneOf": [{ "type": "string", "pattern": "^[a-f0-9-]{16,64}$" }, { "type": "null" }] },
+        "taskRevision": { "type": "integer", "minimum": 1 },
+        "contextVersion": { "type": "integer", "minimum": 1 },
+        "taskStatus": { "$ref": "#/$defs/taskStatus" },
+        "contextStatus": { "$ref": "#/$defs/contextStatus" },
+        "completionDecision": { "$ref": "#/$defs/completionDecision" },
+        "deliveryAcceptance": { "$ref": "#/$defs/deliveryAcceptance" },
+        "acceptanceProfile": { "$ref": "#/$defs/acceptanceProfile" },
+        "requestedSourceScope": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "resolvedSourceScope": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "verifiedSourceScope": { "type": "array", "items": { "$ref": "#/$defs/sourceEntry" } },
+        "verifiedSourceScopeHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+        "evidenceSet": { "oneOf": [{ "$ref": "es-platform-evidence-v1.schema.json#/$defs/normalizedEvidenceSet" }, { "type": "null" }] },
+        "completionReceipt": { "oneOf": [{ "type": "object", "required": ["path", "receiptHash"], "properties": { "path": { "type": "string" }, "receiptHash": { "$ref": "#/$defs/hash" } } }, { "type": "null" }] },
+        "idempotencyKeys": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "completionDecision": { "const": "accepted" } }, "required": ["completionDecision"] },
+          "then": { "properties": { "taskStatus": { "const": "Completed" }, "contextStatus": { "const": "Frozen" }, "completionReceipt": { "type": "object" } } }
+        }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "eventId", "eventType", "occurredUtc", "previousEventHash", "eventHash", "state"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "eventId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "eventType": { "type": "string", "minLength": 1 },
+        "occurredUtc": { "type": "string", "format": "date-time" },
+        "previousEventHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+        "eventHash": { "$ref": "#/$defs/hash" },
+        "state": { "$ref": "#/$defs/state" },
+        "metadata": { "type": "object" }
+      }
+    },
+    "completionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "receiptId", "taskId", "taskRevision", "contextVersion", "planHash", "routePlanId", "routePlanPath", "routePlanHash", "routePlanArtifactHash", "routePlanSnapshotHash", "goalRevisionHash", "acceptanceProfileHash", "evidenceContractId", "evidenceContractHash", "evaluationId", "evaluationRecordPath", "evaluationRecordHash", "evidenceSetHash", "verifiedSourceScopeHash", "completionDecision", "issuedUtc", "receiptHash"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "receiptId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "taskId": { "$ref": "#/$defs/id" },
+        "taskRevision": { "type": "integer", "minimum": 1 },
+        "contextVersion": { "type": "integer", "minimum": 1 },
+        "planHash": { "$ref": "#/$defs/hash" },
+        "routePlanId": { "type": "string", "pattern": "^route-[a-f0-9]{32}$" },
+        "routePlanPath": { "type": "string", "minLength": 1 },
+        "routePlanHash": { "$ref": "#/$defs/hash" },
+        "routePlanArtifactHash": { "$ref": "#/$defs/hash" },
+        "routePlanSnapshotHash": { "$ref": "#/$defs/hash" },
+        "goalRevisionHash": { "$ref": "#/$defs/hash" },
+        "acceptanceProfileHash": { "$ref": "#/$defs/hash" },
+        "evidenceContractId": { "const": "es://automation/contracts/platform-evidence/v1" },
+        "evidenceContractHash": { "$ref": "#/$defs/hash" },
+        "evaluationId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "evaluationRecordPath": { "type": "string", "minLength": 1 },
+        "evaluationRecordHash": { "$ref": "#/$defs/hash" },
+        "evidenceSetHash": { "$ref": "#/$defs/hash" },
+        "verifiedSourceScopeHash": { "$ref": "#/$defs/hash" },
+        "completionDecision": { "const": "accepted" },
+        "issuedUtc": { "type": "string", "format": "date-time" },
+        "receiptHash": { "$ref": "#/$defs/hash" }
+      }
+    }
+  }
+}

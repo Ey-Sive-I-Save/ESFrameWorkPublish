@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/commercial-metric-registry/v1",
+  "title": "ES Commercial Metric Registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "$id", "registryId", "scope", "metrics"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "$id": { "const": "es://automation/contracts/commercial-metric-registry/v1" },
+    "registryId": { "const": "es.ai-collaboration.commercial-metrics.v1" },
+    "scope": { "const": "task-cohort" },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["metricId", "sourceAuthority", "calculation", "unit", "missingEvidencePolicy", "scope", "implementationState"],
+        "properties": {
+          "metricId": { "enum": ["successRate", "stableSuccessRate", "hardViolationRate", "claimOverstatementRate", "humanCorrectionRate", "meanLatency", "meanCost", "recoveryRate", "regressionPassRate"] },
+          "sourceAuthority": { "enum": ["TaskContextRuntime", "registered-external-verifier"] },
+          "calculation": { "enum": ["accepted-latest-evaluations", "all-accepted-goal-cohorts", "task-blocking-failure-observations", "claim-audit-observations", "interaction-correction-observations", "first-event-to-latest-evaluation", "verified-run-cost-observations", "nonaccepted-to-accepted-transitions", "registered-regression-results"] },
+          "unit": { "enum": ["ratio", "milliseconds", "cost-units"] },
+          "missingEvidencePolicy": { "const": "evidence-pending-null" },
+          "scope": { "const": "task-cohort" },
+          "implementationState": { "enum": ["platform-derived", "evidence-pending"] }
+        }
+      }
+    }
+  }
+}

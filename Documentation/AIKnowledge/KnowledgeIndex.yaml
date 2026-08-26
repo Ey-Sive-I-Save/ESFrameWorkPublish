@@ -80,7 +80,7 @@ entries:
       - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: f4bed972d8eaa714ab956ecbe65ca5dd2b5eac7cc74bfd018400f252521398b2
+    contentHash: bbd42d2ed32462bcbaffe51efc9a16c75976f0bb7e67120d0903dc8a9c43a450
     staleWhen: AIBrain/ESAutomationCenter/TaskContract/Skill治理元数据结构或权威路由变化
   - knowledgeId: es.knowledge.routing-quality.v1
     file: entries/knowledge-routing-quality.md
@@ -97,7 +97,7 @@ entries:
       - Documentation/AIKnowledge/tools/Test-ESKnowledgeRouteProbeRegistry.ps1
     authority: Derived from current project contracts and routing source
     evidenceLevel: S1
-    contentHash: f0f605a86d0bbf37374dad191b2ce3669d0988aae3f5f34e319461d1692a878a
+    contentHash: c0268b32a74aec9f441525b70d0b9b662e42190748ead90b7ce0b9b6b7c8e462
     staleWhen: 任一 SourceRef 哈希、Knowledge 条目合同、AIBrain 选择算法、用户定向低风险策略、AICommand 权限或验证器判定规则变化
   - knowledgeId: es.knowledge.maintenance-transaction.v1
     file: entries/knowledge-maintenance-transaction.md
@@ -149,7 +149,7 @@ entries:
       - Documentation/ES_AUTOMATION_CENTER_STANDARD.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: 213843683a35870c55805831ca987af5525b29d21deef115d9acdb5892e554ef
+    contentHash: 08d52951a7f03caf4983af215bc2f908e5d8e5696bec49186204d7092b71f8a9
     staleWhen: Feishu SDK/API、凭据策略、Node Worker/C# TaskContract、Unity 受管运行证据或任一 SourceRef 哈希变化
   - knowledgeId: es.feishu.task-lifecycle.v1
     file: entries/feishu-task-lifecycle.md
@@ -188,8 +188,27 @@ entries:
       - Documentation/ES_AUTOMATION_GOVERNANCE_CONTRACTS.md
     authority: Derived
     evidenceLevel: S1
-    contentHash: c48888f858ce0df2c7a895b3294db72608dfd9f5b49a2792fbb58f084bc80ff0
+    contentHash: aa7e483c14ecbc5b389d466ce36e8d6cf6b26b7b01719ae0dc2f87b6c2a405d6
     staleWhen: ESAutomation TaskContract、CompletionDecision、Verifier 或 Receipt 合同变更
+  - knowledgeId: es.automation.task-context-runtime.v1
+    file: entries/task-context-runtime.md
+    topic: Skill-agnostic TaskContextRuntime 状态、证据、Receipt 与适配边界
+    routeKeys: [task-context-runtime, task-lifecycle, context-lifecycle, goal-revision, route-plan, completion-decision, delivery-acceptance, evidence-set, evidence-verifier, source-scope, receipt, cas, reopen]
+    relatedSkills: [es-task-context-runtime, es-task-read-snapshot, es-observability-evidence, es-aibrain-route-authoring]
+    requiredReads:
+      - ES/Automation/Contracts/es-task-context-runtime-intent-v1.json
+      - ES/Automation/Contracts/es-task-context-runtime-integration-policy-v1.json
+      - ES/Automation/Contracts/es-route-plan-v1.schema.json
+      - ES/Automation/Contracts/es-route-stage.registry.json
+      - ES/Automation/RoutePlan/ESRoutePlanContract.psm1
+      - ES/Automation/Contracts/es-task-context-evaluation-adapter-v1.json
+      - ES/Automation/TaskContextRuntime/references/state-transition-contract.md
+      - .agents/skills/es-task-context-runtime/SKILL.md
+      - Assets/Plugins/ES/AICommands/任务上下文运行时_受控生命周期_AI命令.md
+    authority: Derived
+    evidenceLevel: S2
+    contentHash: 536b478f58ba2dcdf9a3d4143a2966dcdccc5d333523aacdb1bfc2566467c3e5
+    staleWhen: TaskContextRuntime intent、integration policy、schema、平台模块、状态迁移合同、Skill 或 AICommand 入口变化
   - knowledgeId: es.function-area.governance.v1
     file: entries/function-area-routing.md
     topic: 治理与规划功能区
@@ -399,7 +418,7 @@ entries:
       - Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/AgentSkills与AICommands协作边界_AI协作警告.md
     authority: Source + AIWarnings
     evidenceLevel: S1
-    contentHash: 977ed67f7e74bc04d568b6a2cd7899033d111d68db68ccec469c5c3e43d3c91c
+    contentHash: c013219b943891e78db1dd9facf44a03a3cf3aabb5d8f8880fde3a96367514bb
     staleWhen: PlanHash、TaskContract、Worker、Bridge、Graph 或 RunRecord 合同变化
   - knowledgeId: es.project.editor-workbench-authoring.v1
     file: entries/editor-workbench-authoring.md
@@ -465,9 +484,12 @@ entries:
       - .agents/skills/es-ui-intent-authoring/references/intent-spec.contract.md
       - .agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json
       - .agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md
+      - .agents/skills/es-ui-prefab-authoring/scripts/validate_ui_snapshot_evidence.py
+      - .agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md
+      - Assets/Scripts/ESLogic/Runtime/UI/ESUIFocalCropRawImage.cs
     authority: Source + Skill contract + Unity evidence
     evidenceLevel: S2
-    contentHash: 33a8494f7df449fe62f498842d8b547ca0be9de19c2b9700c920197bf88f058b
+    contentHash: 961b5be9ece1f541575199a017ef67fc08f04cc6da4704d5ef4ece37676e9577
     staleWhen: ScreenSpec schema、组件注册表、Materializer、Prefab/Fixture 产物或视觉证据合同变化
   - knowledgeId: es.project.game-ui-open-source-automation-patterns.v1
     file: entries/game-ui-open-source-automation-patterns.md
@@ -522,7 +544,6 @@ entries:
       - .agents/skills/es-ui-intent-authoring/references/intent-spec.contract.md
       - .agents/skills/es-ui-intent-authoring/references/player-intent-registry.json
       - .agents/skills/es-ui-intent-authoring/scripts/validate_intent_spec.py
-      - .agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py
     authority: Governed UI intent Skill + IntentSpec contract + player-intent registry + validator source
     evidenceLevel: S1
     hashSchema: v2
@@ -548,15 +569,16 @@ entries:
       - .agents/skills/es-ui-prefab-authoring/SKILL.md
       - .agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json
       - .agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md
+      - .agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md
       - .agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py
       - .agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py
       - Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs
     authority: Current project source + governed UI authoring contracts + derived screen-family decisions
     evidenceLevel: S0
     hashSchema: v2
-    contentHash: b2c4d82041129aa49cc56270499594c65b19bef688bc666bdf9c8a9360e94da1
-    sourceSetHash: b2c4d82041129aa49cc56270499594c65b19bef688bc666bdf9c8a9360e94da1
-    entryBodyHash: e7b24c2cbc0d4e090358e5ea50f1af7f3c8ad06a9cc06f8d662a90a56bdff5cd
+    contentHash: 31688f658b350df9cb0673b15aa5e67654e75df06f4532e2a544dd3c7ed68485
+    sourceSetHash: 31688f658b350df9cb0673b15aa5e67654e75df06f4532e2a544dd3c7ed68485
+    entryBodyHash: c77910234aab1d80355ae501d6323a9d8b5e75fc5898fbc52f3a3d7120f0d90f
     staleWhen: ScreenSpec v3、组件注册表、Validator、Adapter、Materializer、现有 UI canonical 条目、官方来源锁或任一 SourceRef 哈希变化。
   - knowledgeId: es.project.game-ui-visual-design-system.v1
     file: entries/game-ui-visual-design-system.md
@@ -574,18 +596,99 @@ entries:
       - .agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json
       - .agents/skills/es-ui-prefab-authoring/references/ai-visual-brief.md
       - .agents/skills/es-ui-prefab-authoring/references/commercial-ui-patterns.md
+      - .agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md
       - .agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py
       - .agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py
       - Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs
+      - Assets/Scripts/ESLogic/Runtime/UI/ESUIFocalCropRawImage.cs
       - Documentation/ES_UI_AUTHORING_WORKFLOW.md
       - Packages/manifest.json
     authority: Current project source + governed UI authoring contracts + derived visual-system decisions + official source snapshot
     evidenceLevel: S0
     hashSchema: v2
-    contentHash: 1292ed146928c166eb8eb04184f6f5e72eba52c23de7fe2a0fac133a85e96965
-    sourceSetHash: 1292ed146928c166eb8eb04184f6f5e72eba52c23de7fe2a0fac133a85e96965
-    entryBodyHash: 0791dccb8c80011d7ff23ab309d43d16751f02082174a9ac0517a30db1ca9130
+    contentHash: bbb23209e5b17cf215d3c242cbe42e4cd49491bcdadf4f3bdc9b80c5e532e089
+    sourceSetHash: bbb23209e5b17cf215d3c242cbe42e4cd49491bcdadf4f3bdc9b80c5e532e089
+    entryBodyHash: 5d9360db8472fb07b89adcfcaaefb24fe591fa40a2618e68240357ffe78839ac
     staleWhen: ScreenSpec v3 Token schema、Validator、Adapter、Materializer、字体/素材治理、视觉证据合同、官方来源锁或任一 SourceRef 哈希变化。
+  - knowledgeId: es.project.game-ui-capability-readiness.v1
+    file: entries/game-ui-capability-readiness.md
+    topic: 游戏 UI 自动测量、布局求解、素材、Token、Behavior Bridge、视觉评分与修复闭环的能力就绪判定
+    routeKeys: [ui-automation, ui-capability-readiness, ui-reference-measurement, ui-layout-solver, ui-conflict-diagnosis, ui-asset-generation, ui-visual-design, ui-behavior-bridge, ui-visual-evaluation, ui-repair-loop, design-to-unity, ui-mcp]
+    relatedSkills: [es-ui-prefab-authoring, es-ui-intent-authoring, es-knowledge-creator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/game-ui-capability-readiness.md
+      - Documentation/AIKnowledge/entries/ui-automation-authoring.md
+      - Documentation/AIKnowledge/entries/game-ui-open-source-automation-patterns.md
+      - Documentation/AIKnowledge/entries/game-ui-visual-design-system.md
+      - Documentation/AIKnowledge/UI/game-ui-vision-input-source-snapshot.md
+      - Documentation/AIKnowledge/UI/game-ui-open-source-automation-source-snapshot.md
+      - Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md
+      - Documentation/AIKnowledge/UI/unity-ui-canvas-layout.md
+      - Documentation/AIKnowledge/UI/unity-ui-layout-clipping.md
+      - Documentation/AIKnowledge/UI/unity-ui-interaction-rendering.md
+      - .agents/skills/es-ui-prefab-authoring/SKILL.md
+      - .agents/skills/es-ui-prefab-authoring/scripts/resolve_ui_asset_manifest.py
+      - .agents/skills/es-ui-prefab-authoring/scripts/ingest_ui_reference.py
+      - .agents/skills/es-ui-prefab-authoring/scripts/resolve_ui_layout_plan.py
+      - .agents/skills/es-ui-prefab-authoring/scripts/evaluate_ui_tokens.py
+      - .agents/skills/es-ui-prefab-authoring/scripts/evaluate_ui_typography.py
+      - .agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py
+      - .agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py
+      - .agents/skills/es-ui-prefab-authoring/scripts/validate_ui_snapshot_evidence.py
+      - .agents/skills/es-ui-prefab-authoring/scripts/validate_ui_gpu_evidence.py
+      - Assets/Scripts/ESLogic/Editor/UI/ESUIScreenSpecAdapter.cs
+      - Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs
+      - Assets/Scripts/ESLogic/Runtime/UI/ESUIFocalCropRawImage.cs
+      - Packages/manifest.json
+      - ProjectSettings/ProjectVersion.txt
+    authority: Current ES source/contracts + Unity 2022.3 package facts + bounded external source snapshots
+    evidenceLevel: S0
+    hashSchema: v2
+    contentHash: 0403ef069ff967998fcb540db6085e04dba8890fa9572352cd99a7ca1a9fa958
+    sourceSetHash: 0403ef069ff967998fcb540db6085e04dba8890fa9572352cd99a7ca1a9fa958
+    entryBodyHash: 77537b838581196412620a6aa63754213c3c3e4d3f0b82522941b61ecb3d2ec1
+    staleWhen: ScreenSpec schema、Validator、Adapter、Materializer、组件/素材注册、Unity/UGUI/Input System/TMP 版本、视觉证据合同、外部来源快照或任一 SourceRef 哈希变化。
+  - knowledgeId: es.project.game-ui-request-intent-contract.v1
+    file: entries/game-ui-request-intent-contract.md
+    topic: 游戏 UI 需求意图、屏幕族、主动作、视觉目标与参考策略的不可漂移合同
+    routeKeys: [ui-automation, ui-workflow, ui-intent, ui-screen-family, ui-visual-design, requirements-traceability, intent-drift, reference-policy]
+    relatedSkills: [es-ui-intent-authoring, es-ui-prefab-authoring, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/game-ui-request-intent-contract.md
+      - Documentation/AIKnowledge/entries/game-ui-player-intent-spec.md
+      - Documentation/AIKnowledge/entries/game-ui-screen-family-decisions.md
+      - Documentation/AIKnowledge/entries/game-ui-reference-design-evidence.md
+      - .agents/skills/es-ui-intent-authoring/SKILL.md
+      - .agents/skills/es-ui-intent-authoring/references/intent-spec.contract.md
+      - .agents/skills/es-ui-prefab-authoring/SKILL.md
+      - .agents/skills/es-ui-prefab-authoring/scripts/generate_ui_iteration_packet.py
+      - .agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py
+      - .agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md
+    authority: Current UI intent/ScreenSpec contracts, generator, validator and failure-feedback rules
+    evidenceLevel: S0
+    hashSchema: v2
+    contentHash: a86f981dd23b1804f8e3cd1e1a0cd58d88e0b6394ea7be53db19b348decc12cf
+    sourceSetHash: a86f981dd23b1804f8e3cd1e1a0cd58d88e0b6394ea7be53db19b348decc12cf
+    entryBodyHash: 5aeb90d5c36c122b7431347a573e7d44fa94094e74098cbbe479dff716f58d34
+    staleWhen: ScreenSpec schema、Task Classifier、IntentSpec、Generator、Validator、视觉参考入口、产品边界或任一 SourceRef 哈希变化。
+  - knowledgeId: es.project.game-ui-vision-input-source-snapshot.v1
+    file: UI/game-ui-vision-input-source-snapshot.md
+    topic: 游戏 UI 参考图解析、测量候选、设计 IR 与视觉诊断的外部来源锁
+    routeKeys: [ui-automation, ui-reference-measurement, ui-vision-input, design-ir, source-map, visual-diagnosis]
+    relatedSkills: [es-ui-prefab-authoring, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/UI/game-ui-vision-input-source-snapshot.md
+      - Documentation/AIKnowledge/UI/game-ui-open-source-automation-source-snapshot.md
+      - Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md
+      - .agents/skills/es-ui-prefab-authoring/scripts/ingest_ui_reference.py
+      - Documentation/AIKnowledge/entries/game-ui-reference-design-evidence.md
+    authority: Pinned external vision/design-source snapshots + current ES reference-ingestion contract
+    evidenceLevel: S0
+    hashSchema: v2
+    contentHash: c607207e65f8f322e63cb2e0526c1a97190f1c1cd1cfd75461568a0458b59afa
+    sourceSetHash: c607207e65f8f322e63cb2e0526c1a97190f1c1cd1cfd75461568a0458b59afa
+    entryBodyHash: 0000000000000000000000000000000000000000000000000000000000000000
+    staleWhen: pinned repository/model source hash、参考图测量器、ScreenSpec/LayoutPlan/Materializer 合同或任一 SourceRef 哈希变化。
   - knowledgeId: es.project.game-ui-reference-design-evidence.v1
     file: entries/game-ui-reference-design-evidence.md
     topic: 游戏 UI 参考图 provenance、区域、观察/假设与输入侧 design evidence
@@ -616,6 +719,7 @@ entries:
       - .agents/skills/es-ui-prefab-authoring/references/game-ui-screen-spec.v3.template.json
       - .agents/skills/es-ui-prefab-authoring/references/game-ui-component-registry.json
       - .agents/skills/es-ui-prefab-authoring/references/game-ui-materializer-contract.md
+      - .agents/skills/es-ui-prefab-authoring/references/ui-failure-feedback-rules.md
       - .agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py
       - .agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py
       - Assets/Scripts/ESLogic/Editor/UI/ESUIScreenSpecAdapter.cs
@@ -630,6 +734,36 @@ entries:
     sourceSetHash: 58e08515b70bb85d851cd9c3d8b6431ea9c8ad56b4a7a7734669c1a6e33c1004
     entryBodyHash: 682ce7a02d577f0b490f9989bf862eca2e002145763ccea5d50a886951ff8ee4
     staleWhen: ScreenSpec assets schema、Registry、Validator、任一 Adapter、Materializer/resolver、Unity Image/SpriteAtlas 版本、资源发布方案、官方来源锁或任一 SourceRef 哈希变化。
+  - knowledgeId: es.project.game-ui-ai-workflow-divergence-and-quality-gates.v1
+    file: entries/game-ui-ai-workflow-divergence-and-quality-gates.md
+    topic: Unity 游戏 UI AI 工作流分歧、真实贴图、多分辨率、配色和字体质量门
+    routeKeys: [ui-automation, ui-workflow, ui-layout, responsive, ui-asset-manifest, asset-provenance, ui-visual-design, design-token, typography-role, font-fallback, ui-visual-evaluation, design-to-unity]
+    relatedSkills: [es-ui-prefab-authoring, es-knowledge-creator, es-knowledge-validator]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/game-ui-ai-workflow-divergence-and-quality-gates.md
+      - Documentation/AIKnowledge/entries/game-ui-capability-readiness.md
+      - Documentation/AIKnowledge/entries/game-ui-visual-design-system.md
+      - Documentation/AIKnowledge/entries/game-ui-asset-manifest.md
+      - Documentation/AIKnowledge/entries/ui-automation-authoring.md
+      - Documentation/AIKnowledge/UI/game-ui-design-official-source-lock.md
+      - Documentation/AIKnowledge/UI/unity-official-agent-skills-source-snapshot.md
+      - Documentation/AIKnowledge/UI/game-ui-open-source-automation-source-snapshot.md
+      - Documentation/AIKnowledge/UI/unity-ui-canvas-layout.md
+      - Documentation/AIKnowledge/UI/unity-ui-interaction-rendering.md
+      - .agents/skills/es-ui-prefab-authoring/SKILL.md
+      - .agents/skills/es-ui-prefab-authoring/scripts/screen_spec_adapter.py
+      - .agents/skills/es-ui-prefab-authoring/scripts/validate_game_ui_screen_spec.py
+      - Assets/Scripts/ESLogic/Editor/UI/ESUIScreenSpecAdapter.cs
+      - Assets/Scripts/ESLogic/Editor/UI/ESUIGameScreenMaterializer.cs
+      - Packages/manifest.json
+      - ProjectSettings/ProjectVersion.txt
+    authority: Pinned Unity official source snapshots + bounded open-source workflow snapshots + current ES UI contracts
+    evidenceLevel: S0
+    hashSchema: v2
+    contentHash: 1e00de96de85c990840af38562c0b4fe3375f68d36699cc65f3a63e985493baf
+    sourceSetHash: 1e00de96de85c990840af38562c0b4fe3375f68d36699cc65f3a63e985493baf
+    entryBodyHash: 22dc7e0b4aa2767473997bbb791d0c79d2e370396fdddbd6ee2cf0ced277077e
+    staleWhen: Unity/UGUI/TMP/Input System version, ScreenSpec/Validator/Adapter/Materializer schema, AssetManifest/Token/Font contract, pinned external source hash, or visual evidence contract changes.
   - knowledgeId: es.project.game-ui-behavior-focus-navigation.v1
     file: entries/game-ui-behavior-focus-navigation.md
     topic: 游戏 UI BehaviorSpec、binding、状态转换、焦点图、Selectable Navigation 与输入 modality
@@ -672,9 +806,9 @@ entries:
     authority: Current ScreenSpec/adapter/materializer source + TMP/package facts + official source snapshot
     evidenceLevel: S0
     hashSchema: v2
-    contentHash: 6cb6664e2d64a289c375d46603a6d9e421c366d62cc2823b93643ec038f3b81f
-    sourceSetHash: 6cb6664e2d64a289c375d46603a6d9e421c366d62cc2823b93643ec038f3b81f
-    entryBodyHash: a1ac054d4f341afe0ed7e45ec2de4dfd2fcb2429238b8670aac3ba710a9702a8
+    contentHash: 0632d7088c2e111810f6dcec9514fe2072a3e14d89c6bb2615f34cd284696c8d
+    sourceSetHash: 0632d7088c2e111810f6dcec9514fe2072a3e14d89c6bb2615f34cd284696c8d
+    entryBodyHash: 1fdd595cb1c67811e67bba92053e9496f9eddda1772493e3895482632d02e861
     staleWhen: ScreenSpec/text schema、Visual Brief、Validator、任一 Adapter、Materializer/Fixture Driver、TMP/Localization/Accessibility 包或字体资产、官方来源锁、locale/text fixture 或任一 SourceRef 哈希变化。
   - knowledgeId: es.project.shot-performance-evidence.v1
     file: entries/shot-performance-evidence.md
@@ -1073,7 +1207,7 @@ entries:
     requiredReads: [Documentation/AIKnowledge/Editor/project-screen-spec-materializer/visual-evidence-boundary.md]
     authority: AIWarnings P0 + current Materializer source + governed evidence contract
     evidenceLevel: S1
-    contentHash: 0dfe6ff12ee21e492661785a9b64cec3caa4dea156d1a1399f68d0ac5a3df909
+    contentHash: 4a6fc8d225bb99e2545008e3a9367a47ec420932134a8f8e87a016aea3501fdc
     staleWhen: Unity、Materializer 捕获、证据等级、UI 作者工作流或任一 SourceRef 哈希变化
   - knowledgeId: es.project.stable-graph-v2.v1
     file: Editor/project-stable-graph-v2/stable-graph-v2-authoring.md
@@ -1206,7 +1340,7 @@ entries:
     requiredReads: [Documentation/AIKnowledge/Engineering/engineering-performance-evidence/hot-path-container-performance-evidence-contract.md]
     authority: Unity official documentation + Source + AIWarnings + AICommand + Skill contracts
     evidenceLevel: S1
-    contentHash: d5110365cc32a1dc4be2efd6055f363f6f4ed3fd51d3a9e80741dd5fde90d27f
+    contentHash: f7bd6fec4df06e31d68592bc9fe493238c09e8a8f9eed950b195dcf12f8b6454
     staleWhen: Unity、热路径容器 P0、Pool、性能预算、证据回执、Automation RunRecord、AICommand、目标平台或任一 SourceRef 哈希变化
   - knowledgeId: es.engineering.managed-allocation-static-audit.v1
     file: Engineering/engineering-performance-evidence/managed-allocation-static-audit.md
@@ -1248,6 +1382,24 @@ entries:
     evidenceLevel: S1
     contentHash: cd0dd576fed08a778ae98eaa6df9d4c4a6747a633cf2009158d5aa7d92943804
     staleWhen: Unity 版本或官方来源响应、Time/Physics/Layer 项目设置、ESPhysicsLayers、ESPhysicsQueryModule、物理查询测试定义、AIWarnings 运动规则或任一 SourceRef 哈希变化
+  - knowledgeId: es.ai.collaboration-menu.v1
+    file: entries/ai-collaboration-menu.md
+    topic: AI 协作菜单、稳定选项与只读路由边界
+    routeKeys: [menu, collaboration-menu, guidance, creation, iteration, framework-governance, evidence, context-discovery, session-coordination]
+    relatedSkills: [es-ai-collaboration-menu, es-ai-interaction-governance, es-codex-session-bootstrap, es-aibrain-route-authoring]
+    requiredReads:
+      - Documentation/AIKnowledge/entries/ai-collaboration-menu.md
+      - .agents/skills/es-ai-collaboration-menu/SKILL.md
+      - .agents/skills/es-ai-collaboration-menu/references/menu-contract.md
+      - .agents/skills/es-ai-collaboration-menu/references/menu-options.json
+      - .agents/skills/es-ai-collaboration-menu/references/session-submenu.json
+    authority: es-ai-collaboration-menu contract and current project routing policy
+    evidenceLevel: S1
+    hashSchema: v2
+    contentHash: 38760a9c65b60d06aec5ef184fbb072dab538af25b293bd9b25379ea1c04987e
+    sourceSetHash: 38760a9c65b60d06aec5ef184fbb072dab538af25b293bd9b25379ea1c04987e
+    entryBodyHash: 89505c519a82e7cf4ad1387d4d733922731b4e10f454e84c8b2febc063006c2f
+    staleWhen: 菜单合同、选项表、会话子菜单、只读边界、验证器或任一 SourceRef 哈希变化
   - knowledgeId: es.ai.interaction-governance.v1
     file: entries/ai-interaction-governance.md
     topic: AI 用户交互评价、任务收尾和可注入下一步候选治理

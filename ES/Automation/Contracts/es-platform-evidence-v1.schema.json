@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/platform-evidence/v1",
+  "title": "ES Platform CandidateEvidence and EvidenceSet v1",
+  "oneOf": [
+    { "$ref": "#/$defs/candidateEvidenceSet" },
+    { "$ref": "#/$defs/legacyCandidateEvidenceSet" },
+    { "$ref": "#/$defs/normalizedEvidenceSet" }
+  ],
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+    "candidateOutcome": { "enum": ["passed", "failed", "unverified"] },
+    "candidateProducerType": { "enum": ["platform", "adapter", "skill", "worker", "human"] },
+    "contradiction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["critical", "description"],
+      "properties": {
+        "critical": { "type": "boolean" },
+        "description": { "type": "string", "minLength": 1 }
+      }
+    },
+    "sourceDrift": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "expectedHash", "actualHash", "resolved"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "expectedHash": { "$ref": "#/$defs/hash" },
+        "actualHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+        "resolved": { "type": "boolean" }
+      }
+    },
+    "candidateEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claimId", "candidateOutcome", "capturedUtc", "sourceScopeHash", "candidateEvidenceHash", "candidateProducerType", "artifactPath"],
+      "properties": {
+        "claimId": { "$ref": "#/$defs/id" },
+        "candidateOutcome": { "$ref": "#/$defs/candidateOutcome" },
+        "capturedUtc": { "type": "string", "format": "date-time" },
+        "sourceScopeHash": { "$ref": "#/$defs/hash" },
+        "candidateEvidenceHash": { "$ref": "#/$defs/hash" },
+        "candidateProducerType": { "$ref": "#/$defs/candidateProducerType" },
+        "artifactPath": { "type": ["string", "null"] }
+      }
+    },
+    "legacyCandidateEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claimId", "outcome", "capturedUtc", "sourceScopeHash", "evidenceHash", "producerType", "artifactPath"],
+      "properties": {
+        "claimId": { "$ref": "#/$defs/id" },
+        "outcome": { "$ref": "#/$defs/candidateOutcome" },
+        "capturedUtc": { "type": "string", "format": "date-time" },
+        "sourceScopeHash": { "$ref": "#/$defs/hash" },
+        "evidenceHash": { "$ref": "#/$defs/hash" },
+        "producerType": { "$ref": "#/$defs/candidateProducerType" },
+        "artifactPath": { "type": ["string", "null"] }
+      }
+    },
+    "candidateEvidenceSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "contractId", "contractHash", "recordType", "taskId", "evidenceSetId", "capturedUtc", "items", "contradictions", "sourceDrift", "unverifiedClaims"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "contractId": { "const": "es://automation/contracts/platform-evidence/v1" },
+        "contractHash": { "$ref": "#/$defs/hash" },
+        "recordType": { "const": "CandidateEvidenceSet" },
+        "taskId": { "$ref": "#/$defs/id" },
+        "evidenceSetId": { "$ref": "#/$defs/id" },
+        "capturedUtc": { "type": "string", "format": "date-time" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/candidateEvidence" } },
+        "contradictions": { "type": "array", "items": { "$ref": "#/$defs/contradiction" } },
+        "sourceDrift": { "type": "array", "items": { "$ref": "#/$defs/sourceDrift" } },
+        "unverifiedClaims": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+      }
+    },
+    "legacyCandidateEvidenceSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "taskId", "evidenceSetId", "capturedUtc", "items", "contradictions", "sourceDrift", "unverifiedClaims"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "taskId": { "$ref": "#/$defs/id" },
+        "evidenceSetId": { "$ref": "#/$defs/id" },
+        "capturedUtc": { "type": "string", "format": "date-time" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/legacyCandidateEvidence" } },
+        "contradictions": { "type": "array", "items": { "$ref": "#/$defs/contradiction" } },
+        "sourceDrift": { "type": "array", "items": { "$ref": "#/$defs/sourceDrift" } },
+        "unverifiedClaims": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+      }
+    },
+    "normalizedEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claimId", "outcome", "candidateOutcome", "capturedUtc", "sourceScopeHash", "evidenceHash", "candidateEvidenceHash", "producerType", "candidateProducerType", "verificationStatus", "verifierId", "verifierDefinitionHash", "artifactHash", "artifactPath"],
+      "properties": {
+        "claimId": { "$ref": "#/$defs/id" },
+        "outcome": { "enum": ["passed", "failed", "unverified"] },
+        "candidateOutcome": { "$ref": "#/$defs/candidateOutcome" },
+        "capturedUtc": { "type": "string", "format": "date-time" },
+        "sourceScopeHash": { "$ref": "#/$defs/hash" },
+        "evidenceHash": { "$ref": "#/$defs/hash" },
+        "candidateEvidenceHash": { "$ref": "#/$defs/hash" },
+        "producerType": { "enum": ["platform", "unverified"] },
+        "candidateProducerType": { "$ref": "#/$defs/candidateProducerType" },
+        "verificationStatus": { "enum": ["verified", "unverified", "rejected"] },
+        "verifierId": { "type": ["string", "null"] },
+        "verifierDefinitionHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+        "artifactHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+        "artifactPath": { "type": ["string", "null"] }
+      }
+    },
+    "normalizedEvidenceSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "contractId", "contractHash", "recordType", "inputContractMode", "taskId", "evidenceSetId", "capturedUtc", "items", "contradictions", "sourceDrift", "unverifiedClaims", "evidenceSetHash"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "contractId": { "const": "es://automation/contracts/platform-evidence/v1" },
+        "contractHash": { "$ref": "#/$defs/hash" },
+        "recordType": { "const": "EvidenceSet" },
+        "inputContractMode": { "enum": ["canonical-v1", "legacy-task-context-v1"] },
+        "taskId": { "$ref": "#/$defs/id" },
+        "evidenceSetId": { "$ref": "#/$defs/id" },
+        "capturedUtc": { "type": "string", "format": "date-time" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/normalizedEvidence" } },
+        "contradictions": { "type": "array", "items": { "$ref": "#/$defs/contradiction" } },
+        "sourceDrift": { "type": "array", "items": { "$ref": "#/$defs/sourceDrift" } },
+        "unverifiedClaims": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "evidenceSetHash": { "$ref": "#/$defs/hash" }
+      }
+    }
+  }
+}

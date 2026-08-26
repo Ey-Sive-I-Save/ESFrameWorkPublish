@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "policyId": "es.task-context-runtime.integration-acceptance.v1",
+  "coreVersion": "v1",
+  "selectionContract": {
+    "field": "requiredCapabilityIds",
+    "default": [],
+    "rule": "A conditional capability is required only when its stable capabilityId is explicitly selected by the active RuntimeAcceptance or ReleaseAcceptance profile."
+  },
+  "coreAcceptanceForbiddenTerms": [
+    "AIBrain runTask",
+    "ESAutomationFacade",
+    "Worker EvidenceSet",
+    "Codex Session adapter",
+    "Semantic Archive adapter",
+    "Unity Editor task creation",
+    "all Skills in TaskContextRuntime"
+  ],
+  "coreAcceptanceExclusions": [
+    "prohibited-capability-absence",
+    "unselected-conditional-capability-absence",
+    "core-profile-runtime-not-run",
+    "delivery-acceptance-pending",
+    "automation-accepted-not-completion"
+  ],
+  "prohibitedCapabilities": [
+    {
+      "capabilityId": "skill.global-auto-wrap",
+      "reasonCode": "CORE_V1_SKILL_AUTO_WRAP_PROHIBITED",
+      "statement": "Automatically wrapping every Skill in TaskContextRuntime is not supported.",
+      "scope": "core-v1",
+      "nonBlockingProfiles": ["StaticReview", "EngineeringReadiness", "RuntimeAcceptance", "ReleaseAcceptance"]
+    },
+    {
+      "capabilityId": "adapter.direct-lifecycle-ownership",
+      "reasonCode": "PLATFORM_LIFECYCLE_OWNERSHIP_REQUIRED",
+      "statement": "Skill, Worker, Codex Session, and Semantic Archive adapters may not own or directly mutate task or context lifecycle.",
+      "scope": "all-profiles",
+      "nonBlockingProfiles": ["StaticReview", "EngineeringReadiness", "RuntimeAcceptance", "ReleaseAcceptance"]
+    },
+    {
+      "capabilityId": "discovery.implies-business-execution",
+      "reasonCode": "DISCOVERY_IS_NOT_EXECUTION",
+      "statement": "Skill, AICommand, Catalog, or capability discovery may not trigger automatic business execution.",
+      "scope": "all-profiles",
+      "nonBlockingProfiles": ["StaticReview", "EngineeringReadiness", "RuntimeAcceptance", "ReleaseAcceptance"]
+    },
+    {
+      "capabilityId": "automation.accepted-projects-completion",
+      "reasonCode": "AUTOMATION_ACCEPTED_IS_NOT_COMPLETION",
+      "statement": "ESAutomationRunStatus.Accepted may not be projected as completionDecision=accepted.",
+      "scope": "all-profiles",
+      "nonBlockingProfiles": ["StaticReview", "EngineeringReadiness", "RuntimeAcceptance", "ReleaseAcceptance"]
+    },
+    {
+      "capabilityId": "profile.global-runtime-release-gate",
+      "reasonCode": "PROFILE_SCOPE_ISOLATION_REQUIRED",
+      "statement": "A non-target Runtime or Release capability gap may not block StaticReview or EngineeringReadiness.",
+      "scope": "all-profiles",
+      "nonBlockingProfiles": ["StaticReview", "EngineeringReadiness", "RuntimeAcceptance", "ReleaseAcceptance"]
+    }
+  ],
+  "conditionalCapabilities": [
+    {
+      "capabilityId": "aibrain.run-task",
+      "statement": "AIBrain runTask dispatch for TaskContextRuntime.",
+      "requiredOnlyWhenSelected": true,
+      "eligibleProfiles": ["RuntimeAcceptance", "ReleaseAcceptance"],
+      "nonBlockingProfiles": ["StaticReview", "EngineeringReadiness"],
+      "requiresCapabilities": ["automation-facade.task-endpoint"]
+    },
+    {
+      "capabilityId": "automation-facade.task-endpoint",
+      "statement": "A registered ESAutomationFacade business endpoint for TaskContextRuntime.",
+      "requiredOnlyWhenSelected": true,
+      "eligibleProfiles": ["RuntimeAcceptance", "ReleaseAcceptance"],
+      "nonBlockingProfiles": ["StaticReview", "EngineeringReadiness"],
+      "requiresCapabilities": []
+    },
+    {
+      "capabilityId": "worker.evidence-set-adapter",
+      "statement": "Worker submission of candidate EvidenceSet data through the platform API.",
+      "requiredOnlyWhenSelected": true,
+      "eligibleProfiles": ["RuntimeAcceptance", "ReleaseAcceptance"],
+      "nonBlockingProfiles": ["StaticReview", "EngineeringReadiness"],
+      "requiresCapabilities": []
+    },
+    {
+      "capabilityId": "codex-session.context-adapter",
+      "statement": "Codex Session creation and recovery through a platform context adapter.",
+      "requiredOnlyWhenSelected": true,
+      "eligibleProfiles": ["RuntimeAcceptance", "ReleaseAcceptance"],
+      "nonBlockingProfiles": ["StaticReview", "EngineeringReadiness"],
+      "requiresCapabilities": []
+    },
+    {
+      "capabilityId": "semantic-archive.context-adapter",
+      "statement": "Semantic Archive requests for the platform-owned Archived transition.",
+      "requiredOnlyWhenSelected": true,
+      "eligibleProfiles": ["RuntimeAcceptance", "ReleaseAcceptance"],
+      "nonBlockingProfiles": ["StaticReview", "EngineeringReadiness"],
+      "requiresCapabilities": []
+    },
+    {
+      "capabilityId": "unity-editor.task-creation-adapter",
+      "statement": "Unity Editor task creation through the platform API.",
+      "requiredOnlyWhenSelected": true,
+      "eligibleProfiles": ["RuntimeAcceptance", "ReleaseAcceptance"],
+      "nonBlockingProfiles": ["StaticReview", "EngineeringReadiness"],
+      "requiresCapabilities": []
+    }
+  ],
+  "profileRules": [
+    {
+      "profileId": "StaticReview",
+      "requiredCapabilityIds": [],
+      "missingConditionalCapability": "non-blocking",
+      "runtimeNotRun": "non-blocking"
+    },
+    {
+      "profileId": "EngineeringReadiness",
+      "requiredCapabilityIds": [],
+      "missingConditionalCapability": "non-blocking",
+      "runtimeNotRun": "non-blocking"
+    },
+    {
+      "profileId": "RuntimeAcceptance",
+      "requiredCapabilityIds": [],
+      "missingConditionalCapability": "blocking-only-when-selected",
+      "runtimeNotRun": "blocking"
+    },
+    {
+      "profileId": "ReleaseAcceptance",
+      "requiredCapabilityIds": [],
+      "missingConditionalCapability": "blocking-only-when-selected",
+      "runtimeNotRun": "blocking"
+    }
+  ]
+}

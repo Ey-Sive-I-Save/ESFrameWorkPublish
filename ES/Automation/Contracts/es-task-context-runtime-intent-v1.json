@@ -1,0 +1,146 @@
+{
+  "contractVersion": "1",
+  "objective": "Implement a Skill-agnostic TaskContextRuntime that owns task/context lifecycle, source verification, evidence decisions, immutable receipts, and delivery acceptance without transferring lifecycle ownership to Skills or Workers.",
+  "scope": [
+    "ES/Automation/Contracts/es-task-context-runtime-v1.schema.json",
+    "ES/Automation/Contracts/es-platform-evidence-v1.schema.json",
+    "ES/Automation/Contracts/es-evidence-verifier-registry-v1.schema.json",
+    "ES/Automation/Contracts/es-task-transcript-slice-v1.schema.json",
+    "ES/Automation/Contracts/ESJsonSchemaLite.psm1",
+    "ES/Automation/Contracts/es-goal-v1.schema.json",
+    "ES/Automation/Contracts/es-route-plan-v1.schema.json",
+    "ES/Automation/Contracts/es-route-stage.registry.json",
+    "ES/Automation/RoutePlan/",
+    "ES/Automation/Contracts/es-task-context-runtime-integration-policy-v1.json",
+    "ES/Automation/TaskContextRuntime/",
+    "ES/Automation/Evaluation/ESTranscriptCorrectionObservation.psm1",
+    ".agents/skills/es-task-context-runtime/",
+    ".agents project discovery registries",
+    "Documentation/AIKnowledge TaskContextRuntime route"
+  ],
+  "mustPreserve": [
+    "completionDecision and deliveryAcceptance remain independent state axes",
+    "ESAutomationRunStatus.Accepted remains a run-admission status and is never projected as completionDecision=accepted",
+    "Skills declare semantics and preferences but never own task or context lifecycle",
+    "Workers provide execution results and candidate evidence but never self-accept completion",
+    "candidate outcome, evidenceHash, and producerType remain non-authoritative inputs; platform-normalized values come only from the verifier selected by the frozen AcceptanceProfile",
+    "canonical CandidateEvidence uses the central platform Evidence contract while legacy TaskContext v1 payloads enter only through an explicit compatibility projection",
+    "the frozen AcceptanceProfile and accepted Receipt bind the central Evidence contract ID and SHA-256; contract drift limits the current completion claim",
+    "every required claim has an explicit registered verifier binding whose declared claim scope, definition hash, and registry snapshot hash are frozen",
+    "optional observation claims have explicit registered verifier bindings but never participate in completionDecision, required evidence freshness, or task hard-blocking",
+    "human correction observations are derived only by platform rereading a task-bound Codex transcript slice under the trusted session root; candidate counts and whole-session projections are non-authoritative",
+    "task transcript bindings contain no transcript text and bind TaskId, GoalRevisionHash, TaskRevision, ContextVersion, SessionId, source prefix hash, exact line range, and normalized slice hash",
+    "a transcript-capable TaskContext freezes interactionSessionId at creation, and the verifier accepts only the last non-injected user message before the frozen task creation timestamp plus its first post-creation user follow-up",
+    "verifier registry structure and semantics reject duplicate identity, unanchored claim scope, field duplication, unsupported authority expansion, and bound-definition drift",
+    "Core v1 integration acceptance distinguishes prohibited capabilities from conditionally selected adapter capabilities",
+    "missing conditional adapter capabilities never block StaticReview or EngineeringReadiness",
+    "accepted completion requires frozen AcceptanceProfile, complete fresh EvidenceSet, verified sourceScope, no critical contradiction, no unresolved source drift, bounded UnverifiedClaims, and an immutable bound Receipt",
+    "every TaskContext binds one immutable frozen GoalRevision by goalId, goalRevision, and goalRevisionHash",
+    "every TaskContext binds one platform-verified RoutePlan whose canonical hash, exact routeKeys, stage registry membership, GoalRevision SourceRef, registry SourceRef, Git HEAD, and all SourceRef hashes are independently replayable",
+    "PowerShell RoutePlan producers, validators, fixtures, and TaskContext consumers use one shared canonicalization and validation implementation rather than copying the hash algorithm",
+    "RoutePlan validation failure limits only the current RoutePlan or completion claim and never projects into project-global P0",
+    "GoalRevision is reread and rehashed before accepted completion; Goal drift limits only the current completion claim",
+    "all state mutations use TaskRevision and ContextVersion compare-and-swap"
+  ],
+  "allowedTransitions": [
+    "Active+Live -> completionDecision=accepted -> Completed+Frozen with deliveryAcceptance=pending",
+    "Completed+Frozen with deliveryAcceptance=pending -> deliveryAcceptance=accepted",
+    "Completed+Frozen with deliveryAcceptance=pending -> deliveryAcceptance=rejected without rolling back completionDecision",
+    "Completed+Frozen -> explicit Reopen -> Active+Live at a new TaskRevision and ContextVersion",
+    "Live -> Compacting -> Live",
+    "Live or Compacting -> PartiallyInvalidated on source drift",
+    "PartiallyInvalidated -> Live only after explicit source reverification",
+    "Completed+Frozen -> Completed+Archived",
+    "non-quarantined context -> Quarantined -> compatible recovered context"
+  ],
+  "forbiddenTransitions": [
+    "deliveryAcceptance=rejected -> rollback completionDecision=accepted",
+    "accepted completion with unresolved SourceDrift",
+    "accepted completion with missing or stale required evidence",
+    "accepted completion without a verified sourceScope binding",
+    "accepted completion after central Evidence contract drift or with an EvidenceSet bound to another contract hash",
+    "optional observation absence, staleness, or verifier failure -> task completion blocked",
+    "whole-session correction count -> arbitrary task-object humanCorrectionRate",
+    "candidate-provided correction count -> platform correction observation",
+    "system, developer, world-state, or reasoning content -> persisted task transcript slice",
+    "receipt mutation or acceptance of an orphan receipt",
+    "state mutation with stale TaskRevision or ContextVersion",
+    "Skill or Worker directly changing lifecycle state outside the platform API",
+    "substitution of Automation run Accepted for TaskContextRuntime completion accepted",
+    "global Skill auto-wrapping or discovery-triggered automatic business execution",
+    "requiring an unselected adapter capability for StaticReview or EngineeringReadiness"
+    ,"creating a TaskContext from a RoutePlan whose selected stage is not registered for the exact profile and at least one frozen routeKey"
+    ,"creating a TaskContext from a RoutePlan whose GoalRevision or route-stage registry is absent from the canonical SourceRef set"
+    ,"accepting a depth-2 stage without an exact directional registry authorization for the frozen profile and routeKey"
+  ],
+  "acceptanceSignals": [
+    "intent contract validates as aligned/allow",
+    "the central Evidence schema validates canonical, legacy compatibility, and normalized records while TaskContext schema references the normalized definition instead of copying it",
+    "the verifier registry schema and semantic validator pass definition-drift and unrelated-registry-addition counterexamples",
+    "optional verifier bindings are frozen, validated, and replayed without changing the required-claim completion decision",
+    "task transcript slice tests reject wrong TaskId, GoalRevisionHash, revision/version, SessionId, source prefix hash, truncated range, cross-task reuse, and whole-session projection",
+    "verified task transcript slices derive correction observations without persisting transcript text, while missing bindings keep humanCorrectionRate evidence-pending/null",
+    "deterministic static tests pass accepted, rejected, undetermined, delivery independence, illegal transition, CAS conflict, idempotency, drift, receipt tamper, orphan receipt, reopen, path escape, and interruption recovery cases",
+    "Skill discovery and route validators find exactly one TaskContextRuntime Skill",
+    "integration policy validation proves stable capability identities and profile isolation",
+    "strict UTF-8 and target diff checks pass"
+    ,"RoutePlan contract tests recompute routePlanHash, routePlanId, sourceRefsHash, Git HEAD, GoalRevision binding, registry binding, stage membership, and depth authorization from real fixture artifacts"
+    ,"forged RoutePlan hash, forged SourceRef hash, missing GoalRevision SourceRef, missing registry SourceRef, unregistered stage, profile mismatch, routeKey mismatch, and unauthorized depth are rejected before TaskContext creation"
+  ],
+  "counterexamples": [
+    "A worker returns success and the task becomes Completed without platform evidence evaluation",
+    "A user rejects delivery and the historical completion receipt is deleted or downgraded",
+    "A stale caller overwrites a newer context revision",
+    "A ReadSnapshot source changes after evidence capture but accepted completion still succeeds",
+    "a TaskContext is created without a frozen GoalRevision or with a forged GoalRevision hash",
+    "a generic source hash verifier is used to prove compilation, Runtime, Release, performance, visual, or arbitrary domain success",
+    "a GoalRevision changes after task creation but completion still issues an accepted Receipt",
+    "a producer adds an authority-like field or forges the central Evidence contract hash and the platform accepts it",
+    "an optional interaction observation is absent and completion becomes undetermined or rejected",
+    "a candidate chooses a shorter transcript range that omits a correction and the platform accepts the claimed normalized slice hash",
+    "a transcript slice for another TaskId or GoalRevision is reused in the current task",
+    "a whole Codex session correction count is assigned to one TaskContext without an exact line-range binding",
+    "system or developer messages are copied into a project artifact or metric report",
+    "An immutable receipt exists without a committed event and is treated as authoritative",
+    "StaticReview fails because AIBrain runTask, ESAutomationFacade, Worker, Codex Session, Semantic Archive, or Unity Editor integration is absent"
+    ,"a correctly hashed RoutePlan with an unregistered stage, mismatched routeKey, or forged snapshot is accepted because only JSON Schema shape was checked"
+    ,"the RoutePlan validator and TaskContext consumer implement different canonical field sets and therefore disagree on the same immutable artifact"
+  ],
+  "nonGoals": [
+    "automatic business execution",
+    "automatic wrapping of all Skills in TaskContextRuntime",
+    "unselected AIBrain, ESAutomationFacade, Worker, Codex Session, Semantic Archive, or Unity Editor adapters",
+    "rewriting existing Skills to own TaskContextRuntime lifecycle",
+    "treating deliveryAcceptance=pending as failure after accepted platform completion",
+    "treating ESAutomationRunStatus.Accepted as completionDecision=accepted",
+    "replacing ESAutomationCenter run-state semantics",
+    "Unity Runtime, Worker Runtime, release, Git, history, or audit-state execution"
+  ],
+  "assumptions": [
+    "PowerShell 5.1 or later is available for the platform-neutral static core",
+    "project-relative source paths are the only accepted sourceScope path form",
+    "create-only event snapshots are sufficient for v1 recovery and auditability"
+  ],
+  "unresolvedQuestions": [],
+  "intentAlignmentStatus": "aligned",
+  "executionDecision": "allow",
+  "revision": 7,
+  "sourceRefs": [
+    "current user transcript: fixed TaskStatus/ContextStatus and completion/delivery semantics",
+    "AGENTS.md",
+    "Assets/Plugins/ES/AIWarnings/",
+    ".agents/skills/es-ai-interaction-governance/references/intent-contract.schema.json"
+  ],
+  "priorContradictions": [
+    "Revision 1 left integration capability profile isolation implicit, which could let a future validator misclassify optional adapter gaps as Core v1 acceptance failures.",
+    "Revision 2 did not freeze verifier definition identity or constrain which claim kind a verifier could prove, and did not revalidate GoalRevision at completion."
+    ,"Revision 3 still embedded Evidence input/output structure in TaskContextRuntime and did not freeze a central Evidence contract identity."
+    ,"Revision 4 bound RoutePlan hashes and SourceRefs but did not freeze routeKeys or require the consumer to replay exact stage/Profile/route/depth registry membership through one shared canonical implementation."
+    ,"Revision 5 left optional observability claims implicit and therefore could either block completion or tempt a caller to project whole-session correction counts into an arbitrary task."
+    ,"Revision 6 compared candidate transcript fields to Task identity but did not freeze the Codex session or task-creation time anchor, leaving same-format cross-session or pre-task slice substitution possible."
+  ],
+  "recovery": {
+    "resumeAction": "Load and verify the last contiguous valid event chain; ignore unreferenced orphan receipts; retry with the current TaskRevision and ContextVersion.",
+    "partialStatePolicy": "Fail closed on event gaps, hash mismatch, invalid transition, receipt mismatch, or source drift; never overwrite an existing event or receipt."
+  }
+}

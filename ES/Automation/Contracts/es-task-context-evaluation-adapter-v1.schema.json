@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/task-context-evaluation-adapter/v1",
+  "title": "ES TaskContext Evaluation Adapter V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "contractId", "adapterId", "taskId", "taskVersion", "commandId",
+    "skillName", "routeKeys", "inputContract", "worker", "platformBinding",
+    "lifecycleEffects", "forbiddenProjections", "observability", "rollback", "integration"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/task-context-evaluation-adapter/v1" },
+    "adapterId": { "const": "es.task-context.evaluate@1" },
+    "taskId": { "const": "es.task-context.evaluate" },
+    "taskVersion": { "const": 1 },
+    "commandId": { "const": "task.context-runtime.mutate" },
+    "skillName": { "const": "es-task-context-runtime" },
+    "routeKeys": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/text" } },
+    "inputContract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "fields"],
+      "properties": {
+        "path": { "$ref": "#/$defs/projectPath" },
+        "sha256": { "$ref": "#/$defs/hash" },
+        "fields": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/text" } }
+      }
+    },
+    "worker": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "workerId", "version", "entrypoint", "entrypointHash"],
+      "properties": {
+        "type": { "const": "PowerShell" },
+        "workerId": { "const": "es.task-context.evaluate" },
+        "version": { "const": "1.0.0" },
+        "entrypoint": { "$ref": "#/$defs/projectPath" },
+        "entrypointHash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "platformBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["storeRoot", "action", "evaluationContractId", "decisionAuthority", "decisionScope"],
+      "properties": {
+        "storeRoot": { "const": "ES/Output/TaskContextRuntime" },
+        "action": { "const": "Evaluate" },
+        "evaluationContractId": { "const": "es://automation/contracts/evaluation-record/v1" },
+        "decisionAuthority": { "const": "TaskContextRuntime EvaluationRecord" },
+        "decisionScope": { "const": "task-object" }
+      }
+    },
+    "lifecycleEffects": {
+      "type": "object", "additionalProperties": false,
+      "required": ["taskRevision", "contextVersion", "taskStatus", "contextStatus", "writes"],
+      "properties": {
+        "taskRevision": { "const": "unchanged" },
+        "contextVersion": { "const": "unchanged" },
+        "taskStatus": { "const": "unchanged" },
+        "contextStatus": { "const": "unchanged" },
+        "writes": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/text" } }
+      }
+    },
+    "forbiddenProjections": { "type": "array", "minItems": 5, "uniqueItems": true, "items": { "$ref": "#/$defs/text" } },
+    "observability": {
+      "type": "object", "additionalProperties": false,
+      "required": ["discovery", "planning", "execution", "status", "mismatchSignals"],
+      "properties": {
+        "discovery": { "$ref": "#/$defs/text" },
+        "planning": { "$ref": "#/$defs/text" },
+        "execution": { "$ref": "#/$defs/text" },
+        "status": { "$ref": "#/$defs/text" },
+        "mismatchSignals": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/text" } }
+      }
+    },
+    "rollback": {
+      "type": "object", "additionalProperties": false,
+      "required": ["fastPath", "registration", "data"],
+      "properties": {
+        "fastPath": { "$ref": "#/$defs/text" },
+        "registration": { "$ref": "#/$defs/text" },
+        "data": { "$ref": "#/$defs/text" }
+      }
+    },
+    "integration": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "sourceRegistrationIntegrated", "unityRuntimeRegistrationVerified",
+        "productionExecutionObserved", "globalP0Integrated", "runtimeStatus", "releaseStatus"
+      ],
+      "properties": {
+        "sourceRegistrationIntegrated": { "const": true },
+        "unityRuntimeRegistrationVerified": { "const": false },
+        "productionExecutionObserved": { "const": false },
+        "globalP0Integrated": { "const": false },
+        "runtimeStatus": { "const": "runtime-not-run" },
+        "releaseStatus": { "const": "not-verified" }
+      }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "text": { "type": "string", "minLength": 1 },
+    "projectPath": { "type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$" }
+  }
+}

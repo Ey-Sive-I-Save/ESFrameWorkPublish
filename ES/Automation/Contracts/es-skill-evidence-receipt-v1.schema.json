@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://esframework.local/contracts/es-skill-evidence-receipt-v1.schema.json",
+  "title": "ES Skill Evidence Receipt V1",
+  "type": "object",
+  "required": [
+    "evidenceContractId",
+    "evidenceContractHash",
+    "skillName",
+    "case",
+    "status",
+    "evidenceLevel",
+    "receiptPath",
+    "sourceRefs",
+    "sourceRefHashes",
+    "toolId",
+    "unityVersion",
+    "capturedUtc"
+  ],
+  "properties": {
+    "evidenceContractId": {
+      "type": "string",
+      "const": "es.skill-evidence-receipt"
+    },
+    "evidenceContractHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "skillName": {
+      "type": "string",
+      "pattern": "^es-[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "case": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed", "blocked", "not-run"]
+    },
+    "evidenceLevel": {
+      "type": "string",
+      "pattern": "^S[0-6]$"
+    },
+    "receiptPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceRefs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "sourceRefHashes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{64}$"
+      }
+    },
+    "toolId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "unityVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capturedUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "timestampUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "authorizationKind": {
+      "type": "string",
+      "enum": ["managed-aibrain", "current-user-direct", "read-only"]
+    },
+    "planHash": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "userInstructionHash": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "authorizedOperations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "authorizedPaths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": true
+}

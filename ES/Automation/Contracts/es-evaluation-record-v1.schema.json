@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/evaluation-record/v1",
+  "title": "ES Platform Evaluation Request and Record v1",
+  "oneOf": [
+    { "$ref": "#/$defs/evaluationRequest" },
+    { "$ref": "#/$defs/evaluationRecord" }
+  ],
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+    "nullableHash": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] },
+    "evaluationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "contractId", "contractHash", "recordType", "storeRoot", "taskId", "expectedTaskRevision", "expectedContextVersion", "idempotencyKey"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "contractId": { "const": "es://automation/contracts/evaluation-record/v1" },
+        "contractHash": { "$ref": "#/$defs/hash" },
+        "recordType": { "const": "EvaluationRequest" },
+        "storeRoot": { "type": "string", "minLength": 1 },
+        "taskId": { "$ref": "#/$defs/id" },
+        "expectedTaskRevision": { "type": "integer", "minimum": 1 },
+        "expectedContextVersion": { "type": "integer", "minimum": 1 },
+        "idempotencyKey": { "$ref": "#/$defs/id" }
+      }
+    },
+    "trajectoryRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordType", "eventCount", "firstEventId", "lastEventId", "lastEventHash", "eventTypes", "taskStatus", "contextStatus"],
+      "properties": {
+        "recordType": { "const": "TrajectoryRecord" },
+        "eventCount": { "type": "integer", "minimum": 1 },
+        "firstEventId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "lastEventId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "lastEventHash": { "$ref": "#/$defs/hash" },
+        "eventTypes": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "taskStatus": { "type": "string", "minLength": 1 },
+        "contextStatus": { "type": "string", "minLength": 1 }
+      }
+    },
+    "outcomeAssertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordType", "assertionId", "claimId", "verifierId", "outcome", "evidenceHash", "sourceScopeHash"],
+      "properties": {
+        "recordType": { "const": "OutcomeAssertion" },
+        "assertionId": { "$ref": "#/$defs/id" },
+        "claimId": { "$ref": "#/$defs/id" },
+        "verifierId": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+        "outcome": { "enum": ["passed", "failed", "unverified"] },
+        "evidenceHash": { "$ref": "#/$defs/nullableHash" },
+        "sourceScopeHash": { "$ref": "#/$defs/nullableHash" }
+      }
+    },
+    "failureRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordType", "failureId", "code", "object", "field", "profile", "scope", "classification", "completionImpact", "predicate", "evidenceRefs", "recovery"],
+      "properties": {
+        "recordType": { "const": "FailureRecord" },
+        "failureId": { "$ref": "#/$defs/id" },
+        "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_.-]{2,127}$" },
+        "object": { "type": "string", "minLength": 1 },
+        "field": { "type": "string", "minLength": 1 },
+        "profile": { "$ref": "#/$defs/id" },
+        "scope": { "const": "task-object" },
+        "classification": { "enum": ["missing", "drift", "stale", "contradiction", "required-failure", "policy"] },
+        "completionImpact": { "enum": ["claim-cap", "task-completion-block"] },
+        "predicate": { "type": "string", "minLength": 1 },
+        "evidenceRefs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "recovery": { "type": "string", "minLength": 1 }
+      }
+    },
+    "influenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["refId", "kind", "identity", "hash", "path"],
+      "properties": {
+        "refId": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["goal-revision", "acceptance-profile", "evidence-contract", "outcome-evaluator", "evidence-verifier", "source-scope", "route-plan"] },
+        "identity": { "type": "string", "minLength": 1 },
+        "hash": { "$ref": "#/$defs/hash" },
+        "path": { "type": ["string", "null"] }
+      }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["refId", "kind", "identity", "hash", "path"],
+      "properties": {
+        "refId": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["artifact", "source", "evidence-set", "event-chain", "completion-receipt"] },
+        "identity": { "type": "string", "minLength": 1 },
+        "hash": { "$ref": "#/$defs/nullableHash" },
+        "path": { "type": ["string", "null"] }
+      }
+    },
+    "evaluationRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "contractId", "contractHash", "recordType", "evaluationId", "purpose", "requestHash", "evaluatorId", "evaluatorDefinitionHash", "taskId", "taskRevision", "contextVersion", "planHash", "goalRevisionHash", "acceptanceProfileId", "acceptanceProfileHash", "evidenceContractId", "evidenceContractHash", "evidenceSetHash", "verifiedSourceScopeHash", "evaluatedUtc", "decision", "decisionScope", "evidenceState", "inputSnapshotHash", "trajectoryRecord", "outcomeAssertions", "failureRecords", "influenceRefs", "evidenceRefs", "nonClaims", "recordHash"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "contractId": { "const": "es://automation/contracts/evaluation-record/v1" },
+        "contractHash": { "$ref": "#/$defs/hash" },
+        "recordType": { "const": "EvaluationRecord" },
+        "evaluationId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "purpose": { "enum": ["advisory", "completion"] },
+        "requestHash": { "$ref": "#/$defs/hash" },
+        "evaluatorId": { "$ref": "#/$defs/id" },
+        "evaluatorDefinitionHash": { "$ref": "#/$defs/hash" },
+        "taskId": { "$ref": "#/$defs/id" },
+        "taskRevision": { "type": "integer", "minimum": 1 },
+        "contextVersion": { "type": "integer", "minimum": 1 },
+        "planHash": { "$ref": "#/$defs/hash" },
+        "goalRevisionHash": { "$ref": "#/$defs/hash" },
+        "acceptanceProfileId": { "$ref": "#/$defs/id" },
+        "acceptanceProfileHash": { "$ref": "#/$defs/hash" },
+        "evidenceContractId": { "const": "es://automation/contracts/platform-evidence/v1" },
+        "evidenceContractHash": { "$ref": "#/$defs/hash" },
+        "evidenceSetHash": { "$ref": "#/$defs/nullableHash" },
+        "verifiedSourceScopeHash": { "$ref": "#/$defs/nullableHash" },
+        "evaluatedUtc": { "type": "string", "format": "date-time" },
+        "decision": { "enum": ["accepted", "rejected", "undetermined"] },
+        "decisionScope": { "const": "task-object" },
+        "evidenceState": { "enum": ["pending", "partial", "closed", "stale"] },
+        "inputSnapshotHash": { "$ref": "#/$defs/hash" },
+        "trajectoryRecord": { "$ref": "#/$defs/trajectoryRecord" },
+        "outcomeAssertions": { "type": "array", "items": { "$ref": "#/$defs/outcomeAssertion" } },
+        "failureRecords": { "type": "array", "items": { "$ref": "#/$defs/failureRecord" } },
+        "influenceRefs": { "type": "array", "items": { "$ref": "#/$defs/influenceRef" } },
+        "evidenceRefs": { "type": "array", "items": { "$ref": "#/$defs/evidenceRef" } },
+        "nonClaims": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "recordHash": { "$ref": "#/$defs/hash" }
+      }
+    }
+  }
+}

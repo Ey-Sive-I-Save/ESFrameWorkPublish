@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://esframework.local/contracts/es-skill-evidence-binding-v1.schema.json",
+  "title": "ES Skill Evidence Contract Binding V1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "bindingId",
+    "skillName",
+    "contract",
+    "localContract",
+    "stableEntrypoint",
+    "compatibility"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "bindingId": {
+      "type": "string",
+      "pattern": "^es\\.skill-evidence-binding\\.es-[a-z0-9]+(?:-[a-z0-9]+)*\\.v1$"
+    },
+    "skillName": {
+      "type": "string",
+      "pattern": "^es-[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "contract": {
+      "type": "object",
+      "required": ["id", "version", "path", "hash"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "const": "es.skill-evidence-receipt"
+        },
+        "version": {
+          "type": "string",
+          "const": "1"
+        },
+        "path": {
+          "type": "string",
+          "const": "ES/Automation/Contracts/es-skill-evidence-receipt-v1.schema.json"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "localContract": {
+      "type": "object",
+      "required": ["path", "hash", "mode"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(references/evidence-receipt-contract\\.md)?$"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^([a-f0-9]{64})?$"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["compatibility-copy", "additive-extension", "central-authoritative"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "stableEntrypoint": {
+      "type": "object",
+      "required": ["path", "hash", "mode", "centralValidatorPath"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "const": "scripts/Test-ESSkillEvidence.ps1"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "mode": {
+          "type": "string",
+          "const": "central-delegate"
+        },
+        "centralValidatorPath": {
+          "type": "string",
+          "const": ".agents/skills/es-skill-governance/scripts/Test-ESStrictEvidenceReceipt.ps1"
+        }
+      },
+      "additionalProperties": false
+    },
+    "compatibility": {
+      "type": "object",
+      "required": ["legacyReadable", "legacyReceiptBeforeUtc", "legacyReceiptAcceptanceEndsUtc", "newReceiptBinding", "retirementState"],
+      "properties": {
+        "legacyReadable": {
+          "type": "boolean",
+          "const": true
+        },
+        "legacyReceiptBeforeUtc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "legacyReceiptAcceptanceEndsUtc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "newReceiptBinding": {
+          "type": "string",
+          "const": "required"
+        },
+        "retirementState": {
+          "type": "string",
+          "const": "not-authorized"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

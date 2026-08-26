@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/outcome-evaluator-registry/v1",
+  "title": "ES Outcome Evaluator Registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "$id", "schemaVersion", "registryId", "evaluators"],
+  "properties": {
+    "$schema": { "const": "https://json-schema.org/draft/2020-12/schema" },
+    "$id": { "const": "es://automation/contracts/outcome-evaluator-registry/v1" },
+    "schemaVersion": { "const": 1 },
+    "registryId": { "const": "es.task-context.outcome-evaluators.v1" },
+    "evaluators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["evaluatorId", "authority", "algorithmVersion", "profileIdPattern", "decisionPolicy", "scopeType", "recordContractId", "acceptedRequires"],
+        "properties": {
+          "evaluatorId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+          "authority": { "const": "TaskContextRuntime" },
+          "algorithmVersion": { "const": "task-context-outcome-v1" },
+          "profileIdPattern": { "type": "string", "minLength": 3 },
+          "decisionPolicy": { "const": "rejected-if-authoritative-required-failure;undetermined-if-gap-or-drift;accepted-if-all-required-verified" },
+          "scopeType": { "const": "task-object" },
+          "recordContractId": { "const": "es://automation/contracts/evaluation-record/v1" },
+          "acceptedRequires": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "registryId": "esframework-route-stage-registry",
+  "normalizationVersion": "route-stage-canonical-v1",
+  "defaultMaxDepth": 1,
+  "maxDepth": 2,
+  "externalInputs": [
+    "goal-revision"
+  ],
+  "depthAuthorizations": [
+    {
+      "reasonCode": "ROUTE.DEPTH_2.STATIC_REPLAY_AFTER_VALIDATION",
+      "authorizesDepth": 2,
+      "profiles": [
+        "governance"
+      ],
+      "routeKeys": [
+        "skill",
+        "static-replay",
+        "validation"
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageContractId": "es.route-stage.skill-creator.v1",
+      "skillName": "es-skill-creator",
+      "profiles": [
+        "governance"
+      ],
+      "routeKeys": [
+        "creator",
+        "skill"
+      ],
+      "requires": [
+        "goal-revision"
+      ],
+      "produces": [
+        "skill-candidate"
+      ],
+      "failureConditions": [
+        "candidate-write-denied",
+        "skill-contract-invalid"
+      ],
+      "depthReasonCode": ""
+    },
+    {
+      "stageContractId": "es.route-stage.skill-validator.v1",
+      "skillName": "es-skill-validator",
+      "profiles": [
+        "governance"
+      ],
+      "routeKeys": [
+        "skill",
+        "validation"
+      ],
+      "requires": [
+        "skill-candidate"
+      ],
+      "produces": [
+        "static-validation"
+      ],
+      "failureConditions": [
+        "candidate-schema-invalid",
+        "validation-evidence-pending"
+      ],
+      "depthReasonCode": ""
+    },
+    {
+      "stageContractId": "es.route-stage.static-deep-replay.v1",
+      "skillName": "es-static-deep-replay",
+      "profiles": [
+        "governance"
+      ],
+      "routeKeys": [
+        "skill",
+        "static-replay",
+        "validation"
+      ],
+      "requires": [
+        "static-validation"
+      ],
+      "produces": [
+        "replay-receipt"
+      ],
+      "failureConditions": [
+        "replay-nondeterministic",
+        "source-snapshot-stale"
+      ],
+      "depthReasonCode": "ROUTE.DEPTH_2.STATIC_REPLAY_AFTER_VALIDATION"
+    }
+  ]
+}

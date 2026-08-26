@@ -1,0 +1,4 @@
+interface:
+  display_name: "ES Task Context Runtime"
+  short_description: "Manage task and context lifecycle evidence and receipts."
+  default_prompt: "Use $es-task-context-runtime to create, transition, complete, or verify a TaskContextRuntime task through the platform API."

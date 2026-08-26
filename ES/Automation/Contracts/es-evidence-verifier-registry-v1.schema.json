@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/evidence-verifier-registry/v1",
+  "title": "ES Evidence Verifier Registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "$id", "schemaVersion", "registryId", "verifiers"],
+  "properties": {
+    "$schema": { "const": "https://json-schema.org/draft/2020-12/schema" },
+    "$id": { "const": "es://automation/contracts/evidence-verifier-registry/v1" },
+    "schemaVersion": { "const": 1 },
+    "registryId": { "const": "es.task-context.evidence-verifiers.v1" },
+    "verifiers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["verifierId", "authority", "artifactFormat", "claimIdPattern", "requiredArtifactFields", "observationFields", "outcomePolicy"],
+        "properties": {
+          "verifierId": { "$ref": "#/$defs/id" },
+          "authority": { "$ref": "#/$defs/id" },
+          "artifactFormat": { "const": "json" },
+          "claimIdPattern": { "type": "string", "minLength": 3 },
+          "requiredArtifactFields": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/fieldName" } },
+          "observationFields": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/fieldName" } },
+          "outcomePolicy": {
+            "enum": [
+              "failed-if-any-hash-mismatch;unverified-if-empty;passed-if-all-match",
+              "failed-if-static-replay-blocked;unverified-if-runner-unavailable;passed-if-static-replay-passed",
+              "passed-if-task-slice-verified;unverified-if-followup-missing"
+            ]
+          },
+          "implementationPath": { "type": "string", "minLength": 1 },
+          "implementationHash": { "$ref": "#/$defs/hash" },
+          "maxSourceFiles": { "type": "integer", "minimum": 1, "maximum": 4096 },
+          "maxSourceBytes": { "type": "integer", "minimum": 1, "maximum": 536870912 },
+          "maxExecutionSeconds": { "type": "integer", "minimum": 1, "maximum": 900 },
+          "maxOutputChars": { "type": "integer", "minimum": 4096, "maximum": 16777216 }
+          ,"contractPath": { "type": "string", "minLength": 1 }
+          ,"contractHash": { "$ref": "#/$defs/hash" }
+          ,"maxTranscriptBytes": { "type": "integer", "minimum": 1024, "maximum": 104857600 }
+          ,"maxSliceLines": { "type": "integer", "minimum": 2, "maximum": 4096 }
+          ,"maxSliceChars": { "type": "integer", "minimum": 1024, "maximum": 16777216 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "fieldName": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{0,63}$" }
+  }
+}

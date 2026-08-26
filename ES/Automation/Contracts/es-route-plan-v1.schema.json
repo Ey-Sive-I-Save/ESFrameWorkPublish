@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/route-plan/v1",
+  "title": "ES Read-Only RoutePlan V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "routePlanId", "routePlanHash", "status", "routeState", "evidenceState", "effect", "profile", "scope", "routeKeys", "goalRevision", "stages", "maxDepth", "budget", "stopConditions", "issues", "snapshot", "shadowIntegration", "compatibility", "executionEnabled"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "es://automation/contracts/route-plan/v1" },
+    "routePlanId": { "type": "string", "pattern": "^route-[a-f0-9]{32}$" },
+    "routePlanHash": { "$ref": "#/$defs/hash" },
+    "status": { "enum": ["Ready", "EvidencePending", "NeedsRegistration", "Blocked", "NotApplicable"] },
+    "routeState": { "enum": ["core", "extension", "blocked"] },
+    "evidenceState": { "enum": ["unknown", "pending", "partial", "closed", "stale", "runtime-not-run"] },
+    "effect": { "enum": ["hard-block", "claim-cap", "review", "stop-next-read"] },
+    "profile": { "$ref": "#/$defs/token" },
+    "scope": { "enum": ["task-object"] },
+    "routeKeys": { "$ref": "#/$defs/stringSet" },
+    "goalRevision": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["goalId", "goalRevision", "revisionHash", "projectPath", "artifactHash"],
+      "properties": {
+        "goalId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+        "goalRevision": { "type": "string", "pattern": "^r[1-9][0-9]{0,8}$" },
+        "revisionHash": { "$ref": "#/$defs/hash" },
+        "projectPath": { "type": "string", "minLength": 1 },
+        "artifactHash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "stages": { "type": "array", "items": { "$ref": "#/$defs/stage" } },
+    "maxDepth": { "type": "integer", "minimum": 0, "maximum": 2 },
+    "budget": { "type": "object" },
+    "stopConditions": { "type": "array", "items": { "$ref": "#/$defs/stopCondition" } },
+    "issues": { "type": "array", "items": { "$ref": "#/$defs/issue" } },
+    "snapshot": { "$ref": "#/$defs/snapshot" },
+    "shadowIntegration": { "$ref": "#/$defs/shadowIntegration" },
+    "compatibility": { "$ref": "#/$defs/compatibility" },
+    "executionEnabled": { "const": false }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "Ready" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "goalRevision": { "type": "object" },
+          "snapshot": {
+            "type": "object",
+            "properties": {
+              "head": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+              "registryHash": { "$ref": "#/$defs/hash" }
+            },
+            "required": ["head", "registryHash"]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "token": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$" },
+    "stringSet": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/token" } },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stageId", "stageContractId", "skillName", "depth", "requires", "produces", "failureConditions", "depthReasonCode", "executionStatus"],
+      "properties": {
+        "stageId": { "type": "string", "pattern": "^stage-[0-9]{2}-[a-z0-9-]{1,81}$" },
+        "stageContractId": { "type": "string", "minLength": 1 },
+        "skillName": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,80}$" },
+        "depth": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "requires": { "$ref": "#/$defs/stringSet" },
+        "produces": { "$ref": "#/$defs/stringSet" },
+        "failureConditions": { "$ref": "#/$defs/stringSet" },
+        "depthReasonCode": { "type": "string" },
+        "executionStatus": { "const": "not-executed" }
+      }
+    },
+    "stopCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "predicate", "trigger", "outcome", "evidence", "recovery"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^ROUTE\\.[A-Z0-9_]{1,96}$" },
+        "predicate": { "type": "string", "minLength": 1 },
+        "trigger": { "type": "string", "minLength": 1 },
+        "outcome": { "enum": ["hard-block", "claim-cap", "review", "stop-next-read"] },
+        "evidence": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "recovery": { "type": "string", "minLength": 1 }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["object", "field", "profile", "scope", "reasonCode", "predicate", "effect", "recovery"],
+      "properties": {
+        "object": { "type": "string", "minLength": 1 },
+        "field": { "type": "string", "minLength": 1 },
+        "profile": { "$ref": "#/$defs/token" },
+        "scope": { "const": "task-object" },
+        "reasonCode": { "type": "string", "pattern": "^ROUTE\\.[A-Z0-9_]{1,96}$" },
+        "predicate": { "type": "string", "minLength": 1 },
+        "effect": { "enum": ["hard-block", "claim-cap", "review", "stop-next-read"] },
+        "recovery": { "type": "string", "minLength": 1 }
+      }
+    },
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectPath", "sha256"],
+      "properties": {
+        "projectPath": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["head", "sourceRefs", "sourceRefsHash", "registryHash", "coverage"],
+      "properties": {
+        "head": { "type": ["string", "null"], "pattern": "^[a-f0-9]{40}$" },
+        "sourceRefs": { "type": "array", "items": { "$ref": "#/$defs/sourceRef" } },
+        "sourceRefsHash": { "$ref": "#/$defs/hash" },
+        "registryHash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["normalizationVersion", "includes"],
+          "properties": {
+            "normalizationVersion": { "const": "route-plan-canonical-v1" },
+            "includes": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+          }
+        }
+      }
+    },
+    "shadowIntegration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contractId", "mode", "algorithmId", "selectedProfile", "selectedScope", "candidateStatus",
+        "decisionHash", "decisionId", "legacyPlanStatusBefore", "legacyPlanStatusAfter",
+        "stateChanged", "verificationRequired", "rollbackState", "rollbackAction",
+        "productionRouteIntegrated", "globalP0Integrated", "observationCodes"
+      ],
+      "properties": {
+        "contractId": { "const": "es://automation/contracts/route-plan-shadow-candidate/v1" },
+        "mode": { "const": "read-only-shadow" },
+        "algorithmId": { "const": "route-shadow-canonical-v1" },
+        "selectedProfile": { "const": "governance" },
+        "selectedScope": { "const": "task-object" },
+        "candidateStatus": { "enum": ["candidate-emitted", "not-selected"] },
+        "decisionHash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "decisionId": { "type": ["string", "null"], "pattern": "^route-decision-[a-f0-9]{32}$" },
+        "legacyPlanStatusBefore": { "type": "string", "minLength": 1 },
+        "legacyPlanStatusAfter": { "type": "string", "minLength": 1 },
+        "stateChanged": { "const": false },
+        "verificationRequired": { "const": true },
+        "rollbackState": { "const": "available" },
+        "rollbackAction": { "const": "discard-shadow-candidate" },
+        "productionRouteIntegrated": { "const": false },
+        "globalP0Integrated": { "const": false },
+        "observationCodes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^SHADOW\\.[A-Z0-9_]{1,96}$" }
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["legacyPlanStatus", "projectionOnly", "productionRouteIntegrated", "globalP0Integrated", "executionAuthority"],
+      "properties": {
+        "legacyPlanStatus": { "type": "string", "minLength": 1 },
+        "projectionOnly": { "const": true },
+        "productionRouteIntegrated": { "const": false },
+        "globalP0Integrated": { "const": false },
+        "executionAuthority": { "const": "none" }
+      }
+    }
+  }
+}

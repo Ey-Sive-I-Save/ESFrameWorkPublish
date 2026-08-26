@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "$id": "es://automation/contracts/commercial-metric-registry/v1",
+  "registryId": "es.ai-collaboration.commercial-metrics.v1",
+  "scope": "task-cohort",
+  "metrics": [
+    { "metricId": "successRate", "sourceAuthority": "TaskContextRuntime", "calculation": "accepted-latest-evaluations", "unit": "ratio", "missingEvidencePolicy": "evidence-pending-null", "scope": "task-cohort", "implementationState": "platform-derived" },
+    { "metricId": "stableSuccessRate", "sourceAuthority": "TaskContextRuntime", "calculation": "all-accepted-goal-cohorts", "unit": "ratio", "missingEvidencePolicy": "evidence-pending-null", "scope": "task-cohort", "implementationState": "platform-derived" },
+    { "metricId": "hardViolationRate", "sourceAuthority": "TaskContextRuntime", "calculation": "task-blocking-failure-observations", "unit": "ratio", "missingEvidencePolicy": "evidence-pending-null", "scope": "task-cohort", "implementationState": "platform-derived" },
+    { "metricId": "claimOverstatementRate", "sourceAuthority": "registered-external-verifier", "calculation": "claim-audit-observations", "unit": "ratio", "missingEvidencePolicy": "evidence-pending-null", "scope": "task-cohort", "implementationState": "evidence-pending" },
+    { "metricId": "humanCorrectionRate", "sourceAuthority": "TaskContextRuntime", "calculation": "interaction-correction-observations", "unit": "ratio", "missingEvidencePolicy": "evidence-pending-null", "scope": "task-cohort", "implementationState": "platform-derived" },
+    { "metricId": "meanLatency", "sourceAuthority": "TaskContextRuntime", "calculation": "first-event-to-latest-evaluation", "unit": "milliseconds", "missingEvidencePolicy": "evidence-pending-null", "scope": "task-cohort", "implementationState": "platform-derived" },
+    { "metricId": "meanCost", "sourceAuthority": "registered-external-verifier", "calculation": "verified-run-cost-observations", "unit": "cost-units", "missingEvidencePolicy": "evidence-pending-null", "scope": "task-cohort", "implementationState": "evidence-pending" },
+    { "metricId": "recoveryRate", "sourceAuthority": "TaskContextRuntime", "calculation": "nonaccepted-to-accepted-transitions", "unit": "ratio", "missingEvidencePolicy": "evidence-pending-null", "scope": "task-cohort", "implementationState": "platform-derived" },
+    { "metricId": "regressionPassRate", "sourceAuthority": "TaskContextRuntime", "calculation": "registered-regression-results", "unit": "ratio", "missingEvidencePolicy": "evidence-pending-null", "scope": "task-cohort", "implementationState": "platform-derived" }
+  ]
+}

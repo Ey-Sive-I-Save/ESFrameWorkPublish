@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "es://automation/contracts/outcome-evaluator-registry/v1",
+  "schemaVersion": 1,
+  "registryId": "es.task-context.outcome-evaluators.v1",
+  "evaluators": [
+    {
+      "evaluatorId": "platform.task-context-outcome-v1",
+      "authority": "TaskContextRuntime",
+      "algorithmVersion": "task-context-outcome-v1",
+      "profileIdPattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$",
+      "decisionPolicy": "rejected-if-authoritative-required-failure;undetermined-if-gap-or-drift;accepted-if-all-required-verified",
+      "scopeType": "task-object",
+      "recordContractId": "es://automation/contracts/evaluation-record/v1",
+      "acceptedRequires": [
+        "frozen-goal-revision",
+        "frozen-acceptance-profile",
+        "current-evidence-contract",
+        "current-selected-verifier-definitions",
+        "current-source-scope",
+        "platform-verified-required-claims",
+        "no-critical-contradiction",
+        "no-unresolved-source-or-artifact-drift"
+      ]
+    }
+  ]
+}

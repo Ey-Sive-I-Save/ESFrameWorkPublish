@@ -13,8 +13,13 @@
       "type": "string",
       "enum": [
         "listTasks",
+        "listCapabilities",
+        "runKnowledgeRouteProbes",
+        "getFailureTelemetry",
+        "planTask",
         "runTask",
         "getRun",
+        "cancelRun",
         "submitInput",
         "submitContentProposal",
         "getUnityCompilationState",

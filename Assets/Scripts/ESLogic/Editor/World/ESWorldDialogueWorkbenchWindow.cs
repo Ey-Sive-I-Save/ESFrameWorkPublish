@@ -13,13 +13,19 @@ namespace ES
     /// 世界对话编辑器的对话图与空间放置工具。
     /// 图资产负责节点/边权威数据，地图资产负责放置记录，Scene 只保存 3D 锚点投影。
     /// </summary>
-    public sealed class ESWorldDialogueEditorWindow : EditorWindow, IESWindowPresentationShortTitle
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Workspace)]
+    public sealed class ESWorldDialogueEditorWindow : EditorWindow,
+        IESWindowPresentationShortTitle,
+        IESWindowSleepRelationshipState
     {
         public string ESWindow_PresentationShortTitle => "对话";
         private enum ViewMode : byte { Graph, Map2D, Scene3D }
 
         private const string GraphGuidSessionKey = "ES.WorldDialogueWorkbench.GraphGuid";
         private const string MapGuidSessionKey = "ES.WorldDialogueWorkbench.MapGuid";
+
+        [SerializeField] private string serializedSleepOwnerKey = string.Empty;
+        [SerializeField] private bool serializedSleepOwnerDetachedByClose;
 
         private ESWorldDialogueGraphAsset graphAsset;
         private ESWorldMapAsset mapAsset;
@@ -39,23 +45,62 @@ namespace ES
         {
             ESWorldDialogueEditorWindow window = GetWindow<ESWorldDialogueEditorWindow>("ES 世界对话编辑器");
             window.minSize = new Vector2(920f, 620f);
+            window.maxSize = new Vector2(1600f, 1100f);
+            window.ConfigureIndependentSleep();
             window.Show();
             window.Focus();
         }
 
-        public static void OpenFor(ESWorldMapAsset asset, EditorWindow owner = null)
+        public static void OpenFor(ESWorldMapAsset asset)
         {
             ESWorldDialogueEditorWindow window = GetWindow<ESWorldDialogueEditorWindow>("ES 世界对话编辑器");
             window.minSize = new Vector2(920f, 620f);
+            window.maxSize = new Vector2(1600f, 1100f);
+            window.ConfigureIndependentSleep();
             window.BindMap(asset);
             window.Show();
             window.Focus();
         }
 
-        public static void OpenFor(ESWorldDialogueGraphAsset asset, ESWorldMapAsset map = null, EditorWindow owner = null)
+        public static void OpenFor(
+            ESWorldDialogueGraphAsset asset,
+            ESWorldMapAsset map = null)
         {
             ESWorldDialogueEditorWindow window = GetWindow<ESWorldDialogueEditorWindow>("ES 世界对话编辑器");
             window.minSize = new Vector2(920f, 620f);
+            window.ConfigureIndependentSleep();
+            window.BindGraph(asset);
+            if (map != null) window.BindMap(map);
+            window.Show();
+            window.Focus();
+        }
+
+        public static void OpenFor(
+            ESWorldMapAsset asset,
+            ESWorldBuilderWorkbenchWindow owner)
+        {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner));
+            ESWorldDialogueEditorWindow window = GetWindow<ESWorldDialogueEditorWindow>("ES 世界对话编辑器");
+            window.minSize = new Vector2(920f, 620f);
+            window.maxSize = new Vector2(1600f, 1100f);
+            window.ConfigureFollowOwner(owner);
+            window.BindMap(asset);
+            window.Show();
+            window.Focus();
+        }
+
+        public static void OpenFor(
+            ESWorldDialogueGraphAsset asset,
+            ESWorldMapAsset map,
+            ESWorldBuilderWorkbenchWindow owner)
+        {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner));
+            ESWorldDialogueEditorWindow window = GetWindow<ESWorldDialogueEditorWindow>("ES 世界对话编辑器");
+            window.minSize = new Vector2(920f, 620f);
+            window.maxSize = new Vector2(1600f, 1100f);
+            window.ConfigureFollowOwner(owner);
             window.BindGraph(asset);
             if (map != null) window.BindMap(map);
             window.Show();
@@ -67,6 +112,7 @@ namespace ES
             ESWindowFoundation.BindWithStandardSystemHost(
                 this,
                 ESWindowFoundation.EnsureStandardSystemActionBar(this));
+            RestoreSleepOwnerRelationship();
             if (!sceneHooked)
             {
                 SceneView.duringSceneGui += OnSceneGUI;
@@ -77,14 +123,95 @@ namespace ES
 
         private void OnDisable()
         {
-            ESWindowFoundation.Unbind(this, true);
+            ESWindowFoundation.Suspend(this);
             if (sceneHooked)
             {
                 SceneView.duringSceneGui -= OnSceneGUI;
                 sceneHooked = false;
             }
-            graphSerialized = null;
-            mapSerialized = null;
+            ReleaseSerializedObjects();
+        }
+
+        private void ReleaseSerializedObjects()
+        {
+            try { graphSerialized?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            finally { graphSerialized = null; }
+
+            try { mapSerialized?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            finally { mapSerialized = null; }
+        }
+
+        private void OnDestroy()
+        {
+            ESWindowFoundation.Close(this);
+        }
+
+        bool IESWindowSleepRelationshipState.SleepOwnerDetachedByClose
+            => serializedSleepOwnerDetachedByClose;
+
+        void IESWindowSleepRelationshipState.DetachSleepOwnerAfterOwnerClose()
+        {
+            serializedSleepOwnerKey = string.Empty;
+            serializedSleepOwnerDetachedByClose = true;
+        }
+
+        private void ConfigureIndependentSleep()
+        {
+            serializedSleepOwnerKey = string.Empty;
+            serializedSleepOwnerDetachedByClose = false;
+            ESWindowFoundation.ClearPendingSleepOwner(this);
+            ESWindowFoundation.ClearSleepOwner(this);
+        }
+
+        private void ConfigureFollowOwner(ESWorldBuilderWorkbenchWindow owner)
+        {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner));
+            serializedSleepOwnerKey = ESWorldBuilderWorkbenchWindow.SleepOwnerKey;
+            serializedSleepOwnerDetachedByClose = false;
+            if (!ESWindowFoundation.SetSleepOwner(
+                    this,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner))
+            {
+                throw new InvalidOperationException("世界对话编辑器无法建立 FollowOwner 生命周期关系。");
+            }
+        }
+
+        private void RestoreSleepOwnerRelationship()
+        {
+            if (serializedSleepOwnerDetachedByClose
+                || string.IsNullOrWhiteSpace(serializedSleepOwnerKey))
+                return;
+
+            if (!string.Equals(
+                    serializedSleepOwnerKey,
+                    ESWorldBuilderWorkbenchWindow.SleepOwnerKey,
+                    StringComparison.Ordinal))
+            {
+                Debug.LogError("世界对话编辑器检测到未知的休眠 ownerKey，已安全脱离："
+                    + serializedSleepOwnerKey);
+                serializedSleepOwnerKey = string.Empty;
+                serializedSleepOwnerDetachedByClose = true;
+                return;
+            }
+
+            ESWorldBuilderWorkbenchWindow owner = ESWorldBuilderWorkbenchWindow.UsingWindow;
+            if (owner != null)
+            {
+                ESWindowFoundation.SetSleepOwner(
+                    this,
+                    owner,
+                    ESWindowSleepLinkMode.FollowOwner);
+                return;
+            }
+
+            ESWindowFoundation.RegisterPendingSleepOwner(
+                this,
+                serializedSleepOwnerKey,
+                ESWindowSleepLinkMode.FollowOwner);
         }
 
         private void OnGUI()
@@ -168,6 +295,12 @@ namespace ES
                 return;
             }
             EnsureGraphDefinition();
+            if (graphAsset.Definition == null || graphAsset.Definition.nodes == null
+                || graphAsset.Definition.edges == null)
+            {
+                EditorGUILayout.HelpBox("对话图数据结构不完整，已停止 Graph 编辑。请先迁移或修复资产。", MessageType.Error);
+                return;
+            }
             graphSerialized.Update();
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -253,7 +386,19 @@ namespace ES
                 return;
             }
             SerializedProperty nodes = graphSerialized.FindProperty("definition.nodes");
+            if (nodes == null || !nodes.isArray || selectedNodeIndex < 0 || selectedNodeIndex >= nodes.arraySize)
+            {
+                EditorGUILayout.HelpBox("节点列表已被外部修改，已取消本次节点编辑。", MessageType.Warning);
+                GUILayout.EndArea();
+                return;
+            }
             SerializedProperty node = nodes.GetArrayElementAtIndex(selectedNodeIndex);
+            if (node == null)
+            {
+                EditorGUILayout.HelpBox("当前节点序列化数据已失效，已取消本次节点编辑。", MessageType.Warning);
+                GUILayout.EndArea();
+                return;
+            }
             EditorGUILayout.LabelField("稳定 Node ID", node.FindPropertyRelative("nodeId").stringValue, EditorStyles.miniLabel);
             EditorGUILayout.PropertyField(node.FindPropertyRelative("title"), new GUIContent("标题"));
             EditorGUILayout.PropertyField(node.FindPropertyRelative("speaker"), new GUIContent("说话者"));
@@ -291,6 +436,11 @@ namespace ES
             if (mapAsset == null)
             {
                 EditorGUILayout.HelpBox("2D 地图放置需要绑定 ESWorldMapAsset。", MessageType.Warning);
+                return;
+            }
+            if (mapAsset.Definition == null)
+            {
+                EditorGUILayout.HelpBox("地图数据结构不完整，已停止 2D 编辑。请先迁移或修复资产。", MessageType.Error);
                 return;
             }
             if (graphAsset == null) EditorGUILayout.HelpBox("可从 Project 拖入 ESWorldDialogueGraphAsset，或先在工具栏绑定对话图。", MessageType.Info);
@@ -367,7 +517,9 @@ namespace ES
                 GUI.FocusControl(null);
                 evt.Use();
             }
-            if (canvas.Contains(evt.mousePosition) && evt.type == EventType.MouseDrag && evt.button == 0 && selectedPlacementIndex >= 0)
+            if (canvas.Contains(evt.mousePosition) && evt.type == EventType.MouseDrag && evt.button == 0
+                && placements != null && selectedPlacementIndex >= 0
+                && selectedPlacementIndex < placements.Count && placements[selectedPlacementIndex] != null)
             {
                 if (!mapDragUndoRecorded) { Undo.RecordObject(mapAsset, "移动 2D 对话入口"); mapDragUndoRecorded = true; }
                 ESWorldDialoguePlacement placement = placements[selectedPlacementIndex];
@@ -390,7 +542,20 @@ namespace ES
                 return;
             }
             SerializedProperty placements = mapSerialized.FindProperty("definition.dialoguePlacements");
+            if (placements == null || !placements.isArray
+                || selectedPlacementIndex < 0 || selectedPlacementIndex >= placements.arraySize)
+            {
+                EditorGUILayout.HelpBox("放置列表已被外部修改，已取消本次入口编辑。", MessageType.Warning);
+                GUILayout.EndArea();
+                return;
+            }
             SerializedProperty placement = placements.GetArrayElementAtIndex(selectedPlacementIndex);
+            if (placement == null)
+            {
+                EditorGUILayout.HelpBox("当前入口序列化数据已失效，已取消本次入口编辑。", MessageType.Warning);
+                GUILayout.EndArea();
+                return;
+            }
             using (new EditorGUILayout.VerticalScope(ESEditorPresentation.SurfaceStyle))
             {
                 GUILayout.Label("空间放置检查器", ESEditorPresentation.HeaderStyle);
@@ -426,6 +591,11 @@ namespace ES
         {
             EditorGUILayout.HelpBox("在 SceneView 中直接拖入 ESWorldDialogueGraphAsset。SceneView 为 2D 模式时写入 XY 平面锚点，否则写入 3D 地表/水平面锚点。Scene 对象和地图放置记录分层保存。", MessageType.Info);
             if (mapAsset == null) return;
+            if (mapAsset.Definition == null)
+            {
+                EditorGUILayout.HelpBox("地图数据结构不完整，已停止 Scene 编辑。请先迁移或修复资产。", MessageType.Error);
+                return;
+            }
             using (new EditorGUILayout.HorizontalScope())
             {
                 if (GUILayout.Button("同步当前场景锚点", GUILayout.Height(28f))) SyncSceneAnchors();
@@ -472,13 +642,24 @@ namespace ES
 
         private void AddSceneAnchor(Vector3 position, ESWorldDialoguePlacementSpace space)
         {
-            if (mapAsset == null || graphAsset == null) { SetStatus("需要同时绑定地图和对话图。", MessageType.Warning); return; }
+            if (mapAsset == null || graphAsset == null || mapAsset.Definition == null || graphAsset.Definition == null)
+            {
+                SetStatus("需要同时绑定有效的地图和对话图。", MessageType.Warning);
+                return;
+            }
+            string graphPath = AssetDatabase.GetAssetPath(graphAsset);
+            string mapPath = AssetDatabase.GetAssetPath(mapAsset);
+            string graphGuid = AssetDatabase.AssetPathToGUID(graphPath);
+            string mapGuid = AssetDatabase.AssetPathToGUID(mapPath);
+            if (string.IsNullOrEmpty(graphGuid) || string.IsNullOrEmpty(mapGuid))
+            {
+                SetStatus("地图或对话图不是有效的项目资产，无法创建 Scene 锚点。", MessageType.Error);
+                return;
+            }
             EnsureMapPlacements();
             string placementId = Guid.NewGuid().ToString("N");
             string graphKey = ESWorldDialogueAuthoringUtility.GetAssetKey(graphAsset);
-            string graphGuid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(graphAsset));
             string scenePath = SceneManager.GetActiveScene().path;
-            string mapGuid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(mapAsset));
             Undo.RecordObject(mapAsset, "拖放对话入口到 Scene");
             GameObject anchorObject = new GameObject("ES 对话入口 · " + graphAsset.name);
             Undo.RegisterCreatedObjectUndo(anchorObject, "拖放对话入口到 Scene");
@@ -514,21 +695,45 @@ namespace ES
 
         private void SyncSceneAnchors()
         {
-            if (mapAsset == null) return;
+            if (mapAsset == null || mapAsset.Definition == null)
+            {
+                SetStatus("地图结构无效，无法同步 Scene 对话锚点。", MessageType.Error);
+                return;
+            }
             EnsureMapPlacements();
             ESWorldDialogueAnchor[] anchors = Resources.FindObjectsOfTypeAll<ESWorldDialogueAnchor>();
+            string currentMapGuid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(mapAsset));
+            var seenPlacementIds = new HashSet<string>(StringComparer.Ordinal);
             int updated = 0;
+            int skippedForeign = 0;
+            int skippedDuplicate = 0;
             Undo.RecordObject(mapAsset, "同步 Scene 对话锚点");
             for (int i = 0; i < anchors.Length; i++)
             {
                 ESWorldDialogueAnchor anchor = anchors[i];
                 if (anchor == null || EditorUtility.IsPersistent(anchor) || anchor.gameObject.scene != SceneManager.GetActiveScene()) continue;
+                if (!string.IsNullOrEmpty(anchor.mapAssetGuid)
+                    && !string.Equals(anchor.mapAssetGuid, currentMapGuid, StringComparison.Ordinal))
+                {
+                    skippedForeign++;
+                    continue;
+                }
+                if (!string.IsNullOrWhiteSpace(anchor.placementId)
+                    && !seenPlacementIds.Add(anchor.placementId))
+                {
+                    skippedDuplicate++;
+                    continue;
+                }
                 Undo.RecordObject(anchor, "同步 Scene 对话锚点");
-                ESWorldDialoguePlacement placement = FindPlacement(anchor.placementId);
+                string placementId = string.IsNullOrWhiteSpace(anchor.placementId)
+                    ? Guid.NewGuid().ToString("N")
+                    : anchor.placementId;
+                if (!string.Equals(anchor.placementId, placementId, StringComparison.Ordinal))
+                    anchor.placementId = placementId;
+                ESWorldDialoguePlacement placement = FindPlacement(placementId);
                 if (placement == null)
                 {
-                    placement = new ESWorldDialoguePlacement { placementId = string.IsNullOrWhiteSpace(anchor.placementId) ? Guid.NewGuid().ToString("N") : anchor.placementId };
-                    anchor.placementId = placement.placementId;
+                    placement = new ESWorldDialoguePlacement { placementId = placementId };
                     mapAsset.Definition.dialoguePlacements.Add(placement);
                 }
                 placement.dialogueGraphKey = anchor.dialogueGraphKey;
@@ -550,7 +755,11 @@ namespace ES
                 ESWorldMapAuthoringUtility.MarkChanged(mapAsset);
                 EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
             }
-            SetStatus("已同步当前场景对话锚点：" + updated + " 个。", MessageType.Info);
+            string suffix = skippedForeign > 0 || skippedDuplicate > 0
+                ? "（跳过其他地图 " + skippedForeign + " 个、重复身份 " + skippedDuplicate + " 个）"
+                : string.Empty;
+            SetStatus("已同步当前场景对话锚点：" + updated + " 个。" + suffix,
+                skippedForeign > 0 || skippedDuplicate > 0 ? MessageType.Warning : MessageType.Info);
         }
 
         private ESWorldDialogueGraphAsset FindDraggedGraph()
@@ -563,7 +772,17 @@ namespace ES
 
         private void AddMapPlacement(Vector2 worldPoint)
         {
-            if (mapAsset == null || graphAsset == null) { SetStatus("需要同时绑定地图和对话图。", MessageType.Warning); return; }
+            if (mapAsset == null || graphAsset == null || mapAsset.Definition == null || graphAsset.Definition == null)
+            {
+                SetStatus("需要同时绑定有效的地图和对话图。", MessageType.Warning);
+                return;
+            }
+            if (string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(mapAsset)))
+                || string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(graphAsset))))
+            {
+                SetStatus("地图或对话图不是有效的项目资产，无法创建地图入口。", MessageType.Error);
+                return;
+            }
             EnsureMapPlacements();
             Undo.RecordObject(mapAsset, "放置 2D 对话入口");
             string placementId = Guid.NewGuid().ToString("N");
@@ -588,6 +807,11 @@ namespace ES
         {
             if (graphAsset == null) { SetStatus("请先绑定对话图资产。", MessageType.Warning); return; }
             EnsureGraphDefinition();
+            if (graphAsset.Definition == null || graphAsset.Definition.nodes == null)
+            {
+                SetStatus("对话图结构不完整，无法新增节点。", MessageType.Error);
+                return;
+            }
             Undo.RecordObject(graphAsset, "新增对话节点");
             ESWorldDialogueNodeData node = new ESWorldDialogueNodeData
             {
@@ -606,7 +830,12 @@ namespace ES
         private void ConnectSelectedNode(int targetIndex)
         {
             ESWorldDialogueGraphDefinition definition = graphAsset == null ? null : graphAsset.Definition;
-            if (definition == null || selectedNodeIndex < 0 || selectedNodeIndex >= definition.nodes.Count || targetIndex < 0 || targetIndex >= definition.nodes.Count || targetIndex == selectedNodeIndex) return;
+            if (definition == null || definition.nodes == null || definition.edges == null
+                || selectedNodeIndex < 0 || selectedNodeIndex >= definition.nodes.Count
+                || targetIndex < 0 || targetIndex >= definition.nodes.Count
+                || targetIndex == selectedNodeIndex
+                || definition.nodes[selectedNodeIndex] == null || definition.nodes[targetIndex] == null)
+                return;
             graphSerialized?.ApplyModifiedProperties();
             Undo.RecordObject(graphAsset, "连接对话数据流");
             ESWorldDialogueNodeData from = definition.nodes[selectedNodeIndex];
@@ -629,7 +858,10 @@ namespace ES
 
         private void DeleteSelectedNode()
         {
-            if (graphAsset == null || selectedNodeIndex < 0 || selectedNodeIndex >= graphAsset.Definition.nodes.Count) return;
+            if (graphAsset == null || graphAsset.Definition == null || graphAsset.Definition.nodes == null
+                || selectedNodeIndex < 0 || selectedNodeIndex >= graphAsset.Definition.nodes.Count
+                || graphAsset.Definition.nodes[selectedNodeIndex] == null)
+                return;
             graphSerialized?.ApplyModifiedProperties();
             string nodeId = graphAsset.Definition.nodes[selectedNodeIndex].nodeId;
             Undo.RecordObject(graphAsset, "删除对话节点");
@@ -687,7 +919,7 @@ namespace ES
 
         private ESWorldDialoguePlacement FindPlacement(string placementId)
         {
-            if (mapAsset == null || mapAsset.Definition.dialoguePlacements == null) return null;
+            if (mapAsset == null || mapAsset.Definition == null || mapAsset.Definition.dialoguePlacements == null) return null;
             for (int i = 0; i < mapAsset.Definition.dialoguePlacements.Count; i++)
                 if (mapAsset.Definition.dialoguePlacements[i] != null && mapAsset.Definition.dialoguePlacements[i].placementId == placementId) return mapAsset.Definition.dialoguePlacements[i];
             return null;
@@ -695,7 +927,9 @@ namespace ES
 
         private void LoadGraphFromSelectedPlacement()
         {
-            if (mapAsset == null || mapAsset.Definition.dialoguePlacements == null || selectedPlacementIndex < 0 || selectedPlacementIndex >= mapAsset.Definition.dialoguePlacements.Count) return;
+            if (mapAsset == null || mapAsset.Definition == null || mapAsset.Definition.dialoguePlacements == null
+                || selectedPlacementIndex < 0 || selectedPlacementIndex >= mapAsset.Definition.dialoguePlacements.Count)
+                return;
             ESWorldDialoguePlacement placement = mapAsset.Definition.dialoguePlacements[selectedPlacementIndex];
             string path = placement == null ? string.Empty : AssetDatabase.GUIDToAssetPath(placement.dialogueGraphAssetGuid);
             ESWorldDialogueGraphAsset asset = string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<ESWorldDialogueGraphAsset>(path);
@@ -706,7 +940,10 @@ namespace ES
 
         private void BindCurrentGraphToSelectedPlacement()
         {
-            if (graphAsset == null || mapAsset == null || mapAsset.Definition.dialoguePlacements == null || selectedPlacementIndex < 0 || selectedPlacementIndex >= mapAsset.Definition.dialoguePlacements.Count) return;
+            if (graphAsset == null || graphAsset.Definition == null || mapAsset == null || mapAsset.Definition == null
+                || mapAsset.Definition.dialoguePlacements == null || selectedPlacementIndex < 0
+                || selectedPlacementIndex >= mapAsset.Definition.dialoguePlacements.Count)
+                return;
             mapSerialized?.ApplyModifiedProperties();
             ESWorldDialoguePlacement placement = mapAsset.Definition.dialoguePlacements[selectedPlacementIndex];
             if (placement == null) return;
@@ -721,7 +958,7 @@ namespace ES
 
         private int FindPlacementAt(Vector2 point, Vector2 min, Vector2 max, Rect canvas)
         {
-            if (mapAsset == null || mapAsset.Definition.dialoguePlacements == null) return -1;
+            if (mapAsset == null || mapAsset.Definition == null || mapAsset.Definition.dialoguePlacements == null) return -1;
             for (int i = 0; i < mapAsset.Definition.dialoguePlacements.Count; i++)
             {
                 ESWorldDialoguePlacement placement = mapAsset.Definition.dialoguePlacements[i];
@@ -746,25 +983,49 @@ namespace ES
             string path = EditorUtility.SaveFilePanelInProject("创建 ES 对话图资产", "ESWorldDialogueGraph", "asset", "选择对话图保存位置");
             if (string.IsNullOrWhiteSpace(path)) return;
             ESWorldDialogueGraphAsset asset = CreateInstance<ESWorldDialogueGraphAsset>();
-            asset.Definition.EnsureStableIds();
-            asset.Definition.nodes.Add(new ESWorldDialogueNodeData
+            bool createdAsset = false;
+            try
             {
-                nodeId = Guid.NewGuid().ToString("N"),
-                title = "开场对话",
-                speaker = "旁白",
-                text = "这是一个可拖入 2D 地图或 3D Scene 的对话入口。",
-                graphPosition = new Vector2(80f, 90f),
-                outputs = new List<ESWorldDialoguePortData> { new ESWorldDialoguePortData { portId = Guid.NewGuid().ToString("N"), displayName = "继续" } }
-            });
-            asset.Definition.entryNodeId = asset.Definition.nodes[0].nodeId;
-            AssetDatabase.CreateAsset(asset, path);
-            AssetDatabase.SaveAssets();
-            BindGraph(asset);
-            SetStatus("已创建对话图资产。", MessageType.Info);
+                if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path) != null
+                    || System.IO.File.Exists(System.IO.Path.GetFullPath(path)))
+                    throw new InvalidOperationException("目标对话图资产已存在；请选择新的路径。");
+                asset.Definition.EnsureStableIds();
+                asset.Definition.nodes.Add(new ESWorldDialogueNodeData
+                {
+                    nodeId = Guid.NewGuid().ToString("N"),
+                    title = "开场对话",
+                    speaker = "旁白",
+                    text = "这是一个可拖入 2D 地图或 3D Scene 的对话入口。",
+                    graphPosition = new Vector2(80f, 90f),
+                    outputs = new List<ESWorldDialoguePortData> { new ESWorldDialoguePortData { portId = Guid.NewGuid().ToString("N"), displayName = "继续" } }
+                });
+                asset.Definition.entryNodeId = asset.Definition.nodes[0].nodeId;
+                AssetDatabase.CreateAsset(asset, path);
+                createdAsset = true;
+                AssetDatabase.SaveAssetIfDirty(asset);
+                if (AssetDatabase.LoadAssetAtPath<ESWorldDialogueGraphAsset>(path) == null)
+                    throw new InvalidOperationException("对话图已写入，但 Unity 没有成功加载目标资产。");
+                BindGraph(asset);
+                SetStatus("已创建对话图资产。", MessageType.Info);
+            }
+            catch (Exception exception)
+            {
+                if (createdAsset)
+                    AssetDatabase.DeleteAsset(path);
+                else if (asset != null)
+                    DestroyImmediate(asset);
+                SetStatus("创建对话图失败：" + exception.Message, MessageType.Error);
+            }
         }
 
         private void BindGraph(ESWorldDialogueGraphAsset asset)
         {
+            if (graphSerialized != null && graphSerialized.targetObject != asset)
+            {
+                try { graphSerialized.Dispose(); }
+                catch (Exception exception) { Debug.LogException(exception); }
+                finally { graphSerialized = null; }
+            }
             graphAsset = asset;
             graphSerialized = asset == null ? null : new SerializedObject(asset);
             selectedNodeIndex = -1;
@@ -779,6 +1040,12 @@ namespace ES
 
         private void BindMap(ESWorldMapAsset asset)
         {
+            if (mapSerialized != null && mapSerialized.targetObject != asset)
+            {
+                try { mapSerialized.Dispose(); }
+                catch (Exception exception) { Debug.LogException(exception); }
+                finally { mapSerialized = null; }
+            }
             mapAsset = asset;
             mapSerialized = asset == null ? null : new SerializedObject(asset);
             selectedPlacementIndex = -1;
@@ -803,12 +1070,29 @@ namespace ES
             ESWorldDialogueSaveResult graphResult = graphAsset == null ? new ESWorldDialogueSaveResult(true, false, 0, string.Empty, null) : ESWorldDialogueAuthoringUtility.Save(graphAsset, graphSerialized);
             ESWorldMapSaveResult mapResult = mapAsset == null ? new ESWorldMapSaveResult(true, false, 0, string.Empty, null) : ESWorldMapAuthoringUtility.Save(mapAsset, mapSerialized);
             bool sceneSaved = false;
-            Scene active = SceneManager.GetActiveScene();
-            if (active.IsValid() && !string.IsNullOrEmpty(active.path)) sceneSaved = EditorSceneManager.SaveScene(active);
             if (!graphResult.success || !mapResult.success)
             {
                 SetStatus("保存失败：" + (graphResult.success ? mapResult.error : graphResult.error), MessageType.Error);
                 return;
+            }
+
+            Scene active = SceneManager.GetActiveScene();
+            if (active.IsValid() && !string.IsNullOrEmpty(active.path))
+            {
+                try
+                {
+                    sceneSaved = EditorSceneManager.SaveScene(active);
+                }
+                catch (Exception exception)
+                {
+                    SetStatus("图/地图资产已保存，但当前场景保存失败：" + exception.Message, MessageType.Warning);
+                    return;
+                }
+                if (!sceneSaved)
+                {
+                    SetStatus("图/地图资产已保存，但当前场景未能保存。", MessageType.Warning);
+                    return;
+                }
             }
             SetStatus("对话图、地图资产" + (sceneSaved ? "与当前场景" : string.Empty) + "已保存。", MessageType.Info);
         }

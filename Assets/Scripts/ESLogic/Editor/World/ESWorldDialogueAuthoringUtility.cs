@@ -70,11 +70,19 @@ namespace ES
         private static string ComputeContentHash(ESWorldDialogueGraphAsset asset)
         {
             ESWorldDialogueGraphAsset snapshot = UnityEngine.Object.Instantiate(asset);
-            snapshot.hideFlags = HideFlags.HideAndDontSave;
-            snapshot.Definition.contentHash = string.Empty;
-            snapshot.Definition.contentVersion = 0;
-            string json = EditorJsonUtility.ToJson(snapshot);
-            UnityEngine.Object.DestroyImmediate(snapshot);
+            string json;
+            try
+            {
+                snapshot.hideFlags = HideFlags.HideAndDontSave;
+                snapshot.Definition.contentHash = string.Empty;
+                snapshot.Definition.contentVersion = 0;
+                json = EditorJsonUtility.ToJson(snapshot);
+            }
+            finally
+            {
+                if (snapshot != null)
+                    UnityEngine.Object.DestroyImmediate(snapshot);
+            }
             using (SHA256 sha = SHA256.Create())
             {
                 byte[] bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(json ?? string.Empty));

@@ -261,6 +261,14 @@ namespace ES
         private bool dragEdgePanAccepted;
         private string dragEdgePanReason = string.Empty;
         private object activeDragSessionToken;
+        // Native StartDrag transfers control away from UI Toolkit. The source
+        // pointer is released synchronously and can emit PointerCaptureOut before
+        // DragUpdated/DragPerform; keep the native payload alive across that edge.
+        private object externalDragPayloadToken;
+        private bool externalDragTransferInFlight;
+        private bool externalDragWatchdogRegistered;
+        private double externalDragLastSignalTime;
+        private const double ExternalDragWatchdogTimeoutSeconds = 1.5d;
         private object externalPointerSessionToken;
         private ESWorkbenchBottomPanelDensity activeBottomPanelDensity = ESWorkbenchBottomPanelDensity.Normal;
         private float appliedBottomDrawerHeight;
@@ -369,7 +377,7 @@ namespace ES
                     if (state != null && !string.IsNullOrWhiteSpace(state.objectId)
                         && !string.IsNullOrWhiteSpace(state.presetId))
                         selectedPresetByObjectId[state.objectId] = state.presetId;
-            actions.Selection.Changed += OnSelectionChanged;
+            actions.Selection.SetChanged += OnSelectionSetChanged;
             actions.Tools.Changed += OnToolChanged;
         }
 
@@ -416,6 +424,7 @@ namespace ES
             availableCenterWidth = LayoutPolicy.ResolveProtectedCenterWidth(availableWidth);
             ApplyMinimumWindowSize();
             root = new VisualElement { name = "ESWorkbenchHost" };
+            root.AddToClassList("es-workbench-shell");
             root.style.flexGrow = 1f;
             root.style.minWidth = 0f;
             root.style.minHeight = 0f;
@@ -428,10 +437,13 @@ namespace ES
             root.RegisterCallback<PointerDownEvent>(OnVisualEvidencePointerDown, TrickleDown.TrickleDown);
             root.RegisterCallback<PointerCancelEvent>(OnRootPointerCancel, TrickleDown.TrickleDown);
             root.RegisterCallback<WheelEvent>(OnVisualEvidenceWheel, TrickleDown.TrickleDown);
-            root.RegisterCallback<DragExitedEvent>(OnDragExited);
+            root.RegisterCallback<DragExitedEvent>(OnDragExited, TrickleDown.TrickleDown);
+            root.RegisterCallback<PointerCaptureOutEvent>(OnRootPointerCaptureOut, TrickleDown.TrickleDown);
+            root.RegisterCallback<FocusOutEvent>(OnRootFocusOut, TrickleDown.TrickleDown);
             root.RegisterCallback<DetachFromPanelEvent>(OnRootDetachedFromPanel);
 
             commandBar = CreateHorizontalBar("ESWorkbenchCommandBar", 44f);
+            commandBar.AddToClassList("es-workbench-command-bar");
             commandBar.style.backgroundColor = ESEditorPresentation.WindowRaisedSurfaceColor;
             root.Add(commandBar);
 
@@ -520,6 +532,7 @@ namespace ES
             RefreshRegistrations();
             root.schedule.Execute(() =>
             {
+                if (disposed) return;
                 ApplyPaneVisibility(availableWidth);
                 ApplyBottomDrawerVisibility();
             });
@@ -551,6 +564,7 @@ namespace ES
 
         internal void ReleaseContributedContent()
         {
+            externalDragTransferInFlight = false;
             CancelWorkbenchDrag(true);
             if (!string.IsNullOrEmpty(activatedAuthoringModeId))
             {
@@ -617,11 +631,13 @@ namespace ES
         private VisualElement BuildLeftPanel()
         {
             VisualElement panel = leftPanel = new VisualElement { name = "ESWorkbenchLeftPanel" };
+            panel.AddToClassList("es-workbench-side-panel");
+            panel.AddToClassList("es-workbench-content-panel");
             panel.style.flexGrow = 1f;
             panel.style.minWidth = LayoutPolicy.MinimumLeftPaneWidth;
             panel.style.minHeight = 0f;
             panel.style.backgroundColor = ESEditorPresentation.WindowInsetSurfaceColor;
-            panel.style.borderRightWidth = 1f;
+            panel.style.borderRightWidth = 0f;
             panel.style.borderRightColor = ESEditorPresentation.DividerColor;
             panel.RegisterCallback<GeometryChangedEvent>(evt =>
             {
@@ -651,13 +667,16 @@ namespace ES
         private VisualElement BuildCenterPanel()
         {
             VisualElement panel = centerPanel = new VisualElement { name = "ESWorkbenchCenterPanel" };
+            panel.AddToClassList("es-workbench-center-stage");
             panel.style.flexGrow = 1f;
             panel.style.minWidth = LayoutPolicy.MinimumCenterWidth;
             panel.style.minHeight = 0f;
             panel.RegisterCallback<GeometryChangedEvent>(OnCenterGeometryChanged);
             documentTabs = CreateHorizontalBar("ESWorkbenchDocumentTabs", 31f);
+            documentTabs.AddToClassList("es-workbench-subbar");
             panel.Add(documentTabs);
             viewportModeBar = CreateHorizontalBar("ESWorkbenchViewportModes", 29f);
+            viewportModeBar.AddToClassList("es-workbench-subbar");
             panel.Add(viewportModeBar);
             viewportHost = new VisualElement { name = "ESWorkbenchViewportHost" };
             viewportHost.style.flexGrow = 1f;
@@ -665,8 +684,9 @@ namespace ES
             viewportHost.style.minHeight = 0f;
             viewportHost.style.flexDirection = FlexDirection.Row;
             toolRail = new VisualElement { name = "ESWorkbenchToolRail" };
-            toolRail.style.width = 54f;
-            toolRail.style.minWidth = 54f;
+            toolRail.AddToClassList("es-workbench-tool-rail");
+            toolRail.style.width = 46f;
+            toolRail.style.minWidth = 46f;
             toolRail.style.flexShrink = 0f;
             toolRail.style.alignItems = Align.Center;
             toolRail.style.paddingTop = 5f;
@@ -675,6 +695,7 @@ namespace ES
             toolRail.style.borderRightColor = ESEditorPresentation.DividerColor;
             viewportHost.Add(toolRail);
             VisualElement surface = new VisualElement { name = "ESWorkbenchViewportSurface" };
+            surface.AddToClassList("es-workbench-viewport-surface");
             surface.style.flexGrow = 1f;
             surface.style.minWidth = 0f;
             surface.style.minHeight = 0f;
@@ -683,9 +704,13 @@ namespace ES
             centerContent.style.flexGrow = 1f;
             centerContent.style.minWidth = 0f;
             centerContent.style.minHeight = 0f;
-            centerContent.RegisterCallback<DragUpdatedEvent>(OnDragUpdated);
-            centerContent.RegisterCallback<DragPerformEvent>(OnDragPerform);
-            centerContent.RegisterCallback<DragLeaveEvent>(OnDragLeave);
+            // Drag events can target the active viewport's IMGUIContainer or another
+            // nested VisualElement. Register in trickle-down so the workbench host
+            // receives the native drag before a child consumes/stops propagation;
+            // bubbling-only registration made preview/perform depend on the child.
+            centerContent.RegisterCallback<DragUpdatedEvent>(OnDragUpdated, TrickleDown.TrickleDown);
+            centerContent.RegisterCallback<DragPerformEvent>(OnDragPerform, TrickleDown.TrickleDown);
+            centerContent.RegisterCallback<DragLeaveEvent>(OnDragLeave, TrickleDown.TrickleDown);
             surface.Add(centerContent);
             dropFeedback = new VisualElement { name = "ESWorkbenchDropFeedback", pickingMode = PickingMode.Ignore };
             dropFeedback.style.position = Position.Absolute;
@@ -752,6 +777,7 @@ namespace ES
             viewportHost.Add(surface);
             panel.Add(viewportHost);
             viewportFooter = CreateHorizontalBar("ESWorkbenchViewportFooter", 25f);
+            viewportFooter.AddToClassList("es-workbench-viewport-footer");
             viewportFooter.style.height = 44f;
             viewportFooter.style.flexWrap = Wrap.Wrap;
             viewportFooter.style.borderTopWidth = 1f;
@@ -763,6 +789,7 @@ namespace ES
         private VisualElement BuildBottomDrawer()
         {
             VisualElement drawer = bottomDrawer = new VisualElement { name = "ESWorkbenchBottomDrawer" };
+            drawer.AddToClassList("es-workbench-bottom-drawer");
             drawer.style.flexGrow = 1f;
             drawer.style.minHeight = LayoutPolicy.CollapsedBottomDrawerHeight;
             drawer.style.backgroundColor = ESEditorPresentation.WindowInsetSurfaceColor;
@@ -814,11 +841,12 @@ namespace ES
         private VisualElement BuildInspectorPanel()
         {
             VisualElement panel = inspectorPanel = new VisualElement { name = "ESWorkbenchInspectorPanel" };
+            panel.AddToClassList("es-workbench-inspector-panel");
             panel.style.flexGrow = 1f;
             panel.style.minWidth = LayoutPolicy.MinimumInspectorPaneWidth;
             panel.style.minHeight = 0f;
             panel.style.backgroundColor = ESEditorPresentation.WindowRaisedSurfaceColor;
-            panel.style.borderLeftWidth = 1f;
+            panel.style.borderLeftWidth = 0f;
             panel.style.borderLeftColor = ESEditorPresentation.DividerColor;
             panel.RegisterCallback<GeometryChangedEvent>(evt =>
             {
@@ -828,6 +856,7 @@ namespace ES
                     layout.inspectorPaneWidth = width;
             });
             VisualElement titleBar = CreateHorizontalBar("ESWorkbenchInspectorTitleBar", 31f);
+            titleBar.AddToClassList("es-workbench-panel-header");
             inspectorTitle = new Label(presentation.InspectorTitle);
             inspectorTitle.AddToClassList("es-brand-title");
             inspectorTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -1593,6 +1622,7 @@ namespace ES
         private void BuildObjectsPanel()
         {
             VisualElement header = contentLibraryHeader = new VisualElement { name = "ESWorkbenchContentLibraryHeader" };
+            header.AddToClassList("es-workbench-panel-header");
             header.style.paddingLeft = 9f;
             header.style.paddingRight = 9f;
             header.style.paddingTop = 7f;
@@ -1672,6 +1702,7 @@ namespace ES
             leftContent.Add(breadcrumbBar);
 
             VisualElement browser = contentBrowser = new VisualElement { name = "ESWorkbenchContentBrowser" };
+            browser.AddToClassList("es-workbench-content-browser");
             browser.style.flexDirection = FlexDirection.Row;
             browser.style.flexGrow = 1f;
             browser.style.minHeight = 0f;
@@ -1698,7 +1729,7 @@ namespace ES
                 name = "ESWorkbenchContentCategoryTree",
                 itemsSource = contentCategoryNodes,
                 fixedItemHeight = 30f,
-                selectionType = SelectionType.Single,
+                selectionType = SelectionType.Multiple,
                 makeItem = CreateContentCategoryRow,
                 bindItem = BindContentCategoryRow
             };
@@ -1712,6 +1743,7 @@ namespace ES
             browser.Add(kindRail);
 
             VisualElement results = contentResults = new VisualElement { name = "ESWorkbenchContentResults" };
+            results.AddToClassList("es-workbench-content-results");
             results.style.flexGrow = 1f;
             results.style.minWidth = 0f;
             results.style.minHeight = 0f;
@@ -1775,8 +1807,9 @@ namespace ES
             objectList.style.flexGrow = 1f;
             objectList.selectionChanged += selection =>
             {
-                ESWorkbenchObjectDescriptor selected = selection.OfType<ESWorkbenchObjectDescriptor>().FirstOrDefault();
-                if (selected != null) actions.Selection.Select(GetEffectiveDescriptor(selected).ToSelection());
+                actions.Selection.SelectMany(selection
+                    .OfType<ESWorkbenchObjectDescriptor>()
+                    .Select(value => GetEffectiveDescriptor(value).ToSelection()));
             };
             results.Add(objectList);
             objectGridList = new ListView
@@ -2360,15 +2393,16 @@ namespace ES
             {
                 itemsSource = visibleHierarchy,
                 fixedItemHeight = 27f,
-                selectionType = SelectionType.Single,
+                selectionType = SelectionType.Multiple,
                 makeItem = CreateHierarchyRow,
                 bindItem = BindHierarchyRow
             };
             hierarchyList.style.flexGrow = 1f;
             hierarchyList.selectionChanged += selection =>
             {
-                ESWorkbenchHierarchyDescriptor selected = selection.OfType<ESWorkbenchHierarchyDescriptor>().FirstOrDefault();
-                if (selected != null) actions.Selection.Select(selected.ToSelection());
+                actions.Selection.SelectMany(selection
+                    .OfType<ESWorkbenchHierarchyDescriptor>()
+                    .Select(value => value.ToSelection()));
             };
             leftContent.Add(hierarchyList);
             hierarchyEmptyLabel = CreateListEmptyLabel("没有作者对象", "绑定资产或注册动态层级源后将在这里显示稳定层级。");
@@ -2689,6 +2723,7 @@ namespace ES
                 name = "ESWorkbenchContentGridCard" + slotName,
                 userData = new ContentCardState(viewportFeel.DragStartPixels)
             };
+            card.AddToClassList("es-workbench-resource-card");
             card.style.flexGrow = 1f;
             card.style.flexBasis = 0f;
             card.style.minWidth = 0f;
@@ -2700,10 +2735,10 @@ namespace ES
             card.style.paddingTop = 5f;
             card.style.paddingBottom = 5f;
             card.style.backgroundColor = ESEditorPresentation.ControlSurfaceColor;
-            card.style.borderLeftWidth = 1f;
-            card.style.borderRightWidth = 1f;
-            card.style.borderTopWidth = 1f;
-            card.style.borderBottomWidth = 2f;
+            card.style.borderLeftWidth = 2f;
+            card.style.borderRightWidth = 0f;
+            card.style.borderTopWidth = 0f;
+            card.style.borderBottomWidth = 1f;
             card.style.borderLeftColor = ESEditorPresentation.DividerColor;
             card.style.borderRightColor = ESEditorPresentation.DividerColor;
             card.style.borderTopColor = ESEditorPresentation.DividerColor;
@@ -2986,10 +3021,14 @@ namespace ES
                     .Where(value => value != null)
                     .Distinct()
                     .ToArray();
+                externalDragPayloadToken = activeDragSessionToken;
+                externalDragTransferInFlight = true;
+                NoteExternalDragSignal();
                 DragAndDrop.StartDrag(batch.Count > 1 ? "批量放置 " + batch.Count + " 项" : item.DisplayName);
             }
             catch (Exception exception)
             {
+                externalDragTransferInFlight = false;
                 ClearOwnedDragPayload(true);
                 pointerCoordinator.EndExternalContent(activeDragSessionToken);
                 activeDragSessionToken = null;
@@ -3050,6 +3089,7 @@ namespace ES
         private static VisualElement CreateThumbnailWell(string name, float width, float height)
         {
             VisualElement well = new VisualElement { name = name, pickingMode = PickingMode.Ignore };
+            well.AddToClassList("es-workbench-resource-preview");
             if (width > 0f)
             {
                 well.style.width = width;
@@ -3060,9 +3100,9 @@ namespace ES
             well.style.position = Position.Relative;
             well.style.overflow = Overflow.Hidden;
             well.style.backgroundColor = new Color(0.075f, 0.085f, 0.1f, 1f);
-            well.style.borderLeftWidth = 1f;
-            well.style.borderRightWidth = 1f;
-            well.style.borderTopWidth = 1f;
+            well.style.borderLeftWidth = 0f;
+            well.style.borderRightWidth = 0f;
+            well.style.borderTopWidth = 0f;
             well.style.borderBottomWidth = 1f;
             well.style.borderLeftColor = new Color(0.22f, 0.24f, 0.28f, 1f);
             well.style.borderRightColor = new Color(0.22f, 0.24f, 0.28f, 1f);
@@ -3559,10 +3599,18 @@ namespace ES
                 filterMode = FilterMode.Bilinear,
                 wrapMode = TextureWrapMode.Clamp
             };
-            Color32[] pixels = BuildGeneratedContentThumbnailPixels(kind, seed, width, height);
-            texture.SetPixels32(pixels);
-            texture.Apply(false, true);
-            return texture;
+            try
+            {
+                Color32[] pixels = BuildGeneratedContentThumbnailPixels(kind, seed, width, height);
+                texture.SetPixels32(pixels);
+                texture.Apply(false, true);
+                return texture;
+            }
+            catch
+            {
+                SafeDestroyThumbnail(texture);
+                throw;
+            }
         }
 
         private static Color32[] BuildGeneratedContentThumbnailPixels(
@@ -3841,12 +3889,19 @@ namespace ES
 
         private void EnsureThumbnailRefreshScheduled()
         {
-            if (root == null || thumbnailRefreshSchedule != null) return;
+            if (disposed || root == null || thumbnailRefreshSchedule != null) return;
             thumbnailRefreshSchedule = root.schedule.Execute(PollContentThumbnails).Every(180);
         }
 
         private void PollContentThumbnails()
         {
+            if (disposed)
+            {
+                thumbnailRefreshSchedule?.Pause();
+                thumbnailRefreshSchedule = null;
+                return;
+            }
+
             bool pending = false;
             bool changed = false;
             foreach (ThumbnailEntry entry in thumbnailCache.Values)
@@ -3892,6 +3947,7 @@ namespace ES
 
         private void OnDragUpdated(DragUpdatedEvent evt)
         {
+            NoteExternalDragSignal();
             ESWorkbenchObjectDescriptor item = ResolveDragItem();
             IReadOnlyList<ESWorkbenchObjectDescriptor> batch = ResolveDragBatch();
             string reason = string.Empty;
@@ -3946,16 +4002,24 @@ namespace ES
 
         private void OnDragLeave(DragLeaveEvent evt)
         {
-            if (centerContent == null) return;
-            Vector2 local = centerContent.WorldToLocal(evt.mousePosition);
-            if (!centerContent.contentRect.Contains(local))
-            {
-                StopDragEdgePan();
-                HideDropFeedback();
-            }
+            externalDragTransferInFlight = false;
+            StopDragEdgePan();
+            HideDropFeedback();
+            CancelWorkbenchDrag(true);
         }
 
         private void OnDragExited(DragExitedEvent evt)
+        {
+            externalDragTransferInFlight = false;
+            CancelWorkbenchDrag(true);
+        }
+
+        private void OnRootPointerCaptureOut(PointerCaptureOutEvent evt)
+        {
+            CancelWorkbenchDrag(true);
+        }
+
+        private void OnRootFocusOut(FocusOutEvent evt)
         {
             CancelWorkbenchDrag(true);
         }
@@ -3975,15 +4039,22 @@ namespace ES
             // 当前视口的临时预览，避免旧 owner 阻塞下一次打开的工作台。
             StopDragEdgePan();
             ClearViewportDropPreview();
+            externalDragTransferInFlight = false;
             CancelWorkbenchDrag(true);
             DeactivateCurrentViewport();
         }
 
         private void OnDragPerform(DragPerformEvent evt)
         {
+            NoteExternalDragSignal();
             ESWorkbenchObjectDescriptor item = ResolveDragItem();
             IReadOnlyList<ESWorkbenchObjectDescriptor> batch = ResolveDragBatch();
-            Vector2 local = centerContent.WorldToLocal(evt.mousePosition);
+            // DragPerform can race panel detach/rebind. Resolve the coordinate without
+            // dereferencing a torn-down centerContent so the finally block always owns
+            // the external-drag release contract.
+            Vector2 local = centerContent == null
+                ? evt.mousePosition
+                : centerContent.WorldToLocal(evt.mousePosition);
             try
             {
                 if ((activeDragSessionToken == null && !EnsureExternalPointerOwnership())
@@ -4023,6 +4094,7 @@ namespace ES
             }
             finally
             {
+                externalDragTransferInFlight = false;
                 CancelWorkbenchDrag(true);
                 evt.StopPropagation();
             }
@@ -4175,7 +4247,10 @@ namespace ES
         private void ClearViewportDropPreview()
         {
             if (activeViewport is IESWorkbenchDropPreviewViewport previewViewport)
-                previewViewport.ClearDropPreview();
+            {
+                try { previewViewport.ClearDropPreview(); }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
         }
 
         private ESWorkbenchObjectDescriptor ResolveDragItem()
@@ -4213,8 +4288,55 @@ namespace ES
             return externalDragBatch;
         }
 
+        private void NoteExternalDragSignal()
+        {
+            if (!externalDragTransferInFlight) return;
+            externalDragLastSignalTime = EditorApplication.timeSinceStartup;
+            if (externalDragWatchdogRegistered) return;
+            EditorApplication.update += OnExternalDragWatchdog;
+            externalDragWatchdogRegistered = true;
+        }
+
+        private void StopExternalDragWatchdog()
+        {
+            if (!externalDragWatchdogRegistered) return;
+            EditorApplication.update -= OnExternalDragWatchdog;
+            externalDragWatchdogRegistered = false;
+        }
+
+        private void OnExternalDragWatchdog()
+        {
+            if (disposed || !externalDragTransferInFlight || externalDragPayloadToken == null)
+            {
+                StopExternalDragWatchdog();
+                return;
+            }
+            if (!ReferenceEquals(
+                    DragAndDrop.GetGenericData(DragSessionKey),
+                    externalDragPayloadToken))
+            {
+                externalDragTransferInFlight = false;
+                CancelWorkbenchDrag(true);
+                return;
+            }
+            if (EditorApplication.timeSinceStartup - externalDragLastSignalTime
+                < ExternalDragWatchdogTimeoutSeconds)
+                return;
+
+            // Unity may omit DragExited when the native drag leaves an editor
+            // surface. The handoff grace period is over; force the same terminal
+            // cancellation contract so the next gesture cannot inherit stale data.
+            externalDragTransferInFlight = false;
+            CancelWorkbenchDrag(true);
+        }
+
         private void CancelWorkbenchDrag(bool clearObjectReferences)
         {
+            bool preserveNativePayload = externalDragTransferInFlight
+                && externalDragPayloadToken != null
+                && ReferenceEquals(
+                    DragAndDrop.GetGenericData(DragSessionKey),
+                    externalDragPayloadToken);
             StopDragEdgePan();
             HideDropFeedback();
             externalDragBatch.Clear();
@@ -4222,7 +4344,21 @@ namespace ES
             pointerCoordinator.EndExternalContent(activeDragSessionToken);
             pointerCoordinator.EndExternalContent(externalPointerSessionToken);
             externalPointerSessionToken = null;
-            ClearOwnedDragPayload(clearObjectReferences);
+            // PointerCaptureOut/FocusOut can be emitted while StartDrag hands
+            // control to Unity. Release the UI owner, but retain the native payload
+            // until DragPerform/DragExited reaches a terminal path.
+            activeDragSessionToken = null;
+            if (preserveNativePayload)
+            {
+                NoteExternalDragSignal();
+            }
+            else
+            {
+                StopExternalDragWatchdog();
+                ClearOwnedDragPayload(clearObjectReferences);
+                externalDragPayloadToken = null;
+                externalDragTransferInFlight = false;
+            }
         }
 
         private bool EnsureExternalPointerOwnership()
@@ -4298,6 +4434,7 @@ namespace ES
         private void StopDragEdgePan()
         {
             dragEdgePanSchedule?.Pause();
+            dragEdgePanSchedule = null;
             dragEdgePanSession.Stop();
             dragEdgePanViewport = null;
             dragEdgePanItem = null;
@@ -4308,11 +4445,26 @@ namespace ES
 
         private void ClearOwnedDragPayload(bool clearObjectReferences)
         {
-            if (activeDragSessionToken == null) return;
-            object currentToken = DragAndDrop.GetGenericData(DragSessionKey);
-            if (!ReferenceEquals(currentToken, activeDragSessionToken))
+            object payloadToken = activeDragSessionToken ?? externalDragPayloadToken;
+            if (payloadToken == null)
             {
-                activeDragSessionToken = null;
+                StopExternalDragWatchdog();
+                return;
+            }
+            object currentToken = DragAndDrop.GetGenericData(DragSessionKey);
+            if (!ReferenceEquals(currentToken, payloadToken))
+            {
+                // A new source gesture installs activeDragSessionToken before
+                // clearing a stale native payload. Do not erase that new token
+                // merely because the global DragAndDrop slot still belongs to
+                // the previous/another host; otherwise StartDrag writes a null
+                // session key and the next drop can never resolve its payload.
+                if (!ReferenceEquals(payloadToken, activeDragSessionToken))
+                    activeDragSessionToken = null;
+                if (ReferenceEquals(payloadToken, externalDragPayloadToken))
+                    externalDragPayloadToken = null;
+                externalDragTransferInFlight = false;
+                StopExternalDragWatchdog();
                 return;
             }
             DragAndDrop.SetGenericData(DragSessionKey, null);
@@ -4320,6 +4472,9 @@ namespace ES
             DragAndDrop.SetGenericData(BatchDragPayloadKey, null);
             if (clearObjectReferences) DragAndDrop.objectReferences = Array.Empty<UnityEngine.Object>();
             activeDragSessionToken = null;
+            externalDragPayloadToken = null;
+            externalDragTransferInFlight = false;
+            StopExternalDragWatchdog();
         }
 
         private void RebuildObjectList(bool refreshSource = true)
@@ -4399,7 +4554,7 @@ namespace ES
                     + (duplicateContentIdCount > 0 ? " · 已去重 " + duplicateContentIdCount : string.Empty);
             }
             RestoreStableSelection(source);
-            SynchronizeListSelection(actions.Selection.Current);
+            SynchronizeListSelection(actions.Selection.CurrentSet);
         }
 
         internal static bool MatchesContentKind(ESWorkbenchObjectDescriptor item, string filter)
@@ -4659,7 +4814,7 @@ namespace ES
             if (hierarchyEmptyLabel != null) hierarchyEmptyLabel.style.display = visibleHierarchy.Count == 0 ? DisplayStyle.Flex : DisplayStyle.None;
             if (hierarchyList != null) hierarchyList.style.display = visibleHierarchy.Count == 0 ? DisplayStyle.None : DisplayStyle.Flex;
             RestoreStableSelection();
-            SynchronizeListSelection(actions.Selection.Current);
+            SynchronizeListSelection(actions.Selection.CurrentSet);
         }
 
         private void RestoreStableSelection(IReadOnlyList<ESWorkbenchObjectDescriptor> contentSource = null)
@@ -5194,9 +5349,11 @@ namespace ES
             SetStatus("视口已适配全部内容。", MessageType.Info);
         }
 
-        private void OnSelectionChanged(ESWorkbenchSelection selection)
+        private void OnSelectionSetChanged(IReadOnlyList<ESWorkbenchSelection> selections)
         {
-            SynchronizeListSelection(selection);
+            ESWorkbenchSelection selection = selections?.FirstOrDefault()
+                ?? ESWorkbenchSelection.Empty;
+            SynchronizeListSelection(selections);
             objectList?.RefreshItems();
             objectGridList?.RefreshItems();
             PulseSelectedContentCard();
@@ -5209,6 +5366,7 @@ namespace ES
             if (root?.panel == null) return;
             root.schedule.Execute(() =>
             {
+                if (disposed) return;
                 root.Query<VisualElement>("ESWorkbenchObjectRow").ForEach(PulseContentElement);
                 root.Query<VisualElement>("ESWorkbenchContentGridCardFirst").ForEach(PulseContentElement);
                 root.Query<VisualElement>("ESWorkbenchContentGridCardSecond").ForEach(PulseContentElement);
@@ -5231,6 +5389,7 @@ namespace ES
             element.style.opacity = 0.78f;
             element.schedule.Execute(() =>
             {
+                if (disposed) return;
                 ObjectRowState currentRow = element.userData as ObjectRowState;
                 ContentCardState currentCard = element.userData as ContentCardState;
                 if ((currentRow != null && currentRow.pulseVersion != pulseVersion)
@@ -5536,7 +5695,7 @@ namespace ES
 
         private void ApplyPaneVisibility(float width)
         {
-            if (outerSplit == null || contentSplit == null) return;
+            if (disposed || outerSplit == null || contentSplit == null) return;
             bool compact = LayoutPolicy.ResolveTier(width) != ESWorkbenchResponsiveTier.Wide;
             bool showLeft = compact ? layout.compactSidePane == "left" : layout.leftPaneVisible;
             bool showInspector = compact ? layout.compactSidePane == "inspector" : layout.inspectorPaneVisible;
@@ -5805,7 +5964,7 @@ namespace ES
 
         private void ApplyBottomDrawerVisibility()
         {
-            if (workspaceSplit == null) return;
+            if (disposed || workspaceSplit == null) return;
             workspaceSplit.UnCollapse();
             float height = layout.bottomDrawerExpanded
                 ? ResolveBottomPanelHeight()
@@ -5947,7 +6106,7 @@ namespace ES
 
         private void RebuildBottomDrawer()
         {
-            if (bottomContent == null) return;
+            if (disposed || bottomContent == null) return;
             ReleaseBottomPanelContent();
             bottomContent.Clear();
             ResolveBottomPanels();
@@ -6184,7 +6343,10 @@ namespace ES
             {
                 visualLongChineseContent = evt.newValue;
                 selectedVisualScenarioId = string.Empty;
-                root?.schedule.Execute(RebuildBottomDrawer);
+                root?.schedule.Execute(() =>
+                {
+                    if (!disposed) RebuildBottomDrawer();
+                });
             });
             longChineseToggle.style.marginLeft = 8f;
             longChineseToggle.style.marginTop = 4f;
@@ -6412,7 +6574,10 @@ namespace ES
             SetStatus(
                 "已应用场景逻辑尺寸；请核对主题和编辑器缩放是否匹配。",
                 MessageType.Info);
-            root?.schedule.Execute(RebuildBottomDrawer).StartingIn(120);
+            root?.schedule.Execute(() =>
+            {
+                if (!disposed) RebuildBottomDrawer();
+            }).StartingIn(120);
         }
 
         private ESWorkbenchVisualValidationScenario ResolveSelectedVisualScenario(
@@ -6540,7 +6705,10 @@ namespace ES
             if (!string.IsNullOrWhiteSpace(scenarioId))
                 visualInteractionObservationsByScenario.Remove(scenarioId);
             SetStatus("已重置当前视觉场景的交互记录。", MessageType.Info);
-            root?.schedule.Execute(RebuildBottomDrawer);
+            root?.schedule.Execute(()
+            {
+                if (!disposed) RebuildBottomDrawer();
+            });
         }
 
         private void AddLatestVisualEvidenceRow(VisualElement container)
@@ -6862,18 +7030,31 @@ namespace ES
 
         private void SynchronizeListSelection(ESWorkbenchSelection selection)
         {
-            string stableId = selection?.StableId ?? string.Empty;
+            SynchronizeListSelection(selection == null || selection.IsEmpty
+                ? Array.Empty<ESWorkbenchSelection>()
+                : new[] { selection });
+        }
+
+        private void SynchronizeListSelection(IReadOnlyList<ESWorkbenchSelection> selections)
+        {
+            var stableIds = new HashSet<string>(
+                (selections ?? Array.Empty<ESWorkbenchSelection>())
+                    .Where(value => value != null && !value.IsEmpty)
+                    .Select(value => value.StableId),
+                StringComparer.Ordinal);
             if (objectList != null)
             {
-                int objectIndex = visibleObjects.FindIndex(value => value.BaseObjectId == stableId);
-                if (objectIndex >= 0) objectList.SetSelectionWithoutNotify(new[] { objectIndex });
-                else objectList.SetSelectionWithoutNotify(Array.Empty<int>());
+                objectList.SetSelectionWithoutNotify(visibleObjects
+                    .Select((value, index) => new { value, index })
+                    .Where(pair => pair.value != null && stableIds.Contains(pair.value.BaseObjectId))
+                    .Select(pair => pair.index));
             }
             if (hierarchyList != null)
             {
-                int hierarchyIndex = visibleHierarchy.FindIndex(value => value.ItemId == stableId);
-                if (hierarchyIndex >= 0) hierarchyList.SetSelectionWithoutNotify(new[] { hierarchyIndex });
-                else hierarchyList.SetSelectionWithoutNotify(Array.Empty<int>());
+                hierarchyList.SetSelectionWithoutNotify(visibleHierarchy
+                    .Select((value, index) => new { value, index })
+                    .Where(pair => pair.value != null && stableIds.Contains(pair.value.ItemId))
+                    .Select(pair => pair.index));
             }
         }
 
@@ -6945,7 +7126,8 @@ namespace ES
                         pointerCoordinator: pointerCoordinator),
                     selection,
                     hierarchyItem.Spatial,
-                    readOnlyViewport || IsHierarchyLocked(selection.StableId)));
+                    readOnlyViewport || IsHierarchyLocked(selection.StableId),
+                    actions.Selection.CurrentSet));
             }
             if (view != null)
             {
@@ -7222,7 +7404,7 @@ namespace ES
             if (disposed) return;
             disposed = true;
             StopDragEdgePan();
-            actions.Selection.Changed -= OnSelectionChanged;
+            actions.Selection.SetChanged -= OnSelectionSetChanged;
             actions.Tools.Changed -= OnToolChanged;
             ReleaseContributedContent();
             foreach (IESWorkbenchViewport viewport in liveViewports.Values)
@@ -7237,24 +7419,39 @@ namespace ES
             root?.UnregisterCallback<PointerDownEvent>(OnVisualEvidencePointerDown, TrickleDown.TrickleDown);
             root?.UnregisterCallback<PointerCancelEvent>(OnRootPointerCancel, TrickleDown.TrickleDown);
             root?.UnregisterCallback<WheelEvent>(OnVisualEvidenceWheel, TrickleDown.TrickleDown);
-            root?.UnregisterCallback<DragExitedEvent>(OnDragExited);
+            root?.UnregisterCallback<DragExitedEvent>(OnDragExited, TrickleDown.TrickleDown);
+            root?.UnregisterCallback<PointerCaptureOutEvent>(OnRootPointerCaptureOut, TrickleDown.TrickleDown);
+            root?.UnregisterCallback<FocusOutEvent>(OnRootFocusOut, TrickleDown.TrickleDown);
             root?.UnregisterCallback<DetachFromPanelEvent>(OnRootDetachedFromPanel);
+            centerContent?.UnregisterCallback<DragUpdatedEvent>(OnDragUpdated, TrickleDown.TrickleDown);
+            centerContent?.UnregisterCallback<DragPerformEvent>(OnDragPerform, TrickleDown.TrickleDown);
+            centerContent?.UnregisterCallback<DragLeaveEvent>(OnDragLeave, TrickleDown.TrickleDown);
             centerPanel?.UnregisterCallback<GeometryChangedEvent>(OnCenterGeometryChanged);
             thumbnailRefreshSchedule?.Pause();
             thumbnailRefreshSchedule = null;
             thumbnailCache.Clear();
             foreach (Texture2D texture in semanticThumbnailCache.Values)
-                if (texture != null) UnityEngine.Object.DestroyImmediate(texture);
+                SafeDestroyThumbnail(texture);
             semanticThumbnailCache.Clear();
             foreach (Texture2D texture in generatedThumbnailCache.Values)
-                if (texture != null) UnityEngine.Object.DestroyImmediate(texture);
+                SafeDestroyThumbnail(texture);
             generatedThumbnailCache.Clear();
             generatedThumbnailLru.Clear();
             generatedThumbnailLruNodes.Clear();
+            externalDragTransferInFlight = false;
             CancelWorkbenchDrag(true);
             pointerCoordinator.Reset();
+            contentPointerGate.Reset();
             visualInteractionObservationsByScenario.Clear();
             unityIconCache.Clear();
+        }
+
+        private static void SafeDestroyThumbnail(Texture2D texture)
+        {
+            if (texture == null)
+                return;
+            try { UnityEngine.Object.DestroyImmediate(texture); }
+            catch (Exception exception) { Debug.LogException(exception); }
         }
     }
 
@@ -7427,6 +7624,7 @@ namespace ES
             Rect viewport = contentRect;
             if (viewport.width <= 1f || viewport.height <= 1f) return;
             Painter2D painter = generationContext.painter2D;
+            ESWorkbenchViewportRenderStyle.DrawCanvasBackdrop(painter, viewport);
             Rect worldBounds = ResolveWorldBounds();
             Rect canvasBounds = ResolveCanvasBounds(viewport, worldBounds);
             DrawGrid(painter, canvasBounds);
@@ -7461,20 +7659,7 @@ namespace ES
 
         private static void DrawGrid(Painter2D painter, Rect rect)
         {
-            painter.strokeColor = new Color(0.24f, 0.28f, 0.3f, 0.34f);
-            painter.lineWidth = 1f;
-            painter.BeginPath();
-            const int lines = 12;
-            for (int i = 0; i <= lines; i++)
-            {
-                float x = Mathf.Lerp(rect.xMin, rect.xMax, i / (float)lines);
-                float y = Mathf.Lerp(rect.yMin, rect.yMax, i / (float)lines);
-                painter.MoveTo(new Vector2(x, rect.yMin));
-                painter.LineTo(new Vector2(x, rect.yMax));
-                painter.MoveTo(new Vector2(rect.xMin, y));
-                painter.LineTo(new Vector2(rect.xMax, y));
-            }
-            painter.Stroke();
+            ESWorkbenchViewportRenderStyle.DrawCanvasGrid(painter, rect, 12, 12);
         }
 
         private void DrawItem(
@@ -7591,6 +7776,10 @@ namespace ES
                 return;
             }
             ESWorkbenchPointerIntentKind intent = intentDecision.Intent;
+            bool additiveSelection = evt.shiftKey || evt.ctrlKey || evt.commandKey;
+            bool toggleSelection = evt.ctrlKey || evt.commandKey;
+            if (additiveSelection && intent == ESWorkbenchPointerIntentKind.Manipulate)
+                intent = ESWorkbenchPointerIntentKind.Select;
             if (intent == ESWorkbenchPointerIntentKind.None)
             {
                 evt.StopImmediatePropagation();
@@ -7598,11 +7787,13 @@ namespace ES
             }
             if (hitSelection == null || hitSelection.IsEmpty)
             {
-                if (intent == ESWorkbenchPointerIntentKind.Select) context.Selection.Clear();
+                if (intent == ESWorkbenchPointerIntentKind.Select
+                    && !additiveSelection && !toggleSelection)
+                    context.Selection.Clear();
                 evt.StopPropagation();
                 return;
             }
-            context.Selection.Select(hitSelection);
+            context.Selection.Select(hitSelection, additiveSelection, toggleSelection);
             if (intent == ESWorkbenchPointerIntentKind.Manipulate)
             {
                 if (!context.PointerCoordinator.TryAcquire(
@@ -8582,14 +8773,20 @@ namespace ES
                         return;
                     }
                     ESWorkbenchPointerIntentKind intent = intentDecision.Intent;
+                    bool additiveSelection = evt.shift || evt.control || evt.command;
+                    bool toggleSelection = evt.control || evt.command;
+                    if (additiveSelection && intent == ESWorkbenchPointerIntentKind.Manipulate)
+                        intent = ESWorkbenchPointerIntentKind.Select;
                     if (!hasHit)
                     {
-                        if (intent == ESWorkbenchPointerIntentKind.Select) context.Selection.Clear();
+                        if (intent == ESWorkbenchPointerIntentKind.Select
+                            && !additiveSelection && !toggleSelection)
+                            context.Selection.Clear();
                         if (intent != ESWorkbenchPointerIntentKind.None) evt.Use();
                     }
                     else if (intent == ESWorkbenchPointerIntentKind.Select)
                     {
-                        context.Selection.Select(hitSelection);
+                        context.Selection.Select(hitSelection, additiveSelection, toggleSelection);
                         evt.Use();
                     }
                     else if (intent == ESWorkbenchPointerIntentKind.Manipulate)
@@ -9014,7 +9211,10 @@ namespace ES
         }
     }
 
-    [ESWindowSleepContract(ESWindowSleepMode.Transient, "短生命周期工作台弹窗")]
+    [ESWindowSleepContract(
+        ESWindowSleepMode.Transient,
+        ESWindowSurfaceKind.Popup,
+        "短生命周期工作台弹窗")]
     [ESWindowPresentationShortTitle("弹窗")]
     internal sealed class ESWorkbenchPopupWindow : EditorWindow
     {
@@ -9023,14 +9223,32 @@ namespace ES
 
         private ESWorkbenchPopupRequest request;
         private ESWorkbenchActionContext context;
+        private EditorWindow ownerWindow;
         private IDisposable ownerHold;
         private bool configured;
 
         internal static void Open(EditorWindow owner, ESWorkbenchPopupRequest request, ESWorkbenchActionContext context, Rect screenAnchor)
         {
             if (owner == null || request == null || context == null) return;
+            if (!ESWindowFoundation.IsBound(owner))
+                throw new InvalidOperationException(
+                    "ES Workbench Popup 只接受已接入 ESWindowFoundation 的 owner。");
             if (activeWindow != null)
-                activeWindow.Close();
+            {
+                try
+                {
+                    activeWindow.Close();
+                }
+                catch (Exception closeException)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "ES Workbench Popup 现有实例关闭失败，已拒绝创建第二个实例。",
+                        closeException));
+                    return;
+                }
+                if (activeWindow != null)
+                    return;
+            }
             openingWindow = true;
             ESWorkbenchPopupWindow window = null;
             try
@@ -9040,6 +9258,7 @@ namespace ES
                 window.hideFlags = HideFlags.DontSave;
                 window.request = request;
                 window.context = context;
+                window.ownerWindow = owner;
                 window.configured = true;
                 window.titleContent = new GUIContent(request.Title);
                 window.ownerHold = ESWindowFoundation.HoldInteraction(owner, "ES Workbench Popup");
@@ -9049,9 +9268,11 @@ namespace ES
             {
                 if (window != null)
                 {
-                    window.ownerHold?.Dispose();
+                    try { window.ownerHold?.Dispose(); }
+                    catch (Exception cleanupException) { Debug.LogException(cleanupException); }
                     window.ownerHold = null;
-                    window.Close();
+                    try { window.Close(); }
+                    catch (Exception closeException) { Debug.LogException(closeException); }
                 }
                 throw;
             }
@@ -9065,7 +9286,7 @@ namespace ES
         {
             // Popup lifetime is owner-scoped; keep ES cleanup hooks without
             // exposing a standalone sleep state for the transient surface.
-            ES.EditorInternal.ESEditorPresentation.BindWindow(this, allowSemiSleep: false);
+            ESWindowFoundation.BindTransient(this);
             if (openingWindow)
                 return;
             EditorApplication.delayCall -= CloseIfContextWasLost;
@@ -9074,6 +9295,7 @@ namespace ES
 
         public void CreateGUI()
         {
+            ESWindowFoundation.Unbind(this);
             rootVisualElement.Clear();
             rootVisualElement.style.paddingLeft = 8f;
             rootVisualElement.style.paddingRight = 8f;
@@ -9088,25 +9310,36 @@ namespace ES
                 content.style.minHeight = 0f;
                 rootVisualElement.Add(content);
             }
+            ESWindowFoundation.BindTransient(this);
         }
 
         private void OnDisable()
         {
             EditorApplication.delayCall -= CloseIfContextWasLost;
-            ES.EditorInternal.ESEditorPresentation.UnbindWindow(this, true);
-            ownerHold?.Dispose();
+            ESWindowFoundation.Suspend(this);
+            IDisposable currentOwnerHold = ownerHold;
             ownerHold = null;
+            try { currentOwnerHold?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
             configured = false;
             request = null;
             context = null;
+            ownerWindow = null;
             if (ReferenceEquals(activeWindow, this))
                 activeWindow = null;
+        }
+
+        private void OnDestroy()
+        {
+            ESWindowFoundation.Close(this);
         }
 
         private void CloseIfContextWasLost()
         {
             EditorApplication.delayCall -= CloseIfContextWasLost;
-            if (this != null && !configured)
+            bool ownerContextLost = ownerWindow == null
+                || !ESWindowFoundation.IsBound(ownerWindow);
+            if (this != null && (!configured || ownerContextLost))
                 Close();
         }
     }

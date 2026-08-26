@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -9,25 +10,49 @@ namespace ES
     /// 当前 EditorSequencePlayer 发现 CameraTrackEditorSampler，并渲染该 Sampler 已拥有的
     /// 独立 Preview View。因此关闭面板不会影响轨道播放，停止轨道才会销毁全部预览资源。
     /// </summary>
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Preview)]
     public sealed class ESCameraTrackPreviewWindow : ESSinglePageIMGUIWindow<ESCameraTrackPreviewWindow>
     {
         private readonly List<CameraTrackEditorSampler> samplers = new List<CameraTrackEditorSampler>(4);
+        private const double SamplerRefreshIntervalSeconds = 0.1d;
         private string[] samplerNames = new string[0];
         private int selectedIndex;
         private double nextRepaintTime;
+        private double nextSamplerRefreshTime;
 
         [MenuItem("【ES】/内容制作/相机/打开轨道相机预览", false, 141)]
         private static void OpenFromMenu()
         {
-            Open();
+            ESTrackViewWindow owner = ESTrackViewWindow.window;
+            if (owner == null)
+            {
+                ESTrackViewWindow.OpenWindow();
+                owner = ESTrackViewWindow.window;
+            }
+
+            if (owner == null)
+            {
+                Debug.LogWarning("[轨道相机预览] 无法打开：轨道编辑器窗口未能建立。");
+                return;
+            }
+
+            Open(owner);
         }
 
-        public static void Open(EditorWindow owner = null)
+        public static void Open(ESTrackViewWindow owner)
         {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner));
+
             ESCameraTrackPreviewWindow window = GetWindow<ESCameraTrackPreviewWindow>();
             window.ESWindow_SetSleepOwnerOverride(owner);
+            ESWindowFoundation.SetSleepOwner(
+                window,
+                owner,
+                ESWindowSleepLinkMode.FollowOwner);
             window.titleContent = new GUIContent("轨道相机预览");
             window.minSize = new Vector2(360f, 220f);
+            window.maxSize = new Vector2(1400f, 1000f);
             window.Show();
             window.ForceMenuTreeRebuild();
         }
@@ -43,7 +68,7 @@ namespace ES
             => ESWindowSleepLinkMode.FollowOwner;
         protected override EditorWindow ESWindow_SleepOwner
             => ESTrackViewWindow.window;
-        protected override string ESWindow_SleepOwnerKey => "ES.TrackView.Window";
+        protected override string ESWindow_SleepOwnerKey => ESTrackViewWindow.SleepOwnerKey;
         protected override Vector2 ESWindow_MinSize => new Vector2(360f, 220f);
         protected override Vector2 ESWindow_DefaultSize => new Vector2(760f, 520f);
         protected override string ESWindow_PageStableId => "camera.track-preview";
@@ -73,6 +98,7 @@ namespace ES
             EditorApplication.update -= OnEditorUpdate;
             samplers.Clear();
             nextRepaintTime = 0d;
+            nextSamplerRefreshTime = 0d;
         }
 
         protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
@@ -124,6 +150,10 @@ namespace ES
 
         private void CollectSamplers()
         {
+            double now = EditorApplication.timeSinceStartup;
+            if (now < nextSamplerRefreshTime)
+                return;
+            nextSamplerRefreshTime = now + SamplerRefreshIntervalSeconds;
             samplers.Clear();
             ITrackSequence sequence = ESTrackViewWindow.Sequence;
             EditorSequencePlayer player = EditorTimelinePlayer.Instance.ActiveSequence;

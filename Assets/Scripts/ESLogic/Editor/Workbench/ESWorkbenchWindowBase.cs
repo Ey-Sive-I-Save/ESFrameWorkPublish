@@ -174,6 +174,7 @@ namespace ES
         private ESWorkbenchHostPresentationDescriptor presentation;
         private Vector2 standardContentScroll;
         private bool workbenchHostSessionActive;
+        private int workbenchRefreshGeneration;
         private const string AssetGuidPrefix = "ES.Workbench.AssetGuid.";
         private const string DocumentPrefix = "ES.Workbench.Document.";
 
@@ -183,6 +184,19 @@ namespace ES
         /// 静默改变贡献注册、活动记录和恢复快照的权威键。
         /// </summary>
         protected abstract string ESWorkbench_WorkbenchId { get; }
+        /// <summary>
+        /// Stable navigation and section identities are part of the workbench contract.
+        /// Domain windows may override them when they expose multiple navigation roots;
+        /// the default keeps one deterministic identity per workbench.
+        /// </summary>
+        protected virtual string ESWorkbench_NavigatorId => ESWorkbench_WorkbenchId + ".navigator";
+        protected virtual string ESWorkbench_SectionId => ESWorkbench_WorkbenchId + ".section";
+        /// <summary>
+        /// Workbench panes are intentionally flexible at the window level; their
+        /// responsive layout policy bounds internal panes instead of imposing a
+        /// misleading fixed maxSize on docked Unity windows.
+        /// </summary>
+        protected virtual string ESWorkbench_LayoutMaxStrategy => "unbounded-flexible";
         protected virtual string ESWorkbench_BrandTitle => "ES 内容工作台";
         protected virtual ESWorkbenchHostPresentationDescriptor ESWorkbench_DefaultPresentation =>
             new ESWorkbenchHostPresentationDescriptor(
@@ -524,6 +538,17 @@ namespace ES
         {
         }
 
+        /// <summary>
+        /// 请求宿主按统一生命周期刷新动态集合、层级、Inspector 与视口。
+        /// 派生工作台完成领域状态变更后使用此入口，避免直接触碰内部宿主
+        /// 或复制刷新顺序；默认使用显式刷新语义。
+        /// </summary>
+        protected void ESWorkbench_RequestRefresh(
+            ESWorkbenchRefreshReason reason = ESWorkbenchRefreshReason.Explicit)
+        {
+            RefreshWorkbench(reason);
+        }
+
         private void QueueWorkbenchDataRefresh()
         {
             pendingDataRefresh?.Pause();
@@ -533,9 +558,12 @@ namespace ES
                 RefreshWorkbench(ESWorkbenchRefreshReason.DataChanged);
                 return;
             }
+            int refreshGeneration = workbenchRefreshGeneration;
             pendingDataRefresh = rootVisualElement.schedule.Execute(() =>
             {
                 pendingDataRefresh = null;
+                if (!workbenchHostSessionActive || refreshGeneration != workbenchRefreshGeneration)
+                    return;
                 RefreshWorkbench(ESWorkbenchRefreshReason.DataChanged);
             }).StartingIn(80);
         }
@@ -916,11 +944,16 @@ namespace ES
             ESWorkbench_RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "core.duplicate", "复制所选", context =>
                 {
-                    context.Authoring.TryDuplicate(context.Selection.Current, out _);
+                    if (context.Selection.CurrentSet.Count > 1)
+                        context.Authoring.TryDuplicateMany(context.Selection.CurrentSet, out _);
+                    else
+                        context.Authoring.TryDuplicate(context.Selection.Current, out _);
                 }, "复制当前作者对象",
                 priority: 70,
                 shortcut: new ESWorkbenchShortcut(KeyCode.D, EventModifiers.Control),
-                canExecute: context => context.Authoring.CanDuplicate(context.Selection.Current),
+                canExecute: context => context.Selection.CurrentSet.Count > 1
+                    ? context.Selection.CurrentSet.All(context.Authoring.CanDuplicate)
+                    : context.Authoring.CanDuplicate(context.Selection.Current),
                 showInToolbar: false,
                 showInContextMenu: true,
                 role: ESWorkbenchCommandRole.Authoring,
@@ -928,11 +961,16 @@ namespace ES
             ESWorkbench_RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "core.delete", "删除所选", context =>
                 {
-                    context.Authoring.TryDelete(context.Selection.Current, out _);
+                    if (context.Selection.CurrentSet.Count > 1)
+                        context.Authoring.TryDeleteMany(context.Selection.CurrentSet, out _);
+                    else
+                        context.Authoring.TryDelete(context.Selection.Current, out _);
                 }, "删除当前作者对象",
                 priority: 60,
                 shortcut: new ESWorkbenchShortcut(KeyCode.Delete),
-                canExecute: context => context.Authoring.CanDelete(context.Selection.Current),
+                canExecute: context => context.Selection.CurrentSet.Count > 1
+                    ? context.Selection.CurrentSet.All(context.Authoring.CanDelete)
+                    : context.Authoring.CanDelete(context.Selection.Current),
                 showInToolbar: false,
                 showInContextMenu: true,
                 role: ESWorkbenchCommandRole.Dangerous,
@@ -959,32 +997,49 @@ namespace ES
             root.style.paddingRight = 8f;
             root.style.paddingTop = 6f;
             root.style.paddingBottom = 8f;
-            var serialized = new SerializedObject(target);
+            SerializedObject serialized = null;
             bool released = false;
-            SerializedProperty iterator = serialized.GetIterator();
-            bool enterChildren = true;
-            int visibleFieldCount = 0;
-            while (iterator.NextVisible(enterChildren))
+            try
             {
-                enterChildren = false;
-                SerializedProperty property = iterator.Copy();
-                var field = new PropertyField(property);
-                if (property.propertyPath == "m_Script") field.SetEnabled(false);
-                field.style.marginBottom = 3f;
-                root.Add(field);
-                visibleFieldCount++;
+                serialized = new SerializedObject(target);
+                SerializedProperty iterator = serialized.GetIterator();
+                bool enterChildren = true;
+                int visibleFieldCount = 0;
+                while (iterator.NextVisible(enterChildren))
+                {
+                    enterChildren = false;
+                    SerializedProperty property = iterator.Copy();
+                    var field = new PropertyField(property);
+                    if (property.propertyPath == "m_Script") field.SetEnabled(false);
+                    field.style.marginBottom = 3f;
+                    root.Add(field);
+                    visibleFieldCount++;
+                }
+                if (visibleFieldCount == 0)
+                    root.Add(ESWindowPresentation.CreateEmptyState("没有可编辑属性", "当前对象没有可序列化字段。", null, null));
+                root.Bind(serialized);
+                root.RegisterCallback<DetachFromPanelEvent>(_ =>
+                {
+                    if (released) return;
+                    released = true;
+                    root.Unbind();
+                    serialized.Dispose();
+                });
+                return root;
             }
-            if (visibleFieldCount == 0)
-                root.Add(ESWindowPresentation.CreateEmptyState("没有可编辑属性", "当前对象没有可序列化字段。", null, null));
-            root.Bind(serialized);
-            root.RegisterCallback<DetachFromPanelEvent>(_ =>
+            catch (Exception exception)
             {
-                if (released) return;
-                released = true;
-                root.Unbind();
-                serialized.Dispose();
-            });
-            return root;
+                if (serialized != null)
+                    serialized.Dispose();
+                root.Add(ESWindowPresentation.CreateEmptyState(
+                    "Inspector 暂时不可用",
+                    "目标对象在窗口重建期间失效，已安全跳过本次绘制。",
+                    null,
+                    null));
+                Debug.LogException(new InvalidOperationException(
+                    "ES 工作台序列化 Inspector 创建失败。", exception));
+                return root;
+            }
         }
 
         protected bool ESWorkbench_IsModuleEnabled(TModule module)
@@ -1066,6 +1121,7 @@ namespace ES
             ESWorkbench_ValidateStableIdentity();
             base.ESWindow_OnHostEnable();
             workbenchHostSessionActive = true;
+            workbenchRefreshGeneration++;
             try
             {
                 workbenchLayout ??= new ESWorkbenchLayoutState();
@@ -1107,6 +1163,7 @@ namespace ES
         {
             if (!workbenchHostSessionActive) return;
             workbenchHostSessionActive = false;
+            workbenchRefreshGeneration++;
             try { pendingDataRefresh?.Pause(); }
             catch (Exception exception) { Debug.LogException(exception); }
             pendingDataRefresh = null;
@@ -1124,6 +1181,27 @@ namespace ES
             catch (Exception exception) { Debug.LogException(exception); }
             try { base.ESWindow_OnHostDisable(); }
             catch (Exception exception) { Debug.LogException(exception); }
+        }
+
+        /// <summary>
+        /// 工作台实例键只用于当前 EditorWindow 的恢复状态。窗口真正销毁时清理对应
+        /// SessionState，避免每次新建工作台都留下不可达的资产/文档键；OnDisable
+        /// 不执行此清理，以保留 Domain Reload 和 UI 重建恢复语义。
+        /// </summary>
+        protected override void OnDestroy()
+        {
+            if (previewScene != null)
+            {
+                try { ESWorkbench_ClosePreviewScene(); }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
+            if (!string.IsNullOrEmpty(workbenchInstanceKey))
+            {
+                string instanceSuffix = GetType().FullName + "." + workbenchInstanceKey;
+                SessionState.EraseString(AssetGuidPrefix + instanceSuffix);
+                SessionState.EraseString(DocumentPrefix + instanceSuffix);
+            }
+            base.OnDestroy();
         }
 
         protected ESWorkbenchAssetRegistrationState ESWorkbench_GetRegistrationState(string slotId)
@@ -1215,7 +1293,11 @@ namespace ES
         {
             if (previewScene == null) return;
             previewScene.Dispose();
-            previewScene = null;
+            // Close() retains the scene handle when Unity refuses to close the
+            // PreviewScene. Keep the owner alive so the next host-cleanup pass
+            // can retry instead of losing the only recovery path.
+            if (!previewScene.IsOpen)
+                previewScene = null;
         }
 
         protected void ESWorkbench_SetStatus(string message, MessageType type = MessageType.Info)

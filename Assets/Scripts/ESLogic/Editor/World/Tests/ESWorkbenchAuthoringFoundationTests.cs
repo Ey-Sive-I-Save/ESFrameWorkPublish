@@ -319,6 +319,7 @@ namespace ES.Tests.Editor.World
         {
             string workbenchId = "tests.workbench.active-contribution-count";
             int releaseCount = 0;
+            int failedInjectionCleanupCount = 0;
             int thrownInjectionCount = 0;
             Assert.IsTrue(ESWorkbenchContributionRegistry<TestModule>.RegisterOrUpdate(
                 new ESWorkbenchContributionDescriptor<TestModule>(
@@ -356,6 +357,8 @@ namespace ES.Tests.Editor.World
                     {
                         thrownInjectionCount++;
                         context.RegisterTool(new ESWorkbenchToolDescriptor("throws.tool", "异常工具", _ => { }));
+                        context.RegisterCleanup(new ESWorkbenchBottomPanelContent(
+                            new VisualElement(), () => failedInjectionCleanupCount++));
                         throw new InvalidOperationException("test injection failure");
                     },
                     owner: Owner),
@@ -371,6 +374,8 @@ namespace ES.Tests.Editor.World
                 Assert.AreEqual(1, session.Entries.Count);
                 Assert.Zero(session.Tools.Count, "注入异常不得留下已经登记的半成品工具。");
                 Assert.AreEqual(1, thrownInjectionCount);
+                Assert.AreEqual(1, failedInjectionCleanupCount,
+                    "Inject 失败时，已登记的临时副作用必须立即释放。");
                 Assert.IsFalse(session.IsDisposed);
 
                 session.Dispose();
@@ -455,6 +460,55 @@ namespace ES.Tests.Editor.World
                 UnityEngine.Object.DestroyImmediate(firstObject);
                 UnityEngine.Object.DestroyImmediate(replacement);
             }
+        }
+
+        [Test]
+        public void SelectionServiceReplacesAndDeduplicatesSelectionSetAtomically()
+        {
+            var service = new ESWorkbenchSelectionService();
+            int singleChanges = 0;
+            int setChanges = 0;
+            service.Changed += _ => singleChanges++;
+            service.SetChanged += _ => setChanges++;
+            var first = new ESWorkbenchSelection("first", "test", null, null);
+            var second = new ESWorkbenchSelection("second", "test", null, null);
+
+            service.SelectMany(new[] { first, second, first });
+
+            Assert.AreEqual(2, service.CurrentSet.Count);
+            Assert.AreSame(first, service.CurrentSet[0]);
+            Assert.AreSame(second, service.CurrentSet[1]);
+            Assert.AreSame(first, service.Current);
+            Assert.AreEqual(1, singleChanges);
+            Assert.AreEqual(1, setChanges);
+
+            service.Clear();
+
+            Assert.IsTrue(service.Current.IsEmpty);
+            Assert.AreEqual(0, service.CurrentSet.Count);
+            Assert.AreEqual(2, singleChanges);
+            Assert.AreEqual(2, setChanges);
+        }
+
+        [Test]
+        public void SelectionServiceModifierSelectionAddsAndTogglesWithoutClearingSet()
+        {
+            var service = new ESWorkbenchSelectionService();
+            var first = new ESWorkbenchSelection("first", "test", null, null);
+            var second = new ESWorkbenchSelection("second", "test", null, null);
+
+            service.Select(first);
+            service.Select(second, additive: true, toggle: false);
+            Assert.AreEqual(2, service.CurrentSet.Count);
+            Assert.AreSame(first, service.Current);
+
+            service.Select(first, additive: true, toggle: true);
+            Assert.AreEqual(1, service.CurrentSet.Count);
+            Assert.AreSame(second, service.Current);
+
+            service.Select(second, additive: true, toggle: true);
+            Assert.IsTrue(service.Current.IsEmpty);
+            Assert.AreEqual(0, service.CurrentSet.Count);
         }
 
         [Test]
@@ -5636,6 +5690,140 @@ namespace ES.Tests.Editor.World
         }
 
         [Test]
+        public void AuthoringServiceBatchMoveDeduplicatesAndPublishesOneTransaction()
+        {
+            var target = ScriptableObject.CreateInstance<TestAsset>();
+            var selection = new ESWorkbenchSelectionService();
+            var service = new ESWorkbenchAuthoringService();
+            int refreshCount = 0;
+            int dirtyCount = 0;
+            var actions = new ESWorkbenchActionContext(
+                null,
+                selection,
+                new ESWorkbenchToolStateService(),
+                service,
+                (_, __) => { },
+                (_, __) => { },
+                _ => refreshCount++,
+                (_, __) => dirtyCount++);
+            var adapter = new ESWorkbenchAuthoringAdapterDescriptor(
+                "tests.batch-move",
+                value => value?.Kind == "test.batch-move",
+                move: context =>
+                {
+                    target.counter++;
+                    return ESWorkbenchMutationResult.Success(
+                        "Moved",
+                        context.Selection,
+                        "test.batch-move.items");
+                },
+                resolveUndoTargets: _ => new UnityEngine.Object[] { target });
+            service.Bind(actions, () => new[] { adapter });
+            try
+            {
+                var selections = new[]
+                {
+                    new ESWorkbenchSelection("a", "test.batch-move", target, null),
+                    new ESWorkbenchSelection("b", "test.batch-move", target, null),
+                    new ESWorkbenchSelection("a", "test.batch-move", target, null)
+                };
+
+                Assert.IsTrue(service.TryMoveMany(selections, Vector3.right, out string message), message);
+                Assert.AreEqual(2, target.counter, "重复稳定身份不得重复执行作者回调。 ");
+                Assert.AreEqual(2, selection.CurrentSet.Count);
+                Assert.AreEqual(1, refreshCount, "批量事务只能发布一次刷新。 ");
+                Assert.AreEqual(1, dirtyCount, "同一 DirtyKey 必须合并。 ");
+            }
+            finally
+            {
+                service.Unbind();
+                UnityEngine.Object.DestroyImmediate(target);
+            }
+        }
+
+        [Test]
+        public void AuthoringServiceRoutesNamedPropertyThroughOneUndoContract()
+        {
+            var target = ScriptableObject.CreateInstance<TestAsset>();
+            var selection = new ESWorkbenchSelectionService();
+            var service = new ESWorkbenchAuthoringService();
+            var actions = new ESWorkbenchActionContext(
+                null,
+                selection,
+                new ESWorkbenchToolStateService(),
+                service,
+                (_, __) => { },
+                (_, __) => { },
+                _ => { },
+                (_, __) => { });
+            var adapter = new ESWorkbenchAuthoringAdapterDescriptor(
+                "tests.property",
+                value => value?.Kind == "test.property",
+                setProperty: context =>
+                {
+                    target.counter = (int)context.PropertyValue;
+                    return ESWorkbenchMutationResult.Success(
+                        "Property set", context.Selection, "test.property.counter");
+                },
+                canSetProperty: (value, path, _) => path == "counter",
+                resolveUndoTargets: _ => new UnityEngine.Object[] { target });
+            service.Bind(actions, () => new[] { adapter });
+            try
+            {
+                var selected = new ESWorkbenchSelection("property", "test.property", target, null);
+                Assert.IsTrue(service.CanSetProperty(selected, "counter", 7));
+                Assert.IsTrue(service.TrySetProperty(selected, "counter", 7, out string message), message);
+                Assert.AreEqual(7, target.counter);
+            }
+            finally
+            {
+                service.Unbind();
+                UnityEngine.Object.DestroyImmediate(target);
+            }
+        }
+
+        [Test]
+        public void AuthoringServiceBatchPropertyUsesOneTransactionAndDeduplicates()
+        {
+            var target = ScriptableObject.CreateInstance<TestAsset>();
+            var selection = new ESWorkbenchSelectionService();
+            var service = new ESWorkbenchAuthoringService();
+            int refreshCount = 0;
+            var actions = new ESWorkbenchActionContext(
+                null, selection, new ESWorkbenchToolStateService(), service,
+                (_, __) => { }, (_, __) => { }, _ => refreshCount++, (_, __) => { });
+            var adapter = new ESWorkbenchAuthoringAdapterDescriptor(
+                "tests.batch-property",
+                value => value?.Kind == "test.batch-property",
+                setProperty: context =>
+                {
+                    target.counter += (int)context.PropertyValue;
+                    return ESWorkbenchMutationResult.Success(
+                        "Property set", context.Selection, "test.batch-property.counter");
+                },
+                canSetProperty: (value, path, _) => path == "counter",
+                resolveUndoTargets: _ => new UnityEngine.Object[] { target });
+            service.Bind(actions, () => new[] { adapter });
+            try
+            {
+                var selections = new[]
+                {
+                    new ESWorkbenchSelection("a", "test.batch-property", target, null),
+                    new ESWorkbenchSelection("b", "test.batch-property", target, null),
+                    new ESWorkbenchSelection("a", "test.batch-property", target, null)
+                };
+                Assert.IsTrue(service.TrySetPropertyMany(selections, "counter", 2, out string message), message);
+                Assert.AreEqual(4, target.counter);
+                Assert.AreEqual(1, refreshCount);
+            }
+            finally
+            {
+                service.Unbind();
+                UnityEngine.Object.DestroyImmediate(target);
+            }
+        }
+
+        [Test]
         public void AuthoringServiceRoutesRotateAndScaleOnlyWhenAdapterAllowsThem()
         {
             var target = ScriptableObject.CreateInstance<TestAsset>();
@@ -6732,6 +6920,32 @@ namespace ES.Tests.Editor.World
             coalescer.Cancel();
             Assert.IsFalse(coalescer.HasPending);
             Assert.IsFalse(coalescer.TryConsume(9d, out _));
+        }
+
+        [Test]
+        public void ViewportInteractionPaletteKeepsAuthoringStatesDistinctAndAlphaBounded()
+        {
+            var states = (ESWorkbenchViewportRenderStyle.InteractionState[])Enum.GetValues(
+                typeof(ESWorkbenchViewportRenderStyle.InteractionState));
+            Color[] colors = states
+                .Select(ESWorkbenchViewportRenderStyle.ResolveInteractionColor)
+                .ToArray();
+
+            for (int i = 0; i < colors.Length; i++)
+                for (int j = i + 1; j < colors.Length; j++)
+                    Assert.AreNotEqual(colors[i], colors[j],
+                        states[i] + " 与 " + states[j] + " 必须保持可区分的视觉语义。");
+
+            Color accepted = ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                ESWorkbenchViewportRenderStyle.InteractionState.PreviewAllowed);
+            Color rejected = ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                ESWorkbenchViewportRenderStyle.InteractionState.PreviewRejected);
+            Assert.Greater(rejected.r, accepted.r,
+                "拒绝态需要比允许态更明确地投影错误色。 ");
+            Assert.AreEqual(0f,
+                ESWorkbenchViewportRenderStyle.WithAlpha(Color.white, -1f).a);
+            Assert.AreEqual(1f,
+                ESWorkbenchViewportRenderStyle.WithAlpha(Color.white, 2f).a);
         }
 
         private sealed class TestAsset : ScriptableObject

@@ -85,6 +85,21 @@ namespace ES
             catch
             {
                 session?.Dispose();
+                if (request.ownsEditorTarget
+                    && request.editorTarget is IPoolableAuto poolable
+                    && !poolable.IsRecycled)
+                {
+                    try
+                    {
+                        poolable.TryAutoPushedToPool();
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        Debug.LogException(new InvalidOperationException(
+                            "Camera Track Preview 构建失败，owned EditorTarget 回收失败。",
+                            cleanupException));
+                    }
+                }
                 throw;
             }
         }
@@ -119,31 +134,48 @@ namespace ES
             renderContext = new ESEditorPreviewRenderContext(
                 owner,
                 ESEditorPreviewSceneMode.HiddenObjectsInActiveScene);
-            renderContext.Ensure();
-            if (!renderContext.IsReady || renderContext.Camera == null)
-                return;
+            try
+            {
+                renderContext.Ensure();
+                if (!renderContext.IsReady || renderContext.Camera == null)
+                    return;
 
-            Camera outputCamera = renderContext.Camera;
-            CinemachineBrain brain = outputCamera.GetComponent<CinemachineBrain>();
-            if (brain == null)
-                brain = outputCamera.gameObject.AddComponent<CinemachineBrain>();
+                Camera outputCamera = renderContext.Camera;
+                CinemachineBrain brain = outputCamera.GetComponent<CinemachineBrain>();
+                if (brain == null)
+                    brain = outputCamera.gameObject.AddComponent<CinemachineBrain>();
 
-            // 预览只由 Sample() 显式 ManualUpdate，防止 Editor Update 与采样顺序争抢。
-            brain.enabled = false;
-            rigRootObject = new GameObject(string.IsNullOrWhiteSpace(trackName) ? "ES Camera Preview Rigs" : trackName + " Camera Preview Rigs");
-            rigRootObject.hideFlags = HideFlags.HideAndDontSave;
-            rigRootObject.transform.SetParent(outputCamera.transform, false);
-            previewView = new ESCameraPreviewView(
-                new ESCameraViewId("EditorTrackPreview." + sessionId),
-                sessionId,
-                outputCamera,
-                brain,
-                definitionCatalog,
-                rigCatalog,
-                rigRootObject.transform);
+                // 预览只由 Sample() 显式 ManualUpdate，防止 Editor Update 与采样顺序争抢。
+                brain.enabled = false;
+                rigRootObject = new GameObject(string.IsNullOrWhiteSpace(trackName) ? "ES Camera Preview Rigs" : trackName + " Camera Preview Rigs");
+                rigRootObject.hideFlags = HideFlags.HideAndDontSave;
+                rigRootObject.transform.SetParent(outputCamera.transform, false);
+                previewView = new ESCameraPreviewView(
+                    new ESCameraViewId("EditorTrackPreview." + sessionId),
+                    sessionId,
+                    outputCamera,
+                    brain,
+                    definitionCatalog,
+                    rigCatalog,
+                    rigRootObject.transform);
 
-            if (previewView.IsReady)
-                ESEditorPreviewLifecycleHub.RegisterScope(this);
+                if (previewView.IsReady)
+                    ESEditorPreviewLifecycleHub.RegisterScope(this);
+            }
+            catch
+            {
+                // The factory cannot receive a session reference when this
+                // constructor throws. Roll back every resource created so far.
+                try { ESEditorPreviewLifecycleHub.UnregisterScope(this); }
+                catch (Exception cleanupException) { Debug.LogException(cleanupException); }
+                try { previewView?.Dispose(); }
+                catch (Exception cleanupException) { Debug.LogException(cleanupException); }
+                try { ESEditorPreviewUtility.DestroyObject(rigRootObject); }
+                catch (Exception cleanupException) { Debug.LogException(cleanupException); }
+                try { renderContext?.Dispose(); }
+                catch (Exception cleanupException) { Debug.LogException(cleanupException); }
+                throw;
+            }
         }
 
         public bool IsReady => !disposed && previewView != null && previewView.IsReady;
@@ -233,11 +265,17 @@ namespace ES
             disposed = true;
             ESEditorPreviewLifecycleHub.UnregisterScope(this);
             foreach (ESCameraLease lease in leases)
-                previewView?.Release(lease);
+            {
+                try { previewView?.Release(lease); }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
             leases.Clear();
-            previewView?.Dispose();
-            ESEditorPreviewUtility.DestroyObject(rigRootObject);
-            renderContext?.Dispose();
+            try { previewView?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            try { ESEditorPreviewUtility.DestroyObject(rigRootObject); }
+            catch (Exception exception) { Debug.LogException(exception); }
+            try { renderContext?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
             reportedTargetErrors.Clear();
             visibleTargetInstanceIds.Clear();
         }

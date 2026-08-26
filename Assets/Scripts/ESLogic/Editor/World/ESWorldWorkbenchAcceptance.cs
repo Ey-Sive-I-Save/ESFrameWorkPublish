@@ -860,28 +860,51 @@ namespace ES
 
             try
             {
+                bool callbackDelivered = false;
+                bool callbackScheduled = false;
                 Action<string, bool> callback = (path, success) =>
                 {
-                    EditorApplication.delayCall += () =>
+                    if (callbackScheduled) return;
+                    callbackScheduled = true;
+                    EditorApplication.CallbackFunction delayedCallback = null;
+                    delayedCallback = () =>
                     {
-                        string actualPath = string.IsNullOrWhiteSpace(path)
-                            ? snapshotPath : Path.GetFullPath(path);
-                        bool captured = success
-                            && IsWithinRoot(actualPath, acceptance.RunDirectory)
-                            && File.Exists(actualPath);
-                        ESWorldWorkbenchAcceptanceResult updated = acceptance;
-                        string updateMessage = captured
-                            ? "Memory Profiler 快照已生成并挂接到验收清单。"
-                            : "Memory Profiler 快照未成功生成或输出路径不可信。";
-                        if (TryAttachMemoryProfilerSnapshot(
-                                acceptance.ManifestPath,
-                                acceptance.SourceAssetGuid,
-                                captured ? actualPath : string.Empty,
-                                updateMessage,
-                                out ESWorldWorkbenchAcceptanceResult attached))
-                            updated = attached;
-                        completed?.Invoke(captured, updateMessage, updated);
+                        EditorApplication.delayCall -= delayedCallback;
+                        if (callbackDelivered) return;
+                        callbackDelivered = true;
+                        try
+                        {
+                            string actualPath = string.IsNullOrWhiteSpace(path)
+                                ? snapshotPath : Path.GetFullPath(path);
+                            bool captured = success
+                                && IsWithinRoot(actualPath, acceptance.RunDirectory)
+                                && File.Exists(actualPath);
+                            ESWorldWorkbenchAcceptanceResult updated = acceptance;
+                            string updateMessage = captured
+                                ? "Memory Profiler 快照已生成并挂接到验收清单。"
+                                : "Memory Profiler 快照未成功生成或输出路径不可信。";
+                            if (TryAttachMemoryProfilerSnapshot(
+                                    acceptance.ManifestPath,
+                                    acceptance.SourceAssetGuid,
+                                    captured ? actualPath : string.Empty,
+                                    updateMessage,
+                                    out ESWorldWorkbenchAcceptanceResult attached))
+                                updated = attached;
+                            try
+                            {
+                                completed?.Invoke(captured, updateMessage, updated);
+                            }
+                            catch (Exception completionException)
+                            {
+                                Debug.LogException(completionException);
+                            }
+                        }
+                        catch (Exception callbackException)
+                        {
+                            Debug.LogException(callbackException);
+                        }
                     };
+                    EditorApplication.delayCall += delayedCallback;
                 };
                 method.Invoke(null, BuildTakeSnapshotArguments(method, snapshotPath, callback));
                 return true;

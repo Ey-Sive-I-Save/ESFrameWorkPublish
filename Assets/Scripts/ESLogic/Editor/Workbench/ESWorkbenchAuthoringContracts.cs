@@ -840,24 +840,112 @@ namespace ES
     public sealed class ESWorkbenchSelectionService
     {
         private ESWorkbenchSelection current = ESWorkbenchSelection.Empty;
+        private readonly List<ESWorkbenchSelection> currentSet = new List<ESWorkbenchSelection>();
+        private readonly IReadOnlyList<ESWorkbenchSelection> currentSetView;
+
+        public ESWorkbenchSelectionService()
+        {
+            currentSetView = currentSet.AsReadOnly();
+        }
 
         public ESWorkbenchSelection Current => current;
+        /// <summary>
+        /// The ordered, de-duplicated selection set. Current remains the first
+        /// item for backwards compatibility with single-selection consumers.
+        /// </summary>
+        public IReadOnlyList<ESWorkbenchSelection> CurrentSet => currentSetView;
         public event Action<ESWorkbenchSelection> Changed;
+        public event Action<IReadOnlyList<ESWorkbenchSelection>> SetChanged;
 
         public void Select(ESWorkbenchSelection selection)
         {
-            ESWorkbenchSelection next = selection ?? ESWorkbenchSelection.Empty;
-            if (ReferenceEquals(current, next)
-                || (current.StableId == next.StableId && current.Kind == next.Kind
-                    && current.UnityObject == next.UnityObject && Equals(current.Payload, next.Payload)))
+            SelectMany(selection == null || selection.IsEmpty
+                ? Array.Empty<ESWorkbenchSelection>()
+                : new[] { selection });
+        }
+
+        /// <summary>
+        /// Selects from a spatial gesture. Ctrl/Command toggles the hit item;
+        /// Shift adds it; a plain click replaces the set. This keeps modifier
+        /// semantics in the shared service instead of duplicating them in each
+        /// viewport implementation.
+        /// </summary>
+        public void Select(
+            ESWorkbenchSelection selection,
+            bool additive,
+            bool toggle)
+        {
+            if (selection == null || selection.IsEmpty)
+            {
+                if (!additive && !toggle) Clear();
                 return;
-            current = next;
-            Changed?.Invoke(current);
+            }
+            if (!additive && !toggle)
+            {
+                Select(selection);
+                return;
+            }
+
+            var next = currentSet.ToList();
+            int existing = next.FindIndex(value => value.StableId == selection.StableId
+                && value.Kind == selection.Kind);
+            if (toggle)
+            {
+                if (existing >= 0) next.RemoveAt(existing);
+                else next.Add(selection);
+            }
+            else if (existing < 0)
+            {
+                next.Add(selection);
+            }
+            SelectMany(next);
+        }
+
+        /// <summary>
+        /// Replaces the selection atomically. Null/empty entries are ignored,
+        /// identity is de-duplicated by StableId + Kind, and the first item is
+        /// exposed through Current for existing single-selection code.
+        /// </summary>
+        public void SelectMany(IEnumerable<ESWorkbenchSelection> selections)
+        {
+            var next = (selections ?? Enumerable.Empty<ESWorkbenchSelection>())
+                .Where(value => value != null && !value.IsEmpty)
+                .GroupBy(value => new { value.StableId, value.Kind })
+                .Select(value => value.First())
+                .ToList();
+            bool unchanged = currentSet.Count == next.Count;
+            if (unchanged)
+            {
+                for (int i = 0; i < next.Count; i++)
+                {
+                    ESWorkbenchSelection before = currentSet[i];
+                    ESWorkbenchSelection after = next[i];
+                    if (before.StableId != after.StableId || before.Kind != after.Kind
+                        || before.UnityObject != after.UnityObject
+                        || !Equals(before.Payload, after.Payload))
+                    {
+                        unchanged = false;
+                        break;
+                    }
+                }
+            }
+            if (unchanged) return;
+
+            ESWorkbenchSelection previous = current;
+            currentSet.Clear();
+            currentSet.AddRange(next);
+            current = currentSet.Count == 0 ? ESWorkbenchSelection.Empty : currentSet[0];
+            if (!ReferenceEquals(previous, current)
+                && (previous.StableId != current.StableId || previous.Kind != current.Kind
+                    || previous.UnityObject != current.UnityObject
+                    || !Equals(previous.Payload, current.Payload)))
+                Changed?.Invoke(current);
+            SetChanged?.Invoke(currentSetView);
         }
 
         public void Clear()
         {
-            Select(ESWorkbenchSelection.Empty);
+            SelectMany(Array.Empty<ESWorkbenchSelection>());
         }
     }
 
@@ -991,7 +1079,8 @@ namespace ES
         Rotate,
         Scale,
         Duplicate,
-        Delete
+        Delete,
+        SetProperty
     }
 
     public sealed class ESWorkbenchMutationContext
@@ -1002,7 +1091,9 @@ namespace ES
             ESWorkbenchMutationKind kind,
             ESWorkbenchSelection selection,
             ESWorkbenchObjectDescriptor item,
-            Vector3 worldPosition)
+            Vector3 worldPosition,
+            string propertyPath = null,
+            object propertyValue = null)
         {
             Actions = actions;
             Adapter = adapter;
@@ -1010,6 +1101,8 @@ namespace ES
             Selection = selection ?? ESWorkbenchSelection.Empty;
             Item = item;
             WorldPosition = worldPosition;
+            PropertyPath = propertyPath ?? string.Empty;
+            PropertyValue = propertyValue;
         }
 
         public ESWorkbenchActionContext Actions { get; }
@@ -1020,6 +1113,8 @@ namespace ES
         public Vector3 WorldPosition { get; }
         public Vector3 RotationEuler => WorldPosition;
         public Vector3 Scale => WorldPosition;
+        public string PropertyPath { get; }
+        public object PropertyValue { get; }
     }
 
     public readonly struct ESWorkbenchCreateRequest
@@ -1093,11 +1188,14 @@ namespace ES
             Func<ESWorkbenchSelection, bool> canRotate = null,
             Func<ESWorkbenchMutationContext, ESWorkbenchMutationResult> rotate = null,
             Func<ESWorkbenchSelection, bool> canScale = null,
-            Func<ESWorkbenchMutationContext, ESWorkbenchMutationResult> scale = null)
+            Func<ESWorkbenchMutationContext, ESWorkbenchMutationResult> scale = null,
+            Func<ESWorkbenchSelection, string, object, bool> canSetProperty = null,
+            Func<ESWorkbenchMutationContext, ESWorkbenchMutationResult> setProperty = null)
         {
             if (string.IsNullOrWhiteSpace(adapterId)) throw new ArgumentException("作者适配器 ID 不能为空。", nameof(adapterId));
             if (matchesSelection == null) throw new ArgumentNullException(nameof(matchesSelection));
-            if (create == null && move == null && rotate == null && scale == null && duplicate == null && delete == null)
+            if (create == null && move == null && rotate == null && scale == null
+                && duplicate == null && delete == null && setProperty == null)
                 throw new ArgumentException("作者适配器必须声明至少一种变更操作。", nameof(create));
             AdapterId = adapterId.Trim();
             MatchesSelection = matchesSelection;
@@ -1110,6 +1208,8 @@ namespace ES
             Rotate = rotate;
             CanScale = canScale;
             Scale = scale;
+            CanSetProperty = canSetProperty;
+            SetProperty = setProperty;
             ResolveUndoTargets = resolveUndoTargets;
             Committed = committed;
             Priority = priority;
@@ -1128,6 +1228,8 @@ namespace ES
         public Func<ESWorkbenchMutationContext, ESWorkbenchMutationResult> Rotate { get; }
         public Func<ESWorkbenchSelection, bool> CanScale { get; }
         public Func<ESWorkbenchMutationContext, ESWorkbenchMutationResult> Scale { get; }
+        public Func<ESWorkbenchSelection, string, object, bool> CanSetProperty { get; }
+        public Func<ESWorkbenchMutationContext, ESWorkbenchMutationResult> SetProperty { get; }
         public Func<ESWorkbenchMutationContext, IEnumerable<UnityEngine.Object>> ResolveUndoTargets { get; }
         public Action<ESWorkbenchMutationContext, ESWorkbenchMutationResult> Committed { get; }
         public Func<ESWorkbenchActionContext, bool> IsAvailable { get; }
@@ -1171,6 +1273,10 @@ namespace ES
         public bool CanScale(ESWorkbenchSelection selection) =>
             IsMutationAllowed(ESWorkbenchMutationKind.Scale, selection, null, out _)
             && ResolveForSelection(selection, ESWorkbenchMutationKind.Scale) != null;
+        public bool CanSetProperty(ESWorkbenchSelection selection, string propertyPath, object value) =>
+            !string.IsNullOrWhiteSpace(propertyPath)
+            && IsMutationAllowed(ESWorkbenchMutationKind.SetProperty, selection, null, out _)
+            && ResolveForProperty(selection, propertyPath, value) != null;
         public bool CanDuplicate(ESWorkbenchSelection selection) =>
             IsMutationAllowed(ESWorkbenchMutationKind.Duplicate, selection, null, out _)
             && ResolveForSelection(selection, ESWorkbenchMutationKind.Duplicate) != null;
@@ -1180,6 +1286,21 @@ namespace ES
 
         public bool TryCreate(ESWorkbenchObjectDescriptor item, Vector3 worldPosition, out string message) =>
             Execute(ESWorkbenchMutationKind.Create, ESWorkbenchSelection.Empty, item, worldPosition, out message);
+
+        /// <summary>Sets one named authoring property through the owning adapter and one Undo group.</summary>
+        public bool TrySetProperty(
+            ESWorkbenchSelection selection,
+            string propertyPath,
+            object value,
+            out string message) =>
+            Execute(
+                ESWorkbenchMutationKind.SetProperty,
+                selection,
+                null,
+                default,
+                out message,
+                propertyPath,
+                value);
 
         public bool CanCreateBatch(IReadOnlyList<ESWorkbenchCreateRequest> requests, out string message)
         {
@@ -1322,12 +1443,130 @@ namespace ES
         public bool TryDelete(ESWorkbenchSelection selection, out string message) =>
             Execute(ESWorkbenchMutationKind.Delete, selection, null, default, out message);
 
+        /// <summary>
+        /// Executes one mutation kind for a selection set as a single Undo
+        /// transaction. Existing single-selection entry points remain unchanged;
+        /// derived workbenches can opt into batch authoring without reimplementing
+        /// validation, adapter routing, rollback, dirty aggregation or refresh.
+        /// </summary>
+        public bool TryMoveMany(
+            IReadOnlyList<ESWorkbenchSelection> selections,
+            Vector3 worldPosition,
+            out string message) =>
+            ExecuteBatch(ESWorkbenchMutationKind.Move, selections, worldPosition, out message);
+
+        /// <summary>
+        /// Commits one absolute position per selection as a single Undo
+        /// transaction. Viewports use this overload to preserve relative
+        /// offsets during multi-object drags.
+        /// </summary>
+        public bool TryMoveMany(
+            IReadOnlyList<ESWorkbenchSelection> selections,
+            IReadOnlyList<Vector3> worldPositions,
+            out string message)
+        {
+            if (worldPositions == null || selections == null
+                || worldPositions.Count != selections.Count)
+            {
+                message = "批量移动的位置数量与选择对象数量不一致。";
+                actions?.SetStatus(message, MessageType.Warning);
+                return false;
+            }
+            return ExecuteBatch(
+                ESWorkbenchMutationKind.Move,
+                selections,
+                index => worldPositions[index],
+                out message);
+        }
+
+        public bool TryRotateMany(
+            IReadOnlyList<ESWorkbenchSelection> selections,
+            Vector3 rotationEuler,
+            out string message) =>
+            ExecuteBatch(ESWorkbenchMutationKind.Rotate, selections, rotationEuler, out message);
+
+        public bool TryRotateMany(
+            IReadOnlyList<ESWorkbenchSelection> selections,
+            IReadOnlyList<Vector3> rotationEulers,
+            out string message)
+        {
+            if (rotationEulers == null || selections == null
+                || rotationEulers.Count != selections.Count)
+            {
+                message = "批量旋转的角度数量与选择对象数量不一致。";
+                actions?.SetStatus(message, MessageType.Warning);
+                return false;
+            }
+            return ExecuteBatch(
+                ESWorkbenchMutationKind.Rotate,
+                selections,
+                index => rotationEulers[index],
+                out message);
+        }
+
+        public bool TryScaleMany(
+            IReadOnlyList<ESWorkbenchSelection> selections,
+            Vector3 scale,
+            out string message) =>
+            ExecuteBatch(ESWorkbenchMutationKind.Scale, selections, scale, out message);
+
+        public bool TryScaleMany(
+            IReadOnlyList<ESWorkbenchSelection> selections,
+            IReadOnlyList<Vector3> scales,
+            out string message)
+        {
+            if (scales == null || selections == null || scales.Count != selections.Count)
+            {
+                message = "批量缩放值数量与选择对象数量不一致。";
+                actions?.SetStatus(message, MessageType.Warning);
+                return false;
+            }
+            return ExecuteBatch(
+                ESWorkbenchMutationKind.Scale,
+                selections,
+                index => scales[index],
+                out message);
+        }
+
+        public bool TryDuplicateMany(
+            IReadOnlyList<ESWorkbenchSelection> selections,
+            out string message) =>
+            ExecuteBatch(ESWorkbenchMutationKind.Duplicate, selections, Vector3.zero, out message);
+
+        public bool TryDeleteMany(
+            IReadOnlyList<ESWorkbenchSelection> selections,
+            out string message) =>
+            ExecuteBatch(ESWorkbenchMutationKind.Delete, selections, Vector3.zero, out message);
+
+        public bool TrySetPropertyMany(
+            IReadOnlyList<ESWorkbenchSelection> selections,
+            string propertyPath,
+            object value,
+            out string message)
+        {
+            if (string.IsNullOrWhiteSpace(propertyPath))
+            {
+                message = "批量属性写入缺少属性路径。";
+                actions?.SetStatus(message, MessageType.Warning);
+                return false;
+            }
+            return ExecuteBatch(
+                ESWorkbenchMutationKind.SetProperty,
+                selections,
+                _ => Vector3.zero,
+                out message,
+                propertyPath,
+                value);
+        }
+
         private bool Execute(
             ESWorkbenchMutationKind kind,
             ESWorkbenchSelection selection,
             ESWorkbenchObjectDescriptor item,
             Vector3 worldPosition,
-            out string message)
+            out string message,
+            string propertyPath = null,
+            object propertyValue = null)
         {
             message = string.Empty;
             LastOperationCommittedWithPostCommitFailure = false;
@@ -1339,7 +1578,9 @@ namespace ES
             }
             ESWorkbenchAuthoringAdapterDescriptor adapter = kind == ESWorkbenchMutationKind.Create
                 ? ResolveForCreate(item)
-                : ResolveForSelection(selection, kind);
+                : kind == ESWorkbenchMutationKind.SetProperty
+                    ? ResolveForProperty(selection, propertyPath, propertyValue)
+                    : ResolveForSelection(selection, kind);
             Func<ESWorkbenchMutationContext, ESWorkbenchMutationResult> handler = ResolveHandler(adapter, kind);
             if (adapter == null || handler == null)
             {
@@ -1347,7 +1588,8 @@ namespace ES
                 return false;
             }
 
-            var context = new ESWorkbenchMutationContext(actions, adapter, kind, selection, item, worldPosition);
+            var context = new ESWorkbenchMutationContext(
+                actions, adapter, kind, selection, item, worldPosition, propertyPath, propertyValue);
             string undoName = ResolveOperationName(kind) + " · " + adapter.AdapterId;
             Undo.IncrementCurrentGroup();
             int undoGroup = Undo.GetCurrentGroup();
@@ -1408,6 +1650,171 @@ namespace ES
             }
         }
 
+        private bool ExecuteBatch(
+            ESWorkbenchMutationKind kind,
+            IReadOnlyList<ESWorkbenchSelection> selections,
+            Vector3 value,
+            out string message) =>
+            ExecuteBatch(kind, selections, _ => value, out message);
+
+        private bool ExecuteBatch(
+            ESWorkbenchMutationKind kind,
+            IReadOnlyList<ESWorkbenchSelection> selections,
+            Func<int, Vector3> valueResolver,
+            out string message,
+            string propertyPath = null,
+            object propertyValue = null)
+        {
+            message = string.Empty;
+            LastOperationCommittedWithPostCommitFailure = false;
+            if (actions == null)
+            {
+                message = "作者服务尚未绑定工作台。";
+                return false;
+            }
+            if (selections == null || selections.Count == 0)
+            {
+                message = "没有可执行作者操作的选择对象。";
+                actions.SetStatus(message, MessageType.Warning);
+                return false;
+            }
+
+            var contexts = new List<ESWorkbenchMutationContext>(selections.Count);
+            var targets = new List<UnityEngine.Object>();
+            var uniqueSelections = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < selections.Count; i++)
+            {
+                ESWorkbenchSelection selection = selections[i];
+                if (selection == null || selection.IsEmpty)
+                {
+                    message = "批量作者操作包含空选择（第 " + (i + 1) + " 项）。";
+                    actions.SetStatus(message, MessageType.Warning);
+                    return false;
+                }
+                string selectionKey = selection.StableId.Length + ":" + selection.StableId
+                    + selection.Kind.Length + ":" + selection.Kind;
+                if (!uniqueSelections.Add(selectionKey)) continue;
+                if (!IsMutationAllowed(kind, selection, null, out message))
+                {
+                    actions.SetStatus(message, MessageType.Warning);
+                    return false;
+                }
+                ESWorkbenchAuthoringAdapterDescriptor adapter = kind == ESWorkbenchMutationKind.SetProperty
+                    ? ResolveForProperty(selection, propertyPath, propertyValue)
+                    : ResolveForSelection(selection, kind);
+                Func<ESWorkbenchMutationContext, ESWorkbenchMutationResult> handler =
+                    ResolveHandler(adapter, kind);
+                if (adapter == null || handler == null)
+                {
+                    message = "对象“" + selection.StableId + "”没有注册"
+                        + ResolveOperationName(kind) + "能力。";
+                    actions.SetStatus(message, MessageType.Warning);
+                    return false;
+                }
+                var context = new ESWorkbenchMutationContext(
+                    actions, adapter, kind, selection, null, valueResolver(i), propertyPath, propertyValue);
+                UnityEngine.Object[] undoTargets;
+                try
+                {
+                    undoTargets = adapter.ResolveUndoTargets?.Invoke(context)?
+                        .Where(target => target != null)
+                        .Distinct()
+                        .ToArray() ?? Array.Empty<UnityEngine.Object>();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                    message = "对象“" + selection.StableId + "”的 Undo 目标解析失败："
+                        + exception.Message;
+                    actions.SetStatus(message + "（作者操作未执行）", MessageType.Error);
+                    return false;
+                }
+                if (undoTargets.Length == 0)
+                {
+                    message = "对象“" + selection.StableId + "”的作者适配器没有声明 Undo 目标。";
+                    actions.SetStatus(message, MessageType.Error);
+                    return false;
+                }
+                contexts.Add(context);
+                targets.AddRange(undoTargets);
+            }
+            if (contexts.Count == 0)
+            {
+                message = "没有可执行作者操作的唯一选择对象。";
+                actions.SetStatus(message, MessageType.Warning);
+                return false;
+            }
+
+            string undoName = "批量" + ResolveOperationName(kind);
+            Undo.IncrementCurrentGroup();
+            int undoGroup = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName(undoName);
+            var results = new List<ESWorkbenchMutationResult>(contexts.Count);
+            try
+            {
+                Undo.RegisterCompleteObjectUndo(targets.Distinct().ToArray(), undoName);
+                for (int i = 0; i < contexts.Count; i++)
+                {
+                    ESWorkbenchMutationResult result =
+                        ResolveHandler(contexts[i].Adapter, kind)(contexts[i])
+                        ?? ESWorkbenchMutationResult.Failure("作者操作没有返回结果。");
+                    if (!result.Succeeded)
+                    {
+                        Undo.RevertAllDownToGroup(undoGroup);
+                        message = undoName + "在第 " + (i + 1) + " 项失败：" + result.Message;
+                        actions.SetStatus(message + "（全部作者数据已回滚）", MessageType.Error);
+                        return false;
+                    }
+                    results.Add(result);
+                }
+                Undo.CollapseUndoOperations(undoGroup);
+            }
+            catch (Exception exception)
+            {
+                Undo.RevertAllDownToGroup(undoGroup);
+                Debug.LogException(exception);
+                message = undoName + "失败：" + exception.Message;
+                actions.SetStatus(message + "（全部作者数据已回滚）", MessageType.Error);
+                return false;
+            }
+
+            try
+            {
+                var committedSelections = new List<ESWorkbenchSelection>();
+                var dirty = new Dictionary<string, ESWorkbenchDirtyFlags>(StringComparer.Ordinal);
+                ESWorkbenchRefreshReason refreshReason = ESWorkbenchRefreshReason.DataChanged;
+                for (int i = 0; i < contexts.Count; i++)
+                {
+                    ESWorkbenchMutationContext context = contexts[i];
+                    ESWorkbenchMutationResult result = results[i];
+                    context.Adapter.Committed?.Invoke(context, result);
+                    committedSelections.Add(result.Selection ?? context.Selection);
+                    if (!string.IsNullOrWhiteSpace(result.DirtyKey))
+                    {
+                        dirty.TryGetValue(result.DirtyKey, out ESWorkbenchDirtyFlags flags);
+                        dirty[result.DirtyKey] = flags | result.DirtyFlags;
+                    }
+                    if ((int)result.RefreshReason > (int)refreshReason)
+                        refreshReason = result.RefreshReason;
+                }
+                foreach (KeyValuePair<string, ESWorkbenchDirtyFlags> pair in dirty)
+                    actions.MarkDirty(pair.Key, pair.Value);
+                actions.Selection.SelectMany(committedSelections);
+                actions.Refresh(refreshReason);
+                message = undoName + "完成，共处理 " + contexts.Count + " 个对象。";
+                actions.SetStatus(message, MessageType.Info);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                LastOperationCommittedWithPostCommitFailure = true;
+                message = undoName + "已提交，但提交后同步失败：" + exception.Message;
+                actions.SetStatus(message + "（请刷新工作台并检查持久化状态）", MessageType.Error);
+                return true;
+            }
+        }
+
         private bool IsMutationAllowed(
             ESWorkbenchMutationKind kind,
             ESWorkbenchSelection selection,
@@ -1452,6 +1859,26 @@ namespace ES
                     && !EvaluateAdapterPredicate(adapter, "旋转能力查询", () => adapter.CanRotate(selection))) continue;
                 if (kind == ESWorkbenchMutationKind.Scale && adapter.CanScale != null
                     && !EvaluateAdapterPredicate(adapter, "缩放能力查询", () => adapter.CanScale(selection))) continue;
+                return adapter;
+            }
+            return null;
+        }
+
+        private ESWorkbenchAuthoringAdapterDescriptor ResolveForProperty(
+            ESWorkbenchSelection selection,
+            string propertyPath,
+            object value)
+        {
+            if (selection == null || selection.IsEmpty || string.IsNullOrWhiteSpace(propertyPath)) return null;
+            foreach (ESWorkbenchAuthoringAdapterDescriptor adapter in OrderedAdapters())
+            {
+                if (adapter.SetProperty == null
+                    || !EvaluateAdapterPredicate(adapter, "选择匹配", () => adapter.MatchesSelection(selection)))
+                    continue;
+                if (adapter.CanSetProperty != null
+                    && !EvaluateAdapterPredicate(adapter, "属性能力查询",
+                        () => adapter.CanSetProperty(selection, propertyPath, value)))
+                    continue;
                 return adapter;
             }
             return null;
@@ -1516,6 +1943,7 @@ namespace ES
                 case ESWorkbenchMutationKind.Scale: return adapter.Scale;
                 case ESWorkbenchMutationKind.Duplicate: return adapter.Duplicate;
                 case ESWorkbenchMutationKind.Delete: return adapter.Delete;
+                case ESWorkbenchMutationKind.SetProperty: return adapter.SetProperty;
                 default: return null;
             }
         }
@@ -1530,6 +1958,7 @@ namespace ES
                 case ESWorkbenchMutationKind.Scale: return "缩放对象";
                 case ESWorkbenchMutationKind.Duplicate: return "复制对象";
                 case ESWorkbenchMutationKind.Delete: return "删除对象";
+                case ESWorkbenchMutationKind.SetProperty: return "设置属性";
                 default: return "作者操作";
             }
         }

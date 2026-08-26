@@ -99,7 +99,8 @@ namespace ES
                 if (saved == null)
                     throw new InvalidOperationException("保存正式玩家 Variant 失败：" + VariantPath);
 
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(definition);
+                AssetDatabase.SaveAssetIfDirty(saved);
                 AssetDatabase.Refresh();
 
                 if (!ESCharacterTemplateReleaseGate.ValidateFormalCharacterPrefab(VariantPath, out string report))
@@ -125,11 +126,9 @@ namespace ES
         private static ActorDataInfo EnsureHertaDefinition()
         {
             ActorDataInfo definition = AssetDatabase.LoadAssetAtPath<ActorDataInfo>(DefinitionPath);
-            if (definition == null)
-            {
+            bool definitionCreated = definition == null;
+            if (definitionCreated)
                 definition = ScriptableObject.CreateInstance<ActorDataInfo>();
-                AssetDatabase.CreateAsset(definition, DefinitionPath);
-            }
 
             definition.name = "大黑塔_ActorData";
             definition.SetKey("player.herta");
@@ -142,6 +141,20 @@ namespace ES
             definition.motionShared.stableMovementSharpness = PlayerGroundMovementSharpness;
             definition.motionShared.orientationSharpness = PlayerOrientationSharpness;
             definition.motionVariable = EntityMotionVariableData.Default;
+
+            if (definitionCreated)
+            {
+                try
+                {
+                    AssetDatabase.CreateAsset(definition, DefinitionPath);
+                }
+                catch
+                {
+                    if (definition != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(definition)))
+                        UnityEngine.Object.DestroyImmediate(definition);
+                    throw;
+                }
+            }
             EditorUtility.SetDirty(definition);
             return definition;
         }
@@ -173,7 +186,7 @@ namespace ES
                 UnityEngine.Object.DestroyImmediate(source);
                 if (saved == null)
                     throw new InvalidOperationException("保存大黑塔独立表现源失败：" + PresentationSourcePath);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(saved);
                 return saved;
             }
             finally

@@ -247,7 +247,7 @@ namespace ES
                 if (prefab == null)
                     throw new InvalidOperationException($"保存第一次构建前基础模板失败：{TemplatePath}");
 
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(prefab);
                 AssetDatabase.Refresh();
                 return prefab;
             }
@@ -287,7 +287,7 @@ namespace ES
                 if (prefab == null)
                     throw new InvalidOperationException($"保存完整通用角色架构失败：{CompleteTemplatePath}");
 
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(prefab);
                 AssetDatabase.Refresh();
                 return prefab;
             }

@@ -3679,22 +3679,30 @@ namespace ES
             if (camera == null || viewport.width < 1f || viewport.height < 1f)
                 return false;
 
-            Rect header = new Rect(viewport.x, viewport.y, viewport.width, HeaderHeight);
-            EditorGUI.DrawRect(header, new Color(0.015f, 0.02f, 0.028f, 0.92f));
-            EditorGUI.DrawRect(new Rect(header.x, header.yMax - 1f, header.width, 1f),
-                new Color(1f, 1f, 1f, 0.1f));
-            GUI.Label(
-                new Rect(header.x + 9f, header.y + 7f, Mathf.Max(70f, header.width - 190f), 18f),
-                new GUIContent(string.IsNullOrWhiteSpace(title) ? "三维作者视图" : title),
-                EditorStyles.miniBoldLabel);
+            string cameraStatus = string.Format(
+                "距离 {0:0.##} · 角度 {1:0.#}/{2:0.#}{3}",
+                camera.Distance,
+                camera.Yaw,
+                camera.Pitch,
+                readOnly ? " · 只读" : string.Empty);
+            string combinedStatus = string.IsNullOrWhiteSpace(status)
+                ? cameraStatus
+                : status + " · " + cameraStatus;
+            ESWorkbenchViewportRenderStyle.DrawGuiChrome(
+                viewport,
+                string.IsNullOrWhiteSpace(title) ? "三维作者视图" : title,
+                readOnly ? "运行时构图投影" : "世界空间作者视口",
+                combinedStatus,
+                ESWorkbenchViewportRenderStyle.ResolveAccent(readOnly),
+                readOnly);
 
             bool clicked = false;
             if (viewport.width >= 150f)
             {
                 bool showFrameButton = frameAll != null && viewport.width >= 300f;
-                float right = header.xMax - 10f;
-                Rect zoomInButton = new Rect(right - 26f, header.y + 5f, 26f, 22f);
-                Rect zoomOutButton = new Rect(right - 56f, header.y + 5f, 26f, 22f);
+                float right = viewport.xMax - 10f;
+                Rect zoomInButton = new Rect(right - 26f, viewport.y + 5f, 26f, 22f);
+                Rect zoomOutButton = new Rect(right - 56f, viewport.y + 5f, 26f, 22f);
                 if (GUI.Button(zoomOutButton, new GUIContent("-", "缩小视口"), EditorStyles.miniButtonLeft))
                 {
                     camera.Zoom(1f);
@@ -3706,25 +3714,13 @@ namespace ES
                     GUI.changed = true;
                 }
                 if (showFrameButton && GUI.Button(
-                    new Rect(header.xMax - 176f, header.y + 5f, 110f, 22f),
+                    new Rect(viewport.xMax - 176f, viewport.y + 5f, 110f, 22f),
                     new GUIContent("推荐视角", "按当前内容重新取景"), EditorStyles.miniButton))
                 {
                     frameAll();
                     clicked = true;
                 }
             }
-
-            string cameraStatus = string.Format(
-                "距离 {0:0.##} · 角度 {1:0.#}/{2:0.#}{3}",
-                camera.Distance,
-                camera.Yaw,
-                camera.Pitch,
-                readOnly ? " · 只读" : string.Empty);
-            Rect footer = new Rect(viewport.x + 9f, viewport.yMax - 23f,
-                Mathf.Max(1f, viewport.width - 18f), 17f);
-            GUI.Label(footer, new GUIContent(
-                string.IsNullOrWhiteSpace(status) ? cameraStatus : status + " · " + cameraStatus,
-                cameraStatus), EditorStyles.whiteMiniLabel);
             DrawAxis(viewport, camera);
             return clicked;
         }
@@ -3765,6 +3761,312 @@ namespace ES
             Handles.DrawAAPolyLine(3f, new Vector3(start.x, start.y), new Vector3(end.x, end.y));
             GUI.color = color;
             GUI.Label(new Rect(end.x - 5f, end.y - 9f, 16f, 18f), label, EditorStyles.whiteMiniLabel);
+        }
+    }
+
+    /// <summary>
+    /// 工作台视口的公共渲染语义。它只负责舞台、网格和 chrome，不拥有领域数据、
+    /// 选择或相机状态；2D、3D 和其他专业工作台必须通过这一层保持视觉一致。
+    /// </summary>
+    public static class ESWorkbenchViewportRenderStyle
+    {
+        public static readonly Color StageBackground = new Color(0.035f, 0.047f, 0.058f, 1f);
+        public static readonly Color StageSurface = new Color(0.055f, 0.071f, 0.084f, 1f);
+        public static readonly Color GridMinor = new Color(0.34f, 0.43f, 0.48f, 0.16f);
+        public static readonly Color GridMajor = new Color(0.40f, 0.55f, 0.62f, 0.30f);
+        public static readonly Color AuthoringAccent = new Color(0.28f, 0.72f, 0.92f, 1f);
+        public static readonly Color ReadOnlyAccent = new Color(0.67f, 0.50f, 0.94f, 1f);
+        public static readonly Color SelectionAccent = new Color(0.98f, 0.78f, 0.24f, 1f);
+        public static readonly Color WarningAccent = new Color(1f, 0.56f, 0.24f, 1f);
+        public static readonly Color ErrorAccent = new Color(1f, 0.30f, 0.34f, 1f);
+        public static readonly Color StatusSurface = new Color(0.018f, 0.026f, 0.033f, 0.92f);
+
+        public enum InteractionState : byte
+        {
+            Normal,
+            Hover,
+            Selected,
+            PreviewAllowed,
+            PreviewRejected,
+            Brush
+        }
+
+        public static Color ResolveAccent(bool readOnly)
+        {
+            return readOnly ? ReadOnlyAccent : AuthoringAccent;
+        }
+
+        public static Color ResolveInteractionColor(InteractionState state)
+        {
+            switch (state)
+            {
+                case InteractionState.Selected: return SelectionAccent;
+                case InteractionState.PreviewRejected: return ErrorAccent;
+                case InteractionState.PreviewAllowed: return AuthoringAccent;
+                case InteractionState.Brush: return WarningAccent;
+                case InteractionState.Hover: return Color.Lerp(AuthoringAccent, Color.white, 0.18f);
+                default: return Color.Lerp(AuthoringAccent, Color.white, 0.04f);
+            }
+        }
+
+        public static Color WithAlpha(Color color, float alpha)
+        {
+            color.a = Mathf.Clamp01(alpha);
+            return color;
+        }
+
+        public static void DrawGuiBackdrop(Rect viewport)
+        {
+            if (!IsRepaint(viewport)) return;
+            EditorGUI.DrawRect(viewport, StageBackground);
+            EditorGUI.DrawRect(
+                new Rect(viewport.x, viewport.y, viewport.width, Mathf.Min(1f, viewport.height)),
+                new Color(1f, 1f, 1f, 0.06f));
+        }
+
+        public static void DrawGuiChrome(
+            Rect viewport,
+            string title,
+            string subtitle,
+            string status,
+            Color accent,
+            bool readOnly)
+        {
+            if (!IsRepaint(viewport) || viewport.width < 1f || viewport.height < 1f)
+                return;
+
+            float headerHeight = Mathf.Min(ESWorkbenchViewportOverlay.HeaderHeight, viewport.height);
+            Rect header = new Rect(viewport.x, viewport.y, viewport.width, headerHeight);
+            EditorGUI.DrawRect(header, new Color(0.025f, 0.036f, 0.045f, 0.94f));
+            EditorGUI.DrawRect(
+                new Rect(header.x, header.yMax - 1f, header.width, 1f),
+                Color.Lerp(accent, Color.white, 0.14f));
+            EditorGUI.DrawRect(
+                new Rect(header.x, header.y, Mathf.Min(3f, header.width), header.height),
+                accent);
+
+            // 缩放按钮在窄视口仍可用，标题必须主动让出它们的固定占位；
+            // 否则 150~180px 的面板会出现标题压住按钮的重叠。
+            float titleRight = viewport.width >= 150f
+                ? viewport.xMax - 72f
+                : viewport.xMax - 10f;
+            float titleWidth = Mathf.Max(32f, titleRight - (header.x + 10f));
+            GUI.Label(
+                new Rect(header.x + 10f, header.y + 5f, titleWidth, 16f),
+                string.IsNullOrWhiteSpace(title) ? "视口" : title,
+                EditorStyles.boldLabel);
+            if (viewport.width >= 310f && !string.IsNullOrWhiteSpace(subtitle))
+            {
+                GUI.color = new Color(0.73f, 0.79f, 0.82f, 1f);
+                GUI.Label(
+                    new Rect(header.x + 10f, header.y + 18f, titleWidth, 12f),
+                    subtitle,
+                    EditorStyles.miniLabel);
+                GUI.color = Color.white;
+            }
+
+            string mode = readOnly ? "只读预览" : "编辑中";
+            if (viewport.width >= 360f)
+            {
+                float badgeWidth = readOnly ? 62f : 48f;
+                Rect badge = new Rect(header.xMax - badgeWidth - 182f, header.y + 6f, badgeWidth, 19f);
+                EditorGUI.DrawRect(badge, new Color(accent.r, accent.g, accent.b, 0.16f));
+                GUI.color = accent;
+                GUI.Label(badge, mode, EditorStyles.miniBoldLabel);
+                GUI.color = Color.white;
+            }
+
+            Rect footer = new Rect(
+                viewport.x + 8f,
+                Mathf.Max(viewport.y, viewport.yMax - 24f),
+                Mathf.Max(1f, viewport.width - 16f),
+                Mathf.Min(18f, viewport.height));
+            DrawGuiStatusStrip(
+                footer,
+                string.IsNullOrWhiteSpace(status) ? mode : status,
+                accent);
+
+            DrawFrame(viewport, accent);
+        }
+
+        /// <summary>
+        /// 在有限宽度内把状态拆成可扫描的语义片段。超出宽度的内容被收纳，
+        /// 不再让长坐标或相机描述挤压标题和交互区域。
+        /// </summary>
+        public static void DrawGuiStatusStrip(
+            Rect footer,
+            string statusText,
+            Color accent)
+        {
+            if (!IsRepaint(footer) || footer.width <= 1f || footer.height <= 1f)
+                return;
+            EditorGUI.DrawRect(footer, StatusSurface);
+            float cursor = footer.x + 6f;
+            float right = footer.xMax - 6f;
+            int hidden = 0;
+            int segmentStart = 0;
+            int segmentIndex = 0;
+            while (!string.IsNullOrWhiteSpace(statusText) && segmentStart < statusText.Length)
+            {
+                int separator = statusText.IndexOf(" · ", segmentStart, StringComparison.Ordinal);
+                int segmentEnd = separator >= 0 ? separator : statusText.Length;
+                string value = statusText.Substring(segmentStart, segmentEnd - segmentStart).Trim();
+                segmentStart = separator >= 0 ? separator + 3 : statusText.Length;
+                if (string.IsNullOrWhiteSpace(value)) continue;
+                float measured = EditorStyles.whiteMiniLabel.CalcSize(new GUIContent(value)).x;
+                float width = Mathf.Clamp(measured + 14f, 42f, 190f);
+                if (cursor + width > right)
+                {
+                    int remaining = CountStatusSegments(statusText, segmentStart);
+                    float available = right - cursor;
+                    float reservedMore = remaining > 0 ? 34f : 0f;
+                    float clippedWidth = available - reservedMore;
+                    if (clippedWidth >= 42f)
+                    {
+                        // 长坐标/相机状态优先保留当前片段，剩余片段再收纳；
+                        // 这样极窄视口不会只剩一个没有语义的“+1”。
+                        Rect clippedChip = new Rect(cursor, footer.y + 2f, clippedWidth,
+                            Mathf.Max(12f, footer.height - 4f));
+                        EditorGUI.DrawRect(clippedChip,
+                            new Color(accent.r, accent.g, accent.b, segmentIndex == 0 ? 0.15f : 0.08f));
+                        GUI.color = segmentIndex == 0 ? accent : new Color(0.78f, 0.84f, 0.87f, 1f);
+                        GUI.Label(new Rect(
+                                clippedChip.x + 7f,
+                                clippedChip.y,
+                                clippedChip.width - 14f,
+                                clippedChip.height),
+                            new GUIContent(value, value), EditorStyles.whiteMiniLabel);
+                        GUI.color = Color.white;
+                        cursor += clippedWidth + 4f;
+                        hidden = remaining;
+                    }
+                    else
+                    {
+                        hidden = remaining + 1;
+                    }
+                    break;
+                }
+                Rect chip = new Rect(cursor, footer.y + 2f, width, Mathf.Max(12f, footer.height - 4f));
+                EditorGUI.DrawRect(chip, new Color(accent.r, accent.g, accent.b, segmentIndex == 0 ? 0.15f : 0.08f));
+                GUI.color = segmentIndex == 0 ? accent : new Color(0.78f, 0.84f, 0.87f, 1f);
+                GUI.Label(new Rect(chip.x + 7f, chip.y, chip.width - 14f, chip.height), value,
+                    EditorStyles.whiteMiniLabel);
+                cursor += width + 4f;
+                GUI.color = Color.white;
+                segmentIndex++;
+            }
+            if (hidden > 0)
+            {
+                float available = right - cursor;
+                float moreWidth = Mathf.Min(30f, Mathf.Max(0f, available));
+                if (moreWidth >= 14f)
+                {
+                    Rect more = new Rect(cursor, footer.y + 2f, moreWidth,
+                        Mathf.Max(12f, footer.height - 4f));
+                    EditorGUI.DrawRect(more, new Color(1f, 1f, 1f, 0.06f));
+                    GUI.color = new Color(0.68f, 0.74f, 0.78f, 1f);
+                    GUI.Label(more,
+                        new GUIContent(moreWidth >= 24f ? "+" + hidden : "...", statusText),
+                        EditorStyles.centeredGreyMiniLabel);
+                    GUI.color = Color.white;
+                }
+                else if (footer.width >= 8f)
+                {
+                    // 极窄布局仍保留一条可悬停的状态提示，不让信息完全消失。
+                    Rect marker = new Rect(footer.xMax - 5f, footer.y + 3f, 3f,
+                        Mathf.Max(10f, footer.height - 6f));
+                    EditorGUI.DrawRect(marker, WithAlpha(accent, 0.86f));
+                    GUI.Label(marker, new GUIContent("", statusText));
+                }
+            }
+        }
+
+        private static int CountStatusSegments(string statusText, int start)
+        {
+            int count = 0;
+            int cursor = Mathf.Clamp(start, 0, statusText?.Length ?? 0);
+            while (!string.IsNullOrWhiteSpace(statusText) && cursor < statusText.Length)
+            {
+                int separator = statusText.IndexOf(" · ", cursor, StringComparison.Ordinal);
+                count++;
+                if (separator < 0) break;
+                cursor = separator + 3;
+            }
+            return count;
+        }
+
+        public static void DrawCanvasBackdrop(Painter2D painter, Rect viewport)
+        {
+            if (painter == null || viewport.width <= 1f || viewport.height <= 1f)
+                return;
+            painter.fillColor = StageBackground;
+            painter.BeginPath();
+            painter.MoveTo(viewport.min);
+            painter.LineTo(new Vector2(viewport.xMax, viewport.yMin));
+            painter.LineTo(viewport.max);
+            painter.LineTo(new Vector2(viewport.xMin, viewport.yMax));
+            painter.ClosePath();
+            painter.Fill();
+        }
+
+        public static void DrawCanvasGrid(Painter2D painter, Rect rect, int columns, int rows)
+        {
+            if (painter == null || rect.width <= 1f || rect.height <= 1f)
+                return;
+            columns = Mathf.Clamp(columns, 1, 256);
+            rows = Mathf.Clamp(rows, 1, 256);
+
+            painter.strokeColor = GridMinor;
+            painter.lineWidth = 1f;
+            painter.BeginPath();
+            for (int x = 0; x <= columns; x++)
+            {
+                float px = Mathf.Lerp(rect.xMin, rect.xMax, x / (float)columns);
+                painter.MoveTo(new Vector2(px, rect.yMin));
+                painter.LineTo(new Vector2(px, rect.yMax));
+            }
+            for (int y = 0; y <= rows; y++)
+            {
+                float py = Mathf.Lerp(rect.yMin, rect.yMax, y / (float)rows);
+                painter.MoveTo(new Vector2(rect.xMin, py));
+                painter.LineTo(new Vector2(rect.xMax, py));
+            }
+            painter.Stroke();
+
+            painter.strokeColor = GridMajor;
+            painter.lineWidth = 1.4f;
+            painter.BeginPath();
+            int majorStepX = Mathf.Max(1, columns / 4);
+            int majorStepY = Mathf.Max(1, rows / 4);
+            for (int x = 0; x <= columns; x += majorStepX)
+            {
+                float px = Mathf.Lerp(rect.xMin, rect.xMax, x / (float)columns);
+                painter.MoveTo(new Vector2(px, rect.yMin));
+                painter.LineTo(new Vector2(px, rect.yMax));
+            }
+            for (int y = 0; y <= rows; y += majorStepY)
+            {
+                float py = Mathf.Lerp(rect.yMin, rect.yMax, y / (float)rows);
+                painter.MoveTo(new Vector2(rect.xMin, py));
+                painter.LineTo(new Vector2(rect.xMax, py));
+            }
+            painter.Stroke();
+        }
+
+        private static void DrawFrame(Rect viewport, Color accent)
+        {
+            EditorGUI.DrawRect(new Rect(viewport.x, viewport.y, viewport.width, 1f), new Color(1f, 1f, 1f, 0.09f));
+            EditorGUI.DrawRect(new Rect(viewport.x, viewport.yMax - 1f, viewport.width, 1f), new Color(0f, 0f, 0f, 0.46f));
+            EditorGUI.DrawRect(new Rect(viewport.x, viewport.y, 1f, viewport.height), Color.Lerp(accent, Color.black, 0.35f));
+            EditorGUI.DrawRect(new Rect(viewport.xMax - 1f, viewport.y, 1f, viewport.height), new Color(0f, 0f, 0f, 0.42f));
+        }
+
+        private static bool IsRepaint(Rect viewport)
+        {
+            return Event.current != null
+                && Event.current.type == EventType.Repaint
+                && viewport.width > 0f
+                && viewport.height > 0f;
         }
     }
 
@@ -4385,6 +4687,7 @@ namespace ES
     {
         private readonly ESWorkbenchViewportContext context;
         private readonly ESWorkbenchSelection selection;
+        private readonly IReadOnlyList<ESWorkbenchSelection> selections;
         private readonly ESWorkbenchSpatialDescriptor spatial;
         private readonly Vector3Field positionField;
         private readonly Vector3Field rotationField;
@@ -4398,10 +4701,12 @@ namespace ES
             ESWorkbenchViewportContext context,
             ESWorkbenchSelection selection,
             ESWorkbenchSpatialDescriptor spatial,
-            bool locked)
+            bool locked,
+            IReadOnlyList<ESWorkbenchSelection> selections = null)
         {
             this.context = context ?? throw new ArgumentNullException(nameof(context));
             this.selection = selection ?? throw new ArgumentNullException(nameof(selection));
+            this.selections = selections ?? new[] { selection };
             this.spatial = spatial ?? throw new ArgumentNullException(nameof(spatial));
             name = "ESWorkbenchPrecisionTransform";
             style.marginTop = 7f;
@@ -4561,11 +4866,24 @@ namespace ES
                 Report("吸附后的" + validationError, MessageType.Warning);
                 return;
             }
-            bool succeeded = kind == ESWorkbenchMutationKind.Move
-                ? context.Actions.Authoring.TryMove(selection, value, out string message)
-                : kind == ESWorkbenchMutationKind.Rotate
-                    ? context.Actions.Authoring.TryRotate(selection, value, out message)
-                    : context.Actions.Authoring.TryScale(selection, value, out message);
+            bool succeeded;
+            string message;
+            if (selections.Count > 1)
+            {
+                succeeded = kind == ESWorkbenchMutationKind.Move
+                    ? context.Actions.Authoring.TryMoveMany(selections, value, out message)
+                    : kind == ESWorkbenchMutationKind.Rotate
+                        ? context.Actions.Authoring.TryRotateMany(selections, value, out message)
+                        : context.Actions.Authoring.TryScaleMany(selections, value, out message);
+            }
+            else
+            {
+                succeeded = kind == ESWorkbenchMutationKind.Move
+                    ? context.Actions.Authoring.TryMove(selection, value, out message)
+                    : kind == ESWorkbenchMutationKind.Rotate
+                        ? context.Actions.Authoring.TryRotate(selection, value, out message)
+                        : context.Actions.Authoring.TryScale(selection, value, out message);
+            }
             Report(string.IsNullOrWhiteSpace(message)
                     ? succeeded ? "精确变换已提交。" : "精确变换提交失败。"
                     : message,

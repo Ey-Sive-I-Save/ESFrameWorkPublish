@@ -10,6 +10,7 @@ using ES.EditorInternal;
 namespace ES
 {
     /// <summary>Draft-first UI Toolkit world authoring surface. Formal assets are changed only by CommitDraft.</summary>
+    [ESWindowSleepContract(ESWindowSleepMode.Full, ESWindowSurfaceKind.Workspace)]
     public sealed class ESWorldMapSpaceEditorWindow : EditorWindow, IESWindowPresentationShortTitle
     {
         public string ESWindow_PresentationShortTitle => "空间";
@@ -41,6 +42,7 @@ namespace ES
         private readonly List<HierarchyItem> hierarchyItems = new List<HierarchyItem>();
         private readonly Dictionary<ESWorldAuthoringTool, ToolbarToggle> toolToggles = new Dictionary<ESWorldAuthoringTool, ToolbarToggle>();
         private IVisualElementScheduledItem pendingViewportRefresh;
+        private int viewportRefreshGeneration;
         private bool rebuildingInspector;
 
         [MenuItem("【ES】/内容制作/环境/世界空间编辑器", false, 121)]
@@ -49,6 +51,7 @@ namespace ES
             ESWorldMapSpaceEditorWindow window = GetWindow<ESWorldMapSpaceEditorWindow>();
             window.titleContent = new GUIContent("ES 世界空间编辑器");
             window.minSize = new Vector2(980f, 620f);
+            window.maxSize = new Vector2(1600f, 1100f);
             window.Show();
         }
 
@@ -57,6 +60,7 @@ namespace ES
             ESWorldMapSpaceEditorWindow window = GetWindow<ESWorldMapSpaceEditorWindow>();
             window.titleContent = new GUIContent("ES 世界空间编辑器");
             window.minSize = new Vector2(980f, 620f);
+            window.maxSize = new Vector2(1600f, 1100f);
             window.Show();
             window.SetMapAsset(asset);
             window.Focus();
@@ -64,6 +68,7 @@ namespace ES
 
         private void OnEnable()
         {
+            viewportRefreshGeneration++;
             if (string.IsNullOrEmpty(mapGuid)) return;
             string path = AssetDatabase.GUIDToAssetPath(mapGuid);
             ESWorldMapAsset restored = string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<ESWorldMapAsset>(path);
@@ -72,13 +77,26 @@ namespace ES
 
         private void OnDisable()
         {
-            ESWindowFoundation.Unbind(this, true);
-            pendingViewportRefresh?.Pause();
+            viewportRefreshGeneration++;
+            ESWindowFoundation.Suspend(this);
+            try { pendingViewportRefresh?.Pause(); }
+            catch (Exception exception) { Debug.LogException(exception); }
             pendingViewportRefresh = null;
-            viewport?.Dispose();
+
+            ESWorldAuthoringViewport currentViewport = viewport;
             viewport = null;
-            editSession?.Dispose();
+            try { currentViewport?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+
+            ESWorldEditSession currentSession = editSession;
             editSession = null;
+            try { currentSession?.Dispose(); }
+            catch (Exception exception) { Debug.LogException(exception); }
+        }
+
+        private void OnDestroy()
+        {
+            ESWindowFoundation.Close(this);
         }
 
         private void OnFocus()
@@ -93,13 +111,16 @@ namespace ES
 
         public void CreateGUI()
         {
+            ESWindowFoundation.Unbind(this);
             rootVisualElement.Clear();
             shell = new ESWindowShell("ES 世界空间编辑器", "草稿、可视编辑、验证与提交共用一个作者态会话");
             rootVisualElement.Add(shell.Root);
             BuildHeader();
             BuildToolBar();
             BuildWorkspace();
-            ESEditorPresentation.BindWindow(this, true, new ESWindowActionHosts(shell.HeaderToolbar, shell.Toolbar, shell.Content));
+            ESWindowFoundation.BindFullSleep(
+                this,
+                new ESWindowActionHosts(shell.HeaderToolbar, shell.Toolbar, shell.Content));
             ESWorldMapAsset current = editSession?.Source;
             if (current == null && !string.IsNullOrEmpty(mapGuid))
             {
@@ -615,7 +636,17 @@ namespace ES
         private void ScheduleViewportRefresh()
         {
             pendingViewportRefresh?.Pause();
-            pendingViewportRefresh = rootVisualElement.schedule.Execute(() => viewport?.Rebuild()).StartingIn(180);
+            int generation = viewportRefreshGeneration;
+            pendingViewportRefresh = rootVisualElement.schedule.Execute(() =>
+            {
+                if (this == null
+                    || rootVisualElement == null
+                    || generation != viewportRefreshGeneration
+                    || viewport == null)
+                    return;
+
+                viewport.Rebuild();
+            }).StartingIn(180);
         }
 
         private void CommitDraft()
@@ -707,11 +738,29 @@ namespace ES
             string path = EditorUtility.SaveFilePanelInProject("创建 ES 世界地图", "ESWorldMap", "asset", "选择地图资产保存位置");
             if (string.IsNullOrWhiteSpace(path)) return;
             ESWorldMapAsset asset = CreateInstance<ESWorldMapAsset>();
-            AssetDatabase.CreateAsset(asset, path);
-            AssetDatabase.SaveAssetIfDirty(asset);
-            SetMapAsset(asset);
-            InitializeDraft();
-            Selection.activeObject = asset;
+            bool createdAsset = false;
+            try
+            {
+                if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path) != null
+                    || System.IO.File.Exists(System.IO.Path.GetFullPath(path)))
+                    throw new InvalidOperationException("目标地图资产已存在；请选择新的路径。");
+                AssetDatabase.CreateAsset(asset, path);
+                createdAsset = true;
+                AssetDatabase.SaveAssetIfDirty(asset);
+                if (AssetDatabase.LoadAssetAtPath<ESWorldMapAsset>(path) == null)
+                    throw new InvalidOperationException("地图已写入，但 Unity 没有成功加载目标资产。");
+                SetMapAsset(asset);
+                InitializeDraft();
+                Selection.activeObject = asset;
+            }
+            catch (Exception exception)
+            {
+                if (createdAsset)
+                    AssetDatabase.DeleteAsset(path);
+                else if (asset != null)
+                    DestroyImmediate(asset);
+                shell.SetStatus("创建地图失败：" + exception.Message, ESStatusKind.Error);
+            }
         }
 
         private void UpdateSessionStatus(string message)

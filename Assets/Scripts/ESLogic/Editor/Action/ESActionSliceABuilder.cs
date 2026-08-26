@@ -140,7 +140,16 @@ namespace ES
 
             asset = ScriptableObject.CreateInstance<T>();
             asset.name = assetName;
-            AssetDatabase.CreateAsset(asset, path);
+            try
+            {
+                AssetDatabase.CreateAsset(asset, path);
+            }
+            catch
+            {
+                if (asset != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(asset)))
+                    UnityEngine.Object.DestroyImmediate(asset);
+                throw;
+            }
             created = true;
             return asset;
         }

@@ -101,7 +101,11 @@ namespace ES
                 },
             };
             EditorUtility.SetDirty(blenderSettings);
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(playerDefinition);
+            AssetDatabase.SaveAssetIfDirty(vehicleDefinition);
+            AssetDatabase.SaveAssetIfDirty(definitionCatalog);
+            AssetDatabase.SaveAssetIfDirty(rigCatalog);
+            AssetDatabase.SaveAssetIfDirty(blenderSettings);
             AssetDatabase.Refresh();
         }
 
@@ -139,30 +143,42 @@ namespace ES
             }
 
             GameObject cameraObject = new GameObject("ES Camera System (MainView)");
-            cameraObject.transform.SetParent(sceneRoot, false);
-            cameraObject.transform.SetPositionAndRotation(new Vector3(0f, 2f, -5f), Quaternion.identity);
-            cameraObject.tag = "MainCamera";
+            Transform rigRoot = null;
+            try
+            {
+                cameraObject.transform.SetParent(sceneRoot, false);
+                cameraObject.transform.SetPositionAndRotation(new Vector3(0f, 2f, -5f), Quaternion.identity);
+                cameraObject.tag = "MainCamera";
 
-            Camera camera = cameraObject.AddComponent<Camera>();
-            camera.nearClipPlane = 0.05f;
-            camera.fieldOfView = 60f;
-            camera.clearFlags = CameraClearFlags.Skybox;
+                Camera camera = cameraObject.AddComponent<Camera>();
+                camera.nearClipPlane = 0.05f;
+                camera.fieldOfView = 60f;
+                camera.clearFlags = CameraClearFlags.Skybox;
 
-            CinemachineBrain brain = cameraObject.AddComponent<CinemachineBrain>();
-            brain.m_UpdateMethod = CinemachineBrain.UpdateMethod.SmartUpdate;
-            brain.m_BlendUpdateMethod = CinemachineBrain.BrainUpdateMethod.LateUpdate;
-            Transform rigRoot = new GameObject("Runtime Rigs (Director Owned)").transform;
-            rigRoot.SetParent(sceneRoot, false);
-            ESCameraSceneBinding binding = cameraObject.AddComponent<ESCameraSceneBinding>();
-            binding.ConfigureForAuthoring(
-                ESCameraViewId.Main.Key,
-                camera,
-                brain,
-                definitionCatalog,
-                rigCatalog,
-                AssetDatabase.LoadAssetAtPath<CinemachineBlenderSettings>(BlenderSettingsPath),
-                rigRoot);
-            return camera;
+                CinemachineBrain brain = cameraObject.AddComponent<CinemachineBrain>();
+                brain.m_UpdateMethod = CinemachineBrain.UpdateMethod.SmartUpdate;
+                brain.m_BlendUpdateMethod = CinemachineBrain.BrainUpdateMethod.LateUpdate;
+                rigRoot = new GameObject("Runtime Rigs (Director Owned)").transform;
+                rigRoot.SetParent(sceneRoot, false);
+                ESCameraSceneBinding binding = cameraObject.AddComponent<ESCameraSceneBinding>();
+                binding.ConfigureForAuthoring(
+                    ESCameraViewId.Main.Key,
+                    camera,
+                    brain,
+                    definitionCatalog,
+                    rigCatalog,
+                    AssetDatabase.LoadAssetAtPath<CinemachineBlenderSettings>(BlenderSettingsPath),
+                    rigRoot);
+                return camera;
+            }
+            catch
+            {
+                if (rigRoot != null)
+                    UnityEngine.Object.DestroyImmediate(rigRoot.gameObject);
+                if (cameraObject != null)
+                    UnityEngine.Object.DestroyImmediate(cameraObject);
+                throw;
+            }
         }
 
         private static GameObject RebuildPlayerThirdPersonRig()
@@ -296,7 +312,16 @@ namespace ES
                 return asset;
 
             asset = ScriptableObject.CreateInstance<T>();
-            AssetDatabase.CreateAsset(asset, path);
+            try
+            {
+                AssetDatabase.CreateAsset(asset, path);
+            }
+            catch
+            {
+                if (asset != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(asset)))
+                    UnityEngine.Object.DestroyImmediate(asset);
+                throw;
+            }
             return asset;
         }
 

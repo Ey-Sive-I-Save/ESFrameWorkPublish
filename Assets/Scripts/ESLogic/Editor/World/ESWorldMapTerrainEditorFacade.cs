@@ -77,35 +77,51 @@ namespace ES
             }
 
             ESWorldMapHeightfield field = definition.heightfield;
-            field.EnsureSamples();
-            int resolution = GetTerrainResolution(Mathf.Max(field.width, field.height));
-            TerrainData data = new TerrainData
+            TerrainData data = null;
+            GameObject terrainObject = null;
+            try
             {
-                heightmapResolution = resolution,
-                size = new Vector3(
-                    Mathf.Max(1f, definition.worldMax.x - definition.worldMin.x),
-                    Mathf.Max(1f, definition.terrainHeightScale),
-                    Mathf.Max(1f, definition.worldMax.y - definition.worldMin.y))
-            };
-            float[,] heights = new float[resolution, resolution];
-            for (int y = 0; y < resolution; y++)
-                for (int x = 0; x < resolution; x++)
+                field.EnsureSamples();
+                int resolution = GetTerrainResolution(Mathf.Max(field.width, field.height));
+                data = new TerrainData
                 {
-                    int sx = Mathf.RoundToInt(x / (float)(resolution - 1) * (field.width - 1));
-                    int sy = Mathf.RoundToInt(y / (float)(resolution - 1) * (field.height - 1));
-                    heights[y, x] = field.Get(sx, sy);
-                }
-            data.SetHeights(0, 0, heights);
-            GameObject terrainObject = Terrain.CreateTerrainGameObject(data);
-            SceneManager.MoveGameObjectToScene(terrainObject, previewScene);
-            terrainObject.name = "ES 临时 Unity Terrain 预览";
-            handle = new ESWorldMapTerrainPreviewHandle
+                    heightmapResolution = resolution,
+                    size = new Vector3(
+                        Mathf.Max(1f, definition.worldMax.x - definition.worldMin.x),
+                        Mathf.Max(1f, definition.terrainHeightScale),
+                        Mathf.Max(1f, definition.worldMax.y - definition.worldMin.y))
+                };
+                float[,] heights = new float[resolution, resolution];
+                for (int y = 0; y < resolution; y++)
+                    for (int x = 0; x < resolution; x++)
+                    {
+                        int sx = Mathf.RoundToInt(x / (float)(resolution - 1) * (field.width - 1));
+                        int sy = Mathf.RoundToInt(y / (float)(resolution - 1) * (field.height - 1));
+                        heights[y, x] = field.Get(sx, sy);
+                    }
+                data.SetHeights(0, 0, heights);
+                terrainObject = Terrain.CreateTerrainGameObject(data);
+                if (terrainObject == null)
+                    throw new InvalidOperationException("Unity Terrain 预览对象创建失败。");
+                SceneManager.MoveGameObjectToScene(terrainObject, previewScene);
+                terrainObject.name = "ES 临时 Unity Terrain 预览";
+                handle = new ESWorldMapTerrainPreviewHandle
+                {
+                    previewScene = previewScene,
+                    terrainObject = terrainObject,
+                    terrainData = data
+                };
+                return true;
+            }
+            catch (Exception exception)
             {
-                previewScene = previewScene,
-                terrainObject = terrainObject,
-                terrainData = data
-            };
-            return true;
+                if (terrainObject != null)
+                    UnityEngine.Object.DestroyImmediate(terrainObject);
+                if (data != null)
+                    UnityEngine.Object.DestroyImmediate(data);
+                error = "Unity Terrain 预览创建失败，已清理临时对象：" + exception.Message;
+                return false;
+            }
         }
 
         public bool TryPaintHeight(ESWorldMapDefinition definition, Vector2 worldPoint, Vector2 worldMin, Vector2 worldMax, float normalizedHeight, float radiusWorld, float strength, float falloff, ESWorldTerrainBrushMode mode, out string error)
@@ -236,6 +252,7 @@ namespace ES
             if (asset == null || asset.Definition == null) { error = "地图资产无效。"; return false; }
             ESWorldMapDefinition definition = asset.Definition;
             if (string.IsNullOrWhiteSpace(terrainDataPath) || !terrainDataPath.StartsWith("Assets/", System.StringComparison.Ordinal)) { error = "TerrainData 路径必须位于 Assets/ 下。"; return false; }
+            if (!string.IsNullOrWhiteSpace(scenePath) && !scenePath.StartsWith("Assets/", System.StringComparison.Ordinal)) { error = "场景路径必须位于 Assets/ 下。"; return false; }
             ESWorldMapHeightfield field = definition.heightfield;
             if (field == null || !field.IsValid(out error)) return false;
             field.EnsureSamples();
@@ -262,20 +279,45 @@ namespace ES
             AssetDatabase.SaveAssetIfDirty(data);
             if (!string.IsNullOrWhiteSpace(scenePath))
             {
-                if (!scenePath.StartsWith("Assets/", System.StringComparison.Ordinal)) { error = "场景路径必须位于 Assets/ 下。"; return false; }
-                Scene scene = File.Exists(scenePath) ? EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single) : EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-                GameObject terrainObject = null;
-                Terrain[] terrains = UnityEngine.Object.FindObjectsByType<Terrain>(FindObjectsSortMode.None);
-                for (int i = 0; i < terrains.Length; i++) if (terrains[i].terrainData == data) { terrainObject = terrains[i].gameObject; break; }
-                if (terrainObject == null)
+                Scene previousActiveScene = SceneManager.GetActiveScene();
+                Scene scene = SceneManager.GetSceneByPath(scenePath);
+                bool ownsScene = !scene.IsValid() || !scene.isLoaded;
+                if (ownsScene)
+                    scene = File.Exists(scenePath)
+                        ? EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive)
+                        : EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+                try
                 {
-                    terrainObject = Terrain.CreateTerrainGameObject(data);
-                    terrainObject.name = asset.name + "_Terrain";
-                    SceneManager.MoveGameObjectToScene(terrainObject, scene);
+                    GameObject terrainObject = null;
+                    foreach (GameObject root in scene.GetRootGameObjects())
+                    {
+                        Terrain candidate = root.GetComponentInChildren<Terrain>(true);
+                        if (candidate != null && candidate.terrainData == data)
+                        {
+                            terrainObject = candidate.gameObject;
+                            break;
+                        }
+                    }
+                    if (terrainObject == null)
+                    {
+                        terrainObject = Terrain.CreateTerrainGameObject(data);
+                        terrainObject.name = asset.name + "_Terrain";
+                        SceneManager.MoveGameObjectToScene(terrainObject, scene);
+                    }
+                    EditorSceneManager.MarkSceneDirty(scene);
+                    bool saved = File.Exists(scenePath)
+                        ? EditorSceneManager.SaveScene(scene)
+                        : EditorSceneManager.SaveScene(scene, scenePath);
+                    if (!saved)
+                        throw new InvalidOperationException("地形场景保存失败：" + scenePath);
                 }
-                EditorSceneManager.MarkSceneDirty(scene);
-                if (File.Exists(scenePath)) EditorSceneManager.SaveScene(scene);
-                else EditorSceneManager.SaveScene(scene, scenePath);
+                finally
+                {
+                    if (ownsScene && scene.IsValid() && scene.isLoaded)
+                        EditorSceneManager.CloseScene(scene, true);
+                    if (previousActiveScene.IsValid() && previousActiveScene.isLoaded)
+                        SceneManager.SetActiveScene(previousActiveScene);
+                }
             }
             EditorUtility.SetDirty(asset);
             AssetDatabase.SaveAssetIfDirty(asset);
@@ -337,10 +379,32 @@ namespace ES
         public static void DestroyPreview(ESWorldMapTerrainPreviewHandle handle)
         {
             if (handle == null) return;
-            if (handle.terrainObject != null) UnityEngine.Object.DestroyImmediate(handle.terrainObject);
-            if (handle.terrainData != null) UnityEngine.Object.DestroyImmediate(handle.terrainData);
+            GameObject terrainObject = handle.terrainObject;
+            TerrainData terrainData = handle.terrainData;
             handle.terrainObject = null;
             handle.terrainData = null;
+            try
+            {
+                if (terrainObject != null)
+                    UnityEngine.Object.DestroyImmediate(terrainObject);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[ESWorldTerrain] 临时 Terrain 对象清理失败：" + exception.Message);
+            }
+            try
+            {
+                // Clear the handle before releasing the data so a failed object
+                // destruction cannot make callers retry against stale Unity refs.
+                if (terrainData != null)
+                    UnityEngine.Object.DestroyImmediate(terrainData);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[ESWorldTerrain] 临时 TerrainData 清理失败：" + exception.Message);
+            }
+            handle.previewScene = default;
+            handle.persistent = false;
         }
 
         public static bool TryPaintHeight(ESWorldMapDefinition definition, Vector2 worldPoint, Vector2 worldMin, Vector2 worldMax, float normalizedHeight, out string error)

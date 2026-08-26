@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -65,7 +66,16 @@ namespace ES
             {
                 info = ScriptableObject.CreateInstance<ItemDataInfo>();
                 ConfigureDefinition(info);
-                AssetDatabase.CreateAsset(info, WeaponInfoPath);
+                try
+                {
+                    AssetDatabase.CreateAsset(info, WeaponInfoPath);
+                }
+                catch
+                {
+                    if (info != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(info)))
+                        UnityEngine.Object.DestroyImmediate(info);
+                    throw;
+                }
             }
 
             ESItemDataValidationCode validationCode = info.ValidateConfiguration();
@@ -332,6 +342,12 @@ namespace ES
 
             GameObject root = BuildWeaponRoot(info);
             string rebuildPath = AssetDatabase.GenerateUniqueAssetPath(WeaponPrefabRebuildPath);
+            string backupPath = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "ESLongBarPrefab-" + System.Guid.NewGuid().ToString("N") + ".prefab");
+            bool backupCreated = false;
+            bool replacementCommitted = false;
+            bool backupRecoveryFailed = false;
             try
             {
                 GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, rebuildPath);
@@ -341,29 +357,82 @@ namespace ES
                 ValidateExistingPrefab(saved, info);
                 if (Selection.activeObject != null
                     && string.Equals(
-                        AssetDatabase.GetAssetPath(Selection.activeObject),
+                    AssetDatabase.GetAssetPath(Selection.activeObject),
                         WeaponPrefabPath,
                         System.StringComparison.Ordinal))
                 {
                     Selection.activeObject = null;
                 }
+                string targetAbsolutePath = System.IO.Path.GetFullPath(WeaponPrefabPath);
+                string backupAbsolutePath = System.IO.Path.GetFullPath(backupPath);
+                if (System.IO.File.Exists(targetAbsolutePath))
+                {
+                    System.IO.File.Copy(targetAbsolutePath, backupAbsolutePath, true);
+                    backupCreated = true;
+                }
                 FileUtil.ReplaceFile(
                     System.IO.Path.GetFullPath(rebuildPath),
-                    System.IO.Path.GetFullPath(WeaponPrefabPath));
+                    targetAbsolutePath);
                 AssetDatabase.ImportAsset(
                     WeaponPrefabPath,
                     ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
+                GameObject imported = AssetDatabase.LoadAssetAtPath<GameObject>(WeaponPrefabPath);
+                ValidateExistingPrefab(imported, info);
+                replacementCommitted = true;
+            }
+            catch
+            {
+                if (backupCreated)
+                {
+                    try
+                    {
+                        System.IO.File.Copy(
+                            System.IO.Path.GetFullPath(backupPath),
+                            System.IO.Path.GetFullPath(WeaponPrefabPath),
+                            true);
+                        AssetDatabase.ImportAsset(
+                            WeaponPrefabPath,
+                            ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
+                    }
+                    catch (Exception restoreException)
+                    {
+                        backupRecoveryFailed = true;
+                        Debug.LogException(new InvalidOperationException("大长条 Prefab 升级失败，旧文件恢复也失败。", restoreException));
+                    }
+                }
+                throw;
             }
             finally
             {
                 Object.DestroyImmediate(root);
-                AssetDatabase.DeleteAsset(rebuildPath);
+                if (!AssetDatabase.DeleteAsset(rebuildPath)
+                    && AssetDatabase.LoadMainAssetAtPath(rebuildPath) != null)
+                {
+                    Debug.LogWarning("大长条 Prefab 临时重建资产未能清理，请手动检查：" + rebuildPath);
+                }
+                if (!backupRecoveryFailed && backupCreated && System.IO.File.Exists(System.IO.Path.GetFullPath(backupPath)))
+                {
+                    try
+                    {
+                        System.IO.File.Delete(System.IO.Path.GetFullPath(backupPath));
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        Debug.LogWarning(
+                            "大长条 Prefab 已完成处理，但临时备份未能清理，请手动检查："
+                            + backupPath
+                            + "\n"
+                            + cleanupException.Message);
+                    }
+                }
             }
 
             AssetDatabase.SaveAssetIfDirty(info);
             AssetDatabase.Refresh();
             prefab = AssetDatabase.LoadAssetAtPath<GameObject>(WeaponPrefabPath);
             ValidateExistingPrefab(prefab, info);
+            if (!replacementCommitted)
+                throw new System.InvalidOperationException("大长条 Prefab 替换未完成。");
             return prefab;
         }
 
@@ -601,7 +670,16 @@ namespace ES
             {
                 group = ScriptableObject.CreateInstance<ItemDataGroup>();
                 group.name = "大长条_WeaponDataGroup";
-                AssetDatabase.CreateAsset(group, WeaponGroupPath);
+                try
+                {
+                    AssetDatabase.CreateAsset(group, WeaponGroupPath);
+                }
+                catch
+                {
+                    if (group != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(group)))
+                        UnityEngine.Object.DestroyImmediate(group);
+                    throw;
+                }
             }
 
             group.Infos ??= new Dictionary<string, ItemDataInfo>();

@@ -36,7 +36,10 @@ namespace ES.Editor
         [MenuItem("【ES】/验证与诊断/静态审计/打开 UI 风险体检")]
         private static void Open()
         {
-            GetWindow<ESUIRiskAuditWindow>("ES UI 风险体检");
+            ESUIRiskAuditWindow window = GetWindow<ESUIRiskAuditWindow>("ES UI 风险体检");
+            window.minSize = new Vector2(560f, 400f);
+            window.maxSize = new Vector2(1400f, 1000f);
+            window.Show();
         }
 
         public override GUIContent ESWindow_GetWindowGUIContent()

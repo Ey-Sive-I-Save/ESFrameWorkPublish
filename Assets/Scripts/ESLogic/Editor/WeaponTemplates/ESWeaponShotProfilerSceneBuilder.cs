@@ -191,12 +191,17 @@ namespace ES
             manager.autoCreatePhysicsQueryModule = true;
 
             ESResourcePlanBinder binder = runtime.AddComponent<ESResourcePlanBinder>();
-            var serializedBinder = new SerializedObject(binder);
-            SerializedProperty planProperty = serializedBinder.FindProperty("plan");
-            if (planProperty == null)
-                throw new MissingFieldException(typeof(ESResourcePlanBinder).FullName, "plan");
-            planProperty.objectReferenceValue = resourcePlan;
-            serializedBinder.ApplyModifiedPropertiesWithoutUndo();
+            // ES-EDITOR-VALIDATOR: intentional-no-undo
+            // The binder belongs to a generated profiler scene, not the user's
+            // current scene; do not put this temporary fixture in Undo history.
+            using (var serializedBinder = new SerializedObject(binder))
+            {
+                SerializedProperty planProperty = serializedBinder.FindProperty("plan");
+                if (planProperty == null)
+                    throw new MissingFieldException(typeof(ESResourcePlanBinder).FullName, "plan");
+                planProperty.objectReferenceValue = resourcePlan;
+                serializedBinder.ApplyModifiedPropertiesWithoutUndo();
+            }
             return binder;
         }
 

@@ -96,6 +96,7 @@ namespace ES
         private readonly Action<ESWorkbenchHostPresentationDescriptor> registerPresentation;
         private readonly Action<ESWorkbenchBottomPanelDescriptor> registerBottomPanel;
         private readonly Action<string> reportDiagnostic;
+        private readonly Action<IDisposable> registerCleanup;
 
         internal ESWorkbenchContributionContext(
             string workbenchId,
@@ -116,7 +117,8 @@ namespace ES
             Action<ESWorkbenchCollectionSource<ESWorkbenchIssueDescriptor>> registerIssueSource,
             Action<ESWorkbenchHostPresentationDescriptor> registerPresentation,
             Action<ESWorkbenchBottomPanelDescriptor> registerBottomPanel,
-            Action<string> reportDiagnostic)
+            Action<string> reportDiagnostic,
+            Action<IDisposable> registerCleanup)
         {
             WorkbenchId = workbenchId;
             Window = window;
@@ -137,10 +139,21 @@ namespace ES
             this.registerPresentation = registerPresentation;
             this.registerBottomPanel = registerBottomPanel;
             this.reportDiagnostic = reportDiagnostic;
+            this.registerCleanup = registerCleanup;
         }
 
         public string WorkbenchId { get; }
         public object Window { get; }
+
+        /// <summary>
+        /// Registers cleanup for side effects created during Inject. The cleanup is
+        /// committed with a successful contribution, or disposed immediately when
+        /// Inject throws before returning its normal release handle.
+        /// </summary>
+        public void RegisterCleanup(IDisposable cleanup)
+        {
+            if (cleanup != null) registerCleanup?.Invoke(cleanup);
+        }
 
         public void RegisterDocument(ESWorkbenchDocumentDefinition document)
         {
@@ -275,6 +288,7 @@ namespace ES
             new List<ESWorkbenchHostPresentationDescriptor>();
         internal readonly List<ESWorkbenchBottomPanelDescriptor> BottomPanels =
             new List<ESWorkbenchBottomPanelDescriptor>();
+        internal readonly List<IDisposable> Cleanups = new List<IDisposable>();
         internal readonly List<string> Diagnostics = new List<string>();
     }
 
@@ -631,6 +645,12 @@ namespace ES
                 {
                     if (activeBuffer != null) activeBuffer.Diagnostics.Add(message);
                     else { diagnostics.Add(message); reportDiagnostic?.Invoke(message); }
+                },
+                cleanup =>
+                {
+                    if (cleanup == null) return;
+                    if (activeBuffer != null) activeBuffer.Cleanups.Add(cleanup);
+                    else releases.Add(cleanup);
                 });
 
             Action<ESWorkbenchContributionBuffer> commitBuffer = buffer =>
@@ -713,6 +733,9 @@ namespace ES
                         IDisposable release = descriptor.Inject(context);
                         activeBuffer = null;
                         if (release != null) releases.Add(release);
+                        for (int cleanupIndex = 0; cleanupIndex < buffer.Cleanups.Count; cleanupIndex++)
+                            releases.Add(buffer.Cleanups[cleanupIndex]);
+                        buffer.Cleanups.Clear();
                         commitBuffer(buffer);
                         injected.Add(descriptor.ContributionId);
                         activeDescriptors.Add(descriptor);
@@ -724,6 +747,7 @@ namespace ES
                     }
                     catch (Exception exception)
                     {
+                        DisposeContributionCleanups(buffer.Cleanups);
                         string message = "贡献 " + descriptor.ContributionId + " 注入失败：" + exception.Message;
                         diagnostics.Add(message);
                         reportDiagnostic?.Invoke(message);
@@ -754,6 +778,16 @@ namespace ES
                 documents, authoringModes, assetSlots, entries,
                 viewports, objects, objectSources, hierarchy, hierarchySources, authoringAdapters,
                 inspectors, tools, commands, issueSources, presentations, bottomPanels, diagnostics);
+        }
+
+        private static void DisposeContributionCleanups(List<IDisposable> cleanups)
+        {
+            for (int i = cleanups.Count - 1; i >= 0; i--)
+            {
+                try { cleanups[i]?.Dispose(); }
+                catch (Exception exception) { UnityEngine.Debug.LogException(exception); }
+            }
+            cleanups.Clear();
         }
 
         private static void RegisterUnique<T>(

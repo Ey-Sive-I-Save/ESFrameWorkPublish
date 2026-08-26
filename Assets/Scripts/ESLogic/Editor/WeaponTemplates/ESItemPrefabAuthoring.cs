@@ -265,7 +265,16 @@ namespace ES
                 request.configureNewDefinition(definition);
                 request.validateDefinitionOwnership(definition);
                 request.validateDefinitionBeforePrefab(definition);
-                AssetDatabase.CreateAsset(definition, request.definitionPath);
+                try
+                {
+                    AssetDatabase.CreateAsset(definition, request.definitionPath);
+                }
+                catch
+                {
+                    if (definition != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(definition)))
+                        UnityEngine.Object.DestroyImmediate(definition);
+                    throw;
+                }
                 AssetDatabase.SaveAssetIfDirty(definition);
             }
 

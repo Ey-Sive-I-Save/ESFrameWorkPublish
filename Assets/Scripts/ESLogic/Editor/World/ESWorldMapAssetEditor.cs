@@ -19,8 +19,13 @@ namespace ES
             serializedObject.Update();
             EditorGUILayout.HelpBox("地图资产是脱离 Scene 的权威定义。Scene、Prefab 或随机生成结果都只能作为内容来源，不直接成为运行时状态。", MessageType.Info);
 
-            if (definitionProperty != null)
-                EditorGUILayout.PropertyField(definitionProperty, new GUIContent("地图定义"), true);
+            if (definitionProperty == null)
+            {
+                EditorGUILayout.HelpBox("地图序列化字段 definition 缺失，已停止编辑器绘制。", MessageType.Error);
+                serializedObject.ApplyModifiedProperties();
+                return;
+            }
+            EditorGUILayout.PropertyField(definitionProperty, new GUIContent("地图定义"), true);
 
             EditorGUILayout.Space(6f);
             using (new EditorGUILayout.HorizontalScope())
@@ -36,13 +41,29 @@ namespace ES
 
                 if (GUILayout.Button("填充默认空间模板", GUILayout.Height(24f)))
                 {
-                    Undo.RecordObject(target, "填充地图空间模板");
                     SerializedProperty template = definitionProperty.FindPropertyRelative("spaceTemplate");
-                    template.FindPropertyRelative("templateId").stringValue = "default-space";
-                    template.FindPropertyRelative("gridWidth").intValue = 16;
-                    template.FindPropertyRelative("gridHeight").intValue = 16;
-                    template.FindPropertyRelative("cellSize").floatValue = 16f;
-                    template.FindPropertyRelative("sceneFreeAuthoring").boolValue = true;
+                    if (template == null)
+                    {
+                        Debug.LogError("[ES] 地图空间模板字段缺失，已取消填充。", target);
+                        return;
+                    }
+                    Undo.RecordObject(target, "填充地图空间模板");
+                    SerializedProperty templateId = template.FindPropertyRelative("templateId");
+                    SerializedProperty gridWidth = template.FindPropertyRelative("gridWidth");
+                    SerializedProperty gridHeight = template.FindPropertyRelative("gridHeight");
+                    SerializedProperty cellSize = template.FindPropertyRelative("cellSize");
+                    SerializedProperty sceneFreeAuthoring = template.FindPropertyRelative("sceneFreeAuthoring");
+                    if (templateId == null || gridWidth == null || gridHeight == null
+                        || cellSize == null || sceneFreeAuthoring == null)
+                    {
+                        Debug.LogError("[ES] 地图空间模板结构不完整，已取消填充。", target);
+                        return;
+                    }
+                    templateId.stringValue = "default-space";
+                    gridWidth.intValue = 16;
+                    gridHeight.intValue = 16;
+                    cellSize.floatValue = 16f;
+                    sceneFreeAuthoring.boolValue = true;
                     serializedObject.ApplyModifiedProperties();
                     ESWorldMapAuthoringUtility.MarkChanged((ESWorldMapAsset)target);
                 }

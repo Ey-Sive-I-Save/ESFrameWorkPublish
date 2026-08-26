@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEditor.UIElements;
@@ -30,6 +31,8 @@ namespace ES
     /// </summary>
     public sealed class ESWorldBuilderWorkbenchWindow : ESWorkbenchWindowBase<ESWorldBuilderWorkbenchWindow, ESWorldMapAsset, ESWorldWorkbenchModule>
     {
+        internal const string SleepOwnerKey = "ES.WorldBuilder.Window";
+
         private sealed class WorldBrushPaletteTemplate
         {
             public WorldBrushPaletteTemplate(string id, string displayName, float normalizedHeight, string description,
@@ -97,6 +100,9 @@ namespace ES
         internal const double CommercialValidationMinimumDurationSeconds = 30d;
         private static bool commercialValidationAcceptanceInProgress;
         private static ESWorldEditSession commercialValidationPeerSession;
+        private static int commercialValidationGeneration;
+        private static EditorApplication.CallbackFunction commercialValidationDelayCallback;
+        private int memoryProfilerCaptureGeneration;
 
         private sealed class WorldPersistenceAdapter : IESWorkbenchPersistenceAdapter<ESWorldMapAsset>
         {
@@ -311,7 +317,7 @@ namespace ES
                 asset.name = "ES World 商业验收样本";
                 PopulateCommercialValidationSample(asset);
                 AssetDatabase.CreateAsset(asset, CommercialValidationAssetPath);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(asset);
             }
             else
             {
@@ -320,7 +326,7 @@ namespace ES
                 if (!string.Equals(before, EditorJsonUtility.ToJson(asset), StringComparison.Ordinal))
                 {
                     EditorUtility.SetDirty(asset);
-                    AssetDatabase.SaveAssets();
+                    AssetDatabase.SaveAssetIfDirty(asset);
                 }
             }
 
@@ -350,6 +356,7 @@ namespace ES
                 return;
             }
             commercialValidationAcceptanceInProgress = true;
+            int validationGeneration = ++commercialValidationGeneration;
 
             main.editSession.ReloadFromSource();
             main.ESWorkbench_ClearDirty();
@@ -400,18 +407,21 @@ namespace ES
                 return;
             }
 
-            WaitForCommercialValidationConflict(main, peer, source, 0);
+            WaitForCommercialValidationConflict(main, peer, source, 0, validationGeneration);
         }
 
         private static void WaitForCommercialValidationConflict(
             ESWorldBuilderWorkbenchWindow main,
             ESWorldEditSession peer,
             ESWorldMapAsset source,
-            int frame)
+            int frame,
+            int validationGeneration)
         {
             if (main == null
                 || peer == null
                 || !ReferenceEquals(peer, commercialValidationPeerSession)
+                || validationGeneration != commercialValidationGeneration
+                || !commercialValidationAcceptanceInProgress
                 || source == null
                 || main.editSession == null)
             {
@@ -425,8 +435,14 @@ namespace ES
                     FailCommercialValidationAcceptance("副窗口提交后主窗口未观察到外部冲突。");
                     return;
                 }
-                EditorApplication.delayCall += () =>
-                    WaitForCommercialValidationConflict(main, peer, source, frame + 1);
+                CancelCommercialValidationDelayCallback();
+                commercialValidationDelayCallback = () =>
+                {
+                    EditorApplication.delayCall -= commercialValidationDelayCallback;
+                    commercialValidationDelayCallback = null;
+                    WaitForCommercialValidationConflict(main, peer, source, frame + 1, validationGeneration);
+                };
+                EditorApplication.delayCall += commercialValidationDelayCallback;
                 return;
             }
 
@@ -450,9 +466,18 @@ namespace ES
 
         private static void FailCommercialValidationAcceptance(string message)
         {
+            CancelCommercialValidationDelayCallback();
             commercialValidationAcceptanceInProgress = false;
             ReleaseCommercialValidationPeerSession();
             Debug.LogError("[ES World 商业验收] " + message);
+        }
+
+        private static void CancelCommercialValidationDelayCallback()
+        {
+            if (commercialValidationDelayCallback == null)
+                return;
+            EditorApplication.delayCall -= commercialValidationDelayCallback;
+            commercialValidationDelayCallback = null;
         }
 
         private static void ReleaseCommercialValidationPeerSession()
@@ -502,8 +527,21 @@ namespace ES
             base.ESWindow_OnHostEnable();
         }
 
+        protected override void ESWindow_OnFoundationBound()
+        {
+            base.ESWindow_OnFoundationBound();
+            ESWindowFoundation.ResolvePendingSleepOwners(SleepOwnerKey, this);
+        }
+
         protected override void ESWindow_OnHostDisable()
         {
+            memoryProfilerCaptureGeneration++;
+            // Invalidate any bounded commercial-validation delayCall before the
+            // base cleanup disposes this window's edit session.
+            commercialValidationGeneration++;
+            CancelCommercialValidationDelayCallback();
+            commercialValidationAcceptanceInProgress = false;
+            ReleaseCommercialValidationPeerSession();
             Selection.selectionChanged -= OnSelectionChanged;
             base.ESWindow_OnHostDisable();
         }
@@ -1434,14 +1472,14 @@ namespace ES
                             "world.poi", 550, true));
                         context.RegisterPresentation(new ESWorkbenchHostPresentationDescriptor(
                             "world.presentation",
-                            "ES 世界工作台",
+                            "ES World Studio",
                              "世界地图",
                              "世界视图",
                              "二维地图、三维世界与游戏构图视图",
                              "世界检查器",
                              WorldLayoutPolicy,
                              leftPanelTitle: "世界内容与层级",
-                             workspaceTitle: "世界作者场景",
+                             workspaceTitle: "世界创作工作台",
                              emptyState: new ESWorkbenchEmptyStateDescriptor(
                                  "创建或打开一张世界地图",
                                  "从空白作者资产开始，或打开内置商业验收样本检查内容库、层级、2D / 3D / 游戏构图、检查器与生产任务布局。",
@@ -1927,10 +1965,13 @@ namespace ES
                 "正在采集 World Memory Profiler 快照。",
                 acceptance.ManifestPath);
             ESWorkbench_SetStatus("正在启动 Memory Profiler 快照，请等待完成回调。", MessageType.Info);
+            int captureGeneration = ++memoryProfilerCaptureGeneration;
             bool started = ESWorldWorkbenchAcceptance.TryCaptureMemoryProfilerSnapshot(
                 acceptance,
                 (success, message, updated) =>
                 {
+                    if (captureGeneration != memoryProfilerCaptureGeneration)
+                        return;
                     latestAcceptance = updated;
                     ESWorkbench_RecordTask(
                         taskId,
@@ -2097,6 +2138,20 @@ namespace ES
                 role: ESWorkbenchCommandRole.Validation,
                 unityIconName: "d_UnityEditor.InspectorWindow"));
             context.RegisterCommand(new ESWorkbenchCommandDescriptor(
+                "world.bind-formal-object", "绑定正式对象", _ => BindSelectedFormalSceneObject(),
+                "把当前 Unity 正式 Scene 中选中的 GameObject 绑定到当前 World Prefab 稳定身份；PreviewScene 对象会被拒绝。",
+                priority: 491,
+                canExecute: _ => CanBindSelectedFormalSceneObject(),
+                role: ESWorkbenchCommandRole.Authoring,
+                unityIconName: "d_Linked"));
+            context.RegisterCommand(new ESWorkbenchCommandDescriptor(
+                "world.select-formal-object", "选择正式对象", _ => SelectFormalSceneObject(),
+                "根据已保存的正式 Scene GlobalObjectId 选择对应 GameObject；不会从 PreviewScene 推断正式对象。",
+                priority: 490,
+                canExecute: _ => CanSelectFormalSceneObject(),
+                role: ESWorkbenchCommandRole.Validation,
+                unityIconName: "d_RectTool"));
+            context.RegisterCommand(new ESWorkbenchCommandDescriptor(
                 "world.revert", "回退草稿", _ => RevertWorldDraft(), "回退到当前编辑会话基线",
                 priority: 490,
                 canExecute: _ => editSession != null && editSession.IsDirty
@@ -2234,7 +2289,9 @@ namespace ES
                 canRotate: IsWorldPrefabSelection,
                 rotate: RotateWorldSelectionMutation,
                 canScale: IsWorldScalableSelection,
-                scale: ScaleWorldSelectionMutation);
+                scale: ScaleWorldSelectionMutation,
+                canSetProperty: CanSetWorldProperty,
+                setProperty: SetWorldPropertyMutation);
         }
 
         private IEnumerable<ESWorkbenchObjectDescriptor> QueryWorldPalette()
@@ -2842,16 +2899,19 @@ namespace ES
                 {
                     ESWorldMapPrefabPlacement item = definition.prefabPlacements[i];
                     if (item == null || string.IsNullOrWhiteSpace(item.placementId)) continue;
-                    string prefabPath = string.IsNullOrWhiteSpace(item.editorPrefabGuid)
-                        ? string.Empty
-                        : AssetDatabase.GUIDToAssetPath(item.editorPrefabGuid);
-                    GameObject prefab = string.IsNullOrEmpty(prefabPath)
-                        ? null
-                        : AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+                    string stableId = "world.prefab." + item.placementId;
+                    string selectedStableId = ESWorkbench_Selection.Current?.StableId;
+                    // Resolve a formal Scene object only for the selected row. A full
+                    // hierarchy refresh must not perform GlobalObjectId lookups for
+                    // every placement (large maps can contain thousands of entries).
+                    GameObject formalObject = string.Equals(stableId, selectedStableId, StringComparison.Ordinal)
+                        && TryResolveFormalSceneObject(item, out GameObject resolvedFormalObject, out _)
+                        ? resolvedFormalObject
+                        : null;
                     yield return new ESWorkbenchHierarchyDescriptor(
-                        "world.prefab." + item.placementId,
+                        stableId,
                         item.placementId,
-                        "world.map", "world.prefab", unityObject: prefab, payload: item.placementId, order: 3000 + i,
+                        "world.map", "world.prefab", unityObject: formalObject, payload: item.placementId, order: 3000 + i,
                         spatial: new ESWorkbenchSpatialDescriptor(
                             item.position,
                             item.scale,
@@ -3221,6 +3281,17 @@ namespace ES
             return Mathf.Clamp(authoringBrushRadius, 0.5f, 64f);
         }
 
+        internal float GetTerrainBrushStrength()
+        {
+            return Mathf.Clamp01(authoringBrushStrength);
+        }
+
+        internal void SetTerrainBrushStrength(float value)
+        {
+            authoringBrushStrength = Mathf.Clamp(value, 0.05f, 1f);
+            Repaint();
+        }
+
         internal bool HandleTerrainBrushShortcut(KeyCode keyCode, EventModifiers modifiers)
         {
             if (keyCode != KeyCode.LeftBracket && keyCode != KeyCode.RightBracket)
@@ -3273,7 +3344,8 @@ namespace ES
                     : " · 增量强度 " + Mathf.RoundToInt(strength * 100f) + "%")
                 + " · 半径 " + radius.ToString("0.#")
                 + "m · 强度 " + Mathf.RoundToInt(strength * 100f)
-                + "% · 衰减 " + Mathf.RoundToInt(falloff * 100f) + "%";
+                + "% · 衰减 " + Mathf.RoundToInt(falloff * 100f) + "%"
+                + " · Shift+[ / ] 调强度";
             return cachedBrushSummary;
         }
 
@@ -3471,6 +3543,8 @@ namespace ES
                 actions.Add(remove);
                 root.Add(actions);
             }
+            if (selection != null && selection.Kind == "world.prefab")
+                AddFormalSceneBindingInspector(root, selection, locked);
             VisualElement validation = new VisualElement();
             validation.style.borderTopWidth = 1f;
             validation.style.borderTopColor = ESEditorPresentation.DividerColor;
@@ -3485,6 +3559,143 @@ namespace ES
             validation.Add(validationLabel);
             root.Add(validation);
             return root;
+        }
+
+        private void AddFormalSceneBindingInspector(
+            VisualElement root,
+            ESWorkbenchSelection selection,
+            bool locked)
+        {
+            ESWorldMapPrefabPlacement placement = FindPrefabPlacement(selection?.StableId);
+            if (placement == null) return;
+            VisualElement section = new VisualElement();
+            section.style.borderTopWidth = 1f;
+            section.style.borderTopColor = ESEditorPresentation.DividerColor;
+            section.style.marginTop = 8f;
+            section.style.paddingTop = 7f;
+            section.Add(new Label("正式 Scene 身份映射"));
+            bool resolved = TryResolveFormalSceneObject(
+                placement, out GameObject formalObject, out string reason);
+            Label state = new Label(resolved
+                ? "已绑定 · " + formalObject.name + " · " + placement.formalScenePath
+                : string.IsNullOrWhiteSpace(placement.formalObjectGlobalId)
+                    ? "未绑定 · 当前 PreviewScene 对象不是正式对象证据。"
+                    : "映射失效 · " + reason);
+            state.style.whiteSpace = WhiteSpace.Normal;
+            state.style.color = ESEditorPresentation.GetStatusAccent(
+                0, resolved ? ESStatusKind.Ready : ESStatusKind.Warning);
+            section.Add(state);
+            Button bind = ESWindowPresentation.CreateToolbarButton(
+                "绑定当前正式对象",
+                "仅接受当前已加载的非 PreviewScene GameObject，并写入 Draft 的 GlobalObjectId。",
+                BindSelectedFormalSceneObject);
+            bind.SetEnabled(!locked && CanBindSelectedFormalSceneObject());
+            bind.style.marginTop = 5f;
+            section.Add(bind);
+            Button select = ESWindowPresentation.CreateToolbarButton(
+                "选择正式对象",
+                "按保存的 GlobalObjectId 选择正式 Scene 对象；映射失效时不回退到 PreviewScene。",
+                SelectFormalSceneObject);
+            select.SetEnabled(resolved);
+            select.style.marginTop = 4f;
+            section.Add(select);
+            root.Add(section);
+        }
+
+        private ESWorldMapPrefabPlacement FindPrefabPlacement(string stableId)
+        {
+            const string prefix = "world.prefab.";
+            if (string.IsNullOrWhiteSpace(stableId)
+                || !stableId.StartsWith(prefix, StringComparison.Ordinal)
+                || editSession?.Draft?.Definition?.prefabPlacements == null)
+                return null;
+            string placementId = stableId.Substring(prefix.Length);
+            return editSession.Draft.Definition.prefabPlacements.Find(
+                value => value != null
+                    && string.Equals(value.placementId, placementId, StringComparison.Ordinal));
+        }
+
+        private bool CanBindSelectedFormalSceneObject()
+        {
+            if (ESWorkbench_IsHierarchyLocked("world.map")
+                || FindPrefabPlacement(ESWorkbench_Selection.Current?.StableId) == null)
+                return false;
+            GameObject selected = Selection.activeGameObject;
+            return ESWorkbenchFormalSceneIdentity.TryCapture(
+                selected, out _, out _, out _);
+        }
+
+        private void BindSelectedFormalSceneObject()
+        {
+            ESWorldMapPrefabPlacement placement = FindPrefabPlacement(
+                ESWorkbench_Selection.Current?.StableId);
+            GameObject selected = Selection.activeGameObject;
+            if (placement == null)
+            {
+                ESWorkbench_SetStatus("请先选择一个 World Prefab 作者对象。", MessageType.Warning);
+                return;
+            }
+            if (!ESWorkbenchFormalSceneIdentity.TryCapture(
+                selected,
+                out string formalScenePath,
+                out string formalObjectGlobalId,
+                out string captureReason))
+            {
+                ESWorkbench_SetStatus(
+                    string.IsNullOrWhiteSpace(captureReason)
+                        ? "只能绑定当前已加载、已保存且非 PreviewScene 中的正式 GameObject。"
+                        : captureReason,
+                    MessageType.Warning);
+                return;
+            }
+            Undo.RecordObject(editSession.Draft, "绑定 World 正式 Scene 对象");
+            placement.formalScenePath = formalScenePath;
+            placement.formalObjectGlobalId = formalObjectGlobalId;
+            NotifyWorldDraftChanged("definition.prefabPlacements", false);
+            ESWorkbench_SetStatus(
+                "已绑定正式 Scene 对象：" + selected.name
+                + "。PreviewScene 不参与正式身份判断。", MessageType.Info);
+            ESWorkbench_Actions?.Refresh(ESWorkbenchRefreshReason.DataChanged);
+        }
+
+        private bool CanSelectFormalSceneObject()
+        {
+            return TryResolveFormalSceneObject(
+                FindPrefabPlacement(ESWorkbench_Selection.Current?.StableId),
+                out _, out _);
+        }
+
+        private void SelectFormalSceneObject()
+        {
+            ESWorldMapPrefabPlacement placement = FindPrefabPlacement(
+                ESWorkbench_Selection.Current?.StableId);
+            if (!TryResolveFormalSceneObject(
+                placement, out GameObject formalObject, out string reason))
+            {
+                ESWorkbench_SetStatus("正式 Scene 对象映射无效：" + reason, MessageType.Warning);
+                return;
+            }
+            Selection.activeGameObject = formalObject;
+            EditorGUIUtility.PingObject(formalObject);
+            ESWorkbench_SetStatus("已选择正式 Scene 对象：" + formalObject.name + "。", MessageType.Info);
+        }
+
+        private static bool TryResolveFormalSceneObject(
+            ESWorldMapPrefabPlacement placement,
+            out GameObject formalObject,
+            out string reason)
+        {
+            if (placement == null)
+            {
+                formalObject = null;
+                reason = "尚未建立正式 Scene 映射。";
+                return false;
+            }
+            return ESWorkbenchFormalSceneIdentity.TryResolve(
+                placement.formalScenePath,
+                placement.formalObjectGlobalId,
+                out formalObject,
+                out reason);
         }
 
         private VisualElement CreateWorldContentInspector(ESWorkbenchObjectDescriptor content)
@@ -3866,6 +4077,75 @@ namespace ES
                 && (selection.Kind == "world.prefab" || selection.Kind == "world.region");
         }
 
+        private static bool CanSetWorldProperty(
+            ESWorkbenchSelection selection,
+            string propertyPath,
+            object value)
+        {
+            if (!IsMutableWorldSelection(selection) || string.IsNullOrWhiteSpace(propertyPath)) return false;
+            switch (selection.Kind)
+            {
+                case "world.region":
+                    return propertyPath == "displayName" || propertyPath == "semanticTag"
+                        || propertyPath == "priority" || propertyPath == "min" || propertyPath == "max";
+                case "world.poi":
+                    return propertyPath == "displayName" || propertyPath == "category"
+                        || propertyPath == "regionId" || propertyPath == "position"
+                        || propertyPath == "discoverable";
+                case "world.prefab":
+                    return propertyPath == "regionId" || propertyPath == "position"
+                        || propertyPath == "rotationEuler" || propertyPath == "scale"
+                        || propertyPath == "enabled";
+                default:
+                    return false;
+            }
+        }
+
+        private ESWorkbenchMutationResult SetWorldPropertyMutation(ESWorkbenchMutationContext context)
+        {
+            ESWorkbenchSelection selection = context?.Selection;
+            ESWorldMapDefinition definition = editSession?.Draft?.Definition;
+            if (definition == null || !CanSetWorldProperty(selection, context.PropertyPath, context.PropertyValue))
+                return ESWorkbenchMutationResult.Failure("当前世界对象不支持该属性写入。");
+            string id = selection.Payload as string;
+            string path = context.PropertyPath;
+            object value = context.PropertyValue;
+            if (selection.Kind == "world.region")
+            {
+                ESWorldMapRegionDefinition target = definition.regions?.Find(item => item != null && item.regionId == id);
+                if (target == null) return ESWorkbenchMutationResult.Failure("所选区域已经不存在。");
+                if (path == "displayName" && value is string regionName) target.displayName = regionName;
+                else if (path == "semanticTag" && value is string regionTag) target.semanticTag = regionTag;
+                else if (path == "priority" && value is int regionPriority) target.priority = regionPriority;
+                else if (path == "min" && value is Vector2 regionMin) target.min = regionMin;
+                else if (path == "max" && value is Vector2 regionMax) target.max = regionMax;
+                else return ESWorkbenchMutationResult.Failure("区域属性值类型不匹配：" + path);
+                return ESWorkbenchMutationResult.Success("区域属性已更新。", selection, "definition.regions");
+            }
+            if (selection.Kind == "world.poi")
+            {
+                ESWorldMapPoiDefinition target = definition.pois?.Find(item => item != null && item.poiId == id);
+                if (target == null) return ESWorkbenchMutationResult.Failure("所选 POI 已经不存在。");
+                if (path == "displayName" && value is string poiName) target.displayName = poiName;
+                else if (path == "category" && value is string poiCategory) target.category = poiCategory;
+                else if (path == "regionId" && value is string poiRegion) target.regionId = poiRegion;
+                else if (path == "position" && value is Vector2 poiPosition) target.position = poiPosition;
+                else if (path == "discoverable" && value is bool discoverable) target.discoverable = discoverable;
+                else return ESWorkbenchMutationResult.Failure("POI 属性值类型不匹配：" + path);
+                return ESWorkbenchMutationResult.Success("POI 属性已更新。", selection, "definition.pois");
+            }
+            ESWorldMapPrefabPlacement placement = definition.prefabPlacements?
+                .Find(item => item != null && item.placementId == id);
+            if (placement == null) return ESWorkbenchMutationResult.Failure("所选 Prefab 放置已经不存在。");
+            if (path == "regionId" && value is string prefabRegion) placement.regionId = prefabRegion;
+            else if (path == "position" && value is Vector3 prefabPosition) placement.position = prefabPosition;
+            else if (path == "rotationEuler" && value is Vector3 prefabRotation) placement.rotationEuler = prefabRotation;
+            else if (path == "scale" && value is Vector3 prefabScale) placement.scale = prefabScale;
+            else if (path == "enabled" && value is bool prefabEnabled) placement.enabled = prefabEnabled;
+            else return ESWorkbenchMutationResult.Failure("Prefab 属性值类型不匹配：" + path);
+            return ESWorkbenchMutationResult.Success("Prefab 属性已更新。", selection, "definition.prefabPlacements");
+        }
+
         private ESWorkbenchMutationResult DuplicateWorldSelectionMutation(ESWorkbenchMutationContext context)
         {
             ESWorkbenchSelection selection = context?.Selection;
@@ -3911,6 +4191,10 @@ namespace ES
             if (placement == null) return ESWorkbenchMutationResult.Failure("所选 Prefab 放置已经不存在。");
             ESWorldMapPrefabPlacement placementCopy = JsonUtility.FromJson<ESWorldMapPrefabPlacement>(JsonUtility.ToJson(placement));
             placementCopy.placementId = NextStableId("placement", value => definition.prefabPlacements.Exists(item => item != null && item.placementId == value));
+            // A duplicate receives a new author identity; never copy the source's
+            // formal Scene GlobalObjectId and accidentally point two placements at one object.
+            placementCopy.formalScenePath = string.Empty;
+            placementCopy.formalObjectGlobalId = string.Empty;
             placementCopy.position = ClampToWorld(placementCopy.position
                 + new Vector3(Mathf.Max(1f, definition.chunkSize * 0.25f), 0f, Mathf.Max(1f, definition.chunkSize * 0.25f)), definition);
             definition.prefabPlacements.Add(placementCopy);
@@ -4124,7 +4408,7 @@ namespace ES
                     falloff.RegisterValueChangedCallback(evt => { authoringBrushFalloff = Mathf.Clamp01(evt.newValue); Repaint(); });
                     content.Add(falloff);
                 }
-                content.Add(new Label("抬高、降低、平整、平滑均写入同一份 Draft；2D/3D 按住左键连续绘制，一次拖动只产生一条 Undo 记录。"));
+                content.Add(new Label("抬高、降低、平整、平滑均写入同一份 Draft；2D/3D 按住左键连续绘制，一次拖动只产生一条 Undo 记录。\nShift + [ / ] 可快速降低或提高强度；[ / ] 调整半径。"));
                 return content;
             });
             Rect anchor = new Rect(position.center, Vector2.one);
@@ -4218,12 +4502,30 @@ namespace ES
             string path = EditorUtility.SaveFilePanelInProject("创建 ES 世界地图资产", "ESWorldMap", "asset", "选择地图资产保存位置");
             if (string.IsNullOrWhiteSpace(path)) return;
             ESWorldMapAsset asset = ScriptableObject.CreateInstance<ESWorldMapAsset>();
-            EnsureDefinitionBaseline(asset);
-            AssetDatabase.CreateAsset(asset, path);
-            AssetDatabase.SaveAssets();
-            ESWorkbench_BindAsset(asset);
-            Selection.activeObject = asset;
-            ESWorkbench_SetStatus("已创建空白地图基线；可按需填充默认配置或显式加载示例内容。", MessageType.Info);
+            bool createdAsset = false;
+            try
+            {
+                if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path) != null
+                    || System.IO.File.Exists(System.IO.Path.GetFullPath(path)))
+                    throw new InvalidOperationException("目标地图资产已存在；请选择新的路径。");
+                EnsureDefinitionBaseline(asset);
+                AssetDatabase.CreateAsset(asset, path);
+                createdAsset = true;
+                AssetDatabase.SaveAssetIfDirty(asset);
+                if (AssetDatabase.LoadAssetAtPath<ESWorldMapAsset>(path) == null)
+                    throw new InvalidOperationException("地图已写入，但 Unity 没有成功加载目标资产。");
+                ESWorkbench_BindAsset(asset);
+                Selection.activeObject = asset;
+                ESWorkbench_SetStatus("已创建空白地图基线；可按需填充默认配置或显式加载示例内容。", MessageType.Info);
+            }
+            catch (Exception exception)
+            {
+                if (createdAsset)
+                    AssetDatabase.DeleteAsset(path);
+                else if (asset != null)
+                    DestroyImmediate(asset);
+                ESWorkbench_SetStatus("创建地图失败：" + exception.Message, MessageType.Error);
+            }
         }
 
         private static void EnsureAssetFolder(string folderPath)

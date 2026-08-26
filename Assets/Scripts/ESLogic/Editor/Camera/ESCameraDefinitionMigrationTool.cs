@@ -273,14 +273,15 @@ namespace ES
             if (target == null || target is MonoScript)
                 return false;
 
-            SerializedObject serialized = new SerializedObject(target);
-            SerializedProperty iterator = serialized.GetIterator();
-            bool changed = false;
-            while (iterator.Next(true))
+            using (SerializedObject serialized = new SerializedObject(target))
             {
-                string targetField = ResolveTargetField(iterator.name);
-                if (targetField == null || iterator.propertyType != SerializedPropertyType.String || string.IsNullOrWhiteSpace(iterator.stringValue))
-                    continue;
+                SerializedProperty iterator = serialized.GetIterator();
+                bool changed = false;
+                while (iterator.Next(true))
+                {
+                    string targetField = ResolveTargetField(iterator.name);
+                    if (targetField == null || iterator.propertyType != SerializedPropertyType.String || string.IsNullOrWhiteSpace(iterator.stringValue))
+                        continue;
 
                 report.legacyFound++;
                 string legacyKey = iterator.stringValue;
@@ -338,17 +339,18 @@ namespace ES
                     report.legacyCleared++;
                 }
 
-                iterator.stringValue = string.Empty;
-                changed = true;
+                    iterator.stringValue = string.Empty;
+                    changed = true;
+                }
+
+                if (!changed)
+                    return false;
+
+                serialized.ApplyModifiedProperties();
+                EditorUtility.SetDirty(target);
+                report.changedPaths.Add(path);
+                return true;
             }
-
-            if (!changed)
-                return false;
-
-            serialized.ApplyModifiedProperties();
-            EditorUtility.SetDirty(target);
-            report.changedPaths.Add(path);
-            return true;
         }
 
         private static bool TryGetDirtyAssetError(string assetPath, out string error)

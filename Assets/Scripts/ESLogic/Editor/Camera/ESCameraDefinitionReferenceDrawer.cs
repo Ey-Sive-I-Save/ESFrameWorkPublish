@@ -14,6 +14,23 @@ namespace ES
         private static readonly Dictionary<string, ESCameraDefinitionReference> cachedByString = new Dictionary<string, ESCameraDefinitionReference>(StringComparer.Ordinal);
         private static string cacheError;
 
+        static ESCameraDefinitionReferenceDrawer()
+        {
+            // Catalog assets can be reimported or removed while an Inspector is
+            // still visible. Drop the derived display cache so OnGUI cannot show
+            // a definition that no longer exists until the next picker opening.
+            EditorApplication.projectChanged -= ClearCache;
+            EditorApplication.projectChanged += ClearCache;
+        }
+
+        private static void ClearCache()
+        {
+            cachedEntries.Clear();
+            cachedByReference.Clear();
+            cachedByString.Clear();
+            cacheError = null;
+        }
+
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             EditorGUI.BeginProperty(position, label, property);
@@ -76,10 +93,7 @@ namespace ES
 
         private static void RefreshCache()
         {
-            cachedEntries.Clear();
-            cachedByReference.Clear();
-            cachedByString.Clear();
-            cacheError = null;
+            ClearCache();
             string[] guids = AssetDatabase.FindAssets("t:ESCameraViewDefinitionCatalog", new[] { "Assets" });
             if (guids.Length != 1)
             {
@@ -143,16 +157,35 @@ namespace ES
 
         internal static void Write(SerializedObject serializedObject, string propertyPath, ESCameraDefinitionReference reference)
         {
-            serializedObject.Update();
-            SerializedProperty property = serializedObject.FindProperty(propertyPath);
-            SerializedProperty enumKey = property?.FindPropertyRelative(nameof(ESCameraDefinitionReference.enumKey));
-            SerializedProperty stringKey = property?.FindPropertyRelative(nameof(ESCameraDefinitionReference.stringKey));
-            if (enumKey == null || stringKey == null)
+            if (serializedObject == null || string.IsNullOrEmpty(propertyPath))
                 return;
 
-            enumKey.intValue = (int)reference.enumKey;
-            stringKey.stringValue = reference.stringKey ?? string.Empty;
-            serializedObject.ApplyModifiedProperties();
+            try
+            {
+                UnityEngine.Object[] targets = serializedObject.targetObjects;
+                if (targets == null || targets.Length == 0)
+                    return;
+                for (int i = 0; i < targets.Length; i++)
+                    if (targets[i] == null)
+                        return;
+
+                serializedObject.UpdateIfRequiredOrScript();
+                SerializedProperty property = serializedObject.FindProperty(propertyPath);
+                SerializedProperty enumKey = property?.FindPropertyRelative(nameof(ESCameraDefinitionReference.enumKey));
+                SerializedProperty stringKey = property?.FindPropertyRelative(nameof(ESCameraDefinitionReference.stringKey));
+                if (enumKey == null || stringKey == null)
+                    return;
+
+                Undo.RecordObjects(targets, "写入相机定义引用");
+                enumKey.intValue = (int)reference.enumKey;
+                stringKey.stringValue = reference.stringKey ?? string.Empty;
+                serializedObject.ApplyModifiedProperties();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCameraDefinitionReferenceDrawer] 写回引用失败，目标可能已失效。", exception));
+            }
         }
 
         private struct Entry

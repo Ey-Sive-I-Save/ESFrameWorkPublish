@@ -32,6 +32,46 @@ namespace ES.Tests.Editor.World
         }
 
         [Test]
+        public void PrefabPlacementWithoutFormalSceneBindingRemainsValid()
+        {
+            ESWorldMapPrefabPlacement placement = new ESWorldMapPrefabPlacement
+            {
+                placementId = "placement-unbound",
+                prefabKey = "prefab-key"
+            };
+
+            Assert.IsTrue(placement.IsValid(out string error), error);
+        }
+
+        [Test]
+        public void PrefabPlacementRejectsOneSidedFormalSceneBinding()
+        {
+            ESWorldMapPrefabPlacement placement = new ESWorldMapPrefabPlacement
+            {
+                placementId = "placement-partial",
+                prefabKey = "prefab-key",
+                formalScenePath = "Assets/Scenes/Formal.unity"
+            };
+
+            Assert.IsFalse(placement.IsValid(out string error));
+            StringAssert.Contains("formalScenePath", error);
+        }
+
+        [Test]
+        public void PrefabPlacementAcceptsCompleteFormalSceneBinding()
+        {
+            ESWorldMapPrefabPlacement placement = new ESWorldMapPrefabPlacement
+            {
+                placementId = "placement-bound",
+                prefabKey = "prefab-key",
+                formalScenePath = "Assets/Scenes/Formal.unity",
+                formalObjectGlobalId = "GlobalObjectId_V1-1-2-3-4"
+            };
+
+            Assert.IsTrue(placement.IsValid(out string error), error);
+        }
+
+        [Test]
         public void DraftMutationDoesNotPolluteFormalAsset()
         {
             session.Draft.Definition.mapId = "draft-map";
@@ -130,6 +170,36 @@ namespace ES.Tests.Editor.World
             Assert.AreEqual("recovered-draft", session.Draft.Definition.mapId);
             Assert.IsTrue(session.IsDirty);
             CollectionAssert.Contains(session.ChangedPaths, "definition.mapId");
+        }
+
+        [Test]
+        public void DisposePersistsUntrackedDraftMutationBeforeDestroyingTemporaryObject()
+        {
+            session.Draft.Definition.mapId = "untracked-recovered-draft";
+            Assert.IsTrue(session.HasUntrackedDraftMutation);
+
+            session.Dispose();
+            session = ESWorldEditSession.Open(source);
+
+            Assert.AreEqual("untracked-recovered-draft", session.Draft.Definition.mapId);
+            Assert.IsTrue(session.IsDirty);
+            CollectionAssert.Contains(session.ChangedPaths, "definition.mapId");
+            Assert.AreEqual("source-map", source.Definition.mapId);
+        }
+
+        [Test]
+        public void ExplicitRecoveryClearIsNotReintroducedByDispose()
+        {
+            session.Draft.Definition.mapId = "discarded-draft";
+            session.NotifyDraftChanged("definition.mapId");
+            session.ClearRecoveryState();
+            session.Dispose();
+
+            session = ESWorldEditSession.Open(source);
+
+            Assert.AreEqual("source-map", session.Draft.Definition.mapId);
+            Assert.IsFalse(session.IsDirty);
+            Assert.Zero(session.ChangeCount);
         }
 
         [Test]
@@ -840,7 +910,11 @@ namespace ES.Tests.Editor.World
         {
             int before = ESEditorPreviewLifecycleHub.ActiveScopeCount;
             var scope = new ESEditorPreviewResourceScope("WorldTests");
-            var texture = new Texture2D(4, 4) { name = "WorldTests Preview Texture" };
+            var texture = new Texture2D(4, 4)
+            {
+                name = "WorldTests Preview Texture",
+                hideFlags = ESEditorPreviewUtility.PreviewHideFlags
+            };
             try
             {
                 Assert.AreEqual(before + 1, ESEditorPreviewLifecycleHub.ActiveScopeCount);
@@ -856,6 +930,50 @@ namespace ES.Tests.Editor.World
             Assert.IsTrue(scope.IsDisposed);
             Assert.IsTrue(texture == null);
             Assert.Throws<System.ObjectDisposedException>(() => scope.RegisterTexture(null));
+        }
+
+        [Test]
+        public void PreviewResourceScopeRegistrationIsIdempotentForSameUnityObject()
+        {
+            var scope = new ESEditorPreviewResourceScope("WorldTests.Idempotent");
+            var texture = new Texture2D(4, 4)
+            {
+                name = "WorldTests Idempotent Preview Texture",
+                hideFlags = ESEditorPreviewUtility.PreviewHideFlags
+            };
+            try
+            {
+                Assert.AreSame(texture, scope.RegisterTexture(texture));
+                Assert.AreSame(texture, scope.RegisterTexture(texture));
+                Assert.AreEqual(1, scope.RegisteredObjectCount);
+                Assert.AreEqual(0, scope.RegisteredRenderTextureCount);
+            }
+            finally
+            {
+                scope.Dispose();
+            }
+
+            Assert.IsTrue(texture == null);
+        }
+
+        [Test]
+        public void PreviewResourceScopeRunsSameDisposeActionOnlyOnce()
+        {
+            var scope = new ESEditorPreviewResourceScope("WorldTests.DisposeAction");
+            int disposeCount = 0;
+            System.Action disposeAction = () => disposeCount++;
+            try
+            {
+                scope.RegisterDisposeAction(disposeAction);
+                scope.RegisterDisposeAction(disposeAction);
+                Assert.AreEqual(1, scope.RegisteredDisposerCount);
+            }
+            finally
+            {
+                scope.Dispose();
+            }
+
+            Assert.AreEqual(1, disposeCount);
         }
 
         [Test]

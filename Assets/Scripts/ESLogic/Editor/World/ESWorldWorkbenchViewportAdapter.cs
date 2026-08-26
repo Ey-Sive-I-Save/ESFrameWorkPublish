@@ -41,6 +41,7 @@ namespace ES
                     kind == ESWorkbenchViewportKind.Scene3D ? window.CancelTerrainStroke : null,
                     kind == ESWorkbenchViewportKind.Scene3D ? window.HandleTerrainBrushShortcut : null,
                     kind == ESWorkbenchViewportKind.Scene3D ? window.GetTerrainBrushRadius : null,
+                    kind == ESWorkbenchViewportKind.Scene3D ? window.GetTerrainBrushStrength : null,
                     kind == ESWorkbenchViewportKind.Scene3D ? window.GetTerrainBrushSummary : null,
                      context.StatusChanged,
                      this.feel);
@@ -61,6 +62,8 @@ namespace ES
                     window.CancelTerrainStroke,
                     window.HandleTerrainBrushShortcut,
                     window.GetTerrainBrushRadius,
+                    window.GetTerrainBrushStrength,
+                    window.SetTerrainBrushStrength,
                     window.GetTerrainBrushSummary,
                     this.feel,
                     context.PointerCoordinator,
@@ -94,7 +97,14 @@ namespace ES
             ESWorldMapAsset draft = window.ESWorld_Draft;
             if (kind == ESWorkbenchViewportKind.Scene3D || kind == ESWorkbenchViewportKind.Game)
             {
-                if (reason == ESWorkbenchRefreshReason.SelectionChanged) return;
+                if (reason == ESWorkbenchRefreshReason.SelectionChanged)
+                {
+                    // Selection is shared by the Host, hierarchy and Inspector. The 3D
+                    // projection must still repaint even when its preview objects do not
+                    // need to be rebuilt; returning here left stale selection visuals.
+                    viewport3D?.RefreshSelection();
+                    return;
+                }
                 viewport3D?.Bind(draft, reason == ESWorkbenchRefreshReason.Initial || reason == ESWorkbenchRefreshReason.AssetChanged);
             }
             else viewport2D?.Bind(draft, reason);
@@ -447,10 +457,15 @@ namespace ES
         private readonly Action terrainStrokeCancel;
         private readonly Func<KeyCode, EventModifiers, bool> terrainBrushShortcut;
         private readonly Func<float> terrainBrushRadius;
+        private readonly Func<float> terrainBrushStrength;
+        private readonly Action<float> terrainBrushStrengthChanged;
         private readonly Func<string> terrainBrushSummary;
         private readonly Action statusChanged;
         private readonly VisualElement labelOverlay;
+        private readonly Label modeBadge;
+        private readonly Slider brushStrengthSlider;
         private readonly Dictionary<string, Label> regionLabels = new Dictionary<string, Label>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Label> entityLabels = new Dictionary<string, Label>(StringComparer.Ordinal);
         private ESWorldMapAsset draft;
         private bool panning;
         private int panPointerId = -1;
@@ -461,6 +476,8 @@ namespace ES
         private Vector3 moveOriginWorld;
         private bool pendingMoveValid;
         private ESWorkbenchSelection movingSelection;
+        private readonly List<ESWorkbenchSelection> movingSelections = new List<ESWorkbenchSelection>();
+        private readonly List<Vector3> movingSelectionOrigins = new List<Vector3>();
         private readonly ESWorkbenchMoveGestureAnchor moveAnchor;
         private bool paintingTerrain;
         private readonly ESWorkbenchStrokeSampler terrainStrokeSampler = new ESWorkbenchStrokeSampler();
@@ -504,6 +521,8 @@ namespace ES
             Action terrainStrokeCancel = null,
             Func<KeyCode, EventModifiers, bool> terrainBrushShortcut = null,
             Func<float> terrainBrushRadius = null,
+            Func<float> terrainBrushStrength = null,
+            Action<float> terrainBrushStrengthChanged = null,
             Func<string> terrainBrushSummary = null,
             ESWorkbenchViewportFeelSettings feel = null,
             ESWorkbenchPointerInteractionCoordinator pointerCoordinator = null,
@@ -521,6 +540,8 @@ namespace ES
             this.terrainStrokeCancel = terrainStrokeCancel;
             this.terrainBrushShortcut = terrainBrushShortcut;
             this.terrainBrushRadius = terrainBrushRadius;
+            this.terrainBrushStrength = terrainBrushStrength;
+            this.terrainBrushStrengthChanged = terrainBrushStrengthChanged;
             this.terrainBrushSummary = terrainBrushSummary;
             this.statusChanged = statusChanged;
             this.feel = feel ?? ESWorkbenchViewportFeelSettings.Standard;
@@ -566,6 +587,48 @@ namespace ES
             labelOverlay.style.top = 0f;
             labelOverlay.style.bottom = 0f;
             Add(labelOverlay);
+            modeBadge = new Label("WORLD DRAFT · 2D 数据编辑");
+            modeBadge.name = "ESWorldMap2DModeBadge";
+            modeBadge.pickingMode = PickingMode.Ignore;
+            modeBadge.style.position = Position.Absolute;
+            modeBadge.style.left = 8f;
+            modeBadge.style.top = 8f;
+            modeBadge.style.height = 20f;
+            modeBadge.style.paddingLeft = 6f;
+            modeBadge.style.paddingRight = 6f;
+            modeBadge.style.paddingTop = 2f;
+            modeBadge.style.color = Color.white;
+            modeBadge.style.backgroundColor = new Color(0.03f, 0.07f, 0.12f, 0.82f);
+            modeBadge.style.borderBottomLeftRadius = 3f;
+            modeBadge.style.borderBottomRightRadius = 3f;
+            modeBadge.style.borderTopLeftRadius = 3f;
+            modeBadge.style.borderTopRightRadius = 3f;
+            Add(modeBadge);
+            brushStrengthSlider = new Slider("强度", 0.05f, 1f)
+            {
+                name = "ESWorldMap2DBrushStrength",
+                value = Mathf.Clamp(terrainBrushStrength?.Invoke() ?? 0.65f, 0.05f, 1f),
+                showInputField = true
+            };
+            brushStrengthSlider.pickingMode = PickingMode.Position;
+            brushStrengthSlider.style.position = Position.Absolute;
+            brushStrengthSlider.style.left = 8f;
+            brushStrengthSlider.style.top = 32f;
+            brushStrengthSlider.style.width = 190f;
+            brushStrengthSlider.style.height = 22f;
+            brushStrengthSlider.style.paddingLeft = 5f;
+            brushStrengthSlider.style.paddingRight = 5f;
+            brushStrengthSlider.style.backgroundColor = new Color(0.03f, 0.07f, 0.12f, 0.82f);
+            brushStrengthSlider.style.borderBottomLeftRadius = 3f;
+            brushStrengthSlider.style.borderBottomRightRadius = 3f;
+            brushStrengthSlider.style.borderTopLeftRadius = 3f;
+            brushStrengthSlider.style.borderTopRightRadius = 3f;
+            brushStrengthSlider.RegisterValueChangedCallback(evt =>
+            {
+                terrainBrushStrengthChanged?.Invoke(Mathf.Clamp(evt.newValue, 0.05f, 1f));
+                MarkDirtyRepaint();
+            });
+            Add(brushStrengthSlider);
         }
 
         public void Bind(ESWorldMapAsset asset, ESWorkbenchRefreshReason reason)
@@ -579,6 +642,8 @@ namespace ES
                 ClearPointerWorldStatus();
             }
             draft = asset;
+            brushStrengthSlider?.SetValueWithoutNotify(
+                Mathf.Clamp(terrainBrushStrength?.Invoke() ?? brushStrengthSlider.value, 0.05f, 1f));
             if (assetChanged || reason == ESWorkbenchRefreshReason.Initial
                 || reason == ESWorkbenchRefreshReason.AssetChanged
                 || reason == ESWorkbenchRefreshReason.DataChanged
@@ -586,6 +651,7 @@ namespace ES
                 || reason == ESWorkbenchRefreshReason.Explicit)
                 SynchronizeRegionLabels();
             else UpdateRegionLabelPositions();
+            SynchronizeEntityLabels();
             MarkDirtyRepaint();
         }
 
@@ -601,6 +667,7 @@ namespace ES
             Rect viewport = contentRect;
             if (viewport.width <= 1f || viewport.height <= 1f) return;
             Painter2D painter = context.painter2D;
+            ESWorkbenchViewportRenderStyle.DrawCanvasBackdrop(painter, viewport);
             ESWorldMapDefinition definition = draft?.Definition;
             if (definition == null)
             {
@@ -650,22 +717,7 @@ namespace ES
         {
             int columns = Mathf.Clamp(definition.spaceTemplate?.gridWidth ?? 16, 1, 128);
             int rows = Mathf.Clamp(definition.spaceTemplate?.gridHeight ?? 16, 1, 128);
-            painter.strokeColor = ESWorldMapEditorPresentation.Grid;
-            painter.lineWidth = 1f;
-            painter.BeginPath();
-            for (int x = 0; x <= columns; x++)
-            {
-                float px = Mathf.Lerp(rect.xMin, rect.xMax, x / (float)columns);
-                painter.MoveTo(new Vector2(px, rect.yMin));
-                painter.LineTo(new Vector2(px, rect.yMax));
-            }
-            for (int y = 0; y <= rows; y++)
-            {
-                float py = Mathf.Lerp(rect.yMin, rect.yMax, y / (float)rows);
-                painter.MoveTo(new Vector2(rect.xMin, py));
-                painter.LineTo(new Vector2(rect.xMax, py));
-            }
-            painter.Stroke();
+            ESWorkbenchViewportRenderStyle.DrawCanvasGrid(painter, rect, columns, rows);
         }
 
         private void DrawTerrainBrushGuide(
@@ -681,10 +733,22 @@ namespace ES
             float radiusWorld = Mathf.Max(0.5f, terrainBrushRadius?.Invoke() ?? 8f);
             Vector2 center = WorldToCanvas(new Vector2(worldPoint.x, worldPoint.z), min, max, rect);
             float radiusPixels = Mathf.Max(2f, radiusWorld / Mathf.Max(0.001f, max.x - min.x) * rect.width);
-            painter.strokeColor = new Color(0.18f, 0.86f, 1f, 0.96f);
+            painter.strokeColor = ESWorkbenchViewportRenderStyle.WithAlpha(
+                ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                    ESWorkbenchViewportRenderStyle.InteractionState.Brush), 0.96f);
             painter.lineWidth = 2f;
             painter.BeginPath();
             painter.Arc(center, radiusPixels, 0f, 360f);
+            painter.Stroke();
+            float strength = Mathf.Clamp01(terrainBrushStrength?.Invoke() ?? 0.65f);
+            float innerRadius = Mathf.Max(2f, radiusPixels * (0.18f + strength * 0.72f));
+            painter.strokeColor = ESWorkbenchViewportRenderStyle.WithAlpha(
+                ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                    ESWorkbenchViewportRenderStyle.InteractionState.Brush),
+                0.28f + strength * 0.58f);
+            painter.lineWidth = 1f + strength * 1.5f;
+            painter.BeginPath();
+            painter.Arc(center, innerRadius, 0f, 360f);
             painter.Stroke();
             float cross = Mathf.Clamp(radiusPixels * 0.18f, 4f, 12f);
             painter.BeginPath();
@@ -710,15 +774,39 @@ namespace ES
                 Vector2 a = WorldToCanvas(region.min, min, max, rect);
                 Vector2 b = WorldToCanvas(region.max, min, max, rect);
                 Rect regionRect = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
-                Color color = ESWorldMapEditorPresentation.Region;
                 bool selected = IsSelected(stableId);
                 bool hovered = !selected && hover.IsHovered(stableId);
-                if (selected) color.a = Mathf.Min(0.78f, color.a + 0.28f);
-                else if (hovered) color.a = Mathf.Min(0.62f, color.a + 0.18f);
+                ESWorkbenchViewportRenderStyle.InteractionState state = selected
+                    ? ESWorkbenchViewportRenderStyle.InteractionState.Selected
+                    : hovered
+                        ? ESWorkbenchViewportRenderStyle.InteractionState.Hover
+                        : ESWorkbenchViewportRenderStyle.InteractionState.Normal;
+                Color baseColor = state == ESWorkbenchViewportRenderStyle.InteractionState.Normal
+                    ? ResolveRegionBaseColor(region)
+                    : ESWorkbenchViewportRenderStyle.ResolveInteractionColor(state);
+                Color color = ESWorkbenchViewportRenderStyle.WithAlpha(
+                    baseColor,
+                    selected ? 0.78f : hovered ? 0.62f : 0.20f);
                 DrawFilledRect(painter, regionRect, color);
-                if (selected) DrawOutline(painter, regionRect, ESWorldMapEditorPresentation.Selection, 2.5f);
-                else if (hovered) DrawOutline(painter, regionRect, ESWorldMapEditorPresentation.Selection, 1.5f);
+                if (selected) DrawOutline(painter, regionRect,
+                    ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                        ESWorkbenchViewportRenderStyle.InteractionState.Selected), 2.5f);
+                else if (hovered) DrawOutline(painter, regionRect,
+                    ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                        ESWorkbenchViewportRenderStyle.InteractionState.Hover), 1.5f);
             }
+        }
+
+        private static Color ResolveRegionBaseColor(ESWorldMapRegionDefinition region)
+        {
+            string key = string.IsNullOrWhiteSpace(region?.semanticTag)
+                ? region?.regionId
+                : region.semanticTag;
+            int hash = 17;
+            if (!string.IsNullOrEmpty(key))
+                for (int i = 0; i < key.Length; i++) hash = unchecked(hash * 31 + key[i]);
+            float hue = Mathf.Abs(hash % 360) / 360f;
+            return Color.HSVToRGB(hue, 0.46f, 0.86f);
         }
 
         private void DrawPois(Painter2D painter, ESWorldMapDefinition definition, Vector2 min, Vector2 max, Rect rect)
@@ -736,8 +824,12 @@ namespace ES
                 Vector2 point = WorldToCanvas(poi.position, min, max, rect);
                 bool selected = IsSelected(stableId);
                 bool hovered = !selected && hover.IsHovered(stableId);
-                painter.fillColor = selected || hovered
-                    ? ESWorldMapEditorPresentation.Selection : ESWorldMapEditorPresentation.Poi;
+                painter.fillColor = ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                    selected
+                        ? ESWorkbenchViewportRenderStyle.InteractionState.Selected
+                        : hovered
+                            ? ESWorkbenchViewportRenderStyle.InteractionState.Hover
+                            : ESWorkbenchViewportRenderStyle.InteractionState.Normal);
                 float radius = feel.ResolveMarkerRadiusPixels(selected, hovered);
                 painter.BeginPath();
                 painter.Arc(point, radius, 0f, 360f);
@@ -761,8 +853,12 @@ namespace ES
                 bool selected = IsSelected(stableId);
                 bool hovered = !selected && hover.IsHovered(stableId);
                 float radius = feel.ResolveMarkerRadiusPixels(selected, hovered);
-                painter.strokeColor = selected || hovered
-                    ? ESWorldMapEditorPresentation.Selection : ESWorldMapEditorPresentation.Poi;
+                painter.strokeColor = ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                    selected
+                        ? ESWorkbenchViewportRenderStyle.InteractionState.Selected
+                        : hovered
+                            ? ESWorkbenchViewportRenderStyle.InteractionState.Hover
+                            : ESWorkbenchViewportRenderStyle.InteractionState.Normal);
                 painter.lineWidth = selected ? 3f : hovered ? 2.5f : 2f;
                 painter.BeginPath();
                 painter.Arc(point, radius, 0f, 360f);
@@ -857,13 +953,27 @@ namespace ES
                 return;
             }
             ESWorkbenchPointerIntentKind intent = intentDecision.Intent;
+            bool additiveSelection = evt.shiftKey || evt.ctrlKey || evt.commandKey;
+            bool toggleSelection = evt.ctrlKey || evt.commandKey;
+            // A modified click changes the selection set; it must not arm a
+            // single-object transform gesture against only Current.
+            if (additiveSelection && intent == ESWorkbenchPointerIntentKind.Manipulate)
+                intent = ESWorkbenchPointerIntentKind.Select;
             // 地形笔刷与对象变换是互斥工具。笔刷只在没有精确可操作目标时
             // 拥有地面主意图；命中区域、POI 或 Prefab 时沿用统一目标仲裁。
             if (hitSelection != null && !hitSelection.IsEmpty
                 && (intent == ESWorkbenchPointerIntentKind.Select
                     || intent == ESWorkbenchPointerIntentKind.Manipulate))
             {
-                selection.Select(hitSelection);
+                bool preserveExistingSet = !additiveSelection
+                    && selection.CurrentSet.Count > 1
+                    && selection.CurrentSet.Any(value => value != null
+                        && value.StableId == hitSelection.StableId
+                        && value.Kind == hitSelection.Kind);
+                selection.Select(
+                    hitSelection,
+                    additiveSelection || preserveExistingSet,
+                    toggleSelection);
                 if (intent == ESWorkbenchPointerIntentKind.Manipulate)
                 {
                     if (!pointerCoordinator.TryAcquire(
@@ -887,6 +997,22 @@ namespace ES
                     movePointerId = evt.pointerId;
                     movingSelection = actions.Selection.Current;
                     moveOriginWorld = ResolveSelectionWorldPosition(movingSelection, point);
+                    movingSelections.Clear();
+                    movingSelectionOrigins.Clear();
+                    foreach (ESWorkbenchSelection candidate in selection.CurrentSet)
+                    {
+                        if (candidate == null || candidate.IsEmpty || !actions.Authoring.CanMove(candidate))
+                            continue;
+                        if (!TryResolveSelectionWorldPosition(candidate, moveOriginWorld.y, out Vector3 origin))
+                            continue;
+                        movingSelections.Add(candidate);
+                        movingSelectionOrigins.Add(origin);
+                    }
+                    if (movingSelections.Count == 0)
+                    {
+                        movingSelections.Add(movingSelection);
+                        movingSelectionOrigins.Add(moveOriginWorld);
+                    }
                     Vector3 pointerStart = new Vector3(point.x, moveOriginWorld.y, point.z);
                     if (!moveAnchor.Capture(moveOriginWorld, pointerStart))
                     {
@@ -945,11 +1071,11 @@ namespace ES
             {
                 if (hitSelection == null || hitSelection.IsEmpty)
                 {
-                    selection.Clear();
+                    if (!additiveSelection && !toggleSelection) selection.Clear();
                     evt.StopPropagation();
                     return;
                 }
-                selection.Select(hitSelection);
+                selection.Select(hitSelection, additiveSelection, toggleSelection);
             }
             else if (intent == ESWorkbenchPointerIntentKind.GroundAction)
             {
@@ -1207,7 +1333,19 @@ namespace ES
                     evt.pointerId,
                     ESWorkbenchPointerOwnerKind.Viewport);
                 if (this.HasPointerCapture(evt.pointerId)) this.ReleasePointer(evt.pointerId);
-                if (shouldCommit) actions.Authoring.TryMove(target, worldPosition, out _);
+                if (shouldCommit)
+                {
+                    if (movingSelections.Count > 1)
+                    {
+                        Vector3 delta = worldPosition - moveOriginWorld;
+                        var targets = new List<Vector3>(movingSelectionOrigins.Count);
+                        for (int i = 0; i < movingSelectionOrigins.Count; i++)
+                            targets.Add(movingSelectionOrigins[i] + delta);
+                        actions.Authoring.TryMoveMany(movingSelections, targets, out _);
+                    }
+                    else
+                        actions.Authoring.TryMove(target, worldPosition, out _);
+                }
                 evt.StopPropagation();
                 return;
             }
@@ -1794,7 +1932,9 @@ namespace ES
         {
             Vector2 origin = WorldToCanvas(new Vector2(moveOriginWorld.x, moveOriginWorld.z), min, max, mapRect);
             Vector2 target = WorldToCanvas(new Vector2(pendingMoveWorld.x, pendingMoveWorld.z), min, max, mapRect);
-            painter.strokeColor = new Color(1f, 0.72f, 0.18f, 0.9f);
+            painter.strokeColor = ESWorkbenchViewportRenderStyle.WithAlpha(
+                ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                    ESWorkbenchViewportRenderStyle.InteractionState.PreviewAllowed), 0.9f);
             painter.lineWidth = 1.5f;
             painter.BeginPath();
             painter.MoveTo(origin);
@@ -1802,26 +1942,29 @@ namespace ES
             painter.Stroke();
 
             Vector3 size = ResolveSelectionSize(definition, movingSelection);
+            Color targetColor = ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                ESWorkbenchViewportRenderStyle.InteractionState.PreviewAllowed);
             DrawTargetShape(
                 painter,
                 target,
                 WorldSizeToCanvas(size, min, max, mapRect),
                 movingSelection?.Kind == "world.region" ? ESWorkbenchContentKind.RegionTemplate : ESWorkbenchContentKind.Prefab,
-                new Color(1f, 0.72f, 0.18f, 0.2f),
-                new Color(1f, 0.72f, 0.18f, 1f));
-            DrawCrosshair(painter, target, 10f, new Color(1f, 0.78f, 0.22f, 1f));
+                ESWorkbenchViewportRenderStyle.WithAlpha(targetColor, 0.2f),
+                targetColor);
+            DrawCrosshair(painter, target, 10f, targetColor);
         }
 
         private void DrawDropPreview(Painter2D painter, Vector2 min, Vector2 max, Rect mapRect)
         {
             if (dropPreviewItem == null || dropPreviewPositions.Count == 0) return;
             Vector2 canvasSize = WorldSizeToCanvas(dropPreviewSize, min, max, mapRect);
-            Color fill = dropPreviewState.Accepted
-                ? new Color(0.18f, 0.72f, 0.92f, 0.2f)
-                : new Color(0.92f, 0.18f, 0.2f, 0.16f);
-            Color outline = dropPreviewState.Accepted
-                ? new Color(0.26f, 0.84f, 1f, 1f)
-                : new Color(1f, 0.28f, 0.3f, 1f);
+            ESWorkbenchViewportRenderStyle.InteractionState previewState = dropPreviewState.Accepted
+                ? ESWorkbenchViewportRenderStyle.InteractionState.PreviewAllowed
+                : ESWorkbenchViewportRenderStyle.InteractionState.PreviewRejected;
+            Color previewColor = ESWorkbenchViewportRenderStyle.ResolveInteractionColor(previewState);
+            Color fill = ESWorkbenchViewportRenderStyle.WithAlpha(previewColor,
+                dropPreviewState.Accepted ? 0.20f : 0.16f);
+            Color outline = previewColor;
             for (int i = 0; i < dropPreviewPositions.Count; i++)
             {
                 Vector3 position = dropPreviewPositions[i];
@@ -1994,6 +2137,8 @@ namespace ES
             edgePanSchedule?.Pause();
             pendingMoveValid = false;
             movingSelection = null;
+            movingSelections.Clear();
+            movingSelectionOrigins.Clear();
             moveAnchor.Reset();
             MarkDirtyRepaint();
         }
@@ -2022,12 +2167,27 @@ namespace ES
                     label.style.fontSize = 10f;
                     label.style.paddingLeft = 4f;
                     label.style.paddingRight = 4f;
+                    label.style.paddingTop = 1f;
+                    label.style.paddingBottom = 1f;
+                    label.style.color = Color.white;
+                    label.style.backgroundColor = new Color(0.05f, 0.08f, 0.12f, 0.78f);
+                    label.style.borderBottomLeftRadius = 3f;
+                    label.style.borderBottomRightRadius = 3f;
+                    label.style.borderTopLeftRadius = 3f;
+                    label.style.borderTopRightRadius = 3f;
+                    label.style.unityTextAlign = TextAnchor.MiddleLeft;
                     label.style.overflow = Overflow.Hidden;
                     label.style.textOverflow = TextOverflow.Ellipsis;
                     regionLabels.Add(region.regionId, label);
                     labelOverlay.Add(label);
                 }
-                label.text = string.IsNullOrWhiteSpace(region.displayName) ? region.regionId : region.displayName;
+                string displayName = string.IsNullOrWhiteSpace(region.displayName)
+                    ? "区域 " + (i + 1)
+                    : region.displayName.Trim();
+                string semantic = string.IsNullOrWhiteSpace(region.semanticTag)
+                    ? string.Empty
+                    : " · " + region.semanticTag.Trim();
+                label.text = displayName + semantic;
                 label.tooltip = label.text;
             }
             string[] stale = regionLabels.Keys.Where(id => !liveIds.Contains(id)).ToArray();
@@ -2060,6 +2220,104 @@ namespace ES
                 label.style.top = top + 1f;
                 label.style.width = Mathf.Max(24f, Mathf.Abs(second.x - first.x) - 4f);
             }
+            UpdateEntityLabelPositions();
+        }
+
+        private void SynchronizeEntityLabels()
+        {
+            ESWorldMapDefinition definition = draft?.Definition;
+            var liveIds = new HashSet<string>(StringComparer.Ordinal);
+            if (definition?.pois != null)
+            {
+                for (int i = 0; i < definition.pois.Count; i++)
+                {
+                    ESWorldMapPoiDefinition poi = definition.pois[i];
+                    if (poi == null || string.IsNullOrWhiteSpace(poi.poiId)) continue;
+                    string stableId = "world.poi." + poi.poiId;
+                    if (!isHierarchyVisible(stableId)) continue;
+                    liveIds.Add(stableId);
+                    Label label = GetOrCreateEntityLabel(stableId);
+                    label.text = string.IsNullOrWhiteSpace(poi.displayName) ? "POI " + (i + 1) : poi.displayName.Trim();
+                    label.tooltip = label.text + "\n" + stableId;
+                }
+            }
+            if (definition?.prefabPlacements != null)
+            {
+                for (int i = 0; i < definition.prefabPlacements.Count; i++)
+                {
+                    ESWorldMapPrefabPlacement placement = definition.prefabPlacements[i];
+                    if (placement == null || string.IsNullOrWhiteSpace(placement.placementId)) continue;
+                    string stableId = "world.prefab." + placement.placementId;
+                    if (!isHierarchyVisible(stableId)) continue;
+                    liveIds.Add(stableId);
+                    Label label = GetOrCreateEntityLabel(stableId);
+                    label.text = string.IsNullOrWhiteSpace(placement.prefabKey)
+                        ? "Prefab " + (i + 1)
+                        : placement.prefabKey;
+                    label.tooltip = label.text + "\n" + stableId;
+                }
+            }
+            string[] stale = entityLabels.Keys.Where(id => !liveIds.Contains(id)).ToArray();
+            for (int i = 0; i < stale.Length; i++)
+            {
+                entityLabels[stale[i]].RemoveFromHierarchy();
+                entityLabels.Remove(stale[i]);
+            }
+            UpdateEntityLabelPositions();
+        }
+
+        private Label GetOrCreateEntityLabel(string stableId)
+        {
+            if (entityLabels.TryGetValue(stableId, out Label existing)) return existing;
+            var label = new Label { pickingMode = PickingMode.Ignore };
+            label.style.position = Position.Absolute;
+            label.style.height = 17f;
+            label.style.minWidth = 40f;
+            label.style.maxWidth = 150f;
+            label.style.fontSize = 9f;
+            label.style.paddingLeft = 3f;
+            label.style.paddingRight = 3f;
+            label.style.color = Color.white;
+            label.style.backgroundColor = new Color(0.04f, 0.06f, 0.1f, 0.72f);
+            label.style.borderBottomLeftRadius = 3f;
+            label.style.borderBottomRightRadius = 3f;
+            label.style.borderTopLeftRadius = 3f;
+            label.style.borderTopRightRadius = 3f;
+            label.style.unityTextAlign = TextAnchor.MiddleLeft;
+            label.style.overflow = Overflow.Hidden;
+            label.style.textOverflow = TextOverflow.Ellipsis;
+            entityLabels.Add(stableId, label);
+            labelOverlay.Add(label);
+            return label;
+        }
+
+        private void UpdateEntityLabelPositions()
+        {
+            ESWorldMapDefinition definition = draft?.Definition;
+            if (definition == null || contentRect.width <= 1f || contentRect.height <= 1f) return;
+            Vector2 min = ResolveWorldMin();
+            Vector2 max = ResolveWorldMax();
+            Rect mapRect = ResolveMapRect(contentRect, min, max);
+            if (definition.pois != null)
+                for (int i = 0; i < definition.pois.Count; i++)
+                {
+                    ESWorldMapPoiDefinition poi = definition.pois[i];
+                    if (poi == null || !entityLabels.TryGetValue("world.poi." + poi.poiId, out Label label)) continue;
+                    Vector2 point = WorldToCanvas(poi.position, min, max, mapRect);
+                    label.style.left = point.x + 7f;
+                    label.style.top = point.y - 9f;
+                    label.style.display = DisplayStyle.Flex;
+                }
+            if (definition.prefabPlacements != null)
+                for (int i = 0; i < definition.prefabPlacements.Count; i++)
+                {
+                    ESWorldMapPrefabPlacement placement = definition.prefabPlacements[i];
+                    if (placement == null || !entityLabels.TryGetValue("world.prefab." + placement.placementId, out Label label)) continue;
+                    Vector2 point = WorldToCanvas(new Vector2(placement.position.x, placement.position.z), min, max, mapRect);
+                    label.style.left = point.x + 7f;
+                    label.style.top = point.y - 9f;
+                    label.style.display = DisplayStyle.Flex;
+                }
         }
 
         public void Dispose()
@@ -2072,6 +2330,7 @@ namespace ES
             ClearDropPreview();
             generateVisualContent -= Draw;
             regionLabels.Clear();
+            entityLabels.Clear();
             labelOverlay.Clear();
             StopPanning();
             StopMoving();

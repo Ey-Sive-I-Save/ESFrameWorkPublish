@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -42,6 +43,7 @@ namespace ES
         private readonly Action terrainStrokeCancel;
         private readonly Func<KeyCode, EventModifiers, bool> terrainBrushShortcut;
         private readonly Func<float> terrainBrushRadius;
+        private readonly Func<float> terrainBrushStrength;
         private readonly Func<string> terrainBrushSummary;
         private readonly Action statusChanged;
         private readonly ESWorkbenchViewportContext context;
@@ -109,6 +111,9 @@ namespace ES
         private int activeControlId;
         private string transformingStableId;
         private ESWorkbenchSelection transformingSelection;
+        private readonly List<ESWorkbenchSelection> transformingSelections = new List<ESWorkbenchSelection>();
+        private readonly List<Vector3> transformingStartPositions = new List<Vector3>();
+        private readonly List<Vector3> transformingStartValues = new List<Vector3>();
         private readonly ESWorkbenchPointerGestureSession gestureSession;
         private readonly ESWorkbenchMoveGestureAnchor moveAnchor;
         private readonly ESWorkbenchTransformGestureSession transformGesture;
@@ -162,6 +167,7 @@ namespace ES
             Action terrainStrokeCancel = null,
             Func<KeyCode, EventModifiers, bool> terrainBrushShortcut = null,
             Func<float> terrainBrushRadius = null,
+            Func<float> terrainBrushStrength = null,
             Func<string> terrainBrushSummary = null,
             Action statusChanged = null,
             ESWorkbenchViewportFeelSettings feel = null)
@@ -173,6 +179,7 @@ namespace ES
             this.terrainStrokeCancel = terrainStrokeCancel;
             this.terrainBrushShortcut = terrainBrushShortcut;
             this.terrainBrushRadius = terrainBrushRadius;
+            this.terrainBrushStrength = terrainBrushStrength;
             this.terrainBrushSummary = terrainBrushSummary;
             this.statusChanged = statusChanged;
             this.context = context;
@@ -237,6 +244,16 @@ namespace ES
             }
             if (assetChanged || resetCamera || preview == null) Rebuild(resetCamera || assetChanged);
             else RequestRebuild(false);
+        }
+
+        /// <summary>
+        /// Refreshes selection-dependent projection visuals without rebuilding the
+        /// PreviewScene. SelectionChanged is a projection update, not an asset rebuild.
+        /// </summary>
+        public void RefreshSelection()
+        {
+            if (disposed) return;
+            renderHost?.MarkDirtyRepaint();
         }
 
         private void RequestRebuild(bool resetCamera)
@@ -340,7 +357,9 @@ namespace ES
             terrainPreviewHeightBuffer = new float[resolution, resolution];
             FillTerrainPreviewHeightBuffer(field, terrainPreviewHeightBuffer, 0, 0, resolution);
             terrainData.SetHeights(0, 0, terrainPreviewHeightBuffer);
-            terrainObject = contentScope.RegisterGameObject(Terrain.CreateTerrainGameObject(terrainData));
+            GameObject createdTerrain = Terrain.CreateTerrainGameObject(terrainData);
+            createdTerrain.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
+            terrainObject = contentScope.RegisterGameObject(createdTerrain);
             terrainObject.name = "ES World Draft Terrain";
             preview.PreparePreviewObject(terrainObject, "World draft terrain.", samplingTarget: false);
             terrainObject.transform.position = preview.GroupOrigin
@@ -398,15 +417,19 @@ namespace ES
                 Vector2 size = Vector2.Max(Vector2.one * 0.1f, region.max - region.min);
                 int xSegments = ResolveRegionGuideSegments(size.x, definition.chunkSize);
                 int zSegments = ResolveRegionGuideSegments(size.y, definition.chunkSize);
-                Mesh mesh = contentScope.RegisterObject(new Mesh
+                Mesh mesh = new Mesh
                 {
-                    name = "ES World 区域贴地网格 · " + region.regionId
-                });
+                    name = "ES World 区域贴地网格 · " + region.regionId,
+                    hideFlags = ESEditorPreviewUtility.PreviewHideFlags
+                };
+                mesh = contentScope.RegisterObject(mesh);
                 mesh.MarkDynamic();
-                var root = contentScope.RegisterGameObject(new GameObject(
+                var root = new GameObject(
                     "ES World 区域预览 · " + region.regionId,
                     typeof(MeshFilter),
-                    typeof(MeshRenderer)));
+                    typeof(MeshRenderer));
+                root.hideFlags = ESEditorPreviewUtility.PreviewHideFlags;
+                root = contentScope.RegisterGameObject(root);
                 root.GetComponent<MeshFilter>().sharedMesh = mesh;
                 MeshRenderer renderer = root.GetComponent<MeshRenderer>();
                 renderer.sharedMaterials = regionMaterials;
@@ -442,18 +465,24 @@ namespace ES
                 ?? Shader.Find("Unlit/Color");
             if (shader == null) return false;
 
+            Color authoring = ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                ESWorkbenchViewportRenderStyle.InteractionState.Normal);
+            Color hover = ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                ESWorkbenchViewportRenderStyle.InteractionState.Hover);
+            Color selected = ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                ESWorkbenchViewportRenderStyle.InteractionState.Selected);
             regionFillMaterial = CreateRegionGuideMaterial(
-                shader, "ES World 区域填充", new Color(0.1f, 0.62f, 0.8f, 0.1f), 3000);
+                shader, "ES World 区域填充", ESWorkbenchViewportRenderStyle.WithAlpha(authoring, 0.10f), 3000);
             regionOutlineMaterial = CreateRegionGuideMaterial(
-                shader, "ES World 区域边界", new Color(0.2f, 0.78f, 0.9f, 0.96f), 3010);
+                shader, "ES World 区域边界", ESWorkbenchViewportRenderStyle.WithAlpha(authoring, 0.90f), 3010);
             regionSelectedFillMaterial = CreateRegionGuideMaterial(
-                shader, "ES World 选中区域填充", new Color(0.18f, 0.72f, 1f, 0.24f), 3020);
+                shader, "ES World 选中区域填充", ESWorkbenchViewportRenderStyle.WithAlpha(selected, 0.24f), 3020);
             regionSelectedOutlineMaterial = CreateRegionGuideMaterial(
-                shader, "ES World 选中区域边界", ESWorldMapEditorPresentation.Selection, 3030);
+                shader, "ES World 选中区域边界", selected, 3030);
             regionHoverFillMaterial = CreateRegionGuideMaterial(
-                shader, "ES World 悬停区域填充", new Color(0.16f, 0.68f, 0.92f, 0.17f), 3020);
+                shader, "ES World 悬停区域填充", ESWorkbenchViewportRenderStyle.WithAlpha(hover, 0.17f), 3020);
             regionHoverOutlineMaterial = CreateRegionGuideMaterial(
-                shader, "ES World 悬停区域边界", new Color(0.28f, 0.82f, 1f, 0.82f), 3030);
+                shader, "ES World 悬停区域边界", ESWorkbenchViewportRenderStyle.WithAlpha(hover, 0.82f), 3030);
             regionMaterials = new[] { regionFillMaterial, regionOutlineMaterial };
             regionSelectedMaterials = new[] { regionSelectedFillMaterial, regionSelectedOutlineMaterial };
             regionHoverMaterials = new[] { regionHoverFillMaterial, regionHoverOutlineMaterial };
@@ -465,6 +494,7 @@ namespace ES
             Material material = contentScope.RegisterObject(new Material(shader)
             {
                 name = materialName,
+                hideFlags = ESEditorPreviewUtility.PreviewHideFlags,
                 renderQueue = renderQueue
             });
             ESEditorPreviewUtility.ConfigureDoubleSidedTransparent(material, color);
@@ -599,11 +629,12 @@ namespace ES
                 RequestRebuild(false);
             if (preview?.IsReady != true || draft?.Definition == null)
             {
-                EditorGUI.DrawRect(rect, new Color(0.055f, 0.07f, 0.08f, 1f));
+                ESWorkbenchViewportRenderStyle.DrawGuiBackdrop(rect);
                 GUI.Label(rect, "选择地图资产以启动 3D 作者视口", EditorStyles.centeredGreyMiniLabel);
                 return;
             }
 
+            ESWorkbenchViewportRenderStyle.DrawGuiBackdrop(rect);
             UpdateRegionGuideVisuals();
             if (readOnlyGameView && gameCameraMode == ESWorldGamePreviewCameraMode.Player)
             {
@@ -778,21 +809,43 @@ namespace ES
                         return;
                     }
                     ESWorkbenchPointerIntentKind intent = intentDecision.Intent;
+                    bool additiveSelection = evt.shift;
+                    bool toggleSelection = evt.control || evt.command;
+                    if ((additiveSelection || toggleSelection)
+                        && intent == ESWorkbenchPointerIntentKind.Manipulate)
+                        intent = ESWorkbenchPointerIntentKind.Select;
                     if (hitPlacement && intent == ESWorkbenchPointerIntentKind.Manipulate)
                     {
                         string placementId = stableId.Substring("world.prefab.".Length);
-                        context.Selection.Select(new ESWorkbenchSelection(stableId, "world.prefab", null, placementId));
+                        ESWorkbenchSelection hit = new ESWorkbenchSelection(stableId, "world.prefab", null, placementId);
+                        bool preserveExistingSet = !additiveSelection
+                            && context.Selection.CurrentSet.Count > 1
+                            && context.Selection.CurrentSet.Any(value => value != null
+                                && value.StableId == hit.StableId && value.Kind == hit.Kind);
+                        context.Selection.Select(hit, additiveSelection || preserveExistingSet, toggleSelection);
                         BeginTransform(stableId, instance, rect, evt.mousePosition);
                     }
                     else if (hitPlacement && intent == ESWorkbenchPointerIntentKind.Select)
                     {
                         string placementId = stableId.Substring("world.prefab.".Length);
-                        context.Selection.Select(new ESWorkbenchSelection(stableId, "world.prefab", null, placementId));
+                        ESWorkbenchSelection hit = new ESWorkbenchSelection(stableId, "world.prefab", null, placementId);
+                        bool preserveExistingSet = !additiveSelection
+                            && context.Selection.CurrentSet.Count > 1
+                            && context.Selection.CurrentSet.Any(value => value != null
+                                && value.StableId == hit.StableId && value.Kind == hit.Kind);
+                        context.Selection.Select(hit, additiveSelection || preserveExistingSet, toggleSelection);
                     }
                     else if (hitGuide && (intent == ESWorkbenchPointerIntentKind.Manipulate
                         || intent == ESWorkbenchPointerIntentKind.Select))
                     {
-                        context.Selection.Select(guideSelection);
+                        bool preserveExistingSet = !additiveSelection
+                            && context.Selection.CurrentSet.Count > 1
+                            && context.Selection.CurrentSet.Any(value => value != null
+                                && value.StableId == guideSelection.StableId && value.Kind == guideSelection.Kind);
+                        context.Selection.Select(
+                            guideSelection,
+                            additiveSelection || preserveExistingSet,
+                            toggleSelection);
                         if (intent == ESWorkbenchPointerIntentKind.Manipulate)
                             BeginGuideTransform(guideSelection, guidePosition, rect, evt.mousePosition);
                     }
@@ -1034,6 +1087,38 @@ namespace ES
             }
             transformingStableId = stableId;
             transformingSelection = selection;
+            transformingSelections.Clear();
+            transformingStartPositions.Clear();
+            transformingStartValues.Clear();
+            if ((moving || rotating || scaling) && context.Selection.CurrentSet.Count > 1)
+            {
+                foreach (ESWorkbenchSelection candidate in context.Selection.CurrentSet)
+                {
+                    if (candidate == null || candidate.IsEmpty) continue;
+                    bool canTransform = moving
+                        ? context.Actions.Authoring.CanMove(candidate)
+                        : rotating
+                            ? context.Actions.Authoring.CanRotate(candidate)
+                            : context.Actions.Authoring.CanScale(candidate);
+                    if (!canTransform)
+                        continue;
+                    int candidateIndex = previewStableIds.IndexOf(candidate.StableId);
+                    if (candidateIndex < 0 || candidateIndex >= previewObjects.Count
+                        || previewObjects[candidateIndex] == null)
+                        continue;
+                    transformingSelections.Add(candidate);
+                    Transform candidateTransform = previewObjects[candidateIndex].transform;
+                    transformingStartPositions.Add(candidateTransform.position - preview.GroupOrigin);
+                    transformingStartValues.Add(
+                        rotating ? candidateTransform.eulerAngles : candidateTransform.localScale);
+                }
+            }
+            if (transformingSelections.Count == 0)
+            {
+                transformingSelections.Add(selection);
+                transformingStartPositions.Add(instance.transform.position - preview.GroupOrigin);
+                transformingStartValues.Add(rotating ? instance.transform.eulerAngles : instance.transform.localScale);
+            }
             transformStartValue = moving ? instance.transform.position - preview.GroupOrigin
                 : rotating ? instance.transform.eulerAngles : instance.transform.localScale;
             if (!moving && !transformGesture.Begin(
@@ -1205,6 +1290,10 @@ namespace ES
             bool shouldCommit = pendingTransformValid;
             bool commitMove = moving;
             bool commitRotate = rotating;
+            ESWorkbenchSelection[] batchSelections = transformingSelections.ToArray();
+            Vector3[] batchStarts = transformingStartPositions.ToArray();
+            Vector3[] batchTransformStarts = transformingStartValues.ToArray();
+            Vector3 batchStartValue = transformStartValue;
             StopTransform();
             gestureSession.Finish(ESWorkbenchPointerGestureSession.EndReason.Commit);
             pointerCoordinator.Release(
@@ -1214,11 +1303,65 @@ namespace ES
             ReleaseMouseControl();
             if (!shouldCommit) return;
             bool succeeded = commitMove
-                ? context.Actions.Authoring.TryMove(selection, value, out _)
+                ? CommitMoveSelections(selection, value, batchSelections, batchStarts, batchStartValue)
                 : commitRotate
-                    ? context.Actions.Authoring.TryRotate(selection, value, out _)
-                    : context.Actions.Authoring.TryScale(selection, value, out _);
+                    ? CommitRotateOrScaleSelections(
+                        selection, value, batchSelections, batchTransformStarts, batchStartValue, true)
+                    : CommitRotateOrScaleSelections(
+                        selection, value, batchSelections, batchTransformStarts, batchStartValue, false);
             if (!succeeded) RequestRebuild(false);
+        }
+
+        private bool CommitRotateOrScaleSelections(
+            ESWorkbenchSelection primarySelection,
+            Vector3 primaryTarget,
+            IReadOnlyList<ESWorkbenchSelection> selections,
+            IReadOnlyList<Vector3> startValues,
+            Vector3 startValue,
+            bool rotation)
+        {
+            if (selections == null || selections.Count <= 1)
+            {
+                return rotation
+                    ? context.Actions.Authoring.TryRotate(primarySelection, primaryTarget, out _)
+                    : context.Actions.Authoring.TryScale(primarySelection, primaryTarget, out _);
+            }
+            var targets = new List<Vector3>(startValues.Count);
+            if (rotation)
+            {
+                Vector3 delta = primaryTarget - startValue;
+                for (int i = 0; i < startValues.Count; i++)
+                    targets.Add(startValues[i] + delta);
+                return context.Actions.Authoring.TryRotateMany(selections, targets, out _);
+            }
+            Vector3 ratio = new Vector3(
+                SafeScaleRatio(primaryTarget.x, startValue.x),
+                SafeScaleRatio(primaryTarget.y, startValue.y),
+                SafeScaleRatio(primaryTarget.z, startValue.z));
+            for (int i = 0; i < startValues.Count; i++)
+                targets.Add(Vector3.Scale(startValues[i], ratio));
+            return context.Actions.Authoring.TryScaleMany(selections, targets, out _);
+        }
+
+        private static float SafeScaleRatio(float target, float start)
+        {
+            return Mathf.Abs(start) > 0.0001f ? target / start : 1f;
+        }
+
+        private bool CommitMoveSelections(
+            ESWorkbenchSelection primarySelection,
+            Vector3 primaryTarget,
+            IReadOnlyList<ESWorkbenchSelection> selections,
+            IReadOnlyList<Vector3> startPositions,
+            Vector3 startValue)
+        {
+            if (selections == null || selections.Count <= 1)
+                return context.Actions.Authoring.TryMove(primarySelection, primaryTarget, out _);
+            Vector3 delta = primaryTarget - startValue;
+            var targets = new List<Vector3>(startPositions.Count);
+            for (int i = 0; i < startPositions.Count; i++)
+                targets.Add(preview.GroupOrigin + startPositions[i] + delta);
+            return context.Actions.Authoring.TryMoveMany(selections, targets, out _);
         }
 
         private bool TryHitPlacement(Rect rect, Vector2 guiPoint, out string stableId, out GameObject instance)
@@ -1438,6 +1581,30 @@ namespace ES
 
         private void ApplyPreviewTransform(string stableId, Vector3 value)
         {
+            if (transformingSelections.Count > 1)
+            {
+                Vector3 delta = value - transformStartValue;
+                Vector3 ratio = new Vector3(
+                    SafeScaleRatio(value.x, transformStartValue.x),
+                    SafeScaleRatio(value.y, transformStartValue.y),
+                    SafeScaleRatio(value.z, transformStartValue.z));
+                for (int i = 0; i < transformingSelections.Count; i++)
+                {
+                    int selectedIndex = previewStableIds.IndexOf(transformingSelections[i].StableId);
+                    if (selectedIndex < 0 || selectedIndex >= previewObjects.Count
+                        || previewObjects[selectedIndex] == null)
+                        continue;
+                    Transform selectedTransform = previewObjects[selectedIndex].transform;
+                    if (moving)
+                        selectedTransform.position =
+                            preview.GroupOrigin + transformingStartPositions[i] + delta;
+                    else if (rotating)
+                        selectedTransform.eulerAngles = transformingStartValues[i] + delta;
+                    else if (scaling)
+                        selectedTransform.localScale = Vector3.Scale(transformingStartValues[i], ratio);
+                }
+                return;
+            }
             int index = previewStableIds.IndexOf(stableId);
             if (index < 0 || index >= previewObjects.Count || previewObjects[index] == null) return;
             Transform target = previewObjects[index].transform;
@@ -1645,10 +1812,14 @@ namespace ES
                         new Vector3(poi.position.x, SampleWorldHeight(poi.position), poi.position.y));
                     bool selected = context?.Selection.Current?.StableId == stableId;
                     bool hovered = !selected && hover.IsHovered(stableId);
-                    Handles.color = selected
-                        ? ESWorldMapEditorPresentation.Selection
-                        : hovered ? new Color(0.28f, 0.82f, 1f, 0.92f)
-                        : new Color(0.95f, 0.64f, 0.18f, 0.85f);
+                    Handles.color = ESWorkbenchViewportRenderStyle.WithAlpha(
+                        ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                            selected
+                                ? ESWorkbenchViewportRenderStyle.InteractionState.Selected
+                                : hovered
+                                    ? ESWorkbenchViewportRenderStyle.InteractionState.Hover
+                                    : ESWorkbenchViewportRenderStyle.InteractionState.Normal),
+                        selected || hovered ? 0.92f : 0.85f);
                     Vector3 world = preview.GroupOrigin + position;
                     float markerPixels = feel.ResolveMarkerRadiusPixels(selected, hovered);
                     float markerRadius = Mathf.Max(0.05f, definition.chunkSize * 0.01f);
@@ -1679,7 +1850,9 @@ namespace ES
             float radius = Mathf.Max(0.5f, terrainBrushRadius?.Invoke() ?? 8f);
             Handles.SetCamera(preview.Camera);
             Color previous = Handles.color;
-            Handles.color = new Color(0.18f, 0.86f, 1f, 0.96f);
+            Handles.color = ESWorkbenchViewportRenderStyle.WithAlpha(
+                ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                    ESWorkbenchViewportRenderStyle.InteractionState.Brush), 0.96f);
             for (int i = 0; i < terrainBrushGuidePoints.Length; i++)
             {
                 float angle = i / (float)(terrainBrushGuidePoints.Length - 1) * Mathf.PI * 2f;
@@ -1690,6 +1863,23 @@ namespace ES
                     + new Vector3(world2D.x, SampleWorldHeight(world2D) + 0.05f, world2D.y);
             }
             Handles.DrawAAPolyLine(2f, terrainBrushGuidePoints);
+            float strength = Mathf.Clamp01(terrainBrushStrength?.Invoke() ?? 0.65f);
+            var innerPoints = new Vector3[terrainBrushGuidePoints.Length];
+            float innerRadius = radius * (0.18f + strength * 0.72f);
+            for (int i = 0; i < innerPoints.Length; i++)
+            {
+                float angle = i / (float)(innerPoints.Length - 1) * Mathf.PI * 2f;
+                Vector2 world2D = new Vector2(
+                    point.x + Mathf.Cos(angle) * innerRadius,
+                    point.z + Mathf.Sin(angle) * innerRadius);
+                innerPoints[i] = preview.GroupOrigin
+                    + new Vector3(world2D.x, SampleWorldHeight(world2D) + 0.07f, world2D.y);
+            }
+            Handles.color = ESWorkbenchViewportRenderStyle.WithAlpha(
+                ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                    ESWorkbenchViewportRenderStyle.InteractionState.Brush),
+                0.28f + strength * 0.58f);
+            Handles.DrawAAPolyLine(1f + strength * 1.5f, innerPoints);
             Vector3 center = preview.GroupOrigin + point + Vector3.up * 0.08f;
             float cross = Mathf.Clamp(radius * 0.14f, 0.35f, 2.5f);
             Handles.DrawLine(center - Vector3.right * cross, center + Vector3.right * cross);
@@ -1716,7 +1906,8 @@ namespace ES
             }
             Handles.SetCamera(preview.Camera);
             Color previous = Handles.color;
-            Handles.color = new Color(1f, 0.72f, 0.18f, 1f);
+            Handles.color = ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                ESWorkbenchViewportRenderStyle.InteractionState.Selected);
             Bounds targetBounds = ResolveTransformTargetBounds();
             Handles.DrawWireCube(targetBounds.center, targetBounds.size);
             if (moving)
@@ -1764,7 +1955,8 @@ namespace ES
 
             Handles.SetCamera(preview.Camera);
             Color previous = Handles.color;
-            Handles.color = new Color(1f, 0.72f, 0.18f, 1f);
+            Handles.color = ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                ESWorkbenchViewportRenderStyle.InteractionState.Selected);
             Handles.DrawAAPolyLine(3f, corners);
 
             Vector3 start = preview.GroupOrigin
@@ -1811,9 +2003,10 @@ namespace ES
             if (dropPreviewItem == null || dropPreviewPositions.Count == 0 || preview?.Camera == null) return;
             Handles.SetCamera(preview.Camera);
             Color previous = Handles.color;
-            Handles.color = dropPreviewState.Accepted
-                ? new Color(0.2f, 0.82f, 1f, 1f)
-                : new Color(1f, 0.22f, 0.25f, 1f);
+            Handles.color = ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                dropPreviewState.Accepted
+                    ? ESWorkbenchViewportRenderStyle.InteractionState.PreviewAllowed
+                    : ESWorkbenchViewportRenderStyle.InteractionState.PreviewRejected);
             for (int i = 0; i < dropPreviewPositions.Count; i++)
             {
                 Vector3 position = dropPreviewPositions[i];
@@ -1865,7 +2058,8 @@ namespace ES
             if (index < 0 || index >= previewObjects.Count || previewObjects[index] == null) return;
             Color previous = Handles.color;
             Handles.SetCamera(preview.Camera);
-            Handles.color = ESWorldMapEditorPresentation.Selection;
+            Handles.color = ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                ESWorkbenchViewportRenderStyle.InteractionState.Selected);
             Bounds bounds = previewBounds.Calculate(previewObjects[index]);
             Handles.DrawWireCube(bounds.center, bounds.size);
             Handles.color = previous;
@@ -1882,7 +2076,9 @@ namespace ES
             if (index < 0 || index >= previewObjects.Count || previewObjects[index] == null) return;
             Color previous = Handles.color;
             Handles.SetCamera(preview.Camera);
-            Handles.color = new Color(0.28f, 0.82f, 1f, 0.78f);
+            Handles.color = ESWorkbenchViewportRenderStyle.WithAlpha(
+                ESWorkbenchViewportRenderStyle.ResolveInteractionColor(
+                    ESWorkbenchViewportRenderStyle.InteractionState.Hover), 0.78f);
             Bounds bounds = previewBounds.Calculate(previewObjects[index]);
             Handles.DrawWireCube(bounds.center, bounds.size * 1.03f);
             Handles.color = previous;
@@ -1984,6 +2180,9 @@ namespace ES
             pendingTransformValid = false;
             transformingStableId = string.Empty;
             transformingSelection = null;
+            transformingSelections.Clear();
+            transformingStartPositions.Clear();
+            transformingStartValues.Clear();
             moveAnchor.Reset();
             transformGesture.Reset();
             edgePanSession.Stop();
@@ -2457,16 +2656,19 @@ namespace ES
 
         private void DrawOverlay(Rect rect)
         {
+            string pointerStatus = lastPointerWorldPositionValid
+                ? string.Format("坐标 {0:0.##}, {1:0.##}, {2:0.##}",
+                    lastPointerWorldPosition.x,
+                    lastPointerWorldPosition.y,
+                    lastPointerWorldPosition.z)
+                : readOnlyGameView ? "构图预览" : "未选择对象";
             ESWorkbenchViewportOverlay.DrawNavigationToolbar(
                 rect,
                 cameraNavigation,
                 readOnlyGameView ? "游戏构图预览" : "世界三维作者视图",
-                lastPointerWorldPositionValid
-                    ? string.Format("指针 {0:0.##}, {1:0.##}, {2:0.##}",
-                        lastPointerWorldPosition.x,
-                        lastPointerWorldPosition.y,
-                        lastPointerWorldPosition.z)
-                    : readOnlyGameView ? "运行时构图只读投影" : "未选择对象",
+                pointerStatus + " · " + ResolveViewportGizmoStatus()
+                    + " · 碰撞 " + (readOnlyGameView ? "投影" : "作者配置")
+                    + " · 导航 " + (readOnlyGameView ? "相机" : "轨道"),
                 FrameAll,
                 readOnlyGameView);
 
@@ -2491,6 +2693,15 @@ namespace ES
                 new Rect(details.x + 8f, details.y + 3f, details.width - 16f, details.height - 6f),
                 new GUIContent(fidelitySummary, fidelitySummary),
                 EditorStyles.wordWrappedMiniLabel);
+        }
+
+        private string ResolveViewportGizmoStatus()
+        {
+            if (paintingTerrain) return "操控 笔刷";
+            if (moving) return "操控 移动";
+            if (rotating) return "操控 旋转";
+            if (scaling) return "操控 缩放";
+            return readOnlyGameView ? "操控 只读" : "操控 选择";
         }
 
         private void DrawGameModeButton(Rect rect, ESWorldGamePreviewCameraMode mode, string title)
@@ -2518,6 +2729,9 @@ namespace ES
                         ApplyGameCameraDefaults(definition, min, max);
                         playerCameraNavigationSynchronized = false;
                         ConfigureGamePreviewCamera(definition);
+                        // 相机模式同时改变可见内容合同（总览必须恢复被流式裁剪的远端放置物）。
+                        // 仅更新相机不会重建 PreviewScene，导致之前已裁剪的对象无法回来。
+                        Rebuild(false);
                     }
                     renderHost.MarkDirtyRepaint();
                 }
@@ -2593,6 +2807,9 @@ namespace ES
         private bool ShouldIncludeGamePlacement(ESWorldMapDefinition definition, ESWorldMapPrefabPlacement placement)
         {
             if (!readOnlyGameView || definition?.streaming == null || !definition.streaming.enabled) return true;
+            // 总览是作者验收地图完整性的视图，不能沿用玩家/第三人称的
+            // 流式半径裁剪；否则即使点击“总览”，远端正式放置物仍会消失。
+            if (gameCameraMode == ESWorldGamePreviewCameraMode.Overview) return true;
             Vector2 min = definition.worldMin;
             Vector2 max = definition.worldMax;
             Vector2 anchor = ResolveGameAnchor(definition, min, max);

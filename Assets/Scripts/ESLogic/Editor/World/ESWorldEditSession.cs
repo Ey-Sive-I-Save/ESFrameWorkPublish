@@ -161,6 +161,7 @@ namespace ES
         private bool externalConflict;
         private string conflictOwnerSessionId = string.Empty;
         private bool disposed;
+        private bool recoveryStateCleared;
         private readonly HashSet<string> changedPaths = new HashSet<string>(StringComparer.Ordinal);
         private ESWorldMapAsset baselineSnapshot;
         private SerializedObject serializedBaseline;
@@ -334,6 +335,27 @@ namespace ES
         public void Dispose()
         {
             if (disposed) return;
+
+            // OnDisable/Domain Reload may arrive between a direct Draft mutation and
+            // NotifyDraftChanged/SynchronizeDraftAfterUndoRedo. Capture that latest
+            // in-memory state before destroying the temporary object. This is recovery
+            // persistence only; it never commits Source or changes the formal asset.
+            try
+            {
+                if (!recoveryStateCleared && Draft != null)
+                {
+                    SerializedDraft?.ApplyModifiedProperties();
+                    string draftJson = Serialize(Draft);
+                    draftHash = ComputeHash(draftJson);
+                    RebuildChangedPaths("definition");
+                    Persist(draftJson);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[ESWorldEditSession] 关闭前无法持久化最新草稿恢复快照：" + exception.Message);
+            }
+
             disposed = true;
             UnregisterActiveSession();
             SerializedDraft?.Dispose();
@@ -348,6 +370,7 @@ namespace ES
 
         internal void ClearRecoveryState()
         {
+            recoveryStateCleared = true;
             SessionState.EraseString(SessionPrefix + identity + BaselineSuffix);
             SessionState.EraseString(SessionPrefix + identity + BaselineHashSuffix);
             SessionState.EraseString(SessionPrefix + identity + DraftSuffix);
@@ -424,6 +447,7 @@ namespace ES
 
         private void Persist(string draftJson = null)
         {
+            recoveryStateCleared = false;
             SessionState.SetString(SessionPrefix + identity + BaselineSuffix, baselineJson ?? string.Empty);
             SessionState.SetString(SessionPrefix + identity + BaselineHashSuffix, baselineHash ?? string.Empty);
             SessionState.SetString(SessionPrefix + identity + DraftSuffix, draftJson ?? Serialize(Draft));

@@ -1561,6 +1561,7 @@ namespace ES.EditorInternal
                     RecordFallbackUndo(undoName);
                     serializedProperty.managedReferenceValue = value;
                     serializedProperty.serializedObject.ApplyModifiedProperties();
+                    MarkSerializedTargetsDirty(serializedProperty.serializedObject);
                     GUI.changed = true;
                     return true;
                 }
@@ -1627,29 +1628,38 @@ namespace ES.EditorInternal
                         return false;
                     }
 
-                    var serializedObject = new SerializedObject(target);
-                    SerializedProperty serializedProperty = serializedObject.FindProperty(Property.UnityPropertyPath);
-                    if (serializedProperty == null
-                        || serializedProperty.propertyType != SerializedPropertyType.ManagedReference)
+                    SerializedObject serializedObject = null;
+                    try
                     {
-                        error = "第 " + (i + 1) + " 个目标没有兼容的 SerializeReference 字段。";
-                        return false;
-                    }
+                        serializedObject = new SerializedObject(target);
+                        SerializedProperty serializedProperty = serializedObject.FindProperty(Property.UnityPropertyPath);
+                        if (serializedProperty == null
+                            || serializedProperty.propertyType != SerializedPropertyType.ManagedReference)
+                        {
+                            error = "第 " + (i + 1) + " 个目标没有兼容的 SerializeReference 字段。";
+                            return false;
+                        }
 
-                    object targetValue = null;
-                    if (concreteType != null
-                        && !TryCreateValue(concreteType, out targetValue, out string createError))
+                        object targetValue = null;
+                        if (concreteType != null
+                            && !TryCreateValue(concreteType, out targetValue, out string createError))
+                        {
+                            error = "第 " + (i + 1) + " 个目标无法创建 "
+                                    + concreteType.Name + "：" + createError;
+                            return false;
+                        }
+
+                        assignments.Add(new ManagedReferenceTargetAssignment(
+                            target,
+                            serializedObject,
+                            serializedProperty,
+                            targetValue));
+                        serializedObject = null;
+                    }
+                    finally
                     {
-                        error = "第 " + (i + 1) + " 个目标无法创建 "
-                                + concreteType.Name + "：" + createError;
-                        return false;
+                        serializedObject?.Dispose();
                     }
-
-                    assignments.Add(new ManagedReferenceTargetAssignment(
-                        target,
-                        serializedObject,
-                        serializedProperty,
-                        targetValue));
                 }
 
                 if (!ESEditorSerializedMutation.TryApply(
@@ -1668,6 +1678,21 @@ namespace ES.EditorInternal
             {
                 error = exception.GetType().Name + "：" + exception.Message;
                 return false;
+            }
+            finally
+            {
+                for (int index = 0; index < assignments.Count; index++)
+                {
+                    try
+                    {
+                        assignments[index].SerializedObject?.Dispose();
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(new InvalidOperationException(
+                            "多态引用批量写入序列化视图释放失败。", exception));
+                    }
+                }
             }
         }
 
@@ -1718,6 +1743,24 @@ namespace ES.EditorInternal
 
             if (targets.Count > 0)
                 Undo.RecordObjects(targets.ToArray(), undoName);
+        }
+
+        private static void MarkSerializedTargetsDirty(SerializedObject serializedObject)
+        {
+            if (serializedObject == null)
+                return;
+            UnityEngine.Object[] targets = serializedObject.targetObjects;
+            if (targets == null)
+                return;
+            for (int i = 0; i < targets.Length; i++)
+            {
+                UnityEngine.Object target = targets[i];
+                if (target == null)
+                    continue;
+                EditorUtility.SetDirty(target);
+                if (PrefabUtility.IsPartOfPrefabInstance(target))
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+            }
         }
 
         private string GetUnresolvedManagedReferenceTypeName(object currentValue)
@@ -1797,6 +1840,21 @@ namespace ES.EditorInternal
             {
                 error = exception.GetType().Name + "：" + exception.Message;
                 return false;
+            }
+            finally
+            {
+                for (int index = 0; index < assignments.Count; index++)
+                {
+                    try
+                    {
+                        assignments[index].SerializedObject?.Dispose();
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(new InvalidOperationException(
+                            "多态引用批量写入序列化视图释放失败。", exception));
+                    }
+                }
             }
         }
 
@@ -2183,8 +2241,10 @@ namespace ES.EditorInternal
             }
 
             UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
-            EditorApplication.delayCall += () =>
+            EditorApplication.CallbackFunction delayedRebuild = null;
+            delayedRebuild = () =>
             {
+                EditorApplication.delayCall -= delayedRebuild;
                 try
                 {
                     ActiveEditorTracker.sharedTracker.ForceRebuild();
@@ -2195,6 +2255,7 @@ namespace ES.EditorInternal
 
                 UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
             };
+            EditorApplication.delayCall += delayedRebuild;
         }
     }
 }

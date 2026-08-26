@@ -56,6 +56,12 @@ namespace ES.EditorInternal {
         }
         public void TryGetOrAdd(Component go, ESGetAddOption option, IPropertyValueEntry entry)
         {
+            if (go == null || entry == null || entry.BaseValueType == null)
+            {
+                Debug.LogWarning("ESGetAdd无法执行：宿主对象或组件类型无效。");
+                return;
+            }
+
             Component cNow = null;
             Type componentType = entry.BaseValueType;
             if (option == ESGetAddOption.SelfOnly)
@@ -77,10 +83,17 @@ namespace ES.EditorInternal {
 
             if (cNow != null)
             {
-                Undo.RecordObject(go, "ES Get Component");
-                entry.WeakSmartValue = cNow;
-                EditorUtility.SetDirty(go);
-                PrefabUtility.RecordPrefabInstancePropertyModifications(go);
+                try
+                {
+                    Undo.RecordObject(go, "ES Get Component");
+                    entry.WeakSmartValue = cNow;
+                    EditorUtility.SetDirty(go);
+                    RecordPrefabInstanceModification(go);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning($"ESGetAdd写入已有组件引用失败：{exception.Message}");
+                }
             }
             else
             {
@@ -99,11 +112,34 @@ namespace ES.EditorInternal {
                     Debug.LogWarning($"ESGetAdd添加组件失败：{componentType.FullName}\n{e.Message}");
                     return;
                 }
-                Undo.RecordObject(go, "ES Add Component");
-                entry.WeakSmartValue = cNow;
-                EditorUtility.SetDirty(go);
-                PrefabUtility.RecordPrefabInstancePropertyModifications(go);
+                try
+                {
+                    Undo.RecordObject(go, "ES Add Component");
+                    entry.WeakSmartValue = cNow;
+                    EditorUtility.SetDirty(go);
+                    RecordPrefabInstanceModification(go);
+                }
+                catch (Exception exception)
+                {
+                    try
+                    {
+                        if (cNow != null)
+                            Undo.DestroyObjectImmediate(cNow);
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        Debug.LogException(new InvalidOperationException(
+                            "ESGetAdd赋值失败且新增组件回收失败。", cleanupException));
+                    }
+                    Debug.LogWarning($"ESGetAdd写入新增组件引用失败，已尝试回收组件：{exception.Message}");
+                }
             }
+        }
+
+        private static void RecordPrefabInstanceModification(Component host)
+        {
+            if (host != null && PrefabUtility.IsPartOfPrefabInstance(host))
+                PrefabUtility.RecordPrefabInstancePropertyModifications(host);
         }
 
         private static bool CanAddComponent(Type componentType)

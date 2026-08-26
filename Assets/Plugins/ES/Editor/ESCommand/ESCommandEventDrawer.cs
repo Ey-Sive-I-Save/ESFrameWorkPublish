@@ -80,6 +80,9 @@ namespace ES.Editor
             {
                 if (GUI.Button(clearRect, "清空"))
                 {
+                    if (!TryGetLiveTargets(commands.serializedObject, out UnityEngine.Object[] targets))
+                        return;
+                    Undo.RecordObjects(targets, "清空命令事件");
                     commands.ClearArray();
                     commands.serializedObject.ApplyModifiedProperties();
                 }
@@ -131,6 +134,9 @@ namespace ES.Editor
             Rect removeRect = new Rect(inner.xMax - 52f, inner.y, 52f, Line);
             if (GUI.Button(removeRect, "删除"))
             {
+                if (!TryGetLiveTargets(commands.serializedObject, out UnityEngine.Object[] targets))
+                    return;
+                Undo.RecordObjects(targets, "删除命令事件");
                 commands.DeleteArrayElementAtIndex(index);
                 commands.serializedObject.ApplyModifiedProperties();
                 return;
@@ -190,12 +196,92 @@ namespace ES.Editor
         private static void AddCommand(object userData)
         {
             AddCommandData data = (AddCommandData)userData;
-            SerializedProperty commands = data.commands;
-            int index = commands.arraySize;
-            commands.InsertArrayElementAtIndex(index);
-            SerializedProperty item = commands.GetArrayElementAtIndex(index);
-            item.managedReferenceValue = Activator.CreateInstance(data.type);
-            commands.serializedObject.ApplyModifiedProperties();
+            if (data.commands == null || string.IsNullOrEmpty(data.propertyPath))
+                return;
+
+            SerializedProperty insertedCommands = null;
+            try
+            {
+                SerializedObject serializedObject = data.commands.serializedObject;
+                if (serializedObject == null)
+                    return;
+                UnityEngine.Object[] targets = serializedObject.targetObjects;
+                if (targets == null || targets.Length == 0)
+                    return;
+                for (int i = 0; i < targets.Length; i++)
+                    if (targets[i] == null)
+                        return;
+
+                serializedObject.UpdateIfRequiredOrScript();
+                SerializedProperty commands = serializedObject.FindProperty(data.propertyPath);
+                if (commands == null || !commands.isArray)
+                    return;
+
+                // Construct before mutating the serialized array. A command type
+                // with a throwing constructor must not leave an empty element in
+                // the drawer's draft state.
+                ESCommand command = Activator.CreateInstance(data.type) as ESCommand;
+                if (command == null)
+                    return;
+
+                int index = commands.arraySize;
+                Undo.RecordObjects(targets, "添加命令事件");
+                commands.InsertArrayElementAtIndex(index);
+                insertedCommands = commands;
+                SerializedProperty item = commands.GetArrayElementAtIndex(index);
+                if (item == null)
+                {
+                    commands.DeleteArrayElementAtIndex(index);
+                    insertedCommands = null;
+                    return;
+                }
+                item.managedReferenceValue = command;
+                serializedObject.ApplyModifiedProperties();
+            }
+            catch (Exception exception)
+            {
+                // The only mutation in this block is the new array slot. If a
+                // managed-reference assignment fails, remove that slot before
+                // returning so the drawer cannot expose a half-created command.
+                try
+                {
+                    if (insertedCommands != null && insertedCommands.isArray
+                        && insertedCommands.arraySize > 0)
+                        insertedCommands.DeleteArrayElementAtIndex(insertedCommands.arraySize - 1);
+                }
+                catch
+                {
+                    // Preserve the original failure as the actionable evidence.
+                }
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandEventDrawer] 添加命令失败，目标可能已失效。", exception));
+            }
+        }
+
+        private static bool TryGetLiveTargets(SerializedObject serializedObject,
+            out UnityEngine.Object[] targets)
+        {
+            targets = null;
+            if (serializedObject == null)
+                return false;
+
+            try
+            {
+                targets = serializedObject.targetObjects;
+                if (targets == null || targets.Length == 0)
+                    return false;
+                for (int i = 0; i < targets.Length; i++)
+                    if (targets[i] == null)
+                        return false;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESCommandEventDrawer] 多对象目标已失效，取消结构修改。", exception));
+                targets = null;
+                return false;
+            }
         }
 
         private static void EnsureCommandTypes()
@@ -240,11 +326,13 @@ namespace ES.Editor
         private readonly struct AddCommandData
         {
             public readonly SerializedProperty commands;
+            public readonly string propertyPath;
             public readonly Type type;
 
             public AddCommandData(SerializedProperty commands, Type type)
             {
                 this.commands = commands.Copy();
+                this.propertyPath = commands.propertyPath;
                 this.type = type;
             }
         }

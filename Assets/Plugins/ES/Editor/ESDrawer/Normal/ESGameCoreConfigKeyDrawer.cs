@@ -13,9 +13,16 @@ namespace ES.EditorInternal
         private const float Gap = 2f;
         private const float PanelPadding = 6f;
         private static readonly Color PanelAccent = new Color(1f, 0.72f, 0.18f, 0.95f);
+        private static readonly string[] RequiredPropertyNames =
+        {
+            "enumKey", "stringKey", "definitionGuid", "definitionLocalFileId", "definitionTypeName"
+        };
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
+            if (!HasRequiredProperties(property))
+                return EditorGUIUtility.singleLineHeight * 2f + PanelPadding * 2f;
+
             ESGameCoreDefinitionLocator.Candidate current = ESGameCoreDefinitionLocator.FindCandidate(property, ResolveEnumType());
             int lines = 5 + (ESGameCoreDefinitionLocator.IsStale(property, current) ? 1 : 0) + (property.isExpanded ? 3 : 0);
             return lines * Line + (lines - 1) * Gap + PanelPadding * 2f;
@@ -24,6 +31,14 @@ namespace ES.EditorInternal
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             EditorGUI.BeginProperty(position, label, property);
+            if (!HasRequiredProperties(property))
+            {
+                Rect errorRect = new Rect(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight * 2f);
+                EditorGUI.HelpBox(errorRect, "GameCore 配置键的序列化结构不完整，请重新导入或迁移该资产。", MessageType.Error);
+                EditorGUI.EndProperty();
+                return;
+            }
+
             int previousIndent = EditorGUI.indentLevel;
             float previousLabelWidth = EditorGUIUtility.labelWidth;
             EditorGUI.indentLevel = 0;
@@ -121,6 +136,19 @@ namespace ES.EditorInternal
             EditorGUI.EndProperty();
         }
 
+        private static bool HasRequiredProperties(SerializedProperty property)
+        {
+            if (property == null)
+                return false;
+
+            for (int i = 0; i < RequiredPropertyNames.Length; i++)
+            {
+                if (property.FindPropertyRelative(RequiredPropertyNames[i]) == null)
+                    return false;
+            }
+            return true;
+        }
+
         protected abstract Type ResolveEnumType();
 
         private ESConfigKeyUsage ResolveUsage()
@@ -198,6 +226,9 @@ namespace ES.EditorInternal
             Type enumType,
             ESConfigKeyUsage usage)
         {
+            if (property == null || property.serializedObject == null || property.serializedObject.targetObject == null)
+                return;
+
             IReadOnlyList<ESGameCoreDefinitionLocator.Candidate> candidates = ESGameCoreDefinitionLocator.GetCandidates(enumType);
             var entries = new List<ESSearchDropdown.Entry>(candidates.Count);
             string currentGuid = property.FindPropertyRelative("definitionGuid")?.stringValue ?? string.Empty;
@@ -270,7 +301,8 @@ namespace ES.EditorInternal
             Type enumType,
             ESConfigKeyUsage usage)
         {
-            property.serializedObject.Update();
+            if (!TryPrepareMutation(property, out _, out _, out _, out _, out _, out _))
+                return;
             if (property.serializedObject.targetObject is ScriptableObject definition
                 && ESGameCoreDefinitionLocator.TryCreateCandidate(definition, enumType, out ESGameCoreDefinitionLocator.Candidate candidate))
                 ApplyCandidate(property, enumType, usage, candidate);
@@ -282,6 +314,13 @@ namespace ES.EditorInternal
             ESConfigKeyUsage usage,
             ESGameCoreDefinitionLocator.Candidate candidate)
         {
+            if (candidate == null
+                || !TryPrepareMutation(property, out SerializedObject serializedObject,
+                    out SerializedProperty enumKey, out SerializedProperty stringKey,
+                    out SerializedProperty definitionGuid, out SerializedProperty definitionLocalFileId,
+                    out SerializedProperty definitionTypeName))
+                return;
+
             int resolvedEnumKey = candidate.enumKey;
             string resolvedStringKey = candidate.stringKey ?? string.Empty;
             if (usage == ESConfigKeyUsage.Declaration
@@ -294,19 +333,21 @@ namespace ES.EditorInternal
                     out resolvedStringKey))
                 return;
 
-            property.serializedObject.Update();
-            property.FindPropertyRelative("enumKey").intValue = resolvedEnumKey;
-            property.FindPropertyRelative("stringKey").stringValue = resolvedStringKey ?? string.Empty;
+            RecordMutationUndo(property, "同步 GameCore 配置键");
+            enumKey.intValue = resolvedEnumKey;
+            stringKey.stringValue = resolvedStringKey ?? string.Empty;
             if (resolvedEnumKey == candidate.enumKey
                 && string.Equals(resolvedStringKey, candidate.stringKey, StringComparison.Ordinal))
             {
-                property.FindPropertyRelative("definitionGuid").stringValue = candidate.guid ?? string.Empty;
-                property.FindPropertyRelative("definitionLocalFileId").longValue = candidate.localFileId;
-                property.FindPropertyRelative("definitionTypeName").stringValue = candidate.assetTypeName ?? string.Empty;
+                definitionGuid.stringValue = candidate.guid ?? string.Empty;
+                definitionLocalFileId.longValue = candidate.localFileId;
+                definitionTypeName.stringValue = candidate.assetTypeName ?? string.Empty;
             }
             else
             {
-                ClearDefinitionIdentity(property);
+                definitionGuid.stringValue = string.Empty;
+                definitionLocalFileId.longValue = 0;
+                definitionTypeName.stringValue = string.Empty;
             }
             Apply(property);
             if (usage == ESConfigKeyUsage.Declaration)
@@ -320,6 +361,10 @@ namespace ES.EditorInternal
             int enumKey,
             string stringKey)
         {
+            if (!TryPrepareMutation(property, out _, out SerializedProperty enumKeyProperty,
+                    out SerializedProperty stringKeyProperty, out SerializedProperty definitionGuid,
+                    out SerializedProperty definitionLocalFileId, out SerializedProperty definitionTypeName))
+                return;
             if (usage == ESConfigKeyUsage.Declaration
                 && !TryResolveDeclarationConflict(
                     property,
@@ -330,10 +375,12 @@ namespace ES.EditorInternal
                     out stringKey))
                 return;
 
-            property.serializedObject.Update();
-            property.FindPropertyRelative("enumKey").intValue = enumKey;
-            property.FindPropertyRelative("stringKey").stringValue = stringKey ?? string.Empty;
-            ClearDefinitionIdentity(property);
+            RecordMutationUndo(property, "修改 GameCore 配置键");
+            enumKeyProperty.intValue = enumKey;
+            stringKeyProperty.stringValue = stringKey ?? string.Empty;
+            definitionGuid.stringValue = string.Empty;
+            definitionLocalFileId.longValue = 0;
+            definitionTypeName.stringValue = string.Empty;
             Apply(property);
             if (usage == ESConfigKeyUsage.Declaration)
                 ESGameCoreDefinitionLocator.ClearCache();
@@ -350,6 +397,11 @@ namespace ES.EditorInternal
         {
             resolvedEnumKey = requestedEnumKey;
             resolvedStringKey = requestedStringKey ?? string.Empty;
+            if (property?.serializedObject != null && property.serializedObject.isEditingMultipleObjects)
+            {
+                Debug.LogWarning("[ESGameCore][ConfigKey] 定义型 ConfigKey 不支持多对象同时写入，已取消本次修改。");
+                return false;
+            }
             if (!(property.serializedObject.targetObject is ScriptableObject owner))
                 return true;
 
@@ -402,11 +454,65 @@ namespace ES.EditorInternal
 
         private static void Clear(SerializedProperty property)
         {
-            property.serializedObject.Update();
-            property.FindPropertyRelative("enumKey").intValue = 0;
-            property.FindPropertyRelative("stringKey").stringValue = string.Empty;
-            ClearDefinitionIdentity(property);
+            if (!TryPrepareMutation(property, out _, out SerializedProperty enumKey,
+                    out SerializedProperty stringKey, out SerializedProperty definitionGuid,
+                    out SerializedProperty definitionLocalFileId, out SerializedProperty definitionTypeName))
+                return;
+            RecordMutationUndo(property, "清空 GameCore 配置键");
+            enumKey.intValue = 0;
+            stringKey.stringValue = string.Empty;
+            definitionGuid.stringValue = string.Empty;
+            definitionLocalFileId.longValue = 0;
+            definitionTypeName.stringValue = string.Empty;
             Apply(property);
+        }
+
+        private static bool TryPrepareMutation(
+            SerializedProperty property,
+            out SerializedObject serializedObject,
+            out SerializedProperty enumKey,
+            out SerializedProperty stringKey,
+            out SerializedProperty definitionGuid,
+            out SerializedProperty definitionLocalFileId,
+            out SerializedProperty definitionTypeName)
+        {
+            serializedObject = null;
+            enumKey = null;
+            stringKey = null;
+            definitionGuid = null;
+            definitionLocalFileId = null;
+            definitionTypeName = null;
+            if (property == null || property.serializedObject == null)
+                return false;
+
+            try
+            {
+                serializedObject = property.serializedObject;
+                UnityEngine.Object[] targets = serializedObject.targetObjects;
+                if (targets == null || targets.Length == 0)
+                    return false;
+                for (int i = 0; i < targets.Length; i++)
+                    if (targets[i] == null)
+                        return false;
+
+                serializedObject.UpdateIfRequiredOrScript();
+                enumKey = property.FindPropertyRelative("enumKey");
+                stringKey = property.FindPropertyRelative("stringKey");
+                definitionGuid = property.FindPropertyRelative("definitionGuid");
+                definitionLocalFileId = property.FindPropertyRelative("definitionLocalFileId");
+                definitionTypeName = property.FindPropertyRelative("definitionTypeName");
+                if (enumKey == null || stringKey == null || definitionGuid == null
+                    || definitionLocalFileId == null || definitionTypeName == null)
+                    return false;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESGameCoreConfigKeyDrawer] 目标或序列化字段已失效，取消写回。", exception));
+                serializedObject = null;
+                return false;
+            }
         }
 
         private static void ClearDefinitionIdentity(SerializedProperty property)
@@ -427,7 +533,22 @@ namespace ES.EditorInternal
         {
             property.serializedObject.ApplyModifiedProperties();
             foreach (UnityEngine.Object target in property.serializedObject.targetObjects)
-                if (target != null) EditorUtility.SetDirty(target);
+            {
+                if (target == null)
+                    continue;
+                EditorUtility.SetDirty(target);
+                if (PrefabUtility.IsPartOfPrefabInstance(target))
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+            }
+        }
+
+        private static void RecordMutationUndo(SerializedProperty property, string undoName)
+        {
+            if (property?.serializedObject == null)
+                return;
+            UnityEngine.Object[] targets = property.serializedObject.targetObjects;
+            if (targets != null && targets.Length > 0)
+                Undo.RecordObjects(targets, undoName);
         }
 
         private static void LocateDefinitionAsset(SerializedProperty property, Type enumType)
@@ -793,8 +914,22 @@ namespace ES.EditorInternal
             if (rebuildTables && !report.HasErrors)
                 RebuildTables(items, ref report);
             if (repair && report.repaired != 0)
-                AssetDatabase.SaveAssets();
+                SaveItemAssets(items);
             return report;
+        }
+
+        private static void SaveItemAssets(IEnumerable<ItemDataInfo> items)
+        {
+            var paths = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ItemDataInfo item in items ?? Enumerable.Empty<ItemDataInfo>())
+            {
+                string path = item == null ? string.Empty : AssetDatabase.GetAssetPath(item);
+                if (string.IsNullOrWhiteSpace(path) || !paths.Add(path))
+                    continue;
+                UnityEngine.Object asset = AssetDatabase.LoadMainAssetAtPath(path);
+                if (asset != null)
+                    AssetDatabase.SaveAssetIfDirty(asset);
+            }
         }
 
         private static List<ItemDataInfo> FindItems()
@@ -1045,7 +1180,8 @@ namespace ES.EditorInternal
                     bool changed = item.EnsureActiveKindData();
                     if (changed)
                         EditorUtility.SetDirty(item);
-                    AssetDatabase.SaveAssets();
+                    if (changed)
+                        AssetDatabase.SaveAssetIfDirty(item);
                     ESItemDataValidationCode current = item.ValidateConfiguration();
                     itemWorkflowMessageType = current == ESItemDataValidationCode.Valid ? MessageType.Info : MessageType.Error;
                     itemWorkflowResult = changed ? "已整理当前 Item 配置。" : "当前 Item 无需整理。";

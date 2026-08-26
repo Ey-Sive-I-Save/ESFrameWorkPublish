@@ -171,12 +171,30 @@ namespace ES
                 stringKey.SetSTR(infoKey);
 
             Undo.RecordObject(targetGroup as ScriptableObject, "SO Table Create Group Info");
-            AssetDatabase.AddObjectToAsset(infoAsset, groupAssetPath);
-            targetGroup._TryAddInfoToDic(infoKey, infoAsset);
-            EditorUtility.SetDirty(targetGroup as ScriptableObject);
-            AssetDatabase.ImportAsset(groupAssetPath, ImportAssetOptions.ForceUpdate);
-            createdInfo = true;
-            return infoAsset;
+            bool dictionaryAdded = false;
+            try
+            {
+                AssetDatabase.AddObjectToAsset(infoAsset, groupAssetPath);
+                targetGroup._TryAddInfoToDic(infoKey, infoAsset);
+                if (!ReferenceEquals(targetGroup.GetInfoByKey(infoKey), infoAsset))
+                    throw new InvalidOperationException("Group 未接受导入 Info，可能存在 Key 冲突。");
+                dictionaryAdded = true;
+                EditorUtility.SetDirty(targetGroup as ScriptableObject);
+                AssetDatabase.ImportAsset(groupAssetPath, ImportAssetOptions.ForceUpdate);
+                createdInfo = true;
+                return infoAsset;
+            }
+            catch (Exception exception)
+            {
+                if (dictionaryAdded)
+                    targetGroup._RemoveInfoFromDic(infoKey);
+                if (AssetDatabase.IsSubAsset(infoAsset))
+                    AssetDatabase.RemoveObjectFromAsset(infoAsset);
+                if (infoAsset != null)
+                    UnityEngine.Object.DestroyImmediate(infoAsset, true);
+                reason = "创建 Info 失败，已回滚：" + exception.Message;
+                return null;
+            }
         }
 
         private bool TryDeleteInfoFromGroup(ISoDataGroup targetGroup, string infoKey, out string reason)
@@ -203,6 +221,14 @@ namespace ES
             }
 
             string groupAssetPath = AssetDatabase.GetAssetPath(targetGroup as ScriptableObject);
+            string infoAssetPath = AssetDatabase.GetAssetPath(infoAsset);
+            if (string.IsNullOrEmpty(groupAssetPath)
+                || !string.Equals(groupAssetPath, infoAssetPath, StringComparison.Ordinal)
+                || !AssetDatabase.IsSubAsset(infoAsset))
+            {
+                reason = "拒绝删除：Info 不是当前 Group 资产中的子资产。";
+                return false;
+            }
             if (!string.IsNullOrEmpty(groupAssetPath))
                 Undo.RecordObject(targetGroup as ScriptableObject, "SO Table Delete Group Info");
 
@@ -227,6 +253,11 @@ namespace ES
             if (groupAsset == null)
             {
                 reason = "Group 不是可删除的 ScriptableObject。";
+                return false;
+            }
+            if (ESScriptableObjectClassification.GetClass(groupAsset) == ESScriptableObjectClass.GameCore)
+            {
+                reason = "GameCore Group 必须通过统一内容注册事务处理，禁止从 SO Table 规则直接删除。";
                 return false;
             }
 

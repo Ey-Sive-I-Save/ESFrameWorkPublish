@@ -29,15 +29,29 @@ namespace ES
 
             EnsureFolder(DefaultFolder);
 
+            bool createdTarget = false;
             if (target == null)
             {
                 target = ScriptableObject.CreateInstance<ESSoTableDataRule>();
                 target.name = "ESSoTableDataRule";
-                AssetDatabase.CreateAsset(target, DefaultAssetPath);
+                try
+                {
+                    AssetDatabase.CreateAsset(target, DefaultAssetPath);
+                }
+                catch
+                {
+                    if (target != null && !EditorUtility.IsPersistent(target))
+                        Object.DestroyImmediate(target);
+                    throw;
+                }
+                Undo.RegisterCreatedObjectUndo(target, "创建独立 SO 表格规则");
+                createdTarget = true;
             }
 
             if (source != null && source != target)
             {
+                if (!createdTarget)
+                    Undo.RecordObject(target, "迁移旧 SO 表格规则");
                 EditorUtility.CopySerialized(source, target);
                 target.name = "ESSoTableDataRule";
                 EditorUtility.SetDirty(target);
@@ -49,7 +63,7 @@ namespace ES
                 Debug.Log("未找到旧 SO 表格规则，已创建空的独立规则资产：" + DefaultAssetPath, target);
             }
 
-            AssetDatabase.SaveAssets();
+            AssetDatabase.SaveAssetIfDirty(target);
             AssetDatabase.Refresh();
             Selection.activeObject = target;
             EditorGUIUtility.PingObject(target);

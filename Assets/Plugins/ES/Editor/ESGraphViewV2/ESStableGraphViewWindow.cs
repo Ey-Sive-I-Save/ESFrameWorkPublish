@@ -92,6 +92,7 @@ namespace ES.EditorInternal
         private ToolbarSearchField searchField;
         private Label statusLabel;
         private IVisualElementScheduledItem searchSchedule;
+        private IVisualElementScheduledItem focusAfterOpenSchedule;
         private ToolbarLayoutMode toolbarLayoutMode = (ToolbarLayoutMode)byte.MaxValue;
         private GraphAsset autoSaveAsset;
         private double autoSaveDueTime;
@@ -142,6 +143,7 @@ namespace ES.EditorInternal
         {
             titleContent = new GUIContent("ES 稳定图 V2");
             minSize = MinimumWindowSize;
+            maxSize = new Vector2(1800f, 1200f);
         }
 
         private void PlaceInitialFloatingWindow()
@@ -462,6 +464,8 @@ namespace ES.EditorInternal
         private void OnDisable()
         {
             ESWindowFoundation.Suspend(this);
+            focusAfterOpenSchedule?.Pause();
+            focusAfterOpenSchedule = null;
             Undo.undoRedoPerformed -= OnUndoRedo;
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.projectChanged -= OnProjectChanged;
@@ -586,7 +590,16 @@ namespace ES.EditorInternal
         {
             if (graphView == null || graphView.Asset == null)
                 return;
-            graphView.schedule.Execute(() => graphView.SmoothFrameAll()).StartingIn(80);
+            focusAfterOpenSchedule?.Pause();
+            focusAfterOpenSchedule = graphView.schedule
+                .Execute(() =>
+                {
+                    focusAfterOpenSchedule = null;
+                    if (this == null || graphView == null || graphView.Asset == null)
+                        return;
+                    graphView.SmoothFrameAll();
+                })
+                .StartingIn(80);
         }
 
         private void ShowCreationTemplateMenu(VisualElement anchor)
@@ -725,6 +738,9 @@ namespace ES.EditorInternal
             GraphAsset asset = CreateDomainAsset(domainKind);
             try
             {
+                if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path) != null
+                    || File.Exists(Path.GetFullPath(path)))
+                    throw new InvalidOperationException("目标图资产已存在；请选择新的路径。");
                 PopulateDomainTemplate(asset, kind);
                 List<ESGraphValidationIssue> templateIssues = ESGraphAuthoringRegistry.Validate(asset);
                 ESGraphValidationIssue[] templateErrors = templateIssues
@@ -735,7 +751,7 @@ namespace ES.EditorInternal
                         + string.Join("\n", templateErrors.Select(issue => issue.code + "：" + issue.message)));
                 AssetDatabase.CreateAsset(asset, path);
                 EditorUtility.SetDirty(asset);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(asset);
                 Selection.activeObject = asset;
                 SetAsset(asset);
                 FocusAssetAfterOpen();
@@ -1445,6 +1461,7 @@ namespace ES.EditorInternal
         private readonly HashSet<string> nudgeBatchSelectionIds =
             new HashSet<string>(StringComparer.Ordinal);
         private IVisualElementScheduledItem nudgeFlushSchedule;
+        private IVisualElementScheduledItem rebuildSchedule;
         private string previewDragPortId;
         private string activeDragPortId;
         private readonly HashSet<string> compatibleHighlightPortIds = new HashSet<string>(StringComparer.Ordinal);
@@ -1681,6 +1698,8 @@ namespace ES.EditorInternal
             SelectionChanged = null;
             edgeAnimationSchedule?.Pause();
             edgeAnimationSchedule = null;
+            rebuildSchedule?.Pause();
+            rebuildSchedule = null;
             CancelViewAnimation();
             CancelEdgeReconnect();
             CancelEndpointReconnect();
@@ -1871,6 +1890,18 @@ namespace ES.EditorInternal
                 Asset.Nodes.Count + " 个节点 / " + Asset.Edges.Count + " 条连线");
             edgeFlowOverlay?.MarkDirtyRepaint();
             NotifySelectionChanged(true);
+        }
+
+        private void ScheduleRebuild()
+        {
+            rebuildSchedule?.Pause();
+            rebuildSchedule = schedule.Execute(() =>
+            {
+                rebuildSchedule = null;
+                if (Asset == null)
+                    return;
+                Rebuild();
+            }).StartingIn(1);
         }
 
         public void ApplyChange(ESGraphChange change)
@@ -5289,7 +5320,7 @@ namespace ES.EditorInternal
                     report?.Invoke("删除图元素失败：" + deleteResult.error);
                 BuildGraphIndexes();
                 RefreshPortRelationVisuals();
-                schedule.Execute(Rebuild).StartingIn(1);
+                ScheduleRebuild();
             }
 
             if (change.edgesToCreate != null && change.edgesToCreate.Count > 0)
@@ -5329,7 +5360,7 @@ namespace ES.EditorInternal
                     BuildGraphIndexes();
                     RefreshPortRelationVisuals();
                     edgeFlowOverlay?.MarkDirtyRepaint();
-                    schedule.Execute(Rebuild).StartingIn(1);
+                    ScheduleRebuild();
                 }
             }
 

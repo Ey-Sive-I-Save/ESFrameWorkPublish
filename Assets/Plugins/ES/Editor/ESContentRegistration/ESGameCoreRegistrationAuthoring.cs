@@ -510,6 +510,29 @@ namespace ES
             out string error)
         {
             alreadyLinked = false;
+            if (targetGroupAsset == null || targetGroup == null || source == null || dataInfo == null)
+            {
+                error = "Group、Source 或 DataInfo 无效。";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(groupKey))
+            {
+                error = "GameCore GroupKey 不能为空。";
+                return false;
+            }
+            string targetGroupPath = AssetDatabase.GetAssetPath(targetGroupAsset);
+            string sourcePath = AssetDatabase.GetAssetPath(source);
+            if (string.IsNullOrEmpty(targetGroupPath) || string.IsNullOrEmpty(sourcePath))
+            {
+                error = "Group 与 DataInfo 必须是已保存资产，拒绝对临时对象注册。";
+                return false;
+            }
+            Type infoType = targetGroup.GetSOInfoType();
+            if (infoType == null || !infoType.IsAssignableFrom(source.GetType()))
+            {
+                error = "DataInfo 类型不属于目标 Group。";
+                return false;
+            }
             ISoDataInfo existing = targetGroup.GetInfoByKey(groupKey);
             if (existing != null && !ReferenceEquals(existing, dataInfo))
             {

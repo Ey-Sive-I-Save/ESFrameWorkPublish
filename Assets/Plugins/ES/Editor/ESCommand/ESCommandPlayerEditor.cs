@@ -17,9 +17,17 @@ namespace ES.Editor
 
         public override void OnInspectorGUI()
         {
+            ESCommandPlayer player = target as ESCommandPlayer;
+            if (player == null || playOnStart == null || eventToPlay == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "ES Command Player 的目标对象或序列化结构已失效，当前 Inspector 已停止写入。",
+                    MessageType.Error);
+                return;
+            }
+
             serializedObject.Update();
 
-            ESCommandPlayer player = (ESCommandPlayer)target;
             DrawHeader(player);
 
             EditorGUILayout.Space(6f);

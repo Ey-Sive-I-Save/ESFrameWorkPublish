@@ -25,13 +25,19 @@ namespace ES
         private readonly HashSet<string> stringKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> duplicateStringKeys = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<EntryValidation> validation = new List<EntryValidation>();
+        private int multiEditValidationFrame = -1;
+        private int multiEditValidationCacheHash;
+        private string multiEditValidationPropertyPath;
+        private string multiEditValidationReason;
+        private bool multiEditValidationResult;
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
             float line = EditorGUIUtility.singleLineHeight;
             if (!property.isExpanded)
                 return line + 6f;
-            if (property.serializedObject.isEditingMultipleObjects)
+            if (property.serializedObject.isEditingMultipleObjects
+                && !TryGetSafeMultiEdit(property, out _))
                 return line * 3f + EditorGUIUtility.standardVerticalSpacing + 6f;
 
             SerializedProperty entries = property.FindPropertyRelative("entries");
@@ -97,10 +103,11 @@ namespace ES
                 if (!property.isExpanded)
                     return;
 
-                if (property.serializedObject.isEditingMultipleObjects)
+                if (property.serializedObject.isEditingMultipleObjects
+                    && !TryGetSafeMultiEdit(property, out string multiEditReason))
                 {
                     Rect multiRect = new Rect(content.x, content.y, content.width, line * 2f);
-                    EditorGUI.HelpBox(multiRect, "Enum/String 表暂不支持安全批量编辑，请单独选择一个对象。", MessageType.Info);
+                    EditorGUI.HelpBox(multiRect, multiEditReason, MessageType.Info);
                     return;
                 }
 
@@ -356,6 +363,8 @@ namespace ES
             SerializedProperty entries,
             ESEnumStringTableNewEntryMode mode)
         {
+            if (!BeginMutation(table, "ES 枚举字符串表添加条目"))
+                return;
             int index = entries.arraySize;
             entries.InsertArrayElementAtIndex(index);
             SerializedProperty entry = entries.GetArrayElementAtIndex(index);
@@ -378,6 +387,8 @@ namespace ES
             SerializedProperty entries,
             int index)
         {
+            if (!BeginMutation(table, "ES 枚举字符串表删除条目"))
+                return;
             entries.DeleteArrayElementAtIndex(index);
             CommitStructuralChange(table);
         }
@@ -388,23 +399,216 @@ namespace ES
             int from,
             int to)
         {
-            entries.MoveArrayElement(from, to);
+            if (!BeginMutation(table, "ES 枚举字符串表移动条目"))
+                return;
+            if (!entries.MoveArrayElement(from, to))
+                return;
             CommitStructuralChange(table);
         }
 
         private static void CommitStructuralChange(SerializedProperty table)
         {
             IncrementSerializedRevision(table);
-            table.serializedObject.ApplyModifiedProperties();
+            CommitMutation(table);
             GUI.changed = true;
             GUIUtility.ExitGUI();
         }
 
         private static void CommitValueChange(SerializedProperty table)
         {
+            RegisterMutationUndo(table?.serializedObject, "ES 枚举字符串表修改值");
             IncrementSerializedRevision(table);
-            table.serializedObject.ApplyModifiedProperties();
+            CommitMutation(table);
             GUI.changed = true;
+        }
+
+        private static bool BeginMutation(SerializedProperty table, string undoName)
+        {
+            SerializedObject serializedObject = table?.serializedObject;
+            if (serializedObject == null)
+                return false;
+            serializedObject.Update();
+            RegisterMutationUndo(serializedObject, undoName);
+            UnityEngine.Object[] targets = serializedObject.targetObjects;
+            if (targets == null || targets.Length == 0)
+                return false;
+            for (int i = 0; i < targets.Length; i++)
+                if (targets[i] == null)
+                    return false;
+            return true;
+        }
+
+        private static void RegisterMutationUndo(SerializedObject serializedObject, string undoName)
+        {
+            if (serializedObject == null)
+                return;
+            UnityEngine.Object[] targets = serializedObject.targetObjects;
+            if (targets != null && targets.Length > 0)
+                Undo.RegisterCompleteObjectUndo(targets, undoName);
+        }
+
+        private static void CommitMutation(SerializedProperty table)
+        {
+            SerializedObject serializedObject = table?.serializedObject;
+            if (serializedObject == null)
+                return;
+            serializedObject.ApplyModifiedProperties();
+            UnityEngine.Object[] targets = serializedObject.targetObjects;
+            if (targets == null)
+                return;
+            for (int i = 0; i < targets.Length; i++)
+            {
+                UnityEngine.Object target = targets[i];
+                if (target == null)
+                    continue;
+                EditorUtility.SetDirty(target);
+                if (PrefabUtility.IsPartOfPrefabInstance(target))
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+            }
+        }
+
+        /// <summary>
+        /// Multiple-object editing is safe only when every target exposes the same
+        /// entry shape and the same stable Enum/String identity at each index.
+        /// Unity can otherwise apply an index-based SerializedProperty write to
+        /// unrelated rows on different targets. In that case the drawer keeps the
+        /// existing read-only guard instead of guessing a merge policy.
+        /// </summary>
+        private bool TryGetSafeMultiEdit(SerializedProperty property, out string reason)
+        {
+            int cacheHash = BuildMultiEditValidationCacheHash(property, out string propertyPath);
+            if (multiEditValidationFrame == Time.frameCount
+                && multiEditValidationCacheHash == cacheHash
+                && string.Equals(multiEditValidationPropertyPath, propertyPath, StringComparison.Ordinal))
+            {
+                reason = multiEditValidationReason;
+                return multiEditValidationResult;
+            }
+
+            multiEditValidationFrame = Time.frameCount;
+            multiEditValidationCacheHash = cacheHash;
+            multiEditValidationPropertyPath = propertyPath;
+            multiEditValidationResult = ComputeSafeMultiEdit(property, out multiEditValidationReason);
+            reason = multiEditValidationReason;
+            return multiEditValidationResult;
+        }
+
+        private static int BuildMultiEditValidationCacheHash(
+            SerializedProperty property,
+            out string propertyPath)
+        {
+            propertyPath = property?.propertyPath ?? string.Empty;
+            SerializedObject serializedObject = property?.serializedObject;
+            UnityEngine.Object[] targets = serializedObject?.targetObjects;
+            if (serializedObject == null || targets == null)
+                return 0;
+
+            unchecked
+            {
+                int hash = StringComparer.Ordinal.GetHashCode(propertyPath);
+                hash = (hash * 397) ^ targets.Length;
+                for (int i = 0; i < targets.Length; i++)
+                    hash = (hash * 397) ^ (targets[i] != null ? targets[i].GetInstanceID() : 0);
+                return hash;
+            }
+        }
+
+        private static bool ComputeSafeMultiEdit(SerializedProperty property, out string reason)
+        {
+            reason = "Enum/String 表仅在所有目标的条目结构与稳定 Key 完全一致时支持批量编辑；请先统一结构。";
+            SerializedObject serializedObject = property?.serializedObject;
+            UnityEngine.Object[] targets = serializedObject?.targetObjects;
+            if (serializedObject == null || targets == null || targets.Length < 2)
+                return false;
+
+            int expectedCount = -1;
+            SerializedProperty firstEntries = null;
+            for (int targetIndex = 0; targetIndex < targets.Length; targetIndex++)
+            {
+                UnityEngine.Object target = targets[targetIndex];
+                if (target == null)
+                    return false;
+
+                SerializedObject targetSerializedObject = null;
+                try
+                {
+                    targetSerializedObject = new SerializedObject(target);
+                    targetSerializedObject.UpdateIfRequiredOrScript();
+                }
+                catch (Exception exception)
+                {
+                    reason = "批量编辑已停用：无法建立目标的序列化视图（" + exception.Message + "）。";
+                    targetSerializedObject?.Dispose();
+                    return false;
+                }
+
+                try
+                {
+                    SerializedProperty targetTable = targetSerializedObject.FindProperty(property.propertyPath);
+                    SerializedProperty targetEntries = targetTable?.FindPropertyRelative("entries");
+                    if (targetEntries == null || !targetEntries.isArray)
+                    {
+                        reason = "批量编辑已停用：存在目标缺少兼容的 entries 数组。";
+                        return false;
+                    }
+
+                if (expectedCount < 0)
+                {
+                    expectedCount = targetEntries.arraySize;
+                    firstEntries = targetEntries;
+                }
+                else if (targetEntries.arraySize != expectedCount)
+                {
+                    reason = "批量编辑已停用：目标的条目数量不同，不能按索引安全写回。";
+                    return false;
+                }
+
+                    for (int entryIndex = 0; entryIndex < expectedCount; entryIndex++)
+                    {
+                    SerializedProperty entry = targetEntries.GetArrayElementAtIndex(entryIndex);
+                    SerializedProperty hasEnumKey = entry.FindPropertyRelative("hasEnumKey");
+                    SerializedProperty enumKey = entry.FindPropertyRelative("enumKey");
+                    SerializedProperty stringKey = entry.FindPropertyRelative("stringKey");
+                    SerializedProperty value = entry.FindPropertyRelative("value");
+                    if (hasEnumKey == null || enumKey == null || stringKey == null || value == null)
+                    {
+                        reason = "批量编辑已停用：存在目标的条目字段结构不兼容。";
+                        return false;
+                    }
+
+                    if (targetIndex == 0)
+                        continue;
+
+                    SerializedProperty firstEntry = firstEntries.GetArrayElementAtIndex(entryIndex);
+                    SerializedProperty firstValue = firstEntry?.FindPropertyRelative("value");
+                    if (firstEntry == null
+                        || firstValue == null
+                        || firstEntry.FindPropertyRelative("hasEnumKey")?.boolValue != hasEnumKey.boolValue
+                        || firstEntry.FindPropertyRelative("enumKey")?.longValue != enumKey.longValue
+                        || firstValue.propertyType != value.propertyType
+                        || (firstValue.propertyType == SerializedPropertyType.ManagedReference
+                            && !string.Equals(
+                                firstValue.managedReferenceFullTypename,
+                                value.managedReferenceFullTypename,
+                                StringComparison.Ordinal))
+                        || !string.Equals(
+                            firstEntry.FindPropertyRelative("stringKey")?.stringValue,
+                            stringKey.stringValue,
+                            StringComparison.Ordinal))
+                    {
+                        reason = "批量编辑已停用：目标的稳定 Enum/String Key 顺序不同，不能按索引合并。";
+                        return false;
+                    }
+                    }
+                }
+                finally
+                {
+                    targetSerializedObject.Dispose();
+                }
+            }
+
+            reason = string.Empty;
+            return true;
         }
 
         private static void IncrementSerializedRevision(SerializedProperty table)

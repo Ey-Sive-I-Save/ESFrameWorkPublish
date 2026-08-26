@@ -26,10 +26,24 @@ namespace ES
         [HideLabel]
         public Dictionary<string, SoType> Infos = new Dictionary<string, SoType>();
         public string FileName => name;
-        public List<string> AllKeys => Infos.Keys.ToList();
-        public IEnumerable<ISoDataInfo> AllInfos => Infos.Values;//.Cast<ISoDataInfo>().ToList();
+        public List<string> AllKeys => Infos == null ? new List<string>() : Infos.Keys.ToList();
+        public IEnumerable<ISoDataInfo> AllInfos => Infos == null
+            ? Enumerable.Empty<ISoDataInfo>()
+            : Infos.Values;//.Cast<ISoDataInfo>().ToList();
         public void _TryAddInfoToDic(string s, ScriptableObject o)
         {
+            if (Infos == null)
+                Infos = new Dictionary<string, SoType>();
+            if (string.IsNullOrWhiteSpace(s))
+            {
+                Debug.LogWarning("拒绝写入空 Info Key：" + name);
+                return;
+            }
+            if (o == null)
+            {
+                Debug.LogWarning("拒绝写入空 Info 对象：" + s + " -> " + name);
+                return;
+            }
             if (Infos.ContainsKey(s))
             {
                 //键重复
@@ -39,15 +53,20 @@ namespace ES
             {
                 Infos.Add(s, typeMatch);
             }
+            else
+            {
+                Debug.LogWarning("Info 类型不匹配" + o.GetType().FullName + " 无法放入 " + name);
+            }
         }
         public bool NotContainsInfoKey(string s)
         {
+            if (Infos == null) return true;
             if (Infos.ContainsKey(s)) return false;
             else return true;
         }
         public ISoDataInfo GetInfoByKey(string k)
         {
-            if (Infos.ContainsKey(k))
+            if (Infos != null && Infos.ContainsKey(k))
             {
                 return Infos[k];
             }
@@ -64,13 +83,14 @@ namespace ES
         /// <summary>聚合启动入口：只转发已声明为 GameCore 的 Info，不反射、不猜测类型。</summary>
         public void InjectGameCoreTables()
         {
+            if (Infos == null) return;
             foreach (SoType info in Infos.Values)
                 if (info is IGameCoreSO gameCore)
                     gameCore.InjectGameCoreTables();
         }
         public void _RemoveInfoFromDic(string k)
         {
-            if (Infos.TryGetValue(k, out var info))
+            if (Infos != null && Infos.TryGetValue(k, out var info))
             {
                 Infos.Remove(k);
 
@@ -81,14 +101,19 @@ namespace ES
         
         public virtual IEnumerable<SoType> Query(Func<SoType, bool> predicate)
         {
+            if (Infos == null || predicate == null)
+                return Enumerable.Empty<SoType>();
             return Infos.Values.Where(predicate);
         }
         // 批量获取
         public virtual List<SoType> GetInfosByKeys(IEnumerable<string> keys)
         {
             var result = new List<SoType>();
+            if (Infos == null || keys == null)
+                return result;
             foreach (var key in keys)
             {
+                if (string.IsNullOrWhiteSpace(key)) continue;
                 if (Infos.TryGetValue(key, out var info))
                 {
                     result.Add(info);
@@ -99,8 +124,11 @@ namespace ES
         public virtual List<SoType> GetInfosByKeys(params string[] keys)
         {
             var result = new List<SoType>();
+            if (Infos == null || keys == null)
+                return result;
             foreach (var key in keys)
             {
+                if (string.IsNullOrWhiteSpace(key)) continue;
                 if (Infos.TryGetValue(key, out var info))
                 {
                     result.Add(info);
@@ -125,6 +153,7 @@ namespace ES
             {
                 if (info == null) continue;
 
+                if (Infos == null) continue;
                 foreach (var kvp in Infos)
                 {
                     if (ReferenceEquals(kvp.Value, info))
@@ -149,6 +178,7 @@ namespace ES
             {
                 if (info == null) continue;
 
+                if (Infos == null) continue;
                 foreach (var kvp in Infos)
                 {
                     if (ReferenceEquals(kvp.Value, info))

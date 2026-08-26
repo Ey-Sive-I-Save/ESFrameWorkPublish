@@ -43,6 +43,26 @@ namespace ES.EditorInternal
                     if (target == null || serializedObject == null)
                     {
                         error = "第 " + (index + 1) + " 个序列化目标已经失效。";
+                        if (serializedObject != null)
+                            serializedObject.Dispose();
+                        DisposeSerializedObjects(serializedObjects);
+                        return false;
+                    }
+                    bool targetIsBound = false;
+                    UnityEngine.Object[] serializedTargets = serializedObject.targetObjects;
+                    for (int targetIndex = 0; targetIndex < serializedTargets.Length; targetIndex++)
+                    {
+                        if (serializedTargets[targetIndex] == target)
+                        {
+                            targetIsBound = true;
+                            break;
+                        }
+                    }
+                    if (!targetIsBound)
+                    {
+                        error = "第 " + (index + 1) + " 个 SerializedObject 未绑定对应目标。";
+                        serializedObject.Dispose();
+                        DisposeSerializedObjects(serializedObjects);
                         return false;
                     }
                     undoTargets[index] = target;
@@ -52,6 +72,7 @@ namespace ES.EditorInternal
             catch (Exception exception)
             {
                 error = exception.GetType().Name + "：" + exception.Message;
+                DisposeSerializedObjects(serializedObjects);
                 return false;
             }
 
@@ -104,6 +125,28 @@ namespace ES.EditorInternal
                 if (!string.IsNullOrEmpty(refreshFailure))
                     error += "\n回滚后的视图同步失败：" + refreshFailure;
                 return false;
+            }
+            finally
+            {
+                DisposeSerializedObjects(serializedObjects);
+            }
+        }
+
+        internal static void DisposeSerializedObjects(IReadOnlyList<SerializedObject> serializedObjects)
+        {
+            if (serializedObjects == null)
+                return;
+            for (int index = 0; index < serializedObjects.Count; index++)
+            {
+                try
+                {
+                    serializedObjects[index]?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "批量序列化视图释放失败。", exception));
+                }
             }
         }
 

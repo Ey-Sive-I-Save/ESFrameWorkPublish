@@ -18,12 +18,21 @@ namespace ES.EditorInternal
         private const int AdvancedLineCount = 7;
         private const float PanelPadding = 6f;
         private static readonly Color PanelAccent = new Color(0.22f, 0.78f, 1f, 0.95f);
+        private static readonly string[] RequiredPropertyNames =
+        {
+            "enumKey", "stringKey", "guid", "localFileId", "assetTypeName",
+            "address", "groupName", "editorPath", "editorOnly", "alwaysLoaded"
+        };
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
+            if (!HasRequiredProperties(property))
+                return EditorGUIUtility.singleLineHeight * 2f + PanelPadding * 2f;
+
             ESAssetCatalogKeyPicker.Candidate current = ESAssetCatalogKeyPicker.FindCurrent(ResolveKind(), property);
             bool needsAttention = ESAssetCatalogKeyPicker.IsBoundSourceMissing(property, current)
-                || ESAssetCatalogKeyPicker.HasLibraryKeyConflict(current);
+                || ESAssetCatalogKeyPicker.HasLibraryKeyConflict(current)
+                || ESAssetCatalogKeyPicker.HasStaleBoundKey(property, current);
             int lines = 5 + (needsAttention ? 1 : 0) + (property.isExpanded ? AdvancedLineCount : 0);
             return lines * Line + (lines - 1) * Gap + PanelPadding * 2f;
         }
@@ -31,6 +40,14 @@ namespace ES.EditorInternal
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             EditorGUI.BeginProperty(position, label, property);
+            if (!HasRequiredProperties(property))
+            {
+                Rect errorRect = new Rect(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight * 2f);
+                EditorGUI.HelpBox(errorRect, "资源配置键的序列化结构不完整，请重新导入或迁移该资产。", MessageType.Error);
+                EditorGUI.EndProperty();
+                return;
+            }
+
             int previousIndent = EditorGUI.indentLevel;
             float previousLabelWidth = EditorGUIUtility.labelWidth;
             EditorGUI.indentLevel = 0;
@@ -47,16 +64,9 @@ namespace ES.EditorInternal
             SerializedProperty enumKey = property.FindPropertyRelative("enumKey");
             SerializedProperty stringKey = property.FindPropertyRelative("stringKey");
             ESAssetCatalogKeyPicker.Candidate current = ESAssetCatalogKeyPicker.FindCurrent(ResolveKind(), property);
-            if (SynchronizeBoundKey(property, current))
-            {
-                property.serializedObject.Update();
-                enumKey = property.FindPropertyRelative("enumKey");
-                stringKey = property.FindPropertyRelative("stringKey");
-                current = ESAssetCatalogKeyPicker.FindCurrent(ResolveKind(), property);
-            }
-
             bool isBoundSourceMissing = ESAssetCatalogKeyPicker.IsBoundSourceMissing(property, current);
             bool hasLibraryKeyConflict = ESAssetCatalogKeyPicker.HasLibraryKeyConflict(current);
+            bool hasStaleBoundKey = ESAssetCatalogKeyPicker.HasStaleBoundKey(property, current);
             bool isBoundToRegisteredSource = current != null && ESAssetCatalogKeyPicker.HasBoundIdentity(property);
             bool hasKeyConflict = current != null
                 && ESAssetCatalogKeyPicker.CountKeyMatches(ResolveKind(), current.enumKey, current.stringKey) > 1;
@@ -65,9 +75,9 @@ namespace ES.EditorInternal
             DrawHeader(row, ResolveTitle(property, label), "资源配置键 · " + ResolveKindDisplayName(ResolveKind()));
 
             row = NextLine(ref position);
-            string enumLabel = isBoundToRegisteredSource ? "枚举 Key（自动同步）" : "枚举 Key（可选）";
+            string enumLabel = isBoundToRegisteredSource ? "枚举 Key（绑定源可同步）" : "枚举 Key（可选）";
             Rect contentRect = EditorGUI.PrefixLabel(row, new GUIContent(enumLabel,
-                isBoundToRegisteredSource ? "关联资产存在时由 AssetLibrary 自动维护" : "通常不需要手填；从资产或下拉列表选择即可"));
+                isBoundToRegisteredSource ? "关联资产的 Library Key 变化时会提示手动同步" : "通常不需要手填；从资产或下拉列表选择即可"));
             DrawActionRow(contentRect, out Rect selectorRect, out Rect clearRect, out Rect locateRect);
             using (new EditorGUI.DisabledScope(isBoundToRegisteredSource))
             {
@@ -75,6 +85,7 @@ namespace ES.EditorInternal
                 EditorGUI.PropertyField(selectorRect, enumKey, GUIContent.none);
                 if (EditorGUI.EndChangeCheck())
                 {
+                    RecordMutationUndo(property, "清除资源配置关联");
                     ClearAssetIdentity(property);
                     Apply(property);
                 }
@@ -90,8 +101,8 @@ namespace ES.EditorInternal
 
             row = NextLine(ref position);
             Rect stringRect = EditorGUI.PrefixLabel(row, new GUIContent(
-                isBoundToRegisteredSource ? "字符串 Key（自动同步）" : "字符串 Key（可选）",
-                isBoundToRegisteredSource ? "关联资产存在时由 AssetLibrary 自动维护" : "需要稳定文本地址时使用；也可从项目内 Library/Catalog 选择。"));
+                isBoundToRegisteredSource ? "字符串 Key（绑定源可同步）" : "字符串 Key（可选）",
+                isBoundToRegisteredSource ? "关联资产的 Library Key 变化时会提示手动同步" : "需要稳定文本地址时使用；也可从项目内 Library/Catalog 选择。"));
             DrawStringSelectionRow(stringRect, out Rect stringInputRect, out Rect stringSelectRect);
             using (new EditorGUI.DisabledScope(isBoundToRegisteredSource))
             {
@@ -100,6 +111,7 @@ namespace ES.EditorInternal
                 if (EditorGUI.EndChangeCheck())
                 {
                     stringKey.stringValue = editedStringKey ?? string.Empty;
+                    RecordMutationUndo(property, "清除资源配置关联");
                     ClearAssetIdentity(property);
                     Apply(property);
                 }
@@ -116,6 +128,7 @@ namespace ES.EditorInternal
             {
                 if (selectedAsset == null)
                 {
+                    RecordMutationUndo(property, "清除资源配置关联");
                     ClearAssetIdentity(property);
                     Apply(property);
                 }
@@ -130,19 +143,32 @@ namespace ES.EditorInternal
                     Debug.LogWarning("[ESRes][ConfigKey] 无法打开注册入口：" + selectedAsset.name + "。" + registrationError, selectedAsset);
             }
 
-            if (isBoundSourceMissing || hasLibraryKeyConflict)
+            if (isBoundSourceMissing || hasLibraryKeyConflict || hasStaleBoundKey)
             {
                 row = NextLine(ref position);
                 Rect syncLabel = EditorGUI.PrefixLabel(row, new GUIContent(
-                    hasLibraryKeyConflict ? "Library Key conflict" : "Bound source missing",
+                    hasLibraryKeyConflict ? "Library Key conflict" : hasStaleBoundKey ? "Bound Key changed" : "Bound source missing",
                     hasLibraryKeyConflict
                         ? "The same asset has different Keys in multiple Libraries; resolve the Library conflict before synchronizing."
-                        : "The bound asset is no longer in any project Library/Catalog; reselect or register it."));
+                        : hasStaleBoundKey
+                            ? "The bound source has a different Library Key; review and explicitly synchronize it."
+                            : "The bound asset is no longer in any project Library/Catalog; reselect or register it."));
                 EditorGUI.HelpBox(syncLabel,
                     hasLibraryKeyConflict
-                        ? "同一资产在多个 Library 中配置了不同 Key。请先统一 Library Key，ConfigKey 才会自动同步。"
-                        : "已绑定的源资产不在项目内任何 Library/Catalog。请重新选择或收集该资产。",
+                        ? "同一资产在多个 Library 中配置了不同 Key。请先统一 Library Key，再执行显式同步。"
+                        : hasStaleBoundKey
+                            ? "绑定源的 Library Key 已变化。请确认后点击“同步绑定 Key”，不会在 Inspector 重绘时自动写入。"
+                            : "已绑定的源资产不在项目内任何 Library/Catalog。请重新选择或收集该资产。",
                     MessageType.Warning);
+                if (hasStaleBoundKey && !hasLibraryKeyConflict)
+                {
+                    Rect syncButton = new Rect(syncLabel.xMax - 86f, syncLabel.y, 82f, syncLabel.height);
+                    if (GUI.Button(syncButton, "同步绑定 Key", EditorStyles.miniButton))
+                    {
+                        ESAssetCatalogKeyPicker.ApplyCandidate(property, current);
+                        GUI.changed = true;
+                    }
+                }
             }
 
             string summary = current != null
@@ -170,6 +196,19 @@ namespace ES.EditorInternal
             EditorGUIUtility.labelWidth = previousLabelWidth;
             EditorGUI.indentLevel = previousIndent;
             EditorGUI.EndProperty();
+        }
+
+        private static bool HasRequiredProperties(SerializedProperty property)
+        {
+            if (property == null)
+                return false;
+
+            for (int i = 0; i < RequiredPropertyNames.Length; i++)
+            {
+                if (property.FindPropertyRelative(RequiredPropertyNames[i]) == null)
+                    return false;
+            }
+            return true;
         }
 
         protected abstract Type ResolveEnumType();
@@ -276,14 +315,17 @@ namespace ES.EditorInternal
 
         private static void Clear(SerializedProperty property)
         {
+            RecordMutationUndo(property, "清空资源配置");
             property.FindPropertyRelative("enumKey").intValue = 0;
             property.FindPropertyRelative("stringKey").stringValue = string.Empty;
-            ClearAssetIdentity(property);
+            ClearAssetIdentity(property, recordUndo: false);
             Apply(property);
         }
 
-        private static void ClearAssetIdentity(SerializedProperty property)
+        private static void ClearAssetIdentity(SerializedProperty property, bool recordUndo = true)
         {
+            if (recordUndo)
+                RecordMutationUndo(property, "清除资源配置关联");
             property.FindPropertyRelative("guid").stringValue = string.Empty;
             property.FindPropertyRelative("localFileId").longValue = 0;
             property.FindPropertyRelative("assetTypeName").stringValue = string.Empty;
@@ -292,17 +334,6 @@ namespace ES.EditorInternal
             property.FindPropertyRelative("editorPath").stringValue = string.Empty;
             property.FindPropertyRelative("editorOnly").boolValue = false;
             property.FindPropertyRelative("alwaysLoaded").boolValue = false;
-        }
-
-        private static bool SynchronizeBoundKey(SerializedProperty property, ESAssetCatalogKeyPicker.Candidate source)
-        {
-            if (property == null || property.hasMultipleDifferentValues || source == null
-                || ESAssetCatalogKeyPicker.HasLibraryKeyConflict(source)
-                || !ESAssetCatalogKeyPicker.IsStale(property, source))
-                return false;
-
-            ESAssetCatalogKeyPicker.ApplyCandidate(property, source);
-            return true;
         }
 
         private static void Locate(SerializedProperty property)
@@ -318,7 +349,22 @@ namespace ES.EditorInternal
         {
             property.serializedObject.ApplyModifiedProperties();
             foreach (UnityEngine.Object target in property.serializedObject.targetObjects)
-                if (target != null) EditorUtility.SetDirty(target);
+            {
+                if (target == null)
+                    continue;
+                EditorUtility.SetDirty(target);
+                if (PrefabUtility.IsPartOfPrefabInstance(target))
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+            }
+        }
+
+        private static void RecordMutationUndo(SerializedProperty property, string undoName)
+        {
+            if (property?.serializedObject == null)
+                return;
+            UnityEngine.Object[] targets = property.serializedObject.targetObjects;
+            if (targets != null && targets.Length > 0)
+                Undo.RecordObjects(targets, undoName);
         }
     }
 
@@ -428,6 +474,11 @@ namespace ES.EditorInternal
                 candidate.stringKey);
         }
 
+        public static bool HasStaleBoundKey(SerializedProperty property, Candidate candidate)
+        {
+            return HasBoundIdentity(property) && candidate != null && IsStale(property, candidate);
+        }
+
         public static UnityEngine.Object ResolveAsset(Candidate candidate)
         {
             if (candidate == null) return null;
@@ -526,6 +577,9 @@ namespace ES.EditorInternal
 
         public static void ShowMenu(Rect position, ESAssetReferKind kind, SerializedProperty property)
         {
+            if (property == null || property.serializedObject == null || property.serializedObject.targetObject == null)
+                return;
+
             EnsureLoaded();
             var entries = new List<ESSearchDropdown.Entry>();
             string currentGuid = property.FindPropertyRelative("guid")?.stringValue ?? string.Empty;
@@ -580,7 +634,10 @@ namespace ES.EditorInternal
             foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(path))
                 if (asset != null && AssetDatabase.TryGetGUIDAndLocalFileIdentifier(asset, out string assetGuid, out long fileId)
                     && assetGuid == guid && fileId == localFileId) return asset;
-            return AssetDatabase.LoadMainAssetAtPath(path);
+            // A stored sub-asset identity must never silently fall back to the main asset.
+            // Doing so would present a different object as the bound source after a fileId
+            // drift or sub-asset deletion.
+            return null;
         }
 
         public static void Invalidate()
@@ -1127,48 +1184,109 @@ namespace ES.EditorInternal
 
         public static void ApplyCandidate(SerializedProperty property, Candidate candidate, bool recordUndo = true)
         {
-            if (property == null || candidate == null)
+            if (candidate == null
+                || !TryPrepareMutation(property, out SerializedObject serializedObject,
+                    out SerializedProperty enumKey, out SerializedProperty stringKey,
+                    out SerializedProperty guid, out SerializedProperty localFileId,
+                    out SerializedProperty assetTypeName, out SerializedProperty editorPath,
+                    out SerializedProperty address, out SerializedProperty groupName,
+                    out SerializedProperty editorOnly, out SerializedProperty alwaysLoaded))
                 return;
 
             if (recordUndo)
             {
-                UnityEngine.Object[] targets = property.serializedObject.targetObjects
-                    .Where(target => target != null)
-                    .ToArray();
-                if (targets.Length > 0)
-                    Undo.RecordObjects(targets, "Synchronize AssetLibrary ConfigKey");
+                Undo.RecordObjects(serializedObject.targetObjects, "Synchronize AssetLibrary ConfigKey");
             }
-            property.serializedObject.Update();
-            property.FindPropertyRelative("enumKey").intValue = candidate.enumKey;
-            property.FindPropertyRelative("stringKey").stringValue = candidate.stringKey ?? string.Empty;
-            property.FindPropertyRelative("guid").stringValue = candidate.guid ?? string.Empty;
-            property.FindPropertyRelative("localFileId").longValue = NormalizeStoredLocalFileId(
+            enumKey.intValue = candidate.enumKey;
+            stringKey.stringValue = candidate.stringKey ?? string.Empty;
+            guid.stringValue = candidate.guid ?? string.Empty;
+            localFileId.longValue = NormalizeStoredLocalFileId(
                 candidate.guid,
                 candidate.localFileId,
                 candidate.assetPath);
-            property.FindPropertyRelative("assetTypeName").stringValue = candidate.assetTypeName ?? string.Empty;
-            property.FindPropertyRelative("editorPath").stringValue = candidate.assetPath ?? string.Empty;
-            property.FindPropertyRelative("address").stringValue = string.Empty;
-            property.FindPropertyRelative("groupName").stringValue = string.Empty;
-            property.FindPropertyRelative("editorOnly").boolValue = ESAssetPipelineIO.IsEditorOnly(candidate.assetPath, LoadAsset(candidate));
-            property.FindPropertyRelative("alwaysLoaded").boolValue = false;
+            assetTypeName.stringValue = candidate.assetTypeName ?? string.Empty;
+            editorPath.stringValue = candidate.assetPath ?? string.Empty;
+            address.stringValue = string.Empty;
+            groupName.stringValue = string.Empty;
+            editorOnly.boolValue = ESAssetPipelineIO.IsEditorOnly(candidate.assetPath, LoadAsset(candidate));
+            alwaysLoaded.boolValue = false;
             ESAssetConfigKeyDrawerBase.Apply(property);
         }
 
         private static void ClearCandidate(SerializedProperty property)
         {
-            property.serializedObject.Update();
-            property.FindPropertyRelative("enumKey").intValue = 0;
-            property.FindPropertyRelative("stringKey").stringValue = string.Empty;
-            property.FindPropertyRelative("guid").stringValue = string.Empty;
-            property.FindPropertyRelative("localFileId").longValue = 0;
-            property.FindPropertyRelative("assetTypeName").stringValue = string.Empty;
-            property.FindPropertyRelative("address").stringValue = string.Empty;
-            property.FindPropertyRelative("groupName").stringValue = string.Empty;
-            property.FindPropertyRelative("editorPath").stringValue = string.Empty;
-            property.FindPropertyRelative("editorOnly").boolValue = false;
-            property.FindPropertyRelative("alwaysLoaded").boolValue = false;
+            if (!TryPrepareMutation(property, out _, out SerializedProperty enumKey,
+                    out SerializedProperty stringKey, out SerializedProperty guid,
+                    out SerializedProperty localFileId, out SerializedProperty assetTypeName,
+                    out SerializedProperty editorPath, out SerializedProperty address,
+                    out SerializedProperty groupName, out SerializedProperty editorOnly,
+                    out SerializedProperty alwaysLoaded))
+                return;
+
+            Undo.RecordObjects(property.serializedObject.targetObjects, "清空资源配置");
+            enumKey.intValue = 0;
+            stringKey.stringValue = string.Empty;
+            guid.stringValue = string.Empty;
+            localFileId.longValue = 0;
+            assetTypeName.stringValue = string.Empty;
+            address.stringValue = string.Empty;
+            groupName.stringValue = string.Empty;
+            editorPath.stringValue = string.Empty;
+            editorOnly.boolValue = false;
+            alwaysLoaded.boolValue = false;
             ESAssetConfigKeyDrawerBase.Apply(property);
+        }
+
+        private static bool TryPrepareMutation(
+            SerializedProperty property,
+            out SerializedObject serializedObject,
+            out SerializedProperty enumKey,
+            out SerializedProperty stringKey,
+            out SerializedProperty guid,
+            out SerializedProperty localFileId,
+            out SerializedProperty assetTypeName,
+            out SerializedProperty editorPath,
+            out SerializedProperty address,
+            out SerializedProperty groupName,
+            out SerializedProperty editorOnly,
+            out SerializedProperty alwaysLoaded)
+        {
+            serializedObject = null;
+            enumKey = stringKey = guid = assetTypeName = editorPath = address = groupName = editorOnly = alwaysLoaded = null;
+            localFileId = null;
+            if (property == null || property.serializedObject == null)
+                return false;
+            try
+            {
+                serializedObject = property.serializedObject;
+                UnityEngine.Object[] targets = serializedObject.targetObjects;
+                if (targets == null || targets.Length == 0)
+                    return false;
+                for (int i = 0; i < targets.Length; i++)
+                    if (targets[i] == null)
+                        return false;
+                serializedObject.UpdateIfRequiredOrScript();
+                enumKey = property.FindPropertyRelative("enumKey");
+                stringKey = property.FindPropertyRelative("stringKey");
+                guid = property.FindPropertyRelative("guid");
+                localFileId = property.FindPropertyRelative("localFileId");
+                assetTypeName = property.FindPropertyRelative("assetTypeName");
+                editorPath = property.FindPropertyRelative("editorPath");
+                address = property.FindPropertyRelative("address");
+                groupName = property.FindPropertyRelative("groupName");
+                editorOnly = property.FindPropertyRelative("editorOnly");
+                alwaysLoaded = property.FindPropertyRelative("alwaysLoaded");
+                return enumKey != null && stringKey != null && guid != null && localFileId != null
+                    && assetTypeName != null && editorPath != null && address != null && groupName != null
+                    && editorOnly != null && alwaysLoaded != null;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "[ESAssetConfigKeyDrawer] 目标或序列化字段已失效，取消资源配置写回。", exception));
+                serializedObject = null;
+                return false;
+            }
         }
     }
 

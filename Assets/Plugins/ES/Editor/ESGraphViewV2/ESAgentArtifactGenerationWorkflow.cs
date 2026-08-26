@@ -45,6 +45,9 @@ namespace ES.EditorInternal
                 return false;
             try
             {
+                if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path) != null
+                    || File.Exists(Path.GetFullPath(path)))
+                    throw new InvalidOperationException("目标 Agent Authoring Graph 已存在；请选择新的路径。");
                 asset = ScriptableObject.CreateInstance<ESAgentAuthoringGraphAsset>();
                 Populate(asset, kind);
                 List<ESGraphValidationIssue> templateIssues = ESGraphAuthoringRegistry.Validate(asset);
@@ -57,7 +60,7 @@ namespace ES.EditorInternal
                 EnsureTemplateCanBake(asset, kind);
                 AssetDatabase.CreateAsset(asset, path);
                 EditorUtility.SetDirty(asset);
-                AssetDatabase.SaveAssets();
+                AssetDatabase.SaveAssetIfDirty(asset);
                 Selection.activeObject = asset;
                 ESStableGraphViewWindow.ShowWindow().OpenGraph(asset);
                 return true;
@@ -2235,6 +2238,17 @@ namespace ES.EditorInternal
                 throw new UnauthorizedAccessException("Agent Artifact 写入路径不能穿过 junction/symlink：" + path);
         }
 
+        internal static void EnsureProjectReadPath(string path)
+        {
+            string full = Path.GetFullPath(path);
+            string projectRoot = GetProjectRoot().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!string.Equals(full, projectRoot, StringComparison.OrdinalIgnoreCase)
+                && !full.StartsWith(projectRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Agent Artifact 读取路径越出项目根目录：" + path);
+            if (ContainsExistingReparsePoint(projectRoot, full))
+                throw new UnauthorizedAccessException("Agent Artifact 读取路径不能穿过 junction/symlink：" + path);
+        }
+
         private static void DeleteCandidateDirectory(string path)
         {
             string full = Path.GetFullPath(path);
@@ -3131,6 +3145,8 @@ namespace ES.EditorInternal
             EditorApplication.update += PollLauncher;
             AssemblyReloadEvents.beforeAssemblyReload -= DetachForReload;
             AssemblyReloadEvents.beforeAssemblyReload += DetachForReload;
+            EditorApplication.quitting -= DetachForReload;
+            EditorApplication.quitting += DetachForReload;
         }
 
         private static void PollLauncher()
@@ -3234,6 +3250,7 @@ namespace ES.EditorInternal
         {
             EditorApplication.update -= PollLauncher;
             AssemblyReloadEvents.beforeAssemblyReload -= DetachForReload;
+            EditorApplication.quitting -= DetachForReload;
             activeProcess?.Dispose();
             activeProcess = null;
             activeReport = null;
@@ -3766,6 +3783,7 @@ namespace ES.EditorInternal
             var window = GetWindow<ESAgentArtifactCandidateReviewWindow>();
             window.titleContent = new GUIContent("智能助手候选审查");
             window.minSize = new Vector2(820f, 560f);
+            window.maxSize = new Vector2(1800f, 1200f);
             window.requestDirectory = requestDirectory ?? string.Empty;
             window.Refresh();
             window.Show();

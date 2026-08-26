@@ -48,6 +48,7 @@ namespace ES.EditorInternal.Installer
 
         private static ESInstaller installer;
         private static bool dependencyCheckInProgress;
+        private const double PackageRequestTimeoutSeconds = 120d;
 
         private static bool TryBeginDependencyCheck()
         {
@@ -268,12 +269,12 @@ namespace ES.EditorInternal.Installer
             return result;
         }
 
-        private static async Task<InstalledPackageSnapshot> CaptureInstalledPackageSnapshotAsync()
+        private static async Task<InstalledPackageSnapshot> CaptureInstalledPackageSnapshotAsync(Func<bool> isValid = null)
         {
             try
             {
                 ListRequest request = Client.List(false, false);
-                await WaitForListRequestCompletion(request);
+                await WaitForListRequestCompletion(request, isValid);
                 if (request.Status == StatusCode.Success && request.Result != null)
                     return new InstalledPackageSnapshot(request.Result.ToArray(), null);
 
@@ -290,30 +291,94 @@ namespace ES.EditorInternal.Installer
             }
         }
 
-        private static Task WaitForListRequestCompletion(ListRequest request)
+        private static Task WaitForListRequestCompletion(ListRequest request, Func<bool> isValid = null)
         {
             var tcs = new TaskCompletionSource<bool>();
+            if (request == null)
+            {
+                tcs.SetException(new InvalidOperationException("ES Installer 收到空的 UPM ListRequest。"));
+                return tcs.Task;
+            }
+
+            double deadline = EditorApplication.timeSinceStartup + PackageRequestTimeoutSeconds;
             void CheckCompletion()
             {
-                if (request.IsCompleted)
+                if (isValid != null && !isValid())
                 {
                     EditorApplication.update -= CheckCompletion;
-                    tcs.SetResult(true);
+                    tcs.TrySetCanceled();
+                    return;
+                }
+
+                bool completed = false;
+                try
+                {
+                    completed = request.IsCompleted;
+                }
+                catch (Exception exception)
+                {
+                    EditorApplication.update -= CheckCompletion;
+                    tcs.TrySetException(exception);
+                    return;
+                }
+
+                if (completed)
+                {
+                    EditorApplication.update -= CheckCompletion;
+                    tcs.TrySetResult(true);
+                }
+                else if (EditorApplication.timeSinceStartup >= deadline)
+                {
+                    EditorApplication.update -= CheckCompletion;
+                    tcs.TrySetException(new TimeoutException(
+                        "ES Installer 等待 UPM ListRequest 超时。"));
                 }
             }
             EditorApplication.update += CheckCompletion;
             return tcs.Task;
         }
 
-        private static Task WaitForAddRequestCompletion(AddRequest request)
+        private static Task WaitForAddRequestCompletion(AddRequest request, Func<bool> isValid = null)
         {
             var tcs = new TaskCompletionSource<bool>();
+            if (request == null)
+            {
+                tcs.SetException(new InvalidOperationException("ES Installer 收到空的 UPM AddRequest。"));
+                return tcs.Task;
+            }
+
+            double deadline = EditorApplication.timeSinceStartup + PackageRequestTimeoutSeconds;
             void CheckCompletion()
             {
-                if (request.IsCompleted)
+                if (isValid != null && !isValid())
                 {
                     EditorApplication.update -= CheckCompletion;
-                    tcs.SetResult(true);
+                    tcs.TrySetCanceled();
+                    return;
+                }
+
+                bool completed = false;
+                try
+                {
+                    completed = request.IsCompleted;
+                }
+                catch (Exception exception)
+                {
+                    EditorApplication.update -= CheckCompletion;
+                    tcs.TrySetException(exception);
+                    return;
+                }
+
+                if (completed)
+                {
+                    EditorApplication.update -= CheckCompletion;
+                    tcs.TrySetResult(true);
+                }
+                else if (EditorApplication.timeSinceStartup >= deadline)
+                {
+                    EditorApplication.update -= CheckCompletion;
+                    tcs.TrySetException(new TimeoutException(
+                        "ES Installer 等待 UPM AddRequest 超时。"));
                 }
             }
             EditorApplication.update += CheckCompletion;
@@ -758,6 +823,7 @@ namespace ES.EditorInternal.Installer
         // UI状态
         private bool isRefreshingStatuses;
         private bool isMainPackageInstalled = false; // 主包是否已安装
+        private readonly Queue<ESPackageBase> pendingPackageInstallStateChecks = new Queue<ESPackageBase>();
 
         // 包选择相关
         private List<string> availablePackageIds = new List<string>();
@@ -783,6 +849,7 @@ namespace ES.EditorInternal.Installer
         {
             installer = GetOrCreateInstallerWindow();
             installer.minSize = new Vector2(600, 500);
+            installer.maxSize = new Vector2(1400, 1000);
             installer.Show();
             installer.Focus();
         }
@@ -1778,7 +1845,8 @@ namespace ES.EditorInternal.Installer
             await CheckPackageDependenciesAsync(currentProfile.mainPackage);
 
 
-            Repaint(); // 刷新UI
+            if (this != null)
+                Repaint(); // 刷新UI
         }
 
         /// <summary>
@@ -1786,63 +1854,52 @@ namespace ES.EditorInternal.Installer
         /// </summary>
         private async Task CheckPackageInstallStateAsync(ESPackageBase package)
         {
-            await Task.Run(() =>
-          {
+            if (package == null)
+                return;
+
+            // Unity 序列化对象、AssetDatabase 和类型检查不能从 Task.Run 后台线程访问。
+            // 这里保持所有包状态读取在 Editor 主线程完成，避免关闭/重载期间的数据竞态。
+            {
               // 检查文件夹是否存在
               string packagePath = GetSafePackageFolderPath(package);
 
               if (string.IsNullOrEmpty(packagePath) || !Directory.Exists(packagePath))
               {
                   package.installState = PackageInstallState.NotInstalled;
-                  return;
-              }
-
-              // 检查是否有.unitypackage文件
-              string[] packageFiles = Directory.GetFiles(packagePath, "*.unitypackage");
-
-              if (packageFiles.Length == 0)
-              {
-                  package.installState = PackageInstallState.NotInstalled;
-                  return;
-              }
-
-              // 如果有checkClass，检查类是否存在
-              if (!string.IsNullOrEmpty(package.checkClass))
-              {
-                  bool classExists = IsClassExists(package.checkClass);
-                  if (classExists)
-                  {
-                      package.installState = PackageInstallState.Installed;
-                  }
-                  else
-                  {
-                      package.installState = PackageInstallState.NotInstalled;
-                  }
-              }
-              // 如果有assetPath，检查资产路径是否存在
-              else if (!string.IsNullOrEmpty(package.assetPath))
-              {
-                  if (!TryResolveProjectAssetPath(package.assetPath, out string fullPath))
-                  {
-                      package.installState = PackageInstallState.NotInstalled;
-                      return;
-                  }
-                  // Debug.Log("Checking asset path: " + fullPath);
-                  if (File.Exists(fullPath) || Directory.Exists(fullPath))
-                  {
-                      package.installState = PackageInstallState.Installed;
-                  }
-                  else
-                  {
-                      package.installState = PackageInstallState.NotInstalled;
-                  }
               }
               else
               {
-                  // 没有checkClass或assetPath，只要有package文件就认为可以安装（但不一定已安装）
-                  package.installState = PackageInstallState.NotInstalled;
+                  // 检查是否有.unitypackage文件
+                  string[] packageFiles = Directory.GetFiles(packagePath, "*.unitypackage");
+                  if (packageFiles.Length == 0)
+                  {
+                      package.installState = PackageInstallState.NotInstalled;
+                  }
+                  else
+                  {
+                      // 如果有checkClass，检查类是否存在
+                      if (!string.IsNullOrEmpty(package.checkClass))
+                      {
+                          package.installState = IsClassExists(package.checkClass)
+                              ? PackageInstallState.Installed
+                              : PackageInstallState.NotInstalled;
+                      }
+                      // 如果有assetPath，检查资产路径是否存在
+                      else if (!string.IsNullOrEmpty(package.assetPath)
+                          && TryResolveProjectAssetPath(package.assetPath, out string fullPath))
+                      {
+                          package.installState = File.Exists(fullPath) || Directory.Exists(fullPath)
+                              ? PackageInstallState.Installed
+                              : PackageInstallState.NotInstalled;
+                      }
+                      else
+                      {
+                          // 没有checkClass或assetPath，只要有package文件就认为可以安装（但不一定已安装）
+                          package.installState = PackageInstallState.NotInstalled;
+                      }
+                  }
               }
-          });
+            }
 
             // 如果是主包，更新isMainPackageInstalled
             if (package.packageId == "es_main")
@@ -1850,7 +1907,16 @@ namespace ES.EditorInternal.Installer
                 isMainPackageInstalled = package.installState == PackageInstallState.Installed;
             }
 
-            EditorApplication.delayCall += () => Repaint(); // 在主线程刷新UI
+            EditorApplication.delayCall -= RepaintAfterPackageCheck;
+            EditorApplication.delayCall += RepaintAfterPackageCheck;
+            await Task.CompletedTask;
+        }
+
+        private void RepaintAfterPackageCheck()
+        {
+            EditorApplication.delayCall -= RepaintAfterPackageCheck;
+            if (this != null)
+                Repaint();
         }
 
         /// <summary>
@@ -1859,7 +1925,9 @@ namespace ES.EditorInternal.Installer
         private async Task CheckPackageDependenciesAsync(ESPackageBase package)
         {
             if (package == null) return;
-            InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync();
+            InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync(IsActiveInstaller);
+            if (!IsActiveInstaller())
+                return;
             if (!snapshot.IsAvailable)
             {
                 ShowStatus(snapshot.FailureMessage, MessageType.Error);
@@ -2067,6 +2135,9 @@ namespace ES.EditorInternal.Installer
 
         protected override void ESWindow_OnHostDisable()
         {
+            EditorApplication.delayCall -= RepaintAfterPackageCheck;
+            EditorApplication.delayCall -= CheckPendingPackageInstallState;
+            pendingPackageInstallStateChecks.Clear();
             AssetDatabase.importPackageCompleted -= OnTrustedImportCompleted;
             AssetDatabase.importPackageCancelled -= OnTrustedImportCancelled;
             AssetDatabase.importPackageFailed -= OnTrustedImportFailed;
@@ -3863,11 +3934,24 @@ namespace ES.EditorInternal.Installer
                 return;
             }
 
-            // 延迟检查安装状态
-            EditorApplication.delayCall += () =>
+            // 延迟检查安装状态；使用可撤销命名回调，避免窗口关闭后仍启动检查。
+            EditorApplication.delayCall -= CheckPendingPackageInstallState;
+            pendingPackageInstallStateChecks.Enqueue(package);
+            EditorApplication.delayCall += CheckPendingPackageInstallState;
+        }
+
+        private void CheckPendingPackageInstallState()
+        {
+            EditorApplication.delayCall -= CheckPendingPackageInstallState;
+            if (!IsActiveInstaller() || pendingPackageInstallStateChecks.Count == 0)
+                return;
+
+            while (pendingPackageInstallStateChecks.Count > 0)
             {
-                _ = CheckPackageInstallStateAsync(package);
-            };
+                ESPackageBase package = pendingPackageInstallStateChecks.Dequeue();
+                if (package != null)
+                    _ = CheckPackageInstallStateAsync(package);
+            }
         }
 
         /// <summary>
@@ -4098,7 +4182,8 @@ namespace ES.EditorInternal.Installer
             }
 
             ShowStatus("正在检查所有Unity官方包...", MessageType.Info);
-            InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync();
+            InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync(IsActiveInstaller);
+            if (!IsActiveInstaller()) return;
             if (!snapshot.IsAvailable)
             {
                 ShowStatus(snapshot.FailureMessage, MessageType.Error);
@@ -4120,6 +4205,7 @@ namespace ES.EditorInternal.Installer
             foreach (var dependency in currentProfile.mainPackage.unityDependencies.Where(d => !d.isInstalled))
             {
                 await InstallUnityPackageDependency(dependency);
+                if (!IsActiveInstaller()) return;
                 await Task.Delay(100); // 给安装一些时间
             }
 
@@ -4136,7 +4222,8 @@ namespace ES.EditorInternal.Installer
             }
             try
             {
-                InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync();
+                InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync(IsActiveInstaller);
+                if (!IsActiveInstaller()) return;
                 if (!snapshot.IsAvailable)
                     throw new InvalidOperationException(snapshot.FailureMessage);
                 dependency.isInstalled = CheckUnityPackageInstalled(dependency, snapshot.Packages);
@@ -4175,7 +4262,15 @@ namespace ES.EditorInternal.Installer
                 return;
             }
 
-            await WaitForAddRequestCompletion(request);
+            try
+            {
+                await WaitForAddRequestCompletion(request, IsActiveInstaller);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            if (!IsActiveInstaller()) return;
 
             try
             {
@@ -4213,7 +4308,8 @@ namespace ES.EditorInternal.Installer
 
             try
             {
-                InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync();
+                InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync(IsActiveInstaller);
+                if (!IsActiveInstaller()) return;
                 if (!snapshot.IsAvailable)
                     throw new InvalidOperationException(snapshot.FailureMessage);
                 dependency.isInstalled = CheckGitPackageInstalled(dependency, snapshot.Packages);
@@ -4258,7 +4354,15 @@ namespace ES.EditorInternal.Installer
                 return;
             }
 
-            await WaitForAddRequestCompletion(request);
+            try
+            {
+                await WaitForAddRequestCompletion(request, IsActiveInstaller);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            if (!IsActiveInstaller()) return;
 
             try
             {
@@ -4322,7 +4426,8 @@ namespace ES.EditorInternal.Installer
             }
 
             ShowStatus("正在检查所有Git包...", MessageType.Info);
-            InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync();
+            InstalledPackageSnapshot snapshot = await CaptureInstalledPackageSnapshotAsync(IsActiveInstaller);
+            if (!IsActiveInstaller()) return;
             if (!snapshot.IsAvailable)
             {
                 ShowStatus(snapshot.FailureMessage, MessageType.Error);
@@ -4344,6 +4449,7 @@ namespace ES.EditorInternal.Installer
             foreach (var dependency in currentProfile.mainPackage.gitDependencies.Where(d => !d.isInstalled))
             {
                 await InstallGitPackageDependency(dependency);
+                if (!IsActiveInstaller()) return;
                 await Task.Delay(100);
             }
 
@@ -4364,6 +4470,7 @@ namespace ES.EditorInternal.Installer
             foreach (var dependency in currentProfile.mainPackage.userDependencies)
             {
                 await CheckUserPackageDependency(dependency);
+                if (!IsActiveInstaller()) return;
             }
 
             ShowStatus("用户包检查完成", MessageType.Info);
@@ -4493,6 +4600,7 @@ namespace ES.EditorInternal.Installer
 
                 // 2. 基于同一 canonical profile 检查包和四类依赖状态。
                 await CheckAllPackagesInstallStateAsync();
+                if (!IsActiveInstaller()) return;
 
                 ShowStatus("所有状态刷新完成", MessageType.Info);
             }
@@ -4504,8 +4612,11 @@ namespace ES.EditorInternal.Installer
             finally
             {
                 isRefreshingStatuses = false;
-                ESWindow_CurrentPageContext?.RefreshPageActions();
-                Repaint();
+                if (IsActiveInstaller())
+                {
+                    ESWindow_CurrentPageContext?.RefreshPageActions();
+                    Repaint();
+                }
             }
         }
 
@@ -4677,9 +4788,15 @@ namespace ES.EditorInternal.Installer
         /// </summary>
         private void ShowStatus(string message, MessageType type = MessageType.Info)
         {
+            if (!IsActiveInstaller()) return;
             statusMessage = message;
             statusType = type;
             Repaint();
+        }
+
+        private bool IsActiveInstaller()
+        {
+            return this != null && ReferenceEquals(installer, this);
         }
 
         #endregion

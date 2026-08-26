@@ -369,6 +369,14 @@ namespace ES
 
         public override void OnInspectorGUI()
         {
+            if (catalogId == null || formatVersion == null || bindings == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "运行时字体目录的序列化结构不完整，当前 Inspector 已停止写入；请检查资产版本或执行迁移。",
+                    MessageType.Error);
+                return;
+            }
+
             serializedObject.UpdateIfRequiredOrScript();
             DrawSummary();
             DrawActions();

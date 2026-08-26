@@ -14,7 +14,14 @@ namespace ES.EditorInternal
 
         public override void OnInspectorGUI()
         {
-            GraphAsset graph = (GraphAsset)target;
+            GraphAsset graph = target as GraphAsset;
+            if (graph == null || graph.Nodes == null || graph.Edges == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "稳定图资产目标或序列化集合已失效，当前 Inspector 已停止读取。",
+                    MessageType.Error);
+                return;
+            }
             EditorGUILayout.HelpBox(
                 "图资产是节点、端口和连线的唯一保存权威。请通过稳定图编辑器进行修改。",
                 MessageType.Info);

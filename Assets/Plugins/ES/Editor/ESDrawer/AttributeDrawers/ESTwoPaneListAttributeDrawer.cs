@@ -12,6 +12,7 @@ namespace ES.EditorInternal
         private const float SearchHeight = 20f;
         private const float RowHeight = 24f;
         private const float Gap = 6f;
+        private const int MaxStateEntries = 256;
 
         private static readonly System.Collections.Generic.Dictionary<string, int> SelectedIndexByPath =
             new System.Collections.Generic.Dictionary<string, int>(64);
@@ -61,7 +62,12 @@ namespace ES.EditorInternal
         private void DrawLeftPane(Rect rect, IList list, SerializedProperty serializedProperty)
         {
             Rect toolbar = new Rect(rect.x + Gap, rect.y + Gap, rect.width - Gap * 2f, ToolbarHeight);
-            EditorGUI.LabelField(toolbar, Attribute.leftTitle + "  " + list.Count + " 项", EditorStyles.boldLabel);
+            bool isMultiObject = serializedProperty.serializedObject != null
+                && serializedProperty.serializedObject.isEditingMultipleObjects;
+            EditorGUI.LabelField(toolbar,
+                Attribute.leftTitle + "  " + list.Count + " 项"
+                + (isMultiObject ? "（多对象时禁用结构操作）" : string.Empty),
+                EditorStyles.boldLabel);
 
             Rect addRect = new Rect(toolbar.xMax - 136f, toolbar.y, 24f, ToolbarHeight);
             Rect duplicateRect = new Rect(toolbar.xMax - 108f, toolbar.y, 24f, ToolbarHeight);
@@ -69,7 +75,7 @@ namespace ES.EditorInternal
             Rect upRect = new Rect(toolbar.xMax - 52f, toolbar.y, 24f, ToolbarHeight);
             Rect downRect = new Rect(toolbar.xMax - 24f, toolbar.y, 24f, ToolbarHeight);
 
-            bool canResize = !list.IsFixedSize && !list.IsReadOnly;
+            bool canResize = !isMultiObject && !list.IsFixedSize && !list.IsReadOnly;
             GUI.enabled = canResize;
             if (GUI.Button(addRect, "+"))
                 AddElement(serializedProperty);
@@ -83,11 +89,11 @@ namespace ES.EditorInternal
                 RemoveElement(serializedProperty, selectedIndex);
             GUI.enabled = true;
 
-            GUI.enabled = list.Count > 1 && selectedIndex > 0;
+            GUI.enabled = !isMultiObject && list.Count > 1 && selectedIndex > 0;
             if (GUI.Button(upRect, "\u2191"))
                 MoveElement(serializedProperty, selectedIndex, selectedIndex - 1);
 
-            GUI.enabled = list.Count > 1 && selectedIndex < list.Count - 1;
+            GUI.enabled = !isMultiObject && list.Count > 1 && selectedIndex < list.Count - 1;
             if (GUI.Button(downRect, "\u2193"))
                 MoveElement(serializedProperty, selectedIndex, selectedIndex + 1);
             GUI.enabled = true;
@@ -179,43 +185,100 @@ namespace ES.EditorInternal
 
         private void AddElement(SerializedProperty property)
         {
-            property.serializedObject.Update();
+            if (!HasLiveProperty(property))
+                return;
+
+            if (!BeginStructuralMutation(property, "ES 列表添加元素"))
+                return;
             property.arraySize++;
             SetSelectedIndex(property.arraySize - 1);
-            property.serializedObject.ApplyModifiedProperties();
+            CommitStructuralMutation(property);
         }
 
         private void DuplicateElement(SerializedProperty property, int index)
         {
-            if (index < 0 || index >= property.arraySize)
+            if (!HasLiveProperty(property) || index < 0 || index >= property.arraySize)
                 return;
 
-            property.serializedObject.Update();
+            if (!BeginStructuralMutation(property, "ES 列表复制元素"))
+                return;
             property.InsertArrayElementAtIndex(index);
             SetSelectedIndex(index + 1);
-            property.serializedObject.ApplyModifiedProperties();
+            CommitStructuralMutation(property);
         }
 
         private void RemoveElement(SerializedProperty property, int index)
         {
-            if (index < 0 || index >= property.arraySize)
+            if (!HasLiveProperty(property) || index < 0 || index >= property.arraySize)
                 return;
 
-            property.serializedObject.Update();
+            if (!BeginStructuralMutation(property, "ES 列表删除元素"))
+                return;
             property.DeleteArrayElementAtIndex(index);
             SetSelectedIndex(Mathf.Clamp(index, 0, property.arraySize - 1));
-            property.serializedObject.ApplyModifiedProperties();
+            CommitStructuralMutation(property);
         }
 
         private void MoveElement(SerializedProperty property, int from, int to)
         {
-            if (from < 0 || from >= property.arraySize || to < 0 || to >= property.arraySize || from == to)
+            if (!HasLiveProperty(property)
+                || from < 0 || from >= property.arraySize || to < 0 || to >= property.arraySize || from == to)
                 return;
 
-            property.serializedObject.Update();
-            property.MoveArrayElement(from, to);
+            if (!BeginStructuralMutation(property, "ES 列表移动元素"))
+                return;
+            if (!property.MoveArrayElement(from, to))
+                return;
             SetSelectedIndex(to);
-            property.serializedObject.ApplyModifiedProperties();
+            CommitStructuralMutation(property);
+        }
+
+        private static bool BeginStructuralMutation(SerializedProperty property, string undoName)
+        {
+            SerializedObject serializedObject = property?.serializedObject;
+            if (serializedObject == null || serializedObject.targetObject == null)
+                return false;
+            if (serializedObject.isEditingMultipleObjects)
+                return false;
+
+            serializedObject.Update();
+            UnityEngine.Object[] targets = serializedObject.targetObjects;
+            if (targets == null || targets.Length == 0)
+                return false;
+            for (int i = 0; i < targets.Length; i++)
+                if (targets[i] == null)
+                    return false;
+            Undo.RegisterCompleteObjectUndo(targets, undoName);
+            return true;
+        }
+
+        private static bool HasLiveProperty(SerializedProperty property)
+        {
+            return property != null
+                && property.serializedObject != null
+                && property.serializedObject.targetObject != null;
+        }
+
+        private static void CommitStructuralMutation(SerializedProperty property)
+        {
+            SerializedObject serializedObject = property?.serializedObject;
+            if (serializedObject == null || serializedObject.targetObject == null)
+                return;
+
+            serializedObject.ApplyModifiedProperties();
+            UnityEngine.Object[] targets = serializedObject.targetObjects;
+            if (targets == null)
+                return;
+
+            for (int i = 0; i < targets.Length; i++)
+            {
+                UnityEngine.Object target = targets[i];
+                if (target == null)
+                    continue;
+                EditorUtility.SetDirty(target);
+                if (PrefabUtility.IsPartOfPrefabInstance(target))
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+            }
         }
 
         private int GetSelectedIndex(IList list)
@@ -227,7 +290,7 @@ namespace ES.EditorInternal
 
         private void SetSelectedIndex(int index)
         {
-            SelectedIndexByPath[GetStateKey()] = Mathf.Max(0, index);
+            SetBounded(SelectedIndexByPath, GetStateKey(), Mathf.Max(0, index));
         }
 
         private string GetElementLabel(object element, int index)
@@ -305,7 +368,29 @@ namespace ES.EditorInternal
 
         private static void SetScroll(System.Collections.Generic.Dictionary<string, Vector2> table, string key, Vector2 value)
         {
+            SetBounded(table, key, value);
+        }
+
+        private static void SetBounded<T>(System.Collections.Generic.Dictionary<string, T> table, string key, T value)
+        {
+            if (table == null || string.IsNullOrEmpty(key))
+                return;
+
             table[key] = value;
+            if (table.Count <= MaxStateEntries)
+                return;
+
+            var staleKeys = new System.Collections.Generic.List<string>();
+            foreach (string existingKey in table.Keys)
+            {
+                if (!string.Equals(existingKey, key, System.StringComparison.Ordinal))
+                    staleKeys.Add(existingKey);
+                if (staleKeys.Count >= table.Count - MaxStateEntries)
+                    break;
+            }
+
+            for (int i = 0; i < staleKeys.Count; i++)
+                table.Remove(staleKeys[i]);
         }
 
         private static string GetSearch(string key)
@@ -315,7 +400,7 @@ namespace ES.EditorInternal
 
         private static void SetSearch(string key, string value)
         {
-            SearchByPath[key] = value ?? string.Empty;
+            SetBounded(SearchByPath, key, value ?? string.Empty);
         }
 
         private static void EnsureStyles()

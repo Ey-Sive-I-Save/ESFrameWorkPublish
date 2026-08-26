@@ -28,7 +28,11 @@ namespace ES.EditorInternal
 
     public sealed class ESAgentArtifactPhysicalFileIO : IESAgentArtifactFileIO
     {
-        public bool FileExists(string path) => System.IO.File.Exists(path);
+        public bool FileExists(string path)
+        {
+            ESAgentArtifactGenerationWorkspace.EnsureProjectReadPath(path);
+            return System.IO.File.Exists(path);
+        }
         public void CopyAtomically(string sourcePath, string targetPath)
             => ESAgentArtifactGenerationWorkspace.CopyFileAtomically(sourcePath, targetPath);
         public void DeleteFile(string path)
@@ -37,7 +41,10 @@ namespace ES.EditorInternal
             if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
         }
         public string ComputeSha256(string path)
-            => ESAgentArtifactGenerationWorkspace.ComputeSha256(path);
+        {
+            ESAgentArtifactGenerationWorkspace.EnsureProjectReadPath(path);
+            return ESAgentArtifactGenerationWorkspace.ComputeSha256(path);
+        }
     }
 
     public sealed class ESAgentArtifactImportResult

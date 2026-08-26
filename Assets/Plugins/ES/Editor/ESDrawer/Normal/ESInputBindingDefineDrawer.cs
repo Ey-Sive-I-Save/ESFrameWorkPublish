@@ -16,11 +16,15 @@ namespace ES.EditorInternal
         private const float Gap = 4f;
 
         private static InputActionRebindingExtensions.RebindingOperation listenOperation;
+        private static InputActionRebindingExtensions.RebindingOperation delayedStopOperation;
         private static SerializedObject listenTarget;
         private static string listenPropertyPath;
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
+            if (!HasRequiredProperties(property))
+                return EditorGUIUtility.singleLineHeight * 2f + Gap;
+
             SerializedProperty source = property.FindPropertyRelative("source");
             SerializedProperty isComposite = property.FindPropertyRelative("isComposite");
             SerializedProperty isPartOfComposite = property.FindPropertyRelative("isPartOfComposite");
@@ -43,6 +47,14 @@ namespace ES.EditorInternal
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             EditorGUI.BeginProperty(position, label, property);
+
+            if (!HasRequiredProperties(property))
+            {
+                Rect errorRect = new Rect(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight * 2f);
+                EditorGUI.HelpBox(errorRect, "ESInputBindingDefine 的序列化结构不完整，请重新导入或迁移该资产。", MessageType.Error);
+                EditorGUI.EndProperty();
+                return;
+            }
 
             SerializedProperty schemeId = property.FindPropertyRelative("schemeId");
             SerializedProperty source = property.FindPropertyRelative("source");
@@ -109,6 +121,22 @@ namespace ES.EditorInternal
             }
 
             EditorGUI.EndProperty();
+        }
+
+        private static bool HasRequiredProperties(SerializedProperty property)
+        {
+            if (property == null)
+                return false;
+
+            return property.FindPropertyRelative("schemeId") != null
+                && property.FindPropertyRelative("source") != null
+                && property.FindPropertyRelative("path") != null
+                && property.FindPropertyRelative("virtualControlId") != null
+                && property.FindPropertyRelative("interactions") != null
+                && property.FindPropertyRelative("processors") != null
+                && property.FindPropertyRelative("isComposite") != null
+                && property.FindPropertyRelative("isPartOfComposite") != null
+                && property.FindPropertyRelative("name") != null;
         }
 
         private static void DrawPathRow(
@@ -260,6 +288,9 @@ namespace ES.EditorInternal
 
         private static void ShowControlMenu(Rect anchorRect, SerializedObject serializedObject, string propertyPath, string schemeId, string bindingPropertyPath)
         {
+            if (!HasLiveSerializedTarget(serializedObject, propertyPath))
+                return;
+
             var entries = new List<ESSearchDropdown.Entry>();
             bool any = false;
             bool hasValueTypeFilter = TryGetExpectedValueType(serializedObject, bindingPropertyPath, out ESInputValueType expectedValueType);
@@ -295,6 +326,9 @@ namespace ES.EditorInternal
                 return false;
             }
 
+            if (!HasLiveSerializedTarget(serializedObject, propertyPath))
+                return false;
+
             bool added = false;
             serializedObject.Update();
             string currentPath = serializedObject.FindProperty(propertyPath)?.stringValue ?? string.Empty;
@@ -323,7 +357,7 @@ namespace ES.EditorInternal
         private static bool TryGetExpectedValueType(SerializedObject serializedObject, string bindingPropertyPath, out ESInputValueType valueType)
         {
             valueType = ESInputValueType.Button;
-            if (serializedObject == null || string.IsNullOrEmpty(bindingPropertyPath))
+            if (!HasLiveSerializedTarget(serializedObject, bindingPropertyPath))
                 return false;
 
             serializedObject.Update();
@@ -369,7 +403,7 @@ namespace ES.EditorInternal
 
         private static void SetStringProperty(SerializedObject serializedObject, string propertyPath, string value)
         {
-            if (serializedObject == null || string.IsNullOrEmpty(propertyPath))
+            if (!HasLiveSerializedTarget(serializedObject, propertyPath))
             {
                 return;
             }
@@ -382,6 +416,26 @@ namespace ES.EditorInternal
                 property.stringValue = value;
                 serializedObject.ApplyModifiedProperties();
                 MarkDirty(serializedObject);
+            }
+        }
+
+        private static bool HasLiveSerializedTarget(SerializedObject serializedObject, string propertyPath)
+        {
+            if (serializedObject == null || string.IsNullOrEmpty(propertyPath))
+                return false;
+            try
+            {
+                UnityEngine.Object[] targets = serializedObject.targetObjects;
+                if (targets == null || targets.Length == 0)
+                    return false;
+                for (int i = 0; i < targets.Length; i++)
+                    if (targets[i] == null)
+                        return false;
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -406,18 +460,28 @@ namespace ES.EditorInternal
 
             listenTarget = serializedObject;
             listenPropertyPath = propertyPath;
-            listenOperation = new InputActionRebindingExtensions.RebindingOperation()
-                .WithControlsExcluding("<Pointer>/position")
-                .WithControlsExcluding("<Pointer>/delta")
-                .WithControlsExcluding("<Pointer>/press")
-                .WithControlsExcluding("<Pointer>/clickCount")
-                .WithControlsExcluding("<Touchscreen>/touch*/position")
-                .WithControlsExcluding("<Touchscreen>/touch*/delta")
-                .OnMatchWaitForAnother(0.05f)
-                .OnApplyBinding(OnListenApplyBinding)
-                .OnComplete(OnListenComplete)
-                .OnCancel(OnListenCancel);
-            listenOperation.Start();
+            try
+            {
+                listenOperation = new InputActionRebindingExtensions.RebindingOperation()
+                    .WithControlsExcluding("<Pointer>/position")
+                    .WithControlsExcluding("<Pointer>/delta")
+                    .WithControlsExcluding("<Pointer>/press")
+                    .WithControlsExcluding("<Pointer>/clickCount")
+                    .WithControlsExcluding("<Touchscreen>/touch*/position")
+                    .WithControlsExcluding("<Touchscreen>/touch*/delta")
+                    .OnMatchWaitForAnother(0.05f)
+                    .OnApplyBinding(OnListenApplyBinding)
+                    .OnComplete(OnListenComplete)
+                    .OnCancel(OnListenCancel);
+                listenOperation.Start();
+            }
+            catch (Exception exception)
+            {
+                StopListen();
+                Debug.LogException(new InvalidOperationException(
+                    "ES 输入绑定监听启动失败。", exception));
+                return;
+            }
 
             EditorApplication.update -= PumpListen;
             EditorApplication.update += PumpListen;
@@ -435,35 +499,62 @@ namespace ES.EditorInternal
             InputActionRebindingExtensions.RebindingOperation operation,
             string path)
         {
-            if (listenTarget == null || string.IsNullOrEmpty(listenPropertyPath) || string.IsNullOrEmpty(path))
+            if (!HasLiveSerializedTarget(listenTarget, listenPropertyPath) || string.IsNullOrEmpty(path))
             {
                 return;
             }
 
-            listenTarget.Update();
-            SerializedProperty property = listenTarget.FindProperty(listenPropertyPath);
-            if (property != null)
+            try
             {
-                RecordUndo(listenTarget, "监听输入绑定");
-                property.stringValue = path;
-                listenTarget.ApplyModifiedProperties();
-                MarkDirty(listenTarget);
+                listenTarget.Update();
+                SerializedProperty property = listenTarget.FindProperty(listenPropertyPath);
+                if (property != null)
+                {
+                    RecordUndo(listenTarget, "监听输入绑定");
+                    property.stringValue = path;
+                    listenTarget.ApplyModifiedProperties();
+                    MarkDirty(listenTarget);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new InvalidOperationException(
+                    "ES 输入绑定监听写回失败，已保留当前窗口状态。", exception));
             }
         }
 
         private static void OnListenComplete(InputActionRebindingExtensions.RebindingOperation operation)
         {
-            EditorApplication.delayCall += StopListen;
+            ScheduleStopListen(operation);
         }
 
         private static void OnListenCancel(InputActionRebindingExtensions.RebindingOperation operation)
         {
-            EditorApplication.delayCall += StopListen;
+            ScheduleStopListen(operation);
+        }
+
+        private static void ScheduleStopListen(
+            InputActionRebindingExtensions.RebindingOperation operation)
+        {
+            EditorApplication.delayCall -= StopScheduledListen;
+            delayedStopOperation = operation;
+            EditorApplication.delayCall += StopScheduledListen;
+        }
+
+        private static void StopScheduledListen()
+        {
+            EditorApplication.delayCall -= StopScheduledListen;
+            InputActionRebindingExtensions.RebindingOperation operation = delayedStopOperation;
+            delayedStopOperation = null;
+            if (operation != null && ReferenceEquals(listenOperation, operation))
+                StopListen();
         }
 
         private static void StopListen()
         {
             EditorApplication.update -= PumpListen;
+            EditorApplication.delayCall -= StopScheduledListen;
+            delayedStopOperation = null;
 
             if (listenOperation != null)
             {
@@ -503,22 +594,27 @@ namespace ES.EditorInternal
 
         private static void RecordUndo(SerializedObject serializedObject, string undoName)
         {
-            if (serializedObject == null || serializedObject.targetObject == null)
+            if (!HasLiveSerializedTarget(serializedObject, "__target__"))
             {
                 return;
             }
 
-            Undo.RecordObject(serializedObject.targetObject, undoName);
+            Undo.RecordObjects(serializedObject.targetObjects, undoName);
         }
 
         private static void MarkDirty(SerializedObject serializedObject)
         {
-            if (serializedObject == null || serializedObject.targetObject == null)
+            if (!HasLiveSerializedTarget(serializedObject, "__target__"))
             {
                 return;
             }
 
-            EditorUtility.SetDirty(serializedObject.targetObject);
+            foreach (UnityEngine.Object target in serializedObject.targetObjects)
+            {
+                EditorUtility.SetDirty(target);
+                if (PrefabUtility.IsPartOfPrefabInstance(target))
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+            }
         }
 
         [ESWindowSleepContract(
@@ -543,6 +639,14 @@ namespace ES.EditorInternal
                 {
                     return;
                 }
+                UnityEngine.Object[] targets;
+                try { targets = targetObject.targetObjects; }
+                catch { return; }
+                if (targets == null || targets.Length != 1 || targets[0] == null)
+                {
+                    Debug.LogWarning("[ESInputBinding] 导入窗口仅支持单对象编辑，已拒绝多对象或失效目标。");
+                    return;
+                }
 
                 ESInputActionBindingImportWindow window = GetWindow<ESInputActionBindingImportWindow>(
                     true,
@@ -551,12 +655,25 @@ namespace ES.EditorInternal
                 window.ReleaseTemporaryInputAction();
                 window.titleContent = new GUIContent("导入 InputAction 绑定");
                 window.minSize = new Vector2(560f, 380f);
+                window.maxSize = new Vector2(1400f, 1000f);
                 window.targetObject = targetObject;
                 window.bindingPropertyPath = bindingPropertyPath;
-                window.holder = CreateInstance<Holder>();
-                window.holder.action = BuildActionFromCurrentBinding(targetObject, bindingPropertyPath);
-                window.holderObject = new SerializedObject(window.holder);
-                window.ShowUtility();
+                try
+                {
+                    window.holder = CreateInstance<Holder>();
+                    window.holder.action = BuildActionFromCurrentBinding(targetObject, bindingPropertyPath);
+                    window.holderObject = new SerializedObject(window.holder);
+                    window.ShowUtility();
+                }
+                catch (Exception exception)
+                {
+                    window.ReleaseTemporaryInputAction();
+                    window.targetObject = null;
+                    window.bindingPropertyPath = null;
+                    Debug.LogException(new InvalidOperationException(
+                        "ES InputAction 绑定导入窗口初始化失败，已回收临时对象。", exception));
+                    window.Close();
+                }
             }
 
             public override GUIContent ESWindow_GetWindowGUIContent()
@@ -578,22 +695,36 @@ namespace ES.EditorInternal
 
             private void ReleaseTemporaryInputAction()
             {
-                if (holder != null)
-                {
-                    if (holder.action != null)
-                    {
-                        holder.action.Dispose();
-                    }
-
-                    DestroyImmediate(holder);
-                    holder = null;
-                }
+                SerializedObject serializedHolder = holderObject;
                 holderObject = null;
+                try
+                {
+                    serializedHolder?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "ES InputAction 绑定导入窗口释放序列化视图失败。", exception));
+                }
+
+                Holder holderToRelease = holder;
+                holder = null;
+                if (holderToRelease != null)
+                {
+                    try
+                    {
+                        holderToRelease.action?.Dispose();
+                    }
+                    finally
+                    {
+                        DestroyImmediate(holderToRelease);
+                    }
+                }
             }
 
             protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
             {
-                if (holder == null || holderObject == null)
+                if (!HasLiveTarget() || holder == null || holderObject == null)
                 {
                     Close();
                     return;
@@ -602,9 +733,28 @@ namespace ES.EditorInternal
                 EditorGUILayout.LabelField("临时 InputAction", EditorStyles.boldLabel);
                 EditorGUILayout.HelpBox("这个 InputAction 只用于配置辅助。使用 Unity 自带的 InputAction 绑定界面添加 Binding，然后从下方选择一条导入到当前 ES 绑定。", MessageType.Info);
 
-                holderObject.Update();
-                EditorGUILayout.PropertyField(holderObject.FindProperty("action"), new GUIContent("InputAction"), true);
-                holderObject.ApplyModifiedProperties();
+                try
+                {
+                    holderObject.Update();
+                    SerializedProperty actionProperty = holderObject.FindProperty("action");
+                    if (actionProperty == null)
+                        throw new InvalidOperationException("临时 InputAction 序列化字段不存在。");
+                    EditorGUILayout.PropertyField(actionProperty, new GUIContent("InputAction"), true);
+                    holderObject.ApplyModifiedProperties();
+                }
+                catch (ExitGUIException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    context.SetStatus("临时 InputAction 已失效，窗口将安全关闭。", MessageType.Error);
+                    Debug.LogException(new InvalidOperationException(
+                        "ES InputAction 绑定导入窗口绘制失败。", exception));
+                    ReleaseTemporaryInputAction();
+                    Close();
+                    return;
+                }
 
                 EditorGUILayout.Space(6f);
                 DrawBindingList();
@@ -633,7 +783,19 @@ namespace ES.EditorInternal
                         {
                             if (GUILayout.Button("导入", GUILayout.Width(64f)))
                             {
-                                ImportBinding(binding);
+                                try
+                                {
+                                    ImportBinding(binding);
+                                }
+                                catch (ExitGUIException)
+                                {
+                                    throw;
+                                }
+                                catch (Exception exception)
+                                {
+                                    Debug.LogException(new InvalidOperationException(
+                                        "ES InputAction 绑定导入失败，未继续关闭窗口。", exception));
+                                }
                             }
                         }
                     }
@@ -644,7 +806,7 @@ namespace ES.EditorInternal
 
             private void ImportBinding(InputBinding binding)
             {
-                if (targetObject == null || string.IsNullOrEmpty(bindingPropertyPath))
+                if (!HasLiveTarget())
                 {
                     return;
                 }
@@ -655,11 +817,9 @@ namespace ES.EditorInternal
                     return;
                 }
 
-                UnityEngine.Object undoTarget = targetObject.targetObject;
-                if (undoTarget != null)
-                {
-                    Undo.RecordObject(undoTarget, "导入 InputAction 绑定");
-                }
+                if (!HasLiveSerializedTarget(targetObject, bindingPropertyPath))
+                    return;
+                RecordUndo(targetObject, "导入 InputAction 绑定");
 
                 targetObject.Update();
                 SerializedProperty bindingProperty = targetObject.FindProperty(bindingPropertyPath);
@@ -689,12 +849,14 @@ namespace ES.EditorInternal
                 }
 
                 targetObject.ApplyModifiedProperties();
-                if (undoTarget != null)
-                {
-                    EditorUtility.SetDirty(undoTarget);
-                }
+                MarkDirty(targetObject);
 
                 Close();
+            }
+
+            private bool HasLiveTarget()
+            {
+                return HasLiveSerializedTarget(targetObject, bindingPropertyPath);
             }
 
             private static void SetRelativeString(SerializedProperty root, string relativePath, string value)

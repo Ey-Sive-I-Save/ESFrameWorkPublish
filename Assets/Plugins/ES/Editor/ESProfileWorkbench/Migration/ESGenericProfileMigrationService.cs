@@ -215,24 +215,26 @@ namespace ES.EditorInternal
 
         private static void ExecutePlan(ProfilePlan plan, List<string> operations)
         {
-            var serializedProfile = new SerializedObject(plan.Profile);
-            for (int index = 0; index < plan.Steps.Count; index++)
+            using (var serializedProfile = new SerializedObject(plan.Profile))
             {
-                IESGenericProfileMigrator migrator = plan.Steps[index];
-                serializedProfile.UpdateIfRequiredOrScript();
-                if (!migrator.TryMigrate(plan.Profile, serializedProfile, out string error))
+                for (int index = 0; index < plan.Steps.Count; index++)
                 {
-                    throw new InvalidOperationException(
-                        "Profile “" + plan.Profile.name + "” 迁移器 " + migrator.MigrationId
-                        + " 执行失败：" + NormalizeError(error));
-                }
+                    IESGenericProfileMigrator migrator = plan.Steps[index];
+                    serializedProfile.UpdateIfRequiredOrScript();
+                    if (!migrator.TryMigrate(plan.Profile, serializedProfile, out string error))
+                    {
+                        throw new InvalidOperationException(
+                            "Profile “" + plan.Profile.name + "” 迁移器 " + migrator.MigrationId
+                            + " 执行失败：" + NormalizeError(error));
+                    }
 
-                SerializedProperty schemaVersion = FindHeaderSchemaVersion(serializedProfile);
-                schemaVersion.intValue = migrator.ToVersion;
-                serializedProfile.ApplyModifiedProperties();
-                operations.Add(
-                    plan.Profile.name + "：" + migrator.MigrationId
-                    + " v" + migrator.FromVersion + " → v" + migrator.ToVersion);
+                    SerializedProperty schemaVersion = FindHeaderSchemaVersion(serializedProfile);
+                    schemaVersion.intValue = migrator.ToVersion;
+                    serializedProfile.ApplyModifiedProperties();
+                    operations.Add(
+                        plan.Profile.name + "：" + migrator.MigrationId
+                        + " v" + migrator.FromVersion + " → v" + migrator.ToVersion);
+                }
             }
         }
 
@@ -291,9 +293,12 @@ namespace ES.EditorInternal
                 if (!TryValidateProfileEditable(profile, out error))
                     return false;
 
-                var serializedProfile = new SerializedObject(profile);
-                serializedProfile.UpdateIfRequiredOrScript();
-                int sourceVersion = FindHeaderSchemaVersion(serializedProfile).intValue;
+                int sourceVersion;
+                using (var serializedProfile = new SerializedObject(profile))
+                {
+                    serializedProfile.UpdateIfRequiredOrScript();
+                    sourceVersion = FindHeaderSchemaVersion(serializedProfile).intValue;
+                }
                 if (!TryBuildPlan(
                         profile,
                         sourceVersion,
@@ -636,28 +641,30 @@ namespace ES.EditorInternal
             private static string CaptureSerializedHash(ESGenericProfile profile)
             {
                 var builder = new StringBuilder(EditorJsonUtility.ToJson(profile, false));
-                var serializedProfile = new SerializedObject(profile);
-                serializedProfile.UpdateIfRequiredOrScript();
-                SerializedProperty iterator = serializedProfile.GetIterator();
-                bool enterChildren = true;
-                while (iterator.Next(enterChildren))
+                using (var serializedProfile = new SerializedObject(profile))
                 {
-                    enterChildren = true;
-                    if (iterator.propertyType == SerializedPropertyType.ManagedReference)
+                    serializedProfile.UpdateIfRequiredOrScript();
+                    SerializedProperty iterator = serializedProfile.GetIterator();
+                    bool enterChildren = true;
+                    while (iterator.Next(enterChildren))
                     {
-                        builder.Append("\nmanaged:")
-                            .Append(iterator.propertyPath)
-                            .Append('|')
-                            .Append(iterator.managedReferenceFullTypename)
-                            .Append('|')
-                            .Append(iterator.managedReferenceId);
-                    }
-                    else if (iterator.propertyType == SerializedPropertyType.ObjectReference)
-                    {
-                        builder.Append("\nobject:")
-                            .Append(iterator.propertyPath)
-                            .Append('|')
-                            .Append(iterator.objectReferenceInstanceIDValue);
+                        enterChildren = true;
+                        if (iterator.propertyType == SerializedPropertyType.ManagedReference)
+                        {
+                            builder.Append("\nmanaged:")
+                                .Append(iterator.propertyPath)
+                                .Append('|')
+                                .Append(iterator.managedReferenceFullTypename)
+                                .Append('|')
+                                .Append(iterator.managedReferenceId);
+                        }
+                        else if (iterator.propertyType == SerializedPropertyType.ObjectReference)
+                        {
+                            builder.Append("\nobject:")
+                                .Append(iterator.propertyPath)
+                                .Append('|')
+                                .Append(iterator.objectReferenceInstanceIDValue);
+                        }
                     }
                 }
 

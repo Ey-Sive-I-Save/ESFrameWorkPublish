@@ -2003,6 +2003,13 @@ namespace ES.EditorInternal
 
         private void RefreshValidationIfNeeded()
         {
+            // A scheduled item can race with DetachFromPanelEvent. Do not rebuild or
+            // touch inspector state after the element has left its host panel.
+            if (panel == null)
+            {
+                CancelScheduledValidation();
+                return;
+            }
             if (validatedRevision == validationRevision)
                 return;
             RefreshValidation();
@@ -2412,6 +2419,8 @@ namespace ES.EditorInternal
             launchButton?.SetEnabled(false);
             bool started = ESAgentImplementationSessionLauncher.TryLaunchApprovedImplementation(spec, message =>
             {
+                if (launchButton == null || launchButton.panel == null)
+                    return;
                 bool canEnable = !ESAgentImplementationSessionLauncher.IsLaunching
                     && ESAgentImplementationSessionLauncher.CanLaunchApprovedImplementation(spec, out _);
                 launchButton?.SetEnabled(canEnable);

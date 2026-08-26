@@ -17,21 +17,33 @@ namespace ES
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             EditorGUI.BeginProperty(position, label, property);
-            Rect content = EditorGUI.PrefixLabel(position, label);
-            ESTagStableReference reference = ReadReference(property);
-            bool isKnown = ESTagEditorCatalogCache.TryGetPickerEntry(reference, out ESTagEditorCatalogCache.PickerEntry current);
-            string display = reference.IsEmpty ? EmptyLabel : isKnown ? current.FullDisplayName : "缺失 Tag · " + reference;
-            GUIContent buttonContent = new GUIContent(display, isKnown || reference.IsEmpty
-                ? "从正式 GameTag Catalog 选择稳定 Tag。"
-                : "此引用未在当前正式 GameTag Catalog 中找到；请重新选择或执行 Bake。\n" + reference);
+            try
+            {
+                Rect content = EditorGUI.PrefixLabel(position, label);
+                ESTagStableReference reference = ReadReference(property);
+                bool isKnown = ESTagEditorCatalogCache.TryGetPickerEntry(reference, out ESTagEditorCatalogCache.PickerEntry current);
+                string display = reference.IsEmpty ? EmptyLabel : isKnown ? current.FullDisplayName : "缺失 Tag · " + reference;
+                GUIContent buttonContent = new GUIContent(display, isKnown || reference.IsEmpty
+                    ? "从正式 GameTag Catalog 选择稳定 Tag。"
+                    : "此引用未在当前正式 GameTag Catalog 中找到；请重新选择或执行 Bake。\n" + reference);
 
-            Color previousColor = GUI.color;
-            if (!reference.IsEmpty && !isKnown)
-                GUI.color = new Color(1f, 0.55f, 0.55f);
-            if (EditorGUI.DropdownButton(content, buttonContent, FocusType.Keyboard))
-                OpenPicker(content, property, isKnown ? current.Reference : default);
-            GUI.color = previousColor;
-            EditorGUI.EndProperty();
+                Color previousColor = GUI.color;
+                try
+                {
+                    if (!reference.IsEmpty && !isKnown)
+                        GUI.color = new Color(1f, 0.55f, 0.55f);
+                    if (EditorGUI.DropdownButton(content, buttonContent, FocusType.Keyboard))
+                        OpenPicker(content, property, isKnown ? current.Reference : default);
+                }
+                finally
+                {
+                    GUI.color = previousColor;
+                }
+            }
+            finally
+            {
+                EditorGUI.EndProperty();
+            }
         }
 
         private static void OpenPicker(Rect anchorRect, SerializedProperty property, ESTagStableReference selected)
@@ -81,10 +93,13 @@ namespace ES
 
         private static void WriteReference(SerializedObject serializedObject, string propertyPath, ESTagStableReference reference)
         {
-            if (serializedObject == null)
+            if (serializedObject == null || serializedObject.targetObject == null || string.IsNullOrEmpty(propertyPath))
                 return;
 
             serializedObject.Update();
+            UnityEngine.Object[] targets = serializedObject.targetObjects;
+            if (targets != null && targets.Length > 0)
+                Undo.RegisterCompleteObjectUndo(targets, "ES 选择稳定 GameTag");
             SerializedProperty property = serializedObject.FindProperty(propertyPath);
             if (property == null)
                 return;
@@ -99,6 +114,17 @@ namespace ES
             enumValue.intValue = reference.enumValue;
             stringKey.stringValue = reference.stringKey ?? string.Empty;
             serializedObject.ApplyModifiedProperties();
+            if (targets == null)
+                return;
+            for (int i = 0; i < targets.Length; i++)
+            {
+                UnityEngine.Object target = targets[i];
+                if (target == null)
+                    continue;
+                EditorUtility.SetDirty(target);
+                if (PrefabUtility.IsPartOfPrefabInstance(target))
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+            }
         }
     }
 }

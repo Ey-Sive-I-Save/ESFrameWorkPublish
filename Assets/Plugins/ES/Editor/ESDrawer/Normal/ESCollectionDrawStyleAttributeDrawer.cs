@@ -462,72 +462,79 @@ namespace ES.EditorInternal
             if (!TryCollectTargets(out List<CollectionTarget> targets, out error))
                 return false;
 
-            if (!Attribute.AllowDuplicateItems)
-            {
-                for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
-                {
-                    if (ContainsConcreteType(targets[targetIndex].Property, concreteType, -1))
-                    {
-                        error = "目标 " + (targetIndex + 1) + " 已包含类型 "
-                                + ESTypeCatalog.GetDisplayName(concreteType) + "。";
-                        return false;
-                    }
-                }
-            }
-
-            var values = new List<object>(targets.Count);
             try
             {
-                for (int index = 0; index < targets.Count; index++)
-                    values.Add(Activator.CreateInstance(concreteType, nonPublic: true));
-            }
-            catch (Exception exception)
-            {
-                error = exception.GetType().Name + "：" + exception.Message;
-                return false;
-            }
-
-            var insertIndexes = new List<int>(targets.Count);
-            for (int index = 0; index < targets.Count; index++)
-            {
-                int insertIndex = targets[index].Property.arraySize;
-                if (Attribute.EnforceDefaultOrder
-                    && !TryFindDefaultInsertIndex(
-                        targets[index].Property,
-                        values[index],
-                        out insertIndex,
-                        out error))
+                if (!Attribute.AllowDuplicateItems)
                 {
+                    for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
+                    {
+                        if (ContainsConcreteType(targets[targetIndex].Property, concreteType, -1))
+                        {
+                            error = "目标 " + (targetIndex + 1) + " 已包含类型 "
+                                    + ESTypeCatalog.GetDisplayName(concreteType) + "。";
+                            return false;
+                        }
+                    }
+                }
+
+                var values = new List<object>(targets.Count);
+                try
+                {
+                    for (int index = 0; index < targets.Count; index++)
+                        values.Add(Activator.CreateInstance(concreteType, nonPublic: true));
+                }
+                catch (Exception exception)
+                {
+                    error = exception.GetType().Name + "：" + exception.Message;
                     return false;
                 }
 
-                insertIndexes.Add(insertIndex);
-            }
-
-            string undoName = "添加 " + ESTypeCatalog.GetDisplayName(concreteType);
-            return TryMutateTargets(
-                targets,
-                undoName,
-                (target, targetIndex) =>
+                var insertIndexes = new List<int>(targets.Count);
+                for (int index = 0; index < targets.Count; index++)
                 {
-                    int insertIndex = target.Property.arraySize;
-                    target.Property.arraySize = insertIndex + 1;
-                    SerializedProperty element = target.Property.GetArrayElementAtIndex(insertIndex);
-                    if (element == null
-                        || element.propertyType != SerializedPropertyType.ManagedReference)
+                    int insertIndex = targets[index].Property.arraySize;
+                    if (Attribute.EnforceDefaultOrder
+                        && !TryFindDefaultInsertIndex(
+                            targets[index].Property,
+                            values[index],
+                            out insertIndex,
+                            out error))
                     {
-                        throw new InvalidOperationException("新增位置不是可写的 SerializeReference 元素。");
+                        return false;
                     }
 
-                    element.managedReferenceValue = values[targetIndex];
-                    int destination = insertIndexes[targetIndex];
-                    if (destination != insertIndex
-                        && !target.Property.MoveArrayElement(insertIndex, destination))
+                    insertIndexes.Add(insertIndex);
+                }
+
+                string undoName = "添加 " + ESTypeCatalog.GetDisplayName(concreteType);
+                return TryMutateTargets(
+                    targets,
+                    undoName,
+                    (target, targetIndex) =>
                     {
-                        throw new InvalidOperationException("Unity 拒绝把新增元素放入默认顺序位置。");
-                    }
-                },
-                out error);
+                        int insertIndex = target.Property.arraySize;
+                        target.Property.arraySize = insertIndex + 1;
+                        SerializedProperty element = target.Property.GetArrayElementAtIndex(insertIndex);
+                        if (element == null
+                            || element.propertyType != SerializedPropertyType.ManagedReference)
+                        {
+                            throw new InvalidOperationException("新增位置不是可写的 SerializeReference 元素。");
+                        }
+
+                        element.managedReferenceValue = values[targetIndex];
+                        int destination = insertIndexes[targetIndex];
+                        if (destination != insertIndex
+                            && !target.Property.MoveArrayElement(insertIndex, destination))
+                        {
+                            throw new InvalidOperationException("Unity 拒绝把新增元素放入默认顺序位置。");
+                        }
+                    },
+                    out error);
+            }
+            finally
+            {
+                DisposeCollectionTargets(targets);
+            }
         }
 
         private bool TryDeleteElement(int index, out string error)
@@ -536,28 +543,35 @@ namespace ES.EditorInternal
             if (!TryCollectTargets(out List<CollectionTarget> targets, out error))
                 return false;
 
-            for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
+            try
             {
-                if (index < 0 || index >= targets[targetIndex].Property.arraySize)
+                for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
                 {
-                    error = "目标 " + (targetIndex + 1) + " 不包含索引 " + index + "。";
-                    return false;
+                    if (index < 0 || index >= targets[targetIndex].Property.arraySize)
+                    {
+                        error = "目标 " + (targetIndex + 1) + " 不包含索引 " + index + "。";
+                        return false;
+                    }
                 }
-            }
 
-            return TryMutateTargets(
-                targets,
-                "删除集合元素",
-                (target, _) =>
-                {
-                    int previousSize = target.Property.arraySize;
-                    target.Property.DeleteArrayElementAtIndex(index);
-                    if (target.Property.arraySize == previousSize)
+                return TryMutateTargets(
+                    targets,
+                    "删除集合元素",
+                    (target, _) =>
+                    {
+                        int previousSize = target.Property.arraySize;
                         target.Property.DeleteArrayElementAtIndex(index);
-                    if (target.Property.arraySize != previousSize - 1)
-                        throw new InvalidOperationException("Unity 没有真正移除目标 List 元素。");
-                },
-                out error);
+                        if (target.Property.arraySize == previousSize)
+                            target.Property.DeleteArrayElementAtIndex(index);
+                        if (target.Property.arraySize != previousSize - 1)
+                            throw new InvalidOperationException("Unity 没有真正移除目标 List 元素。");
+                    },
+                    out error);
+            }
+            finally
+            {
+                DisposeCollectionTargets(targets);
+            }
         }
 
         private bool TryMoveElement(int from, int to, out string error)
@@ -566,35 +580,42 @@ namespace ES.EditorInternal
             if (!TryCollectTargets(out List<CollectionTarget> targets, out error))
                 return false;
 
-            for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
+            try
             {
-                int size = targets[targetIndex].Property.arraySize;
-                if (from < 0 || from >= size || to < 0 || to >= size)
+                for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
                 {
-                    error = "目标 " + (targetIndex + 1) + " 无法执行该重排。";
-                    return false;
+                    int size = targets[targetIndex].Property.arraySize;
+                    if (from < 0 || from >= size || to < 0 || to >= size)
+                    {
+                        error = "目标 " + (targetIndex + 1) + " 无法执行该重排。";
+                        return false;
+                    }
+
+                    if (Attribute.EnforceDefaultOrder
+                        && !CanMoveWithoutBreakingDefaultOrder(
+                            targets[targetIndex].Property,
+                            from,
+                            to,
+                            out error))
+                    {
+                        return false;
+                    }
                 }
 
-                if (Attribute.EnforceDefaultOrder
-                    && !CanMoveWithoutBreakingDefaultOrder(
-                        targets[targetIndex].Property,
-                        from,
-                        to,
-                        out error))
-                {
-                    return false;
-                }
+                return TryMutateTargets(
+                    targets,
+                    "重排集合元素",
+                    (target, _) =>
+                    {
+                        if (!target.Property.MoveArrayElement(from, to))
+                            throw new InvalidOperationException("Unity 拒绝移动目标 List 元素。");
+                    },
+                    out error);
             }
-
-            return TryMutateTargets(
-                targets,
-                "重排集合元素",
-                (target, _) =>
-                {
-                    if (!target.Property.MoveArrayElement(from, to))
-                        throw new InvalidOperationException("Unity 拒绝移动目标 List 元素。");
-                },
-                out error);
+            finally
+            {
+                DisposeCollectionTargets(targets);
+            }
         }
 
         private bool TryDuplicateElement(int index, out string error)
@@ -609,58 +630,65 @@ namespace ES.EditorInternal
             if (!TryCollectTargets(out List<CollectionTarget> targets, out error))
                 return false;
 
-            var copies = new List<object>(targets.Count);
-            for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
+            try
             {
-                SerializedProperty property = targets[targetIndex].Property;
-                if (index < 0 || index >= property.arraySize)
+                var copies = new List<object>(targets.Count);
+                for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
                 {
-                    error = "目标 " + (targetIndex + 1) + " 不包含索引 " + index + "。";
-                    return false;
+                    SerializedProperty property = targets[targetIndex].Property;
+                    if (index < 0 || index >= property.arraySize)
+                    {
+                        error = "目标 " + (targetIndex + 1) + " 不包含索引 " + index + "。";
+                        return false;
+                    }
+
+                    SerializedProperty source = property.GetArrayElementAtIndex(index);
+                    object sourceValue = source?.managedReferenceValue;
+                    if (sourceValue == null)
+                    {
+                        error = "缺失类型或空元素不能复制；请先恢复其具体类型。";
+                        return false;
+                    }
+
+                    try
+                    {
+                        copies.Add(Sirenix.Serialization.SerializationUtility.CreateCopy(sourceValue));
+                    }
+                    catch (Exception exception)
+                    {
+                        error = exception.GetType().Name + "：" + exception.Message;
+                        return false;
+                    }
                 }
 
-                SerializedProperty source = property.GetArrayElementAtIndex(index);
-                object sourceValue = source?.managedReferenceValue;
-                if (sourceValue == null)
-                {
-                    error = "缺失类型或空元素不能复制；请先恢复其具体类型。";
-                    return false;
-                }
+                return TryMutateTargets(
+                    targets,
+                    "复制集合元素",
+                    (target, targetIndex) =>
+                    {
+                        int appendIndex = target.Property.arraySize;
+                        target.Property.arraySize = appendIndex + 1;
+                        SerializedProperty duplicate = target.Property.GetArrayElementAtIndex(appendIndex);
+                        if (duplicate == null
+                            || duplicate.propertyType != SerializedPropertyType.ManagedReference)
+                        {
+                            throw new InvalidOperationException("复制位置不是可写的 SerializeReference 元素。");
+                        }
 
-                try
-                {
-                    copies.Add(Sirenix.Serialization.SerializationUtility.CreateCopy(sourceValue));
-                }
-                catch (Exception exception)
-                {
-                    error = exception.GetType().Name + "：" + exception.Message;
-                    return false;
-                }
+                        duplicate.managedReferenceValue = copies[targetIndex];
+                        int destination = Mathf.Min(index + 1, appendIndex);
+                        if (destination != appendIndex
+                            && !target.Property.MoveArrayElement(appendIndex, destination))
+                        {
+                            throw new InvalidOperationException("Unity 拒绝移动复制后的集合元素。");
+                        }
+                    },
+                    out error);
             }
-
-            return TryMutateTargets(
-                targets,
-                "复制集合元素",
-                (target, targetIndex) =>
-                {
-                    int appendIndex = target.Property.arraySize;
-                    target.Property.arraySize = appendIndex + 1;
-                    SerializedProperty duplicate = target.Property.GetArrayElementAtIndex(appendIndex);
-                    if (duplicate == null
-                        || duplicate.propertyType != SerializedPropertyType.ManagedReference)
-                    {
-                        throw new InvalidOperationException("复制位置不是可写的 SerializeReference 元素。");
-                    }
-
-                    duplicate.managedReferenceValue = copies[targetIndex];
-                    int destination = Mathf.Min(index + 1, appendIndex);
-                    if (destination != appendIndex
-                        && !target.Property.MoveArrayElement(appendIndex, destination))
-                    {
-                        throw new InvalidOperationException("Unity 拒绝移动复制后的集合元素。");
-                    }
-                },
-                out error);
+            finally
+            {
+                DisposeCollectionTargets(targets);
+            }
         }
 
         private bool TrySetElementEnabled(int index, bool enabled, out string error)
@@ -675,37 +703,44 @@ namespace ES.EditorInternal
             if (!TryCollectTargets(out List<CollectionTarget> targets, out error))
                 return false;
 
-            for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
+            try
             {
-                SerializedProperty collection = targets[targetIndex].Property;
-                if (index < 0 || index >= collection.arraySize)
+                for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
                 {
-                    error = "目标 " + (targetIndex + 1) + " 不包含索引 " + index + "。";
-                    return false;
-                }
+                    SerializedProperty collection = targets[targetIndex].Property;
+                    if (index < 0 || index >= collection.arraySize)
+                    {
+                        error = "目标 " + (targetIndex + 1) + " 不包含索引 " + index + "。";
+                        return false;
+                    }
 
-                SerializedProperty enabledProperty = collection
-                    .GetArrayElementAtIndex(index)
-                    ?.FindPropertyRelative(Attribute.EnabledMemberName);
-                if (enabledProperty == null
-                    || enabledProperty.propertyType != SerializedPropertyType.Boolean)
-                {
-                    error = "元素没有可写的 bool 字段“" + Attribute.EnabledMemberName + "”。";
-                    return false;
-                }
-            }
-
-            return TryMutateTargets(
-                targets,
-                enabled ? "启用集合元素" : "停用集合元素",
-                (target, _) =>
-                {
-                    SerializedProperty enabledProperty = target.Property
+                    SerializedProperty enabledProperty = collection
                         .GetArrayElementAtIndex(index)
-                        .FindPropertyRelative(Attribute.EnabledMemberName);
-                    enabledProperty.boolValue = enabled;
-                },
-                out error);
+                        ?.FindPropertyRelative(Attribute.EnabledMemberName);
+                    if (enabledProperty == null
+                        || enabledProperty.propertyType != SerializedPropertyType.Boolean)
+                    {
+                        error = "元素没有可写的 bool 字段“" + Attribute.EnabledMemberName + "”。";
+                        return false;
+                    }
+                }
+
+                return TryMutateTargets(
+                    targets,
+                    enabled ? "启用集合元素" : "停用集合元素",
+                    (target, _) =>
+                    {
+                        SerializedProperty enabledProperty = target.Property
+                            .GetArrayElementAtIndex(index)
+                            .FindPropertyRelative(Attribute.EnabledMemberName);
+                        enabledProperty.boolValue = enabled;
+                    },
+                    out error);
+            }
+            finally
+            {
+                DisposeCollectionTargets(targets);
+            }
         }
 
         private bool TryRestoreElementDefaultOrder(int index, out string error)
@@ -714,46 +749,53 @@ namespace ES.EditorInternal
             if (!TryCollectTargets(out List<CollectionTarget> targets, out error))
                 return false;
 
-            var destinations = new List<int>(targets.Count);
-            bool hasChange = false;
-            for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
+            try
             {
-                SerializedProperty property = targets[targetIndex].Property;
-                if (index < 0 || index >= property.arraySize)
+                var destinations = new List<int>(targets.Count);
+                bool hasChange = false;
+                for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
                 {
-                    error = "目标 " + (targetIndex + 1) + " 不包含索引 " + index + "。";
-                    return false;
-                }
-
-                if (!TryBuildStableDefaultOrderPlan(property, out List<int> plan, out error))
-                    return false;
-                int destination = plan.IndexOf(index);
-                if (destination < 0)
-                {
-                    error = "无法定位当前元素的默认顺序位置。";
-                    return false;
-                }
-
-                destinations.Add(destination);
-                hasChange |= destination != index;
-            }
-
-            if (!hasChange)
-                return true;
-
-            return TryMutateTargets(
-                targets,
-                "按默认顺序归位集合元素",
-                (target, targetIndex) =>
-                {
-                    int destination = destinations[targetIndex];
-                    if (destination != index
-                        && !target.Property.MoveArrayElement(index, destination))
+                    SerializedProperty property = targets[targetIndex].Property;
+                    if (index < 0 || index >= property.arraySize)
                     {
-                        throw new InvalidOperationException("Unity 拒绝归位当前集合元素。");
+                        error = "目标 " + (targetIndex + 1) + " 不包含索引 " + index + "。";
+                        return false;
                     }
-                },
-                out error);
+
+                    if (!TryBuildStableDefaultOrderPlan(property, out List<int> plan, out error))
+                        return false;
+                    int destination = plan.IndexOf(index);
+                    if (destination < 0)
+                    {
+                        error = "无法定位当前元素的默认顺序位置。";
+                        return false;
+                    }
+
+                    destinations.Add(destination);
+                    hasChange |= destination != index;
+                }
+
+                if (!hasChange)
+                    return true;
+
+                return TryMutateTargets(
+                    targets,
+                    "按默认顺序归位集合元素",
+                    (target, targetIndex) =>
+                    {
+                        int destination = destinations[targetIndex];
+                        if (destination != index
+                            && !target.Property.MoveArrayElement(index, destination))
+                        {
+                            throw new InvalidOperationException("Unity 拒绝归位当前集合元素。");
+                        }
+                    },
+                    out error);
+            }
+            finally
+            {
+                DisposeCollectionTargets(targets);
+            }
         }
 
         private bool TrySortAllByDefaultOrder(out string error)
@@ -762,31 +804,38 @@ namespace ES.EditorInternal
             if (!TryCollectTargets(out List<CollectionTarget> targets, out error))
                 return false;
 
-            var plans = new List<List<int>>(targets.Count);
-            bool hasChange = false;
-            for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
+            try
             {
-                if (!TryBuildStableDefaultOrderPlan(
-                        targets[targetIndex].Property,
-                        out List<int> plan,
-                        out error))
+                var plans = new List<List<int>>(targets.Count);
+                bool hasChange = false;
+                for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
                 {
-                    return false;
+                    if (!TryBuildStableDefaultOrderPlan(
+                            targets[targetIndex].Property,
+                            out List<int> plan,
+                            out error))
+                    {
+                        return false;
+                    }
+
+                    plans.Add(plan);
+                    for (int index = 0; index < plan.Count; index++)
+                        hasChange |= plan[index] != index;
                 }
 
-                plans.Add(plan);
-                for (int index = 0; index < plan.Count; index++)
-                    hasChange |= plan[index] != index;
+                if (!hasChange)
+                    return true;
+
+                return TryMutateTargets(
+                    targets,
+                    "按 DefaultOrder 整理集合",
+                    (target, targetIndex) => ApplyStableOrderPlan(target.Property, plans[targetIndex]),
+                    out error);
             }
-
-            if (!hasChange)
-                return true;
-
-            return TryMutateTargets(
-                targets,
-                "按 DefaultOrder 整理集合",
-                (target, targetIndex) => ApplyStableOrderPlan(target.Property, plans[targetIndex]),
-                out error);
+            finally
+            {
+                DisposeCollectionTargets(targets);
+            }
         }
 
         private bool TryFindDefaultInsertIndex(
@@ -944,17 +993,24 @@ namespace ES.EditorInternal
             Action<CollectionTarget, int> mutation,
             out string error)
         {
-            bool changed = ESEditorSerializedMutation.TryApply(
-                targets,
-                undoName,
-                target => target.Target,
-                target => target.SerializedObject,
-                mutation,
-                RefreshSerializedTree,
-                out error);
-            if (changed)
-                GUI.changed = true;
-            return changed;
+            try
+            {
+                bool changed = ESEditorSerializedMutation.TryApply(
+                    targets,
+                    undoName,
+                    target => target.Target,
+                    target => target.SerializedObject,
+                    mutation,
+                    RefreshSerializedTree,
+                    out error);
+                if (changed)
+                    GUI.changed = true;
+                return changed;
+            }
+            finally
+            {
+                DisposeCollectionTargets(targets);
+            }
         }
 
         internal bool AllowDuplicateItems => Attribute.AllowDuplicateItems;
@@ -967,16 +1023,23 @@ namespace ES.EditorInternal
             if (!TryCollectTargets(out List<CollectionTarget> targets, out reason))
                 return false;
 
-            for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
+            try
             {
-                if (!ContainsConcreteType(targets[targetIndex].Property, concreteType, index))
-                    continue;
-                reason = "当前集合禁止重复类型；另一个元素已经使用 "
-                         + ESTypeCatalog.GetDisplayName(concreteType) + "。";
-                return false;
-            }
+                for (int targetIndex = 0; targetIndex < targets.Count; targetIndex++)
+                {
+                    if (!ContainsConcreteType(targets[targetIndex].Property, concreteType, index))
+                        continue;
+                    reason = "当前集合禁止重复类型；另一个元素已经使用 "
+                             + ESTypeCatalog.GetDisplayName(concreteType) + "。";
+                    return false;
+                }
 
-            return true;
+                return true;
+            }
+            finally
+            {
+                DisposeCollectionTargets(targets);
+            }
         }
 
         internal void ExecuteSetElementEnabled(int index, bool enabled)
@@ -1368,18 +1431,43 @@ namespace ES.EditorInternal
 
             for (int index = 0; index < Property.Tree.WeakTargets.Count; index++)
             {
-                if (!(Property.Tree.WeakTargets[index] is UnityEngine.Object target))
+                if (!(Property.Tree.WeakTargets[index] is UnityEngine.Object target) || target == null)
                 {
-                    error = "目标 " + (index + 1) + " 不是 Unity 对象。";
+                    error = "目标 " + (index + 1) + " 不是仍然有效的 Unity 对象。";
+                    DisposeCollectionTargets(targets);
                     return false;
                 }
 
-                var serializedObject = new SerializedObject(target);
-                serializedObject.UpdateIfRequiredOrScript();
-                SerializedProperty property = serializedObject.FindProperty(Property.UnityPropertyPath);
+                SerializedObject serializedObject;
+                try
+                {
+                    serializedObject = new SerializedObject(target);
+                    serializedObject.UpdateIfRequiredOrScript();
+                }
+                catch (Exception exception)
+                {
+                    error = "目标 " + (index + 1) + " 无法建立序列化视图：" + exception.Message;
+                    DisposeCollectionTargets(targets);
+                    return false;
+                }
+
+                SerializedProperty property;
+                try
+                {
+                    property = serializedObject.FindProperty(Property.UnityPropertyPath);
+                }
+                catch (Exception exception)
+                {
+                    error = "目标 " + (index + 1) + " 查找集合属性失败：" + exception.Message;
+                    serializedObject.Dispose();
+                    DisposeCollectionTargets(targets);
+                    return false;
+                }
                 if (property == null || !property.isArray || !IsManagedReferenceCollection(property))
                 {
                     error = "目标 " + (index + 1) + " 没有兼容的 SerializeReference List。";
+                    serializedObject.Dispose();
+                    DisposeCollectionTargets(targets);
                     return false;
                 }
 
@@ -1387,6 +1475,26 @@ namespace ES.EditorInternal
             }
 
             return true;
+        }
+
+        private static void DisposeCollectionTargets(IReadOnlyList<CollectionTarget> targets)
+        {
+            if (targets == null)
+                return;
+            for (int index = 0; index < targets.Count; index++)
+            {
+                try
+                {
+                    targets[index].SerializedObject?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "集合批量编辑序列化视图释放失败。", exception));
+                }
+            }
+            if (targets is List<CollectionTarget> list)
+                list.Clear();
         }
 
         private CollectionState ReadCollectionState(SerializedProperty collectionProperty)
@@ -1431,46 +1539,53 @@ namespace ES.EditorInternal
                     true,
                     false);
 
-            int commonSize = targets[0].Property.arraySize;
-            for (int index = 1; index < targets.Count; index++)
+            try
             {
-                if (targets[index].Property.arraySize != commonSize)
+                int commonSize = targets[0].Property.arraySize;
+                for (int index = 1; index < targets.Count; index++)
                 {
-                    return new CollectionState(
-                        Mathf.Min(commonSize, collectionProperty.arraySize),
-                        false,
-                        true,
-                        "多个目标的集合长度不一致。请单独选择对象后再新增、删除或重排，避免覆盖不同配置。",
-                        false,
-                        true,
-                        false);
+                    if (targets[index].Property.arraySize != commonSize)
+                    {
+                        return new CollectionState(
+                            Mathf.Min(commonSize, collectionProperty.arraySize),
+                            false,
+                            true,
+                            "多个目标的集合长度不一致。请单独选择对象后再新增、删除或重排，避免覆盖不同配置。",
+                            false,
+                            true,
+                            false);
+                    }
                 }
-            }
 
-            bool allSupportDefaultOrder = Attribute.EnforceDefaultOrder && commonSize > 0;
-            bool allDefaultOrderSorted = true;
-            string multiOrderNotice = null;
-            for (int index = 0; index < targets.Count && Attribute.EnforceDefaultOrder; index++)
+                bool allSupportDefaultOrder = Attribute.EnforceDefaultOrder && commonSize > 0;
+                bool allDefaultOrderSorted = true;
+                string multiOrderNotice = null;
+                for (int index = 0; index < targets.Count && Attribute.EnforceDefaultOrder; index++)
+                {
+                    ReadDefaultOrderState(
+                        targets[index].Property,
+                        out bool supportsDefaultOrder,
+                        out bool isSorted,
+                        out string targetNotice);
+                    allSupportDefaultOrder &= supportsDefaultOrder;
+                    allDefaultOrderSorted &= isSorted;
+                    if (multiOrderNotice == null && !string.IsNullOrEmpty(targetNotice))
+                        multiOrderNotice = targetNotice;
+                }
+
+                return new CollectionState(
+                    commonSize,
+                    true,
+                    false,
+                    multiOrderNotice,
+                    allSupportDefaultOrder,
+                    allDefaultOrderSorted,
+                    !string.IsNullOrEmpty(multiOrderNotice));
+            }
+            finally
             {
-                ReadDefaultOrderState(
-                    targets[index].Property,
-                    out bool supportsDefaultOrder,
-                    out bool isSorted,
-                    out string targetNotice);
-                allSupportDefaultOrder &= supportsDefaultOrder;
-                allDefaultOrderSorted &= isSorted;
-                if (multiOrderNotice == null && !string.IsNullOrEmpty(targetNotice))
-                    multiOrderNotice = targetNotice;
+                DisposeCollectionTargets(targets);
             }
-
-            return new CollectionState(
-                commonSize,
-                true,
-                false,
-                multiOrderNotice,
-                allSupportDefaultOrder,
-                allDefaultOrderSorted,
-                !string.IsNullOrEmpty(multiOrderNotice));
         }
 
         private void ReadDefaultOrderState(

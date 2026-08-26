@@ -17,6 +17,9 @@ namespace ES.EditorInternal
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
+            if (!HasRequiredProperties(property))
+                return EditorGUIUtility.singleLineHeight * 2f + Gap;
+
             SerializedProperty valueType = property.FindPropertyRelative("valueType");
             SerializedProperty triggerFeatures = property.FindPropertyRelative("triggerFeatures");
             SerializedProperty bindings = property.FindPropertyRelative("bindings");
@@ -48,6 +51,14 @@ namespace ES.EditorInternal
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             EditorGUI.BeginProperty(position, label, property);
+
+            if (!HasRequiredProperties(property))
+            {
+                Rect errorRect = new Rect(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight * 2f);
+                EditorGUI.HelpBox(errorRect, "ESInputActionDefine 的序列化结构不完整，请重新导入或迁移该资产。", MessageType.Error);
+                EditorGUI.EndProperty();
+                return;
+            }
 
             SerializedProperty id = property.FindPropertyRelative("id");
             SerializedProperty actionName = property.FindPropertyRelative("actionName");
@@ -110,6 +121,23 @@ namespace ES.EditorInternal
             }
 
             EditorGUI.EndProperty();
+        }
+
+        private static bool HasRequiredProperties(SerializedProperty property)
+        {
+            if (property == null)
+                return false;
+
+            return property.FindPropertyRelative("id") != null
+                && property.FindPropertyRelative("actionName") != null
+                && property.FindPropertyRelative("valueType") != null
+                && property.FindPropertyRelative("category") != null
+                && property.FindPropertyRelative("allowRebind") != null
+                && property.FindPropertyRelative("displayName") != null
+                && property.FindPropertyRelative("triggerFeatures") != null
+                && property.FindPropertyRelative("pressPolicy") != null
+                && property.FindPropertyRelative("longPressDuration") != null
+                && property.FindPropertyRelative("doublePressWindow") != null;
         }
 
         private static Rect NextLine(ref Rect position)
@@ -293,6 +321,14 @@ namespace ES.EditorInternal
             {
                 if (targetObject == null || string.IsNullOrEmpty(actionPropertyPath))
                     return;
+                UnityEngine.Object[] targets;
+                try { targets = targetObject.targetObjects; }
+                catch { return; }
+                if (targets == null || targets.Length != 1 || targets[0] == null)
+                {
+                    Debug.LogWarning("[ESInputAction] 导入窗口仅支持单对象编辑，已拒绝多对象或失效目标。");
+                    return;
+                }
 
                 ESInputActionImportWindow window = GetWindow<ESInputActionImportWindow>(
                     true,
@@ -301,12 +337,25 @@ namespace ES.EditorInternal
                 window.ReleaseTemporaryInputAction();
                 window.titleContent = new GUIContent("InputAction 绑定辅助");
                 window.minSize = new Vector2(640f, 440f);
+                window.maxSize = new Vector2(1400f, 1000f);
                 window.targetObject = targetObject;
                 window.actionPropertyPath = actionPropertyPath;
-                window.holder = CreateInstance<Holder>();
-                window.holder.action = window.BuildActionFromCurrentConfig();
-                window.holderObject = new SerializedObject(window.holder);
-                window.ShowUtility();
+                try
+                {
+                    window.holder = CreateInstance<Holder>();
+                    window.holder.action = window.BuildActionFromCurrentConfig();
+                    window.holderObject = new SerializedObject(window.holder);
+                    window.ShowUtility();
+                }
+                catch (Exception exception)
+                {
+                    window.ReleaseTemporaryInputAction();
+                    window.targetObject = null;
+                    window.actionPropertyPath = null;
+                    Debug.LogException(new InvalidOperationException(
+                        "ES InputAction 辅助窗口初始化失败，已回收临时对象。", exception));
+                    window.Close();
+                }
             }
 
             public override GUIContent ESWindow_GetWindowGUIContent()
@@ -330,12 +379,32 @@ namespace ES.EditorInternal
                         "从当前 ES 输入动作配置重新生成临时 InputAction。",
                         context =>
                         {
-                            holder.action?.Dispose();
-                            holder.action = BuildActionFromCurrentConfig();
-                            holderObject = new SerializedObject(holder);
-                            context.RefreshPageActions();
-                            context.SetStatus("已从 ES 配置重建临时 InputAction");
-                            Repaint();
+                            InputAction rebuiltAction = null;
+                            SerializedObject rebuiltObject = null;
+                            try
+                            {
+                                rebuiltAction = BuildActionFromCurrentConfig();
+                                rebuiltObject = new SerializedObject(holder);
+                                InputAction previousAction = holder.action;
+                                SerializedObject previousObject = holderObject;
+                                holder.action = rebuiltAction;
+                                holderObject = rebuiltObject;
+                                rebuiltAction = null;
+                                rebuiltObject = null;
+                                previousAction?.Dispose();
+                                previousObject?.Dispose();
+                                context.RefreshPageActions();
+                                context.SetStatus("已从 ES 配置重建临时 InputAction");
+                                Repaint();
+                            }
+                            catch (Exception exception)
+                            {
+                                rebuiltAction?.Dispose();
+                                rebuiltObject?.Dispose();
+                                context.SetStatus("重建临时 InputAction 失败，已保留旧状态。", MessageType.Error);
+                                Debug.LogException(new InvalidOperationException(
+                                    "ES InputAction 辅助窗口重建失败。", exception));
+                            }
                         })
                     .When(() => holder != null && targetObject != null)
                     .WithUnityIcon("Refresh")
@@ -375,13 +444,31 @@ namespace ES.EditorInternal
 
             private void ReleaseTemporaryInputAction()
             {
-                if (holder != null)
-                {
-                    holder.action?.Dispose();
-                    DestroyImmediate(holder);
-                    holder = null;
-                }
+                SerializedObject serializedHolder = holderObject;
                 holderObject = null;
+                try
+                {
+                    serializedHolder?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new InvalidOperationException(
+                        "ES InputAction 辅助窗口释放序列化视图失败。", exception));
+                }
+
+                Holder holderToRelease = holder;
+                holder = null;
+                if (holderToRelease != null)
+                {
+                    try
+                    {
+                        holderToRelease.action?.Dispose();
+                    }
+                    finally
+                    {
+                        DestroyImmediate(holderToRelease);
+                    }
+                }
             }
 
             protected override void ESWindow_DrawIMGUI(ESMenuTreePageContext context)
@@ -395,9 +482,28 @@ namespace ES.EditorInternal
                 EditorGUILayout.LabelField("InputAction 辅助配置", EditorStyles.boldLabel);
                 EditorGUILayout.HelpBox("这里使用 Unity 原生 InputAction 绘制器生成合法 binding。它只作为配置工具，不会成为运行时主数据源。", MessageType.Info);
 
-                holderObject.Update();
-                EditorGUILayout.PropertyField(holderObject.FindProperty("action"), new GUIContent("临时 InputAction"), true);
-                holderObject.ApplyModifiedProperties();
+                try
+                {
+                    holderObject.Update();
+                    SerializedProperty actionProperty = holderObject.FindProperty("action");
+                    if (actionProperty == null)
+                        throw new InvalidOperationException("临时 InputAction 序列化字段不存在。");
+                    EditorGUILayout.PropertyField(actionProperty, new GUIContent("临时 InputAction"), true);
+                    holderObject.ApplyModifiedProperties();
+                }
+                catch (ExitGUIException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    context.SetStatus("临时 InputAction 已失效，窗口将安全关闭。", MessageType.Error);
+                    Debug.LogException(new InvalidOperationException(
+                        "ES InputAction 辅助窗口绘制失败。", exception));
+                    ReleaseTemporaryInputAction();
+                    Close();
+                    return;
+                }
 
                 EditorGUILayout.Space(4f);
                 importSchemeId = EditorGUILayout.TextField("导入方案", importSchemeId);
@@ -407,11 +513,14 @@ namespace ES.EditorInternal
 
             private bool CanImportBindings()
             {
-                return holder?.action != null && holder.action.bindings.Count > 0;
+                return HasLiveTarget() && holder?.action != null && holder.action.bindings.Count > 0;
             }
 
             private InputAction BuildActionFromCurrentConfig()
             {
+                if (!HasLiveTarget())
+                    return new InputAction("临时动作", InputActionType.Button);
+
                 targetObject.Update();
                 SerializedProperty actionProperty = targetObject.FindProperty(actionPropertyPath);
                 if (actionProperty == null)
@@ -439,7 +548,7 @@ namespace ES.EditorInternal
 
             private void ImportAllBindings(bool clearOld)
             {
-                if (targetObject == null || holder?.action == null)
+                if (!HasLiveTarget() || holder?.action == null)
                     return;
 
                 targetObject.Update();
@@ -448,7 +557,13 @@ namespace ES.EditorInternal
                 if (bindingsProperty == null || !bindingsProperty.isArray)
                     return;
 
-                Undo.RecordObject(targetObject.targetObject, clearOld ? "覆盖 ES 输入绑定" : "追加 ES 输入绑定");
+                UnityEngine.Object[] targets = targetObject.targetObjects;
+                if (targets == null || targets.Length == 0)
+                    return;
+                for (int i = 0; i < targets.Length; i++)
+                    if (targets[i] == null)
+                        return;
+                Undo.RecordObjects(targets, clearOld ? "覆盖 ES 输入绑定" : "追加 ES 输入绑定");
 
                 if (clearOld)
                     bindingsProperty.ClearArray();
@@ -467,8 +582,33 @@ namespace ES.EditorInternal
                 }
 
                 targetObject.ApplyModifiedProperties();
-                EditorUtility.SetDirty(targetObject.targetObject);
+                foreach (UnityEngine.Object target in targets)
+                {
+                    EditorUtility.SetDirty(target);
+                    if (PrefabUtility.IsPartOfPrefabInstance(target))
+                        PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+                }
                 Close();
+            }
+
+            private bool HasLiveTarget()
+            {
+                if (targetObject == null || string.IsNullOrEmpty(actionPropertyPath))
+                    return false;
+                try
+                {
+                    UnityEngine.Object[] targets = targetObject.targetObjects;
+                    if (targets == null || targets.Length == 0)
+                        return false;
+                    for (int i = 0; i < targets.Length; i++)
+                        if (targets[i] == null)
+                            return false;
+                    return true;
+                }
+                catch
+                {
+                    return false;
+                }
             }
 
             private void DrawPreview()

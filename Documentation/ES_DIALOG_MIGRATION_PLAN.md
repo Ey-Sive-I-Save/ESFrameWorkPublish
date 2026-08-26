@@ -67,7 +67,7 @@ rg -n 'EditorUtility\.DisplayDialog(?:Complex)?\s*\(' Assets -g '*.cs'
 - Editor 窗口生命周期现在有声明式 `ESWindowSleepContract`：直接窗口必须标记
   `Full` 或 `Transient`，核心绑定入口会拒绝合同与 `allowSemiSleep` 不一致；对话框、进度、
   Popup、命令面板和临时输入窗口统一标记为 `Transient`，长生命周期工作台标记为 `Full`。
-- `ESWindowFoundation.EnsureStandardSystemActionBar` 为直接 IMGUI 长生命周期窗口提供正常流布局的显式 System 宿主；Shader 烘焙、SSU 迁移、Agent 候选审查、世界对话编辑器已改用该入口。
+- `ESWindowFoundation.EnsureStandardSystemActionBar` 为直接 IMGUI 长生命周期窗口提供正常流布局的显式 System 宿主；Shader 烘焙、ESNative 迁移、Agent 候选审查、世界对话编辑器已改用该入口。
 - `ESDialogRequest.Owner` 可携带明确宿主上下文；编辑器 presenter 优先使用它，迁移调用点不应继续依赖焦点/鼠标悬停猜测。
 - Editor presenter 不再从焦点或鼠标悬停窗口猜测 owner；缺失 owner 默认拒绝，只有调用方显式设置 `AllowMainWorkspaceFallback = true`（或高级请求的 `allowMainWorkspaceFallback = true`）时才允许落到主编辑器工作区，传入非 `EditorWindow` owner 会被拒绝。
 - `ESDialogRequest.CreateSnapshot()` 必须保留 `AllowMainWorkspaceFallback`；请求快照不能把已声明的 owner 例外静默清除。

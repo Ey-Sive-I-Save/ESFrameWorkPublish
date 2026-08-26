@@ -644,9 +644,9 @@ entries:
     authority: Current ES source/contracts + Unity 2022.3 package facts + bounded external source snapshots
     evidenceLevel: S0
     hashSchema: v2
-    contentHash: 0403ef069ff967998fcb540db6085e04dba8890fa9572352cd99a7ca1a9fa958
-    sourceSetHash: 0403ef069ff967998fcb540db6085e04dba8890fa9572352cd99a7ca1a9fa958
-    entryBodyHash: 77537b838581196412620a6aa63754213c3c3e4d3f0b82522941b61ecb3d2ec1
+    contentHash: 46fa4a23dff6f56fab8e5eaca3a5ae3abab39796ad292e8223a5403d0dabda5e
+    sourceSetHash: 46fa4a23dff6f56fab8e5eaca3a5ae3abab39796ad292e8223a5403d0dabda5e
+    entryBodyHash: 2be9ecdc77297c3be0191ced5e052504960d0c66103fa595f944694010bc22dc
     staleWhen: ScreenSpec schema、Validator、Adapter、Materializer、组件/素材注册、Unity/UGUI/Input System/TMP 版本、视觉证据合同、外部来源快照或任一 SourceRef 哈希变化。
   - knowledgeId: es.project.game-ui-request-intent-contract.v1
     file: entries/game-ui-request-intent-contract.md

@@ -5,7 +5,7 @@
 `RouteKeys`: `performance`, `runtime-hot-container`, `container-warmup`, `steady-state-gc`, `capacity-growth`, `pool`, `prewarm`, `profiler`, `run-record`, `evidence`, `zero-gc`  
 `RequiredReads`: 见“RequiredReads”  
 `RelatedSkills`: `es-ai-knowledge-curation`, `es-performance-budgeting`, `es-observability-evidence`, `es-first-principles-analysis`, `es-adversarial-review`, `es-use-ai-command`  
-`ContentHash`: `d5110365cc32a1dc4be2efd6055f363f6f4ed3fd51d3a9e80741dd5fde90d27f`
+`ContentHash`: `f7bd6fec4df06e31d68592bc9fe493238c09e8a8f9eed950b195dcf12f8b6454`
 `ContentHashMethod`: 所有 SourceRef 的实际 SHA-256 按哈希字符串升序无分隔拼接，再计算 UTF-8 SHA-256  
 `EvidenceLevel`: `S1`  
 `RuntimeStatus`: `runtime-not-run`  
@@ -318,7 +318,7 @@ Static S1 只能证明当前来源、合同、路由和哈希闭合，以及设�
 - `Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/对象池（Pool）/对象池预热_Space与0GC_AI协作警告.md` (`f88f17a86b2703c968ba19aefafacfc36b79c26c0b20d567dd0e69d10b7c25a3`)
 - `Assets/Plugins/ES/AIWarnings/30_运行时专项（RuntimeOperations）/对象池（Pool）/GameObject对象池_GameManager模块_AI协作警告.md` (`6beb3f9d18ebf505170695a06e52c0065a49c0fd7628a800853bc529f355a633`)
 - `Assets/Plugins/ES/AIWarnings/20_架构现状（Architecture）/跨系统核心语义（CoreSemantics）/ESAutomationCenter与受管Worker治理_AI协作警告.md` (`a33c17c739c6394096b8892bd3eb2497ff4f02b2ecd17fd86e14b4d7ce8c3306`)
-- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs` (`a636a42521eb8f13462455b726c7e06fe3211cd733e5c280092af0a45673e485`)
+- `Assets/Plugins/ES/Editor/ESAutomation/ESAutomationCenter.cs` (`6fc627e16930d541b1275bb5d687e1fdad8d96b751616002dbf2fbdbfa38fbc3`)
 - `Assets/Scripts/ESLogic/Runtime/GameManager/Modules/Runtime/MODULE_ESGameObjectPoolModule.cs` (`e5904b9119fed0902e25bb048a0c24682b4e372c0873e2637785a4355a53fe27`)
 - `.agents/skills/es-performance-budgeting/references/performance-budget-contract.md` (`d285bec3cfd0d86000bb828353c70b5b8bd26e498437f77dba9dd2568618ed6e`)
 - `.agents/skills/es-observability-evidence/references/evidence-receipt-contract.md` (`bc4aa4619224223ad566d13473a28ce2a3073aad7f5262c7890bc37b260a5c7f`)

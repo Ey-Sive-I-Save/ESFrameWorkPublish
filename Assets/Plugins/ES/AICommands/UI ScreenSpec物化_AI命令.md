@@ -1,5 +1,11 @@
 # UI ScreenSpec 物化 AI 命令
 
+## 必须先读
+
+- `.agents/skills/es-ui-prefab-authoring/SKILL.md`
+- `Documentation/AIKnowledge/AIBRAIN_ENTRY.md` 中命中的 UI 路由与 SourceRefs
+- 本命令全文及其绑定的 `es.ui.materialize-screen@1` TaskContract
+
 ## 直接生效协议
 
 当用户要求通过当前 Unity Editor 生成 UI Prefab、Fixture Scene 或视觉证据时，AI 必须：

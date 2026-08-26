@@ -11,6 +11,7 @@
 AIKnowledge 解决“针对一个任务挑选最小相关知识集合”的问题，而不是把整个项目压缩成一份总结。
 
 三态落地可用性评分规范见：[`tools/ESKnowledgeEffectivenessRubric.md`](tools/ESKnowledgeEffectivenessRubric.md)。
+本轮初步三态观察见：[`reports/knowledge-routing-quality-three-state-preliminary.md`](reports/knowledge-routing-quality-three-state-preliminary.md)；该报告不是正式验收证据。
 
 ## 使用理念：以落地决策为中心
 
